@@ -39,6 +39,8 @@ The seed file is the one source of truth for the fictional world. These parties 
 
 Norvia ran BizTalk Server 2016 for a decade to connect its TMS, WMS, ERP and a growing number of Carrier and Shipper EDI/API integrations. In 2024, a "modernize to Azure" initiative hired a contractor to migrate flows to Azure Integration Services. About 60% of the estate was migrated, the most valuable and fragile orchestrations first. Then the contractor's engagement ended and the initiative quietly stalled. BizTalk still runs the remaining 40% (mostly EDI/AS2 trading partner agreements), nobody is sure exactly which 40%, and the person who understood the whole picture is gone.
 
+BizTalk is part of Norvia's history, not of the sandbox. Nothing here runs or simulates it: every flow in the sandbox is one that has already been migrated to Azure.
+
 ## The as-found estate
 
 The sandbox can run in an *as-found* state, which reproduces the problems a health check would find, and each problem can be fixed one at a time:
@@ -63,3 +65,4 @@ The first slice of the sandbox can re-enact the first incident end to end: the C
 - Norvia runs a mixed fleet of its own Vehicles plus subcontracted Carriers.
 - Parties are named Shipper and Consignee rather than "customer".
 - Outside parties are played by the Partner portal.
+- BizTalk is not part of the sandbox.

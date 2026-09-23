@@ -6,7 +6,7 @@ Norvia runs a **mixed** operation: its own fleet handles regional and Benelux tr
 
 | # | Process | Trigger → outcome | Applies to | Main integrations | Status |
 |---|---|---|---|---|---|
-| P1 | Transport Order intake | Transport Order received (Shipper API, EDI via BizTalk, WMS handoff) → accepted or rejected | Both | APIM, BizTalk, WMS | Adopted |
+| P1 | Transport Order intake | Transport Order received (Shipper API, WMS handoff) → accepted or rejected | Both | APIM, WMS | Adopted |
 | P2 | Rating | Transport Order accepted → priced per Shipper contract | Both | ERP (contracts) | Adopted |
 | P3 | Transport planning | Accepted Transport Orders → consolidated into Shipments and assigned to own fleet or a Carrier | Both | — | Adopted |
 | P4 | Carrier booking | Shipment assigned to a Carrier → booking confirmed or rejected | Carrier | Carrier APIs/EDI | Adopted |
