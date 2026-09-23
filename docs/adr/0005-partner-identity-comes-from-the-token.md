@@ -1,0 +1,3 @@
+# Partner identity comes from the token
+
+Inbound partner calls to API Management carry both a subscription key (product and rate limiting) and an Entra JWT (identity and authorization). Every Partner portal persona is its own client app registration, granted only the app roles of the "Norvia Partner API" that its party needs. APIM validates the token for each operation and derives the partner's identity from the `azp` claim; a partner-supplied identifier in the payload is never trusted. The Partner portal gets each persona's token through federated credentials that trust its managed identity, so no client secrets exist.
