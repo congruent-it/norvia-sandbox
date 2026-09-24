@@ -53,5 +53,15 @@ public sealed class TransportOrderQueriesTests : IDisposable
         order.Should().BeNull();
     }
 
+    [Fact]
+    public async Task FindAsync_WhenTheQueryFails_ThrowsRatherThanSayingThereIsNone()
+    {
+        _mediator.Send(new GetTransportOrderQuery("TO-0000042"), Arg.Any<CancellationToken>()).Returns(Result<TransportOrderView>.Error("The query failed."));
+
+        var find = () => _queries.FindAsync("TO-0000042", Xunit.TestContext.Current.CancellationToken);
+
+        await find.Should().ThrowAsync<InvalidOperationException>();
+    }
+
     public void Dispose() => _services.Dispose();
 }

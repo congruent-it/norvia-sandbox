@@ -25,6 +25,11 @@ internal sealed class TransportOrderQueries(IServiceScopeFactory scopes) : ITran
         await using var scope = scopes.CreateAsyncScope();
         var result = await scope.ServiceProvider.GetRequiredService<IMediator>()
             .Send(new GetTransportOrderQuery(transportOrderNumber), cancellationToken);
-        return result.IsSuccess ? result.Value : null;
+        return result.Status switch
+        {
+            ResultStatus.Ok => result.Value,
+            ResultStatus.NotFound => null,
+            _ => throw new InvalidOperationException($"Reading Transport Order {transportOrderNumber} failed with {result.Status}."),
+        };
     }
 }

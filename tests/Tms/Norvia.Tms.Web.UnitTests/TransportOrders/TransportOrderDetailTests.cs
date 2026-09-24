@@ -7,14 +7,14 @@ namespace Norvia.Tms.Web.UnitTests.TransportOrders;
 public sealed class TransportOrderDetailTests : TmsWebContext
 {
     [Fact]
-    public void Render_AnAcceptedOrder_ShowsEverythingTheShipperSubmitted()
+    public void Render_AnAcceptedTransportOrder_ShowsEverythingTheShipperSubmitted()
     {
         Queries.FindAsync("TO-0000042", Arg.Any<CancellationToken>()).Returns(Samples.View("TO-0000042"));
 
         var page = RenderDetail("TO-0000042");
 
         page.WaitForAssertion(() => page.Find("h1").TextContent.Should().Be("Transport Order TO-0000042"));
-        Definitions(page, "Booking").Should().Equal(new Dictionary<string, string>
+        Definitions(page, "Transport Order").Should().Equal(new Dictionary<string, string>
         {
             ["Status"] = "Accepted",
             ["Shipper"] = "Brouwer Dranken",
@@ -41,7 +41,7 @@ public sealed class TransportOrderDetailTests : TmsWebContext
     }
 
     [Fact]
-    public void Render_AnOrderWithoutTheOptionalParts_SaysTheyWereNotGiven()
+    public void Render_ATransportOrderWithoutTheOptionalParts_SaysTheyWereNotGiven()
     {
         var view = Samples.View("TO-0000042");
         view = view with
@@ -61,7 +61,20 @@ public sealed class TransportOrderDetailTests : TmsWebContext
     }
 
     [Fact]
-    public void Render_BeforeTheOrderIsRead_ShowsLoading()
+    public void Render_ATransportOrderWithoutGoodsLines_SaysNoneWereGiven()
+    {
+        var view = Samples.View("TO-0000042");
+        Queries.FindAsync("TO-0000042", Arg.Any<CancellationToken>())
+            .Returns(view with { TransportOrder = view.TransportOrder with { GoodsLines = [] } });
+
+        var page = RenderDetail("TO-0000042");
+
+        page.WaitForAssertion(() => Section(page, "Goods").TextContent.Should().Contain("No goods lines were given."));
+        Section(page, "Goods").QuerySelectorAll("table").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Render_BeforeTheTransportOrderIsRead_ShowsLoading()
     {
         Queries.FindAsync("TO-0000042", Arg.Any<CancellationToken>())
             .Returns(new TaskCompletionSource<TransportOrderView?>().Task);
@@ -72,7 +85,7 @@ public sealed class TransportOrderDetailTests : TmsWebContext
     }
 
     [Fact]
-    public void Render_AnUnknownNumber_SaysThereIsNoSuchOrder()
+    public void Render_AnUnknownNumber_SaysThereIsNoSuchTransportOrder()
     {
         Queries.FindAsync("TO-0000999", Arg.Any<CancellationToken>()).Returns((TransportOrderView?)null);
 
@@ -84,7 +97,7 @@ public sealed class TransportOrderDetailTests : TmsWebContext
     }
 
     [Fact]
-    public void Render_WhenTheOrderCantBeRead_ShowsAnError()
+    public void Render_WhenTheTransportOrderCantBeRead_ShowsAnError()
     {
         Queries.FindAsync("TO-0000042", Arg.Any<CancellationToken>())
             .Returns<TransportOrderView?>(_ => throw new TimeoutException("The database didn't answer."));

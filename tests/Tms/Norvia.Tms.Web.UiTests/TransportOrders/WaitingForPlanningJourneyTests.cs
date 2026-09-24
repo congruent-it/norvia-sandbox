@@ -13,7 +13,7 @@ public sealed class WaitingForPlanningJourneyTests(TmsUiFixture tms) : BrowserPa
     private readonly TmsUiFixture _tms = tms;
 
     [Fact]
-    public async Task AnOrderAcceptedWhileTheListIsOpen_AppearsWithoutARefresh_AndOpensWithEverythingTheShipperSubmitted()
+    public async Task ATransportOrderAcceptedWhileTheListIsOpen_AppearsWithoutARefresh_AndOpensWithEverythingTheShipperSubmitted()
     {
         var shipperReference = $"UI-{Guid.NewGuid():N}"[..20];
         await Page.GotoAsync("/transport-orders");
@@ -30,7 +30,7 @@ public sealed class WaitingForPlanningJourneyTests(TmsUiFixture tms) : BrowserPa
         await row.GetByRole(AriaRole.Link, new() { Name = number }).ClickAsync();
 
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = $"Transport Order {number}", Level = 1 })).ToBeVisibleAsync();
-        await Expect(Region("Booking")).ToContainTextAsync(shipperReference);
+        await Expect(Region("Transport Order")).ToContainTextAsync(shipperReference);
         await Expect(Region("Collection")).ToContainTextAsync("Waalhaven Oostzijde 88, 3087 BM Rotterdam, NL");
         await Expect(Region("Delivery")).ToContainTextAsync("Café De Zwaan");
         await Expect(Region("Delivery")).ToContainTextAsync("Sanne de Vries");

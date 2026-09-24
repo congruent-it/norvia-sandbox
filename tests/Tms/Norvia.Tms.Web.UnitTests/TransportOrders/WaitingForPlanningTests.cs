@@ -6,7 +6,7 @@ namespace Norvia.Tms.Web.UnitTests.TransportOrders;
 public sealed class WaitingForPlanningTests : TmsWebContext
 {
     [Fact]
-    public void Render_BeforeTheOrdersAreRead_ShowsLoading()
+    public void Render_BeforeTheTransportOrdersAreRead_ShowsLoading()
     {
         var neverAnswered = new TaskCompletionSource<IReadOnlyList<TransportOrderSummary>>();
         Queries.ListWaitingForPlanningAsync(Arg.Any<CancellationToken>())
@@ -18,7 +18,7 @@ public sealed class WaitingForPlanningTests : TmsWebContext
     }
 
     [Fact]
-    public void Render_WithOrdersWaiting_ListsEachWithNumberShipperReferenceAndCollectionWindowInRotterdamTime()
+    public void Render_WithTransportOrdersWaiting_ListsEachWithNumberShipperReferenceAndCollectionWindowInRotterdamTime()
     {
         Queries.ListWaitingForPlanningAsync(Arg.Any<CancellationToken>()).Returns([Samples.Summary("TO-0000042", "BD-2026-0042")]);
 
@@ -30,7 +30,7 @@ public sealed class WaitingForPlanningTests : TmsWebContext
     }
 
     [Fact]
-    public void Render_WithNoOrdersWaiting_SaysSoInsteadOfAnEmptyTable()
+    public void Render_WithNoTransportOrdersWaiting_SaysSoInsteadOfAnEmptyTable()
     {
         Queries.ListWaitingForPlanningAsync(Arg.Any<CancellationToken>()).Returns([]);
 
@@ -42,7 +42,7 @@ public sealed class WaitingForPlanningTests : TmsWebContext
     }
 
     [Fact]
-    public void Render_WhenAnOrderIsAcceptedWhileTheListIsOpen_ShowsItWithoutARefresh()
+    public void Render_WhenATransportOrderIsAcceptedWhileTheListIsOpen_ShowsItWithoutARefresh()
     {
         Queries.ListWaitingForPlanningAsync(Arg.Any<CancellationToken>()).Returns(
             [Samples.Summary("TO-0000042")],
@@ -56,7 +56,7 @@ public sealed class WaitingForPlanningTests : TmsWebContext
     }
 
     [Fact]
-    public void Render_WhenTheOrdersCantBeRead_ShowsAnErrorAndTriesAgain()
+    public void Render_WhenTheTransportOrdersCantBeRead_ShowsAnErrorAndTriesAgain()
     {
         Queries.ListWaitingForPlanningAsync(Arg.Any<CancellationToken>()).Returns(
             _ => throw new TimeoutException("The database didn't answer."),
@@ -74,7 +74,7 @@ public sealed class WaitingForPlanningTests : TmsWebContext
     }
 
     [Fact]
-    public void Render_WhenARefreshFails_KeepsTheOrdersAlreadyShownAndWarnsTheyMayBeOutOfDate()
+    public void Render_WhenARefreshFails_KeepsTheTransportOrdersAlreadyShownAndWarnsTheyMayBeOutOfDate()
     {
         Queries.ListWaitingForPlanningAsync(Arg.Any<CancellationToken>()).Returns(
             _ => Task.FromResult<IReadOnlyList<TransportOrderSummary>>([Samples.Summary("TO-0000042")]),

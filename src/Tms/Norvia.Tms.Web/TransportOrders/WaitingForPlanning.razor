@@ -12,7 +12,7 @@
 
 <h1>Transport Orders waiting for planning</h1>
 
-@if (_list.Orders is not { } orders)
+@if (_list.TransportOrders is not { } transportOrders)
 {
     @if (_list.LastReadFailed)
     {
@@ -41,7 +41,7 @@ else
         </div>
     }
 
-    @if (orders.Count == 0)
+    @if (transportOrders.Count == 0)
     {
         <div role="status">
             <FluentMessageBar Intent="MessageIntent.Info" AllowDismiss="false">
@@ -51,13 +51,13 @@ else
     }
     else
     {
-        <FluentDataGrid Items="orders.AsQueryable()" TGridItem="TransportOrderSummary" aria-label="Transport Orders waiting for planning">
+        <FluentDataGrid Items="transportOrders.AsQueryable()" TGridItem="TransportOrderSummary" aria-label="Transport Orders waiting for planning">
             <TemplateColumn Title="Transport Order">
                 <a href="/transport-orders/@context.TransportOrderNumber">@context.TransportOrderNumber</a>
             </TemplateColumn>
-            <PropertyColumn Title="Shipper" Property="@(order => order.Shipper.Name ?? order.Shipper.Id)" />
-            <PropertyColumn Title="Shipper reference" Property="@(order => order.ShipperReference)" />
-            <PropertyColumn Title="Collection window" Property="@(order => NorviaTime.FormatWindow(order.CollectionEarliest, order.CollectionLatest))" />
+            <PropertyColumn Title="Shipper" Property="@(transportOrder => transportOrder.Shipper.Name ?? transportOrder.Shipper.Id)" />
+            <PropertyColumn Title="Shipper reference" Property="@(transportOrder => transportOrder.ShipperReference)" />
+            <PropertyColumn Title="Collection window" Property="@(transportOrder => NorviaTime.FormatWindow(transportOrder.CollectionEarliest, transportOrder.CollectionLatest))" />
         </FluentDataGrid>
     }
 }

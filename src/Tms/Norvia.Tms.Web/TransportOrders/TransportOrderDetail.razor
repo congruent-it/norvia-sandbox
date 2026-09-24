@@ -27,7 +27,7 @@ else if (!_loaded)
         <span>Loading Transport Order @TransportOrderNumber…</span>
     </FluentStack>
 }
-else if (_order is null)
+else if (_transportOrder is null)
 {
     <div role="status">
         <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
@@ -37,23 +37,23 @@ else if (_order is null)
 }
 else
 {
-    var submitted = _order.TransportOrder;
+    var submitted = _transportOrder.TransportOrder;
     var collection = submitted.Collection;
     var delivery = submitted.Delivery;
 
     <div class="detail-sections">
-        <TransportOrderSection Heading="Booking">
+        <TransportOrderSection Heading="Transport Order">
             <dl>
                 <dt>Status</dt>
-                <dd>@_order.Status</dd>
+                <dd>@_transportOrder.Status</dd>
                 <dt>Shipper</dt>
-                <dd>@(_order.Shipper.Name ?? _order.Shipper.Id)</dd>
+                <dd>@(_transportOrder.Shipper.Name ?? _transportOrder.Shipper.Id)</dd>
                 <dt>Shipper reference</dt>
                 <dd>@Given(submitted.ShipperReference)</dd>
                 <dt>Received</dt>
-                <dd>@NorviaTime.Format(_order.ReceivedAt)</dd>
+                <dd>@NorviaTime.Format(_transportOrder.ReceivedAt)</dd>
                 <dt>Correlation ID</dt>
-                <dd>@_order.CorrelationId</dd>
+                <dd>@_transportOrder.CorrelationId</dd>
             </dl>
         </TransportOrderSection>
 
@@ -85,12 +85,19 @@ else
     </div>
 
     <TransportOrderSection Heading="Goods">
-        <FluentDataGrid Items="(submitted.GoodsLines ?? []).AsQueryable()" TGridItem="CanonicalGoodsLine" aria-label="Goods lines">
-            <PropertyColumn Title="Package type" Property="@(line => Given(line.PackageType))" />
-            <PropertyColumn Title="Quantity" Property="@(line => FormatNumber(line.Quantity))" />
-            <PropertyColumn Title="Weight (kg)" Property="@(line => FormatNumber(line.WeightKg))" />
-            <PropertyColumn Title="Dimensions (cm, L × W × H)" Property="@(line => FormatDimensions(line.DimensionsCm))" />
-        </FluentDataGrid>
+        @if (submitted.GoodsLines is not { Count: > 0 } goodsLines)
+        {
+            <p>No goods lines were given.</p>
+        }
+        else
+        {
+            <FluentDataGrid Items="goodsLines.AsQueryable()" TGridItem="CanonicalGoodsLine" aria-label="Goods lines">
+                <PropertyColumn Title="Package type" Property="@(line => Given(line.PackageType))" />
+                <PropertyColumn Title="Quantity" Property="@(line => FormatNumber(line.Quantity))" />
+                <PropertyColumn Title="Weight (kg)" Property="@(line => FormatNumber(line.WeightKg))" />
+                <PropertyColumn Title="Dimensions (cm, L × W × H)" Property="@(line => FormatDimensions(line.DimensionsCm))" />
+            </FluentDataGrid>
+        }
     </TransportOrderSection>
 
     <TransportOrderSection Heading="Instructions">
@@ -102,7 +109,7 @@ else
     private bool _loaded;
     private bool _failed;
     private readonly CancellationTokenSource _closed = new();
-    private TransportOrderView? _order;
+    private TransportOrderView? _transportOrder;
 
     [Parameter, EditorRequired]
     public string TransportOrderNumber { get; set; } = string.Empty;
@@ -110,11 +117,15 @@ else
     protected override async Task OnParametersSetAsync()
     {
         _loaded = _failed = false;
-        _order = null;
+        _transportOrder = null;
         try
         {
-            _order = await Queries.FindAsync(TransportOrderNumber, _closed.Token);
+            _transportOrder = await Queries.FindAsync(TransportOrderNumber, _closed.Token);
             _loaded = true;
+        }
+        catch (OperationCanceledException) when (_closed.IsCancellationRequested)
+        {
+            // The page closed while it was reading.
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
