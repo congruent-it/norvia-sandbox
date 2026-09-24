@@ -40,7 +40,8 @@ public static class DependencyInjection
         builder.Services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
         builder.Services.AddScoped(typeof(IReadRepository<>), typeof(EfRepository<>));
         builder.Services.AddScoped<IDomainEventDispatcher, MediatorDomainEventDispatcher>();
-        builder.Services.AddScoped<IOutbox, EfOutbox>();
+        builder.Services.AddScoped<OutboxBuffer>();
+        builder.Services.AddScoped<IOutbox>(services => services.GetRequiredService<OutboxBuffer>());
         builder.Services.AddScoped<ITransportOrderNumbers, SqlTransportOrderNumbers>();
         builder.Services.AddSingleton<IShipperDirectory, SeedFileShipperDirectory>();
         builder.Services.AddHostedService<OutboxPublisher>();

@@ -168,10 +168,11 @@ A key that doesn't apply is left out, never sent empty.
 ## 9. Web applications: Blazor
 
 - Web UIs **must** be built with Blazor (Blazor Web App template). Choose the render mode per page or component: static SSR by default, Interactive Server where interactivity is needed, and WebAssembly only with a stated reason.
+- UI components **must** come from the Fluent UI Blazor library (`Microsoft.FluentUI.AspNetCore.Components`): layout, navigation, data grids, forms, dialogs and messages. Write a component of your own only when Fluent UI has nothing that fits, and build it from Fluent UI components and design tokens so every application looks the same. Don't add another component library or CSS framework.
 - Components render and handle UI events. Business rules stay in the domain; data access goes through application services or typed API clients, never a `DbContext` in a component.
 - Keep components small. Split a component when it has more than one reason to change; move logic that is not about rendering into a plain C# class that can be unit tested.
 - Use `[EditorRequired]` on parameters a component cannot work without.
-- Use `EditForm` with a validator for forms; show validation messages next to the field.
+- Use `EditForm` with a validator and Fluent UI input components for forms; show validation messages next to the field.
 - Build for accessibility: semantic HTML, labels on every input, keyboard-operable controls. Playwright tests locate elements by role and label, so accessible markup is also testable markup.
 - Add `data-testid` attributes only where no role or label identifies an element uniquely.
 - Handle loading, empty and error states explicitly in every component that fetches data.

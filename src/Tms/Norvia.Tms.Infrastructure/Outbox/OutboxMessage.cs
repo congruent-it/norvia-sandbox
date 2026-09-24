@@ -1,7 +1,11 @@
+using System.Text.Json;
+using Ardalis.SharedKernel;
+using Norvia.Tms.Application.IntegrationEvents;
+
 namespace Norvia.Tms.Infrastructure.Outbox;
 
 /// <summary>An integration event waiting to be published, stored in the same transaction as the change that caused it.</summary>
-public sealed class OutboxMessage
+internal sealed class OutboxMessage : IAggregateRoot
 {
     public long Id { get; private set; }
 
@@ -23,4 +27,19 @@ public sealed class OutboxMessage
     public DateTimeOffset? PublishedAt { get; private set; }
 
     public void MarkPublished(DateTimeOffset publishedAt) => PublishedAt = publishedAt;
+
+    public static OutboxMessage From(IntegrationEvent integrationEvent, DateTimeOffset createdAt)
+    {
+        ArgumentNullException.ThrowIfNull(integrationEvent);
+        return new OutboxMessage
+        {
+            EventId = integrationEvent.EventId,
+            Topic = integrationEvent.Topic,
+            EventType = integrationEvent.EventType,
+            CorrelationId = integrationEvent.CorrelationId,
+            Body = JsonSerializer.Serialize(integrationEvent, integrationEvent.GetType(), IntegrationEventJson.Options),
+            ApplicationProperties = JsonSerializer.Serialize(integrationEvent.ApplicationProperties, IntegrationEventJson.Options),
+            CreatedAt = createdAt,
+        };
+    }
 }

@@ -1,20 +1,17 @@
 using Ardalis.SharedKernel;
 using Microsoft.EntityFrameworkCore;
-using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Infrastructure.Outbox;
 
 namespace Norvia.Tms.Infrastructure.Data;
 
-public sealed class TmsDbContext(DbContextOptions<TmsDbContext> options, IDomainEventDispatcher dispatcher) : DbContext(options)
+internal sealed class TmsDbContext(DbContextOptions<TmsDbContext> options, IDomainEventDispatcher dispatcher, OutboxBuffer outbox)
+    : DbContext(options)
 {
     public const string TransportOrderNumberSequence = "TransportOrderNumbers";
 
-    public DbSet<TransportOrder> TransportOrders => Set<TransportOrder>();
-
-    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
-
-    // Domain events are handled before the commit, so whatever their handlers add (outbox messages above all) is
-    // saved in the same transaction as the change that raised them.
+    // Domain events are handled before the commit, and the integration events their handlers raise are saved as
+    // outbox messages in the same transaction as the change that raised them. Everything else works with data
+    // through the repositories.
     public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
         var withEvents = ChangeTracker.Entries<HasDomainEventsBase>()
@@ -22,6 +19,7 @@ public sealed class TmsDbContext(DbContextOptions<TmsDbContext> options, IDomain
             .Where(entity => entity.DomainEvents.Count > 0)
             .ToArray();
         await dispatcher.DispatchAndClearEvents(withEvents);
+        AddRange(outbox.TakePending());
 
         return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }

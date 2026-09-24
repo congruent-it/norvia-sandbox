@@ -1,0 +1,128 @@
+# The pull request gates of coding guidelines §11 (and the vulnerable-package check of §8), run on every PR and on main.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+  CONFIGURATION: Release
+
+jobs:
+  build:
+    name: Build, format, unit and architecture tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('global.json', 'Directory.Packages.props', '**/*.csproj', 'dotnet-tools.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: |
+          dotnet tool restore
+          dotnet restore Norvia.slnx
+
+      # Warnings are errors (Directory.Build.props), so a clean build is also the "no warnings" gate.
+      - name: Build
+        run: dotnet build Norvia.slnx --no-restore --configuration "$CONFIGURATION"
+
+      - name: Check formatting
+        run: dotnet format Norvia.slnx --no-restore --verify-no-changes
+
+      - name: Check for vulnerable packages
+        run: |
+          dotnet package list --project Norvia.slnx --vulnerable --include-transitive --format json > vulnerable-packages.json
+          vulnerable=$(jq -r '[.projects[].frameworks[]? | (.topLevelPackages // [])[], (.transitivePackages // [])[]
+            | "\(.id) \(.resolvedVersion): \([.vulnerabilities[].severity] | join(", "))"] | unique | .[]' vulnerable-packages.json)
+          if [ -n "$vulnerable" ]; then
+            echo "::error::Vulnerable packages found"
+            echo "$vulnerable"
+            exit 1
+          fi
+
+      # Each unit test project enforces the 80% line coverage threshold itself (Directory.Build.props).
+      - name: Unit and architecture tests
+        run: |
+          failed=0
+          for project in $(find tests -name '*.UnitTests.csproj' -o -name '*.ArchitectureTests.csproj' | sort); do
+            dotnet test "$project" --no-build --configuration "$CONFIGURATION" \
+              --logger trx --results-directory TestResults || failed=1
+          done
+          exit $failed
+
+      - name: Coverage summary
+        if: always()
+        run: |
+          if find tests -name coverage.cobertura.xml | grep -q .; then
+            dotnet reportgenerator -reports:"tests/**/coverage.cobertura.xml" -targetdir:TestResults/coverage \
+              -reporttypes:"MarkdownSummaryGithub;Cobertura"
+            cat TestResults/coverage/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-test-results
+          path: TestResults/
+          if-no-files-found: ignore
+
+  integration:
+    name: Integration tests (Aspire, SQL Server, Service Bus emulator)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('global.json', 'Directory.Packages.props', '**/*.csproj', 'dotnet-tools.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Build
+        run: dotnet build Norvia.slnx --configuration "$CONFIGURATION"
+
+      # The test host starts the AppHost, which runs SQL Server and the Service Bus emulator in Docker.
+      - name: Integration tests
+        env:
+          NORVIA_TEST_LOG_FILE: ${{ github.workspace }}/TestResults/tms-api.log
+        run: |
+          mkdir -p TestResults
+          failed=0
+          for project in $(find tests -name '*.IntegrationTests.csproj' | sort); do
+            dotnet test "$project" --no-build --configuration "$CONFIGURATION" \
+              --logger trx --results-directory TestResults || failed=1
+          done
+          exit $failed
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-test-results
+          path: TestResults/
+          if-no-files-found: ignore

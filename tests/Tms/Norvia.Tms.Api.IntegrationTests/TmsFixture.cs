@@ -29,6 +29,12 @@ public sealed class TmsFixture : IAsyncLifetime
 
     public IEnumerable<ServiceBusReceivedMessage> Published => _published;
 
+    /// <summary>The links the Aspire dashboard shows for the TMS API.</summary>
+    public IReadOnlyList<Uri> TmsDashboardUrls =>
+        _app!.ResourceNotifications.TryGetCurrentState("tms-api", out var state)
+            ? [.. state.Snapshot.Urls.Select(url => new Uri(url.Url))]
+            : [];
+
     public async ValueTask InitializeAsync()
     {
         using var startup = new CancellationTokenSource(StartupTimeout);

@@ -4,6 +4,7 @@ using Norvia.Tms.Api.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.Submit;
 using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Infrastructure;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,12 +25,18 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.RespectNullableAnnotations = true;
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
-builder.Services.AddApiVersioning(options =>
-{
-    options.DefaultApiVersion = new ApiVersion(1);
-    options.ApiVersionReader = new UrlSegmentApiVersionReader();
-});
-builder.Services.AddOpenApi();
+builder.Services
+    .AddApiVersioning(options =>
+    {
+        options.DefaultApiVersion = new ApiVersion(1);
+        options.ApiVersionReader = new UrlSegmentApiVersionReader();
+    })
+    .AddApiExplorer(options =>
+    {
+        options.GroupNameFormat = "'v'V";
+        options.SubstituteApiVersionInUrl = true;
+    })
+    .AddOpenApi();
 
 var app = builder.Build();
 
@@ -42,7 +49,12 @@ app.UseExceptionHandler(new ExceptionHandlerOptions
 });
 app.UseStatusCodePages();
 
-app.MapOpenApi();
+// API Management imports the OpenAPI document (coding guidelines §6), so it's published in every environment.
+app.MapOpenApi().WithDocumentPerVersion();
+if (app.Environment.IsDevelopment())
+{
+    app.MapScalarApiReference(options => options.WithTitle("Norvia TMS API"));
+}
 app.MapDefaultEndpoints();
 app.MapTransportOrders();
 

@@ -41,7 +41,7 @@ Every concept has one system of record ([ADR 0002](docs/adr/0002-one-system-of-r
 
 ## Tech stack
 
-.NET 10 with Clean Architecture, EF Core with Ardalis repositories and specifications, Minimal APIs, and Blazor for web UIs. Tests use xUnit, NSubstitute, bUnit, Testcontainers and Playwright, with an 80% line coverage gate on unit tests. The Azure side is API Management, Logic Apps, Service Bus, Key Vault, Entra ID, Application Insights and Container Apps. See [docs/coding-guidelines.md](docs/coding-guidelines.md) for the full rules.
+.NET 10 with Clean Architecture, EF Core with Ardalis repositories and specifications, Minimal APIs, and Blazor with Fluent UI components for web UIs. Tests use xUnit, NSubstitute, bUnit, Testcontainers and Playwright, with an 80% line coverage gate on unit tests. The Azure side is API Management, Logic Apps, Service Bus, Key Vault, Entra ID, Application Insights and Container Apps. See [docs/coding-guidelines.md](docs/coding-guidelines.md) for the full rules.
 
 ## Running it locally
 
@@ -60,6 +60,8 @@ dotnet test Norvia.slnx                      # unit, architecture and integratio
 | [seed/norvia.seed.json](seed/norvia.seed.json) | The seed file: the one source of Shippers, Carriers and Personas |
 
 Set `NORVIA_TEST_LOG_FILE` to a path to keep the TMS's own logs from an integration test run.
+
+CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the pull request gates of the coding guidelines on every PR and on `main`: a warning-free build, `dotnet format`, the vulnerable-package check, unit and architecture tests with the coverage gate, and the integration tests.
 
 ## Contributing
 

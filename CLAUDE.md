@@ -16,4 +16,4 @@ Single-context: a root `CONTEXT.md` and `docs/adr/`. See `docs/agents/domain.md`
 
 ## Coding guidelines
 
-All .NET code and tests follow `docs/coding-guidelines.md`: Clean Architecture (dependencies point inwards, enforced by architecture tests), Ardalis repositories and specifications for data access, Blazor for web apps, xUnit + NSubstitute for unit tests (at least 80% line coverage), and Playwright for UI tests. The tracking contract in §7 also applies to APIM policies, Logic Apps and Service Bus subscriptions.
+All .NET code and tests follow `docs/coding-guidelines.md`: Clean Architecture (dependencies point inwards, enforced by architecture tests), Ardalis repositories and specifications for data access, Blazor with Fluent UI components for web apps, xUnit + NSubstitute for unit tests (at least 80% line coverage), and Playwright for UI tests. The tracking contract in §7 also applies to APIM policies, Logic Apps and Service Bus subscriptions.

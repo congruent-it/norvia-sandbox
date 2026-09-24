@@ -1,11 +1,10 @@
 using System.Text.Json;
+using Ardalis.SharedKernel;
 using Azure.Messaging.ServiceBus;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Norvia.Tms.Infrastructure.Data;
 
 namespace Norvia.Tms.Infrastructure.Outbox;
 
@@ -51,19 +50,15 @@ internal sealed partial class OutboxPublisher(
     private async Task PublishPendingAsync(CancellationToken cancellationToken)
     {
         await using var scope = scopes.CreateAsyncScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<TmsDbContext>();
+        var outboxMessages = scope.ServiceProvider.GetRequiredService<IRepository<OutboxMessage>>();
 
-        var pending = await dbContext.OutboxMessages
-            .Where(message => message.PublishedAt == null)
-            .OrderBy(message => message.Id)
-            .Take(options.Value.BatchSize)
-            .ToListAsync(cancellationToken);
+        var pending = await outboxMessages.ListAsync(new UnpublishedOutboxMessagesSpec(options.Value.BatchSize), cancellationToken);
 
         foreach (var message in pending)
         {
             await SenderFor(message.Topic).SendMessageAsync(ToServiceBusMessage(message), cancellationToken);
             message.MarkPublished(time.GetUtcNow());
-            await dbContext.SaveChangesAsync(cancellationToken);
+            await outboxMessages.UpdateAsync(message, cancellationToken);
             LogPublished(message.EventType, message.EventId, message.CorrelationId);
         }
     }
