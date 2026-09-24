@@ -1,0 +1,15 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.5.4">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <UserSecretsId>norvia-sandbox-apphost</UserSecretsId>
+    <!-- The AppHost runs with dotnet run and the test host; the Aspire CLI bundle is optional. -->
+    <NoWarn>$(NoWarn);ASPIRE010</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Azure.ServiceBus" />
+    <PackageReference Include="Aspire.Hosting.SqlServer" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Tms\Norvia.Tms.Api\Norvia.Tms.Api.csproj" />
+  </ItemGroup>
+</Project>

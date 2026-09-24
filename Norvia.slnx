@@ -1,0 +1,19 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Norvia.AppHost/Norvia.AppHost.csproj" />
+    <Project Path="src/Norvia.ServiceDefaults/Norvia.ServiceDefaults.csproj" />
+  </Folder>
+  <Folder Name="/src/Tms/">
+    <Project Path="src/Tms/Norvia.Tms.Api/Norvia.Tms.Api.csproj" />
+    <Project Path="src/Tms/Norvia.Tms.Application/Norvia.Tms.Application.csproj" />
+    <Project Path="src/Tms/Norvia.Tms.Domain/Norvia.Tms.Domain.csproj" />
+    <Project Path="src/Tms/Norvia.Tms.Infrastructure/Norvia.Tms.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/" />
+  <Folder Name="/tests/Tms/">
+    <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests/Norvia.Tms.Api.IntegrationTests.csproj" />
+    <Project Path="tests/Tms/Norvia.Tms.Application.UnitTests/Norvia.Tms.Application.UnitTests.csproj" />
+    <Project Path="tests/Tms/Norvia.Tms.ArchitectureTests/Norvia.Tms.ArchitectureTests.csproj" />
+    <Project Path="tests/Tms/Norvia.Tms.Domain.UnitTests/Norvia.Tms.Domain.UnitTests.csproj" />
+  </Folder>
+</Solution>

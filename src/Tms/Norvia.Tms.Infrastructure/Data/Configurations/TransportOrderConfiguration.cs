@@ -1,0 +1,57 @@
+using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Norvia.Tms.Domain.Shippers;
+using Norvia.Tms.Domain.TransportOrders;
+
+namespace Norvia.Tms.Infrastructure.Data.Configurations;
+
+internal sealed class TransportOrderConfiguration : IEntityTypeConfiguration<TransportOrder>
+{
+    private static readonly JsonSerializerOptions DetailsJson = new(JsonSerializerDefaults.Web);
+
+    public void Configure(EntityTypeBuilder<TransportOrder> builder)
+    {
+        builder.ToTable("TransportOrders");
+        builder.Ignore(order => order.DomainEvents);
+
+        builder.HasKey(order => order.Id);
+        builder.Property(order => order.Id)
+            .HasConversion(id => id.Value, value => new TransportOrderId(value))
+            .ValueGeneratedNever();
+
+        builder.Property(order => order.Number)
+            .HasConversion(number => number.Value, value => TransportOrderNumber.Parse(value))
+            .HasMaxLength(10)
+            .IsRequired();
+        builder.HasIndex(order => order.Number).IsUnique();
+
+        builder.Property(order => order.ShipperId)
+            .HasConversion(id => id.Value, value => new ShipperId(value))
+            .HasMaxLength(50)
+            .IsRequired();
+
+        builder.Property(order => order.Status)
+            .HasConversion<string>()
+            .HasMaxLength(20);
+        builder.HasIndex(order => new { order.Status, order.ReceivedAt });
+
+        builder.Property(order => order.CorrelationId)
+            .HasConversion(id => id.Value, value => new CorrelationId(value))
+            .HasMaxLength(128)
+            .IsRequired();
+
+        // What the Shipper submitted is kept whole, as one JSON document: it's only ever read back as a whole.
+        builder.Property(order => order.Details)
+            .HasConversion(
+                details => JsonSerializer.Serialize(details, DetailsJson),
+                json => JsonSerializer.Deserialize<TransportOrderDetails>(json, DetailsJson)!,
+                new ValueComparer<TransportOrderDetails>(
+                    (left, right) => Equals(left, right),
+                    details => details.GetHashCode(),
+                    details => details))
+            .HasColumnName("Details")
+            .IsRequired();
+    }
+}

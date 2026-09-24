@@ -1,0 +1,90 @@
+using Ardalis.Result;
+using Ardalis.SharedKernel;
+using Norvia.Tms.Application.CanonicalModel;
+using Norvia.Tms.Application.Shippers;
+using Norvia.Tms.Application.TransportOrders;
+using Norvia.Tms.Application.TransportOrders.GetByNumber;
+using Norvia.Tms.Application.TransportOrders.List;
+using Norvia.Tms.Domain.Shippers;
+using Norvia.Tms.Domain.TransportOrders;
+using NSubstitute;
+
+namespace Norvia.Tms.Application.UnitTests.TransportOrders;
+
+public sealed class TransportOrderQueryTests
+{
+    private readonly IReadRepository<TransportOrder> _repository = Substitute.For<IReadRepository<TransportOrder>>();
+    private readonly IShipperDirectory _shippers = Substitute.For<IShipperDirectory>();
+
+    public TransportOrderQueryTests()
+    {
+        _shippers.Find(new ShipperId("SHP-0001")).Returns(new Shipper(new ShipperId("SHP-0001"), "Brouwer Dranken", true));
+    }
+
+    [Fact]
+    public async Task Get_KnownNumber_ReturnsTheTransportOrderWithItsShipper()
+    {
+        var order = Samples.AcceptedOrder(sequence: 5);
+        _repository.FirstOrDefaultAsync(Arg.Is<TransportOrderByNumberSpec>(s => s.Number.Value == "TO-0000005"), Arg.Any<CancellationToken>())
+            .Returns(order);
+
+        var result = await new GetTransportOrderHandler(_repository, _shippers).Handle(new GetTransportOrderQuery("TO-0000005"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().BeEquivalentTo(new TransportOrderView(
+            "TO-0000005",
+            TransportOrderStatus.Accepted,
+            new ShipperView("SHP-0001", "Brouwer Dranken"),
+            "corr-1",
+            Samples.Now,
+            CanonicalTransportOrder.From(order)));
+    }
+
+    [Fact]
+    public async Task Get_UnknownNumber_ReturnsNotFound()
+    {
+        var result = await new GetTransportOrderHandler(_repository, _shippers).Handle(new GetTransportOrderQuery("TO-0000099"), CancellationToken.None);
+
+        result.Status.Should().Be(ResultStatus.NotFound);
+    }
+
+    [Fact]
+    public async Task Get_MalformedNumber_ReturnsNotFound()
+    {
+        var result = await new GetTransportOrderHandler(_repository, _shippers).Handle(new GetTransportOrderQuery("42"), CancellationToken.None);
+
+        result.Status.Should().Be(ResultStatus.NotFound);
+    }
+
+    [Fact]
+    public async Task List_ByStatus_ReturnsSummariesInTheOrderTheyWereReceived()
+    {
+        var first = Samples.AcceptedOrder(sequence: 1);
+        var second = Samples.AcceptedOrder(sequence: 2);
+        _repository.ListAsync(Arg.Is<TransportOrdersByStatusSpec>(s => s.Status == TransportOrderStatus.Accepted), Arg.Any<CancellationToken>())
+            .Returns([first, second]);
+
+        var summaries = await new ListTransportOrdersHandler(_repository, _shippers).Handle(new ListTransportOrdersQuery(TransportOrderStatus.Accepted), CancellationToken.None);
+
+        summaries.Select(s => s.TransportOrderNumber).Should().Equal("TO-0000001", "TO-0000002");
+        summaries[0].Should().BeEquivalentTo(new TransportOrderSummary(
+            "TO-0000001",
+            TransportOrderStatus.Accepted,
+            new ShipperView("SHP-0001", "Brouwer Dranken"),
+            "BD-2026-0001",
+            Samples.Now.AddDays(1),
+            Samples.Now.AddDays(1).AddHours(4),
+            Samples.Now));
+    }
+
+    [Fact]
+    public async Task List_ShipperNotInSeed_ShowsTheShipperIdWithoutAName()
+    {
+        _shippers.Find(Arg.Any<ShipperId>()).Returns((Shipper?)null);
+        _repository.ListAsync(Arg.Any<TransportOrdersByStatusSpec>(), Arg.Any<CancellationToken>()).Returns([Samples.AcceptedOrder()]);
+
+        var summaries = await new ListTransportOrdersHandler(_repository, _shippers).Handle(new ListTransportOrdersQuery(TransportOrderStatus.Accepted), CancellationToken.None);
+
+        summaries.Single().Shipper.Should().Be(new ShipperView("SHP-0001", null));
+    }
+}

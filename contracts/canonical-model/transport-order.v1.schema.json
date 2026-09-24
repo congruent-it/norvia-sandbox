@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/transport-order.v1.schema.json",
+  "title": "TransportOrder",
+  "description": "A Shipper's instruction for Norvia to move goods from an origin to a destination (Canonical Model, version 1). The schema fixes the shape and the units; which fields a booking must fill in, and the values they may take, are Transport Order rules the TMS checks so it can report every failure with its own code.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["shipperId"],
+  "properties": {
+    "transportOrderNumber": {
+      "description": "Assigned by the TMS on acceptance. Never sent on submission; always present on published events.",
+      "type": "string",
+      "pattern": "^TO-[0-9]{7}$"
+    },
+    "shipperId": {
+      "description": "The Shipper, as derived by the integration layer from the partner's token (ADR 0005). Never taken from a partner payload.",
+      "type": "string",
+      "minLength": 1
+    },
+    "shipperReference": {
+      "description": "The Shipper's own reference for the booking. Unique per Shipper.",
+      "type": ["string", "null"]
+    },
+    "collection": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "address": { "$ref": "#/$defs/address" },
+        "window": { "$ref": "#/$defs/timeWindow" }
+      }
+    },
+    "delivery": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "address": { "$ref": "#/$defs/address" },
+        "consignee": { "$ref": "#/$defs/consignee" },
+        "window": { "$ref": "#/$defs/timeWindow" }
+      }
+    },
+    "goodsLines": {
+      "type": ["array", "null"],
+      "items": { "$ref": "#/$defs/goodsLine" }
+    },
+    "instructions": {
+      "description": "Free text for anything the structured fields don't cover.",
+      "type": ["string", "null"]
+    }
+  },
+  "$defs": {
+    "address": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "street": { "type": ["string", "null"] },
+        "postcode": { "type": ["string", "null"] },
+        "city": { "type": ["string", "null"] },
+        "country": {
+          "description": "ISO 3166-1 alpha-2 country code.",
+          "type": ["string", "null"],
+          "pattern": "^[A-Z]{2}$"
+        }
+      }
+    },
+    "timeWindow": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "earliest": { "description": "UTC timestamp with offset.", "type": ["string", "null"], "format": "date-time" },
+        "latest": { "description": "UTC timestamp with offset.", "type": ["string", "null"], "format": "date-time" }
+      }
+    },
+    "consignee": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": ["string", "null"] },
+        "contactName": { "type": ["string", "null"] },
+        "phone": { "type": ["string", "null"] },
+        "email": { "type": ["string", "null"] }
+      }
+    },
+    "goodsLine": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "packageType": {
+          "description": "One of pallet, parcel, crate or loose.",
+          "type": ["string", "null"]
+        },
+        "quantity": { "type": ["integer", "null"] },
+        "weightKg": { "description": "Weight of the whole line in kilograms.", "type": ["number", "null"] },
+        "dimensionsCm": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "length": { "type": ["number", "null"] },
+            "width": { "type": ["number", "null"] },
+            "height": { "type": ["number", "null"] }
+          }
+        }
+      }
+    }
+  }
+}

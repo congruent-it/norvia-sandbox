@@ -1,0 +1,56 @@
+{
+  "$comment": "The one source of truth for Norvia's fictional world (SCENARIO.md). Applications load their read copies of master data from here until the ERP sync exists.",
+  "shippers": [
+    {
+      "id": "SHP-0001",
+      "name": "Brouwer Dranken",
+      "active": true,
+      "addresses": [
+        {
+          "label": "Brouwer Dranken warehouse",
+          "street": "Waalhaven Oostzijde 88",
+          "postcode": "3087 BM",
+          "city": "Rotterdam",
+          "country": "NL"
+        },
+        {
+          "label": "Café De Zwaan",
+          "street": "Oudegracht 112",
+          "postcode": "3511 AW",
+          "city": "Utrecht",
+          "country": "NL",
+          "consignee": { "name": "Café De Zwaan", "contactName": "Sanne de Vries", "phone": "+31 30 555 0142" }
+        },
+        {
+          "label": "Getränke Schmitz",
+          "street": "Kölner Landstraße 301",
+          "postcode": "40591",
+          "city": "Düsseldorf",
+          "country": "DE",
+          "consignee": { "name": "Getränke Schmitz GmbH", "contactName": "Jonas Schmitz", "phone": "+49 211 555 0190" }
+        }
+      ]
+    }
+  ],
+  "carriers": [
+    {
+      "id": "CAR-0001",
+      "name": "Van Dijk Transport",
+      "active": true
+    }
+  ],
+  "personas": [
+    {
+      "id": "brouwer-dranken",
+      "displayName": "Brouwer Dranken",
+      "party": { "type": "Shipper", "id": "SHP-0001" },
+      "clientAppRegistration": "norvia-persona-brouwer-dranken"
+    },
+    {
+      "id": "van-dijk-transport",
+      "displayName": "Van Dijk Transport",
+      "party": { "type": "Carrier", "id": "CAR-0001" },
+      "clientAppRegistration": "norvia-persona-van-dijk-transport"
+    }
+  ]
+}

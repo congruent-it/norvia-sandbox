@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/transport-order-accepted.v1.schema.json",
+  "title": "TransportOrderAccepted",
+  "description": "The TMS accepted a Transport Order (Canonical Model event, version 1). Published on the Transport Order events topic.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "transportOrderNumber", "transportOrder"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "const": "TransportOrderAccepted" },
+    "eventVersion": { "const": 1 },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "correlationId": { "type": "string", "minLength": 1 },
+    "transportOrderNumber": { "type": "string", "pattern": "^TO-[0-9]{7}$" },
+    "transportOrder": {
+      "allOf": [
+        { "$ref": "transport-order.v1.schema.json" },
+        { "required": ["transportOrderNumber"] }
+      ]
+    }
+  }
+}

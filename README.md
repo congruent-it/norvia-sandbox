@@ -4,7 +4,7 @@ A working integration estate for a fictional company, **Norvia Logistics B.V.**,
 
 The estate can also run *as found*, reproducing the problems a health check would find (a missing dead-letter alert, a mapping that can't handle a Carrier status, marketplace orders routed to the wrong system), and fixing them one at a time.
 
-> **Status:** design phase. The domain model, decisions and business processes are documented. No application code or infrastructure has been committed yet. The first build is one thin end-to-end slice through the TMS.
+> **Status:** first build. The TMS takes in a Transport Order through its intake API and publishes `TransportOrderAccepted`, running locally under Aspire. The rest of P1 (validation, the Logic App, API Management, the Partner portal and the Azure estate) follows in the tickets under GitHub issue #1.
 
 ## Start here
 
@@ -42,6 +42,24 @@ Every concept has one system of record ([ADR 0002](docs/adr/0002-one-system-of-r
 ## Tech stack
 
 .NET 10 with Clean Architecture, EF Core with Ardalis repositories and specifications, Minimal APIs, and Blazor for web UIs. Tests use xUnit, NSubstitute, bUnit, Testcontainers and Playwright, with an 80% line coverage gate on unit tests. The Azure side is API Management, Logic Apps, Service Bus, Key Vault, Entra ID, Application Insights and Container Apps. See [docs/coding-guidelines.md](docs/coding-guidelines.md) for the full rules.
+
+## Running it locally
+
+Needs the .NET 10 SDK and Docker.
+
+```bash
+dotnet run --project src/Norvia.AppHost      # TMS, SQL Server and the Service Bus emulator, with the Aspire dashboard
+dotnet test Norvia.slnx                      # unit, architecture and integration tests (the last start the AppHost)
+```
+
+| Where | What |
+|---|---|
+| [src/](src/) | The applications: the Aspire AppHost and ServiceDefaults, and the TMS in Clean Architecture layers |
+| [tests/](tests/) | Tests per project, mirroring `src/` |
+| [contracts/canonical-model/](contracts/canonical-model/) | The Canonical Model as JSON Schemas |
+| [seed/norvia.seed.json](seed/norvia.seed.json) | The seed file: the one source of Shippers, Carriers and Personas |
+
+Set `NORVIA_TEST_LOG_FILE` to a path to keep the TMS's own logs from an integration test run.
 
 ## Contributing
 
