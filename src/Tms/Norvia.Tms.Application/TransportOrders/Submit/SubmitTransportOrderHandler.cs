@@ -24,13 +24,25 @@ public sealed class SubmitTransportOrderHandler(
         var correlationId = new CorrelationId(command.CorrelationId);
         var receivedAt = time.GetUtcNow();
 
-        var reasons = rules.Check(shippers.Find(shipperId), details, receivedAt);
+        // A double click or a Logic App retry sends the same booking again: answer with what it got the first time.
+        var referenceHolder = await FindReferenceHolderAsync(shipperId, details.ShipperReference, cancellationToken);
+        if (referenceHolder is not null && referenceHolder.IsRepeatOf(details))
+        {
+            return SubmitTransportOrderResult.From(referenceHolder, repeat: true);
+        }
+
+        var reasons = rules.Check(shippers.Find(shipperId), details, receivedAt, referenceHolder);
         var order = reasons.Count > 0
             ? TransportOrder.Reject(shipperId, details, reasons, correlationId, receivedAt)
             : TransportOrder.Accept(shipperId, details, await numbers.NextAsync(cancellationToken), correlationId, receivedAt);
 
         await repository.AddAsync(order, cancellationToken);
 
-        return new SubmitTransportOrderResult(order.Id.Value, order.Status, order.Number?.Value, RejectionReasonView.From(order.RejectionReasons));
+        return SubmitTransportOrderResult.From(order);
     }
+
+    private async Task<TransportOrder?> FindReferenceHolderAsync(ShipperId shipperId, string? shipperReference, CancellationToken cancellationToken) =>
+        string.IsNullOrWhiteSpace(shipperReference)
+            ? null
+            : await repository.SingleOrDefaultAsync(new TransportOrderByShipperReferenceSpec(shipperId, shipperReference), cancellationToken);
 }

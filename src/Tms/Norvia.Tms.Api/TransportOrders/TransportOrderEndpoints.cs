@@ -27,7 +27,10 @@ public static class TransportOrderEndpoints
         transportOrders.MapPost("/", SubmitAsync)
             .WithName("SubmitTransportOrder")
             .WithSummary("Submit a Transport Order (Canonical Model) on behalf of the Shipper it names.")
-            .WithDescription("A booking that breaks Transport Order rules gets a 422 listing every reason. It is kept as Rejected, readable at the problem's instance.");
+            .WithDescription(
+                "A booking that breaks Transport Order rules gets a 422 listing every reason. It is kept as Rejected, readable at the problem's instance. "
+                + "Submitting the same booking again (same Shipper, Shipper reference and content) gets a 200 with the original Transport Order, "
+                + "flagged as a repeat; reusing a Shipper reference for different content is rejected with ShipperReferenceReused.");
 
         transportOrders.MapGet("/{id:guid}", GetByIdAsync)
             .WithName("GetTransportOrderById")
@@ -42,7 +45,7 @@ public static class TransportOrderEndpoints
         return app;
     }
 
-    private static async Task<Results<Created<AcceptedTransportOrder>, ProblemHttpResult, ValidationProblem>> SubmitAsync(
+    private static async Task<Results<Created<AcceptedTransportOrder>, Ok<AcceptedTransportOrder>, ProblemHttpResult, ValidationProblem>> SubmitAsync(
         [FromHeader(Name = CorrelationIdHeader)] string? correlationId,
         CanonicalTransportOrder transportOrder,
         IMediator mediator,
@@ -65,9 +68,10 @@ public static class TransportOrderEndpoints
                 extensions: new Dictionary<string, object?> { ["reasons"] = result.RejectionReasons });
         }
 
-        return TypedResults.Created(
-            $"/v1/transport-orders/{result.TransportOrderNumber}",
-            new AcceptedTransportOrder(result.TransportOrderNumber!, result.Status));
+        var accepted = new AcceptedTransportOrder(result.TransportOrderNumber!, result.Status, result.Repeat);
+        return result.Repeat
+            ? TypedResults.Ok(accepted)
+            : TypedResults.Created($"/v1/transport-orders/{result.TransportOrderNumber}", accepted);
     }
 
     private static async Task<Results<Ok<TransportOrderView>, ProblemHttpResult>> GetAsync(

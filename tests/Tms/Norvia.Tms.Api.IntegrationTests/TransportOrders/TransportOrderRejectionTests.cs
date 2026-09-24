@@ -37,6 +37,7 @@ public sealed class TransportOrderRejectionTests(TmsFixture tms)
         "WeightInvalid",
         "DimensionsInvalid",
         "TotalWeightOverLimit",
+        "ShipperReferenceTooLong",
     ];
 
     [Theory]
@@ -200,6 +201,7 @@ public sealed class TransportOrderRejectionTests(TmsFixture tms)
             case "WeightInvalid": firstLine["weightKg"] = 0; break;
             case "DimensionsInvalid": firstLine["dimensionsCm"]!["length"] = 0; break;
             case "TotalWeightOverLimit": firstLine["weightKg"] = 23_940.5m; break;
+            case "ShipperReferenceTooLong": booking["shipperReference"] = $"{booking["shipperReference"]}-{new string('X', 100)}"; break;
             default: throw new ArgumentOutOfRangeException(nameof(code), code, "No way to break that rule.");
         }
     }

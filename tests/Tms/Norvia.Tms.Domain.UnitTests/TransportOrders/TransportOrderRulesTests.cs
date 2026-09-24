@@ -53,6 +53,53 @@ public sealed class TransportOrderRulesTests
     }
 
     [Fact]
+    public void Check_ReferenceHeldForDifferentContent_RejectsWithShipperReferenceReused()
+    {
+        var holder = AcceptedWith(CompleteBooking());
+
+        var reasons = _rules.Check(BrouwerDranken, CompleteBooking() with { Instructions = "Call ahead" }, Now, holder);
+
+        CodesOf(reasons).Should().Equal(RejectionCode.ShipperReferenceReused);
+        reasons.Single().Message.Should().Be(
+            "The Shipper reference 'BD-2026-0001' is already used for Transport Order TO-0000007, with different content.");
+    }
+
+    [Fact]
+    public void Check_ReferenceHeldForTheSameContent_FindsNothingWrong()
+    {
+        var reasons = _rules.Check(BrouwerDranken, CompleteBooking(), Now, AcceptedWith(CompleteBooking()));
+
+        reasons.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_ReferenceHeldAndOtherRulesBroken_ReportsEveryFailure()
+    {
+        var booking = CompleteBooking() with { GoodsLines = [] };
+
+        var reasons = _rules.Check(BrouwerDranken, booking, Now, AcceptedWith(CompleteBooking()));
+
+        CodesOf(reasons).Should().Equal(RejectionCode.ShipperReferenceReused, RejectionCode.GoodsLinesMissing);
+    }
+
+    [Fact]
+    public void Check_ReferenceAtTheLengthLimit_FindsNothingWrong()
+    {
+        var reasons = _rules.Check(BrouwerDranken, CompleteBooking() with { ShipperReference = new string('R', 100) }, Now);
+
+        reasons.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Check_ReferenceOverTheLengthLimit_RejectsWithShipperReferenceTooLong()
+    {
+        var reasons = _rules.Check(BrouwerDranken, CompleteBooking() with { ShipperReference = new string('R', 101) }, Now);
+
+        CodesOf(reasons).Should().Equal(RejectionCode.ShipperReferenceTooLong);
+        reasons.Single().Message.Should().Be("The Shipper reference is 101 characters long; it may be at most 100.");
+    }
+
+    [Fact]
     public void Check_NoCollectionAddress_RejectsWithCollectionAddressMissing()
     {
         var booking = CompleteBooking();
@@ -379,6 +426,9 @@ public sealed class TransportOrderRulesTests
 
         CodesOf(reasons).Should().Equal(RejectionCode.TotalWeightOverLimit);
     }
+
+    private static TransportOrder AcceptedWith(TransportOrderDetails details) => TransportOrder.Accept(
+        BrouwerDranken.Id, details, TransportOrderNumber.FromSequence(7), new CorrelationId("corr-original"), Now.AddDays(-1));
 
     private static RejectionCode[] CodesOf(IEnumerable<RejectionReason> reasons) => [.. reasons.Select(reason => reason.Code)];
 

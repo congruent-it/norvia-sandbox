@@ -35,6 +35,14 @@ internal sealed class TransportOrderConfiguration : IEntityTypeConfiguration<Tra
             .HasMaxLength(50)
             .IsRequired();
 
+        // Only an Accepted Transport Order holds its Shipper reference, so this index is what guarantees that two
+        // submissions of one booking, even at the same moment, never become two Transport Orders. The binary collation
+        // compares references exactly, as the domain does.
+        builder.Property(order => order.ShipperReference)
+            .HasMaxLength(TransportOrderRules.MaxShipperReferenceLength)
+            .UseCollation("Latin1_General_100_BIN2");
+        builder.HasIndex(order => new { order.ShipperId, order.ShipperReference }).IsUnique();
+
         builder.Property(order => order.Status)
             .HasConversion<string>()
             .HasMaxLength(20);

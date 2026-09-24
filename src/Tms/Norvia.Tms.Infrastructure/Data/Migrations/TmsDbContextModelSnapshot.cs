@@ -55,6 +55,11 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<string>("ShipperReference")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -65,6 +70,10 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                     b.HasIndex("Number")
                         .IsUnique()
                         .HasFilter("[Number] IS NOT NULL");
+
+                    b.HasIndex("ShipperId", "ShipperReference")
+                        .IsUnique()
+                        .HasFilter("[ShipperReference] IS NOT NULL");
 
                     b.HasIndex("Status", "ReceivedAt");
 

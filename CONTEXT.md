@@ -56,6 +56,10 @@ _Avoid_: freight, forwarding
 A Shipper's instruction for Norvia to move goods from an origin to a destination. The TMS owns it.
 _Avoid_: order, booking, job
 
+**Shipper reference**:
+The Shipper's own reference for a booking. It is unique per Shipper: an Accepted Transport Order holds it, so the same booking sent again is a repeat that gets the original Transport Order back, and the reference sent with different content is rejected. A Rejected booking holds no reference.
+_Avoid_: order reference, customer reference, idempotency key
+
 **Rejected booking**:
 A submitted Transport Order that broke one or more Transport Order rules. The TMS keeps it with every rejection reason (a stable code and a plain-language message) and what the Shipper submitted, but gives it no Transport Order number, and nothing downstream acts on it.
 _Avoid_: failed order, invalid order

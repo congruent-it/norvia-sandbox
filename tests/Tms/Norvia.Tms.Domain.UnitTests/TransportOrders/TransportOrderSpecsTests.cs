@@ -49,6 +49,23 @@ public sealed class TransportOrderSpecsTests
         listed.Should().ContainSingle().Which.Should().BeSameAs(rejected);
     }
 
+    [Fact]
+    public void ByShipperReference_Evaluated_FindsTheShippersAcceptedTransportOrderWithThatReference()
+    {
+        var held = Accepted(1, Morning);
+        var orders = new[]
+        {
+            Rejected(Morning),
+            held,
+            TransportOrder.Accept(new ShipperId("SHP-0003"), TransportOrderTests.SampleDetails(), TransportOrderNumber.FromSequence(2), new CorrelationId("corr-2"), Morning),
+            TransportOrder.Accept(new ShipperId("SHP-0001"), TransportOrderTests.SampleDetails() with { ShipperReference = "BD-2026-0002" }, TransportOrderNumber.FromSequence(3), new CorrelationId("corr-3"), Morning),
+        };
+
+        var found = new TransportOrderByShipperReferenceSpec(new ShipperId("SHP-0001"), "BD-2026-0001").Evaluate(orders);
+
+        found.Should().ContainSingle().Which.Should().BeSameAs(held);
+    }
+
     private static TransportOrder Rejected(DateTimeOffset receivedAt) => TransportOrder.Reject(
         new ShipperId("SHP-0001"),
         TransportOrderTests.SampleDetails(),

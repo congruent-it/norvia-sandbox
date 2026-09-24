@@ -25,4 +25,6 @@ public enum RejectionCode
     WeightInvalid,
     DimensionsInvalid,
     TotalWeightOverLimit,
+    ShipperReferenceReused,
+    ShipperReferenceTooLong,
 }
