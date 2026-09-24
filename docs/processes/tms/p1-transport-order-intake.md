@@ -49,20 +49,20 @@ On a TMS server error or timeout, the Logic App retries with a bounded exponenti
 
 ## Validation rules
 
-| Rule |
-|---|
-| The Shipper exists and is active in the TMS's seed-loaded Shipper data |
-| A Shipper reference is given, and it is unique per Shipper |
-| The collection address, the delivery address and the Consignee name are given |
-| Each address has a street, postcode, city and country |
-| The collection window's earliest time is not in the past and is not after its latest time |
-| A delivery window, when given, is internally consistent and doesn't end before the collection window starts |
-| There is at least one goods line |
-| Each goods line has a package type from the fixed list (pallet, parcel, crate, loose), a quantity of at least 1 and a weight greater than 0 |
-| Dimensions, when given, are positive |
-| The total weight doesn't exceed the limit for a single Transport Order (a TMS setting, 24,000 kg by default) |
+| Rule | Codes |
+|---|---|
+| The Shipper exists and is active in the TMS's seed-loaded Shipper data | `UnknownShipper`, `InactiveShipper` |
+| A Shipper reference is given, and it is unique per Shipper | `ShipperReferenceMissing` |
+| The collection address, the delivery address and the Consignee name are given | `CollectionAddressMissing`, `DeliveryAddressMissing`, `ConsigneeNameMissing` |
+| Each address has a street, postcode, city and country | `CollectionAddressIncomplete`, `DeliveryAddressIncomplete` |
+| The collection window has an earliest and a latest time. Its earliest time is not in the past and is not after its latest time | `CollectionWindowMissing`, `CollectionWindowInPast`, `CollectionWindowReversed` |
+| A delivery window, when given, is internally consistent and doesn't end before the collection window starts | `DeliveryWindowIncomplete`, `DeliveryWindowReversed`, `DeliveryWindowBeforeCollection` |
+| There is at least one goods line | `GoodsLinesMissing` |
+| Each goods line has a package type from the fixed list (pallet, parcel, crate, loose), a quantity of at least 1 and a weight greater than 0 | `PackageTypeInvalid`, `QuantityInvalid`, `WeightInvalid` |
+| Dimensions, when given, are positive | `DimensionsInvalid` |
+| The total weight doesn't exceed the limit for a single Transport Order (the TMS setting `TransportOrderRules:MaxTotalWeightKg`, 24,000 kg by default) | `TotalWeightOverLimit` |
 
-Each failure has a stable code and a readable message. The 24,000 kg limit and the package type list are sandbox defaults, chosen to be believable, not to follow any regulation.
+Each failure has a stable code and a readable message. Codes are never renamed; new rules add new codes. The 24,000 kg limit and the package type list are sandbox defaults, chosen to be believable, not to follow any regulation.
 
 ## Responses
 
@@ -70,7 +70,7 @@ Each failure has a stable code and a readable message. The 24,000 kg limit and t
 |---|---|
 | Accepted | Success, with the Transport Order number and status |
 | Repeat (same Shipper, same Shipper reference, same content) | Success, returning the original Transport Order, flagged as a repeat |
-| Validation failure, or a reused Shipper reference with different content | Client error, listing every failure |
+| Validation failure, or a reused Shipper reference with different content | Client error (422 ProblemDetails) listing every failure's code and message. Its `instance` is where the Rejected booking can be read |
 | Caller without the intake role | Refused |
 
 ## Correlation ID

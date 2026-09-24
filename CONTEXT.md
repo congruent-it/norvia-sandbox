@@ -56,6 +56,10 @@ _Avoid_: freight, forwarding
 A Shipper's instruction for Norvia to move goods from an origin to a destination. The TMS owns it.
 _Avoid_: order, booking, job
 
+**Rejected booking**:
+A submitted Transport Order that broke one or more Transport Order rules. The TMS keeps it with every rejection reason (a stable code and a plain-language message) and what the Shipper submitted, but gives it no Transport Order number, and nothing downstream acts on it.
+_Avoid_: failed order, invalid order
+
 **Shipment**:
 The physical movement that carries out one Transport Order, including its tracking status. Each Transport Order has exactly one Shipment, and a Shipment never carries more than one Transport Order. Consolidation happens on a Trip, not inside a Shipment. The TMS owns it.
 _Avoid_: delivery, consignment, trip

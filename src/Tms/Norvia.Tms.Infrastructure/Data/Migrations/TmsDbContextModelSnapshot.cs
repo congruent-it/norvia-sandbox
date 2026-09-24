@@ -40,12 +40,15 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                         .HasColumnName("Details");
 
                     b.Property<string>("Number")
-                        .IsRequired()
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");
 
                     b.Property<DateTimeOffset>("ReceivedAt")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("RejectionReasons")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ShipperId")
                         .IsRequired()
@@ -60,7 +63,8 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Number")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[Number] IS NOT NULL");
 
                     b.HasIndex("Status", "ReceivedAt");
 

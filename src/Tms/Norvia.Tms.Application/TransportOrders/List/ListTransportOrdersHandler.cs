@@ -15,7 +15,8 @@ public sealed class ListTransportOrdersHandler(IReadRepository<TransportOrder> r
         var orders = await repository.ListAsync(new TransportOrdersByStatusSpec(query.Status), cancellationToken);
 
         return [.. orders.Select(order => new TransportOrderSummary(
-            order.Number.Value,
+            order.Id.Value,
+            order.Number?.Value,
             order.Status,
             ShipperView.Of(order.ShipperId, shippers),
             order.Details.ShipperReference,

@@ -41,6 +41,57 @@ public sealed class TransportOrderTests
             .Which.TransportOrder.Should().BeSameAs(order);
     }
 
+    [Fact]
+    public void Reject_Booking_IsRejectedWithItsReasonsAndNoNumber()
+    {
+        RejectionReason[] reasons = [new(RejectionCode.InactiveShipper, "Inactive."), new(RejectionCode.GoodsLinesMissing, "No goods.")];
+
+        var order = TransportOrder.Reject(new ShipperId("SHP-0001"), SampleDetails(), reasons, new CorrelationId("corr-1"), ReceivedAt);
+
+        order.Status.Should().Be(TransportOrderStatus.Rejected);
+        order.Number.Should().BeNull();
+        order.RejectionReasons.Should().Equal(reasons);
+    }
+
+    [Fact]
+    public void Reject_Booking_KeepsWhatTheShipperSubmitted()
+    {
+        var details = SampleDetails();
+
+        var order = TransportOrder.Reject(new ShipperId("SHP-0001"), details, [Inactive], new CorrelationId("corr-1"), ReceivedAt);
+
+        order.ShipperId.Should().Be(new ShipperId("SHP-0001"));
+        order.Details.Should().Be(details);
+        order.CorrelationId.Should().Be(new CorrelationId("corr-1"));
+        order.ReceivedAt.Should().Be(ReceivedAt);
+    }
+
+    [Fact]
+    public void Reject_Booking_RaisesTransportOrderRejected()
+    {
+        var order = TransportOrder.Reject(new ShipperId("SHP-0001"), SampleDetails(), [Inactive], new CorrelationId("corr-1"), ReceivedAt);
+
+        order.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<TransportOrderRejectedEvent>()
+            .Which.TransportOrder.Should().BeSameAs(order);
+    }
+
+    [Fact]
+    public void Reject_WithoutReasons_Throws()
+    {
+        var act = () => TransportOrder.Reject(new ShipperId("SHP-0001"), SampleDetails(), [], new CorrelationId("corr-1"), ReceivedAt);
+
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void Accept_Booking_HasNoRejectionReasons()
+    {
+        var order = TransportOrder.Accept(new ShipperId("SHP-0001"), SampleDetails(), TransportOrderNumber.FromSequence(7), new CorrelationId("corr-1"), ReceivedAt);
+
+        order.RejectionReasons.Should().BeEmpty();
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
@@ -74,6 +125,8 @@ public sealed class TransportOrderTests
 
         other.Should().NotBe(SampleDetails());
     }
+
+    private static readonly RejectionReason Inactive = new(RejectionCode.InactiveShipper, "Inactive.");
 
     internal static TransportOrderDetails SampleDetails() => new(
         ShipperReference: "BD-2026-0001",

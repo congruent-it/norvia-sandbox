@@ -26,6 +26,20 @@ internal static class Samples
         ],
         Instructions: "Ring at the side entrance");
 
+    public static readonly RejectionReason[] Reasons =
+    [
+        new(RejectionCode.InactiveShipper, "The Shipper is not active, so Norvia can't take bookings for it."),
+        new(RejectionCode.GoodsLinesMissing, "The booking has no goods lines."),
+    ];
+
+    public static TransportOrder RejectedOrder(string correlationId = "corr-2") =>
+        TransportOrder.Reject(
+            new ShipperId("SHP-0001"),
+            CanonicalTransportOrder().ToDetails(),
+            Reasons,
+            new CorrelationId(correlationId),
+            Now);
+
     public static TransportOrder AcceptedOrder(long sequence = 7, string correlationId = "corr-1") =>
         TransportOrder.Accept(
             new ShipperId("SHP-0001"),

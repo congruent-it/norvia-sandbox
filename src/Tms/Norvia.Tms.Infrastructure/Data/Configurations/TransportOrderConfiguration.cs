@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -10,6 +11,7 @@ namespace Norvia.Tms.Infrastructure.Data.Configurations;
 internal sealed class TransportOrderConfiguration : IEntityTypeConfiguration<TransportOrder>
 {
     private static readonly JsonSerializerOptions DetailsJson = new(JsonSerializerDefaults.Web);
+    private static readonly JsonSerializerOptions ReasonsJson = new(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter() } };
 
     public void Configure(EntityTypeBuilder<TransportOrder> builder)
     {
@@ -21,10 +23,11 @@ internal sealed class TransportOrderConfiguration : IEntityTypeConfiguration<Tra
             .HasConversion(id => id.Value, value => new TransportOrderId(value))
             .ValueGeneratedNever();
 
+        // A Rejected booking has no number, so uniqueness only covers the rows that have one. EF never passes a null
+        // to a value converter, which is why the conversions below can assume a value.
         builder.Property(order => order.Number)
-            .HasConversion(number => number.Value, value => TransportOrderNumber.Parse(value))
-            .HasMaxLength(10)
-            .IsRequired();
+            .HasConversion(number => number!.Value, value => TransportOrderNumber.Parse(value))
+            .HasMaxLength(10);
         builder.HasIndex(order => order.Number).IsUnique();
 
         builder.Property(order => order.ShipperId)
@@ -52,6 +55,17 @@ internal sealed class TransportOrderConfiguration : IEntityTypeConfiguration<Tra
                     details => details.GetHashCode(),
                     details => details))
             .HasColumnName("Details")
+            .IsRequired();
+
+        // The column is never null (an Accepted Transport Order stores []), so neither is what it holds.
+        builder.Property(order => order.RejectionReasons)
+            .HasConversion(
+                reasons => JsonSerializer.Serialize(reasons, ReasonsJson),
+                json => JsonSerializer.Deserialize<RejectionReason[]>(json, ReasonsJson)!,
+                new ValueComparer<IReadOnlyList<RejectionReason>>(
+                    (left, right) => left!.SequenceEqual(right!),
+                    reasons => reasons.Count,
+                    reasons => reasons.ToArray()))
             .IsRequired();
     }
 }

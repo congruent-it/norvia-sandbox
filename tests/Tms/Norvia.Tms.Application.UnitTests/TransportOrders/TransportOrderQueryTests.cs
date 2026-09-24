@@ -3,6 +3,7 @@ using Ardalis.SharedKernel;
 using Norvia.Tms.Application.CanonicalModel;
 using Norvia.Tms.Application.Shippers;
 using Norvia.Tms.Application.TransportOrders;
+using Norvia.Tms.Application.TransportOrders.GetById;
 using Norvia.Tms.Application.TransportOrders.GetByNumber;
 using Norvia.Tms.Application.TransportOrders.List;
 using Norvia.Tms.Domain.Shippers;
@@ -32,11 +33,13 @@ public sealed class TransportOrderQueryTests
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().BeEquivalentTo(new TransportOrderView(
+            order.Id.Value,
             "TO-0000005",
             TransportOrderStatus.Accepted,
             new ShipperView("SHP-0001", "Brouwer Dranken"),
             "corr-1",
             Samples.Now,
+            [],
             CanonicalTransportOrder.From(order)));
     }
 
@@ -57,6 +60,58 @@ public sealed class TransportOrderQueryTests
     }
 
     [Fact]
+    public async Task GetById_RejectedBooking_ReturnsItsReasonsAndSubmittedContentWithoutANumber()
+    {
+        var order = Samples.RejectedOrder();
+        _repository.FirstOrDefaultAsync(Arg.Is<TransportOrderByIdSpec>(s => s.Id == order.Id), Arg.Any<CancellationToken>())
+            .Returns(order);
+
+        var result = await new GetTransportOrderByIdHandler(_repository, _shippers).Handle(new GetTransportOrderByIdQuery(order.Id.Value), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().BeEquivalentTo(new TransportOrderView(
+            order.Id.Value,
+            null,
+            TransportOrderStatus.Rejected,
+            new ShipperView("SHP-0001", "Brouwer Dranken"),
+            "corr-2",
+            Samples.Now,
+            [
+                new RejectionReasonView("InactiveShipper", "The Shipper is not active, so Norvia can't take bookings for it."),
+                new RejectionReasonView("GoodsLinesMissing", "The booking has no goods lines."),
+            ],
+            Samples.CanonicalTransportOrder()));
+    }
+
+    [Fact]
+    public async Task GetById_UnknownId_ReturnsNotFound()
+    {
+        var result = await new GetTransportOrderByIdHandler(_repository, _shippers).Handle(new GetTransportOrderByIdQuery(Guid.NewGuid()), CancellationToken.None);
+
+        result.Status.Should().Be(ResultStatus.NotFound);
+    }
+
+    [Fact]
+    public async Task List_Rejected_ReturnsSummariesWithoutANumber()
+    {
+        var rejected = Samples.RejectedOrder();
+        _repository.ListAsync(Arg.Is<TransportOrdersByStatusSpec>(s => s.Status == TransportOrderStatus.Rejected), Arg.Any<CancellationToken>())
+            .Returns([rejected]);
+
+        var summaries = await new ListTransportOrdersHandler(_repository, _shippers).Handle(new ListTransportOrdersQuery(TransportOrderStatus.Rejected), CancellationToken.None);
+
+        summaries.Should().ContainSingle().Which.Should().BeEquivalentTo(new TransportOrderSummary(
+            rejected.Id.Value,
+            null,
+            TransportOrderStatus.Rejected,
+            new ShipperView("SHP-0001", "Brouwer Dranken"),
+            "BD-2026-0001",
+            Samples.Now.AddDays(1),
+            Samples.Now.AddDays(1).AddHours(4),
+            Samples.Now));
+    }
+
+    [Fact]
     public async Task List_ByStatus_ReturnsSummariesInTheOrderTheyWereReceived()
     {
         var first = Samples.AcceptedOrder(sequence: 1);
@@ -68,6 +123,7 @@ public sealed class TransportOrderQueryTests
 
         summaries.Select(s => s.TransportOrderNumber).Should().Equal("TO-0000001", "TO-0000002");
         summaries[0].Should().BeEquivalentTo(new TransportOrderSummary(
+            first.Id.Value,
             "TO-0000001",
             TransportOrderStatus.Accepted,
             new ShipperView("SHP-0001", "Brouwer Dranken"),

@@ -1,7 +1,6 @@
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Mediator;
-using Norvia.Tms.Application.CanonicalModel;
 using Norvia.Tms.Application.Shippers;
 using Norvia.Tms.Domain.TransportOrders;
 
@@ -20,17 +19,6 @@ public sealed class GetTransportOrderHandler(IReadRepository<TransportOrder> rep
         }
 
         var order = await repository.FirstOrDefaultAsync(new TransportOrderByNumberSpec(number), cancellationToken);
-        if (order is null)
-        {
-            return Result.NotFound();
-        }
-
-        return new TransportOrderView(
-            order.Number.Value,
-            order.Status,
-            ShipperView.Of(order.ShipperId, shippers),
-            order.CorrelationId.Value,
-            order.ReceivedAt,
-            CanonicalTransportOrder.From(order));
+        return order is null ? Result.NotFound() : TransportOrderView.Of(order, shippers);
     }
 }
