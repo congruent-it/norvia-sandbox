@@ -15,6 +15,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.Services.AddScoped<IPipelineBehavior<SubmitTransportOrderCommand, Result<SubmitTransportOrderResult>>, TrackIntakeInLoggingScope>();
 builder.AddTmsInfrastructure();
+builder.AddTmsOutboxPublisher();
 
 // Issuer, audience and keys come from Authentication:Schemes:Bearer: Entra in Azure, the AppHost's local key otherwise.
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

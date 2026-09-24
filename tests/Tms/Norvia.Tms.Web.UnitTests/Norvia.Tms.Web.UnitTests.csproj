@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <Include>[Norvia.Tms.Web]*</Include>
+    <!-- The composition root has no behaviour to unit test (coding guidelines §10). -->
+    <ExcludeByFile>**/Norvia.Tms.Web/Program.cs</ExcludeByFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="bunit" />
+    <PackageReference Include="coverlet.msbuild" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+    <PackageReference Include="xunit.v3.mtp-off" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="AwesomeAssertions" />
+    <Using Include="Bunit" />
+    <Using Include="NSubstitute" />
+    <ProjectReference Include="..\..\..\src\Tms\Norvia.Tms.Web\Norvia.Tms.Web.csproj" />
+  </ItemGroup>
+</Project>

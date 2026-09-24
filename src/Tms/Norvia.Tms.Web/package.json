@@ -1,0 +1,13 @@
+{
+  "name": "norvia-tms-web",
+  "private": true,
+  "description": "Builds the TMS UI's stylesheet with Tailwind CSS; the build runs it (see Norvia.Tms.Web.csproj).",
+  "scripts": {
+    "build:css": "tailwindcss --input Styles/app.css --output wwwroot/app.css --minify"
+  },
+  "devDependencies": {
+    "@fontsource/lato": "5.3.0",
+    "@tailwindcss/cli": "4.3.3",
+    "tailwindcss": "4.3.3"
+  }
+}

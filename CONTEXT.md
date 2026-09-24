@@ -68,6 +68,10 @@ _Avoid_: failed order, invalid order
 The way a Transport Order reached the TMS: the Shipper API for Transport-only bookings, and later the WMS handoff for Fulfilment. Every channel uses the same intake API. The TMS knows the channel from the caller's identity, and each Transport Order records the one it came from.
 _Avoid_: source, origin (origin is where goods are collected)
 
+**Waiting for planning**:
+Said of an Accepted Transport Order that no Shipment has been made from yet. The Planner's list in the TMS UI shows them, and a Transport Order appears there as soon as it is accepted.
+_Avoid_: open orders, backlog, unplanned orders
+
 **Shipment**:
 The physical movement that carries out one Transport Order, including its tracking status. Each Transport Order has exactly one Shipment, and a Shipment never carries more than one Transport Order. Consolidation happens on a Trip, not inside a Shipment. The TMS owns it.
 _Avoid_: delivery, consignment, trip

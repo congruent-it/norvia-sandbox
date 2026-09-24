@@ -1,0 +1,180 @@
+/*
+ * The TMS UI's stylesheet, built by Tailwind CSS into wwwroot/app.css (ADR 0018). It gives the app the look of
+ * Bootswatch's Flatly theme: navy and teal, Lato, flat surfaces. Tailwind's preflight resets the page instead of Fluent
+ * UI's reboot.css: the reboot isn't in a cascade layer, so it would win over every Tailwind utility.
+ */
+@import "tailwindcss";
+
+@source "../**/*.razor";
+
+/*
+ * Flatly's palette and type (Bootswatch 5, flatly/_variables.scss). Static, so every colour is emitted as a variable:
+ * the Fluent UI overrides below use some that no utility does.
+ */
+@theme static {
+    --color-primary: #2c3e50;
+    --color-secondary: #95a5a6;
+    --color-success: #18bc9c;
+    --color-info: #3498db;
+    --color-warning: #f39c12;
+    --color-danger: #e74c3c;
+    --color-light: #ecf0f1;
+    --color-dark: #7b8a8b;
+    --color-border: #dee2e6;
+    --color-muted: #6c757d;
+    --font-sans: "Lato", -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --radius-flatly: 0.375rem;
+}
+
+@font-face {
+    font-family: "Lato";
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("fonts/lato-latin-400-normal.woff2") format("woff2");
+}
+
+@font-face {
+    font-family: "Lato";
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url("fonts/lato-latin-700-normal.woff2") format("woff2");
+}
+
+@layer base {
+    body {
+        /* Fluent UI's components read their font from this token, which Fluent's script sets on the root. */
+        --body-font: var(--font-sans);
+        margin: 0;
+        background-color: #fff;
+        color: var(--color-primary);
+        font-family: var(--font-sans);
+        font-size: 0.9375rem;
+        line-height: 1.5;
+    }
+
+    h1,
+    h2 {
+        margin-top: 0;
+        font-weight: 700;
+        line-height: 1.2;
+        color: var(--color-primary);
+    }
+
+    h1 {
+        margin-bottom: 1.5rem;
+        font-size: 1.875rem;
+    }
+
+    h2 {
+        margin-bottom: 0.75rem;
+        font-size: 1.25rem;
+    }
+
+    a {
+        color: var(--color-success);
+        text-decoration: underline;
+    }
+
+    a:hover {
+        color: #13967d;
+    }
+}
+
+@layer components {
+    .detail-list {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        column-gap: 1.5rem;
+        row-gap: 0.25rem;
+        margin: 0;
+    }
+
+    .detail-list dt {
+        font-weight: 700;
+    }
+
+    .detail-list dd {
+        margin: 0;
+    }
+}
+
+/*
+ * Fluent UI's own component styles aren't in a cascade layer, so these overrides aren't either: a layered rule would
+ * always lose to them.
+ */
+
+/* Tables as Flatly draws them: bold headers over a heavier rule, a light rule between rows, a hover tint. */
+.flatly-table.fluent-data-grid {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.flatly-table.fluent-data-grid th,
+.flatly-table.fluent-data-grid td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-primary);
+    font-family: var(--font-sans);
+    font-size: 0.9375rem;
+}
+
+.flatly-table.fluent-data-grid th {
+    border-bottom: 2px solid var(--color-primary);
+    font-weight: 700;
+    text-align: left;
+}
+
+.flatly-table.fluent-data-grid .col-title {
+    padding: 0;
+}
+
+.flatly-table.fluent-data-grid tbody tr:hover td {
+    background-color: var(--color-light);
+}
+
+/*
+ * Alerts as Flatly draws them: solid colour, white text, in light mode. Fluent scopes its own with an attribute
+ * (.fluent-messagebar.intent-error[b-…], three classes' worth), so these add body and :not(.dark) to outrank it.
+ */
+body .fluent-messagebar.intent-error:not(.dark),
+body .fluent-messagebar.intent-warning:not(.dark),
+body .fluent-messagebar.intent-info:not(.dark) {
+    padding: 0.75rem 1rem;
+    border: none;
+    border-radius: var(--radius-flatly);
+    color: #fff;
+    font-family: var(--font-sans);
+    font-size: 0.9375rem;
+}
+
+body .fluent-messagebar.intent-error:not(.dark) {
+    background-color: var(--color-danger);
+}
+
+body .fluent-messagebar.intent-warning:not(.dark) {
+    background-color: var(--color-warning);
+}
+
+body .fluent-messagebar.intent-info:not(.dark) {
+    background-color: var(--color-info);
+}
+
+body .fluent-messagebar.intent-error:not(.dark) svg,
+body .fluent-messagebar.intent-warning:not(.dark) svg,
+body .fluent-messagebar.intent-info:not(.dark) svg {
+    fill: #fff !important;
+}
+
+body .fluent-messagebar .fluent-messagebar-message {
+    color: inherit;
+    font-size: inherit;
+}
+
+#blazor-error-ui {
+    display: none;
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 1000;
+}

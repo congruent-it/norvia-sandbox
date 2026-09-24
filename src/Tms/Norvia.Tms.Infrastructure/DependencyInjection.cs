@@ -30,11 +30,8 @@ public static class DependencyInjection
         builder.Services.AddDbContext<TmsDbContext>(options =>
             options.UseSqlServer(builder.Configuration.GetConnectionString(DatabaseConnectionName)));
         builder.EnrichSqlServerDbContext<TmsDbContext>();
-        builder.AddAzureServiceBusClient(MessagingConnectionName);
 
         builder.Services.AddOptions<DatabaseOptions>().BindConfiguration(DatabaseOptions.SectionName);
-        builder.Services.AddOptions<OutboxOptions>().BindConfiguration(OutboxOptions.SectionName)
-            .ValidateDataAnnotations().ValidateOnStart();
         builder.Services.AddOptions<SeedOptions>().BindConfiguration(SeedOptions.SectionName)
             .ValidateDataAnnotations()
             .Validate(options => File.Exists(options.Path), "The seed file doesn't exist.")
@@ -54,6 +51,21 @@ public static class DependencyInjection
         builder.Services.AddScoped<ITransportOrderNumbers, SqlTransportOrderNumbers>();
         builder.Services.AddScoped<IPipelineBehavior<SubmitTransportOrderCommand, Result<SubmitTransportOrderResult>>, RetrySubmissionThatLostARace>();
         builder.Services.AddSingleton<IShipperDirectory, SeedFileShipperDirectory>();
+
+        return builder;
+    }
+
+    /// <summary>
+    /// Sends committed outbox messages to Service Bus. Only the process that takes in Transport Orders runs it: the
+    /// TMS UI shares the database, and a second publisher would send the same message twice.
+    /// </summary>
+    public static IHostApplicationBuilder AddTmsOutboxPublisher(this IHostApplicationBuilder builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.AddAzureServiceBusClient(MessagingConnectionName);
+        builder.Services.AddOptions<OutboxOptions>().BindConfiguration(OutboxOptions.SectionName)
+            .ValidateDataAnnotations().ValidateOnStart();
         builder.Services.AddHostedService<OutboxPublisher>();
 
         return builder;

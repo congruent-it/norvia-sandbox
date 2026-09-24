@@ -4,7 +4,7 @@ A working integration estate for a fictional company, **Norvia Logistics B.V.**,
 
 The estate can also run *as found*, reproducing the problems a health check would find (a missing dead-letter alert, a mapping that can't handle a Carrier status, marketplace orders routed to the wrong system), and fixing them one at a time.
 
-> **Status:** first build. The TMS takes in a Transport Order through its intake API and publishes `TransportOrderAccepted`, running locally under Aspire. The rest of P1 (validation, the Logic App, API Management, the Partner portal and the Azure estate) follows in the tickets under GitHub issue #1.
+> **Status:** first build. The TMS takes in a Transport Order through its intake API and publishes `TransportOrderAccepted`, running locally under Aspire. The TMS UI lists the Transport Orders waiting for planning, live, and shows each one in full. The rest of P1 (validation, the Logic App, API Management, the Partner portal and the Azure estate) follows in the tickets under GitHub issue #1.
 
 ## Start here
 
@@ -41,20 +41,20 @@ Every concept has one system of record ([ADR 0002](docs/adr/0002-one-system-of-r
 
 ## Tech stack
 
-.NET 10 with Clean Architecture, EF Core with Ardalis repositories and specifications, Minimal APIs, and Blazor with Fluent UI components for web UIs. Tests use xUnit, NSubstitute, bUnit, Testcontainers and Playwright, with an 80% line coverage gate on unit tests. The Azure side is API Management, Logic Apps, Service Bus, Key Vault, Entra ID, Application Insights and Container Apps. See [docs/coding-guidelines.md](docs/coding-guidelines.md) for the full rules.
+.NET 10 with Clean Architecture, EF Core with Ardalis repositories and specifications, Minimal APIs, and Blazor with Fluent UI components for web UIs, styled with Tailwind CSS in the TMS UI. Tests use xUnit, NSubstitute, bUnit, Testcontainers and Playwright, with an 80% line coverage gate on unit tests. The Azure side is API Management, Logic Apps, Service Bus, Key Vault, Entra ID, Application Insights and Container Apps. See [docs/coding-guidelines.md](docs/coding-guidelines.md) for the full rules.
 
 ## Running it locally
 
-Needs the .NET 10 SDK and Docker.
+Needs the .NET 10 SDK, Docker, and Node.js 20 or later (the TMS UI's stylesheet is built with Tailwind CSS, [ADR 0018](docs/adr/0018-the-tms-ui-is-styled-with-tailwind-in-flatlys-look.md)).
 
 ```bash
-dotnet run --project src/Norvia.AppHost      # TMS, SQL Server and the Service Bus emulator, with the Aspire dashboard
-dotnet test Norvia.slnx                      # unit, architecture and integration tests (the last start the AppHost)
+dotnet run --project src/Norvia.AppHost      # TMS API, TMS UI, SQL Server and the Service Bus emulator, with the Aspire dashboard
+dotnet test Norvia.slnx                      # unit, architecture, integration and UI tests (the last two start the AppHost)
 ```
 
 | Where | What |
 |---|---|
-| [src/](src/) | The applications: the Aspire AppHost and ServiceDefaults, and the TMS in Clean Architecture layers |
+| [src/](src/) | The applications: the Aspire AppHost and ServiceDefaults, and the TMS in Clean Architecture layers, with its Blazor UI in `Norvia.Tms.Web` |
 | [tests/](tests/) | Tests per project, mirroring `src/` |
 | [contracts/canonical-model/](contracts/canonical-model/) | The Canonical Model as JSON Schemas |
 | [seed/norvia.seed.json](seed/norvia.seed.json) | The seed file: the one source of Shippers, Carriers and Personas |
@@ -62,6 +62,8 @@ dotnet test Norvia.slnx                      # unit, architecture and integratio
 There is no Entra locally. The TMS trusts JWTs signed with the AppHost's secret parameter `local-token-signing-key` (issuer and audience in [LocalTokens.cs](src/Norvia.AppHost/LocalTokens.cs)), so submitting a Transport Order needs a token signed with that key, with the `TransportOrders.Intake` role and the local intake Logic App's client ID as `azp`. The integration tests issue their own.
 
 Set `NORVIA_TEST_LOG_FILE` to a path to keep the TMS's own logs from an integration test run.
+
+The TMS UI (`tms-web` on the Aspire dashboard) reads the TMS database through the TMS query side; it takes in nothing and publishes nothing. Its list of Transport Orders waiting for planning reads again every second (`LiveList:RefreshInterval`), so an accepted Transport Order appears without a refresh. The UI tests drive it with Playwright in headless Chromium, which their fixture installs on the first run. They keep a trace and a video of each failed test under `TestResults/playwright`, or under `$NORVIA_UI_TEST_ARTIFACTS/playwright` when that is set.
 
 CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the pull request gates of the coding guidelines on every PR and on `main`: a warning-free build, `dotnet format`, the vulnerable-package check, unit and architecture tests with the coverage gate, and the integration tests.
 

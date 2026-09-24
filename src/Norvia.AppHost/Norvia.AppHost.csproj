@@ -11,5 +11,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Tms\Norvia.Tms.Api\Norvia.Tms.Api.csproj" />
+    <ProjectReference Include="..\Tms\Norvia.Tms.Web\Norvia.Tms.Web.csproj" />
   </ItemGroup>
 </Project>
