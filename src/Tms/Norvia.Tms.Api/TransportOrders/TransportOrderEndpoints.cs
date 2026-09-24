@@ -16,30 +16,39 @@ public static class TransportOrderEndpoints
 {
     public const string CorrelationIdHeader = "X-Correlation-ID";
 
+    /// <summary>The app role only the intake Logic App's managed identity holds, so nothing bypasses the integration layer.</summary>
+    public const string IntakeRole = "TransportOrders.Intake";
+
+    /// <summary>The intake channel the caller submits for, such as <c>ShipperApi</c> from the intake Logic App.</summary>
+    public const string IntakeChannelHeader = "X-Intake-Channel";
+
     public static IEndpointRouteBuilder MapTransportOrders(this IEndpointRouteBuilder app)
     {
         var transportOrders = app.NewVersionedApi("TransportOrders")
             .MapGroup("/v{version:apiVersion}/transport-orders")
-            .HasApiVersion(1)
-            // Authorization for the intake Logic App (commands) and API Management (queries) arrives with #20.
-            .AllowAnonymous();
+            .HasApiVersion(1);
 
         transportOrders.MapPost("/", SubmitAsync)
             .WithName("SubmitTransportOrder")
+            .RequireAuthorization(policy => policy.RequireRole(IntakeRole))
             .WithSummary("Submit a Transport Order (Canonical Model) on behalf of the Shipper it names.")
             .WithDescription(
                 "A booking that breaks Transport Order rules gets a 422 listing every reason. It is kept as Rejected, readable at the problem's instance. "
                 + "Submitting the same booking again (same Shipper, Shipper reference and content) gets a 200 with the original Transport Order, "
                 + "flagged as a repeat; reusing a Shipper reference for different content is rejected with ShipperReferenceReused.");
 
-        transportOrders.MapGet("/{id:guid}", GetByIdAsync)
+        // Reads stay open until their callers exist: the TMS UI (#21) and API Management's Shipper tracking role (P8)
+        // bring the roles they are authorized on.
+        var queries = transportOrders.MapGroup("").AllowAnonymous();
+
+        queries.MapGet("/{id:guid}", GetByIdAsync)
             .WithName("GetTransportOrderById")
             .WithSummary("Read a Transport Order or a Rejected booking by its ID.");
 
-        transportOrders.MapGet("/{transportOrderNumber}", GetAsync)
+        queries.MapGet("/{transportOrderNumber}", GetAsync)
             .WithName("GetTransportOrder");
 
-        transportOrders.MapGet("/", ListAsync)
+        queries.MapGet("/", ListAsync)
             .WithName("ListTransportOrders");
 
         return app;
@@ -47,17 +56,23 @@ public static class TransportOrderEndpoints
 
     private static async Task<Results<Created<AcceptedTransportOrder>, Ok<AcceptedTransportOrder>, ProblemHttpResult, ValidationProblem>> SubmitAsync(
         [FromHeader(Name = CorrelationIdHeader)] string? correlationId,
+        [FromHeader(Name = IntakeChannelHeader)] string? channel,
         CanonicalTransportOrder transportOrder,
         IMediator mediator,
         CancellationToken cancellationToken)
     {
         var errors = CanonicalShape.Check(transportOrder, correlationId);
+        if (!TryParseIntakeChannel(channel, out var intakeChannel))
+        {
+            errors[IntakeChannelHeader] = [$"The intake channel header is required and must be one of: {string.Join(", ", Enum.GetNames<IntakeChannel>())}."];
+        }
+
         if (errors.Count > 0)
         {
             return TypedResults.ValidationProblem(errors);
         }
 
-        var result = (await mediator.Send(new SubmitTransportOrderCommand(transportOrder, correlationId!), cancellationToken)).Value;
+        var result = (await mediator.Send(new SubmitTransportOrderCommand(transportOrder, intakeChannel, correlationId!), cancellationToken)).Value;
         if (result.Status == TransportOrderStatus.Rejected)
         {
             return TypedResults.Problem(
@@ -72,6 +87,14 @@ public static class TransportOrderEndpoints
         return result.Repeat
             ? TypedResults.Ok(accepted)
             : TypedResults.Created($"/v1/transport-orders/{result.TransportOrderNumber}", accepted);
+    }
+
+    // Only a channel's exact name counts: Enum.TryParse alone would also take "1" or "shipperapi".
+    private static bool TryParseIntakeChannel(string? value, out IntakeChannel channel)
+    {
+        channel = default;
+        return Enum.GetNames<IntakeChannel>().Contains(value, StringComparer.Ordinal)
+            && Enum.TryParse(value, out channel);
     }
 
     private static async Task<Results<Ok<TransportOrderView>, ProblemHttpResult>> GetAsync(

@@ -53,6 +53,10 @@ internal sealed class TransportOrderConfiguration : IEntityTypeConfiguration<Tra
             .HasMaxLength(20);
         builder.HasIndex(order => new { order.Status, order.ReceivedAt });
 
+        builder.Property(order => order.Channel)
+            .HasConversion<string>()
+            .HasMaxLength(20);
+
         builder.Property(order => order.CorrelationId)
             .HasConversion(id => id.Value, value => new CorrelationId(value))
             .HasMaxLength(128)

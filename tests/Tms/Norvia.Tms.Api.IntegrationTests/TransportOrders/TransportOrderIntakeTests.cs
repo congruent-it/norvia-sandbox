@@ -43,6 +43,7 @@ public sealed class TransportOrderIntakeTests(TmsFixture tms)
         order["status"]!.GetValue<string>().Should().Be("Accepted");
         order["shipper"]!["id"]!.GetValue<string>().Should().Be("SHP-0001");
         order["shipper"]!["name"]!.GetValue<string>().Should().Be("Brouwer Dranken", "the TMS loads its Shippers from the seed file");
+        order["channel"]!.GetValue<string>().Should().Be("ShipperApi");
         order["correlationId"]!.GetValue<string>().Should().Be(correlationId);
         ShouldBeTheSubmittedTransportOrder(order["transportOrder"]!, booking, number);
     }
@@ -99,11 +100,46 @@ public sealed class TransportOrderIntakeTests(TmsFixture tms)
         {
             Content = JsonContent.Create(Bookings.Valid(NewReference())),
         };
+        request.Headers.Add("X-Intake-Channel", "ShipperApi");
 
         using var response = await tms.Tms.SendAsync(request, _cancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         response.Content.Headers.ContentType!.MediaType.Should().Be("application/problem+json");
+    }
+
+    [Fact]
+    public async Task Submit_WithoutIntakeChannel_IsABadRequest()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("/v1/transport-orders", UriKind.Relative))
+        {
+            Content = JsonContent.Create(Bookings.Valid(NewReference())),
+        };
+        request.Headers.Add("X-Correlation-ID", NewCorrelationId());
+
+        using var response = await tms.Tms.SendAsync(request, _cancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await ReadJsonAsync(response))["errors"]!["X-Intake-Channel"].Should().NotBeNull();
+    }
+
+    [Theory]
+    [InlineData("Edi")]
+    [InlineData("shipperapi")]
+    [InlineData("1")]
+    public async Task Submit_UnknownIntakeChannel_IsABadRequest(string channel)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("/v1/transport-orders", UriKind.Relative))
+        {
+            Content = JsonContent.Create(Bookings.Valid(NewReference())),
+        };
+        request.Headers.Add("X-Correlation-ID", NewCorrelationId());
+        request.Headers.Add("X-Intake-Channel", channel);
+
+        using var response = await tms.Tms.SendAsync(request, _cancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await ReadJsonAsync(response))["errors"]!["X-Intake-Channel"].Should().NotBeNull();
     }
 
     [Fact]
@@ -200,6 +236,7 @@ public sealed class TransportOrderIntakeTests(TmsFixture tms)
             Content = JsonContent.Create(booking),
         };
         request.Headers.Add("X-Correlation-ID", correlationId);
+        request.Headers.Add("X-Intake-Channel", "ShipperApi");
         return await tms.Tms.SendAsync(request, _cancellationToken);
     }
 

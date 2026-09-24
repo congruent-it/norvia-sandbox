@@ -222,6 +222,7 @@ public sealed class TransportOrderRejectionTests(TmsFixture tms)
             Content = JsonContent.Create(booking),
         };
         request.Headers.Add("X-Correlation-ID", correlationId);
+        request.Headers.Add("X-Intake-Channel", "ShipperApi");
         return await tms.Tms.SendAsync(request, _cancellationToken);
     }
 

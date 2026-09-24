@@ -12,7 +12,7 @@ public sealed class TransportOrderTests
     {
         var number = TransportOrderNumber.FromSequence(7);
 
-        var order = TransportOrder.Accept(new ShipperId("SHP-0001"), SampleDetails(), number, new CorrelationId("corr-1"), ReceivedAt);
+        var order = TransportOrder.Accept(new ShipperId("SHP-0001"), SampleDetails(), number, IntakeChannel.ShipperApi, new CorrelationId("corr-1"), ReceivedAt);
 
         order.Status.Should().Be(TransportOrderStatus.Accepted);
         order.Number.Should().Be(number);
@@ -23,7 +23,7 @@ public sealed class TransportOrderTests
     {
         var details = SampleDetails();
 
-        var order = TransportOrder.Accept(new ShipperId("SHP-0001"), details, TransportOrderNumber.FromSequence(7), new CorrelationId("corr-1"), ReceivedAt);
+        var order = TransportOrder.Accept(new ShipperId("SHP-0001"), details, TransportOrderNumber.FromSequence(7), IntakeChannel.ShipperApi, new CorrelationId("corr-1"), ReceivedAt);
 
         order.ShipperId.Should().Be(new ShipperId("SHP-0001"));
         order.Details.Should().Be(details);
@@ -32,9 +32,25 @@ public sealed class TransportOrderTests
     }
 
     [Fact]
+    public void Accept_Booking_RecordsTheIntakeChannelItCameFrom()
+    {
+        var order = TransportOrder.Accept(new ShipperId("SHP-0001"), SampleDetails(), TransportOrderNumber.FromSequence(7), IntakeChannel.ShipperApi, new CorrelationId("corr-1"), ReceivedAt);
+
+        order.Channel.Should().Be(IntakeChannel.ShipperApi);
+    }
+
+    [Fact]
+    public void Reject_Booking_RecordsTheIntakeChannelItCameFrom()
+    {
+        var order = TransportOrder.Reject(new ShipperId("SHP-0001"), SampleDetails(), [Inactive], IntakeChannel.ShipperApi, new CorrelationId("corr-1"), ReceivedAt);
+
+        order.Channel.Should().Be(IntakeChannel.ShipperApi);
+    }
+
+    [Fact]
     public void Accept_Booking_RaisesTransportOrderAccepted()
     {
-        var order = TransportOrder.Accept(new ShipperId("SHP-0001"), SampleDetails(), TransportOrderNumber.FromSequence(7), new CorrelationId("corr-1"), ReceivedAt);
+        var order = TransportOrder.Accept(new ShipperId("SHP-0001"), SampleDetails(), TransportOrderNumber.FromSequence(7), IntakeChannel.ShipperApi, new CorrelationId("corr-1"), ReceivedAt);
 
         order.DomainEvents.Should().ContainSingle()
             .Which.Should().BeOfType<TransportOrderAcceptedEvent>()
@@ -46,7 +62,7 @@ public sealed class TransportOrderTests
     {
         RejectionReason[] reasons = [new(RejectionCode.InactiveShipper, "Inactive."), new(RejectionCode.GoodsLinesMissing, "No goods.")];
 
-        var order = TransportOrder.Reject(new ShipperId("SHP-0001"), SampleDetails(), reasons, new CorrelationId("corr-1"), ReceivedAt);
+        var order = TransportOrder.Reject(new ShipperId("SHP-0001"), SampleDetails(), reasons, IntakeChannel.ShipperApi, new CorrelationId("corr-1"), ReceivedAt);
 
         order.Status.Should().Be(TransportOrderStatus.Rejected);
         order.Number.Should().BeNull();
@@ -58,7 +74,7 @@ public sealed class TransportOrderTests
     {
         var details = SampleDetails();
 
-        var order = TransportOrder.Reject(new ShipperId("SHP-0001"), details, [Inactive], new CorrelationId("corr-1"), ReceivedAt);
+        var order = TransportOrder.Reject(new ShipperId("SHP-0001"), details, [Inactive], IntakeChannel.ShipperApi, new CorrelationId("corr-1"), ReceivedAt);
 
         order.ShipperId.Should().Be(new ShipperId("SHP-0001"));
         order.Details.Should().Be(details);
@@ -69,7 +85,7 @@ public sealed class TransportOrderTests
     [Fact]
     public void Reject_Booking_RaisesTransportOrderRejected()
     {
-        var order = TransportOrder.Reject(new ShipperId("SHP-0001"), SampleDetails(), [Inactive], new CorrelationId("corr-1"), ReceivedAt);
+        var order = TransportOrder.Reject(new ShipperId("SHP-0001"), SampleDetails(), [Inactive], IntakeChannel.ShipperApi, new CorrelationId("corr-1"), ReceivedAt);
 
         order.DomainEvents.Should().ContainSingle()
             .Which.Should().BeOfType<TransportOrderRejectedEvent>()
@@ -79,7 +95,7 @@ public sealed class TransportOrderTests
     [Fact]
     public void Reject_WithoutReasons_Throws()
     {
-        var act = () => TransportOrder.Reject(new ShipperId("SHP-0001"), SampleDetails(), [], new CorrelationId("corr-1"), ReceivedAt);
+        var act = () => TransportOrder.Reject(new ShipperId("SHP-0001"), SampleDetails(), [], IntakeChannel.ShipperApi, new CorrelationId("corr-1"), ReceivedAt);
 
         act.Should().Throw<ArgumentException>();
     }
@@ -87,7 +103,7 @@ public sealed class TransportOrderTests
     [Fact]
     public void Accept_Booking_HasNoRejectionReasons()
     {
-        var order = TransportOrder.Accept(new ShipperId("SHP-0001"), SampleDetails(), TransportOrderNumber.FromSequence(7), new CorrelationId("corr-1"), ReceivedAt);
+        var order = TransportOrder.Accept(new ShipperId("SHP-0001"), SampleDetails(), TransportOrderNumber.FromSequence(7), IntakeChannel.ShipperApi, new CorrelationId("corr-1"), ReceivedAt);
 
         order.RejectionReasons.Should().BeEmpty();
     }
@@ -95,7 +111,7 @@ public sealed class TransportOrderTests
     [Fact]
     public void Accept_Booking_HoldsItsShipperReference()
     {
-        var order = TransportOrder.Accept(new ShipperId("SHP-0001"), SampleDetails(), TransportOrderNumber.FromSequence(7), new CorrelationId("corr-1"), ReceivedAt);
+        var order = TransportOrder.Accept(new ShipperId("SHP-0001"), SampleDetails(), TransportOrderNumber.FromSequence(7), IntakeChannel.ShipperApi, new CorrelationId("corr-1"), ReceivedAt);
 
         order.ShipperReference.Should().Be("BD-2026-0001");
     }
@@ -103,7 +119,7 @@ public sealed class TransportOrderTests
     [Fact]
     public void Reject_Booking_HoldsNoShipperReference()
     {
-        var order = TransportOrder.Reject(new ShipperId("SHP-0001"), SampleDetails(), [Inactive], new CorrelationId("corr-1"), ReceivedAt);
+        var order = TransportOrder.Reject(new ShipperId("SHP-0001"), SampleDetails(), [Inactive], IntakeChannel.ShipperApi, new CorrelationId("corr-1"), ReceivedAt);
 
         order.ShipperReference.Should().BeNull("a Rejected booking leaves its Shipper reference free for a corrected booking");
     }
@@ -111,7 +127,7 @@ public sealed class TransportOrderTests
     [Fact]
     public void IsRepeatOf_SameContent_IsARepeat()
     {
-        var order = TransportOrder.Accept(new ShipperId("SHP-0001"), SampleDetails(), TransportOrderNumber.FromSequence(7), new CorrelationId("corr-1"), ReceivedAt);
+        var order = TransportOrder.Accept(new ShipperId("SHP-0001"), SampleDetails(), TransportOrderNumber.FromSequence(7), IntakeChannel.ShipperApi, new CorrelationId("corr-1"), ReceivedAt);
 
         order.IsRepeatOf(SampleDetails()).Should().BeTrue();
     }
@@ -119,7 +135,7 @@ public sealed class TransportOrderTests
     [Fact]
     public void IsRepeatOf_DifferentContent_IsNotARepeat()
     {
-        var order = TransportOrder.Accept(new ShipperId("SHP-0001"), SampleDetails(), TransportOrderNumber.FromSequence(7), new CorrelationId("corr-1"), ReceivedAt);
+        var order = TransportOrder.Accept(new ShipperId("SHP-0001"), SampleDetails(), TransportOrderNumber.FromSequence(7), IntakeChannel.ShipperApi, new CorrelationId("corr-1"), ReceivedAt);
 
         order.IsRepeatOf(SampleDetails() with { Instructions = "Call ahead" }).Should().BeFalse();
     }

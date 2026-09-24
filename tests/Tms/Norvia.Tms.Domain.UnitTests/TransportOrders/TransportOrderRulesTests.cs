@@ -428,7 +428,7 @@ public sealed class TransportOrderRulesTests
     }
 
     private static TransportOrder AcceptedWith(TransportOrderDetails details) => TransportOrder.Accept(
-        BrouwerDranken.Id, details, TransportOrderNumber.FromSequence(7), new CorrelationId("corr-original"), Now.AddDays(-1));
+        BrouwerDranken.Id, details, TransportOrderNumber.FromSequence(7), IntakeChannel.ShipperApi, new CorrelationId("corr-original"), Now.AddDays(-1));
 
     private static RejectionCode[] CodesOf(IEnumerable<RejectionReason> reasons) => [.. reasons.Select(reason => reason.Code)];
 

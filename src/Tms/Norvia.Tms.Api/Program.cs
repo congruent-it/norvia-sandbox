@@ -1,5 +1,8 @@
 using System.Text.Json.Serialization;
+using Ardalis.Result;
 using Asp.Versioning;
+using Mediator;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Norvia.Tms.Api.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.Submit;
 using Norvia.Tms.Domain.TransportOrders;
@@ -9,7 +12,23 @@ using Scalar.AspNetCore;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+builder.Services.AddScoped<IPipelineBehavior<SubmitTransportOrderCommand, Result<SubmitTransportOrderResult>>, TrackIntakeInLoggingScope>();
 builder.AddTmsInfrastructure();
+
+// Issuer, audience and keys come from Authentication:Schemes:Bearer: Entra in Azure, the AppHost's local key otherwise.
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        // Entra puts a managed identity's app roles in the "roles" claim; keep claims as the token names them.
+        options.MapInboundClaims = false;
+        options.TokenValidationParameters.RoleClaimType = "roles";
+
+        // Configuration switches these checks off when it names no issuer or audience; a TMS that isn't told whom to
+        // trust must trust no one.
+        options.TokenValidationParameters.ValidateIssuer = true;
+        options.TokenValidationParameters.ValidateAudience = true;
+    });
+builder.Services.AddAuthorization();
 
 builder.Services.AddMediator(options =>
 {
@@ -48,6 +67,8 @@ app.UseExceptionHandler(new ExceptionHandlerOptions
         : StatusCodes.Status500InternalServerError,
 });
 app.UseStatusCodePages();
+app.UseAuthentication();
+app.UseAuthorization();
 
 // API Management imports the OpenAPI document (coding guidelines §6), so it's published in every environment.
 app.MapOpenApi().WithDocumentPerVersion();

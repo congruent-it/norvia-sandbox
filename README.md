@@ -59,6 +59,8 @@ dotnet test Norvia.slnx                      # unit, architecture and integratio
 | [contracts/canonical-model/](contracts/canonical-model/) | The Canonical Model as JSON Schemas |
 | [seed/norvia.seed.json](seed/norvia.seed.json) | The seed file: the one source of Shippers, Carriers and Personas |
 
+There is no Entra locally. The TMS trusts JWTs signed with the AppHost's secret parameter `local-token-signing-key` (issuer and audience in [LocalTokens.cs](src/Norvia.AppHost/LocalTokens.cs)), so submitting a Transport Order needs a token with the `TransportOrders.Intake` role signed with that key. The integration tests issue their own.
+
 Set `NORVIA_TEST_LOG_FILE` to a path to keep the TMS's own logs from an integration test run.
 
 CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the pull request gates of the coding guidelines on every PR and on `main`: a warning-free build, `dotnet format`, the vulnerable-package check, unit and architecture tests with the coverage gate, and the integration tests.

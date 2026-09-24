@@ -33,8 +33,8 @@ public sealed class SubmitTransportOrderHandler(
 
         var reasons = rules.Check(shippers.Find(shipperId), details, receivedAt, referenceHolder);
         var order = reasons.Count > 0
-            ? TransportOrder.Reject(shipperId, details, reasons, correlationId, receivedAt)
-            : TransportOrder.Accept(shipperId, details, await numbers.NextAsync(cancellationToken), correlationId, receivedAt);
+            ? TransportOrder.Reject(shipperId, details, reasons, command.Channel, correlationId, receivedAt)
+            : TransportOrder.Accept(shipperId, details, await numbers.NextAsync(cancellationToken), command.Channel, correlationId, receivedAt);
 
         await repository.AddAsync(order, cancellationToken);
 
