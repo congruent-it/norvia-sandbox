@@ -16,7 +16,7 @@
 {
     @if (_list.LastReadFailed)
     {
-        <div role="alert">
+        <div role="alert" class="mb-4">
             <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
                 The Transport Orders waiting for planning couldn't be loaded. Trying again…
             </FluentMessageBar>
@@ -34,7 +34,7 @@ else
 {
     @if (_list.LastReadFailed)
     {
-        <div role="alert">
+        <div role="alert" class="mb-4">
             <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
                 The list couldn't be refreshed and may be out of date. Trying again…
             </FluentMessageBar>
@@ -51,7 +51,7 @@ else
     }
     else
     {
-        <FluentDataGrid Items="transportOrders.AsQueryable()" TGridItem="TransportOrderSummary" aria-label="Transport Orders waiting for planning">
+        <FluentDataGrid Items="transportOrders.AsQueryable()" TGridItem="TransportOrderSummary" Class="flatly-table" aria-label="Transport Orders waiting for planning">
             <TemplateColumn Title="Transport Order">
                 <a href="/transport-orders/@context.TransportOrderNumber">@context.TransportOrderNumber</a>
             </TemplateColumn>

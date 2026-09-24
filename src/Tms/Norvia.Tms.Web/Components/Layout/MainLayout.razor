@@ -1,25 +1,26 @@
 @inherits LayoutComponentBase
 
-<FluentLayout>
-    <FluentHeader>
-        <a class="app-title" href="/">Norvia TMS</a>
-    </FluentHeader>
-    <FluentStack Orientation="Orientation.Horizontal" Class="app-body" HorizontalGap="0">
-        <nav aria-label="Main">
-            <FluentNavMenu Width="220" Title="Main">
-                <FluentNavLink Href="/transport-orders" Match="NavLinkMatch.Prefix">Waiting for planning</FluentNavLink>
-            </FluentNavMenu>
-        </nav>
-        <FluentBodyContent Class="app-content">
-            <main>
-                @Body
-            </main>
-        </FluentBodyContent>
-    </FluentStack>
-</FluentLayout>
+@* Fluent UI's own components take Flatly's navy as their accent, and stay light as Flatly is. *@
+<FluentDesignTheme Mode="DesignThemeModes.Light" CustomColor="#2c3e50" />
+
+@* Flatly's navbar: navy, with the brand and the main navigation in white. *@
+<header class="bg-primary text-white">
+    <nav aria-label="Main" class="mx-auto flex max-w-7xl flex-wrap items-center gap-x-8 gap-y-2 px-4 py-4">
+        <a href="/" class="text-xl font-bold text-white no-underline hover:text-white">Norvia TMS</a>
+        <NavLink href="/transport-orders" Match="NavLinkMatch.Prefix"
+                 class="text-white/75 no-underline hover:text-success"
+                 ActiveClass="!text-white">
+            Waiting for planning
+        </NavLink>
+    </nav>
+</header>
+
+<main class="mx-auto max-w-7xl px-4 py-8">
+    @Body
+</main>
 
 <div id="blazor-error-ui" data-nosnippet>
     <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
-        Something went wrong. <a href="" class="reload">Reload</a>
+        Something went wrong. <a href="" class="reload text-white">Reload</a>
     </FluentMessageBar>
 </div>

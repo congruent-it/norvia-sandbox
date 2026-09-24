@@ -41,11 +41,11 @@ Every concept has one system of record ([ADR 0002](docs/adr/0002-one-system-of-r
 
 ## Tech stack
 
-.NET 10 with Clean Architecture, EF Core with Ardalis repositories and specifications, Minimal APIs, and Blazor with Fluent UI components for web UIs. Tests use xUnit, NSubstitute, bUnit, Testcontainers and Playwright, with an 80% line coverage gate on unit tests. The Azure side is API Management, Logic Apps, Service Bus, Key Vault, Entra ID, Application Insights and Container Apps. See [docs/coding-guidelines.md](docs/coding-guidelines.md) for the full rules.
+.NET 10 with Clean Architecture, EF Core with Ardalis repositories and specifications, Minimal APIs, and Blazor with Fluent UI components for web UIs, styled with Tailwind CSS in the TMS UI. Tests use xUnit, NSubstitute, bUnit, Testcontainers and Playwright, with an 80% line coverage gate on unit tests. The Azure side is API Management, Logic Apps, Service Bus, Key Vault, Entra ID, Application Insights and Container Apps. See [docs/coding-guidelines.md](docs/coding-guidelines.md) for the full rules.
 
 ## Running it locally
 
-Needs the .NET 10 SDK and Docker.
+Needs the .NET 10 SDK, Docker, and Node.js 20 or later (the TMS UI's stylesheet is built with Tailwind CSS, [ADR 0018](docs/adr/0018-the-tms-ui-is-styled-with-tailwind-in-flatlys-look.md)).
 
 ```bash
 dotnet run --project src/Norvia.AppHost      # TMS API, TMS UI, SQL Server and the Service Bus emulator, with the Aspire dashboard

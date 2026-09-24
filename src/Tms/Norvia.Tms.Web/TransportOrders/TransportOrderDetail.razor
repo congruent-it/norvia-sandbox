@@ -8,7 +8,7 @@
 
 <PageTitle>@TransportOrderNumber · Norvia TMS</PageTitle>
 
-<FluentAnchor Href="/transport-orders" Appearance="Appearance.Hypertext">Back to the Transport Orders waiting for planning</FluentAnchor>
+<p class="mb-2"><a href="/transport-orders">← Back to the Transport Orders waiting for planning</a></p>
 
 <h1>Transport Order @TransportOrderNumber</h1>
 
@@ -22,7 +22,7 @@
 }
 else if (!_loaded)
 {
-    <FluentStack VerticalAlignment="VerticalAlignment.Center" role="status">
+    <FluentStack VerticalAlignment="VerticalAlignment.Center" role="status" Class="text-muted">
         <FluentProgressRing />
         <span>Loading Transport Order @TransportOrderNumber…</span>
     </FluentStack>
@@ -41,9 +41,9 @@ else
     var collection = submitted.Collection;
     var delivery = submitted.Delivery;
 
-    <div class="detail-sections">
+    <div class="mb-4 grid gap-4 md:grid-cols-3">
         <TransportOrderSection Heading="Transport Order">
-            <dl>
+            <dl class="detail-list">
                 <dt>Status</dt>
                 <dd>@_transportOrder.Status</dd>
                 <dt>Shipper</dt>
@@ -58,7 +58,7 @@ else
         </TransportOrderSection>
 
         <TransportOrderSection Heading="Collection">
-            <dl>
+            <dl class="detail-list">
                 <dt>Address</dt>
                 <dd>@FormatAddress(collection?.Address)</dd>
                 <dt>Window</dt>
@@ -67,7 +67,7 @@ else
         </TransportOrderSection>
 
         <TransportOrderSection Heading="Delivery">
-            <dl>
+            <dl class="detail-list">
                 <dt>Address</dt>
                 <dd>@FormatAddress(delivery?.Address)</dd>
                 <dt>Consignee</dt>
@@ -87,11 +87,11 @@ else
     <TransportOrderSection Heading="Goods">
         @if (submitted.GoodsLines is not { Count: > 0 } goodsLines)
         {
-            <p>No goods lines were given.</p>
+            <p class="m-0">No goods lines were given.</p>
         }
         else
         {
-            <FluentDataGrid Items="goodsLines.AsQueryable()" TGridItem="CanonicalGoodsLine" aria-label="Goods lines">
+            <FluentDataGrid Items="goodsLines.AsQueryable()" TGridItem="CanonicalGoodsLine" Class="flatly-table" aria-label="Goods lines">
                 <PropertyColumn Title="Package type" Property="@(line => Given(line.PackageType))" />
                 <PropertyColumn Title="Quantity" Property="@(line => FormatNumber(line.Quantity))" />
                 <PropertyColumn Title="Weight (kg)" Property="@(line => FormatNumber(line.WeightKg))" />
@@ -100,8 +100,10 @@ else
         }
     </TransportOrderSection>
 
+    <div class="h-4"></div>
+
     <TransportOrderSection Heading="Instructions">
-        <p>@Given(submitted.Instructions)</p>
+        <p class="m-0 whitespace-pre-line">@Given(submitted.Instructions)</p>
     </TransportOrderSection>
 }
 

@@ -32,6 +32,13 @@ jobs:
         with:
           global-json-file: global.json
 
+      # The TMS UI's stylesheet is built with Tailwind CSS during the .NET build (ADR 0018).
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/Tms/Norvia.Tms.Web/package-lock.json
+
       - uses: actions/cache@v4
         with:
           path: ${{ env.NUGET_PACKAGES }}
@@ -97,6 +104,13 @@ jobs:
       - uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
+
+      # The TMS UI's stylesheet is built with Tailwind CSS during the .NET build (ADR 0018).
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/Tms/Norvia.Tms.Web/package-lock.json
 
       - uses: actions/cache@v4
         with:

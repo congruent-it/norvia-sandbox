@@ -1,9 +1,9 @@
-@* A titled part of a Transport Order's detail, a region named by its heading. *@
-<section aria-labelledby="@_headingId">
-    <FluentCard>
-        <h2 id="@_headingId">@Heading</h2>
+@* A titled part of a Transport Order's detail, drawn as a Flatly card: a region named by its heading. *@
+<section aria-labelledby="@_headingId" class="rounded-flatly border border-border">
+    <h2 id="@_headingId" class="!mb-0 border-b border-border bg-black/[0.03] px-4 py-3 !text-base">@Heading</h2>
+    <div class="px-4 py-3">
         @ChildContent
-    </FluentCard>
+    </div>
 </section>
 
 @code {
