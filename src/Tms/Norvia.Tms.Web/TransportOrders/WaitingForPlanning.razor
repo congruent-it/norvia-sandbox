@@ -1,0 +1,76 @@
+@page "/"
+@page "/transport-orders"
+@rendermode InteractiveServer
+@using Microsoft.Extensions.Options
+@implements IAsyncDisposable
+@inject ITransportOrderQueries Queries
+@inject TimeProvider Time
+@inject IOptions<LiveListOptions> Options
+@inject ILogger<LiveTransportOrderList> Logger
+
+<PageTitle>Waiting for planning · Norvia TMS</PageTitle>
+
+<h1>Transport Orders waiting for planning</h1>
+
+@if (_list.Orders is not { } orders)
+{
+    @if (_list.LastReadFailed)
+    {
+        <div role="alert">
+            <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+                The Transport Orders waiting for planning couldn't be loaded. Trying again…
+            </FluentMessageBar>
+        </div>
+    }
+    else
+    {
+        <FluentStack VerticalAlignment="VerticalAlignment.Center" role="status">
+            <FluentProgressRing />
+            <span>Loading the Transport Orders waiting for planning…</span>
+        </FluentStack>
+    }
+}
+else
+{
+    @if (_list.LastReadFailed)
+    {
+        <div role="alert">
+            <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
+                The list couldn't be refreshed and may be out of date. Trying again…
+            </FluentMessageBar>
+        </div>
+    }
+
+    @if (orders.Count == 0)
+    {
+        <div role="status">
+            <FluentMessageBar Intent="MessageIntent.Info" AllowDismiss="false">
+                No Transport Orders are waiting for planning. A Transport Order appears here as soon as it is accepted.
+            </FluentMessageBar>
+        </div>
+    }
+    else
+    {
+        <FluentDataGrid Items="orders.AsQueryable()" TGridItem="TransportOrderSummary" aria-label="Transport Orders waiting for planning">
+            <TemplateColumn Title="Transport Order">
+                <a href="/transport-orders/@context.TransportOrderNumber">@context.TransportOrderNumber</a>
+            </TemplateColumn>
+            <PropertyColumn Title="Shipper" Property="@(order => order.Shipper.Name ?? order.Shipper.Id)" />
+            <PropertyColumn Title="Shipper reference" Property="@(order => order.ShipperReference)" />
+            <PropertyColumn Title="Collection window" Property="@(order => NorviaTime.FormatWindow(order.CollectionEarliest, order.CollectionLatest))" />
+        </FluentDataGrid>
+    }
+}
+
+@code {
+    private LiveTransportOrderList _list = null!;
+
+    protected override void OnInitialized()
+    {
+        _list = new LiveTransportOrderList(Queries, Time, Options.Value.RefreshInterval, Logger);
+        _list.Changed += () => InvokeAsync(StateHasChanged);
+        _list.Start();
+    }
+
+    public ValueTask DisposeAsync() => _list.DisposeAsync();
+}

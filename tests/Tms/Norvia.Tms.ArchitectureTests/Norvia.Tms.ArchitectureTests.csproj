@@ -13,5 +13,6 @@
     <Using Include="Xunit" />
     <Using Include="AwesomeAssertions" />
     <ProjectReference Include="..\..\..\src\Tms\Norvia.Tms.Api\Norvia.Tms.Api.csproj" />
+    <ProjectReference Include="..\..\..\src\Tms\Norvia.Tms.Web\Norvia.Tms.Web.csproj" />
   </ItemGroup>
 </Project>

@@ -1,0 +1,131 @@
+@page "/transport-orders/{TransportOrderNumber}"
+@* Interactive like the list: Fluent UI's components don't survive static streaming rendering. *@
+@rendermode InteractiveServer
+@implements IDisposable
+@using Norvia.Tms.Application.CanonicalModel
+@inject ITransportOrderQueries Queries
+@inject ILogger<TransportOrderDetail> Logger
+
+<PageTitle>@TransportOrderNumber · Norvia TMS</PageTitle>
+
+<FluentAnchor Href="/transport-orders" Appearance="Appearance.Hypertext">Back to the Transport Orders waiting for planning</FluentAnchor>
+
+<h1>Transport Order @TransportOrderNumber</h1>
+
+@if (_failed)
+{
+    <div role="alert">
+        <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+            Transport Order @TransportOrderNumber couldn't be loaded. Reload the page to try again.
+        </FluentMessageBar>
+    </div>
+}
+else if (!_loaded)
+{
+    <FluentStack VerticalAlignment="VerticalAlignment.Center" role="status">
+        <FluentProgressRing />
+        <span>Loading Transport Order @TransportOrderNumber…</span>
+    </FluentStack>
+}
+else if (_order is null)
+{
+    <div role="status">
+        <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
+            There is no Transport Order @TransportOrderNumber.
+        </FluentMessageBar>
+    </div>
+}
+else
+{
+    var submitted = _order.TransportOrder;
+    var collection = submitted.Collection;
+    var delivery = submitted.Delivery;
+
+    <div class="detail-sections">
+        <TransportOrderSection Heading="Booking">
+            <dl>
+                <dt>Status</dt>
+                <dd>@_order.Status</dd>
+                <dt>Shipper</dt>
+                <dd>@(_order.Shipper.Name ?? _order.Shipper.Id)</dd>
+                <dt>Shipper reference</dt>
+                <dd>@Given(submitted.ShipperReference)</dd>
+                <dt>Received</dt>
+                <dd>@NorviaTime.Format(_order.ReceivedAt)</dd>
+                <dt>Correlation ID</dt>
+                <dd>@_order.CorrelationId</dd>
+            </dl>
+        </TransportOrderSection>
+
+        <TransportOrderSection Heading="Collection">
+            <dl>
+                <dt>Address</dt>
+                <dd>@FormatAddress(collection?.Address)</dd>
+                <dt>Window</dt>
+                <dd>@NorviaTime.FormatWindow(collection?.Window?.Earliest, collection?.Window?.Latest)</dd>
+            </dl>
+        </TransportOrderSection>
+
+        <TransportOrderSection Heading="Delivery">
+            <dl>
+                <dt>Address</dt>
+                <dd>@FormatAddress(delivery?.Address)</dd>
+                <dt>Consignee</dt>
+                <dd>@Given(delivery?.Consignee?.Name)</dd>
+                <dt>Contact</dt>
+                <dd>@Given(delivery?.Consignee?.ContactName)</dd>
+                <dt>Phone</dt>
+                <dd>@Given(delivery?.Consignee?.Phone)</dd>
+                <dt>Email</dt>
+                <dd>@Given(delivery?.Consignee?.Email)</dd>
+                <dt>Window</dt>
+                <dd>@NorviaTime.FormatWindow(delivery?.Window?.Earliest, delivery?.Window?.Latest)</dd>
+            </dl>
+        </TransportOrderSection>
+    </div>
+
+    <TransportOrderSection Heading="Goods">
+        <FluentDataGrid Items="(submitted.GoodsLines ?? []).AsQueryable()" TGridItem="CanonicalGoodsLine" aria-label="Goods lines">
+            <PropertyColumn Title="Package type" Property="@(line => Given(line.PackageType))" />
+            <PropertyColumn Title="Quantity" Property="@(line => FormatNumber(line.Quantity))" />
+            <PropertyColumn Title="Weight (kg)" Property="@(line => FormatNumber(line.WeightKg))" />
+            <PropertyColumn Title="Dimensions (cm, L × W × H)" Property="@(line => FormatDimensions(line.DimensionsCm))" />
+        </FluentDataGrid>
+    </TransportOrderSection>
+
+    <TransportOrderSection Heading="Instructions">
+        <p>@Given(submitted.Instructions)</p>
+    </TransportOrderSection>
+}
+
+@code {
+    private bool _loaded;
+    private bool _failed;
+    private readonly CancellationTokenSource _closed = new();
+    private TransportOrderView? _order;
+
+    [Parameter, EditorRequired]
+    public string TransportOrderNumber { get; set; } = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loaded = _failed = false;
+        _order = null;
+        try
+        {
+            _order = await Queries.FindAsync(TransportOrderNumber, _closed.Token);
+            _loaded = true;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning(exception, "Reading Transport Order {TransportOrderNumber} failed", TransportOrderNumber);
+            _failed = true;
+        }
+    }
+
+    public void Dispose()
+    {
+        _closed.Cancel();
+        _closed.Dispose();
+    }
+}

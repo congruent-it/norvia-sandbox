@@ -38,8 +38,8 @@ public static class TransportOrderEndpoints
                 + "Submitting the same booking again (same Shipper, Shipper reference and content) gets a 200 with the original Transport Order, "
                 + "flagged as a repeat; reusing a Shipper reference for different content is rejected with ShipperReferenceReused.");
 
-        // Reads stay open until their callers exist: the TMS UI (#21) and API Management's Shipper tracking role (P8)
-        // bring the roles they are authorized on.
+        // Reads stay open until their caller exists: API Management's Shipper tracking role (P8) brings the role it is
+        // authorized on. The TMS UI doesn't call them; it reads through the query side in process.
         var queries = transportOrders.MapGroup("").AllowAnonymous();
 
         queries.MapGet("/{id:guid}", GetByIdAsync)

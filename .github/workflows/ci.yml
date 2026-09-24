@@ -88,7 +88,7 @@ jobs:
           if-no-files-found: ignore
 
   integration:
-    name: Integration tests (Aspire, SQL Server, Service Bus emulator)
+    name: Integration and UI tests (Aspire, SQL Server, Service Bus emulator, Playwright)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -107,14 +107,20 @@ jobs:
       - name: Build
         run: dotnet build Norvia.slnx --configuration "$CONFIGURATION"
 
-      # The test host starts the AppHost, which runs SQL Server and the Service Bus emulator in Docker.
-      - name: Integration tests
+      # Chromium's system libraries need root, so they are installed here rather than by the UI test fixture.
+      - name: Install Playwright's Chromium
+        run: pwsh tests/Tms/Norvia.Tms.Web.UiTests/bin/"$CONFIGURATION"/net10.0/playwright.ps1 install --with-deps chromium
+
+      # The test host starts the AppHost, which runs SQL Server and the Service Bus emulator in Docker. UI tests keep
+      # a Playwright trace and video of every failed test.
+      - name: Integration and UI tests
         env:
           NORVIA_TEST_LOG_FILE: ${{ github.workspace }}/TestResults/tms-api.log
+          NORVIA_UI_TEST_ARTIFACTS: ${{ github.workspace }}/TestResults
         run: |
           mkdir -p TestResults
           failed=0
-          for project in $(find tests -name '*.IntegrationTests.csproj' | sort); do
+          for project in $(find tests -name '*.IntegrationTests.csproj' -o -name '*.UiTests.csproj' | sort); do
             dotnet test "$project" --no-build --configuration "$CONFIGURATION" \
               --logger trx --results-directory TestResults || failed=1
           done

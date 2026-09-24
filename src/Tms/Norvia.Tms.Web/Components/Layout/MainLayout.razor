@@ -1,0 +1,25 @@
+@inherits LayoutComponentBase
+
+<FluentLayout>
+    <FluentHeader>
+        <a class="app-title" href="/">Norvia TMS</a>
+    </FluentHeader>
+    <FluentStack Orientation="Orientation.Horizontal" Class="app-body" HorizontalGap="0">
+        <nav aria-label="Main">
+            <FluentNavMenu Width="220" Title="Main">
+                <FluentNavLink Href="/transport-orders" Match="NavLinkMatch.Prefix">Waiting for planning</FluentNavLink>
+            </FluentNavMenu>
+        </nav>
+        <FluentBodyContent Class="app-content">
+            <main>
+                @Body
+            </main>
+        </FluentBodyContent>
+    </FluentStack>
+</FluentLayout>
+
+<div id="blazor-error-ui" data-nosnippet>
+    <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+        Something went wrong. <a href="" class="reload">Reload</a>
+    </FluentMessageBar>
+</div>

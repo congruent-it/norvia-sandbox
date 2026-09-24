@@ -1,0 +1,52 @@
+body {
+    margin: 0;
+    font-family: var(--body-font);
+    background-color: var(--neutral-layer-1);
+    color: var(--neutral-foreground-rest);
+}
+
+.app-title {
+    color: inherit;
+    font-size: var(--type-ramp-plus-2-font-size);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.app-body {
+    min-height: calc(100vh - 50px);
+}
+
+.app-content {
+    padding: calc(var(--design-unit) * 4px);
+}
+
+.detail-sections {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: calc(var(--design-unit) * 4px);
+}
+
+.detail-sections dl {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    column-gap: calc(var(--design-unit) * 4px);
+    row-gap: calc(var(--design-unit) * 1px);
+    margin: 0;
+}
+
+.detail-sections dt {
+    color: var(--neutral-foreground-hint);
+}
+
+.detail-sections dd {
+    margin: 0;
+}
+
+#blazor-error-ui {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+}

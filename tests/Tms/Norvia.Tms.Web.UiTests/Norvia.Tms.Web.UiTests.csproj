@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Testing" />
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Microsoft.Playwright" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+    <PackageReference Include="xunit.v3.mtp-off" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="AwesomeAssertions" />
+    <ProjectReference Include="..\..\..\src\Norvia.AppHost\Norvia.AppHost.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The same Canonical Model bookings the API integration tests submit. -->
+    <Compile Include="..\Norvia.Tms.Api.IntegrationTests\TransportOrders\Bookings.cs" Link="TransportOrders\Bookings.cs" />
+  </ItemGroup>
+</Project>

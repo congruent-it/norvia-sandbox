@@ -23,7 +23,7 @@ var localTokenSigningKey = builder.AddParameter(
     secret: true,
     persist: true);
 
-builder.AddProject<Projects.Norvia_Tms_Api>("tms-api")
+var tmsApi = builder.AddProject<Projects.Norvia_Tms_Api>("tms-api")
     .WithReference(tmsDatabase).WaitFor(tmsDatabase)
     .WithReference(messaging).WaitFor(messaging)
     .WithEnvironment("Seed__Path", seedFile)
@@ -45,5 +45,12 @@ builder.AddProject<Projects.Norvia_Tms_Api>("tms-api")
         url.Url = "/scalar";
         url.DisplayText = "API reference (Scalar)";
     });
+
+// The TMS UI reads the TMS database through the query side. It waits for the API, which applies the migrations locally.
+builder.AddProject<Projects.Norvia_Tms_Web>("tms-web")
+    .WithReference(tmsDatabase).WaitFor(tmsApi)
+    .WithEnvironment("Seed__Path", seedFile)
+    .WithHttpHealthCheck("/health")
+    .WithUrlForEndpoint("http", url => url.DisplayText = "TMS UI");
 
 builder.Build().Run();
