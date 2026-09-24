@@ -57,8 +57,8 @@ public sealed class TransportOrderSpecsTests
         {
             Rejected(Morning),
             held,
-            TransportOrder.Accept(new ShipperId("SHP-0003"), TransportOrderTests.SampleDetails(), TransportOrderNumber.FromSequence(2), new CorrelationId("corr-2"), Morning),
-            TransportOrder.Accept(new ShipperId("SHP-0001"), TransportOrderTests.SampleDetails() with { ShipperReference = "BD-2026-0002" }, TransportOrderNumber.FromSequence(3), new CorrelationId("corr-3"), Morning),
+            TransportOrder.Accept(new ShipperId("SHP-0003"), TransportOrderTests.SampleDetails(), TransportOrderNumber.FromSequence(2), IntakeChannel.ShipperApi, new CorrelationId("corr-2"), Morning),
+            TransportOrder.Accept(new ShipperId("SHP-0001"), TransportOrderTests.SampleDetails() with { ShipperReference = "BD-2026-0002" }, TransportOrderNumber.FromSequence(3), IntakeChannel.ShipperApi, new CorrelationId("corr-3"), Morning),
         };
 
         var found = new TransportOrderByShipperReferenceSpec(new ShipperId("SHP-0001"), "BD-2026-0001").Evaluate(orders);
@@ -70,6 +70,7 @@ public sealed class TransportOrderSpecsTests
         new ShipperId("SHP-0001"),
         TransportOrderTests.SampleDetails(),
         [new RejectionReason(RejectionCode.InactiveShipper, "Inactive.")],
+        IntakeChannel.ShipperApi,
         new CorrelationId("corr-rejected"),
         receivedAt);
 
@@ -77,6 +78,7 @@ public sealed class TransportOrderSpecsTests
         new ShipperId("SHP-0001"),
         TransportOrderTests.SampleDetails(),
         TransportOrderNumber.FromSequence(sequence),
+        IntakeChannel.ShipperApi,
         new CorrelationId($"corr-{sequence}"),
         receivedAt);
 }

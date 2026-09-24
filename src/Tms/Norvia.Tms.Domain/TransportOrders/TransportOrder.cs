@@ -15,12 +15,14 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
         TransportOrderId id,
         ShipperId shipperId,
         TransportOrderDetails details,
+        IntakeChannel channel,
         CorrelationId correlationId,
         DateTimeOffset receivedAt)
     {
         Id = id;
         ShipperId = shipperId;
         Details = details;
+        Channel = channel;
         CorrelationId = correlationId;
         ReceivedAt = receivedAt;
     }
@@ -40,6 +42,8 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
 
     public TransportOrderDetails Details { get; private set; }
 
+    public IntakeChannel Channel { get; private set; }
+
     public CorrelationId CorrelationId { get; private set; }
 
     public DateTimeOffset ReceivedAt { get; private set; }
@@ -54,10 +58,11 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
         ShipperId shipperId,
         TransportOrderDetails details,
         TransportOrderNumber number,
+        IntakeChannel channel,
         CorrelationId correlationId,
         DateTimeOffset receivedAt)
     {
-        var order = new TransportOrder(TransportOrderId.New(), shipperId, details, correlationId, receivedAt)
+        var order = new TransportOrder(TransportOrderId.New(), shipperId, details, channel, correlationId, receivedAt)
         {
             Number = number,
             Status = TransportOrderStatus.Accepted,
@@ -71,6 +76,7 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
         ShipperId shipperId,
         TransportOrderDetails details,
         IReadOnlyList<RejectionReason> reasons,
+        IntakeChannel channel,
         CorrelationId correlationId,
         DateTimeOffset receivedAt)
     {
@@ -80,7 +86,7 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
             throw new ArgumentException("A booking is rejected for at least one reason.", nameof(reasons));
         }
 
-        var order = new TransportOrder(TransportOrderId.New(), shipperId, details, correlationId, receivedAt)
+        var order = new TransportOrder(TransportOrderId.New(), shipperId, details, channel, correlationId, receivedAt)
         {
             Status = TransportOrderStatus.Rejected,
             RejectionReasons = [.. reasons],

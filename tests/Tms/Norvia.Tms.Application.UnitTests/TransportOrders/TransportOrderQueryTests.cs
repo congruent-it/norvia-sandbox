@@ -37,6 +37,7 @@ public sealed class TransportOrderQueryTests
             "TO-0000005",
             TransportOrderStatus.Accepted,
             new ShipperView("SHP-0001", "Brouwer Dranken"),
+            IntakeChannel.ShipperApi,
             "corr-1",
             Samples.Now,
             [],
@@ -74,6 +75,7 @@ public sealed class TransportOrderQueryTests
             null,
             TransportOrderStatus.Rejected,
             new ShipperView("SHP-0001", "Brouwer Dranken"),
+            IntakeChannel.ShipperApi,
             "corr-2",
             Samples.Now,
             [

@@ -29,6 +29,11 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.Property<string>("CorrelationId")
                         .IsRequired()
                         .HasMaxLength(128)
@@ -73,6 +78,7 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
 
                     b.HasIndex("ShipperId", "ShipperReference")
                         .IsUnique()
+                        .HasDatabaseName("IX_TransportOrders_ShipperId_ShipperReference")
                         .HasFilter("[ShipperReference] IS NOT NULL");
 
                     b.HasIndex("Status", "ReceivedAt");

@@ -64,6 +64,10 @@ _Avoid_: order reference, customer reference, idempotency key
 A submitted Transport Order that broke one or more Transport Order rules. The TMS keeps it with every rejection reason (a stable code and a plain-language message) and what the Shipper submitted, but gives it no Transport Order number, and nothing downstream acts on it.
 _Avoid_: failed order, invalid order
 
+**Intake channel**:
+The way a Transport Order reached the TMS: the Shipper API for Transport-only bookings, and later the WMS handoff for Fulfilment. Every channel uses the same intake API. The TMS knows the channel from the caller's identity, and each Transport Order records the one it came from.
+_Avoid_: source, origin (origin is where goods are collected)
+
 **Shipment**:
 The physical movement that carries out one Transport Order, including its tracking status. Each Transport Order has exactly one Shipment, and a Shipment never carries more than one Transport Order. Consolidation happens on a Trip, not inside a Shipment. The TMS owns it.
 _Avoid_: delivery, consignment, trip

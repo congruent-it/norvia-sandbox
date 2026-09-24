@@ -37,6 +37,7 @@ internal static class Samples
             new ShipperId("SHP-0001"),
             CanonicalTransportOrder().ToDetails(),
             Reasons,
+            IntakeChannel.ShipperApi,
             new CorrelationId(correlationId),
             Now);
 
@@ -45,6 +46,7 @@ internal static class Samples
             new ShipperId("SHP-0001"),
             CanonicalTransportOrder().ToDetails(),
             TransportOrderNumber.FromSequence(sequence),
+            IntakeChannel.ShipperApi,
             new CorrelationId(correlationId),
             Now);
 }

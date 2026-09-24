@@ -23,7 +23,7 @@ public abstract record IntegrationEvent(Guid EventId, DateTimeOffset OccurredAt,
         {
             ["eventType"] = EventType,
             ["eventVersion"] = EventVersion,
-            ["correlationId"] = CorrelationId,
+            [TrackingKeys.CorrelationId] = CorrelationId,
         };
 
     // Not public, so it stays out of the serialized body; an override wouldn't inherit a [JsonIgnore].

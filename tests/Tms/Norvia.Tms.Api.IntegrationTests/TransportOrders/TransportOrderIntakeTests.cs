@@ -43,6 +43,7 @@ public sealed class TransportOrderIntakeTests(TmsFixture tms)
         order["status"]!.GetValue<string>().Should().Be("Accepted");
         order["shipper"]!["id"]!.GetValue<string>().Should().Be("SHP-0001");
         order["shipper"]!["name"]!.GetValue<string>().Should().Be("Brouwer Dranken", "the TMS loads its Shippers from the seed file");
+        order["channel"]!.GetValue<string>().Should().Be("ShipperApi");
         order["correlationId"]!.GetValue<string>().Should().Be(correlationId);
         ShouldBeTheSubmittedTransportOrder(order["transportOrder"]!, booking, number);
     }
@@ -104,6 +105,51 @@ public sealed class TransportOrderIntakeTests(TmsFixture tms)
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         response.Content.Headers.ContentType!.MediaType.Should().Be("application/problem+json");
+    }
+
+    [Fact]
+    public async Task Submit_ValidTransportOrder_TracesCarryTheTrackingContractKeys()
+    {
+        var correlationId = NewCorrelationId();
+        var number = await SubmitAcceptedAsync(Bookings.Valid(NewReference()), correlationId);
+
+        var outcome = await tms.TmsLogAsync(log => log["correlationId"] == correlationId && log["transportOrderNumber"] == number, _cancellationToken);
+
+        outcome["flow"].Should().Be("transport-order-intake");
+        outcome["partyId"].Should().Be("SHP-0001");
+    }
+
+    [Fact]
+    public async Task Submit_ValidTransportOrder_PublishingTheEventJoinsTheSameTrail()
+    {
+        var correlationId = NewCorrelationId();
+        var number = await SubmitAcceptedAsync(Bookings.Valid(NewReference()), correlationId);
+
+        var published = await tms.TmsLogAsync(log => log["correlationId"] == correlationId && log["eventType"] == "TransportOrderAccepted", _cancellationToken);
+
+        published["transportOrderNumber"].Should().Be(number);
+        published["flow"].Should().Be("transport-order-intake");
+        published["partyId"].Should().Be("SHP-0001");
+    }
+
+    [Fact]
+    public async Task Submit_ValidTransportOrder_LogsNoConsigneeDetails()
+    {
+        var booking = Bookings.Valid(NewReference());
+        var correlationId = NewCorrelationId();
+        var number = await SubmitAcceptedAsync(booking, correlationId);
+        await tms.TmsLogAsync(log => log["transportOrderNumber"] == number, _cancellationToken);
+
+        var delivery = booking["delivery"]!;
+        string[] personalData =
+        [
+            delivery["consignee"]!["name"]!.GetValue<string>(),
+            delivery["consignee"]!["contactName"]!.GetValue<string>(),
+            delivery["consignee"]!["phone"]!.GetValue<string>(),
+            delivery["address"]!["street"]!.GetValue<string>(),
+        ];
+        tms.TmsLogs.Where(log => log["correlationId"] == correlationId).Should().NotBeEmpty()
+            .And.NotContain(log => personalData.Any(value => log.Text.Contains(value, StringComparison.Ordinal)));
     }
 
     [Fact]

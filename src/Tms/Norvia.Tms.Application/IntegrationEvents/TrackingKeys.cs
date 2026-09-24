@@ -1,0 +1,17 @@
+namespace Norvia.Tms.Application.IntegrationEvents;
+
+/// <summary>
+/// The keys of the tracking contract (coding guidelines §7), under the same names in logging scopes and on Service Bus
+/// messages, so the Integration console finds every trace of a Message trail.
+/// </summary>
+public static class TrackingKeys
+{
+    public const string CorrelationId = "correlationId";
+    public const string Flow = "flow";
+    public const string PartyId = "partyId";
+    public const string TransportOrderNumber = "transportOrderNumber";
+    public const string Outcome = "outcome";
+
+    /// <summary>The <see cref="Outcome"/> of a call the application refused, such as one without the right role.</summary>
+    public const string Refused = "Refused";
+}

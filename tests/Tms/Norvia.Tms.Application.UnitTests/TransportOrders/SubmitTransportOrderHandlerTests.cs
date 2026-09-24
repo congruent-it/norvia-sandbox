@@ -28,7 +28,7 @@ public sealed class SubmitTransportOrderHandlerTests
     [Fact]
     public async Task Handle_ValidBooking_ReturnsAcceptedWithTheNextNumber()
     {
-        var result = await _handler.Handle(new SubmitTransportOrderCommand(Samples.CanonicalTransportOrder(), "corr-1"), CancellationToken.None);
+        var result = await _handler.Handle(new SubmitTransportOrderCommand(Samples.CanonicalTransportOrder(), IntakeChannel.ShipperApi, "corr-1"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Status.Should().Be(TransportOrderStatus.Accepted);
@@ -39,7 +39,7 @@ public sealed class SubmitTransportOrderHandlerTests
     [Fact]
     public async Task Handle_ValidBooking_StoresTheAcceptedTransportOrder()
     {
-        await _handler.Handle(new SubmitTransportOrderCommand(Samples.CanonicalTransportOrder(), "corr-1"), CancellationToken.None);
+        await _handler.Handle(new SubmitTransportOrderCommand(Samples.CanonicalTransportOrder(), IntakeChannel.ShipperApi, "corr-1"), CancellationToken.None);
 
         await _repository.Received(1).AddAsync(
             Arg.Is<TransportOrder>(order =>
@@ -47,6 +47,7 @@ public sealed class SubmitTransportOrderHandlerTests
                 && order.Status == TransportOrderStatus.Accepted
                 && order.ShipperId.Value == "SHP-0001"
                 && order.CorrelationId.Value == "corr-1"
+                && order.Channel == IntakeChannel.ShipperApi
                 && order.ReceivedAt == Samples.Now
                 && order.Details == Samples.CanonicalTransportOrder().ToDetails()),
             Arg.Any<CancellationToken>());
@@ -55,7 +56,7 @@ public sealed class SubmitTransportOrderHandlerTests
     [Fact]
     public async Task Handle_BookingBreakingRules_ReturnsRejectedWithEveryReason()
     {
-        var result = await _handler.Handle(new SubmitTransportOrderCommand(BrokenBooking(), "corr-1"), CancellationToken.None);
+        var result = await _handler.Handle(new SubmitTransportOrderCommand(BrokenBooking(), IntakeChannel.ShipperApi, "corr-1"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Status.Should().Be(TransportOrderStatus.Rejected);
@@ -67,7 +68,7 @@ public sealed class SubmitTransportOrderHandlerTests
     [Fact]
     public async Task Handle_BookingBreakingRules_StoresTheRejectedBookingWithoutTakingANumber()
     {
-        var result = await _handler.Handle(new SubmitTransportOrderCommand(BrokenBooking(), "corr-1"), CancellationToken.None);
+        var result = await _handler.Handle(new SubmitTransportOrderCommand(BrokenBooking(), IntakeChannel.ShipperApi, "corr-1"), CancellationToken.None);
 
         await _repository.Received(1).AddAsync(
             Arg.Is<TransportOrder>(order =>
@@ -76,6 +77,7 @@ public sealed class SubmitTransportOrderHandlerTests
                 && order.Number == null
                 && order.RejectionReasons.Count == 2
                 && order.CorrelationId.Value == "corr-1"
+                && order.Channel == IntakeChannel.ShipperApi
                 && order.Details == BrokenBooking().ToDetails()),
             Arg.Any<CancellationToken>());
         await _numbers.DidNotReceive().NextAsync(Arg.Any<CancellationToken>());
@@ -86,7 +88,7 @@ public sealed class SubmitTransportOrderHandlerTests
     {
         var booking = Samples.CanonicalTransportOrder() with { ShipperId = "SHP-9999" };
 
-        var result = await _handler.Handle(new SubmitTransportOrderCommand(booking, "corr-1"), CancellationToken.None);
+        var result = await _handler.Handle(new SubmitTransportOrderCommand(booking, IntakeChannel.ShipperApi, "corr-1"), CancellationToken.None);
 
         result.Value.Status.Should().Be(TransportOrderStatus.Rejected);
         result.Value.RejectionReasons.Select(reason => reason.Code).Should().Equal("UnknownShipper");
@@ -95,7 +97,7 @@ public sealed class SubmitTransportOrderHandlerTests
     [Fact]
     public async Task Handle_ValidBooking_IsNotARepeat()
     {
-        var result = await _handler.Handle(new SubmitTransportOrderCommand(Samples.CanonicalTransportOrder(), "corr-1"), CancellationToken.None);
+        var result = await _handler.Handle(new SubmitTransportOrderCommand(Samples.CanonicalTransportOrder(), IntakeChannel.ShipperApi, "corr-1"), CancellationToken.None);
 
         result.Value.Repeat.Should().BeFalse();
     }
@@ -106,7 +108,7 @@ public sealed class SubmitTransportOrderHandlerTests
         var original = Samples.AcceptedOrder(sequence: 7);
         HeldBy(original);
 
-        var result = await _handler.Handle(new SubmitTransportOrderCommand(Samples.CanonicalTransportOrder(), "corr-again"), CancellationToken.None);
+        var result = await _handler.Handle(new SubmitTransportOrderCommand(Samples.CanonicalTransportOrder(), IntakeChannel.ShipperApi, "corr-again"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Repeat.Should().BeTrue();
@@ -121,7 +123,7 @@ public sealed class SubmitTransportOrderHandlerTests
     {
         HeldBy(Samples.AcceptedOrder(sequence: 7));
 
-        await _handler.Handle(new SubmitTransportOrderCommand(Samples.CanonicalTransportOrder(), "corr-again"), CancellationToken.None);
+        await _handler.Handle(new SubmitTransportOrderCommand(Samples.CanonicalTransportOrder(), IntakeChannel.ShipperApi, "corr-again"), CancellationToken.None);
 
         await _repository.DidNotReceive().AddAsync(Arg.Any<TransportOrder>(), Arg.Any<CancellationToken>());
         await _numbers.DidNotReceive().NextAsync(Arg.Any<CancellationToken>());
@@ -133,7 +135,7 @@ public sealed class SubmitTransportOrderHandlerTests
         HeldBy(Samples.AcceptedOrder(sequence: 7));
         _time.Advance(TimeSpan.FromDays(3));
 
-        var result = await _handler.Handle(new SubmitTransportOrderCommand(Samples.CanonicalTransportOrder(), "corr-again"), CancellationToken.None);
+        var result = await _handler.Handle(new SubmitTransportOrderCommand(Samples.CanonicalTransportOrder(), IntakeChannel.ShipperApi, "corr-again"), CancellationToken.None);
 
         result.Value.Repeat.Should().BeTrue("a repeat is recognised before the booking is validated again");
     }
@@ -144,7 +146,7 @@ public sealed class SubmitTransportOrderHandlerTests
         HeldBy(Samples.AcceptedOrder(sequence: 7));
         var booking = Samples.CanonicalTransportOrder() with { Instructions = "Call ahead" };
 
-        var result = await _handler.Handle(new SubmitTransportOrderCommand(booking, "corr-reused"), CancellationToken.None);
+        var result = await _handler.Handle(new SubmitTransportOrderCommand(booking, IntakeChannel.ShipperApi, "corr-reused"), CancellationToken.None);
 
         result.Value.Repeat.Should().BeFalse();
         result.Value.Status.Should().Be(TransportOrderStatus.Rejected);
@@ -162,7 +164,7 @@ public sealed class SubmitTransportOrderHandlerTests
                 Arg.Any<CancellationToken>())
             .Returns(Samples.AcceptedOrder(sequence: 7));
 
-        var result = await _handler.Handle(new SubmitTransportOrderCommand(Samples.CanonicalTransportOrder(), "corr-again"), CancellationToken.None);
+        var result = await _handler.Handle(new SubmitTransportOrderCommand(Samples.CanonicalTransportOrder(), IntakeChannel.ShipperApi, "corr-again"), CancellationToken.None);
 
         result.Value.Repeat.Should().BeTrue();
     }
@@ -172,7 +174,7 @@ public sealed class SubmitTransportOrderHandlerTests
     {
         HeldBy(Samples.AcceptedOrder(sequence: 7));
 
-        var result = await _handler.Handle(new SubmitTransportOrderCommand(BrokenBooking(), "corr-1"), CancellationToken.None);
+        var result = await _handler.Handle(new SubmitTransportOrderCommand(BrokenBooking(), IntakeChannel.ShipperApi, "corr-1"), CancellationToken.None);
 
         result.Value.Repeat.Should().BeFalse();
         result.Value.RejectionReasons.Select(reason => reason.Code).Should().Equal("ShipperReferenceMissing", "GoodsLinesMissing");

@@ -1,10 +1,16 @@
 using System.Collections.Concurrent;
+using System.Net.Http.Headers;
+using System.Security.Cryptography;
+using System.Text;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Azure;
 using Aspire.Hosting.Testing;
 using Azure.Messaging.ServiceBus;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.JsonWebTokens;
+using Microsoft.IdentityModel.Tokens;
+using Norvia.AppHost;
 
 [assembly: AssemblyFixture(typeof(Norvia.Tms.Api.IntegrationTests.TmsFixture))]
 
@@ -12,22 +18,31 @@ namespace Norvia.Tms.Api.IntegrationTests;
 
 /// <summary>
 /// Runs the Norvia AppHost once for the whole test run (TMS, SQL and the Service Bus emulator) and records every
-/// message published to the Transport Order events topic through a subscription of its own.
+/// message published to the Transport Order events topic through a subscription of its own. It holds the key the TMS
+/// trusts locally, so it issues tokens the way Entra would: <see cref="Tms"/> calls as the intake Logic App does.
+/// The TMS writes its logs as JSON with their scopes, which the fixture keeps so tests can follow a Message trail.
 /// </summary>
 public sealed class TmsFixture : IAsyncLifetime
 {
     public const string TransportOrderEventsTopic = "transport-order-events";
     private const string TestSubscription = "tms-api-integration-tests";
+    public const string IntakeRole = "TransportOrders.Intake";
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
+    private readonly string _tokenSigningKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
     private readonly ConcurrentQueue<ServiceBusReceivedMessage> _published = new();
+    private readonly ConcurrentQueue<TmsLog> _tmsLogs = new();
     private DistributedApplication? _app;
     private ServiceBusClient? _serviceBus;
     private ServiceBusProcessor? _processor;
 
+    /// <summary>A client holding the intake role, as the intake Logic App's managed identity does.</summary>
     public HttpClient Tms { get; private set; } = null!;
 
     public IEnumerable<ServiceBusReceivedMessage> Published => _published;
+
+    /// <summary>Every log the TMS has written so far.</summary>
+    public IEnumerable<TmsLog> TmsLogs => _tmsLogs;
 
     /// <summary>The links the Aspire dashboard shows for the TMS API.</summary>
     public IReadOnlyList<Uri> TmsDashboardUrls =>
@@ -39,16 +54,22 @@ public sealed class TmsFixture : IAsyncLifetime
     {
         using var startup = new CancellationTokenSource(StartupTimeout);
 
-        var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(startup.Token);
+        var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(
+            [$"Parameters:{LocalTokens.SigningKeyParameter}={_tokenSigningKey}"],
+            startup.Token);
         var topic = builder.Resources.OfType<AzureServiceBusTopicResource>().Single(t => t.TopicName == TransportOrderEventsTopic);
         builder.CreateResourceBuilder(topic).AddServiceBusSubscription(TestSubscription);
+        builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(r => r.Name == "tms-api"))
+            // Aspire sets the formatter under this exact name, and environment names are case-sensitive on Linux.
+            .WithEnvironment("LOGGING__CONSOLE__FORMATTERNAME", "json")
+            .WithEnvironment("Logging__Console__FormatterOptions__IncludeScopes", "true");
 
         _app = await builder.BuildAsync(startup.Token);
         await _app.StartAsync(startup.Token);
-        CopyTmsLogsToFile();
+        CollectTmsLogs();
         await _app.ResourceNotifications.WaitForResourceHealthyAsync("tms-api", startup.Token);
 
-        Tms = _app.CreateHttpClient("tms-api");
+        Tms = CreateTmsClient(IssueToken([IntakeRole]));
 
         _serviceBus = new ServiceBusClient(await _app.GetConnectionStringAsync("messaging", startup.Token));
         _processor = _serviceBus.CreateProcessor(TransportOrderEventsTopic, TestSubscription);
@@ -61,22 +82,74 @@ public sealed class TmsFixture : IAsyncLifetime
         await _processor.StartProcessingAsync(startup.Token);
     }
 
-    // Set NORVIA_TEST_LOG_FILE to keep the TMS's own logs from a test run, for diagnosing a failure.
-    private void CopyTmsLogsToFile()
+    /// <summary>Waits for the TMS to write a log that matches, as logs arrive a moment after the call.</summary>
+    public async Task<TmsLog> TmsLogAsync(Func<TmsLog, bool> match, CancellationToken cancellationToken)
     {
-        var logFile = Environment.GetEnvironmentVariable("NORVIA_TEST_LOG_FILE");
-        if (string.IsNullOrEmpty(logFile))
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(30));
+        while (!_tmsLogs.Any(match))
         {
-            return;
+            await Task.Delay(TimeSpan.FromMilliseconds(200), timeout.Token);
         }
 
+        return _tmsLogs.First(match);
+    }
+
+    /// <summary>A client for the TMS API that sends the given token, or none.</summary>
+    public HttpClient CreateTmsClient(string? token)
+    {
+        var client = _app!.CreateHttpClient("tms-api");
+        if (token is not null)
+        {
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+
+        return client;
+    }
+
+    /// <summary>
+    /// A token for the TMS API as Entra issues it to a managed identity: its client ID in <c>azp</c> and its app roles
+    /// in <c>roles</c>. By default it is the intake Logic App's, for the TMS, signed with the key the TMS trusts; change
+    /// any of those to show what the TMS refuses.
+    /// </summary>
+    public string IssueToken(
+        string[] roles,
+        string audience = LocalTokens.TmsAudience,
+        string clientId = LocalTokens.IntakeLogicAppClientId,
+        string? signingKey = null) =>
+        new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
+        {
+            Issuer = LocalTokens.Issuer,
+            Audience = audience,
+            Expires = DateTime.UtcNow.AddHours(1),
+            Claims = new Dictionary<string, object> { ["azp"] = clientId, ["roles"] = roles },
+            SigningCredentials = new SigningCredentials(
+                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey ?? _tokenSigningKey)),
+                SecurityAlgorithms.HmacSha256),
+        });
+
+    // Set NORVIA_TEST_LOG_FILE to also keep the TMS's own logs from a test run, for diagnosing a failure.
+    private void CollectTmsLogs()
+    {
+        var logFile = Environment.GetEnvironmentVariable("NORVIA_TEST_LOG_FILE");
         var resourceLogs = _app!.Services.GetRequiredService<ResourceLoggerService>();
         var tmsApi = _app.Services.GetRequiredService<DistributedApplicationModel>().Resources.Single(r => r.Name == "tms-api");
         _ = Task.Run(async () =>
         {
             await foreach (var batch in resourceLogs.WatchAsync(tmsApi))
             {
-                await File.AppendAllLinesAsync(logFile, batch.Select(line => line.Content));
+                foreach (var line in batch)
+                {
+                    if (TmsLog.TryParse(line.Content) is { } log)
+                    {
+                        _tmsLogs.Enqueue(log);
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(logFile))
+                {
+                    await File.AppendAllLinesAsync(logFile, batch.Select(line => line.Content));
+                }
             }
         });
     }
