@@ -1,0 +1,154 @@
+# E2 Carrier invoice matching
+
+Carrier invoice matching checks what a Carrier asks to be paid against the Carrier cost Norvia agreed for each Carrier booking. The TMS hands the ERP each Carrier cost once the Shipment is Delivered. The Carrier sends a Carrier invoice from its Persona through API Management. The ERP matches each line, approves an invoice that matches in full, puts the rest in front of Finance, and tells the Carrier the outcome. This is the ERP half of [P9 Freight settlement](../tms/p9-freight-settlement.md). Terms are defined in [CONTEXT.md](../../../CONTEXT.md).
+
+| | |
+|---|---|
+| **Trigger** | A Carrier invoice is submitted by a Carrier. `CarrierCostIncurred` from the TMS (P9) supplies what it is matched against |
+| **Outcome** | An Approved Carrier invoice: every line Matched, Accepted or Rejected. The Carrier told the outcome of each line |
+| **Owning system** | ERP. It owns Carrier invoices (ADR 0002). The TMS owns the Carrier cost until it hands it over (ADR 0013) |
+| **Applies to** | Carriers only |
+| **Integrations touched** | Service Bus (Shipment events, Invoicing events), Carrier cost Logic App, Partner portal (Carrier invoice screens and endpoint), API Management, Carrier invoice Logic App, Carrier invoice outcome Logic App, Key Vault, ERP billing API |
+
+## Carrier costs
+
+The ERP keeps one **Carrier cost** per Carrier booking that the TMS handed over: the Carrier booking number, the Carrier booking reference, the Carrier, the Shipment number, the Transport Order number, the charge lines and total, the source (Carrier Rate Card version, or Spot with its remark) and the delivery time. The Carrier cost Logic App picks up `CarrierCostIncurred` and calls the ERP billing API to record it. A repeat for the same Carrier booking number with the same content returns the original, flagged as a repeat.
+
+A Carrier cost is **Open** until a Carrier invoice line is Matched or Accepted against it, and then **Invoiced**.
+
+## Carrier invoice
+
+A Carrier sends one Carrier invoice for any number of its Carrier bookings.
+
+| Part | Required |
+|---|---|
+| The Carrier's own invoice number. Unique per Carrier | Yes |
+| Invoice date | Yes |
+| Lines: Carrier booking reference, amount in EUR without VAT, an optional description | At least one |
+
+The Carrier comes from the token, never from the payload (ADR 0005). Amounts are without VAT, and VAT on Carrier invoices is deferred with Dutch VAT rules ([E1](e1-invoicing.md#deferred)).
+
+## Matching
+
+The ERP matches each line on its own, against the Carrier cost with that Carrier booking reference.
+
+| Line result | When |
+|---|---|
+| Matched | The Carrier cost exists for this Carrier, is Open, and the amount is within tolerance of its total |
+| Price mismatch | The Carrier cost exists for this Carrier and is Open, but the amount is outside tolerance |
+| Unknown booking | No Carrier cost with that reference has arrived for this Carrier. That includes a reference that belongs to another Carrier |
+| Duplicate | The Carrier cost is already Invoiced by an earlier line |
+
+The **tolerance** is an ERP setting, in EUR, €0 by default: the amount must equal the Carrier cost to the cent.
+
+Matching runs in the same transaction that records the Carrier invoice. A Matched line is accepted at once and its Carrier cost becomes Invoiced. The other lines wait for Finance.
+
+Carrier costs and Carrier invoices arrive on separate paths, so a Carrier invoice can arrive before the Carrier cost it refers to. When a Carrier cost is recorded, the ERP matches again every undecided Unknown booking line with that Carrier and Carrier booking reference, in the same transaction. The line gets its new result, and it can be Matched and accepted then.
+
+## Status
+
+### Carrier invoice line
+
+| Status | Meaning |
+|---|---|
+| Matched | Accepted automatically at the invoiced amount. Final |
+| To decide | Price mismatch, Unknown booking or Duplicate. It waits for Finance, and an Unknown booking line can still become Matched |
+| Accepted | Finance accepted it, at the invoiced amount or an adjusted amount, with a remark when adjusted. Its Carrier cost becomes Invoiced. Final |
+| Rejected | Finance rejected it, with a reason. Its Carrier cost, if any, stays as it was. Final |
+
+Finance can accept only a line that has an Open Carrier cost for this Carrier. An Unknown booking or Duplicate line can only be rejected, or left for a late Carrier cost to arrive.
+
+### Carrier invoice
+
+| Status | Meaning |
+|---|---|
+| Received | Recorded, with at least one line To decide |
+| Approved | Every line is Matched, Accepted or Rejected. The approved amount is the sum of the Matched and Accepted amounts. Final |
+
+A Carrier invoice whose lines all match is Approved in the transaction that records it. Paying the approved amount is out of scope, and Approved is the end of E2.
+
+## Steps
+
+1. **Draft.** The presenter plays a Carrier Persona in the Partner portal and opens its **draft invoice** screen. It lists the Persona's Confirmed bookings that it has reported Delivered and hasn't invoiced yet, each with the price from the booking request (P4). The presenter selects bookings and can edit an amount, to show a mismatch on purpose.
+2. **Submit.** The portal calls API Management with the Persona's token and subscription key.
+3. **Check at the edge.** API Management checks the token (audience "Norvia Partner API", role `CarrierInvoices.Submit`). A Shipper Persona's token gets 403. API Management maps the `azp` claim to a Carrier ID (ADR 0005), creates a correlation ID and passes both to the Carrier invoice Logic App.
+4. **Map.** The Logic App maps the [Carrier invoice format](#carrier-invoice-format) to the Canonical Model and calls the ERP billing API.
+5. **Record and match.** The ERP checks the [receiving rules](#receiving-rules), records the Carrier invoice and matches its lines, all in one transaction. The Logic App relays the ERP's answer to the Carrier: received, with each line's result. The path is synchronous, as the Carrier's booking answer is in P4, so the Carrier knows its invoice arrived.
+6. **Decide.** A Carrier invoice with lines To decide appears in Finance's list. Finance accepts or rejects each line. When the last line is decided, the invoice becomes Approved.
+7. **Tell the Carrier.** When a Carrier invoice becomes Approved, whether on receipt or after Finance, the ERP publishes `CarrierInvoiceApproved`. The Carrier invoice outcome Logic App maps it and calls the Carrier Persona's invoice outcome endpoint with credentials from Key Vault, and reports it to the ERP as told, as in P7.
+
+On a server error or timeout from the Carrier's endpoint, the outcome Logic App retries as in P4. When the retries are used up, or on a client error, it reports the outcome as not delivered. The ERP flags the invoice **Carrier not told** with the technical cause, and Finance phones the Carrier.
+
+A Carrier with a Rejected line sends a new Carrier invoice, with a new invoice number, for whatever it still claims. The Duplicate rule makes sure no Carrier cost is paid twice.
+
+## Receiving rules
+
+| Rule | Failure code |
+|---|---|
+| The Carrier exists in the ERP's seed-loaded Carrier data | `CarrierNotFound` |
+| The Carrier hasn't used this invoice number for different content | `InvoiceNumberUsed` |
+| There is at least one line, and each line has a Carrier booking reference and an amount above zero | Client error |
+| No Carrier booking reference appears twice in the same invoice | Client error |
+
+A submission that repeats one already recorded (the same Carrier, invoice number and content) succeeds, returns the original result flagged as a repeat, and publishes no event. Each failure has a stable code and a readable message. A line whose Carrier booking reference is unknown doesn't fail the invoice. It becomes Unknown booking.
+
+## Carrier invoice format
+
+The Carrier invoice format follows the conventions of the [Carrier booking format](../tms/p4-carrier-booking.md#carrier-booking-format): JSON with its own field names and local dates. The Carrier invoice Logic App maps Carrier → Canonical, and the outcome Logic App maps Canonical → Carrier.
+
+The outcome carries the Carrier's invoice number, the approved amount and, per line, the Carrier booking reference, the result (`MATCHED`, `ACCEPTED`, `ACCEPTED_ADJUSTED` or `REJECTED`), the accepted amount, and Finance's remark or reason.
+
+## ERP UI
+
+| List | Shows | Actions |
+|---|---|---|
+| Carrier invoices to decide | Received Carrier invoices, oldest first: Carrier, Carrier invoice number, date, total, the number of lines per result | Open. Per line: accept, accept at an adjusted amount (with a remark), reject (with a reason) |
+| Carrier invoices | All Carrier invoices, newest first, with their status, approved amount, and a Carrier told time or "Carrier not told" | Open |
+| Open Carrier costs | Carrier costs not yet Invoiced, per Carrier, oldest delivery first, with their source. A Spot price is marked | Open |
+
+On opening a line, Finance sees its Carrier cost next to it: the charge lines, the source and, for a Spot price, the Planner's remark. The lists update without a page refresh.
+
+## Partner portal
+
+- Each Carrier Persona gets the **draft invoice** screen from step 1. It works from the Persona's own records of its bookings and Tracking events, so it needs no call to Norvia.
+- Each Carrier Persona gets an **invoice outcome endpoint** and an **invoices** page listing its submitted Carrier invoices with the outcome per line once told.
+
+## ERP API
+
+| Operation | Caller | Role |
+|---|---|---|
+| Record a Carrier cost | Carrier cost Logic App | `CarrierCosts.Record` |
+| Receive a Carrier invoice | Carrier invoice Logic App | `CarrierInvoices.Receive` |
+| Report a Carrier invoice outcome as told or not delivered | Carrier invoice outcome Logic App | `CarrierInvoices.Report` |
+
+Finance decides lines in the ERP UI, with Finance permissions. The ERP billing API accepts only the Canonical Model (ADR 0003).
+
+## Correlation ID
+
+API Management creates a new correlation ID for each Carrier invoice, as it does for each Carrier answer in P4. The ERP stores it on the Carrier invoice, and `CarrierInvoiceApproved` carries it. The Carrier cost keeps the correlation ID from `CarrierCostIncurred`. Tracing a Carrier booking from release to payment approval follows the Carrier booking number in the TMS and the Carrier booking reference on the invoice line.
+
+## Events
+
+All events go to the topic for Invoicing events, through the ERP's transactional outbox (ADR 0003).
+
+| Event | Published when | Carries | Consumers |
+|---|---|---|---|
+| `CarrierInvoiceApproved` | A Carrier invoice becomes Approved | Carrier ID, the Carrier's invoice number, approved amount, per line the Carrier booking reference, result, accepted amount and remark or reason, correlation ID | Carrier invoice outcome Logic App. Monitoring |
+| `CarrierInvoiceOutcomeNotDelivered` | The outcome is reported not delivered | Carrier ID, the Carrier's invoice number, technical cause, correlation ID | Monitoring. An alert later |
+
+Recording a Carrier cost, receiving a Carrier invoice that still has lines To decide, and deciding a line that isn't the last publish nothing.
+
+## Deferred
+
+These were left out on purpose while designing E2, each with its reason.
+
+- **Paying Carriers.** Approved is the end of E2. Payment runs and bank files are a separate process.
+- **VAT on Carrier invoices,** and Dutch VAT rules. Lines are without VAT.
+- **Carrier credit notes.** A Carrier claims less by sending a new Carrier invoice. Rejected lines are simply not paid.
+- **Cancellation fees, waiting time and other surcharges.** The TMS hands over only the Carrier cost of the booking that carried the Shipment (P9).
+- **A percentage tolerance, and a tolerance per Carrier.** One fixed amount is enough for the demo.
+- **EDI invoices (INVOIC).** All Carriers use the one JSON format, as for bookings in P4.
+- **As-found toggles and presenter-panel faults.** They are added after the fixed state is built. The candidates:
+  - Presenter-panel fault: a Carrier sends its invoice with the Carrier booking reference in a format the Carrier invoice Logic App mangles (for example with a prefix stripped), so every line lands as Unknown booking.
+  - Toggle: no alert on the dead-letter queue of the `CarrierCostIncurred` subscription, so Carrier invoices wait on Unknown booking with no one told why.
+  - Presenter-panel fault: a Carrier's invoice outcome endpoint is down, so the invoice is flagged Carrier not told.

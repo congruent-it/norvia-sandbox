@@ -1,6 +1,6 @@
 # One system of record per concept
 
-Each core concept has exactly one owning application: the TMS owns Transport Orders, Shipments and Carrier bookings; the WMS owns Fulfilment Orders and Inventory; the ERP owns Shipper master data, contracts and invoicing. Other applications hold only references or replicated read copies that they receive through AIS. This keeps every integration flow's direction unambiguous: the owner publishes and everyone else consumes.
+Each core concept has exactly one owning application: the TMS owns Transport Orders, Shipments and Carrier bookings; the WMS owns Fulfilment Orders and Inventory; the ERP owns Shipper and Carrier master data, contracts and invoicing. Other applications hold only references or replicated read copies that they receive through AIS. This keeps every integration flow's direction unambiguous: the owner publishes and everyone else consumes.
 
 ## Consequences
 
