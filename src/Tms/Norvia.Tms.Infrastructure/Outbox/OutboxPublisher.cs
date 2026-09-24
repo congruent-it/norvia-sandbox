@@ -56,6 +56,8 @@ internal sealed partial class OutboxPublisher(
 
         foreach (var message in pending)
         {
+            // The message's application properties are its tracking-contract keys, so its traces join its Message trail.
+            using var trail = logger.BeginScope(ApplicationPropertiesOf(message));
             await SenderFor(message.Topic).SendMessageAsync(ToServiceBusMessage(message), cancellationToken);
             message.MarkPublished(time.GetUtcNow());
             await outboxMessages.UpdateAsync(message, cancellationToken);
@@ -84,19 +86,26 @@ internal sealed partial class OutboxPublisher(
             ContentType = "application/json",
         };
 
-        using var properties = JsonDocument.Parse(message.ApplicationProperties);
-        foreach (var property in properties.RootElement.EnumerateObject())
+        foreach (var (name, value) in ApplicationPropertiesOf(message))
         {
-            serviceBusMessage.ApplicationProperties[property.Name] = property.Value.ValueKind switch
+            serviceBusMessage.ApplicationProperties[name] = value;
+        }
+
+        return serviceBusMessage;
+    }
+
+    private static Dictionary<string, object?> ApplicationPropertiesOf(OutboxMessage message)
+    {
+        using var properties = JsonDocument.Parse(message.ApplicationProperties);
+        return properties.RootElement.EnumerateObject().ToDictionary(
+            property => property.Name,
+            property => (object?)(property.Value.ValueKind switch
             {
                 JsonValueKind.Number when property.Value.TryGetInt32(out var number) => number,
                 JsonValueKind.Number => property.Value.GetDouble(),
                 JsonValueKind.True or JsonValueKind.False => property.Value.GetBoolean(),
                 _ => property.Value.GetString(),
-            };
-        }
-
-        return serviceBusMessage;
+            }));
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Published {EventType} {EventId} for correlation ID {CorrelationId}")]

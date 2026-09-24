@@ -1,16 +1,16 @@
 using Ardalis.Result;
 using Mediator;
 using Microsoft.Extensions.Logging;
-using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Domain.TransportOrders;
 
 namespace Norvia.Tms.Application.TransportOrders.Submit;
 
 /// <summary>
-/// Puts the tracking-contract keys the TMS knows about a submission in the logging scope, so every trace of an intake
-/// call joins its Message trail (coding guidelines §7). The Transport Order number is known only once the booking is
-/// accepted, so it's added for the outcome. Only keys and rejection codes are logged, never what the Shipper submitted:
-/// that holds the Consignee's name, address and phone number.
+/// Adds the tracking-contract keys only the submission knows to the logging scope (coding guidelines §7): the Shipper
+/// as <c>partyId</c>, and the Transport Order number once the booking is accepted, for the outcome. The API's request
+/// scope already carries <c>correlationId</c> and <c>flow</c> for the whole intake call, refused calls included. Only
+/// keys and rejection codes are logged, never what the Shipper submitted: that holds the Consignee's name, address and
+/// phone number.
 /// </summary>
 public sealed partial class TrackIntakeInLoggingScope(ILogger<TrackIntakeInLoggingScope> logger)
     : IPipelineBehavior<SubmitTransportOrderCommand, Result<SubmitTransportOrderResult>>
@@ -23,7 +23,7 @@ public sealed partial class TrackIntakeInLoggingScope(ILogger<TrackIntakeInLoggi
         ArgumentNullException.ThrowIfNull(message);
         ArgumentNullException.ThrowIfNull(next);
 
-        using var trail = logger.BeginScope(TrailOf(message));
+        using var party = logger.BeginScope(PartyOf(message));
         var result = await next(message, cancellationToken);
         if (result.IsSuccess)
         {
@@ -33,20 +33,10 @@ public sealed partial class TrackIntakeInLoggingScope(ILogger<TrackIntakeInLoggi
         return result;
     }
 
-    private static Dictionary<string, object?> TrailOf(SubmitTransportOrderCommand message)
-    {
-        var trail = new Dictionary<string, object?>
-        {
-            ["correlationId"] = message.CorrelationId,
-            ["flow"] = Flows.TransportOrderIntake,
-        };
-        if (!string.IsNullOrWhiteSpace(message.TransportOrder.ShipperId))
-        {
-            trail["partyId"] = message.TransportOrder.ShipperId;
-        }
-
-        return trail;
-    }
+    private static Dictionary<string, object?> PartyOf(SubmitTransportOrderCommand message) =>
+        string.IsNullOrWhiteSpace(message.TransportOrder.ShipperId)
+            ? []
+            : new() { ["partyId"] = message.TransportOrder.ShipperId };
 
     private void LogOutcome(SubmitTransportOrderResult outcome)
     {

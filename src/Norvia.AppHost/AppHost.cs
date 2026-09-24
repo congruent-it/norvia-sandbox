@@ -31,6 +31,7 @@ builder.AddProject<Projects.Norvia_Tms_Api>("tms-api")
     .WithEnvironment("Authentication__Schemes__Bearer__ValidIssuer", LocalTokens.Issuer)
     .WithEnvironment("Authentication__Schemes__Bearer__ValidAudiences__0", LocalTokens.TmsAudience)
     .WithEnvironment("Authentication__Schemes__Bearer__SigningKeys__0__Issuer", LocalTokens.Issuer)
+    .WithEnvironment($"IntakeCallers__ChannelByClientId__{LocalTokens.IntakeLogicAppClientId}", "ShipperApi")
     .WithEnvironment(async context =>
     {
         // JWT bearer configuration takes a signing key as base64.

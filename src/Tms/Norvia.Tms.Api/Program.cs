@@ -3,6 +3,7 @@ using Ardalis.Result;
 using Asp.Versioning;
 using Mediator;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Api.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.Submit;
 using Norvia.Tms.Domain.TransportOrders;
@@ -29,6 +30,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         options.TokenValidationParameters.ValidateAudience = true;
     });
 builder.Services.AddAuthorization();
+builder.Services.AddOptions<IntakeCallersOptions>().BindConfiguration(IntakeCallersOptions.SectionName)
+    .Validate(options => options.ChannelByClientId.Count > 0, "No caller is registered for an intake channel.")
+    .ValidateOnStart();
+builder.Services.AddSingleton<IntakeCallers>();
 
 builder.Services.AddMediator(options =>
 {
@@ -59,6 +64,8 @@ builder.Services
 
 var app = builder.Build();
 
+// Outermost, so even a refused or failed call is traced under its correlation ID.
+app.UseMiddleware<TrackingScopeMiddleware>();
 app.UseExceptionHandler(new ExceptionHandlerOptions
 {
     // A request the API can't bind (malformed JSON, a field outside the Canonical Model) is the caller's error.

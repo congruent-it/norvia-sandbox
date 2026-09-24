@@ -100,7 +100,6 @@ public sealed class TransportOrderIntakeTests(TmsFixture tms)
         {
             Content = JsonContent.Create(Bookings.Valid(NewReference())),
         };
-        request.Headers.Add("X-Intake-Channel", "ShipperApi");
 
         using var response = await tms.Tms.SendAsync(request, _cancellationToken);
 
@@ -109,37 +108,48 @@ public sealed class TransportOrderIntakeTests(TmsFixture tms)
     }
 
     [Fact]
-    public async Task Submit_WithoutIntakeChannel_IsABadRequest()
+    public async Task Submit_ValidTransportOrder_TracesCarryTheTrackingContractKeys()
     {
-        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("/v1/transport-orders", UriKind.Relative))
-        {
-            Content = JsonContent.Create(Bookings.Valid(NewReference())),
-        };
-        request.Headers.Add("X-Correlation-ID", NewCorrelationId());
+        var correlationId = NewCorrelationId();
+        var number = await SubmitAcceptedAsync(Bookings.Valid(NewReference()), correlationId);
 
-        using var response = await tms.Tms.SendAsync(request, _cancellationToken);
+        var outcome = await tms.TmsLogAsync(log => log["correlationId"] == correlationId && log["transportOrderNumber"] == number, _cancellationToken);
 
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        (await ReadJsonAsync(response))["errors"]!["X-Intake-Channel"].Should().NotBeNull();
+        outcome["flow"].Should().Be("transport-order-intake");
+        outcome["partyId"].Should().Be("SHP-0001");
     }
 
-    [Theory]
-    [InlineData("Edi")]
-    [InlineData("shipperapi")]
-    [InlineData("1")]
-    public async Task Submit_UnknownIntakeChannel_IsABadRequest(string channel)
+    [Fact]
+    public async Task Submit_ValidTransportOrder_PublishingTheEventJoinsTheSameTrail()
     {
-        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("/v1/transport-orders", UriKind.Relative))
-        {
-            Content = JsonContent.Create(Bookings.Valid(NewReference())),
-        };
-        request.Headers.Add("X-Correlation-ID", NewCorrelationId());
-        request.Headers.Add("X-Intake-Channel", channel);
+        var correlationId = NewCorrelationId();
+        var number = await SubmitAcceptedAsync(Bookings.Valid(NewReference()), correlationId);
 
-        using var response = await tms.Tms.SendAsync(request, _cancellationToken);
+        var published = await tms.TmsLogAsync(log => log["correlationId"] == correlationId && log["eventType"] == "TransportOrderAccepted", _cancellationToken);
 
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        (await ReadJsonAsync(response))["errors"]!["X-Intake-Channel"].Should().NotBeNull();
+        published["transportOrderNumber"].Should().Be(number);
+        published["flow"].Should().Be("transport-order-intake");
+        published["partyId"].Should().Be("SHP-0001");
+    }
+
+    [Fact]
+    public async Task Submit_ValidTransportOrder_LogsNoConsigneeDetails()
+    {
+        var booking = Bookings.Valid(NewReference());
+        var correlationId = NewCorrelationId();
+        var number = await SubmitAcceptedAsync(booking, correlationId);
+        await tms.TmsLogAsync(log => log["transportOrderNumber"] == number, _cancellationToken);
+
+        var delivery = booking["delivery"]!;
+        string[] personalData =
+        [
+            delivery["consignee"]!["name"]!.GetValue<string>(),
+            delivery["consignee"]!["contactName"]!.GetValue<string>(),
+            delivery["consignee"]!["phone"]!.GetValue<string>(),
+            delivery["address"]!["street"]!.GetValue<string>(),
+        ];
+        tms.TmsLogs.Where(log => log["correlationId"] == correlationId).Should().NotBeEmpty()
+            .And.NotContain(log => personalData.Any(value => log.Text.Contains(value, StringComparison.Ordinal)));
     }
 
     [Fact]
@@ -236,7 +246,6 @@ public sealed class TransportOrderIntakeTests(TmsFixture tms)
             Content = JsonContent.Create(booking),
         };
         request.Headers.Add("X-Correlation-ID", correlationId);
-        request.Headers.Add("X-Intake-Channel", "ShipperApi");
         return await tms.Tms.SendAsync(request, _cancellationToken);
     }
 

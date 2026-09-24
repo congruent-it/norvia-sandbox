@@ -1,18 +1,18 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Nodes;
-using Norvia.AppHost;
 
 namespace Norvia.Tms.Api.IntegrationTests.TransportOrders;
 
 /// <summary>
-/// Only a caller holding the intake role, which in Azure is only the intake Logic App's managed identity, may submit
-/// a Transport Order. Anything else is refused before any Transport Order logic runs: nothing is stored and nothing
-/// is published.
+/// Only a caller holding the intake role and registered for an intake channel, which in Azure is only the intake Logic
+/// App's managed identity, may submit a Transport Order. Anything else is refused before any Transport Order logic
+/// runs: nothing is stored and nothing is published, but the refusal is traced under its correlation ID.
 /// </summary>
 public sealed class TransportOrderIntakeAuthorizationTests(TmsFixture tms)
 {
-    private static readonly TimeSpan OutboxSettleTime = TimeSpan.FromSeconds(3);
+    private const string UnrelatedSigningKey = "an-unrelated-key-that-is-long-enough-for-hmac-sha256";
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
     private readonly CancellationToken _cancellationToken = TestContext.Current.CancellationToken;
 
     [Fact]
@@ -26,7 +26,15 @@ public sealed class TransportOrderIntakeAuthorizationTests(TmsFixture tms)
     [Fact]
     public async Task Submit_TokenWithoutTheIntakeRole_IsForbiddenAndLeavesNoTrace()
     {
-        using var caller = tms.CreateTmsClient(tms.IssueToken("TransportOrders.Read"));
+        using var caller = tms.CreateTmsClient(tms.IssueToken(["TransportOrders.Read"]));
+
+        await ShouldBeRefusedAsync(caller, HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Submit_CallerWithoutAnIntakeChannel_IsForbiddenAndLeavesNoTrace()
+    {
+        using var caller = tms.CreateTmsClient(tms.IssueToken([TmsFixture.IntakeRole], clientId: "some-other-app"));
 
         await ShouldBeRefusedAsync(caller, HttpStatusCode.Forbidden);
     }
@@ -34,7 +42,7 @@ public sealed class TransportOrderIntakeAuthorizationTests(TmsFixture tms)
     [Fact]
     public async Task Submit_TokenForAnotherAudience_IsUnauthorized()
     {
-        using var caller = tms.CreateTmsClient(tms.IssueTokenFor("api://norvia-erp", TmsFixture.IntakeRole));
+        using var caller = tms.CreateTmsClient(tms.IssueToken([TmsFixture.IntakeRole], audience: "api://norvia-erp"));
 
         await ShouldBeRefusedAsync(caller, HttpStatusCode.Unauthorized);
     }
@@ -42,8 +50,7 @@ public sealed class TransportOrderIntakeAuthorizationTests(TmsFixture tms)
     [Fact]
     public async Task Submit_TokenSignedWithAnotherKey_IsUnauthorized()
     {
-        using var caller = tms.CreateTmsClient(
-            TmsFixture.IssueToken(LocalTokens.TmsAudience, "an-unrelated-key-that-is-long-enough-for-hmac-sha256", TmsFixture.IntakeRole));
+        using var caller = tms.CreateTmsClient(tms.IssueToken([TmsFixture.IntakeRole], signingKey: UnrelatedSigningKey));
 
         await ShouldBeRefusedAsync(caller, HttpStatusCode.Unauthorized);
     }
@@ -56,6 +63,19 @@ public sealed class TransportOrderIntakeAuthorizationTests(TmsFixture tms)
         response.StatusCode.Should().Be(HttpStatusCode.Created);
     }
 
+    [Fact]
+    public async Task Submit_Refused_IsTracedAsRefusedUnderItsCorrelationId()
+    {
+        var correlationId = Guid.NewGuid().ToString();
+        using var caller = tms.CreateTmsClient(tms.IssueToken(["TransportOrders.Read"]));
+
+        using var response = await SubmitAsync(caller, Bookings.Valid(NewReference()), correlationId);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var refusal = await tms.TmsLogAsync(log => log["correlationId"] == correlationId && log["outcome"] == "Refused", _cancellationToken);
+        refusal["flow"].Should().Be("transport-order-intake");
+    }
+
     private async Task ShouldBeRefusedAsync(HttpClient caller, HttpStatusCode refusal)
     {
         var reference = NewReference();
@@ -66,8 +86,24 @@ public sealed class TransportOrderIntakeAuthorizationTests(TmsFixture tms)
         response.StatusCode.Should().Be(refusal);
         (await ListedReferencesAsync("Accepted")).Should().NotContain(reference);
         (await ListedReferencesAsync("Rejected")).Should().NotContain(reference);
-        await Task.Delay(OutboxSettleTime, _cancellationToken);
+        await OutboxPassedAsync();
         tms.Published.Should().NotContain(message => message.CorrelationId == correlationId);
+    }
+
+    // The outbox publishes oldest first, so once a booking accepted after the refusal is published, anything the
+    // refusal might have stored would have been published too.
+    private async Task OutboxPassedAsync()
+    {
+        var marker = Guid.NewGuid().ToString();
+        using var accepted = await SubmitAsync(tms.Tms, Bookings.Valid(NewReference()), marker);
+        accepted.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_cancellationToken);
+        timeout.CancelAfter(Timeout);
+        while (!tms.Published.Any(message => message.CorrelationId == marker))
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(200), timeout.Token);
+        }
     }
 
     private static string NewReference() => $"BD-{Guid.NewGuid():N}"[..20];
@@ -79,7 +115,6 @@ public sealed class TransportOrderIntakeAuthorizationTests(TmsFixture tms)
             Content = JsonContent.Create(booking),
         };
         request.Headers.Add("X-Correlation-ID", correlationId);
-        request.Headers.Add("X-Intake-Channel", "ShipperApi");
         return await caller.SendAsync(request, _cancellationToken);
     }
 

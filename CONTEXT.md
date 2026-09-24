@@ -65,7 +65,7 @@ A submitted Transport Order that broke one or more Transport Order rules. The TM
 _Avoid_: failed order, invalid order
 
 **Intake channel**:
-The way a Transport Order reached the TMS: the Shipper API for Transport-only bookings, and later the WMS handoff for Fulfilment. Every channel uses the same intake API, and each Transport Order records the one it came from.
+The way a Transport Order reached the TMS: the Shipper API for Transport-only bookings, and later the WMS handoff for Fulfilment. Every channel uses the same intake API. The TMS knows the channel from the caller's identity, and each Transport Order records the one it came from.
 _Avoid_: source, origin (origin is where goods are collected)
 
 **Shipment**:

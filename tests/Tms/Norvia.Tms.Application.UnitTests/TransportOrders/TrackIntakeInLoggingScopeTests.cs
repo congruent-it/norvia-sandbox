@@ -21,17 +21,23 @@ public sealed partial class TrackIntakeInLoggingScopeTests : IDisposable
     }
 
     [Fact]
-    public async Task Handle_Submission_HandlerLogsCarryTheCorrelationIdFlowAndPartyId()
+    public async Task Handle_Submission_HandlerLogsCarryThePartyId()
     {
         await _behaviour.Handle(Command(), HandlerThatLogs(Accepted()), CancellationToken.None);
 
         var handlerLog = _logs.Collector.GetSnapshot().Single(log => log.Category == "Handler");
-        ScopeKeysOf(handlerLog).Should().Contain(new Dictionary<string, object?>
-        {
-            ["correlationId"] = "corr-1",
-            ["flow"] = "transport-order-intake",
-            ["partyId"] = "SHP-0001",
-        });
+        ScopeKeysOf(handlerLog).Should().Contain("partyId", "SHP-0001");
+    }
+
+    [Fact]
+    public async Task Handle_SubmissionWithoutShipperId_LeavesThePartyIdOut()
+    {
+        var command = Command() with { TransportOrder = Samples.CanonicalTransportOrder() with { ShipperId = " " } };
+
+        await _behaviour.Handle(command, HandlerThatLogs(Accepted()), CancellationToken.None);
+
+        var handlerLog = _logs.Collector.GetSnapshot().Single(log => log.Category == "Handler");
+        ScopeKeysOf(handlerLog).Should().NotContainKey("partyId", "a key that doesn't apply is left out, never sent empty");
     }
 
     [Fact]
@@ -43,8 +49,6 @@ public sealed partial class TrackIntakeInLoggingScopeTests : IDisposable
         outcome.Message.Should().Contain("TO-0000007").And.Contain("Accepted");
         ScopeKeysOf(outcome).Should().Contain(new Dictionary<string, object?>
         {
-            ["correlationId"] = "corr-1",
-            ["flow"] = "transport-order-intake",
             ["partyId"] = "SHP-0001",
             ["transportOrderNumber"] = "TO-0000007",
         });

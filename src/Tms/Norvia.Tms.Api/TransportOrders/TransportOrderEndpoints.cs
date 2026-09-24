@@ -1,8 +1,11 @@
+using System.Security.Claims;
 using Ardalis.Result;
 using Mediator;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Application.CanonicalModel;
+using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.GetById;
 using Norvia.Tms.Application.TransportOrders.GetByNumber;
@@ -14,13 +17,10 @@ namespace Norvia.Tms.Api.TransportOrders;
 
 public static class TransportOrderEndpoints
 {
-    public const string CorrelationIdHeader = "X-Correlation-ID";
+    public const string CorrelationIdHeader = TrackingScopeMiddleware.CorrelationIdHeader;
 
     /// <summary>The app role only the intake Logic App's managed identity holds, so nothing bypasses the integration layer.</summary>
     public const string IntakeRole = "TransportOrders.Intake";
-
-    /// <summary>The intake channel the caller submits for, such as <c>ShipperApi</c> from the intake Logic App.</summary>
-    public const string IntakeChannelHeader = "X-Intake-Channel";
 
     public static IEndpointRouteBuilder MapTransportOrders(this IEndpointRouteBuilder app)
     {
@@ -31,6 +31,7 @@ public static class TransportOrderEndpoints
         transportOrders.MapPost("/", SubmitAsync)
             .WithName("SubmitTransportOrder")
             .RequireAuthorization(policy => policy.RequireRole(IntakeRole))
+            .WithMetadata(new TrackedFlow(Flows.TransportOrderIntake))
             .WithSummary("Submit a Transport Order (Canonical Model) on behalf of the Shipper it names.")
             .WithDescription(
                 "A booking that breaks Transport Order rules gets a 422 listing every reason. It is kept as Rejected, readable at the problem's instance. "
@@ -56,17 +57,21 @@ public static class TransportOrderEndpoints
 
     private static async Task<Results<Created<AcceptedTransportOrder>, Ok<AcceptedTransportOrder>, ProblemHttpResult, ValidationProblem>> SubmitAsync(
         [FromHeader(Name = CorrelationIdHeader)] string? correlationId,
-        [FromHeader(Name = IntakeChannelHeader)] string? channel,
         CanonicalTransportOrder transportOrder,
+        ClaimsPrincipal caller,
+        IntakeCallers intakeCallers,
         IMediator mediator,
         CancellationToken cancellationToken)
     {
-        var errors = CanonicalShape.Check(transportOrder, correlationId);
-        if (!TryParseIntakeChannel(channel, out var intakeChannel))
+        // The channel follows from who calls, so a caller with the intake role can't submit for another channel.
+        if (!intakeCallers.TryFindChannel(caller, out var intakeChannel))
         {
-            errors[IntakeChannelHeader] = [$"The intake channel header is required and must be one of: {string.Join(", ", Enum.GetNames<IntakeChannel>())}."];
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "The caller is not registered for an intake channel.");
         }
 
+        var errors = CanonicalShape.Check(transportOrder, correlationId);
         if (errors.Count > 0)
         {
             return TypedResults.ValidationProblem(errors);
@@ -87,14 +92,6 @@ public static class TransportOrderEndpoints
         return result.Repeat
             ? TypedResults.Ok(accepted)
             : TypedResults.Created($"/v1/transport-orders/{result.TransportOrderNumber}", accepted);
-    }
-
-    // Only a channel's exact name counts: Enum.TryParse alone would also take "1" or "shipperapi".
-    private static bool TryParseIntakeChannel(string? value, out IntakeChannel channel)
-    {
-        channel = default;
-        return Enum.GetNames<IntakeChannel>().Contains(value, StringComparer.Ordinal)
-            && Enum.TryParse(value, out channel);
     }
 
     private static async Task<Results<Ok<TransportOrderView>, ProblemHttpResult>> GetAsync(

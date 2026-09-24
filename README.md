@@ -59,7 +59,7 @@ dotnet test Norvia.slnx                      # unit, architecture and integratio
 | [contracts/canonical-model/](contracts/canonical-model/) | The Canonical Model as JSON Schemas |
 | [seed/norvia.seed.json](seed/norvia.seed.json) | The seed file: the one source of Shippers, Carriers and Personas |
 
-There is no Entra locally. The TMS trusts JWTs signed with the AppHost's secret parameter `local-token-signing-key` (issuer and audience in [LocalTokens.cs](src/Norvia.AppHost/LocalTokens.cs)), so submitting a Transport Order needs a token with the `TransportOrders.Intake` role signed with that key. The integration tests issue their own.
+There is no Entra locally. The TMS trusts JWTs signed with the AppHost's secret parameter `local-token-signing-key` (issuer and audience in [LocalTokens.cs](src/Norvia.AppHost/LocalTokens.cs)), so submitting a Transport Order needs a token signed with that key, with the `TransportOrders.Intake` role and the local intake Logic App's client ID as `azp`. The integration tests issue their own.
 
 Set `NORVIA_TEST_LOG_FILE` to a path to keep the TMS's own logs from an integration test run.
 

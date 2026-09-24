@@ -12,9 +12,9 @@ Transport Order intake takes a Shipper's booking into the TMS and accepts or rej
 
 ## Channels
 
-The intake API records the intake channel each Transport Order came from. The caller names it in the `X-Intake-Channel` header, which is required, and it is readable on the Transport Order through the query side.
+The intake API records the intake channel each Transport Order came from, and it is readable on the Transport Order through the query side. The channel follows from who calls: the TMS setting `IntakeCallers:ChannelByClientId` maps each caller's client ID (the token's `azp`, or `appid` in a v1 token) to its channel, so a caller can't submit for a channel that isn't its own. In Azure the intake Logic App's managed identity is the only caller on the Shipper API channel.
 
-| Channel | Header value | Service | Status |
+| Channel | Value | Service | Status |
 |---|---|---|---|
 | Shipper API | `ShipperApi` | Transport-only | Built by this process |
 | WMS handoff | | Fulfilment | Later. It reuses the same intake API with its own channel |
@@ -37,7 +37,7 @@ The path runs synchronously end to end: Partner portal → API Management → in
 1. **Book.** The presenter plays a Shipper Persona (Brouwer Dranken) in the Partner portal, fills in the booking form and submits it. The portal calls API Management with the Persona's token and subscription key.
 2. **Check at the edge.** API Management checks the subscription key and the Entra token (audience "Norvia Partner API", role `TransportOrders.Submit`). A token without the role gets 403 before any Logic App runs. This is how a Carrier Persona (Van Dijk Transport) gets refused. API Management maps the token's `azp` claim to a Shipper ID through the seed-derived mapping, creates the correlation ID and passes both to the Logic App (ADR 0005).
 3. **Map.** The Logic App maps the partner booking to a Canonical Model `TransportOrder`. The partner format differs on purpose: it has its own field names, flat address fields, weights as text with units and local date/times. The Canonical Model uses UTC timestamps with offsets, weights in kilograms as numbers and ISO 3166 country codes.
-4. **Submit to the TMS.** The Logic App calls the TMS intake API with its managed identity, which is the only identity that holds the intake role (`TransportOrders.Intake`). A caller without it is refused before any Transport Order logic runs, so nothing is stored or published. The API accepts only the Canonical Model (ADR 0003). The Shipper comes from the token, never from the payload.
+4. **Submit to the TMS.** The Logic App calls the TMS intake API with its managed identity, which is the only identity that holds the intake role (`TransportOrders.Intake`). A caller without it, or not registered for an intake channel, is refused before any Transport Order logic runs, so nothing is stored or published. The API accepts only the Canonical Model (ADR 0003). The Shipper ID in it is the one API Management took from the Shipper's token, never one the Shipper typed (ADR 0005). The TMS trusts it because only the intake Logic App can call.
 5. **Check for a repeat.** If the Shipper already has an Accepted Transport Order under this Shipper reference with the same content, the TMS returns the original Transport Order, flags it as a repeat and stops. This happens before validation, so a repeat that arrives after the collection window has started still gets the original. If the reference is held for different content, the booking is rejected (`ShipperReferenceReused`), together with any other failures. A Rejected booking holds no reference, so the Shipper can resubmit a corrected booking under the same one.
 6. **Validate.** The TMS checks the booking against the [validation rules](#validation-rules). It collects every failure and never stops at the first one.
 7. **Record.** An accepted booking gets a Transport Order number and the status Accepted. A rejected one is stored with the status Rejected and its reasons. The outcome event is published in the same transaction (see [Events](#events)).
@@ -76,13 +76,13 @@ Each failure has a stable code and a readable message. Codes are never renamed; 
 | Repeat (same Shipper, same Shipper reference, same content) | Success (200 rather than 201), returning the original Transport Order's number and status, flagged as a repeat (`repeat: true`) |
 | Validation failure, or a reused Shipper reference with different content | Client error (422 ProblemDetails) listing every failure's code and message. Its `instance` is where the Rejected booking can be read |
 | Caller without a valid token for the TMS API | Refused (401) |
-| Caller whose token lacks the intake role | Refused (403) |
+| Caller whose token lacks the intake role, or that isn't registered for an intake channel | Refused (403) |
 
 ## Correlation ID
 
 API Management creates the correlation ID at the edge. It travels as a header through the Logic App to the TMS, is stored on the Transport Order and is carried in the properties of the outcome event. Every intake attempt, whether accepted, rejected, refused or failed, can be found by it in Application Insights.
 
-The TMS puts the tracking-contract keys it knows in the logging scope of an intake call: `correlationId`, `flow` (`transport-order-intake`), `partyId` (the Shipper ID) and, once the booking is accepted, `transportOrderNumber`. It never logs the Consignee's name, address or phone number.
+The TMS puts the tracking-contract keys it knows in the logging scope of an intake call. `correlationId` and `flow` (`transport-order-intake`) cover the whole call, from before authentication, so a refused call is logged under its correlation ID with the outcome `Refused`. `partyId` (the Shipper ID) covers the submission, and `transportOrderNumber` is added once the booking is accepted. Publishing the outcome event later is logged under the event's own tracking keys, so it joins the same trail. The TMS never logs the Consignee's name, address or phone number.
 
 It is not the Transport Order number. The TMS assigns that number only on acceptance, and rejected or refused attempts need tracing too.
 
