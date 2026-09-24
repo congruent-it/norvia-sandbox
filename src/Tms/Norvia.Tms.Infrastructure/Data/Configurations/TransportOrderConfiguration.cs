@@ -10,6 +10,8 @@ namespace Norvia.Tms.Infrastructure.Data.Configurations;
 
 internal sealed class TransportOrderConfiguration : IEntityTypeConfiguration<TransportOrder>
 {
+    public const string ShipperReferenceIndex = "IX_TransportOrders_ShipperId_ShipperReference";
+
     private static readonly JsonSerializerOptions DetailsJson = new(JsonSerializerDefaults.Web);
     private static readonly JsonSerializerOptions ReasonsJson = new(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter() } };
 
@@ -36,12 +38,15 @@ internal sealed class TransportOrderConfiguration : IEntityTypeConfiguration<Tra
             .IsRequired();
 
         // Only an Accepted Transport Order holds its Shipper reference, so this index is what guarantees that two
-        // submissions of one booking, even at the same moment, never become two Transport Orders. The binary collation
-        // compares references exactly, as the domain does.
+        // submissions of one booking, even at the same moment, never become two Transport Orders
+        // (RetrySubmissionThatLostARace answers the second). The binary collation compares references exactly, as the
+        // domain does.
         builder.Property(order => order.ShipperReference)
             .HasMaxLength(TransportOrderRules.MaxShipperReferenceLength)
             .UseCollation("Latin1_General_100_BIN2");
-        builder.HasIndex(order => new { order.ShipperId, order.ShipperReference }).IsUnique();
+        builder.HasIndex(order => new { order.ShipperId, order.ShipperReference })
+            .IsUnique()
+            .HasDatabaseName(ShipperReferenceIndex);
 
         builder.Property(order => order.Status)
             .HasConversion<string>()

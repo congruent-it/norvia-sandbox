@@ -49,7 +49,6 @@ public sealed class TransportOrderRules(decimal maxTotalWeightKg)
         {
             reasons.Add(new(RejectionCode.InactiveShipper, "The Shipper is not active, so Norvia can't take bookings for it."));
         }
-
     }
 
     private static void CheckShipperReference(TransportOrderDetails details, TransportOrder? referenceHolder, List<RejectionReason> reasons)

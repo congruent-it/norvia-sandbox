@@ -155,21 +155,27 @@ public sealed class SubmitTransportOrderHandlerTests
     }
 
     [Fact]
-    public async Task Handle_ReferenceHeldByTheSameShipper_IsLookedUpForThatShipperAndReference()
+    public async Task Handle_SameBookingAgain_IsRecognisedByItsShipperAndReference()
     {
-        await _handler.Handle(new SubmitTransportOrderCommand(Samples.CanonicalTransportOrder(), "corr-1"), CancellationToken.None);
+        _repository.SingleOrDefaultAsync(
+                Arg.Is<TransportOrderByShipperReferenceSpec>(spec => spec.ShipperId == new ShipperId("SHP-0001") && spec.ShipperReference == "BD-2026-0001"),
+                Arg.Any<CancellationToken>())
+            .Returns(Samples.AcceptedOrder(sequence: 7));
 
-        await _repository.Received(1).SingleOrDefaultAsync(
-            Arg.Is<TransportOrderByShipperReferenceSpec>(spec => spec.ShipperId == new ShipperId("SHP-0001") && spec.ShipperReference == "BD-2026-0001"),
-            Arg.Any<CancellationToken>());
+        var result = await _handler.Handle(new SubmitTransportOrderCommand(Samples.CanonicalTransportOrder(), "corr-again"), CancellationToken.None);
+
+        result.Value.Repeat.Should().BeTrue();
     }
 
     [Fact]
-    public async Task Handle_NoShipperReference_LooksNothingUp()
+    public async Task Handle_NoShipperReference_IsNeverARepeatOrAReuse()
     {
-        await _handler.Handle(new SubmitTransportOrderCommand(BrokenBooking(), "corr-1"), CancellationToken.None);
+        HeldBy(Samples.AcceptedOrder(sequence: 7));
 
-        await _repository.DidNotReceive().SingleOrDefaultAsync(Arg.Any<TransportOrderByShipperReferenceSpec>(), Arg.Any<CancellationToken>());
+        var result = await _handler.Handle(new SubmitTransportOrderCommand(BrokenBooking(), "corr-1"), CancellationToken.None);
+
+        result.Value.Repeat.Should().BeFalse();
+        result.Value.RejectionReasons.Select(reason => reason.Code).Should().Equal("ShipperReferenceMissing", "GoodsLinesMissing");
     }
 
     private void HeldBy(TransportOrder original) =>

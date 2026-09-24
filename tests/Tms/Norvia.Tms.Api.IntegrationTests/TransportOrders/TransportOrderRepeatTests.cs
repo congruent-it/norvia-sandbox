@@ -66,7 +66,7 @@ public sealed class TransportOrderRepeatTests(TmsFixture tms)
     }
 
     [Fact]
-    public async Task Submit_SameBookingManyTimesAtOnce_BooksOneTransportOrder()
+    public async Task Submit_SameBookingManyTimesAtOnce_BooksOneTransportOrderAndAnswersTheRestAsRepeats()
     {
         var reference = NewReference();
         var booking = Bookings.Valid(reference);
@@ -75,11 +75,10 @@ public sealed class TransportOrderRepeatTests(TmsFixture tms)
 
         try
         {
-            // A submission that loses the race to the one being accepted fails with a server error, which the intake
-            // Logic App retries; the retry is then a repeat.
-            responses.Select(r => r.StatusCode).Should().AllSatisfy(status =>
-                status.Should().BeOneOf(HttpStatusCode.Created, HttpStatusCode.OK, HttpStatusCode.InternalServerError));
             responses.Should().ContainSingle(r => r.StatusCode == HttpStatusCode.Created);
+            responses.Where(r => r.StatusCode != HttpStatusCode.Created).Should().AllSatisfy(r => r.StatusCode.Should().Be(HttpStatusCode.OK));
+            var numbers = await Task.WhenAll(responses.Select(async r => (await ReadJsonAsync(r))["transportOrderNumber"]!.GetValue<string>()));
+            numbers.Distinct().Should().ContainSingle();
             (await ListAsync("Accepted")).Where(o => o!["shipperReference"]!.GetValue<string>() == reference).Should().ContainSingle();
         }
         finally

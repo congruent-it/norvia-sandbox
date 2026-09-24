@@ -1,4 +1,6 @@
+using Ardalis.Result;
 using Ardalis.SharedKernel;
+using Mediator;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -7,6 +9,7 @@ using Microsoft.Extensions.Options;
 using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.Shippers;
 using Norvia.Tms.Application.TransportOrders;
+using Norvia.Tms.Application.TransportOrders.Submit;
 using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Infrastructure.Data;
 using Norvia.Tms.Infrastructure.Outbox;
@@ -49,6 +52,7 @@ public static class DependencyInjection
         builder.Services.AddScoped<OutboxBuffer>();
         builder.Services.AddScoped<IOutbox>(services => services.GetRequiredService<OutboxBuffer>());
         builder.Services.AddScoped<ITransportOrderNumbers, SqlTransportOrderNumbers>();
+        builder.Services.AddScoped<IPipelineBehavior<SubmitTransportOrderCommand, Result<SubmitTransportOrderResult>>, RetrySubmissionThatLostARace>();
         builder.Services.AddSingleton<IShipperDirectory, SeedFileShipperDirectory>();
         builder.Services.AddHostedService<OutboxPublisher>();
 

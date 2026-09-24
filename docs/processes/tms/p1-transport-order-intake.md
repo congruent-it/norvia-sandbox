@@ -45,7 +45,7 @@ The path runs synchronously end to end: Partner portal → API Management → in
 
 ### When the same booking arrives twice at once
 
-A unique index on the Shipper and the Shipper reference of Accepted Transport Orders makes sure only one of them is booked. The other fails with a server error and publishes nothing. The Logic App retries it (see below), and the retry is then a repeat.
+A unique index on the Shipper and the Shipper reference of Accepted Transport Orders makes sure only one of them is booked. The TMS then runs the other once more, finds the Transport Order the first one booked and answers it as a repeat. It publishes nothing.
 
 ### When the TMS can't be reached
 
