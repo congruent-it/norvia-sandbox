@@ -62,7 +62,7 @@ The delivery time on the Proof of delivery is what the Consignee signed. It isn'
 | The TMS refuses the Proof of delivery (client error) | The Logic App dead-letters the message with the TMS's failure code and message. No retry |
 | The TMS is unavailable (server error or timeout) | The message is retried from the queue. After the queue's maximum delivery count it goes to the dead-letter queue |
 
-In every failure after `202`, the blob stays in the inbound container, so a dead-lettered message can be investigated and replayed. A lifecycle rule deletes anything left there after 30 days.
+In every failure after `202`, the blob stays in the inbound container, so a dead-lettered message can be investigated and replayed. A lifecycle rule deletes anything left there after 90 days, the integration layer's retention (`integrationRetentionDays`).
 
 None of these reaches the Carrier. Nothing is lost, but it's only seen if someone watches: alerts on failed Carrier Proof of delivery Logic App runs and on the dead-letter queue on the integration side, and the missing flag on the business side.
 
@@ -148,7 +148,7 @@ The canonical Proof of delivery names its source: a Carrier ID, or Own fleet. Fo
 
 The TMS keeps Proof of delivery files in its own blob container. They stay in the hot tier for 30 days, then move to cool. They aren't deleted: a legal retention period is deferred.
 
-The inbound container belongs to the integration layer and is only transit. The Logic App deletes each blob once the TMS has accepted it, and a lifecycle rule deletes anything left after 30 days.
+The inbound container belongs to the integration layer and is only transit. The Logic App deletes each blob once the TMS has accepted it, and a lifecycle rule deletes anything left after 90 days, the integration layer's retention (`integrationRetentionDays`).
 
 ## Own fleet
 

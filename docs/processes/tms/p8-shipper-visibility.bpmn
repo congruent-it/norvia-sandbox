@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_P8" targetNamespace="https://norvia.example/processes/tms/p8">
+  <bpmn:collaboration id="Collaboration_P8">
+    <bpmn:participant id="Participant_P8" name="P8 Shipper visibility" processRef="Process_P8" />
+    <bpmn:textAnnotation id="Ann_Pull"><bpmn:text>Pull only: no Logic App, queue or read model, so the Shipper sees exactly what the TMS holds. A Proof of delivery file is streamed along the same path.</bpmn:text></bpmn:textAnnotation>
+  </bpmn:collaboration>
+  <bpmn:process id="Process_P8" name="P8 Shipper visibility" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_P8">
+      <bpmn:lane id="L_Shipper" name="Shipper (Partner portal Persona)">
+        <bpmn:flowNodeRef>s_ask</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>t_ask</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>e_403</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>t_unavail</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>e_unavail</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>t_see</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>e_see</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="L_Apim" name="API Management">
+        <bpmn:flowNodeRef>t_edge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>gw_role</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>t_id</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>t_call</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>t_policy</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>b_call</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="L_Tms" name="TMS">
+        <bpmn:flowNodeRef>t_read</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>gw_found</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>t_nf</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>t_proj</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>gw_m</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="s_ask" name="Shipper opens tracking screen, or the screen polls">
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:userTask id="t_ask" name="List, get or find Transport Orders">
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="t_edge" name="Check subscription key and token">
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="gw_role" name="Role Tracking.Read?">
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+      <bpmn:outgoing>Flow_5</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="e_403" name="Refused (403)">
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="t_id" name="Map azp to Shipper ID, create correlation ID">
+      <bpmn:incoming>Flow_5</bpmn:incoming>
+      <bpmn:outgoing>Flow_6</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="t_call" name="Call TMS Shipper tracking API (managed identity)">
+      <bpmn:incoming>Flow_6</bpmn:incoming>
+      <bpmn:outgoing>Flow_7</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:userTask id="t_unavail" name="See 'temporarily unavailable', last answer kept">
+      <bpmn:incoming>Flow_8</bpmn:incoming>
+      <bpmn:outgoing>Flow_9</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="e_unavail">
+      <bpmn:incoming>Flow_9</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="t_read" name="Read only this Shipper's Transport Orders">
+      <bpmn:incoming>Flow_7</bpmn:incoming>
+      <bpmn:outgoing>Flow_10</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="gw_found" name="Found?">
+      <bpmn:incoming>Flow_10</bpmn:incoming>
+      <bpmn:outgoing>Flow_11</bpmn:outgoing>
+      <bpmn:outgoing>Flow_12</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="t_nf" name="Return TransportOrderNotFound">
+      <bpmn:incoming>Flow_12</bpmn:incoming>
+      <bpmn:outgoing>Flow_14</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="t_proj" name="Project Shipper view: Tracking status, progress, ETA, current POD">
+      <bpmn:incoming>Flow_11</bpmn:incoming>
+      <bpmn:outgoing>Flow_13</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="gw_m">
+      <bpmn:incoming>Flow_13</bpmn:incoming>
+      <bpmn:incoming>Flow_14</bpmn:incoming>
+      <bpmn:outgoing>Flow_15</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="t_policy" name="Map to Shipper tracking format (policy)">
+      <bpmn:incoming>Flow_15</bpmn:incoming>
+      <bpmn:outgoing>Flow_16</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:userTask id="t_see" name="See Tracking status, progress, ETA, last update, POD">
+      <bpmn:incoming>Flow_16</bpmn:incoming>
+      <bpmn:outgoing>Flow_17</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="e_see">
+      <bpmn:incoming>Flow_17</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:boundaryEvent id="b_call" name="TMS unavailable" attachedToRef="t_call">
+      <bpmn:outgoing>Flow_8</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrorDef_b_call" />
+    </bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="s_ask" targetRef="t_ask" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="t_ask" targetRef="t_edge" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="t_edge" targetRef="gw_role" />
+    <bpmn:sequenceFlow id="Flow_4" name="No" sourceRef="gw_role" targetRef="e_403" />
+    <bpmn:sequenceFlow id="Flow_5" name="Yes" sourceRef="gw_role" targetRef="t_id" />
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="t_id" targetRef="t_call" />
+    <bpmn:sequenceFlow id="Flow_7" sourceRef="t_call" targetRef="t_read" />
+    <bpmn:sequenceFlow id="Flow_8" name="Gateway error, no retry" sourceRef="b_call" targetRef="t_unavail" />
+    <bpmn:sequenceFlow id="Flow_9" sourceRef="t_unavail" targetRef="e_unavail" />
+    <bpmn:sequenceFlow id="Flow_10" sourceRef="t_read" targetRef="gw_found" />
+    <bpmn:sequenceFlow id="Flow_11" name="Yes" sourceRef="gw_found" targetRef="t_proj" />
+    <bpmn:sequenceFlow id="Flow_12" name="No, or another Shipper's" sourceRef="gw_found" targetRef="t_nf" />
+    <bpmn:sequenceFlow id="Flow_13" sourceRef="t_proj" targetRef="gw_m" />
+    <bpmn:sequenceFlow id="Flow_14" sourceRef="t_nf" targetRef="gw_m" />
+    <bpmn:sequenceFlow id="Flow_15" sourceRef="gw_m" targetRef="t_policy" />
+    <bpmn:sequenceFlow id="Flow_16" sourceRef="t_policy" targetRef="t_see" />
+    <bpmn:sequenceFlow id="Flow_17" sourceRef="t_see" targetRef="e_see" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_P8">
+    <bpmndi:BPMNPlane id="Plane_P8" bpmnElement="Collaboration_P8">
+      <bpmndi:BPMNShape id="Participant_P8_di" bpmnElement="Participant_P8" isHorizontal="true">
+        <dc:Bounds x="100" y="60" width="2040" height="540" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="L_Shipper_di" bpmnElement="L_Shipper" isHorizontal="true">
+        <dc:Bounds x="130" y="60" width="2010" height="140" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="L_Apim_di" bpmnElement="L_Apim" isHorizontal="true">
+        <dc:Bounds x="130" y="200" width="2010" height="140" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="L_Tms_di" bpmnElement="L_Tms" isHorizontal="true">
+        <dc:Bounds x="130" y="340" width="2010" height="260" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_ask_di" bpmnElement="s_ask">
+        <dc:Bounds x="212" y="112" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_ask_di" bpmnElement="t_ask">
+        <dc:Bounds x="325" y="90" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_edge_di" bpmnElement="t_edge">
+        <dc:Bounds x="475" y="230" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gw_role_di" bpmnElement="gw_role" isMarkerVisible="true">
+        <dc:Bounds x="655" y="245" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="e_403_di" bpmnElement="e_403">
+        <dc:Bounds x="662" y="112" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_id_di" bpmnElement="t_id">
+        <dc:Bounds x="775" y="230" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_call_di" bpmnElement="t_call">
+        <dc:Bounds x="925" y="230" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_unavail_di" bpmnElement="t_unavail">
+        <dc:Bounds x="1075" y="90" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="e_unavail_di" bpmnElement="e_unavail">
+        <dc:Bounds x="1262" y="112" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_read_di" bpmnElement="t_read">
+        <dc:Bounds x="1075" y="370" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gw_found_di" bpmnElement="gw_found" isMarkerVisible="true">
+        <dc:Bounds x="1255" y="385" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_nf_di" bpmnElement="t_nf">
+        <dc:Bounds x="1375" y="490" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_proj_di" bpmnElement="t_proj">
+        <dc:Bounds x="1375" y="370" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gw_m_di" bpmnElement="gw_m" isMarkerVisible="true">
+        <dc:Bounds x="1555" y="385" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_policy_di" bpmnElement="t_policy">
+        <dc:Bounds x="1675" y="230" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_see_di" bpmnElement="t_see">
+        <dc:Bounds x="1825" y="90" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="e_see_di" bpmnElement="e_see">
+        <dc:Bounds x="2012" y="112" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="b_call_di" bpmnElement="b_call">
+        <dc:Bounds x="992" y="212" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Ann_Pull_di" bpmnElement="Ann_Pull">
+        <dc:Bounds x="1740" y="380" width="280" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
+        <di:waypoint x="248" y="130" />
+        <di:waypoint x="325" y="130" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
+        <di:waypoint x="435" y="130" />
+        <di:waypoint x="530" y="130" />
+        <di:waypoint x="530" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3">
+        <di:waypoint x="585" y="270" />
+        <di:waypoint x="655" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4">
+        <di:waypoint x="680" y="245" />
+        <di:waypoint x="680" y="148" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_5_di" bpmnElement="Flow_5">
+        <di:waypoint x="705" y="270" />
+        <di:waypoint x="775" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_6_di" bpmnElement="Flow_6">
+        <di:waypoint x="885" y="270" />
+        <di:waypoint x="925" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_7_di" bpmnElement="Flow_7">
+        <di:waypoint x="1035" y="270" />
+        <di:waypoint x="1130" y="270" />
+        <di:waypoint x="1130" y="370" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_8_di" bpmnElement="Flow_8">
+        <di:waypoint x="1010" y="212" />
+        <di:waypoint x="1010" y="130" />
+        <di:waypoint x="1075" y="130" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_9_di" bpmnElement="Flow_9">
+        <di:waypoint x="1185" y="130" />
+        <di:waypoint x="1262" y="130" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_10_di" bpmnElement="Flow_10">
+        <di:waypoint x="1185" y="410" />
+        <di:waypoint x="1255" y="410" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_11_di" bpmnElement="Flow_11">
+        <di:waypoint x="1305" y="410" />
+        <di:waypoint x="1375" y="410" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_12_di" bpmnElement="Flow_12">
+        <di:waypoint x="1280" y="435" />
+        <di:waypoint x="1280" y="530" />
+        <di:waypoint x="1375" y="530" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_13_di" bpmnElement="Flow_13">
+        <di:waypoint x="1485" y="410" />
+        <di:waypoint x="1555" y="410" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_14_di" bpmnElement="Flow_14">
+        <di:waypoint x="1485" y="530" />
+        <di:waypoint x="1580" y="530" />
+        <di:waypoint x="1580" y="435" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_15_di" bpmnElement="Flow_15">
+        <di:waypoint x="1580" y="385" />
+        <di:waypoint x="1580" y="270" />
+        <di:waypoint x="1675" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_16_di" bpmnElement="Flow_16">
+        <di:waypoint x="1785" y="270" />
+        <di:waypoint x="1880" y="270" />
+        <di:waypoint x="1880" y="170" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_17_di" bpmnElement="Flow_17">
+        <di:waypoint x="1935" y="130" />
+        <di:waypoint x="2012" y="130" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

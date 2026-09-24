@@ -1,0 +1,436 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_P1" targetNamespace="https://norvia.example/processes/tms/p1">
+  <bpmn:collaboration id="Collaboration_P1">
+    <bpmn:participant id="Participant_Intake" name="P1 Transport Order intake" processRef="Process_P1" />
+    <bpmn:participant id="Participant_ServiceBus" name="Service Bus: Transport Order events topic" />
+    <bpmn:messageFlow id="MessageFlow_Accepted" sourceRef="Event_PublishAccepted" targetRef="Participant_ServiceBus" />
+    <bpmn:messageFlow id="MessageFlow_Rejected" sourceRef="Event_PublishRejected" targetRef="Participant_ServiceBus" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_P1" name="P1 Transport Order intake" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_P1">
+      <bpmn:lane id="Lane_Shipper" name="Shipper (Partner portal)">
+        <bpmn:flowNodeRef>Start_Booking</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Book</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_Refused</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_NotReceived</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_SeeOutcome</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_OutcomeSeen</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Apim" name="API Management">
+        <bpmn:flowNodeRef>Task_CheckEdge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_HasRole</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_MapShipper</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_LogicApp" name="Intake Logic App">
+        <bpmn:flowNodeRef>Task_MapCanonical</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Submit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Boundary_RetriesExhausted</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_GatewayError</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Relay</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Tms" name="TMS">
+        <bpmn:flowNodeRef>Gateway_Repeat</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ReturnOriginal</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Validate</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_Valid</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_RecordAccepted</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_RecordRejected</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Event_PublishAccepted</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Event_PublishRejected</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_Merge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Respond</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start_Booking" name="Shipper wants to book a transport">
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:userTask id="Task_Book" name="Fill in and submit booking">
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="End_Refused" name="Refused (403)">
+      <bpmn:incoming>Flow_NoRole</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="End_NotReceived" name="Booking not received (gateway error)">
+      <bpmn:incoming>Flow_GatewayErrorToShipper</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:userTask id="Task_SeeOutcome" name="See outcome in Partner portal">
+      <bpmn:incoming>Flow_RelayToShipper</bpmn:incoming>
+      <bpmn:outgoing>Flow_End</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="End_OutcomeSeen" name="Accepted, repeat or Rejected with reasons">
+      <bpmn:incoming>Flow_End</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="Task_CheckEdge" name="Check subscription key and Entra token">
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_HasRole" name="Role TransportOrders.Submit?">
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_HasRole</bpmn:outgoing>
+      <bpmn:outgoing>Flow_NoRole</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Task_MapCanonical" name="Map booking to Canonical Model TransportOrder">
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+      <bpmn:outgoing>Flow_5</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Task_Submit" name="Submit to TMS intake API (retry on 5xx / timeout)">
+      <bpmn:incoming>Flow_5</bpmn:incoming>
+      <bpmn:outgoing>Flow_6</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:boundaryEvent id="Boundary_RetriesExhausted" name="Retries exhausted" attachedToRef="Task_Submit">
+      <bpmn:outgoing>Flow_RetriesExhausted</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrorDef_RetriesExhausted" />
+    </bpmn:boundaryEvent>
+    <bpmn:serviceTask id="Task_GatewayError" name="Return gateway error">
+      <bpmn:incoming>Flow_RetriesExhausted</bpmn:incoming>
+      <bpmn:outgoing>Flow_GatewayErrorToShipper</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Task_Relay" name="Relay response in partner format">
+      <bpmn:incoming>Flow_RespondToLogicApp</bpmn:incoming>
+      <bpmn:outgoing>Flow_RelayToShipper</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_Repeat" name="Shipper reference seen before?">
+      <bpmn:incoming>Flow_6</bpmn:incoming>
+      <bpmn:outgoing>Flow_SameContent</bpmn:outgoing>
+      <bpmn:outgoing>Flow_NewReference</bpmn:outgoing>
+      <bpmn:outgoing>Flow_DifferentContent</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Task_ReturnOriginal" name="Return original Transport Order, flagged as repeat">
+      <bpmn:incoming>Flow_SameContent</bpmn:incoming>
+      <bpmn:outgoing>Flow_RepeatToMerge</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:businessRuleTask id="Task_Validate" name="Validate against all rules, collect every failure">
+      <bpmn:incoming>Flow_NewReference</bpmn:incoming>
+      <bpmn:outgoing>Flow_7</bpmn:outgoing>
+    </bpmn:businessRuleTask>
+    <bpmn:exclusiveGateway id="Gateway_Valid" name="All rules pass?">
+      <bpmn:incoming>Flow_7</bpmn:incoming>
+      <bpmn:outgoing>Flow_Valid</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Invalid</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Task_RecordAccepted" name="Assign Transport Order number, record Accepted">
+      <bpmn:incoming>Flow_Valid</bpmn:incoming>
+      <bpmn:outgoing>Flow_8</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Task_RecordRejected" name="Record Rejected with reasons">
+      <bpmn:incoming>Flow_Invalid</bpmn:incoming>
+      <bpmn:incoming>Flow_DifferentContent</bpmn:incoming>
+      <bpmn:outgoing>Flow_9</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:intermediateThrowEvent id="Event_PublishAccepted" name="TransportOrderAccepted (outbox)">
+      <bpmn:incoming>Flow_8</bpmn:incoming>
+      <bpmn:outgoing>Flow_AcceptedToMerge</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MessageDef_Accepted" />
+    </bpmn:intermediateThrowEvent>
+    <bpmn:intermediateThrowEvent id="Event_PublishRejected" name="TransportOrderRejected (outbox)">
+      <bpmn:incoming>Flow_9</bpmn:incoming>
+      <bpmn:outgoing>Flow_RejectedToMerge</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MessageDef_Rejected" />
+    </bpmn:intermediateThrowEvent>
+    <bpmn:exclusiveGateway id="Gateway_Merge">
+      <bpmn:incoming>Flow_RepeatToMerge</bpmn:incoming>
+      <bpmn:incoming>Flow_AcceptedToMerge</bpmn:incoming>
+      <bpmn:incoming>Flow_RejectedToMerge</bpmn:incoming>
+      <bpmn:outgoing>Flow_10</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Task_Respond" name="Respond to Logic App">
+      <bpmn:incoming>Flow_10</bpmn:incoming>
+      <bpmn:outgoing>Flow_RespondToLogicApp</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start_Booking" targetRef="Task_Book" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_Book" targetRef="Task_CheckEdge" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_CheckEdge" targetRef="Gateway_HasRole" />
+    <bpmn:sequenceFlow id="Flow_HasRole" name="Yes" sourceRef="Gateway_HasRole" targetRef="Task_MapShipper" />
+    <bpmn:sequenceFlow id="Flow_NoRole" name="No" sourceRef="Gateway_HasRole" targetRef="End_Refused" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Task_MapShipper" targetRef="Task_MapCanonical" />
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="Task_MapCanonical" targetRef="Task_Submit" />
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="Task_Submit" targetRef="Gateway_Repeat" />
+    <bpmn:sequenceFlow id="Flow_RetriesExhausted" sourceRef="Boundary_RetriesExhausted" targetRef="Task_GatewayError" />
+    <bpmn:sequenceFlow id="Flow_GatewayErrorToShipper" sourceRef="Task_GatewayError" targetRef="End_NotReceived" />
+    <bpmn:sequenceFlow id="Flow_SameContent" name="Yes, same content" sourceRef="Gateway_Repeat" targetRef="Task_ReturnOriginal" />
+    <bpmn:sequenceFlow id="Flow_NewReference" name="No" sourceRef="Gateway_Repeat" targetRef="Task_Validate" />
+    <bpmn:sequenceFlow id="Flow_DifferentContent" name="Yes, different content" sourceRef="Gateway_Repeat" targetRef="Task_RecordRejected" />
+    <bpmn:sequenceFlow id="Flow_7" sourceRef="Task_Validate" targetRef="Gateway_Valid" />
+    <bpmn:sequenceFlow id="Flow_Valid" name="Yes" sourceRef="Gateway_Valid" targetRef="Task_RecordAccepted" />
+    <bpmn:sequenceFlow id="Flow_Invalid" name="No" sourceRef="Gateway_Valid" targetRef="Task_RecordRejected" />
+    <bpmn:sequenceFlow id="Flow_8" sourceRef="Task_RecordAccepted" targetRef="Event_PublishAccepted" />
+    <bpmn:sequenceFlow id="Flow_9" sourceRef="Task_RecordRejected" targetRef="Event_PublishRejected" />
+    <bpmn:sequenceFlow id="Flow_RepeatToMerge" sourceRef="Task_ReturnOriginal" targetRef="Gateway_Merge" />
+    <bpmn:sequenceFlow id="Flow_AcceptedToMerge" sourceRef="Event_PublishAccepted" targetRef="Gateway_Merge" />
+    <bpmn:sequenceFlow id="Flow_RejectedToMerge" sourceRef="Event_PublishRejected" targetRef="Gateway_Merge" />
+    <bpmn:sequenceFlow id="Flow_10" sourceRef="Gateway_Merge" targetRef="Task_Respond" />
+    <bpmn:sequenceFlow id="Flow_RespondToLogicApp" sourceRef="Task_Respond" targetRef="Task_Relay" />
+    <bpmn:sequenceFlow id="Flow_RelayToShipper" sourceRef="Task_Relay" targetRef="Task_SeeOutcome" />
+    <bpmn:sequenceFlow id="Flow_End" sourceRef="Task_SeeOutcome" targetRef="End_OutcomeSeen" />
+    <bpmn:serviceTask id="Task_MapShipper" name="Map azp to Shipper ID, create correlation ID">
+      <bpmn:incoming>Flow_HasRole</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+    </bpmn:serviceTask>
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_P1">
+    <bpmndi:BPMNPlane id="Plane_P1" bpmnElement="Collaboration_P1">
+      <bpmndi:BPMNShape id="Participant_Intake_di" bpmnElement="Participant_Intake" isHorizontal="true">
+        <dc:Bounds x="100" y="60" width="1960" height="800" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Tms_di" bpmnElement="Lane_Tms" isHorizontal="true">
+        <dc:Bounds x="130" y="540" width="1930" height="320" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_LogicApp_di" bpmnElement="Lane_LogicApp" isHorizontal="true">
+        <dc:Bounds x="130" y="360" width="1930" height="180" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Apim_di" bpmnElement="Lane_Apim" isHorizontal="true">
+        <dc:Bounds x="130" y="210" width="1930" height="150" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Shipper_di" bpmnElement="Lane_Shipper" isHorizontal="true">
+        <dc:Bounds x="130" y="60" width="1930" height="150" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Start_Booking_di" bpmnElement="Start_Booking">
+        <dc:Bounds x="182" y="117" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="155" y="160" width="90" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Book_di" bpmnElement="Task_Book">
+        <dc:Bounds x="260" y="95" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Refused_di" bpmnElement="End_Refused">
+        <dc:Bounds x="562" y="117" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="545" y="93" width="70" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_NotReceived_di" bpmnElement="End_NotReceived">
+        <dc:Bounds x="1222" y="117" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1195" y="70" width="90" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SeeOutcome_di" bpmnElement="Task_SeeOutcome">
+        <dc:Bounds x="1790" y="95" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_OutcomeSeen_di" bpmnElement="End_OutcomeSeen">
+        <dc:Bounds x="1952" y="117" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1920" y="160" width="100" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CheckEdge_di" bpmnElement="Task_CheckEdge">
+        <dc:Bounds x="400" y="245" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_HasRole_di" bpmnElement="Gateway_HasRole" isMarkerVisible="true">
+        <dc:Bounds x="555" y="260" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="530" y="317" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_MapShipper_di" bpmnElement="Task_MapShipper">
+        <dc:Bounds x="660" y="245" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_MapCanonical_di" bpmnElement="Task_MapCanonical">
+        <dc:Bounds x="800" y="410" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Submit_di" bpmnElement="Task_Submit">
+        <dc:Bounds x="940" y="410" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_GatewayError_di" bpmnElement="Task_GatewayError">
+        <dc:Bounds x="1080" y="410" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Relay_di" bpmnElement="Task_Relay">
+        <dc:Bounds x="1790" y="410" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Repeat_di" bpmnElement="Gateway_Repeat" isMarkerVisible="true">
+        <dc:Bounds x="1035" y="665" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="930" y="720" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ReturnOriginal_di" bpmnElement="Task_ReturnOriginal">
+        <dc:Bounds x="1150" y="560" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Validate_di" bpmnElement="Task_Validate">
+        <dc:Bounds x="1150" y="650" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Valid_di" bpmnElement="Gateway_Valid" isMarkerVisible="true">
+        <dc:Bounds x="1305" y="665" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1292" y="645" width="76" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_RecordAccepted_di" bpmnElement="Task_RecordAccepted">
+        <dc:Bounds x="1430" y="650" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_RecordRejected_di" bpmnElement="Task_RecordRejected">
+        <dc:Bounds x="1430" y="740" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_PublishAccepted_di" bpmnElement="Event_PublishAccepted">
+        <dc:Bounds x="1582" y="672" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1550" y="625" width="100" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_PublishRejected_di" bpmnElement="Event_PublishRejected">
+        <dc:Bounds x="1632" y="762" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1681" y="800" width="89" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Merge_di" bpmnElement="Gateway_Merge" isMarkerVisible="true">
+        <dc:Bounds x="1695" y="665" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Respond_di" bpmnElement="Task_Respond">
+        <dc:Bounds x="1790" y="650" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Boundary_RetriesExhausted_di" bpmnElement="Boundary_RetriesExhausted">
+        <dc:Bounds x="992" y="392" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="905" y="372" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
+        <di:waypoint x="218" y="135" />
+        <di:waypoint x="260" y="135" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
+        <di:waypoint x="360" y="135" />
+        <di:waypoint x="450" y="135" />
+        <di:waypoint x="450" y="245" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3">
+        <di:waypoint x="500" y="285" />
+        <di:waypoint x="555" y="285" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_HasRole_di" bpmnElement="Flow_HasRole">
+        <di:waypoint x="605" y="285" />
+        <di:waypoint x="660" y="285" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="621" y="267" width="19" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_NoRole_di" bpmnElement="Flow_NoRole">
+        <di:waypoint x="580" y="260" />
+        <di:waypoint x="580" y="153" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="586" y="215" width="16" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4">
+        <di:waypoint x="710" y="325" />
+        <di:waypoint x="710" y="450" />
+        <di:waypoint x="800" y="450" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_5_di" bpmnElement="Flow_5">
+        <di:waypoint x="900" y="450" />
+        <di:waypoint x="940" y="450" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_6_di" bpmnElement="Flow_6">
+        <di:waypoint x="990" y="490" />
+        <di:waypoint x="990" y="690" />
+        <di:waypoint x="1035" y="690" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RetriesExhausted_di" bpmnElement="Flow_RetriesExhausted">
+        <di:waypoint x="1010" y="392" />
+        <di:waypoint x="1010" y="380" />
+        <di:waypoint x="1130" y="380" />
+        <di:waypoint x="1130" y="410" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_GatewayErrorToShipper_di" bpmnElement="Flow_GatewayErrorToShipper">
+        <di:waypoint x="1180" y="450" />
+        <di:waypoint x="1240" y="450" />
+        <di:waypoint x="1240" y="153" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_SameContent_di" bpmnElement="Flow_SameContent">
+        <di:waypoint x="1060" y="665" />
+        <di:waypoint x="1060" y="600" />
+        <di:waypoint x="1150" y="600" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1066" y="575" width="80" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_NewReference_di" bpmnElement="Flow_NewReference">
+        <di:waypoint x="1085" y="690" />
+        <di:waypoint x="1150" y="690" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1105" y="672" width="16" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_DifferentContent_di" bpmnElement="Flow_DifferentContent">
+        <di:waypoint x="1060" y="715" />
+        <di:waypoint x="1060" y="840" />
+        <di:waypoint x="1480" y="840" />
+        <di:waypoint x="1480" y="820" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1070" y="822" width="110" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_7_di" bpmnElement="Flow_7">
+        <di:waypoint x="1250" y="690" />
+        <di:waypoint x="1305" y="690" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Valid_di" bpmnElement="Flow_Valid">
+        <di:waypoint x="1355" y="690" />
+        <di:waypoint x="1430" y="690" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1380" y="672" width="20" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Invalid_di" bpmnElement="Flow_Invalid">
+        <di:waypoint x="1330" y="715" />
+        <di:waypoint x="1330" y="780" />
+        <di:waypoint x="1430" y="780" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1338" y="740" width="16" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_8_di" bpmnElement="Flow_8">
+        <di:waypoint x="1530" y="690" />
+        <di:waypoint x="1582" y="690" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_9_di" bpmnElement="Flow_9">
+        <di:waypoint x="1530" y="780" />
+        <di:waypoint x="1632" y="780" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RepeatToMerge_di" bpmnElement="Flow_RepeatToMerge">
+        <di:waypoint x="1250" y="600" />
+        <di:waypoint x="1720" y="600" />
+        <di:waypoint x="1720" y="665" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_AcceptedToMerge_di" bpmnElement="Flow_AcceptedToMerge">
+        <di:waypoint x="1618" y="690" />
+        <di:waypoint x="1695" y="690" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RejectedToMerge_di" bpmnElement="Flow_RejectedToMerge">
+        <di:waypoint x="1668" y="780" />
+        <di:waypoint x="1720" y="780" />
+        <di:waypoint x="1720" y="715" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_10_di" bpmnElement="Flow_10">
+        <di:waypoint x="1745" y="690" />
+        <di:waypoint x="1790" y="690" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RespondToLogicApp_di" bpmnElement="Flow_RespondToLogicApp">
+        <di:waypoint x="1840" y="650" />
+        <di:waypoint x="1840" y="490" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RelayToShipper_di" bpmnElement="Flow_RelayToShipper">
+        <di:waypoint x="1840" y="410" />
+        <di:waypoint x="1840" y="175" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_End_di" bpmnElement="Flow_End">
+        <di:waypoint x="1890" y="135" />
+        <di:waypoint x="1952" y="135" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Participant_ServiceBus_di" bpmnElement="Participant_ServiceBus" isHorizontal="true">
+        <dc:Bounds x="100" y="900" width="1960" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="MessageFlow_Accepted_di" bpmnElement="MessageFlow_Accepted">
+        <di:waypoint x="1600" y="708" />
+        <di:waypoint x="1600" y="900" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MessageFlow_Rejected_di" bpmnElement="MessageFlow_Rejected">
+        <di:waypoint x="1650" y="798" />
+        <di:waypoint x="1650" y="900" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

@@ -12,7 +12,7 @@ Shipper visibility lets a Shipper see where its Transport Orders stand. The Ship
 
 ## Scope
 
-P8 is **pull only**. The Shipper queries, and nothing is sent to it. A query goes from API Management straight to the TMS, which ADR 0003 allows for synchronous queries. No Logic App, queue or read model sits in between, so the Shipper always sees what the TMS believes.
+P8 is **pull only**. The Shipper queries, and nothing is sent to it. A query goes from API Management straight to the TMS, because Logic Apps are never used for read actions (ADR 0003). No Logic App, queue or read model sits in between, so the Shipper always sees what the TMS believes.
 
 - **Shippers** are designed here in full, through their Personas.
 - **Consignees** get no tracking view. See [Deferred](#deferred).

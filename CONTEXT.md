@@ -28,6 +28,10 @@ _Avoid_: chauffeur, operator
 A Norvia employee who turns accepted Transport Orders into Shipments, assigns each one to Norvia's own fleet or to a Carrier, and builds and dispatches the Own fleet's Trips.
 _Avoid_: scheduler, traffic controller
 
+**Integration operator**:
+A Norvia IT employee who watches the integration layer and resolves the messages that failed in it, using the Integration console.
+_Avoid_: admin, support engineer, ops
+
 **Vehicle**:
 A van, rigid truck or tractor with trailer in Norvia's own fleet, with a payload in kg and a number of pallet places. Each type needs a Driver with a matching licence. The ERP owns its master data, and the TMS owns its availability.
 _Avoid_: truck, asset, unit
@@ -243,6 +247,10 @@ Norvia's system of record for Shipper, Carrier, Vehicle and Driver master data, 
 The application a Driver uses on the road to receive their Trip, start and end it, and complete each Stop, capturing a Proof of delivery at each delivery. It is Norvia's own, separate from the TMS, and reaches it only through Azure Integration Services.
 _Avoid_: mobile app, handheld, scanner
 
+**Integration console**:
+Norvia's own application for the Integration operator to find Message trails, see failed runs and dead-lettered messages, and resubmit or discard them. It reads what the integration layer already records and keeps nothing of its own.
+_Avoid_: admin portal, monitoring portal, dashboard
+
 **Partner portal**:
 The single application that plays every party outside Norvia (Shippers and Carriers) in demos, with one persona per party. It reaches Norvia only through API Management.
 _Avoid_: shipper portal, carrier portal, external app
@@ -256,3 +264,7 @@ _Avoid_: user, role, tenant
 **Canonical Model**:
 Norvia's own message format: one schema per business event or document, named with the terms in this glossary. Partner formats are mapped to and from it at the edges.
 _Avoid_: common data model, standard format
+
+**Message trail**:
+Everything the integration layer did under one correlation ID: the call or event it started from, and every queue, subscription, Logic App run and application call that followed from it, fan-out included. An action by a Norvia employee in an application starts a new trail.
+_Avoid_: integration message, message flow, transaction

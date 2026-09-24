@@ -210,7 +210,7 @@ A new version from P11 replaces the Trip as before (ADR 0015). It keeps the outc
 The Driver app gains:
 
 - an **outbox** that publishes its events to the topic for Driver app events, so a report is never lost between recording it and publishing it
-- a **transit container** for Proof of delivery files. The Driver reports Logic App deletes each file once the TMS has accepted its Proof of delivery, and a lifecycle rule deletes anything left after 30 days
+- a **transit container** for Proof of delivery files. The Driver reports Logic App deletes each file once the TMS has accepted its Proof of delivery, and a lifecycle rule deletes anything left after 90 days, the integration layer's retention (`integrationRetentionDays`)
 - an **outcome endpoint** that the Driver reports Logic App calls, role `DriverReports.ReportOutcome`
 
 It still reaches the TMS only through Azure Integration Services (ADR 0001).

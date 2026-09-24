@@ -1,0 +1,305 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_P2" targetNamespace="https://norvia.example/processes/tms/p2">
+  <bpmn:collaboration id="Collaboration_P2">
+    <bpmn:participant id="Participant_P2" name="P2 Rating" processRef="Process_P2" />
+    <bpmn:participant id="SB" name="Service Bus: Transport Order events topic" />
+    <bpmn:messageFlow id="MessageFlow_1" sourceRef="ev_rated" targetRef="SB" />
+    <bpmn:messageFlow id="MessageFlow_2" sourceRef="ev_fail" targetRef="SB" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_P2" name="P2 Rating" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_P2">
+      <bpmn:lane id="L_Tms" name="TMS (after P1 acceptance)">
+        <bpmn:flowNodeRef>s_acc</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>gw_ch</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>t_nyr</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>t_nrs</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>e_nrs</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="L_Worker" name="TMS Rating worker">
+        <bpmn:flowNodeRef>s_sweep</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>t_pick</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>t_ver</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>t_lane</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>t_wb</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>gw_ok</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>t_calc</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>t_rated</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ev_rated</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>e_rated</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>t_fail</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ev_fail</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="L_Cs" name="Customer service (TMS UI)">
+        <bpmn:flowNodeRef>t_list</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>t_rerate</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="s_acc" name="Transport Order accepted (P1)">
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:exclusiveGateway id="gw_ch" name="Channel?">
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="t_nyr" name="Set Not yet rated">
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_5</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="t_nrs" name="Set Not rated separately">
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="e_nrs" name="Not rated separately (billed via Fulfilment Contract)">
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:startEvent id="s_sweep" name="Sweep timer">
+      <bpmn:outgoing>Flow_6</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerDef_s_sweep" />
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="t_pick" name="Pick up Not yet rated order">
+      <bpmn:incoming>Flow_5</bpmn:incoming>
+      <bpmn:incoming>Flow_6</bpmn:incoming>
+      <bpmn:outgoing>Flow_7</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="t_ver" name="Choose Rate Card version valid on collection date">
+      <bpmn:incoming>Flow_7</bpmn:incoming>
+      <bpmn:incoming>Flow_19</bpmn:incoming>
+      <bpmn:outgoing>Flow_8</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="t_lane" name="Match Lane from collection and delivery Zones">
+      <bpmn:incoming>Flow_8</bpmn:incoming>
+      <bpmn:outgoing>Flow_9</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="t_wb" name="Choose Weight Break from total gross weight">
+      <bpmn:incoming>Flow_9</bpmn:incoming>
+      <bpmn:outgoing>Flow_10</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="gw_ok" name="Version, Lane and Weight Break found?">
+      <bpmn:incoming>Flow_10</bpmn:incoming>
+      <bpmn:outgoing>Flow_11</bpmn:outgoing>
+      <bpmn:outgoing>Flow_12</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="t_calc" name="Calculate Freight Charge (+ minimum charge line)">
+      <bpmn:incoming>Flow_11</bpmn:incoming>
+      <bpmn:outgoing>Flow_13</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="t_rated" name="Record Rated, freeze Freight Charge">
+      <bpmn:incoming>Flow_13</bpmn:incoming>
+      <bpmn:outgoing>Flow_14</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:intermediateThrowEvent id="ev_rated" name="TransportOrderRated">
+      <bpmn:incoming>Flow_14</bpmn:incoming>
+      <bpmn:outgoing>Flow_15</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MessageDef_ev_rated" />
+    </bpmn:intermediateThrowEvent>
+    <bpmn:endEvent id="e_rated" name="Rated">
+      <bpmn:incoming>Flow_15</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="t_fail" name="Record Rating failed with reason">
+      <bpmn:incoming>Flow_12</bpmn:incoming>
+      <bpmn:outgoing>Flow_16</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:intermediateThrowEvent id="ev_fail" name="TransportOrderRatingFailed">
+      <bpmn:incoming>Flow_16</bpmn:incoming>
+      <bpmn:outgoing>Flow_17</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MessageDef_ev_fail" />
+    </bpmn:intermediateThrowEvent>
+    <bpmn:userTask id="t_list" name="See order in rating exceptions list">
+      <bpmn:incoming>Flow_17</bpmn:incoming>
+      <bpmn:outgoing>Flow_18</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="t_rerate" name="Re-rate after the Rate Card is corrected">
+      <bpmn:incoming>Flow_18</bpmn:incoming>
+      <bpmn:outgoing>Flow_19</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="s_acc" targetRef="gw_ch" />
+    <bpmn:sequenceFlow id="Flow_2" name="Shipper API" sourceRef="gw_ch" targetRef="t_nyr" />
+    <bpmn:sequenceFlow id="Flow_3" name="WMS" sourceRef="gw_ch" targetRef="t_nrs" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="t_nrs" targetRef="e_nrs" />
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="t_nyr" targetRef="t_pick" />
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="s_sweep" targetRef="t_pick" />
+    <bpmn:sequenceFlow id="Flow_7" sourceRef="t_pick" targetRef="t_ver" />
+    <bpmn:sequenceFlow id="Flow_8" sourceRef="t_ver" targetRef="t_lane" />
+    <bpmn:sequenceFlow id="Flow_9" sourceRef="t_lane" targetRef="t_wb" />
+    <bpmn:sequenceFlow id="Flow_10" sourceRef="t_wb" targetRef="gw_ok" />
+    <bpmn:sequenceFlow id="Flow_11" name="Yes" sourceRef="gw_ok" targetRef="t_calc" />
+    <bpmn:sequenceFlow id="Flow_12" name="No" sourceRef="gw_ok" targetRef="t_fail" />
+    <bpmn:sequenceFlow id="Flow_13" sourceRef="t_calc" targetRef="t_rated" />
+    <bpmn:sequenceFlow id="Flow_14" sourceRef="t_rated" targetRef="ev_rated" />
+    <bpmn:sequenceFlow id="Flow_15" sourceRef="ev_rated" targetRef="e_rated" />
+    <bpmn:sequenceFlow id="Flow_16" sourceRef="t_fail" targetRef="ev_fail" />
+    <bpmn:sequenceFlow id="Flow_17" sourceRef="ev_fail" targetRef="t_list" />
+    <bpmn:sequenceFlow id="Flow_18" sourceRef="t_list" targetRef="t_rerate" />
+    <bpmn:sequenceFlow id="Flow_19" name="Re-rate (same collection-date rule)" sourceRef="t_rerate" targetRef="t_ver" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_P2">
+    <bpmndi:BPMNPlane id="Plane_P2" bpmnElement="Collaboration_P2">
+      <bpmndi:BPMNShape id="Participant_P2_di" bpmnElement="Participant_P2" isHorizontal="true">
+        <dc:Bounds x="100" y="160" width="1890" height="660" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="L_Tms_di" bpmnElement="L_Tms" isHorizontal="true">
+        <dc:Bounds x="130" y="160" width="1860" height="260" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="L_Worker_di" bpmnElement="L_Worker" isHorizontal="true">
+        <dc:Bounds x="130" y="420" width="1860" height="260" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="L_Cs_di" bpmnElement="L_Cs" isHorizontal="true">
+        <dc:Bounds x="130" y="680" width="1860" height="140" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SB_di" bpmnElement="SB" isHorizontal="true">
+        <dc:Bounds x="100" y="60" width="1890" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_acc_di" bpmnElement="s_acc">
+        <dc:Bounds x="212" y="212" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gw_ch_di" bpmnElement="gw_ch" isMarkerVisible="true">
+        <dc:Bounds x="355" y="205" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_nyr_di" bpmnElement="t_nyr">
+        <dc:Bounds x="475" y="190" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_nrs_di" bpmnElement="t_nrs">
+        <dc:Bounds x="475" y="310" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="e_nrs_di" bpmnElement="e_nrs">
+        <dc:Bounds x="662" y="332" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_sweep_di" bpmnElement="s_sweep">
+        <dc:Bounds x="512" y="472" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_pick_di" bpmnElement="t_pick">
+        <dc:Bounds x="625" y="450" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_ver_di" bpmnElement="t_ver">
+        <dc:Bounds x="775" y="450" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_lane_di" bpmnElement="t_lane">
+        <dc:Bounds x="925" y="450" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_wb_di" bpmnElement="t_wb">
+        <dc:Bounds x="1075" y="450" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gw_ok_di" bpmnElement="gw_ok" isMarkerVisible="true">
+        <dc:Bounds x="1255" y="465" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_calc_di" bpmnElement="t_calc">
+        <dc:Bounds x="1375" y="450" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_rated_di" bpmnElement="t_rated">
+        <dc:Bounds x="1525" y="450" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ev_rated_di" bpmnElement="ev_rated">
+        <dc:Bounds x="1712" y="472" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="e_rated_di" bpmnElement="e_rated">
+        <dc:Bounds x="1862" y="472" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_fail_di" bpmnElement="t_fail">
+        <dc:Bounds x="1375" y="570" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ev_fail_di" bpmnElement="ev_fail">
+        <dc:Bounds x="1562" y="592" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_list_di" bpmnElement="t_list">
+        <dc:Bounds x="1675" y="710" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_rerate_di" bpmnElement="t_rerate">
+        <dc:Bounds x="1825" y="710" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
+        <di:waypoint x="248" y="230" />
+        <di:waypoint x="355" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
+        <di:waypoint x="405" y="230" />
+        <di:waypoint x="475" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3">
+        <di:waypoint x="380" y="255" />
+        <di:waypoint x="380" y="350" />
+        <di:waypoint x="475" y="350" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4">
+        <di:waypoint x="585" y="350" />
+        <di:waypoint x="662" y="350" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_5_di" bpmnElement="Flow_5">
+        <di:waypoint x="585" y="230" />
+        <di:waypoint x="600" y="230" />
+        <di:waypoint x="600" y="490" />
+        <di:waypoint x="625" y="490" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_6_di" bpmnElement="Flow_6">
+        <di:waypoint x="548" y="490" />
+        <di:waypoint x="625" y="490" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_7_di" bpmnElement="Flow_7">
+        <di:waypoint x="735" y="490" />
+        <di:waypoint x="775" y="490" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_8_di" bpmnElement="Flow_8">
+        <di:waypoint x="885" y="490" />
+        <di:waypoint x="925" y="490" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_9_di" bpmnElement="Flow_9">
+        <di:waypoint x="1035" y="490" />
+        <di:waypoint x="1075" y="490" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_10_di" bpmnElement="Flow_10">
+        <di:waypoint x="1185" y="490" />
+        <di:waypoint x="1255" y="490" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_11_di" bpmnElement="Flow_11">
+        <di:waypoint x="1305" y="490" />
+        <di:waypoint x="1375" y="490" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_12_di" bpmnElement="Flow_12">
+        <di:waypoint x="1280" y="515" />
+        <di:waypoint x="1280" y="610" />
+        <di:waypoint x="1375" y="610" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_13_di" bpmnElement="Flow_13">
+        <di:waypoint x="1485" y="490" />
+        <di:waypoint x="1525" y="490" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_14_di" bpmnElement="Flow_14">
+        <di:waypoint x="1635" y="490" />
+        <di:waypoint x="1712" y="490" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_15_di" bpmnElement="Flow_15">
+        <di:waypoint x="1748" y="490" />
+        <di:waypoint x="1862" y="490" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_16_di" bpmnElement="Flow_16">
+        <di:waypoint x="1485" y="610" />
+        <di:waypoint x="1562" y="610" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_17_di" bpmnElement="Flow_17">
+        <di:waypoint x="1598" y="610" />
+        <di:waypoint x="1730" y="610" />
+        <di:waypoint x="1730" y="710" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_18_di" bpmnElement="Flow_18">
+        <di:waypoint x="1785" y="750" />
+        <di:waypoint x="1825" y="750" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_19_di" bpmnElement="Flow_19">
+        <di:waypoint x="1880" y="790" />
+        <di:waypoint x="1880" y="805" />
+        <di:waypoint x="830" y="805" />
+        <di:waypoint x="830" y="530" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MessageFlow_1_di" bpmnElement="MessageFlow_1">
+        <di:waypoint x="1730" y="472" />
+        <di:waypoint x="1730" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MessageFlow_2_di" bpmnElement="MessageFlow_2">
+        <di:waypoint x="1580" y="592" />
+        <di:waypoint x="1580" y="565" />
+        <di:waypoint x="1655" y="565" />
+        <di:waypoint x="1655" y="120" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

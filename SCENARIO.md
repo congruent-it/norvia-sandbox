@@ -26,6 +26,7 @@ Norvia runs a **mixed fleet**. Its own **Vehicles** and **Drivers** handle regio
 | **ERP** | Shipper and Carrier master data, contracts, invoicing | Its first slice is invoicing ([E1](docs/processes/erp/e1-invoicing.md), [E2](docs/processes/erp/e2-carrier-invoice-matching.md)). Master data still comes from the sandbox's seed file, loaded by both the ERP and the TMS. |
 | **Driver app** | Nothing | Used by Norvia's **Drivers** on the road to receive a dispatched **Trip** and report each **Stop**. Reaches the TMS only through Azure Integration Services. |
 | **Partner portal** | Nothing at Norvia | Plays every outside party (Shippers and Carriers) as **Personas**. It reaches Norvia only through API Management. |
+| **Integration console** | Nothing | Used by Norvia's **Integration operator** to find Message trails and resolve failed runs and dead-lettered messages. It reads the estate's telemetry and keeps nothing of its own ([design](docs/operations/integration-console.md)). |
 
 The applications never call each other directly. Everything between them goes through Azure Integration Services: API Management at the edge, Logic Apps for mapping and routing, and Service Bus for events, all speaking Norvia's **Canonical Model**.
 

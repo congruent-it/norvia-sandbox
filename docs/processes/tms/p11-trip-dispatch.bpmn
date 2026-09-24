@@ -1,0 +1,358 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_P11" targetNamespace="https://norvia.example/processes/tms/p11">
+  <bpmn:collaboration id="Collaboration_P11">
+    <bpmn:participant id="Participant_P11" name="P11 Trip dispatch" processRef="Process_P11" />
+    <bpmn:textAnnotation id="Ann_Amend">
+      <bpmn:text>Amend: until the Trip is In progress (P12) the Planner can change anything under the same rules. Each Amend sends the whole Trip as a new version. Taking a Shipment off sends it back to Planned and publishes ShipmentTakenOffTrip.</bpmn:text>
+    </bpmn:textAnnotation>
+  </bpmn:collaboration>
+  <bpmn:process id="Process_P11" name="P11 Trip dispatch" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_P11">
+      <bpmn:lane id="L_Planner" name="Planner (TMS UI)">
+        <bpmn:flowNodeRef>s_ship</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>t_build</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>t_edit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>gw_ready</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>t_dispatch</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>t_again</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="L_Tms" name="TMS">
+        <bpmn:flowNodeRef>t_rules</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>gw_pass</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>t_recheck</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>gw_pass2</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>t_disp</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ev_disp</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>t_ok</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>e_ok</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>t_ndrec</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ev_nd</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="L_La" name="Trip dispatch Logic App">
+        <bpmn:flowNodeRef>t_send</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>t_rep</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>t_nd</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>b_send</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="L_App" name="Driver app">
+        <bpmn:flowNodeRef>t_accept</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="s_ship" name="Released Own fleet Shipment (or Re-delivery) in list">
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:userTask id="t_build" name="Select Shipments, create a Trip or add to one">
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="t_edit" name="Order Stops, set Vehicle, Driver, start and duration">
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+      <bpmn:incoming>Flow_5</bpmn:incoming>
+      <bpmn:incoming>Flow_7</bpmn:incoming>
+      <bpmn:incoming>Flow_11</bpmn:incoming>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:businessRuleTask id="t_rules" name="Check Trip rules (P10 availability and P11)">
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+    </bpmn:businessRuleTask>
+    <bpmn:exclusiveGateway id="gw_pass" name="Pass?">
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+      <bpmn:outgoing>Flow_5</bpmn:outgoing>
+      <bpmn:outgoing>Flow_6</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:exclusiveGateway id="gw_ready" name="Ready to dispatch?">
+      <bpmn:incoming>Flow_6</bpmn:incoming>
+      <bpmn:outgoing>Flow_7</bpmn:outgoing>
+      <bpmn:outgoing>Flow_8</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="t_dispatch" name="Dispatch Trip">
+      <bpmn:incoming>Flow_8</bpmn:incoming>
+      <bpmn:outgoing>Flow_9</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:businessRuleTask id="t_recheck" name="Re-check every rule, and TripIncomplete">
+      <bpmn:incoming>Flow_9</bpmn:incoming>
+      <bpmn:outgoing>Flow_10</bpmn:outgoing>
+    </bpmn:businessRuleTask>
+    <bpmn:exclusiveGateway id="gw_pass2" name="Pass?">
+      <bpmn:incoming>Flow_10</bpmn:incoming>
+      <bpmn:outgoing>Flow_11</bpmn:outgoing>
+      <bpmn:outgoing>Flow_12</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="t_disp" name="Set Trip and Shipments Dispatched, new version">
+      <bpmn:incoming>Flow_12</bpmn:incoming>
+      <bpmn:outgoing>Flow_13</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:intermediateThrowEvent id="ev_disp" name="TripDispatched (whole Trip)">
+      <bpmn:incoming>Flow_13</bpmn:incoming>
+      <bpmn:incoming>Flow_23</bpmn:incoming>
+      <bpmn:outgoing>Flow_14</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MessageDef_ev_disp" />
+    </bpmn:intermediateThrowEvent>
+    <bpmn:serviceTask id="t_send" name="Send Trip version to the Driver app">
+      <bpmn:incoming>Flow_14</bpmn:incoming>
+      <bpmn:outgoing>Flow_15</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="t_accept" name="Accept version, keep the latest per Trip">
+      <bpmn:incoming>Flow_15</bpmn:incoming>
+      <bpmn:outgoing>Flow_16</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="t_rep" name="Report delivered">
+      <bpmn:incoming>Flow_16</bpmn:incoming>
+      <bpmn:outgoing>Flow_17</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="t_ok" name="Version Delivered to Driver app">
+      <bpmn:incoming>Flow_17</bpmn:incoming>
+      <bpmn:outgoing>Flow_18</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="e_ok" name="Trip with its Driver">
+      <bpmn:incoming>Flow_18</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="t_nd" name="Report not delivered">
+      <bpmn:incoming>Flow_19</bpmn:incoming>
+      <bpmn:outgoing>Flow_20</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="t_ndrec" name="Version Not delivered">
+      <bpmn:incoming>Flow_20</bpmn:incoming>
+      <bpmn:outgoing>Flow_21</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:intermediateThrowEvent id="ev_nd" name="TripNotDelivered">
+      <bpmn:incoming>Flow_21</bpmn:incoming>
+      <bpmn:outgoing>Flow_22</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MessageDef_ev_nd" />
+    </bpmn:intermediateThrowEvent>
+    <bpmn:userTask id="t_again" name="Send again">
+      <bpmn:incoming>Flow_22</bpmn:incoming>
+      <bpmn:outgoing>Flow_23</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:boundaryEvent id="b_send" name="Retries used up" attachedToRef="t_send">
+      <bpmn:outgoing>Flow_19</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrorDef_b_send" />
+    </bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="s_ship" targetRef="t_build" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="t_build" targetRef="t_edit" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="t_edit" targetRef="t_rules" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="t_rules" targetRef="gw_pass" />
+    <bpmn:sequenceFlow id="Flow_5" name="No: refused with code" sourceRef="gw_pass" targetRef="t_edit" />
+    <bpmn:sequenceFlow id="Flow_6" name="Yes" sourceRef="gw_pass" targetRef="gw_ready" />
+    <bpmn:sequenceFlow id="Flow_7" name="Keep editing (Draft)" sourceRef="gw_ready" targetRef="t_edit" />
+    <bpmn:sequenceFlow id="Flow_8" name="Yes" sourceRef="gw_ready" targetRef="t_dispatch" />
+    <bpmn:sequenceFlow id="Flow_9" sourceRef="t_dispatch" targetRef="t_recheck" />
+    <bpmn:sequenceFlow id="Flow_10" sourceRef="t_recheck" targetRef="gw_pass2" />
+    <bpmn:sequenceFlow id="Flow_11" name="No" sourceRef="gw_pass2" targetRef="t_edit" />
+    <bpmn:sequenceFlow id="Flow_12" name="Yes" sourceRef="gw_pass2" targetRef="t_disp" />
+    <bpmn:sequenceFlow id="Flow_13" sourceRef="t_disp" targetRef="ev_disp" />
+    <bpmn:sequenceFlow id="Flow_14" sourceRef="ev_disp" targetRef="t_send" />
+    <bpmn:sequenceFlow id="Flow_15" sourceRef="t_send" targetRef="t_accept" />
+    <bpmn:sequenceFlow id="Flow_16" sourceRef="t_accept" targetRef="t_rep" />
+    <bpmn:sequenceFlow id="Flow_17" sourceRef="t_rep" targetRef="t_ok" />
+    <bpmn:sequenceFlow id="Flow_18" sourceRef="t_ok" targetRef="e_ok" />
+    <bpmn:sequenceFlow id="Flow_19" sourceRef="b_send" targetRef="t_nd" />
+    <bpmn:sequenceFlow id="Flow_20" sourceRef="t_nd" targetRef="t_ndrec" />
+    <bpmn:sequenceFlow id="Flow_21" sourceRef="t_ndrec" targetRef="ev_nd" />
+    <bpmn:sequenceFlow id="Flow_22" sourceRef="ev_nd" targetRef="t_again" />
+    <bpmn:sequenceFlow id="Flow_23" name="Same version again" sourceRef="t_again" targetRef="ev_disp" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_P11">
+    <bpmndi:BPMNPlane id="Plane_P11" bpmnElement="Collaboration_P11">
+      <bpmndi:BPMNShape id="Participant_P11_di" bpmnElement="Participant_P11" isHorizontal="true">
+        <dc:Bounds x="100" y="60" width="2490" height="800" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="L_App_di" bpmnElement="L_App" isHorizontal="true">
+        <dc:Bounds x="130" y="720" width="2460" height="140" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="L_La_di" bpmnElement="L_La" isHorizontal="true">
+        <dc:Bounds x="130" y="460" width="2460" height="260" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="L_Tms_di" bpmnElement="L_Tms" isHorizontal="true">
+        <dc:Bounds x="130" y="200" width="2460" height="260" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="L_Planner_di" bpmnElement="L_Planner" isHorizontal="true">
+        <dc:Bounds x="130" y="60" width="2460" height="140" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s_ship_di" bpmnElement="s_ship">
+        <dc:Bounds x="212" y="112" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_build_di" bpmnElement="t_build">
+        <dc:Bounds x="325" y="90" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_edit_di" bpmnElement="t_edit">
+        <dc:Bounds x="475" y="90" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_rules_di" bpmnElement="t_rules">
+        <dc:Bounds x="625" y="230" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gw_pass_di" bpmnElement="gw_pass" isMarkerVisible="true">
+        <dc:Bounds x="805" y="245" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gw_ready_di" bpmnElement="gw_ready" isMarkerVisible="true">
+        <dc:Bounds x="955" y="105" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_dispatch_di" bpmnElement="t_dispatch">
+        <dc:Bounds x="1075" y="90" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_recheck_di" bpmnElement="t_recheck">
+        <dc:Bounds x="1225" y="230" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gw_pass2_di" bpmnElement="gw_pass2" isMarkerVisible="true">
+        <dc:Bounds x="1405" y="245" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_disp_di" bpmnElement="t_disp">
+        <dc:Bounds x="1525" y="230" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ev_disp_di" bpmnElement="ev_disp">
+        <dc:Bounds x="1712" y="252" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_send_di" bpmnElement="t_send">
+        <dc:Bounds x="1825" y="490" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_accept_di" bpmnElement="t_accept">
+        <dc:Bounds x="1975" y="750" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_rep_di" bpmnElement="t_rep">
+        <dc:Bounds x="2125" y="490" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_ok_di" bpmnElement="t_ok">
+        <dc:Bounds x="2275" y="230" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="e_ok_di" bpmnElement="e_ok">
+        <dc:Bounds x="2462" y="252" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_nd_di" bpmnElement="t_nd">
+        <dc:Bounds x="1975" y="610" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_ndrec_di" bpmnElement="t_ndrec">
+        <dc:Bounds x="2125" y="350" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ev_nd_di" bpmnElement="ev_nd">
+        <dc:Bounds x="2312" y="372" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="t_again_di" bpmnElement="t_again">
+        <dc:Bounds x="2425" y="90" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="b_send_di" bpmnElement="b_send">
+        <dc:Bounds x="1862" y="552" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
+        <di:waypoint x="248" y="130" />
+        <di:waypoint x="325" y="130" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
+        <di:waypoint x="435" y="130" />
+        <di:waypoint x="475" y="130" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3">
+        <di:waypoint x="585" y="130" />
+        <di:waypoint x="680" y="130" />
+        <di:waypoint x="680" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4">
+        <di:waypoint x="735" y="270" />
+        <di:waypoint x="805" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_5_di" bpmnElement="Flow_5">
+        <di:waypoint x="830" y="295" />
+        <di:waypoint x="830" y="330" />
+        <di:waypoint x="530" y="330" />
+        <di:waypoint x="530" y="170" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="640" y="316" width="80" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_6_di" bpmnElement="Flow_6">
+        <di:waypoint x="830" y="245" />
+        <di:waypoint x="830" y="130" />
+        <di:waypoint x="955" y="130" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_7_di" bpmnElement="Flow_7">
+        <di:waypoint x="980" y="105" />
+        <di:waypoint x="980" y="75" />
+        <di:waypoint x="530" y="75" />
+        <di:waypoint x="530" y="90" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_8_di" bpmnElement="Flow_8">
+        <di:waypoint x="1005" y="130" />
+        <di:waypoint x="1075" y="130" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_9_di" bpmnElement="Flow_9">
+        <di:waypoint x="1185" y="130" />
+        <di:waypoint x="1280" y="130" />
+        <di:waypoint x="1280" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_10_di" bpmnElement="Flow_10">
+        <di:waypoint x="1335" y="270" />
+        <di:waypoint x="1405" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_11_di" bpmnElement="Flow_11">
+        <di:waypoint x="1430" y="295" />
+        <di:waypoint x="1430" y="330" />
+        <di:waypoint x="530" y="330" />
+        <di:waypoint x="530" y="170" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_12_di" bpmnElement="Flow_12">
+        <di:waypoint x="1455" y="270" />
+        <di:waypoint x="1525" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_13_di" bpmnElement="Flow_13">
+        <di:waypoint x="1635" y="270" />
+        <di:waypoint x="1712" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_14_di" bpmnElement="Flow_14">
+        <di:waypoint x="1748" y="270" />
+        <di:waypoint x="1880" y="270" />
+        <di:waypoint x="1880" y="490" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_15_di" bpmnElement="Flow_15">
+        <di:waypoint x="1935" y="530" />
+        <di:waypoint x="1950" y="530" />
+        <di:waypoint x="1950" y="790" />
+        <di:waypoint x="1975" y="790" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_16_di" bpmnElement="Flow_16">
+        <di:waypoint x="2085" y="790" />
+        <di:waypoint x="2180" y="790" />
+        <di:waypoint x="2180" y="570" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_17_di" bpmnElement="Flow_17">
+        <di:waypoint x="2235" y="530" />
+        <di:waypoint x="2250" y="530" />
+        <di:waypoint x="2250" y="270" />
+        <di:waypoint x="2275" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_18_di" bpmnElement="Flow_18">
+        <di:waypoint x="2385" y="270" />
+        <di:waypoint x="2462" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_19_di" bpmnElement="Flow_19">
+        <di:waypoint x="1880" y="588" />
+        <di:waypoint x="1880" y="650" />
+        <di:waypoint x="1975" y="650" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_20_di" bpmnElement="Flow_20">
+        <di:waypoint x="2085" y="650" />
+        <di:waypoint x="2100" y="650" />
+        <di:waypoint x="2100" y="390" />
+        <di:waypoint x="2125" y="390" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_21_di" bpmnElement="Flow_21">
+        <di:waypoint x="2235" y="390" />
+        <di:waypoint x="2312" y="390" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_22_di" bpmnElement="Flow_22">
+        <di:waypoint x="2348" y="390" />
+        <di:waypoint x="2400" y="390" />
+        <di:waypoint x="2400" y="130" />
+        <di:waypoint x="2425" y="130" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_23_di" bpmnElement="Flow_23">
+        <di:waypoint x="2480" y="90" />
+        <di:waypoint x="2480" y="75" />
+        <di:waypoint x="1730" y="75" />
+        <di:waypoint x="1730" y="252" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Ann_Amend_di" bpmnElement="Ann_Amend">
+        <dc:Bounds x="470" y="755" width="420" height="70" />
+      </bpmndi:BPMNShape>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
