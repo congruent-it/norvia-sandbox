@@ -30,6 +30,13 @@
           "consignee": { "name": "Getränke Schmitz GmbH", "contactName": "Jonas Schmitz", "phone": "+49 211 555 0190" }
         }
       ]
+    },
+    {
+      "$comment": "A former customer, kept inactive so the TMS has a Shipper to reject bookings for (P1).",
+      "id": "SHP-0002",
+      "name": "Kaasmakerij Hoeve de Linde",
+      "active": false,
+      "addresses": []
     }
   ],
   "carriers": [

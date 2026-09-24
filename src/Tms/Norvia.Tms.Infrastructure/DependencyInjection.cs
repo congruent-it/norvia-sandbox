@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.Shippers;
 using Norvia.Tms.Application.TransportOrders;
+using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Infrastructure.Data;
 using Norvia.Tms.Infrastructure.Outbox;
 using Norvia.Tms.Infrastructure.Shippers;
@@ -36,7 +37,12 @@ public static class DependencyInjection
             .Validate(options => File.Exists(options.Path), "The seed file doesn't exist.")
             .ValidateOnStart();
 
+        builder.Services.AddOptions<TransportOrderRulesOptions>().BindConfiguration(TransportOrderRulesOptions.SectionName)
+            .ValidateDataAnnotations().ValidateOnStart();
+
         builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton(services =>
+            new TransportOrderRules(services.GetRequiredService<IOptions<TransportOrderRulesOptions>>().Value.MaxTotalWeightKg));
         builder.Services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
         builder.Services.AddScoped(typeof(IReadRepository<>), typeof(EfRepository<>));
         builder.Services.AddScoped<IDomainEventDispatcher, MediatorDomainEventDispatcher>();

@@ -24,11 +24,12 @@ public sealed record TransportOrderAcceptedV1(
     public static TransportOrderAcceptedV1 From(TransportOrder order)
     {
         ArgumentNullException.ThrowIfNull(order);
+        var number = order.Number ?? throw new ArgumentException("Only an Accepted Transport Order has a number.", nameof(order));
         return new(
             Guid.CreateVersion7(),
             order.ReceivedAt,
             order.CorrelationId.Value,
-            order.Number.Value,
+            number.Value,
             CanonicalTransportOrder.From(order));
     }
 

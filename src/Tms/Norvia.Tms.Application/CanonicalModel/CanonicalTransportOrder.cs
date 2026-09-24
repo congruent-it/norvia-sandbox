@@ -32,7 +32,7 @@ public sealed record CanonicalTransportOrder(
         ArgumentNullException.ThrowIfNull(order);
         var details = order.Details;
         return new CanonicalTransportOrder(
-            order.Number.Value,
+            order.Number?.Value,
             order.ShipperId.Value,
             details.ShipperReference,
             details.Collection is { } collection

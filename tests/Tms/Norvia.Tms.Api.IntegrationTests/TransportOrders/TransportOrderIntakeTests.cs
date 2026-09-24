@@ -85,7 +85,7 @@ public sealed class TransportOrderIntakeTests(TmsFixture tms)
 
         var body = JsonNode.Parse(message.Body.ToString())!;
         var validation = CanonicalModelSchemas.ValidateTransportOrderAccepted(body);
-        validation.IsValid.Should().BeTrue(string.Join("; ", validation.Details?.Where(d => d.Errors is not null).SelectMany(d => d.Errors!.Select(e => $"{d.InstanceLocation}: {e.Value}")) ?? []));
+        validation.IsValid.Should().BeTrue(CanonicalModelSchemas.Errors(validation));
         body["correlationId"]!.GetValue<string>().Should().Be(correlationId);
         body["transportOrderNumber"]!.GetValue<string>().Should().Be(number);
         ShouldBeTheSubmittedTransportOrder(body["transportOrder"]!, booking, number);

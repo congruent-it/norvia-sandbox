@@ -45,7 +45,8 @@ internal static partial class CanonicalShape
 
     private static void CheckCountry(CanonicalAddress? address, string field, Dictionary<string, string[]> errors)
     {
-        if (address?.Country is { } country && !IsoCountryCode().IsMatch(country))
+        // A blank country is a missing one, which the Transport Order rules reject; only a given one must be a code.
+        if (address?.Country is { } country && !string.IsNullOrWhiteSpace(country) && !IsoCountryCode().IsMatch(country))
         {
             errors[field] = ["The country must be an ISO 3166-1 alpha-2 code, such as NL."];
         }
