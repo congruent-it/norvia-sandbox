@@ -37,6 +37,13 @@
       "name": "Kaasmakerij Hoeve de Linde",
       "active": false,
       "addresses": []
+    },
+    {
+      "$comment": "A second active Shipper, so the TMS can show that Shipper references are unique per Shipper, not across Shippers (P1).",
+      "id": "SHP-0003",
+      "name": "Tuincentrum Groenrijk",
+      "active": true,
+      "addresses": []
     }
   ],
   "carriers": [

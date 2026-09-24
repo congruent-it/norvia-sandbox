@@ -24,6 +24,7 @@ public sealed class TransportOrderIntakeTests(TmsFixture tms)
         var body = await ReadJsonAsync(response);
         body["transportOrderNumber"]!.GetValue<string>().Should().MatchRegex("^TO-[0-9]{7}$");
         body["status"]!.GetValue<string>().Should().Be("Accepted");
+        body["repeat"]!.GetValue<bool>().Should().BeFalse();
         response.Headers.Location!.ToString().Should().EndWith($"/v1/transport-orders/{body["transportOrderNumber"]}");
     }
 

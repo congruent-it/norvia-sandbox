@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Norvia.Tms.Domain.Shippers;
 using static System.FormattableString;
 
@@ -12,15 +13,24 @@ public sealed class TransportOrderRules(decimal maxTotalWeightKg)
     /// <summary>The package types a goods line may have.</summary>
     public static readonly IReadOnlyList<string> PackageTypes = ["pallet", "parcel", "crate", "loose"];
 
+    /// <summary>The longest Shipper reference the TMS keeps as a key. Chosen well above any real reference.</summary>
+    public const int MaxShipperReferenceLength = 100;
+
     public decimal MaxTotalWeightKg { get; } = maxTotalWeightKg;
 
     /// <param name="shipper">The Shipper the booking names, or null when the TMS doesn't know it.</param>
-    public IReadOnlyList<RejectionReason> Check(Shipper? shipper, TransportOrderDetails details, DateTimeOffset now)
+    /// <param name="referenceHolder">The Accepted Transport Order that already holds the booking's Shipper reference, if any.</param>
+    public IReadOnlyList<RejectionReason> Check(
+        Shipper? shipper,
+        TransportOrderDetails details,
+        DateTimeOffset now,
+        TransportOrder? referenceHolder = null)
     {
         ArgumentNullException.ThrowIfNull(details);
         var reasons = new List<RejectionReason>();
 
         CheckShipper(shipper, details, reasons);
+        CheckShipperReference(details, referenceHolder, reasons);
         CheckAddresses(details, reasons);
         CheckWindows(details, now, reasons);
         CheckGoodsLines(details, reasons);
@@ -39,10 +49,24 @@ public sealed class TransportOrderRules(decimal maxTotalWeightKg)
         {
             reasons.Add(new(RejectionCode.InactiveShipper, "The Shipper is not active, so Norvia can't take bookings for it."));
         }
+    }
 
+    private static void CheckShipperReference(TransportOrderDetails details, TransportOrder? referenceHolder, List<RejectionReason> reasons)
+    {
         if (IsBlank(details.ShipperReference))
         {
             reasons.Add(new(RejectionCode.ShipperReferenceMissing, "The booking has no Shipper reference."));
+        }
+        else if (details.ShipperReference.Length > MaxShipperReferenceLength)
+        {
+            reasons.Add(new(RejectionCode.ShipperReferenceTooLong, Invariant(
+                $"The Shipper reference is {details.ShipperReference.Length} characters long; it may be at most {MaxShipperReferenceLength}.")));
+        }
+
+        if (referenceHolder is not null && !referenceHolder.IsRepeatOf(details))
+        {
+            reasons.Add(new(RejectionCode.ShipperReferenceReused, Invariant(
+                $"The Shipper reference '{details.ShipperReference}' is already used for Transport Order {referenceHolder.Number}, with different content.")));
         }
     }
 
@@ -169,5 +193,5 @@ public sealed class TransportOrderRules(decimal maxTotalWeightKg)
         }
     }
 
-    private static bool IsBlank(string? value) => string.IsNullOrWhiteSpace(value);
+    private static bool IsBlank([NotNullWhen(false)] string? value) => string.IsNullOrWhiteSpace(value);
 }

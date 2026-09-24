@@ -92,6 +92,38 @@ public sealed class TransportOrderTests
         order.RejectionReasons.Should().BeEmpty();
     }
 
+    [Fact]
+    public void Accept_Booking_HoldsItsShipperReference()
+    {
+        var order = TransportOrder.Accept(new ShipperId("SHP-0001"), SampleDetails(), TransportOrderNumber.FromSequence(7), new CorrelationId("corr-1"), ReceivedAt);
+
+        order.ShipperReference.Should().Be("BD-2026-0001");
+    }
+
+    [Fact]
+    public void Reject_Booking_HoldsNoShipperReference()
+    {
+        var order = TransportOrder.Reject(new ShipperId("SHP-0001"), SampleDetails(), [Inactive], new CorrelationId("corr-1"), ReceivedAt);
+
+        order.ShipperReference.Should().BeNull("a Rejected booking leaves its Shipper reference free for a corrected booking");
+    }
+
+    [Fact]
+    public void IsRepeatOf_SameContent_IsARepeat()
+    {
+        var order = TransportOrder.Accept(new ShipperId("SHP-0001"), SampleDetails(), TransportOrderNumber.FromSequence(7), new CorrelationId("corr-1"), ReceivedAt);
+
+        order.IsRepeatOf(SampleDetails()).Should().BeTrue();
+    }
+
+    [Fact]
+    public void IsRepeatOf_DifferentContent_IsNotARepeat()
+    {
+        var order = TransportOrder.Accept(new ShipperId("SHP-0001"), SampleDetails(), TransportOrderNumber.FromSequence(7), new CorrelationId("corr-1"), ReceivedAt);
+
+        order.IsRepeatOf(SampleDetails() with { Instructions = "Call ahead" }).Should().BeFalse();
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("   ")]

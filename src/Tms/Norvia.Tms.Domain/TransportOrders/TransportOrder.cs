@@ -6,6 +6,8 @@ namespace Norvia.Tms.Domain.TransportOrders;
 /// <summary>
 /// A Shipper's instruction for Norvia to move goods from an origin to a destination. The TMS owns it (ADR 0002).
 /// A booking that breaks the Transport Order rules is kept too, as Rejected and without a number.
+/// A Shipper reference is unique per Shipper: an Accepted Transport Order holds its reference, so a later booking with
+/// the same reference is either a repeat of it or a reuse, which the rules reject.
 /// </summary>
 public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoot
 {
@@ -28,6 +30,12 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
 
     public ShipperId ShipperId { get; private set; }
 
+    /// <summary>
+    /// The Shipper reference this Transport Order holds for its Shipper. Null for a Rejected booking, which holds no
+    /// reference, so the Shipper can book again under it once the booking is corrected.
+    /// </summary>
+    public string? ShipperReference { get; private set; }
+
     public TransportOrderStatus Status { get; private set; }
 
     public TransportOrderDetails Details { get; private set; }
@@ -38,6 +46,9 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
 
     /// <summary>Every rule a Rejected booking broke; empty for an Accepted Transport Order.</summary>
     public IReadOnlyList<RejectionReason> RejectionReasons { get; private set; } = [];
+
+    /// <summary>Whether a booking under this Transport Order's Shipper reference is the same booking sent again.</summary>
+    public bool IsRepeatOf(TransportOrderDetails details) => Details.Equals(details);
 
     public static TransportOrder Accept(
         ShipperId shipperId,
@@ -50,6 +61,7 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
         {
             Number = number,
             Status = TransportOrderStatus.Accepted,
+            ShipperReference = details.ShipperReference,
         };
         order.RegisterDomainEvent(new TransportOrderAcceptedEvent(order));
         return order;

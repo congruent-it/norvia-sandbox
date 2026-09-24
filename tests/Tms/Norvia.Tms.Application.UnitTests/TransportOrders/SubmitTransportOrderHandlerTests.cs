@@ -92,6 +92,95 @@ public sealed class SubmitTransportOrderHandlerTests
         result.Value.RejectionReasons.Select(reason => reason.Code).Should().Equal("UnknownShipper");
     }
 
+    [Fact]
+    public async Task Handle_ValidBooking_IsNotARepeat()
+    {
+        var result = await _handler.Handle(new SubmitTransportOrderCommand(Samples.CanonicalTransportOrder(), "corr-1"), CancellationToken.None);
+
+        result.Value.Repeat.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Handle_SameBookingAgain_ReturnsTheOriginalTransportOrderFlaggedAsARepeat()
+    {
+        var original = Samples.AcceptedOrder(sequence: 7);
+        HeldBy(original);
+
+        var result = await _handler.Handle(new SubmitTransportOrderCommand(Samples.CanonicalTransportOrder(), "corr-again"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Repeat.Should().BeTrue();
+        result.Value.Id.Should().Be(original.Id.Value);
+        result.Value.Status.Should().Be(TransportOrderStatus.Accepted);
+        result.Value.TransportOrderNumber.Should().Be("TO-0000007");
+        result.Value.RejectionReasons.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Handle_SameBookingAgain_StoresNothingAndTakesNoNumber()
+    {
+        HeldBy(Samples.AcceptedOrder(sequence: 7));
+
+        await _handler.Handle(new SubmitTransportOrderCommand(Samples.CanonicalTransportOrder(), "corr-again"), CancellationToken.None);
+
+        await _repository.DidNotReceive().AddAsync(Arg.Any<TransportOrder>(), Arg.Any<CancellationToken>());
+        await _numbers.DidNotReceive().NextAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_SameBookingAgainAfterTheCollectionWindowStarted_IsStillARepeat()
+    {
+        HeldBy(Samples.AcceptedOrder(sequence: 7));
+        _time.Advance(TimeSpan.FromDays(3));
+
+        var result = await _handler.Handle(new SubmitTransportOrderCommand(Samples.CanonicalTransportOrder(), "corr-again"), CancellationToken.None);
+
+        result.Value.Repeat.Should().BeTrue("a repeat is recognised before the booking is validated again");
+    }
+
+    [Fact]
+    public async Task Handle_ReferenceHeldForDifferentContent_IsRejectedAsReused()
+    {
+        HeldBy(Samples.AcceptedOrder(sequence: 7));
+        var booking = Samples.CanonicalTransportOrder() with { Instructions = "Call ahead" };
+
+        var result = await _handler.Handle(new SubmitTransportOrderCommand(booking, "corr-reused"), CancellationToken.None);
+
+        result.Value.Repeat.Should().BeFalse();
+        result.Value.Status.Should().Be(TransportOrderStatus.Rejected);
+        result.Value.RejectionReasons.Select(reason => reason.Code).Should().Equal("ShipperReferenceReused");
+        await _repository.Received(1).AddAsync(
+            Arg.Is<TransportOrder>(order => order.Status == TransportOrderStatus.Rejected && order.CorrelationId.Value == "corr-reused"),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_SameBookingAgain_IsRecognisedByItsShipperAndReference()
+    {
+        _repository.SingleOrDefaultAsync(
+                Arg.Is<TransportOrderByShipperReferenceSpec>(spec => spec.ShipperId == new ShipperId("SHP-0001") && spec.ShipperReference == "BD-2026-0001"),
+                Arg.Any<CancellationToken>())
+            .Returns(Samples.AcceptedOrder(sequence: 7));
+
+        var result = await _handler.Handle(new SubmitTransportOrderCommand(Samples.CanonicalTransportOrder(), "corr-again"), CancellationToken.None);
+
+        result.Value.Repeat.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Handle_NoShipperReference_IsNeverARepeatOrAReuse()
+    {
+        HeldBy(Samples.AcceptedOrder(sequence: 7));
+
+        var result = await _handler.Handle(new SubmitTransportOrderCommand(BrokenBooking(), "corr-1"), CancellationToken.None);
+
+        result.Value.Repeat.Should().BeFalse();
+        result.Value.RejectionReasons.Select(reason => reason.Code).Should().Equal("ShipperReferenceMissing", "GoodsLinesMissing");
+    }
+
+    private void HeldBy(TransportOrder original) =>
+        _repository.SingleOrDefaultAsync(Arg.Any<TransportOrderByShipperReferenceSpec>(), Arg.Any<CancellationToken>()).Returns(original);
+
     private static CanonicalTransportOrder BrokenBooking() =>
         Samples.CanonicalTransportOrder() with { ShipperReference = null, GoodsLines = [] };
 }

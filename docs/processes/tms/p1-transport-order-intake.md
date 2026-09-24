@@ -38,10 +38,14 @@ The path runs synchronously end to end: Partner portal → API Management → in
 2. **Check at the edge.** API Management checks the subscription key and the Entra token (audience "Norvia Partner API", role `TransportOrders.Submit`). A token without the role gets 403 before any Logic App runs. This is how a Carrier Persona (Van Dijk Transport) gets refused. API Management maps the token's `azp` claim to a Shipper ID through the seed-derived mapping, creates the correlation ID and passes both to the Logic App (ADR 0005).
 3. **Map.** The Logic App maps the partner booking to a Canonical Model `TransportOrder`. The partner format differs on purpose: it has its own field names, flat address fields, weights as text with units and local date/times. The Canonical Model uses UTC timestamps with offsets, weights in kilograms as numbers and ISO 3166 country codes.
 4. **Submit to the TMS.** The Logic App calls the TMS intake API with its managed identity, which is the only identity that holds the intake role. The API accepts only the Canonical Model (ADR 0003). The Shipper comes from the token, never from the payload.
-5. **Check for a repeat.** If the Shipper has already submitted this Shipper reference with the same content, the TMS returns the original Transport Order, flags it as a repeat and stops. If the reference was used for different content, the booking is rejected.
+5. **Check for a repeat.** If the Shipper already has an Accepted Transport Order under this Shipper reference with the same content, the TMS returns the original Transport Order, flags it as a repeat and stops. This happens before validation, so a repeat that arrives after the collection window has started still gets the original. If the reference is held for different content, the booking is rejected (`ShipperReferenceReused`), together with any other failures. A Rejected booking holds no reference, so the Shipper can resubmit a corrected booking under the same one.
 6. **Validate.** The TMS checks the booking against the [validation rules](#validation-rules). It collects every failure and never stops at the first one.
 7. **Record.** An accepted booking gets a Transport Order number and the status Accepted. A rejected one is stored with the status Rejected and its reasons. The outcome event is published in the same transaction (see [Events](#events)).
 8. **Respond.** The TMS answers the Logic App, which relays the answer to the Shipper in the partner format with its meaning unchanged. The accepted Transport Order appears in the TMS UI's list of Transport Orders waiting for planning, without a page refresh.
+
+### When the same booking arrives twice at once
+
+A unique index on the Shipper and the Shipper reference of Accepted Transport Orders makes sure only one of them is booked. The TMS then runs the other once more, finds the Transport Order the first one booked and answers it as a repeat. It publishes nothing.
 
 ### When the TMS can't be reached
 
@@ -52,7 +56,7 @@ On a TMS server error or timeout, the Logic App retries with a bounded exponenti
 | Rule | Codes |
 |---|---|
 | The Shipper exists and is active in the TMS's seed-loaded Shipper data | `UnknownShipper`, `InactiveShipper` |
-| A Shipper reference is given, and it is unique per Shipper | `ShipperReferenceMissing` |
+| A Shipper reference is given, is at most 100 characters and is unique per Shipper: no Accepted Transport Order of the same Shipper holds it for different content. Two Shippers may use the same reference | `ShipperReferenceMissing`, `ShipperReferenceTooLong`, `ShipperReferenceReused` |
 | The collection address, the delivery address and the Consignee name are given | `CollectionAddressMissing`, `DeliveryAddressMissing`, `ConsigneeNameMissing` |
 | Each address has a street, postcode, city and country | `CollectionAddressIncomplete`, `DeliveryAddressIncomplete` |
 | The collection window has an earliest and a latest time. Its earliest time is not in the past and is not after its latest time | `CollectionWindowMissing`, `CollectionWindowInPast`, `CollectionWindowReversed` |
@@ -69,7 +73,7 @@ Each failure has a stable code and a readable message. Codes are never renamed; 
 | Case | TMS response |
 |---|---|
 | Accepted | Success, with the Transport Order number and status |
-| Repeat (same Shipper, same Shipper reference, same content) | Success, returning the original Transport Order, flagged as a repeat |
+| Repeat (same Shipper, same Shipper reference, same content) | Success (200 rather than 201), returning the original Transport Order's number and status, flagged as a repeat (`repeat: true`) |
 | Validation failure, or a reused Shipper reference with different content | Client error (422 ProblemDetails) listing every failure's code and message. Its `instance` is where the Rejected booking can be read |
 | Caller without the intake role | Refused |
 
