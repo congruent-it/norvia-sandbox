@@ -1,6 +1,7 @@
 using Ardalis.Result;
 using Mediator;
 using Microsoft.Extensions.Logging;
+using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Domain.TransportOrders;
 
 namespace Norvia.Tms.Application.TransportOrders.Submit;
@@ -36,7 +37,7 @@ public sealed partial class TrackIntakeInLoggingScope(ILogger<TrackIntakeInLoggi
     private static Dictionary<string, object?> PartyOf(SubmitTransportOrderCommand message) =>
         string.IsNullOrWhiteSpace(message.TransportOrder.ShipperId)
             ? []
-            : new() { ["partyId"] = message.TransportOrder.ShipperId };
+            : new() { [TrackingKeys.PartyId] = message.TransportOrder.ShipperId };
 
     private void LogOutcome(SubmitTransportOrderResult outcome)
     {
@@ -47,7 +48,7 @@ public sealed partial class TrackIntakeInLoggingScope(ILogger<TrackIntakeInLoggi
             return;
         }
 
-        using var numbered = logger.BeginScope(new Dictionary<string, object?> { ["transportOrderNumber"] = number });
+        using var numbered = logger.BeginScope(new Dictionary<string, object?> { [TrackingKeys.TransportOrderNumber] = number });
         if (outcome.Repeat)
         {
             LogRepeat(logger, number);

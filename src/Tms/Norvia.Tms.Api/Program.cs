@@ -29,6 +29,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         options.TokenValidationParameters.ValidateIssuer = true;
         options.TokenValidationParameters.ValidateAudience = true;
     });
+builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+    .Validate(
+        options => HasAny(options.TokenValidationParameters.ValidIssuer, options.TokenValidationParameters.ValidIssuers)
+            && HasAny(options.TokenValidationParameters.ValidAudience, options.TokenValidationParameters.ValidAudiences)
+            && (options.Authority is not null || options.TokenValidationParameters.IssuerSigningKeys?.Any() == true),
+        "Authentication:Schemes:Bearer must name the issuer and audience to trust, and an Authority or signing keys.")
+    .ValidateOnStart();
 builder.Services.AddAuthorization();
 builder.Services.AddOptions<IntakeCallersOptions>().BindConfiguration(IntakeCallersOptions.SectionName)
     .Validate(options => options.ChannelByClientId.Count > 0, "No caller is registered for an intake channel.")
@@ -88,3 +95,6 @@ app.MapTransportOrders();
 
 await app.Services.MigrateTmsDatabaseAsync();
 await app.RunAsync();
+
+static bool HasAny(string? one, IEnumerable<string>? many) =>
+    !string.IsNullOrWhiteSpace(one) || many?.Any(value => !string.IsNullOrWhiteSpace(value)) == true;

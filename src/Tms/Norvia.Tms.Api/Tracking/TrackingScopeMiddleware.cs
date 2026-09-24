@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Norvia.Tms.Application.IntegrationEvents;
 
 namespace Norvia.Tms.Api.Tracking;
 
@@ -32,7 +33,7 @@ public sealed partial class TrackingScopeMiddleware(RequestDelegate next, ILogge
 
         if (context.Response.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
-            using var refused = logger.BeginScope(new Dictionary<string, object?> { ["outcome"] = "Refused" });
+            using var refused = logger.BeginScope(new Dictionary<string, object?> { [TrackingKeys.Outcome] = TrackingKeys.Refused });
             LogRefused(logger, context.Response.StatusCode);
         }
     }
@@ -40,11 +41,11 @@ public sealed partial class TrackingScopeMiddleware(RequestDelegate next, ILogge
     // A key that doesn't apply is left out, never sent empty.
     private static Dictionary<string, object?> TrailOf(HttpContext context, TrackedFlow flow)
     {
-        var trail = new Dictionary<string, object?> { ["flow"] = flow.Name };
+        var trail = new Dictionary<string, object?> { [TrackingKeys.Flow] = flow.Name };
         var correlationId = context.Request.Headers[CorrelationIdHeader].ToString();
         if (!string.IsNullOrWhiteSpace(correlationId))
         {
-            trail["correlationId"] = correlationId;
+            trail[TrackingKeys.CorrelationId] = correlationId;
         }
 
         return trail;

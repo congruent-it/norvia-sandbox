@@ -35,8 +35,8 @@ public sealed record TransportOrderAcceptedV1(
 
     protected override IEnumerable<KeyValuePair<string, object>> TrackingProperties() =>
     [
-        new("flow", Flows.TransportOrderIntake),
-        new("partyId", TransportOrder.ShipperId),
-        new("transportOrderNumber", TransportOrderNumber),
+        new(TrackingKeys.Flow, Flows.TransportOrderIntake),
+        new(TrackingKeys.PartyId, TransportOrder.ShipperId),
+        new(TrackingKeys.TransportOrderNumber, TransportOrderNumber),
     ];
 }
