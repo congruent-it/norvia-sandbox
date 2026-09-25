@@ -1,12 +1,12 @@
 using Ardalis.Result;
 using Ardalis.SharedKernel;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Time.Testing;
 using Norvia.PartnerPortal.Application.Bookings;
 using Norvia.PartnerPortal.Application.Bookings.Submit;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Domain.Bookings;
-using Microsoft.Extensions.Logging;
 using Norvia.PartnerPortal.Domain.Personas;
 
 namespace Norvia.PartnerPortal.Application.UnitTests.Bookings;
