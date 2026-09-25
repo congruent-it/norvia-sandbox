@@ -126,6 +126,16 @@ public sealed class SubmitTransportOrderPolicyTests
     }
 
     [Fact]
+    public void Outbound_EveryAnswerFromTheLogicApp_CarriesTheCorrelationId_EvenOneFromAFailedRun()
+    {
+        // A failed run answers with the Logic Apps runtime's error, which carries no header of the workflow's.
+        var header = SubmitTransportOrderPolicy.Outbound.Elements("set-header").Single(header => header.Attribute("name")!.Value == "X-Correlation-ID");
+
+        header.Attribute("exists-action")!.Value.Should().Be("override");
+        header.Element("value")!.Value.Should().Be("@((string)context.Variables[\"correlationId\"])");
+    }
+
+    [Fact]
     public void OnError_ACallRefusedForItsKeyOrToken_GetsACorrelationIdAndIsTraced()
     {
         // API Management checks the subscription key before the inbound section runs, so the correlation ID may not exist yet.

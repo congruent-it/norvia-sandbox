@@ -13,6 +13,8 @@ internal static class SubmitTransportOrderPolicy
 
     public static XElement Inbound => Section("inbound");
 
+    public static XElement Outbound => Section("outbound");
+
     public static XElement OnError => Section("on-error");
 
     /// <summary>The inbound check whose condition matches, and the status it answers with when the condition holds.</summary>

@@ -86,6 +86,10 @@
   </backend>
   <outbound>
     <base />
+    <!-- Also on an answer from a failed run, which comes from the Logic Apps runtime without the workflow's headers. -->
+    <set-header name="X-Correlation-ID" exists-action="override">
+      <value>@((string)context.Variables["correlationId"])</value>
+    </set-header>
   </outbound>
   <on-error>
     <base />
