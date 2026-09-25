@@ -1,0 +1,95 @@
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http.Resilience;
+using Microsoft.IdentityModel.JsonWebTokens;
+using Microsoft.IdentityModel.Tokens;
+
+namespace Norvia.Integration.LocalPartnerApi.UnitTests;
+
+/// <summary>
+/// Runs the local Partner API in memory, configured as the AppHost configures it, with the TMS replaced by
+/// <see cref="Tms"/>. It holds the key both trust, so it issues Persona tokens the way the Partner portal does locally.
+/// </summary>
+public sealed class LocalPartnerApiFactory : WebApplicationFactory<Program>
+{
+    public const string BrouwerKey = "brouwer-subscription-key";
+    public const string VanDijkKey = "van-dijk-subscription-key";
+    public const string BrouwerClientId = "norvia-local-persona-brouwer-dranken";
+    public const string VanDijkClientId = "norvia-local-persona-van-dijk-transport";
+    public const string Issuer = "https://norvia.local/tokens";
+    public const string PartnerApiAudience = "api://norvia-partner-api";
+    public const string TmsAudience = "api://norvia-tms";
+    public const string IntakeClientId = "norvia-local-intake-logic-app";
+
+    public byte[] SigningKey { get; } = RandomNumberGenerator.GetBytes(64);
+
+    public StubTms Tms { get; } = new();
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        var signingKey = Convert.ToBase64String(SigningKey);
+        foreach (var (name, value) in new Dictionary<string, string>
+        {
+            ["PartnerApi:SubscriptionKeys:brouwer-dranken"] = BrouwerKey,
+            ["PartnerApi:SubscriptionKeys:van-dijk-transport"] = VanDijkKey,
+            ["PartnerApi:ShippersByClientId:" + BrouwerClientId] = "SHP-0001",
+            ["PartnerApi:Tokens:Issuer"] = Issuer,
+            ["PartnerApi:Tokens:Audience"] = PartnerApiAudience,
+            ["PartnerApi:Tokens:SigningKey"] = signingKey,
+            ["Tms:BaseAddress"] = "http://tms-api",
+            ["Tms:Tokens:Issuer"] = Issuer,
+            ["Tms:Tokens:Audience"] = TmsAudience,
+            ["Tms:Tokens:ClientId"] = IntakeClientId,
+            ["Tms:Tokens:SigningKey"] = signingKey,
+        })
+        {
+            builder.UseSetting(name, value);
+        }
+
+        builder.ConfigureTestServices(services =>
+        {
+            services.AddHttpClient<TmsIntake>().ConfigurePrimaryHttpMessageHandler(() => Tms);
+            // Retries straight away, so a test of an unreachable TMS doesn't wait out the backoff.
+            services.ConfigureAll<HttpStandardResilienceOptions>(options => options.Retry.Delay = TimeSpan.Zero);
+        });
+    }
+
+    /// <summary>A Persona's token as the Partner portal issues it locally; change any part to show what is refused.</summary>
+    public string PersonaToken(
+        string clientId = BrouwerClientId,
+        string[]? roles = null,
+        string audience = PartnerApiAudience,
+        byte[]? signingKey = null,
+        DateTime? expires = null)
+    {
+        var claims = new Dictionary<string, object> { ["azp"] = clientId };
+        if ((roles ?? ["TransportOrders.Submit"]) is { Length: > 0 } granted)
+        {
+            claims["roles"] = granted;
+        }
+
+        var validUntil = expires ?? DateTime.UtcNow.AddHours(1);
+        return new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
+        {
+            Issuer = Issuer,
+            Audience = audience,
+            NotBefore = validUntil.AddHours(-2),
+            IssuedAt = validUntil.AddHours(-2),
+            Expires = validUntil,
+            Claims = claims,
+            SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(signingKey ?? SigningKey), SecurityAlgorithms.HmacSha256),
+        });
+    }
+
+    public static string Sample(string name)
+    {
+        using var stream = typeof(LocalPartnerApiFactory).Assembly.GetManifestResourceStream($"PartnerApi/samples/bookings/{name}")
+            ?? throw new InvalidOperationException($"{name} is not an embedded sample.");
+        using var reader = new StreamReader(stream, Encoding.UTF8);
+        return reader.ReadToEnd();
+    }
+}

@@ -1,0 +1,14 @@
+@* An address's fields. It fills in the form's own AddressForm, so it needs no binding of its own. *@
+<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="sm:col-span-2">
+        <FluentTextField Label="Street" @bind-Value="Address.Street" />
+    </div>
+    <FluentTextField Label="Postcode" @bind-Value="Address.Postcode" />
+    <FluentTextField Label="City" @bind-Value="Address.City" />
+    <FluentTextField Label="Country" @bind-Value="Address.Country" Placeholder="NL or Netherlands" />
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public AddressForm Address { get; set; } = null!;
+}

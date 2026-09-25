@@ -1,0 +1,4 @@
+# Built by the Tailwind CSS target in Norvia.PartnerPortal.Web.csproj.
+node_modules/
+wwwroot/app.css
+wwwroot/fonts/

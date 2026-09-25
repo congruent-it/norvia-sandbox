@@ -32,12 +32,14 @@ jobs:
         with:
           global-json-file: global.json
 
-      # The TMS UI's stylesheet is built with Tailwind CSS during the .NET build (ADR 0018).
+      # The TMS UI's and the Partner portal's stylesheets are built with Tailwind CSS during the .NET build (ADR 0018, ADR 0022).
       - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: src/Tms/Norvia.Tms.Web/package-lock.json
+          cache-dependency-path: |
+            src/Tms/Norvia.Tms.Web/package-lock.json
+            src/PartnerPortal/Norvia.PartnerPortal.Web/package-lock.json
 
       - uses: actions/cache@v4
         with:
@@ -112,12 +114,14 @@ jobs:
         with:
           global-json-file: global.json
 
-      # The TMS UI's stylesheet is built with Tailwind CSS during the .NET build (ADR 0018).
+      # The TMS UI's and the Partner portal's stylesheets are built with Tailwind CSS during the .NET build (ADR 0018, ADR 0022).
       - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: src/Tms/Norvia.Tms.Web/package-lock.json
+          cache-dependency-path: |
+            src/Tms/Norvia.Tms.Web/package-lock.json
+            src/PartnerPortal/Norvia.PartnerPortal.Web/package-lock.json
 
       - uses: actions/cache@v4
         with:
@@ -128,7 +132,8 @@ jobs:
       - name: Build
         run: dotnet build Norvia.slnx --configuration "$CONFIGURATION"
 
-      # Chromium's system libraries need root, so they are installed here rather than by the UI test fixture.
+      # Chromium's system libraries need root, so they are installed here rather than by the UI test fixtures. Every UI
+      # test project uses the same Playwright version, so one install serves them all.
       - name: Install Playwright's Chromium
         run: pwsh tests/Tms/Norvia.Tms.Web.UiTests/bin/"$CONFIGURATION"/net10.0/playwright.ps1 install --with-deps chromium
 

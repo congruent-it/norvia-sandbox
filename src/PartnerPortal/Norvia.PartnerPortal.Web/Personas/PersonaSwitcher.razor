@@ -1,0 +1,23 @@
+@* The Persona switcher: one button per Persona, the current one pressed. A plain form post, since the layout isn't interactive. *@
+<form method="post" action="/persona" class="flex flex-wrap items-center gap-2" aria-label="Persona">
+    <AntiforgeryToken />
+    <span class="text-xs font-semibold uppercase tracking-widest text-muted">Playing</span>
+    <div class="flex border border-primary">
+        @foreach (var persona in Personas)
+        {
+            var current = persona == Current;
+            <button type="submit" name="persona" value="@persona.Id" aria-pressed="@(current ? "true" : "false")"
+                    class="@(current ? "bg-primary text-white" : "bg-white text-primary hover:bg-light") cursor-pointer border-0 px-3 py-2 font-sans text-xs font-semibold uppercase tracking-wider">
+                @persona.DisplayName
+            </button>
+        }
+    </div>
+</form>
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<PersonaView> Personas { get; set; } = [];
+
+    [Parameter, EditorRequired]
+    public PersonaView Current { get; set; } = null!;
+}

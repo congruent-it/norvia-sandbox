@@ -1,0 +1,247 @@
+using System.Net;
+using System.Text.Json.Nodes;
+using Microsoft.Extensions.Logging.Testing;
+using Microsoft.Extensions.Options;
+using Norvia.PartnerPortal.Application.Bookings;
+using Norvia.PartnerPortal.Domain.Bookings;
+using Norvia.PartnerPortal.Domain.Personas;
+using Norvia.PartnerPortal.Infrastructure.PartnerApi;
+
+namespace Norvia.PartnerPortal.Infrastructure.UnitTests.PartnerApi;
+
+public sealed class NorviaPartnerApiClientTests : IDisposable
+{
+    private readonly StubHandler _partnerApi = new();
+    private readonly IPersonaTokens _tokens = Substitute.For<IPersonaTokens>();
+    private readonly FakeLogger<NorviaPartnerApiClient> _logger = new();
+    private readonly HttpClient _http;
+    private readonly NorviaPartnerApiClient _client;
+
+    public NorviaPartnerApiClientTests()
+    {
+        _http = new HttpClient(_partnerApi) { BaseAddress = new Uri("https://apim.example/partner/v1/") };
+        _tokens.GetTokenAsync(Samples.BrouwerDranken.Id, Arg.Any<CancellationToken>()).Returns("brouwer-token");
+        var options = Options.Create(new PartnerApiOptions
+        {
+            BaseAddress = _http.BaseAddress,
+            PersonaClientIds = "brouwer-dranken=client-1;van-dijk-transport=client-2",
+            SubscriptionKeys = new() { ["brouwer-dranken"] = "brouwer-key", ["van-dijk-transport"] = "van-dijk-key" },
+        });
+        _client = new NorviaPartnerApiClient(_http, _tokens, options, _logger);
+    }
+
+    public void Dispose()
+    {
+        _http.Dispose();
+        _partnerApi.Dispose();
+    }
+
+    [Fact]
+    public async Task SubmitAsync_PostsTheBookingToTransportOrders_AsThePersona()
+    {
+        _partnerApi.Answer(HttpStatusCode.Created, Contracts.Read("PartnerApi/samples/responses/accepted.json"));
+
+        await SubmitAsync(Samples.FullBooking());
+
+        _partnerApi.Request!.Method.Should().Be(HttpMethod.Post);
+        _partnerApi.Request.RequestUri.Should().Be(new Uri("https://apim.example/partner/v1/transport-orders"));
+        _partnerApi.Request.Headers.GetValues("Ocp-Apim-Subscription-Key").Should().Equal("brouwer-key");
+        _partnerApi.Request.Headers.Authorization!.Scheme.Should().Be("Bearer");
+        _partnerApi.Request.Headers.Authorization.Parameter.Should().Be("brouwer-token");
+    }
+
+    [Fact]
+    public async Task SubmitAsync_FullBooking_SendsItInThePartnerFormat()
+    {
+        _partnerApi.Answer(HttpStatusCode.Created, Contracts.Read("PartnerApi/samples/responses/accepted.json"));
+
+        await SubmitAsync(Samples.FullBooking());
+
+        var sent = JsonNode.Parse(_partnerApi.RequestBody!);
+        JsonNode.DeepEquals(sent, JsonNode.Parse("""
+            {
+              "bookingRef": "BD-2030-0002",
+              "pickupStreet": "Waalhaven Oostzijde 88",
+              "pickupPostalCode": "3087 BM",
+              "pickupCity": "Rotterdam",
+              "pickupCountry": "NL",
+              "pickupFrom": "02-10-2030 07:30",
+              "pickupUntil": "02-10-2030 11:00",
+              "receiverName": "Getränke Schmitz GmbH",
+              "receiverContact": "Jonas Schmitz",
+              "receiverPhone": "+49 211 555 0190",
+              "receiverEmail": "wareneingang@getraenke-schmitz.example",
+              "receiverStreet": "Kölner Landstraße 301",
+              "receiverPostalCode": "40591",
+              "receiverCity": "Düsseldorf",
+              "receiverCountry": "DE",
+              "deliverFrom": "03-10-2030 08:00",
+              "deliverUntil": "03-10-2030 16:30",
+              "items": [
+                { "packaging": "PX", "count": 4, "weight": "2400 kg", "dimensions": "120x80x160 cm" },
+                { "packaging": "CR", "count": 10, "weight": "180.25 kg", "dimensions": "60x40x35.5 cm" },
+                { "packaging": "PK", "count": 3, "weight": "12 kg" },
+                { "packaging": "NE", "count": 1, "weight": "35 kg" }
+              ],
+              "remarks": "Deliver at dock 3. Call Jonas 30 minutes before arrival."
+            }
+            """)).Should().BeTrue(sent!.ToJsonString());
+        Contracts.BookingSchemaErrors(sent).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SubmitAsync_EmptyBooking_LeavesOutWhatIsEmpty_SoNorviaNamesWhatIsMissing()
+    {
+        _partnerApi.Answer(HttpStatusCode.UnprocessableEntity, Contracts.Read("PartnerApi/samples/responses/rejected.json"));
+
+        await SubmitAsync(new BookingRequest
+        {
+            ShipperReference = " ",
+            CollectionAddress = new BookingAddress(Street: "Waalhaven Oostzijde 88", City: ""),
+            GoodsLines = [new BookingGoodsLine(PackageType: null, Quantity: null, WeightKg: null)],
+        });
+
+        var sent = JsonNode.Parse(_partnerApi.RequestBody!);
+        JsonNode.DeepEquals(sent, JsonNode.Parse("""{ "pickupStreet": "Waalhaven Oostzijde 88", "items": [{}] }""")).Should().BeTrue(sent!.ToJsonString());
+        Contracts.BookingSchemaErrors(sent).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SubmitAsync_Accepted_IsBookedUnderTheTransportOrderNumber()
+    {
+        _partnerApi.Answer(HttpStatusCode.Created, Contracts.Read("PartnerApi/samples/responses/accepted.json"));
+
+        var answer = await SubmitAsync(Samples.FullBooking());
+
+        answer.Should().Be(NorviaAnswer.Accepted("TO-0000042", "7f3c1a52-9d4e-4b8a-a1f0-2e6d8c5b9a31"));
+    }
+
+    [Fact]
+    public async Task SubmitAsync_AlreadyBooked_IsBookedUnderTheOriginalNumber()
+    {
+        _partnerApi.Answer(HttpStatusCode.OK, Contracts.Read("PartnerApi/samples/responses/already-booked.json"));
+
+        var answer = await SubmitAsync(Samples.FullBooking());
+
+        answer.Should().Be(NorviaAnswer.AlreadyBooked("TO-0000042", "c81e5d07-3a2f-4f6b-9e14-0b7a9d2c6e58"));
+    }
+
+    [Fact]
+    public async Task SubmitAsync_Rejected_KeepsEveryReason()
+    {
+        _partnerApi.Answer(HttpStatusCode.UnprocessableEntity, Contracts.Read("PartnerApi/samples/responses/rejected.json"));
+
+        var answer = await SubmitAsync(Samples.FullBooking());
+
+        answer.Result.Should().Be(BookingResult.Rejected);
+        answer.MessageId.Should().Be("5a9e2b14-6c3d-47f1-8b20-d4e7f1a0c963");
+        answer.Reasons.Should().HaveCount(5).And.StartWith(new RejectionReason("DeliveryAddressIncomplete", "The delivery address has no country."));
+    }
+
+    [Fact]
+    public async Task SubmitAsync_NotReceived_IsNotReceived_WithNorviasMessageId()
+    {
+        _partnerApi.Answer(HttpStatusCode.BadGateway, Contracts.Read("PartnerApi/samples/responses/not-received.json"));
+
+        var answer = await SubmitAsync(Samples.FullBooking());
+
+        answer.Should().Be(NorviaAnswer.NotReceived("e2d4f6a8-1b3c-4d5e-8f70-9a1b2c3d4e5f"));
+    }
+
+    [Fact]
+    public async Task SubmitAsync_ForbiddenAtTheEdge_IsRefusedInNorviasWords()
+    {
+        _partnerApi.Answer(HttpStatusCode.Forbidden, """{ "messageId": "corr-403", "text": "This client may not submit Transport Orders." }""", correlationId: "corr-403");
+
+        var answer = await SubmitAsync(Samples.FullBooking());
+
+        answer.Should().Be(NorviaAnswer.Refused("This client may not submit Transport Orders.", "corr-403"));
+    }
+
+    [Fact]
+    public async Task SubmitAsync_UnauthorizedAtTheEdge_IsRefused_WithTheCorrelationIdFromTheHeader()
+    {
+        _partnerApi.Answer(HttpStatusCode.Unauthorized, """{ "statusCode": 401, "message": "Access denied due to invalid subscription key." }""", correlationId: "corr-401");
+
+        var answer = await SubmitAsync(Samples.FullBooking());
+
+        answer.Result.Should().Be(BookingResult.Refused);
+        answer.Text.Should().Be("Norvia didn't recognise this Persona's subscription key or token.");
+        answer.MessageId.Should().Be("corr-401");
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.InternalServerError, "")]
+    [InlineData(HttpStatusCode.ServiceUnavailable, "<html>Service unavailable</html>")]
+    [InlineData(HttpStatusCode.Created, """{ "result": "ACCEPTED" }""")]
+    [InlineData(HttpStatusCode.UnprocessableEntity, """{ "result": "REJECTED", "errors": [] }""")]
+    [InlineData(HttpStatusCode.OK, """{ "result": "SOMETHING_NEW", "norviaOrderNo": "TO-0000042" }""")]
+    public async Task SubmitAsync_AnswerThatSaysNothingWasBooked_IsNotReceived(HttpStatusCode status, string body)
+    {
+        _partnerApi.Answer(status, body, correlationId: "corr-5xx");
+
+        var answer = await SubmitAsync(Samples.FullBooking());
+
+        answer.Should().Be(NorviaAnswer.NotReceived("corr-5xx"));
+    }
+
+    [Fact]
+    public async Task SubmitAsync_NorviaUnreachable_IsNotReceived()
+    {
+        _partnerApi.Fail(new HttpRequestException("Connection refused"));
+
+        var answer = await SubmitAsync(Samples.FullBooking());
+
+        answer.Should().Be(NorviaAnswer.NotReceived(null));
+    }
+
+    [Fact]
+    public async Task SubmitAsync_NorviaTooSlow_IsNotReceived()
+    {
+        _partnerApi.Fail(new TaskCanceledException("The request was canceled due to the configured HttpClient.Timeout.", new TimeoutException()));
+
+        var answer = await SubmitAsync(Samples.FullBooking());
+
+        answer.Should().Be(NorviaAnswer.NotReceived(null));
+    }
+
+    [Fact]
+    public async Task SubmitAsync_NoTokenForThePersona_IsNotReceived_AndSendsNothing()
+    {
+        _tokens.GetTokenAsync(Samples.BrouwerDranken.Id, Arg.Any<CancellationToken>()).Returns<string>(_ => throw new InvalidOperationException("Entra said no."));
+
+        var answer = await SubmitAsync(Samples.FullBooking());
+
+        answer.Should().Be(NorviaAnswer.NotReceived(null));
+        _partnerApi.Request.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task SubmitAsync_Answered_LogsTheTrackingKeys_SoTheTraceJoinsNorviasMessageTrail()
+    {
+        _partnerApi.Answer(HttpStatusCode.Created, Contracts.Read("PartnerApi/samples/responses/accepted.json"));
+
+        await SubmitAsync(Samples.FullBooking());
+
+        var scope = _logger.LatestRecord.Scopes.OfType<IEnumerable<KeyValuePair<string, object?>>>().SelectMany(keys => keys).ToDictionary();
+        scope.Should().Contain("flow", "transport-order-intake")
+            .And.Contain("partyId", "SHP-0001")
+            .And.Contain("correlationId", "7f3c1a52-9d4e-4b8a-a1f0-2e6d8c5b9a31")
+            .And.Contain("transportOrderNumber", "TO-0000042");
+    }
+
+    [Fact]
+    public async Task SubmitAsync_CancelledByTheCaller_Throws()
+    {
+        using var cancelled = new CancellationTokenSource();
+        await cancelled.CancelAsync();
+        _partnerApi.Fail(new TaskCanceledException());
+
+        var submit = () => _client.SubmitAsync(Samples.BrouwerDranken, Samples.FullBooking(), cancelled.Token);
+
+        await submit.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    private Task<NorviaAnswer> SubmitAsync(BookingRequest booking) =>
+        _client.SubmitAsync(Samples.BrouwerDranken, booking, TestContext.Current.CancellationToken);
+}

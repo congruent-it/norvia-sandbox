@@ -1,0 +1,48 @@
+@*
+    A local time window: from and until, in the time of the address it belongs to. Fluent UI has no input for a date and
+    time together, so these are native inputs in Lux's look.
+*@
+<div class="grid gap-4 sm:grid-cols-2">
+    <div>
+        <label for="@FromId" class="lux-label">@FromLabel</label>
+        <InputDate Type="InputDateType.DateTimeLocal" id="@FromId" class="lux-input" Value="From" ValueChanged="FromChanged" ValueExpression="FromExpression" />
+    </div>
+    <div>
+        <label for="@UntilId" class="lux-label">@UntilLabel</label>
+        <InputDate Type="InputDateType.DateTimeLocal" id="@UntilId" class="lux-input" Value="Until" ValueChanged="UntilChanged" ValueExpression="UntilExpression" />
+    </div>
+</div>
+
+@code {
+    private string FromId => $"{Id}-from";
+
+    private string UntilId => $"{Id}-until";
+
+    /// <summary>Makes the inputs' IDs unique on the page, such as "collection".</summary>
+    [Parameter, EditorRequired]
+    public string Id { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string FromLabel { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string UntilLabel { get; set; } = string.Empty;
+
+    [Parameter]
+    public DateTime? From { get; set; }
+
+    [Parameter]
+    public EventCallback<DateTime?> FromChanged { get; set; }
+
+    [Parameter, EditorRequired]
+    public System.Linq.Expressions.Expression<Func<DateTime?>> FromExpression { get; set; } = null!;
+
+    [Parameter]
+    public DateTime? Until { get; set; }
+
+    [Parameter]
+    public EventCallback<DateTime?> UntilChanged { get; set; }
+
+    [Parameter, EditorRequired]
+    public System.Linq.Expressions.Expression<Func<DateTime?>> UntilExpression { get; set; } = null!;
+}

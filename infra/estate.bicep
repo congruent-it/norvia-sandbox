@@ -91,6 +91,7 @@ module partnerApi 'estate/partner-api.bicep' = {
     intakeLogicAppHostName: intakeLogicApp.outputs.logicAppHostName
     intakeTriggerAudience: identities.outputs.intakeTriggerAudience
     applicationInsightsName: monitoring.outputs.applicationInsightsName
+    partnerPortalPrincipalId: identities.outputs.partnerPortalPrincipalId
   }
 }
 
@@ -99,6 +100,7 @@ output ESTATE_SERVICE_BUS_NAMESPACE string = messaging.outputs.namespaceName
 output ESTATE_LOG_ANALYTICS_WORKSPACE string = monitoring.outputs.workspaceName
 output ESTATE_APPLICATION_INSIGHTS string = monitoring.outputs.applicationInsightsName
 output ESTATE_ENTRA_ISSUER string = identities.outputs.entraIssuer
+output ESTATE_ENTRA_TENANT_ID string = identities.outputs.entraTenantId
 output ESTATE_TMS_API_CLIENT_ID string = identities.outputs.tmsApiClientId
 output ESTATE_INTAKE_CLIENT_ID string = identities.outputs.intakeClientId
 output ESTATE_INTAKE_IDENTITY_ID string = identities.outputs.intakeIdentityId
@@ -109,3 +111,5 @@ output ESTATE_PARTNER_API_CLIENT_ID string = identities.outputs.partnerApiClient
 output ESTATE_PERSONA_CLIENT_IDS string = join(identities.outputs.personaClientIds, ';')
 output ESTATE_PARTNER_PORTAL_IDENTITY_ID string = identities.outputs.partnerPortalIdentityId
 output ESTATE_PARTNER_PORTAL_CLIENT_ID string = identities.outputs.partnerPortalClientId
+output ESTATE_PARTNER_PORTAL_IDENTITY_NAME string = identities.outputs.partnerPortalIdentityName
+output ESTATE_PARTNER_PORTAL_KEY_VAULT string = partnerApi.outputs.partnerPortalKeyVaultName

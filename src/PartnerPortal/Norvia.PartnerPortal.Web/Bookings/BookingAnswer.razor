@@ -1,0 +1,56 @@
+@* Norvia's answer to a booking, in plain words: what was booked, or why nothing was. *@
+<section aria-label="Norvia's answer" class="mb-6">
+    @switch (Booking.Result)
+    {
+        case BookingResult.Accepted:
+            <div role="status">
+                <FluentMessageBar Intent="MessageIntent.Success" AllowDismiss="false">
+                    Norvia accepted the booking as Transport Order <strong>@Booking.TransportOrderNumber</strong>.
+                </FluentMessageBar>
+            </div>
+            break;
+        case BookingResult.AlreadyBooked:
+            <div role="status">
+                <FluentMessageBar Intent="MessageIntent.Info" AllowDismiss="false">
+                    Norvia already has this booking, as Transport Order <strong>@Booking.TransportOrderNumber</strong>. Nothing new was booked.
+                </FluentMessageBar>
+            </div>
+            break;
+        case BookingResult.Rejected:
+            <div role="alert">
+                <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+                    <p class="m-0">Norvia rejected the booking, so nothing was booked. Correct the following and send it again:</p>
+                    <ul class="mb-0 mt-2 list-disc pl-5">
+                        @foreach (var reason in Booking.Reasons)
+                        {
+                            <li>@reason.Text</li>
+                        }
+                    </ul>
+                </FluentMessageBar>
+            </div>
+            break;
+        case BookingResult.NotReceived:
+            <div role="alert">
+                <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
+                    Norvia did not receive the booking, so nothing was booked. Send it again in a moment.
+                </FluentMessageBar>
+            </div>
+            break;
+        case BookingResult.Refused:
+            <div role="alert">
+                <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+                    Norvia refused the booking: @Booking.Text Nothing was booked.
+                </FluentMessageBar>
+            </div>
+            break;
+    }
+    @if (Booking.MessageId is not null)
+    {
+        <p class="mt-2 text-xs text-muted">Norvia's reference for this attempt: <span>@Booking.MessageId</span></p>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public BookingView Booking { get; set; } = null!;
+}

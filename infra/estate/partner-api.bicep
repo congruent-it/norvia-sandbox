@@ -26,6 +26,9 @@ param intakeTriggerAudience string
 
 param applicationInsightsName string
 
+@description('The Partner portal\'s identity, the one principal that may read the Personas\' subscription keys.')
+param partnerPortalPrincipalId string
+
 var resourceToken = uniqueString(resourceGroup().id)
 
 resource apiManagementIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
@@ -224,5 +227,44 @@ resource personaSubscriptions 'Microsoft.ApiManagement/service/subscriptions@202
   }
 ]
 
+// The Partner portal books as each Persona with its subscription key (ADR 0005), which it reads from here with its own
+// identity. Nothing else may read them.
+resource partnerPortalSecrets 'Microsoft.KeyVault/vaults@2024-11-01' = {
+  name: 'kv-portal-${resourceToken}'
+  location: location
+  tags: tags
+  properties: {
+    tenantId: tenant().tenantId
+    sku: {
+      family: 'A'
+      name: 'standard'
+    }
+    enableRbacAuthorization: true
+  }
+}
+
+resource subscriptionKeys 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = [
+  for (persona, i) in personaClientIds: {
+    parent: partnerPortalSecrets
+    name: 'subscription-key-${split(persona, '=')[0]}'
+    properties: {
+      value: personaSubscriptions[i].listSecrets().primaryKey
+    }
+  }
+]
+
+var keyVaultSecretsUser = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
+
+resource partnerPortalReadsTheKeys 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(partnerPortalSecrets.id, partnerPortalPrincipalId, keyVaultSecretsUser)
+  scope: partnerPortalSecrets
+  properties: {
+    principalId: partnerPortalPrincipalId
+    roleDefinitionId: keyVaultSecretsUser
+    principalType: 'ServicePrincipal'
+  }
+}
+
 output apiManagementName string = apiManagement.name
+output partnerPortalKeyVaultName string = partnerPortalSecrets.name
 output partnerApiUrl string = '${apiManagement.properties.gatewayUrl}/${partnerApi.properties.path}'

@@ -1,0 +1,183 @@
+@page "/personas/{PersonaId}/bookings/new"
+@*
+    Interactive: the form adds and removes goods lines, and shows Norvia's answer in place. Not prerendered: a prerendered
+    form looks ready before it is, and what is typed or clicked in it then is lost.
+*@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject IPartnerPortal Portal
+@inject NavigationManager Navigation
+@inject ILogger<NewBooking> Logger
+
+<PageTitle>Book a transport · @(_persona?.DisplayName ?? PersonaId) · Partner portal</PageTitle>
+
+<h1>Book a transport</h1>
+
+@if (_loadFailed)
+{
+    <div role="alert">
+        <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+            The booking form couldn't be loaded. Reload the page to try again.
+        </FluentMessageBar>
+    </div>
+}
+else if (_form is null)
+{
+    <FluentStack VerticalAlignment="VerticalAlignment.Center" role="status">
+        <FluentProgressRing />
+        <span>Loading the booking form…</span>
+    </FluentStack>
+}
+else
+{
+    <p class="mb-8 max-w-3xl">
+        As <strong>@_persona!.DisplayName</strong>, ask Norvia to move goods from A to B. Norvia answers straight away: with a
+        Transport Order number, or with every reason it can't take the booking.
+    </p>
+
+    <EditForm Model="_form" OnValidSubmit="SubmitAsync" FormName="booking">
+        <BookingFormValidator />
+
+        <fieldset class="lux-fieldset">
+            <legend>Booking</legend>
+            <div class="max-w-md">
+                <FluentTextField Label="Shipper reference" @bind-Value="_form.ShipperReference" />
+                <FluentValidationMessage For="() => _form.ShipperReference" />
+            </div>
+        </fieldset>
+
+        <fieldset class="lux-fieldset">
+            <legend>Collection</legend>
+            <div class="grid gap-4">
+                <AddressFields Address="_form.Collection" />
+                <LocalTimeFields Id="collection" FromLabel="Collect from" UntilLabel="Collect until"
+                                 @bind-From="_form.CollectFrom" @bind-Until="_form.CollectUntil" />
+            </div>
+        </fieldset>
+
+        <fieldset class="lux-fieldset">
+            <legend>Delivery</legend>
+            <div class="grid gap-4">
+                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <FluentTextField Label="Consignee" @bind-Value="_form.Consignee.Name" />
+                    <FluentTextField Label="Contact name" @bind-Value="_form.Consignee.ContactName" />
+                    <FluentTextField Label="Phone" TextFieldType="TextFieldType.Tel" @bind-Value="_form.Consignee.Phone" />
+                    <div>
+                        <FluentTextField Label="Email" TextFieldType="TextFieldType.Email" @bind-Value="_form.Consignee.Email" />
+                        <FluentValidationMessage For="() => _form.Consignee.Email" />
+                    </div>
+                </div>
+                <AddressFields Address="_form.Delivery" />
+                <LocalTimeFields Id="delivery" FromLabel="Deliver from (optional)" UntilLabel="Deliver until (optional)"
+                                 @bind-From="_form.DeliverFrom" @bind-Until="_form.DeliverUntil" />
+            </div>
+        </fieldset>
+
+        <fieldset class="lux-fieldset">
+            <legend>Goods</legend>
+            @for (var index = 0; index < _form.GoodsLines.Count; index++)
+            {
+                var line = _form.GoodsLines[index];
+                <GoodsLineFields @key="line" Line="line" Number="index + 1" CanRemove="_form.GoodsLines.Count > 1"
+                                 OnRemove="() => _form.RemoveGoodsLine(line)" />
+            }
+            <FluentButton Appearance="Appearance.Outline" OnClick="_form.AddGoodsLine">Add a goods line</FluentButton>
+        </fieldset>
+
+        <fieldset class="lux-fieldset">
+            <legend>Instructions</legend>
+            <div class="max-w-3xl">
+                <FluentTextArea Label="Instructions for Norvia (optional)" @bind-Value="_form.Instructions" Rows="3" />
+            </div>
+        </fieldset>
+
+        @if (_answer is not null)
+        {
+            <BookingAnswer Booking="_answer" />
+        }
+        else if (_submitFailed)
+        {
+            <div role="alert" class="mb-6">
+                <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+                    The booking couldn't be sent or recorded. Check My bookings before you send it again: sending it again under the same reference never books it twice.
+                </FluentMessageBar>
+            </div>
+        }
+
+        <div class="flex flex-wrap items-center gap-4">
+            <FluentButton Type="ButtonType.Submit" Appearance="Appearance.Accent" Disabled="_sending">Book transport</FluentButton>
+            <FluentButton Appearance="Appearance.Outline" OnClick="StartNewAsync" Disabled="_sending">Start a new booking</FluentButton>
+            @if (_sending)
+            {
+                <FluentStack VerticalAlignment="VerticalAlignment.Center" role="status" Width="auto">
+                    <FluentProgressRing />
+                    <span>Sending the booking to Norvia…</span>
+                </FluentStack>
+            }
+        </div>
+    </EditForm>
+}
+
+@code {
+    private PersonaView? _persona;
+    private BookingForm? _form;
+    private BookingView? _answer;
+    private bool _loadFailed;
+    private bool _sending;
+    private bool _submitFailed;
+
+    [Parameter]
+    public string PersonaId { get; set; } = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _form = null;
+        _answer = null;
+        try
+        {
+            _persona = PersonaChoice.Find(PersonaId, await Portal.ListPersonasAsync(CancellationToken.None));
+            if (_persona is null)
+            {
+                Navigation.NotFound();
+                return;
+            }
+
+            await StartNewAsync();
+        }
+        catch (Exception exception)
+        {
+            PageLog.LoadFailed(Logger, exception, PersonaId);
+            _loadFailed = true;
+        }
+    }
+
+    private async Task StartNewAsync()
+    {
+        var draft = await Portal.DraftBookingAsync(PersonaId, CancellationToken.None);
+        _form = draft is null ? null : BookingForm.From(draft);
+        _answer = null;
+        _submitFailed = false;
+    }
+
+    // After any answer the form keeps what was entered, so after a rejection only what was wrong needs changing, and
+    // sending it again after an acceptance shows that Norvia doesn't book it twice.
+    private async Task SubmitAsync()
+    {
+        _sending = true;
+        _answer = null;
+        _submitFailed = false;
+        try
+        {
+            _answer = await Portal.SubmitBookingAsync(PersonaId, _form!.ToRequest(), CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            // Norvia unreachable is an answer, not this: here the portal itself failed, for example to keep its record.
+            PageLog.SubmitFailed(Logger, exception, PersonaId);
+            _submitFailed = true;
+        }
+        finally
+        {
+            _sending = false;
+        }
+    }
+}
