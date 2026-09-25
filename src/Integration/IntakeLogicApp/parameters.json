@@ -1,0 +1,14 @@
+{
+  "tmsBaseUrl": {
+    "type": "String",
+    "value": "@appsetting('TMS_BASE_URL')"
+  },
+  "tmsAudience": {
+    "type": "String",
+    "value": "@appsetting('TMS_API_CLIENT_ID')"
+  },
+  "intakeIdentityId": {
+    "type": "String",
+    "value": "@appsetting('INTAKE_IDENTITY_ID')"
+  }
+}

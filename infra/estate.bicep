@@ -10,15 +10,19 @@ param environmentName string
 @description('The Azure region for every resource in the estate.')
 param location string
 
-@description('''How many days the integration layer keeps what it traced: Application Insights and Log Analytics now, and
-Logic Apps run history and the transit containers once they exist. The one place retention is set (coding guidelines
-§7). Application Insights accepts only these values.''')
+@description('''How many days the integration layer keeps what it traced: Application Insights, Log Analytics and Logic Apps
+run history now (at most 365 days for run history), and the transit containers once they exist. The one place retention
+is set (coding guidelines §7). Application Insights accepts only these values.''')
 @allowed([30, 60, 90, 120, 180, 270, 365, 550, 730])
 param integrationRetentionDays int = 90
 
 @description('''The presenter's Entra object ID, empty for none. The presenter may read the estate's messages, for example to see
 an event land on its topic.''')
 param presenterPrincipalId string = ''
+
+@description('''The TMS API's address, empty before the apps are first deployed. azd's postdeploy hook stores it, so the intake
+Logic App keeps it when the estate is deployed again.''')
+param tmsBaseUrl string = ''
 
 var tags = {
   'azd-env-name': environmentName
@@ -58,6 +62,19 @@ module identities 'estate/identities.bicep' = {
   }
 }
 
+module intakeLogicApp 'estate/intake-logic-app.bicep' = {
+  scope: resourceGroup
+  params: {
+    location: location
+    tags: tags
+    integrationRetentionDays: integrationRetentionDays
+    intakeIdentityName: identities.outputs.intakeIdentityName
+    tmsApiClientId: identities.outputs.tmsApiClientId
+    tmsBaseUrl: tmsBaseUrl
+    applicationInsightsName: monitoring.outputs.applicationInsightsName
+  }
+}
+
 // The hook stores each output as AZURE_<NAME>, which is where azd looks up the AppHost's Estate parameters.
 output ESTATE_SERVICE_BUS_NAMESPACE string = messaging.outputs.namespaceName
 output ESTATE_LOG_ANALYTICS_WORKSPACE string = monitoring.outputs.workspaceName
@@ -66,3 +83,4 @@ output ESTATE_ENTRA_ISSUER string = identities.outputs.entraIssuer
 output ESTATE_TMS_API_CLIENT_ID string = identities.outputs.tmsApiClientId
 output ESTATE_INTAKE_CLIENT_ID string = identities.outputs.intakeClientId
 output ESTATE_INTAKE_IDENTITY_ID string = identities.outputs.intakeIdentityId
+output ESTATE_INTAKE_LOGIC_APP string = intakeLogicApp.outputs.logicAppName

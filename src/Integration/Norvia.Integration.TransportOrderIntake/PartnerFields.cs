@@ -16,5 +16,18 @@ internal sealed class PartnerFields(JsonNode? node)
     public IEnumerable<PartnerFields>? Items() =>
         (node as JsonObject)?["items"] is JsonArray items ? items.Select(item => new PartnerFields(item)) : null;
 
+    /// <summary>Parses a partner's JSON text, reading text that isn't JSON as absent.</summary>
+    public static JsonNode? Parse(string? json)
+    {
+        try
+        {
+            return string.IsNullOrEmpty(json) ? null : JsonNode.Parse(json);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
     private JsonValue? Value(string name) => (node as JsonObject)?[name] as JsonValue;
 }

@@ -8,8 +8,8 @@ param tags object
 var intakeRole = 'TransportOrders.Intake'
 var intakeRoleId = guid('norvia-tms-api', environmentName, intakeRole)
 
-// The intake Logic App's identity (P1.9 gives it to the workflow). It is the one principal holding the TMS intake
-// role, so nothing reaches the TMS without passing the integration layer.
+// The intake Logic App's identity, which it runs as. It is the one principal holding the TMS intake role, so nothing
+// reaches the TMS without passing the integration layer.
 resource intakeIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
   name: 'id-intake-${uniqueString(resourceGroup().id)}'
   location: location
@@ -58,3 +58,4 @@ output entraIssuer string = '${environment().authentication.loginEndpoint}${tena
 output tmsApiClientId string = tmsApi.appId
 output intakeClientId string = intakeIdentity.properties.clientId
 output intakeIdentityId string = intakeIdentity.id
+output intakeIdentityName string = intakeIdentity.name

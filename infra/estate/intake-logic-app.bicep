@@ -1,0 +1,191 @@
+// The intake Logic App (P1.9): a Logic Apps Standard app that maps a partner booking, submits it to the TMS as the
+// intake identity and relays the outcome. The workflow and its local functions are deployed by azd's postdeploy hook
+// (infra/deploy-intake-logic-app.sh), because the app needs the TMS's address, which exists only after Aspire deploys it.
+
+param location string
+param tags object
+param integrationRetentionDays int
+
+@description('The intake identity: the one principal holding the TMS intake role. The Logic App calls the TMS as it, and nothing else.')
+param intakeIdentityName string
+
+@description('The TMS API app registration, the audience of the tokens the Logic App gets for the TMS.')
+param tmsApiClientId string
+
+@description('The TMS API\'s address, empty until the apps are first deployed. The postdeploy hook sets it.')
+param tmsBaseUrl string
+
+param applicationInsightsName string
+
+var resourceToken = uniqueString(resourceGroup().id)
+var logicAppName = 'logic-intake-${resourceToken}'
+var contentShareName = logicAppName
+
+resource intakeIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
+  name: intakeIdentityName
+}
+
+// The Logic App's own identity, for its storage and the Key Vault reference, so the intake identity holds nothing but
+// the TMS intake role.
+resource hostIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
+  name: 'id-intake-host-${resourceToken}'
+  location: location
+  tags: tags
+}
+
+resource applicationInsights 'Microsoft.Insights/components@2020-02-02' existing = {
+  name: applicationInsightsName
+}
+
+// Logic Apps Standard keeps its state and run history here. It reaches blobs, queues and tables as its host identity.
+resource storage 'Microsoft.Storage/storageAccounts@2024-01-01' = {
+  name: 'stintake${resourceToken}'
+  location: location
+  tags: tags
+  kind: 'StorageV2'
+  sku: {
+    name: 'Standard_LRS'
+  }
+  properties: {
+    minimumTlsVersion: 'TLS1_2'
+    allowBlobPublicAccess: false
+    supportsHttpsTrafficOnly: true
+    // The app's content share on the Workflow Standard plan still needs a key; it is read from Key Vault, never kept
+    // in the app's settings.
+    allowSharedKeyAccess: true
+  }
+}
+
+resource fileServices 'Microsoft.Storage/storageAccounts/fileServices@2024-01-01' = {
+  parent: storage
+  name: 'default'
+}
+
+// Created here because the app skips checking the content share, which it can't do through a Key Vault reference.
+resource contentShare 'Microsoft.Storage/storageAccounts/fileServices/shares@2024-01-01' = {
+  parent: fileServices
+  name: contentShareName
+}
+
+var storageRoles = [
+  'b7e6dc6d-f1e8-4753-8033-0f276bb0955b' // Storage Blob Data Owner
+  '974c5e8b-45b9-4653-ba55-5f855dd0fb88' // Storage Queue Data Contributor
+  '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3' // Storage Table Data Contributor
+  '17d1049b-9a84-46fb-8f53-869881c3d3ab' // Storage Account Contributor
+]
+
+resource storageAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = [
+  for role in storageRoles: {
+    name: guid(storage.id, hostIdentity.id, role)
+    scope: storage
+    properties: {
+      principalId: hostIdentity.properties.principalId
+      roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', role)
+      principalType: 'ServicePrincipal'
+    }
+  }
+]
+
+resource keyVault 'Microsoft.KeyVault/vaults@2024-11-01' = {
+  name: 'kv-norvia-${resourceToken}'
+  location: location
+  tags: tags
+  properties: {
+    tenantId: tenant().tenantId
+    sku: {
+      family: 'A'
+      name: 'standard'
+    }
+    enableRbacAuthorization: true
+  }
+}
+
+resource contentConnection 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = {
+  parent: keyVault
+  name: 'intake-logic-app-content'
+  properties: {
+    value: 'DefaultEndpointsProtocol=https;AccountName=${storage.name};AccountKey=${storage.listKeys().keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
+  }
+}
+
+var keyVaultSecretsUser = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
+
+resource contentConnectionAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(contentConnection.id, hostIdentity.id, keyVaultSecretsUser)
+  scope: contentConnection
+  properties: {
+    principalId: hostIdentity.properties.principalId
+    roleDefinitionId: keyVaultSecretsUser
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource plan 'Microsoft.Web/serverfarms@2024-11-01' = {
+  name: 'asp-intake-${resourceToken}'
+  location: location
+  tags: tags
+  kind: 'elastic'
+  sku: {
+    name: 'WS1'
+    tier: 'WorkflowStandard'
+  }
+}
+
+resource logicApp 'Microsoft.Web/sites@2024-11-01' = {
+  name: logicAppName
+  location: location
+  tags: tags
+  kind: 'functionapp,workflowapp'
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${hostIdentity.id}': {}
+      '${intakeIdentity.id}': {}
+    }
+  }
+  properties: {
+    serverFarmId: plan.id
+    httpsOnly: true
+    keyVaultReferenceIdentity: hostIdentity.id
+    siteConfig: {
+      // The intake map and relay are .NET 8 local functions (ADR 0019).
+      netFrameworkVersion: 'v8.0'
+      use32BitWorkerProcess: false
+      ftpsState: 'Disabled'
+      minTlsVersion: '1.2'
+      // Needed when the app reaches its storage with a managed identity.
+      functionsRuntimeScaleMonitoringEnabled: true
+      appSettings: [
+        { name: 'APP_KIND', value: 'workflowApp' }
+        { name: 'FUNCTIONS_EXTENSION_VERSION', value: '~4' }
+        { name: 'FUNCTIONS_WORKER_RUNTIME', value: 'dotnet' }
+        { name: 'WEBSITE_NODE_DEFAULT_VERSION', value: '~20' }
+        { name: 'AzureFunctionsJobHost__extensionBundle__id', value: 'Microsoft.Azure.Functions.ExtensionBundle.Workflows' }
+        { name: 'AzureFunctionsJobHost__extensionBundle__version', value: '[1.*, 2.0.0)' }
+        { name: 'AzureWebJobsStorage__blobServiceUri', value: storage.properties.primaryEndpoints.blob }
+        { name: 'AzureWebJobsStorage__queueServiceUri', value: storage.properties.primaryEndpoints.queue }
+        { name: 'AzureWebJobsStorage__tableServiceUri', value: storage.properties.primaryEndpoints.table }
+        { name: 'AzureWebJobsStorage__credential', value: 'managedidentity' }
+        { name: 'AzureWebJobsStorage__managedIdentityResourceId', value: hostIdentity.id }
+        { name: 'WEBSITE_CONTENTAZUREFILECONNECTIONSTRING', value: '@Microsoft.KeyVault(SecretUri=${contentConnection.properties.secretUri})' }
+        { name: 'WEBSITE_CONTENTSHARE', value: contentShareName }
+        { name: 'WEBSITE_SKIP_CONTENTSHARE_VALIDATION', value: '1' }
+        // Where the runs' telemetry goes: the estate's Application Insights (coding guidelines §7).
+        { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: applicationInsights.properties.ConnectionString }
+        // Run history keeps as long as the rest of the integration layer's traces; Logic Apps keeps it for 365 days at most.
+        { name: 'Workflows.RuntimeConfiguration.RetentionInDays', value: string(min(integrationRetentionDays, 365)) }
+        // The workflow's parameters (parameters.json).
+        { name: 'TMS_BASE_URL', value: tmsBaseUrl }
+        { name: 'TMS_API_CLIENT_ID', value: tmsApiClientId }
+        { name: 'INTAKE_IDENTITY_ID', value: intakeIdentity.id }
+      ]
+    }
+  }
+  dependsOn: [
+    storageAccess
+    contentConnectionAccess
+    contentShare
+  ]
+}
+
+output logicAppName string = logicApp.name

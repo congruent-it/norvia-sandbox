@@ -6,3 +6,6 @@ param location = readEnvironmentVariable('AZURE_LOCATION')
 
 // The hook sets this to the signed-in Azure CLI user.
 param presenterPrincipalId = readEnvironmentVariable('ESTATE_PRESENTER_PRINCIPAL_ID', '')
+
+// The postdeploy hook stores the TMS API's address once Aspire has deployed it.
+param tmsBaseUrl = readEnvironmentVariable('ESTATE_TMS_BASE_URL', '')

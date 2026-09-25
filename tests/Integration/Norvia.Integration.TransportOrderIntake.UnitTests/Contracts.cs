@@ -2,7 +2,10 @@ using System.Reflection;
 
 namespace Norvia.Integration.TransportOrderIntake.UnitTests;
 
-/// <summary>The files in contracts/, embedded in the test assembly under their path, such as <c>PartnerApi/booking.v1.schema.json</c>.</summary>
+/// <summary>
+/// The files in contracts/, and the intake Logic App's definition, embedded in the test assembly under their path, such as
+/// <c>PartnerApi/booking.v1.schema.json</c>.
+/// </summary>
 internal static class Contracts
 {
     private static readonly Assembly Assembly = typeof(Contracts).Assembly;

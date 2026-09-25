@@ -1,4 +1,4 @@
-// Where the estate's telemetry goes: the TMS's traces, the Container Apps logs and, from P1.9, the Logic Apps' runs.
+// Where the estate's telemetry goes: the TMS's traces, the Container Apps logs and the Logic Apps' runs.
 // The Integration console reads it from here (ADR 0017).
 
 param location string

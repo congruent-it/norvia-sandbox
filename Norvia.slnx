@@ -5,6 +5,7 @@
   </Folder>
   <Folder Name="/src/Integration/">
     <Project Path="src/Integration/Norvia.Integration.TransportOrderIntake/Norvia.Integration.TransportOrderIntake.csproj" />
+    <Project Path="src/Integration/Norvia.Integration.TransportOrderIntake.Functions/Norvia.Integration.TransportOrderIntake.Functions.csproj" />
   </Folder>
   <Folder Name="/src/Tms/">
     <Project Path="src/Tms/Norvia.Tms.Api/Norvia.Tms.Api.csproj" />

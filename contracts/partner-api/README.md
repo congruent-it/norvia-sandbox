@@ -41,7 +41,20 @@ The Logic App relays the TMS's outcome in the partner format, unchanged in meani
 | `REJECTED` | 422 | The booking breaks Transport Order rules, or reuses a reference for different content | `errors`: every reason, with the TMS's code and message as `code` and `text` |
 | `NOT_RECEIVED` | 502 | The TMS couldn't be reached, even after the Logic App's retries. Nothing is booked, so the Shipper sends it again | `text` saying so |
 
-Any other answer from the TMS (400, 401 or 403) means the integration layer is at fault, not the Shipper: the Logic App sent something the TMS won't take, or isn't allowed to call it. The Shipper gets `NOT_RECEIVED` too, and the Logic App run fails, for the Integration operator to find by its `messageId`.
+Any other client error from the TMS (400, 401 or 403, for example) means the integration layer is at fault, not the Shipper: the Logic App sent something the TMS won't take, or isn't allowed to call it. The Shipper gets `NOT_RECEIVED` too, and the Logic App run fails, for the Integration operator to find by its `messageId`.
+
+An answer the Logic App can't pass on in full, such as an acceptance without a Transport Order number or a rejection without its reasons, is also `NOT_RECEIVED`, because relaying part of it would change its meaning.
+
+## How API Management calls the intake Logic App
+
+API Management passes the booking to the intake Logic App's HTTP trigger as the Shipper sent it (`POST`, the booking as the body), with two headers of its own:
+
+| Header | Holds |
+|---|---|
+| `X-Shipper-ID` | The Shipper ID, which API Management took from the token (ADR 0005) |
+| `X-Correlation-ID` | The correlation ID API Management created at the edge. It becomes the run's client tracking ID and the answer's `messageId` |
+
+The Logic App answers with the response above, and returns the correlation ID in the `X-Correlation-ID` header too.
 
 ## Samples
 

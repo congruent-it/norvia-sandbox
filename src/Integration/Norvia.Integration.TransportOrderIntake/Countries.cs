@@ -64,6 +64,9 @@ internal static class Countries
         .SelectMany(known => known.Names.Append(known.Country.Code).Select(name => (name, known.Country)))
         .ToDictionary(entry => entry.name, entry => entry.Country, StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Every way of writing a country the map reads: each name and each code.</summary>
+    public static IEnumerable<string> Spellings => ByName.Keys;
+
     public static Country? Find(string? name) =>
         name is not null && ByName.TryGetValue(name.Trim(), out var country) ? country : null;
 }

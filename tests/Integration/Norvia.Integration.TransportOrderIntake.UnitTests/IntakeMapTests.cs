@@ -21,6 +21,27 @@ public sealed class IntakeMapTests
     }
 
     [Fact]
+    public void ToTransportOrder_BookingAsText_GivesTheExpectedTransportOrder()
+    {
+        // The Logic App passes the booking to the map as the JSON text the Shipper sent.
+        var transportOrder = IntakeMap.ToTransportOrder(PartnerApiSamples.Booking("full").ToJsonString(), ShipperId);
+
+        JsonNode.DeepEquals(transportOrder, PartnerApiSamples.ExpectedTransportOrder("full")).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("not JSON")]
+    [InlineData("""["a list, not a booking"]""")]
+    public void ToTransportOrder_TextThatIsNoBooking_GivesOnlyTheShipper(string partnerBooking)
+    {
+        // The map never rejects a booking: the TMS reports everything that is then missing, with its own codes.
+        var transportOrder = IntakeMap.ToTransportOrder(partnerBooking, ShipperId);
+
+        transportOrder.ToJsonString().Should().Be("""{"shipperId":"SHP-0001"}""");
+    }
+
+    [Fact]
     public void ToTransportOrder_ConvertedUnits_WritesNumbersWithoutTrailingZeros()
     {
         // The Logic App's run history shows the mapped message, so 2.5 t must read as 2500 kg, not 2500.0.
@@ -45,6 +66,17 @@ public sealed class IntakeMapTests
         country.Should().MatchRegex("^[A-Z]{2}$", $"the map should know the country {spelling}");
         var earliest = collection?["window"]?["earliest"];
         earliest.Should().NotBeNull($"the map should know the time zone of {spelling}");
+    }
+
+    [Fact]
+    public void Spellings_TheMapKnows_AreExactlyTheOnesTheBookingSchemaAllows()
+    {
+        // The two lists live apart until a second partner format needs countries too, so neither may drift from the other.
+        var schemaAllows = PartnerApiSamples.CountrySpellings().ToHashSet(StringComparer.Ordinal);
+        var mapKnows = Countries.Spellings.ToHashSet(StringComparer.Ordinal);
+
+        mapKnows.Except(schemaAllows).Should().BeEmpty("the booking schema should allow every spelling the map knows");
+        schemaAllows.Except(mapKnows).Should().BeEmpty("the map should know every spelling the booking schema allows");
     }
 
     [Fact]
