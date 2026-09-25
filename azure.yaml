@@ -8,6 +8,12 @@ services:
     project: ./src/Norvia.AppHost/Norvia.AppHost.csproj
     host: containerapp
 hooks:
+  # The estate goes first. azd asks for the AppHost's parameters, the estate's outputs, before it runs preprovision,
+  # so `azd up` deploys the estate in preup; `azd provision` on its own does it in preprovision.
+  preup:
+    shell: sh
+    run: ./infra/provision-estate.sh
+    interactive: true
   preprovision:
     shell: sh
     run: ./infra/provision-estate.sh

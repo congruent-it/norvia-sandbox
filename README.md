@@ -78,18 +78,17 @@ Needs the [Azure Developer CLI](https://aka.ms/azd) and the Azure CLI, both sign
 
 ```bash
 azd env new <environment> --subscription <subscription-id> --location <region>
-azd hooks run preprovision                   # the first time only: deploys the estate and stores its outputs
 AZD_UP_CONCURRENCY=1 azd up                  # one image at a time (see below)
 infra/smoke-test-intake.sh                   # after a deployment: checks intake end to end on the deployed TMS
 ```
 
-On an environment's first run, azd asks for the AppHost's parameters before it runs the preprovision hook. Those parameters are the estate's outputs, so run the hook once yourself first. Don't type in values for `estate_*` parameters: they are the names and IDs the estate creates. After that, `azd up` finds them in the environment.
+azd asks for the AppHost's parameters, which are the estate's outputs, before it runs the preprovision hook. So `azd up` also runs the estate hook as a preup hook, before anything else, and the preprovision run then sees the estate is already deployed. The hook needs the environment's subscription and region, so create the environment with both, as above. If azd still asks for an `estate_*` parameter, don't type in a value: they are the names and IDs the estate creates. Stop, run `azd hooks run preprovision`, and start `azd up` again.
 
 azd (1.33 and 1.34 at least) builds the AppHost's container images in parallel, and the builds share the .NET SDK's local cache of base-image layers. Two of them can then collide on the same cached layer (`CONTAINER1013 … being used by another process`), and azd cancels the rest. `AZD_UP_CONCURRENCY=1`, or `AZD_DEPLOY_CONCURRENCY=1` for `azd deploy`, builds one image at a time. azd reads both from the shell, not from the azd environment.
 
 `azd up` runs in three steps ([ADR 0004](docs/adr/0004-bicep-owns-the-estate-aspire-owns-the-apps.md)):
 
-1. The preprovision hook ([infra/provision-estate.sh](infra/provision-estate.sh)) deploys the estate, [infra/estate.bicep](infra/estate.bicep), into `rg-<environment>`. That covers the Service Bus namespace with the `transport-order-events` topic, Log Analytics and Application Insights, the TMS API's app registration with its intake role, and the intake Logic App's managed identity, which holds that role. The hook stores the estate's outputs in the azd environment as `AZURE_ESTATE_*`.
+1. The estate hook ([infra/provision-estate.sh](infra/provision-estate.sh)), run before `azd up` and before `azd provision`, deploys the estate, [infra/estate.bicep](infra/estate.bicep), into `rg-<environment>`. That covers the Service Bus namespace with the `transport-order-events` topic, Log Analytics and Application Insights, the TMS API's app registration with its intake role, and the intake Logic App's managed identity, which holds that role. The hook stores the estate's outputs in the azd environment as `AZURE_ESTATE_*`.
 2. azd provisions and deploys the apps from the AppHost into the same resource group: the Container Apps environment, the TMS API (reachable from outside the environment), the TMS UI (reachable only inside it), the migrations as a Container Apps job, and Azure SQL serverless on the free offer. In Azure the AppHost references the estate's Service Bus, workspace and Application Insights instead of creating its own. The TMS trusts only Entra tokens for its app registration, and only the intake Logic App's identity may submit. Its queries also need such a token until API Management's Shipper tracking role arrives (P8); Entra issues one only to a principal holding one of the TMS's roles.
 3. The postdeploy hook ([infra/migrate-tms.sh](infra/migrate-tms.sh)) runs the migrations job and fails the deployment if it fails. In Azure nothing makes the TMS wait for it, so on a first deployment the TMS logs failed outbox cycles until the schema exists.
 

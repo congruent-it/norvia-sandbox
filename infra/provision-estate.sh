@@ -1,6 +1,8 @@
 #!/bin/sh
-# azd preprovision hook: deploys the estate Bicep (ADR 0004), then stores its outputs in the azd environment as
-# AZURE_ESTATE_*, where azd looks up the AppHost's Estate parameters when it provisions the apps.
+# azd preup and preprovision hook: deploys the estate Bicep (ADR 0004), then stores its outputs in the azd environment
+# as AZURE_ESTATE_*, where azd looks up the AppHost's Estate parameters when it provisions the apps. It runs before
+# `azd up` too, because azd asks for those parameters before it runs the preprovision hook; `azd provision` on its own
+# runs it as preprovision.
 #
 # It deploys with the Azure CLI, which must be signed in to the same tenant as azd, as a user who may create app
 # registrations (the Entra ones are part of the estate).
@@ -9,6 +11,14 @@ cd "$(dirname "$0")"
 
 : "${AZURE_SUBSCRIPTION_ID:?Choose a subscription first: azd env set AZURE_SUBSCRIPTION_ID <id>}"
 : "${AZURE_LOCATION:?Choose a region first: azd env set AZURE_LOCATION <region>}"
+
+# In one `azd up` this runs twice, as preup and as preprovision, both times under the same azd process. The second
+# time the estate is already deployed.
+deployed_in_this_run="${TMPDIR:-/tmp}/norvia-estate-$AZURE_ENV_NAME-$PPID"
+if [ -n "$(find "$deployed_in_this_run" -mmin -180 2>/dev/null)" ]; then
+  echo "The Norvia estate is already deployed in this run of azd."
+  exit 0
+fi
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
@@ -36,3 +46,4 @@ jq -r 'to_entries[] | "\(.key | ascii_upcase) \(.value.value)"' "$work/outputs.j
 while read -r name value; do
   azd env set "AZURE_$name" "$value"
 done < "$work/outputs.env"
+touch "$deployed_in_this_run"
