@@ -8,8 +8,8 @@ param tags object
 @description('The presenter\'s Entra object ID, empty for none. The presenter is the one user who may open the demo UIs.')
 param presenterPrincipalId string
 
-@description('The demo UIs\' host names, comma separated, empty before the apps are first deployed.')
-param demoUiHosts string
+@description('Easy Auth\'s sign-in callbacks on the demo UIs, comma separated, empty before the apps are first deployed.')
+param demoUiRedirectUris string
 
 var intakeRole = 'TransportOrders.Intake'
 var intakeRoleId = guid('norvia-tms-api', environmentName, intakeRole)
@@ -192,8 +192,8 @@ resource demoUis 'Microsoft.Graph/applications@v1.0' = {
   displayName: 'Norvia demo UIs (${environmentName})'
   signInAudience: 'AzureADMyOrg'
   web: {
-    // Easy Auth's callback on each demo UI. The postdeploy hook adds them once Aspire has deployed the apps.
-    redirectUris: [for host in filter(split(demoUiHosts, ','), host => !empty(host)): 'https://${host}/.auth/login/aad/callback']
+    // The postdeploy hook adds them once Aspire has deployed the apps.
+    redirectUris: filter(split(demoUiRedirectUris, ','), uri => !empty(uri))
     implicitGrantSettings: {
       // Without a client secret Easy Auth asks for an ID token only, which a gate needs and nothing more.
       enableIdTokenIssuance: true

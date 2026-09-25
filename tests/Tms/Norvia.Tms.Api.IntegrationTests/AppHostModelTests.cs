@@ -9,6 +9,9 @@ namespace Norvia.Tms.Api.IntegrationTests;
 /// <summary>Checks the AppHost's resource model without starting anything, as it runs locally and as azd deploys it.</summary>
 public sealed class AppHostModelTests
 {
+    /// <summary>The UIs a presenter shows side by side, which have no login of their own (ADR 0024).</summary>
+    public static TheoryData<string> DemoUis => ["tms-web", "partner-portal-web"];
+
     [Fact]
     public async Task EveryTopic_HasASubscription_SoTheServiceBusEmulatorStarts()
     {
@@ -179,24 +182,20 @@ public sealed class AppHostModelTests
         await using var builder = await CreateForAzureAsync();
 
         // The intake Logic App runs outside the environment.
-        ((IResourceWithEndpoints)Resource(builder, "tms-api")).Annotations.OfType<EndpointAnnotation>()
-            .Should().Contain(endpoint => endpoint.IsExternal);
+        IsReachableFromOutsideTheContainerAppsEnvironment(builder, "tms-api").Should().BeTrue();
     }
 
     [Theory]
-    [InlineData("tms-web")]
-    [InlineData("partner-portal-web")]
+    [MemberData(nameof(DemoUis))]
     public async Task InAzure_ADemoUi_IsReachableFromThePresentersBrowser(string demoUi)
     {
         await using var builder = await CreateForAzureAsync();
 
-        ((IResourceWithEndpoints)Resource(builder, demoUi)).Annotations.OfType<EndpointAnnotation>()
-            .Should().Contain(endpoint => endpoint.IsExternal);
+        IsReachableFromOutsideTheContainerAppsEnvironment(builder, demoUi).Should().BeTrue();
     }
 
     [Theory]
-    [InlineData("tms-web")]
-    [InlineData("partner-portal-web")]
+    [MemberData(nameof(DemoUis))]
     public async Task InAzure_ADemoUi_IsBehindAnEntraSignIn_ForTheDemoUisAppRegistration(string demoUi)
     {
         await using var builder = await CreateForAzureAsync();
@@ -213,8 +212,7 @@ public sealed class AppHostModelTests
     }
 
     [Theory]
-    [InlineData("tms-web")]
-    [InlineData("partner-portal-web")]
+    [MemberData(nameof(DemoUis))]
     public async Task InAzure_ADemoUisHealthProbes_NeedNoSignIn(string demoUi)
     {
         await using var builder = await CreateForAzureAsync();
@@ -225,8 +223,7 @@ public sealed class AppHostModelTests
     }
 
     [Theory]
-    [InlineData("tms-web")]
-    [InlineData("partner-portal-web")]
+    [MemberData(nameof(DemoUis))]
     public async Task Locally_ADemoUi_HasNoSignIn(string demoUi)
     {
         await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(TestContext.Current.CancellationToken);
@@ -242,6 +239,9 @@ public sealed class AppHostModelTests
 
     private static IResource Resource(IDistributedApplicationTestingBuilder builder, string name) =>
         builder.Resources.Single(resource => resource.Name == name);
+
+    private static bool IsReachableFromOutsideTheContainerAppsEnvironment(IDistributedApplicationTestingBuilder builder, string name) =>
+        Resource(builder, name).Annotations.OfType<EndpointAnnotation>().Any(endpoint => endpoint.IsExternal);
 
     /// <summary>What the AppHost adds to the Bicep of the container app azd deploys for a resource.</summary>
     private static string ContainerAppBicepOf(IDistributedApplicationTestingBuilder builder, string name)

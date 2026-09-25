@@ -20,10 +20,10 @@ param integrationRetentionDays int = 90
 an event land on its topic, and is the one user who may open the demo UIs in Azure.''')
 param presenterPrincipalId string = ''
 
-@description('''The demo UIs' host names (the TMS UI and the Partner portal), comma separated, empty before the apps are first
-deployed. azd's postdeploy hook stores them, so their app registration keeps its redirect URIs when the estate is deployed
-again.''')
-param demoUiHosts string = ''
+@description('''Easy Auth's sign-in callbacks on the demo UIs (the TMS UI and the Partner portal), comma separated, empty before
+the apps are first deployed. azd's postdeploy hook stores them, so the demo UIs' app registration keeps them when the
+estate is deployed again.''')
+param demoUiRedirectUris string = ''
 
 @description('''The TMS API's address, empty before the apps are first deployed. azd's postdeploy hook stores it, so the intake
 Logic App keeps it when the estate is deployed again.''')
@@ -65,7 +65,7 @@ module identities 'estate/identities.bicep' = {
     location: location
     tags: tags
     presenterPrincipalId: presenterPrincipalId
-    demoUiHosts: demoUiHosts
+    demoUiRedirectUris: demoUiRedirectUris
   }
 }
 
