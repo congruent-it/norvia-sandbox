@@ -7,3 +7,4 @@ TestResults/
 coverage.cobertura.xml
 *.cobertura.xml
 .azure/
+.estate-outputs.json

@@ -27,11 +27,7 @@ public static class DependencyInjection
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        builder.Services.AddDbContext<TmsDbContext>(options =>
-            options.UseSqlServer(builder.Configuration.GetConnectionString(DatabaseConnectionName)));
-        builder.EnrichSqlServerDbContext<TmsDbContext>();
-
-        builder.Services.AddOptions<DatabaseOptions>().BindConfiguration(DatabaseOptions.SectionName);
+        builder.AddTmsDbContext();
         builder.Services.AddOptions<SeedOptions>().BindConfiguration(SeedOptions.SectionName)
             .ValidateDataAnnotations()
             .Validate(options => File.Exists(options.Path), "The seed file doesn't exist.")
@@ -40,13 +36,11 @@ public static class DependencyInjection
         builder.Services.AddOptions<TransportOrderRulesOptions>().BindConfiguration(TransportOrderRulesOptions.SectionName)
             .ValidateDataAnnotations().ValidateOnStart();
 
-        builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton(services =>
             new TransportOrderRules(services.GetRequiredService<IOptions<TransportOrderRulesOptions>>().Value.MaxTotalWeightKg));
         builder.Services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
         builder.Services.AddScoped(typeof(IReadRepository<>), typeof(EfRepository<>));
         builder.Services.AddScoped<IDomainEventDispatcher, MediatorDomainEventDispatcher>();
-        builder.Services.AddScoped<OutboxBuffer>();
         builder.Services.AddScoped<IOutbox>(services => services.GetRequiredService<OutboxBuffer>());
         builder.Services.AddScoped<ITransportOrderNumbers, SqlTransportOrderNumbers>();
         builder.Services.AddScoped<IPipelineBehavior<SubmitTransportOrderCommand, Result<SubmitTransportOrderResult>>, RetrySubmissionThatLostARace>();
@@ -71,15 +65,37 @@ public static class DependencyInjection
         return builder;
     }
 
-    /// <summary>Applies pending migrations when <see cref="DatabaseOptions.MigrateOnStartup"/> is on.</summary>
+    /// <summary>
+    /// Registers what applying the TMS's migrations needs, and nothing else: migrations change the schema, never an
+    /// aggregate, so no domain event is dispatched.
+    /// </summary>
+    public static IHostApplicationBuilder AddTmsDatabaseMigrations(this IHostApplicationBuilder builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.AddTmsDbContext();
+        builder.Services.AddSingleton<IDomainEventDispatcher, NoDomainEvents>();
+
+        return builder;
+    }
+
+    /// <summary>
+    /// Applies pending migrations. Only the TMS migrations run this, as a deployment step, never the TMS itself at
+    /// startup (coding guidelines §5).
+    /// </summary>
     public static async Task MigrateTmsDatabaseAsync(this IServiceProvider services, CancellationToken cancellationToken = default)
     {
         await using var scope = services.CreateAsyncScope();
-        if (!scope.ServiceProvider.GetRequiredService<IOptions<DatabaseOptions>>().Value.MigrateOnStartup)
-        {
-            return;
-        }
-
         await scope.ServiceProvider.GetRequiredService<TmsDbContext>().Database.MigrateAsync(cancellationToken);
+    }
+
+    /// <summary>The <see cref="TmsDbContext"/> and what it is built with, apart from its domain event dispatcher.</summary>
+    private static void AddTmsDbContext(this IHostApplicationBuilder builder)
+    {
+        builder.Services.AddDbContext<TmsDbContext>(options =>
+            options.UseSqlServer(builder.Configuration.GetConnectionString(DatabaseConnectionName)));
+        builder.EnrichSqlServerDbContext<TmsDbContext>();
+        builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddScoped<OutboxBuffer>();
     }
 }

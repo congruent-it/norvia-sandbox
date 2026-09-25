@@ -12,7 +12,7 @@ Transport Order intake takes a Shipper's booking into the TMS and accepts or rej
 
 ## Channels
 
-The intake API records the intake channel each Transport Order came from, and it is readable on the Transport Order through the query side. The channel follows from who calls: the TMS setting `IntakeCallers:ChannelByClientId` maps each caller's client ID (the token's `azp`, or `appid` in a v1 token) to its channel, so a caller can't submit for a channel that isn't its own. In Azure the intake Logic App's managed identity is the only caller on the Shipper API channel.
+The intake API records the intake channel each Transport Order came from, and it is readable on the Transport Order through the query side. The channel follows from who calls: the TMS setting `IntakeCallers:ClientIdsByChannel` lists the client IDs (the token's `azp`, or `appid` in a v1 token) that may call for each channel, each client ID on one channel only, so a caller can't submit for a channel that isn't its own. In Azure the intake Logic App's managed identity is the only caller on the Shipper API channel.
 
 | Channel | Value | Service | Status |
 |---|---|---|---|

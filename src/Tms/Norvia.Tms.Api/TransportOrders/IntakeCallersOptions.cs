@@ -3,13 +3,19 @@ using Norvia.Tms.Domain.TransportOrders;
 namespace Norvia.Tms.Api.TransportOrders;
 
 /// <summary>
-/// The callers that may submit Transport Orders, each for its own intake channel, keyed by the client ID in their token
-/// (<c>azp</c>, or <c>appid</c> in a v1 token). In Azure the intake Logic App's managed identity is the one caller on
-/// the Shipper API channel, so a caller can't choose the channel it submits for.
+/// The callers that may submit Transport Orders for each intake channel, by the client ID in their token (<c>azp</c>,
+/// or <c>appid</c> in a v1 token). A caller is registered for one channel only, so it can't choose the channel it
+/// submits for. In Azure the intake Logic App's managed identity is the one caller on the Shipper API channel.
 /// </summary>
 public sealed class IntakeCallersOptions
 {
     public const string SectionName = "IntakeCallers";
 
-    public Dictionary<string, IntakeChannel> ChannelByClientId { get; init; } = [];
+    public Dictionary<IntakeChannel, string[]> ClientIdsByChannel { get; init; } = [];
+
+    /// <summary>Whether no client ID is listed twice, on one channel or on two, in any case.</summary>
+    public bool RegistersEachCallerOnce() =>
+        ClientIdsByChannel.Values.SelectMany(clientIds => clientIds)
+            .CountBy(clientId => clientId, StringComparer.OrdinalIgnoreCase)
+            .All(registrations => registrations.Value == 1);
 }

@@ -39,7 +39,8 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
     .ValidateOnStart();
 builder.Services.AddAuthorization();
 builder.Services.AddOptions<IntakeCallersOptions>().BindConfiguration(IntakeCallersOptions.SectionName)
-    .Validate(options => options.ChannelByClientId.Count > 0, "No caller is registered for an intake channel.")
+    .Validate(options => options.ClientIdsByChannel.Values.Any(clientIds => clientIds.Length > 0), "No caller is registered for an intake channel.")
+    .Validate(options => options.RegistersEachCallerOnce(), "A caller is registered more than once.")
     .ValidateOnStart();
 builder.Services.AddSingleton<IntakeCallers>();
 
@@ -94,7 +95,6 @@ if (app.Environment.IsDevelopment())
 app.MapDefaultEndpoints();
 app.MapTransportOrders();
 
-await app.Services.MigrateTmsDatabaseAsync();
 await app.RunAsync();
 
 static bool HasAny(string? one, IEnumerable<string>? many) =>

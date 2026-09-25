@@ -1,5 +1,4 @@
 using System.Diagnostics.CodeAnalysis;
-using Ardalis.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Norvia.Tms.Infrastructure.Outbox;
@@ -12,9 +11,4 @@ internal sealed class TmsDbContextDesignTimeFactory : IDesignTimeDbContextFactor
     public TmsDbContext CreateDbContext(string[] args) =>
         new(new DbContextOptionsBuilder<TmsDbContext>().UseSqlServer("Server=design-time;Database=tms").Options, new NoDomainEvents(),
             new OutboxBuffer(TimeProvider.System));
-
-    private sealed class NoDomainEvents : IDomainEventDispatcher
-    {
-        public Task DispatchAndClearEvents(IEnumerable<IHasDomainEvents> entitiesWithEvents) => Task.CompletedTask;
-    }
 }
