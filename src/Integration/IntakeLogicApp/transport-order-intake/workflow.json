@@ -20,16 +20,72 @@
       }
     },
     "actions": {
+      "Refuse_a_caller_other_than_API_Management": {
+        "type": "If",
+        "expression": {
+          "and": [
+            {
+              "equals": [
+                "@triggerOutputs()?['headers']?['X-MS-CLIENT-PRINCIPAL-ID']",
+                "@parameters('apiManagementPrincipalId')"
+              ]
+            }
+          ]
+        },
+        "actions": {},
+        "else": {
+          "actions": {
+            "Refuse_the_caller": {
+              "type": "Response",
+              "kind": "Http",
+              "inputs": {
+                "statusCode": 403,
+                "headers": {
+                  "X-Correlation-ID": "@{triggerOutputs()?['headers']?['X-Correlation-ID']}"
+                },
+                "body": "Only API Management may call this workflow."
+              },
+              "runAfter": {},
+              "trackedProperties": {
+                "correlationId": "@action()?['inputs']?['headers']?['X-Correlation-ID']",
+                "flow": "transport-order-intake",
+                "outcome": "Refused",
+                "failureCode": "CallerNotApiManagement"
+              }
+            },
+            "Fail_the_run_the_caller_is_not_API_Management": {
+              "type": "Terminate",
+              "inputs": {
+                "runStatus": "Failed",
+                "runError": {
+                  "code": "CallerNotApiManagement",
+                  "message": "The workflow was called other than through API Management, so nothing was mapped or sent to the TMS."
+                }
+              },
+              "runAfter": {
+                "Refuse_the_caller": [
+                  "Succeeded"
+                ]
+              }
+            }
+          }
+        },
+        "runAfter": {}
+      },
       "Map_the_booking": {
         "type": "InvokeFunction",
         "inputs": {
           "functionName": "MapPartnerBooking",
           "parameters": {
-            "partnerBooking": "@{triggerBody()}",
+            "partnerBooking": "@{base64(triggerBody())}",
             "shipperId": "@{triggerOutputs()?['headers']?['X-Shipper-ID']}"
           }
         },
-        "runAfter": {}
+        "runAfter": {
+          "Refuse_a_caller_other_than_API_Management": [
+            "Succeeded"
+          ]
+        }
       },
       "Submit_to_the_TMS": {
         "type": "Http",
@@ -76,7 +132,7 @@
             "tmsStatusCode": "@coalesce(actions('Submit_to_the_TMS')?['outputs']?['statusCode'], 0)",
             "tmsResponse": "@{coalesce(actions('Submit_to_the_TMS')?['outputs']?['body'], '')}",
             "correlationId": "@{triggerOutputs()?['headers']?['X-Correlation-ID']}",
-            "partnerBooking": "@{triggerBody()}"
+            "partnerBooking": "@{base64(triggerBody())}"
           }
         },
         "runAfter": {

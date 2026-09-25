@@ -24,5 +24,6 @@
     <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\responses\*.json" LogicalName="PartnerApi/samples/responses/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\src\Integration\IntakeLogicApp\*.json" LogicalName="IntakeLogicApp/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\src\Integration\IntakeLogicApp\transport-order-intake\workflow.json" LogicalName="IntakeLogicApp/transport-order-intake/workflow.json" />
+    <EmbeddedResource Include="..\..\..\infra\estate\partner-api\*.policy.xml" LogicalName="PartnerApiPolicies/%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

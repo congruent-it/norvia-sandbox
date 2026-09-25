@@ -279,6 +279,10 @@ _Avoid_: admin portal, monitoring portal, dashboard
 The single application that plays every party outside Norvia (Shippers and Carriers) in demos, with one persona per party. It reaches Norvia only through API Management.
 _Avoid_: shipper portal, carrier portal, external app
 
+**Norvia Partner API**:
+The API that Shippers and Carriers call Norvia through, in API Management. A partner calls it with a subscription key and an Entra token for its own client app; the token, never the payload, says which party it is. Its booking operation is the TMS's Shipper API intake channel.
+_Avoid_: Shipper API (that is the intake channel), gateway, public API
+
 **Persona**:
 One fictional party (a specific Shipper or Carrier) as played in the Partner portal, with its own identity towards Norvia.
 _Avoid_: user, role, tenant

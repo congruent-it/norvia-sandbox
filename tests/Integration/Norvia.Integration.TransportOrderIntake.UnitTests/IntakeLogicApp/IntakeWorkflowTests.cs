@@ -31,6 +31,54 @@ public sealed class IntakeWorkflowTests
     }
 
     [Fact]
+    public void CallerCheck_RefusesACallerOtherThanApiManagementBeforeAnythingElse()
+    {
+        // Easy Auth lets only API Management's identity through, but a SAS-signed callback URL skips it; then Easy Auth
+        // sets no client principal (App Service strips one a caller sends).
+        var check = IntakeWorkflow.Action(IntakeWorkflow.CallerCheck);
+
+        check["type"]!.GetValue<string>().Should().Be("If");
+        check["runAfter"]!.AsObject().Should().BeEmpty();
+        JsonNode.DeepEquals(check["expression"], new JsonObject
+        {
+            ["and"] = new JsonArray(new JsonObject
+            {
+                ["equals"] = new JsonArray(
+                    "@triggerOutputs()?['headers']?['X-MS-CLIENT-PRINCIPAL-ID']",
+                    "@parameters('apiManagementPrincipalId')"),
+            }),
+        }).Should().BeTrue();
+        IntakeWorkflow.Action("Map_the_booking")["runAfter"]![IntakeWorkflow.CallerCheck]!.AsArray()
+            .Select(status => status!.GetValue<string>()).Should().BeEquivalentTo("Succeeded");
+    }
+
+    [Fact]
+    public void CallerCheck_AnswersAnotherCaller403AndFailsTheRunAsRefused()
+    {
+        var refusal = IntakeWorkflow.Action(IntakeWorkflow.CallerCheck)["else"]!["actions"]!.AsObject();
+        var answer = refusal.Select(action => action.Value!).Single(action => action["type"]!.GetValue<string>() == "Response");
+        var end = refusal.Select(action => action.Value!).Single(action => action["type"]!.GetValue<string>() == "Terminate");
+
+        IntakeWorkflow.Action(IntakeWorkflow.CallerCheck)["actions"]!.AsObject().Should().BeEmpty();
+        answer["inputs"]!["statusCode"]!.GetValue<int>().Should().Be(403);
+        end["inputs"]!["runStatus"]!.GetValue<string>().Should().Be("Failed");
+        end["inputs"]!["runError"]!["code"]!.GetValue<string>().Should().Be("CallerNotApiManagement");
+    }
+
+    [Fact]
+    public void CallerCheck_TracksTheRefusalWithTheKeysOfTheTrackingContract()
+    {
+        var answer = IntakeWorkflow.Action("Refuse_the_caller");
+        var tracked = answer["trackedProperties"]!.AsObject();
+
+        tracked.Select(property => property.Key).Should().BeEquivalentTo("correlationId", "flow", "outcome", "failureCode");
+        tracked["correlationId"]!.GetValue<string>().Should().Be("@action()?['inputs']?['headers']?['X-Correlation-ID']");
+        tracked["flow"]!.GetValue<string>().Should().Be(Flow);
+        tracked["outcome"]!.GetValue<string>().Should().Be("Refused");
+        tracked["failureCode"]!.GetValue<string>().Should().Be("CallerNotApiManagement");
+    }
+
+    [Fact]
     public void MapTheBooking_CallsTheIntakeMapWithTheBookingAndTheShipperFromTheHeader()
     {
         var map = IntakeWorkflow.Action("Map_the_booking");
@@ -39,9 +87,20 @@ public sealed class IntakeWorkflowTests
         map["inputs"]!["functionName"]!.GetValue<string>().Should().Be("MapPartnerBooking");
         JsonNode.DeepEquals(map["inputs"]!["parameters"], new JsonObject
         {
-            ["partnerBooking"] = "@{triggerBody()}",
+            ["partnerBooking"] = "@{base64(triggerBody())}",
             ["shipperId"] = "@{triggerOutputs()?['headers']?['X-Shipper-ID']}",
         }).Should().BeTrue();
+    }
+
+    [Fact]
+    public void LocalFunctions_GetTheBookingEncoded_SoItsFieldsCantStandInForTheirParameters()
+    {
+        // The Functions runtime reads the fields of a parameter that holds JSON text as parameters too: a booking with
+        // a shipperId field would then choose the Shipper (ADR 0005). Base64 text has no fields.
+        foreach (var (name, operation) in IntakeWorkflow.Operations().Where(operation => operation.Operation["type"]?.GetValue<string>() == "InvokeFunction"))
+        {
+            operation["inputs"]!["parameters"]!["partnerBooking"]!.GetValue<string>().Should().Be("@{base64(triggerBody())}", name);
+        }
     }
 
     [Fact]
@@ -122,7 +181,7 @@ public sealed class IntakeWorkflowTests
             ["tmsStatusCode"] = "@coalesce(actions('Submit_to_the_TMS')?['outputs']?['statusCode'], 0)",
             ["tmsResponse"] = "@{coalesce(actions('Submit_to_the_TMS')?['outputs']?['body'], '')}",
             ["correlationId"] = "@{triggerOutputs()?['headers']?['X-Correlation-ID']}",
-            ["partnerBooking"] = "@{triggerBody()}",
+            ["partnerBooking"] = "@{base64(triggerBody())}",
         }).Should().BeTrue();
     }
 
@@ -177,7 +236,7 @@ public sealed class IntakeWorkflowTests
         // The estate sets them for the deployed Logic App; nothing environment-specific is in source.
         var parameters = IntakeWorkflow.ParametersFile;
 
-        parameters.Select(parameter => parameter.Key).Should().BeEquivalentTo("tmsBaseUrl", "tmsAudience", "intakeIdentityId");
+        parameters.Select(parameter => parameter.Key).Should().BeEquivalentTo("tmsBaseUrl", "tmsAudience", "intakeIdentityId", "apiManagementPrincipalId");
         foreach (var (name, parameter) in parameters)
         {
             parameter!["value"]!.GetValue<string>().Should().StartWith("@appsetting('", $"{name} comes from an app setting");

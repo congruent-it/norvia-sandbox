@@ -45,9 +45,25 @@ Any other client error from the TMS (400, 401 or 403, for example) means the int
 
 An answer the Logic App can't pass on in full, such as an acceptance without a Transport Order number or a rejection without its reasons, is also `NOT_RECEIVED`, because relaying part of it would change its meaning.
 
+## Calling the Norvia Partner API
+
+A Shipper submits a booking with `POST {partner API URL}/transport-orders`, where the URL is the estate's output `ESTATE_PARTNER_API_URL` (`https://<API Management>.azure-api.net/partner/v1`). Every call carries:
+
+| Header | Holds |
+|---|---|
+| `Ocp-Apim-Subscription-Key` | The partner's subscription key for the *Norvia partners* product. There is one subscription per Persona, named after it |
+| `Authorization` | `Bearer` and an Entra v2.0 token for the Norvia Partner API, requested as the Persona's client app with the scope `<Norvia Partner API client ID>/.default`. Only a token holding the app role `TransportOrders.Submit` may submit |
+
+API Management answers these calls itself, before any Logic App runs. Each answer carries the correlation ID in `X-Correlation-ID`, by which Norvia finds the refused call:
+
+| HTTP status | When | Body |
+|---|---|---|
+| 401 | The subscription key or the token is missing, or isn't valid for the Norvia Partner API | API Management's own error |
+| 403 | The token is valid but lacks the role `TransportOrders.Submit`, as a Carrier's does, or names a client that is no Shipper | `messageId` (the correlation ID) and `text` |
+
 ## How API Management calls the intake Logic App
 
-API Management passes the booking to the intake Logic App's HTTP trigger as the Shipper sent it (`POST`, the booking as the body), with two headers of its own:
+API Management passes the booking to the intake Logic App's HTTP trigger as the Shipper sent it (`POST`, the booking as the body), with two headers of its own. It calls the trigger without a SAS signature, with a token of its own managed identity, and replaces any of these headers the Shipper sent:
 
 | Header | Holds |
 |---|---|
@@ -55,6 +71,8 @@ API Management passes the booking to the intake Logic App's HTTP trigger as the 
 | `X-Correlation-ID` | The correlation ID API Management created at the edge. It becomes the run's client tracking ID and the answer's `messageId` |
 
 The Logic App answers with the response above, and returns the correlation ID in the `X-Correlation-ID` header too.
+
+The trigger accepts only API Management. Easy Auth lets through only a token of API Management's identity, and the workflow's first step answers 403 to any call Easy Auth didn't authenticate as that identity, such as one through a SAS-signed callback URL. That run fails with the code `CallerNotApiManagement`, before anything is mapped or sent to the TMS.
 
 ## Samples
 

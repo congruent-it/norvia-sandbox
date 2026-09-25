@@ -13,7 +13,8 @@ The map never rejects a booking. A value it can't read (an unknown country, a da
 ## Consequences
 
 - The map project targets `net8.0`, the only .NET version Logic Apps local functions run on, while the rest of the solution targets .NET 10. The tests run it on .NET 10.
-- The map reads IANA time zone IDs (`Europe/Amsterdam`). On Windows, which Logic Apps Standard runs on, .NET finds them through ICU, so the Logic App must not run in invariant globalization mode.
+- The map reads IANA time zone IDs (`Europe/Amsterdam`), and each country also carries its Windows time zone ID (`W. Europe Standard Time`). On the Windows host Logic Apps Standard runs on, .NET finds no IANA time zone, so the map falls back to the Windows one. A test checks each Windows ID against the IANA one with the test machine's time zone data.
+- The Functions runtime reads the fields of a parameter that holds JSON text as parameters too, so a booking field named like a parameter (`shipperId`) would take its place. The workflow therefore passes the booking to the functions base64-encoded; the run history shows it readable on the trigger.
 - The function wrapper, `Norvia.Integration.TransportOrderIntake.Functions`, came with the intake Logic App (#25). Building it writes the functions into the Logic App project's `lib/custom` folder. The map itself has no dependency on the Logic Apps SDK.
 - The relay of the TMS's outcome to the partner format is .NET code in the map's library too, run as a local function, so it can be tested in CI as well. Logic Apps' own test SDK runs workflows only on Windows, so the workflow is kept thin and CI checks its definition, not its runs.
 - Changing the map is a code change that needs a build and deployment of the Logic App, not a map upload.

@@ -16,7 +16,9 @@ internal static class LocalTimes
             return null;
         }
 
-        var timeZone = TimeZoneInfo.FindSystemTimeZoneById(country.TimeZoneId);
+        var timeZone = TimeZoneInfo.TryFindSystemTimeZoneById(country.TimeZoneId, out var ianaTimeZone)
+            ? ianaTimeZone
+            : TimeZoneInfo.FindSystemTimeZoneById(country.WindowsTimeZoneId);
         var utc = local - timeZone.GetUtcOffset(local);
         return utc.ToString(CanonicalFormat, CultureInfo.InvariantCulture);
     }

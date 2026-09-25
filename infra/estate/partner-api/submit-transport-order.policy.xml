@@ -1,0 +1,105 @@
+<policies>
+  <inbound>
+    <base />
+    <set-variable name="correlationId" value="@(Guid.NewGuid().ToString())" />
+    <validate-azure-ad-token tenant-id="{{entra-tenant-id}}" output-token-variable-name="partnerToken">
+      <audiences>
+        <audience>{{partner-api-client-id}}</audience>
+      </audiences>
+    </validate-azure-ad-token>
+    <choose>
+      <when condition="@(!((Jwt)context.Variables[&quot;partnerToken&quot;]).Claims.GetValueOrDefault(&quot;roles&quot;, &quot;&quot;).Split(',').Contains(&quot;TransportOrders.Submit&quot;))">
+        <trace source="norvia-partner-api" severity="information">
+          <message>This client may not submit Transport Orders.</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="transport-order-intake" />
+          <metadata name="outcome" value="Refused" />
+          <metadata name="failureCode" value="NotAllowedToSubmit" />
+        </trace>
+        <return-response>
+          <set-status code="403" reason="Forbidden" />
+          <set-header name="X-Correlation-ID" exists-action="override">
+            <value>@((string)context.Variables["correlationId"])</value>
+          </set-header>
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+          </set-header>
+          <set-body>@(new JObject(
+            new JProperty("messageId", (string)context.Variables["correlationId"]),
+            new JProperty("text", "This client may not submit Transport Orders.")).ToString())</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <set-variable name="shipperId" value="@{
+      var clientId = ((Jwt)context.Variables[&quot;partnerToken&quot;]).Claims.GetValueOrDefault(&quot;azp&quot;, &quot;&quot;);
+      foreach (var entry in &quot;{{shippers-by-client-id}}&quot;.Split(';'))
+      {
+        var pair = entry.Split('=');
+        if (pair.Length == 2 &amp;&amp; pair[0] == clientId) { return pair[1]; }
+      }
+      return &quot;&quot;;
+    }" />
+    <choose>
+      <when condition="@(string.IsNullOrEmpty((string)context.Variables[&quot;shipperId&quot;]))">
+        <trace source="norvia-partner-api" severity="information">
+          <message>No Shipper is registered for this client.</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="transport-order-intake" />
+          <metadata name="outcome" value="Refused" />
+          <metadata name="failureCode" value="NoShipperForClient" />
+        </trace>
+        <return-response>
+          <set-status code="403" reason="Forbidden" />
+          <set-header name="X-Correlation-ID" exists-action="override">
+            <value>@((string)context.Variables["correlationId"])</value>
+          </set-header>
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+          </set-header>
+          <set-body>@(new JObject(
+            new JProperty("messageId", (string)context.Variables["correlationId"]),
+            new JProperty("text", "No Shipper is registered for this client.")).ToString())</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <set-header name="X-Shipper-ID" exists-action="override">
+      <value>@((string)context.Variables["shipperId"])</value>
+    </set-header>
+    <set-header name="X-Correlation-ID" exists-action="override">
+      <value>@((string)context.Variables["correlationId"])</value>
+    </set-header>
+    <trace source="norvia-partner-api" severity="information">
+      <message>Passed to the intake Logic App</message>
+      <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+      <metadata name="flow" value="transport-order-intake" />
+      <metadata name="partyId" value="@((string)context.Variables[&quot;shipperId&quot;])" />
+    </trace>
+    <set-backend-service backend-id="intake-logic-app" />
+    <rewrite-uri template="/api/transport-order-intake/triggers/When_a_Shipper_books/invoke" copy-unmatched-params="false" />
+    <set-query-parameter name="api-version" exists-action="override">
+      <value>2022-05-01</value>
+    </set-query-parameter>
+    <authentication-managed-identity resource="{{intake-trigger-audience}}" client-id="{{api-management-identity-client-id}}" />
+  </inbound>
+  <backend>
+    <base />
+  </backend>
+  <outbound>
+    <base />
+  </outbound>
+  <on-error>
+    <base />
+    <!-- API Management checks the subscription key before the inbound section runs. -->
+    <set-variable name="correlationId" value="@(context.Variables.ContainsKey(&quot;correlationId&quot;) ? (string)context.Variables[&quot;correlationId&quot;] : Guid.NewGuid().ToString())" />
+    <trace source="norvia-partner-api" severity="information">
+      <message>@(context.LastError.Message)</message>
+      <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+      <metadata name="flow" value="transport-order-intake" />
+      <metadata name="outcome" value="@(context.Response.StatusCode == 401 || context.Response.StatusCode == 403 ? &quot;Refused&quot; : &quot;Failed&quot;)" />
+      <metadata name="failureCode" value="@(string.IsNullOrEmpty(context.LastError.Reason) ? context.LastError.Source : context.LastError.Reason)" />
+    </trace>
+    <set-header name="X-Correlation-ID" exists-action="override">
+      <value>@((string)context.Variables["correlationId"])</value>
+    </set-header>
+  </on-error>
+</policies>
