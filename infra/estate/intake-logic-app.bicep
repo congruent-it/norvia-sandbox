@@ -17,6 +17,14 @@ param tmsBaseUrl string
 
 param applicationInsightsName string
 
+@description('API Management\'s identity, the one caller the trigger accepts.')
+param apiManagementPrincipalId string
+param apiManagementClientId string
+
+@description('The app registration Easy Auth validates API Management\'s tokens for, and its audience.')
+param intakeTriggerClientId string
+param intakeTriggerAudience string
+
 var resourceToken = uniqueString(resourceGroup().id)
 var logicAppName = 'logic-intake-${resourceToken}'
 var contentShareName = logicAppName
@@ -178,6 +186,7 @@ resource logicApp 'Microsoft.Web/sites@2024-11-01' = {
         { name: 'TMS_BASE_URL', value: tmsBaseUrl }
         { name: 'TMS_API_CLIENT_ID', value: tmsApiClientId }
         { name: 'INTAKE_IDENTITY_ID', value: intakeIdentity.id }
+        { name: 'API_MANAGEMENT_PRINCIPAL_ID', value: apiManagementPrincipalId }
       ]
     }
   }
@@ -188,4 +197,51 @@ resource logicApp 'Microsoft.Web/sites@2024-11-01' = {
   ]
 }
 
+// Only API Management may call the trigger (ADR 0005, ADR 0020): Easy Auth accepts a token of its identity alone. Easy Auth lets
+// other calls through to the runtime, which is what Logic Apps needs, and a SAS-signed callback URL still works; the
+// workflow's first step refuses any caller Easy Auth didn't authenticate as API Management.
+resource easyAuth 'Microsoft.Web/sites/config@2024-11-01' = {
+  parent: logicApp
+  name: 'authsettingsV2'
+  properties: {
+    platform: {
+      enabled: true
+    }
+    globalValidation: {
+      requireAuthentication: true
+      // Logic Apps needs this: with Return401 the portal can't show the workflow.
+      unauthenticatedClientAction: 'AllowAnonymous'
+    }
+    httpSettings: {
+      requireHttps: true
+    }
+    identityProviders: {
+      azureActiveDirectory: {
+        enabled: true
+        registration: {
+          openIdIssuer: '${environment().authentication.loginEndpoint}${tenant().tenantId}/v2.0'
+          clientId: intakeTriggerClientId
+        }
+        validation: {
+          allowedAudiences: [
+            intakeTriggerAudience
+            intakeTriggerClientId
+          ]
+          defaultAuthorizationPolicy: {
+            allowedApplications: [
+              apiManagementClientId
+            ]
+            allowedPrincipals: {
+              identities: [
+                apiManagementPrincipalId
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 output logicAppName string = logicApp.name
+output logicAppHostName string = logicApp.properties.defaultHostName

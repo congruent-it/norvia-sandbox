@@ -7,6 +7,8 @@ internal static class IntakeWorkflow
 {
     public const string TmsCall = "Submit_to_the_TMS";
 
+    public const string CallerCheck = "Refuse_a_caller_other_than_API_Management";
+
     private static readonly Lazy<JsonObject> WorkflowFile = new(() => Read("IntakeLogicApp/transport-order-intake/workflow.json"));
 
     public static JsonObject Definition => WorkflowFile.Value["definition"]!.AsObject();

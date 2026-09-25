@@ -10,5 +10,9 @@
   "intakeIdentityId": {
     "type": "String",
     "value": "@appsetting('INTAKE_IDENTITY_ID')"
+  },
+  "apiManagementPrincipalId": {
+    "type": "String",
+    "value": "@appsetting('API_MANAGEMENT_PRINCIPAL_ID')"
   }
 }

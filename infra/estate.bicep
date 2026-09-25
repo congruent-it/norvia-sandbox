@@ -72,6 +72,25 @@ module intakeLogicApp 'estate/intake-logic-app.bicep' = {
     tmsApiClientId: identities.outputs.tmsApiClientId
     tmsBaseUrl: tmsBaseUrl
     applicationInsightsName: monitoring.outputs.applicationInsightsName
+    apiManagementPrincipalId: identities.outputs.apiManagementPrincipalId
+    apiManagementClientId: identities.outputs.apiManagementClientId
+    intakeTriggerClientId: identities.outputs.intakeTriggerClientId
+    intakeTriggerAudience: identities.outputs.intakeTriggerAudience
+  }
+}
+
+module partnerApi 'estate/partner-api.bicep' = {
+  scope: resourceGroup
+  params: {
+    location: location
+    tags: tags
+    apiManagementIdentityName: identities.outputs.apiManagementIdentityName
+    partnerApiClientId: identities.outputs.partnerApiClientId
+    shippersByClientId: join(filter(identities.outputs.shipperByClientId, entry => !empty(entry)), ';')
+    personaClientIds: identities.outputs.personaClientIds
+    intakeLogicAppHostName: intakeLogicApp.outputs.logicAppHostName
+    intakeTriggerAudience: identities.outputs.intakeTriggerAudience
+    applicationInsightsName: monitoring.outputs.applicationInsightsName
   }
 }
 
@@ -84,3 +103,9 @@ output ESTATE_TMS_API_CLIENT_ID string = identities.outputs.tmsApiClientId
 output ESTATE_INTAKE_CLIENT_ID string = identities.outputs.intakeClientId
 output ESTATE_INTAKE_IDENTITY_ID string = identities.outputs.intakeIdentityId
 output ESTATE_INTAKE_LOGIC_APP string = intakeLogicApp.outputs.logicAppName
+output ESTATE_API_MANAGEMENT string = partnerApi.outputs.apiManagementName
+output ESTATE_PARTNER_API_URL string = partnerApi.outputs.partnerApiUrl
+output ESTATE_PARTNER_API_CLIENT_ID string = identities.outputs.partnerApiClientId
+output ESTATE_PERSONA_CLIENT_IDS string = join(identities.outputs.personaClientIds, ';')
+output ESTATE_PARTNER_PORTAL_IDENTITY_ID string = identities.outputs.partnerPortalIdentityId
+output ESTATE_PARTNER_PORTAL_CLIENT_ID string = identities.outputs.partnerPortalClientId
