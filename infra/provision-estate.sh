@@ -1,6 +1,6 @@
 #!/bin/sh
 # azd preup and preprovision hook: deploys the estate Bicep (ADR 0004), then stores its outputs in the azd environment
-# as AZURE_ESTATE_*, where azd looks up the AppHost's Estate parameters when it provisions the apps. It runs before
+# where azd looks up the AppHost's Estate parameters when it provisions and deploys the apps. It runs before
 # `azd up` too, because azd asks for those parameters before it runs the preprovision hook; `azd provision` on its own
 # runs it as preprovision.
 #
@@ -43,7 +43,10 @@ for attempt in 1 2 3; do
 done
 
 jq -r 'to_entries[] | "\(.key | ascii_upcase) \(.value.value)"' "$work/outputs.json" > "$work/outputs.env"
+# Provisioning finds an Estate parameter as AZURE_<NAME> in the azd environment, but deploying, which puts some of them
+# straight into the apps' settings, reads them only from the environment's config as infra.parameters.<name>.
 while read -r name value; do
   azd env set "AZURE_$name" "$value"
+  azd env config set "infra.parameters.$(echo "$name" | tr '[:upper:]' '[:lower:]')" "$value"
 done < "$work/outputs.env"
 touch "$deployed_in_this_run"
