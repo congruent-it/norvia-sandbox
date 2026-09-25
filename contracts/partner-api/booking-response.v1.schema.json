@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/partner-api/booking-response.v1.schema.json",
+  "title": "BookingResponse",
+  "description": "Norvia's answer to a booking sent to the Norvia Partner API (version 1). The result says which of the four answers it is; each comes with its own HTTP status, listed in the Partner API README.",
+  "type": "object",
+  "required": ["result", "messageId"],
+  "properties": {
+    "result": { "enum": ["ACCEPTED", "ALREADY_BOOKED", "REJECTED", "NOT_RECEIVED"] },
+    "messageId": {
+      "description": "Norvia's ID for this attempt (the correlation ID). Quote it when asking Norvia about the booking.",
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/accepted" },
+    { "$ref": "#/$defs/alreadyBooked" },
+    { "$ref": "#/$defs/rejected" },
+    { "$ref": "#/$defs/notReceived" }
+  ],
+  "$defs": {
+    "bookingRef": {
+      "description": "The Shipper's reference from the booking, when it had one.",
+      "type": "string"
+    },
+    "norviaOrderNo": {
+      "description": "Norvia's order number for the booking. Quote it in later contact with Norvia.",
+      "type": "string",
+      "pattern": "^TO-[0-9]{7}$"
+    },
+    "accepted": {
+      "description": "HTTP 201. Norvia accepted the booking and gave it an order number.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result", "messageId", "norviaOrderNo"],
+      "properties": {
+        "result": { "const": "ACCEPTED" },
+        "messageId": true,
+        "bookingRef": { "$ref": "#/$defs/bookingRef" },
+        "norviaOrderNo": { "$ref": "#/$defs/norviaOrderNo" }
+      }
+    },
+    "alreadyBooked": {
+      "description": "HTTP 200. Norvia already has this booking (the same reference with the same content) and returns its original order number. Nothing new was booked.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result", "messageId", "norviaOrderNo"],
+      "properties": {
+        "result": { "const": "ALREADY_BOOKED" },
+        "messageId": true,
+        "bookingRef": { "$ref": "#/$defs/bookingRef" },
+        "norviaOrderNo": { "$ref": "#/$defs/norviaOrderNo" }
+      }
+    },
+    "rejected": {
+      "description": "HTTP 422. Norvia did not accept the booking, for every reason listed. Fix them all and send the booking again; the same reference may be used.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result", "messageId", "errors"],
+      "properties": {
+        "result": { "const": "REJECTED" },
+        "messageId": true,
+        "bookingRef": { "$ref": "#/$defs/bookingRef" },
+        "errors": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["code", "text"],
+            "properties": {
+              "code": {
+                "description": "A stable code for the reason, such as GoodsLinesMissing. The codes are listed in the P1 process document.",
+                "type": "string",
+                "pattern": "^[A-Z][A-Za-z]+$"
+              },
+              "text": { "description": "The reason in plain language.", "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    "notReceived": {
+      "description": "HTTP 502. Norvia could not take the booking in, because the TMS could not be reached or the integration layer failed, so nothing was booked. Send it again later; if Norvia did book it in the meantime, the answer is ALREADY_BOOKED.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result", "messageId", "text"],
+      "properties": {
+        "result": { "const": "NOT_RECEIVED" },
+        "messageId": true,
+        "bookingRef": { "$ref": "#/$defs/bookingRef" },
+        "text": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

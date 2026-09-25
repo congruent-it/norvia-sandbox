@@ -1,0 +1,16 @@
+{
+  "shipperId": "SHP-0001",
+  "shipperReference": "BD-2030-0006",
+  "collection": {
+    "address": { "street": "Waalhaven Oostzijde 88", "postcode": "3087 BM", "city": "Rotterdam", "country": "NL" },
+    "window": { "earliest": "2030-03-31T01:30:00+00:00", "latest": "2030-03-31T04:00:00+00:00" }
+  },
+  "delivery": {
+    "address": { "street": "Oudegracht 112", "postcode": "3511 AW", "city": "Utrecht", "country": "NL" },
+    "consignee": { "name": "Café De Zwaan" }
+  },
+  "goodsLines": [
+    { "packageType": "pallet", "quantity": 1, "weightKg": 400 }
+  ],
+  "instructions": "The clocks go forward from 02:00 to 03:00 on the collection night, so 02:30 doesn't exist: it reads as standard time."
+}

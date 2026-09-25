@@ -1,0 +1,20 @@
+{
+  "bookingRef": "BD-2030-0005",
+  "pickupStreet": "Waalhaven Oostzijde 88",
+  "pickupPostalCode": "3087 BM",
+  "pickupCity": "Rotterdam",
+  "pickupCountry": "Netherlands",
+  "pickupFrom": "2030-10-01T08:00",
+  "pickupUntil": "01-10-2030 12:00",
+  "receiverName": "Café De Zwaan",
+  "receiverStreet": "Oudegracht 112",
+  "receiverPostalCode": "3511 AW",
+  "receiverCity": "Utrecht",
+  "receiverCountry": "Atlantis",
+  "deliverFrom": "02-10-2030 08:00",
+  "deliverUntil": "02-10-2030 12:00",
+  "items": [
+    { "packaging": "ZZ", "count": "2", "weight": "850", "dimensions": "120 by 80 by 150" },
+    "one pallet"
+  ]
+}

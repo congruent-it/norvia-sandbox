@@ -3,6 +3,9 @@
     <Project Path="src/Norvia.AppHost/Norvia.AppHost.csproj" />
     <Project Path="src/Norvia.ServiceDefaults/Norvia.ServiceDefaults.csproj" />
   </Folder>
+  <Folder Name="/src/Integration/">
+    <Project Path="src/Integration/Norvia.Integration.TransportOrderIntake/Norvia.Integration.TransportOrderIntake.csproj" />
+  </Folder>
   <Folder Name="/src/Tms/">
     <Project Path="src/Tms/Norvia.Tms.Api/Norvia.Tms.Api.csproj" />
     <Project Path="src/Tms/Norvia.Tms.Application/Norvia.Tms.Application.csproj" />
@@ -11,6 +14,9 @@
     <Project Path="src/Tms/Norvia.Tms.Web/Norvia.Tms.Web.csproj" />
   </Folder>
   <Folder Name="/tests/" />
+  <Folder Name="/tests/Integration/">
+    <Project Path="tests/Integration/Norvia.Integration.TransportOrderIntake.UnitTests/Norvia.Integration.TransportOrderIntake.UnitTests.csproj" />
+  </Folder>
   <Folder Name="/tests/Tms/">
     <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests/Norvia.Tms.Api.IntegrationTests.csproj" />
     <Project Path="tests/Tms/Norvia.Tms.Application.UnitTests/Norvia.Tms.Application.UnitTests.csproj" />

@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/partner-api/booking.v1.schema.json",
+  "title": "Booking",
+  "description": "A Shipper's transport booking, as sent to the Norvia Partner API (version 1). The Shipper is never named here: API Management takes it from the token (ADR 0005). Which fields a booking must fill in for Norvia to accept it is for Norvia to decide; the response lists every reason when it doesn't.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "bookingRef": {
+      "description": "The Shipper's own reference for the booking. Norvia accepts each reference once per Shipper; sending the same booking again returns the original order.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "pickupStreet": { "description": "Street and house number where the goods are picked up.", "type": "string" },
+    "pickupPostalCode": { "type": "string" },
+    "pickupCity": { "type": "string" },
+    "pickupCountry": { "$ref": "#/$defs/country" },
+    "pickupFrom": { "description": "The earliest pickup time, local to the pickup address.", "$ref": "#/$defs/localDateTime" },
+    "pickupUntil": { "description": "The latest pickup time, local to the pickup address.", "$ref": "#/$defs/localDateTime" },
+    "receiverName": { "description": "The company or person that receives the goods.", "type": "string" },
+    "receiverContact": { "description": "Who to ask for at the receiver.", "type": "string" },
+    "receiverPhone": { "type": "string" },
+    "receiverEmail": { "type": "string", "format": "email" },
+    "receiverStreet": { "description": "Street and house number where the goods are delivered.", "type": "string" },
+    "receiverPostalCode": { "type": "string" },
+    "receiverCity": { "type": "string" },
+    "receiverCountry": { "$ref": "#/$defs/country" },
+    "deliverFrom": { "description": "The earliest delivery time, local to the receiver's address. Optional, together with deliverUntil.", "$ref": "#/$defs/localDateTime" },
+    "deliverUntil": { "description": "The latest delivery time, local to the receiver's address. Optional, together with deliverFrom.", "$ref": "#/$defs/localDateTime" },
+    "items": {
+      "description": "The goods, one item per kind of package.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/item" }
+    },
+    "remarks": { "description": "Free text for anything the other fields don't cover.", "type": "string" }
+  },
+  "$defs": {
+    "country": {
+      "description": "The country by its English name, its own name, a common variant, or its ISO 3166-1 alpha-2 code. The list is every spelling the map can read, for the countries of Europe; whether Norvia carries goods there is for Norvia to decide.",
+      "enum": [
+        "Albania", "Shqipëria", "AL",
+        "Andorra", "AD",
+        "Austria", "Österreich", "AT",
+        "Belarus", "BY",
+        "Belgium", "België", "Belgique", "Belgien", "BE",
+        "Bosnia and Herzegovina", "Bosna i Hercegovina", "BA",
+        "Bulgaria", "България", "BG",
+        "Croatia", "Hrvatska", "HR",
+        "Cyprus", "CY",
+        "Czechia", "Czech Republic", "Česko", "CZ",
+        "Denmark", "Danmark", "DK",
+        "Estonia", "Eesti", "EE",
+        "Finland", "Suomi", "FI",
+        "France", "FR",
+        "Germany", "Deutschland", "DE",
+        "Greece", "Ελλάδα", "GR",
+        "Hungary", "Magyarország", "HU",
+        "Iceland", "Ísland", "IS",
+        "Ireland", "Éire", "IE",
+        "Italy", "Italia", "IT",
+        "Latvia", "Latvija", "LV",
+        "Liechtenstein", "LI",
+        "Lithuania", "Lietuva", "LT",
+        "Luxembourg", "Luxemburg", "Lëtzebuerg", "LU",
+        "Malta", "MT",
+        "Moldova", "MD",
+        "Monaco", "MC",
+        "Montenegro", "Crna Gora", "ME",
+        "Netherlands", "The Netherlands", "Nederland", "Holland", "NL",
+        "North Macedonia", "Macedonia", "MK",
+        "Norway", "Norge", "NO",
+        "Poland", "Polska", "PL",
+        "Portugal", "PT",
+        "Romania", "România", "RO",
+        "San Marino", "SM",
+        "Serbia", "Srbija", "RS",
+        "Slovakia", "Slovensko", "SK",
+        "Slovenia", "Slovenija", "SI",
+        "Spain", "España", "ES",
+        "Sweden", "Sverige", "SE",
+        "Switzerland", "Schweiz", "Suisse", "Svizzera", "CH",
+        "Turkey", "Türkiye", "TR",
+        "Ukraine", "Україна", "UA",
+        "United Kingdom", "UK", "Great Britain", "England", "Scotland", "Wales", "Northern Ireland", "GB"
+      ]
+    },
+    "localDateTime": {
+      "description": "A local date and time as dd-MM-yyyy HH:mm (24-hour clock), in the time zone of the address it belongs to. A time in the hour the clocks skip in spring reads as standard time; one in the hour they repeat in autumn reads as the later, standard-time occurrence.",
+      "type": "string",
+      "pattern": "^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{4} ([01][0-9]|2[0-3]):[0-5][0-9]$",
+      "examples": ["01-10-2030 08:00"]
+    },
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "packaging": {
+          "description": "The package code (UN/ECE Recommendation 21): PX pallet, PK package or parcel, CR crate, NE unpacked (loose goods).",
+          "enum": ["PX", "PK", "CR", "NE"]
+        },
+        "count": { "description": "How many packages of this kind.", "type": "integer" },
+        "weight": {
+          "description": "The weight of all packages of this item together, with its unit: kg, t, lb or lbs. A decimal point or comma is allowed; thousands separators are not.",
+          "type": "string",
+          "pattern": "^[0-9]+([.,][0-9]+)? ?([kK][gG]|[tT]|[lL][bB][sS]?)$",
+          "examples": ["850 kg", "2,5 t", "850 lb"]
+        },
+        "dimensions": {
+          "description": "Length x width x height of one package, with its unit: cm, mm or m. A decimal point or comma is allowed.",
+          "type": "string",
+          "pattern": "^[0-9]+([.,][0-9]+)? ?[xX] ?[0-9]+([.,][0-9]+)? ?[xX] ?[0-9]+([.,][0-9]+)? ?([cC][mM]|[mM][mM]|[mM])$",
+          "examples": ["120x80x150 cm", "1,2 x 0,8 x 1,5 m"]
+        }
+      }
+    }
+  }
+}

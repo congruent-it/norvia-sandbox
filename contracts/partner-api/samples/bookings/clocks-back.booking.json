@@ -1,0 +1,18 @@
+{
+  "bookingRef": "BD-2030-0007",
+  "pickupStreet": "Waalhaven Oostzijde 88",
+  "pickupPostalCode": "3087 BM",
+  "pickupCity": "Rotterdam",
+  "pickupCountry": "Netherlands",
+  "pickupFrom": "27-10-2030 02:30",
+  "pickupUntil": "27-10-2030 05:00",
+  "receiverName": "Café De Zwaan",
+  "receiverStreet": "Oudegracht 112",
+  "receiverPostalCode": "3511 AW",
+  "receiverCity": "Utrecht",
+  "receiverCountry": "Netherlands",
+  "items": [
+    { "packaging": "PX", "count": 1, "weight": "400 kg" }
+  ],
+  "remarks": "The clocks go back from 03:00 to 02:00 on the collection night, so 02:30 happens twice: it reads as the later, standard-time one."
+}

@@ -1,0 +1,15 @@
+{
+  "shipperId": "SHP-0001",
+  "shipperReference": "BD-2030-0001",
+  "collection": {
+    "address": { "street": "Waalhaven Oostzijde 88", "postcode": "3087 BM", "city": "Rotterdam", "country": "NL" },
+    "window": { "earliest": "2030-10-01T06:00:00+00:00", "latest": "2030-10-01T10:00:00+00:00" }
+  },
+  "delivery": {
+    "address": { "street": "Oudegracht 112", "postcode": "3511 AW", "city": "Utrecht", "country": "NL" },
+    "consignee": { "name": "Café De Zwaan" }
+  },
+  "goodsLines": [
+    { "packageType": "pallet", "quantity": 2, "weightKg": 850 }
+  ]
+}
