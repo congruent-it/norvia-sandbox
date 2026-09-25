@@ -80,6 +80,18 @@ public sealed class IntakeMapTests
     }
 
     [Fact]
+    public void Countries_WindowsTimeZone_IsTheOneForTheirIanaTimeZone()
+    {
+        // The Logic App's Windows host can't look up an IANA time zone, so the map falls back to the Windows one. This
+        // machine's time zone data (CLDR) says which Windows time zone each IANA one is.
+        foreach (var country in Countries.All)
+        {
+            TimeZoneInfo.TryConvertIanaIdToWindowsId(country.TimeZoneId, out var windowsId).Should().BeTrue(country.Code);
+            country.WindowsTimeZoneId.Should().Be(windowsId, $"that is the Windows time zone of {country.TimeZoneId}");
+        }
+    }
+
+    [Fact]
     public void ToTransportOrder_IsoCode_GivesTheSameCode()
     {
         var booking = new JsonObject { ["pickupCountry"] = "PT" };
