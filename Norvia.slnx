@@ -11,6 +11,7 @@
     <Project Path="src/Tms/Norvia.Tms.Application/Norvia.Tms.Application.csproj" />
     <Project Path="src/Tms/Norvia.Tms.Domain/Norvia.Tms.Domain.csproj" />
     <Project Path="src/Tms/Norvia.Tms.Infrastructure/Norvia.Tms.Infrastructure.csproj" />
+    <Project Path="src/Tms/Norvia.Tms.Migrations/Norvia.Tms.Migrations.csproj" />
     <Project Path="src/Tms/Norvia.Tms.Web/Norvia.Tms.Web.csproj" />
   </Folder>
   <Folder Name="/tests/" />

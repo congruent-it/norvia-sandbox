@@ -1,0 +1,26 @@
+#!/bin/sh
+# azd preprovision hook: deploys the estate Bicep (ADR 0004), then stores its outputs in the azd environment as
+# AZURE_ESTATE_*, where azd looks up the AppHost's Estate parameters when it provisions the apps.
+#
+# It deploys with the Azure CLI, which must be signed in to the same tenant as azd, as a user who may create app
+# registrations (the Entra ones are part of the estate).
+set -eu
+cd "$(dirname "$0")"
+
+az account set --subscription "$AZURE_SUBSCRIPTION_ID"
+
+ESTATE_PRESENTER_PRINCIPAL_ID=$(az ad signed-in-user show --query id --output tsv 2>/dev/null || true)
+export ESTATE_PRESENTER_PRINCIPAL_ID
+
+echo "Deploying the Norvia estate to rg-$AZURE_ENV_NAME..."
+az deployment sub create \
+  --name "norvia-estate-$AZURE_ENV_NAME" \
+  --location "$AZURE_LOCATION" \
+  --parameters estate.bicepparam \
+  --query properties.outputs --output json > .estate-outputs.json
+
+jq -r 'to_entries[] | "\(.key | ascii_upcase) \(.value.value)"' .estate-outputs.json |
+  while read -r name value; do
+    azd env set "AZURE_$name" "$value"
+  done
+rm .estate-outputs.json

@@ -6,11 +6,14 @@
     <NoWarn>$(NoWarn);ASPIRE010</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Azure.AppContainers" />
+    <PackageReference Include="Aspire.Hosting.Azure.ApplicationInsights" />
     <PackageReference Include="Aspire.Hosting.Azure.ServiceBus" />
-    <PackageReference Include="Aspire.Hosting.SqlServer" />
+    <PackageReference Include="Aspire.Hosting.Azure.Sql" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Tms\Norvia.Tms.Api\Norvia.Tms.Api.csproj" />
+    <ProjectReference Include="..\Tms\Norvia.Tms.Migrations\Norvia.Tms.Migrations.csproj" />
     <ProjectReference Include="..\Tms\Norvia.Tms.Web\Norvia.Tms.Web.csproj" />
   </ItemGroup>
 </Project>

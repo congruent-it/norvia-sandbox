@@ -57,6 +57,13 @@ jobs:
       - name: Check formatting
         run: dotnet format Norvia.slnx --no-restore --verify-no-changes
 
+      # The estate is deployed by azd, not CI (ADR 0004); CI checks that it builds and passes the Bicep linter.
+      - name: Build and lint the estate Bicep
+        run: |
+          az bicep install
+          az bicep build --file infra/estate.bicep --stdout > /dev/null
+          az bicep lint --file infra/estate.bicep
+
       - name: Check for vulnerable packages
         run: |
           dotnet package list --project Norvia.slnx --vulnerable --include-transitive --format json > vulnerable-packages.json

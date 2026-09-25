@@ -8,8 +8,9 @@ namespace Norvia.Tms.Api.TransportOrders;
 public sealed class IntakeCallers(IOptions<IntakeCallersOptions> options)
 {
     // Client IDs are GUIDs in Azure, which tokens and configuration may write in different case.
-    private readonly Dictionary<string, IntakeChannel> _channelByClientId =
-        new(options.Value.ChannelByClientId, StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, IntakeChannel> _channelByClientId = options.Value.ClientIdsByChannel
+        .SelectMany(channel => channel.Value.Select(clientId => KeyValuePair.Create(clientId, channel.Key)))
+        .ToDictionary(StringComparer.OrdinalIgnoreCase);
 
     public bool TryFindChannel(ClaimsPrincipal caller, out IntakeChannel channel)
     {

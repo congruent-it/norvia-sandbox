@@ -1,0 +1,17 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+
+# `azd up` deploys the estate Bicep in infra/ first, then the apps from the Aspire AppHost (ADR 0004).
+name: norvia-sandbox
+services:
+  app:
+    language: dotnet
+    project: ./src/Norvia.AppHost/Norvia.AppHost.csproj
+    host: containerapp
+hooks:
+  preprovision:
+    shell: sh
+    run: ./infra/provision-estate.sh
+    interactive: true
+  postdeploy:
+    shell: sh
+    run: ./infra/migrate-tms.sh
