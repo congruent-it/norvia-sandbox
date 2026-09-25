@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Norvia.PartnerPortal.Application.Bookings;
@@ -94,6 +95,31 @@ public sealed class NewBookingTests : PortalWebContext
 
         page.WaitForAssertion(() => page.Find("[role=alert]").TextContent.Should().Contain("The booking couldn't be sent or recorded."));
         Field(Group(page, "Booking"), "Shipper reference").GetAttribute("value").Should().Be("BK-20260925-100000");
+    }
+
+    [Fact]
+    public void Submit_WhenThePortalFails_ShowsItsTraceId_SoTheAttemptCanBeFound()
+    {
+        Portal.SubmitBookingAsync("brouwer-dranken", Arg.Any<BookingRequest>(), Arg.Any<CancellationToken>())
+            .Returns<BookingView?>(_ => throw new InvalidOperationException("The database is down."));
+        var page = RenderPage();
+        using var submitting = new Activity("Event onsubmit").Start();
+
+        page.Find("form").Submit();
+
+        page.WaitForAssertion(() => page.Find("[role=alert]").TextContent.Should().Contain($"The portal's trace ID for this attempt: {submitting.TraceId}"));
+    }
+
+    [Fact]
+    public void Submit_NotReceivedWithoutNorviasReference_ShowsThePortalsTraceId()
+    {
+        AnswerWith(NorviaAnswer.NotReceived(null));
+        var page = RenderPage();
+        using var submitting = new Activity("Event onsubmit").Start();
+
+        page.Find("form").Submit();
+
+        page.WaitForAssertion(() => page.Find("[aria-label=\"Norvia's answer\"]").TextContent.Should().Contain($"The portal's trace ID for this attempt: {submitting.TraceId}"));
     }
 
     [Fact]

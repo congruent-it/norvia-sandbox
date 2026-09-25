@@ -61,6 +61,39 @@ public sealed class BookingAnswerTests : PortalWebContext
         Render(NorviaAnswer.NotReceived(null)).Markup.Should().NotContain("Norvia's reference");
     }
 
-    private IRenderedComponent<BookingAnswer> Render(NorviaAnswer answer) =>
-        Render<BookingAnswer>(parameters => parameters.Add(component => component.Booking, Samples.Answered(answer)));
+    [Fact]
+    public void AnAnswerWithoutAMessageId_ShowsThePortalsTraceId_SoTheAttemptCanStillBeFound()
+    {
+        Render(NorviaAnswer.NotReceived(null), traceId: "4bf92f3577b34da6a3ce929d0e0e4736").Markup
+            .Should().Contain("The portal's trace ID for this attempt: <span>4bf92f3577b34da6a3ce929d0e0e4736</span>");
+    }
+
+    [Fact]
+    public void AnAnswerWithAMessageId_ShowsOnlyNorviasReference()
+    {
+        Render(NorviaAnswer.Accepted("TO-0000042", "corr-1"), traceId: "4bf92f3577b34da6a3ce929d0e0e4736").Markup
+            .Should().NotContain("trace ID");
+    }
+
+    [Fact]
+    public void AnAnswerThePortalCouldntRecord_ShowsTheAnswer_AndSaysItIsntInMyBookings()
+    {
+        var booking = Samples.Answered(NorviaAnswer.Accepted("TO-0000042", "corr-1")) with { Recorded = false };
+
+        var answer = Render<BookingAnswer>(parameters => parameters.Add(component => component.Booking, booking));
+
+        answer.Markup.Should().Contain("Transport Order <strong>TO-0000042</strong>");
+        answer.Find("[role=alert]").TextContent.Should().Contain("The portal couldn't keep this answer, so it isn't in My bookings.");
+    }
+
+    [Fact]
+    public void AnAnswerThePortalRecorded_SaysNothingAboutMyBookings()
+    {
+        Render(NorviaAnswer.Accepted("TO-0000042", "corr-1")).Markup.Should().NotContain("My bookings");
+    }
+
+    private IRenderedComponent<BookingAnswer> Render(NorviaAnswer answer, string? traceId = null) =>
+        Render<BookingAnswer>(parameters => parameters
+            .Add(component => component.Booking, Samples.Answered(answer))
+            .Add(component => component.TraceId, traceId));
 }

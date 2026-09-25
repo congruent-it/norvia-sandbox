@@ -13,6 +13,9 @@ public sealed record BookingView(
     string? Text,
     string? MessageId)
 {
+    /// <summary>False when the portal couldn't keep its record of the booking, so it isn't in My bookings. Norvia's answer stands.</summary>
+    public bool Recorded { get; init; } = true;
+
     public static BookingView From(Booking booking)
     {
         ArgumentNullException.ThrowIfNull(booking);
