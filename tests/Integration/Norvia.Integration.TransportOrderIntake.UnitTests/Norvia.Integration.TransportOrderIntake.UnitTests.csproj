@@ -22,5 +22,7 @@
     <EmbeddedResource Include="..\..\..\contracts\partner-api\*.json" LogicalName="PartnerApi/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\bookings\*.json" LogicalName="PartnerApi/samples/bookings/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\responses\*.json" LogicalName="PartnerApi/samples/responses/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\src\Integration\IntakeLogicApp\*.json" LogicalName="IntakeLogicApp/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\src\Integration\IntakeLogicApp\transport-order-intake\workflow.json" LogicalName="IntakeLogicApp/transport-order-intake/workflow.json" />
   </ItemGroup>
 </Project>

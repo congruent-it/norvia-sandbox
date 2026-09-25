@@ -8,3 +8,5 @@ coverage.cobertura.xml
 *.cobertura.xml
 .azure/
 .estate-outputs.json
+# The intake Logic App's local functions, written there by building their project.
+src/Integration/IntakeLogicApp/lib/
