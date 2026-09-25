@@ -3,12 +3,16 @@ using Norvia.Tms.Application.TransportOrders.List;
 namespace Norvia.Tms.Web.TransportOrders;
 
 /// <summary>
-/// Keeps the list of Transport Orders waiting for planning current while a page shows it: it reads the list, then
-/// reads it again every <see cref="LiveListOptions.RefreshInterval"/>, so a Transport Order accepted meanwhile appears without a
-/// refresh. The TMS UI reads through the query side only and never consumes events (ADR 0003), so it asks again.
+/// Keeps a list of Transport Orders current while a page shows it, such as those waiting for planning or the Rejected
+/// bookings: it reads the list, then reads it again every <see cref="LiveListOptions.RefreshInterval"/>, so one that
+/// arrives meanwhile appears without a refresh. The TMS UI reads through the query side only and never consumes events
+/// (ADR 0003), so it asks again.
 /// </summary>
+/// <param name="read">Reads the list, such as <see cref="ITransportOrderQueries.ListRejectedAsync"/>.</param>
+/// <param name="listName">What the list holds, for the log, such as "the Rejected bookings".</param>
 internal sealed partial class LiveTransportOrderList(
-    ITransportOrderQueries queries,
+    Func<CancellationToken, Task<IReadOnlyList<TransportOrderSummary>>> read,
+    string listName,
     TimeProvider time,
     TimeSpan refreshInterval,
     ILogger<LiveTransportOrderList> logger)
@@ -53,13 +57,13 @@ internal sealed partial class LiveTransportOrderList(
     {
         try
         {
-            TransportOrders = await queries.ListWaitingForPlanningAsync(cancellationToken);
+            TransportOrders = await read(cancellationToken);
             LastReadFailed = false;
         }
         catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {
-            // Keep what the Planner sees and try again on the next tick: a short outage mustn't empty the list.
-            LogReadFailed(exception);
+            // Keep what the page shows and try again on the next tick: a short outage mustn't empty the list.
+            LogReadFailed(exception, listName);
             LastReadFailed = true;
         }
     }
@@ -71,6 +75,6 @@ internal sealed partial class LiveTransportOrderList(
         _stopped.Dispose();
     }
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Reading the Transport Orders waiting for planning failed; trying again")]
-    private partial void LogReadFailed(Exception exception);
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Reading {ListName} failed; trying again")]
+    private partial void LogReadFailed(Exception exception, string listName);
 }

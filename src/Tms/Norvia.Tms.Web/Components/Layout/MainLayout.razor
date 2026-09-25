@@ -7,11 +7,14 @@
 <header class="bg-primary text-white">
     <nav aria-label="Main" class="mx-auto flex max-w-7xl flex-wrap items-center gap-x-8 gap-y-2 px-4 py-4">
         <a href="/" class="text-xl font-bold text-white no-underline hover:text-white">Norvia TMS</a>
-        <NavLink href="/transport-orders" Match="NavLinkMatch.Prefix"
+        <NavLink href="@_role.View" Match="NavLinkMatch.Prefix"
                  class="text-white/75 no-underline hover:text-success"
                  ActiveClass="!text-white">
-            Waiting for planning
+            @_role.ViewTitle
         </NavLink>
+        <div class="ml-auto">
+            <RoleSwitcher Current="_role" />
+        </div>
     </nav>
 </header>
 
@@ -24,3 +27,14 @@
         Something went wrong. <a href="" class="reload text-white">Reload</a>
     </FluentMessageBar>
 </div>
+
+@code {
+    private NorviaRole _role = NorviaRole.Planner;
+
+    // The layout renders statically on every request, so it reads the role from the request itself.
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    protected override void OnParametersSet() =>
+        _role = HttpContext is null ? NorviaRole.Planner : NorviaRole.Current(HttpContext.Request);
+}

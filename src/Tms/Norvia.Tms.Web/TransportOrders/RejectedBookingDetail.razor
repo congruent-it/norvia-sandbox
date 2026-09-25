@@ -1,0 +1,109 @@
+@page "/rejected-bookings/{Id:guid}"
+@* Interactive like the lists: Fluent UI's components don't survive static streaming rendering. *@
+@rendermode InteractiveServer
+@implements IDisposable
+@inject ITransportOrderQueries Queries
+@inject ILogger<RejectedBookingDetail> Logger
+
+<PageTitle>Rejected booking · Norvia TMS</PageTitle>
+
+<p class="mb-2"><a href="/rejected-bookings">← Back to the rejected bookings</a></p>
+
+@if (_failed)
+{
+    <h1>Rejected booking</h1>
+    <div role="alert">
+        <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+            The rejected booking couldn't be loaded. Reload the page to try again.
+        </FluentMessageBar>
+    </div>
+}
+else if (!_loaded)
+{
+    <h1>Rejected booking</h1>
+    <FluentStack VerticalAlignment="VerticalAlignment.Center" role="status" Class="text-muted">
+        <FluentProgressRing />
+        <span>Loading the rejected booking…</span>
+    </FluentStack>
+}
+else if (_booking is null)
+{
+    <h1>Rejected booking</h1>
+    <div role="status">
+        <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
+            There is no such rejected booking.
+        </FluentMessageBar>
+    </div>
+}
+else
+{
+    var shipper = _booking.Shipper.Name ?? _booking.Shipper.Id;
+    var reference = _booking.TransportOrder.ShipperReference;
+
+    @* Named as the Shipper names it on the phone: by its Shipper reference, when it gave one. *@
+    <h1>@(string.IsNullOrWhiteSpace(reference) ? $"Rejected booking from {shipper}" : $"Rejected booking {reference}")</h1>
+
+    <div class="mb-4">
+        <TransportOrderSection Heading="Reasons">
+            <ul class="m-0 list-disc space-y-1 pl-5">
+                @foreach (var reason in _booking.RejectionReasons)
+                {
+                    <li>@reason.Message</li>
+                }
+            </ul>
+        </TransportOrderSection>
+    </div>
+
+    <SubmittedBooking Submitted="_booking.TransportOrder">
+        <Booking>
+            <TransportOrderSection Heading="Rejected booking">
+                <dl class="detail-list">
+                    <dt>Shipper</dt>
+                    <dd>@shipper</dd>
+                    <dt>Shipper reference</dt>
+                    <dd>@SubmittedBooking.Given(reference)</dd>
+                    <dt>Received</dt>
+                    <dd>@NorviaTime.Format(_booking.ReceivedAt)</dd>
+                    <dt>Correlation ID</dt>
+                    <dd>@_booking.CorrelationId</dd>
+                </dl>
+            </TransportOrderSection>
+        </Booking>
+    </SubmittedBooking>
+}
+
+@code {
+    private bool _loaded;
+    private bool _failed;
+    private readonly CancellationTokenSource _closed = new();
+    private TransportOrderView? _booking;
+
+    [Parameter, EditorRequired]
+    public Guid Id { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loaded = _failed = false;
+        _booking = null;
+        try
+        {
+            _booking = await Queries.FindRejectedAsync(Id, _closed.Token);
+            _loaded = true;
+        }
+        catch (OperationCanceledException) when (_closed.IsCancellationRequested)
+        {
+            // The page closed while it was reading.
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning(exception, "Reading Rejected booking {TransportOrderId} failed", Id);
+            _failed = true;
+        }
+    }
+
+    public void Dispose()
+    {
+        _closed.Cancel();
+        _closed.Dispose();
+    }
+}

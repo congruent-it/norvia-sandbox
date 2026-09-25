@@ -4,7 +4,7 @@ A working integration estate for a fictional company, **Norvia Logistics B.V.**,
 
 The estate can also run *as found*, reproducing the problems a health check would find (a missing dead-letter alert, a mapping that can't handle a Carrier status, marketplace orders routed to the wrong system), and fixing them one at a time.
 
-> **Status:** first build. The TMS takes in a Transport Order through its intake API and publishes `TransportOrderAccepted`, running locally under Aspire. The TMS UI lists the Transport Orders waiting for planning, live, and shows each one in full. The rest of P1 (validation, the Logic App, API Management, the Partner portal and the Azure estate) follows in the tickets under GitHub issue #1.
+> **Status:** first build. The TMS takes in a Transport Order through its intake API and publishes `TransportOrderAccepted`, running locally under Aspire. The TMS UI lists the Transport Orders waiting for planning for the Planner and the rejected bookings for Customer service, both live, and shows each one in full; a Role switcher moves between the two without a login. The rest of P1 (validation, the Logic App, API Management, the Partner portal and the Azure estate) follows in the tickets under GitHub issue #1.
 
 ## Start here
 
@@ -63,7 +63,7 @@ There is no Entra locally. The TMS trusts JWTs signed with the AppHost's secret 
 
 Set `NORVIA_TEST_LOG_FILE` to a path to keep the TMS's own logs from an integration test run.
 
-The TMS UI (`tms-web` on the Aspire dashboard) reads the TMS database through the TMS query side; it takes in nothing and publishes nothing. Its list of Transport Orders waiting for planning reads again every second (`LiveList:RefreshInterval`), so an accepted Transport Order appears without a refresh. The UI tests drive it with Playwright in headless Chromium, which their fixture installs on the first run. They keep a trace and a video of each failed test under `TestResults/playwright`, or under `$NORVIA_UI_TEST_ARTIFACTS/playwright` when that is set.
+The TMS UI (`tms-web` on the Aspire dashboard) reads the TMS database through the TMS query side; it takes in nothing and publishes nothing. Its lists of Transport Orders waiting for planning and of rejected bookings read again every second (`LiveList:RefreshInterval`), so a new one appears without a refresh. The Role switcher in the navbar remembers the chosen role in a cookie, and `/` opens that role's view: the Planner's by default. The UI tests drive it with Playwright in headless Chromium, which their fixture installs on the first run. They keep a trace and a video of each failed test under `TestResults/playwright`, or under `$NORVIA_UI_TEST_ARTIFACTS/playwright` when that is set.
 
 CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the pull request gates of the coding guidelines on every PR and on `main`: a warning-free build, `dotnet format`, the vulnerable-package check, unit and architecture tests with the coverage gate, and the integration tests.
 

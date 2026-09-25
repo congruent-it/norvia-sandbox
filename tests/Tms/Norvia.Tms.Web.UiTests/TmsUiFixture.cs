@@ -1,6 +1,8 @@
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json.Nodes;
 using Aspire.Hosting;
 using Aspire.Hosting.Testing;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -57,6 +59,17 @@ public sealed class TmsUiFixture : IAsyncLifetime
 
         _playwright = await Playwright.CreateAsync();
         Browser = await _playwright.Chromium.LaunchAsync();
+    }
+
+    /// <summary>Submits a Canonical Model booking to TMS intake, as the intake Logic App does, each on a trail of its own.</summary>
+    public async Task<HttpResponseMessage> SubmitAsync(JsonObject booking, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("/v1/transport-orders", UriKind.Relative))
+        {
+            Content = JsonContent.Create(booking),
+        };
+        request.Headers.Add("X-Correlation-ID", Guid.NewGuid().ToString());
+        return await Intake.SendAsync(request, cancellationToken);
     }
 
     // A token as Entra issues it to the intake Logic App's managed identity, signed with the key the TMS trusts locally.
