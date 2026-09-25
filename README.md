@@ -85,7 +85,7 @@ infra/smoke-test-intake.sh                   # after a deployment: checks intake
 
 On an environment's first run, azd asks for the AppHost's parameters before it runs the preprovision hook. Those parameters are the estate's outputs, so run the hook once yourself first. Don't type in values for `estate_*` parameters: they are the names and IDs the estate creates. After that, `azd up` finds them in the environment.
 
-azd 1.33 builds the AppHost's container images in parallel, and the builds share the .NET SDK's local cache of base-image layers. Two of them can then collide on the same cached layer (`CONTAINER1013 … being used by another process`), and azd cancels the rest. `AZD_UP_CONCURRENCY=1`, or `AZD_DEPLOY_CONCURRENCY=1` for `azd deploy`, builds one image at a time. azd reads both from the shell, not from the azd environment.
+azd (1.33 and 1.34 at least) builds the AppHost's container images in parallel, and the builds share the .NET SDK's local cache of base-image layers. Two of them can then collide on the same cached layer (`CONTAINER1013 … being used by another process`), and azd cancels the rest. `AZD_UP_CONCURRENCY=1`, or `AZD_DEPLOY_CONCURRENCY=1` for `azd deploy`, builds one image at a time. azd reads both from the shell, not from the azd environment.
 
 `azd up` runs in three steps ([ADR 0004](docs/adr/0004-bicep-owns-the-estate-aspire-owns-the-apps.md)):
 
