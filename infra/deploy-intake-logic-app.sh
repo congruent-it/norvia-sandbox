@@ -21,7 +21,14 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 (cd src/Integration/IntakeLogicApp && zip -qr "$work/intake-logic-app.zip" host.json parameters.json transport-order-intake lib)
 
-echo "Deploying the intake Logic App to $logic_app..."
-az logicapp deployment source config-zip --subscription "$AZURE_SUBSCRIPTION_ID" --name "$logic_app" --resource-group "$resource_group" \
-  --src "$work/intake-logic-app.zip" --output none
+# A changed app setting restarts the app, and a zip deployment during the restart fails. Deploying again is safe.
+for attempt in 1 2 3; do
+  echo "Deploying the intake Logic App to $logic_app (attempt $attempt)..."
+  if az logicapp deployment source config-zip --subscription "$AZURE_SUBSCRIPTION_ID" --name "$logic_app" --resource-group "$resource_group" \
+    --src "$work/intake-logic-app.zip" --output none; then
+    break
+  fi
+  [ "$attempt" -lt 3 ] || exit 1
+  sleep 60
+done
 echo "The intake Logic App calls the TMS at $tms."
