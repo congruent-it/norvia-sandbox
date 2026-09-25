@@ -18,10 +18,12 @@ hooks:
     shell: sh
     run: ./infra/provision-estate.sh
     interactive: true
-  # Then the databases' migrations, and the intake Logic App, which needs the address of the TMS just deployed.
+  # Then the databases' migrations, the intake Logic App, which needs the address of the TMS just deployed, and the
+  # demo UIs' sign-in, which needs theirs.
   postdeploy:
     shell: sh
     run: >-
       ./infra/migrate.sh tms-migrations "the TMS database" &&
       ./infra/migrate.sh partner-portal-migrations "the Partner portal's database" &&
-      ./infra/deploy-intake-logic-app.sh
+      ./infra/deploy-intake-logic-app.sh &&
+      ./infra/register-demo-ui-callbacks.sh

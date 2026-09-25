@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Ardalis.SharedKernel;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -55,13 +56,31 @@ public static class DependencyInjection
         await scope.ServiceProvider.GetRequiredService<PartnerPortalDbContext>().Database.MigrateAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// In Azure the database is serverless and pauses after an hour unused, and the first connection then waits while it
+    /// resumes, which can take a minute. SqlClient gives up after 15 seconds by default, which would lose the booking's
+    /// record.
+    /// </summary>
+    private static string? WaitingForAResume(string? connectionString)
+    {
+        const int resumeSeconds = 90;
+        if (connectionString is null)
+        {
+            return null;
+        }
+
+        var connection = new SqlConnectionStringBuilder(connectionString);
+        connection.ConnectTimeout = Math.Max(connection.ConnectTimeout, resumeSeconds);
+        return connection.ConnectionString;
+    }
+
     private static bool IsValid(object options) =>
         Validator.TryValidateObject(options, new ValidationContext(options), validationResults: null, validateAllProperties: true);
 
     private static void AddPartnerPortalDbContext(this IHostApplicationBuilder builder)
     {
         builder.Services.AddDbContext<PartnerPortalDbContext>(options =>
-            options.UseSqlServer(builder.Configuration.GetConnectionString(DatabaseConnectionName)));
+            options.UseSqlServer(WaitingForAResume(builder.Configuration.GetConnectionString(DatabaseConnectionName))));
         builder.EnrichSqlServerDbContext<PartnerPortalDbContext>();
         builder.Services.AddSingleton(TimeProvider.System);
     }

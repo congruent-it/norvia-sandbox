@@ -295,6 +295,14 @@ _Avoid_: user, role, tenant
 The control in the Partner portal that chooses which Persona the presenter plays. Everything done after choosing one is done as that party, towards Norvia.
 _Avoid_: login, impersonation, role switcher (that is for Norvia's own users)
 
+**Presenter**:
+The person who runs a demo of the sandbox: they play Norvia's users through the Role switcher and its partners through the Persona switcher. Not a party of Norvia's; in Azure, the one person the demo UIs let in.
+_Avoid_: user, admin, operator (that is the Integration operator)
+
+**Demo UIs**:
+The TMS UI and the Partner portal, the two UIs a presenter shows side by side. They have no login; in Azure an Entra sign-in in front of them, the gate, admits only the presenter (ADR 0024). The gate is not a login in the domain's sense: the apps don't know who passed it.
+_Avoid_: frontends, portals, login (for the gate)
+
 ## Integration
 
 **Canonical Model**:

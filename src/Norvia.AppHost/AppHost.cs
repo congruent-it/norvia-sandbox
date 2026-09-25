@@ -82,6 +82,14 @@ if (builder.ExecutionContext.IsPublishMode)
         .WithEnvironment("Authentication__Schemes__Bearer__ValidAudiences__0", estate.TmsApiClientId)
         .WithEnvironment("IntakeCallers__ClientIdsByChannel__ShipperApi__0", estate.IntakeClientId);
 
+    // The TMS UI and the Partner portal have no login of their own, so in Azure they open to the presenter's browser
+    // behind an Entra sign-in that only the presenter passes (ADR 0024). The apps don't know it is there.
+    foreach (var demoUi in new[] { tmsWeb, partnerPortal })
+    {
+        demoUi.WithExternalHttpEndpoints()
+            .PublishAsAzureContainerApp((infrastructure, app) => infrastructure.Add(DemoUiGate.For(infrastructure, app, estate)));
+    }
+
     // In Azure the Partner portal books through API Management as each Persona: it runs as the identity every Persona's
     // client app trusts, so it gets their tokens without a secret (ADR 0005), and reads their subscription keys from
     // the estate's Key Vault.

@@ -17,8 +17,13 @@ is set (coding guidelines §7). Application Insights accepts only these values.'
 param integrationRetentionDays int = 90
 
 @description('''The presenter's Entra object ID, empty for none. The presenter may read the estate's messages, for example to see
-an event land on its topic.''')
+an event land on its topic, and is the one user who may open the demo UIs in Azure.''')
 param presenterPrincipalId string = ''
+
+@description('''Easy Auth's sign-in callbacks on the demo UIs (the TMS UI and the Partner portal), comma separated, empty before
+the apps are first deployed. azd's postdeploy hook stores them, so the demo UIs' app registration keeps them when the
+estate is deployed again.''')
+param demoUiRedirectUris string = ''
 
 @description('''The TMS API's address, empty before the apps are first deployed. azd's postdeploy hook stores it, so the intake
 Logic App keeps it when the estate is deployed again.''')
@@ -59,6 +64,8 @@ module identities 'estate/identities.bicep' = {
     environmentName: environmentName
     location: location
     tags: tags
+    presenterPrincipalId: presenterPrincipalId
+    demoUiRedirectUris: demoUiRedirectUris
   }
 }
 
@@ -113,3 +120,4 @@ output ESTATE_PARTNER_PORTAL_IDENTITY_ID string = identities.outputs.partnerPort
 output ESTATE_PARTNER_PORTAL_CLIENT_ID string = identities.outputs.partnerPortalClientId
 output ESTATE_PARTNER_PORTAL_IDENTITY_NAME string = identities.outputs.partnerPortalIdentityName
 output ESTATE_PARTNER_PORTAL_KEY_VAULT string = partnerApi.outputs.partnerPortalKeyVaultName
+output ESTATE_DEMO_UIS_CLIENT_ID string = identities.outputs.demoUisClientId

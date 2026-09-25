@@ -44,13 +44,30 @@
             </div>
             break;
     }
+    @if (!Booking.Recorded)
+    {
+        <div role="alert" class="mt-2">
+            <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
+                The portal couldn't keep this answer, so it isn't in My bookings.
+            </FluentMessageBar>
+        </div>
+    }
     @if (Booking.MessageId is not null)
     {
         <p class="mt-2 text-xs text-muted">Norvia's reference for this attempt: <span>@Booking.MessageId</span></p>
+    }
+    else if (TraceId is not null)
+    {
+        @* Nothing Norvia can find it by, so the portal's own trace, which Application Insights finds it by. *@
+        <p class="mt-2 text-xs text-muted">The portal's trace ID for this attempt: <span>@TraceId</span></p>
     }
 </section>
 
 @code {
     [Parameter, EditorRequired]
     public BookingView Booking { get; set; } = null!;
+
+    /// <summary>The trace of the attempt that got this answer, shown when Norvia gave no reference of its own.</summary>
+    [Parameter]
+    public string? TraceId { get; set; }
 }
