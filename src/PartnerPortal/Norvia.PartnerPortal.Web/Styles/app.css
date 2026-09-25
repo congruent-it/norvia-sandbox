@@ -1,0 +1,302 @@
+/*
+ * The Partner portal's stylesheet, built by Tailwind CSS into wwwroot/app.css (ADR 0022). It gives the portal the look of
+ * Bootswatch's Lux theme: black and white, uppercase labels and headings with wide letter-spacing, square corners and
+ * Nunito Sans. Side by side with the TMS UI (Flatly), it reads at once as someone else's application. Tailwind's
+ * preflight resets the page instead of Fluent UI's reboot.css: the reboot isn't in a cascade layer, so it would win over
+ * every Tailwind utility.
+ */
+@import "tailwindcss";
+
+@source "../**/*.razor";
+
+/*
+ * Lux's palette and type (Bootswatch 5, lux/_variables.scss). Static, so every colour is emitted as a variable: the
+ * Fluent UI overrides below use some that no utility does.
+ */
+@theme static {
+    --color-primary: #1a1a1a;
+    --color-body: #55595c;
+    --color-muted: #919aa1;
+    --color-success: #4bbf73;
+    --color-info: #1f9bcf;
+    --color-warning: #f0ad4e;
+    --color-danger: #d9534f;
+    --color-light: #f7f7f9;
+    --color-border: #eceeef;
+    --font-sans: "Nunito Sans", -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+@font-face {
+    font-family: "Nunito Sans";
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("fonts/nunito-sans-latin-400-normal.woff2") format("woff2");
+}
+
+@font-face {
+    font-family: "Nunito Sans";
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url("fonts/nunito-sans-latin-600-normal.woff2") format("woff2");
+}
+
+@font-face {
+    font-family: "Nunito Sans";
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url("fonts/nunito-sans-latin-700-normal.woff2") format("woff2");
+}
+
+@layer base {
+    body {
+        /* Fluent UI's components read their font from this token, which Fluent's script sets on the root. */
+        --body-font: var(--font-sans);
+        margin: 0;
+        background-color: #fff;
+        color: var(--color-body);
+        font-family: var(--font-sans);
+        font-size: 0.875rem;
+        line-height: 1.5;
+    }
+
+    /* Lux's signature: uppercase headings, spaced wide. */
+    h1,
+    h2,
+    h3 {
+        margin-top: 0;
+        color: var(--color-primary);
+        font-weight: 600;
+        line-height: 1.2;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+    }
+
+    h1 {
+        margin-bottom: 2rem;
+        font-size: 2rem;
+    }
+
+    h2 {
+        margin-bottom: 1rem;
+        font-size: 1.25rem;
+    }
+
+    h3 {
+        margin-bottom: 0.75rem;
+        font-size: 1rem;
+    }
+
+    a {
+        color: var(--color-primary);
+        text-decoration: underline;
+    }
+
+    a:hover {
+        color: var(--color-body);
+    }
+}
+
+@layer components {
+    /* A form section: a heading, then its fields in a grid. */
+    .lux-fieldset {
+        margin: 0 0 2rem;
+        padding: 0;
+        border: none;
+    }
+
+    .lux-fieldset > legend {
+        margin-bottom: 1rem;
+        padding: 0;
+        color: var(--color-primary);
+        font-size: 1rem;
+        font-weight: 600;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+    }
+
+    /* Labels as Lux draws them: small, bold, uppercase. */
+    .lux-label {
+        display: block;
+        margin-bottom: 0.25rem;
+        color: var(--color-primary);
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+    }
+
+    /* The one native input (date and time; Fluent UI has none), drawn like Lux's: filled, borderless, square. */
+    .lux-input {
+        box-sizing: border-box;
+        width: 100%;
+        min-height: 2.25rem;
+        padding: 0.375rem 0.75rem;
+        border: 1px solid transparent;
+        border-radius: 0;
+        background-color: var(--color-light);
+        color: var(--color-body);
+        font-family: var(--font-sans);
+        font-size: 0.875rem;
+    }
+
+    .lux-input:focus {
+        border-color: var(--color-primary);
+        outline: none;
+    }
+
+    .lux-input.invalid {
+        border-color: var(--color-danger);
+    }
+
+    .validation-message {
+        margin-top: 0.25rem;
+        color: var(--color-danger);
+        font-size: 0.75rem;
+    }
+
+    .detail-list {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        column-gap: 1.5rem;
+        row-gap: 0.25rem;
+        margin: 0;
+    }
+
+    .detail-list dt {
+        color: var(--color-primary);
+        font-weight: 600;
+    }
+
+    .detail-list dd {
+        margin: 0;
+    }
+}
+
+/*
+ * Fluent UI's own component styles aren't in a cascade layer, so these overrides aren't either: a layered rule would
+ * always lose to them.
+ */
+
+/* Inputs as Lux draws them: a light grey fill, no border, square corners. */
+fluent-text-field::part(root),
+fluent-number-field::part(root),
+fluent-text-area::part(control),
+fluent-select::part(control) {
+    border: 1px solid transparent;
+    border-radius: 0;
+    background: var(--color-light);
+}
+
+fluent-text-field,
+fluent-number-field,
+fluent-text-area,
+fluent-select {
+    width: 100%;
+    min-width: 0;
+    font-family: var(--font-sans);
+}
+
+.fluent-input-label {
+    color: var(--color-primary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+/* Buttons as Lux draws them: square, bold, uppercase and spaced. */
+fluent-button::part(control) {
+    border-radius: 0;
+    font-family: var(--font-sans);
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+/* Tables as Lux draws them: small uppercase headers, generous rows, a light rule between them. */
+.lux-table.fluent-data-grid {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.lux-table.fluent-data-grid th,
+.lux-table.fluent-data-grid td {
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-body);
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    vertical-align: top;
+}
+
+.lux-table.fluent-data-grid th {
+    color: var(--color-primary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-align: left;
+    text-transform: uppercase;
+}
+
+.lux-table.fluent-data-grid .col-title {
+    padding: 0;
+}
+
+/*
+ * Alerts as Lux draws them: solid colour, white text, square, in light mode. Fluent scopes its own with an attribute
+ * (.fluent-messagebar.intent-error[b-…], three classes' worth), so these add body and :not(.dark) to outrank it.
+ */
+body .fluent-messagebar.intent-success:not(.dark),
+body .fluent-messagebar.intent-error:not(.dark),
+body .fluent-messagebar.intent-warning:not(.dark),
+body .fluent-messagebar.intent-info:not(.dark) {
+    padding: 1rem 1.25rem;
+    border: none;
+    border-radius: 0;
+    color: #fff;
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+}
+
+body .fluent-messagebar.intent-success:not(.dark) {
+    background-color: var(--color-success);
+}
+
+body .fluent-messagebar.intent-error:not(.dark) {
+    background-color: var(--color-danger);
+}
+
+body .fluent-messagebar.intent-warning:not(.dark) {
+    background-color: var(--color-warning);
+}
+
+body .fluent-messagebar.intent-info:not(.dark) {
+    background-color: var(--color-info);
+}
+
+body .fluent-messagebar.intent-success:not(.dark) svg,
+body .fluent-messagebar.intent-error:not(.dark) svg,
+body .fluent-messagebar.intent-warning:not(.dark) svg,
+body .fluent-messagebar.intent-info:not(.dark) svg {
+    fill: #fff !important;
+}
+
+body .fluent-messagebar .fluent-messagebar-message {
+    color: inherit;
+    font-size: inherit;
+}
+
+body .fluent-messagebar a {
+    color: #fff;
+    font-weight: 600;
+}
+
+#blazor-error-ui {
+    display: none;
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 1000;
+}

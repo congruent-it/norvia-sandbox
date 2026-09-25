@@ -1,0 +1,90 @@
+@page "/personas/{PersonaId}/bookings"
+@* Interactive like the booking form: Fluent UI's components don't survive static streaming rendering. *@
+@rendermode InteractiveServer
+@inject IPartnerPortal Portal
+@inject NavigationManager Navigation
+@inject ILogger<MyBookings> Logger
+
+<PageTitle>My bookings · @(_persona?.DisplayName ?? PersonaId) · Partner portal</PageTitle>
+
+<h1>My bookings</h1>
+
+@if (_loadFailed)
+{
+    <div role="alert">
+        <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+            The bookings couldn't be loaded. Reload the page to try again.
+        </FluentMessageBar>
+    </div>
+}
+else if (_bookings is null)
+{
+    <FluentStack VerticalAlignment="VerticalAlignment.Center" role="status">
+        <FluentProgressRing />
+        <span>Loading the bookings…</span>
+    </FluentStack>
+}
+else if (_bookings.Count == 0)
+{
+    <div role="status">
+        <FluentMessageBar Intent="MessageIntent.Info" AllowDismiss="false">
+            @_persona!.DisplayName hasn't sent Norvia a booking yet. <a href="@PersonaChoice.NewBookingPath(PersonaId)">Book a transport</a>.
+        </FluentMessageBar>
+    </div>
+}
+else
+{
+    <p class="mb-6">Every booking @_persona!.DisplayName sent Norvia, the latest first, with Norvia's answer.</p>
+    <FluentDataGrid Items="_bookings.AsQueryable()" TGridItem="BookingView" Class="lux-table" aria-label="Bookings">
+        <PropertyColumn Title="Sent" Property="@(booking => PortalTime.Format(booking.SentAt))" />
+        <PropertyColumn Title="Shipper reference" Property="@(booking => booking.ShipperReference ?? "None")" />
+        <PropertyColumn Title="Answer" Property="@(booking => BookingResultText.Of(booking.Result))" />
+        <PropertyColumn Title="Transport Order" Property="@(booking => booking.TransportOrderNumber ?? "")" />
+        <TemplateColumn Title="Details">
+            @if (context.Reasons.Count > 0)
+            {
+                <ul class="m-0 list-disc pl-4">
+                    @foreach (var reason in context.Reasons)
+                    {
+                        <li>@reason.Text</li>
+                    }
+                </ul>
+            }
+            else if (context.Text is not null)
+            {
+                @context.Text
+            }
+        </TemplateColumn>
+        <PropertyColumn Title="Norvia's reference" Property="@(booking => booking.MessageId ?? "")" Class="text-xs" />
+    </FluentDataGrid>
+}
+
+@code {
+    private PersonaView? _persona;
+    private IReadOnlyList<BookingView>? _bookings;
+    private bool _loadFailed;
+
+    [Parameter]
+    public string PersonaId { get; set; } = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _bookings = null;
+        try
+        {
+            _persona = PersonaChoice.Find(PersonaId, await Portal.ListPersonasAsync(CancellationToken.None));
+            if (_persona is null)
+            {
+                Navigation.NotFound();
+                return;
+            }
+
+            _bookings = await Portal.ListBookingsAsync(PersonaId, CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            PageLog.BookingsLoadFailed(Logger, exception, PersonaId);
+            _loadFailed = true;
+        }
+    }
+}

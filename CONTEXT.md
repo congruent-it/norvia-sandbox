@@ -64,6 +64,10 @@ _Avoid_: freight, forwarding
 A Shipper's instruction for Norvia to move goods from an origin to a destination. The TMS owns it.
 _Avoid_: order, booking, job
 
+**Booking**:
+What a Shipper sends Norvia through the Norvia Partner API to ask for a transport, in the partner format. Norvia takes it in as a Transport Order, or keeps it as a Rejected booking. The Partner portal keeps every booking a Persona sent, with Norvia's answer, as the outside party's own records.
+_Avoid_: order, Transport Order (that is Norvia's, once accepted), Carrier booking (that is Norvia's request to a Carrier)
+
 **Shipper reference**:
 The Shipper's own reference for a booking. It is unique per Shipper: an Accepted Transport Order holds it, so the same booking sent again is a repeat that gets the original Transport Order back, and the reference sent with different content is rejected. A Rejected booking holds no reference.
 _Avoid_: order reference, customer reference, idempotency key
@@ -286,6 +290,10 @@ _Avoid_: Shipper API (that is the intake channel), gateway, public API
 **Persona**:
 One fictional party (a specific Shipper or Carrier) as played in the Partner portal, with its own identity towards Norvia.
 _Avoid_: user, role, tenant
+
+**Persona switcher**:
+The control in the Partner portal that chooses which Persona the presenter plays. Everything done after choosing one is done as that party, towards Norvia.
+_Avoid_: login, impersonation, role switcher (that is for Norvia's own users)
 
 ## Integration
 

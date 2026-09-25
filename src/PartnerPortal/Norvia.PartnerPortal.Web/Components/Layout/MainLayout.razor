@@ -1,0 +1,62 @@
+@inherits LayoutComponentBase
+@inject IPartnerPortal Portal
+@inject ILogger<MainLayout> Logger
+
+@* Fluent UI's own components take Lux's near-black as their accent, and stay light as Lux is. *@
+<FluentDesignTheme Mode="DesignThemeModes.Light" CustomColor="#1a1a1a" />
+
+@* Lux's navbar, light: white, with the brand and the navigation in near-black capitals, over a rule. *@
+<header class="border-b border-border bg-white">
+    <nav aria-label="Main" class="mx-auto flex max-w-7xl flex-wrap items-center gap-x-8 gap-y-3 px-4 py-6 text-xs font-semibold uppercase tracking-wider">
+        <a href="/" class="text-base tracking-[0.25em] text-primary no-underline hover:text-primary">Partner portal</a>
+        @if (_current is not null)
+        {
+            <NavLink href="@PersonaChoice.NewBookingPath(_current.Id)" Match="NavLinkMatch.All"
+                     class="text-muted no-underline hover:text-primary" ActiveClass="!text-primary">
+                Book a transport
+            </NavLink>
+            <NavLink href="@PersonaChoice.BookingsPath(_current.Id)" Match="NavLinkMatch.All"
+                     class="text-muted no-underline hover:text-primary" ActiveClass="!text-primary">
+                My bookings
+            </NavLink>
+            <div class="ml-auto">
+                <PersonaSwitcher Personas="_personas" Current="_current" />
+            </div>
+        }
+    </nav>
+</header>
+
+<main class="mx-auto max-w-7xl px-4 py-10">
+    @Body
+</main>
+
+<div id="blazor-error-ui" data-nosnippet>
+    <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+        Something went wrong. <a href="" class="reload">Reload</a>
+    </FluentMessageBar>
+</div>
+
+@code {
+    private IReadOnlyList<PersonaView> _personas = [];
+    private PersonaView? _current;
+
+    // The layout renders statically on every request, so it reads the Persona from the request itself.
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            _personas = await Portal.ListPersonasAsync(HttpContext?.RequestAborted ?? CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            // The page itself says what it couldn't load; the navbar just goes without the Personas.
+            PageLog.PersonasFailed(Logger, exception);
+            _personas = [];
+        }
+
+        _current = HttpContext is null || _personas.Count == 0 ? _personas.FirstOrDefault() : PersonaChoice.Current(HttpContext.Request, _personas);
+    }
+}

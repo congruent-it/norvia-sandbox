@@ -18,7 +18,10 @@ hooks:
     shell: sh
     run: ./infra/provision-estate.sh
     interactive: true
-  # Then the TMS's migrations, and the intake Logic App, which needs the address of the TMS just deployed.
+  # Then the databases' migrations, and the intake Logic App, which needs the address of the TMS just deployed.
   postdeploy:
     shell: sh
-    run: ./infra/migrate-tms.sh && ./infra/deploy-intake-logic-app.sh
+    run: >-
+      ./infra/migrate.sh tms-migrations "the TMS database" &&
+      ./infra/migrate.sh partner-portal-migrations "the Partner portal's database" &&
+      ./infra/deploy-intake-logic-app.sh

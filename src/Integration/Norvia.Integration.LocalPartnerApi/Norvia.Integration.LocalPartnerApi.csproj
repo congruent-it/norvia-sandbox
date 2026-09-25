@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!-- Locally, plays API Management and the intake Logic App for the Partner portal (ADR 0023). azd never deploys it. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Norvia.ServiceDefaults\Norvia.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\Norvia.Integration.TransportOrderIntake\Norvia.Integration.TransportOrderIntake.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Norvia.Integration.LocalPartnerApi.UnitTests" />
+  </ItemGroup>
+</Project>

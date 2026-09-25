@@ -178,6 +178,7 @@ resource triggerRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
 }
 
 output entraIssuer string = '${environment().authentication.loginEndpoint}${tenant().tenantId}/v2.0'
+output entraTenantId string = tenant().tenantId
 output tmsApiClientId string = tmsApi.appId
 output intakeClientId string = intakeIdentity.properties.clientId
 output intakeIdentityId string = intakeIdentity.id
@@ -190,6 +191,8 @@ output shipperByClientId array = [
 @description('Each Persona\'s client ID: personaId=clientId.')
 output personaClientIds array = [for (persona, i) in personas: '${persona.id}=${personaApps[i].appId}']
 output partnerPortalIdentityId string = partnerPortalIdentity.id
+output partnerPortalIdentityName string = partnerPortalIdentity.name
+output partnerPortalPrincipalId string = partnerPortalIdentity.properties.principalId
 output partnerPortalClientId string = partnerPortalIdentity.properties.clientId
 output apiManagementIdentityName string = apiManagementIdentity.name
 output apiManagementPrincipalId string = apiManagementIdentity.properties.principalId

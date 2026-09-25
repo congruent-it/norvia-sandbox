@@ -19,14 +19,48 @@ public sealed class AppHostModelTests
     }
 
     [Theory]
-    [InlineData("tms-api")]
-    [InlineData("tms-web")]
-    public async Task Locally_TheTms_StartsOnceItsDatabaseIsMigrated(string tmsResource)
+    [InlineData("tms-api", "tms-migrations")]
+    [InlineData("tms-web", "tms-migrations")]
+    [InlineData("partner-portal-web", "partner-portal-migrations")]
+    public async Task Locally_AnApp_StartsOnceItsDatabaseIsMigrated(string app, string migrations)
     {
         await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(TestContext.Current.CancellationToken);
 
-        Resource(builder, tmsResource).Annotations.OfType<WaitAnnotation>()
-            .Should().Contain(wait => wait.Resource.Name == "tms-migrations" && wait.WaitType == WaitType.WaitForCompletion);
+        Resource(builder, app).Annotations.OfType<WaitAnnotation>()
+            .Should().Contain(wait => wait.Resource.Name == migrations && wait.WaitType == WaitType.WaitForCompletion);
+    }
+
+    [Fact]
+    public async Task Locally_ThePartnerPortal_ReachesNorviaThroughTheLocalPartnerApi_WithTokensItSignsItself()
+    {
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(TestContext.Current.CancellationToken);
+
+        var portal = await EnvironmentOfAsync(builder, "partner-portal-web");
+
+        portal.Should().Contain("PartnerApi__BaseAddress", "{partner-api.bindings.http.url}/partner/v1")
+            .And.Contain("PartnerApi__PersonaClientIds", "brouwer-dranken=norvia-local-persona-brouwer-dranken;van-dijk-transport=norvia-local-persona-van-dijk-transport")
+            .And.Contain("PartnerApi__LocalTokens__Roles__brouwer-dranken__0", "TransportOrders.Submit")
+            .And.ContainKey("PartnerApi__LocalTokens__SigningKey");
+        portal.Keys.Should().NotContain("PartnerApi__LocalTokens__Roles__van-dijk-transport__0", "a Carrier Persona holds no submit role");
+        portal.Keys.Should().NotContain(key => key.StartsWith("PartnerApi__Entra", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Locally_EveryPersona_HasOneSubscriptionKey_ThatTheLocalPartnerApiKnows()
+    {
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(TestContext.Current.CancellationToken);
+
+        var portal = await EnvironmentOfAsync(builder, "partner-portal-web");
+        var partnerApi = await EnvironmentOfAsync(builder, "partner-api");
+
+        foreach (var persona in new[] { "brouwer-dranken", "van-dijk-transport" })
+        {
+            var key = $"PartnerApi__SubscriptionKeys__{persona}";
+            portal[key].Should().NotBeNullOrEmpty().And.Be(partnerApi[key]);
+        }
+
+        partnerApi.Should().Contain("PartnerApi__ShippersByClientId__norvia-local-persona-brouwer-dranken", "SHP-0001");
+        partnerApi.Keys.Should().NotContain(key => key.Contains("van-dijk-transport", StringComparison.Ordinal) && key.Contains("ShippersByClientId", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -69,12 +103,55 @@ public sealed class AppHostModelTests
     [InlineData("tms-api")]
     [InlineData("tms-web")]
     [InlineData("tms-migrations")]
-    public async Task InAzure_TheTms_SendsItsTelemetryToTheEstatesApplicationInsights(string tmsResource)
+    [InlineData("partner-portal-web")]
+    [InlineData("partner-portal-migrations")]
+    public async Task InAzure_AnApp_SendsItsTelemetryToTheEstatesApplicationInsights(string tmsResource)
     {
         await using var builder = await CreateForAzureAsync();
 
         builder.Resources.OfType<AzureApplicationInsightsResource>().Single().IsExisting().Should().BeTrue();
         (await EnvironmentOfAsync(builder, tmsResource)).Should().ContainKey("APPLICATIONINSIGHTS_CONNECTION_STRING");
+    }
+
+    [Fact]
+    public async Task InAzure_ThePartnerPortal_BooksThroughApiManagement_AsTheIdentityThePersonasTrust()
+    {
+        await using var builder = await CreateForAzureAsync();
+
+        var portal = await EnvironmentOfAsync(builder, "partner-portal-web");
+
+        portal.Should().Contain("PartnerApi__BaseAddress", "{estate-partner-api-url.value}")
+            .And.Contain("PartnerApi__PersonaClientIds", "{estate-persona-client-ids.value}")
+            .And.Contain("PartnerApi__Entra__TenantId", "{estate-entra-tenant-id.value}")
+            .And.Contain("PartnerApi__Entra__Scope", "{estate-partner-api-client-id.value}/.default")
+            .And.Contain("PartnerApi__Entra__ManagedIdentityClientId", "{estate-partner-portal-client-id.value}");
+        portal.Keys.Should().NotContain(key => key.StartsWith("PartnerApi__LocalTokens", StringComparison.Ordinal), "only Entra issues tokens in Azure");
+        Resource(builder, "partner-portal-web").Annotations.OfType<AppIdentityAnnotation>()
+            .Should().ContainSingle().Which.IdentityResource.Should().BeOfType<AzureUserAssignedIdentityResource>().Which.Name.Should().Be("partner-portal-identity");
+        builder.Resources.OfType<AzureUserAssignedIdentityResource>().Single(identity => identity.Name == "partner-portal-identity")
+            .IsExisting().Should().BeTrue("the estate owns the identity, because the Personas' app registrations trust it");
+    }
+
+    [Fact]
+    public async Task InAzure_ThePersonasSubscriptionKeys_ComeFromTheEstatesKeyVault()
+    {
+        await using var builder = await CreateForAzureAsync();
+
+        var portal = await EnvironmentOfAsync(builder, "partner-portal-web");
+
+        builder.Resources.OfType<AzureKeyVaultResource>().Single().IsExisting().Should().BeTrue();
+        foreach (var persona in new[] { "brouwer-dranken", "van-dijk-transport" })
+        {
+            portal[$"PartnerApi__SubscriptionKeys__{persona}"].Should().Contain($"subscription-key-{persona}");
+        }
+    }
+
+    [Fact]
+    public async Task InAzure_ThereIsNoLocalPartnerApi_ApiManagementIsTheOne()
+    {
+        await using var builder = await CreateForAzureAsync();
+
+        builder.Resources.Should().NotContain(resource => resource.Name == "partner-api");
     }
 
     [Fact]
@@ -116,8 +193,10 @@ public sealed class AppHostModelTests
     /// <summary>The environment a resource gets as azd deploys it, with each value as its manifest expression.</summary>
     private static async Task<Dictionary<string, string>> EnvironmentOfAsync(IDistributedApplicationTestingBuilder builder, string name)
     {
-        var context = new EnvironmentCallbackContext(builder.ExecutionContext, cancellationToken: TestContext.Current.CancellationToken);
-        foreach (var callback in Resource(builder, name).Annotations.OfType<EnvironmentCallbackAnnotation>())
+        var resource = Resource(builder, name);
+        // Some callbacks, such as a reference's, ask which resource they configure.
+        var context = new EnvironmentCallbackContext(builder.ExecutionContext, resource, cancellationToken: TestContext.Current.CancellationToken);
+        foreach (var callback in resource.Annotations.OfType<EnvironmentCallbackAnnotation>())
         {
             await callback.Callback(context);
         }

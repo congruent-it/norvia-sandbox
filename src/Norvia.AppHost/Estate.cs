@@ -21,4 +21,23 @@ public sealed class Estate(IDistributedApplicationBuilder builder)
 
     /// <summary>The intake Logic App's managed identity, the one caller on the Shipper API intake channel.</summary>
     public IResourceBuilder<ParameterResource> IntakeClientId { get; } = builder.AddParameter("estate-intake-client-id");
+
+    public IResourceBuilder<ParameterResource> EntraTenantId { get; } = builder.AddParameter("estate-entra-tenant-id");
+
+    /// <summary>The Norvia Partner API in API Management: <c>https://&lt;API Management&gt;.azure-api.net/partner/v1</c>.</summary>
+    public IResourceBuilder<ParameterResource> PartnerApiUrl { get; } = builder.AddParameter("estate-partner-api-url");
+
+    /// <summary>The Norvia Partner API's app registration, the audience of the Personas' tokens.</summary>
+    public IResourceBuilder<ParameterResource> PartnerApiClientId { get; } = builder.AddParameter("estate-partner-api-client-id");
+
+    /// <summary>Each Persona's client app: <c>personaId=clientId</c> pairs separated by semicolons.</summary>
+    public IResourceBuilder<ParameterResource> PersonaClientIds { get; } = builder.AddParameter("estate-persona-client-ids");
+
+    /// <summary>The Partner portal's managed identity, which every Persona's client app trusts (ADR 0005).</summary>
+    public IResourceBuilder<ParameterResource> PartnerPortalIdentity { get; } = builder.AddParameter("estate-partner-portal-identity-name");
+
+    public IResourceBuilder<ParameterResource> PartnerPortalClientId { get; } = builder.AddParameter("estate-partner-portal-client-id");
+
+    /// <summary>The Key Vault that holds each Persona's subscription key as <c>subscription-key-&lt;persona&gt;</c>.</summary>
+    public IResourceBuilder<ParameterResource> PartnerPortalKeyVault { get; } = builder.AddParameter("estate-partner-portal-key-vault");
 }
