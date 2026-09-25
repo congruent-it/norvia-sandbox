@@ -69,6 +69,17 @@ public sealed class IntakeMapTests
     }
 
     [Fact]
+    public void Spellings_TheMapKnows_AreExactlyTheOnesTheBookingSchemaAllows()
+    {
+        // The two lists live apart until a second partner format needs countries too, so neither may drift from the other.
+        var schemaAllows = PartnerApiSamples.CountrySpellings().ToHashSet(StringComparer.Ordinal);
+        var mapKnows = Countries.Spellings.ToHashSet(StringComparer.Ordinal);
+
+        mapKnows.Except(schemaAllows).Should().BeEmpty("the booking schema should allow every spelling the map knows");
+        schemaAllows.Except(mapKnows).Should().BeEmpty("the map should know every spelling the booking schema allows");
+    }
+
+    [Fact]
     public void ToTransportOrder_IsoCode_GivesTheSameCode()
     {
         var booking = new JsonObject { ["pickupCountry"] = "PT" };

@@ -3,4 +3,8 @@
     <!-- Logic Apps Standard runs local functions on .NET 8 only (ADR 0019). -->
     <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
+  <ItemGroup>
+    <!-- The tests check that the booking schema allows exactly the country spellings the map knows. -->
+    <InternalsVisibleTo Include="Norvia.Integration.TransportOrderIntake.UnitTests" />
+  </ItemGroup>
 </Project>
