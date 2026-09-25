@@ -84,6 +84,8 @@ API Management creates the correlation ID at the edge. It travels as a header th
 
 The TMS puts the tracking-contract keys it knows in the logging scope of an intake call. `correlationId` and `flow` (`transport-order-intake`) cover the whole call, from before authentication, so a refused call is logged under its correlation ID with the outcome `Refused`. `partyId` (the Shipper ID) covers the submission, and `transportOrderNumber` is added once the booking is accepted. Publishing the outcome event later is logged under the event's own tracking keys, so it joins the same trail. The TMS never logs the Consignee's name, address or phone number.
 
+API Management records its part of the trail as traces in Application Insights, with the same keys: a call it passes on with `correlationId`, `flow` and `partyId`, and a call it refuses with `correlationId`, `flow`, `outcome` (`Refused`) and `failureCode`. Its request telemetry also carries the correlation ID it sent to the Logic App and returned to the caller.
+
 The intake Logic App sets the run's client tracking ID to the correlation ID, and sets the tracking contract's keys as tracked properties on its trigger (`correlationId`, `flow`, `partyId`) and on the step that calls the TMS, which adds `transportOrderNumber` once known, `outcome` and `failureCode`. Logic Apps lets a tracked property read only its own step, so the TMS call's keys come from the call itself: the correlation ID from its header, the Shipper from the Transport Order it sends. The run history shows the partner booking (the trigger), the Canonical Model Transport Order (the TMS call's input) and the TMS's answer (its output). No step uses secure inputs or outputs.
 
 | TMS answer | `outcome` | `failureCode` | The Shipper gets |
