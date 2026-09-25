@@ -4,7 +4,8 @@
 #   1. the holder of the TMS intake role (the intake Logic App's managed identity) submits a Transport Order and reads
 #      it back, from a throwaway Container Apps job that runs as that identity;
 #   2. a caller without the role is refused, by Entra and by the TMS;
-#   3. the TransportOrderAccepted event is on the estate's transport-order-events topic;
+#   3. the TransportOrderAccepted event is on the estate's transport-order-events topic, seen through a subscription of
+#      the test's own;
 #   4. the TMS's traces of the call are in Application Insights, found by correlation ID.
 set -euo pipefail
 
@@ -13,9 +14,9 @@ resource_group=${AZURE_RESOURCE_GROUP:-rg-$AZURE_ENV_NAME}
 tms="https://$(az containerapp show --name tms-api --resource-group "$resource_group" --query properties.configuration.ingress.fqdn --output tsv)"
 correlation_id=$(cat /proc/sys/kernel/random/uuid)
 shipper_reference="SMOKE-$(date +%Y%m%d%H%M%S)"
-collection_day=$(date -u -d '+2 days' +%F)
-booking=$(jq -c --arg reference "$shipper_reference" --arg day "$collection_day" '
-  .shipperReference = $reference
+booking=$(jq -c --arg reference "$shipper_reference" '
+  (now + 2 * 86400 | strftime("%Y-%m-%d")) as $day
+  | .shipperReference = $reference
   | .collection.window = { earliest: "\($day)T06:00:00+00:00", latest: "\($day)T10:00:00+00:00" }' \
   "$(dirname "$0")/../contracts/partner-api/samples/bookings/minimal.transport-order.json")
 
@@ -25,9 +26,27 @@ fail() { echo "FAIL  $*" >&2; exit 1; }
 echo "TMS: $tms"
 echo "Correlation ID: $correlation_id"
 
+# The test's own subscription, created before the event is published, receives only this call's event. Its filter
+# keeps to the tracking contract (coding guidelines §7). Service Bus deletes it after 10 idle minutes if the cleanup
+# below doesn't run.
+run="smoke-intake-$(date +%s)"
+job=$run
+subscription=$run
+cleanup() {
+  az containerapp job delete --name "$job" --resource-group "$resource_group" --yes --output none 2>/dev/null || true
+  az servicebus topic subscription delete --resource-group "$resource_group" --namespace-name "$AZURE_ESTATE_SERVICE_BUS_NAMESPACE" \
+    --topic-name transport-order-events --name "$subscription" --output none 2>/dev/null || true
+}
+trap cleanup EXIT
+az servicebus topic subscription create --resource-group "$resource_group" --namespace-name "$AZURE_ESTATE_SERVICE_BUS_NAMESPACE" \
+  --topic-name transport-order-events --name "$subscription" --auto-delete-on-idle PT10M --output none
+az servicebus topic subscription rule create --resource-group "$resource_group" --namespace-name "$AZURE_ESTATE_SERVICE_BUS_NAMESPACE" \
+  --topic-name transport-order-events --subscription-name "$subscription" --name this-call \
+  --filter-sql-expression "(sys.CorrelationId = '$correlation_id' AND resubmitTo IS NULL) OR resubmitTo = '$subscription'" --output none
+az servicebus topic subscription rule delete --resource-group "$resource_group" --namespace-name "$AZURE_ESTATE_SERVICE_BUS_NAMESPACE" \
+  --topic-name transport-order-events --subscription-name "$subscription" --name '$Default' --output none
+
 # 1. The intake identity submits and reads back. Its token can only be had inside Azure, so a job runs the calls.
-job="smoke-intake-$(date +%s)"
-trap 'az containerapp job delete --name "$job" --resource-group "$resource_group" --yes --output none 2>/dev/null || true' EXIT
 az containerapp job create --name "$job" --resource-group "$resource_group" \
   --environment "$(az containerapp env list --resource-group "$resource_group" --query '[0].id' --output tsv)" \
   --trigger-type Manual --replica-timeout 300 --replica-retry-limit 0 \
@@ -45,7 +64,7 @@ az containerapp job create --name "$job" --resource-group "$resource_group" \
     echo "Submitted: $status $(cat /tmp/submitted.json)"
     [ "$status" = 201 ]
     number=$(python3 -c "import json; print(json.load(open(\"/tmp/submitted.json\"))[\"transportOrderNumber\"])")
-    echo "Read back: $(curl -fsS "$TMS/v1/transport-orders/$number")"' \
+    echo "Read back: $(curl -fsS "$TMS/v1/transport-orders/$number" -H "Authorization: Bearer $token")"' \
   --output none
 execution=$(az containerapp job start --name "$job" --resource-group "$resource_group" --query name --output tsv)
 while
@@ -71,26 +90,14 @@ for token in "" "$(az account get-access-token --query accessToken --output tsv)
 done
 pass "the TMS refuses a caller without a token and one with a token for another audience"
 
-# 3. The event is on the topic. Peek-lock the monitoring subscription's messages, then release every lock.
+# 3. The event is on the topic: receive it from the test's own subscription.
 service_bus_token=$(az account get-access-token --resource https://servicebus.azure.net --query accessToken --output tsv)
-subscription="https://$AZURE_ESTATE_SERVICE_BUS_NAMESPACE.servicebus.windows.net/transport-order-events/subscriptions/monitoring"
-locks=()
-found=""
-for _ in $(seq 1 50); do
-  headers=$(curl -sS -D - -o /dev/null -X POST "$subscription/messages/head?timeout=10" -H "Authorization: Bearer $service_bus_token")
-  grep -q '^HTTP/[0-9.]* 201' <<<"$headers" || break
-  locks+=("$(grep -i '^location:' <<<"$headers" | tr -d '\r' | cut -d' ' -f2)")
-  # The event type is the message's subject, which the REST API calls its label.
-  broker_properties=$(grep -i '^brokerproperties:' <<<"$headers" | cut -d' ' -f2-)
-  if jq -e --arg id "$correlation_id" '.CorrelationId == $id and .Label == "TransportOrderAccepted"' <<<"$broker_properties" >/dev/null; then
-    found=yes
-    break
-  fi
-done
-for lock in "${locks[@]}"; do
-  curl -sS -o /dev/null -X PUT "$lock" -H "Authorization: Bearer $service_bus_token"
-done
-[ -n "$found" ] || fail "no TransportOrderAccepted event with correlation ID $correlation_id on transport-order-events"
+messages="https://$AZURE_ESTATE_SERVICE_BUS_NAMESPACE.servicebus.windows.net/transport-order-events/subscriptions/$subscription/messages/head?timeout=60"
+headers=$(curl -sS -D - -o /dev/null -X DELETE "$messages" -H "Authorization: Bearer $service_bus_token")
+# The event type is the message's subject, which the REST API calls its label.
+broker_properties=$(grep -i '^brokerproperties:' <<<"$headers" | cut -d' ' -f2- || true)
+jq -e '.Label == "TransportOrderAccepted"' <<<"${broker_properties:-null}" >/dev/null \
+  || fail "no TransportOrderAccepted event with correlation ID $correlation_id reached transport-order-events"
 pass "TransportOrderAccepted is on the transport-order-events topic"
 
 # 4. The TMS's traces are in Application Insights. Ingestion takes a few minutes.

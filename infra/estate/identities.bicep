@@ -56,6 +56,5 @@ resource intakeRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
 
 output entraIssuer string = '${environment().authentication.loginEndpoint}${tenant().tenantId}/v2.0'
 output tmsApiClientId string = tmsApi.appId
-output tmsApiIdentifierUri string = tmsApi.identifierUris[0]
 output intakeClientId string = intakeIdentity.properties.clientId
 output intakeIdentityId string = intakeIdentity.id

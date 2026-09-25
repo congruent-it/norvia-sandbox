@@ -89,6 +89,7 @@ public static class DependencyInjection
         await scope.ServiceProvider.GetRequiredService<TmsDbContext>().Database.MigrateAsync(cancellationToken);
     }
 
+    /// <summary>The <see cref="TmsDbContext"/> and what it is built with, apart from its domain event dispatcher.</summary>
     private static void AddTmsDbContext(this IHostApplicationBuilder builder)
     {
         builder.Services.AddDbContext<TmsDbContext>(options =>

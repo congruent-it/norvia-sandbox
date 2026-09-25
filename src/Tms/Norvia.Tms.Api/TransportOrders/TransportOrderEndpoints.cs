@@ -38,9 +38,10 @@ public static class TransportOrderEndpoints
                 + "Submitting the same booking again (same Shipper, Shipper reference and content) gets a 200 with the original Transport Order, "
                 + "flagged as a repeat; reusing a Shipper reference for different content is rejected with ShipperReferenceReused.");
 
-        // Reads stay open until their caller exists: API Management's Shipper tracking role (P8) brings the role it is
-        // authorized on. The TMS UI doesn't call them; it reads through the query side in process.
-        var queries = transportOrders.MapGroup("").AllowAnonymous();
+        // Reads get their own role with their caller, API Management's Shipper tracking (P8). Until then they answer any
+        // caller with a TMS token: the API is reachable from outside Azure, and in Azure Entra issues a TMS token only
+        // to a principal holding one of its roles. The TMS UI doesn't call them; it reads through the query side in process.
+        var queries = transportOrders.MapGroup("").RequireAuthorization();
 
         queries.MapGet("/{id:guid}", GetByIdAsync)
             .WithName("GetTransportOrderById")

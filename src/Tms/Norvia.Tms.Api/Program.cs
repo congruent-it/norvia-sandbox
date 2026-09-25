@@ -40,9 +40,7 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
 builder.Services.AddAuthorization();
 builder.Services.AddOptions<IntakeCallersOptions>().BindConfiguration(IntakeCallersOptions.SectionName)
     .Validate(options => options.ClientIdsByChannel.Values.Any(clientIds => clientIds.Length > 0), "No caller is registered for an intake channel.")
-    .Validate(
-        options => options.ClientIdsByChannel.Values.SelectMany(clientIds => clientIds).CountBy(clientId => clientId, StringComparer.OrdinalIgnoreCase).All(count => count.Value == 1),
-        "A caller is registered for more than one intake channel.")
+    .Validate(options => options.RegistersEachCallerOnce(), "A caller is registered more than once.")
     .ValidateOnStart();
 builder.Services.AddSingleton<IntakeCallers>();
 

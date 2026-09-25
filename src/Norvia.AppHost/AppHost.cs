@@ -32,8 +32,13 @@ var tmsWeb = builder.AddProject<Projects.Norvia_Tms_Web>("tms-web")
     .WithHttpHealthCheck("/health")
     .WithUrlForEndpoint("http", url => url.DisplayText = "TMS UI");
 
-IResourceBuilder<ProjectResource>[] tms = [tmsMigrations, tmsApi, tmsWeb];
-IResourceBuilder<ProjectResource>[] readersOfTheSeedFile = [tmsApi, tmsWeb];
+// Locally the TMS reads the repo's seed file; in Azure the copy its image carries, next to the app (the image's working
+// directory).
+var seedPath = builder.ExecutionContext.IsPublishMode ? Path.Combine("seed", "norvia.seed.json") : seedFile;
+foreach (var readerOfTheSeedFile in new[] { tmsApi, tmsWeb })
+{
+    readerOfTheSeedFile.WithEnvironment("Seed__Path", seedPath);
+}
 
 if (builder.ExecutionContext.IsPublishMode)
 {
@@ -47,15 +52,9 @@ if (builder.ExecutionContext.IsPublishMode)
     messaging.PublishAsExisting(estate.ServiceBusNamespace, null);
 
     var insights = builder.AddAzureApplicationInsights("insights").PublishAsExisting(estate.ApplicationInsights, null);
-    foreach (var project in tms)
+    foreach (var tmsProject in new[] { tmsMigrations, tmsApi, tmsWeb })
     {
-        project.WithReference(insights);
-    }
-
-    foreach (var project in readersOfTheSeedFile)
-    {
-        // The seed file ships in the image, next to the app (the image's working directory).
-        project.WithEnvironment("Seed__Path", Path.Combine("seed", "norvia.seed.json"));
+        tmsProject.WithReference(insights);
     }
 
     // In Azure the TMS trusts Entra only, and only the intake Logic App's managed identity may submit (ADR 0005).
@@ -72,11 +71,6 @@ else
     messaging.RunAsEmulator(emulator => emulator.WithConfiguration(ResubmitAwareFilters.Apply))
         .AddServiceBusTopic("transport-order-events")
         .AddServiceBusSubscription("monitoring");
-
-    foreach (var project in readersOfTheSeedFile)
-    {
-        project.WithEnvironment("Seed__Path", seedFile);
-    }
 
     // Locally the TMS trusts tokens signed with this key (see LocalTokens).
     var localTokenSigningKey = builder.AddParameter(

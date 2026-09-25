@@ -12,4 +12,10 @@ public sealed class IntakeCallersOptions
     public const string SectionName = "IntakeCallers";
 
     public Dictionary<IntakeChannel, string[]> ClientIdsByChannel { get; init; } = [];
+
+    /// <summary>Whether no client ID is listed twice, on one channel or on two, in any case.</summary>
+    public bool RegistersEachCallerOnce() =>
+        ClientIdsByChannel.Values.SelectMany(clientIds => clientIds)
+            .CountBy(clientId => clientId, StringComparer.OrdinalIgnoreCase)
+            .All(registrations => registrations.Value == 1);
 }

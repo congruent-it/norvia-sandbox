@@ -10,8 +10,9 @@ param environmentName string
 @description('The Azure region for every resource in the estate.')
 param location string
 
-@description('''How many days the integration layer keeps what it traced: Application Insights, Log Analytics, Logic Apps
-run history and the transit containers. The one place retention is set (coding guidelines §7).''')
+@description('''How many days the integration layer keeps what it traced: Application Insights and Log Analytics now, and
+Logic Apps run history and the transit containers once they exist. The one place retention is set (coding guidelines
+§7). Application Insights accepts only these values.''')
 @allowed([30, 60, 90, 120, 180, 270, 365, 550, 730])
 param integrationRetentionDays int = 90
 
@@ -63,6 +64,5 @@ output ESTATE_LOG_ANALYTICS_WORKSPACE string = monitoring.outputs.workspaceName
 output ESTATE_APPLICATION_INSIGHTS string = monitoring.outputs.applicationInsightsName
 output ESTATE_ENTRA_ISSUER string = identities.outputs.entraIssuer
 output ESTATE_TMS_API_CLIENT_ID string = identities.outputs.tmsApiClientId
-output ESTATE_TMS_API_IDENTIFIER_URI string = identities.outputs.tmsApiIdentifierUri
 output ESTATE_INTAKE_CLIENT_ID string = identities.outputs.intakeClientId
 output ESTATE_INTAKE_IDENTITY_ID string = identities.outputs.intakeIdentityId

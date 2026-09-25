@@ -4,12 +4,14 @@
 set -eu
 
 resource_group=${AZURE_RESOURCE_GROUP:-rg-$AZURE_ENV_NAME}
-execution=$(az containerapp job start --name tms-migrations --resource-group "$resource_group" --query name --output tsv)
+execution=$(az containerapp job start --subscription "$AZURE_SUBSCRIPTION_ID" --name tms-migrations \
+  --resource-group "$resource_group" --query name --output tsv)
 echo "Migrating the TMS database ($execution)..."
 
+# The job itself gives up after its replica timeout (30 minutes).
 while
-  status=$(az containerapp job execution show --name tms-migrations --resource-group "$resource_group" \
-    --job-execution-name "$execution" --query properties.status --output tsv)
+  status=$(az containerapp job execution show --subscription "$AZURE_SUBSCRIPTION_ID" --name tms-migrations \
+    --resource-group "$resource_group" --job-execution-name "$execution" --query properties.status --output tsv)
   [ "$status" = Running ] || [ "$status" = Processing ]
 do
   sleep 10
