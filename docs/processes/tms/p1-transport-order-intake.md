@@ -49,7 +49,7 @@ A unique index on the Shipper and the Shipper reference of Accepted Transport Or
 
 ### When the TMS can't be reached
 
-On a TMS server error or timeout, the Logic App retries with a bounded exponential policy. When the retries are used up, it returns a gateway error (`NOT_RECEIVED`) that tells the Shipper the booking was not received, so they know to try again. The run shows as failed in the Logic App run history.
+On a TMS server error or timeout, the Logic App retries with a bounded exponential policy: three retries, 5 to 20 seconds apart, each attempt timing out after 30 seconds. The Shipper's call waits for the answer, so even when every attempt times out the answer comes back in about three minutes, before Azure closes the call at 230 seconds. When the retries are used up, it returns a gateway error (`NOT_RECEIVED`) that tells the Shipper the booking was not received, so they know to try again. The run shows as failed in the Logic App run history. Intake is idempotent, so a retry of a booking the TMS did take in is answered as a repeat.
 
 ## Validation rules
 
@@ -83,6 +83,17 @@ Each failure has a stable code and a readable message. Codes are never renamed; 
 API Management creates the correlation ID at the edge. It travels as a header through the Logic App to the TMS, is stored on the Transport Order and is carried in the properties of the outcome event. Every intake attempt, whether accepted, rejected, refused or failed, can be found by it in Application Insights.
 
 The TMS puts the tracking-contract keys it knows in the logging scope of an intake call. `correlationId` and `flow` (`transport-order-intake`) cover the whole call, from before authentication, so a refused call is logged under its correlation ID with the outcome `Refused`. `partyId` (the Shipper ID) covers the submission, and `transportOrderNumber` is added once the booking is accepted. Publishing the outcome event later is logged under the event's own tracking keys, so it joins the same trail. The TMS never logs the Consignee's name, address or phone number.
+
+The intake Logic App sets the run's client tracking ID to the correlation ID, and sets the tracking contract's keys as tracked properties on its trigger (`correlationId`, `flow`, `partyId`) and on the step that calls the TMS, which adds `transportOrderNumber` once known, `outcome` and `failureCode`. Logic Apps lets a tracked property read only its own step, so the TMS call's keys come from the call itself: the correlation ID from its header, the Shipper from the Transport Order it sends. The run history shows the partner booking (the trigger), the Canonical Model Transport Order (the TMS call's input) and the TMS's answer (its output). No step uses secure inputs or outputs.
+
+| TMS answer | `outcome` | `failureCode` | The Shipper gets |
+|---|---|---|---|
+| Accepted, or a repeat | `Succeeded` | | `ACCEPTED` or `ALREADY_BOOKED` |
+| Rejected (422) | `Refused` | `TransportOrderRejected`. Each reason's own code is in the run's TMS answer | `REJECTED` |
+| Another client error, such as 400, 401 or 403: the integration layer is at fault | `Failed` | `TmsCallRefused` | `NOT_RECEIVED`, and the run fails |
+| A server error, 408, 429 or no answer, after the retries | `Failed` | `TmsUnavailable` | `NOT_RECEIVED`, and the run fails |
+
+The relay decides the failure code the run fails with, and the TMS call's `failureCode` follows the same rule in the workflow, because a tracked property can't read the relay. Logic Apps can't leave a tracked property out when it doesn't apply, so `transportOrderNumber` and `failureCode` are recorded as null there, never as an empty value.
 
 It is not the Transport Order number. The TMS assigns that number only on acceptance, and rejected or refused attempts need tracing too.
 

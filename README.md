@@ -4,7 +4,7 @@ A working integration estate for a fictional company, **Norvia Logistics B.V.**,
 
 The estate can also run *as found*, reproducing the problems a health check would find (a missing dead-letter alert, a mapping that can't handle a Carrier status, marketplace orders routed to the wrong system), and fixing them one at a time.
 
-> **Status:** first build. The TMS takes in a Transport Order through its intake API and publishes `TransportOrderAccepted`, running locally under Aspire. The TMS UI lists the Transport Orders waiting for planning for the Planner and the rejected bookings for Customer service, both live, and shows each one in full; a Role switcher moves between the two without a login. The partner booking format and the intake map to the Canonical Model exist and are tested with sample messages. `azd up` deploys the estate (Service Bus, monitoring, Entra) and the TMS to Azure. The rest of P1 (the Logic App, API Management and the Partner portal) follows in the tickets under GitHub issue #1.
+> **Status:** first build. The TMS takes in a Transport Order through its intake API and publishes `TransportOrderAccepted`, running locally under Aspire. The TMS UI lists the Transport Orders waiting for planning for the Planner and the rejected bookings for Customer service, both live, and shows each one in full; a Role switcher moves between the two without a login. The partner booking format and the intake map to the Canonical Model exist and are tested with sample messages. `azd up` deploys the estate (Service Bus, monitoring, Entra, the intake Logic App) and the TMS to Azure. The intake Logic App maps a partner booking, submits it to the TMS as the one identity holding the intake role, and answers in the partner format. The rest of P1 (API Management and the Partner portal) follows in the tickets under GitHub issue #1.
 
 ## Start here
 
@@ -58,7 +58,7 @@ dotnet test Norvia.slnx                      # unit, architecture, integration a
 | [tests/](tests/) | Tests per project, mirroring `src/` |
 | [contracts/canonical-model/](contracts/canonical-model/) | The Canonical Model as JSON Schemas |
 | [contracts/partner-api/](contracts/partner-api/README.md) | The Norvia Partner API's booking format and responses, with sample bookings and the Canonical Model Transport Order each maps to |
-| [src/Integration/](src/Integration/) | Code the integration layer runs: the intake map from a partner booking to the Canonical Model ([ADR 0019](docs/adr/0019-the-intake-map-is-dotnet-code-run-as-a-logic-apps-local-function.md)) |
+| [src/Integration/](src/Integration/) | What the integration layer runs: the intake Logic App ([IntakeLogicApp](src/Integration/IntakeLogicApp/)), and the intake map and relay it calls as .NET local functions ([ADR 0019](docs/adr/0019-the-intake-map-is-dotnet-code-run-as-a-logic-apps-local-function.md)) |
 | [seed/norvia.seed.json](seed/norvia.seed.json) | The seed file: the one source of Shippers, Carriers and Personas |
 | [infra/](infra/) | The estate Bicep and the azd hooks that deploy it ([ADR 0004](docs/adr/0004-bicep-owns-the-estate-aspire-owns-the-apps.md)) |
 
@@ -74,7 +74,7 @@ CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the pull request 
 
 ## Deploying to Azure
 
-Needs the [Azure Developer CLI](https://aka.ms/azd) and the Azure CLI, both signed in to the same tenant as a user who may create resources in the subscription and app registrations in Entra ID, plus `jq`.
+Needs the [Azure Developer CLI](https://aka.ms/azd) and the Azure CLI, both signed in to the same tenant as a user who may create resources in the subscription and app registrations in Entra ID, plus `jq` and `zip`.
 
 ```bash
 azd env new <environment> --subscription <subscription-id> --location <region>
@@ -88,13 +88,13 @@ azd (1.33 and 1.34 at least) builds the AppHost's container images in parallel, 
 
 `azd up` runs in three steps ([ADR 0004](docs/adr/0004-bicep-owns-the-estate-aspire-owns-the-apps.md)):
 
-1. The estate hook ([infra/provision-estate.sh](infra/provision-estate.sh)), run before `azd up` and before `azd provision`, deploys the estate, [infra/estate.bicep](infra/estate.bicep), into `rg-<environment>`. That covers the Service Bus namespace with the `transport-order-events` topic, Log Analytics and Application Insights, the TMS API's app registration with its intake role, and the intake Logic App's managed identity, which holds that role. The hook stores the estate's outputs in the azd environment as `AZURE_ESTATE_*`.
+1. The estate hook ([infra/provision-estate.sh](infra/provision-estate.sh)), run before `azd up` and before `azd provision`, deploys the estate, [infra/estate.bicep](infra/estate.bicep), into `rg-<environment>`. That covers the Service Bus namespace with the `transport-order-events` topic, Log Analytics and Application Insights, the TMS API's app registration with its intake role, and the intake Logic App: a Logic Apps Standard app on a Workflow Standard plan, with its storage account and a Key Vault. It calls the TMS as the intake Logic App's managed identity, the one that holds that role, and reaches its own storage and Key Vault with a second identity that holds nothing else. The hook stores the estate's outputs in the azd environment as `AZURE_ESTATE_*`.
 2. azd provisions and deploys the apps from the AppHost into the same resource group: the Container Apps environment, the TMS API (reachable from outside the environment), the TMS UI (reachable only inside it), the migrations as a Container Apps job, and Azure SQL serverless on the free offer. In Azure the AppHost references the estate's Service Bus, workspace and Application Insights instead of creating its own. The TMS trusts only Entra tokens for its app registration, and only the intake Logic App's identity may submit. Its queries also need such a token until API Management's Shipper tracking role arrives (P8); Entra issues one only to a principal holding one of the TMS's roles.
-3. The postdeploy hook ([infra/migrate-tms.sh](infra/migrate-tms.sh)) runs the migrations job and fails the deployment if it fails. In Azure nothing makes the TMS wait for it, so on a first deployment the TMS logs failed outbox cycles until the schema exists.
+3. The postdeploy hook runs the migrations job ([infra/migrate-tms.sh](infra/migrate-tms.sh)) and fails the deployment if it fails. In Azure nothing makes the TMS wait for it, so on a first deployment the TMS logs failed outbox cycles until the schema exists. It then deploys the intake Logic App's workflow and local functions ([infra/deploy-intake-logic-app.sh](infra/deploy-intake-logic-app.sh)) and gives it the TMS's address, which exists only once Aspire has deployed the TMS. The address is kept in the azd environment as `ESTATE_TMS_BASE_URL`, so deploying the estate again keeps it.
 
 The smoke test runs the intake identity's calls from a throwaway Container Apps job, and sees the event through a Service Bus subscription of its own that it removes afterwards. It needs the rights of whoever ran `azd up`: the estate grants that user Azure Service Bus Data Receiver on the namespace.
 
-No secrets are involved. The TMS reaches SQL and Service Bus with its managed identity, and Service Bus accepts no keys. The Application Insights connection string only says where telemetry goes. Retention of Application Insights and Log Analytics (and of Logic Apps run history, once there is one) is the estate parameter `integrationRetentionDays`, 90 days by default. To change it, set it in [infra/estate.bicepparam](infra/estate.bicepparam).
+The applications hold no secrets. The TMS reaches SQL and Service Bus with its managed identity, and Service Bus accepts no keys. The intake Logic App reaches its storage and the TMS with managed identities too. Only its content share, which Logic Apps Standard still reaches with a storage key, needs one: the estate puts that connection string in Key Vault, and the app reads it through a Key Vault reference. The Application Insights connection string only says where telemetry goes. Retention of Application Insights, Log Analytics and the Logic App's run history is the estate parameter `integrationRetentionDays`, 90 days by default (run history keeps 365 days at most). To change it, set it in [infra/estate.bicepparam](infra/estate.bicepparam).
 
 `azd down --purge` removes the resource group. The app registration is not in it; delete *Norvia TMS API (&lt;environment&gt;)* in Entra ID yourself.
 
