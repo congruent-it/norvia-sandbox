@@ -57,7 +57,7 @@ else
                 <a href="/rejected-bookings/@context.Id">@NorviaTime.Format(context.ReceivedAt)</a>
             </TemplateColumn>
             <PropertyColumn Title="Shipper" Property="@(booking => booking.Shipper.Name ?? booking.Shipper.Id)" />
-            <PropertyColumn Title="Shipper reference" Property="@(booking => string.IsNullOrWhiteSpace(booking.ShipperReference) ? NorviaTime.NotGiven : booking.ShipperReference)" />
+            <PropertyColumn Title="Shipper reference" Property="@(booking => SubmittedTransportOrder.Given(booking.ShipperReference))" />
         </FluentDataGrid>
     }
 }

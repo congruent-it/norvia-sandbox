@@ -5,6 +5,7 @@ namespace Norvia.Tms.Web.Roles;
 /// quickly. Each role opens on its own view.
 /// </summary>
 /// <param name="Key">The stable name the role is remembered and switched by.</param>
+/// <param name="Name">The role as the Role switcher names it.</param>
 /// <param name="View">Where the role opens.</param>
 /// <param name="ViewTitle">The role's view as the navigation names it.</param>
 public sealed record NorviaRole(string Key, string Name, string View, string ViewTitle)

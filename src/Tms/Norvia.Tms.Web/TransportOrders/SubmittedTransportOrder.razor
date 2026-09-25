@@ -1,9 +1,9 @@
 @* What a Shipper submitted, as it was received: where from, where to, the goods and the instructions. The page puts its
-   own card about the booking first, beside collection and delivery. *@
+   own summary card first, beside collection and delivery. *@
 @using Norvia.Tms.Application.CanonicalModel
 
 <div class="mb-4 grid gap-4 md:grid-cols-3">
-    @Booking
+    @Summary
 
     <TransportOrderSection Heading="Collection">
         <dl class="detail-list">
@@ -58,7 +58,7 @@
     [Parameter, EditorRequired]
     public CanonicalTransportOrder Submitted { get; set; } = null!;
 
-    /// <summary>The page's own card about the booking, shown first.</summary>
+    /// <summary>The page's own summary card, shown first: the Transport Order, or the Rejected booking.</summary>
     [Parameter, EditorRequired]
-    public RenderFragment? Booking { get; set; }
+    public RenderFragment? Summary { get; set; }
 }

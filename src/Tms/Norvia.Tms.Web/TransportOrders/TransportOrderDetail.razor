@@ -36,8 +36,8 @@ else if (_transportOrder is null)
 }
 else
 {
-    <SubmittedBooking Submitted="_transportOrder.TransportOrder">
-        <Booking>
+    <SubmittedTransportOrder Submitted="_transportOrder.TransportOrder">
+        <Summary>
             <TransportOrderSection Heading="Transport Order">
                 <dl class="detail-list">
                     <dt>Status</dt>
@@ -45,15 +45,15 @@ else
                     <dt>Shipper</dt>
                     <dd>@(_transportOrder.Shipper.Name ?? _transportOrder.Shipper.Id)</dd>
                     <dt>Shipper reference</dt>
-                    <dd>@SubmittedBooking.Given(_transportOrder.TransportOrder.ShipperReference)</dd>
+                    <dd>@SubmittedTransportOrder.Given(_transportOrder.TransportOrder.ShipperReference)</dd>
                     <dt>Received</dt>
                     <dd>@NorviaTime.Format(_transportOrder.ReceivedAt)</dd>
                     <dt>Correlation ID</dt>
                     <dd>@_transportOrder.CorrelationId</dd>
                 </dl>
             </TransportOrderSection>
-        </Booking>
-    </SubmittedBooking>
+        </Summary>
+    </SubmittedTransportOrder>
 }
 
 @code {

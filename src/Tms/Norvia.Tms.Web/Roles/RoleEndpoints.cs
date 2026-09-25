@@ -13,9 +13,11 @@ public static class RoleEndpoints
 
     public static IEndpointRouteBuilder MapRoleSwitcher(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGet("/", OpenHome);
+        // Anonymous like the rest of the TMS UI: it's a demo application without a login (issue #22), and the role
+        // chooses only what the UI shows first, not what a user may do.
+        endpoints.MapGet("/", OpenHome).AllowAnonymous();
         // A form post, so the Role switcher works before the page is interactive; antiforgery applies to form binding.
-        endpoints.MapPost("/role", ([FromForm] string role, HttpResponse response) => Switch(role, response));
+        endpoints.MapPost("/role", ([FromForm] string role, HttpResponse response) => Switch(role, response)).AllowAnonymous();
         return endpoints;
     }
 
@@ -26,7 +28,8 @@ public static class RoleEndpoints
         ArgumentNullException.ThrowIfNull(response);
         if (NorviaRole.Find(role) is not { } chosen)
         {
-            return TypedResults.BadRequest();
+            // With a body, so the status code pages don't turn it into the Not Found page.
+            return TypedResults.Problem($"There is no role '{role}'.", statusCode: StatusCodes.Status400BadRequest, title: "Unknown role");
         }
 
         response.Cookies.Append(NorviaRole.CookieName, chosen.Key, new CookieOptions

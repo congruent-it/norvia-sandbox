@@ -2,8 +2,8 @@ using Ardalis.Result;
 using Mediator;
 using Microsoft.Extensions.DependencyInjection;
 using Norvia.Tms.Application.TransportOrders;
-using Norvia.Tms.Application.TransportOrders.GetById;
 using Norvia.Tms.Application.TransportOrders.GetByNumber;
+using Norvia.Tms.Application.TransportOrders.GetRejectedBooking;
 using Norvia.Tms.Application.TransportOrders.List;
 using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Web.TransportOrders;
@@ -79,7 +79,7 @@ public sealed class TransportOrderQueriesTests : IDisposable
     public async Task FindRejectedAsync_ARejectedBooking_ReturnsIt()
     {
         var view = Samples.RejectedView();
-        _mediator.Send(new GetTransportOrderByIdQuery(view.Id), Arg.Any<CancellationToken>()).Returns(Result.Success(view));
+        _mediator.Send(new GetRejectedBookingQuery(view.Id), Arg.Any<CancellationToken>()).Returns(Result.Success(view));
 
         var booking = await _queries.FindRejectedAsync(view.Id, Xunit.TestContext.Current.CancellationToken);
 
@@ -87,21 +87,10 @@ public sealed class TransportOrderQueriesTests : IDisposable
     }
 
     [Fact]
-    public async Task FindRejectedAsync_AnAcceptedTransportOrder_ReturnsNull()
-    {
-        var view = Samples.View("TO-0000042");
-        _mediator.Send(new GetTransportOrderByIdQuery(view.Id), Arg.Any<CancellationToken>()).Returns(Result.Success(view));
-
-        var booking = await _queries.FindRejectedAsync(view.Id, Xunit.TestContext.Current.CancellationToken);
-
-        booking.Should().BeNull();
-    }
-
-    [Fact]
     public async Task FindRejectedAsync_AnUnknownId_ReturnsNull()
     {
         var id = Guid.NewGuid();
-        _mediator.Send(new GetTransportOrderByIdQuery(id), Arg.Any<CancellationToken>()).Returns(Result<TransportOrderView>.NotFound());
+        _mediator.Send(new GetRejectedBookingQuery(id), Arg.Any<CancellationToken>()).Returns(Result<TransportOrderView>.NotFound());
 
         var booking = await _queries.FindRejectedAsync(id, Xunit.TestContext.Current.CancellationToken);
 
@@ -112,7 +101,7 @@ public sealed class TransportOrderQueriesTests : IDisposable
     public async Task FindRejectedAsync_WhenTheQueryFails_ThrowsRatherThanSayingThereIsNone()
     {
         var id = Guid.NewGuid();
-        _mediator.Send(new GetTransportOrderByIdQuery(id), Arg.Any<CancellationToken>()).Returns(Result<TransportOrderView>.Error("The query failed."));
+        _mediator.Send(new GetRejectedBookingQuery(id), Arg.Any<CancellationToken>()).Returns(Result<TransportOrderView>.Error("The query failed."));
 
         var find = () => _queries.FindRejectedAsync(id, Xunit.TestContext.Current.CancellationToken);
 

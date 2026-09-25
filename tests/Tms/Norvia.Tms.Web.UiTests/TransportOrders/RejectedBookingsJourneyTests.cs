@@ -19,6 +19,7 @@ public sealed class RejectedBookingsJourneyTests(TmsUiFixture tms) : BrowserPage
     {
         var shipperReference = $"UI-{Guid.NewGuid():N}"[..20];
         var booking = Bookings.Valid(shipperReference);
+        booking["delivery"]!["consignee"]!["name"] = null;
         booking["goodsLines"] = new JsonArray();
         await RejectAsync(booking);
 
@@ -36,9 +37,10 @@ public sealed class RejectedBookingsJourneyTests(TmsUiFixture tms) : BrowserPage
         await row.GetByRole(AriaRole.Link).ClickAsync();
 
         await Expect(Heading($"Rejected booking {shipperReference}")).ToBeVisibleAsync();
-        await Expect(Region("Reasons").GetByRole(AriaRole.Listitem)).ToHaveTextAsync(["The booking has no goods lines."]);
+        await Expect(Region("Reasons").GetByRole(AriaRole.Listitem)).ToHaveTextAsync(
+            ["The booking has no Consignee name.", "The booking has no goods lines."]);
         await Expect(Region("Collection")).ToContainTextAsync("Waalhaven Oostzijde 88, 3087 BM Rotterdam, NL");
-        await Expect(Region("Delivery")).ToContainTextAsync("Café De Zwaan");
+        await Expect(Region("Delivery")).ToContainTextAsync("Oudegracht 112, 3511 AW Utrecht, NL");
         await Expect(Region("Goods")).ToContainTextAsync("No goods lines were given.");
         await Expect(Region("Instructions")).ToContainTextAsync("Ring at the side entrance");
 

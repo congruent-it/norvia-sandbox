@@ -54,22 +54,22 @@ else
         </TransportOrderSection>
     </div>
 
-    <SubmittedBooking Submitted="_booking.TransportOrder">
-        <Booking>
+    <SubmittedTransportOrder Submitted="_booking.TransportOrder">
+        <Summary>
             <TransportOrderSection Heading="Rejected booking">
                 <dl class="detail-list">
                     <dt>Shipper</dt>
                     <dd>@shipper</dd>
                     <dt>Shipper reference</dt>
-                    <dd>@SubmittedBooking.Given(reference)</dd>
+                    <dd>@SubmittedTransportOrder.Given(reference)</dd>
                     <dt>Received</dt>
                     <dd>@NorviaTime.Format(_booking.ReceivedAt)</dd>
                     <dt>Correlation ID</dt>
                     <dd>@_booking.CorrelationId</dd>
                 </dl>
             </TransportOrderSection>
-        </Booking>
-    </SubmittedBooking>
+        </Summary>
+    </SubmittedTransportOrder>
 }
 
 @code {

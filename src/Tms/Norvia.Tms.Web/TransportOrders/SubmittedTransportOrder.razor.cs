@@ -3,9 +3,9 @@ using Norvia.Tms.Application.CanonicalModel;
 
 namespace Norvia.Tms.Web.TransportOrders;
 
-public sealed partial class SubmittedBooking
+public sealed partial class SubmittedTransportOrder
 {
-    // A booking is shown as submitted, so a field the Shipper left out says so rather than showing nothing.
+    // A Transport Order is shown as submitted, so a field the Shipper left out says so rather than showing nothing.
     internal static string Given(string? value) => string.IsNullOrWhiteSpace(value) ? NorviaTime.NotGiven : value;
 
     private static string FormatNumber(decimal? value) =>

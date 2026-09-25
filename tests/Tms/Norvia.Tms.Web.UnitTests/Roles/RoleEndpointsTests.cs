@@ -58,7 +58,7 @@ public sealed class RoleEndpointsTests
 
         var result = RoleEndpoints.Switch("administrator", context.Response);
 
-        result.Should().BeOfType<BadRequest>();
+        result.Should().BeOfType<ProblemHttpResult>().Which.StatusCode.Should().Be(StatusCodes.Status400BadRequest);
         context.Response.Headers.SetCookie.Should().BeEmpty();
     }
 }

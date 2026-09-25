@@ -39,6 +39,27 @@ public sealed class TransportOrderSpecsTests
     }
 
     [Fact]
+    public void RejectedBookingById_Evaluated_FindsOnlyThatRejectedBooking()
+    {
+        var rejected = Rejected(Morning);
+        var orders = new[] { Accepted(1, Morning), rejected, Rejected(Morning) };
+
+        var found = new RejectedBookingByIdSpec(rejected.Id).Evaluate(orders);
+
+        found.Should().ContainSingle().Which.Should().BeSameAs(rejected);
+    }
+
+    [Fact]
+    public void RejectedBookingById_AnAcceptedTransportOrdersId_FindsNothing()
+    {
+        var accepted = Accepted(1, Morning);
+
+        var found = new RejectedBookingByIdSpec(accepted.Id).Evaluate([accepted, Rejected(Morning)]);
+
+        found.Should().BeEmpty();
+    }
+
+    [Fact]
     public void ByStatus_Rejected_ListsOnlyTheRejectedBookings()
     {
         var rejected = Rejected(Morning);

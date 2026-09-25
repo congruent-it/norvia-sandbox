@@ -1,8 +1,8 @@
 using Ardalis.Result;
 using Mediator;
 using Norvia.Tms.Application.TransportOrders;
-using Norvia.Tms.Application.TransportOrders.GetById;
 using Norvia.Tms.Application.TransportOrders.GetByNumber;
+using Norvia.Tms.Application.TransportOrders.GetRejectedBooking;
 using Norvia.Tms.Application.TransportOrders.List;
 using Norvia.Tms.Domain.TransportOrders;
 
@@ -23,12 +23,8 @@ internal sealed class TransportOrderQueries(IServiceScopeFactory scopes) : ITran
     public async Task<TransportOrderView?> FindAsync(string transportOrderNumber, CancellationToken cancellationToken) =>
         FoundOrNull(await SendAsync(new GetTransportOrderQuery(transportOrderNumber), cancellationToken), $"Transport Order {transportOrderNumber}");
 
-    public async Task<TransportOrderView?> FindRejectedAsync(Guid id, CancellationToken cancellationToken)
-    {
-        var booking = FoundOrNull(await SendAsync(new GetTransportOrderByIdQuery(id), cancellationToken), $"Rejected booking {id}");
-        // Only a Rejected booking: the ID of an Accepted Transport Order doesn't open it as one.
-        return booking?.Status == TransportOrderStatus.Rejected ? booking : null;
-    }
+    public async Task<TransportOrderView?> FindRejectedAsync(Guid id, CancellationToken cancellationToken) =>
+        FoundOrNull(await SendAsync(new GetRejectedBookingQuery(id), cancellationToken), $"Rejected booking {id}");
 
     private async Task<TResponse> SendAsync<TResponse>(IQuery<TResponse> query, CancellationToken cancellationToken)
     {
@@ -36,10 +32,10 @@ internal sealed class TransportOrderQueries(IServiceScopeFactory scopes) : ITran
         return await scope.ServiceProvider.GetRequiredService<IMediator>().Send(query, cancellationToken);
     }
 
-    private static TransportOrderView? FoundOrNull(Result<TransportOrderView> result, string what) => result.Status switch
+    private static TransportOrderView? FoundOrNull(Result<TransportOrderView> result, string sought) => result.Status switch
     {
         ResultStatus.Ok => result.Value,
         ResultStatus.NotFound => null,
-        _ => throw new InvalidOperationException($"Reading {what} failed with {result.Status}."),
+        _ => throw new InvalidOperationException($"Reading {sought} failed with {result.Status}."),
     };
 }
