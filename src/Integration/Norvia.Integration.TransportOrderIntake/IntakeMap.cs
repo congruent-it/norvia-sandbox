@@ -49,6 +49,11 @@ public static class IntakeMap
         return transportOrder;
     }
 
+    /// <summary>Maps the booking as the JSON text the Shipper sent, which is how the intake Logic App passes it.</summary>
+    /// <remarks>Text that isn't a JSON object is no booking at all: it maps to a Transport Order that names only the Shipper.</remarks>
+    public static JsonObject ToTransportOrder(string partnerBooking, string shipperId) =>
+        ToTransportOrder(PartnerFields.Parse(partnerBooking) ?? new JsonObject(), shipperId);
+
     private static JsonObject? Address(PartnerFields booking, string party, Country? country) =>
         Compact(new JsonObject
         {
