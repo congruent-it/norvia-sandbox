@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- Logic Apps Standard runs local functions on .NET 8 only (ADR 0019). -->
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+</Project>

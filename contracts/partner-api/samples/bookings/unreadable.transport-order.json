@@ -1,0 +1,16 @@
+{
+  "shipperId": "SHP-0001",
+  "shipperReference": "BD-2030-0005",
+  "collection": {
+    "address": { "street": "Waalhaven Oostzijde 88", "postcode": "3087 BM", "city": "Rotterdam", "country": "NL" },
+    "window": { "latest": "2030-10-01T10:00:00+00:00" }
+  },
+  "delivery": {
+    "address": { "street": "Oudegracht 112", "postcode": "3511 AW", "city": "Utrecht" },
+    "consignee": { "name": "Café De Zwaan" }
+  },
+  "goodsLines": [
+    { "packageType": "ZZ" },
+    {}
+  ]
+}

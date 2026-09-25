@@ -1,0 +1,20 @@
+{
+  "bookingRef": "BD-2030-0004",
+  "pickupStreet": "Waalhaven Oostzijde 88",
+  "pickupPostalCode": "3087 BM",
+  "pickupCity": "Rotterdam",
+  "pickupCountry": "The Netherlands",
+  "pickupFrom": "26-10-2030 22:00",
+  "pickupUntil": "27-10-2030 06:00",
+  "receiverName": "The Dutch Tap House Ltd",
+  "receiverStreet": "14 Wharf Road",
+  "receiverPostalCode": "N1 7GR",
+  "receiverCity": "London",
+  "receiverCountry": "United Kingdom",
+  "deliverFrom": "28-10-2030 09:00",
+  "deliverUntil": "28-10-2030 13:00",
+  "items": [
+    { "packaging": "PX", "count": 8, "weight": "5200 kg" }
+  ],
+  "remarks": "The clocks go back in the night of the collection: the window is eight local hours, nine real ones."
+}

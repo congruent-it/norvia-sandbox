@@ -1,0 +1,12 @@
+{
+  "result": "REJECTED",
+  "messageId": "5a9e2b14-6c3d-47f1-8b20-d4e7f1a0c963",
+  "bookingRef": "BD-2030-0005",
+  "errors": [
+    { "code": "DeliveryAddressIncomplete", "text": "The delivery address has no country." },
+    { "code": "CollectionWindowMissing", "text": "The booking has no collection window with both an earliest and a latest time." },
+    { "code": "PackageTypeInvalid", "text": "Goods line 1 has package type 'ZZ'; it must be one of pallet, parcel, crate, loose." },
+    { "code": "QuantityInvalid", "text": "Goods line 1 needs a quantity of at least 1." },
+    { "code": "WeightInvalid", "text": "Goods line 1 needs a weight greater than 0 kg." }
+  ]
+}

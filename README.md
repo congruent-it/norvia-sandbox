@@ -4,7 +4,7 @@ A working integration estate for a fictional company, **Norvia Logistics B.V.**,
 
 The estate can also run *as found*, reproducing the problems a health check would find (a missing dead-letter alert, a mapping that can't handle a Carrier status, marketplace orders routed to the wrong system), and fixing them one at a time.
 
-> **Status:** first build. The TMS takes in a Transport Order through its intake API and publishes `TransportOrderAccepted`, running locally under Aspire. The TMS UI lists the Transport Orders waiting for planning for the Planner and the rejected bookings for Customer service, both live, and shows each one in full; a Role switcher moves between the two without a login. The rest of P1 (validation, the Logic App, API Management, the Partner portal and the Azure estate) follows in the tickets under GitHub issue #1.
+> **Status:** first build. The TMS takes in a Transport Order through its intake API and publishes `TransportOrderAccepted`, running locally under Aspire. The TMS UI lists the Transport Orders waiting for planning for the Planner and the rejected bookings for Customer service, both live, and shows each one in full; a Role switcher moves between the two without a login. The partner booking format and the intake map to the Canonical Model exist and are tested with sample messages. The rest of P1 (validation, the Logic App, API Management, the Partner portal and the Azure estate) follows in the tickets under GitHub issue #1.
 
 ## Start here
 
@@ -57,6 +57,8 @@ dotnet test Norvia.slnx                      # unit, architecture, integration a
 | [src/](src/) | The applications: the Aspire AppHost and ServiceDefaults, and the TMS in Clean Architecture layers, with its Blazor UI in `Norvia.Tms.Web` |
 | [tests/](tests/) | Tests per project, mirroring `src/` |
 | [contracts/canonical-model/](contracts/canonical-model/) | The Canonical Model as JSON Schemas |
+| [contracts/partner-api/](contracts/partner-api/README.md) | The Norvia Partner API's booking format and responses, with sample bookings and the Canonical Model Transport Order each maps to |
+| [src/Integration/](src/Integration/) | Code the integration layer runs: the intake map from a partner booking to the Canonical Model ([ADR 0019](docs/adr/0019-the-intake-map-is-dotnet-code-run-as-a-logic-apps-local-function.md)) |
 | [seed/norvia.seed.json](seed/norvia.seed.json) | The seed file: the one source of Shippers, Carriers and Personas |
 
 There is no Entra locally. The TMS trusts JWTs signed with the AppHost's secret parameter `local-token-signing-key` (issuer and audience in [LocalTokens.cs](src/Norvia.AppHost/LocalTokens.cs)), so submitting a Transport Order needs a token signed with that key, with the `TransportOrders.Intake` role and the local intake Logic App's client ID as `azp`. The integration tests issue their own.

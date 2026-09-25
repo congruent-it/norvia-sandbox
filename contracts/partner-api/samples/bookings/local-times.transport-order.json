@@ -1,0 +1,17 @@
+{
+  "shipperId": "SHP-0001",
+  "shipperReference": "BD-2030-0004",
+  "collection": {
+    "address": { "street": "Waalhaven Oostzijde 88", "postcode": "3087 BM", "city": "Rotterdam", "country": "NL" },
+    "window": { "earliest": "2030-10-26T20:00:00+00:00", "latest": "2030-10-27T05:00:00+00:00" }
+  },
+  "delivery": {
+    "address": { "street": "14 Wharf Road", "postcode": "N1 7GR", "city": "London", "country": "GB" },
+    "consignee": { "name": "The Dutch Tap House Ltd" },
+    "window": { "earliest": "2030-10-28T09:00:00+00:00", "latest": "2030-10-28T13:00:00+00:00" }
+  },
+  "goodsLines": [
+    { "packageType": "pallet", "quantity": 8, "weightKg": 5200 }
+  ],
+  "instructions": "The clocks go back in the night of the collection: the window is eight local hours, nine real ones."
+}
