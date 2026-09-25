@@ -39,9 +39,20 @@ public sealed class IntakeWorkflowTests
         map["inputs"]!["functionName"]!.GetValue<string>().Should().Be("MapPartnerBooking");
         JsonNode.DeepEquals(map["inputs"]!["parameters"], new JsonObject
         {
-            ["partnerBooking"] = "@{triggerBody()}",
+            ["partnerBooking"] = "@{base64(triggerBody())}",
             ["shipperId"] = "@{triggerOutputs()?['headers']?['X-Shipper-ID']}",
         }).Should().BeTrue();
+    }
+
+    [Fact]
+    public void LocalFunctions_GetTheBookingEncoded_SoItsFieldsCantStandInForTheirParameters()
+    {
+        // The Functions runtime reads the fields of a parameter that holds JSON text as parameters too: a booking with
+        // a shipperId field would then choose the Shipper (ADR 0005). Base64 text has no fields.
+        foreach (var (name, operation) in IntakeWorkflow.Operations().Where(operation => operation.Operation["type"]?.GetValue<string>() == "InvokeFunction"))
+        {
+            operation["inputs"]!["parameters"]!["partnerBooking"]!.GetValue<string>().Should().Be("@{base64(triggerBody())}", name);
+        }
     }
 
     [Fact]
@@ -122,7 +133,7 @@ public sealed class IntakeWorkflowTests
             ["tmsStatusCode"] = "@coalesce(actions('Submit_to_the_TMS')?['outputs']?['statusCode'], 0)",
             ["tmsResponse"] = "@{coalesce(actions('Submit_to_the_TMS')?['outputs']?['body'], '')}",
             ["correlationId"] = "@{triggerOutputs()?['headers']?['X-Correlation-ID']}",
-            ["partnerBooking"] = "@{triggerBody()}",
+            ["partnerBooking"] = "@{base64(triggerBody())}",
         }).Should().BeTrue();
     }
 

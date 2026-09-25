@@ -25,7 +25,7 @@
         "inputs": {
           "functionName": "MapPartnerBooking",
           "parameters": {
-            "partnerBooking": "@{triggerBody()}",
+            "partnerBooking": "@{base64(triggerBody())}",
             "shipperId": "@{triggerOutputs()?['headers']?['X-Shipper-ID']}"
           }
         },
@@ -76,7 +76,7 @@
             "tmsStatusCode": "@coalesce(actions('Submit_to_the_TMS')?['outputs']?['statusCode'], 0)",
             "tmsResponse": "@{coalesce(actions('Submit_to_the_TMS')?['outputs']?['body'], '')}",
             "correlationId": "@{triggerOutputs()?['headers']?['X-Correlation-ID']}",
-            "partnerBooking": "@{triggerBody()}"
+            "partnerBooking": "@{base64(triggerBody())}"
           }
         },
         "runAfter": {
