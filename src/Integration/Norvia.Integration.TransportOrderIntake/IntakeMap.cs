@@ -16,7 +16,7 @@ public static class IntakeMap
     public static JsonObject ToTransportOrder(JsonNode partnerBooking, string shipperId)
     {
         ArgumentNullException.ThrowIfNull(partnerBooking);
-        var booking = new PartnerBooking(partnerBooking);
+        var booking = new PartnerFields(partnerBooking);
 
         var collectionCountry = Countries.Find(booking.Text("pickupCountry"));
         var deliveryCountry = Countries.Find(booking.Text("receiverCountry"));
@@ -49,7 +49,7 @@ public static class IntakeMap
         return transportOrder;
     }
 
-    private static JsonObject? Address(PartnerBooking booking, string party, Country? country) =>
+    private static JsonObject? Address(PartnerFields booking, string party, Country? country) =>
         Compact(new JsonObject
         {
             ["street"] = booking.Text(party + "Street"),
@@ -59,14 +59,14 @@ public static class IntakeMap
         });
 
     /// <summary>A window's local times are those of the place the goods are collected or delivered.</summary>
-    private static JsonObject? Window(PartnerBooking booking, string from, string until, Country? country) =>
+    private static JsonObject? Window(PartnerFields booking, string from, string until, Country? country) =>
         Compact(new JsonObject
         {
             ["earliest"] = LocalTimes.ToUtc(booking.Text(from), country),
             ["latest"] = LocalTimes.ToUtc(booking.Text(until), country),
         });
 
-    private static JsonArray? GoodsLines(PartnerBooking booking)
+    private static JsonArray? GoodsLines(PartnerFields booking)
     {
         if (booking.Items() is not { } items)
         {

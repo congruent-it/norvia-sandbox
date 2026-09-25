@@ -9,27 +9,24 @@ namespace Norvia.Integration.TransportOrderIntake.UnitTests;
 internal static class PartnerApiSamples
 {
     private const string BookingSuffix = ".booking.json";
-
-    private static readonly string BookingsDirectory = Path.Combine(AppContext.BaseDirectory, "PartnerApi", "samples", "bookings");
-    private static readonly string ResponsesDirectory = Path.Combine(AppContext.BaseDirectory, "PartnerApi", "samples", "responses");
+    private const string BookingsFolder = "PartnerApi/samples/bookings";
+    private const string ResponsesFolder = "PartnerApi/samples/responses";
 
     public static IEnumerable<string> BookingNames() =>
-        Directory.EnumerateFiles(BookingsDirectory, "*" + BookingSuffix)
-            .Select(path => Path.GetFileName(path)[..^BookingSuffix.Length])
+        Contracts.FileNames(BookingsFolder)
+            .Where(name => name.EndsWith(BookingSuffix, StringComparison.Ordinal))
+            .Select(name => name[..^BookingSuffix.Length])
             .Order(StringComparer.Ordinal);
 
-    public static JsonNode Booking(string name) => Read(Path.Combine(BookingsDirectory, name + BookingSuffix));
+    public static JsonNode Booking(string name) => Read($"{BookingsFolder}/{name}{BookingSuffix}");
 
-    public static JsonNode ExpectedTransportOrder(string name) => Read(Path.Combine(BookingsDirectory, name + ".transport-order.json"));
+    public static JsonNode ExpectedTransportOrder(string name) => Read($"{BookingsFolder}/{name}.transport-order.json");
 
     public static IEnumerable<string> ResponseNames() =>
-        Directory.EnumerateFiles(ResponsesDirectory, "*.json")
-            .Select(Path.GetFileNameWithoutExtension)
-            .OfType<string>()
-            .Order(StringComparer.Ordinal);
+        Contracts.FileNames(ResponsesFolder).Select(Path.GetFileNameWithoutExtension).OfType<string>().Order(StringComparer.Ordinal);
 
-    public static JsonNode Response(string name) => Read(Path.Combine(ResponsesDirectory, name + ".json"));
+    public static JsonNode Response(string name) => Read($"{ResponsesFolder}/{name}.json");
 
     private static JsonNode Read(string path) =>
-        JsonNode.Parse(File.ReadAllText(path)) ?? throw new InvalidOperationException($"{path} holds no JSON.");
+        JsonNode.Parse(Contracts.Read(path)) ?? throw new InvalidOperationException($"{path} holds no JSON.");
 }

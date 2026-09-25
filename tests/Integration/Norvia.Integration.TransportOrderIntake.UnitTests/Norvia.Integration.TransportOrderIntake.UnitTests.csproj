@@ -16,8 +16,11 @@
     <Using Include="AwesomeAssertions" />
     <ProjectReference Include="..\..\..\src\Integration\Norvia.Integration.TransportOrderIntake\Norvia.Integration.TransportOrderIntake.csproj" />
   </ItemGroup>
+  <!-- Embedded, so the unit tests read the contracts without touching the file system (coding guidelines §10). -->
   <ItemGroup>
-    <None Include="..\..\..\contracts\canonical-model\*.json" Link="CanonicalModel\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="..\..\..\contracts\partner-api\**\*.json" Link="PartnerApi\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <EmbeddedResource Include="..\..\..\contracts\canonical-model\*.json" LogicalName="CanonicalModel/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\contracts\partner-api\*.json" LogicalName="PartnerApi/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\bookings\*.json" LogicalName="PartnerApi/samples/bookings/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\responses\*.json" LogicalName="PartnerApi/samples/responses/%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

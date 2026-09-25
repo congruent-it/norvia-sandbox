@@ -82,7 +82,7 @@
       }
     },
     "notReceived": {
-      "description": "HTTP 502. Norvia could not take the booking in, so nothing was booked. Send it again later; if Norvia did book it in the meantime, the answer is ALREADY_BOOKED.",
+      "description": "HTTP 502. Norvia could not take the booking in, because the TMS could not be reached or the integration layer failed, so nothing was booked. Send it again later; if Norvia did book it in the meantime, the answer is ALREADY_BOOKED.",
       "type": "object",
       "additionalProperties": false,
       "required": ["result", "messageId", "text"],

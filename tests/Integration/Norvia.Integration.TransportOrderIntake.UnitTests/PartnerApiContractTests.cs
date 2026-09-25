@@ -14,7 +14,7 @@ public sealed class PartnerApiContractTests
 
     [Theory]
     [MemberData(nameof(Bookings))]
-    public void BookingSchema_Sample_IsValid(string sample)
+    public void Validate_SampleBooking_KeepsToTheBookingSchema(string sample)
     {
         var results = Schemas.PartnerBooking.Validate(PartnerApiSamples.Booking(sample));
 
@@ -22,14 +22,14 @@ public sealed class PartnerApiContractTests
     }
 
     [Fact]
-    public void BookingSchema_UnreadableSample_IsInvalid()
+    public void Validate_UnreadableSampleBooking_BreaksTheBookingSchema()
     {
         Schemas.PartnerBooking.Validate(PartnerApiSamples.Booking(UnreadableSample)).IsValid.Should().BeFalse();
     }
 
     [Theory]
     [MemberData(nameof(Responses))]
-    public void BookingResponseSchema_Sample_IsValid(string sample)
+    public void Validate_SampleResponse_KeepsToTheResponseSchema(string sample)
     {
         var results = Schemas.PartnerBookingResponse.Validate(PartnerApiSamples.Response(sample));
 
@@ -37,7 +37,7 @@ public sealed class PartnerApiContractTests
     }
 
     [Fact]
-    public void BookingResponseSchema_AcceptedWithoutOrderNumber_IsInvalid()
+    public void Validate_AcceptedWithoutOrderNumber_BreaksTheResponseSchema()
     {
         var response = new JsonObject { ["result"] = "ACCEPTED", ["messageId"] = "7f3c1a52-9d4e-4b8a-a1f0-2e6d8c5b9a31" };
 
@@ -45,7 +45,7 @@ public sealed class PartnerApiContractTests
     }
 
     [Fact]
-    public void BookingResponseSchema_RejectedWithoutErrors_IsInvalid()
+    public void Validate_RejectedWithoutErrors_BreaksTheResponseSchema()
     {
         var response = new JsonObject
         {
