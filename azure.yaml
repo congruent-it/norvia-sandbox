@@ -26,4 +26,4 @@ hooks:
       ./infra/migrate.sh tms-migrations "the TMS database" &&
       ./infra/migrate.sh partner-portal-migrations "the Partner portal's database" &&
       ./infra/deploy-intake-logic-app.sh &&
-      ./infra/open-demo-uis.sh
+      ./infra/register-demo-ui-callbacks.sh
