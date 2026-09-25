@@ -132,9 +132,10 @@ pass "TransportOrderAccepted is on the transport-order-events topic"
 # 4. The TMS's traces are in Application Insights. Ingestion takes a few minutes.
 workspace=$(az monitor log-analytics workspace show --resource-group "$resource_group" \
   --workspace-name "$AZURE_ESTATE_LOG_ANALYTICS_WORKSPACE" --query customerId --output tsv)
-query="let trail = AppTraces | where tostring(Properties.correlationId) == '$correlation_id' | distinct OperationId;
+# Azure Monitor names the TMS after its Container Apps environment too: [<environment>]/tms-api.
+query="let trail = AppTraces | where tostring(Properties.correlationId) == '$correlation_id' and isnotempty(OperationId) | distinct OperationId;
 union AppRequests, AppTraces, AppDependencies
-| where OperationId in (trail) and AppRoleName == 'tms-api'
+| where OperationId in (trail) and AppRoleName endswith 'tms-api'
 | summarize count() by Type"
 for _ in $(seq 1 30); do
   result=$(az rest --method post --resource https://api.loganalytics.io \
