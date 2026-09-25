@@ -19,14 +19,14 @@ The booking never names the Shipper. API Management takes it from the token and 
 | `receiverName`, `receiverContact`, `receiverPhone`, `receiverEmail` | `delivery.consignee` | Nests the flat fields |
 | `receiverStreet`, `receiverPostalCode`, `receiverCity`, `receiverCountry` | `delivery.address` | Nests the flat fields |
 | `deliverFrom`, `deliverUntil`: local to the receiver's address | `delivery.window` | Converts from the time zone of the receiver's country |
-| Countries by English name (`Netherlands`, `United Kingdom`), a common variant (`Nederland`, `UK`) or code | ISO 3166-1 alpha-2 (`NL`, `GB`) | Looks the country up in the countries Norvia drives to |
+| Countries by English name (`Netherlands`, `United Kingdom`), their own name (`Nederland`, `Österreich`), a common variant (`Holland`, `UK`) or code | ISO 3166-1 alpha-2 (`NL`, `GB`) | Translates the name, for every country in Europe. It doesn't decide where Norvia carries goods: that is for the TMS, and for Rating once it exists |
 | `items[].packaging`: UN/ECE Rec. 21 code `PX`, `PK`, `CR`, `NE` | `goodsLines[].packageType`: `pallet`, `parcel`, `crate`, `loose` | Translates the code. An unknown code is passed on as given, so the TMS's rejection names it |
 | `items[].count` | `goodsLines[].quantity` | Copies it |
 | `items[].weight`: text with a unit, `kg`, `t`, `lb` or `lbs`, decimal point or comma (`2,5 t`) | `goodsLines[].weightKg`: a number | Converts to kilograms, rounded to the gram |
 | `items[].dimensions`: `L x W x H` text with a unit, `cm`, `mm` or `m` | `goodsLines[].dimensionsCm`: numbers | Converts to centimetres |
 | `remarks` | `instructions` | Copies it |
 
-The map never rejects a booking; the TMS decides. Any other value the map can't read (a country Norvia doesn't drive to, a date in another format, a weight without a unit) is left out, and the TMS's [validation rules](../../docs/processes/tms/p1-transport-order-intake.md#validation-rules) report what is then missing, with their stable codes. A local time in the hour the clocks skip in spring reads as standard time. One in the hour they repeat in autumn reads as its later, standard-time occurrence.
+The map never rejects a booking; the TMS decides. Any other value the map can't read (a country name it doesn't know, a date in another format, a weight without a unit) is left out, and the TMS's [validation rules](../../docs/processes/tms/p1-transport-order-intake.md#validation-rules) report what is then missing, with their stable codes. A local time in the hour the clocks skip in spring reads as standard time. One in the hour they repeat in autumn reads as its later, standard-time occurrence.
 
 Dimensions are optional, so dimensions the map can't read are left out without the TMS noticing. The booking schema's pattern is what keeps them readable.
 

@@ -27,6 +27,10 @@ internal static class PartnerApiSamples
 
     public static JsonNode Response(string name) => Read($"{ResponsesFolder}/{name}.json");
 
+    /// <summary>Every way of writing a country that the booking schema allows.</summary>
+    public static IEnumerable<string> CountrySpellings() =>
+        Read("PartnerApi/booking.v1.schema.json")["$defs"]!["country"]!["enum"]!.AsArray().Select(spelling => spelling!.GetValue<string>());
+
     private static JsonNode Read(string path) =>
         JsonNode.Parse(Contracts.Read(path)) ?? throw new InvalidOperationException($"{path} holds no JSON.");
 }

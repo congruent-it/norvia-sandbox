@@ -31,6 +31,30 @@ public sealed class IntakeMapTests
         pallets["dimensionsCm"]!["length"]!.ToJsonString().Should().Be("120");
     }
 
+    public static TheoryData<string> CountrySpellings => new(PartnerApiSamples.CountrySpellings());
+
+    [Theory]
+    [MemberData(nameof(CountrySpellings))]
+    public void ToTransportOrder_CountrySpellingTheBookingSchemaAllows_GivesItsCodeAndLocalTime(string spelling)
+    {
+        var booking = new JsonObject { ["pickupCountry"] = spelling, ["pickupFrom"] = "01-10-2030 08:00" };
+
+        var collection = IntakeMap.ToTransportOrder(booking, ShipperId)["collection"];
+
+        var country = collection?["address"]?["country"]?.GetValue<string>();
+        country.Should().MatchRegex("^[A-Z]{2}$", $"the map should know the country {spelling}");
+        var earliest = collection?["window"]?["earliest"];
+        earliest.Should().NotBeNull($"the map should know the time zone of {spelling}");
+    }
+
+    [Fact]
+    public void ToTransportOrder_IsoCode_GivesTheSameCode()
+    {
+        var booking = new JsonObject { ["pickupCountry"] = "PT" };
+
+        IntakeMap.ToTransportOrder(booking, ShipperId)["collection"]!["address"]!["country"]!.GetValue<string>().Should().Be("PT");
+    }
+
     [Theory]
     [MemberData(nameof(Samples))]
     public void ToTransportOrder_Sample_GivesAValidCanonicalTransportOrder(string sample)
