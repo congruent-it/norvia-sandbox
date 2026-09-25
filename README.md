@@ -77,9 +77,13 @@ CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the pull request 
 Needs the [Azure Developer CLI](https://aka.ms/azd) and the Azure CLI, both signed in to the same tenant as a user who may create resources in the subscription and app registrations in Entra ID, plus `jq`.
 
 ```bash
-azd up                                       # asks for an environment name, a subscription and a region the first time
+azd env new <environment> --subscription <subscription-id> --location <region>
+azd hooks run preprovision                   # the first time only: deploys the estate and stores its outputs
+azd up
 infra/smoke-test-intake.sh                   # after a deployment: checks intake end to end on the deployed TMS
 ```
+
+On an environment's first run, azd asks for the AppHost's parameters before it runs the preprovision hook. Those parameters are the estate's outputs, so run the hook once yourself first. Don't type in values for `estate_*` parameters: they are the names and IDs the estate creates. After that, `azd up` finds them in the environment.
 
 `azd up` runs in three steps ([ADR 0004](docs/adr/0004-bicep-owns-the-estate-aspire-owns-the-apps.md)):
 
