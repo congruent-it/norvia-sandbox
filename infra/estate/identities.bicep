@@ -5,12 +5,20 @@ param environmentName string
 param location string
 param tags object
 
+@description('The presenter\'s Entra object ID, empty for none. The presenter is the one user who may open the demo UIs.')
+param presenterPrincipalId string
+
+@description('The demo UIs\' host names, comma separated, empty before the apps are first deployed.')
+param demoUiHosts string
+
 var intakeRole = 'TransportOrders.Intake'
 var intakeRoleId = guid('norvia-tms-api', environmentName, intakeRole)
 var submitRole = 'TransportOrders.Submit'
 var submitRoleId = guid('norvia-partner-api', environmentName, submitRole)
 var triggerRole = 'TransportOrderIntake.Trigger'
 var triggerRoleId = guid('norvia-intake-trigger', environmentName, triggerRole)
+var demoUisRole = 'DemoUis.Use'
+var demoUisRoleId = guid('norvia-demo-uis', environmentName, demoUisRole)
 
 // Every Persona the Partner portal plays is its own client app registration (ADR 0005). The seed file names them.
 var personas = loadJsonContent('../../seed/norvia.seed.json').personas
@@ -177,6 +185,46 @@ resource triggerRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
   principalId: apiManagementIdentity.properties.principalId
 }
 
+// What Easy Auth signs the presenter in to in front of the TMS UI and the Partner portal (ADR 0024). The apps have no
+// login of their own; this is a gate for the demo environment.
+resource demoUis 'Microsoft.Graph/applications@v1.0' = {
+  uniqueName: 'norvia-demo-uis-${environmentName}'
+  displayName: 'Norvia demo UIs (${environmentName})'
+  signInAudience: 'AzureADMyOrg'
+  web: {
+    // Easy Auth's callback on each demo UI. The postdeploy hook adds them once Aspire has deployed the apps.
+    redirectUris: [for host in filter(split(demoUiHosts, ','), host => !empty(host)): 'https://${host}/.auth/login/aad/callback']
+    implicitGrantSettings: {
+      // Without a client secret Easy Auth asks for an ID token only, which a gate needs and nothing more.
+      enableIdTokenIssuance: true
+    }
+  }
+  appRoles: [
+    {
+      id: demoUisRoleId
+      value: demoUisRole
+      displayName: 'Use the demo UIs'
+      description: 'Open the TMS UI and the Partner portal in Azure. Only the presenter holds it.'
+      allowedMemberTypes: [
+        'User'
+      ]
+      isEnabled: true
+    }
+  ]
+}
+
+resource demoUisPrincipal 'Microsoft.Graph/servicePrincipals@v1.0' = {
+  appId: demoUis.appId
+  // Entra signs in only the users assigned to it, so anyone else is refused before either app runs.
+  appRoleAssignmentRequired: true
+}
+
+resource demoUisRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = if (!empty(presenterPrincipalId)) {
+  resourceId: demoUisPrincipal.id
+  appRoleId: demoUisRoleId
+  principalId: presenterPrincipalId
+}
+
 output entraIssuer string = '${environment().authentication.loginEndpoint}${tenant().tenantId}/v2.0'
 output entraTenantId string = tenant().tenantId
 output tmsApiClientId string = tmsApi.appId
@@ -199,3 +247,4 @@ output apiManagementPrincipalId string = apiManagementIdentity.properties.princi
 output apiManagementClientId string = apiManagementIdentity.properties.clientId
 output intakeTriggerClientId string = intakeTrigger.appId
 output intakeTriggerAudience string = intakeTrigger.identifierUris[0]
+output demoUisClientId string = demoUis.appId

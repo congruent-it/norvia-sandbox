@@ -2,6 +2,7 @@ using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Azure;
 using Aspire.Hosting.Testing;
+using Azure.Provisioning.AppContainers;
 
 namespace Norvia.Tms.Api.IntegrationTests;
 
@@ -182,6 +183,58 @@ public sealed class AppHostModelTests
             .Should().Contain(endpoint => endpoint.IsExternal);
     }
 
+    [Theory]
+    [InlineData("tms-web")]
+    [InlineData("partner-portal-web")]
+    public async Task InAzure_ADemoUi_IsReachableFromThePresentersBrowser(string demoUi)
+    {
+        await using var builder = await CreateForAzureAsync();
+
+        ((IResourceWithEndpoints)Resource(builder, demoUi)).Annotations.OfType<EndpointAnnotation>()
+            .Should().Contain(endpoint => endpoint.IsExternal);
+    }
+
+    [Theory]
+    [InlineData("tms-web")]
+    [InlineData("partner-portal-web")]
+    public async Task InAzure_ADemoUi_IsBehindAnEntraSignIn_ForTheDemoUisAppRegistration(string demoUi)
+    {
+        await using var builder = await CreateForAzureAsync();
+
+        var bicep = ContainerAppBicepOf(builder, demoUi);
+
+        bicep.Should().Contain("Microsoft.App/containerApps/authConfigs@")
+            .And.MatchRegex(@"platform: \{\s*enabled: true\s*\}")
+            .And.Contain("unauthenticatedClientAction: 'RedirectToLoginPage'")
+            .And.Contain("redirectToProvider: 'azureactivedirectory'")
+            .And.Contain("clientId: estate_demo_uis_client_id")
+            .And.Contain("openIdIssuer: estate_entra_issuer");
+        bicep.Should().NotContain("clientSecret", "Entra gives Easy Auth an ID token without a secret");
+    }
+
+    [Theory]
+    [InlineData("tms-web")]
+    [InlineData("partner-portal-web")]
+    public async Task InAzure_ADemoUisHealthProbes_NeedNoSignIn(string demoUi)
+    {
+        await using var builder = await CreateForAzureAsync();
+
+        var bicep = ContainerAppBicepOf(builder, demoUi);
+
+        bicep.Should().MatchRegex(@"excludedPaths: \[\s*'/health'\s*'/alive'\s*\]");
+    }
+
+    [Theory]
+    [InlineData("tms-web")]
+    [InlineData("partner-portal-web")]
+    public async Task Locally_ADemoUi_HasNoSignIn(string demoUi)
+    {
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(TestContext.Current.CancellationToken);
+
+        Resource(builder, demoUi).Annotations.Should().NotContain(annotation => annotation is AzureContainerAppCustomizationAnnotation);
+        builder.Resources.OfType<ParameterResource>().Should().NotContain(parameter => parameter.Name == "estate-demo-uis-client-id");
+    }
+
     private static Task<IDistributedApplicationTestingBuilder> CreateForAzureAsync() =>
         DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(
             ["--operation", "publish", "--publisher", "default", "--output-path", Path.GetTempPath()],
@@ -189,6 +242,19 @@ public sealed class AppHostModelTests
 
     private static IResource Resource(IDistributedApplicationTestingBuilder builder, string name) =>
         builder.Resources.Single(resource => resource.Name == name);
+
+    /// <summary>What the AppHost adds to the Bicep of the container app azd deploys for a resource.</summary>
+    private static string ContainerAppBicepOf(IDistributedApplicationTestingBuilder builder, string name)
+    {
+        var customizations = Resource(builder, name).Annotations.OfType<AzureContainerAppCustomizationAnnotation>().ToList();
+        var containerApp = new AzureProvisioningResource(name, infrastructure =>
+        {
+            var app = new ContainerApp("app");
+            infrastructure.Add(app);
+            customizations.ForEach(customization => customization.Configure(infrastructure, app));
+        });
+        return containerApp.GetBicepTemplateString();
+    }
 
     /// <summary>The environment a resource gets as azd deploys it, with each value as its manifest expression.</summary>
     private static async Task<Dictionary<string, string>> EnvironmentOfAsync(IDistributedApplicationTestingBuilder builder, string name)

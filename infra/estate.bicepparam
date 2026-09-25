@@ -9,3 +9,6 @@ param presenterPrincipalId = readEnvironmentVariable('ESTATE_PRESENTER_PRINCIPAL
 
 // The postdeploy hook stores the TMS API's address once Aspire has deployed it.
 param tmsBaseUrl = readEnvironmentVariable('ESTATE_TMS_BASE_URL', '')
+
+// The postdeploy hook stores the demo UIs' host names once Aspire has deployed them.
+param demoUiHosts = readEnvironmentVariable('ESTATE_DEMO_UI_HOSTS', '')
