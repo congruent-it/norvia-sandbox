@@ -47,25 +47,54 @@ az servicebus topic subscription rule delete --resource-group "$resource_group" 
   --topic-name transport-order-events --subscription-name "$subscription" --name '$Default' --output none
 
 # 1. The intake identity submits and reads back. Its token can only be had inside Azure, so a job runs the calls.
-az containerapp job create --name "$job" --resource-group "$resource_group" \
-  --environment "$(az containerapp env list --resource-group "$resource_group" --query '[0].id' --output tsv)" \
-  --trigger-type Manual --replica-timeout 300 --replica-retry-limit 0 \
-  --image mcr.microsoft.com/azure-cli:latest \
-  --mi-user-assigned "$AZURE_ESTATE_INTAKE_IDENTITY_ID" \
-  --env-vars "TMS=$tms" "TMS_API_CLIENT_ID=$AZURE_ESTATE_TMS_API_CLIENT_ID" "INTAKE_CLIENT_ID=$AZURE_ESTATE_INTAKE_CLIENT_ID" \
-    "CORRELATION_ID=$correlation_id" "BOOKING=$booking" \
-  --command /bin/sh --args -c '
-    set -eu
-    az login --identity --client-id "$INTAKE_CLIENT_ID" --allow-no-subscriptions --output none
-    token=$(az account get-access-token --resource "$TMS_API_CLIENT_ID" --query accessToken --output tsv)
-    status=$(curl -sS -o /tmp/submitted.json -w "%{http_code}" -X POST "$TMS/v1/transport-orders" \
-      -H "Authorization: Bearer $token" -H "Content-Type: application/json" -H "X-Correlation-ID: $CORRELATION_ID" \
-      -d "$BOOKING")
-    echo "Submitted: $status $(cat /tmp/submitted.json)"
-    [ "$status" = 201 ]
-    number=$(python3 -c "import json; print(json.load(open(\"/tmp/submitted.json\"))[\"transportOrderNumber\"])")
-    echo "Read back: $(curl -fsS "$TMS/v1/transport-orders/$number" -H "Authorization: Bearer $token")"' \
-  --output none
+# The job is described as a definition file: `az containerapp job create --args` takes a leading -c for its own flag.
+calls='set -eu
+az login --identity --client-id "$INTAKE_CLIENT_ID" --allow-no-subscriptions --output none
+token=$(az account get-access-token --resource "$TMS_API_CLIENT_ID" --query accessToken --output tsv)
+status=$(curl -sS -o /tmp/submitted.json -w "%{http_code}" -X POST "$TMS/v1/transport-orders" \
+  -H "Authorization: Bearer $token" -H "Content-Type: application/json" -H "X-Correlation-ID: $CORRELATION_ID" \
+  -d "$BOOKING")
+echo "Submitted: $status $(cat /tmp/submitted.json)"
+[ "$status" = 201 ]
+number=$(python3 -c "import json; print(json.load(open(\"/tmp/submitted.json\"))[\"transportOrderNumber\"])")
+echo "Read back: $(curl -fsS "$TMS/v1/transport-orders/$number" -H "Authorization: Bearer $token")"'
+job_definition=$(mktemp --suffix=.yaml)
+jq -n \
+  --arg location "$AZURE_LOCATION" \
+  --arg identity "$AZURE_ESTATE_INTAKE_IDENTITY_ID" \
+  --arg environment "$(az containerapp env list --resource-group "$resource_group" --query '[0].id' --output tsv)" \
+  --arg calls "$calls" \
+  --arg tms "$tms" --arg tmsApiClientId "$AZURE_ESTATE_TMS_API_CLIENT_ID" --arg intakeClientId "$AZURE_ESTATE_INTAKE_CLIENT_ID" \
+  --arg correlationId "$correlation_id" --arg booking "$booking" '{
+    location: $location,
+    identity: { type: "UserAssigned", userAssignedIdentities: { ($identity): {} } },
+    properties: {
+      environmentId: $environment,
+      configuration: {
+        triggerType: "Manual",
+        replicaTimeout: 300,
+        replicaRetryLimit: 0,
+        manualTriggerConfig: { parallelism: 1, replicaCompletionCount: 1 }
+      },
+      template: {
+        containers: [{
+          name: "smoke-intake",
+          image: "mcr.microsoft.com/azure-cli:latest",
+          command: ["/bin/sh", "-c", $calls],
+          env: [
+            { name: "TMS", value: $tms },
+            { name: "TMS_API_CLIENT_ID", value: $tmsApiClientId },
+            { name: "INTAKE_CLIENT_ID", value: $intakeClientId },
+            { name: "CORRELATION_ID", value: $correlationId },
+            { name: "BOOKING", value: $booking }
+          ],
+          resources: { cpu: 0.5, memory: "1Gi" }
+        }]
+      }
+    }
+  }' > "$job_definition"
+az containerapp job create --name "$job" --resource-group "$resource_group" --yaml "$job_definition" --output none
+rm -f "$job_definition"
 execution=$(az containerapp job start --name "$job" --resource-group "$resource_group" --query name --output tsv)
 while
   status=$(az containerapp job execution show --name "$job" --resource-group "$resource_group" \
