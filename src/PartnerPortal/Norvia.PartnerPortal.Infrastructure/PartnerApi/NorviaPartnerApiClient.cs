@@ -30,6 +30,8 @@ internal sealed partial class NorviaPartnerApiClient(
             {
                 Content = JsonContent.Create(PartnerBookingFormat.ToJson(booking)),
             };
+            // Buffered, so it goes out with its length: the intake Logic App's trigger gets no body from a chunked one.
+            await request.Content.LoadIntoBufferAsync(cancellationToken);
             request.Headers.Add("Ocp-Apim-Subscription-Key", options.Value.SubscriptionKeyOf(persona.Id));
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await tokens.GetTokenAsync(persona.Id, cancellationToken));
 

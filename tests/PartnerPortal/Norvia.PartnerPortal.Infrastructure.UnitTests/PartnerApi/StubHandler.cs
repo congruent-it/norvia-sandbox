@@ -12,6 +12,12 @@ internal sealed class StubHandler : HttpMessageHandler
 
     public string? RequestBody { get; private set; }
 
+    /// <summary>
+    /// The request's Content-Length as the portal sent it, read before the body is: without one the body goes out in
+    /// chunks.
+    /// </summary>
+    public long? RequestContentLength { get; private set; }
+
     public void Answer(HttpStatusCode status, string body, string? correlationId = null) => _answer = () =>
     {
         var response = new HttpResponseMessage(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
@@ -28,6 +34,7 @@ internal sealed class StubHandler : HttpMessageHandler
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         Request = request;
+        RequestContentLength = request.Content?.Headers.ContentLength;
         RequestBody = request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken);
         return _answer();
     }

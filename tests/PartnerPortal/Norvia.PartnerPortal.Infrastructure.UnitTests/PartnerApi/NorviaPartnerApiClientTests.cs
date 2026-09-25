@@ -90,6 +90,16 @@ public sealed class NorviaPartnerApiClientTests : IDisposable
     }
 
     [Fact]
+    public async Task SubmitAsync_SendsTheBookingWithItsLength_BecauseTheIntakeLogicAppGetsNoBodyFromAChunkedOne()
+    {
+        _partnerApi.Answer(HttpStatusCode.Created, Contracts.Read("PartnerApi/samples/responses/accepted.json"));
+
+        await SubmitAsync(Samples.FullBooking());
+
+        _partnerApi.RequestContentLength.Should().Be(System.Text.Encoding.UTF8.GetByteCount(_partnerApi.RequestBody!));
+    }
+
+    [Fact]
     public async Task SubmitAsync_EmptyBooking_LeavesOutWhatIsEmpty_SoNorviaNamesWhatIsMissing()
     {
         _partnerApi.Answer(HttpStatusCode.UnprocessableEntity, Contracts.Read("PartnerApi/samples/responses/rejected.json"));
