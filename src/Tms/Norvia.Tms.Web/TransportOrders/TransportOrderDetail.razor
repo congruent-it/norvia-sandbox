@@ -2,7 +2,6 @@
 @* Interactive like the list: Fluent UI's components don't survive static streaming rendering. *@
 @rendermode InteractiveServer
 @implements IDisposable
-@using Norvia.Tms.Application.CanonicalModel
 @inject ITransportOrderQueries Queries
 @inject ILogger<TransportOrderDetail> Logger
 
@@ -37,74 +36,24 @@ else if (_transportOrder is null)
 }
 else
 {
-    var submitted = _transportOrder.TransportOrder;
-    var collection = submitted.Collection;
-    var delivery = submitted.Delivery;
-
-    <div class="mb-4 grid gap-4 md:grid-cols-3">
-        <TransportOrderSection Heading="Transport Order">
-            <dl class="detail-list">
-                <dt>Status</dt>
-                <dd>@_transportOrder.Status</dd>
-                <dt>Shipper</dt>
-                <dd>@(_transportOrder.Shipper.Name ?? _transportOrder.Shipper.Id)</dd>
-                <dt>Shipper reference</dt>
-                <dd>@Given(submitted.ShipperReference)</dd>
-                <dt>Received</dt>
-                <dd>@NorviaTime.Format(_transportOrder.ReceivedAt)</dd>
-                <dt>Correlation ID</dt>
-                <dd>@_transportOrder.CorrelationId</dd>
-            </dl>
-        </TransportOrderSection>
-
-        <TransportOrderSection Heading="Collection">
-            <dl class="detail-list">
-                <dt>Address</dt>
-                <dd>@FormatAddress(collection?.Address)</dd>
-                <dt>Window</dt>
-                <dd>@NorviaTime.FormatWindow(collection?.Window?.Earliest, collection?.Window?.Latest)</dd>
-            </dl>
-        </TransportOrderSection>
-
-        <TransportOrderSection Heading="Delivery">
-            <dl class="detail-list">
-                <dt>Address</dt>
-                <dd>@FormatAddress(delivery?.Address)</dd>
-                <dt>Consignee</dt>
-                <dd>@Given(delivery?.Consignee?.Name)</dd>
-                <dt>Contact</dt>
-                <dd>@Given(delivery?.Consignee?.ContactName)</dd>
-                <dt>Phone</dt>
-                <dd>@Given(delivery?.Consignee?.Phone)</dd>
-                <dt>Email</dt>
-                <dd>@Given(delivery?.Consignee?.Email)</dd>
-                <dt>Window</dt>
-                <dd>@NorviaTime.FormatWindow(delivery?.Window?.Earliest, delivery?.Window?.Latest)</dd>
-            </dl>
-        </TransportOrderSection>
-    </div>
-
-    <TransportOrderSection Heading="Goods">
-        @if (submitted.GoodsLines is not { Count: > 0 } goodsLines)
-        {
-            <p class="m-0">No goods lines were given.</p>
-        }
-        else
-        {
-            <FluentDataGrid Items="goodsLines.AsQueryable()" TGridItem="CanonicalGoodsLine" Class="flatly-table" aria-label="Goods lines">
-                <PropertyColumn Title="Package type" Property="@(line => Given(line.PackageType))" />
-                <PropertyColumn Title="Quantity" Property="@(line => FormatNumber(line.Quantity))" />
-                <PropertyColumn Title="Weight (kg)" Property="@(line => FormatNumber(line.WeightKg))" />
-                <PropertyColumn Title="Dimensions (cm, L × W × H)" Property="@(line => FormatDimensions(line.DimensionsCm))" />
-            </FluentDataGrid>
-        }
-    </TransportOrderSection>
-
-    <div class="h-4"></div>
-
-    <TransportOrderSection Heading="Instructions">
-        <p class="m-0 whitespace-pre-line">@Given(submitted.Instructions)</p>
-    </TransportOrderSection>
+    <SubmittedTransportOrder Submitted="_transportOrder.TransportOrder">
+        <Summary>
+            <TransportOrderSection Heading="Transport Order">
+                <dl class="detail-list">
+                    <dt>Status</dt>
+                    <dd>@_transportOrder.Status</dd>
+                    <dt>Shipper</dt>
+                    <dd>@(_transportOrder.Shipper.Name ?? _transportOrder.Shipper.Id)</dd>
+                    <dt>Shipper reference</dt>
+                    <dd>@SubmittedTransportOrder.Given(_transportOrder.TransportOrder.ShipperReference)</dd>
+                    <dt>Received</dt>
+                    <dd>@NorviaTime.Format(_transportOrder.ReceivedAt)</dd>
+                    <dt>Correlation ID</dt>
+                    <dd>@_transportOrder.CorrelationId</dd>
+                </dl>
+            </TransportOrderSection>
+        </Summary>
+    </SubmittedTransportOrder>
 }
 
 @code {

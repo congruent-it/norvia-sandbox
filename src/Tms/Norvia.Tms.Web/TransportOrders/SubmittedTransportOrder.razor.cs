@@ -3,10 +3,10 @@ using Norvia.Tms.Application.CanonicalModel;
 
 namespace Norvia.Tms.Web.TransportOrders;
 
-public sealed partial class TransportOrderDetail
+public sealed partial class SubmittedTransportOrder
 {
     // A Transport Order is shown as submitted, so a field the Shipper left out says so rather than showing nothing.
-    private static string Given(string? value) => string.IsNullOrWhiteSpace(value) ? NorviaTime.NotGiven : value;
+    internal static string Given(string? value) => string.IsNullOrWhiteSpace(value) ? NorviaTime.NotGiven : value;
 
     private static string FormatNumber(decimal? value) =>
         value?.ToString("0.###", CultureInfo.InvariantCulture) ?? NorviaTime.NotGiven;

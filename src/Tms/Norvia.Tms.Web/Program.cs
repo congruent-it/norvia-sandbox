@@ -3,6 +3,7 @@ using Norvia.Tms.Application.TransportOrders.List;
 using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Infrastructure;
 using Norvia.Tms.Web.Components;
+using Norvia.Tms.Web.Roles;
 using Norvia.Tms.Web.TransportOrders;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -36,6 +37,7 @@ app.UseAntiforgery();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
+app.MapRoleSwitcher();
 app.MapDefaultEndpoints();
 
 await app.RunAsync();

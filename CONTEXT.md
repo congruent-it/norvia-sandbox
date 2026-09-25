@@ -28,6 +28,14 @@ _Avoid_: chauffeur, operator
 A Norvia employee who turns accepted Transport Orders into Shipments, assigns each one to Norvia's own fleet or to a Carrier, and builds and dispatches the Own fleet's Trips.
 _Avoid_: scheduler, traffic controller
 
+**Customer service**:
+The Norvia employees who answer Shippers about their bookings and Transport Orders, for example about a Rejected booking, from the TMS UI.
+_Avoid_: support, helpdesk, account management
+
+**Role switcher**:
+The control in the TMS UI that moves a Norvia user between Planner and Customer service without a login, so a demo moves quickly. Each role opens on its own view.
+_Avoid_: login, impersonation, persona (that is for parties outside Norvia)
+
 **Integration operator**:
 A Norvia IT employee who watches the integration layer and resolves the messages that failed in it, using the Integration console.
 _Avoid_: admin, support engineer, ops

@@ -45,12 +45,7 @@ public sealed class WaitingForPlanningJourneyTests(TmsUiFixture tms) : BrowserPa
 
     private async Task<string> SubmitAsync(JsonObject booking)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("/v1/transport-orders", UriKind.Relative))
-        {
-            Content = JsonContent.Create(booking),
-        };
-        request.Headers.Add("X-Correlation-ID", Guid.NewGuid().ToString());
-        using var response = await _tms.Intake.SendAsync(request, TestContext.Current.CancellationToken);
+        using var response = await _tms.SubmitAsync(booking, TestContext.Current.CancellationToken);
         response.StatusCode.Should().Be(HttpStatusCode.Created, await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         var accepted = await response.Content.ReadFromJsonAsync<JsonObject>(TestContext.Current.CancellationToken);
         return accepted!["transportOrderNumber"]!.GetValue<string>();

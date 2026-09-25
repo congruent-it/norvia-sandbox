@@ -1,0 +1,20 @@
+@* The Role switcher: one button per role, the current one pressed. A plain form post, since the layout isn't interactive. *@
+<form method="post" action="/role" class="flex items-center gap-2" aria-label="Role">
+    <AntiforgeryToken />
+    <span class="text-white/75">Role</span>
+    <div class="flex overflow-hidden rounded-flatly border border-white/50">
+        @foreach (var role in NorviaRole.All)
+        {
+            var current = role == Current;
+            <button type="submit" name="role" value="@role.Key" aria-pressed="@(current ? "true" : "false")"
+                    class="@(current ? "bg-white text-primary" : "bg-transparent text-white hover:bg-white/10") cursor-pointer border-0 px-3 py-1 font-sans">
+                @role.Name
+            </button>
+        }
+    </div>
+</form>
+
+@code {
+    [Parameter, EditorRequired]
+    public NorviaRole Current { get; set; } = null!;
+}

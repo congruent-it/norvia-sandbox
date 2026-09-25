@@ -5,6 +5,7 @@ using Norvia.Tms.Application.Shippers;
 using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.GetById;
 using Norvia.Tms.Application.TransportOrders.GetByNumber;
+using Norvia.Tms.Application.TransportOrders.GetRejectedBooking;
 using Norvia.Tms.Application.TransportOrders.List;
 using Norvia.Tms.Domain.Shippers;
 using Norvia.Tms.Domain.TransportOrders;
@@ -83,6 +84,29 @@ public sealed class TransportOrderQueryTests
                 new RejectionReasonView("GoodsLinesMissing", "The booking has no goods lines."),
             ],
             Samples.CanonicalTransportOrder()));
+    }
+
+    [Fact]
+    public async Task GetRejectedBooking_ARejectedBookingsId_ReturnsItWithItsShipperAndReasons()
+    {
+        var order = Samples.RejectedOrder();
+        _repository.FirstOrDefaultAsync(Arg.Is<RejectedBookingByIdSpec>(s => s.Id == order.Id), Arg.Any<CancellationToken>())
+            .Returns(order);
+
+        var result = await new GetRejectedBookingHandler(_repository, _shippers).Handle(new GetRejectedBookingQuery(order.Id.Value), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Status.Should().Be(TransportOrderStatus.Rejected);
+        result.Value.Shipper.Should().Be(new ShipperView("SHP-0001", "Brouwer Dranken"));
+        result.Value.RejectionReasons.Should().Equal(RejectionReasonView.From(Samples.Reasons));
+    }
+
+    [Fact]
+    public async Task GetRejectedBooking_AnIdItDoesntFind_ReturnsNotFound()
+    {
+        var result = await new GetRejectedBookingHandler(_repository, _shippers).Handle(new GetRejectedBookingQuery(Guid.NewGuid()), CancellationToken.None);
+
+        result.Status.Should().Be(ResultStatus.NotFound);
     }
 
     [Fact]

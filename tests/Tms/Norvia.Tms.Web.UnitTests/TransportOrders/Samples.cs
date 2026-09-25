@@ -46,4 +46,33 @@ internal static class Samples
                 new CanonicalGoodsLine("crate", 4, 60m, null),
             ],
             "Ring at the side entrance"));
+
+    // Received 11:30 on 24 September 2026 in Rotterdam (UTC+2).
+    public static TransportOrderSummary RejectedSummary(string? reference = "BD-2026-0099") => new(
+        Guid.NewGuid(),
+        null,
+        TransportOrderStatus.Rejected,
+        BrouwerDranken,
+        reference,
+        null,
+        null,
+        new DateTimeOffset(2026, 9, 24, 9, 30, 0, TimeSpan.Zero));
+
+    // A booking with no goods lines and a delivery window before its collection, as the Shipper submitted it.
+    public static TransportOrderView RejectedView()
+    {
+        var submitted = View("TO-0000042").TransportOrder with { TransportOrderNumber = null, ShipperReference = "BD-2026-0099", GoodsLines = [] };
+        return View("TO-0000042") with
+        {
+            TransportOrderNumber = null,
+            Status = TransportOrderStatus.Rejected,
+            CorrelationId = "corr-0099",
+            RejectionReasons =
+            [
+                new RejectionReasonView("GoodsLinesMissing", "The booking has no goods lines."),
+                new RejectionReasonView("DeliveryWindowBeforeCollection", "The delivery window ends before the collection window starts."),
+            ],
+            TransportOrder = submitted,
+        };
+    }
 }
