@@ -156,12 +156,24 @@ The dependency rule, the architecture tests, the mediator, the 80% line coverage
 - **The Application Insights and Logic Apps adapters** are thin wrappers over their SDKs and are covered by the smoke run.
 - **The Aspire dashboard adapter** is unit tested against the dashboard's OTLP JSON, faked at the HTTP boundary: it finds a trail by a business key or its correlation ID, within the range, from the tracking keys only.
 - **bUnit and Playwright** against the Web project with faked ports. For example, a user with only `IntegrationConsole.Read` sees no resubmit or discard, and "body no longer kept" shows for an expired run.
-- **Post-deploy smoke run, slice 1:** book as Brouwer Dranken. Find the trail by the Transport Order number and by the correlation ID. It shows the APIM call, the intake run and the TMS call, and the run's steps open with their bodies.
+- **Post-deploy smoke run, slice 1:** book as Brouwer Dranken. Find the trail by the Transport Order number and by the correlation ID. It shows the APIM call, the intake run and the TMS call, and the run's steps open with their bodies. See [Presenter smoke run](#presenter-smoke-run).
 - **Post-deploy smoke run, slice 2:**
   1. Stop the TMS container app, and post a `POD` as Van Dijk Transport.
   2. After its maximum delivery count, the message reaches the tracking queue's dead-letter queue, and the dead-letter queue panel shows it within seconds.
   3. Start the TMS and resubmit the message. The Shipment moves to Delivered, and the trail shows the failed attempts and the resubmit.
   4. Post a Tracking event for an unknown reference. Discard it with a reason, and find the audit event on its trail.
+
+## Presenter smoke run
+
+After a deployment, and not in CI, the presenter shows the audience the path a booking took. Do it after the demo smoke run of the Norvia Partner API ([infra/smoke-test-partner-api.sh](../../infra/smoke-test-partner-api.sh)), signed in as the presenter the estate was provisioned for. The postdeploy hook prints each UI's address.
+
+1. **Book.** In the Partner portal, choose Brouwer Dranken in the Persona switcher and send a booking. Note the Transport Order number Norvia answers with, and Norvia's reference for the attempt under it: that is the correlation ID API Management created.
+2. **Check the sources.** Run `infra/smoke-test-integration-console.sh <Transport Order number> <correlation ID>`. It waits for Application Insights, which is usually 1 to 5 minutes behind, and checks what the console reads. The trail is found by the Transport Order number and by the correlation ID the portal showed, and it's one successful `transport-order-intake` trail. The trail holds the API Management call, the intake Logic App run (for Brouwer Dranken, `SHP-0001`) and the TMS call, all under that correlation ID. The run's steps open, and the map's and the TMS call's input and output bodies can be fetched. It prints `PASS` or `FAIL` per check, never a body, and ends with the console's pages for this booking. The correlation ID is optional, and without a number it takes Brouwer Dranken's latest booking of the last hour. It reads as you, not as the console's identity, so the console's own access shows only in the steps below.
+3. **Search.** In the Integration console, search for the Transport Order number: one trail, with the flow `transport-order-intake`, outcome `Succeeded` and the Transport Order number among its business keys. Search again for the correlation ID: the same trail.
+4. **Follow the trail.** Open it. In time order it shows the API Management call, the intake run and the TMS call the run made, with the correlation ID at the top.
+5. **Open the run.** On the intake run's hop, choose *Open run*. Its steps show with status and duration. Open `Map_the_booking` for the booking as Brouwer Dranken sent it and the Transport Order it became, and `Submit_to_the_TMS` for the call to the TMS and its answer.
+
+If a hop is still missing after the script's 10 minutes, and the run is younger than its retention, the flow that should have recorded it is breaking the [tracking contract](../coding-guidelines.md#tracking-contract). Fix that flow, or file it against its process; don't work around it in the console.
 
 ## Deferred
 
