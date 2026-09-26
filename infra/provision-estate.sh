@@ -42,11 +42,16 @@ for attempt in 1 2 3; do
   sleep 60
 done
 
-jq -r 'to_entries[] | "\(.key | ascii_upcase) \(.value.value)"' "$work/outputs.json" > "$work/outputs.env"
+# Each output as its name, its value as a JSON string, and its value as it is, tab-separated.
+jq -r 'to_entries[] | [(.key | ascii_upcase), (.value.value | tostring | tojson), (.value.value | tostring)] | @tsv' \
+  "$work/outputs.json" > "$work/outputs.env"
 # Provisioning finds an Estate parameter as AZURE_<NAME> in the azd environment, but deploying, which puts some of them
-# straight into the apps' settings, reads them only from the environment's config as infra.parameters.<name>.
-while read -r name value; do
+# straight into the apps' settings, reads them only from the environment's config as infra.parameters.<name>. That
+# config parses what it is given as JSON, and deploying accepts only strings, so a number such as the retention goes in
+# quoted.
+tab=$(printf '\t')
+while IFS="$tab" read -r name json value; do
   azd env set "AZURE_$name" "$value"
-  azd env config set "infra.parameters.$(echo "$name" | tr '[:upper:]' '[:lower:]')" "$value"
+  azd env config set "infra.parameters.$(echo "$name" | tr '[:upper:]' '[:lower:]')" "$json"
 done < "$work/outputs.env"
 touch "$deployed_in_this_run"
