@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Security.Claims;
 using Ardalis.Result;
 using Mediator;
@@ -70,8 +69,8 @@ public static class TransportOrderEndpoints
             .WithDescription(
                 "Rates the order again with the Rate Card version valid on its collection date, and publishes TransportOrderRated or, "
                 + "when it fails again, another TransportOrderRatingFailed. An order that isn't Rating failed is refused with a 409 and "
-                + "left as it is: a Rated order's Freight Charge stays frozen. The re-rate starts a Message trail of its own: its "
-                + $"events carry the {CorrelationIdHeader} sent, or one the TMS creates and returns in that header.");
+                + "left as it is: a Rated order's Freight Charge stays frozen. Like the first rating, the re-rate continues the Message "
+                + "trail of the order's intake, so its event carries the intake's correlation ID.");
 
         return app;
     }
@@ -150,27 +149,10 @@ public static class TransportOrderEndpoints
 
     private static async Task<Results<Ok<RateTransportOrderResult>, ProblemHttpResult>> ReRateAsync(
         string transportOrderNumber,
-        [FromHeader(Name = CorrelationIdHeader)] string? correlationId,
-        HttpContext context,
-        ILoggerFactory loggers,
         IMediator mediator,
         CancellationToken cancellationToken)
     {
-        // A Customer service action starts a new Message trail (coding guidelines §7), not the intake's.
-        correlationId = string.IsNullOrWhiteSpace(correlationId) ? Guid.NewGuid().ToString() : correlationId;
-        context.Response.Headers[CorrelationIdHeader] = correlationId;
-        var trail = new Dictionary<string, object?>
-        {
-            [TrackingKeys.CorrelationId] = correlationId,
-            [TrackingKeys.TransportOrderNumber] = transportOrderNumber,
-        };
-        foreach (var (key, value) in trail)
-        {
-            Activity.Current?.SetTag(key, value);
-        }
-
-        using var scope = loggers.CreateLogger(typeof(TransportOrderEndpoints)).BeginScope(trail);
-        var result = await mediator.Send(new ReRateTransportOrderCommand(transportOrderNumber, correlationId), cancellationToken);
+        var result = await mediator.Send(new RateTransportOrderCommand(transportOrderNumber, ReRate: true), cancellationToken);
         return result.Status switch
         {
             ResultStatus.Ok => TypedResults.Ok(result.Value),

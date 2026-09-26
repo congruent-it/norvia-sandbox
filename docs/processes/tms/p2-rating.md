@@ -77,7 +77,7 @@ Both events are published to the topic for Transport Order events, through the T
 
 ## Tracking
 
-Rating continues the Message trail of the Transport Order's intake: its events carry the intake's correlation ID. A re-rate is a Customer service action, so it starts a trail of its own: its event carries the correlation ID the TMS UI sends in `X-Correlation-ID`, or one the TMS creates and returns in that header. The Transport Order keeps its intake correlation ID, so tracing an order across both follows the Transport Order number. The rating worker, and the TMS API for a re-rate, put the tracking-contract keys in the logging scope and on the trace of each rating: `correlationId`, `flow` (`transport-order-rating`), `partyId` (the Shipper ID) and `transportOrderNumber`. The outcome event carries the same keys as application properties. When Rating failed, the log scope, the trace and `TransportOrderRatingFailed` also carry `failureCode`.
+Rating continues the Message trail of the Transport Order's intake: its events carry the intake's correlation ID. A re-rate continues it too, so a Transport Order's whole rating, re-rates included, is found by its intake's correlation ID. The rating worker, and the TMS API for a re-rate, put the tracking-contract keys in the logging scope and on the trace of each rating: `correlationId`, `flow` (`transport-order-rating`), `partyId` (the Shipper ID) and `transportOrderNumber`. The outcome event carries the same keys as application properties. When Rating failed, the log scope, the trace and `TransportOrderRatingFailed` also carry `failureCode`.
 
 ## Deferred
 

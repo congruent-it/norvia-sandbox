@@ -184,7 +184,7 @@ public sealed class TransportOrderRatingTests
     {
         var order = RatingFailed();
 
-        var reRated = order.ReRate(RotterdamUtrechtRateCard(), ReRatedAt, ReRateTrail);
+        var reRated = order.ReRate(RotterdamUtrechtRateCard(), ReRatedAt);
 
         reRated.Should().BeTrue();
         order.RatingResult.Should().Be(RatingResult.Rated);
@@ -195,16 +195,15 @@ public sealed class TransportOrderRatingTests
     }
 
     [Fact]
-    public void ReRate_RatingFailedOrderTheRateCardNowCovers_RaisesTransportOrderRatedOnTheReRatesTrail()
+    public void ReRate_RatingFailedOrderTheRateCardNowCovers_RaisesTransportOrderRated()
     {
         var order = RatingFailed();
 
-        order.ReRate(RotterdamUtrechtRateCard(), ReRatedAt, ReRateTrail);
+        order.ReRate(RotterdamUtrechtRateCard(), ReRatedAt);
 
-        var rated = order.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<TransportOrderRatedEvent>().Subject;
-        rated.TransportOrder.Should().BeSameAs(order);
-        rated.CorrelationId.Should().Be(ReRateTrail, "a Customer service action starts a Message trail of its own");
-        order.CorrelationId.Should().Be(new CorrelationId("corr-1"), "the Transport Order keeps its intake's correlation ID");
+        order.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<TransportOrderRatedEvent>()
+            .Which.TransportOrder.Should().BeSameAs(order);
     }
 
     [Fact]
@@ -216,7 +215,7 @@ public sealed class TransportOrderRatingTests
             Versions = [RotterdamUtrechtVersion(1, new DateOnly(2027, 1, 1), null, 12.00m)],
         };
 
-        var reRated = order.ReRate(noLaneToUtrecht, ReRatedAt, ReRateTrail);
+        var reRated = order.ReRate(noLaneToUtrecht, ReRatedAt);
 
         reRated.Should().BeTrue("a re-rate that fails again is still a rating, and publishes its outcome");
         order.RatingResult.Should().Be(RatingResult.RatingFailed);
@@ -224,7 +223,7 @@ public sealed class TransportOrderRatingTests
         order.RatingFailedAt.Should().Be(ReRatedAt);
         order.DomainEvents.Should().ContainSingle()
             .Which.Should().BeOfType<TransportOrderRatingFailedEvent>()
-            .Which.CorrelationId.Should().Be(ReRateTrail);
+            .Which.TransportOrder.Should().BeSameAs(order);
     }
 
     [Fact]
@@ -235,7 +234,7 @@ public sealed class TransportOrderRatingTests
         var freightCharge = order.FreightCharge;
         order.ClearDomainEvents();
 
-        var reRated = order.ReRate(null, ReRatedAt, ReRateTrail);
+        var reRated = order.ReRate(null, ReRatedAt);
 
         reRated.Should().BeFalse("a frozen Freight Charge stays frozen; a wrong one is corrected with a Credit note");
         order.RatingResult.Should().Be(RatingResult.Rated);
@@ -253,7 +252,7 @@ public sealed class TransportOrderRatingTests
         var ratingResult = order.RatingResult;
         order.ClearDomainEvents();
 
-        var reRated = order.ReRate(RotterdamUtrechtRateCard(), ReRatedAt, ReRateTrail);
+        var reRated = order.ReRate(RotterdamUtrechtRateCard(), ReRatedAt);
 
         reRated.Should().BeFalse("only a Rating failed order is re-rated");
         order.RatingResult.Should().Be(ratingResult);
@@ -274,30 +273,15 @@ public sealed class TransportOrderRatingTests
         };
         var order = RatingFailed();
 
-        order.ReRate(rateCard, new DateTimeOffset(2027, 3, 1, 9, 0, 0, TimeSpan.Zero), ReRateTrail);
+        order.ReRate(rateCard, new DateTimeOffset(2027, 3, 1, 9, 0, 0, TimeSpan.Zero));
 
         order.FreightCharge!.RateCardVersion.Should().Be(new RateCardVersionReference(new RateCardId("RC-0001"), 1));
         order.FreightCharge.Total.Should().Be(new Money(93.50m)); // 850 kg ÷ 100 × 11.00
     }
 
-    [Fact]
-    public void Rate_Always_RaisesItsOutcomeOnTheIntakesTrail()
-    {
-        var order = Accepted(IntakeChannel.ShipperApi);
-        order.ClearDomainEvents();
-
-        order.Rate(RotterdamUtrechtRateCard(), RatedAt);
-
-        order.DomainEvents.Should().ContainSingle()
-            .Which.Should().BeOfType<TransportOrderRatedEvent>()
-            .Which.CorrelationId.Should().Be(new CorrelationId("corr-1"), "rating continues the Message trail of the intake");
-    }
-
     private static readonly DateTimeOffset RatedAt = ReceivedAt.AddSeconds(2);
 
     private static readonly DateTimeOffset ReRatedAt = ReceivedAt.AddHours(3);
-
-    private static readonly CorrelationId ReRateTrail = new("corr-re-rate");
 
     private static TransportOrder RatingFailed()
     {

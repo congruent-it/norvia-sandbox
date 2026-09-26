@@ -9,7 +9,7 @@ public sealed class PublishTransportOrderRated(IOutbox outbox) : INotificationHa
     public ValueTask Handle(TransportOrderRatedEvent notification, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(notification);
-        outbox.Add(TransportOrderRatedV1.From(notification.TransportOrder, notification.CorrelationId));
+        outbox.Add(TransportOrderRatedV1.From(notification.TransportOrder));
         return ValueTask.CompletedTask;
     }
 }

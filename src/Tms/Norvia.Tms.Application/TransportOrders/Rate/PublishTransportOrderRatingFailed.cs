@@ -9,7 +9,7 @@ public sealed class PublishTransportOrderRatingFailed(IOutbox outbox) : INotific
     public ValueTask Handle(TransportOrderRatingFailedEvent notification, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(notification);
-        outbox.Add(TransportOrderRatingFailedV1.From(notification.TransportOrder, notification.CorrelationId));
+        outbox.Add(TransportOrderRatingFailedV1.From(notification.TransportOrder));
         return ValueTask.CompletedTask;
     }
 }

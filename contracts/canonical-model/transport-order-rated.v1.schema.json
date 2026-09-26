@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://norvia.example/canonical-model/transport-order-rated.v1.schema.json",
   "title": "TransportOrderRated",
-  "description": "The TMS rated an accepted Transport Order: its Freight Charge is calculated and frozen (Canonical Model event, version 1). Published on the Transport Order events topic, under the correlation ID of the Transport Order's intake, or of the re-rate that rated it.",
+  "description": "The TMS rated an accepted Transport Order: its Freight Charge is calculated and frozen (Canonical Model event, version 1). Published on the Transport Order events topic, under the correlation ID of the Transport Order's intake.",
   "type": "object",
   "additionalProperties": false,
   "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "transportOrderNumber", "shipperId", "freightCharge"],

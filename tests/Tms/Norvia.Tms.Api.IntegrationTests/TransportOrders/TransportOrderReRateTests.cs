@@ -6,7 +6,8 @@ namespace Norvia.Tms.Api.IntegrationTests.TransportOrders;
 /// <summary>
 /// Customer service finds the rating exceptions and re-rates one through the TMS API (P2). On this TMS the test seed is
 /// never corrected, so an order to Düsseldorf, where SHP-0001's Rate Card has no Lane, fails again when it is re-rated.
-/// Re-rating after the Rate Card is corrected is in <see cref="TransportOrderReRateAfterCorrectionTests"/>.
+/// Re-rating after the Rate Card is corrected is in <see cref="TransportOrderReRateAfterCorrectionTests"/>. A re-rate
+/// continues the Message trail of the order's intake, so its events are found by the intake's correlation ID.
 /// </summary>
 public sealed class TransportOrderReRateTests(TmsFixture tms)
 {
@@ -38,14 +39,13 @@ public sealed class TransportOrderReRateTests(TmsFixture tms)
     }
 
     [Fact]
-    public async Task ReRate_FailsAgain_StaysRatingFailed_AndPublishesAnotherTransportOrderRatingFailedOnTheReRatesTrail()
+    public async Task ReRate_FailsAgain_StaysRatingFailed_AndPublishesAnotherTransportOrderRatingFailed()
     {
         var intake = TmsCalls.NewCorrelationId();
         var number = await tms.SubmitAcceptedAsync(Bookings.Valid(TmsCalls.NewReference()).DeliveredToDusseldorf(), intake, _cancellationToken);
         await tms.PublishedAsync(intake, "TransportOrderRatingFailed", _cancellationToken);
 
-        var reRate = TmsCalls.NewCorrelationId();
-        using var response = await tms.ReRateAsync(number, reRate, _cancellationToken);
+        using var response = await tms.ReRateAsync(number, _cancellationToken);
 
         var body = await response.Content.ReadAsStringAsync(_cancellationToken);
         response.StatusCode.Should().Be(HttpStatusCode.OK, body);
@@ -53,18 +53,18 @@ public sealed class TransportOrderReRateTests(TmsFixture tms)
         result["ratingResult"]!.GetValue<string>().Should().Be("RatingFailed");
         result["ratingFailure"]!["code"]!.GetValue<string>().Should().Be("NoMatchingLane");
 
-        var message = (await tms.PublishedAsync(reRate, "TransportOrderRatingFailed", _cancellationToken)).Should().ContainSingle().Subject;
-        message.ApplicationProperties.Should().Contain(new Dictionary<string, object>
+        var events = await tms.PublishedAsync(intake, "TransportOrderRatingFailed", count: 2, _cancellationToken);
+        events.Should().HaveCount(2, "the first rating and the re-rate each publish their outcome");
+        var reRated = events[^1];
+        reRated.ApplicationProperties.Should().Contain(new Dictionary<string, object>
         {
-            ["correlationId"] = reRate,
+            ["correlationId"] = intake,
             ["transportOrderNumber"] = number,
             ["flow"] = "transport-order-rating",
             ["partyId"] = "SHP-0001",
             ["failureCode"] = "NoMatchingLane",
         });
-        var published = JsonNode.Parse(message.Body.ToString())!;
-        CanonicalModelSchemas.ValidateTransportOrderRatingFailed(published).IsValid.Should().BeTrue();
-        tms.PublishedAbout(number, "TransportOrderRatingFailed").Should().HaveCount(2, "the first rating and the re-rate each publish their outcome");
+        CanonicalModelSchemas.ValidateTransportOrderRatingFailed(JsonNode.Parse(reRated.Body.ToString())!).IsValid.Should().BeTrue();
         (await tms.GetTransportOrderAsync(number, _cancellationToken))["ratingResult"]!.GetValue<string>().Should().Be("RatingFailed");
     }
 
@@ -74,10 +74,10 @@ public sealed class TransportOrderReRateTests(TmsFixture tms)
         var intake = TmsCalls.NewCorrelationId();
         var number = await tms.SubmitAcceptedAsync(Bookings.Valid(TmsCalls.NewReference()), intake, _cancellationToken);
         await tms.PublishedAsync(intake, "TransportOrderRated", _cancellationToken);
+        var publishedBefore = tms.Published.Count(m => m.CorrelationId == intake);
         var before = await tms.GetTransportOrderAsync(number, _cancellationToken);
 
-        var reRate = TmsCalls.NewCorrelationId();
-        using var response = await tms.ReRateAsync(number, reRate, _cancellationToken);
+        using var response = await tms.ReRateAsync(number, _cancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
         var problem = JsonNode.Parse(await response.Content.ReadAsStringAsync(_cancellationToken))!;
@@ -87,8 +87,7 @@ public sealed class TransportOrderReRateTests(TmsFixture tms)
         JsonNode.DeepEquals(before, after).Should().BeTrue("a frozen Freight Charge stays frozen");
 
         await Task.Delay(TimeSpan.FromSeconds(3), _cancellationToken); // Let the outbox run, so an event would show up.
-        tms.Published.Should().NotContain(m => m.CorrelationId == reRate);
-        tms.PublishedAbout(number, "TransportOrderRated").Should().ContainSingle();
+        tms.Published.Count(m => m.CorrelationId == intake).Should().Be(publishedBefore);
     }
 
     [Fact]
@@ -97,7 +96,7 @@ public sealed class TransportOrderReRateTests(TmsFixture tms)
         using var wms = tms.CreateTmsClient(tms.IssueToken([TmsFixture.IntakeRole], clientId: TmsFixture.WmsClientId));
         var number = await tms.SubmitAcceptedAsync(Bookings.Valid(TmsCalls.NewReference()), TmsCalls.NewCorrelationId(), _cancellationToken, wms);
 
-        using var response = await tms.ReRateAsync(number, TmsCalls.NewCorrelationId(), _cancellationToken);
+        using var response = await tms.ReRateAsync(number, _cancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await tms.GetTransportOrderAsync(number, _cancellationToken))["ratingResult"]!.GetValue<string>().Should().Be("NotRatedSeparately");
@@ -106,37 +105,26 @@ public sealed class TransportOrderReRateTests(TmsFixture tms)
     [Fact]
     public async Task ReRate_UnknownTransportOrder_IsNotFound()
     {
-        using var response = await tms.ReRateAsync("TO-9999999", TmsCalls.NewCorrelationId(), _cancellationToken);
+        using var response = await tms.ReRateAsync("TO-9999999", _cancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]
-    public async Task ReRate_Always_TracesUnderTheReRatesTrailWithTheTrackingContractKeys()
+    public async Task ReRate_Always_TracesOnTheIntakesTrailWithTheTrackingContractKeys()
     {
-        var number = await tms.SubmitAcceptedAsync(Bookings.Valid(TmsCalls.NewReference()).DeliveredToDusseldorf(), TmsCalls.NewCorrelationId(), _cancellationToken);
+        var intake = TmsCalls.NewCorrelationId();
+        var number = await tms.SubmitAcceptedAsync(Bookings.Valid(TmsCalls.NewReference()).DeliveredToDusseldorf(), intake, _cancellationToken);
         await tms.WaitForRatingResultAsync(number, "RatingFailed", _cancellationToken);
 
-        var reRate = TmsCalls.NewCorrelationId();
-        using var response = await tms.ReRateAsync(number, reRate, _cancellationToken);
+        using var response = await tms.ReRateAsync(number, _cancellationToken);
 
-        var failedAgain = await tms.TmsLogAsync(log => log["correlationId"] == reRate && log["failureCode"] is not null, _cancellationToken);
+        var failedAgain = await tms.TmsLogAsync(
+            log => log["correlationId"] == intake && log.Text.Contains("re-rated", StringComparison.Ordinal),
+            _cancellationToken);
         failedAgain["flow"].Should().Be("transport-order-rating");
         failedAgain["partyId"].Should().Be("SHP-0001");
         failedAgain["transportOrderNumber"].Should().Be(number);
         failedAgain["failureCode"].Should().Be("NoMatchingLane");
-    }
-
-    [Fact]
-    public async Task ReRate_WithoutACorrelationId_StartsATrailOfItsOwn()
-    {
-        var number = await tms.SubmitAcceptedAsync(Bookings.Valid(TmsCalls.NewReference()).DeliveredToDusseldorf(), TmsCalls.NewCorrelationId(), _cancellationToken);
-        await tms.WaitForRatingResultAsync(number, "RatingFailed", _cancellationToken);
-
-        using var response = await tms.Tms.PostAsync(new Uri($"/v1/transport-orders/{number}/re-rate", UriKind.Relative), content: null, _cancellationToken);
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var correlationId = response.Headers.GetValues("X-Correlation-ID").Should().ContainSingle().Subject;
-        (await tms.PublishedAsync(correlationId, "TransportOrderRatingFailed", _cancellationToken)).Should().ContainSingle();
     }
 }

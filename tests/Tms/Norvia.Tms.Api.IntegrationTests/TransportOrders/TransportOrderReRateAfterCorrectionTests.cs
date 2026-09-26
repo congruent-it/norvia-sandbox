@@ -17,22 +17,17 @@ public sealed class TransportOrderReRateAfterCorrectionTests(CorrectableSeedTmsF
     {
         // Collected under version 1 (to 2039) and version 2 (2040 to 2049). Today falls under version 1, so the order
         // collected in 2040 is priced by version 2 only if the re-rate goes by the collection date.
-        var underVersion1 = await SubmitFailingToDusseldorfAsync(new DateTimeOffset(2030, 6, 3, 8, 0, 0, TimeSpan.Zero));
-        var underVersion2 = await SubmitFailingToDusseldorfAsync(new DateTimeOffset(2040, 3, 1, 8, 0, 0, TimeSpan.Zero));
+        var (underVersion1, intake1) = await SubmitFailingToDusseldorfAsync(new DateTimeOffset(2030, 6, 3, 8, 0, 0, TimeSpan.Zero));
+        var (underVersion2, intake2) = await SubmitFailingToDusseldorfAsync(new DateTimeOffset(2040, 3, 1, 8, 0, 0, TimeSpan.Zero));
 
         await tms.CorrectSeedAsync(AddLanesToDusseldorf, _cancellationToken);
 
-        var reRate1 = TmsCalls.NewCorrelationId();
-        var reRate2 = TmsCalls.NewCorrelationId();
-        using (var response = await tms.ReRateAsync(underVersion1, reRate1, _cancellationToken))
+        foreach (var number in new[] { underVersion1, underVersion2 })
         {
-            response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync(_cancellationToken));
-            JsonNode.Parse(await response.Content.ReadAsStringAsync(_cancellationToken))!["ratingResult"]!.GetValue<string>().Should().Be("Rated");
-        }
-
-        using (var response = await tms.ReRateAsync(underVersion2, reRate2, _cancellationToken))
-        {
-            response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync(_cancellationToken));
+            using var response = await tms.ReRateAsync(number, _cancellationToken);
+            var result = await response.Content.ReadAsStringAsync(_cancellationToken);
+            response.StatusCode.Should().Be(HttpStatusCode.OK, result);
+            JsonNode.Parse(result)!["ratingResult"]!.GetValue<string>().Should().Be("Rated");
         }
 
         var order1 = await tms.GetTransportOrderAsync(underVersion1, _cancellationToken);
@@ -45,10 +40,10 @@ public sealed class TransportOrderReRateAfterCorrectionTests(CorrectableSeedTmsF
         order2["freightCharge"]!["rateCardVersion"]!["version"]!.GetValue<int>().Should().Be(2);
         order2["freightCharge"]!["total"]!.GetValue<decimal>().Should().Be(227.63m); // 910.5 kg ÷ 100 × 25.00 = 227.625
 
-        var rated = (await tms.PublishedAsync(reRate1, "TransportOrderRated", _cancellationToken)).Should().ContainSingle().Subject;
+        var rated = (await tms.PublishedAsync(intake1, "TransportOrderRated", _cancellationToken)).Should().ContainSingle().Subject;
         rated.ApplicationProperties.Should().Contain(new Dictionary<string, object>
         {
-            ["correlationId"] = reRate1,
+            ["correlationId"] = intake1,
             ["transportOrderNumber"] = underVersion1,
             ["flow"] = "transport-order-rating",
             ["partyId"] = "SHP-0001",
@@ -56,13 +51,12 @@ public sealed class TransportOrderReRateAfterCorrectionTests(CorrectableSeedTmsF
         var body = JsonNode.Parse(rated.Body.ToString())!;
         CanonicalModelSchemas.ValidateTransportOrderRated(body).IsValid.Should().BeTrue();
         JsonNode.DeepEquals(body["freightCharge"], order1["freightCharge"]).Should().BeTrue();
-        tms.PublishedAbout(underVersion1, "TransportOrderRated").Should().ContainSingle();
-        tms.PublishedAbout(underVersion2, "TransportOrderRated").Should().ContainSingle();
+        (await tms.PublishedAsync(intake2, "TransportOrderRated", _cancellationToken)).Should().ContainSingle();
         (await tms.ListRatingExceptionsAsync(_cancellationToken)).Should().NotContain(e =>
             e!["transportOrderNumber"]!.GetValue<string>() == underVersion1 || e["transportOrderNumber"]!.GetValue<string>() == underVersion2);
     }
 
-    private async Task<string> SubmitFailingToDusseldorfAsync(DateTimeOffset collectedFrom)
+    private async Task<(string Number, string Intake)> SubmitFailingToDusseldorfAsync(DateTimeOffset collectedFrom)
     {
         var intake = TmsCalls.NewCorrelationId();
         var number = await tms.SubmitAcceptedAsync(
@@ -70,7 +64,7 @@ public sealed class TransportOrderReRateAfterCorrectionTests(CorrectableSeedTmsF
         var failed = await tms.WaitForRatingResultAsync(number, "RatingFailed", _cancellationToken);
         failed["ratingFailure"]!["code"]!.GetValue<string>().Should().Be("NoMatchingLane");
         await tms.PublishedAsync(intake, "TransportOrderRatingFailed", _cancellationToken);
-        return number;
+        return (number, intake);
     }
 
     private static void AddLanesToDusseldorf(JsonObject seed)

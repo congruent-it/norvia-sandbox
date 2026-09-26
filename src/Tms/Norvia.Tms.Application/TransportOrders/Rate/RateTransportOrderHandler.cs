@@ -20,13 +20,24 @@ public sealed class RateTransportOrderHandler(IRepository<TransportOrder> reposi
             return Result.NotFound();
         }
 
-        // The rating result, with its Freight Charge or failure, and the outcome event's outbox message are saved in one
-        // transaction.
-        if (order.Rate(rateCards.FindFor(order.ShipperId), time.GetUtcNow()))
+        var rateCard = rateCards.FindFor(order.ShipperId);
+        var rated = command.ReRate ? order.ReRate(rateCard, time.GetUtcNow()) : order.Rate(rateCard, time.GetUtcNow());
+        if (rated)
         {
+            // The rating result, with its Freight Charge or failure, and the outcome event's outbox message are saved in
+            // one transaction.
             await repository.SaveChangesAsync(cancellationToken);
         }
+        else if (command.ReRate)
+        {
+            return Result.Conflict(
+                $"Transport Order {number} is {order.RatingResult}; only a Transport Order whose Rating failed can be re-rated.");
+        }
 
-        return new RateTransportOrderResult(order.RatingResult.Value, RatingFailureView.From(order.RatingFailure));
+        return new RateTransportOrderResult(
+            order.RatingResult.Value,
+            RatingFailureView.From(order.RatingFailure),
+            order.ShipperId.Value,
+            order.CorrelationId.Value);
     }
 }

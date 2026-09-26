@@ -15,7 +15,7 @@ public sealed class PublishTransportOrderRatingFailedTests
     {
         var order = Samples.RatingFailedOrder(sequence: 3, correlationId: "corr-9");
 
-        await new PublishTransportOrderRatingFailed(_outbox).Handle(new TransportOrderRatingFailedEvent(order, order.CorrelationId), CancellationToken.None);
+        await new PublishTransportOrderRatingFailed(_outbox).Handle(new TransportOrderRatingFailedEvent(order), CancellationToken.None);
 
         _outbox.Received(1).Add(Arg.Is<TransportOrderRatingFailedV1>(e =>
             e.TransportOrderNumber == "TO-0000003"
@@ -26,25 +26,9 @@ public sealed class PublishTransportOrderRatingFailedTests
     }
 
     [Fact]
-    public async Task Handle_ReRateThatFailsAgain_PublishesOnTheReRatesTrail()
-    {
-        var order = Samples.RatingFailedOrder(sequence: 3, correlationId: "corr-intake");
-        order.ReRate(null, Samples.Now.AddHours(1), new CorrelationId("corr-re-rate"));
-
-        await new PublishTransportOrderRatingFailed(_outbox).Handle(
-            new TransportOrderRatingFailedEvent(order, new CorrelationId("corr-re-rate")),
-            CancellationToken.None);
-
-        _outbox.Received(1).Add(Arg.Is<TransportOrderRatingFailedV1>(e =>
-            e.CorrelationId == "corr-re-rate"
-            && e.OccurredAt == Samples.Now.AddHours(1)
-            && e.ApplicationProperties["correlationId"].Equals("corr-re-rate")));
-    }
-
-    [Fact]
     public void TransportOrderRatingFailed_Always_GoesToTheTransportOrderEventsTopicWithTheTrackingKeysAndFailureCode()
     {
-        var failed = TransportOrderRatingFailedV1.From(Samples.RatingFailedOrder(sequence: 3, correlationId: "corr-9"), new CorrelationId("corr-9"));
+        var failed = TransportOrderRatingFailedV1.From(Samples.RatingFailedOrder(sequence: 3, correlationId: "corr-9"));
 
         failed.Topic.Should().Be("transport-order-events");
         failed.EventType.Should().Be("TransportOrderRatingFailed");
@@ -66,7 +50,7 @@ public sealed class PublishTransportOrderRatingFailedTests
     [InlineData(true)]
     public void From_OrderWhoseRatingDidNotFail_Throws(bool rated)
     {
-        var act = () => TransportOrderRatingFailedV1.From(rated ? Samples.RatedOrder() : Samples.AcceptedOrder(), new CorrelationId("corr-1"));
+        var act = () => TransportOrderRatingFailedV1.From(rated ? Samples.RatedOrder() : Samples.AcceptedOrder());
 
         act.Should().Throw<ArgumentException>();
     }

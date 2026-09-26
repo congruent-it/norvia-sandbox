@@ -1,6 +1,5 @@
 using Ardalis.Result;
 using Ardalis.SharedKernel;
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using Norvia.Tms.Application.RateCards;
 using Norvia.Tms.Application.TransportOrders;
@@ -11,34 +10,33 @@ using NSubstitute;
 
 namespace Norvia.Tms.Application.UnitTests.TransportOrders;
 
-public sealed class ReRateTransportOrderHandlerTests
+/// <summary>Re-rating through the one "rate Transport Order" operation, as Customer service does from the TMS API.</summary>
+public sealed class ReRateTests
 {
     private readonly IRepository<TransportOrder> _repository = Substitute.For<IRepository<TransportOrder>>();
     private readonly IRateCardDirectory _rateCards = Substitute.For<IRateCardDirectory>();
     private readonly FakeTimeProvider _time = new(Samples.Now.AddHours(3));
-    private readonly ReRateTransportOrderHandler _handler;
+    private readonly RateTransportOrderHandler _handler;
 
-    public ReRateTransportOrderHandlerTests()
+    public ReRateTests()
     {
         _rateCards.FindFor(new ShipperId("SHP-0001")).Returns(Samples.RateCard());
-        _handler = new ReRateTransportOrderHandler(_repository, _rateCards, _time, NullLogger<ReRateTransportOrderHandler>.Instance);
+        _handler = new RateTransportOrderHandler(_repository, _rateCards, _time);
     }
 
     [Fact]
-    public async Task Handle_RatingFailedOrderTheRateCardNowCovers_RatesItOnTheReRatesTrailAndSavesIt()
+    public async Task Handle_RatingFailedOrderTheRateCardNowCovers_RatesItAndSavesIt()
     {
         var order = Samples.RatingFailedOrder(sequence: 7);
         _repository.SingleOrDefaultAsync(Arg.Is<TransportOrderToRateSpec>(s => s.Number.Value == "TO-0000007"), Arg.Any<CancellationToken>())
             .Returns(order);
 
-        var result = await _handler.Handle(new ReRateTransportOrderCommand("TO-0000007", "corr-re-rate"), CancellationToken.None);
+        var result = await _handler.Handle(new RateTransportOrderCommand("TO-0000007", ReRate: true), CancellationToken.None);
 
-        result.Value.Should().Be(new RateTransportOrderResult(RatingResult.Rated, null));
+        result.Value.Should().Be(new RateTransportOrderResult(RatingResult.Rated, null, "SHP-0001", "corr-1"));
         order.FreightCharge!.Total.Should().Be(new Money(112.90m));
         order.RatedAt.Should().Be(Samples.Now.AddHours(3));
-        order.DomainEvents.Should().ContainSingle()
-            .Which.Should().BeOfType<TransportOrderRatedEvent>()
-            .Which.CorrelationId.Should().Be(new CorrelationId("corr-re-rate"));
+        order.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<TransportOrderRatedEvent>();
         await _repository.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
@@ -49,11 +47,13 @@ public sealed class ReRateTransportOrderHandlerTests
         _rateCards.FindFor(new ShipperId("SHP-0001")).Returns((Domain.RateCards.RateCard?)null);
         _repository.SingleOrDefaultAsync(Arg.Any<TransportOrderToRateSpec>(), Arg.Any<CancellationToken>()).Returns(order);
 
-        var result = await _handler.Handle(new ReRateTransportOrderCommand("TO-0000007", "corr-re-rate"), CancellationToken.None);
+        var result = await _handler.Handle(new RateTransportOrderCommand("TO-0000007", ReRate: true), CancellationToken.None);
 
         result.Value.Should().Be(new RateTransportOrderResult(
             RatingResult.RatingFailed,
-            new RatingFailureView("NoRateCard", "Shipper SHP-0001 has no Rate Card.")));
+            new RatingFailureView("NoRateCard", "Shipper SHP-0001 has no Rate Card."),
+            "SHP-0001",
+            "corr-1"));
         order.RatingFailedAt.Should().Be(Samples.Now.AddHours(3));
         order.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<TransportOrderRatingFailedEvent>();
         await _repository.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
@@ -75,7 +75,7 @@ public sealed class ReRateTransportOrderHandlerTests
         var freightCharge = order.FreightCharge;
         _repository.SingleOrDefaultAsync(Arg.Any<TransportOrderToRateSpec>(), Arg.Any<CancellationToken>()).Returns(order);
 
-        var result = await _handler.Handle(new ReRateTransportOrderCommand("TO-0000007", "corr-re-rate"), CancellationToken.None);
+        var result = await _handler.Handle(new RateTransportOrderCommand("TO-0000007", ReRate: true), CancellationToken.None);
 
         result.Status.Should().Be(ResultStatus.Conflict);
         result.Errors.Should().ContainSingle().Which.Should().Be(
@@ -91,7 +91,7 @@ public sealed class ReRateTransportOrderHandlerTests
     [InlineData("42")]
     public async Task Handle_UnknownOrMalformedNumber_ReturnsNotFound(string number)
     {
-        var result = await _handler.Handle(new ReRateTransportOrderCommand(number, "corr-re-rate"), CancellationToken.None);
+        var result = await _handler.Handle(new RateTransportOrderCommand(number, ReRate: true), CancellationToken.None);
 
         result.Status.Should().Be(ResultStatus.NotFound);
     }
@@ -101,7 +101,7 @@ public sealed class ReRateTransportOrderHandlerTests
     {
         _repository.SingleOrDefaultAsync(Arg.Any<TransportOrderToRateSpec>(), Arg.Any<CancellationToken>()).Returns(Samples.RejectedOrder());
 
-        var result = await _handler.Handle(new ReRateTransportOrderCommand("TO-0000007", "corr-re-rate"), CancellationToken.None);
+        var result = await _handler.Handle(new RateTransportOrderCommand("TO-0000007", ReRate: true), CancellationToken.None);
 
         result.Status.Should().Be(ResultStatus.NotFound);
     }
