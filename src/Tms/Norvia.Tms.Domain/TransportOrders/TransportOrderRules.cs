@@ -185,7 +185,7 @@ public sealed class TransportOrderRules(decimal maxTotalWeightKg)
 
     private void CheckTotalWeight(TransportOrderDetails details, List<RejectionReason> reasons)
     {
-        var totalWeightKg = details.GoodsLines.Sum(line => line.WeightKg ?? 0m);
+        var totalWeightKg = details.TotalWeightKg();
         if (totalWeightKg > MaxTotalWeightKg)
         {
             reasons.Add(new(RejectionCode.TotalWeightOverLimit, Invariant(

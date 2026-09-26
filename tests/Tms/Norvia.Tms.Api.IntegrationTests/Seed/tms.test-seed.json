@@ -1,0 +1,54 @@
+{
+  "$comment": "The TMS test host's own seed, in the shape of seed/norvia.seed.json, so tests control the Rate Cards they rate against instead of depending on the demo's.",
+  "shippers": [
+    {
+      "id": "SHP-0001",
+      "name": "Brouwer Dranken",
+      "active": true,
+      "addresses": []
+    },
+    {
+      "$comment": "Inactive, so the TMS has a Shipper to reject bookings for (P1).",
+      "id": "SHP-0002",
+      "name": "Kaasmakerij Hoeve de Linde",
+      "active": false,
+      "addresses": []
+    },
+    {
+      "$comment": "Active without a Rate Card, which the seed allows.",
+      "id": "SHP-0003",
+      "name": "Tuincentrum Groenrijk",
+      "active": true,
+      "addresses": []
+    }
+  ],
+  "rateCards": [
+    {
+      "$comment": "Covers Bookings.Valid: Rotterdam to Utrecht, 910.5 kg in the band up to 2,000 kg, so 910.5 ÷ 100 × 12.40 = 112.902, a Freight Charge of 112.90.",
+      "id": "RC-TEST-0001",
+      "shipperId": "SHP-0001",
+      "versions": [
+        {
+          "version": 1,
+          "validFrom": "2020-01-01",
+          "validTo": null,
+          "zones": [
+            { "name": "Rotterdam", "country": "NL", "postcodePrefixes": ["30", "31"] },
+            { "name": "Utrecht", "country": "NL", "postcodePrefixes": ["35"] }
+          ],
+          "lanes": [
+            {
+              "origin": "Rotterdam",
+              "destination": "Utrecht",
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 14.00 },
+                { "upToKg": 2000, "pricePer100Kg": 12.40 },
+                { "upToKg": 24000, "pricePer100Kg": 9.75 }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

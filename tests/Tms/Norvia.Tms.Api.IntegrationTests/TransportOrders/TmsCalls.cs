@@ -1,0 +1,75 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json.Nodes;
+using Azure.Messaging.ServiceBus;
+
+namespace Norvia.Tms.Api.IntegrationTests.TransportOrders;
+
+/// <summary>What the rating tests do at the TMS's boundary: submit as an intake caller, read the query API, watch the topic.</summary>
+internal static class TmsCalls
+{
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan OutboxSettleTime = TimeSpan.FromSeconds(3);
+
+    public static string NewReference() => $"BD-{Guid.NewGuid():N}"[..20];
+
+    public static string NewCorrelationId() => Guid.NewGuid().ToString();
+
+    /// <summary>Submits a booking the TMS must accept, as the given intake caller or the intake Logic App, and returns its number.</summary>
+    public static async Task<string> SubmitAcceptedAsync(
+        this TmsFixture tms, JsonObject booking, string correlationId, CancellationToken cancellationToken, HttpClient? caller = null)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("/v1/transport-orders", UriKind.Relative))
+        {
+            Content = JsonContent.Create(booking),
+        };
+        request.Headers.Add("X-Correlation-ID", correlationId);
+        using var response = await (caller ?? tms.Tms).SendAsync(request, cancellationToken);
+
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.Created, body);
+        return JsonNode.Parse(body)!["transportOrderNumber"]!.GetValue<string>();
+    }
+
+    public static async Task<JsonNode> GetTransportOrderAsync(this TmsFixture tms, string number, CancellationToken cancellationToken)
+    {
+        using var response = await tms.Tms.GetAsync(new Uri($"/v1/transport-orders/{number}", UriKind.Relative), cancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        return JsonNode.Parse(await response.Content.ReadAsStringAsync(cancellationToken))!;
+    }
+
+    /// <summary>Reads the Transport Order until it has the rating result, as Rating runs a moment after acceptance.</summary>
+    public static async Task<JsonNode> WaitForRatingResultAsync(this TmsFixture tms, string number, string ratingResult, CancellationToken cancellationToken)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(Timeout);
+        while (true)
+        {
+            var order = await tms.GetTransportOrderAsync(number, cancellationToken);
+            if (order["ratingResult"]?.GetValue<string>() == ratingResult)
+            {
+                return order;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(200), timeout.Token);
+        }
+    }
+
+    /// <summary>
+    /// Waits for the first event of the type carrying the correlation ID, then lets the outbox run a few more cycles so a
+    /// duplicate would show up too.
+    /// </summary>
+    public static async Task<IReadOnlyList<ServiceBusReceivedMessage>> PublishedAsync(
+        this TmsFixture tms, string correlationId, string eventType, CancellationToken cancellationToken)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(Timeout);
+        while (!tms.Published.Any(m => m.CorrelationId == correlationId && m.Subject == eventType))
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(200), timeout.Token);
+        }
+
+        await Task.Delay(OutboxSettleTime, cancellationToken);
+        return [.. tms.Published.Where(m => m.CorrelationId == correlationId && m.Subject == eventType)];
+    }
+}

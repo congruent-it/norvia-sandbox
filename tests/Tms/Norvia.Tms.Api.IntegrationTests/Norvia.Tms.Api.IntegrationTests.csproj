@@ -20,5 +20,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\contracts\canonical-model\*.json" Link="CanonicalModel\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Seed\*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

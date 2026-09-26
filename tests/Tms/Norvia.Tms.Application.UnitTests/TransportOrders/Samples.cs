@@ -1,4 +1,5 @@
 using Norvia.Tms.Application.CanonicalModel;
+using Norvia.Tms.Domain.RateCards;
 using Norvia.Tms.Domain.Shippers;
 using Norvia.Tms.Domain.TransportOrders;
 
@@ -49,4 +50,25 @@ internal static class Samples
             IntakeChannel.ShipperApi,
             new CorrelationId(correlationId),
             Now);
+
+    /// <summary>Brouwer Dranken's Rate Card, which covers the sample from Rotterdam to Utrecht: 910.5 kg at 12.40 per 100 kg.</summary>
+    public static RateCard RateCard() => new(
+        new RateCardId("RC-0001"),
+        new ShipperId("SHP-0001"),
+        [
+            new RateCardVersion(
+                3,
+                new DateOnly(2026, 1, 1),
+                null,
+                [new Zone(new ZoneName("Rotterdam"), "NL", ["30"]), new Zone(new ZoneName("Utrecht"), "NL", ["35"])],
+                [new Lane(new ZoneName("Rotterdam"), new ZoneName("Utrecht"), [new WeightBreak(500m, new Money(14.00m)), new WeightBreak(1_000m, new Money(12.40m))])]),
+        ]);
+
+    public static TransportOrder RatedOrder(long sequence = 7, string correlationId = "corr-1")
+    {
+        var order = AcceptedOrder(sequence, correlationId);
+        order.Rate(RateCard(), Now.AddSeconds(2));
+        order.ClearDomainEvents();
+        return order;
+    }
 }

@@ -87,6 +87,37 @@ public sealed class TransportOrderSpecsTests
         found.Should().ContainSingle().Which.Should().BeSameAs(held);
     }
 
+    [Fact]
+    public void NotYetRated_Evaluated_ListsOnlyThoseWaitingForRating_OldestFirst_UpToTheBatchSize()
+    {
+        var wms = TransportOrder.Accept(new ShipperId("SHP-0001"), TransportOrderTests.SampleDetails(), TransportOrderNumber.FromSequence(9), IntakeChannel.Wms, new CorrelationId("corr-9"), Morning);
+        var orders = new[] { Accepted(1, Morning.AddHours(2)), Rejected(Morning), wms, Accepted(2, Morning), Accepted(3, Morning.AddHours(1)) };
+
+        var listed = new TransportOrdersNotYetRatedSpec(skip: 0, batchSize: 2).Evaluate(orders);
+
+        listed.Select(order => order.Number!.Value).Should().Equal("TO-0000002", "TO-0000003");
+    }
+
+    [Fact]
+    public void NotYetRated_Skipping_ListsTheBatchAfterTheOrdersSkipped()
+    {
+        var orders = new[] { Accepted(1, Morning.AddHours(2)), Accepted(2, Morning), Accepted(3, Morning.AddHours(1)) };
+
+        var listed = new TransportOrdersNotYetRatedSpec(skip: 1, batchSize: 1).Evaluate(orders);
+
+        listed.Select(order => order.Number!.Value).Should().Equal("TO-0000003");
+    }
+
+    [Fact]
+    public void ToRate_Evaluated_FindsOnlyThatTransportOrder()
+    {
+        var orders = new[] { Accepted(1, Morning), Accepted(2, Morning) };
+
+        var found = new TransportOrderToRateSpec(TransportOrderNumber.FromSequence(2)).Evaluate(orders);
+
+        found.Should().ContainSingle().Which.Number.Should().Be(TransportOrderNumber.FromSequence(2));
+    }
+
     private static TransportOrder Rejected(DateTimeOffset receivedAt) => TransportOrder.Reject(
         new ShipperId("SHP-0001"),
         TransportOrderTests.SampleDetails(),

@@ -7,12 +7,16 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Norvia.Tms.Application.IntegrationEvents;
+using Norvia.Tms.Application.RateCards;
 using Norvia.Tms.Application.Shippers;
 using Norvia.Tms.Application.TransportOrders;
+using Norvia.Tms.Application.TransportOrders.Rate;
 using Norvia.Tms.Application.TransportOrders.Submit;
 using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Infrastructure.Data;
 using Norvia.Tms.Infrastructure.Outbox;
+using Norvia.Tms.Infrastructure.RateCards;
+using Norvia.Tms.Infrastructure.Rating;
 using Norvia.Tms.Infrastructure.Shippers;
 using Norvia.Tms.Infrastructure.TransportOrders;
 
@@ -45,6 +49,24 @@ public static class DependencyInjection
         builder.Services.AddScoped<ITransportOrderNumbers, SqlTransportOrderNumbers>();
         builder.Services.AddScoped<IPipelineBehavior<SubmitTransportOrderCommand, Result<SubmitTransportOrderResult>>, RetrySubmissionThatLostARace>();
         builder.Services.AddSingleton<IShipperDirectory, SeedFileShipperDirectory>();
+        builder.Services.AddSingleton<IRateCardDirectory, SeedFileRateCardDirectory>();
+
+        return builder;
+    }
+
+    /// <summary>
+    /// Rates accepted Transport Orders in the background (P2), triggered by each acceptance and on a timer. Only the
+    /// process that takes in Transport Orders runs it, as it runs the outbox publisher.
+    /// </summary>
+    public static IHostApplicationBuilder AddTmsRatingWorker(this IHostApplicationBuilder builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.Services.AddOptions<RatingOptions>().BindConfiguration(RatingOptions.SectionName)
+            .ValidateDataAnnotations().ValidateOnStart();
+        builder.Services.AddSingleton<RatingSignal>();
+        builder.Services.AddSingleton<IRatingTrigger>(services => services.GetRequiredService<RatingSignal>());
+        builder.Services.AddHostedService<RatingWorker>();
 
         return builder;
     }

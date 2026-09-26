@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/transport-order-rated.v1.schema.json",
+  "title": "TransportOrderRated",
+  "description": "The TMS rated an accepted Transport Order: its Freight Charge is calculated and frozen (Canonical Model event, version 1). Published on the Transport Order events topic, under the correlation ID of the Transport Order's intake.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "transportOrderNumber", "shipperId", "freightCharge"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "const": "TransportOrderRated" },
+    "eventVersion": { "const": 1 },
+    "occurredAt": { "description": "When the Transport Order was rated.", "type": "string", "format": "date-time" },
+    "correlationId": { "type": "string", "minLength": 1 },
+    "transportOrderNumber": { "type": "string", "pattern": "^TO-[0-9]{7}$" },
+    "shipperId": { "description": "The Shipper whose Rate Card priced the Transport Order.", "type": "string", "minLength": 1 },
+    "freightCharge": {
+      "description": "The price Norvia charges the Shipper for the Transport Order, without VAT.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["currency", "total", "chargeLines", "rateCardVersion"],
+      "properties": {
+        "currency": { "const": "EUR" },
+        "total": { "description": "The sum of the charge lines.", "type": "number", "minimum": 0, "multipleOf": 0.01 },
+        "chargeLines": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "amount"],
+            "properties": {
+              "type": {
+                "description": "What the line charges for: always a Freight line, and a Minimum charge adjustment line when the Lane's minimum charge applies.",
+                "enum": ["Freight", "MinimumChargeAdjustment"]
+              },
+              "amount": { "description": "Rounded to cents, half away from zero.", "type": "number", "minimum": 0, "multipleOf": 0.01 }
+            }
+          }
+        },
+        "rateCardVersion": {
+          "description": "The version of the Shipper's Rate Card the Freight Charge was calculated from: the one valid on the collection date.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["rateCardId", "version"],
+          "properties": {
+            "rateCardId": { "type": "string", "minLength": 1 },
+            "version": { "type": "integer", "minimum": 1 }
+          }
+        }
+      }
+    }
+  }
+}
