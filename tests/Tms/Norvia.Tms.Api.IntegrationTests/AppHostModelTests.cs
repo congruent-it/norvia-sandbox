@@ -246,6 +246,29 @@ public sealed class AppHostModelTests
     }
 
     [Fact]
+    public async Task InAzure_TheIntegrationConsole_ReadsRunsFromTheEstatesLogicApps()
+    {
+        await using var builder = await CreateForAzureAsync();
+
+        var console = await EnvironmentOfAsync(builder, "integration-console-web");
+
+        console.Should().Contain("Estate__ResourceGroupId", "{estate-resource-group-id.value}");
+    }
+
+    [Fact]
+    public async Task Locally_TheIntegrationConsole_GivenADeployedEstate_ReadsRunsFromItsLogicApps()
+    {
+        // Logic Apps exist only in Azure, so a run opens only once the developer names the estate's resource group.
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(
+            ["--Parameters:estate-resource-group-id=/subscriptions/00000000-0000-0000-0000-00000000000a/resourceGroups/rg-norvia"],
+            TestContext.Current.CancellationToken);
+
+        var console = await EnvironmentOfAsync(builder, "integration-console-web");
+
+        console.Should().Contain("Estate__ResourceGroupId", "/subscriptions/00000000-0000-0000-0000-00000000000a/resourceGroups/rg-norvia");
+    }
+
+    [Fact]
     public async Task Locally_TheIntegrationConsole_StartsWithoutAnEstate()
     {
         // It reads a deployed estate once the developer gives it the estate's parameters; until then search says so.
@@ -254,8 +277,9 @@ public sealed class AppHostModelTests
         var console = await EnvironmentOfAsync(builder, "integration-console-web");
 
         console.Should().Contain("Estate__LogAnalyticsWorkspaceId", string.Empty)
-            .And.Contain("Estate__IntegrationRetentionDays", "90");
-        builder.Resources.OfType<ParameterResource>().Should().NotContain(parameter => parameter.Name == "estate-log-analytics-workspace-id");
+            .And.Contain("Estate__IntegrationRetentionDays", "90")
+            .And.Contain("Estate__ResourceGroupId", string.Empty);
+        builder.Resources.OfType<ParameterResource>().Should().NotContain(parameter => parameter.Name == "estate-log-analytics-workspace-id" || parameter.Name == "estate-resource-group-id");
     }
 
     [Fact]

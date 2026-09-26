@@ -25,6 +25,9 @@ param apiManagementClientId string
 param intakeTriggerClientId string
 param intakeTriggerAudience string
 
+@description('The Integration console\'s managed identity, which reads the app\'s run history.')
+param integrationConsolePrincipalId string
+
 var resourceToken = uniqueString(resourceGroup().id)
 var logicAppName = 'logic-intake-${resourceToken}'
 var contentShareName = logicAppName
@@ -240,6 +243,20 @@ resource easyAuth 'Microsoft.Web/sites/config@2024-11-01' = {
         }
       }
     }
+  }
+}
+
+// The Integration console opens a run's steps and their bodies, as its own identity (ADR 0017). Logic Apps Standard
+// Reader lets it read the app, its workflows and their run history, and change nothing: it never resubmits a run.
+var logicAppsStandardReader = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4accf36b-2c05-432f-91c8-5c532dff4c73')
+
+resource integrationConsoleReadsRunHistory 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(logicApp.id, integrationConsolePrincipalId, logicAppsStandardReader)
+  scope: logicApp
+  properties: {
+    principalId: integrationConsolePrincipalId
+    roleDefinitionId: logicAppsStandardReader
+    principalType: 'ServicePrincipal'
   }
 }
 

@@ -4,6 +4,7 @@ using Norvia.IntegrationConsole.Application.Trails.Search;
 using Norvia.IntegrationConsole.Infrastructure;
 using Norvia.IntegrationConsole.Web.Components;
 using Norvia.IntegrationConsole.Web.Operators;
+using Norvia.IntegrationConsole.Web.Runs;
 using Norvia.IntegrationConsole.Web.Trails;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -23,6 +24,7 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddOptions<IntegrationRetention>().BindConfiguration(IntegrationRetention.SectionName)
     .ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddSingleton<ITrailRequests, TrailRequests>();
+builder.Services.AddSingleton<IRunRequests, RunRequests>();
 
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddFluentUIComponents();

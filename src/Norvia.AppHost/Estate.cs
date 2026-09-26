@@ -20,6 +20,12 @@ public sealed class Estate(IDistributedApplicationBuilder builder)
     /// </summary>
     public IResourceBuilder<ParameterResource> IntegrationRetentionDays { get; } = builder.AddParameter("estate-integration-retention-days");
 
+    /// <summary>
+    /// The resource group the estate deploys its Logic Apps into, <c>/subscriptions/{id}/resourceGroups/{name}</c>, where
+    /// the Integration console reads their run history.
+    /// </summary>
+    public IResourceBuilder<ParameterResource> ResourceGroupId { get; } = builder.AddParameter("estate-resource-group-id");
+
     public IResourceBuilder<ParameterResource> ApplicationInsights { get; } = builder.AddParameter("estate-application-insights");
 
     /// <summary>The issuer of Entra's v2.0 tokens for the estate's tenant, which is also the authority to trust.</summary>

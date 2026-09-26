@@ -1,0 +1,277 @@
+@page "/runs/{LogicApp}/{Workflow}/{RunId}"
+@* Interactive, not prerendered: prerendering would read run history twice, and opening a step needs the circuit. *@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using Ardalis.Result
+@using Norvia.IntegrationConsole.Application.Runs.Open
+@using Norvia.IntegrationConsole.Application.Runs.Steps
+@inject IRunRequests Runs
+@inject ILogger<Run> Logger
+@implements IDisposable
+
+<PageTitle>Logic App run · Integration console</PageTitle>
+
+<h1>Logic App run <span class="font-mono text-base">@RunId</span></h1>
+<p class="text-muted mb-1">@Workflow on @LogicApp</p>
+@* The run is read as it is now, not from Application Insights; the console only ever reads it. *@
+<p role="note" class="text-muted mb-6">
+    Fetched live from the Logic App's run history. The console never resubmits a run.
+</p>
+
+@if (_opening)
+{
+    <div role="status">
+        <FluentStack VerticalAlignment="VerticalAlignment.Center">
+            <FluentProgressRing />
+            <span>Opening the run…</span>
+        </FluentStack>
+    </div>
+}
+else if (_failed)
+{
+    <div role="alert">
+        <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+            The run couldn't be opened. Try again in a moment; if it keeps failing, the console may not reach the estate's
+            Logic Apps.
+        </FluentMessageBar>
+    </div>
+}
+else if (_problems is { Count: > 0 })
+{
+    <div role="alert">
+        <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
+            @string.Join(" ", _problems)
+        </FluentMessageBar>
+    </div>
+}
+else if (_run is { IsKept: false } expired)
+{
+    <p role="status">
+        @RunText.NoLongerKept(expired.RunHistoryDays) The run's hop stays on its Message trail, because Application Insights
+        keeps its own record.
+    </p>
+}
+else if (_run is { } run)
+{
+    <p data-run-status class="mb-6">
+        <span class="@(RunText.IsFailure(run.Status) ? "font-bold text-danger" : "")">@run.Status</span>
+        @if (run.Start is { } start)
+        {
+            <span>, started @ConsoleTime.Format(start)</span>
+        }
+        @if (run.Duration is { } duration)
+        {
+            <span>, took @TrailText.Of(duration)</span>
+        }
+    </p>
+
+    @if (run.Steps.Count == 0)
+    {
+        <p role="status">Run history has no steps for this run yet.</p>
+    }
+    else
+    {
+        @* Status, times and errors only: a body shows when the operator opens its step. *@
+        <FluentDataGrid Items="run.Steps.AsQueryable()" TGridItem="RunStep" aria-label="Steps" MultiLine="true"
+                        GridTemplateColumns="minmax(16rem, max-content) max-content max-content max-content minmax(12rem, 1fr)">
+            <TemplateColumn Title="Step">
+                <button type="button" data-step="@context.Name" aria-expanded="@(_step == context.Name ? "true" : "false")"
+                        class="cursor-pointer border-0 bg-transparent p-0 text-left font-mono text-success underline hover:text-white"
+                        @onclick="() => OpenStepAsync(context.Name)">
+                    @context.Name
+                </button>
+                @if (context.InputsHidden)
+                {
+                    <span data-hidden="inputs" class="text-muted ml-2 text-xs">Input hidden</span>
+                }
+                @if (context.OutputsHidden)
+                {
+                    <span data-hidden="outputs" class="text-muted ml-2 text-xs">Output hidden</span>
+                }
+            </TemplateColumn>
+            <TemplateColumn Title="Status">
+                <span class="@(RunText.IsFailure(context.Status) ? "font-bold text-danger" : "")">@context.Status</span>
+            </TemplateColumn>
+            <PropertyColumn Title="Started" Property="@(step => RunText.Started(step.Start))" />
+            <PropertyColumn Title="Duration" Property="@(step => TrailText.Of(step.Duration))" />
+            <PropertyColumn Title="Error" Property="@(step => RunText.Of(step.Error))" />
+        </FluentDataGrid>
+
+        @if (_step is { } opened)
+        {
+            <section aria-label="Step @opened" class="mt-8">
+                <h2 class="font-mono">@opened</h2>
+                @if (_fetching)
+                {
+                    <div role="status">
+                        <FluentStack VerticalAlignment="VerticalAlignment.Center">
+                            <FluentProgressRing />
+                            <span>Fetching the bodies of @opened…</span>
+                        </FluentStack>
+                    </div>
+                }
+                else if (_stepFailed)
+                {
+                    <div role="alert">
+                        <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+                            The bodies of @opened couldn't be fetched. Try again in a moment.
+                        </FluentMessageBar>
+                    </div>
+                }
+                else if (_stepProblems is { Count: > 0 })
+                {
+                    <div role="alert">
+                        <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
+                            @string.Join(" ", _stepProblems)
+                        </FluentMessageBar>
+                    </div>
+                }
+                else if (_stepDetail is { IsKept: false } gone)
+                {
+                    <p role="status">@RunText.NoLongerKept(gone.RunHistoryDays)</p>
+                }
+                else if (_stepDetail is { } detail)
+                {
+                    @BodyOf("Input", "input", "inputs", detail.Input)
+                    @BodyOf("Output", "output", "outputs", detail.Output)
+                }
+            </section>
+        }
+    }
+}
+
+@code {
+    private bool _opening;
+    private bool _failed;
+    private IReadOnlyList<string>? _problems;
+    private RunDetail? _run;
+    private string? _step;
+    private bool _fetching;
+    private bool _stepFailed;
+    private IReadOnlyList<string>? _stepProblems;
+    private StepDetail? _stepDetail;
+    // Cancel reading run history when the operator leaves the page, opens another run or another step.
+    private CancellationTokenSource _open = new();
+    private CancellationTokenSource _fetch = new();
+
+    [Parameter, EditorRequired]
+    public string LogicApp { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string Workflow { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string RunId { get; set; } = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _failed = false;
+        _problems = null;
+        _run = null;
+        await CloseStepAsync();
+
+        await _open.CancelAsync();
+        _open.Dispose();
+        _open = new CancellationTokenSource();
+        var cancellation = _open.Token;
+        _opening = true;
+        try
+        {
+            var result = await Runs.OpenAsync(new OpenRunQuery(LogicApp, Workflow, RunId), cancellation);
+            if (result.IsSuccess)
+            {
+                _run = result.Value;
+            }
+            else
+            {
+                _problems = [.. result.ValidationErrors.Select(error => error.ErrorMessage)];
+            }
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            RunPageLog.OpenFailed(Logger, exception, RunId, Workflow, LogicApp);
+            _failed = true;
+        }
+        finally
+        {
+            _opening = false;
+        }
+    }
+
+    private async Task OpenStepAsync(string step)
+    {
+        await CloseStepAsync();
+        var cancellation = _fetch.Token;
+        _step = step;
+        _fetching = true;
+        try
+        {
+            // Fetched only now, as the operator opens the step, and kept only as long as the page shows it.
+            var result = await Runs.OpenStepAsync(new OpenStepQuery(LogicApp, Workflow, RunId, step), cancellation);
+            if (result.IsSuccess)
+            {
+                _stepDetail = result.Value;
+            }
+            else
+            {
+                _stepProblems = [.. result.ValidationErrors.Select(error => error.ErrorMessage)];
+            }
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            RunPageLog.StepFailed(Logger, exception, step, RunId);
+            _stepFailed = true;
+        }
+        finally
+        {
+            if (!cancellation.IsCancellationRequested)
+            {
+                _fetching = false;
+            }
+        }
+    }
+
+    private async Task CloseStepAsync()
+    {
+        await _fetch.CancelAsync();
+        _fetch.Dispose();
+        _fetch = new CancellationTokenSource();
+        _step = null;
+        _fetching = false;
+        _stepFailed = false;
+        _stepProblems = null;
+        _stepDetail = null;
+    }
+
+    private static RenderFragment BodyOf(string title, string noun, string secureNoun, StepBody body) => __builder =>
+    {
+        <h3 class="mt-4 mb-2 text-base font-bold">@title</h3>
+        @switch (body.State)
+        {
+            case BodyState.Shown:
+                <pre class="bg-surface overflow-x-auto rounded-darkly p-4 font-mono text-xs whitespace-pre-wrap break-words">@RunText.Body(body.Content!)</pre>
+                break;
+            case BodyState.Hidden:
+                <p class="text-muted">@title hidden: the step uses secure @secureNoun, so run history doesn't show it.</p>
+                break;
+            default:
+                <p class="text-muted">No @noun recorded.</p>
+                break;
+        }
+    };
+
+    public void Dispose()
+    {
+        _open.Cancel();
+        _open.Dispose();
+        _fetch.Cancel();
+        _fetch.Dispose();
+    }
+}
