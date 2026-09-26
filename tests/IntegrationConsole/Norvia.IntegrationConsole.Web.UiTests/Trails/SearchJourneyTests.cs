@@ -29,6 +29,7 @@ public sealed class SearchJourneyTests(ConsoleUiFixture console) : BrowserPage(c
         await Expect(Page.GetByRole(AriaRole.Status)).ToContainTextAsync($"2 Message trails carried {number}");
         await Expect(results.GetByRole(AriaRole.Columnheader)).ToHaveTextAsync(
             ["Correlation ID", "Flows", "First seen", "Last seen", "Outcome", "Business keys"]);
+        (await CutOffColumnTitlesAsync(results)).Should().BeEmpty();
         var rows = results.GetByRole(AriaRole.Row).Filter(new() { HasText = "corr-" });
         await Expect(rows).ToHaveCountAsync(2);
         await Expect(rows.Nth(0)).ToContainTextAsync("corr-failed");

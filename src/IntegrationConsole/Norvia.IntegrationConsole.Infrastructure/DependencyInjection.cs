@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Azure.Core;
 using Azure.Identity;
 using Azure.Monitor.Query.Logs;
@@ -5,12 +6,14 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Norvia.IntegrationConsole.Application.Runs;
 using Norvia.IntegrationConsole.Application.Trails;
+using Norvia.IntegrationConsole.Infrastructure.Runs;
 using Norvia.IntegrationConsole.Infrastructure.Trails;
 
 namespace Norvia.IntegrationConsole.Infrastructure;
 
-public static class DependencyInjection
+public static partial class DependencyInjection
 {
     /// <summary>
     /// The client ID of the console's user-assigned managed identity, which the estate Bicep owns. Aspire sets it on the
@@ -23,6 +26,7 @@ public static class DependencyInjection
         ArgumentNullException.ThrowIfNull(builder);
 
         builder.Services.AddSingleton(ConsoleCredential(builder.Configuration));
+        builder.AddWorkflowRuns();
 
         // The AppHost gives the console the Aspire dashboard only locally, and only when no deployed estate is named
         // (ADR 0027). Local telemetry then stays on the developer's machine.
@@ -52,6 +56,28 @@ public static class DependencyInjection
 
         return builder;
     }
+
+    /// <summary>
+    /// Runs and their bodies come from the estate's Logic Apps, read as the console's credential. Logic Apps exist only in
+    /// Azure, so this holds locally too, with the developer's sign-in. Without an estate the ID is empty and the console
+    /// still starts; a run then says it can't be opened.
+    /// </summary>
+    private static void AddWorkflowRuns(this IHostApplicationBuilder builder)
+    {
+        builder.Services.AddOptions<WorkflowRunsOptions>().BindConfiguration(WorkflowRunsOptions.SectionName)
+            .Validate(
+                options => string.IsNullOrEmpty(options.ResourceGroupId) || ResourceGroupId().IsMatch(options.ResourceGroupId),
+                $"{WorkflowRunsOptions.SectionName}:{nameof(WorkflowRunsOptions.ResourceGroupId)} must be the estate's resource group ID: /subscriptions/{{subscription}}/resourceGroups/{{name}}.")
+            .ValidateOnStart();
+        builder.Services.AddHttpClient(LogicAppsWorkflowRuns.ManagementClient);
+        // A content link is signed, so it is as good as the body it fetches: neither is logged. Traces leave out a URL's
+        // query, where the signature is.
+        builder.Services.AddHttpClient(LogicAppsWorkflowRuns.ContentsClient).RemoveAllLoggers();
+        builder.Services.AddSingleton<IWorkflowRuns, LogicAppsWorkflowRuns>();
+    }
+
+    [GeneratedRegex("^/subscriptions/[0-9a-fA-F-]{36}/resourceGroups/[^/]+$")]
+    private static partial Regex ResourceGroupId();
 
     /// <summary>
     /// What the adapters call Azure as. The console checks the operator's app role, then reads the estate as its own

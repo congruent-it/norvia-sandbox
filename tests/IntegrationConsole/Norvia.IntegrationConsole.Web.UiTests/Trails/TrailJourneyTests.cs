@@ -39,6 +39,7 @@ public sealed class TrailJourneyTests(ConsoleUiFixture console) : BrowserPage(co
         await Expect(hops.Nth(1)).ToContainTextAsync("logic-intake: transport-order-intake");
         await Expect(hops.Nth(1).GetByRole(AriaRole.Link, new() { Name = "Open run" })).ToHaveAttributeAsync("href", "/runs/logic-intake/transport-order-intake/0858");
         await Expect(hops.Nth(2)).ToContainTextAsync("tms-api: POST /v1/transport-orders");
+        (await CutOffColumnTitlesAsync(Page.GetByRole(AriaRole.Table, new() { Name = "Hops" }))).Should().BeEmpty();
 
         await Page.GetByRole(AriaRole.Region, new() { Name = "Business keys" }).GetByRole(AriaRole.Link, new() { Name = $"Transport Order {number}" }).ClickAsync();
 

@@ -144,16 +144,24 @@ internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTr
     {
         using var logs = await GetAsync($"api/telemetry/logs?limit={MaximumLogRecords.ToString(CultureInfo.InvariantCulture)}", missingIsEmpty: false, cancellationToken);
 
-        // OTLP JSON: data.resourceLogs[].scopeLogs[].logRecords[].
+        // OTLP JSON: data.resourceLogs[].scopeLogs[].logRecords[], a scope being the logging category. An application's
+        // own records only, not those a framework wrote in its logging scope.
         return
         [
             .. ItemsOf(DataOf(logs), "resourceLogs")
                 .SelectMany(resource => ItemsOf(resource, "scopeLogs")
+                    .Where(scope => !FrameworkLogs.Wrote(CategoryOf(scope)))
                     .SelectMany(scope => ItemsOf(scope, "logRecords"))
                     .Select(record => TrackedRecord.From(record, ServiceOf(resource))))
                 .OfType<TrackedRecord>(),
         ];
     }
+
+    private static string? CategoryOf(JsonElement scope) =>
+        scope.TryGetProperty("scope", out var named) && named.ValueKind == JsonValueKind.Object
+            && named.TryGetProperty("name", out var name) && name.ValueKind == JsonValueKind.String
+            ? name.GetString()
+            : null;
 
     /// <summary>Every span of a trace, or none once the dashboard no longer holds it.</summary>
     private async Task<List<Span>> SpansAsync(string traceId, CancellationToken cancellationToken)

@@ -36,6 +36,15 @@ public abstract class BrowserPage(ConsoleUiFixture console) : IAsyncLifetime
         Page = await _context.NewPageAsync();
     }
 
+    /// <summary>The titles of the table's columns that don't fit their header and show cut off.</summary>
+    protected static Task<string[]> CutOffColumnTitlesAsync(ILocator table) =>
+        table.EvaluateAsync<string[]>("""
+            table => [...table.querySelectorAll('[role=columnheader], th')]
+                .filter(header => [header, ...header.querySelectorAll('*')].some(element => element.scrollWidth > element.clientWidth + 1
+                    && getComputedStyle(element).textOverflow === 'ellipsis'))
+                .map(header => header.textContent.trim())
+            """);
+
     private static string ClientPrincipal(string name, string[] roles) =>
         Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
         {

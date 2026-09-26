@@ -89,6 +89,7 @@ module intakeLogicApp 'estate/intake-logic-app.bicep' = {
     apiManagementClientId: identities.outputs.apiManagementClientId
     intakeTriggerClientId: identities.outputs.intakeTriggerClientId
     intakeTriggerAudience: identities.outputs.intakeTriggerAudience
+    integrationConsolePrincipalId: identities.outputs.integrationConsolePrincipalId
   }
 }
 
@@ -114,6 +115,8 @@ output ESTATE_LOG_ANALYTICS_WORKSPACE string = monitoring.outputs.workspaceName
 output ESTATE_LOG_ANALYTICS_WORKSPACE_ID string = monitoring.outputs.workspaceId
 // The Integration console caps its searches at it: nothing older is kept.
 output ESTATE_INTEGRATION_RETENTION_DAYS string = string(integrationRetentionDays)
+// Where the Integration console reads the Logic Apps' run history.
+output ESTATE_RESOURCE_GROUP_ID string = resourceGroup.id
 output ESTATE_APPLICATION_INSIGHTS string = monitoring.outputs.applicationInsightsName
 output ESTATE_ENTRA_ISSUER string = identities.outputs.entraIssuer
 output ESTATE_ENTRA_TENANT_ID string = identities.outputs.entraTenantId

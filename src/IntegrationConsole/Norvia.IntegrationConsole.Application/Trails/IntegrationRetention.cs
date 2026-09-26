@@ -14,4 +14,10 @@ public sealed class IntegrationRetention
     public int IntegrationRetentionDays { get; set; }
 
     public TimeSpan Period => TimeSpan.FromDays(IntegrationRetentionDays);
+
+    /// <summary>
+    /// How long Logic Apps run history keeps a run and its bodies: the same period, as the estate Bicep sets it, but no
+    /// more than the 365 days Logic Apps Standard keeps at most.
+    /// </summary>
+    public int RunHistoryDays => Math.Min(IntegrationRetentionDays, 365);
 }

@@ -105,6 +105,7 @@ if (builder.ExecutionContext.IsPublishMode)
         .WithAzureUserAssignedIdentity(integrationConsoleIdentity)
         .WithEnvironment("Estate__LogAnalyticsWorkspaceId", estate.LogAnalyticsWorkspaceId)
         .WithEnvironment("Estate__IntegrationRetentionDays", estate.IntegrationRetentionDays)
+        .WithEnvironment("Estate__ResourceGroupId", estate.ResourceGroupId)
         .PublishAsAzureContainerApp((infrastructure, app) =>
             infrastructure.Add(EntraSignIn.For(infrastructure, app, estate.IntegrationConsoleClientId, estate.EntraIssuer)));
 
@@ -136,8 +137,9 @@ else
     // Locally there is no Easy Auth, so the console signs the developer in as an Integration operator with both app
     // roles, as the estate assigns the presenter. It reads Azure with the developer's own sign-in.
     // It searches a deployed estate's workspace once the developer gives it the parameters azd gives it in Azure, as
-    // user secrets (Parameters:estate-log-analytics-workspace-id and Parameters:estate-integration-retention-days).
-    // Without a workspace it still starts, and search says it can't be run.
+    // user secrets (Parameters:estate-log-analytics-workspace-id and Parameters:estate-integration-retention-days), and
+    // opens its Logic App runs given Parameters:estate-resource-group-id. Logic Apps exist only in Azure.
+    // Without a workspace it still starts, and search says it can't be run; without the resource group, a run does.
     var estateWorkspaceId = builder.Configuration["Parameters:estate-log-analytics-workspace-id"];
     var estateRetentionDays = builder.Configuration["Parameters:estate-integration-retention-days"];
     if (!string.IsNullOrEmpty(estateWorkspaceId) && string.IsNullOrEmpty(estateRetentionDays))
@@ -153,6 +155,7 @@ else
         .WithEnvironment("LocalOperator__Roles__0", "IntegrationConsole.Read")
         .WithEnvironment("LocalOperator__Roles__1", "IntegrationConsole.Resubmit")
         .WithEnvironment("Estate__LogAnalyticsWorkspaceId", estateWorkspaceId ?? string.Empty)
+        .WithEnvironment("Estate__ResourceGroupId", builder.Configuration["Parameters:estate-resource-group-id"] ?? string.Empty)
         // Without an estate no search reaches Azure, so the retention is only a placeholder the console starts with.
         .WithEnvironment("Estate__IntegrationRetentionDays", estateRetentionDays ?? "90");
 
