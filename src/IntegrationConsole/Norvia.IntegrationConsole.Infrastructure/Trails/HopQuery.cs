@@ -9,7 +9,8 @@ namespace Norvia.IntegrationConsole.Infrastructure.Trails;
 /// <item><c>request</c>: a call to API Management or an application that recorded the correlation ID, in its own
 /// properties or, for API Management, as its logged <c>X-Correlation-ID</c> header;</item>
 /// <item><c>run</c>: every trigger and action of a Logic App run whose tracked properties recorded it (Logic Apps
-/// Standard telemetry v2, where a run's rows share its run ID);</item>
+/// Standard telemetry v2, where a run's rows share its run ID, kept with its workflow's name in the JSON of their
+/// <c>resource</c> property);</item>
 /// <item><c>record</c>: a trace with tracking keys, such as an application's log in its logging scope or API
 /// Management's <c>trace</c> policy, which belongs to the hop above it;</item>
 /// <item><c>link</c>: a dependency's ID and parent, the steps between a hop and the hop it caused.</item>
@@ -33,17 +34,18 @@ internal static class HopQuery
             | extend tracked = parse_json(tostring(Properties.trackedProperties))
             | extend correlationId = coalesce(tostring(Properties.correlationId), tostring(tracked.correlationId),
                     tostring(Properties["Response-X-Correlation-ID"]), tostring(Properties["Request-X-Correlation-ID"])),
-                runId = tostring(Properties.runId)
+                runId = tostring(parse_json(tostring(Properties.resource)).runId)
             | where correlationId =~ searched;
         let runIds = toscalar(tracked | where isnotempty(runId) | summarize make_set(runId));
         // Every row of those runs, the actions without tracked properties included, so a run's hop lasts as long as it did.
         let runs = AppRequests
             | where OperationId in (runIds)
-            | extend runId = tostring(Properties.runId)
+            | extend resource = parse_json(tostring(Properties.resource))
+            | extend runId = tostring(resource.runId)
             | where runId in (runIds)
             | extend tracked = parse_json(tostring(Properties.trackedProperties))
             | project rowKind = "run", id = Id, parentId = ParentId, start = TimeGenerated, durationMs = DurationMs, name = Name,
-                role = AppRoleName, runId, workflow = tostring(Properties.workflowName), category = tostring(Properties.Category),
+                role = AppRoleName, runId, workflow = tostring(resource.workflowName), category = tostring(Properties.Category),
                 flow = tostring(tracked.flow), outcome = tostring(tracked.outcome), failureCode = tostring(tracked.failureCode),
                 transportOrderNumber = tostring(tracked.transportOrderNumber), shipmentNumber = tostring(tracked.shipmentNumber),
                 carrierBookingNumber = tostring(tracked.carrierBookingNumber), tripNumber = tostring(tracked.tripNumber),
