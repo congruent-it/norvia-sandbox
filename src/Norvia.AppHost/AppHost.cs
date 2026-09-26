@@ -156,6 +156,17 @@ else
         // Without an estate no search reaches Azure, so the retention is only a placeholder the console starts with.
         .WithEnvironment("Estate__IntegrationRetentionDays", estateRetentionDays ?? "90");
 
+    // Without an estate, the console searches what the local apps traced: the telemetry the Aspire dashboard holds, read
+    // through its telemetry API (ADR 0027). The dashboard listens on the launch profile's URL, and its API takes the key
+    // the AppHost generates for it. Nothing local is sent to an estate, so local and Azure trails never mix.
+    if (string.IsNullOrEmpty(estateWorkspaceId)
+        && DashboardUrl(builder.Configuration["ASPNETCORE_URLS"]) is { } dashboardUrl)
+    {
+        integrationConsole
+            .WithEnvironment("LocalTelemetry__DashboardUrl", dashboardUrl)
+            .WithEnvironment("LocalTelemetry__ApiKey", builder.Configuration["AppHost:DashboardApiKey"] ?? string.Empty);
+    }
+
     // Locally the TMS trusts tokens signed with this key (see LocalTokens).
     var localTokenSigningKey = builder.AddParameter(
         LocalTokens.SigningKeyParameter,
@@ -220,3 +231,11 @@ else
 }
 
 builder.Build().Run();
+
+// The dashboard's address from the launch profile's ASPNETCORE_URLS: its http one when it has one, which the console
+// reaches without the development certificate.
+static string? DashboardUrl(string? urls)
+{
+    var all = urls?.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? [];
+    return all.FirstOrDefault(url => url.StartsWith("http://", StringComparison.OrdinalIgnoreCase)) ?? all.FirstOrDefault();
+}

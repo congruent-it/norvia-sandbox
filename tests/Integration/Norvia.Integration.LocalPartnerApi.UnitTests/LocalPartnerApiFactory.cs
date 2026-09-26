@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http.Resilience;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Testing;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
@@ -29,6 +31,9 @@ public sealed class LocalPartnerApiFactory : WebApplicationFactory<Program>
 
     public StubTms Tms { get; } = new();
 
+    /// <summary>What the stand-in logged, with its scopes: the tracking keys its traces carry (coding guidelines §7).</summary>
+    public FakeLogCollector Logs => Services.GetRequiredService<FakeLogCollector>();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         var signingKey = Convert.ToBase64String(SigningKey);
@@ -52,6 +57,7 @@ public sealed class LocalPartnerApiFactory : WebApplicationFactory<Program>
 
         builder.ConfigureTestServices(services =>
         {
+            services.AddLogging(logging => logging.AddFakeLogging());
             services.AddHttpClient<TmsIntake>().ConfigurePrimaryHttpMessageHandler(() => Tms);
             // Retries straight away, so a test of an unreachable TMS doesn't wait out the backoff.
             services.ConfigureAll<HttpStandardResilienceOptions>(options => options.Retry.Delay = TimeSpan.Zero);

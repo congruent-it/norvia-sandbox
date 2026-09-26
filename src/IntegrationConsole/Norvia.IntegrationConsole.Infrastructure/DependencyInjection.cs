@@ -4,6 +4,7 @@ using Azure.Monitor.Query.Logs;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Norvia.IntegrationConsole.Application.Trails;
 using Norvia.IntegrationConsole.Infrastructure.Trails;
 
@@ -23,9 +24,29 @@ public static class DependencyInjection
 
         builder.Services.AddSingleton(ConsoleCredential(builder.Configuration));
 
-        // Message trails come from the Log Analytics workspace behind the estate's Application Insights, read as the
-        // console's credential above.
-        builder.Services.AddOptions<TrailSourceOptions>().BindConfiguration(TrailSourceOptions.SectionName);
+        // The AppHost gives the console the Aspire dashboard only locally, and only when no deployed estate is named
+        // (ADR 0027). Local telemetry then stays on the developer's machine.
+        if (builder.Configuration.GetSection(DashboardTrailSourceOptions.SectionName).Exists())
+        {
+            builder.Services.AddOptions<DashboardTrailSourceOptions>().BindConfiguration(DashboardTrailSourceOptions.SectionName)
+                .ValidateDataAnnotations()
+                .Validate(
+                    options => options.DashboardUrl is null || options.DashboardUrl.IsAbsoluteUri,
+                    $"{DashboardTrailSourceOptions.SectionName}:{nameof(DashboardTrailSourceOptions.DashboardUrl)} must be the dashboard's absolute address.")
+                .ValidateOnStart();
+            builder.Services.AddHttpClient<ITrailSource, DashboardTrailSource>((services, http) =>
+                http.BaseAddress = services.GetRequiredService<IOptions<DashboardTrailSourceOptions>>().Value.DashboardUrl);
+            return builder;
+        }
+
+        // Otherwise Message trails come from the Log Analytics workspace behind the estate's Application Insights, read
+        // as the console's credential above. Without an estate the ID is empty and the console still starts; search
+        // then says it isn't connected.
+        builder.Services.AddOptions<TrailSourceOptions>().BindConfiguration(TrailSourceOptions.SectionName)
+            .Validate(
+                options => string.IsNullOrEmpty(options.LogAnalyticsWorkspaceId) || Guid.TryParse(options.LogAnalyticsWorkspaceId, out _),
+                $"{TrailSourceOptions.SectionName}:{nameof(TrailSourceOptions.LogAnalyticsWorkspaceId)} must be the workspace's ID (its customer ID, a GUID).")
+            .ValidateOnStart();
         builder.Services.AddSingleton(services => new LogsQueryClient(services.GetRequiredService<TokenCredential>()));
         builder.Services.AddSingleton<ITrailSource, LogAnalyticsTrailSource>();
 

@@ -3,7 +3,9 @@
     <PackageReference Include="Azure.Identity" />
     <PackageReference Include="Azure.Monitor.Query.Logs" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
+    <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Norvia.IntegrationConsole.Application\Norvia.IntegrationConsole.Application.csproj" />

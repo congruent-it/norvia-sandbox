@@ -1,8 +1,9 @@
 namespace Norvia.IntegrationConsole.Application.Trails;
 
 /// <summary>
-/// Where the estate's telemetry is searched: the Log Analytics workspace behind Application Insights (ADR 0017). It
-/// reads the tracking contract's keys only (coding guidelines §7), never a message body.
+/// Where the estate's telemetry is searched: the Log Analytics workspace behind Application Insights (ADR 0017), or
+/// locally the Aspire dashboard (ADR 0027). It reads the tracking contract's keys only (coding guidelines §7), never a
+/// message body.
 /// </summary>
 public interface ITrailSource
 {

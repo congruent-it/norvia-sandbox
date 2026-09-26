@@ -272,6 +272,56 @@ public sealed class AppHostModelTests
     }
 
     [Fact]
+    public async Task Locally_TheIntegrationConsole_WithoutAnEstate_SearchesTheAspireDashboardsTelemetry()
+    {
+        // The dashboard listens where the AppHost's launch profile says, and its telemetry API takes the AppHost's key.
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(
+            ["--ASPNETCORE_URLS=https://localhost:17180;http://localhost:15180", "--AppHost:DashboardApiKey=dashboard-api-key"],
+            TestContext.Current.CancellationToken);
+
+        var console = await EnvironmentOfAsync(builder, "integration-console-web");
+
+        console.Should().Contain("LocalTelemetry__DashboardUrl", "http://localhost:15180")
+            .And.Contain("LocalTelemetry__ApiKey", "dashboard-api-key");
+    }
+
+    [Fact]
+    public async Task Locally_TheIntegrationConsole_GivenADeployedEstate_DoesNotSearchTheDashboard()
+    {
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(
+            [
+                "--ASPNETCORE_URLS=http://localhost:15180", "--AppHost:DashboardApiKey=dashboard-api-key",
+                "--Parameters:estate-log-analytics-workspace-id=7f4c1b0e-0000-0000-0000-000000000001", "--Parameters:estate-integration-retention-days=30",
+            ],
+            TestContext.Current.CancellationToken);
+
+        var console = await EnvironmentOfAsync(builder, "integration-console-web");
+
+        console.Keys.Should().NotContain(key => key.StartsWith("LocalTelemetry__", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task InAzure_TheIntegrationConsole_DoesNotSearchADashboard()
+    {
+        await using var builder = await CreateForAzureAsync();
+
+        var console = await EnvironmentOfAsync(builder, "integration-console-web");
+
+        console.Keys.Should().NotContain(key => key.StartsWith("LocalTelemetry__", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Locally_NoApp_SendsTelemetryToApplicationInsights_SoLocalTrailsNeverMixWithTheEstates()
+    {
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(TestContext.Current.CancellationToken);
+
+        foreach (var app in builder.Resources.OfType<ProjectResource>())
+        {
+            (await EnvironmentOfAsync(builder, app.Name)).Keys.Should().NotContain("APPLICATIONINSIGHTS_CONNECTION_STRING", app.Name);
+        }
+    }
+
+    [Fact]
     public async Task Locally_TheIntegrationConsole_GivenAWorkspaceWithoutItsRetention_DoesNotStart()
     {
         // Guessing the retention would cap searches at a period the estate doesn't keep.
