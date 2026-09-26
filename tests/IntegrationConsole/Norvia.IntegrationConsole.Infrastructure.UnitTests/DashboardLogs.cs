@@ -7,18 +7,31 @@ namespace Norvia.IntegrationConsole.Infrastructure.UnitTests;
 
 /// <summary>
 /// Stands in for the Aspire dashboard's telemetry API: answers <c>/api/telemetry/logs</c> with the log records the test
-/// adds, in the OTLP JSON the dashboard returns, and keeps the requests it got.
+/// adds, and <c>/api/telemetry/traces/{traceId}</c> with the spans it adds, in the OTLP JSON the dashboard returns, and
+/// keeps the requests it got.
 /// </summary>
 public sealed class DashboardLogs : HttpMessageHandler
 {
+    private const string TracesPath = "/api/telemetry/traces/";
+
     private readonly Dictionary<string, List<JsonObject>> _recordsByResource = [];
+    private readonly List<(string Resource, JsonObject Span)> _spans = [];
 
     public HttpStatusCode Status { get; set; } = HttpStatusCode.OK;
 
     public List<HttpRequestMessage> Requests { get; } = [];
 
-    /// <summary>A log record of <paramref name="resource"/> at <paramref name="time"/>, with these logging-scope keys.</summary>
-    public DashboardLogs Add(string resource, DateTimeOffset time, Dictionary<string, string> keys, string body = "A log message")
+    /// <summary>
+    /// A log record of <paramref name="resource"/> at <paramref name="time"/>, with these logging-scope keys, written in
+    /// the span <paramref name="spanId"/> of trace <paramref name="traceId"/>, or outside any span when they're left out.
+    /// </summary>
+    public DashboardLogs Add(
+        string resource,
+        DateTimeOffset time,
+        Dictionary<string, string> keys,
+        string body = "A log message",
+        string traceId = "",
+        string spanId = "")
     {
         var attributes = new JsonArray();
         foreach (var (key, value) in keys)
@@ -34,27 +47,66 @@ public sealed class DashboardLogs : HttpMessageHandler
         records.Add(new JsonObject
         {
             // As the dashboard sends it: OTLP JSON writes a 64-bit integer as a string.
-            ["timeUnixNano"] = ((ulong)(time - DateTimeOffset.UnixEpoch).Ticks * 100).ToString(CultureInfo.InvariantCulture),
+            ["timeUnixNano"] = UnixNano(time),
             ["severityNumber"] = 9,
             ["severityText"] = "Information",
             ["body"] = new JsonObject { ["stringValue"] = body },
             ["attributes"] = attributes,
+            ["traceId"] = traceId,
+            ["spanId"] = spanId,
         });
+        return this;
+    }
+
+    /// <summary>A span of <paramref name="resource"/>; <paramref name="kind"/> is OTLP's, 2 for a server span.</summary>
+    public DashboardLogs AddSpan(
+        string resource,
+        string traceId,
+        string spanId,
+        string? parentSpanId,
+        string name,
+        int kind,
+        DateTimeOffset start,
+        DateTimeOffset end)
+    {
+        _spans.Add((resource, new JsonObject
+        {
+            ["traceId"] = traceId,
+            ["spanId"] = spanId,
+            ["parentSpanId"] = parentSpanId,
+            ["name"] = name,
+            ["kind"] = kind,
+            ["startTimeUnixNano"] = UnixNano(start),
+            ["endTimeUnixNano"] = UnixNano(end),
+            ["attributes"] = new JsonArray(),
+        }));
         return this;
     }
 
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         Requests.Add(request);
+        var path = request.RequestUri!.AbsolutePath;
+        if (!path.StartsWith(TracesPath, StringComparison.Ordinal))
+        {
+            return Answer(new JsonObject { ["resourceLogs"] = ResourceLogs() }, _recordsByResource.Values.Sum(records => records.Count));
+        }
+
+        var traceId = path[TracesPath.Length..];
+        var spans = _spans.Where(span => (string?)span.Span["traceId"] == traceId).ToList();
+        return spans.Count == 0
+            ? Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound))
+            : Answer(new JsonObject { ["resourceSpans"] = ResourceSpans(spans) }, spans.Count);
+    }
+
+    private JsonArray ResourceLogs()
+    {
         var resourceLogs = new JsonArray();
         foreach (var (resource, records) in _recordsByResource)
         {
             resourceLogs.Add(new JsonObject
             {
-                ["resource"] = new JsonObject
-                {
-                    ["attributes"] = new JsonArray { new JsonObject { ["key"] = "service.name", ["value"] = new JsonObject { ["stringValue"] = resource } } },
-                },
+                ["resource"] = Resource(resource),
                 ["scopeLogs"] = new JsonArray
                 {
                     new JsonObject
@@ -66,16 +118,39 @@ public sealed class DashboardLogs : HttpMessageHandler
             });
         }
 
-        var count = _recordsByResource.Values.Sum(records => records.Count);
-        var answer = new JsonObject
+        return resourceLogs;
+    }
+
+    private static JsonArray ResourceSpans(List<(string Resource, JsonObject Span)> spans) =>
+    [
+        .. spans.GroupBy(span => span.Resource).Select(resource => new JsonObject
         {
-            ["data"] = new JsonObject { ["resourceLogs"] = resourceLogs },
-            ["totalCount"] = count,
-            ["returnedCount"] = count,
-        };
+            ["resource"] = Resource(resource.Key),
+            ["scopeSpans"] = new JsonArray
+            {
+                new JsonObject
+                {
+                    ["scope"] = new JsonObject { ["name"] = "Microsoft.AspNetCore" },
+                    ["spans"] = new JsonArray([.. resource.Select(span => span.Span.DeepClone())]),
+                },
+            },
+        }),
+    ];
+
+    private Task<HttpResponseMessage> Answer(JsonObject data, int count)
+    {
+        var answer = new JsonObject { ["data"] = data, ["totalCount"] = count, ["returnedCount"] = count };
         return Task.FromResult(new HttpResponseMessage(Status)
         {
             Content = new StringContent(answer.ToJsonString(), Encoding.UTF8, "application/json"),
         });
     }
+
+    private static JsonObject Resource(string name) => new()
+    {
+        ["attributes"] = new JsonArray { new JsonObject { ["key"] = "service.name", ["value"] = new JsonObject { ["stringValue"] = name } } },
+    };
+
+    private static string UnixNano(DateTimeOffset time) =>
+        ((ulong)(time - DateTimeOffset.UnixEpoch).Ticks * 100).ToString(CultureInfo.InvariantCulture);
 }

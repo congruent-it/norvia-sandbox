@@ -312,3 +312,7 @@ _Avoid_: common data model, standard format
 **Message trail**:
 Everything the integration layer did under one correlation ID: the call or event it started from, and every queue, subscription, Logic App run and application call that followed from it, fan-out included. An action by a Norvia employee in an application starts a new trail.
 _Avoid_: integration message, message flow, transaction
+
+**Hop**:
+One thing the integration layer did on a Message trail: an API Management call, a Logic App run, an application call or a published event, with its flow, time, duration and outcome. A hop that started others caused them; where it started more than one, the trail fans out.
+_Avoid_: step (that is an action inside a Logic App run), span, event

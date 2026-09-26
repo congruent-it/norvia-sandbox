@@ -22,7 +22,7 @@ builder.Services.AddSingleton(TimeProvider.System);
 // The estate's own retention, integrationRetentionDays, which caps every search (coding guidelines §7).
 builder.Services.AddOptions<IntegrationRetention>().BindConfiguration(IntegrationRetention.SectionName)
     .ValidateDataAnnotations().ValidateOnStart();
-builder.Services.AddSingleton<ITrailSearch, TrailRequests>();
+builder.Services.AddSingleton<ITrailRequests, TrailRequests>();
 
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddFluentUIComponents();

@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 using Norvia.IntegrationConsole.Application.Trails;
@@ -9,7 +10,8 @@ namespace Norvia.IntegrationConsole.Infrastructure.Trails;
 /// Searches the telemetry the Aspire dashboard holds for Message trails, when the console runs under the local AppHost
 /// (ADR 0027). Locally the applications log the tracking contract's keys (coding guidelines §7) in their logging scope,
 /// which reaches the dashboard as each log record's attributes. It answers the same search as
-/// <see cref="LogAnalyticsTrailSource"/>, and reads those attributes only, never a record's body.
+/// <see cref="LogAnalyticsTrailSource"/>, and reads those attributes only, never a record's body. A trail's hops are
+/// the requests those records were written in, from the spans of their traces.
 /// </summary>
 internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTrailSourceOptions> options) : ITrailSource
 {
@@ -22,14 +24,9 @@ internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTr
     /// <summary>The API key header of the dashboard's telemetry API.</summary>
     internal const string ApiKeyHeader = "x-api-key";
 
-    private static readonly (string Key, BusinessKeyKind Kind)[] BusinessKeys =
-    [
-        ("transportOrderNumber", BusinessKeyKind.TransportOrderNumber),
-        ("shipmentNumber", BusinessKeyKind.ShipmentNumber),
-        ("carrierBookingNumber", BusinessKeyKind.CarrierBookingNumber),
-        ("tripNumber", BusinessKeyKind.TripNumber),
-        ("sourceMessageId", BusinessKeyKind.SourceMessageId),
-    ];
+    // OTLP's span kinds of a call coming in: a request served, or a message received.
+    private const int ServerSpan = 2;
+    private const int ConsumerSpan = 5;
 
     public async Task<IReadOnlyList<FoundTrail>> SearchAsync(TrailSearch search, CancellationToken cancellationToken)
     {
@@ -54,60 +51,208 @@ internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTr
         ];
     }
 
+    public async Task<IReadOnlyList<RecordedHop>> HopsAsync(TrailLookup lookup, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(lookup);
+
+        var records = (await TrackedRecordsAsync(cancellationToken))
+            .Where(record => record.Time >= lookup.From && record.Time <= lookup.To
+                && string.Equals(record.CorrelationId, lookup.CorrelationId, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        var spans = new Dictionary<string, Span>(StringComparer.Ordinal);
+        foreach (var traceId in records.Select(record => record.TraceId).Where(id => id.Length > 0).Distinct(StringComparer.Ordinal))
+        {
+            foreach (var span in await SpansAsync(traceId, cancellationToken))
+            {
+                spans[span.SpanId] = span;
+            }
+        }
+
+        // A record written outside any span is a hop of its own.
+        var hops = records.Select((record, index) => (Record: record, HopId: record.SpanId.Length > 0 ? EntryOf(record.SpanId, spans) : $"{record.Resource}#{index}"))
+            .GroupBy(record => record.HopId, record => record.Record, StringComparer.Ordinal)
+            .ToList();
+        var hopIds = hops.Select(hop => hop.Key).ToHashSet(StringComparer.Ordinal);
+
+        return
+        [
+            .. hops.Select(hop => Hop(
+                hop.Key,
+                [.. hop.OrderBy(record => record.Time)],
+                spans.GetValueOrDefault(hop.Key),
+                spans.GetValueOrDefault(hop.Key) is { } span
+                    ? HopCauses.Of(hop.Key, span.ParentSpanId, hopIds, id => spans.GetValueOrDefault(id)?.ParentSpanId)
+                    : null)),
+        ];
+    }
+
     private static FoundTrail Trail(IGrouping<string, TrackedRecord> hops) => new(
         hops.Key,
         Distinct(hops, "flow"),
         hops.Min(hop => hop.Time),
         hops.Max(hop => hop.Time),
         [.. Distinct(hops, "outcome").Select(FoundTrails.OutcomeOf).OfType<Outcome>()],
-        [.. BusinessKeys.SelectMany(key => Distinct(hops, key.Key).Select(value => new BusinessKey(key.Kind, value)))]);
+        BusinessKeysOf(hops));
+
+    private static RecordedHop Hop(string id, List<TrackedRecord> records, Span? span, string? causedBy)
+    {
+        var (outcome, failureCode) = HopOutcomes.Last(records.Select(record => ((DateTimeOffset?)record.Time, record.Keys.GetValueOrDefault("outcome"), record.Keys.GetValueOrDefault("failureCode"))));
+        return new RecordedHop(
+            id,
+            causedBy,
+            span is null ? records[0].Resource : $"{span.Resource}: {span.Name}",
+            Distinct(records, "flow").FirstOrDefault(),
+            span?.Start ?? records[0].Time,
+            span is { End: { } end } ? end - span.Start : null,
+            outcome,
+            failureCode,
+            BusinessKeysOf(records));
+    }
+
+    /// <summary>
+    /// The request a span belongs to: the nearest span above it that served a call or received a message, within the
+    /// same application. Logs written during a database call in a request are the request's.
+    /// </summary>
+    private static string EntryOf(string spanId, Dictionary<string, Span> spans)
+    {
+        if (!spans.TryGetValue(spanId, out var span))
+        {
+            return spanId;
+        }
+
+        var seen = new HashSet<string>(StringComparer.Ordinal) { span.SpanId };
+        while (span.Kind is not (ServerSpan or ConsumerSpan)
+            && span.ParentSpanId is { } parentId
+            && spans.TryGetValue(parentId, out var parent)
+            && parent.Resource == span.Resource
+            && seen.Add(parent.SpanId))
+        {
+            span = parent;
+        }
+
+        return span.SpanId;
+    }
+
+    private static BusinessKey[] BusinessKeysOf(IEnumerable<TrackedRecord> records) =>
+        [.. TrackedBusinessKeys.All.SelectMany(key => Distinct(records, key.Key).Select(value => new BusinessKey(key.Kind, value)))];
 
     private static string[] Distinct(IEnumerable<TrackedRecord> hops, string key) =>
         [.. hops.Select(hop => hop.Keys.GetValueOrDefault(key)).OfType<string>().Distinct(StringComparer.Ordinal)];
 
     private async Task<List<TrackedRecord>> TrackedRecordsAsync(CancellationToken cancellationToken)
     {
-        using var request = new HttpRequestMessage(
-            HttpMethod.Get,
-            new Uri($"api/telemetry/logs?limit={MaximumLogRecords.ToString(CultureInfo.InvariantCulture)}", UriKind.Relative));
+        using var logs = await GetAsync($"api/telemetry/logs?limit={MaximumLogRecords.ToString(CultureInfo.InvariantCulture)}", missingIsEmpty: false, cancellationToken);
+
+        // OTLP JSON: data.resourceLogs[].scopeLogs[].logRecords[].
+        return
+        [
+            .. ItemsOf(DataOf(logs), "resourceLogs")
+                .SelectMany(resource => ItemsOf(resource, "scopeLogs")
+                    .SelectMany(scope => ItemsOf(scope, "logRecords"))
+                    .Select(record => TrackedRecord.From(record, ServiceOf(resource))))
+                .OfType<TrackedRecord>(),
+        ];
+    }
+
+    /// <summary>Every span of a trace, or none once the dashboard no longer holds it.</summary>
+    private async Task<List<Span>> SpansAsync(string traceId, CancellationToken cancellationToken)
+    {
+        using var trace = await GetAsync($"api/telemetry/traces/{Uri.EscapeDataString(traceId)}", missingIsEmpty: true, cancellationToken);
+
+        // OTLP JSON: data.resourceSpans[].scopeSpans[].spans[].
+        return trace is null
+            ? []
+            :
+            [
+                .. ItemsOf(DataOf(trace), "resourceSpans")
+                    .SelectMany(resource => ItemsOf(resource, "scopeSpans")
+                        .SelectMany(scope => ItemsOf(scope, "spans"))
+                        .Select(span => Span.From(span, ServiceOf(resource))))
+                    .OfType<Span>(),
+            ];
+    }
+
+    /// <summary>The telemetry API's answer, or null when <paramref name="missingIsEmpty"/> and it holds nothing at that address.</summary>
+    private async Task<JsonDocument?> GetAsync(string path, bool missingIsEmpty, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(path, UriKind.Relative));
         if (options.Value.ApiKey is { Length: > 0 } apiKey)
         {
             request.Headers.Add(ApiKeyHeader, apiKey);
         }
 
         using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        if (missingIsEmpty && response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
         response.EnsureSuccessStatusCode();
         await using var content = await response.Content.ReadAsStreamAsync(cancellationToken);
-        using var logs = await JsonDocument.ParseAsync(content, cancellationToken: cancellationToken);
-
-        // OTLP JSON: data.resourceLogs[].scopeLogs[].logRecords[].
-        return
-        [
-            .. ItemsOf(logs.RootElement.TryGetProperty("data", out var data) ? data : default, "resourceLogs")
-                .SelectMany(resource => ItemsOf(resource, "scopeLogs"))
-                .SelectMany(scope => ItemsOf(scope, "logRecords"))
-                .Select(TrackedRecord.From)
-                .OfType<TrackedRecord>(),
-        ];
+        return await JsonDocument.ParseAsync(content, cancellationToken: cancellationToken);
     }
+
+    private static JsonElement DataOf(JsonDocument? answer) =>
+        answer is not null && answer.RootElement.ValueKind == JsonValueKind.Object && answer.RootElement.TryGetProperty("data", out var data) ? data : default;
 
     private static JsonElement[] ItemsOf(JsonElement element, string property) =>
         element.ValueKind == JsonValueKind.Object && element.TryGetProperty(property, out var array) && array.ValueKind == JsonValueKind.Array
             ? [.. array.EnumerateArray()]
             : [];
 
-    /// <summary>A log record reduced to its time and the tracking contract's keys, when it carries a correlation ID.</summary>
-    private sealed record TrackedRecord(DateTimeOffset Time, string CorrelationId, Dictionary<string, string> Keys)
+    private static string ServiceOf(JsonElement resource) =>
+        ItemsOf(resource.ValueKind == JsonValueKind.Object && resource.TryGetProperty("resource", out var attributes) ? attributes : default, "attributes")
+            .Where(attribute => attribute.TryGetProperty("key", out var key) && key.GetString() == "service.name")
+            .Select(attribute => attribute.TryGetProperty("value", out var value) ? TextOf(value) : null)
+            .FirstOrDefault() ?? "unknown";
+
+    private static string? TextOf(JsonElement value) =>
+        value.TryGetProperty("stringValue", out var text) ? text.GetString()
+        : value.TryGetProperty("intValue", out var number) ? number.ToString()
+        : null;
+
+    private static string StringOf(JsonElement element, string property) =>
+        element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() ?? "" : "";
+
+    // OTLP JSON writes a 64-bit integer as a string, as the dashboard does; a number is taken too.
+    private static DateTimeOffset? TimeOf(JsonElement element, string property) =>
+        element.TryGetProperty(property, out var time)
+        && (time.ValueKind == JsonValueKind.String
+            ? ulong.TryParse(time.GetString(), NumberStyles.None, CultureInfo.InvariantCulture, out var nanoseconds)
+            : time.ValueKind == JsonValueKind.Number && time.TryGetUInt64(out nanoseconds))
+        && nanoseconds > 0
+            ? DateTimeOffset.UnixEpoch.AddTicks((long)(nanoseconds / 100))
+            : null;
+
+    /// <summary>A span reduced to what places a hop: its parent, its application, its name and its times.</summary>
+    private sealed record Span(string SpanId, string? ParentSpanId, string Resource, string Name, int Kind, DateTimeOffset Start, DateTimeOffset? End)
+    {
+        public static Span? From(JsonElement span, string resource) =>
+            StringOf(span, "spanId") is { Length: > 0 } spanId && TimeOf(span, "startTimeUnixNano") is { } start
+                ? new Span(
+                    spanId,
+                    StringOf(span, "parentSpanId") is { Length: > 0 } parent ? parent : null,
+                    resource,
+                    StringOf(span, "name"),
+                    span.TryGetProperty("kind", out var kind) && kind.ValueKind == JsonValueKind.Number ? kind.GetInt32() : 0,
+                    start,
+                    TimeOf(span, "endTimeUnixNano"))
+                : null;
+    }
+
+    /// <summary>A log record reduced to its time, where it was written and the tracking contract's keys, when it carries a correlation ID.</summary>
+    private sealed record TrackedRecord(DateTimeOffset Time, string CorrelationId, string Resource, string TraceId, string SpanId, Dictionary<string, string> Keys)
     {
         private static readonly string[] TrackedKeys =
-            ["correlationId", "flow", "outcome", .. BusinessKeys.Select(key => key.Key)];
+            ["correlationId", "flow", "outcome", "failureCode", .. TrackedBusinessKeys.All.Select(key => key.Key)];
 
         public bool Carries(string key) =>
             string.Equals(CorrelationId, key, StringComparison.OrdinalIgnoreCase)
-            || BusinessKeys.Any(business => string.Equals(Keys.GetValueOrDefault(business.Key), key, StringComparison.OrdinalIgnoreCase));
+            || TrackedBusinessKeys.All.Any(business => string.Equals(Keys.GetValueOrDefault(business.Key), key, StringComparison.OrdinalIgnoreCase));
 
         // Only the attributes are read: the body is the formatted message, which is no key.
-        public static TrackedRecord? From(JsonElement record)
+        public static TrackedRecord? From(JsonElement record, string resource)
         {
             var keys = new Dictionary<string, string>(StringComparer.Ordinal);
             foreach (var attribute in ItemsOf(record, "attributes"))
@@ -119,23 +264,9 @@ internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTr
                 }
             }
 
-            return keys.TryGetValue("correlationId", out var correlationId) && TimeOf(record) is { } time
-                ? new TrackedRecord(time, correlationId, keys)
+            return keys.TryGetValue("correlationId", out var correlationId) && TimeOf(record, "timeUnixNano") is { } time
+                ? new TrackedRecord(time, correlationId, resource, StringOf(record, "traceId"), StringOf(record, "spanId"), keys)
                 : null;
         }
-
-        // OTLP JSON writes a 64-bit integer as a string, as the dashboard does; a number is taken too.
-        private static DateTimeOffset? TimeOf(JsonElement record) =>
-            record.TryGetProperty("timeUnixNano", out var time)
-            && (time.ValueKind == JsonValueKind.String
-                ? ulong.TryParse(time.GetString(), NumberStyles.None, CultureInfo.InvariantCulture, out var nanoseconds)
-                : time.TryGetUInt64(out nanoseconds))
-                ? DateTimeOffset.UnixEpoch.AddTicks((long)(nanoseconds / 100))
-                : null;
-
-        private static string? TextOf(JsonElement value) =>
-            value.TryGetProperty("stringValue", out var text) ? text.GetString()
-            : value.TryGetProperty("intValue", out var number) ? number.ToString()
-            : null;
     }
 }
