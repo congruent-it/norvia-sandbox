@@ -85,6 +85,8 @@ azd env new <environment> --subscription <subscription-id> --location <region>
 AZD_UP_CONCURRENCY=1 azd up                  # one image at a time (see below)
 infra/smoke-test-intake.sh                   # after a deployment: checks intake end to end on the deployed TMS
 infra/smoke-test-partner-api.sh              # and the demo smoke run: books through API Management as each Persona
+# after booking as Brouwer Dranken in the Partner portal, follows the booking's Message trail:
+infra/smoke-test-integration-console.sh <Transport Order number> [<correlation ID>]
 ```
 
 azd asks for the AppHost's parameters, which are the estate's outputs, before it runs the preprovision hook. So `azd up` also runs the estate hook as a preup hook, before anything else, and the preprovision run then sees the estate is already deployed. The hook needs the environment's subscription and region, so create the environment with both, as above. If azd still asks for an `estate_*` parameter, don't type in a value: they are the names and IDs the estate creates. Stop, run `azd hooks run preprovision`, and start `azd up` again.
@@ -102,6 +104,8 @@ The presenter, the user who ran `azd up`, opens the TMS UI and the Partner porta
 The presenter also opens the Integration console (`integration-console-web`), where they play the Integration operator. Easy Auth signs them in to the console's own app registration, *Norvia Integration console*, and the console checks that they hold `IntegrationConsole.Read`; anyone without it is refused ([ADR 0026](docs/adr/0026-the-integration-console-signs-operators-in-with-easy-auth-and-checks-their-app-role.md)). The console reads the estate as its own managed identity, never as the operator.
 
 The demo smoke run ([infra/smoke-test-partner-api.sh](infra/smoke-test-partner-api.sh)) is what a presenter repeats after a deployment. It books through API Management as Brouwer Dranken and as Van Dijk Transport, tries a missing or wrong key and token, and follows the accepted and the refused bookings by correlation ID to the Logic App run, the Transport Order, the event and Application Insights. A Persona's token can be had only as the Partner portal's identity, so the Personas' calls run from a throwaway Container Apps job as it. It prints `PASS` or `FAIL` per check.
+
+The presenter then follows a booking through the Integration console ([Presenter smoke run](docs/operations/integration-console.md#presenter-smoke-run)): book as Brouwer Dranken in the Partner portal, and run [infra/smoke-test-integration-console.sh](infra/smoke-test-integration-console.sh) with the Transport Order number it answered with. The script checks that the console's sources hold the booking's Message trail, found by that number and by its correlation ID, with the API Management call, the intake Logic App run and the TMS call, and that the run's steps open with their bodies. It prints the console's pages to open on screen, and never a body.
 
 The intake smoke test runs the intake identity's calls from a throwaway Container Apps job, and sees the event through a Service Bus subscription of its own that it removes afterwards. It needs the rights of whoever ran `azd up`: the estate grants that user Azure Service Bus Data Receiver on the namespace.
 
