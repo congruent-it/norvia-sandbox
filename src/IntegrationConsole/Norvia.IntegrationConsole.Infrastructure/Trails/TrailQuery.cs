@@ -38,11 +38,13 @@ internal static class TrailQuery
             | project TimeGenerated, Properties;
         // The term index narrows each pass before any JSON is parsed: first to the rows mentioning the key, then to
         // the rows of the trails that carried it.
-        let found = toscalar(keysOf(telemetry | where Properties has searched)
+        let mentioningTheKey = telemetry | where Properties has searched;
+        let found = toscalar(keysOf(mentioningTheKey)
             | where correlationId =~ searched or transportOrderNumber =~ searched or shipmentNumber =~ searched
                 or carrierBookingNumber =~ searched or tripNumber =~ searched or sourceMessageId =~ searched
             | summarize make_set(correlationId));
-        keysOf(telemetry | where Properties has_any (found))
+        let ofTheTrailsFound = telemetry | where Properties has_any (found);
+        keysOf(ofTheTrailsFound)
         | where correlationId in (found)
         | summarize firstSeen = min(TimeGenerated), lastSeen = max(TimeGenerated),
             flows = tostring(make_set_if(flow, isnotempty(flow))),
