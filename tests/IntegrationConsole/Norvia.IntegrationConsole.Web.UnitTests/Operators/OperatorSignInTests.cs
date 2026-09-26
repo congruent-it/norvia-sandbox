@@ -32,7 +32,7 @@ public sealed class OperatorSignInTests
         await using var services = SignIn(Environments.Production);
         var context = Request(services, ClientPrincipal.Encode(new
         {
-            auth_typ = "aad",
+            auth_typ = EasyAuthHandler.EntraAuthenticationType,
             claims = new[] { new { typ = "preferred_username", val = "iris@norvia.example" } },
         }));
 
@@ -80,7 +80,7 @@ public sealed class OperatorSignInTests
     [Theory]
     [InlineData("Production")]
     [InlineData("Development")]
-    public async Task Forbid_TakesTheOperatorToTheRefusal(string environment)
+    public async Task Forbid_AnOperatorLackingARole_TakesThemToTheRefusal(string environment)
     {
         await using var services = environment == Environments.Development ? SignIn(environment, LocalOperator("Dev")) : SignIn(environment);
         var context = Request(services);
@@ -115,10 +115,10 @@ public sealed class OperatorSignInTests
     [Theory]
     [InlineData(OperatorRoles.Read, true)]
     [InlineData(OperatorRoles.Resubmit, false)]
-    public async Task ReadPolicy_AdmitsOnlyOperatorsHoldingTheReadRole(string role, bool admitted)
+    public async Task AuthorizeReadPolicy_ForAnOperatorWithARole_AdmitsOnlyTheReadRole(string role, bool admitted)
     {
         await using var services = SignIn(Environments.Production);
-        var operatorWithRole = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Role, role)], "aad"));
+        var operatorWithRole = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Role, role)], EasyAuthHandler.EntraAuthenticationType));
 
         var result = await services.GetRequiredService<IAuthorizationService>()
             .AuthorizeAsync(operatorWithRole, OperatorSignIn.ReadPolicy);
@@ -147,7 +147,7 @@ public sealed class OperatorSignInTests
         var context = new DefaultHttpContext { RequestServices = services };
         if (clientPrincipal is not null)
         {
-            context.Request.Headers[ClientPrincipal.HeaderName] = clientPrincipal;
+            context.Request.Headers[EasyAuthHandler.ClientPrincipalHeader] = clientPrincipal;
         }
 
         return context;

@@ -45,6 +45,6 @@
     {
         var identity = AuthenticationState is null ? null : (await AuthenticationState).User.Identity;
         _operatorName = identity is { IsAuthenticated: true } ? identity.Name : null;
-        _signedInWithEntra = identity?.AuthenticationType == "aad";
+        _signedInWithEntra = identity?.AuthenticationType == EasyAuthHandler.EntraAuthenticationType;
     }
 }

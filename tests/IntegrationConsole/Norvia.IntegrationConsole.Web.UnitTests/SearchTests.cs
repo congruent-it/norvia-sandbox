@@ -7,7 +7,7 @@ namespace Norvia.IntegrationConsole.Web.UnitTests;
 public sealed class SearchTests : ConsoleWebContext
 {
     [Fact]
-    public void Search_IsWhereAnOperatorLands()
+    public void Render_ForAnOperator_ShowsTheSearchPage()
     {
         var page = Render<Search>();
 
@@ -15,7 +15,7 @@ public sealed class SearchTests : ConsoleWebContext
     }
 
     [Fact]
-    public void Search_NeedsTheReadRole()
+    public void Authorize_ForAnyOperator_RequiresTheReadRole()
     {
         // Message trails lead to message bodies, which hold personal data.
         typeof(Search).GetCustomAttributes(typeof(AuthorizeAttribute), inherit: true)

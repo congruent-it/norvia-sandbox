@@ -2,15 +2,16 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Http;
 using Norvia.IntegrationConsole.Web.Components.Layout;
 using Norvia.IntegrationConsole.Web.Components.Pages;
+using Norvia.IntegrationConsole.Web.Operators;
 
 namespace Norvia.IntegrationConsole.Web.UnitTests;
 
 public sealed class LayoutTests : ConsoleWebContext
 {
     [Fact]
-    public void MainLayout_ForAnOperatorSignedInWithEntra_ShowsWhoTheyAre_AndLetsThemSignOut()
+    public void Render_ForAnOperatorSignedInWithEntra_ShowsWhoTheyAre_AndLetsThemSignOut()
     {
-        Operator.SetAuthorized("Iris Operator").SetAuthenticationType("aad");
+        Operator.SetAuthorized("Iris Operator").SetAuthenticationType(EasyAuthHandler.EntraAuthenticationType);
 
         var layout = RenderLayout();
 
@@ -20,7 +21,7 @@ public sealed class LayoutTests : ConsoleWebContext
     }
 
     [Fact]
-    public void MainLayout_ForTheLocalOperator_OffersNoSignOut()
+    public void Render_ForTheLocalOperator_OffersNoSignOut()
     {
         // Locally there is no Easy Auth, so no endpoint to sign out at.
         Operator.SetAuthorized("Dev Eloper").SetAuthenticationType("LocalOperator");
@@ -32,7 +33,7 @@ public sealed class LayoutTests : ConsoleWebContext
     }
 
     [Fact]
-    public void MainLayout_ForNobodySignedIn_ShowsNoOperator()
+    public void Render_ForNobodySignedIn_ShowsNoOperator()
     {
         var layout = RenderLayout();
 
@@ -40,7 +41,7 @@ public sealed class LayoutTests : ConsoleWebContext
     }
 
     [Fact]
-    public void ErrorPage_ShowsTheRequestId_WithoutDetailsOfTheFailure()
+    public void RenderErrorPage_AfterAFailure_ShowsTheRequestIdWithoutDetailsOfTheFailure()
     {
         var page = Render<Error>(parameters => parameters.AddCascadingValue(new DefaultHttpContext { TraceIdentifier = "trace-1" }));
 
@@ -49,7 +50,7 @@ public sealed class LayoutTests : ConsoleWebContext
     }
 
     [Fact]
-    public void NotFoundPage_LeadsBackToSearch()
+    public void RenderNotFoundPage_ForAnUnknownAddress_LeadsBackToSearch()
     {
         var page = Render<NotFound>();
 

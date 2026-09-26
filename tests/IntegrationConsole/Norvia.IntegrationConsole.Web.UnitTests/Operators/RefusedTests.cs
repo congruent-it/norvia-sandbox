@@ -7,7 +7,7 @@ namespace Norvia.IntegrationConsole.Web.UnitTests.Operators;
 public sealed class RefusedTests : ConsoleWebContext
 {
     [Fact]
-    public void Refused_TellsTheOperatorWhichRoleTheyLack_AndAnswersForbidden()
+    public void Render_ForAnOperatorWithoutTheReadRole_TellsThemWhichRoleTheyLack_AndAnswersForbidden()
     {
         Operator.SetAuthorized("Iris Operator").SetRoles(OperatorRoles.Resubmit);
         var request = new DefaultHttpContext();

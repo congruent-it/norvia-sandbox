@@ -18,6 +18,9 @@ internal sealed class EasyAuthHandler(IOptionsMonitor<AuthenticationSchemeOption
     public const string SchemeName = "EasyAuth";
     public const string ClientPrincipalHeader = "X-MS-CLIENT-PRINCIPAL";
 
+    /// <summary>The authentication type Easy Auth gives an operator it signed in with Entra ID.</summary>
+    public const string EntraAuthenticationType = "aad";
+
     /// <summary>Easy Auth's endpoint that signs the browser in to Entra ID and sends it back.</summary>
     public const string SignInPath = "/.auth/login/aad";
 
