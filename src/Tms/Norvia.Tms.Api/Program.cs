@@ -3,6 +3,7 @@ using Ardalis.Result;
 using Asp.Versioning;
 using Mediator;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Api.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.Rate;
@@ -80,10 +81,14 @@ var app = builder.Build();
 app.UseMiddleware<TrackingScopeMiddleware>();
 app.UseExceptionHandler(new ExceptionHandlerOptions
 {
-    // A request the API can't bind (malformed JSON, a field outside the Canonical Model) is the caller's error.
-    StatusCodeSelector = exception => exception is BadHttpRequestException badRequest
-        ? badRequest.StatusCode
-        : StatusCodes.Status500InternalServerError,
+    // A request the API can't bind (malformed JSON, a field outside the Canonical Model) is the caller's error. A change
+    // that lost a race, such as two re-rates of one Transport Order, conflicts with the one that won.
+    StatusCodeSelector = exception => exception switch
+    {
+        BadHttpRequestException badRequest => badRequest.StatusCode,
+        DbUpdateConcurrencyException => StatusCodes.Status409Conflict,
+        _ => StatusCodes.Status500InternalServerError,
+    },
 });
 app.UseStatusCodePages();
 app.UseAuthentication();

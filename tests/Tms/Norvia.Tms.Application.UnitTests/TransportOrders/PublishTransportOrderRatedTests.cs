@@ -16,7 +16,7 @@ public sealed class PublishTransportOrderRatedTests
         var order = Samples.RatedOrder(sequence: 3, correlationId: "corr-9");
         var expected = new FreightChargeView("EUR", 112.90m, [new ChargeLineView("Freight", 112.90m)], new RateCardVersionView("RC-0001", 3));
 
-        await new PublishTransportOrderRated(_outbox).Handle(new TransportOrderRatedEvent(order), CancellationToken.None);
+        await new PublishTransportOrderRated(_outbox).Handle(new TransportOrderRatedEvent(order, order.CorrelationId), CancellationToken.None);
 
         _outbox.Received(1).Add(Arg.Is<TransportOrderRatedV1>(e =>
             e.TransportOrderNumber == "TO-0000003"
@@ -27,9 +27,23 @@ public sealed class PublishTransportOrderRatedTests
     }
 
     [Fact]
+    public async Task Handle_ReRatedOrder_PublishesOnTheReRatesTrail()
+    {
+        var order = Samples.RatingFailedOrder(sequence: 3, correlationId: "corr-intake");
+        order.ReRate(Samples.RateCard(), Samples.Now.AddHours(1), new CorrelationId("corr-re-rate"));
+
+        await new PublishTransportOrderRated(_outbox).Handle(new TransportOrderRatedEvent(order, new CorrelationId("corr-re-rate")), CancellationToken.None);
+
+        _outbox.Received(1).Add(Arg.Is<TransportOrderRatedV1>(e =>
+            e.CorrelationId == "corr-re-rate"
+            && e.OccurredAt == Samples.Now.AddHours(1)
+            && e.ApplicationProperties["correlationId"].Equals("corr-re-rate")));
+    }
+
+    [Fact]
     public void TransportOrderRated_Always_GoesToTheTransportOrderEventsTopicWithTheTrackingKeys()
     {
-        var rated = TransportOrderRatedV1.From(Samples.RatedOrder(sequence: 3, correlationId: "corr-9"));
+        var rated = TransportOrderRatedV1.From(Samples.RatedOrder(sequence: 3, correlationId: "corr-9"), new CorrelationId("corr-9"));
 
         rated.Topic.Should().Be("transport-order-events");
         rated.EventType.Should().Be("TransportOrderRated");
@@ -48,7 +62,7 @@ public sealed class PublishTransportOrderRatedTests
     [Fact]
     public void From_OrderNotRated_Throws()
     {
-        var act = () => TransportOrderRatedV1.From(Samples.AcceptedOrder());
+        var act = () => TransportOrderRatedV1.From(Samples.AcceptedOrder(), new CorrelationId("corr-1"));
 
         act.Should().Throw<ArgumentException>();
     }

@@ -3,8 +3,8 @@ using System.Net;
 namespace Norvia.Tms.Api.IntegrationTests.TransportOrders;
 
 /// <summary>
-/// The TMS API is reachable from outside its Container Apps environment, so its queries answer only callers Entra
-/// issued a TMS token to, and those are only principals holding one of its roles.
+/// The TMS API is reachable from outside its Container Apps environment, so its queries and the re-rate answer only
+/// callers Entra issued a TMS token to, and those are only principals holding one of its roles.
 /// </summary>
 public sealed class TransportOrderQueryAuthorizationTests(TmsFixture tms)
 {
@@ -14,6 +14,7 @@ public sealed class TransportOrderQueryAuthorizationTests(TmsFixture tms)
     [InlineData("/v1/transport-orders?status=Accepted")]
     [InlineData("/v1/transport-orders/TO-0000001")]
     [InlineData("/v1/transport-orders/00000000-0000-0000-0000-000000000001")]
+    [InlineData("/v1/transport-orders/rating-exceptions")]
     public async Task Query_WithoutAToken_IsUnauthorized(string query)
     {
         using var caller = tms.CreateTmsClient(token: null);
@@ -29,6 +30,26 @@ public sealed class TransportOrderQueryAuthorizationTests(TmsFixture tms)
         using var caller = tms.CreateTmsClient(tms.IssueToken([TmsFixture.IntakeRole], audience: "api://norvia-erp"));
 
         using var response = await caller.GetAsync(new Uri("/v1/transport-orders?status=Accepted", UriKind.Relative), _cancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task ReRate_WithoutAToken_IsUnauthorized()
+    {
+        using var caller = tms.CreateTmsClient(token: null);
+
+        using var response = await caller.PostAsync(new Uri("/v1/transport-orders/TO-0000001/re-rate", UriKind.Relative), content: null, _cancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task ReRate_TokenForAnotherAudience_IsUnauthorized()
+    {
+        using var caller = tms.CreateTmsClient(tms.IssueToken([TmsFixture.IntakeRole], audience: "api://norvia-erp"));
+
+        using var response = await caller.PostAsync(new Uri("/v1/transport-orders/TO-0000001/re-rate", UriKind.Relative), content: null, _cancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }

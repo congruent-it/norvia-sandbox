@@ -38,6 +38,29 @@ internal static class TmsCalls
         return JsonNode.Parse(await response.Content.ReadAsStringAsync(cancellationToken))!;
     }
 
+    /// <summary>Re-rates the Transport Order as Customer service does, on a Message trail of the re-rate's own.</summary>
+    public static async Task<HttpResponseMessage> ReRateAsync(
+        this TmsFixture tms, string number, string correlationId, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"/v1/transport-orders/{number}/re-rate", UriKind.Relative));
+        request.Headers.Add("X-Correlation-ID", correlationId);
+        return await tms.Tms.SendAsync(request, cancellationToken);
+    }
+
+    public static async Task<JsonArray> ListRatingExceptionsAsync(this TmsFixture tms, CancellationToken cancellationToken)
+    {
+        using var response = await tms.Tms.GetAsync(new Uri("/v1/transport-orders/rating-exceptions", UriKind.Relative), cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, body);
+        return JsonNode.Parse(body)!.AsArray();
+    }
+
+    /// <summary>Every event published so far about the Transport Order, on any Message trail.</summary>
+    public static IReadOnlyList<ServiceBusReceivedMessage> PublishedAbout(this TmsFixture tms, string number, string eventType) =>
+        [.. tms.Published.Where(m => m.Subject == eventType
+            && m.ApplicationProperties.TryGetValue("transportOrderNumber", out var about)
+            && about as string == number)];
+
     /// <summary>Reads the Transport Order until it has the rating result, as Rating runs a moment after acceptance.</summary>
     public static async Task<JsonNode> WaitForRatingResultAsync(this TmsFixture tms, string number, string ratingResult, CancellationToken cancellationToken)
     {

@@ -83,6 +83,30 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
             return false;
         }
 
+        ApplyRating(rateCard, ratedAt, CorrelationId);
+        return true;
+    }
+
+    /// <summary>
+    /// Rates a Transport Order whose Rating failed again, the same way as the first time: the Rate Card version valid on
+    /// the collection date, not today's. It is Rated, or Rating failed with the new reason, and the outcome event joins
+    /// the re-rate's own Message trail, as a Customer service action starts one. Returns false, changing nothing, unless
+    /// Rating failed: a frozen Freight Charge stays frozen, and a wrong one is corrected with a Credit note in the ERP.
+    /// </summary>
+    public bool ReRate(RateCard? rateCard, DateTimeOffset ratedAt, CorrelationId correlationId)
+    {
+        ArgumentNullException.ThrowIfNull(correlationId);
+        if (RatingResult != TransportOrders.RatingResult.RatingFailed)
+        {
+            return false;
+        }
+
+        ApplyRating(rateCard, ratedAt, correlationId);
+        return true;
+    }
+
+    private void ApplyRating(RateCard? rateCard, DateTimeOffset ratedAt, CorrelationId correlationId)
+    {
         var outcome = rateCard?.Rate(Details)
             ?? RatingOutcome.Failed(RatingFailureCode.NoRateCard, Invariant($"Shipper {ShipperId} has no Rate Card."));
         if (outcome.FreightCharge is { } freightCharge)
@@ -90,17 +114,17 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
             RatingResult = TransportOrders.RatingResult.Rated;
             FreightCharge = freightCharge;
             RatedAt = ratedAt;
-            RegisterDomainEvent(new TransportOrderRatedEvent(this));
+            RatingFailure = null;
+            RatingFailedAt = null;
+            RegisterDomainEvent(new TransportOrderRatedEvent(this, correlationId));
         }
         else
         {
             RatingResult = TransportOrders.RatingResult.RatingFailed;
             RatingFailure = outcome.Failure;
             RatingFailedAt = ratedAt;
-            RegisterDomainEvent(new TransportOrderRatingFailedEvent(this));
+            RegisterDomainEvent(new TransportOrderRatingFailedEvent(this, correlationId));
         }
-
-        return true;
     }
 
     public static TransportOrder Accept(

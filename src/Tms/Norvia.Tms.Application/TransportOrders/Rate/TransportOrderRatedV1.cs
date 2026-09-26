@@ -21,9 +21,11 @@ public sealed record TransportOrderRatedV1(
 
     protected override string TopicName => Topics.TransportOrderEvents;
 
-    public static TransportOrderRatedV1 From(TransportOrder order)
+    /// <param name="correlationId">The Message trail the rating belongs to: the intake's, or a re-rate's own.</param>
+    public static TransportOrderRatedV1 From(TransportOrder order, CorrelationId correlationId)
     {
         ArgumentNullException.ThrowIfNull(order);
+        ArgumentNullException.ThrowIfNull(correlationId);
         if (order is not { Number: { } number, FreightCharge: { } freightCharge, RatedAt: { } ratedAt })
         {
             throw new ArgumentException("Only a Rated Transport Order has a Freight Charge.", nameof(order));
@@ -32,7 +34,7 @@ public sealed record TransportOrderRatedV1(
         return new(
             Guid.CreateVersion7(),
             ratedAt,
-            order.CorrelationId.Value,
+            correlationId.Value,
             number.Value,
             order.ShipperId.Value,
             FreightChargeView.From(freightCharge)!);

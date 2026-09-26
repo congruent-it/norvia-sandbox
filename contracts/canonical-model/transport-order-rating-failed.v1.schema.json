@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://norvia.example/canonical-model/transport-order-rating-failed.v1.schema.json",
   "title": "TransportOrderRatingFailed",
-  "description": "The TMS couldn't rate an accepted Transport Order from its Shipper's Rate Card (Canonical Model event, version 1). The Transport Order stays Accepted and can be planned; Customer service can re-rate it. Published on the Transport Order events topic, under the correlation ID of the Transport Order's intake.",
+  "description": "The TMS couldn't rate an accepted Transport Order from its Shipper's Rate Card (Canonical Model event, version 1). The Transport Order stays Accepted and can be planned; Customer service can re-rate it. Published on the Transport Order events topic, under the correlation ID of the Transport Order's intake, or of the re-rate that failed again.",
   "type": "object",
   "additionalProperties": false,
   "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "transportOrderNumber", "shipperId", "ratingFailure"],

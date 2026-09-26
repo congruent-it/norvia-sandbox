@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.Claims;
 using Ardalis.Result;
 using Mediator;
@@ -10,6 +11,8 @@ using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.GetById;
 using Norvia.Tms.Application.TransportOrders.GetByNumber;
 using Norvia.Tms.Application.TransportOrders.List;
+using Norvia.Tms.Application.TransportOrders.Rate;
+using Norvia.Tms.Application.TransportOrders.RatingExceptions;
 using Norvia.Tms.Application.TransportOrders.Submit;
 using Norvia.Tms.Domain.TransportOrders;
 
@@ -52,6 +55,23 @@ public static class TransportOrderEndpoints
 
         queries.MapGet("/", ListAsync)
             .WithName("ListTransportOrders");
+
+        queries.MapGet("/rating-exceptions", ListRatingExceptionsAsync)
+            .WithName("ListRatingExceptions")
+            .WithSummary("List the rating exceptions: every Transport Order whose Rating failed, with its failure code and message.");
+
+        // Customer service re-rates from the TMS UI, so the re-rate takes the same authorization as the queries: any
+        // caller with a TMS token, until the TMS UI calls with a role of its own.
+        transportOrders.MapPost("/{transportOrderNumber}/re-rate", ReRateAsync)
+            .WithName("ReRateTransportOrder")
+            .RequireAuthorization()
+            .WithMetadata(new TrackedFlow(Flows.TransportOrderRating))
+            .WithSummary("Re-rate a Transport Order whose Rating failed, typically after its Rate Card was corrected.")
+            .WithDescription(
+                "Rates the order again with the Rate Card version valid on its collection date, and publishes TransportOrderRated or, "
+                + "when it fails again, another TransportOrderRatingFailed. An order that isn't Rating failed is refused with a 409 and "
+                + "left as it is: a Rated order's Freight Charge stays frozen. The re-rate starts a Message trail of its own: its "
+                + $"events carry the {CorrelationIdHeader} sent, or one the TMS creates and returns in that header.");
 
         return app;
     }
@@ -122,4 +142,43 @@ public static class TransportOrderEndpoints
         IMediator mediator,
         CancellationToken cancellationToken) =>
         TypedResults.Ok(await mediator.Send(new ListTransportOrdersQuery(status), cancellationToken));
+
+    private static async Task<Ok<IReadOnlyList<RatingExceptionSummary>>> ListRatingExceptionsAsync(
+        IMediator mediator,
+        CancellationToken cancellationToken) =>
+        TypedResults.Ok(await mediator.Send(new ListRatingExceptionsQuery(), cancellationToken));
+
+    private static async Task<Results<Ok<RateTransportOrderResult>, ProblemHttpResult>> ReRateAsync(
+        string transportOrderNumber,
+        [FromHeader(Name = CorrelationIdHeader)] string? correlationId,
+        HttpContext context,
+        ILoggerFactory loggers,
+        IMediator mediator,
+        CancellationToken cancellationToken)
+    {
+        // A Customer service action starts a new Message trail (coding guidelines §7), not the intake's.
+        correlationId = string.IsNullOrWhiteSpace(correlationId) ? Guid.NewGuid().ToString() : correlationId;
+        context.Response.Headers[CorrelationIdHeader] = correlationId;
+        var trail = new Dictionary<string, object?>
+        {
+            [TrackingKeys.CorrelationId] = correlationId,
+            [TrackingKeys.TransportOrderNumber] = transportOrderNumber,
+        };
+        foreach (var (key, value) in trail)
+        {
+            Activity.Current?.SetTag(key, value);
+        }
+
+        using var scope = loggers.CreateLogger(typeof(TransportOrderEndpoints)).BeginScope(trail);
+        var result = await mediator.Send(new ReRateTransportOrderCommand(transportOrderNumber, correlationId), cancellationToken);
+        return result.Status switch
+        {
+            ResultStatus.Ok => TypedResults.Ok(result.Value),
+            ResultStatus.NotFound => TypedResults.Problem(statusCode: StatusCodes.Status404NotFound, title: $"Transport Order {transportOrderNumber} not found."),
+            _ => TypedResults.Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "The Transport Order can't be re-rated.",
+                detail: string.Join(" ", result.Errors)),
+        };
+    }
 }

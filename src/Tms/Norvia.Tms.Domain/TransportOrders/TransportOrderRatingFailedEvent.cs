@@ -2,7 +2,12 @@ using Ardalis.SharedKernel;
 
 namespace Norvia.Tms.Domain.TransportOrders;
 
-public sealed class TransportOrderRatingFailedEvent(TransportOrder transportOrder) : DomainEventBase
+/// <param name="correlationId">
+/// The Message trail the rating belongs to: the intake's for the first rating, a re-rate's own for a re-rate.
+/// </param>
+public sealed class TransportOrderRatingFailedEvent(TransportOrder transportOrder, CorrelationId correlationId) : DomainEventBase
 {
     public TransportOrder TransportOrder { get; } = transportOrder;
+
+    public CorrelationId CorrelationId { get; } = correlationId;
 }

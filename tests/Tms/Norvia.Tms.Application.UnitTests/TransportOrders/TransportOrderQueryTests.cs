@@ -7,6 +7,7 @@ using Norvia.Tms.Application.TransportOrders.GetById;
 using Norvia.Tms.Application.TransportOrders.GetByNumber;
 using Norvia.Tms.Application.TransportOrders.GetRejectedBooking;
 using Norvia.Tms.Application.TransportOrders.List;
+using Norvia.Tms.Application.TransportOrders.RatingExceptions;
 using Norvia.Tms.Domain.Shippers;
 using Norvia.Tms.Domain.TransportOrders;
 using NSubstitute;
@@ -151,6 +152,25 @@ public sealed class TransportOrderQueryTests
         var result = await new GetTransportOrderByIdHandler(_repository, _shippers).Handle(new GetTransportOrderByIdQuery(Guid.NewGuid()), CancellationToken.None);
 
         result.Status.Should().Be(ResultStatus.NotFound);
+    }
+
+    [Fact]
+    public async Task ListRatingExceptions_RatingFailedOrders_ReturnsThemWithTheirFailure()
+    {
+        var failed = Samples.RatingFailedOrder(sequence: 4);
+        _repository.ListAsync(Arg.Any<TransportOrdersRatingFailedSpec>(), Arg.Any<CancellationToken>()).Returns([failed]);
+
+        var exceptions = await new ListRatingExceptionsHandler(_repository, _shippers).Handle(new ListRatingExceptionsQuery(), CancellationToken.None);
+
+        exceptions.Should().ContainSingle().Which.Should().BeEquivalentTo(new RatingExceptionSummary(
+            failed.Id.Value,
+            "TO-0000004",
+            new ShipperView("SHP-0001", "Brouwer Dranken"),
+            "BD-2026-0001",
+            Samples.Now.AddDays(1),
+            Samples.Now,
+            new RatingFailureView("NoRateCard", "Shipper SHP-0001 has no Rate Card."),
+            Samples.Now.AddSeconds(2)));
     }
 
     [Fact]
