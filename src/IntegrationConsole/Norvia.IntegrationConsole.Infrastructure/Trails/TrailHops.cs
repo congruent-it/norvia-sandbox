@@ -32,7 +32,7 @@ internal static class TrailHops
         for (var index = 0; index < records.Count; index++)
         {
             var record = records[index];
-            if (HopCauses.Of(string.Empty, record.ParentId, hopIds, ParentOf) is { } above)
+            if (HopCauses.NearestHopAbove(record.ParentId, hopIds, ParentOf) is { } above)
             {
                 byId[above].Rows.Add(record);
             }
@@ -63,7 +63,7 @@ internal static class TrailHops
     {
         public RecordedHop ToRecorded(string? causedBy)
         {
-            var (outcome, failureCode) = HopOutcomes.Worst(Rows.Select(row => (row.Outcome, row.FailureCode)));
+            var (outcome, failureCode) = HopOutcomes.Last(Rows.Select(row => (row.Start, row.Outcome, row.FailureCode)));
             return new RecordedHop(
                 Id,
                 causedBy,

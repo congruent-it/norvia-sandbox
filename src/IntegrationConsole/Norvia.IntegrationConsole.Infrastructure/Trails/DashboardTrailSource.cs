@@ -28,15 +28,6 @@ internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTr
     private const int ServerSpan = 2;
     private const int ConsumerSpan = 5;
 
-    private static readonly (string Key, BusinessKeyKind Kind)[] BusinessKeys =
-    [
-        ("transportOrderNumber", BusinessKeyKind.TransportOrderNumber),
-        ("shipmentNumber", BusinessKeyKind.ShipmentNumber),
-        ("carrierBookingNumber", BusinessKeyKind.CarrierBookingNumber),
-        ("tripNumber", BusinessKeyKind.TripNumber),
-        ("sourceMessageId", BusinessKeyKind.SourceMessageId),
-    ];
-
     public async Task<IReadOnlyList<FoundTrail>> SearchAsync(TrailSearch search, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(search);
@@ -106,7 +97,7 @@ internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTr
 
     private static RecordedHop Hop(string id, List<TrackedRecord> records, Span? span, string? causedBy)
     {
-        var (outcome, failureCode) = HopOutcomes.Worst(records.Select(record => (record.Keys.GetValueOrDefault("outcome"), record.Keys.GetValueOrDefault("failureCode"))));
+        var (outcome, failureCode) = HopOutcomes.Last(records.Select(record => ((DateTimeOffset?)record.Time, record.Keys.GetValueOrDefault("outcome"), record.Keys.GetValueOrDefault("failureCode"))));
         return new RecordedHop(
             id,
             causedBy,
@@ -144,7 +135,7 @@ internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTr
     }
 
     private static BusinessKey[] BusinessKeysOf(IEnumerable<TrackedRecord> records) =>
-        [.. BusinessKeys.SelectMany(key => Distinct(records, key.Key).Select(value => new BusinessKey(key.Kind, value)))];
+        [.. TrackedBusinessKeys.All.SelectMany(key => Distinct(records, key.Key).Select(value => new BusinessKey(key.Kind, value)))];
 
     private static string[] Distinct(IEnumerable<TrackedRecord> hops, string key) =>
         [.. hops.Select(hop => hop.Keys.GetValueOrDefault(key)).OfType<string>().Distinct(StringComparer.Ordinal)];
@@ -254,11 +245,11 @@ internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTr
     private sealed record TrackedRecord(DateTimeOffset Time, string CorrelationId, string Resource, string TraceId, string SpanId, Dictionary<string, string> Keys)
     {
         private static readonly string[] TrackedKeys =
-            ["correlationId", "flow", "outcome", "failureCode", .. BusinessKeys.Select(key => key.Key)];
+            ["correlationId", "flow", "outcome", "failureCode", .. TrackedBusinessKeys.All.Select(key => key.Key)];
 
         public bool Carries(string key) =>
             string.Equals(CorrelationId, key, StringComparison.OrdinalIgnoreCase)
-            || BusinessKeys.Any(business => string.Equals(Keys.GetValueOrDefault(business.Key), key, StringComparison.OrdinalIgnoreCase));
+            || TrackedBusinessKeys.All.Any(business => string.Equals(Keys.GetValueOrDefault(business.Key), key, StringComparison.OrdinalIgnoreCase));
 
         // Only the attributes are read: the body is the formatted message, which is no key.
         public static TrackedRecord? From(JsonElement record, string resource)

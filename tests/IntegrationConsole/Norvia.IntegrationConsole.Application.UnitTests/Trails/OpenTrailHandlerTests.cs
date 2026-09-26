@@ -68,6 +68,20 @@ public sealed class OpenTrailHandlerTests
     }
 
     [Fact]
+    public async Task Handle_ForAChainOfCalls_KeepsItTogether_BeforeALaterUnrelatedHop()
+    {
+        // Grouped under the hop that caused it: a hop that started earlier, but not from the chain, waits for the chain.
+        Record(
+            Hop("tms-call", secondsAgo: 10, causedBy: "apim-call"),
+            Hop("apim-call", secondsAgo: 30),
+            Hop("unrelated", secondsAgo: 20));
+
+        var trail = await OpenAsync();
+
+        trail.Hops.Select(hop => (hop.Name, hop.Depth)).Should().Equal(("apim-call", 0), ("tms-call", 0), ("unrelated", 0));
+    }
+
+    [Fact]
     public async Task Handle_ForHopsThatClaimToCauseEachOther_ShowsEachOnce()
     {
         // Telemetry is not to be trusted with a cycle, but the trail must still show everything recorded.

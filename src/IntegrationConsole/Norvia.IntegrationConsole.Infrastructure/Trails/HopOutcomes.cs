@@ -6,14 +6,13 @@ namespace Norvia.IntegrationConsole.Infrastructure.Trails;
 internal static class HopOutcomes
 {
     /// <summary>
-    /// The worst outcome a hop recorded, with the failure code recorded alongside it: a hop that failed after it was
-    /// refused failed, whatever it logged last. Outcomes outside the tracking contract are left out.
+    /// The outcome a hop ended with, with the failure code recorded alongside it: a call that was retried and then got
+    /// through succeeded. Outcomes outside the tracking contract are left out.
     /// </summary>
-    public static (Outcome? Outcome, string? FailureCode) Worst(IEnumerable<(string? Outcome, string? FailureCode)> recorded) =>
-        recorded.Select(record => (Outcome: record.Outcome is { } outcome ? FoundTrails.OutcomeOf(outcome) : null, record.FailureCode))
+    public static (Outcome? Outcome, string? FailureCode) Last(IEnumerable<(DateTimeOffset? Time, string? Outcome, string? FailureCode)> recorded) =>
+        recorded.Select(record => (record.Time, Outcome: record.Outcome is { } outcome ? FoundTrails.OutcomeOf(outcome) : null, record.FailureCode))
             .Where(record => record.Outcome is not null)
-            .OrderByDescending(record => record.Outcome)
-            .ThenByDescending(record => !string.IsNullOrEmpty(record.FailureCode))
+            .OrderByDescending(record => record.Time)
             .Select(record => (record.Outcome, string.IsNullOrEmpty(record.FailureCode) ? null : record.FailureCode))
             .FirstOrDefault();
 }

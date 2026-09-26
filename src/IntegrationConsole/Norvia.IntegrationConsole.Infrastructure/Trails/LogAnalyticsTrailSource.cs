@@ -13,15 +13,6 @@ namespace Norvia.IntegrationConsole.Infrastructure.Trails;
 /// </summary>
 internal sealed class LogAnalyticsTrailSource(LogsQueryClient client, IOptions<TrailSourceOptions> options) : ITrailSource
 {
-    private static readonly (string Column, BusinessKeyKind Kind)[] BusinessKeyColumns =
-    [
-        ("transportOrderNumbers", BusinessKeyKind.TransportOrderNumber),
-        ("shipmentNumbers", BusinessKeyKind.ShipmentNumber),
-        ("carrierBookingNumbers", BusinessKeyKind.CarrierBookingNumber),
-        ("tripNumbers", BusinessKeyKind.TripNumber),
-        ("sourceMessageIds", BusinessKeyKind.SourceMessageId),
-    ];
-
     public async Task<IReadOnlyList<FoundTrail>> SearchAsync(TrailSearch search, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(search);
@@ -51,8 +42,8 @@ internal sealed class LogAnalyticsTrailSource(LogsQueryClient client, IOptions<T
     }
 
     private string WorkspaceId() =>
-        options.Value.LogAnalyticsWorkspaceId is { Length: > 0 } workspaceId && !string.IsNullOrWhiteSpace(workspaceId)
-            ? workspaceId
+        !string.IsNullOrWhiteSpace(options.Value.LogAnalyticsWorkspaceId)
+            ? options.Value.LogAnalyticsWorkspaceId
             : throw new InvalidOperationException(
                 $"The console isn't connected to an estate: {TrailSourceOptions.SectionName}:{nameof(TrailSourceOptions.LogAnalyticsWorkspaceId)} is not set.");
 
@@ -62,9 +53,9 @@ internal sealed class LogAnalyticsTrailSource(LogsQueryClient client, IOptions<T
         row.GetDateTimeOffset("firstSeen") ?? default,
         row.GetDateTimeOffset("lastSeen") ?? default,
         [.. Strings(row, "outcomes").Select(FoundTrails.OutcomeOf).OfType<Outcome>()],
-        [.. BusinessKeyColumns.SelectMany(key => Strings(row, key.Column).Select(value => new BusinessKey(key.Kind, value)))]);
+        [.. TrackedBusinessKeys.All.SelectMany(key => Strings(row, $"{key.Key}s").Select(value => new BusinessKey(key.Kind, value)))]);
 
-    // The query returns each set as a JSON array in a string column.
+    // The query returns each set as a JSON array in a string column, named after its key in the plural.
     private static string[] Strings(LogsTableRow row, string column) =>
         row.GetString(column) is { Length: > 0 } json ? JsonSerializer.Deserialize<string[]>(json) ?? [] : [];
 }

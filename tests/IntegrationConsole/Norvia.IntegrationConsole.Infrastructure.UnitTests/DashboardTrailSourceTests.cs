@@ -208,17 +208,31 @@ public sealed class DashboardTrailSourceTests : IDisposable
     }
 
     [Fact]
-    public async Task HopsAsync_AHopRecordingSeveralOutcomes_HasItsWorst_WithThatOutcomesFailureCode()
+    public async Task HopsAsync_AHopRecordingSeveralOutcomes_HasTheOneItEndedWith()
     {
+        // The stand-in retried the TMS, which then took the booking: the hop succeeded.
         _dashboard
             .AddSpan("partner-api", Trace, "a1a1a1a1a1a1a1a1", null, "POST /partner/v1/transport-orders", Server, Now.AddSeconds(-10), Now.AddSeconds(-9))
-            .Add("partner-api", Now.AddMilliseconds(-9800), new() { ["correlationId"] = Booked, ["outcome"] = "Refused", ["failureCode"] = "TransportOrderRejected" }, traceId: Trace, spanId: "a1a1a1a1a1a1a1a1")
-            .Add("partner-api", Now.AddMilliseconds(-9500), new() { ["correlationId"] = Booked, ["outcome"] = "Failed", ["failureCode"] = "TmsUnavailable" }, traceId: Trace, spanId: "a1a1a1a1a1a1a1a1")
-            .Add("partner-api", Now.AddMilliseconds(-9200), new() { ["correlationId"] = Booked, ["outcome"] = "Succeeded" }, traceId: Trace, spanId: "a1a1a1a1a1a1a1a1");
+            .Add("partner-api", Now.AddMilliseconds(-9200), new() { ["correlationId"] = Booked, ["outcome"] = "Succeeded" }, traceId: Trace, spanId: "a1a1a1a1a1a1a1a1")
+            .Add("partner-api", Now.AddMilliseconds(-9800), new() { ["correlationId"] = Booked, ["outcome"] = "Retrying", ["failureCode"] = "TmsUnavailable" }, traceId: Trace, spanId: "a1a1a1a1a1a1a1a1");
 
         var hops = await HopsAsync(Booked);
 
-        hops.Should().ContainSingle().Which.Should().BeEquivalentTo(new { Outcome = Outcome.Failed, FailureCode = "TmsUnavailable" });
+        hops.Should().ContainSingle().Which.Should().BeEquivalentTo(new { Outcome = Outcome.Succeeded, FailureCode = (string?)null });
+    }
+
+    [Fact]
+    public async Task HopsAsync_AHopThatEndedFailing_HasThatOutcome_WithItsFailureCode()
+    {
+        _dashboard
+            .AddSpan("partner-api", Trace, "a1a1a1a1a1a1a1a1", null, "POST /partner/v1/transport-orders", Server, Now.AddSeconds(-10), Now.AddSeconds(-9))
+            .Add("partner-api", Now.AddMilliseconds(-9800), new() { ["correlationId"] = Booked, ["outcome"] = "Retrying", ["failureCode"] = "TmsUnavailable" }, traceId: Trace, spanId: "a1a1a1a1a1a1a1a1")
+            .Add("partner-api", Now.AddMilliseconds(-9500), new() { ["correlationId"] = Booked, ["outcome"] = "Failed", ["failureCode"] = "TmsCallRefused" }, traceId: Trace, spanId: "a1a1a1a1a1a1a1a1")
+            .Add("partner-api", Now.AddMilliseconds(-9200), new() { ["correlationId"] = Booked, ["flow"] = "transport-order-intake" }, traceId: Trace, spanId: "a1a1a1a1a1a1a1a1");
+
+        var hops = await HopsAsync(Booked);
+
+        hops.Should().ContainSingle().Which.Should().BeEquivalentTo(new { Outcome = Outcome.Failed, FailureCode = "TmsCallRefused" });
     }
 
     [Fact]

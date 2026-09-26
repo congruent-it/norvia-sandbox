@@ -11,10 +11,25 @@ internal static class HopCauses
     /// <param name="parent">Its own parent ID in the telemetry, if it has one.</param>
     /// <param name="hops">The IDs of every hop on the trail.</param>
     /// <param name="parentOf">The parent ID of anything else the telemetry recorded, or null when it has none or isn't known.</param>
-    public static string? Of(string hop, string? parent, IReadOnlySet<string> hops, Func<string, string?> parentOf)
+    public static string? Of(string hop, string? parent, IReadOnlySet<string> hops, Func<string, string?> parentOf) =>
+        NearestHopAbove(parent, hops, parentOf, hop);
+
+    /// <summary>
+    /// The nearest hop at or above <paramref name="parent"/>, such as the hop a log record was written in, or null when
+    /// there is none.
+    /// </summary>
+    public static string? NearestHopAbove(string? parent, IReadOnlySet<string> hops, Func<string, string?> parentOf) =>
+        NearestHopAbove(parent, hops, parentOf, below: null);
+
+    private static string? NearestHopAbove(string? parent, IReadOnlySet<string> hops, Func<string, string?> parentOf, string? below)
     {
-        // Telemetry is not to be trusted with a cycle, so the walk stops after as many steps as could ever be needed.
-        var seen = new HashSet<string>(StringComparer.Ordinal) { hop };
+        // Telemetry is not to be trusted with a cycle, so the walk stops at an ID it has already passed.
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        if (below is not null)
+        {
+            seen.Add(below);
+        }
+
         for (var id = parent; !string.IsNullOrEmpty(id) && seen.Add(id); id = parentOf(id))
         {
             if (hops.Contains(id))

@@ -110,7 +110,24 @@ public sealed class LogAnalyticsTrailSourceHopsTests
     }
 
     [Fact]
-    public async Task HopsAsync_AFailedRun_HasItsWorstOutcome_WithItsFailureCode()
+    public async Task HopsAsync_ARunThatFailedAnAttemptThenSucceeded_HasTheOutcomeItEndedWith()
+    {
+        // Rows come back in no particular order; the run's retried call to the TMS first failed, then got through.
+        Answer(
+            Row("run", "submit-retried", "trigger", Now.AddSeconds(-4), 500, "Submit_to_the_TMS", "logic-intake", runId: "0858", workflow: "transport-order-intake",
+                category: "Workflow.Operations.Actions", outcome: "Succeeded"),
+            Row("run", "trigger", null, Now.AddSeconds(-10), 10, "When_a_Shipper_books", "logic-intake", runId: "0858", workflow: "transport-order-intake",
+                category: "Workflow.Operations.Triggers"),
+            Row("run", "submit", "trigger", Now.AddSeconds(-9), 500, "Submit_to_the_TMS", "logic-intake", runId: "0858", workflow: "transport-order-intake",
+                category: "Workflow.Operations.Actions", outcome: "Failed", failureCode: "TmsUnavailable"));
+
+        var hops = await HopsAsync(CorrelationId);
+
+        hops.Should().ContainSingle().Which.Should().BeEquivalentTo(new { Outcome = Outcome.Succeeded, FailureCode = (string?)null });
+    }
+
+    [Fact]
+    public async Task HopsAsync_AFailedRun_HasThatOutcome_WithItsFailureCode()
     {
         Answer(
             Row("run", "trigger", null, Now.AddSeconds(-10), 10, "When_a_Shipper_books", "logic-intake", runId: "0858", workflow: "transport-order-intake",
