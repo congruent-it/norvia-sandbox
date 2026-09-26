@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Norvia.IntegrationConsole.Infrastructure.Trails;
 
 /// <summary>
@@ -9,6 +11,7 @@ public sealed class DashboardTrailSourceOptions
     public const string SectionName = "LocalTelemetry";
 
     /// <summary>The dashboard's own address, whose telemetry API is under <c>/api/telemetry</c>.</summary>
+    [Required]
     public Uri? DashboardUrl { get; set; }
 
     /// <summary>The telemetry API's key, the AppHost's <c>AppHost:DashboardApiKey</c>; empty when the API is unsecured.</summary>

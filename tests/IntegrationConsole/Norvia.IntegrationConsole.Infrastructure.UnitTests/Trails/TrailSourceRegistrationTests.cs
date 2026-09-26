@@ -7,6 +7,11 @@ using Norvia.IntegrationConsole.Infrastructure.Trails;
 
 namespace Norvia.IntegrationConsole.Infrastructure.UnitTests.Trails;
 
+/// <summary>
+/// The AppHost chooses where the console searches: the Aspire dashboard locally, the estate's Log Analytics workspace
+/// in Azure or when a developer points the console at a deployed estate (ADR 0027). Settings that can't be right stop
+/// the console at startup (coding guidelines §8).
+/// </summary>
 public sealed class TrailSourceRegistrationTests
 {
     [Fact]
@@ -24,8 +29,49 @@ public sealed class TrailSourceRegistrationTests
         // Locally the console runs before a developer points it at a deployed estate; search then says so.
         using var services = ServicesWith([]);
 
+        var start = () => Start(services);
+
+        start.Should().NotThrow();
         services.GetRequiredService<ITrailSource>().Should().NotBeNull();
     }
+
+    [Fact]
+    public void AddIntegrationConsoleInfrastructure_WithAWorkspaceIdThatIsNoGuid_DoesNotStart()
+    {
+        using var services = ServicesWith(new() { ["Estate:LogAnalyticsWorkspaceId"] = "norvia-logs" });
+
+        var start = () => Start(services);
+
+        start.Should().Throw<OptionsValidationException>().WithMessage("*Estate:LogAnalyticsWorkspaceId*");
+    }
+
+    [Fact]
+    public void AddIntegrationConsoleInfrastructure_GivenTheDashboard_SearchesTheDashboard()
+    {
+        using var services = ServicesWith(new()
+        {
+            ["LocalTelemetry:DashboardUrl"] = "http://localhost:15180",
+            ["LocalTelemetry:ApiKey"] = "dashboard-api-key",
+        });
+
+        var start = () => Start(services);
+
+        start.Should().NotThrow();
+        services.GetRequiredService<ITrailSource>().Should().BeOfType<DashboardTrailSource>();
+    }
+
+    [Fact]
+    public void AddIntegrationConsoleInfrastructure_GivenADashboardUrlThatIsNotAbsolute_DoesNotStart()
+    {
+        using var services = ServicesWith(new() { ["LocalTelemetry:DashboardUrl"] = "localhost-15180" });
+
+        var start = () => Start(services);
+
+        start.Should().Throw<OptionsValidationException>().WithMessage("*LocalTelemetry:DashboardUrl*");
+    }
+
+    // What the host runs before it starts: every ValidateOnStart registration.
+    private static void Start(ServiceProvider services) => services.GetRequiredService<IStartupValidator>().Validate();
 
     private static ServiceProvider ServicesWith(Dictionary<string, string?> settings)
     {

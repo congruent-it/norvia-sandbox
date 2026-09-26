@@ -19,7 +19,7 @@ internal static class TmsCallTracking
         var keys = OutcomeOf(tmsStatusCode);
         if (TransportOrderNumberIn(tmsResponse) is { Length: > 0 } transportOrderNumber)
         {
-            keys["transportOrderNumber"] = transportOrderNumber;
+            keys[TrackingKeys.TransportOrderNumber] = transportOrderNumber;
         }
 
         return keys;
@@ -27,17 +27,17 @@ internal static class TmsCallTracking
 
     private static Dictionary<string, object?> OutcomeOf(int tmsStatusCode) => tmsStatusCode switch
     {
-        200 or 201 => new() { ["outcome"] = "Succeeded" },
-        422 => new() { ["outcome"] = "Refused", ["failureCode"] = "TransportOrderRejected" },
-        >= 400 and < 500 and not 408 and not 429 => new() { ["outcome"] = "Failed", ["failureCode"] = "TmsCallRefused" },
-        _ => new() { ["outcome"] = "Failed", ["failureCode"] = "TmsUnavailable" },
+        200 or 201 => TrackingKeys.OutcomeOf(TrackingKeys.Succeeded),
+        422 => TrackingKeys.OutcomeOf(TrackingKeys.Refused, "TransportOrderRejected"),
+        >= 400 and < 500 and not 408 and not 429 => TrackingKeys.OutcomeOf(TrackingKeys.Failed, "TmsCallRefused"),
+        _ => TrackingKeys.OutcomeOf(TrackingKeys.Failed, "TmsUnavailable"),
     };
 
     private static string? TransportOrderNumberIn(string tmsResponse)
     {
         try
         {
-            return (JsonNode.Parse(tmsResponse) as JsonObject)?["transportOrderNumber"] is JsonValue number
+            return (JsonNode.Parse(tmsResponse) as JsonObject)?[TrackingKeys.TransportOrderNumber] is JsonValue number
                 && number.TryGetValue<string>(out var text) ? text : null;
         }
         catch (JsonException)

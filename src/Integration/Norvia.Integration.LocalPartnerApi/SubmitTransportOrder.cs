@@ -10,8 +10,6 @@ namespace Norvia.Integration.LocalPartnerApi;
 /// </summary>
 internal static partial class SubmitTransportOrder
 {
-    private const string Flow = "transport-order-intake";
-
     public static IEndpointRouteBuilder MapSubmitTransportOrder(this IEndpointRouteBuilder endpoints)
     {
         // Authorization is the edge's own checks, in API Management's order, not the ASP.NET Core pipeline's.
@@ -30,20 +28,20 @@ internal static partial class SubmitTransportOrder
         var correlationId = Guid.NewGuid().ToString();
         context.Response.Headers["X-Correlation-ID"] = correlationId;
         var logger = loggers.CreateLogger(typeof(SubmitTransportOrder));
-        using var trail = logger.BeginScope(new Dictionary<string, object?> { ["correlationId"] = correlationId, ["flow"] = Flow });
+        using var trail = logger.BeginScope(new Dictionary<string, object?> { [TrackingKeys.CorrelationId] = correlationId, [TrackingKeys.Flow] = TrackingKeys.TransportOrderIntake });
 
         var check = await edge.CheckAsync(context.Request, context.RequestAborted);
         if (check.ShipperId is not { } shipperId)
         {
             // As the policy's trace metadata records a refusal.
-            using var refused = logger.BeginScope(new Dictionary<string, object?> { ["outcome"] = "Refused", ["failureCode"] = check.FailureCode });
+            using var refused = logger.BeginScope(TrackingKeys.OutcomeOf(TrackingKeys.Refused, check.FailureCode));
             LogRefused(logger, check.RefusalStatus, check.FailureCode);
             return check.RefusalStatus == StatusCodes.Status401Unauthorized
                 ? Answer(check.RefusalStatus, new JsonObject { ["statusCode"] = check.RefusalStatus, ["message"] = check.RefusalText })
                 : Answer(check.RefusalStatus, new JsonObject { ["messageId"] = correlationId, ["text"] = check.RefusalText });
         }
 
-        using var party = logger.BeginScope(new Dictionary<string, object?> { ["partyId"] = shipperId });
+        using var party = logger.BeginScope(new Dictionary<string, object?> { [TrackingKeys.PartyId] = shipperId });
         using var reader = new StreamReader(context.Request.Body);
         var booking = await reader.ReadToEndAsync(context.RequestAborted);
 
