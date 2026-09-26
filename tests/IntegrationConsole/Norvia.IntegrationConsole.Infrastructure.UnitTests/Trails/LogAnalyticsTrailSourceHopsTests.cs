@@ -40,6 +40,8 @@ public sealed class LogAnalyticsTrailSourceHopsTests
         LogsQueryModelFactory.LogsTableColumn("sourceMessageId", LogsColumnType.String),
     ];
 
+    private static readonly string[] FrameworkCategories = ["Azure.", "Microsoft.", "System."];
+
     private readonly LogsQueryClient _client = Substitute.For<LogsQueryClient>();
 
     public LogAnalyticsTrailSourceHopsTests() => Answer();
@@ -107,6 +109,38 @@ public sealed class LogAnalyticsTrailSourceHopsTests
         hops.Should().HaveCount(2).And.OnlyContain(hop => hop.Name == "tms-api" && hop.Duration == null && hop.CausedBy == null);
         hops.Select(hop => hop.Time).Should().BeEquivalentTo([Now.AddSeconds(-5), Now.AddSeconds(-4)]);
         hops.Select(hop => hop.Id).Should().OnlyHaveUniqueItems();
+    }
+
+    [Fact]
+    public async Task HopsAsync_RecordsUnderOneParentOutsideAnyHop_AreOneHop_AtTheFirstOnesTime()
+    {
+        // The outbox's send is no call on the trail, yet everything logged under it is one thing that happened.
+        Answer(
+            Row("record", null, "outbox-send", Now.AddSeconds(-4), null, null, "tms-api", flow: "transport-order-intake", outcome: "Succeeded"),
+            Row("record", null, "outbox-send", Now.AddSeconds(-5), null, null, "tms-api", flow: "transport-order-intake", transportOrderNumber: "TO-0000008"),
+            Row("record", null, "outbox-send", Now.AddSeconds(-3), null, null, "partner-portal-web", flow: "transport-order-intake"));
+
+        var hops = await HopsAsync(CorrelationId);
+
+        hops.Should().HaveCount(2);
+        var tms = hops.Should().ContainSingle(hop => hop.Name == "tms-api").Subject;
+        tms.Time.Should().Be(Now.AddSeconds(-5));
+        tms.Outcome.Should().Be(Outcome.Succeeded);
+        tms.BusinessKeys.Should().Equal(new BusinessKey(BusinessKeyKind.TransportOrderNumber, "TO-0000008"));
+    }
+
+    [Fact]
+    public async Task HopsAsync_QueriesNoRecordAFrameworkWrote()
+    {
+        // The Azure SDK logs in the application's logging scope, so its records carry the correlation ID too.
+        await HopsAsync(CorrelationId);
+
+        await _client.Received(1).QueryWorkspaceAsync(
+            WorkspaceId,
+            Arg.Is<string>(query => FrameworkCategories.All(prefix => query.Contains($"CategoryName) startswith \"{prefix}\"", StringComparison.Ordinal))),
+            Arg.Any<LogsQueryTimeRange>(),
+            Arg.Any<LogsQueryOptions>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]

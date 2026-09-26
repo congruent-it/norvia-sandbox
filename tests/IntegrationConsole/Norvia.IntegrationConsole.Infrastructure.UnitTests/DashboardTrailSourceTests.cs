@@ -196,6 +196,23 @@ public sealed class DashboardTrailSourceTests : IDisposable
         hops.Select(hop => hop.Id).Should().OnlyHaveUniqueItems();
     }
 
+    [Theory]
+    [InlineData("Azure.Identity")]
+    [InlineData("Azure.Messaging.ServiceBus")]
+    [InlineData("Microsoft.EntityFrameworkCore.Database.Command")]
+    [InlineData("System.Net.Http.HttpClient.Default.LogicalHandler")]
+    public async Task HopsAsync_ARecordAFrameworkWroteInTheLoggingScope_IsNoHop(string category)
+    {
+        // The TMS's outbox publishes in the intake's logging scope, so the Azure SDK's logs carry its correlation ID too.
+        _dashboard
+            .Add("tms-api", Now.AddMinutes(-4), new() { ["correlationId"] = Booked, ["flow"] = "transport-order-intake" }, category: "Norvia.Tms.Infrastructure.Outbox.OutboxPublisher")
+            .Add("tms-api", Now.AddMinutes(-4).AddSeconds(1), new() { ["correlationId"] = Booked, ["flow"] = "transport-order-intake" }, category: category);
+
+        var hops = await HopsAsync(Booked);
+
+        hops.Should().ContainSingle().Which.Time.Should().Be(Now.AddMinutes(-4));
+    }
+
     [Fact]
     public async Task HopsAsync_ATraceTheDashboardNoLongerHolds_LeavesTheHopsAtTheirRecordsTimes()
     {

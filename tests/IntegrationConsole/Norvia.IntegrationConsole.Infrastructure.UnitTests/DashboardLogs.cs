@@ -14,7 +14,7 @@ public sealed class DashboardLogs : HttpMessageHandler
 {
     private const string TracesPath = "/api/telemetry/traces/";
 
-    private readonly Dictionary<string, List<JsonObject>> _recordsByResource = [];
+    private readonly Dictionary<string, List<(string Category, JsonObject Record)>> _recordsByResource = [];
     private readonly List<(string Resource, JsonObject Span)> _spans = [];
 
     public HttpStatusCode Status { get; set; } = HttpStatusCode.OK;
@@ -23,7 +23,8 @@ public sealed class DashboardLogs : HttpMessageHandler
 
     /// <summary>
     /// A log record of <paramref name="resource"/> at <paramref name="time"/>, with these logging-scope keys, written in
-    /// the span <paramref name="spanId"/> of trace <paramref name="traceId"/>, or outside any span when they're left out.
+    /// the span <paramref name="spanId"/> of trace <paramref name="traceId"/>, or outside any span when they're left out,
+    /// under the logging <paramref name="category"/>, which OTLP names the record's scope.
     /// </summary>
     public DashboardLogs Add(
         string resource,
@@ -31,7 +32,8 @@ public sealed class DashboardLogs : HttpMessageHandler
         Dictionary<string, string> keys,
         string body = "A log message",
         string traceId = "",
-        string spanId = "")
+        string spanId = "",
+        string category = "Norvia.Tms.Api")
     {
         var attributes = new JsonArray();
         foreach (var (key, value) in keys)
@@ -44,7 +46,7 @@ public sealed class DashboardLogs : HttpMessageHandler
             _recordsByResource[resource] = records = [];
         }
 
-        records.Add(new JsonObject
+        records.Add((category, new JsonObject
         {
             // As the dashboard sends it: OTLP JSON writes a 64-bit integer as a string.
             ["timeUnixNano"] = UnixNano(time),
@@ -54,7 +56,7 @@ public sealed class DashboardLogs : HttpMessageHandler
             ["attributes"] = attributes,
             ["traceId"] = traceId,
             ["spanId"] = spanId,
-        });
+        }));
         return this;
     }
 
@@ -107,14 +109,14 @@ public sealed class DashboardLogs : HttpMessageHandler
             resourceLogs.Add(new JsonObject
             {
                 ["resource"] = Resource(resource),
-                ["scopeLogs"] = new JsonArray
-                {
-                    new JsonObject
+                ["scopeLogs"] = new JsonArray(
+                [
+                    .. records.GroupBy(record => record.Category).Select(scope => new JsonObject
                     {
-                        ["scope"] = new JsonObject { ["name"] = "Norvia" },
-                        ["logRecords"] = new JsonArray([.. records.Select(record => record.DeepClone())]),
-                    },
-                },
+                        ["scope"] = new JsonObject { ["name"] = scope.Key },
+                        ["logRecords"] = new JsonArray([.. scope.Select(record => record.Record.DeepClone())]),
+                    }),
+                ]),
             });
         }
 

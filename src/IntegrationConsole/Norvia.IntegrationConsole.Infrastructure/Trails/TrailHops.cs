@@ -28,7 +28,10 @@ internal static class TrailHops
 
         var hopIds = hops.Select(hop => hop.Id).ToHashSet(StringComparer.Ordinal);
         var byId = hops.ToDictionary(hop => hop.Id, StringComparer.Ordinal);
+        // A record under no hop is a hop of its own, together with the records its application wrote under the same
+        // parent, such as everything logged while the TMS's outbox sent an event.
         var records = rows.Where(row => row.Kind == HopRow.Record).ToList();
+        var alone = new List<(string Id, HopRow Record)>();
         for (var index = 0; index < records.Count; index++)
         {
             var record = records[index];
@@ -38,9 +41,12 @@ internal static class TrailHops
             }
             else
             {
-                hops.Add(new Hop($"{record.Role}#{index}", null, record.Role ?? "unknown", record.Start, null, null, [record]));
+                alone.Add((record.ParentId is { } parent ? $"{record.Role}@{parent}" : $"{record.Role}#{index}", record));
             }
         }
+
+        hops.AddRange(alone.GroupBy(record => record.Id, record => record.Record, StringComparer.Ordinal)
+            .Select(together => new Hop(together.Key, null, together.First().Role ?? "unknown", together.Min(record => record.Start), null, null, [.. together])));
 
         return [.. hops.Select(hop => hop.ToRecorded(HopCauses.Of(hop.Id, hop.ParentId, hopIds, ParentOf)))];
     }

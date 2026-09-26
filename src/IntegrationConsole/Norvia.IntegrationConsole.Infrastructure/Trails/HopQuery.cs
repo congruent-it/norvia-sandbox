@@ -22,13 +22,15 @@ internal static class HopQuery
     public static string For(string correlationId) =>
         LogsQueryClient.CreateQuery($"let searched = {correlationId};") + "\n" + Body;
 
-    private const string Body = """
+    private static readonly string Body = $$"""
         // The term index narrows each table to the rows mentioning the correlation ID before any JSON is parsed.
         let requests = AppRequests
             | where Properties has searched
             | project TimeGenerated, source = "request", Id, ParentId, OperationId, Name, DurationMs, AppRoleName, Properties;
+        // An application's own records, not those a framework wrote in its logging scope.
         let traces = AppTraces
             | where Properties has searched
+            | where {{FrameworkLogs.NoneWrote("tostring(Properties.CategoryName)")}}
             | project TimeGenerated, source = "record", Id = "", ParentId, OperationId, Name = "", DurationMs = real(null), AppRoleName, Properties;
         let tracked = union requests, traces
             | extend tracked = parse_json(tostring(Properties.trackedProperties))
