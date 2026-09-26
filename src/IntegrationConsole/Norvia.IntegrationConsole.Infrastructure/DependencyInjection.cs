@@ -1,8 +1,11 @@
 using Azure.Core;
 using Azure.Identity;
+using Azure.Monitor.Query.Logs;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Norvia.IntegrationConsole.Application.Trails;
+using Norvia.IntegrationConsole.Infrastructure.Trails;
 
 namespace Norvia.IntegrationConsole.Infrastructure;
 
@@ -19,6 +22,12 @@ public static class DependencyInjection
         ArgumentNullException.ThrowIfNull(builder);
 
         builder.Services.AddSingleton(ConsoleCredential(builder.Configuration));
+
+        // Message trails come from the Log Analytics workspace behind the estate's Application Insights, read as the
+        // console's credential above.
+        builder.Services.AddOptions<TrailSourceOptions>().BindConfiguration(TrailSourceOptions.SectionName);
+        builder.Services.AddSingleton(services => new LogsQueryClient(services.GetRequiredService<TokenCredential>()));
+        builder.Services.AddSingleton<ITrailSource, LogAnalyticsTrailSource>();
 
         return builder;
     }

@@ -3,4 +3,9 @@
     No Domain project, repositories or specifications: the console has no aggregates and no database. This is the stated
     deviation from coding guidelines §1 (docs/operations/integration-console.md, ADR 0017).
   -->
+  <ItemGroup>
+    <PackageReference Include="Ardalis.Result" />
+    <PackageReference Include="Mediator.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+  </ItemGroup>
 </Project>

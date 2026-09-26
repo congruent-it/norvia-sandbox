@@ -50,6 +50,7 @@ module monitoring 'estate/monitoring.bicep' = {
     location: location
     tags: tags
     integrationRetentionDays: integrationRetentionDays
+    integrationConsolePrincipalId: identities.outputs.integrationConsolePrincipalId
   }
 }
 
@@ -110,6 +111,9 @@ module partnerApi 'estate/partner-api.bicep' = {
 // The hook stores each output as AZURE_<NAME>, which is where azd looks up the AppHost's Estate parameters.
 output ESTATE_SERVICE_BUS_NAMESPACE string = messaging.outputs.namespaceName
 output ESTATE_LOG_ANALYTICS_WORKSPACE string = monitoring.outputs.workspaceName
+output ESTATE_LOG_ANALYTICS_WORKSPACE_ID string = monitoring.outputs.workspaceId
+// The Integration console caps its searches at it: nothing older is kept.
+output ESTATE_INTEGRATION_RETENTION_DAYS string = string(integrationRetentionDays)
 output ESTATE_APPLICATION_INSIGHTS string = monitoring.outputs.applicationInsightsName
 output ESTATE_ENTRA_ISSUER string = identities.outputs.entraIssuer
 output ESTATE_ENTRA_TENANT_ID string = identities.outputs.entraTenantId

@@ -139,6 +139,14 @@ body .fluent-messagebar .fluent-messagebar-message {
     font-size: inherit;
 }
 
+/*
+ * Tailwind's preflight zeroes the padding of every element, the options' hosts included, which puts their text against
+ * the edge of the list and under the selected option's marker. This gives back Fluent's own inset.
+ */
+fluent-option {
+    padding-inline: 0.75rem;
+}
+
 #blazor-error-ui {
     display: none;
     position: fixed;

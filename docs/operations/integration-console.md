@@ -45,7 +45,7 @@ Search and the trail's outline come from Application Insights, so they can be a 
 
 - One search box that accepts a correlation ID, a Transport Order number, a Shipment number, a Carrier booking number, a Trip number or a source message ID (a Carrier's event ID or document ID, or a Driver app event ID).
 - A time range, the last 24 hours by default and at most the retention period (see [Retention](#retention)).
-- Results show one row per trail: correlation ID, the flows it went through, first and last seen, its worst outcome, and the business keys it carried. Trails with a failure come first.
+- Results show one row per trail: correlation ID, the flows it went through, first and last seen, its worst outcome, and the business keys it carried. Trails with a failure come first: a trail has a failure when a hop failed or was dead-lettered. A refusal is the answer the caller was meant to get, and a retry may still succeed, so neither counts.
 - Search results never show message bodies (see [Personal data](#personal-data)).
 
 ### Message trail

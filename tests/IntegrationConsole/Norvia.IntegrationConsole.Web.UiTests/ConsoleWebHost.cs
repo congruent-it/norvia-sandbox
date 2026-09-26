@@ -43,6 +43,11 @@ public sealed class ConsoleWebHost : WebApplicationFactory<Program>
         ArgumentNullException.ThrowIfNull(builder);
 
         builder.UseEnvironment("Test");
+        // Outside Development the host doesn't read the build's static web assets on its own, and interactive pages need
+        // the framework's script from them.
+        builder.UseStaticWebAssets();
+        // What the estate Bicep passes on as integrationRetentionDays.
+        builder.UseSetting("Estate:IntegrationRetentionDays", "90");
         builder.ConfigureServices(services =>
         {
             foreach (var (port, fake) in _ports)

@@ -34,6 +34,7 @@
     <Project Path="tests/Integration/Norvia.Integration.TransportOrderIntake.UnitTests/Norvia.Integration.TransportOrderIntake.UnitTests.csproj" />
   </Folder>
   <Folder Name="/tests/IntegrationConsole/">
+    <Project Path="tests/IntegrationConsole/Norvia.IntegrationConsole.Application.UnitTests/Norvia.IntegrationConsole.Application.UnitTests.csproj" />
     <Project Path="tests/IntegrationConsole/Norvia.IntegrationConsole.ArchitectureTests/Norvia.IntegrationConsole.ArchitectureTests.csproj" />
     <Project Path="tests/IntegrationConsole/Norvia.IntegrationConsole.Infrastructure.UnitTests/Norvia.IntegrationConsole.Infrastructure.UnitTests.csproj" />
     <Project Path="tests/IntegrationConsole/Norvia.IntegrationConsole.Web.UiTests/Norvia.IntegrationConsole.Web.UiTests.csproj" />
