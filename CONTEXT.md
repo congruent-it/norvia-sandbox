@@ -224,6 +224,18 @@ _Avoid_: pricing, costing
 The price Norvia charges a Shipper for one Transport Order, as calculated by Rating and broken into charge lines.
 _Avoid_: price, rate, cost, quote
 
+**Charge line**:
+One part of a Freight Charge, in EUR without VAT and rounded to cents: always a Freight line, plus a Minimum charge adjustment line when the Lane's minimum charge applies. The Freight Charge's total is the sum of its charge lines.
+_Avoid_: price line, surcharge (on its own)
+
+**Rating result**:
+Where a Transport Order stands commercially, separate from its status: Not yet rated, Rated, Rating failed or Not rated separately. Rated and Not rated separately are final. A Rejected booking has none.
+_Avoid_: rating status, price status
+
+**Not rated separately**:
+The Rating result of a Fulfilment Transport Order (WMS channel). It is billed through the Fulfilment Contract, so it gets no Freight Charge of its own.
+_Avoid_: unrated, exempt
+
 **Carrier Rate Card**:
 The part of Norvia's agreement with a Carrier that sets what Norvia pays the Carrier for transport, by Lane and weight. It has the same shape as a Rate Card. The ERP owns it.
 _Avoid_: buy rate, purchase tariff

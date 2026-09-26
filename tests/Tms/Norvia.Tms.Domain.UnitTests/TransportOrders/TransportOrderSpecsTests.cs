@@ -93,9 +93,19 @@ public sealed class TransportOrderSpecsTests
         var wms = TransportOrder.Accept(new ShipperId("SHP-0001"), TransportOrderTests.SampleDetails(), TransportOrderNumber.FromSequence(9), IntakeChannel.Wms, new CorrelationId("corr-9"), Morning);
         var orders = new[] { Accepted(1, Morning.AddHours(2)), Rejected(Morning), wms, Accepted(2, Morning), Accepted(3, Morning.AddHours(1)) };
 
-        var listed = new TransportOrdersNotYetRatedSpec(batchSize: 2).Evaluate(orders);
+        var listed = new TransportOrdersNotYetRatedSpec(skip: 0, batchSize: 2).Evaluate(orders);
 
         listed.Select(order => order.Number!.Value).Should().Equal("TO-0000002", "TO-0000003");
+    }
+
+    [Fact]
+    public void NotYetRated_Skipping_ListsTheBatchAfterTheOrdersSkipped()
+    {
+        var orders = new[] { Accepted(1, Morning.AddHours(2)), Accepted(2, Morning), Accepted(3, Morning.AddHours(1)) };
+
+        var listed = new TransportOrdersNotYetRatedSpec(skip: 1, batchSize: 1).Evaluate(orders);
+
+        listed.Select(order => order.Number!.Value).Should().Equal("TO-0000003");
     }
 
     [Fact]

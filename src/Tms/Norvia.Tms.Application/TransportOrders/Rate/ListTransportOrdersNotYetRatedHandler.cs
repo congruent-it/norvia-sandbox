@@ -11,7 +11,7 @@ public sealed class ListTransportOrdersNotYetRatedHandler(IReadRepository<Transp
     {
         ArgumentNullException.ThrowIfNull(query);
 
-        var orders = await repository.ListAsync(new TransportOrdersNotYetRatedSpec(query.BatchSize), cancellationToken);
+        var orders = await repository.ListAsync(new TransportOrdersNotYetRatedSpec(query.Skip, query.BatchSize), cancellationToken);
 
         // Only an Accepted Transport Order waits for Rating, and every one has a number.
         return [.. orders.Where(order => order.Number is not null).Select(order => new TransportOrderToRate(

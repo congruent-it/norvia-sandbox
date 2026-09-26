@@ -62,28 +62,39 @@ internal sealed partial class RatingWorker(
         base.Dispose();
     }
 
+    // Rated orders leave the Not yet rated list as the sweep goes, so each batch passes over only the orders the sweep
+    // tried and couldn't rate. However many of those wait, every order behind them is still reached.
     private async Task SweepAsync(CancellationToken cancellationToken)
     {
-        IReadOnlyList<TransportOrderToRate> toRate;
-        try
+        var notRated = 0;
+        IReadOnlyList<TransportOrderToRate> batch;
+        do
         {
-            await using var scope = scopes.CreateAsyncScope();
-            toRate = await scope.ServiceProvider.GetRequiredService<IMediator>()
-                .Send(new ListTransportOrdersNotYetRatedQuery(options.Value.BatchSize), cancellationToken);
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            LogSweepFailed(exception);
-            return;
-        }
+            try
+            {
+                await using var scope = scopes.CreateAsyncScope();
+                batch = await scope.ServiceProvider.GetRequiredService<IMediator>()
+                    .Send(new ListTransportOrdersNotYetRatedQuery(notRated, options.Value.BatchSize), cancellationToken);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                LogSweepFailed(exception);
+                return;
+            }
 
-        foreach (var order in toRate)
-        {
-            await RateAsync(order, cancellationToken);
+            foreach (var order in batch)
+            {
+                if (!await RateAsync(order, cancellationToken))
+                {
+                    notRated++;
+                }
+            }
         }
+        while (batch.Count == options.Value.BatchSize);
     }
 
-    private async Task RateAsync(TransportOrderToRate order, CancellationToken cancellationToken)
+    /// <summary>Rates one Transport Order, and says whether it is rated now, by this TMS or another.</summary>
+    private async Task<bool> RateAsync(TransportOrderToRate order, CancellationToken cancellationToken)
     {
         var trail = new Dictionary<string, object?>
         {
@@ -105,22 +116,24 @@ internal sealed partial class RatingWorker(
             if (result.IsSuccess && result.Value == RatingResult.Rated)
             {
                 LogRated(order.TransportOrderNumber);
+                return true;
             }
-            else
-            {
-                // Until Rating failed exists (P2.3), an order its Rate Card can't price waits for the next sweep.
-                LogNotRated(order.TransportOrderNumber);
-            }
+
+            // Until Rating failed exists (P2.3), an order its Rate Card can't price waits for the next sweep.
+            LogNotRated(order.TransportOrderNumber);
+            return false;
         }
         catch (DbUpdateConcurrencyException)
         {
             // Another TMS instance rated it first, and published its one TransportOrderRated.
             LogRatedElsewhere(order.TransportOrderNumber);
+            return true;
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             activity?.SetStatus(ActivityStatusCode.Error);
             LogRatingFailed(exception, order.TransportOrderNumber);
+            return false;
         }
     }
 
