@@ -20,14 +20,45 @@ public sealed class IntakeWorkflowTests
     }
 
     [Fact]
-    public void Trigger_TrackedProperties_AreTheKeysItKnows()
+    public void Trigger_TracksNothing_BecauseLogicAppsDropsARequestTriggersTrackedProperties()
     {
-        var tracked = IntakeWorkflow.Trigger["trackedProperties"]!.AsObject();
+        // Logic Apps Standard records a Request trigger's tracked properties neither in the run history nor in
+        // Application Insights, so the first step tracks the keys the trigger knows.
+        IntakeWorkflow.Trigger["trackedProperties"].Should().BeNull();
+    }
+
+    [Fact]
+    public void Tracking_IsTheFirstStep_SoEveryRunIsOnItsMessageTrail()
+    {
+        var tracking = IntakeWorkflow.Action(IntakeWorkflow.Tracking);
+
+        tracking["type"]!.GetValue<string>().Should().Be("Compose");
+        tracking["runAfter"]!.AsObject().Should().BeEmpty();
+        IntakeWorkflow.Actions.Where(action => action.Key != IntakeWorkflow.Tracking)
+            .Should().OnlyContain(action => action.Value!["runAfter"]!.AsObject().Count > 0, "only the tracking runs first");
+    }
+
+    [Fact]
+    public void Tracking_TakesTheCorrelationIdAndTheShipperFromTheHeaders()
+    {
+        var inputs = IntakeWorkflow.Action(IntakeWorkflow.Tracking)["inputs"];
+
+        JsonNode.DeepEquals(inputs, new JsonObject
+        {
+            ["correlationId"] = "@{triggerOutputs()?['headers']?['X-Correlation-ID']}",
+            ["partyId"] = "@{triggerOutputs()?['headers']?['X-Shipper-ID']}",
+        }).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Tracking_TrackedProperties_AreTheKeysTheTriggerKnows()
+    {
+        var tracked = IntakeWorkflow.Action(IntakeWorkflow.Tracking)["trackedProperties"]!.AsObject();
 
         tracked.Select(property => property.Key).Should().BeEquivalentTo("correlationId", "flow", "partyId");
-        tracked["correlationId"]!.GetValue<string>().Should().Be("@trigger()?['outputs']?['headers']?['X-Correlation-ID']");
+        tracked["correlationId"]!.GetValue<string>().Should().Be("@action()?['inputs']?['correlationId']");
         tracked["flow"]!.GetValue<string>().Should().Be(Flow);
-        tracked["partyId"]!.GetValue<string>().Should().Be("@trigger()?['outputs']?['headers']?['X-Shipper-ID']");
+        tracked["partyId"]!.GetValue<string>().Should().Be("@action()?['inputs']?['partyId']");
     }
 
     [Fact]
@@ -38,7 +69,8 @@ public sealed class IntakeWorkflowTests
         var check = IntakeWorkflow.Action(IntakeWorkflow.CallerCheck);
 
         check["type"]!.GetValue<string>().Should().Be("If");
-        check["runAfter"]!.AsObject().Should().BeEmpty();
+        check["runAfter"]![IntakeWorkflow.Tracking]!.AsArray()
+            .Select(status => status!.GetValue<string>()).Should().BeEquivalentTo("Succeeded");
         JsonNode.DeepEquals(check["expression"], new JsonObject
         {
             ["and"] = new JsonArray(new JsonObject

@@ -11,15 +11,23 @@
         },
         "correlation": {
           "clientTrackingId": "@{triggerOutputs()?['headers']?['X-Correlation-ID']}"
-        },
-        "trackedProperties": {
-          "correlationId": "@trigger()?['outputs']?['headers']?['X-Correlation-ID']",
-          "flow": "transport-order-intake",
-          "partyId": "@trigger()?['outputs']?['headers']?['X-Shipper-ID']"
         }
       }
     },
     "actions": {
+      "Track_the_booking": {
+        "type": "Compose",
+        "inputs": {
+          "correlationId": "@{triggerOutputs()?['headers']?['X-Correlation-ID']}",
+          "partyId": "@{triggerOutputs()?['headers']?['X-Shipper-ID']}"
+        },
+        "runAfter": {},
+        "trackedProperties": {
+          "correlationId": "@action()?['inputs']?['correlationId']",
+          "flow": "transport-order-intake",
+          "partyId": "@action()?['inputs']?['partyId']"
+        }
+      },
       "Refuse_a_caller_other_than_API_Management": {
         "type": "If",
         "expression": {
@@ -70,7 +78,11 @@
             }
           }
         },
-        "runAfter": {}
+        "runAfter": {
+          "Track_the_booking": [
+            "Succeeded"
+          ]
+        }
       },
       "Map_the_booking": {
         "type": "InvokeFunction",
