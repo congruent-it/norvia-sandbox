@@ -19,25 +19,88 @@ public sealed class RateCardTests
     [InlineData(500, 70.00)] // on the boundary: the lighter band, 500 ÷ 100 × 14.00
     [InlineData(500.001, 62.00)] // just above it: the next band, 500.001 ÷ 100 × 12.40 = 62.000124
     [InlineData(2_000, 248.00)] // on the highest boundary: still priced, 2,000 ÷ 100 × 12.40
-    public void FreightChargeFor_WeightOnOrAboveABoundary_UsesTheBandItsUpperLimitIncludes(decimal weightKg, decimal freight)
+    public void Rate_WeightOnOrAboveABoundary_UsesTheBandItsUpperLimitIncludes(decimal weightKg, decimal freight)
     {
-        var charge = RateCardWith(SampleVersion()).FreightChargeFor(Details(weightKg: weightKg));
+        var charge = RateCardWith(SampleVersion()).Rate(Details(weightKg: weightKg)).FreightCharge;
 
         charge!.ChargeLines.Should().Equal(new ChargeLine(ChargeLineType.Freight, new Money(freight)));
     }
 
     [Fact]
-    public void FreightChargeFor_WeightAboveTheHighestBreak_CantPrice()
+    public void Rate_WeightAboveTheHighestBreak_FailsWithWeightAboveHighestBreak()
     {
-        var charge = RateCardWith(SampleVersion()).FreightChargeFor(Details(weightKg: 2_000.5m));
+        var outcome = RateCardWith(SampleVersion()).Rate(Details(weightKg: 2_000.5m));
 
-        charge.Should().BeNull();
+        outcome.FreightCharge.Should().BeNull();
+        outcome.Failure.Should().Be(new RatingFailure(
+            RatingFailureCode.WeightAboveHighestBreak,
+            "The total weight of 2000.5 kg is above the highest Weight Break, up to 2000 kg, of the Lane from Rotterdam to Utrecht in Rate Card RC-0001 version 1."));
     }
 
     [Fact]
-    public void FreightChargeFor_FreightBelowTheMinimum_AddsAnAdjustmentUpToTheMinimum()
+    public void Rate_NoVersionValidOnTheCollectionDate_FailsWithNoValidRateCardVersion()
     {
-        var charge = RateCardWith(SampleVersion()).FreightChargeFor(Details(weightKg: 100m));
+        // The sample's collection starts on 25 September 2026.
+        var rateCard = RateCardWith(
+            SampleVersion(version: 1, validFrom: new DateOnly(2026, 1, 1), validTo: new DateOnly(2026, 9, 24)),
+            SampleVersion(version: 2, validFrom: new DateOnly(2026, 9, 26)));
+
+        var outcome = rateCard.Rate(Details(weightKg: 1_000m));
+
+        outcome.FreightCharge.Should().BeNull();
+        outcome.Failure.Should().Be(new RatingFailure(
+            RatingFailureCode.NoValidRateCardVersion,
+            "No version of Rate Card RC-0001 is valid on the collection date, 2026-09-25."));
+    }
+
+    [Fact]
+    public void Rate_DestinationInNoZone_FailsWithNoMatchingLane()
+    {
+        var details = Details(weightKg: 1_000m) with
+        {
+            Delivery = new DeliveryDetails(new Address("Königsallee 1", "40212", "Düsseldorf", "DE"), null, null),
+        };
+
+        var outcome = RateCardWith(SampleVersion()).Rate(details);
+
+        outcome.FreightCharge.Should().BeNull();
+        outcome.Failure.Should().Be(new RatingFailure(
+            RatingFailureCode.NoMatchingLane,
+            "Rate Card RC-0001 version 1 has no Lane from Rotterdam to DE 40212, which lies in no Zone."));
+    }
+
+    [Fact]
+    public void Rate_BothZonesKnownButNoLaneBetweenThem_FailsWithNoMatchingLane()
+    {
+        // The sample's only Lane runs from Rotterdam to Utrecht, not back.
+        var details = Details(weightKg: 1_000m) with
+        {
+            Collection = new CollectionDetails(
+                new Address("Oudegracht 112", "3511 AW", "Utrecht", "NL"),
+                new TimeWindow(new DateTimeOffset(2026, 9, 25, 8, 0, 0, TimeSpan.Zero), new DateTimeOffset(2026, 9, 25, 12, 0, 0, TimeSpan.Zero))),
+            Delivery = new DeliveryDetails(new Address("Waalhaven Oostzijde 88", "3087 BM", "Rotterdam", "NL"), null, null),
+        };
+
+        var outcome = RateCardWith(SampleVersion()).Rate(details);
+
+        outcome.Failure.Should().Be(new RatingFailure(
+            RatingFailureCode.NoMatchingLane,
+            "Rate Card RC-0001 version 1 has no Lane from Utrecht to Rotterdam."));
+    }
+
+    [Fact]
+    public void Rate_OrderItCovers_HasNoFailure()
+    {
+        var outcome = RateCardWith(SampleVersion()).Rate(Details(weightKg: 1_000m));
+
+        outcome.FreightCharge.Should().NotBeNull();
+        outcome.Failure.Should().BeNull();
+    }
+
+    [Fact]
+    public void Rate_FreightBelowTheMinimum_AddsAnAdjustmentUpToTheMinimum()
+    {
+        var charge = RateCardWith(SampleVersion()).Rate(Details(weightKg: 100m)).FreightCharge;
 
         charge!.ChargeLines.Should().Equal(
             new ChargeLine(ChargeLineType.Freight, new Money(14.00m)),
@@ -46,23 +109,23 @@ public sealed class RateCardTests
     }
 
     [Fact]
-    public void FreightChargeFor_FreightExactlyTheMinimum_HasNoAdjustment()
+    public void Rate_FreightExactlyTheMinimum_HasNoAdjustment()
     {
         // 400 kg ÷ 100 × 14.00 = 56.00, not below the minimum.
         var version = SampleVersion(minimumCharge: 56.00m);
 
-        var charge = RateCardWith(version).FreightChargeFor(Details(weightKg: 400m));
+        var charge = RateCardWith(version).Rate(Details(weightKg: 400m)).FreightCharge;
 
         charge!.ChargeLines.Should().Equal(new ChargeLine(ChargeLineType.Freight, new Money(56.00m)));
     }
 
     [Fact]
-    public void FreightChargeFor_FreightOffTheCent_RoundsEachLineAndAddsThemUp()
+    public void Rate_FreightOffTheCent_RoundsEachLineAndAddsThemUp()
     {
         // 100.25 kg ÷ 100 × 14.00 = 14.035. Rounding only the total would keep the lines at 14.035 and 30.965; each line
         // is rounded to cents instead, half away from zero, and the adjustment makes up the difference to the minimum
         // from the rounded Freight line.
-        var charge = RateCardWith(SampleVersion()).FreightChargeFor(Details(weightKg: 100.25m));
+        var charge = RateCardWith(SampleVersion()).Rate(Details(weightKg: 100.25m)).FreightCharge;
 
         charge!.ChargeLines.Should().Equal(
             new ChargeLine(ChargeLineType.Freight, new Money(14.04m)),
@@ -71,7 +134,7 @@ public sealed class RateCardTests
     }
 
     [Fact]
-    public void FreightChargeFor_PostcodeInTwoZones_TheMostSpecificPrefixDecides()
+    public void Rate_PostcodeInTwoZones_TheMostSpecificPrefixDecides()
     {
         // Utrecht (35) is listed before Utrecht Science Park (3584), so a first match would pick the wrong Zone.
         var version = SampleVersion() with
@@ -84,13 +147,13 @@ public sealed class RateCardTests
             ],
         };
 
-        var charge = RateCardWith(version).FreightChargeFor(Details(weightKg: 1_000m, deliveryPostcode: "3584 CS"));
+        var charge = RateCardWith(version).Rate(Details(weightKg: 1_000m, deliveryPostcode: "3584 CS")).FreightCharge;
 
         charge!.ChargeLines.Should().Equal(new ChargeLine(ChargeLineType.Freight, new Money(200.00m)));
     }
 
     [Fact]
-    public void FreightChargeFor_PostcodeOnlyInTheWiderZone_UsesTheWiderZone()
+    public void Rate_PostcodeOnlyInTheWiderZone_UsesTheWiderZone()
     {
         var version = SampleVersion() with
         {
@@ -102,13 +165,13 @@ public sealed class RateCardTests
             ],
         };
 
-        var charge = RateCardWith(version).FreightChargeFor(Details(weightKg: 1_000m, deliveryPostcode: "3511 AW"));
+        var charge = RateCardWith(version).Rate(Details(weightKg: 1_000m, deliveryPostcode: "3511 AW")).FreightCharge;
 
         charge!.ChargeLines.Should().Equal(new ChargeLine(ChargeLineType.Freight, new Money(124.00m)));
     }
 
     [Fact]
-    public void FreightChargeFor_CollectionJustAfterMidnightInAmsterdam_UsesTheVersionValidOnThatDay()
+    public void Rate_CollectionJustAfterMidnightInAmsterdam_UsesTheVersionValidOnThatDay()
     {
         // 00:30 on 1 March in Amsterdam is still 29 February in UTC.
         var collection = new DateTimeOffset(2028, 3, 1, 0, 30, 0, TimeSpan.FromHours(1)).ToUniversalTime();
@@ -116,7 +179,7 @@ public sealed class RateCardTests
             SampleVersion(version: 1, validFrom: new DateOnly(2028, 1, 1), validTo: new DateOnly(2028, 2, 29)),
             SampleVersion(version: 2, validFrom: new DateOnly(2028, 3, 1)));
 
-        var charge = rateCard.FreightChargeFor(Details(weightKg: 1_000m, collectionEarliest: collection));
+        var charge = rateCard.Rate(Details(weightKg: 1_000m, collectionEarliest: collection)).FreightCharge;
 
         charge!.RateCardVersion.Version.Should().Be(2);
     }

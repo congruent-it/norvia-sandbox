@@ -232,6 +232,10 @@ _Avoid_: price line, surcharge (on its own)
 Where a Transport Order stands commercially, separate from its status: Not yet rated, Rated, Rating failed or Not rated separately. Rated and Not rated separately are final. A Rejected booking has none.
 _Avoid_: rating status, price status
 
+**Rating failure**:
+Why a Transport Order is Rating failed: a stable code (`NoRateCard`, `NoValidRateCardVersion`, `NoMatchingLane` or `WeightAboveHighestBreak`) and a plain-language message. The order stays Accepted, so a Shipper's pricing gap never rejects its booking.
+_Avoid_: rating error, pricing error, rejection (that is for a booking)
+
 **Not rated separately**:
 The Rating result of a Fulfilment Transport Order (WMS channel). It is billed through the Fulfilment Contract, so it gets no Freight Charge of its own.
 _Avoid_: unrated, exempt

@@ -8,6 +8,7 @@ namespace Norvia.Tms.Application.TransportOrders;
 /// <param name="RejectionReasons">Every rule a Rejected booking broke; empty otherwise.</param>
 /// <param name="RatingResult">Null for a Rejected booking, which is never rated.</param>
 /// <param name="FreightCharge">The frozen Freight Charge once the Transport Order is Rated; null until then.</param>
+/// <param name="RatingFailure">Why the Rate Card couldn't price the Transport Order, once Rating failed; null otherwise.</param>
 public sealed record TransportOrderView(
     Guid Id,
     string? TransportOrderNumber,
@@ -19,6 +20,7 @@ public sealed record TransportOrderView(
     IReadOnlyList<RejectionReasonView> RejectionReasons,
     RatingResult? RatingResult,
     FreightChargeView? FreightCharge,
+    RatingFailureView? RatingFailure,
     CanonicalTransportOrder TransportOrder)
 {
     public static TransportOrderView Of(TransportOrder order, IShipperDirectory shippers)
@@ -35,6 +37,7 @@ public sealed record TransportOrderView(
             RejectionReasonView.From(order.RejectionReasons),
             order.RatingResult,
             FreightChargeView.From(order.FreightCharge),
+            RatingFailureView.From(order.RatingFailure),
             CanonicalTransportOrder.From(order));
     }
 }

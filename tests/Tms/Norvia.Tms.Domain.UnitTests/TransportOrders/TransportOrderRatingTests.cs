@@ -95,14 +95,68 @@ public sealed class TransportOrderRatingTests
     }
 
     [Fact]
-    public void Rate_WithoutARateCard_StaysNotYetRated()
+    public void Rate_WithoutARateCard_FailsWithNoRateCard_AndStaysAccepted()
     {
         var order = Accepted(IntakeChannel.ShipperApi);
 
         var rated = order.Rate(null, RatedAt);
 
-        rated.Should().BeFalse();
-        order.RatingResult.Should().Be(RatingResult.NotYetRated);
+        rated.Should().BeTrue("Rating ran, and its result changed");
+        order.RatingResult.Should().Be(RatingResult.RatingFailed);
+        order.RatingFailure.Should().Be(new RatingFailure(RatingFailureCode.NoRateCard, "Shipper SHP-0001 has no Rate Card."));
+        order.RatingFailedAt.Should().Be(RatedAt);
+        order.Status.Should().Be(TransportOrderStatus.Accepted, "a pricing gap never rejects a Shipper's booking");
+        order.FreightCharge.Should().BeNull();
+        order.RatedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public void Rate_OrderTheRateCardCantPrice_FailsWithTheRateCardsReason()
+    {
+        var order = Accepted(IntakeChannel.ShipperApi);
+
+        order.Rate(RotterdamUtrechtRateCard() with { Versions = [RotterdamUtrechtVersion(1, new DateOnly(2027, 1, 1), null, 12.00m)] }, RatedAt);
+
+        order.RatingResult.Should().Be(RatingResult.RatingFailed);
+        order.RatingFailure!.Code.Should().Be(RatingFailureCode.NoValidRateCardVersion);
+    }
+
+    [Fact]
+    public void Rate_RatingFails_RaisesTransportOrderRatingFailed()
+    {
+        var order = Accepted(IntakeChannel.ShipperApi);
+        order.ClearDomainEvents();
+
+        order.Rate(null, RatedAt);
+
+        order.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<TransportOrderRatingFailedEvent>()
+            .Which.TransportOrder.Should().BeSameAs(order);
+    }
+
+    [Fact]
+    public void Rate_RatingFailedOrder_ChangesNothing()
+    {
+        var order = Accepted(IntakeChannel.ShipperApi);
+        order.Rate(null, RatedAt);
+        order.ClearDomainEvents();
+
+        var rated = order.Rate(RotterdamUtrechtRateCard(), RatedAt.AddMinutes(1));
+
+        rated.Should().BeFalse("only a re-rate moves Rating failed on");
+        order.RatingResult.Should().Be(RatingResult.RatingFailed);
+        order.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Rate_Rated_HasNoFailure()
+    {
+        var order = Accepted(IntakeChannel.ShipperApi);
+
+        order.Rate(RotterdamUtrechtRateCard(), RatedAt);
+
+        order.RatingFailure.Should().BeNull();
+        order.RatingFailedAt.Should().BeNull();
     }
 
     [Fact]

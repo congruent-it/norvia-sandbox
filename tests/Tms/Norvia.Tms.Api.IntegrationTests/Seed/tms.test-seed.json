@@ -28,14 +28,15 @@
       "shipperId": "SHP-0001",
       "versions": [
         {
-          "$comment": "Covers Bookings.Valid: Rotterdam to Utrecht, 910.5 kg in the band up to 2,000 kg, so 910.5 ÷ 100 × 12.40 = 112.902, a Freight Charge of 112.90. Utrecht Science Park (3584) lies inside Utrecht (35) and is listed after it, so only the most specific prefix picks it.",
+          "$comment": "Covers Bookings.Valid: Rotterdam to Utrecht, 910.5 kg in the band up to 2,000 kg, so 910.5 ÷ 100 × 12.40 = 112.902, a Freight Charge of 112.90. Utrecht Science Park (3584) lies inside Utrecht (35) and is listed after it, so only the most specific prefix picks it. Its Lane prices up to 5,000 kg only, so a heavier order to it fails with WeightAboveHighestBreak. Düsseldorf is a Zone without a Lane into it, so an order to it fails with NoMatchingLane.",
           "version": 1,
           "validFrom": "2020-01-01",
           "validTo": "2039-12-31",
           "zones": [
             { "name": "Rotterdam", "country": "NL", "postcodePrefixes": ["30", "31"] },
             { "name": "Utrecht", "country": "NL", "postcodePrefixes": ["35"] },
-            { "name": "Utrecht Science Park", "country": "NL", "postcodePrefixes": ["3584"] }
+            { "name": "Utrecht Science Park", "country": "NL", "postcodePrefixes": ["3584"] },
+            { "name": "Düsseldorf", "country": "DE", "postcodePrefixes": ["40"] }
           ],
           "lanes": [
             {
@@ -53,16 +54,16 @@
               "destination": "Utrecht Science Park",
               "minimumCharge": 45.00,
               "weightBreaks": [
-                { "upToKg": 24000, "pricePer100Kg": 15.00 }
+                { "upToKg": 5000, "pricePer100Kg": 15.00 }
               ]
             }
           ]
         },
         {
-          "$comment": "From New Year 2040 Rotterdam to Utrecht costs more, so a collection just after midnight on 1 January in Amsterdam, still 31 December in UTC, shows which version priced it.",
+          "$comment": "From New Year 2040 Rotterdam to Utrecht costs more, so a collection just after midnight on 1 January in Amsterdam, still 31 December in UTC, shows which version priced it. No version is valid from 2050, so an order collected then fails with NoValidRateCardVersion.",
           "version": 2,
           "validFrom": "2040-01-01",
-          "validTo": null,
+          "validTo": "2049-12-31",
           "zones": [
             { "name": "Rotterdam", "country": "NL", "postcodePrefixes": ["30", "31"] },
             { "name": "Utrecht", "country": "NL", "postcodePrefixes": ["35"] }

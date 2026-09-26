@@ -64,19 +64,6 @@ public sealed class TransportOrderRatingTests(TmsFixture tms)
     }
 
     [Fact]
-    public async Task Submit_ShipperWithoutARateCard_IsAcceptedAndShownNotYetRated()
-    {
-        var booking = Bookings.Valid(TmsCalls.NewReference());
-        booking["shipperId"] = "SHP-0003";
-        var number = await tms.SubmitAcceptedAsync(booking, TmsCalls.NewCorrelationId(), _cancellationToken);
-
-        var order = await tms.GetTransportOrderAsync(number, _cancellationToken);
-
-        order["ratingResult"]!.GetValue<string>().Should().Be("NotYetRated");
-        order["freightCharge"].Should().BeNull();
-    }
-
-    [Fact]
     public async Task Submit_ThroughTheWmsChannel_IsNotRatedSeparately_AndPublishesNoRatingEvent()
     {
         using var wms = tms.CreateTmsClient(tms.IssueToken([TmsFixture.IntakeRole], clientId: TmsFixture.WmsClientId));

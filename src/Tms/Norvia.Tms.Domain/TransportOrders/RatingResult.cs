@@ -14,4 +14,7 @@ public enum RatingResult
 
     /// <summary>A Fulfilment Transport Order, billed through the Fulfilment Contract rather than per transport. Final.</summary>
     NotRatedSeparately,
+
+    /// <summary>The Rate Card couldn't price the Transport Order; it carries the failure. A re-rate can still rate it.</summary>
+    RatingFailed,
 }

@@ -54,6 +54,12 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                     b.Property<DateTimeOffset?>("RatedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<DateTimeOffset?>("RatingFailedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("RatingFailure")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("RatingResult")
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");

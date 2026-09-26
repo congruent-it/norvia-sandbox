@@ -103,5 +103,11 @@ internal sealed class TransportOrderConfiguration : IEntityTypeConfiguration<Tra
                     (left, right) => Equals(left, right),
                     freightCharge => freightCharge == null ? 0 : freightCharge.GetHashCode(),
                     freightCharge => freightCharge));
+
+        // Why Rating failed, kept like the rejection reasons: its stable code by name and its message.
+        builder.Property(order => order.RatingFailure)
+            .HasConversion(
+                failure => JsonSerializer.Serialize(failure, EnumNamesJson),
+                json => JsonSerializer.Deserialize<RatingFailure>(json, EnumNamesJson)!);
     }
 }

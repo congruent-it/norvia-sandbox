@@ -12,6 +12,9 @@ public static class TrackingKeys
     public const string TransportOrderNumber = "transportOrderNumber";
     public const string Outcome = "outcome";
 
+    /// <summary>The stable failure code, when there is one, such as a rating failure's <c>NoMatchingLane</c>.</summary>
+    public const string FailureCode = "failureCode";
+
     /// <summary>The <see cref="Outcome"/> of a call the application refused, such as one without the right role.</summary>
     public const string Refused = "Refused";
 }

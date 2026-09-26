@@ -1,6 +1,7 @@
 using Ardalis.SharedKernel;
 using Norvia.Tms.Domain.RateCards;
 using Norvia.Tms.Domain.Shippers;
+using static System.FormattableString;
 
 namespace Norvia.Tms.Domain.TransportOrders;
 
@@ -61,25 +62,44 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
     /// <summary>When the Transport Order was Rated; null until then.</summary>
     public DateTimeOffset? RatedAt { get; private set; }
 
+    /// <summary>Why the Rate Card couldn't price the Transport Order, once Rating failed; null otherwise.</summary>
+    public RatingFailure? RatingFailure { get; private set; }
+
+    /// <summary>When Rating failed; null unless it did.</summary>
+    public DateTimeOffset? RatingFailedAt { get; private set; }
+
     /// <summary>Whether a booking under this Transport Order's Shipper reference is the same booking sent again.</summary>
     public bool IsRepeatOf(TransportOrderDetails details) => Details.Equals(details);
 
     /// <summary>
-    /// Rates a Transport Order that is Not yet rated, from its Shipper's Rate Card, and freezes the Freight Charge on it.
-    /// Returns false, changing nothing, when it isn't waiting for Rating, or when there is no Rate Card or it can't price
-    /// the order.
+    /// Rates a Transport Order that is Not yet rated, from its Shipper's Rate Card: it is Rated with the Freight Charge
+    /// frozen on it, or, when there is no Rate Card or it can't price the order, Rating failed with the reason. Either
+    /// way the order stays Accepted. Returns false, changing nothing, when it isn't waiting for Rating.
     /// </summary>
     public bool Rate(RateCard? rateCard, DateTimeOffset ratedAt)
     {
-        if (RatingResult != TransportOrders.RatingResult.NotYetRated || rateCard?.FreightChargeFor(Details) is not { } freightCharge)
+        if (RatingResult != TransportOrders.RatingResult.NotYetRated)
         {
             return false;
         }
 
-        RatingResult = TransportOrders.RatingResult.Rated;
-        FreightCharge = freightCharge;
-        RatedAt = ratedAt;
-        RegisterDomainEvent(new TransportOrderRatedEvent(this));
+        var outcome = rateCard?.Rate(Details)
+            ?? RatingOutcome.Failed(RatingFailureCode.NoRateCard, Invariant($"Shipper {ShipperId} has no Rate Card."));
+        if (outcome.FreightCharge is { } freightCharge)
+        {
+            RatingResult = TransportOrders.RatingResult.Rated;
+            FreightCharge = freightCharge;
+            RatedAt = ratedAt;
+            RegisterDomainEvent(new TransportOrderRatedEvent(this));
+        }
+        else
+        {
+            RatingResult = TransportOrders.RatingResult.RatingFailed;
+            RatingFailure = outcome.Failure;
+            RatingFailedAt = ratedAt;
+            RegisterDomainEvent(new TransportOrderRatingFailedEvent(this));
+        }
+
         return true;
     }
 

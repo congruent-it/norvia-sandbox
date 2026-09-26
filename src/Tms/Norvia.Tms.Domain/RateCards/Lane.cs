@@ -8,6 +8,9 @@ namespace Norvia.Tms.Domain.RateCards;
 /// <param name="MinimumCharge">The least the Lane charges for a Transport Order, however light.</param>
 public sealed record Lane(ZoneName Origin, ZoneName Destination, IReadOnlyList<WeightBreak> WeightBreaks, Money MinimumCharge)
 {
+    /// <summary>The upper limit of the heaviest Weight Break: the most the Lane prices.</summary>
+    public decimal HighestWeightBreakKg => WeightBreaks.Select(weightBreak => weightBreak.UpToKg).DefaultIfEmpty().Max();
+
     /// <summary>
     /// The lightest Weight Break the weight fits in, or null when it is above the highest. A weight exactly on a
     /// boundary falls in the lighter band, the one whose upper limit it equals.
