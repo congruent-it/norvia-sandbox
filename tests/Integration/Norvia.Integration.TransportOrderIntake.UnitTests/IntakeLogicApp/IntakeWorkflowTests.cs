@@ -28,25 +28,29 @@ public sealed class IntakeWorkflowTests
     }
 
     [Fact]
-    public void Tracking_IsTheFirstStep_SoEveryRunIsOnItsMessageTrail()
+    public void Tracking_RunsStraightAfterTheCallerCheck_SoARunThatStopsBeforeTheTmsCallIsOnItsMessageTrail()
     {
+        // The caller check stays first (ADR 0020), so only a Shipper that API Management vouched for is tracked; a
+        // refused caller is on its trail through the refusal.
         var tracking = IntakeWorkflow.Action(IntakeWorkflow.Tracking);
 
         tracking["type"]!.GetValue<string>().Should().Be("Compose");
-        tracking["runAfter"]!.AsObject().Should().BeEmpty();
-        IntakeWorkflow.Actions.Where(action => action.Key != IntakeWorkflow.Tracking)
-            .Should().OnlyContain(action => action.Value!["runAfter"]!.AsObject().Count > 0, "only the tracking runs first");
+        tracking["runAfter"]![IntakeWorkflow.CallerCheck]!.AsArray()
+            .Select(status => status!.GetValue<string>()).Should().BeEquivalentTo("Succeeded");
+        IntakeWorkflow.Action("Map_the_booking")["runAfter"]![IntakeWorkflow.Tracking]!.AsArray()
+            .Select(status => status!.GetValue<string>()).Should().BeEquivalentTo("Succeeded");
     }
 
     [Fact]
-    public void Tracking_TakesTheCorrelationIdAndTheShipperFromTheHeaders()
+    public void Tracking_TakesTheCorrelationIdAndTheShipperFromTheHeaders_LeavingOutAMissingOne()
     {
+        // An interpolated expression would turn a missing header into an empty key; the contract leaves it out.
         var inputs = IntakeWorkflow.Action(IntakeWorkflow.Tracking)["inputs"];
 
         JsonNode.DeepEquals(inputs, new JsonObject
         {
-            ["correlationId"] = "@{triggerOutputs()?['headers']?['X-Correlation-ID']}",
-            ["partyId"] = "@{triggerOutputs()?['headers']?['X-Shipper-ID']}",
+            ["correlationId"] = "@triggerOutputs()?['headers']?['X-Correlation-ID']",
+            ["partyId"] = "@triggerOutputs()?['headers']?['X-Shipper-ID']",
         }).Should().BeTrue();
     }
 
@@ -69,8 +73,7 @@ public sealed class IntakeWorkflowTests
         var check = IntakeWorkflow.Action(IntakeWorkflow.CallerCheck);
 
         check["type"]!.GetValue<string>().Should().Be("If");
-        check["runAfter"]![IntakeWorkflow.Tracking]!.AsArray()
-            .Select(status => status!.GetValue<string>()).Should().BeEquivalentTo("Succeeded");
+        check["runAfter"]!.AsObject().Should().BeEmpty();
         JsonNode.DeepEquals(check["expression"], new JsonObject
         {
             ["and"] = new JsonArray(new JsonObject
@@ -80,8 +83,8 @@ public sealed class IntakeWorkflowTests
                     "@parameters('apiManagementPrincipalId')"),
             }),
         }).Should().BeTrue();
-        IntakeWorkflow.Action("Map_the_booking")["runAfter"]![IntakeWorkflow.CallerCheck]!.AsArray()
-            .Select(status => status!.GetValue<string>()).Should().BeEquivalentTo("Succeeded");
+        IntakeWorkflow.Actions.Where(action => action.Key != IntakeWorkflow.CallerCheck)
+            .Should().OnlyContain(action => action.Value!["runAfter"]!.AsObject().Count > 0, "only the caller check runs first");
     }
 
     [Fact]

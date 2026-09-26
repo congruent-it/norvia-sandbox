@@ -15,19 +15,6 @@
       }
     },
     "actions": {
-      "Track_the_booking": {
-        "type": "Compose",
-        "inputs": {
-          "correlationId": "@{triggerOutputs()?['headers']?['X-Correlation-ID']}",
-          "partyId": "@{triggerOutputs()?['headers']?['X-Shipper-ID']}"
-        },
-        "runAfter": {},
-        "trackedProperties": {
-          "correlationId": "@action()?['inputs']?['correlationId']",
-          "flow": "transport-order-intake",
-          "partyId": "@action()?['inputs']?['partyId']"
-        }
-      },
       "Refuse_a_caller_other_than_API_Management": {
         "type": "If",
         "expression": {
@@ -78,10 +65,23 @@
             }
           }
         },
+        "runAfter": {}
+      },
+      "Track_the_booking": {
+        "type": "Compose",
+        "inputs": {
+          "correlationId": "@triggerOutputs()?['headers']?['X-Correlation-ID']",
+          "partyId": "@triggerOutputs()?['headers']?['X-Shipper-ID']"
+        },
         "runAfter": {
-          "Track_the_booking": [
+          "Refuse_a_caller_other_than_API_Management": [
             "Succeeded"
           ]
+        },
+        "trackedProperties": {
+          "correlationId": "@action()?['inputs']?['correlationId']",
+          "flow": "transport-order-intake",
+          "partyId": "@action()?['inputs']?['partyId']"
         }
       },
       "Map_the_booking": {
@@ -94,7 +94,7 @@
           }
         },
         "runAfter": {
-          "Refuse_a_caller_other_than_API_Management": [
+          "Track_the_booking": [
             "Succeeded"
           ]
         }
