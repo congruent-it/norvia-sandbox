@@ -13,7 +13,7 @@ internal sealed class TransportOrderConfiguration : IEntityTypeConfiguration<Tra
     public const string ShipperReferenceIndex = "IX_TransportOrders_ShipperId_ShipperReference";
 
     private static readonly JsonSerializerOptions DetailsJson = new(JsonSerializerDefaults.Web);
-    private static readonly JsonSerializerOptions ReasonsJson = new(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter() } };
+    private static readonly JsonSerializerOptions EnumNamesJson = new(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter() } };
 
     public void Configure(EntityTypeBuilder<TransportOrder> builder)
     {
@@ -77,12 +77,31 @@ internal sealed class TransportOrderConfiguration : IEntityTypeConfiguration<Tra
         // The column is never null (an Accepted Transport Order stores []), so neither is what it holds.
         builder.Property(order => order.RejectionReasons)
             .HasConversion(
-                reasons => JsonSerializer.Serialize(reasons, ReasonsJson),
-                json => JsonSerializer.Deserialize<RejectionReason[]>(json, ReasonsJson)!,
+                reasons => JsonSerializer.Serialize(reasons, EnumNamesJson),
+                json => JsonSerializer.Deserialize<RejectionReason[]>(json, EnumNamesJson)!,
                 new ValueComparer<IReadOnlyList<RejectionReason>>(
                     (left, right) => left!.SequenceEqual(right!),
                     reasons => reasons.Count,
                     reasons => reasons.ToArray()))
             .IsRequired();
+
+        // Rating changes a Transport Order after intake, so the TMS instances that rate must not both rate one: the
+        // second save fails instead of publishing a second TransportOrderRated.
+        builder.Property<byte[]>("RowVersion").IsRowVersion();
+
+        builder.Property(order => order.RatingResult)
+            .HasConversion<string>()
+            .HasMaxLength(30);
+        builder.HasIndex(order => new { order.RatingResult, order.ReceivedAt });
+
+        // The Freight Charge is frozen whole, as one JSON document, like what the Shipper submitted.
+        builder.Property(order => order.FreightCharge)
+            .HasConversion(
+                freightCharge => JsonSerializer.Serialize(freightCharge, EnumNamesJson),
+                json => JsonSerializer.Deserialize<FreightCharge>(json, EnumNamesJson)!,
+                new ValueComparer<FreightCharge?>(
+                    (left, right) => Equals(left, right),
+                    freightCharge => freightCharge == null ? 0 : freightCharge.GetHashCode(),
+                    freightCharge => freightCharge));
     }
 }

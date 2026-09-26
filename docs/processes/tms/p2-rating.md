@@ -71,6 +71,10 @@ Both events are published to the topic for Transport Order events, through the T
 
 *Not rated separately* publishes no event. Each successful rating or re-rating publishes exactly one event.
 
+## Tracking
+
+Rating continues the Message trail of the Transport Order's intake: its events carry the intake's correlation ID. The rating worker puts the tracking-contract keys in the logging scope and on the trace of each rating: `correlationId`, `flow` (`transport-order-rating`), `partyId` (the Shipper ID) and `transportOrderNumber`. The outcome event carries the same keys as application properties.
+
 ## Deferred
 
 These were left out on purpose while designing P2, each with its reason.

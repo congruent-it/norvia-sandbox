@@ -17,7 +17,7 @@ The intake API records the intake channel each Transport Order came from, and it
 | Channel | Value | Service | Status |
 |---|---|---|---|
 | Shipper API | `ShipperApi` | Transport-only | Built by this process |
-| WMS handoff | | Fulfilment | Later. It reuses the same intake API with its own channel |
+| WMS handoff | `Wms` | Fulfilment | The channel exists, mapped from its own client ID, but no WMS calls it yet. Its Transport Orders are Not rated separately ([P2](p2-rating.md)) |
 
 BizTalk and EDI intake are not part of the sandbox.
 

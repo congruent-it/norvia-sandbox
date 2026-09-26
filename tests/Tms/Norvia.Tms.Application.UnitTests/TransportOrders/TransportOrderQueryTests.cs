@@ -42,7 +42,25 @@ public sealed class TransportOrderQueryTests
             "corr-1",
             Samples.Now,
             [],
+            RatingResult.NotYetRated,
+            null,
             CanonicalTransportOrder.From(order)));
+    }
+
+    [Fact]
+    public async Task Get_RatedOrder_ShowsItsFreightChargeWithItsChargeLinesAndRateCardVersion()
+    {
+        var order = Samples.RatedOrder(sequence: 5);
+        _repository.FirstOrDefaultAsync(Arg.Any<TransportOrderByNumberSpec>(), Arg.Any<CancellationToken>()).Returns(order);
+
+        var result = await new GetTransportOrderHandler(_repository, _shippers).Handle(new GetTransportOrderQuery("TO-0000005"), CancellationToken.None);
+
+        result.Value.RatingResult.Should().Be(RatingResult.Rated);
+        result.Value.FreightCharge.Should().Be(new FreightChargeView(
+            "EUR",
+            112.90m,
+            [new ChargeLineView("Freight", 112.90m)],
+            new RateCardVersionView("RC-0001", 3)));
     }
 
     [Fact]
@@ -83,6 +101,8 @@ public sealed class TransportOrderQueryTests
                 new RejectionReasonView("InactiveShipper", "The Shipper is not active, so Norvia can't take bookings for it."),
                 new RejectionReasonView("GoodsLinesMissing", "The booking has no goods lines."),
             ],
+            null,
+            null,
             Samples.CanonicalTransportOrder()));
     }
 

@@ -21,12 +21,18 @@ namespace Norvia.Tms.Api.IntegrationTests;
 /// message published to the Transport Order events topic through a subscription of its own. It holds the key the TMS
 /// trusts locally, so it issues tokens the way Entra would: <see cref="Tms"/> calls as the intake Logic App does.
 /// The TMS writes its logs as JSON with their scopes, which the fixture keeps so tests can follow a Message trail.
+/// The TMS reads a seed file of the tests' own, so the Rate Cards it rates against are the tests', not the demo's.
+/// Its rating worker sweeps only once an hour, so a Transport Order rated within moments was rated by its acceptance's
+/// trigger.
 /// </summary>
-public sealed class TmsFixture : IAsyncLifetime
+public class TmsFixture : IAsyncLifetime
 {
     public const string TransportOrderEventsTopic = "transport-order-events";
     private const string TestSubscription = "tms-api-integration-tests";
     public const string IntakeRole = "TransportOrders.Intake";
+
+    /// <summary>The client ID the TMS takes as the WMS handoff's caller. No WMS exists yet, so only the tests call as it.</summary>
+    public const string WmsClientId = "norvia-test-wms";
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
     private readonly string _tokenSigningKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
@@ -59,10 +65,14 @@ public sealed class TmsFixture : IAsyncLifetime
             startup.Token);
         var topic = builder.Resources.OfType<AzureServiceBusTopicResource>().Single(t => t.TopicName == TransportOrderEventsTopic);
         builder.CreateResourceBuilder(topic).AddServiceBusSubscription(TestSubscription);
-        builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(r => r.Name == "tms-api"))
+        var tmsApi = builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(r => r.Name == "tms-api"))
             // Aspire sets the formatter under this exact name, and environment names are case-sensitive on Linux.
             .WithEnvironment("LOGGING__CONSOLE__FORMATTERNAME", "json")
             .WithEnvironment("Logging__Console__FormatterOptions__IncludeScopes", "true");
+        foreach (var (name, value) in TmsApiSettings())
+        {
+            tmsApi.WithEnvironment(name, value);
+        }
 
         _app = await builder.BuildAsync(startup.Token);
         await _app.StartAsync(startup.Token);
@@ -81,6 +91,14 @@ public sealed class TmsFixture : IAsyncLifetime
         _processor.ProcessErrorAsync += _ => Task.CompletedTask;
         await _processor.StartProcessingAsync(startup.Token);
     }
+
+    /// <summary>What the fixture sets on the TMS API on top of what the AppHost gives it, as environment variables.</summary>
+    protected virtual Dictionary<string, string> TmsApiSettings() => new()
+    {
+        ["Seed__Path"] = Path.Combine(AppContext.BaseDirectory, "Seed", "tms.test-seed.json"),
+        ["IntakeCallers__ClientIdsByChannel__Wms__0"] = WmsClientId,
+        ["Rating__SweepInterval"] = "01:00:00",
+    };
 
     /// <summary>Waits for the TMS to write a log that matches, as logs arrive a moment after the call.</summary>
     public async Task<TmsLog> TmsLogAsync(Func<TmsLog, bool> match, CancellationToken cancellationToken)
@@ -172,5 +190,7 @@ public sealed class TmsFixture : IAsyncLifetime
         {
             await _app.DisposeAsync();
         }
+
+        GC.SuppressFinalize(this);
     }
 }

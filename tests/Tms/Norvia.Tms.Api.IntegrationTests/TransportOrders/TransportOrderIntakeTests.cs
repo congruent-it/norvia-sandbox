@@ -73,8 +73,8 @@ public sealed class TransportOrderIntakeTests(TmsFixture tms)
 
         var events = await PublishedEventsAsync(correlationId);
 
-        var message = events.Should().ContainSingle().Subject;
-        message.Subject.Should().Be("TransportOrderAccepted");
+        // Rating follows on the same Message trail with an event of its own.
+        var message = events.Should().ContainSingle(m => m.Subject == "TransportOrderAccepted").Subject;
         message.CorrelationId.Should().Be(correlationId);
         message.ApplicationProperties.Should().Contain(new Dictionary<string, object>
         {

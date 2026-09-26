@@ -30,6 +30,8 @@ internal static class Samples
         "corr-0042",
         new DateTimeOffset(2026, 9, 24, 9, 30, 0, TimeSpan.Zero),
         [],
+        RatingResult.NotYetRated,
+        null,
         new CanonicalTransportOrder(
             number,
             BrouwerDranken.Id,
@@ -67,6 +69,7 @@ internal static class Samples
             TransportOrderNumber = null,
             Status = TransportOrderStatus.Rejected,
             CorrelationId = "corr-0099",
+            RatingResult = null,
             RejectionReasons =
             [
                 new RejectionReasonView("GoodsLinesMissing", "The booking has no goods lines."),

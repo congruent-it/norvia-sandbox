@@ -39,7 +39,7 @@ public sealed class TransportOrderRepeatTests(TmsFixture tms)
         var booking = Bookings.Valid(NewReference());
         var firstCorrelationId = NewCorrelationId();
         var number = await SubmitAcceptedAsync(booking, firstCorrelationId);
-        (await PublishedEventsAsync(firstCorrelationId)).Should().ContainSingle();
+        (await PublishedEventsAsync(firstCorrelationId)).Should().ContainSingle(m => m.Subject == "TransportOrderAccepted");
 
         var againCorrelationId = NewCorrelationId();
         using var again = await SubmitAsync(booking, againCorrelationId);
@@ -47,8 +47,8 @@ public sealed class TransportOrderRepeatTests(TmsFixture tms)
 
         await Task.Delay(OutboxSettleTime, _cancellationToken);
         tms.Published.Should().NotContain(m => m.CorrelationId == againCorrelationId);
-        tms.Published.Where(m => Equals(m.ApplicationProperties.GetValueOrDefault("transportOrderNumber"), number))
-            .Should().ContainSingle("the original acceptance is the only event for this Transport Order");
+        tms.Published.Where(m => m.Subject == "TransportOrderAccepted" && Equals(m.ApplicationProperties.GetValueOrDefault("transportOrderNumber"), number))
+            .Should().ContainSingle("the original acceptance is the only acceptance of this Transport Order");
     }
 
     [Fact]

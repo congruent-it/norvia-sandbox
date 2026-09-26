@@ -5,6 +5,7 @@ using Mediator;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Api.TransportOrders;
+using Norvia.Tms.Application.TransportOrders.Rate;
 using Norvia.Tms.Application.TransportOrders.Submit;
 using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Infrastructure;
@@ -14,8 +15,10 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 builder.Services.AddScoped<IPipelineBehavior<SubmitTransportOrderCommand, Result<SubmitTransportOrderResult>>, TrackIntakeInLoggingScope>();
+builder.Services.AddScoped<IPipelineBehavior<SubmitTransportOrderCommand, Result<SubmitTransportOrderResult>>, TriggerRatingAfterAcceptance>();
 builder.AddTmsInfrastructure();
 builder.AddTmsOutboxPublisher();
+builder.AddTmsRatingWorker();
 
 // Issuer, audience and keys come from Authentication:Schemes:Bearer: Entra in Azure, the AppHost's local key otherwise.
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

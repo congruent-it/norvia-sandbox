@@ -1,0 +1,61 @@
+using System.Text.Json;
+using Microsoft.Extensions.Options;
+using Norvia.Tms.Application.RateCards;
+using Norvia.Tms.Domain.RateCards;
+using Norvia.Tms.Domain.Shippers;
+using Norvia.Tms.Infrastructure.Shippers;
+
+namespace Norvia.Tms.Infrastructure.RateCards;
+
+/// <summary>
+/// The TMS's read copy of the Shippers' Rate Cards, loaded once from the seed file, which plays the ERP until its sync
+/// exists (ADR 0006). A Shipper may have no Rate Card; one with two is a broken seed.
+/// </summary>
+internal sealed class SeedFileRateCardDirectory : IRateCardDirectory
+{
+    private static readonly JsonSerializerOptions SeedJson = new(JsonSerializerDefaults.Web);
+    private readonly Dictionary<ShipperId, RateCard> _rateCards;
+
+    public SeedFileRateCardDirectory(IOptions<SeedOptions> options)
+    {
+        using var file = File.OpenRead(options.Value.Path);
+        var seed = JsonSerializer.Deserialize<SeedFile>(file, SeedJson)
+            ?? throw new InvalidDataException($"The seed file '{options.Value.Path}' is empty.");
+
+        _rateCards = (seed.RateCards ?? [])
+            .Select(ToRateCard)
+            .ToDictionary(rateCard => rateCard.ShipperId);
+    }
+
+    public RateCard? FindFor(ShipperId shipperId) => _rateCards.GetValueOrDefault(shipperId);
+
+    private static RateCard ToRateCard(SeedRateCard rateCard) => new(
+        rateCard.Id,
+        new ShipperId(rateCard.ShipperId),
+        [.. rateCard.Versions.Select(version => new RateCardVersion(
+            version.Version,
+            version.ValidFrom,
+            version.ValidTo,
+            [.. version.Zones.Select(zone => new Zone(zone.Name, zone.Country, zone.PostcodePrefixes))],
+            [.. version.Lanes.Select(lane => new Lane(
+                lane.Origin,
+                lane.Destination,
+                [.. lane.WeightBreaks.Select(weightBreak => new WeightBreak(weightBreak.UpToKg, weightBreak.PricePer100Kg))]))]))]);
+
+    private sealed record SeedFile(IReadOnlyList<SeedRateCard>? RateCards);
+
+    private sealed record SeedRateCard(string Id, string ShipperId, IReadOnlyList<SeedRateCardVersion> Versions);
+
+    private sealed record SeedRateCardVersion(
+        int Version,
+        DateOnly ValidFrom,
+        DateOnly? ValidTo,
+        IReadOnlyList<SeedZone> Zones,
+        IReadOnlyList<SeedLane> Lanes);
+
+    private sealed record SeedZone(string Name, string Country, IReadOnlyList<string> PostcodePrefixes);
+
+    private sealed record SeedLane(string Origin, string Destination, IReadOnlyList<SeedWeightBreak> WeightBreaks);
+
+    private sealed record SeedWeightBreak(decimal UpToKg, decimal PricePer100Kg);
+}

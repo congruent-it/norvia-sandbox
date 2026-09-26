@@ -1,4 +1,5 @@
 using Ardalis.SharedKernel;
+using Norvia.Tms.Domain.RateCards;
 using Norvia.Tms.Domain.Shippers;
 
 namespace Norvia.Tms.Domain.TransportOrders;
@@ -51,8 +52,36 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
     /// <summary>Every rule a Rejected booking broke; empty for an Accepted Transport Order.</summary>
     public IReadOnlyList<RejectionReason> RejectionReasons { get; private set; } = [];
 
+    /// <summary>Null for a Rejected booking, which is never rated.</summary>
+    public RatingResult? RatingResult { get; private set; }
+
+    /// <summary>The Freight Charge frozen on the Transport Order once it is Rated; null until then.</summary>
+    public FreightCharge? FreightCharge { get; private set; }
+
+    /// <summary>When the Transport Order was Rated; null until then.</summary>
+    public DateTimeOffset? RatedAt { get; private set; }
+
     /// <summary>Whether a booking under this Transport Order's Shipper reference is the same booking sent again.</summary>
     public bool IsRepeatOf(TransportOrderDetails details) => Details.Equals(details);
+
+    /// <summary>
+    /// Rates a Transport Order that is Not yet rated, from its Shipper's Rate Card, and freezes the Freight Charge on it.
+    /// Returns false, changing nothing, when it isn't waiting for Rating, or when there is no Rate Card or it can't price
+    /// the order.
+    /// </summary>
+    public bool Rate(RateCard? rateCard, DateTimeOffset ratedAt)
+    {
+        if (RatingResult != TransportOrders.RatingResult.NotYetRated || rateCard?.FreightChargeFor(Details) is not { } freightCharge)
+        {
+            return false;
+        }
+
+        RatingResult = TransportOrders.RatingResult.Rated;
+        FreightCharge = freightCharge;
+        RatedAt = ratedAt;
+        RegisterDomainEvent(new TransportOrderRatedEvent(this));
+        return true;
+    }
 
     public static TransportOrder Accept(
         ShipperId shipperId,
@@ -67,6 +96,7 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
             Number = number,
             Status = TransportOrderStatus.Accepted,
             ShipperReference = details.ShipperReference,
+            RatingResult = channel == IntakeChannel.Wms ? TransportOrders.RatingResult.NotRatedSeparately : TransportOrders.RatingResult.NotYetRated,
         };
         order.RegisterDomainEvent(new TransportOrderAcceptedEvent(order));
         return order;

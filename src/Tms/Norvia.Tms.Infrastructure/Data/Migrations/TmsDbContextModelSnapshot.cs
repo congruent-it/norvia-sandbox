@@ -44,9 +44,19 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                         .HasColumnType("nvarchar(max)")
                         .HasColumnName("Details");
 
+                    b.Property<string>("FreightCharge")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Number")
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");
+
+                    b.Property<DateTimeOffset?>("RatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("RatingResult")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
 
                     b.Property<DateTimeOffset>("ReceivedAt")
                         .HasColumnType("datetimeoffset");
@@ -54,6 +64,11 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                     b.Property<string>("RejectionReasons")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
 
                     b.Property<string>("ShipperId")
                         .IsRequired()
@@ -75,6 +90,8 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                     b.HasIndex("Number")
                         .IsUnique()
                         .HasFilter("[Number] IS NOT NULL");
+
+                    b.HasIndex("RatingResult", "ReceivedAt");
 
                     b.HasIndex("ShipperId", "ShipperReference")
                         .IsUnique()

@@ -4,4 +4,7 @@ namespace Norvia.Tms.Application.IntegrationEvents;
 public static class Flows
 {
     public const string TransportOrderIntake = "transport-order-intake";
+
+    /// <summary>Rating an accepted Transport Order (P2), which continues the Message trail of its intake.</summary>
+    public const string TransportOrderRating = "transport-order-rating";
 }
