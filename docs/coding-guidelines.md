@@ -184,6 +184,7 @@ A key that doesn't apply is left out, never sent empty.
 - Use xUnit for all test projects.
 - Use **NSubstitute** for test doubles. Do not add another mocking library.
   - Substitute interfaces, not concrete classes.
+    Azure SDK clients are the exception: they are designed to be substituted (virtual methods, `*ModelFactory` for results), so substitute the client rather than wrapping it in a port of your own.
   - Substitute only what crosses a boundary of the unit under test (repositories, publishers, clocks, HTTP clients). Do not substitute domain entities or value objects; construct real ones.
   - Prefer asserting on outcomes over `Received()` checks. Use `Received()` when the call itself is the behaviour being tested, such as "publishes `ShipmentDelivered`".
 - Handlers are tested with `IRepository<T>` / `IReadRepository<T>` substituted by NSubstitute; configure them with `Arg.Any<ISpecification<T>>()` or `Arg.Is<SomeSpec>(...)`.

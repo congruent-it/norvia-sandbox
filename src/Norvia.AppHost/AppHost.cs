@@ -137,14 +137,24 @@ else
     // roles, as the estate assigns the presenter. It reads Azure with the developer's own sign-in.
     // It searches a deployed estate's workspace once the developer gives it the parameters azd gives it in Azure, as
     // user secrets (Parameters:estate-log-analytics-workspace-id and Parameters:estate-integration-retention-days).
-    // Without a workspace it still starts, and search says it isn't connected; the retention is then the estate
-    // Bicep's default.
+    // Without a workspace it still starts, and search says it can't be run.
+    var estateWorkspaceId = builder.Configuration["Parameters:estate-log-analytics-workspace-id"];
+    var estateRetentionDays = builder.Configuration["Parameters:estate-integration-retention-days"];
+    if (!string.IsNullOrEmpty(estateWorkspaceId) && string.IsNullOrEmpty(estateRetentionDays))
+    {
+        // Guessing would cap searches at a period the estate doesn't keep.
+        throw new InvalidOperationException(
+            "The Integration console has an estate's workspace but not its retention: set Parameters:estate-integration-retention-days " +
+            "to the estate's integrationRetentionDays (AZURE_ESTATE_INTEGRATION_RETENTION_DAYS in azd env get-values).");
+    }
+
     integrationConsole
         .WithEnvironment("LocalOperator__Name", $"{Environment.UserName} (local)")
         .WithEnvironment("LocalOperator__Roles__0", "IntegrationConsole.Read")
         .WithEnvironment("LocalOperator__Roles__1", "IntegrationConsole.Resubmit")
-        .WithEnvironment("Estate__LogAnalyticsWorkspaceId", builder.Configuration["Parameters:estate-log-analytics-workspace-id"] ?? string.Empty)
-        .WithEnvironment("Estate__IntegrationRetentionDays", builder.Configuration["Parameters:estate-integration-retention-days"] ?? "90");
+        .WithEnvironment("Estate__LogAnalyticsWorkspaceId", estateWorkspaceId ?? string.Empty)
+        // Without an estate no search reaches Azure, so the retention is only a placeholder the console starts with.
+        .WithEnvironment("Estate__IntegrationRetentionDays", estateRetentionDays ?? "90");
 
     // Locally the TMS trusts tokens signed with this key (see LocalTokens).
     var localTokenSigningKey = builder.AddParameter(

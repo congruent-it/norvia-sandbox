@@ -258,6 +258,30 @@ public sealed class AppHostModelTests
         builder.Resources.OfType<ParameterResource>().Should().NotContain(parameter => parameter.Name == "estate-log-analytics-workspace-id");
     }
 
+    [Fact]
+    public async Task Locally_TheIntegrationConsole_GivenADeployedEstate_SearchesItsWorkspaceWithinItsRetention()
+    {
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(
+            ["--Parameters:estate-log-analytics-workspace-id=7f4c1b0e-0000-0000-0000-000000000001", "--Parameters:estate-integration-retention-days=30"],
+            TestContext.Current.CancellationToken);
+
+        var console = await EnvironmentOfAsync(builder, "integration-console-web");
+
+        console.Should().Contain("Estate__LogAnalyticsWorkspaceId", "7f4c1b0e-0000-0000-0000-000000000001")
+            .And.Contain("Estate__IntegrationRetentionDays", "30");
+    }
+
+    [Fact]
+    public async Task Locally_TheIntegrationConsole_GivenAWorkspaceWithoutItsRetention_DoesNotStart()
+    {
+        // Guessing the retention would cap searches at a period the estate doesn't keep.
+        var create = () => DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(
+            ["--Parameters:estate-log-analytics-workspace-id=7f4c1b0e-0000-0000-0000-000000000001"],
+            TestContext.Current.CancellationToken);
+
+        (await create.Should().ThrowAsync<Exception>()).Which.ToString().Should().Contain("Parameters:estate-integration-retention-days");
+    }
+
     private static Task<IDistributedApplicationTestingBuilder> CreateForAzureAsync() =>
         DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(
             ["--operation", "publish", "--publisher", "default", "--output-path", Path.GetTempPath()],
