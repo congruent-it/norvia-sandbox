@@ -37,6 +37,7 @@ public sealed class RunJourneyTests(ConsoleUiFixture console) : BrowserPage(cons
         var steps = Page.GetByRole(AriaRole.Table, new() { Name = "Steps" });
         await Expect(steps.GetByRole(AriaRole.Row).Filter(new() { HasText = "Submit_to_TMS" })).ToContainTextAsync("ServiceUnavailable: The TMS answered 503.");
         await Expect(Page.GetByText("Café De Kroon")).ToHaveCountAsync(0);
+        (await CutOffColumnTitlesAsync(steps)).Should().BeEmpty();
 
         await steps.GetByRole(AriaRole.Button, new() { Name = "Map_partner_booking" }).ClickAsync();
 
