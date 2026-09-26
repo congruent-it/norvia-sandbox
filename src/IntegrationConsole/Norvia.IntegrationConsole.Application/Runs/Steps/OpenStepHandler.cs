@@ -1,7 +1,6 @@
 using Ardalis.Result;
 using Mediator;
 using Microsoft.Extensions.Options;
-using Norvia.IntegrationConsole.Application.Runs.Open;
 using Norvia.IntegrationConsole.Application.Trails;
 
 namespace Norvia.IntegrationConsole.Application.Runs.Steps;
@@ -14,7 +13,7 @@ public sealed class OpenStepHandler(IWorkflowRuns runs, IOptions<IntegrationRete
         ArgumentNullException.ThrowIfNull(query);
 
         var step = query.Step?.Trim();
-        if (OpenRunHandler.RunOf(query.LogicApp, query.Workflow, query.RunId) is not { } run || string.IsNullOrEmpty(step))
+        if (WorkflowRun.Of(query.LogicApp, query.Workflow, query.RunId) is not { } run || string.IsNullOrEmpty(step))
         {
             return Result.Invalid(new ValidationError(nameof(query.Step), "Open a step by its run and its name."));
         }

@@ -207,33 +207,57 @@ public sealed class LogicAppsWorkflowRunsTests : IDisposable
     }
 
     [Fact]
-    public async Task BodiesAsync_ForAStepTheRunDoesntHave_ReturnsNull()
+    public async Task BodiesAsync_ForAStepTheRunDoesntHave_Throws()
     {
+        // The run is kept, so a step it doesn't have is a wrong address, not an expired one.
         _history.Run("Succeeded", "2026-09-26T10:00:00Z", "2026-09-26T10:00:01Z", Trigger("manual", "Succeeded", 0, 0.05));
 
-        var bodies = await WorkflowRuns().BodiesAsync(Run, "No_such_step", TestContext.Current.CancellationToken);
+        var fetch = () => WorkflowRuns().BodiesAsync(Run, "No_such_step", TestContext.Current.CancellationToken);
 
-        bodies.Should().BeNull();
+        await fetch.Should().ThrowAsync<HttpRequestException>();
     }
 
     [Fact]
-    public async Task BodiesAsync_ForABodyRunHistoryNoLongerHas_ReturnsNull()
+    public async Task BodiesAsync_ForABodyRunHistoryNoLongerHas_SaysThatOneIsNone_AndKeepsTheOther()
     {
         var input = ContentLink("Map_partner_booking", "ActionInputs");
+        var output = ContentLink("Map_partner_booking", "ActionOutputs");
         _history
             .Run("Succeeded", "2026-09-26T10:00:00Z", "2026-09-26T10:00:01Z", Trigger("manual", "Succeeded", 0, 0.05))
-            .Answer(ActionAddress("Map_partner_booking"), Action("Map_partner_booking", "Succeeded", 0.1, 0.35, input));
+            .Answer(ActionAddress("Map_partner_booking"), Action("Map_partner_booking", "Succeeded", 0.1, 0.35, input, output))
+            .Answer(output, HttpStatusCode.OK, TransportOrder);
 
         var bodies = await WorkflowRuns().BodiesAsync(Run, "Map_partner_booking", TestContext.Current.CancellationToken);
 
-        bodies.Should().BeNull();
+        bodies.Should().Be(new RecordedBodies(RecordedBody.None, new RecordedBody(false, TransportOrder)));
     }
 
     [Fact]
-    public async Task RunAsync_WhenTheDefinitionCantBeRead_ShowsTheStepsWithoutSecureMarks()
+    public async Task RunAsync_ForAWorkflowTheLogicAppDoesntHave_Throws_RatherThanSayTheRunIsNoLongerKept()
+    {
+        // A wrong Logic App or workflow is a fault to see, not a run past its retention.
+        _history.Answer(DefinitionAddress, HttpStatusCode.NotFound);
+
+        var read = () => WorkflowRuns().RunAsync(Run, TestContext.Current.CancellationToken);
+
+        await read.Should().ThrowAsync<HttpRequestException>();
+    }
+
+    [Fact]
+    public async Task BodiesAsync_ForAWorkflowTheLogicAppDoesntHave_Throws()
+    {
+        _history.Answer(DefinitionAddress, HttpStatusCode.NotFound);
+
+        var fetch = () => WorkflowRuns().BodiesAsync(Run, "manual", TestContext.Current.CancellationToken);
+
+        await fetch.Should().ThrowAsync<HttpRequestException>();
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenTheWorkflowComesWithoutItsDefinition_ShowsTheStepsWithoutSecureMarks()
     {
         _history
-            .Answer(DefinitionAddress, HttpStatusCode.NotFound)
+            .Answer(DefinitionAddress, new JsonObject { ["name"] = Workflow, ["properties"] = new JsonObject() })
             .Run("Succeeded", "2026-09-26T10:00:00Z", "2026-09-26T10:00:01Z", Trigger("manual", "Succeeded", 0, 0.05))
             .Answer(ActionsAddress, Actions());
 

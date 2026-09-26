@@ -16,4 +16,8 @@ public sealed record RunDetail(
     DateTimeOffset? Start,
     TimeSpan? Duration,
     IReadOnlyList<RunStep> Steps,
-    int RunHistoryDays);
+    int RunHistoryDays)
+{
+    /// <summary>Whether the run ended without doing what it was for: failed, timed out, aborted or cancelled.</summary>
+    public bool HasFailure => RunStatuses.IsFailure(Status);
+}

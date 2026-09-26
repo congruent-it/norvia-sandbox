@@ -159,7 +159,7 @@ public sealed class RunTests : ConsoleWebContext
         AnswerStep("Map_partner_booking", StepBody.Shown(Booking), StepBody.Shown("""{"transportOrder":{"number":null}}"""));
         var page = RenderRun();
 
-        page.Find("button[data-step='Map_partner_booking']").Click();
+        page.Find("fluent-button[data-step='Map_partner_booking']").Click();
 
         _runs.Received(1).OpenStepAsync(new OpenStepQuery(Run.LogicApp, Run.Workflow, Run.RunId, "Map_partner_booking"), Arg.Any<CancellationToken>());
         var step = page.Find("[aria-label='Step Map_partner_booking']");
@@ -183,7 +183,7 @@ public sealed class RunTests : ConsoleWebContext
         AnswerStep("Map_partner_booking", StepBody.Shown("<booking ref=\"BD-2026-0042\"/>"), StepBody.None);
         var page = RenderRun();
 
-        page.Find("button[data-step='Map_partner_booking']").Click();
+        page.Find("fluent-button[data-step='Map_partner_booking']").Click();
 
         page.Find("[aria-label='Step Map_partner_booking'] pre").TextContent.Should().Be("<booking ref=\"BD-2026-0042\"/>");
         page.Find("[aria-label='Step Map_partner_booking']").TextContent.Should().Contain("No output recorded.");
@@ -195,7 +195,7 @@ public sealed class RunTests : ConsoleWebContext
         AnswerStep("Map_partner_booking", StepBody.Hidden, StepBody.Hidden);
         var page = RenderRun();
 
-        page.Find("button[data-step='Map_partner_booking']").Click();
+        page.Find("fluent-button[data-step='Map_partner_booking']").Click();
 
         var step = page.Find("[aria-label='Step Map_partner_booking']");
         step.QuerySelectorAll("pre").Should().BeEmpty();
@@ -210,7 +210,7 @@ public sealed class RunTests : ConsoleWebContext
             .Returns(Result.Success(new StepDetail(Run, "Map_partner_booking", IsKept: false, StepBody.None, StepBody.None, 90)));
         var page = RenderRun();
 
-        page.Find("button[data-step='Map_partner_booking']").Click();
+        page.Find("fluent-button[data-step='Map_partner_booking']").Click();
 
         page.Find("[aria-label='Step Map_partner_booking'] [role=status]").TextContent
             .Should().Contain("Body no longer kept (run history is kept for 90 days).");
@@ -222,7 +222,7 @@ public sealed class RunTests : ConsoleWebContext
         _runs.OpenStepAsync(Arg.Any<OpenStepQuery>(), Arg.Any<CancellationToken>()).Returns(new TaskCompletionSource<Result<StepDetail>>().Task);
         var page = RenderRun();
 
-        page.Find("button[data-step='Submit_to_TMS']").Click();
+        page.Find("fluent-button[data-step='Submit_to_TMS']").Click();
 
         page.Find("[aria-label='Step Submit_to_TMS'] [role=status]").TextContent.Should().Contain("Fetching the bodies of Submit_to_TMS");
     }
@@ -234,7 +234,7 @@ public sealed class RunTests : ConsoleWebContext
             .Returns<Result<StepDetail>>(_ => throw new HttpRequestException("500"));
         var page = RenderRun();
 
-        page.Find("button[data-step='Submit_to_TMS']").Click();
+        page.Find("fluent-button[data-step='Submit_to_TMS']").Click();
 
         page.Find("[aria-label='Step Submit_to_TMS'] [role=alert]").TextContent.Should().Contain("The bodies of Submit_to_TMS couldn't be fetched.");
     }
@@ -246,12 +246,12 @@ public sealed class RunTests : ConsoleWebContext
         AnswerStep("Map_partner_booking", StepBody.Shown(Booking), StepBody.None);
         var page = RenderRun();
 
-        page.Find("button[data-step='manual']").Click();
-        page.Find("button[data-step='Map_partner_booking']").Click();
+        page.Find("fluent-button[data-step='manual']").Click();
+        page.Find("fluent-button[data-step='Map_partner_booking']").Click();
 
         page.FindAll("[aria-label^='Step ']").Select(step => step.GetAttribute("aria-label")).Should().Equal("Step Map_partner_booking");
-        page.Find("button[data-step='Map_partner_booking']").GetAttribute("aria-expanded").Should().Be("true");
-        page.Find("button[data-step='manual']").GetAttribute("aria-expanded").Should().Be("false");
+        page.Find("fluent-button[data-step='Map_partner_booking']").GetAttribute("aria-expanded").Should().Be("true");
+        page.Find("fluent-button[data-step='manual']").GetAttribute("aria-expanded").Should().Be("false");
     }
 
     private IRenderedComponent<Runs.Run> RenderRun() =>

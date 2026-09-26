@@ -32,12 +32,12 @@ internal sealed class LogicAppsWorkflowRuns(IHttpClientFactory clients, TokenCre
         ArgumentNullException.ThrowIfNull(run);
 
         var workflow = WorkflowAddress(run);
-        if (await GetAsync($"{workflow}/runs/{Escaped(run.RunId)}?{ApiVersion}", cancellationToken) is not { } recorded)
+        var secure = await SecureDataAsync(workflow, cancellationToken);
+        if (await GetAsync(RunAddress(workflow, run), cancellationToken) is not { } recorded)
         {
             return null;
         }
 
-        var secure = await SecureDataAsync(workflow, cancellationToken);
         var steps = new List<RecordedStep>();
         if (recorded["properties"]?["trigger"] is JsonObject trigger)
         {
@@ -45,7 +45,7 @@ internal sealed class LogicAppsWorkflowRuns(IHttpClientFactory clients, TokenCre
         }
 
         // A run with many actions answers a page at a time.
-        string? page = $"{workflow}/runs/{Escaped(run.RunId)}/actions?{ApiVersion}";
+        string? page = RunAddress(workflow, run, "/actions");
         while (page is not null && await GetAsync(page, cancellationToken) is { } actions)
         {
             steps.AddRange(Items(actions).Select(action => Step(action, action["properties"] as JsonObject, secure)));
@@ -61,27 +61,24 @@ internal sealed class LogicAppsWorkflowRuns(IHttpClientFactory clients, TokenCre
         ArgumentNullException.ThrowIfNull(run);
 
         var workflow = WorkflowAddress(run);
-        if (await GetAsync($"{workflow}/runs/{Escaped(run.RunId)}?{ApiVersion}", cancellationToken) is not { } recorded)
+        var secure = (await SecureDataAsync(workflow, cancellationToken)).GetValueOrDefault(stepName, SecureData.None);
+        if (await GetAsync(RunAddress(workflow, run), cancellationToken) is not { } recorded)
         {
             return null;
         }
 
+        // The run is kept, so a step it doesn't have is a wrong address: that is an error, not an expired run.
         var step = recorded["properties"]?["trigger"] is JsonObject trigger && Text(trigger, "name") == stepName
             ? trigger
-            : (await GetAsync($"{workflow}/runs/{Escaped(run.RunId)}/actions/{Escaped(stepName)}?{ApiVersion}", cancellationToken))?["properties"];
-        if (step is null)
-        {
-            return null;
-        }
+            : (await GetAsync(RunAddress(workflow, run, $"/actions/{Escaped(stepName)}"), cancellationToken)
+                ?? throw new HttpRequestException($"The run has no step {stepName}.", null, HttpStatusCode.NotFound))["properties"];
 
-        var secure = (await SecureDataAsync(workflow, cancellationToken)).GetValueOrDefault(stepName);
-        var input = await BodyAsync(step["inputsLink"], secure.Inputs, cancellationToken);
-        var output = await BodyAsync(step["outputsLink"], secure.Outputs, cancellationToken);
-        return input is null || output is null ? null : new RecordedBodies(input, output);
+        return new RecordedBodies(
+            await BodyAsync(step?["inputsLink"], secure.Inputs, cancellationToken),
+            await BodyAsync(step?["outputsLink"], secure.Outputs, cancellationToken));
     }
 
-    // Null when run history no longer has the body behind the link.
-    private async Task<RecordedBody?> BodyAsync(JsonNode? link, bool secure, CancellationToken cancellationToken)
+    private async Task<RecordedBody> BodyAsync(JsonNode? link, bool secure, CancellationToken cancellationToken)
     {
         if (secure)
         {
@@ -93,10 +90,11 @@ internal sealed class LogicAppsWorkflowRuns(IHttpClientFactory clients, TokenCre
             return RecordedBody.None;
         }
 
+        // Run history can clear one body before the run itself; the other still shows.
         using var response = await clients.CreateClient(ContentsClient).GetAsync(new Uri(uri), cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
-            return null;
+            return RecordedBody.None;
         }
 
         response.EnsureSuccessStatusCode();
@@ -104,16 +102,17 @@ internal sealed class LogicAppsWorkflowRuns(IHttpClientFactory clients, TokenCre
     }
 
     /// <summary>
-    /// Which steps keep their inputs or outputs out of run history, as the workflow's definition sets them. Without the
-    /// definition no step is marked, and a hidden body shows as none.
+    /// Which steps keep their inputs or outputs out of run history, as the workflow's definition sets them. A workflow
+    /// the Logic App doesn't have is a wrong address, so it fails rather than reading as a run past its retention. When
+    /// the workflow comes without its definition no step is marked, and a hidden body shows as none.
     /// </summary>
-    private async Task<Dictionary<string, (bool Inputs, bool Outputs)>> SecureDataAsync(string workflow, CancellationToken cancellationToken)
+    private async Task<Dictionary<string, SecureData>> SecureDataAsync(string workflow, CancellationToken cancellationToken)
     {
-        var secure = new Dictionary<string, (bool Inputs, bool Outputs)>(StringComparer.Ordinal);
+        var secure = new Dictionary<string, SecureData>(StringComparer.Ordinal);
         using var request = await RequestAsync($"{workflow}?{ApiVersion}", cancellationToken);
         using var response = await clients.CreateClient(ManagementClient).SendAsync(request, cancellationToken);
-        if (!response.IsSuccessStatusCode
-            || JsonNode.Parse(await response.Content.ReadAsStringAsync(cancellationToken))?["properties"]?["definition"] is not JsonObject definition)
+        response.EnsureSuccessStatusCode();
+        if (JsonNode.Parse(await response.Content.ReadAsStringAsync(cancellationToken))?["properties"]?["definition"] is not JsonObject definition)
         {
             return secure;
         }
@@ -134,7 +133,7 @@ internal sealed class LogicAppsWorkflowRuns(IHttpClientFactory clients, TokenCre
                 if (child["runtimeConfiguration"]?["secureData"]?["properties"] is JsonArray properties)
                 {
                     var hidden = properties.Select(property => property?.GetValue<string>()).ToList();
-                    secure[name] = (hidden.Contains("inputs"), hidden.Contains("outputs"));
+                    secure[name] = new SecureData(hidden.Contains("inputs"), hidden.Contains("outputs"));
                 }
 
                 Collect(child);
@@ -175,13 +174,16 @@ internal sealed class LogicAppsWorkflowRuns(IHttpClientFactory clients, TokenCre
             $"/hostruntime/runtime/webhooks/workflow/api/management/workflows/{Escaped(run.Workflow)}";
     }
 
-    private static RecordedStep Step(JsonNode named, JsonNode? properties, Dictionary<string, (bool Inputs, bool Outputs)> secure)
+    private static string RunAddress(string workflow, WorkflowRun run, string below = "") =>
+        $"{workflow}/runs/{Escaped(run.RunId)}{below}?{ApiVersion}";
+
+    private static RecordedStep Step(JsonNode named, JsonNode? properties, Dictionary<string, SecureData> secure)
     {
         var name = Text(named, "name") ?? string.Empty;
         var error = properties?["error"] is JsonObject failed && Text(failed, "code") is { } code
             ? new StepError(code, Text(failed, "message"))
             : null;
-        var (inputs, outputs) = secure.GetValueOrDefault(name);
+        var (inputs, outputs) = secure.GetValueOrDefault(name, SecureData.None);
         return new RecordedStep(
             name, Text(properties, "status") ?? "Unknown", Time(properties, "startTime"), Time(properties, "endTime"), error, inputs, outputs);
     }

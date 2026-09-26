@@ -12,8 +12,8 @@ public interface IWorkflowRuns
     Task<RecordedRun?> RunAsync(WorkflowRun run, CancellationToken cancellationToken);
 
     /// <summary>
-    /// The input and output bodies of one step of the run, or null once run history no longer keeps the run or the step.
-    /// A body behind secure inputs or outputs is not fetched.
+    /// The input and output bodies of one step of the run, or null once run history no longer keeps the run. A body
+    /// behind secure inputs or outputs is not fetched, and one run history has already cleared is none.
     /// </summary>
     Task<RecordedBodies?> BodiesAsync(WorkflowRun run, string stepName, CancellationToken cancellationToken);
 }

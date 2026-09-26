@@ -43,7 +43,4 @@ public static class RunText
         { Message: { Length: > 0 } message } => $"{error.Code}: {message}",
         _ => error.Code,
     };
-
-    /// <summary>Whether a run or step ended without doing what it was for.</summary>
-    public static bool IsFailure(string? status) => status is "Failed" or "TimedOut" or "Aborted" or "Cancelled";
 }

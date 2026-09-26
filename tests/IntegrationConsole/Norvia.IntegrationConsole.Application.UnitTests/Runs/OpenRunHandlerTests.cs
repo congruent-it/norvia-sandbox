@@ -33,6 +33,27 @@ public sealed class OpenRunHandlerTests
             new RunStep("Map_partner_booking", "Succeeded", Started.AddSeconds(0.1), TimeSpan.FromMilliseconds(250), null, false, false),
             new RunStep("Submit_to_TMS", "Failed", Started.AddSeconds(0.4), TimeSpan.FromSeconds(2.5),
                 new StepError("ServiceUnavailable", "The TMS answered 503."), false, false));
+        run.HasFailure.Should().BeTrue();
+        run.Steps.Select(step => step.HasFailure).Should().Equal(false, false, true);
+    }
+
+    [Theory]
+    [InlineData("Failed", true)]
+    [InlineData("TimedOut", true)]
+    [InlineData("Aborted", true)]
+    [InlineData("Cancelled", true)]
+    [InlineData("Succeeded", false)]
+    [InlineData("Skipped", false)]
+    [InlineData("Running", false)]
+    public async Task Handle_ForARunAndAStep_CountsAFailureAsLogicAppsDoes(string status, bool failed)
+    {
+        // A skipped step is how a workflow routes around a failure, not one itself.
+        Record(new RecordedRun(status, Started, null, [Step("Submit_to_TMS", status, 0, null)]));
+
+        var run = await OpenAsync();
+
+        run.HasFailure.Should().Be(failed);
+        run.Steps.Should().ContainSingle().Which.HasFailure.Should().Be(failed);
     }
 
     [Theory]

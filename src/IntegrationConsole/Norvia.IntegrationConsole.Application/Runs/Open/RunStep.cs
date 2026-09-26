@@ -11,4 +11,8 @@ public sealed record RunStep(
     TimeSpan? Duration,
     StepError? Error,
     bool InputsHidden,
-    bool OutputsHidden);
+    bool OutputsHidden)
+{
+    /// <summary>Whether the step ended without doing what it was for: failed, timed out, aborted or cancelled.</summary>
+    public bool HasFailure => RunStatuses.IsFailure(Status);
+}

@@ -53,7 +53,7 @@ else if (_run is { IsKept: false } expired)
 else if (_run is { } run)
 {
     <p data-run-status class="mb-6">
-        <span class="@(RunText.IsFailure(run.Status) ? "font-bold text-danger" : "")">@run.Status</span>
+        <span class="@(run.HasFailure ? "font-bold text-danger" : "")">@run.Status</span>
         @if (run.Start is { } start)
         {
             <span>, started @ConsoleTime.Format(start)</span>
@@ -74,11 +74,10 @@ else if (_run is { } run)
         <FluentDataGrid Items="run.Steps.AsQueryable()" TGridItem="RunStep" aria-label="Steps" MultiLine="true"
                         GridTemplateColumns="minmax(16rem, max-content) max-content max-content max-content minmax(12rem, 1fr)">
             <TemplateColumn Title="Step">
-                <button type="button" data-step="@context.Name" aria-expanded="@(_step == context.Name ? "true" : "false")"
-                        class="cursor-pointer border-0 bg-transparent p-0 text-left font-mono text-success underline hover:text-white"
-                        @onclick="() => OpenStepAsync(context.Name)">
+                <FluentButton Appearance="Appearance.Lightweight" Class="font-mono" data-step="@context.Name"
+                              aria-expanded="@(_step == context.Name ? "true" : "false")" OnClick="() => OpenStepAsync(context.Name)">
                     @context.Name
-                </button>
+                </FluentButton>
                 @if (context.InputsHidden)
                 {
                     <span data-hidden="inputs" class="text-muted ml-2 text-xs">Input hidden</span>
@@ -89,7 +88,7 @@ else if (_run is { } run)
                 }
             </TemplateColumn>
             <TemplateColumn Title="Status">
-                <span class="@(RunText.IsFailure(context.Status) ? "font-bold text-danger" : "")">@context.Status</span>
+                <span class="@(context.HasFailure ? "font-bold text-danger" : "")">@context.Status</span>
             </TemplateColumn>
             <PropertyColumn Title="Started" Property="@(step => RunText.Started(step.Start))" />
             <PropertyColumn Title="Duration" Property="@(step => TrailText.Of(step.Duration))" />
