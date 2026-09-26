@@ -66,8 +66,12 @@ else if (_result is { } result)
     @if (result.Trails.Count > 0)
     {
         @* Keys only: a body holds personal data, and shows only when an operator opens a step. *@
-        <FluentDataGrid Items="result.Trails.AsQueryable()" TGridItem="TrailSummary" aria-label="Message trails found">
-            <PropertyColumn Title="Correlation ID" Property="@(trail => trail.CorrelationId)" Class="font-mono text-sm" />
+        @* Every column as wide as its values, which are short and read whole, and the business keys the rest, one per line. *@
+        <FluentDataGrid Items="result.Trails.AsQueryable()" TGridItem="TrailSummary" aria-label="Message trails found" MultiLine="true"
+                        GridTemplateColumns="max-content max-content max-content max-content minmax(8rem, max-content) minmax(14rem, 1fr)">
+            <TemplateColumn Title="Correlation ID">
+                <span class="font-mono text-xs">@context.CorrelationId</span>
+            </TemplateColumn>
             <PropertyColumn Title="Flows" Property="@(trail => string.Join(", ", trail.Flows))" />
             <PropertyColumn Title="First seen" Property="@(trail => ConsoleTime.Format(trail.FirstSeen))" />
             <PropertyColumn Title="Last seen" Property="@(trail => ConsoleTime.Format(trail.LastSeen))" />
@@ -80,7 +84,7 @@ else if (_result is { } result)
                 <ul class="m-0 list-none p-0">
                     @foreach (var key in context.BusinessKeys)
                     {
-                        <li>@TrailText.Of(key)</li>
+                        <li class="whitespace-nowrap">@TrailText.Of(key)</li>
                     }
                 </ul>
             </TemplateColumn>
