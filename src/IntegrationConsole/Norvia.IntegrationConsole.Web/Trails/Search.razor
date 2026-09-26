@@ -1,9 +1,151 @@
 @page "/"
+@* Interactive, not prerendered: prerendering would run every search twice against the estate's telemetry. *@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using Ardalis.Result
+@using Microsoft.Extensions.Options
+@using Norvia.IntegrationConsole.Application.Trails
+@using Norvia.IntegrationConsole.Application.Trails.Search
+@inject ITrailSearch Trails
+@inject NavigationManager Navigation
+@inject IOptions<IntegrationRetention> Retention
+@inject ILogger<Search> Logger
 
 <PageTitle>Search · Integration console</PageTitle>
 
 <h1>Search Message trails</h1>
 <p class="text-muted">
-    Find what the integration layer did with a message, by its correlation ID or a business key it carried. Search isn't
-    here yet.
+    Find what the integration layer did with a message, by its correlation ID or a business key it carried: a Transport
+    Order, Shipment, Carrier booking or Trip number, or a source message ID.
 </p>
+
+<form role="search" aria-label="Message trails" class="mb-8 flex flex-wrap items-end gap-4" @onsubmit="SubmitSearch">
+    <FluentTextField @bind-Value="_key" Label="Correlation ID or business key" Placeholder="TO-2026-000123" Class="min-w-80 grow" />
+    <FluentSelect TOption="string" @bind-Value="_range" Label="Time range">
+        @foreach (var range in _ranges)
+        {
+            <FluentOption TOption="string" Value="@range.Code">@range.Label</FluentOption>
+        }
+    </FluentSelect>
+    <FluentButton Type="ButtonType.Submit" Appearance="Appearance.Accent">Search</FluentButton>
+</form>
+
+@if (_searching is { } searched)
+{
+    <div role="status">
+        <FluentStack VerticalAlignment="VerticalAlignment.Center">
+            <FluentProgressRing />
+            <span>Searching for @searched…</span>
+        </FluentStack>
+    </div>
+}
+else if (_failed)
+{
+    <div role="alert">
+        <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+            The search couldn't be run. Try again in a moment; if it keeps failing, the console may not reach the estate's
+            telemetry.
+        </FluentMessageBar>
+    </div>
+}
+else if (_problems is { Count: > 0 })
+{
+    <div role="alert">
+        <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
+            @string.Join(" ", _problems)
+        </FluentMessageBar>
+    </div>
+}
+else if (_result is { } result)
+{
+    <div role="status" class="mb-4">
+        <p class="mb-1">@(result.Trails.Count == 0 ? "No Message trail" : TrailText.Count(result.Trails.Count)) carried <strong>@_searchedKey</strong> between @ConsoleTime.Format(result.From) and @ConsoleTime.Format(result.To).</p>
+        <p class="text-muted">Telemetry may be a few minutes behind.</p>
+    </div>
+
+    @if (result.Trails.Count > 0)
+    {
+        @* Keys only: a body holds personal data, and shows only when an operator opens a step. *@
+        <FluentDataGrid Items="result.Trails.AsQueryable()" TGridItem="TrailSummary" aria-label="Message trails found">
+            <PropertyColumn Title="Correlation ID" Property="@(trail => trail.CorrelationId)" Class="font-mono text-sm" />
+            <PropertyColumn Title="Flows" Property="@(trail => string.Join(", ", trail.Flows))" />
+            <PropertyColumn Title="First seen" Property="@(trail => ConsoleTime.Format(trail.FirstSeen))" />
+            <PropertyColumn Title="Last seen" Property="@(trail => ConsoleTime.Format(trail.LastSeen))" />
+            <TemplateColumn Title="Outcome">
+                <span data-outcome="@context.WorstOutcome" class="@(context.HasFailure ? "font-bold text-danger" : "")">
+                    @TrailText.Of(context.WorstOutcome)
+                </span>
+            </TemplateColumn>
+            <TemplateColumn Title="Business keys">
+                <ul class="m-0 list-none p-0">
+                    @foreach (var key in context.BusinessKeys)
+                    {
+                        <li>@TrailText.Of(key)</li>
+                    }
+                </ul>
+            </TemplateColumn>
+        </FluentDataGrid>
+    }
+}
+
+@code {
+    private IReadOnlyList<TimeRange> _ranges = [];
+    private string? _key;
+    private string _range = TimeRange.Default.Code;
+    private string? _searching;
+    private string? _searchedKey;
+    private bool _failed;
+    private IReadOnlyList<string>? _problems;
+    private TrailSearchResult? _result;
+
+    [SupplyParameterFromQuery(Name = "key")]
+    private string? Key { get; set; }
+
+    [SupplyParameterFromQuery(Name = "within")]
+    private string? Within { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _ranges = TimeRange.All(Retention.Value.IntegrationRetentionDays);
+        var range = TimeRange.Of(Within, Retention.Value.IntegrationRetentionDays);
+        _key = Key;
+        _range = range.Code;
+        _failed = false;
+        _problems = null;
+        _result = null;
+
+        if (Key is null)
+        {
+            return;
+        }
+
+        _searching = _searchedKey = Key.Trim();
+        try
+        {
+            var result = await Trails.SearchAsync(new SearchTrailsQuery(Key, range.Within), CancellationToken.None);
+            if (result.IsSuccess)
+            {
+                _result = result.Value;
+            }
+            else
+            {
+                _problems = [.. result.ValidationErrors.Select(error => error.ErrorMessage)];
+            }
+        }
+        catch (Exception exception)
+        {
+            PageLog.SearchFailed(Logger, exception, _searchedKey);
+            _failed = true;
+        }
+        finally
+        {
+            _searching = null;
+        }
+    }
+
+    private void SubmitSearch() =>
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameters("/", new Dictionary<string, object?>
+        {
+            ["key"] = _key?.Trim(),
+            ["within"] = _range,
+        }));
+}

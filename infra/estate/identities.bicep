@@ -322,3 +322,4 @@ output intakeTriggerAudience string = intakeTrigger.identifierUris[0]
 output demoUisClientId string = demoUis.appId
 output integrationConsoleClientId string = integrationConsole.appId
 output integrationConsoleIdentityName string = integrationConsoleIdentity.name
+output integrationConsolePrincipalId string = integrationConsoleIdentity.properties.principalId

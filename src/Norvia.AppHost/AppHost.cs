@@ -103,6 +103,8 @@ if (builder.ExecutionContext.IsPublishMode)
         .PublishAsExisting(estate.IntegrationConsoleIdentity, null);
     integrationConsole.WithExternalHttpEndpoints()
         .WithAzureUserAssignedIdentity(integrationConsoleIdentity)
+        .WithEnvironment("Estate__LogAnalyticsWorkspaceId", estate.LogAnalyticsWorkspaceId)
+        .WithEnvironment("Estate__IntegrationRetentionDays", estate.IntegrationRetentionDays)
         .PublishAsAzureContainerApp((infrastructure, app) =>
             infrastructure.Add(EntraSignIn.For(infrastructure, app, estate.IntegrationConsoleClientId, estate.EntraIssuer)));
 
@@ -133,10 +135,16 @@ else
 
     // Locally there is no Easy Auth, so the console signs the developer in as an Integration operator with both app
     // roles, as the estate assigns the presenter. It reads Azure with the developer's own sign-in.
+    // It searches a deployed estate's workspace once the developer gives it the parameters azd gives it in Azure, as
+    // user secrets (Parameters:estate-log-analytics-workspace-id and Parameters:estate-integration-retention-days).
+    // Without a workspace it still starts, and search says it isn't connected; the retention is then the estate
+    // Bicep's default.
     integrationConsole
         .WithEnvironment("LocalOperator__Name", $"{Environment.UserName} (local)")
         .WithEnvironment("LocalOperator__Roles__0", "IntegrationConsole.Read")
-        .WithEnvironment("LocalOperator__Roles__1", "IntegrationConsole.Resubmit");
+        .WithEnvironment("LocalOperator__Roles__1", "IntegrationConsole.Resubmit")
+        .WithEnvironment("Estate__LogAnalyticsWorkspaceId", builder.Configuration["Parameters:estate-log-analytics-workspace-id"] ?? string.Empty)
+        .WithEnvironment("Estate__IntegrationRetentionDays", builder.Configuration["Parameters:estate-integration-retention-days"] ?? "90");
 
     // Locally the TMS trusts tokens signed with this key (see LocalTokens).
     var localTokenSigningKey = builder.AddParameter(

@@ -11,6 +11,15 @@ public sealed class Estate(IDistributedApplicationBuilder builder)
 
     public IResourceBuilder<ParameterResource> LogAnalyticsWorkspace { get; } = builder.AddParameter("estate-log-analytics-workspace");
 
+    /// <summary>The Log Analytics workspace's ID (its customer ID), which the Integration console searches.</summary>
+    public IResourceBuilder<ParameterResource> LogAnalyticsWorkspaceId { get; } = builder.AddParameter("estate-log-analytics-workspace-id");
+
+    /// <summary>
+    /// The estate's <c>integrationRetentionDays</c>: how long Application Insights, Log Analytics and run history keep
+    /// what they traced (coding guidelines §7).
+    /// </summary>
+    public IResourceBuilder<ParameterResource> IntegrationRetentionDays { get; } = builder.AddParameter("estate-integration-retention-days");
+
     public IResourceBuilder<ParameterResource> ApplicationInsights { get; } = builder.AddParameter("estate-application-insights");
 
     /// <summary>The issuer of Entra's v2.0 tokens for the estate's tenant, which is also the authority to trust.</summary>
