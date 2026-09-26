@@ -59,7 +59,7 @@ dotnet test Norvia.slnx                      # unit, architecture, integration a
 | [contracts/canonical-model/](contracts/canonical-model/) | The Canonical Model as JSON Schemas |
 | [contracts/partner-api/](contracts/partner-api/README.md) | The Norvia Partner API's booking format and responses, with sample bookings and the Canonical Model Transport Order each maps to |
 | [src/Integration/](src/Integration/) | What the integration layer runs: the intake Logic App ([IntakeLogicApp](src/Integration/IntakeLogicApp/)), and the intake map and relay it calls as .NET local functions ([ADR 0019](docs/adr/0019-the-intake-map-is-dotnet-code-run-as-a-logic-apps-local-function.md)) |
-| [seed/norvia.seed.json](seed/norvia.seed.json) | The seed file: the one source of Shippers, Carriers and Personas |
+| [seed/norvia.seed.json](seed/norvia.seed.json) | The seed file: the one source of Shippers, Rate Cards, Carriers and Personas |
 | [infra/](infra/) | The estate Bicep and the azd hooks that deploy it ([ADR 0004](docs/adr/0004-bicep-owns-the-estate-aspire-owns-the-apps.md)) |
 
 There is no Entra locally. The TMS trusts JWTs signed with the AppHost's secret parameter `local-token-signing-key` (issuer and audience in [LocalTokens.cs](src/Norvia.AppHost/LocalTokens.cs)), so submitting a Transport Order needs a token signed with that key, with the `TransportOrders.Intake` role and the local intake Logic App's client ID as `azp`. The integration tests issue their own.

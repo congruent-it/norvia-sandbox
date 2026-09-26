@@ -28,9 +28,9 @@ Rating failed can move to Rated through a re-rate. Rated and Not rated separatel
 1. **Acceptance.** P1 accepts a Transport Order and commits it. A Transport-only order starts as *Not yet rated*. An order that came in through the WMS channel is set straight to *Not rated separately*, and P2 does nothing more with it.
 2. **Pick-up.** A background worker in the TMS picks up orders that are *Not yet rated*. It is triggered right after the acceptance commit and also sweeps on a timer, so a crash between acceptance and Rating only delays Rating. No order stays *Not yet rated* for good.
 3. **Choose the Rate Card version.** Take the Shipper's Rate Card version that is valid on the collection date: the date of the earliest collection time in the collection window, in the Europe/Amsterdam timezone.
-4. **Match the Lane.** Find the origin Zone (collection address) and the destination Zone (delivery address) by country and postcode prefix. The most specific prefix wins. The Lane is that pair of Zones.
-5. **Choose the Weight Break.** Take the order's total gross weight in kg and find the Lane's Weight Break it falls in.
-6. **Calculate.** Freight = weight ÷ 100 × the price per 100 kg for that Weight Break. If the Freight is below the Lane's minimum charge, add a charge line that makes up the difference.
+4. **Match the Lane.** Find the origin Zone (collection address) and the destination Zone (delivery address) by country and postcode prefix. Postcodes and prefixes are compared without spaces and in upper case. The most specific prefix wins: when an address lies in a Zone for `35` and in one for `3584`, it is in the `3584` Zone. The Lane is that pair of Zones.
+5. **Choose the Weight Break.** Take the order's total gross weight in kg and find the Lane's Weight Break it falls in. Each Weight Break runs from just above the next lighter one (or 0 kg) up to and including its own upper limit, so a weight exactly on a boundary falls in the lighter band: with breaks up to 500 kg and up to 2,000 kg, 500 kg is priced at the up-to-500 kg price.
+6. **Calculate.** Freight = weight ÷ 100 × the price per 100 kg for that Weight Break. If the Freight, rounded to cents, is below the Lane's minimum charge, add a charge line that makes up the difference, so the total is exactly the minimum charge.
 7. **Record.** Store the Freight Charge (its charge lines, the total, and a reference to the Rate Card version used) and set the result to *Rated*. If any of steps 3–5 failed, set the result to *Rating failed* with the reason instead. Publish the outcome event in the same transaction.
 
 ### Re-rate
@@ -41,7 +41,7 @@ In a real operation a pricing desk would work these exceptions. The sandbox give
 
 ## Calculation
 
-- **Money:** EUR only, without VAT. The ERP adds VAT when it invoices. Each charge line is rounded to cents, half away from zero, and the total is the sum of the rounded lines.
+- **Money:** EUR only, without VAT. The ERP adds VAT when it invoices. Each charge line is rounded to cents, half away from zero, and the total is the sum of the rounded lines. The Minimum charge adjustment is worked out from the rounded Freight line: 100.25 kg at 14.00 per 100 kg is a Freight line of 14.04 (from 14.035), and with a minimum of 45.00 an adjustment of 30.96.
 - **Charge lines:** always a *Freight* line. A *Minimum charge adjustment* line is added only when the minimum applies.
 - **Weight basis:** total gross weight. Volumetric weight isn't used yet.
 
@@ -56,9 +56,11 @@ In a real operation a pricing desk would work these exceptions. The sandbox give
 
 ## Rate Cards in the TMS
 
-The TMS holds a read copy of each Shipper's Rate Card and never edits it (ADR 0006). Until the ERP exists, the TMS loads Rate Cards from the seed file at startup, the same way it loads Shippers. A Rate Card whose Zones overlap is rejected when the seed loads. A Rate Card has versions, and each version has a validity period.
+The TMS holds a read copy of each Shipper's Rate Card and never edits it (ADR 0006). Until the ERP exists, the TMS loads Rate Cards from the seed file at startup, the same way it loads Shippers. A Rate Card has versions, and each version has a validity period and its own Zones and Lanes, each Lane with its Weight Breaks and minimum charge.
 
-The demo seed gives Brouwer Dranken a Rate Card with Benelux Lanes and a deliberate gap: no Lane into Germany. A booking from Rotterdam to Düsseldorf shows `NoMatchingLane` and lands in the rating exceptions list. The live "fix the Rate Card, then re-rate" demo waits for the ERP sync. Until then, tests cover that path.
+Zones may nest, a narrower prefix inside a wider one, because the most specific prefix decides. Two Zones of one version overlap when they claim the same prefix in the same country, as then neither is more specific. A Rate Card whose Zones overlap is rejected when the seed loads, and the TMS doesn't start.
+
+The demo seed gives Brouwer Dranken a Rate Card with Lanes from Rotterdam into the Benelux and a deliberate gap: no Lane into Germany. A booking from Rotterdam to Brouwer Dranken's Antwerp address is Rated. A booking from Rotterdam to Düsseldorf shows `NoMatchingLane` and lands in the rating exceptions list. The live "fix the Rate Card, then re-rate" demo waits for the ERP sync. Until then, tests cover that path.
 
 ## Events
 

@@ -50,6 +50,7 @@ public static class DependencyInjection
         builder.Services.AddScoped<IPipelineBehavior<SubmitTransportOrderCommand, Result<SubmitTransportOrderResult>>, RetrySubmissionThatLostARace>();
         builder.Services.AddSingleton<IShipperDirectory, SeedFileShipperDirectory>();
         builder.Services.AddSingleton<IRateCardDirectory, SeedFileRateCardDirectory>();
+        builder.Services.AddHostedService<LoadRateCardsOnStart>();
 
         return builder;
     }

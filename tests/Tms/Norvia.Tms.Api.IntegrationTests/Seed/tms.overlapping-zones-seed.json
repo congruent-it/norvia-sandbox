@@ -1,0 +1,36 @@
+{
+  "$comment": "A broken seed: Rotterdam and Rijnmond both claim NL 31, so neither is more specific and the TMS must refuse to start on it.",
+  "shippers": [
+    {
+      "id": "SHP-0001",
+      "name": "Brouwer Dranken",
+      "active": true,
+      "addresses": []
+    }
+  ],
+  "rateCards": [
+    {
+      "id": "RC-TEST-OVERLAP",
+      "shipperId": "SHP-0001",
+      "versions": [
+        {
+          "version": 1,
+          "validFrom": "2020-01-01",
+          "validTo": null,
+          "zones": [
+            { "name": "Rotterdam", "country": "NL", "postcodePrefixes": ["30", "31"] },
+            { "name": "Rijnmond", "country": "NL", "postcodePrefixes": ["31"] }
+          ],
+          "lanes": [
+            {
+              "origin": "Rotterdam",
+              "destination": "Rijnmond",
+              "minimumCharge": 45.00,
+              "weightBreaks": [{ "upToKg": 24000, "pricePer100Kg": 9.75 }]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

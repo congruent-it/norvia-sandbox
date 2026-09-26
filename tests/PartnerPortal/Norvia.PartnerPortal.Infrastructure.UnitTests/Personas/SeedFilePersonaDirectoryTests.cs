@@ -24,9 +24,12 @@ public sealed class SeedFilePersonaDirectoryTests
     {
         var brouwer = TheSeedFile().Find(new PersonaId("brouwer-dranken"))!;
 
-        brouwer.SavedAddresses.Should().HaveCount(3);
+        brouwer.SavedAddresses.Should().HaveCount(4);
         brouwer.SavedAddresses[0].Should().Be(new SavedAddress("Brouwer Dranken warehouse", "Waalhaven Oostzijde 88", "3087 BM", "Rotterdam", "NL", Consignee: null));
         brouwer.SavedAddresses[1].Consignee.Should().Be(new SavedConsignee("Café De Zwaan", "Sanne de Vries", "+31 30 555 0142"));
+        brouwer.SavedAddresses[2].Should().Be(new SavedAddress(
+            "Drankenhandel De Schelde", "Noorderlaan 120", "2030", "Antwerpen", "BE",
+            new SavedConsignee("Drankenhandel De Schelde BV", "Pieter Janssens", "+32 3 555 0117")));
     }
 
     [Fact]

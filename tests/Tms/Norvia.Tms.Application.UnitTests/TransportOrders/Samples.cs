@@ -61,7 +61,7 @@ internal static class Samples
                 new DateOnly(2026, 1, 1),
                 null,
                 [new Zone(new ZoneName("Rotterdam"), "NL", ["30"]), new Zone(new ZoneName("Utrecht"), "NL", ["35"])],
-                [new Lane(new ZoneName("Rotterdam"), new ZoneName("Utrecht"), [new WeightBreak(500m, new Money(14.00m)), new WeightBreak(1_000m, new Money(12.40m))])]),
+                [new Lane(new ZoneName("Rotterdam"), new ZoneName("Utrecht"), [new WeightBreak(500m, new Money(14.00m)), new WeightBreak(1_000m, new Money(12.40m))], new Money(45.00m))]),
         ]);
 
     public static TransportOrder RatedOrder(long sequence = 7, string correlationId = "corr-1")

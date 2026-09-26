@@ -213,7 +213,7 @@ A pair of Zones, origin to destination, that a Rate Card prices.
 _Avoid_: route, corridor, relation
 
 **Weight Break**:
-A weight band within a Lane that sets the price per 100 kg for Transport Orders whose total weight falls in it.
+A weight band within a Lane that sets the price per 100 kg for Transport Orders whose total weight falls in it. It runs up to and including its upper limit, so a weight on a boundary falls in the lighter band.
 _Avoid_: weight bracket, tier
 
 **Rating**:

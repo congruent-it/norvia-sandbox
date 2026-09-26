@@ -22,6 +22,14 @@
           "consignee": { "name": "Café De Zwaan", "contactName": "Sanne de Vries", "phone": "+31 30 555 0142" }
         },
         {
+          "label": "Drankenhandel De Schelde",
+          "street": "Noorderlaan 120",
+          "postcode": "2030",
+          "city": "Antwerpen",
+          "country": "BE",
+          "consignee": { "name": "Drankenhandel De Schelde BV", "contactName": "Pieter Janssens", "phone": "+32 3 555 0117" }
+        },
+        {
           "label": "Getränke Schmitz",
           "street": "Kölner Landstraße 301",
           "postcode": "40591",
@@ -44,6 +52,96 @@
       "name": "Tuincentrum Groenrijk",
       "active": true,
       "addresses": []
+    }
+  ],
+  "rateCards": [
+    {
+      "$comment": "Brouwer Dranken's Rate Card: Benelux Lanes out of Rotterdam, where its warehouse is, priced with sandbox values. It deliberately has no Zone in Germany, so a booking to Düsseldorf finds no Lane (P2).",
+      "id": "RC-0001",
+      "shipperId": "SHP-0001",
+      "versions": [
+        {
+          "version": 1,
+          "validFrom": "2026-01-01",
+          "validTo": null,
+          "zones": [
+            { "name": "Rotterdam", "country": "NL", "postcodePrefixes": ["30", "31", "32"] },
+            { "name": "Utrecht", "country": "NL", "postcodePrefixes": ["34", "35", "36", "37", "38", "39"] },
+            { "name": "Amsterdam", "country": "NL", "postcodePrefixes": ["10", "11", "12", "13", "14", "15"] },
+            { "name": "Antwerpen", "country": "BE", "postcodePrefixes": ["20", "21", "22", "23", "24", "25", "26", "27", "28", "29"] },
+            { "name": "Brussel", "country": "BE", "postcodePrefixes": ["10", "11", "12"] },
+            { "name": "Luxembourg", "country": "LU", "postcodePrefixes": ["1", "2", "3", "4", "5", "6", "7", "8", "9"] }
+          ],
+          "lanes": [
+            {
+              "origin": "Rotterdam",
+              "destination": "Rotterdam",
+              "minimumCharge": 55.00,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 9.50 },
+                { "upToKg": 1000, "pricePer100Kg": 8.20 },
+                { "upToKg": 2500, "pricePer100Kg": 6.90 },
+                { "upToKg": 24000, "pricePer100Kg": 4.80 }
+              ]
+            },
+            {
+              "origin": "Rotterdam",
+              "destination": "Utrecht",
+              "minimumCharge": 65.00,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 11.80 },
+                { "upToKg": 1000, "pricePer100Kg": 10.20 },
+                { "upToKg": 2500, "pricePer100Kg": 8.60 },
+                { "upToKg": 24000, "pricePer100Kg": 5.90 }
+              ]
+            },
+            {
+              "origin": "Rotterdam",
+              "destination": "Amsterdam",
+              "minimumCharge": 70.00,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 12.90 },
+                { "upToKg": 1000, "pricePer100Kg": 11.10 },
+                { "upToKg": 2500, "pricePer100Kg": 9.30 },
+                { "upToKg": 24000, "pricePer100Kg": 6.40 }
+              ]
+            },
+            {
+              "origin": "Rotterdam",
+              "destination": "Antwerpen",
+              "minimumCharge": 85.00,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 14.60 },
+                { "upToKg": 1000, "pricePer100Kg": 12.40 },
+                { "upToKg": 2500, "pricePer100Kg": 10.30 },
+                { "upToKg": 24000, "pricePer100Kg": 7.10 }
+              ]
+            },
+            {
+              "origin": "Rotterdam",
+              "destination": "Brussel",
+              "minimumCharge": 95.00,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 16.20 },
+                { "upToKg": 1000, "pricePer100Kg": 13.90 },
+                { "upToKg": 2500, "pricePer100Kg": 11.50 },
+                { "upToKg": 24000, "pricePer100Kg": 7.90 }
+              ]
+            },
+            {
+              "origin": "Rotterdam",
+              "destination": "Luxembourg",
+              "minimumCharge": 145.00,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 24.50 },
+                { "upToKg": 1000, "pricePer100Kg": 20.80 },
+                { "upToKg": 2500, "pricePer100Kg": 17.20 },
+                { "upToKg": 24000, "pricePer100Kg": 11.60 }
+              ]
+            }
+          ]
+        }
+      ]
     }
   ],
   "carriers": [

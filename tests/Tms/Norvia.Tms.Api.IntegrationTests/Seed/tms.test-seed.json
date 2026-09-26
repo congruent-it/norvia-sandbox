@@ -24,13 +24,44 @@
   ],
   "rateCards": [
     {
-      "$comment": "Covers Bookings.Valid: Rotterdam to Utrecht, 910.5 kg in the band up to 2,000 kg, so 910.5 ÷ 100 × 12.40 = 112.902, a Freight Charge of 112.90.",
       "id": "RC-TEST-0001",
       "shipperId": "SHP-0001",
       "versions": [
         {
+          "$comment": "Covers Bookings.Valid: Rotterdam to Utrecht, 910.5 kg in the band up to 2,000 kg, so 910.5 ÷ 100 × 12.40 = 112.902, a Freight Charge of 112.90. Utrecht Science Park (3584) lies inside Utrecht (35) and is listed after it, so only the most specific prefix picks it.",
           "version": 1,
           "validFrom": "2020-01-01",
+          "validTo": "2039-12-31",
+          "zones": [
+            { "name": "Rotterdam", "country": "NL", "postcodePrefixes": ["30", "31"] },
+            { "name": "Utrecht", "country": "NL", "postcodePrefixes": ["35"] },
+            { "name": "Utrecht Science Park", "country": "NL", "postcodePrefixes": ["3584"] }
+          ],
+          "lanes": [
+            {
+              "origin": "Rotterdam",
+              "destination": "Utrecht",
+              "minimumCharge": 45.00,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 14.00 },
+                { "upToKg": 2000, "pricePer100Kg": 12.40 },
+                { "upToKg": 24000, "pricePer100Kg": 9.75 }
+              ]
+            },
+            {
+              "origin": "Rotterdam",
+              "destination": "Utrecht Science Park",
+              "minimumCharge": 45.00,
+              "weightBreaks": [
+                { "upToKg": 24000, "pricePer100Kg": 15.00 }
+              ]
+            }
+          ]
+        },
+        {
+          "$comment": "From New Year 2040 Rotterdam to Utrecht costs more, so a collection just after midnight on 1 January in Amsterdam, still 31 December in UTC, shows which version priced it.",
+          "version": 2,
+          "validFrom": "2040-01-01",
           "validTo": null,
           "zones": [
             { "name": "Rotterdam", "country": "NL", "postcodePrefixes": ["30", "31"] },
@@ -40,10 +71,11 @@
             {
               "origin": "Rotterdam",
               "destination": "Utrecht",
+              "minimumCharge": 50.00,
               "weightBreaks": [
-                { "upToKg": 500, "pricePer100Kg": 14.00 },
-                { "upToKg": 2000, "pricePer100Kg": 12.40 },
-                { "upToKg": 24000, "pricePer100Kg": 9.75 }
+                { "upToKg": 500, "pricePer100Kg": 15.00 },
+                { "upToKg": 2000, "pricePer100Kg": 13.00 },
+                { "upToKg": 24000, "pricePer100Kg": 10.25 }
               ]
             }
           ]

@@ -10,7 +10,8 @@ namespace Norvia.Tms.Infrastructure.RateCards;
 
 /// <summary>
 /// The TMS's read copy of the Shippers' Rate Cards, loaded once from the seed file, which plays the ERP until its sync
-/// exists (ADR 0006). A Shipper may have no Rate Card; one with two is a broken seed.
+/// exists (ADR 0006). A Shipper may have no Rate Card; one with two, or a Rate Card version whose Zones overlap, is a
+/// broken seed, and the TMS refuses to start on it (<see cref="LoadRateCardsOnStart"/>).
 /// </summary>
 internal sealed class SeedFileRateCardDirectory : IRateCardDirectory
 {
@@ -24,24 +25,39 @@ internal sealed class SeedFileRateCardDirectory : IRateCardDirectory
             ?? throw new InvalidDataException($"The seed file '{options.Value.Path}' is empty.");
 
         _rateCards = (seed.RateCards ?? [])
-            .Select(ToRateCard)
+            .Select(rateCard => ToRateCard(rateCard, options.Value.Path))
             .ToDictionary(rateCard => rateCard.ShipperId);
     }
 
     public RateCard? FindFor(ShipperId shipperId) => _rateCards.GetValueOrDefault(shipperId);
 
-    private static RateCard ToRateCard(SeedRateCard rateCard) => new(
+    private static RateCard ToRateCard(SeedRateCard rateCard, string path) => new(
         new RateCardId(rateCard.Id),
         new ShipperId(rateCard.ShipperId),
-        [.. rateCard.Versions.Select(version => new RateCardVersion(
-            version.Version,
-            version.ValidFrom,
-            version.ValidTo,
-            [.. version.Zones.Select(zone => new Zone(new ZoneName(zone.Name), zone.Country, zone.PostcodePrefixes))],
-            [.. version.Lanes.Select(lane => new Lane(
-                new ZoneName(lane.Origin),
-                new ZoneName(lane.Destination),
-                [.. lane.WeightBreaks.Select(weightBreak => new WeightBreak(weightBreak.UpToKg, new Money(weightBreak.PricePer100Kg)))]))]))]);
+        [.. rateCard.Versions.Select(version => ToVersion(version, rateCard.Id, path))]);
+
+    private static RateCardVersion ToVersion(SeedRateCardVersion version, string rateCardId, string path)
+    {
+        try
+        {
+            return new RateCardVersion(
+                version.Version,
+                version.ValidFrom,
+                version.ValidTo,
+                [.. version.Zones.Select(zone => new Zone(new ZoneName(zone.Name), zone.Country, zone.PostcodePrefixes))],
+                [.. version.Lanes.Select(lane => new Lane(
+                    new ZoneName(lane.Origin),
+                    new ZoneName(lane.Destination),
+                    [.. lane.WeightBreaks.Select(weightBreak => new WeightBreak(weightBreak.UpToKg, new Money(weightBreak.PricePer100Kg)))],
+                    new Money(lane.MinimumCharge
+                        ?? throw new InvalidDataException($"The Lane from {lane.Origin} to {lane.Destination} has no minimum charge."))))]);
+        }
+        catch (Exception exception) when (exception is ArgumentException or InvalidDataException)
+        {
+            throw new InvalidDataException(
+                $"Rate Card {rateCardId} version {version.Version} in the seed file '{path}' is invalid. {exception.Message}", exception);
+        }
+    }
 
     private sealed record SeedFile(IReadOnlyList<SeedRateCard>? RateCards);
 
@@ -56,7 +72,7 @@ internal sealed class SeedFileRateCardDirectory : IRateCardDirectory
 
     private sealed record SeedZone(string Name, string Country, IReadOnlyList<string> PostcodePrefixes);
 
-    private sealed record SeedLane(string Origin, string Destination, IReadOnlyList<SeedWeightBreak> WeightBreaks);
+    private sealed record SeedLane(string Origin, string Destination, IReadOnlyList<SeedWeightBreak> WeightBreaks, decimal? MinimumCharge);
 
     private sealed record SeedWeightBreak(decimal UpToKg, decimal PricePer100Kg);
 }

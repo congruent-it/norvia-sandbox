@@ -19,11 +19,11 @@ public sealed record RateCard(RateCardId Id, ShipperId ShipperId, IReadOnlyList<
         ArgumentNullException.ThrowIfNull(details);
         if (CollectionDate.Of(details) is not { } collectionDate
             || Versions.FirstOrDefault(version => version.IsValidOn(collectionDate)) is not { } version
-            || version.FreightFor(details) is not { } freight)
+            || version.ChargeLinesFor(details) is not { } chargeLines)
         {
             return null;
         }
 
-        return new FreightCharge([new ChargeLine(ChargeLineType.Freight, freight)], new RateCardVersionReference(Id, version.Version));
+        return new FreightCharge(chargeLines, new RateCardVersionReference(Id, version.Version));
     }
 }
