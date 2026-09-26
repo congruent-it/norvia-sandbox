@@ -23,8 +23,17 @@ public static class DependencyInjection
 
         builder.Services.AddSingleton(ConsoleCredential(builder.Configuration));
 
-        // Message trails come from the Log Analytics workspace behind the estate's Application Insights, read as the
-        // console's credential above.
+        // The AppHost gives the console the Aspire dashboard only locally, and only when no deployed estate is named
+        // (ADR 0027). Local telemetry then stays on the developer's machine.
+        if (builder.Configuration.GetSection(DashboardTrailSourceOptions.SectionName).Get<DashboardTrailSourceOptions>() is { DashboardUrl: { } dashboard })
+        {
+            builder.Services.AddOptions<DashboardTrailSourceOptions>().BindConfiguration(DashboardTrailSourceOptions.SectionName);
+            builder.Services.AddHttpClient<ITrailSource, DashboardTrailSource>(http => http.BaseAddress = dashboard);
+            return builder;
+        }
+
+        // Otherwise Message trails come from the Log Analytics workspace behind the estate's Application Insights, read
+        // as the console's credential above.
         builder.Services.AddOptions<TrailSourceOptions>().BindConfiguration(TrailSourceOptions.SectionName);
         builder.Services.AddSingleton(services => new LogsQueryClient(services.GetRequiredService<TokenCredential>()));
         builder.Services.AddSingleton<ITrailSource, LogAnalyticsTrailSource>();

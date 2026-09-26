@@ -20,5 +20,5 @@ Tokens are local too: the AppHost's `local-token-signing-key` signs them, as it 
 ## Consequences
 
 - The stand-in is a second implementation of the API Management policy in `infra/estate/partner-api/`. A change to the policy's checks, headers or answers must be made in both. The policy's own tests (`SubmitTransportOrderPolicyTests`) and the stand-in's tests check the same list.
-- The stand-in retries the TMS through the standard resilience handler rather than the workflow's retry policy, and it writes no Logic App run history. Locally, the trail is in the Aspire dashboard's traces.
+- The stand-in retries the TMS through the standard resilience handler rather than the workflow's retry policy, and it writes no Logic App run history. Locally, the trail is in the Aspire dashboard's telemetry, where the Integration console searches it (ADR 0027), so the stand-in logs the tracking keys the policy's traces and the workflow's tracked properties record.
 - It runs only locally. `azd` never deploys it; in Azure the Partner portal is given API Management's address instead.

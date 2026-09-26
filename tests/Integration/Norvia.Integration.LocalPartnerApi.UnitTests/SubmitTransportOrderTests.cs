@@ -203,6 +203,50 @@ public sealed class SubmitTransportOrderTests : IAsyncLifetime
         _factory.Tms.Calls.Should().HaveCountGreaterThan(1);
     }
 
+    [Fact]
+    public async Task Submit_TheTmsAccepts_LogsTheTrackingKeys_AsTheIntakeRunTracksThem()
+    {
+        _factory.Tms.Answer(HttpStatusCode.Created, """{ "transportOrderNumber": "TO-0000042", "status": "Accepted" }""");
+
+        using var response = await SubmitAsync();
+
+        TrackingKeysOfTheAnswer().Should().Contain("correlationId", CorrelationIdOf(response))
+            .And.Contain("flow", "transport-order-intake")
+            .And.Contain("partyId", "SHP-0001")
+            .And.Contain("transportOrderNumber", "TO-0000042")
+            .And.Contain("outcome", "Succeeded")
+            .And.NotContainKey("failureCode");
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.UnprocessableEntity, "Refused", "TransportOrderRejected")]
+    [InlineData(HttpStatusCode.BadRequest, "Failed", "TmsCallRefused")]
+    [InlineData(HttpStatusCode.ServiceUnavailable, "Failed", "TmsUnavailable")]
+    public async Task Submit_TheTmsDoesNotAccept_LogsTheOutcomeAndFailureCode_WithoutATransportOrderNumber(
+        HttpStatusCode tmsStatus, string outcome, string failureCode)
+    {
+        _factory.Tms.Answer(tmsStatus, """{ "title": "Not taken in", "reasons": [ { "code": "QuantityInvalid", "message": "Goods line 1 needs a quantity of at least 1." } ] }""");
+
+        using var response = await SubmitAsync();
+
+        TrackingKeysOfTheAnswer().Should().Contain("outcome", outcome)
+            .And.Contain("failureCode", failureCode)
+            .And.NotContainKey("transportOrderNumber");
+    }
+
+    [Fact]
+    public async Task Submit_RefusedAtTheEdge_LogsTheRefusal_AsTheAPIManagementPolicyTracesIt()
+    {
+        using var response = await SubmitAsync(
+            subscriptionKey: LocalPartnerApiFactory.VanDijkKey,
+            token: _factory.PersonaToken(clientId: LocalPartnerApiFactory.VanDijkClientId, roles: []));
+
+        TrackingKeysOfTheAnswer().Should().Contain("correlationId", CorrelationIdOf(response))
+            .And.Contain("flow", "transport-order-intake")
+            .And.Contain("outcome", "Refused")
+            .And.Contain("failureCode", "NotAllowedToSubmit");
+    }
+
     private async Task<HttpResponseMessage> SubmitAsync(
         string? subscriptionKey = LocalPartnerApiFactory.BrouwerKey,
         string? token = "",
@@ -230,6 +274,14 @@ public sealed class SubmitTransportOrderTests : IAsyncLifetime
 
         return await _partnerApi.SendAsync(request, TestContext.Current.CancellationToken);
     }
+
+    // The keys in scope when the stand-in logged its answer to the partner, as the dashboard receives them.
+    private Dictionary<string, object?> TrackingKeysOfTheAnswer() =>
+        _factory.Logs.GetSnapshot()
+            .Last(log => log.Category == typeof(SubmitTransportOrder).FullName)
+            .Scopes.OfType<IEnumerable<KeyValuePair<string, object?>>>()
+            .SelectMany(keys => keys)
+            .ToDictionary();
 
     private static string? CorrelationIdOf(HttpResponseMessage response) =>
         response.Headers.TryGetValues("X-Correlation-ID", out var values) ? values.SingleOrDefault() : null;

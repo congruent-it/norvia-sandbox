@@ -8,7 +8,7 @@ The Integration console is where the Integration operator finds out what the int
 | **Shows** | Message trails found by correlation ID or business key, failed Logic App runs, dead-lettered messages per queue and subscription |
 | **Changes** | Only dead-letter queues: resubmitting or discarding a dead-lettered message |
 | **Owns** | Nothing. It has no database |
-| **Reads from** | Application Insights (the search index), the Logic Apps management API (run history and step bodies), Service Bus (dead-letter queues) |
+| **Reads from** | Application Insights (the search index; locally the Aspire dashboard's telemetry), the Logic Apps management API (run history and step bodies), Service Bus (dead-letter queues) |
 
 ## Scope
 
@@ -139,10 +139,10 @@ The console follows the coding guidelines with one deviation, stated here as §1
 | Project | Contains |
 |---|---|
 | `IntegrationConsole.Application` | Use cases (search, open trail, open run, list dead-letter queues, resubmit, discard), DTOs, and the ports `ITrailSource`, `IWorkflowRuns`, `IDeadLetterQueues` and `IAuditLog` |
-| `IntegrationConsole.Infrastructure` | Adapters over the Azure SDKs: Application Insights queries, the Logic Apps management API, Service Bus |
+| `IntegrationConsole.Infrastructure` | Adapters over the Azure SDKs: Application Insights queries, the Logic Apps management API, Service Bus; locally, the Aspire dashboard's telemetry API |
 | `IntegrationConsole.Web` | Blazor web app, Interactive Server for the self-refreshing panels |
 
-The dependency rule, the architecture tests, the mediator, the 80% line coverage, bUnit and Playwright all still apply. It runs under Aspire and deploys to Container Apps like the other applications (ADR 0004). Locally it reads a deployed estate with the developer's credentials, because Logic Apps and Application Insights exist only in Azure. It can also list the Service Bus emulator's dead-letter queues.
+The dependency rule, the architecture tests, the mediator, the 80% line coverage, bUnit and Playwright all still apply. It runs under Aspire and deploys to Container Apps like the other applications (ADR 0004). Locally it searches the telemetry the Aspire dashboard holds, since no local app sends telemetry to Application Insights ([ADR 0027](../adr/0027-locally-the-integration-console-searches-the-aspire-dashboards-telemetry.md)); given a deployed estate's workspace, it reads that estate with the developer's credentials instead. Logic Apps exist only in Azure. It can also list the Service Bus emulator's dead-letter queues.
 
 ## Testing
 
@@ -154,6 +154,7 @@ The dependency rule, the architecture tests, the mediator, the 80% line coverage
   - a discarded message is gone from the dead-letter queue;
   - counts and the oldest message's age are right.
 - **The Application Insights and Logic Apps adapters** are thin wrappers over their SDKs and are covered by the smoke run.
+- **The Aspire dashboard adapter** is unit tested against the dashboard's OTLP JSON, faked at the HTTP boundary: it finds a trail by a business key or its correlation ID, within the range, from the tracking keys only.
 - **bUnit and Playwright** against the Web project with faked ports. For example, a user with only `IntegrationConsole.Read` sees no resubmit or discard, and "body no longer kept" shows for an expired run.
 - **Post-deploy smoke run, slice 1:** book as Brouwer Dranken. Find the trail by the Transport Order number and by the correlation ID. It shows the APIM call, the intake run and the TMS call, and the run's steps open with their bodies.
 - **Post-deploy smoke run, slice 2:**

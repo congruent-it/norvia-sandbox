@@ -13,9 +13,6 @@ namespace Norvia.IntegrationConsole.Infrastructure.Trails;
 /// </summary>
 internal sealed class LogAnalyticsTrailSource(LogsQueryClient client, IOptions<TrailSourceOptions> options) : ITrailSource
 {
-    /// <summary>At most this many trails, the latest first: a key that matches more is too broad to read anyway.</summary>
-    internal const int MaximumTrails = 200;
-
     private static readonly (string Column, BusinessKeyKind Kind)[] BusinessKeyColumns =
     [
         ("transportOrderNumbers", BusinessKeyKind.TransportOrderNumber),
@@ -40,7 +37,7 @@ internal sealed class LogAnalyticsTrailSource(LogsQueryClient client, IOptions<T
         // very hop that failed.
         var response = await client.QueryWorkspaceAsync(
             workspaceId,
-            TrailQuery.For(search.Key, MaximumTrails),
+            TrailQuery.For(search.Key, FoundTrails.Maximum),
             new LogsQueryTimeRange(search.From, search.To),
             cancellationToken: cancellationToken);
 
@@ -52,12 +49,8 @@ internal sealed class LogAnalyticsTrailSource(LogsQueryClient client, IOptions<T
         Strings(row, "flows"),
         row.GetDateTimeOffset("firstSeen") ?? default,
         row.GetDateTimeOffset("lastSeen") ?? default,
-        [.. Strings(row, "outcomes").Select(OutcomeOf).OfType<Outcome>()],
+        [.. Strings(row, "outcomes").Select(FoundTrails.OutcomeOf).OfType<Outcome>()],
         [.. BusinessKeyColumns.SelectMany(key => Strings(row, key.Column).Select(value => new BusinessKey(key.Kind, value)))]);
-
-    // An outcome outside the tracking contract is a flow's mistake; the trail is still worth showing without it.
-    private static Outcome? OutcomeOf(string outcome) =>
-        Enum.TryParse<Outcome>(outcome, ignoreCase: false, out var parsed) && Enum.IsDefined(parsed) ? parsed : null;
 
     // The query returns each set as a JSON array in a string column.
     private static string[] Strings(LogsTableRow row, string column) =>

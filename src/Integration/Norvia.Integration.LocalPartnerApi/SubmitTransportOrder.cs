@@ -35,6 +35,8 @@ internal static partial class SubmitTransportOrder
         var check = await edge.CheckAsync(context.Request, context.RequestAborted);
         if (check.ShipperId is not { } shipperId)
         {
+            // As the policy's trace metadata records a refusal.
+            using var refused = logger.BeginScope(new Dictionary<string, object?> { ["outcome"] = "Refused", ["failureCode"] = check.FailureCode });
             LogRefused(logger, check.RefusalStatus, check.FailureCode);
             return check.RefusalStatus == StatusCodes.Status401Unauthorized
                 ? Answer(check.RefusalStatus, new JsonObject { ["statusCode"] = check.RefusalStatus, ["message"] = check.RefusalText })
@@ -49,6 +51,7 @@ internal static partial class SubmitTransportOrder
         var (statusCode, body) = await tms.SubmitAsync(transportOrder.ToJsonString(), correlationId, context.RequestAborted);
         var answer = BookingResponses.Relay(statusCode, body, correlationId, booking);
 
+        using var tmsCall = logger.BeginScope(TmsCallTracking.Of(statusCode, body));
         LogAnswered(logger, answer.StatusCode, answer.FailureCode);
         return Answer(answer.StatusCode, answer.Body);
     }
