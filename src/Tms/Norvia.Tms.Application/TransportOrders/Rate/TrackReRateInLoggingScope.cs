@@ -22,7 +22,7 @@ public sealed partial class TrackReRateInLoggingScope(ILogger<TrackReRateInLoggi
     {
         ArgumentNullException.ThrowIfNull(message);
         ArgumentNullException.ThrowIfNull(next);
-        if (!message.ReRate)
+        if (message.ReRateKey is null)
         {
             return await next(message, cancellationToken);
         }
@@ -54,7 +54,11 @@ public sealed partial class TrackReRateInLoggingScope(ILogger<TrackReRateInLoggi
         }
 
         using var scope = Track(trail);
-        if (outcome.RatingFailure is { } failedAgain)
+        if (outcome.Repeat)
+        {
+            LogRepeat(logger, transportOrderNumber, outcome.RatingResult);
+        }
+        else if (outcome.RatingFailure is { } failedAgain)
         {
             LogFailedAgain(logger, transportOrderNumber, failedAgain.Code, failedAgain.Message);
         }
@@ -79,6 +83,9 @@ public sealed partial class TrackReRateInLoggingScope(ILogger<TrackReRateInLoggi
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Transport Order {TransportOrderNumber} re-rated: Rating failed again with {RatingFailureCode}: {RatingFailureMessage}")]
     private static partial void LogFailedAgain(ILogger logger, string transportOrderNumber, string ratingFailureCode, string ratingFailureMessage);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Transport Order {TransportOrderNumber} re-rate answered as a repeat: {RatingResult}")]
+    private static partial void LogRepeat(ILogger logger, string transportOrderNumber, Domain.TransportOrders.RatingResult ratingResult);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Re-rate refused: {Reason}")]
     private static partial void LogRefused(ILogger logger, IEnumerable<string> reason);

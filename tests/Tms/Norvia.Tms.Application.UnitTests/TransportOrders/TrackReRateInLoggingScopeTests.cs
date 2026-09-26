@@ -10,7 +10,7 @@ namespace Norvia.Tms.Application.UnitTests.TransportOrders;
 
 public sealed class TrackReRateInLoggingScopeTests : IDisposable
 {
-    private static readonly RateTransportOrderCommand ReRate = new("TO-0000007", ReRate: true);
+    private static readonly RateTransportOrderCommand ReRate = new("TO-0000007", ReRateKey: "key-1");
 
     private readonly FakeLoggerProvider _logs = new();
     private readonly ILoggerFactory _loggerFactory;
@@ -51,6 +51,19 @@ public sealed class TrackReRateInLoggingScopeTests : IDisposable
     }
 
     [Fact]
+    public async Task Handle_Repeat_LogsItAsARepeat()
+    {
+        await _behaviour.Handle(
+            ReRate,
+            Answering(new RateTransportOrderResult(RatingResult.Rated, null, "SHP-0001", "corr-intake", Repeat: true)),
+            CancellationToken.None);
+
+        var outcome = _logs.Collector.GetSnapshot().Should().ContainSingle().Subject;
+        outcome.Message.Should().Contain("TO-0000007").And.Contain("repeat");
+        ScopeKeysOf(outcome).Should().Contain("correlationId", "corr-intake");
+    }
+
+    [Fact]
     public async Task Handle_ReRateRefused_LogsTheRefusalWithTheTransportOrderNumber()
     {
         await _behaviour.Handle(ReRate, Answering(Result.Conflict("Transport Order TO-0000007 is Rated.")), CancellationToken.None);
@@ -64,7 +77,7 @@ public sealed class TrackReRateInLoggingScopeTests : IDisposable
     public async Task Handle_FirstRating_LeavesTheTrackingToTheRatingWorker()
     {
         var result = await _behaviour.Handle(
-            ReRate with { ReRate = false },
+            ReRate with { ReRateKey = null },
             Answering(new RateTransportOrderResult(RatingResult.Rated, null, "SHP-0001", "corr-intake")),
             CancellationToken.None);
 

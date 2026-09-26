@@ -104,6 +104,11 @@ internal sealed class TransportOrderConfiguration : IEntityTypeConfiguration<Tra
                     freightCharge => freightCharge == null ? 0 : freightCharge.GetHashCode(),
                     freightCharge => freightCharge));
 
+        // A re-rate sent again under this key is a repeat, answered as before.
+        builder.Property(order => order.LastReRateKey)
+            .HasConversion(key => key!.Value, value => new IdempotencyKey(value))
+            .HasMaxLength(IdempotencyKey.MaxLength);
+
         // Why Rating failed, kept like the rejection reasons: its stable code by name and its message.
         builder.Property(order => order.RatingFailure)
             .HasConversion(

@@ -21,6 +21,9 @@ public static class TransportOrderEndpoints
 {
     public const string CorrelationIdHeader = TrackingScopeMiddleware.CorrelationIdHeader;
 
+    /// <summary>The caller's key for a re-rate, so a retry of it gets the same answer instead of a refusal.</summary>
+    public const string IdempotencyKeyHeader = "Idempotency-Key";
+
     /// <summary>The app role only the intake Logic App's managed identity holds, so nothing bypasses the integration layer.</summary>
     public const string IntakeRole = "TransportOrders.Intake";
 
@@ -69,7 +72,8 @@ public static class TransportOrderEndpoints
             .WithDescription(
                 "Rates the order again with the Rate Card version valid on its collection date, and publishes TransportOrderRated or, "
                 + "when it fails again, another TransportOrderRatingFailed. An order that isn't Rating failed is refused with a 409 and "
-                + "left as it is: a Rated order's Freight Charge stays frozen. Like the first rating, the re-rate continues the Message "
+                + "left as it is: a Rated order's Freight Charge stays frozen. A re-rate sent again under its Idempotency-Key "
+                + "is answered as before, flagged as a repeat, without rating again. Like the first rating, the re-rate continues the Message "
                 + "trail of the order's intake, so its event carries the intake's correlation ID.");
 
         return app;
@@ -147,12 +151,21 @@ public static class TransportOrderEndpoints
         CancellationToken cancellationToken) =>
         TypedResults.Ok(await mediator.Send(new ListRatingExceptionsQuery(), cancellationToken));
 
-    private static async Task<Results<Ok<RateTransportOrderResult>, ProblemHttpResult>> ReRateAsync(
+    private static async Task<Results<Ok<RateTransportOrderResult>, ProblemHttpResult, ValidationProblem>> ReRateAsync(
         string transportOrderNumber,
+        [FromHeader(Name = IdempotencyKeyHeader)] string? idempotencyKey,
         IMediator mediator,
         CancellationToken cancellationToken)
     {
-        var result = await mediator.Send(new RateTransportOrderCommand(transportOrderNumber, ReRate: true), cancellationToken);
+        if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Length > IdempotencyKey.MaxLength)
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [IdempotencyKeyHeader] = [$"A re-rate needs an {IdempotencyKeyHeader} of 1 to {IdempotencyKey.MaxLength} characters, the same for each retry."],
+            });
+        }
+
+        var result = await mediator.Send(new RateTransportOrderCommand(transportOrderNumber, ReRateKey: idempotencyKey), cancellationToken);
         return result.Status switch
         {
             ResultStatus.Ok => TypedResults.Ok(result.Value),

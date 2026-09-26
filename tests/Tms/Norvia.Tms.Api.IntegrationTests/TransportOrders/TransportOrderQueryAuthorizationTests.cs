@@ -39,7 +39,9 @@ public sealed class TransportOrderQueryAuthorizationTests(TmsFixture tms)
     {
         using var caller = tms.CreateTmsClient(token: null);
 
-        using var response = await caller.PostAsync(new Uri("/v1/transport-orders/TO-0000001/re-rate", UriKind.Relative), content: null, _cancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("/v1/transport-orders/TO-0000001/re-rate", UriKind.Relative));
+        request.Headers.Add("Idempotency-Key", "key-1");
+        using var response = await caller.SendAsync(request, _cancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -49,7 +51,9 @@ public sealed class TransportOrderQueryAuthorizationTests(TmsFixture tms)
     {
         using var caller = tms.CreateTmsClient(tms.IssueToken([TmsFixture.IntakeRole], audience: "api://norvia-erp"));
 
-        using var response = await caller.PostAsync(new Uri("/v1/transport-orders/TO-0000001/re-rate", UriKind.Relative), content: null, _cancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("/v1/transport-orders/TO-0000001/re-rate", UriKind.Relative));
+        request.Headers.Add("Idempotency-Key", "key-1");
+        using var response = await caller.SendAsync(request, _cancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }

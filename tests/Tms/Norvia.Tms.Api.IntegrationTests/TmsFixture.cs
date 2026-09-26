@@ -98,6 +98,10 @@ public class TmsFixture : IAsyncLifetime
         ["Seed__Path"] = Path.Combine(AppContext.BaseDirectory, "Seed", "tms.test-seed.json"),
         ["IntakeCallers__ClientIdsByChannel__Wms__0"] = WmsClientId,
         ["Rating__SweepInterval"] = "01:00:00",
+
+        // A test run has no dashboard to take the TMS's telemetry, and a TMS that stops keeps trying to flush it there
+        // for seconds, too long for a restart. Tests read the TMS's console logs instead.
+        ["OTEL_EXPORTER_OTLP_ENDPOINT"] = "",
     };
 
     /// <summary>Waits for the TMS to write a log that matches, as logs arrive a moment after the call.</summary>
@@ -125,26 +129,8 @@ public class TmsFixture : IAsyncLifetime
     {
         using var restart = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         restart.CancelAfter(StartupTimeout);
-        // Under the load of a whole test run, stopping the TMS can outlast the restart command's wait. The TMS is then
-        // left stopping or stopped, so it is started once it has stopped, or restarted again if it is still running.
-        var command = KnownResourceCommands.RestartCommand;
-        for (var attempt = 1; ; attempt++)
-        {
-            var result = await _app!.ResourceCommands.ExecuteCommandAsync("tms-api", command, restart.Token);
-            if (result.Success)
-            {
-                break;
-            }
-
-            attempt.Should().BeLessThan(3, $"restarting the TMS failed: {result.Message}");
-            await Task.Delay(TimeSpan.FromSeconds(5), restart.Token);
-            command = _app.ResourceNotifications.TryGetCurrentState("tms-api", out var state)
-                && state.Snapshot.State?.Text is { } text
-                && (text == KnownResourceStates.Exited || text == KnownResourceStates.Finished)
-                    ? KnownResourceCommands.StartCommand
-                    : KnownResourceCommands.RestartCommand;
-        }
-
+        var result = await _app!.ResourceCommands.ExecuteCommandAsync("tms-api", KnownResourceCommands.RestartCommand, restart.Token);
+        result.Success.Should().BeTrue(result.Message);
         await _app.ResourceNotifications.WaitForResourceHealthyAsync("tms-api", restart.Token);
     }
 

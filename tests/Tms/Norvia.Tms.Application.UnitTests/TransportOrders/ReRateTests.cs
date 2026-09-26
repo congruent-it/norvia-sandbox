@@ -31,7 +31,7 @@ public sealed class ReRateTests
         _repository.SingleOrDefaultAsync(Arg.Is<TransportOrderToRateSpec>(s => s.Number.Value == "TO-0000007"), Arg.Any<CancellationToken>())
             .Returns(order);
 
-        var result = await _handler.Handle(new RateTransportOrderCommand("TO-0000007", ReRate: true), CancellationToken.None);
+        var result = await _handler.Handle(new RateTransportOrderCommand("TO-0000007", ReRateKey: "key-1"), CancellationToken.None);
 
         result.Value.Should().Be(new RateTransportOrderResult(RatingResult.Rated, null, "SHP-0001", "corr-1"));
         order.FreightCharge!.Total.Should().Be(new Money(112.90m));
@@ -47,7 +47,7 @@ public sealed class ReRateTests
         _rateCards.FindFor(new ShipperId("SHP-0001")).Returns((Domain.RateCards.RateCard?)null);
         _repository.SingleOrDefaultAsync(Arg.Any<TransportOrderToRateSpec>(), Arg.Any<CancellationToken>()).Returns(order);
 
-        var result = await _handler.Handle(new RateTransportOrderCommand("TO-0000007", ReRate: true), CancellationToken.None);
+        var result = await _handler.Handle(new RateTransportOrderCommand("TO-0000007", ReRateKey: "key-1"), CancellationToken.None);
 
         result.Value.Should().Be(new RateTransportOrderResult(
             RatingResult.RatingFailed,
@@ -75,7 +75,7 @@ public sealed class ReRateTests
         var freightCharge = order.FreightCharge;
         _repository.SingleOrDefaultAsync(Arg.Any<TransportOrderToRateSpec>(), Arg.Any<CancellationToken>()).Returns(order);
 
-        var result = await _handler.Handle(new RateTransportOrderCommand("TO-0000007", ReRate: true), CancellationToken.None);
+        var result = await _handler.Handle(new RateTransportOrderCommand("TO-0000007", ReRateKey: "key-1"), CancellationToken.None);
 
         result.Status.Should().Be(ResultStatus.Conflict);
         result.Errors.Should().ContainSingle().Which.Should().Be(
@@ -86,12 +86,28 @@ public sealed class ReRateTests
         await _repository.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task Handle_ReRateSentAgainUnderItsKey_AnswersAsBefore_AsARepeat_AndSavesNothing()
+    {
+        var order = Samples.RatingFailedOrder(sequence: 7);
+        _repository.SingleOrDefaultAsync(Arg.Any<TransportOrderToRateSpec>(), Arg.Any<CancellationToken>()).Returns(order);
+        await _handler.Handle(new RateTransportOrderCommand("TO-0000007", ReRateKey: "key-1"), CancellationToken.None);
+        order.ClearDomainEvents();
+        _repository.ClearReceivedCalls();
+
+        var again = await _handler.Handle(new RateTransportOrderCommand("TO-0000007", ReRateKey: "key-1"), CancellationToken.None);
+
+        again.Value.Should().Be(new RateTransportOrderResult(RatingResult.Rated, null, "SHP-0001", "corr-1", Repeat: true));
+        order.DomainEvents.Should().BeEmpty();
+        await _repository.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
     [Theory]
     [InlineData("TO-0000099")]
     [InlineData("42")]
     public async Task Handle_UnknownOrMalformedNumber_ReturnsNotFound(string number)
     {
-        var result = await _handler.Handle(new RateTransportOrderCommand(number, ReRate: true), CancellationToken.None);
+        var result = await _handler.Handle(new RateTransportOrderCommand(number, ReRateKey: "key-1"), CancellationToken.None);
 
         result.Status.Should().Be(ResultStatus.NotFound);
     }
@@ -101,7 +117,7 @@ public sealed class ReRateTests
     {
         _repository.SingleOrDefaultAsync(Arg.Any<TransportOrderToRateSpec>(), Arg.Any<CancellationToken>()).Returns(Samples.RejectedOrder());
 
-        var result = await _handler.Handle(new RateTransportOrderCommand("TO-0000007", ReRate: true), CancellationToken.None);
+        var result = await _handler.Handle(new RateTransportOrderCommand("TO-0000007", ReRateKey: "key-1"), CancellationToken.None);
 
         result.Status.Should().Be(ResultStatus.NotFound);
     }

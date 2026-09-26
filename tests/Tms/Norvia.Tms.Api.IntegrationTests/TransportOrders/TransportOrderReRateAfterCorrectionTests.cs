@@ -22,9 +22,10 @@ public sealed class TransportOrderReRateAfterCorrectionTests(CorrectableSeedTmsF
 
         await tms.CorrectSeedAsync(AddLanesToDusseldorf, _cancellationToken);
 
-        foreach (var number in new[] { underVersion1, underVersion2 })
+        var key1 = Guid.NewGuid().ToString();
+        foreach (var (number, key) in new[] { (underVersion1, key1), (underVersion2, Guid.NewGuid().ToString()) })
         {
-            using var response = await tms.ReRateAsync(number, _cancellationToken);
+            using var response = await tms.ReRateAsync(number, _cancellationToken, key);
             var result = await response.Content.ReadAsStringAsync(_cancellationToken);
             response.StatusCode.Should().Be(HttpStatusCode.OK, result);
             JsonNode.Parse(result)!["ratingResult"]!.GetValue<string>().Should().Be("Rated");
@@ -39,6 +40,13 @@ public sealed class TransportOrderReRateAfterCorrectionTests(CorrectableSeedTmsF
         var order2 = await tms.GetTransportOrderAsync(underVersion2, _cancellationToken);
         order2["freightCharge"]!["rateCardVersion"]!["version"]!.GetValue<int>().Should().Be(2);
         order2["freightCharge"]!["total"]!.GetValue<decimal>().Should().Be(227.63m); // 910.5 kg ÷ 100 × 25.00 = 227.625
+
+        // A retry of the re-rate that rated it answers Rated again, where a new re-rate of a Rated order is refused.
+        using (var retry = await tms.ReRateAsync(underVersion1, _cancellationToken, key1))
+        {
+            retry.StatusCode.Should().Be(HttpStatusCode.OK);
+            JsonNode.Parse(await retry.Content.ReadAsStringAsync(_cancellationToken))!["repeat"]!.GetValue<bool>().Should().BeTrue();
+        }
 
         var rated = (await tms.PublishedAsync(intake1, "TransportOrderRated", _cancellationToken)).Should().ContainSingle().Subject;
         rated.ApplicationProperties.Should().Contain(new Dictionary<string, object>

@@ -103,6 +103,43 @@ public sealed class TransportOrderReRateTests(TmsFixture tms)
     }
 
     [Fact]
+    public async Task ReRate_SentAgainUnderItsKey_AnswersAsBefore_AndPublishesNothingMore()
+    {
+        var intake = TmsCalls.NewCorrelationId();
+        var number = await tms.SubmitAcceptedAsync(Bookings.Valid(TmsCalls.NewReference()).DeliveredToDusseldorf(), intake, _cancellationToken);
+        await tms.PublishedAsync(intake, "TransportOrderRatingFailed", _cancellationToken);
+        var key = Guid.NewGuid().ToString();
+        using var first = await tms.ReRateAsync(number, _cancellationToken, key);
+        first.StatusCode.Should().Be(HttpStatusCode.OK);
+        await tms.PublishedAsync(intake, "TransportOrderRatingFailed", count: 2, _cancellationToken);
+
+        using var retry = await tms.ReRateAsync(number, _cancellationToken, key);
+
+        var body = await retry.Content.ReadAsStringAsync(_cancellationToken);
+        retry.StatusCode.Should().Be(HttpStatusCode.OK, body);
+        var result = JsonNode.Parse(body)!;
+        result["ratingResult"]!.GetValue<string>().Should().Be("RatingFailed");
+        result["repeat"]!.GetValue<bool>().Should().BeTrue();
+        await Task.Delay(TimeSpan.FromSeconds(3), _cancellationToken); // Let the outbox run, so an event would show up.
+        tms.Published.Count(m => m.CorrelationId == intake && m.Subject == "TransportOrderRatingFailed").Should().Be(
+            2, "a retry rates nothing, so it publishes nothing");
+    }
+
+    [Fact]
+    public async Task ReRate_WithoutAnIdempotencyKey_IsABadRequest()
+    {
+        var number = await tms.SubmitAcceptedAsync(Bookings.Valid(TmsCalls.NewReference()).DeliveredToDusseldorf(), TmsCalls.NewCorrelationId(), _cancellationToken);
+        await tms.WaitForRatingResultAsync(number, "RatingFailed", _cancellationToken);
+
+        using var response = await tms.Tms.PostAsync(new Uri($"/v1/transport-orders/{number}/re-rate", UriKind.Relative), content: null, _cancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var problem = JsonNode.Parse(await response.Content.ReadAsStringAsync(_cancellationToken))!;
+        problem["errors"]!["Idempotency-Key"].Should().NotBeNull();
+        (await tms.GetTransportOrderAsync(number, _cancellationToken))["ratingResult"]!.GetValue<string>().Should().Be("RatingFailed");
+    }
+
+    [Fact]
     public async Task ReRate_UnknownTransportOrder_IsNotFound()
     {
         using var response = await tms.ReRateAsync("TO-9999999", _cancellationToken);

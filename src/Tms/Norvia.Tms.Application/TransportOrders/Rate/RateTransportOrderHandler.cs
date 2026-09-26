@@ -21,23 +21,27 @@ public sealed class RateTransportOrderHandler(IRepository<TransportOrder> reposi
         }
 
         var rateCard = rateCards.FindFor(order.ShipperId);
-        var rated = command.ReRate ? order.ReRate(rateCard, time.GetUtcNow()) : order.Rate(rateCard, time.GetUtcNow());
-        if (rated)
+        var outcome = command.ReRateKey is { } key
+            ? order.ReRate(rateCard, time.GetUtcNow(), new IdempotencyKey(key))
+            : order.Rate(rateCard, time.GetUtcNow()) ? ReRateOutcome.ReRated : (ReRateOutcome?)null;
+        switch (outcome)
         {
-            // The rating result, with its Freight Charge or failure, and the outcome event's outbox message are saved in
-            // one transaction.
-            await repository.SaveChangesAsync(cancellationToken);
-        }
-        else if (command.ReRate)
-        {
-            return Result.Conflict(
-                $"Transport Order {number} is {order.RatingResult}; only a Transport Order whose Rating failed can be re-rated.");
+            case ReRateOutcome.ReRated:
+                // The rating result, with its Freight Charge or failure, and the outcome event's outbox message are
+                // saved in one transaction.
+                await repository.SaveChangesAsync(cancellationToken);
+                break;
+            case ReRateOutcome.Refused:
+                return Result.Conflict(
+                    $"Transport Order {number} is {order.RatingResult}; only a Transport Order whose Rating failed can be re-rated.");
         }
 
+        // A first rating of an order that is no longer Not yet rated changes nothing, and answers with where it stands.
         return new RateTransportOrderResult(
             order.RatingResult.Value,
             RatingFailureView.From(order.RatingFailure),
             order.ShipperId.Value,
-            order.CorrelationId.Value);
+            order.CorrelationId.Value,
+            Repeat: outcome == ReRateOutcome.Repeat);
     }
 }

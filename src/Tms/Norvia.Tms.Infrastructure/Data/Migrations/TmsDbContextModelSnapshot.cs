@@ -47,6 +47,10 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                     b.Property<string>("FreightCharge")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("LastReRateKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<string>("Number")
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");
