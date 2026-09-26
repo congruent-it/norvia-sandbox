@@ -50,6 +50,31 @@ internal static class Bookings
         };
     }
 
+    /// <summary>The booking with one goods line of the given total weight.</summary>
+    public static JsonObject Weighing(this JsonObject booking, decimal weightKg)
+    {
+        booking["goodsLines"] = new JsonArray
+        {
+            new JsonObject { ["packageType"] = "pallet", ["quantity"] = 1, ["weightKg"] = weightKg, ["dimensionsCm"] = null },
+        };
+        return booking;
+    }
+
+    /// <summary>The booking delivered to another address in Utrecht, with the given postcode.</summary>
+    public static JsonObject DeliveredTo(this JsonObject booking, string postcode)
+    {
+        booking["delivery"]!["address"] = Address("Heidelberglaan 8", postcode, "Utrecht", "NL");
+        return booking;
+    }
+
+    /// <summary>The booking collected from the given time on, and delivered later the same day.</summary>
+    public static JsonObject CollectedFrom(this JsonObject booking, DateTimeOffset earliest)
+    {
+        booking["collection"]!["window"] = Window(earliest, earliest.AddHours(4));
+        booking["delivery"]!["window"] = Window(earliest.AddHours(6), earliest.AddHours(10));
+        return booking;
+    }
+
     private static JsonObject Address(string street, string postcode, string city, string country) => new()
     {
         ["street"] = street,

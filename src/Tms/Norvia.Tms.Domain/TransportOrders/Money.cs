@@ -9,6 +9,11 @@ public readonly record struct Money(decimal Amount)
 
     public static Money Sum(IEnumerable<Money> amounts) => new(amounts.Sum(money => money.Amount));
 
+    public bool IsBelow(Money other) => Amount < other.Amount;
+
+    /// <summary>The difference between this amount and another.</summary>
+    public Money Minus(Money other) => new(Amount - other.Amount);
+
     /// <summary>The amount multiplied, unrounded, so rounding happens once, on the charge line.</summary>
     public Money Times(decimal factor) => new(Amount * factor);
 

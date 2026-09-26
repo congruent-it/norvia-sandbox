@@ -113,6 +113,10 @@ public class TmsFixture : IAsyncLifetime
         return _tmsLogs.First(match);
     }
 
+    /// <summary>Waits for one of the AppHost's resources to report healthy.</summary>
+    public async Task WaitForHealthyAsync(string resourceName, CancellationToken cancellationToken) =>
+        await _app!.ResourceNotifications.WaitForResourceHealthyAsync(resourceName, cancellationToken);
+
     /// <summary>A client for the TMS API that sends the given token, or none.</summary>
     public HttpClient CreateTmsClient(string? token)
     {

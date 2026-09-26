@@ -132,7 +132,7 @@ public sealed class TransportOrderRatingTests
         validFrom,
         validTo,
         [new Zone(new ZoneName("Rotterdam"), "NL", ["30"]), new Zone(new ZoneName("Utrecht"), "NL", ["35"])],
-        [new Lane(new ZoneName("Rotterdam"), new ZoneName("Utrecht"), [new WeightBreak(1_000m, new Money(pricePer100Kg))])]);
+        [new Lane(new ZoneName("Rotterdam"), new ZoneName("Utrecht"), [new WeightBreak(1_000m, new Money(pricePer100Kg))], new Money(45.00m))]);
 
     private static RateCard RotterdamUtrechtRateCard() => new(
         new RateCardId("RC-0001"),
@@ -143,7 +143,7 @@ public sealed class TransportOrderRatingTests
                 new DateOnly(2026, 1, 1),
                 null,
                 [new Zone(new ZoneName("Rotterdam"), "NL", ["30"]), new Zone(new ZoneName("Utrecht"), "NL", ["35"])],
-                [new Lane(new ZoneName("Rotterdam"), new ZoneName("Utrecht"), [new WeightBreak(500m, new Money(14.00m)), new WeightBreak(1_000m, new Money(12.37m))])]),
+                [new Lane(new ZoneName("Rotterdam"), new ZoneName("Utrecht"), [new WeightBreak(500m, new Money(14.00m)), new WeightBreak(1_000m, new Money(12.37m))], new Money(45.00m))]),
         ]);
 
     private static TransportOrder Accepted(IntakeChannel channel) =>
