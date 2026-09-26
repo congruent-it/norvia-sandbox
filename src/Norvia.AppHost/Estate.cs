@@ -46,4 +46,13 @@ public sealed class Estate(IDistributedApplicationBuilder builder)
     /// portal (ADR 0024). Only the users assigned to it get a token.
     /// </summary>
     public IResourceBuilder<ParameterResource> DemoUisClientId { get; } = builder.AddParameter("estate-demo-uis-client-id");
+
+    /// <summary>
+    /// The Integration console's app registration, which Easy Auth signs operators in to. Its app roles say what an
+    /// operator may do (ADR 0026).
+    /// </summary>
+    public IResourceBuilder<ParameterResource> IntegrationConsoleClientId { get; } = builder.AddParameter("estate-integration-console-client-id");
+
+    /// <summary>The Integration console's managed identity, which it reads the estate as (ADR 0017).</summary>
+    public IResourceBuilder<ParameterResource> IntegrationConsoleIdentity { get; } = builder.AddParameter("estate-integration-console-identity-name");
 }

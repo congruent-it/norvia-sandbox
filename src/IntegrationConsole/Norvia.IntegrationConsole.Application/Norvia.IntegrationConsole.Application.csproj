@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    No Domain project, repositories or specifications: the console has no aggregates and no database. This is the stated
+    deviation from coding guidelines §1 (docs/operations/integration-console.md, ADR 0017).
+  -->
+</Project>

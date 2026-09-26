@@ -25,6 +25,10 @@ the apps are first deployed. azd's postdeploy hook stores them, so the demo UIs'
 estate is deployed again.''')
 param demoUiRedirectUris string = ''
 
+@description('''Easy Auth's sign-in callback on the Integration console, empty before the console is first deployed. azd's
+postdeploy hook stores it, so the console's app registration keeps it when the estate is deployed again.''')
+param integrationConsoleRedirectUris string = ''
+
 @description('''The TMS API's address, empty before the apps are first deployed. azd's postdeploy hook stores it, so the intake
 Logic App keeps it when the estate is deployed again.''')
 param tmsBaseUrl string = ''
@@ -66,6 +70,7 @@ module identities 'estate/identities.bicep' = {
     tags: tags
     presenterPrincipalId: presenterPrincipalId
     demoUiRedirectUris: demoUiRedirectUris
+    integrationConsoleRedirectUris: integrationConsoleRedirectUris
   }
 }
 
@@ -121,3 +126,5 @@ output ESTATE_PARTNER_PORTAL_CLIENT_ID string = identities.outputs.partnerPortal
 output ESTATE_PARTNER_PORTAL_IDENTITY_NAME string = identities.outputs.partnerPortalIdentityName
 output ESTATE_PARTNER_PORTAL_KEY_VAULT string = partnerApi.outputs.partnerPortalKeyVaultName
 output ESTATE_DEMO_UIS_CLIENT_ID string = identities.outputs.demoUisClientId
+output ESTATE_INTEGRATION_CONSOLE_CLIENT_ID string = identities.outputs.integrationConsoleClientId
+output ESTATE_INTEGRATION_CONSOLE_IDENTITY_NAME string = identities.outputs.integrationConsoleIdentityName

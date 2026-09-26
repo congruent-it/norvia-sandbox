@@ -14,6 +14,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Integration\Norvia.Integration.LocalPartnerApi\Norvia.Integration.LocalPartnerApi.csproj" />
+    <ProjectReference Include="..\IntegrationConsole\Norvia.IntegrationConsole.Web\Norvia.IntegrationConsole.Web.csproj" />
     <ProjectReference Include="..\PartnerPortal\Norvia.PartnerPortal.Migrations\Norvia.PartnerPortal.Migrations.csproj" />
     <ProjectReference Include="..\PartnerPortal\Norvia.PartnerPortal.Web\Norvia.PartnerPortal.Web.csproj" />
     <ProjectReference Include="..\Tms\Norvia.Tms.Api\Norvia.Tms.Api.csproj" />

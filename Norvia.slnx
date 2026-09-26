@@ -8,6 +8,11 @@
     <Project Path="src/Integration/Norvia.Integration.LocalPartnerApi/Norvia.Integration.LocalPartnerApi.csproj" />
     <Project Path="src/Integration/Norvia.Integration.TransportOrderIntake.Functions/Norvia.Integration.TransportOrderIntake.Functions.csproj" />
   </Folder>
+  <Folder Name="/src/IntegrationConsole/">
+    <Project Path="src/IntegrationConsole/Norvia.IntegrationConsole.Application/Norvia.IntegrationConsole.Application.csproj" />
+    <Project Path="src/IntegrationConsole/Norvia.IntegrationConsole.Infrastructure/Norvia.IntegrationConsole.Infrastructure.csproj" />
+    <Project Path="src/IntegrationConsole/Norvia.IntegrationConsole.Web/Norvia.IntegrationConsole.Web.csproj" />
+  </Folder>
   <Folder Name="/src/PartnerPortal/">
     <Project Path="src/PartnerPortal/Norvia.PartnerPortal.Application/Norvia.PartnerPortal.Application.csproj" />
     <Project Path="src/PartnerPortal/Norvia.PartnerPortal.Domain/Norvia.PartnerPortal.Domain.csproj" />
@@ -27,6 +32,12 @@
   <Folder Name="/tests/Integration/">
     <Project Path="tests/Integration/Norvia.Integration.LocalPartnerApi.UnitTests/Norvia.Integration.LocalPartnerApi.UnitTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.TransportOrderIntake.UnitTests/Norvia.Integration.TransportOrderIntake.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/tests/IntegrationConsole/">
+    <Project Path="tests/IntegrationConsole/Norvia.IntegrationConsole.ArchitectureTests/Norvia.IntegrationConsole.ArchitectureTests.csproj" />
+    <Project Path="tests/IntegrationConsole/Norvia.IntegrationConsole.Infrastructure.UnitTests/Norvia.IntegrationConsole.Infrastructure.UnitTests.csproj" />
+    <Project Path="tests/IntegrationConsole/Norvia.IntegrationConsole.Web.UiTests/Norvia.IntegrationConsole.Web.UiTests.csproj" />
+    <Project Path="tests/IntegrationConsole/Norvia.IntegrationConsole.Web.UnitTests/Norvia.IntegrationConsole.Web.UnitTests.csproj" />
   </Folder>
   <Folder Name="/tests/PartnerPortal/">
     <Project Path="tests/PartnerPortal/Norvia.PartnerPortal.Application.UnitTests/Norvia.PartnerPortal.Application.UnitTests.csproj" />

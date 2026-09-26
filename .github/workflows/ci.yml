@@ -32,7 +32,8 @@ jobs:
         with:
           global-json-file: global.json
 
-      # The TMS UI's and the Partner portal's stylesheets are built with Tailwind CSS during the .NET build (ADR 0018, ADR 0022).
+      # The TMS UI's, the Partner portal's and the Integration console's stylesheets are built with Tailwind CSS during the
+      # .NET build (ADR 0018, ADR 0022, ADR 0025).
       - uses: actions/setup-node@v5
         with:
           node-version: 22
@@ -40,6 +41,7 @@ jobs:
           cache-dependency-path: |
             src/Tms/Norvia.Tms.Web/package-lock.json
             src/PartnerPortal/Norvia.PartnerPortal.Web/package-lock.json
+            src/IntegrationConsole/Norvia.IntegrationConsole.Web/package-lock.json
 
       - uses: actions/cache@v4
         with:
@@ -114,7 +116,8 @@ jobs:
         with:
           global-json-file: global.json
 
-      # The TMS UI's and the Partner portal's stylesheets are built with Tailwind CSS during the .NET build (ADR 0018, ADR 0022).
+      # The TMS UI's, the Partner portal's and the Integration console's stylesheets are built with Tailwind CSS during the
+      # .NET build (ADR 0018, ADR 0022, ADR 0025).
       - uses: actions/setup-node@v5
         with:
           node-version: 22
@@ -122,6 +125,7 @@ jobs:
           cache-dependency-path: |
             src/Tms/Norvia.Tms.Web/package-lock.json
             src/PartnerPortal/Norvia.PartnerPortal.Web/package-lock.json
+            src/IntegrationConsole/Norvia.IntegrationConsole.Web/package-lock.json
 
       - uses: actions/cache@v4
         with:

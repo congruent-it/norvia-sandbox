@@ -4,17 +4,22 @@ using Azure.Provisioning.AppContainers;
 namespace Norvia.AppHost;
 
 /// <summary>
-/// Easy Auth in front of a demo UI's container app (ADR 0024): every browser signs in to the estate's demo UIs app
-/// registration first, and Entra issues a token only to the users assigned to it.
+/// Easy Auth in front of a container app: every browser signs in to an Entra app registration of the estate's first, and
+/// Entra issues a token only to the users assigned to it. The demo UIs use it as a gate for the presenter (ADR 0024); the
+/// Integration console reads the operator and their app roles from it (ADR 0026).
 /// </summary>
-internal static class DemoUiGate
+internal static class EntraSignIn
 {
     /// <summary>Container Apps probes these, and they tell nobody more than whether the app is up.</summary>
     private static readonly string[] HealthProbePaths = ["/health", "/alive"];
 
-    public static ContainerAppAuthConfig For(AzureResourceInfrastructure infrastructure, ContainerApp app, Estate estate)
+    public static ContainerAppAuthConfig For(
+        AzureResourceInfrastructure infrastructure,
+        ContainerApp app,
+        IResourceBuilder<ParameterResource> appRegistrationClientId,
+        IResourceBuilder<ParameterResource> entraIssuer)
     {
-        var clientId = estate.DemoUisClientId.AsProvisioningParameter(infrastructure);
+        var clientId = appRegistrationClientId.AsProvisioningParameter(infrastructure);
         return new ContainerAppAuthConfig("authConfig")
         {
             Parent = app,
@@ -33,11 +38,11 @@ internal static class DemoUiGate
                 AzureActiveDirectory = new ContainerAppAzureActiveDirectoryConfiguration
                 {
                     IsEnabled = true,
-                    // No client secret: Easy Auth then asks Entra for an ID token only, which is all a gate needs.
+                    // No client secret: Easy Auth then asks Entra for an ID token only, which carries the user's app roles.
                     Registration = new ContainerAppAzureActiveDirectoryRegistrationConfiguration
                     {
                         ClientId = clientId,
-                        OpenIdIssuer = estate.EntraIssuer.AsProvisioningParameter(infrastructure),
+                        OpenIdIssuer = entraIssuer.AsProvisioningParameter(infrastructure),
                     },
                     Validation = new ContainerAppAzureActiveDirectoryValidationConfiguration
                     {

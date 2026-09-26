@@ -13,6 +13,6 @@ Easy Auth holds no client secret. Without one it asks Entra for an ID token only
 
 ## Consequences
 
-- The redirect URIs name the apps' host names, which exist only once Aspire has deployed them. The postdeploy hook ([infra/register-demo-ui-callbacks.sh](../../infra/register-demo-ui-callbacks.sh)) finds the container apps whose gate signs in to the demo UIs' app registration, adds their callbacks, and keeps them in the azd environment as `ESTATE_DEMO_UI_REDIRECT_URIS`, so deploying the estate again keeps them. Until the hook has run once, sign-in fails with a redirect URI mismatch.
+- The redirect URIs name the apps' host names, which exist only once Aspire has deployed them. The postdeploy hook ([infra/register-sign-in-callbacks.sh](../../infra/register-sign-in-callbacks.sh)) finds the container apps whose gate signs in to the demo UIs' app registration, adds their callbacks, and keeps them in the azd environment as `ESTATE_DEMO_UI_REDIRECT_URIS`, so deploying the estate again keeps them. Until the hook has run once, sign-in fails with a redirect URI mismatch.
 - Whoever runs `azd up` is the presenter. Someone else presenting must be assigned the `DemoUis.Use` role on *Norvia demo UIs* in Entra ID.
 - Locally nothing changes: there is no gate and no sign-in.
