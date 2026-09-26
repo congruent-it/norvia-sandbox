@@ -1,0 +1,50 @@
+@inherits LayoutComponentBase
+
+@* Fluent UI's own components go dark as Darkly is, with its blue as their accent. *@
+<FluentDesignTheme Mode="DesignThemeModes.Dark" CustomColor="#375a7f" />
+
+@* Darkly's navbar: blue, with the brand and the navigation in white. *@
+<header class="bg-primary text-white">
+    <nav aria-label="Main" class="mx-auto flex max-w-7xl flex-wrap items-center gap-x-8 gap-y-2 px-4 py-4">
+        <a href="/" class="text-xl font-bold text-white no-underline hover:text-white">Integration console</a>
+        <NavLink href="/" Match="NavLinkMatch.All" class="text-white/75 no-underline hover:text-white" ActiveClass="!text-white">
+            Search
+        </NavLink>
+        @if (_operatorName is not null)
+        {
+            <div class="ml-auto flex items-center gap-4">
+                <span class="text-white/75">@_operatorName</span>
+                @if (_signedInWithEntra)
+                {
+                    @* Easy Auth's endpoint, which signs the browser out of the console and Entra ID. *@
+                    <a href="/.auth/logout" class="text-white no-underline hover:text-success">Sign out</a>
+                }
+            </div>
+        }
+    </nav>
+</header>
+
+<main class="mx-auto max-w-7xl px-4 py-8">
+    @Body
+</main>
+
+<div id="blazor-error-ui" data-nosnippet>
+    <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+        Something went wrong. <a href="" class="reload text-white">Reload</a>
+    </FluentMessageBar>
+</div>
+
+@code {
+    private string? _operatorName;
+    private bool _signedInWithEntra;
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationState { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var identity = AuthenticationState is null ? null : (await AuthenticationState).User.Identity;
+        _operatorName = identity is { IsAuthenticated: true } ? identity.Name : null;
+        _signedInWithEntra = identity?.AuthenticationType == EasyAuthHandler.EntraAuthenticationType;
+    }
+}

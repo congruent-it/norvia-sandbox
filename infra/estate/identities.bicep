@@ -11,6 +11,9 @@ param presenterPrincipalId string
 @description('Easy Auth\'s sign-in callbacks on the demo UIs, comma separated, empty before the apps are first deployed.')
 param demoUiRedirectUris string
 
+@description('Easy Auth\'s sign-in callback on the Integration console, empty before the console is first deployed.')
+param integrationConsoleRedirectUris string
+
 var intakeRole = 'TransportOrders.Intake'
 var intakeRoleId = guid('norvia-tms-api', environmentName, intakeRole)
 var submitRole = 'TransportOrders.Submit'
@@ -19,6 +22,10 @@ var triggerRole = 'TransportOrderIntake.Trigger'
 var triggerRoleId = guid('norvia-intake-trigger', environmentName, triggerRole)
 var demoUisRole = 'DemoUis.Use'
 var demoUisRoleId = guid('norvia-demo-uis', environmentName, demoUisRole)
+var consoleReadRole = 'IntegrationConsole.Read'
+var consoleReadRoleId = guid('norvia-integration-console', environmentName, consoleReadRole)
+var consoleResubmitRole = 'IntegrationConsole.Resubmit'
+var consoleResubmitRoleId = guid('norvia-integration-console', environmentName, consoleResubmitRole)
 
 // Every Persona the Partner portal plays is its own client app registration (ADR 0005). The seed file names them.
 var personas = loadJsonContent('../../seed/norvia.seed.json').personas
@@ -225,6 +232,71 @@ resource demoUisRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = if (!empty(
   principalId: presenterPrincipalId
 }
 
+// What Easy Auth signs Integration operators in to in front of the Integration console (ADR 0026). Unlike the demo UIs'
+// gate, the console reads the operator's app roles and decides for itself what they may see.
+resource integrationConsole 'Microsoft.Graph/applications@v1.0' = {
+  uniqueName: 'norvia-integration-console-${environmentName}'
+  displayName: 'Norvia Integration console (${environmentName})'
+  signInAudience: 'AzureADMyOrg'
+  web: {
+    // The postdeploy hook adds it once Aspire has deployed the console.
+    redirectUris: filter(split(integrationConsoleRedirectUris, ','), uri => !empty(uri))
+    implicitGrantSettings: {
+      // Without a client secret Easy Auth asks for an ID token only, which carries the operator's app roles.
+      enableIdTokenIssuance: true
+    }
+  }
+  appRoles: [
+    {
+      id: consoleReadRoleId
+      value: consoleReadRole
+      displayName: 'Read in the Integration console'
+      description: 'Search Message trails and open run details and message bodies in the Integration console.'
+      allowedMemberTypes: [
+        'User'
+      ]
+      isEnabled: true
+    }
+    {
+      id: consoleResubmitRoleId
+      value: consoleResubmitRole
+      displayName: 'Resubmit in the Integration console'
+      description: 'Also resubmit and discard dead-lettered messages in the Integration console.'
+      allowedMemberTypes: [
+        'User'
+      ]
+      isEnabled: true
+    }
+  ]
+}
+
+resource integrationConsolePrincipal 'Microsoft.Graph/servicePrincipals@v1.0' = {
+  appId: integrationConsole.appId
+  // Entra signs in only users holding one of the console's roles; the console itself refuses those without Read.
+  appRoleAssignmentRequired: true
+}
+
+// The presenter plays the Integration operator in demos, so holds both roles.
+resource consoleReadRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = if (!empty(presenterPrincipalId)) {
+  resourceId: integrationConsolePrincipal.id
+  appRoleId: consoleReadRoleId
+  principalId: presenterPrincipalId
+}
+
+resource consoleResubmitRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = if (!empty(presenterPrincipalId)) {
+  resourceId: integrationConsolePrincipal.id
+  appRoleId: consoleResubmitRoleId
+  principalId: presenterPrincipalId
+}
+
+// The console's own identity, which it reads the estate as, never with the operator's token (ADR 0017). Aspire deploys
+// the console; the estate owns the identity because the estate grants it what it may read.
+resource integrationConsoleIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
+  name: 'id-integration-console-${uniqueString(resourceGroup().id)}'
+  location: location
+  tags: tags
+}
+
 output entraIssuer string = '${environment().authentication.loginEndpoint}${tenant().tenantId}/v2.0'
 output entraTenantId string = tenant().tenantId
 output tmsApiClientId string = tmsApi.appId
@@ -248,3 +320,5 @@ output apiManagementClientId string = apiManagementIdentity.properties.clientId
 output intakeTriggerClientId string = intakeTrigger.appId
 output intakeTriggerAudience string = intakeTrigger.identifierUris[0]
 output demoUisClientId string = demoUis.appId
+output integrationConsoleClientId string = integrationConsole.appId
+output integrationConsoleIdentityName string = integrationConsoleIdentity.name

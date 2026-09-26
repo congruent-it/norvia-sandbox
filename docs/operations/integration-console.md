@@ -122,7 +122,7 @@ Ninety days is the retention Application Insights tables get at no extra cost, a
 
 ## Access and identity
 
-- Integration operators sign in with Entra ID. The console's app registration has two app roles:
+- Integration operators sign in with Entra ID, through Container Apps' built-in authentication in front of the console ([ADR 0026](../adr/0026-the-integration-console-signs-operators-in-with-easy-auth-and-checks-their-app-role.md)). Entra signs in only users holding one of the console's roles, and every page requires `IntegrationConsole.Read`. The console's app registration has two app roles:
   - `IntegrationConsole.Read`: search, trails, run details, panels and bodies;
   - `IntegrationConsole.Resubmit`: also resubmit and discard.
 - The console checks the user's role, then calls Azure with its own managed identity, never with the user's token. The estate Bicep grants that identity:

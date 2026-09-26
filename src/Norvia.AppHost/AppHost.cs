@@ -47,6 +47,11 @@ var partnerPortal = builder.AddProject<Projects.Norvia_PartnerPortal_Web>("partn
     .WithHttpHealthCheck("/health")
     .WithUrlForEndpoint("http", url => url.DisplayText = "Partner portal");
 
+// The Integration console, for the Integration operator. It has no database: it reads what the estate records (ADR 0017).
+var integrationConsole = builder.AddProject<Projects.Norvia_IntegrationConsole_Web>("integration-console-web")
+    .WithHttpHealthCheck("/health")
+    .WithUrlForEndpoint("http", url => url.DisplayText = "Integration console");
+
 // Locally the TMS and the Partner portal read the repo's seed file; in Azure the copy each image carries, next to the
 // app (the image's working directory).
 var seedPath = builder.ExecutionContext.IsPublishMode ? Path.Combine("seed", "norvia.seed.json") : seedFile;
@@ -69,7 +74,7 @@ if (builder.ExecutionContext.IsPublishMode)
     messaging.PublishAsExisting(estate.ServiceBusNamespace, null);
 
     var insights = builder.AddAzureApplicationInsights("insights").PublishAsExisting(estate.ApplicationInsights, null);
-    foreach (var project in new[] { tmsMigrations, tmsApi, tmsWeb, partnerPortalMigrations, partnerPortal })
+    foreach (var project in new[] { tmsMigrations, tmsApi, tmsWeb, partnerPortalMigrations, partnerPortal, integrationConsole })
     {
         project.WithReference(insights);
     }
@@ -87,8 +92,19 @@ if (builder.ExecutionContext.IsPublishMode)
     foreach (var demoUi in new[] { tmsWeb, partnerPortal })
     {
         demoUi.WithExternalHttpEndpoints()
-            .PublishAsAzureContainerApp((infrastructure, app) => infrastructure.Add(DemoUiGate.For(infrastructure, app, estate)));
+            .PublishAsAzureContainerApp((infrastructure, app) =>
+                infrastructure.Add(EntraSignIn.For(infrastructure, app, estate.DemoUisClientId, estate.EntraIssuer)));
     }
+
+    // The Integration console opens to the operators' browsers. Easy Auth signs them in to the console's own app
+    // registration, whose app roles the console checks (ADR 0026). It then reads the estate as its own identity, never
+    // with the operator's token (ADR 0017).
+    var integrationConsoleIdentity = builder.AddAzureUserAssignedIdentity("integration-console-identity")
+        .PublishAsExisting(estate.IntegrationConsoleIdentity, null);
+    integrationConsole.WithExternalHttpEndpoints()
+        .WithAzureUserAssignedIdentity(integrationConsoleIdentity)
+        .PublishAsAzureContainerApp((infrastructure, app) =>
+            infrastructure.Add(EntraSignIn.For(infrastructure, app, estate.IntegrationConsoleClientId, estate.EntraIssuer)));
 
     // In Azure the Partner portal books through API Management as each Persona: it runs as the identity every Persona's
     // client app trusts, so it gets their tokens without a secret (ADR 0005), and reads their subscription keys from
@@ -114,6 +130,13 @@ else
     messaging.RunAsEmulator(emulator => emulator.WithConfiguration(ResubmitAwareFilters.Apply))
         .AddServiceBusTopic("transport-order-events")
         .AddServiceBusSubscription("monitoring");
+
+    // Locally there is no Easy Auth, so the console signs the developer in as an Integration operator with both app
+    // roles, as the estate assigns the presenter. It reads Azure with the developer's own sign-in.
+    integrationConsole
+        .WithEnvironment("LocalOperator__Name", $"{Environment.UserName} (local)")
+        .WithEnvironment("LocalOperator__Roles__0", "IntegrationConsole.Read")
+        .WithEnvironment("LocalOperator__Roles__1", "IntegrationConsole.Resubmit");
 
     // Locally the TMS trusts tokens signed with this key (see LocalTokens).
     var localTokenSigningKey = builder.AddParameter(
