@@ -20,14 +20,49 @@ public sealed class IntakeWorkflowTests
     }
 
     [Fact]
-    public void Trigger_TrackedProperties_AreTheKeysItKnows()
+    public void Trigger_TracksNothing_BecauseLogicAppsDropsARequestTriggersTrackedProperties()
     {
-        var tracked = IntakeWorkflow.Trigger["trackedProperties"]!.AsObject();
+        // Logic Apps Standard records a Request trigger's tracked properties neither in the run history nor in
+        // Application Insights, so the first step tracks the keys the trigger knows.
+        IntakeWorkflow.Trigger["trackedProperties"].Should().BeNull();
+    }
+
+    [Fact]
+    public void Tracking_RunsStraightAfterTheCallerCheck_SoARunThatStopsBeforeTheTmsCallIsOnItsMessageTrail()
+    {
+        // The caller check stays first (ADR 0020), so only a Shipper that API Management vouched for is tracked; a
+        // refused caller is on its trail through the refusal.
+        var tracking = IntakeWorkflow.Action(IntakeWorkflow.Tracking);
+
+        tracking["type"]!.GetValue<string>().Should().Be("Compose");
+        tracking["runAfter"]![IntakeWorkflow.CallerCheck]!.AsArray()
+            .Select(status => status!.GetValue<string>()).Should().BeEquivalentTo("Succeeded");
+        IntakeWorkflow.Action("Map_the_booking")["runAfter"]![IntakeWorkflow.Tracking]!.AsArray()
+            .Select(status => status!.GetValue<string>()).Should().BeEquivalentTo("Succeeded");
+    }
+
+    [Fact]
+    public void Tracking_TakesTheCorrelationIdAndTheShipperFromTheHeaders_LeavingOutAMissingOne()
+    {
+        // An interpolated expression would turn a missing header into an empty key; the contract leaves it out.
+        var inputs = IntakeWorkflow.Action(IntakeWorkflow.Tracking)["inputs"];
+
+        JsonNode.DeepEquals(inputs, new JsonObject
+        {
+            ["correlationId"] = "@triggerOutputs()?['headers']?['X-Correlation-ID']",
+            ["partyId"] = "@triggerOutputs()?['headers']?['X-Shipper-ID']",
+        }).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Tracking_TrackedProperties_AreTheKeysTheTriggerKnows()
+    {
+        var tracked = IntakeWorkflow.Action(IntakeWorkflow.Tracking)["trackedProperties"]!.AsObject();
 
         tracked.Select(property => property.Key).Should().BeEquivalentTo("correlationId", "flow", "partyId");
-        tracked["correlationId"]!.GetValue<string>().Should().Be("@trigger()?['outputs']?['headers']?['X-Correlation-ID']");
+        tracked["correlationId"]!.GetValue<string>().Should().Be("@action()?['inputs']?['correlationId']");
         tracked["flow"]!.GetValue<string>().Should().Be(Flow);
-        tracked["partyId"]!.GetValue<string>().Should().Be("@trigger()?['outputs']?['headers']?['X-Shipper-ID']");
+        tracked["partyId"]!.GetValue<string>().Should().Be("@action()?['inputs']?['partyId']");
     }
 
     [Fact]
@@ -48,8 +83,8 @@ public sealed class IntakeWorkflowTests
                     "@parameters('apiManagementPrincipalId')"),
             }),
         }).Should().BeTrue();
-        IntakeWorkflow.Action("Map_the_booking")["runAfter"]![IntakeWorkflow.CallerCheck]!.AsArray()
-            .Select(status => status!.GetValue<string>()).Should().BeEquivalentTo("Succeeded");
+        IntakeWorkflow.Actions.Where(action => action.Key != IntakeWorkflow.CallerCheck)
+            .Should().OnlyContain(action => action.Value!["runAfter"]!.AsObject().Count > 0, "only the caller check runs first");
     }
 
     [Fact]

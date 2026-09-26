@@ -11,11 +11,6 @@
         },
         "correlation": {
           "clientTrackingId": "@{triggerOutputs()?['headers']?['X-Correlation-ID']}"
-        },
-        "trackedProperties": {
-          "correlationId": "@trigger()?['outputs']?['headers']?['X-Correlation-ID']",
-          "flow": "transport-order-intake",
-          "partyId": "@trigger()?['outputs']?['headers']?['X-Shipper-ID']"
         }
       }
     },
@@ -72,6 +67,23 @@
         },
         "runAfter": {}
       },
+      "Track_the_booking": {
+        "type": "Compose",
+        "inputs": {
+          "correlationId": "@triggerOutputs()?['headers']?['X-Correlation-ID']",
+          "partyId": "@triggerOutputs()?['headers']?['X-Shipper-ID']"
+        },
+        "runAfter": {
+          "Refuse_a_caller_other_than_API_Management": [
+            "Succeeded"
+          ]
+        },
+        "trackedProperties": {
+          "correlationId": "@action()?['inputs']?['correlationId']",
+          "flow": "transport-order-intake",
+          "partyId": "@action()?['inputs']?['partyId']"
+        }
+      },
       "Map_the_booking": {
         "type": "InvokeFunction",
         "inputs": {
@@ -82,7 +94,7 @@
           }
         },
         "runAfter": {
-          "Refuse_a_caller_other_than_API_Management": [
+          "Track_the_booking": [
             "Succeeded"
           ]
         }
