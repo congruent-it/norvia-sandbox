@@ -18,7 +18,7 @@ Each Transport Order has a rating result that is separate from its status. The s
 |---|---|
 | Not yet rated | Accepted, and Rating hasn't run yet |
 | Rated | A Freight Charge has been calculated and is frozen |
-| Rating failed | The Rate Card couldn't price the order. The result carries a failure reason |
+| Rating failed | The Rate Card couldn't price the order. The result carries a failure reason: a stable code and a message, which the query API shows. The order stays Accepted |
 | Not rated separately | A Fulfilment Transport Order (WMS channel). It is billed through the Fulfilment Contract, not per transport |
 
 Rating failed can move to Rated through a re-rate. Rated and Not rated separately are final.
@@ -75,7 +75,7 @@ Both events are published to the topic for Transport Order events, through the T
 
 ## Tracking
 
-Rating continues the Message trail of the Transport Order's intake: its events carry the intake's correlation ID. The rating worker puts the tracking-contract keys in the logging scope and on the trace of each rating: `correlationId`, `flow` (`transport-order-rating`), `partyId` (the Shipper ID) and `transportOrderNumber`. The outcome event carries the same keys as application properties.
+Rating continues the Message trail of the Transport Order's intake: its events carry the intake's correlation ID. The rating worker puts the tracking-contract keys in the logging scope and on the trace of each rating: `correlationId`, `flow` (`transport-order-rating`), `partyId` (the Shipper ID) and `transportOrderNumber`. The outcome event carries the same keys as application properties. When Rating failed, the log scope, the trace and `TransportOrderRatingFailed` also carry `failureCode`.
 
 ## Deferred
 

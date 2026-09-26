@@ -7,9 +7,9 @@ using Norvia.Tms.Domain.TransportOrders;
 namespace Norvia.Tms.Application.TransportOrders.Rate;
 
 public sealed class RateTransportOrderHandler(IRepository<TransportOrder> repository, IRateCardDirectory rateCards, TimeProvider time)
-    : ICommandHandler<RateTransportOrderCommand, Result<RatingResult>>
+    : ICommandHandler<RateTransportOrderCommand, Result<RateTransportOrderResult>>
 {
-    public async ValueTask<Result<RatingResult>> Handle(RateTransportOrderCommand command, CancellationToken cancellationToken)
+    public async ValueTask<Result<RateTransportOrderResult>> Handle(RateTransportOrderCommand command, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
 
@@ -20,12 +20,13 @@ public sealed class RateTransportOrderHandler(IRepository<TransportOrder> reposi
             return Result.NotFound();
         }
 
-        // The Freight Charge, the rating result and TransportOrderRated's outbox message are saved in one transaction.
+        // The rating result, with its Freight Charge or failure, and the outcome event's outbox message are saved in one
+        // transaction.
         if (order.Rate(rateCards.FindFor(order.ShipperId), time.GetUtcNow()))
         {
             await repository.SaveChangesAsync(cancellationToken);
         }
 
-        return order.RatingResult.Value;
+        return new RateTransportOrderResult(order.RatingResult.Value, RatingFailureView.From(order.RatingFailure));
     }
 }

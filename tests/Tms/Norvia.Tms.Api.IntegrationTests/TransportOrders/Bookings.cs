@@ -67,6 +67,13 @@ internal static class Bookings
         return booking;
     }
 
+    /// <summary>The booking delivered to Düsseldorf, in Germany.</summary>
+    public static JsonObject DeliveredToDusseldorf(this JsonObject booking)
+    {
+        booking["delivery"]!["address"] = Address("Königsallee 1", "40212", "Düsseldorf", "DE");
+        return booking;
+    }
+
     /// <summary>The booking collected from the given time on, and delivered later the same day.</summary>
     public static JsonObject CollectedFrom(this JsonObject booking, DateTimeOffset earliest)
     {

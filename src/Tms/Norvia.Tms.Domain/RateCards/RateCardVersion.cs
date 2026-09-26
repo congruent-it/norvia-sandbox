@@ -1,4 +1,5 @@
 using Norvia.Tms.Domain.TransportOrders;
+using static System.FormattableString;
 
 namespace Norvia.Tms.Domain.RateCards;
 
@@ -26,27 +27,45 @@ public sealed record RateCardVersion(
     public bool IsValidOn(DateOnly date) => date >= ValidFrom && (ValidTo is null || date <= ValidTo);
 
     /// <summary>
-    /// The charge lines for a Transport Order, each rounded to cents, or null when no Lane or Weight Break covers it.
+    /// Rates a Transport Order: its Freight Charge, or why this version can't price it because no Lane covers its
+    /// Zones or its weight is above the Lane's highest Weight Break.
     /// </summary>
-    public IReadOnlyList<ChargeLine>? ChargeLinesFor(TransportOrderDetails details)
+    /// <param name="rateCardId">The Rate Card this version belongs to, which the Freight Charge refers to.</param>
+    public RatingOutcome Rate(RateCardId rateCardId, TransportOrderDetails details)
     {
         ArgumentNullException.ThrowIfNull(details);
         var origin = ZoneOf(details.Collection?.Address);
         var destination = ZoneOf(details.Delivery?.Address);
-        var lane = Lanes.FirstOrDefault(lane => lane.Origin == origin?.Name && lane.Destination == destination?.Name);
+        if (Lanes.FirstOrDefault(lane => lane.Origin == origin?.Name && lane.Destination == destination?.Name) is not { } lane)
+        {
+            return RatingOutcome.Failed(RatingFailureCode.NoMatchingLane, Invariant(
+                $"Rate Card {rateCardId} version {Version} has no Lane from {Describe(origin, details.Collection?.Address)} to {Describe(destination, details.Delivery?.Address)}."));
+        }
 
-        return lane?.ChargeLinesFor(details.TotalWeightKg());
+        var weightKg = details.TotalWeightKg();
+        return lane.ChargeLinesFor(weightKg) is { } chargeLines
+            ? RatingOutcome.Priced(new FreightCharge(chargeLines, new RateCardVersionReference(rateCardId, Version)))
+            : RatingOutcome.Failed(RatingFailureCode.WeightAboveHighestBreak, Invariant(
+                $"The total weight of {weightKg} kg is above the highest Weight Break, up to {lane.HighestWeightBreakKg} kg, of the Lane from {lane.Origin} to {lane.Destination} in Rate Card {rateCardId} version {Version}."));
     }
 
-    /// <summary>The Zone the address lies in: of those that cover it, the one with the most specific postcode prefix.</summary>
+    /// <summary>An end of a Lane the message names: its Zone, or the address when it lies in none.</summary>
+    private static string Describe(Zone? zone, Address? address) =>
+        zone is not null ? zone.Name.Value : Invariant($"{address?.Country} {address?.Postcode}, which lies in no Zone");
+
+    /// <summary>
+    /// The Zone the address lies in: of those that cover it, the one with the most specific postcode prefix. Null when
+    /// it lies in none.
+    /// </summary>
     private Zone? ZoneOf(Address? address) =>
         address is null
             ? null
             : Zones
                 .Select(zone => (Zone: zone, Specificity: zone.SpecificityFor(address)))
                 .Where(match => match.Specificity is not null)
-                .MaxBy(match => match.Specificity)
-                .Zone;
+                .OrderByDescending(match => match.Specificity)
+                .Select(match => match.Zone)
+                .FirstOrDefault();
 
     private static IReadOnlyList<Zone> WithoutOverlaps(IReadOnlyList<Zone> zones)
     {

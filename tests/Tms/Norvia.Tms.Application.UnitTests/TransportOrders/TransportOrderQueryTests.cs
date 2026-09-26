@@ -44,6 +44,7 @@ public sealed class TransportOrderQueryTests
             [],
             RatingResult.NotYetRated,
             null,
+            null,
             CanonicalTransportOrder.From(order)));
     }
 
@@ -61,6 +62,20 @@ public sealed class TransportOrderQueryTests
             112.90m,
             [new ChargeLineView("Freight", 112.90m)],
             new RateCardVersionView("RC-0001", 3)));
+    }
+
+    [Fact]
+    public async Task Get_RatingFailedOrder_ShowsTheFailureCodeAndMessage_AndStaysAccepted()
+    {
+        var order = Samples.RatingFailedOrder(sequence: 5);
+        _repository.FirstOrDefaultAsync(Arg.Any<TransportOrderByNumberSpec>(), Arg.Any<CancellationToken>()).Returns(order);
+
+        var result = await new GetTransportOrderHandler(_repository, _shippers).Handle(new GetTransportOrderQuery("TO-0000005"), CancellationToken.None);
+
+        result.Value.Status.Should().Be(TransportOrderStatus.Accepted);
+        result.Value.RatingResult.Should().Be(RatingResult.RatingFailed);
+        result.Value.RatingFailure.Should().Be(new RatingFailureView("NoRateCard", "Shipper SHP-0001 has no Rate Card."));
+        result.Value.FreightCharge.Should().BeNull();
     }
 
     [Fact]
@@ -101,6 +116,7 @@ public sealed class TransportOrderQueryTests
                 new RejectionReasonView("InactiveShipper", "The Shipper is not active, so Norvia can't take bookings for it."),
                 new RejectionReasonView("GoodsLinesMissing", "The booking has no goods lines."),
             ],
+            null,
             null,
             null,
             Samples.CanonicalTransportOrder()));

@@ -71,4 +71,13 @@ internal static class Samples
         order.ClearDomainEvents();
         return order;
     }
+
+    /// <summary>An order whose Shipper has no Rate Card, so Rating failed with NoRateCard.</summary>
+    public static TransportOrder RatingFailedOrder(long sequence = 7, string correlationId = "corr-1")
+    {
+        var order = AcceptedOrder(sequence, correlationId);
+        order.Rate(null, Now.AddSeconds(2));
+        order.ClearDomainEvents();
+        return order;
+    }
 }

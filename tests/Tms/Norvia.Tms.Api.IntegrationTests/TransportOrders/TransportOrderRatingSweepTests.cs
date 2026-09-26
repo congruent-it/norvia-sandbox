@@ -21,18 +21,23 @@ public sealed class TransportOrderRatingSweepTests(SweepOnlyTmsFixture tms) : IC
     }
 
     [Fact]
-    public async Task Sweep_MoreOrdersItCantRateThanOneBatch_StillRatesTheNewerOnes()
+    public async Task Sweep_MoreOrdersItCantPriceThanOneBatch_FailsThemAndStillRatesTheNewerOnes()
     {
-        // SHP-0003 has no Rate Card, so its orders stay Not yet rated, ahead of the newer one in every sweep.
+        // SHP-0003 has no Rate Card, so its orders, ahead of the newer one, become Rating failed.
+        var unpricedNumbers = new List<string>();
         for (var i = 0; i < 3; i++)
         {
             var unpriced = Bookings.Valid(TmsCalls.NewReference());
             unpriced["shipperId"] = "SHP-0003";
-            await tms.SubmitAcceptedAsync(unpriced, TmsCalls.NewCorrelationId(), _cancellationToken);
+            unpricedNumbers.Add(await tms.SubmitAcceptedAsync(unpriced, TmsCalls.NewCorrelationId(), _cancellationToken));
         }
 
         var number = await tms.SubmitAcceptedAsync(Bookings.Valid(TmsCalls.NewReference()), TmsCalls.NewCorrelationId(), _cancellationToken);
 
         await tms.WaitForRatingResultAsync(number, "Rated", _cancellationToken);
+        foreach (var unpricedNumber in unpricedNumbers)
+        {
+            await tms.WaitForRatingResultAsync(unpricedNumber, "RatingFailed", _cancellationToken);
+        }
     }
 }

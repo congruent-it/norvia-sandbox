@@ -1,5 +1,6 @@
 using Norvia.Tms.Domain.Shippers;
 using Norvia.Tms.Domain.TransportOrders;
+using static System.FormattableString;
 
 namespace Norvia.Tms.Domain.RateCards;
 
@@ -11,19 +12,21 @@ namespace Norvia.Tms.Domain.RateCards;
 public sealed record RateCard(RateCardId Id, ShipperId ShipperId, IReadOnlyList<RateCardVersion> Versions)
 {
     /// <summary>
-    /// The Freight Charge for a Transport Order, from the version valid on its collection date, or null when this Rate
-    /// Card can't price it.
+    /// Rates a Transport Order from the version valid on its collection date: its Freight Charge, or why this Rate Card
+    /// can't price it.
     /// </summary>
-    public FreightCharge? FreightChargeFor(TransportOrderDetails details)
+    public RatingOutcome Rate(TransportOrderDetails details)
     {
         ArgumentNullException.ThrowIfNull(details);
-        if (CollectionDate.Of(details) is not { } collectionDate
-            || Versions.FirstOrDefault(version => version.IsValidOn(collectionDate)) is not { } version
-            || version.ChargeLinesFor(details) is not { } chargeLines)
+
+        // An Accepted Transport Order always has a collection window; without one no version can be chosen.
+        if (CollectionDate.Of(details) is not { } collectionDate)
         {
-            return null;
+            return RatingOutcome.Failed(RatingFailureCode.NoValidRateCardVersion, Invariant($"The Transport Order has no collection date to choose a version of Rate Card {Id} by."));
         }
 
-        return new FreightCharge(chargeLines, new RateCardVersionReference(Id, version.Version));
+        return Versions.FirstOrDefault(version => version.IsValidOn(collectionDate)) is { } version
+            ? version.Rate(Id, details)
+            : RatingOutcome.Failed(RatingFailureCode.NoValidRateCardVersion, Invariant($"No version of Rate Card {Id} is valid on the collection date, {collectionDate:yyyy-MM-dd}."));
     }
 }

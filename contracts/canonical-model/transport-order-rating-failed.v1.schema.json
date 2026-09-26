@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/transport-order-rating-failed.v1.schema.json",
+  "title": "TransportOrderRatingFailed",
+  "description": "The TMS couldn't rate an accepted Transport Order from its Shipper's Rate Card (Canonical Model event, version 1). The Transport Order stays Accepted and can be planned; Customer service can re-rate it. Published on the Transport Order events topic, under the correlation ID of the Transport Order's intake.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "transportOrderNumber", "shipperId", "ratingFailure"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "const": "TransportOrderRatingFailed" },
+    "eventVersion": { "const": 1 },
+    "occurredAt": { "description": "When Rating failed.", "type": "string", "format": "date-time" },
+    "correlationId": { "type": "string", "minLength": 1 },
+    "transportOrderNumber": { "type": "string", "pattern": "^TO-[0-9]{7}$" },
+    "shipperId": { "description": "The Shipper whose Rate Card couldn't price the Transport Order.", "type": "string", "minLength": 1 },
+    "ratingFailure": {
+      "description": "Why the Rate Card couldn't price the Transport Order.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "description": "A stable failure code that monitoring can depend on. The codes are listed in the P2 process document.",
+          "enum": ["NoRateCard", "NoValidRateCardVersion", "NoMatchingLane", "WeightAboveHighestBreak"]
+        },
+        "message": { "description": "The reason in plain language.", "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

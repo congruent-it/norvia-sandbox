@@ -8,5 +8,6 @@ Norvia's own message format ([CONTEXT.md](../../CONTEXT.md#integration)): one JS
 | [transport-order-accepted.v1](transport-order-accepted.v1.schema.json) | Event: the TMS accepted a Transport Order |
 | [transport-order-rejected.v1](transport-order-rejected.v1.schema.json) | Event: the TMS rejected a booking, with every reason |
 | [transport-order-rated.v1](transport-order-rated.v1.schema.json) | Event: the TMS rated an accepted Transport Order, with its Freight Charge |
+| [transport-order-rating-failed.v1](transport-order-rating-failed.v1.schema.json) | Event: the TMS couldn't rate an accepted Transport Order, with the failure code and message |
 
 Conventions: property names in camelCase, timestamps as UTC with an offset, weights in kilograms as numbers, money in EUR without VAT as numbers rounded to cents, countries as ISO 3166-1 alpha-2 codes.
