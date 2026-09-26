@@ -38,6 +38,41 @@ internal static class TmsCalls
         return JsonNode.Parse(await response.Content.ReadAsStringAsync(cancellationToken))!;
     }
 
+    /// <summary>Re-rates the Transport Order as Customer service does, under the given idempotency key or a new one.</summary>
+    public static async Task<HttpResponseMessage> ReRateAsync(
+        this TmsFixture tms, string number, CancellationToken cancellationToken, string? idempotencyKey = null)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"/v1/transport-orders/{number}/re-rate", UriKind.Relative));
+        request.Headers.Add("Idempotency-Key", idempotencyKey ?? Guid.NewGuid().ToString());
+        return await tms.Tms.SendAsync(request, cancellationToken);
+    }
+
+    public static async Task<JsonArray> ListRatingExceptionsAsync(this TmsFixture tms, CancellationToken cancellationToken)
+    {
+        using var response = await tms.Tms.GetAsync(new Uri("/v1/transport-orders/rating-exceptions", UriKind.Relative), cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, body);
+        return JsonNode.Parse(body)!.AsArray();
+    }
+
+    /// <summary>
+    /// Waits until the given number of events of the type carrying the correlation ID have been published, then lets the
+    /// outbox run a few more cycles so one more would show up too.
+    /// </summary>
+    public static async Task<IReadOnlyList<ServiceBusReceivedMessage>> PublishedAsync(
+        this TmsFixture tms, string correlationId, string eventType, int count, CancellationToken cancellationToken)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(Timeout);
+        while (tms.Published.Count(m => m.CorrelationId == correlationId && m.Subject == eventType) < count)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(200), timeout.Token);
+        }
+
+        await Task.Delay(OutboxSettleTime, cancellationToken);
+        return [.. tms.Published.Where(m => m.CorrelationId == correlationId && m.Subject == eventType)];
+    }
+
     /// <summary>Reads the Transport Order until it has the rating result, as Rating runs a moment after acceptance.</summary>
     public static async Task<JsonNode> WaitForRatingResultAsync(this TmsFixture tms, string number, string ratingResult, CancellationToken cancellationToken)
     {

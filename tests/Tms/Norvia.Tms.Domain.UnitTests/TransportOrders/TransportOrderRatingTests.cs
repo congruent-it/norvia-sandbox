@@ -179,7 +179,174 @@ public sealed class TransportOrderRatingTests
         order.FreightCharge.Total.Should().Be(new Money(110.50m));
     }
 
+    [Fact]
+    public void ReRate_RatingFailedOrderTheRateCardNowCovers_IsRatedAndLosesItsFailure()
+    {
+        var order = RatingFailed();
+
+        var reRated = order.ReRate(RotterdamUtrechtRateCard(), ReRatedAt, Key);
+
+        reRated.Should().Be(ReRateOutcome.ReRated);
+        order.RatingResult.Should().Be(RatingResult.Rated);
+        order.FreightCharge!.Total.Should().Be(new Money(105.15m));
+        order.RatedAt.Should().Be(ReRatedAt);
+        order.RatingFailure.Should().BeNull();
+        order.RatingFailedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public void ReRate_RatingFailedOrderTheRateCardNowCovers_RaisesTransportOrderRated()
+    {
+        var order = RatingFailed();
+
+        order.ReRate(RotterdamUtrechtRateCard(), ReRatedAt, Key);
+
+        order.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<TransportOrderRatedEvent>()
+            .Which.TransportOrder.Should().BeSameAs(order);
+    }
+
+    [Fact]
+    public void ReRate_FailsAgain_StaysRatingFailedWithTheNewFailure_AndRaisesTransportOrderRatingFailedAgain()
+    {
+        var order = RatingFailed();
+        var noLaneToUtrecht = RotterdamUtrechtRateCard() with
+        {
+            Versions = [RotterdamUtrechtVersion(1, new DateOnly(2027, 1, 1), null, 12.00m)],
+        };
+
+        var reRated = order.ReRate(noLaneToUtrecht, ReRatedAt, Key);
+
+        reRated.Should().Be(ReRateOutcome.ReRated, "a re-rate that fails again is still a rating, and publishes its outcome");
+        order.RatingResult.Should().Be(RatingResult.RatingFailed);
+        order.RatingFailure!.Code.Should().Be(RatingFailureCode.NoValidRateCardVersion);
+        order.RatingFailedAt.Should().Be(ReRatedAt);
+        order.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<TransportOrderRatingFailedEvent>()
+            .Which.TransportOrder.Should().BeSameAs(order);
+    }
+
+    [Fact]
+    public void ReRate_RatedOrder_ChangesNothing()
+    {
+        var order = Accepted(IntakeChannel.ShipperApi);
+        order.Rate(RotterdamUtrechtRateCard(), RatedAt);
+        var freightCharge = order.FreightCharge;
+        order.ClearDomainEvents();
+
+        var reRated = order.ReRate(null, ReRatedAt, Key);
+
+        reRated.Should().Be(ReRateOutcome.Refused, "a frozen Freight Charge stays frozen; a wrong one is corrected with a Credit note");
+        order.RatingResult.Should().Be(RatingResult.Rated);
+        order.FreightCharge.Should().BeSameAs(freightCharge);
+        order.RatedAt.Should().Be(RatedAt);
+        order.DomainEvents.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(IntakeChannel.ShipperApi)]
+    [InlineData(IntakeChannel.Wms)]
+    public void ReRate_NotYetRatedOrNotRatedSeparately_ChangesNothing(IntakeChannel channel)
+    {
+        var order = Accepted(channel);
+        var ratingResult = order.RatingResult;
+        order.ClearDomainEvents();
+
+        var reRated = order.ReRate(RotterdamUtrechtRateCard(), ReRatedAt, Key);
+
+        reRated.Should().Be(ReRateOutcome.Refused, "only a Rating failed order is re-rated");
+        order.RatingResult.Should().Be(ratingResult);
+        order.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ReRate_SeveralVersions_UsesTheOneValidOnTheCollectionDate_NotToday()
+    {
+        // The sample's collection starts on 25 September 2026; the re-rate runs in 2027, under version 2.
+        var rateCard = RotterdamUtrechtRateCard() with
+        {
+            Versions =
+            [
+                RotterdamUtrechtVersion(1, new DateOnly(2026, 1, 1), new DateOnly(2026, 12, 31), pricePer100Kg: 11.00m),
+                RotterdamUtrechtVersion(2, new DateOnly(2027, 1, 1), null, pricePer100Kg: 13.00m),
+            ],
+        };
+        var order = RatingFailed();
+
+        order.ReRate(rateCard, new DateTimeOffset(2027, 3, 1, 9, 0, 0, TimeSpan.Zero), Key);
+
+        order.FreightCharge!.RateCardVersion.Should().Be(new RateCardVersionReference(new RateCardId("RC-0001"), 1));
+        order.FreightCharge.Total.Should().Be(new Money(93.50m)); // 850 kg ÷ 100 × 11.00
+    }
+
     private static readonly DateTimeOffset RatedAt = ReceivedAt.AddSeconds(2);
+
+    [Fact]
+    public void ReRate_SentAgainUnderTheKeyOfTheReRateThatRatedIt_IsARepeatThatChangesNothing()
+    {
+        var order = RatingFailed();
+        order.ReRate(RotterdamUtrechtRateCard(), ReRatedAt, Key);
+        order.ClearDomainEvents();
+
+        var again = order.ReRate(RotterdamUtrechtRateCard(), ReRatedAt.AddMinutes(1), Key);
+
+        again.Should().Be(ReRateOutcome.Repeat, "a retried re-rate gets the answer the first one got");
+        order.RatingResult.Should().Be(RatingResult.Rated);
+        order.RatedAt.Should().Be(ReRatedAt);
+        order.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ReRate_SentAgainUnderTheKeyOfAReRateThatFailedAgain_IsARepeatThatRatesNothing()
+    {
+        var order = RatingFailed();
+        order.ReRate(null, ReRatedAt, Key);
+        order.ClearDomainEvents();
+
+        var again = order.ReRate(RotterdamUtrechtRateCard(), ReRatedAt.AddMinutes(1), Key);
+
+        again.Should().Be(ReRateOutcome.Repeat);
+        order.RatingResult.Should().Be(RatingResult.RatingFailed);
+        order.RatingFailedAt.Should().Be(ReRatedAt);
+        order.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ReRate_NewKeyAfterAReRateFailedAgain_ReRatesAgain()
+    {
+        var order = RatingFailed();
+        order.ReRate(null, ReRatedAt, Key);
+
+        var next = order.ReRate(RotterdamUtrechtRateCard(), ReRatedAt.AddMinutes(1), new IdempotencyKey("key-2"));
+
+        next.Should().Be(ReRateOutcome.ReRated);
+        order.RatingResult.Should().Be(RatingResult.Rated);
+    }
+
+    [Fact]
+    public void ReRate_NewKeyAfterAReRateRatedIt_IsRefused()
+    {
+        var order = RatingFailed();
+        order.ReRate(RotterdamUtrechtRateCard(), ReRatedAt, Key);
+        order.ClearDomainEvents();
+
+        var next = order.ReRate(RotterdamUtrechtRateCard(), ReRatedAt.AddMinutes(1), new IdempotencyKey("key-2"));
+
+        next.Should().Be(ReRateOutcome.Refused, "a new re-rate of a Rated order is refused, however it became Rated");
+        order.DomainEvents.Should().BeEmpty();
+    }
+
+    private static readonly DateTimeOffset ReRatedAt = ReceivedAt.AddHours(3);
+
+    private static readonly IdempotencyKey Key = new("key-1");
+
+    private static TransportOrder RatingFailed()
+    {
+        var order = Accepted(IntakeChannel.ShipperApi);
+        order.Rate(null, RatedAt);
+        order.ClearDomainEvents();
+        return order;
+    }
 
     private static RateCardVersion RotterdamUtrechtVersion(int version, DateOnly validFrom, DateOnly? validTo, decimal pricePer100Kg) => new(
         version,

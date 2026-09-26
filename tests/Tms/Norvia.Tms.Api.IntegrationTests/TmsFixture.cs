@@ -98,6 +98,10 @@ public class TmsFixture : IAsyncLifetime
         ["Seed__Path"] = Path.Combine(AppContext.BaseDirectory, "Seed", "tms.test-seed.json"),
         ["IntakeCallers__ClientIdsByChannel__Wms__0"] = WmsClientId,
         ["Rating__SweepInterval"] = "01:00:00",
+
+        // A test run has no dashboard to take the TMS's telemetry, and a TMS that stops keeps trying to flush it there
+        // for seconds, too long for a restart. Tests read the TMS's console logs instead.
+        ["OTEL_EXPORTER_OTLP_ENDPOINT"] = "",
     };
 
     /// <summary>Waits for the TMS to write a log that matches, as logs arrive a moment after the call.</summary>
@@ -116,6 +120,19 @@ public class TmsFixture : IAsyncLifetime
     /// <summary>Waits for one of the AppHost's resources to report healthy.</summary>
     public async Task WaitForHealthyAsync(string resourceName, CancellationToken cancellationToken) =>
         await _app!.ResourceNotifications.WaitForResourceHealthyAsync(resourceName, cancellationToken);
+
+    /// <summary>
+    /// Restarts the TMS API, as a deployment does, so it reads its seed again. Its database and the topic are kept.
+    /// Every test on this fixture sees the restart, so only a fixture of a test class's own should do it.
+    /// </summary>
+    protected async Task RestartTmsAsync(CancellationToken cancellationToken)
+    {
+        using var restart = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        restart.CancelAfter(StartupTimeout);
+        var result = await _app!.ResourceCommands.ExecuteCommandAsync("tms-api", KnownResourceCommands.RestartCommand, restart.Token);
+        result.Success.Should().BeTrue(result.Message);
+        await _app.ResourceNotifications.WaitForResourceHealthyAsync("tms-api", restart.Token);
+    }
 
     /// <summary>A client for the TMS API that sends the given token, or none.</summary>
     public HttpClient CreateTmsClient(string? token)
@@ -176,7 +193,7 @@ public class TmsFixture : IAsyncLifetime
         });
     }
 
-    public async ValueTask DisposeAsync()
+    public virtual async ValueTask DisposeAsync()
     {
         if (_processor is not null)
         {

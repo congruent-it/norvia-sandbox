@@ -37,6 +37,8 @@ Rating failed can move to Rated through a re-rate. Rated and Not rated separatel
 
 Customer service sees orders with *Rating failed* in a rating exceptions list in the TMS UI. They can re-rate one, typically after the Rate Card has been corrected. A re-rate runs steps 3–7 again with the same collection-date rule, not today's Rate Card. Only orders with *Rating failed* can be re-rated. A Rated order is never re-rated: a wrong charge is corrected in invoicing with a Credit note ([E1](../erp/e1-invoicing.md#credit-notes)).
 
+The TMS API has a list query for the rating exceptions (`GET /v1/transport-orders/rating-exceptions`, each with its failure code and message) and the re-rate command (`POST /v1/transport-orders/{number}/re-rate`). The command answers with the rating result the order has afterwards, and refuses an order that isn't *Rating failed* with a 409 that changes nothing. Each re-rate carries an `Idempotency-Key`. The order keeps the key of its last re-rate, so that re-rate sent again, as a retry, gets the same answer, flagged as a repeat, and rates and publishes nothing. A new key on a Rated order is still refused. A re-rate that fails again stays *Rating failed* with the new reason and publishes another `TransportOrderRatingFailed`. Both take the same authorization as the TMS API's queries.
+
 In a real operation a pricing desk would work these exceptions. The sandbox gives the job to Customer service, to keep the number of demo roles small.
 
 ## Calculation
@@ -75,7 +77,7 @@ Both events are published to the topic for Transport Order events, through the T
 
 ## Tracking
 
-Rating continues the Message trail of the Transport Order's intake: its events carry the intake's correlation ID. The rating worker puts the tracking-contract keys in the logging scope and on the trace of each rating: `correlationId`, `flow` (`transport-order-rating`), `partyId` (the Shipper ID) and `transportOrderNumber`. The outcome event carries the same keys as application properties. When Rating failed, the log scope, the trace and `TransportOrderRatingFailed` also carry `failureCode`.
+Rating continues the Message trail of the Transport Order's intake: its events carry the intake's correlation ID. A re-rate continues it too, so a Transport Order's whole rating, re-rates included, is found by its intake's correlation ID. The rating worker, and the TMS API for a re-rate, put the tracking-contract keys in the logging scope and on the trace of each rating: `correlationId`, `flow` (`transport-order-rating`), `partyId` (the Shipper ID) and `transportOrderNumber`. The outcome event carries the same keys as application properties. When Rating failed, the log scope, the trace and `TransportOrderRatingFailed` also carry `failureCode`.
 
 ## Deferred
 

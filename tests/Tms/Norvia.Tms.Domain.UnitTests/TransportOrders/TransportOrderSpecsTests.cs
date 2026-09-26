@@ -1,3 +1,4 @@
+using Norvia.Tms.Domain.RateCards;
 using Norvia.Tms.Domain.Shippers;
 using Norvia.Tms.Domain.TransportOrders;
 
@@ -106,6 +107,34 @@ public sealed class TransportOrderSpecsTests
         var listed = new TransportOrdersNotYetRatedSpec(skip: 1, batchSize: 1).Evaluate(orders);
 
         listed.Select(order => order.Number!.Value).Should().Equal("TO-0000003");
+    }
+
+    [Fact]
+    public void RatingFailed_Evaluated_ListsExactlyTheRatingFailedOrders_OldestFirst()
+    {
+        var wms = TransportOrder.Accept(new ShipperId("SHP-0001"), TransportOrderTests.SampleDetails(), TransportOrderNumber.FromSequence(9), IntakeChannel.Wms, new CorrelationId("corr-9"), Morning);
+        var failedLater = Accepted(1, Morning.AddHours(2));
+        failedLater.Rate(null, Morning.AddHours(2));
+        var failedEarlier = Accepted(2, Morning);
+        failedEarlier.Rate(null, Morning);
+        var rated = Accepted(3, Morning);
+        rated.Rate(
+            new RateCard(new RateCardId("RC-0001"), new ShipperId("SHP-0001"),
+            [
+                new RateCardVersion(
+                    1,
+                    new DateOnly(2020, 1, 1),
+                    null,
+                    [new Zone(new ZoneName("Rotterdam"), "NL", ["30"]), new Zone(new ZoneName("Utrecht"), "NL", ["35"])],
+                    [new Lane(new ZoneName("Rotterdam"), new ZoneName("Utrecht"), [new WeightBreak(24_000m, new Money(10.00m))], new Money(45.00m))]),
+            ]),
+            Morning);
+        rated.RatingResult.Should().Be(RatingResult.Rated);
+        var orders = new[] { failedLater, Rejected(Morning), wms, failedEarlier, Accepted(4, Morning), rated };
+
+        var listed = new TransportOrdersRatingFailedSpec().Evaluate(orders);
+
+        listed.Select(order => order.Number!.Value).Should().Equal("TO-0000002", "TO-0000001");
     }
 
     [Fact]

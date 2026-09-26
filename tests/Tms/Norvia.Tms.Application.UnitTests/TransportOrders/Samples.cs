@@ -42,12 +42,12 @@ internal static class Samples
             new CorrelationId(correlationId),
             Now);
 
-    public static TransportOrder AcceptedOrder(long sequence = 7, string correlationId = "corr-1") =>
+    public static TransportOrder AcceptedOrder(long sequence = 7, string correlationId = "corr-1", IntakeChannel channel = IntakeChannel.ShipperApi) =>
         TransportOrder.Accept(
             new ShipperId("SHP-0001"),
             CanonicalTransportOrder().ToDetails(),
             TransportOrderNumber.FromSequence(sequence),
-            IntakeChannel.ShipperApi,
+            channel,
             new CorrelationId(correlationId),
             Now);
 

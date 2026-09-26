@@ -32,7 +32,7 @@ public sealed class RateTransportOrderHandlerTests
 
         var result = await _handler.Handle(new RateTransportOrderCommand("TO-0000007"), CancellationToken.None);
 
-        result.Value.Should().Be(new RateTransportOrderResult(RatingResult.Rated, null));
+        result.Value.Should().Be(new RateTransportOrderResult(RatingResult.Rated, null, "SHP-0001", "corr-1"));
         order.FreightCharge!.Total.Should().Be(new Money(112.90m));
         order.RatedAt.Should().Be(Samples.Now.AddSeconds(5));
         await _repository.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
@@ -49,7 +49,9 @@ public sealed class RateTransportOrderHandlerTests
 
         result.Value.Should().Be(new RateTransportOrderResult(
             RatingResult.RatingFailed,
-            new RatingFailureView("NoRateCard", "Shipper SHP-0001 has no Rate Card.")));
+            new RatingFailureView("NoRateCard", "Shipper SHP-0001 has no Rate Card."),
+            "SHP-0001",
+            "corr-1"));
         order.RatingFailedAt.Should().Be(Samples.Now.AddSeconds(5));
         await _repository.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }

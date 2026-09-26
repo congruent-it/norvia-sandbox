@@ -326,7 +326,7 @@ Norvia's own message format: one schema per business event or document, named wi
 _Avoid_: common data model, standard format
 
 **Message trail**:
-Everything the integration layer did under one correlation ID: the call or event it started from, and every queue, subscription, Logic App run and application call that followed from it, fan-out included. An action by a Norvia employee in an application starts a new trail.
+Everything the integration layer did under one correlation ID: the call or event it started from, and every queue, subscription, Logic App run and application call that followed from it, fan-out included. An action by a Norvia employee in an application starts a new trail, except a re-rate: it continues the trail of its Transport Order's intake, so the order's whole rating is found by one correlation ID.
 _Avoid_: integration message, message flow, transaction
 
 **Hop**:

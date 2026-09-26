@@ -68,6 +68,9 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
     /// <summary>When Rating failed; null unless it did.</summary>
     public DateTimeOffset? RatingFailedAt { get; private set; }
 
+    /// <summary>The key of the last re-rate, so that re-rate sent again is known as a repeat; null until one runs.</summary>
+    public IdempotencyKey? LastReRateKey { get; private set; }
+
     /// <summary>Whether a booking under this Transport Order's Shipper reference is the same booking sent again.</summary>
     public bool IsRepeatOf(TransportOrderDetails details) => Details.Equals(details);
 
@@ -83,6 +86,37 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
             return false;
         }
 
+        ApplyRating(rateCard, ratedAt);
+        return true;
+    }
+
+    /// <summary>
+    /// Rates a Transport Order whose Rating failed again, the same way as the first time: the Rate Card version valid on
+    /// the collection date, not today's. It is Rated, or Rating failed with the new reason, and raises its outcome event
+    /// again. Anything but Rating failed is refused, changing nothing: a frozen Freight Charge stays frozen, and a wrong
+    /// one is corrected with a Credit note in the ERP. The last re-rate sent again under its key is a repeat that changes
+    /// nothing, so a retry gets the answer the re-rate got rather than a refusal.
+    /// </summary>
+    public ReRateOutcome ReRate(RateCard? rateCard, DateTimeOffset ratedAt, IdempotencyKey key)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        if (key == LastReRateKey)
+        {
+            return ReRateOutcome.Repeat;
+        }
+
+        if (RatingResult != TransportOrders.RatingResult.RatingFailed)
+        {
+            return ReRateOutcome.Refused;
+        }
+
+        ApplyRating(rateCard, ratedAt);
+        LastReRateKey = key;
+        return ReRateOutcome.ReRated;
+    }
+
+    private void ApplyRating(RateCard? rateCard, DateTimeOffset ratedAt)
+    {
         var outcome = rateCard?.Rate(Details)
             ?? RatingOutcome.Failed(RatingFailureCode.NoRateCard, Invariant($"Shipper {ShipperId} has no Rate Card."));
         if (outcome.FreightCharge is { } freightCharge)
@@ -90,6 +124,8 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
             RatingResult = TransportOrders.RatingResult.Rated;
             FreightCharge = freightCharge;
             RatedAt = ratedAt;
+            RatingFailure = null;
+            RatingFailedAt = null;
             RegisterDomainEvent(new TransportOrderRatedEvent(this));
         }
         else
@@ -99,8 +135,6 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
             RatingFailedAt = ratedAt;
             RegisterDomainEvent(new TransportOrderRatingFailedEvent(this));
         }
-
-        return true;
     }
 
     public static TransportOrder Accept(

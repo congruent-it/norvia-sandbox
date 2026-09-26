@@ -10,6 +10,8 @@ using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.GetById;
 using Norvia.Tms.Application.TransportOrders.GetByNumber;
 using Norvia.Tms.Application.TransportOrders.List;
+using Norvia.Tms.Application.TransportOrders.Rate;
+using Norvia.Tms.Application.TransportOrders.RatingExceptions;
 using Norvia.Tms.Application.TransportOrders.Submit;
 using Norvia.Tms.Domain.TransportOrders;
 
@@ -18,6 +20,9 @@ namespace Norvia.Tms.Api.TransportOrders;
 public static class TransportOrderEndpoints
 {
     public const string CorrelationIdHeader = TrackingScopeMiddleware.CorrelationIdHeader;
+
+    /// <summary>The caller's key for a re-rate, so a retry of it gets the same answer instead of a refusal.</summary>
+    public const string IdempotencyKeyHeader = "Idempotency-Key";
 
     /// <summary>The app role only the intake Logic App's managed identity holds, so nothing bypasses the integration layer.</summary>
     public const string IntakeRole = "TransportOrders.Intake";
@@ -52,6 +57,24 @@ public static class TransportOrderEndpoints
 
         queries.MapGet("/", ListAsync)
             .WithName("ListTransportOrders");
+
+        queries.MapGet("/rating-exceptions", ListRatingExceptionsAsync)
+            .WithName("ListRatingExceptions")
+            .WithSummary("List the rating exceptions: every Transport Order whose Rating failed, with its failure code and message.");
+
+        // Customer service re-rates from the TMS UI, so the re-rate takes the same authorization as the queries: any
+        // caller with a TMS token, until the TMS UI calls with a role of its own.
+        transportOrders.MapPost("/{transportOrderNumber}/re-rate", ReRateAsync)
+            .WithName("ReRateTransportOrder")
+            .RequireAuthorization()
+            .WithMetadata(new TrackedFlow(Flows.TransportOrderRating))
+            .WithSummary("Re-rate a Transport Order whose Rating failed, typically after its Rate Card was corrected.")
+            .WithDescription(
+                "Rates the order again with the Rate Card version valid on its collection date, and publishes TransportOrderRated or, "
+                + "when it fails again, another TransportOrderRatingFailed. An order that isn't Rating failed is refused with a 409 and "
+                + "left as it is: a Rated order's Freight Charge stays frozen. A re-rate sent again under its Idempotency-Key "
+                + "is answered as before, flagged as a repeat, without rating again. Like the first rating, the re-rate continues the Message "
+                + "trail of the order's intake, so its event carries the intake's correlation ID.");
 
         return app;
     }
@@ -122,4 +145,35 @@ public static class TransportOrderEndpoints
         IMediator mediator,
         CancellationToken cancellationToken) =>
         TypedResults.Ok(await mediator.Send(new ListTransportOrdersQuery(status), cancellationToken));
+
+    private static async Task<Ok<IReadOnlyList<RatingExceptionSummary>>> ListRatingExceptionsAsync(
+        IMediator mediator,
+        CancellationToken cancellationToken) =>
+        TypedResults.Ok(await mediator.Send(new ListRatingExceptionsQuery(), cancellationToken));
+
+    private static async Task<Results<Ok<RateTransportOrderResult>, ProblemHttpResult, ValidationProblem>> ReRateAsync(
+        string transportOrderNumber,
+        [FromHeader(Name = IdempotencyKeyHeader)] string? idempotencyKey,
+        IMediator mediator,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Length > IdempotencyKey.MaxLength)
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [IdempotencyKeyHeader] = [$"A re-rate needs an {IdempotencyKeyHeader} of 1 to {IdempotencyKey.MaxLength} characters, the same for each retry."],
+            });
+        }
+
+        var result = await mediator.Send(new RateTransportOrderCommand(transportOrderNumber, ReRateKey: idempotencyKey), cancellationToken);
+        return result.Status switch
+        {
+            ResultStatus.Ok => TypedResults.Ok(result.Value),
+            ResultStatus.NotFound => TypedResults.Problem(statusCode: StatusCodes.Status404NotFound, title: $"Transport Order {transportOrderNumber} not found."),
+            _ => TypedResults.Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "The Transport Order can't be re-rated.",
+                detail: string.Join(" ", result.Errors)),
+        };
+    }
 }
