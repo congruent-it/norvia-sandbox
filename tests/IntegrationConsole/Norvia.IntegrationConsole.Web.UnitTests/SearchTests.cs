@@ -15,7 +15,7 @@ public sealed class SearchTests : ConsoleWebContext
     // 12:00 in Rotterdam (CEST).
     private static readonly DateTimeOffset Now = new(2026, 9, 26, 10, 0, 0, TimeSpan.Zero);
 
-    private readonly ITrailSearch _trails = Substitute.For<ITrailSearch>();
+    private readonly ITrailRequests _trails = Substitute.For<ITrailRequests>();
 
     public SearchTests()
     {
@@ -123,6 +123,18 @@ public sealed class SearchTests : ConsoleWebContext
 
         page.FindAll("thead th").Select(header => header.TextContent.Trim())
             .Should().Equal("Correlation ID", "Flows", "First seen", "Last seen", "Outcome", "Business keys");
+    }
+
+    [Fact]
+    public void Render_WithTrailsFound_LinksEachToItsMessageTrail()
+    {
+        Answer(new TrailSummary("5b0d7f8e-2c41-4a3e-9d6a-0f1e2d3c4b5a", ["transport-order-intake"], Now, Now, Outcome.Succeeded, []));
+
+        var page = RenderAt("/?key=TO-2026-000123");
+
+        var link = page.Find("tbody tr a");
+        link.TextContent.Trim().Should().Be("5b0d7f8e-2c41-4a3e-9d6a-0f1e2d3c4b5a");
+        link.GetAttribute("href").Should().Be("/trails/5b0d7f8e-2c41-4a3e-9d6a-0f1e2d3c4b5a");
     }
 
     [Fact]

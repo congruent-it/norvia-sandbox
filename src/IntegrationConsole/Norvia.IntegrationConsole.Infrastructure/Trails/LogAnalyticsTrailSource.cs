@@ -26,23 +26,35 @@ internal sealed class LogAnalyticsTrailSource(LogsQueryClient client, IOptions<T
     {
         ArgumentNullException.ThrowIfNull(search);
 
-        var workspaceId = options.Value.LogAnalyticsWorkspaceId;
-        if (string.IsNullOrWhiteSpace(workspaceId))
-        {
-            throw new InvalidOperationException(
-                $"The console isn't connected to an estate: {TrailSourceOptions.SectionName}:{nameof(TrailSourceOptions.LogAnalyticsWorkspaceId)} is not set.");
-        }
-
         // The client's default refuses a partial answer (LogsQueryOptions.AllowPartialErrors), which could leave out the
         // very hop that failed.
         var response = await client.QueryWorkspaceAsync(
-            workspaceId,
+            WorkspaceId(),
             TrailQuery.For(search.Key, FoundTrails.Maximum),
             new LogsQueryTimeRange(search.From, search.To),
             cancellationToken: cancellationToken);
 
         return [.. response.Value.Table.Rows.Select(Trail)];
     }
+
+    public async Task<IReadOnlyList<RecordedHop>> HopsAsync(TrailLookup lookup, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(lookup);
+
+        var response = await client.QueryWorkspaceAsync(
+            WorkspaceId(),
+            HopQuery.For(lookup.CorrelationId),
+            new LogsQueryTimeRange(lookup.From, lookup.To),
+            cancellationToken: cancellationToken);
+
+        return TrailHops.Of([.. response.Value.Table.Rows.Select(HopRow.From)]);
+    }
+
+    private string WorkspaceId() =>
+        options.Value.LogAnalyticsWorkspaceId is { Length: > 0 } workspaceId && !string.IsNullOrWhiteSpace(workspaceId)
+            ? workspaceId
+            : throw new InvalidOperationException(
+                $"The console isn't connected to an estate: {TrailSourceOptions.SectionName}:{nameof(TrailSourceOptions.LogAnalyticsWorkspaceId)} is not set.");
 
     private static FoundTrail Trail(LogsTableRow row) => new(
         row.GetString("correlationId"),

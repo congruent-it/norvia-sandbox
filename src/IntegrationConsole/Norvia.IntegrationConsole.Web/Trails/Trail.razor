@@ -1,0 +1,146 @@
+@page "/trails/{CorrelationId}"
+@* Interactive, not prerendered: prerendering would query the estate's telemetry twice for one trail. *@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using Ardalis.Result
+@using Norvia.IntegrationConsole.Application.Trails
+@using Norvia.IntegrationConsole.Application.Trails.Open
+@inject ITrailRequests Trails
+@inject ILogger<Trail> Logger
+@implements IDisposable
+
+<PageTitle>Message trail · Integration console</PageTitle>
+
+<h1>Message trail <span class="font-mono text-base">@CorrelationId</span></h1>
+@* Search and the trail come from Application Insights, so a hop may not be there yet (docs/operations/integration-console.md). *@
+<p role="note" class="text-muted mb-6">
+    Telemetry may be a few minutes behind: a hop that just happened may not show yet.
+</p>
+
+@if (_opening)
+{
+    <div role="status">
+        <FluentStack VerticalAlignment="VerticalAlignment.Center">
+            <FluentProgressRing />
+            <span>Opening the Message trail…</span>
+        </FluentStack>
+    </div>
+}
+else if (_failed)
+{
+    <div role="alert">
+        <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+            The Message trail couldn't be opened. Try again in a moment; if it keeps failing, the console may not reach the
+            estate's telemetry.
+        </FluentMessageBar>
+    </div>
+}
+else if (_problems is { Count: > 0 })
+{
+    <div role="alert">
+        <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
+            @string.Join(" ", _problems)
+        </FluentMessageBar>
+    </div>
+}
+else if (_trail is { } trail)
+{
+    @if (trail.Hops.Count == 0)
+    {
+        <p role="status">Nothing is recorded under @trail.CorrelationId yet.</p>
+    }
+    else
+    {
+        @if (trail.BusinessKeys.Count > 0)
+        {
+            <section aria-label="Business keys" class="mb-6">
+                <h2 class="text-lg">Business keys</h2>
+                <ul class="m-0 flex list-none flex-wrap gap-x-6 gap-y-1 p-0">
+                    @foreach (var key in trail.BusinessKeys)
+                    {
+                        <li><a href="@TrailLinks.Search(key)">@TrailText.Of(key)</a></li>
+                    }
+                </ul>
+            </section>
+        }
+
+        @* Keys only: a body holds personal data, and shows only when an operator opens a step of a run. *@
+        <FluentDataGrid Items="trail.Hops.AsQueryable()" TGridItem="TrailHop" aria-label="Hops" MultiLine="true"
+                        GridTemplateColumns="minmax(16rem, 1fr) max-content max-content max-content max-content max-content">
+            <TemplateColumn Title="Hop">
+                @* Each fan-out indents its branches one level under the hop that caused them. *@
+                <div style="padding-left: @(context.Depth * 1.5)rem">
+                    <span data-depth="@context.Depth">@context.Name</span>
+                    @if (context.Run is { } run)
+                    {
+                        <a href="@TrailLinks.Run(run)" class="ml-2">Open run</a>
+                    }
+                </div>
+            </TemplateColumn>
+            <PropertyColumn Title="Flow" Property="@(hop => hop.Flow)" />
+            <PropertyColumn Title="Time" Property="@(hop => ConsoleTime.Format(hop.Time))" />
+            <PropertyColumn Title="Duration" Property="@(hop => TrailText.Of(hop.Duration))" />
+            <TemplateColumn Title="Outcome">
+                <span data-outcome="@context.Outcome" class="@(context.HasFailure ? "font-bold text-danger" : "")">
+                    @TrailText.Of(context.Outcome)
+                </span>
+            </TemplateColumn>
+            <PropertyColumn Title="Failure code" Property="@(hop => hop.FailureCode)" />
+        </FluentDataGrid>
+    }
+}
+
+@code {
+    private bool _opening;
+    private bool _failed;
+    private IReadOnlyList<string>? _problems;
+    private MessageTrail? _trail;
+    // Cancels the query against the estate's telemetry when the operator leaves the page or opens another trail.
+    private CancellationTokenSource _open = new();
+
+    [Parameter, EditorRequired]
+    public string CorrelationId { get; set; } = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _failed = false;
+        _problems = null;
+        _trail = null;
+
+        await _open.CancelAsync();
+        _open.Dispose();
+        _open = new CancellationTokenSource();
+        var cancellation = _open.Token;
+        _opening = true;
+        try
+        {
+            var result = await Trails.OpenAsync(new OpenTrailQuery(CorrelationId), cancellation);
+            if (result.IsSuccess)
+            {
+                _trail = result.Value;
+            }
+            else
+            {
+                _problems = [.. result.ValidationErrors.Select(error => error.ErrorMessage)];
+            }
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            PageLog.OpenFailed(Logger, exception, CorrelationId);
+            _failed = true;
+        }
+        finally
+        {
+            _opening = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        _open.Cancel();
+        _open.Dispose();
+    }
+}

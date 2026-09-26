@@ -8,4 +8,7 @@ internal static partial class PageLog
 {
     [LoggerMessage(Level = LogLevel.Error, Message = "Searching Message trails for {Key} failed")]
     public static partial void SearchFailed(ILogger logger, Exception exception, string key);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Opening the Message trail {CorrelationId} failed")]
+    public static partial void OpenFailed(ILogger logger, Exception exception, string correlationId);
 }

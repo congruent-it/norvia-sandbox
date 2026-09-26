@@ -5,7 +5,7 @@
 @using Microsoft.Extensions.Options
 @using Norvia.IntegrationConsole.Application.Trails
 @using Norvia.IntegrationConsole.Application.Trails.Search
-@inject ITrailSearch Trails
+@inject ITrailRequests Trails
 @inject NavigationManager Navigation
 @inject IOptions<IntegrationRetention> Retention
 @inject ILogger<Search> Logger
@@ -70,7 +70,7 @@ else if (_result is { } result)
         <FluentDataGrid Items="result.Trails.AsQueryable()" TGridItem="TrailSummary" aria-label="Message trails found" MultiLine="true"
                         GridTemplateColumns="max-content max-content max-content max-content minmax(8rem, max-content) minmax(14rem, 1fr)">
             <TemplateColumn Title="Correlation ID">
-                <span class="font-mono text-xs">@context.CorrelationId</span>
+                <a href="@TrailLinks.Trail(context.CorrelationId)" class="font-mono text-xs">@context.CorrelationId</a>
             </TemplateColumn>
             <PropertyColumn Title="Flows" Property="@(trail => string.Join(", ", trail.Flows))" />
             <PropertyColumn Title="First seen" Property="@(trail => ConsoleTime.Format(trail.FirstSeen))" />

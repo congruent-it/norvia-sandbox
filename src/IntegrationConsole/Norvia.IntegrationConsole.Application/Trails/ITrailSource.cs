@@ -12,4 +12,10 @@ public interface ITrailSource
     /// and <see cref="TrailSearch.To"/>, in no particular order.
     /// </summary>
     Task<IReadOnlyList<FoundTrail>> SearchAsync(TrailSearch search, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The hops recorded under <see cref="TrailLookup.CorrelationId"/> between <see cref="TrailLookup.From"/> and
+    /// <see cref="TrailLookup.To"/>, fan-out included, in no particular order, each naming the hop that caused it.
+    /// </summary>
+    Task<IReadOnlyList<RecordedHop>> HopsAsync(TrailLookup lookup, CancellationToken cancellationToken);
 }
