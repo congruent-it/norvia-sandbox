@@ -9,6 +9,7 @@
 @inject NavigationManager Navigation
 @inject IOptions<IntegrationRetention> Retention
 @inject ILogger<Search> Logger
+@implements IDisposable
 
 <PageTitle>Search · Integration console</PageTitle>
 
@@ -96,6 +97,8 @@ else if (_result is { } result)
     private bool _failed;
     private IReadOnlyList<string>? _problems;
     private TrailSearchResult? _result;
+    // Cancels the query against the estate's telemetry when the operator leaves the page or starts another search.
+    private CancellationTokenSource _search = new();
 
     [SupplyParameterFromQuery(Name = "key")]
     private string? Key { get; set; }
@@ -118,10 +121,14 @@ else if (_result is { } result)
             return;
         }
 
+        await _search.CancelAsync();
+        _search.Dispose();
+        _search = new CancellationTokenSource();
+        var cancellation = _search.Token;
         _searching = _searchedKey = Key.Trim();
         try
         {
-            var result = await Trails.SearchAsync(new SearchTrailsQuery(Key, range.Within), CancellationToken.None);
+            var result = await Trails.SearchAsync(new SearchTrailsQuery(Key, range.Within), cancellation);
             if (result.IsSuccess)
             {
                 _result = result.Value;
@@ -130,6 +137,10 @@ else if (_result is { } result)
             {
                 _problems = [.. result.ValidationErrors.Select(error => error.ErrorMessage)];
             }
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            return;
         }
         catch (Exception exception)
         {
@@ -140,6 +151,12 @@ else if (_result is { } result)
         {
             _searching = null;
         }
+    }
+
+    public void Dispose()
+    {
+        _search.Cancel();
+        _search.Dispose();
     }
 
     private void SubmitSearch() =>

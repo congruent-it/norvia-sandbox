@@ -19,7 +19,8 @@ internal static class TrailQuery
         LogsQueryClient.CreateQuery($"let searched = {key};") + $"\nlet maximumTrails = {maximumTrails};\n" + Body;
 
     private const string Body = """
-        let hops = union isfuzzy=true AppRequests, AppDependencies, AppTraces, AppExceptions
+        let keysOf = (rows:(TimeGenerated:datetime, Properties:dynamic)) {
+            rows
             | extend tracked = parse_json(tostring(Properties.trackedProperties))
             | project TimeGenerated,
                 correlationId = coalesce(tostring(Properties.correlationId), tostring(tracked.correlationId),
@@ -31,12 +32,17 @@ internal static class TrailQuery
                 carrierBookingNumber = coalesce(tostring(Properties.carrierBookingNumber), tostring(tracked.carrierBookingNumber)),
                 tripNumber = coalesce(tostring(Properties.tripNumber), tostring(tracked.tripNumber)),
                 sourceMessageId = coalesce(tostring(Properties.sourceMessageId), tostring(tracked.sourceMessageId))
-            | where isnotempty(correlationId);
-        let found = hops
+            | where isnotempty(correlationId)
+        };
+        let telemetry = union isfuzzy=true AppRequests, AppDependencies, AppTraces, AppExceptions
+            | project TimeGenerated, Properties;
+        // The term index narrows each pass before any JSON is parsed: first to the rows mentioning the key, then to
+        // the rows of the trails that carried it.
+        let found = toscalar(keysOf(telemetry | where Properties has searched)
             | where correlationId =~ searched or transportOrderNumber =~ searched or shipmentNumber =~ searched
                 or carrierBookingNumber =~ searched or tripNumber =~ searched or sourceMessageId =~ searched
-            | distinct correlationId;
-        hops
+            | summarize make_set(correlationId));
+        keysOf(telemetry | where Properties has_any (found))
         | where correlationId in (found)
         | summarize firstSeen = min(TimeGenerated), lastSeen = max(TimeGenerated),
             flows = tostring(make_set_if(flow, isnotempty(flow))),
