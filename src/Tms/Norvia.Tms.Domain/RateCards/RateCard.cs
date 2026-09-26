@@ -8,7 +8,7 @@ namespace Norvia.Tms.Domain.RateCards;
 /// weight. The ERP owns it and the TMS never edits it (ADR 0006); until the ERP sync exists the copy comes from the
 /// seed file.
 /// </summary>
-public sealed record RateCard(string Id, ShipperId ShipperId, IReadOnlyList<RateCardVersion> Versions)
+public sealed record RateCard(RateCardId Id, ShipperId ShipperId, IReadOnlyList<RateCardVersion> Versions)
 {
     /// <summary>
     /// The Freight Charge for a Transport Order, from the version valid on its collection date, or null when this Rate

@@ -11,10 +11,10 @@ public sealed record FreightChargeView(string Currency, decimal Total, IReadOnly
         freightCharge is null
             ? null
             : new(
-                FreightCharge.Currency,
-                freightCharge.Total,
-                [.. freightCharge.ChargeLines.Select(line => new ChargeLineView(line.Type.ToString(), line.Amount))],
-                new RateCardVersionView(freightCharge.RateCardVersion.RateCardId, freightCharge.RateCardVersion.Version));
+                Money.Currency,
+                freightCharge.Total.Amount,
+                [.. freightCharge.ChargeLines.Select(line => new ChargeLineView(line.Type.ToString(), line.Amount.Amount))],
+                new RateCardVersionView(freightCharge.RateCardVersion.RateCardId.Value, freightCharge.RateCardVersion.Version));
 
     public bool Equals(FreightChargeView? other) =>
         other is not null

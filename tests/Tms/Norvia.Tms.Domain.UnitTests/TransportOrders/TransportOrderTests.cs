@@ -174,6 +174,17 @@ public sealed class TransportOrderTests
         other.Should().NotBe(SampleDetails());
     }
 
+    [Fact]
+    public void TotalWeightKg_GoodsLines_IsTheSumOfTheirWeights_CountingAMissingWeightAsNothing()
+    {
+        var details = SampleDetails() with
+        {
+            GoodsLines = [new GoodsLine("pallet", 2, 850.5m, null), new GoodsLine("crate", 4, 60m, null), new GoodsLine("loose", 1, null, null)],
+        };
+
+        details.TotalWeightKg().Should().Be(910.5m);
+    }
+
     private static readonly RejectionReason Inactive = new(RejectionCode.InactiveShipper, "Inactive.");
 
     internal static TransportOrderDetails SampleDetails() => new(

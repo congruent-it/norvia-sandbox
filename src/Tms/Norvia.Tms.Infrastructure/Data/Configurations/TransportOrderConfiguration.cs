@@ -97,8 +97,8 @@ internal sealed class TransportOrderConfiguration : IEntityTypeConfiguration<Tra
         // The Freight Charge is frozen whole, as one JSON document, like what the Shipper submitted.
         builder.Property(order => order.FreightCharge)
             .HasConversion(
-                freightCharge => JsonSerializer.Serialize(freightCharge, EnumNamesJson),
-                json => JsonSerializer.Deserialize<FreightCharge>(json, EnumNamesJson)!,
+                freightCharge => JsonSerializer.Serialize(freightCharge, FreightChargeJson.Options),
+                json => JsonSerializer.Deserialize<FreightCharge>(json, FreightChargeJson.Options)!,
                 new ValueComparer<FreightCharge?>(
                     (left, right) => Equals(left, right),
                     freightCharge => freightCharge == null ? 0 : freightCharge.GetHashCode(),

@@ -49,9 +49,9 @@ public sealed class TransportOrderRatingTests
         rated.Should().BeTrue();
         order.RatingResult.Should().Be(RatingResult.Rated);
         order.FreightCharge.Should().Be(new FreightCharge(
-            [new ChargeLine(ChargeLineType.Freight, 105.15m)], // 850 kg ÷ 100 × 12.37 = 105.145, half away from zero
-            new RateCardVersionReference("RC-0001", 1)));
-        order.FreightCharge!.Total.Should().Be(105.15m);
+            [new ChargeLine(ChargeLineType.Freight, new Money(105.15m))], // 850 kg ÷ 100 × 12.37 = 105.145, half away from zero
+            new RateCardVersionReference(new RateCardId("RC-0001"), 1)));
+        order.FreightCharge!.Total.Should().Be(new Money(105.15m));
     }
 
     [Fact]
@@ -121,8 +121,8 @@ public sealed class TransportOrderRatingTests
 
         order.Rate(rateCard, RatedAt);
 
-        order.FreightCharge!.RateCardVersion.Should().Be(new RateCardVersionReference("RC-0001", 2));
-        order.FreightCharge.Total.Should().Be(110.50m);
+        order.FreightCharge!.RateCardVersion.Should().Be(new RateCardVersionReference(new RateCardId("RC-0001"), 2));
+        order.FreightCharge.Total.Should().Be(new Money(110.50m));
     }
 
     private static readonly DateTimeOffset RatedAt = ReceivedAt.AddSeconds(2);
@@ -131,19 +131,19 @@ public sealed class TransportOrderRatingTests
         version,
         validFrom,
         validTo,
-        [new Zone("Rotterdam", "NL", ["30"]), new Zone("Utrecht", "NL", ["35"])],
-        [new Lane("Rotterdam", "Utrecht", [new WeightBreak(1_000m, pricePer100Kg)])]);
+        [new Zone(new ZoneName("Rotterdam"), "NL", ["30"]), new Zone(new ZoneName("Utrecht"), "NL", ["35"])],
+        [new Lane(new ZoneName("Rotterdam"), new ZoneName("Utrecht"), [new WeightBreak(1_000m, new Money(pricePer100Kg))])]);
 
     private static RateCard RotterdamUtrechtRateCard() => new(
-        "RC-0001",
+        new RateCardId("RC-0001"),
         new ShipperId("SHP-0001"),
         [
             new RateCardVersion(
                 1,
                 new DateOnly(2026, 1, 1),
                 null,
-                [new Zone("Rotterdam", "NL", ["30"]), new Zone("Utrecht", "NL", ["35"])],
-                [new Lane("Rotterdam", "Utrecht", [new WeightBreak(500m, 14.00m), new WeightBreak(1_000m, 12.37m)])]),
+                [new Zone(new ZoneName("Rotterdam"), "NL", ["30"]), new Zone(new ZoneName("Utrecht"), "NL", ["35"])],
+                [new Lane(new ZoneName("Rotterdam"), new ZoneName("Utrecht"), [new WeightBreak(500m, new Money(14.00m)), new WeightBreak(1_000m, new Money(12.37m))])]),
         ]);
 
     private static TransportOrder Accepted(IntakeChannel channel) =>

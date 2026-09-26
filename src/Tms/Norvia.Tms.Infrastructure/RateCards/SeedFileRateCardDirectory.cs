@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using Norvia.Tms.Application.RateCards;
 using Norvia.Tms.Domain.RateCards;
 using Norvia.Tms.Domain.Shippers;
+using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Infrastructure.Shippers;
 
 namespace Norvia.Tms.Infrastructure.RateCards;
@@ -30,17 +31,17 @@ internal sealed class SeedFileRateCardDirectory : IRateCardDirectory
     public RateCard? FindFor(ShipperId shipperId) => _rateCards.GetValueOrDefault(shipperId);
 
     private static RateCard ToRateCard(SeedRateCard rateCard) => new(
-        rateCard.Id,
+        new RateCardId(rateCard.Id),
         new ShipperId(rateCard.ShipperId),
         [.. rateCard.Versions.Select(version => new RateCardVersion(
             version.Version,
             version.ValidFrom,
             version.ValidTo,
-            [.. version.Zones.Select(zone => new Zone(zone.Name, zone.Country, zone.PostcodePrefixes))],
+            [.. version.Zones.Select(zone => new Zone(new ZoneName(zone.Name), zone.Country, zone.PostcodePrefixes))],
             [.. version.Lanes.Select(lane => new Lane(
-                lane.Origin,
-                lane.Destination,
-                [.. lane.WeightBreaks.Select(weightBreak => new WeightBreak(weightBreak.UpToKg, weightBreak.PricePer100Kg))]))]))]);
+                new ZoneName(lane.Origin),
+                new ZoneName(lane.Destination),
+                [.. lane.WeightBreaks.Select(weightBreak => new WeightBreak(weightBreak.UpToKg, new Money(weightBreak.PricePer100Kg)))]))]))]);
 
     private sealed record SeedFile(IReadOnlyList<SeedRateCard>? RateCards);
 

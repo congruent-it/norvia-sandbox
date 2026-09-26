@@ -32,7 +32,7 @@ public sealed class RateTransportOrderHandlerTests
         var result = await _handler.Handle(new RateTransportOrderCommand("TO-0000007"), CancellationToken.None);
 
         result.Value.Should().Be(RatingResult.Rated);
-        order.FreightCharge!.Total.Should().Be(112.90m);
+        order.FreightCharge!.Total.Should().Be(new Money(112.90m));
         order.RatedAt.Should().Be(Samples.Now.AddSeconds(5));
         await _repository.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }

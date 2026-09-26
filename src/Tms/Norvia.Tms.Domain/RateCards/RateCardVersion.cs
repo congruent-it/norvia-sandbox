@@ -15,19 +15,18 @@ public sealed record RateCardVersion(
     public bool IsValidOn(DateOnly date) => date >= ValidFrom && (ValidTo is null || date <= ValidTo);
 
     /// <summary>
-    /// The Freight for a Transport Order in EUR, rounded to cents half away from zero, or null when no Lane or Weight
-    /// Break covers it.
+    /// The Freight for a Transport Order, rounded to cents, or null when no Lane or Weight Break covers it.
     /// </summary>
-    public decimal? FreightFor(TransportOrderDetails details)
+    public Money? FreightFor(TransportOrderDetails details)
     {
         ArgumentNullException.ThrowIfNull(details);
         var origin = ZoneOf(details.Collection?.Address);
         var destination = ZoneOf(details.Delivery?.Address);
         var lane = Lanes.FirstOrDefault(lane => lane.Origin == origin?.Name && lane.Destination == destination?.Name);
-        var weightKg = details.GoodsLines.Sum(line => line.WeightKg ?? 0m);
+        var weightKg = details.TotalWeightKg();
 
         return lane?.WeightBreakFor(weightKg) is { } weightBreak
-            ? Math.Round(weightKg / 100m * weightBreak.PricePer100Kg, 2, MidpointRounding.AwayFromZero)
+            ? weightBreak.PricePer100Kg.Times(weightKg / 100m).RoundedToCents()
             : null;
     }
 

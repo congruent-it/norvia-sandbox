@@ -21,6 +21,10 @@ public sealed record TransportOrderDetails(
 
     public override int GetHashCode() =>
         HashCode.Combine(ShipperReference, Collection, Delivery, GoodsLines.Count, Instructions);
+
+    /// <summary>The weight of all goods lines together, in kg; a line without a weight adds nothing.</summary>
+    // A method, not a property, so it isn't stored with what the Shipper submitted.
+    public decimal TotalWeightKg() => GoodsLines.Sum(line => line.WeightKg ?? 0m);
 }
 
 public sealed record CollectionDetails(Address? Address, TimeWindow? Window);
