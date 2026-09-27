@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!--
+      Only the namespaces these tests unit test are gated. The rest of TMS Infrastructure is EF Core, SQL and Service Bus
+      code, which the API integration tests run against real containers (coding guidelines §10).
+    -->
+    <Include>[Norvia.Tms.Infrastructure]Norvia.Tms.Infrastructure.Rating.*</Include>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="coverlet.msbuild" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.Testing" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+    <PackageReference Include="xunit.v3.mtp-off" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="AwesomeAssertions" />
+    <Using Include="NSubstitute" />
+    <ProjectReference Include="..\..\..\src\Tms\Norvia.Tms.Infrastructure\Norvia.Tms.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

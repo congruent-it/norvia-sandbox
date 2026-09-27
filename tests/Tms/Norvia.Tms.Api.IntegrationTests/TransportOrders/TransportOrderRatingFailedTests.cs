@@ -74,7 +74,7 @@ public sealed class TransportOrderRatingFailedTests(TmsFixture tms)
     }
 
     [Fact]
-    public async Task Submit_OrderTheRateCardCantPrice_RatingTracesCarryTheFailureCode()
+    public async Task Submit_OrderTheRateCardCantPrice_RatingTracesCarryTheFailureCode_WithTheOutcomeSucceeded()
     {
         var correlationId = TmsCalls.NewCorrelationId();
         var number = await tms.SubmitAcceptedAsync(Bookings.Valid(TmsCalls.NewReference()).DeliveredToDusseldorf(), correlationId, _cancellationToken);
@@ -85,6 +85,7 @@ public sealed class TransportOrderRatingFailedTests(TmsFixture tms)
 
         failed["failureCode"].Should().Be("NoMatchingLane");
         failed["transportOrderNumber"].Should().Be(number);
+        failed["outcome"].Should().Be("Succeeded", "Rating failed is Rating's answer, not a failed flow: the order stays Accepted");
     }
 
     private static JsonObject BookingThatFailsWith(string code)

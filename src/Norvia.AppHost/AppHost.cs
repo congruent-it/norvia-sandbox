@@ -40,7 +40,7 @@ var tmsApi = builder.AddProject<Projects.Norvia_Tms_Api>("tms-api")
     .WithRoleAssignments(messaging, ServiceBusBuiltInRole.AzureServiceBusDataSender)
     .WithHttpHealthCheck("/health");
 
-// The TMS UI reads the TMS database through the query side, and changes things only through the TMS API.
+// The TMS UI reads the TMS database through the query side, and changes things only through the TMS API (ADR 0028).
 var tmsWeb = builder.AddProject<Projects.Norvia_Tms_Web>("tms-web")
     .WithReference(tmsDatabase).WaitForCompletion(tmsMigrations)
     .WithReference(tmsApi).WaitFor(tmsApi)

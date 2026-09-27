@@ -15,6 +15,15 @@ public static class TrackingKeys
     /// <summary>The stable failure code, when there is one, such as a rating failure's <c>NoMatchingLane</c>.</summary>
     public const string FailureCode = "failureCode";
 
+    /// <summary>
+    /// The <see cref="Outcome"/> of a step that gave its answer, whatever the answer: Rating failed is Rating's answer, with
+    /// its <see cref="FailureCode"/>, not a failed flow, as the Transport Order stays Accepted.
+    /// </summary>
+    public const string Succeeded = "Succeeded";
+
     /// <summary>The <see cref="Outcome"/> of a call the application refused, such as one without the right role.</summary>
     public const string Refused = "Refused";
+
+    /// <summary>The <see cref="Outcome"/> of a step that didn't give its answer and will be tried again.</summary>
+    public const string Retrying = "Retrying";
 }

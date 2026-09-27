@@ -211,6 +211,7 @@ A key that doesn't apply is left out, never sent empty.
 
 - Branch coverage is reported in the PR but not gated.
 - Exclusions are limited to code with no behaviour to test: EF migrations, generated code, `Program.cs` composition roots and the Aspire AppHost. Mark them with `[ExcludeFromCodeCoverage(Justification = "...")]` or exclude them in the coverlet settings; never exclude hand-written logic to reach the threshold.
+- An Infrastructure project whose code is mostly EF Core, SQL or Service Bus, which only the integration tests run, may gate its unit test project on the namespaces those unit tests cover, with coverlet's `Include` and a comment saying so, as `Norvia.Tms.Infrastructure.UnitTests` does for the rating worker.
 - Coverage is a floor, not a goal. A test that executes code without asserting its behaviour does not count in review.
 
 ### Integration tests

@@ -15,7 +15,8 @@ namespace Norvia.Tms.Infrastructure.Rating;
 /// Rates the Transport Orders that are Not yet rated (P2). It sweeps when it starts, whenever an acceptance triggers
 /// it, and on a timer, so an order whose trigger was missed, for example in a crash just after its acceptance, is still
 /// rated. An order its Shipper's Rate Card can't price becomes Rating failed, which the sweep doesn't pick up again.
-/// It doesn't consume Service Bus (ADR 0003). Each rating is traced under its intake's Message trail.
+/// It doesn't consume Service Bus (ADR 0003). Each rating is traced under its intake's Message trail, with the outcome
+/// Succeeded once it gives its answer, Rated or Rating failed, and Retrying when it didn't and the next sweep tries again.
 /// </summary>
 internal sealed partial class RatingWorker(
     IServiceScopeFactory scopes,
@@ -121,19 +122,27 @@ internal sealed partial class RatingWorker(
             switch (result.IsSuccess ? result.Value : null)
             {
                 case { RatingResult: RatingResult.Rated }:
-                    LogRated(order.TransportOrderNumber);
+                    using (TrackOutcome(activity, TrackingKeys.Succeeded))
+                    {
+                        LogRated(order.TransportOrderNumber);
+                    }
+
                     return true;
                 case { RatingResult: RatingResult.RatingFailed, RatingFailure: { } failure }:
-                    // The order stays Accepted and can be planned. The failure code joins the trail's keys.
-                    activity?.SetTag(TrackingKeys.FailureCode, failure.Code);
-                    using (logger.BeginScope(new Dictionary<string, object?> { [TrackingKeys.FailureCode] = failure.Code }))
+                    // The order stays Accepted and can be planned, so Rating still succeeded. The failure code joins the
+                    // trail's keys.
+                    using (TrackOutcome(activity, TrackingKeys.Succeeded, failure.Code))
                     {
                         LogRatingFailed(order.TransportOrderNumber, failure.Code, failure.Message);
                     }
 
                     return true;
                 default:
-                    LogNotRated(order.TransportOrderNumber);
+                    using (TrackOutcome(activity, TrackingKeys.Retrying))
+                    {
+                        LogNotRated(order.TransportOrderNumber);
+                    }
+
                     return false;
             }
         }
@@ -146,9 +155,31 @@ internal sealed partial class RatingWorker(
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             activity?.SetStatus(ActivityStatusCode.Error);
-            LogRatingThrew(exception, order.TransportOrderNumber);
+            using (TrackOutcome(activity, TrackingKeys.Retrying))
+            {
+                LogRatingThrew(exception, order.TransportOrderNumber);
+            }
+
             return false;
         }
+    }
+
+    /// <summary>Adds a rating's outcome to the trail, with the failure code of a rating that failed.</summary>
+    private IDisposable? TrackOutcome(Activity? activity, string outcome, string? failureCode = null)
+    {
+        // A key that doesn't apply is left out, never sent empty.
+        var keys = new Dictionary<string, object?> { [TrackingKeys.Outcome] = outcome };
+        if (failureCode is not null)
+        {
+            keys[TrackingKeys.FailureCode] = failureCode;
+        }
+
+        foreach (var (key, value) in keys)
+        {
+            activity?.SetTag(key, value);
+        }
+
+        return logger.BeginScope(keys);
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Transport Order {TransportOrderNumber} Rated")]
