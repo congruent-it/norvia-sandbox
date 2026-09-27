@@ -36,6 +36,13 @@ else if (_transportOrder is null)
 }
 else
 {
+    @if (_transportOrder.RatingResult is { } ratingResult)
+    {
+        <div class="mb-4">
+            <TransportOrderRating Result="ratingResult" FreightCharge="_transportOrder.FreightCharge" Failure="_transportOrder.RatingFailure" />
+        </div>
+    }
+
     <SubmittedTransportOrder Submitted="_transportOrder.TransportOrder">
         <Summary>
             <TransportOrderSection Heading="Transport Order">

@@ -10,10 +10,14 @@ internal static class Samples
     public static readonly ShipperView BrouwerDranken = new("SHP-0001", "Brouwer Dranken");
 
     // 06:00–10:00 on 26 September 2026 in Rotterdam, which is summer time (UTC+2).
-    public static TransportOrderSummary Summary(string number = "TO-0000042", string reference = "BD-2026-0042") => new(
+    public static TransportOrderSummary Summary(
+        string number = "TO-0000042",
+        string reference = "BD-2026-0042",
+        RatingResult ratingResult = RatingResult.NotYetRated) => new(
         Guid.NewGuid(),
         number,
         TransportOrderStatus.Accepted,
+        ratingResult,
         BrouwerDranken,
         reference,
         new DateTimeOffset(2026, 9, 26, 4, 0, 0, TimeSpan.Zero),
@@ -50,11 +54,29 @@ internal static class Samples
             ],
             "Ring at the side entrance"));
 
+    // Light enough that the Lane's minimum charge applies, so the Freight Charge has both kinds of charge line.
+    public static TransportOrderView RatedView(string number = "TO-0000042") => View(number) with
+    {
+        RatingResult = RatingResult.Rated,
+        FreightCharge = new FreightChargeView(
+            "EUR",
+            65.00m,
+            [new ChargeLineView("Freight", 38.40m), new ChargeLineView("MinimumChargeAdjustment", 26.60m)],
+            new RateCardVersionView("RC-0001", 3)),
+    };
+
+    public static TransportOrderView RatingFailedView(string number = "TO-0000042") => View(number) with
+    {
+        RatingResult = RatingResult.RatingFailed,
+        RatingFailure = new RatingFailureView("NoMatchingLane", "No Lane of Rate Card RC-0001 goes from Rotterdam to DE 40210."),
+    };
+
     // Received 11:30 on 24 September 2026 in Rotterdam (UTC+2).
     public static TransportOrderSummary RejectedSummary(string? reference = "BD-2026-0099") => new(
         Guid.NewGuid(),
         null,
         TransportOrderStatus.Rejected,
+        null,
         BrouwerDranken,
         reference,
         null,

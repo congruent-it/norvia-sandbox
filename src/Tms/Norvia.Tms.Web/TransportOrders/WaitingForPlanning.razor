@@ -57,6 +57,8 @@ else
             <PropertyColumn Title="Shipper" Property="@(transportOrder => transportOrder.Shipper.Name ?? transportOrder.Shipper.Id)" />
             <PropertyColumn Title="Shipper reference" Property="@(transportOrder => transportOrder.ShipperReference)" />
             <PropertyColumn Title="Collection window" Property="@(transportOrder => NorviaTime.FormatWindow(transportOrder.CollectionEarliest, transportOrder.CollectionLatest))" />
+            @* Shown beside the order, never as a filter: a Planner plans an order whatever its rating result. *@
+            <PropertyColumn Title="Rating result" Property="@(transportOrder => RatingText.Of(transportOrder.RatingResult))" />
         </FluentDataGrid>
     }
 }
