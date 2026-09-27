@@ -11,56 +11,18 @@
 
 <h1>Rejected bookings</h1>
 
-@if (_list.Items is not { } bookings)
-{
-    @if (_list.LastReadFailed)
-    {
-        <div role="alert" class="mb-4">
-            <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
-                The rejected bookings couldn't be loaded. Trying again…
-            </FluentMessageBar>
-        </div>
-    }
-    else
-    {
-        <FluentStack VerticalAlignment="VerticalAlignment.Center" role="status">
-            <FluentProgressRing />
-            <span>Loading the rejected bookings…</span>
-        </FluentStack>
-    }
-}
-else
-{
-    @if (_list.LastReadFailed)
-    {
-        <div role="alert" class="mb-4">
-            <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
-                The list couldn't be refreshed and may be out of date. Trying again…
-            </FluentMessageBar>
-        </div>
-    }
-
-    @if (bookings.Count == 0)
-    {
-        <div role="status">
-            <FluentMessageBar Intent="MessageIntent.Info" AllowDismiss="false">
-                No bookings have been rejected. A rejected booking appears here as soon as it is received.
-            </FluentMessageBar>
-        </div>
-    }
-    else
-    {
-        @* The latest first: a Shipper usually calls about the booking it just sent. *@
-        <FluentDataGrid Items="bookings.OrderByDescending(booking => booking.ReceivedAt).AsQueryable()" TGridItem="TransportOrderSummary" Class="flatly-table" aria-label="Rejected bookings">
-            @* A Rejected booking has no Transport Order number, and may have no Shipper reference, so it opens from when it was received. *@
-            <TemplateColumn Title="Received">
-                <a href="/rejected-bookings/@context.Id">@NorviaTime.Format(context.ReceivedAt)</a>
-            </TemplateColumn>
-            <PropertyColumn Title="Shipper" Property="@(booking => booking.Shipper.Name ?? booking.Shipper.Id)" />
-            <PropertyColumn Title="Shipper reference" Property="@(booking => SubmittedTransportOrder.Given(booking.ShipperReference))" />
-        </FluentDataGrid>
-    }
-}
+<LiveListStates Items="_list.Items" LastReadFailed="_list.LastReadFailed" Name="rejected bookings"
+                Empty="No bookings have been rejected. A rejected booking appears here as soon as it is received." Context="bookings">
+    @* The latest first: a Shipper usually calls about the booking it just sent. *@
+    <FluentDataGrid Items="bookings.OrderByDescending(booking => booking.ReceivedAt).AsQueryable()" TGridItem="TransportOrderSummary" Class="flatly-table" aria-label="Rejected bookings">
+        @* A Rejected booking has no Transport Order number, and may have no Shipper reference, so it opens from when it was received. *@
+        <TemplateColumn Title="Received">
+            <a href="/rejected-bookings/@context.Id">@NorviaTime.Format(context.ReceivedAt)</a>
+        </TemplateColumn>
+        <PropertyColumn Title="Shipper" Property="@(booking => booking.Shipper.Name ?? booking.Shipper.Id)" />
+        <PropertyColumn Title="Shipper reference" Property="@(booking => SubmittedTransportOrder.Given(booking.ShipperReference))" />
+    </FluentDataGrid>
+</LiveListStates>
 
 @code {
     private LiveTransportOrderList<TransportOrderSummary> _list = null!;

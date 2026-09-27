@@ -11,57 +11,19 @@
 
 <h1>Transport Orders waiting for planning</h1>
 
-@if (_list.Items is not { } transportOrders)
-{
-    @if (_list.LastReadFailed)
-    {
-        <div role="alert" class="mb-4">
-            <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
-                The Transport Orders waiting for planning couldn't be loaded. Trying again…
-            </FluentMessageBar>
-        </div>
-    }
-    else
-    {
-        <FluentStack VerticalAlignment="VerticalAlignment.Center" role="status">
-            <FluentProgressRing />
-            <span>Loading the Transport Orders waiting for planning…</span>
-        </FluentStack>
-    }
-}
-else
-{
-    @if (_list.LastReadFailed)
-    {
-        <div role="alert" class="mb-4">
-            <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
-                The list couldn't be refreshed and may be out of date. Trying again…
-            </FluentMessageBar>
-        </div>
-    }
-
-    @if (transportOrders.Count == 0)
-    {
-        <div role="status">
-            <FluentMessageBar Intent="MessageIntent.Info" AllowDismiss="false">
-                No Transport Orders are waiting for planning. A Transport Order appears here as soon as it is accepted.
-            </FluentMessageBar>
-        </div>
-    }
-    else
-    {
-        <FluentDataGrid Items="transportOrders.AsQueryable()" TGridItem="TransportOrderSummary" Class="flatly-table" aria-label="Transport Orders waiting for planning">
-            <TemplateColumn Title="Transport Order">
-                <a href="/transport-orders/@context.TransportOrderNumber">@context.TransportOrderNumber</a>
-            </TemplateColumn>
-            <PropertyColumn Title="Shipper" Property="@(transportOrder => transportOrder.Shipper.Name ?? transportOrder.Shipper.Id)" />
-            <PropertyColumn Title="Shipper reference" Property="@(transportOrder => transportOrder.ShipperReference)" />
-            <PropertyColumn Title="Collection window" Property="@(transportOrder => NorviaTime.FormatWindow(transportOrder.CollectionEarliest, transportOrder.CollectionLatest))" />
-            @* Shown beside the order, never as a filter: a Planner plans an order whatever its rating result. *@
-            <PropertyColumn Title="Rating result" Property="@(transportOrder => RatingText.Of(transportOrder.RatingResult))" />
-        </FluentDataGrid>
-    }
-}
+<LiveListStates Items="_list.Items" LastReadFailed="_list.LastReadFailed" Name="Transport Orders waiting for planning"
+                Empty="No Transport Orders are waiting for planning. A Transport Order appears here as soon as it is accepted." Context="transportOrders">
+    <FluentDataGrid Items="transportOrders.AsQueryable()" TGridItem="TransportOrderSummary" Class="flatly-table" aria-label="Transport Orders waiting for planning">
+        <TemplateColumn Title="Transport Order">
+            <a href="/transport-orders/@context.TransportOrderNumber">@context.TransportOrderNumber</a>
+        </TemplateColumn>
+        <PropertyColumn Title="Shipper" Property="@(transportOrder => transportOrder.Shipper.Name ?? transportOrder.Shipper.Id)" />
+        <PropertyColumn Title="Shipper reference" Property="@(transportOrder => transportOrder.ShipperReference)" />
+        <PropertyColumn Title="Collection window" Property="@(transportOrder => NorviaTime.FormatWindow(transportOrder.CollectionEarliest, transportOrder.CollectionLatest))" />
+        @* Shown beside the order, never as a filter: a Planner plans an order whatever its rating result. *@
+        <PropertyColumn Title="Rating result" Property="@(transportOrder => RatingText.Of(transportOrder.RatingResult))" />
+    </FluentDataGrid>
+</LiveListStates>
 
 @code {
     private LiveTransportOrderList<TransportOrderSummary> _list = null!;
