@@ -57,9 +57,14 @@ public static class Extensions
         }
 
         // In Azure, telemetry goes to the estate's Application Insights, where the Integration console reads it (ADR 0017).
+        // Unsampled: a sampled-out trace drops its logs too, leaving Message trails incomplete at random (ADR 0029).
         if (!string.IsNullOrWhiteSpace(builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]))
         {
-            builder.Services.AddOpenTelemetry().UseAzureMonitor();
+            builder.Services.AddOpenTelemetry().UseAzureMonitor(options =>
+            {
+                options.SamplingRatio = 1.0F;
+                options.TracesPerSecond = null;
+            });
         }
 
         return builder;

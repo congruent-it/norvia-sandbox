@@ -156,6 +156,7 @@ A key that doesn't apply is left out, never sent empty.
 - **Applications** add the keys they know to their logging scope, so their traces join the trail.
 - **Secure inputs and outputs** are used only on steps that handle secrets. Anywhere else they hide the body the Integration operator needs.
 - **Every Service Bus subscription's filter** is a SQL filter that also handles resubmits from the console: `(<the subscription's own condition> AND resubmitTo IS NULL) OR resubmitTo = '<subscription name>'`. A resubmitted message then reaches only the subscription it was dead-lettered from.
+- **Nothing samples a tracked record away.** `ServiceDefaults` sends the applications' telemetry unsampled, and a Logic App's `host.json` leaves `Request` and `Exception` out of sampling ([ADR 0029](adr/0029-the-applications-send-application-insights-every-trace-unsampled.md)).
 - **Retention** of Application Insights, Logic Apps run history and the integration layer's transit containers is set by the one estate Bicep parameter `integrationRetentionDays` (90 by default), never per resource.
 
 ## 8. Configuration, secrets and security
