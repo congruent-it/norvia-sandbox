@@ -1,0 +1,46 @@
+@* The commercial side of a Transport Order: its rating result and, once Rated, the Freight Charge it was given, or, when
+   Rating failed, why. *@
+@using Norvia.Tms.Domain.TransportOrders
+
+<TransportOrderSection Heading="Rating">
+    <dl class="detail-list">
+        <dt>Rating result</dt>
+        <dd>@RatingText.Of(Result)</dd>
+        @if (ShownFreightCharge is { } freightCharge)
+        {
+            <dt>Rate Card</dt>
+            <dd>@freightCharge.RateCardVersion.RateCardId, version @freightCharge.RateCardVersion.Version</dd>
+            <dt>Total</dt>
+            <dd>@RatingText.Amount(freightCharge.Total, freightCharge.Currency)</dd>
+        }
+        else if (Result == RatingResult.RatingFailed && Failure is { } failure)
+        {
+            <dt>Reason</dt>
+            <dd>@failure.Message</dd>
+        }
+    </dl>
+
+    @if (ShownFreightCharge is { } shown)
+    {
+        <FluentDataGrid Items="shown.ChargeLines.AsQueryable()" TGridItem="ChargeLineView" Class="flatly-table mt-3" aria-label="Charge lines">
+            <PropertyColumn Title="Charge line" Property="@(line => RatingText.ChargeLine(line.Type))" />
+            <PropertyColumn Title="Amount (without VAT)" Property="@(line => RatingText.Amount(line.Amount, shown.Currency))" />
+        </FluentDataGrid>
+    }
+</TransportOrderSection>
+
+@code {
+    [Parameter, EditorRequired]
+    public RatingResult Result { get; set; }
+
+    /// <summary>The frozen Freight Charge of a Rated Transport Order.</summary>
+    [Parameter]
+    public FreightChargeView? FreightCharge { get; set; }
+
+    /// <summary>Why Rating failed, for a Rating failed Transport Order.</summary>
+    [Parameter]
+    public RatingFailureView? Failure { get; set; }
+
+    // Only a Rated Transport Order has a Freight Charge to show.
+    private FreightChargeView? ShownFreightCharge => Result == RatingResult.Rated ? FreightCharge : null;
+}

@@ -1,4 +1,5 @@
 using Norvia.Tms.Application.TransportOrders.List;
+using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Web.TransportOrders;
 
 namespace Norvia.Tms.Web.UnitTests.TransportOrders;
@@ -18,7 +19,7 @@ public sealed class WaitingForPlanningTests : TmsWebContext
     }
 
     [Fact]
-    public void Render_WithTransportOrdersWaiting_ListsEachWithNumberShipperReferenceAndCollectionWindowInRotterdamTime()
+    public void Render_WithTransportOrdersWaiting_ListsEachWithNumberShipperReferenceCollectionWindowInRotterdamTimeAndRatingResult()
     {
         Queries.ListWaitingForPlanningAsync(Arg.Any<CancellationToken>()).Returns([Samples.Summary("TO-0000042", "BD-2026-0042")]);
 
@@ -26,7 +27,7 @@ public sealed class WaitingForPlanningTests : TmsWebContext
 
         var row = page.WaitForElement("tr:has(a[href='/transport-orders/TO-0000042'])");
         var cells = row.QuerySelectorAll("td").Select(cell => cell.TextContent.Trim());
-        cells.Should().Equal("TO-0000042", "Brouwer Dranken", "BD-2026-0042", "Sat 26 Sep 2026, 06:00–10:00");
+        cells.Should().Equal("TO-0000042", "Brouwer Dranken", "BD-2026-0042", "Sat 26 Sep 2026, 06:00–10:00", "Not yet rated");
     }
 
     [Fact]
@@ -53,6 +54,31 @@ public sealed class WaitingForPlanningTests : TmsWebContext
         Time.Advance(RefreshInterval);
 
         page.WaitForElement("a[href='/transport-orders/TO-0000043']");
+    }
+
+    [Fact]
+    public void Render_WhenATransportOrderIsRatedWhileTheListIsOpen_ShowsItsNewRatingResultWithoutARefresh()
+    {
+        Queries.ListWaitingForPlanningAsync(Arg.Any<CancellationToken>()).Returns(
+            [Samples.Summary("TO-0000042", ratingResult: RatingResult.NotYetRated)],
+            [Samples.Summary("TO-0000042", ratingResult: RatingResult.Rated)]);
+        var page = Render<WaitingForPlanning>();
+        page.WaitForAssertion(() => RatingResultOf(page, "TO-0000042").Should().Be("Not yet rated"));
+
+        Time.Advance(RefreshInterval);
+
+        page.WaitForAssertion(() => RatingResultOf(page, "TO-0000042").Should().Be("Rated"));
+    }
+
+    [Fact]
+    public void Render_ATransportOrderWhoseRatingFailed_StillListsItAsWaitingForPlanning()
+    {
+        Queries.ListWaitingForPlanningAsync(Arg.Any<CancellationToken>())
+            .Returns([Samples.Summary("TO-0000042", ratingResult: RatingResult.RatingFailed)]);
+
+        var page = Render<WaitingForPlanning>();
+
+        page.WaitForAssertion(() => RatingResultOf(page, "TO-0000042").Should().Be("Rating failed"));
     }
 
     [Fact]
@@ -88,4 +114,8 @@ public sealed class WaitingForPlanningTests : TmsWebContext
             .Contain("The list couldn't be refreshed and may be out of date. Trying again…"));
         page.Find("a[href='/transport-orders/TO-0000042']");
     }
+
+    // The last cell of the Transport Order's row.
+    private static string RatingResultOf(IRenderedComponent<WaitingForPlanning> page, string number) =>
+        page.Find($"tr:has(a[href='/transport-orders/{number}'])").QuerySelectorAll("td")[^1].TextContent.Trim();
 }

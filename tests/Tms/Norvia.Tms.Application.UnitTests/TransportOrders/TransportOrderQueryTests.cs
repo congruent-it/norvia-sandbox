@@ -186,6 +186,7 @@ public sealed class TransportOrderQueryTests
             rejected.Id.Value,
             null,
             TransportOrderStatus.Rejected,
+            null,
             new ShipperView("SHP-0001", "Brouwer Dranken"),
             "BD-2026-0001",
             Samples.Now.AddDays(1),
@@ -208,11 +209,26 @@ public sealed class TransportOrderQueryTests
             first.Id.Value,
             "TO-0000001",
             TransportOrderStatus.Accepted,
+            RatingResult.NotYetRated,
             new ShipperView("SHP-0001", "Brouwer Dranken"),
             "BD-2026-0001",
             Samples.Now.AddDays(1),
             Samples.Now.AddDays(1).AddHours(4),
             Samples.Now));
+    }
+
+    [Fact]
+    public async Task List_Accepted_ShowsEachOrdersRatingResult_RatingFailedIncluded()
+    {
+        _repository.ListAsync(Arg.Is<TransportOrdersByStatusSpec>(s => s.Status == TransportOrderStatus.Accepted), Arg.Any<CancellationToken>())
+            .Returns([Samples.AcceptedOrder(sequence: 1), Samples.RatedOrder(sequence: 2), Samples.RatingFailedOrder(sequence: 3)]);
+
+        var summaries = await new ListTransportOrdersHandler(_repository, _shippers).Handle(new ListTransportOrdersQuery(TransportOrderStatus.Accepted), CancellationToken.None);
+
+        summaries.Select(s => (s.TransportOrderNumber, s.RatingResult)).Should().Equal(
+            ("TO-0000001", RatingResult.NotYetRated),
+            ("TO-0000002", RatingResult.Rated),
+            ("TO-0000003", RatingResult.RatingFailed));
     }
 
     [Fact]
