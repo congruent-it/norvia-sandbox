@@ -29,6 +29,6 @@ public static class RatingText
         _ => type,
     };
 
-    /// <summary>An amount of a Freight Charge, which is always in EUR without VAT.</summary>
-    public static string Euros(decimal amount) => $"EUR {amount.ToString("#,##0.00", Culture)}";
+    /// <summary>An amount of a Freight Charge in its currency, which is always EUR, without VAT.</summary>
+    public static string Amount(decimal amount, string currency) => $"{currency} {amount.ToString("#,##0.00", Culture)}";
 }

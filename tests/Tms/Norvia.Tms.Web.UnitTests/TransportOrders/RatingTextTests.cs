@@ -34,8 +34,8 @@ public sealed class RatingTextTests
     [InlineData(92.87, "EUR 92.87")]
     [InlineData(65, "EUR 65.00")]
     [InlineData(1234.5, "EUR 1,234.50")]
-    public void Euros_AnAmount_ShowsItInEurWithCents(decimal amount, string expected)
+    public void Amount_AnAmountInEur_ShowsItWithItsCurrencyAndCents(decimal amount, string expected)
     {
-        RatingText.Euros(amount).Should().Be(expected);
+        RatingText.Amount(amount, "EUR").Should().Be(expected);
     }
 }

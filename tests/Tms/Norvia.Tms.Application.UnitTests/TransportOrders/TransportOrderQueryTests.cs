@@ -218,7 +218,7 @@ public sealed class TransportOrderQueryTests
     }
 
     [Fact]
-    public async Task List_Accepted_ShowsEachOrdersRatingResult_AndKeepsRatingFailedOrdersWaitingForPlanning()
+    public async Task List_Accepted_ShowsEachOrdersRatingResult_RatingFailedIncluded()
     {
         _repository.ListAsync(Arg.Is<TransportOrdersByStatusSpec>(s => s.Status == TransportOrderStatus.Accepted), Arg.Any<CancellationToken>())
             .Returns([Samples.AcceptedOrder(sequence: 1), Samples.RatedOrder(sequence: 2), Samples.RatingFailedOrder(sequence: 3)]);

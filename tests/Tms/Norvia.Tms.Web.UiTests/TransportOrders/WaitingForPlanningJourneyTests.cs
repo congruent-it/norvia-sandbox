@@ -1,6 +1,3 @@
-using System.Net;
-using System.Net.Http.Json;
-using System.Text.Json.Nodes;
 using Microsoft.Playwright;
 using Norvia.Tms.Api.IntegrationTests.TransportOrders;
 using static Microsoft.Playwright.Assertions;
@@ -10,8 +7,6 @@ namespace Norvia.Tms.Web.UiTests.TransportOrders;
 /// <summary>The Planner's journey: a Transport Order accepted while the list is open appears in it, and opens in full.</summary>
 public sealed class WaitingForPlanningJourneyTests(TmsUiFixture tms) : BrowserPage(tms)
 {
-    private readonly TmsUiFixture _tms = tms;
-
     [Fact]
     public async Task ATransportOrderAcceptedWhileTheListIsOpen_AppearsWithoutARefresh_AndOpensWithEverythingTheShipperSubmitted()
     {
@@ -21,7 +16,7 @@ public sealed class WaitingForPlanningJourneyTests(TmsUiFixture tms) : BrowserPa
         // Submit only once the open list has been read, so the order can only arrive through the live update.
         await Expect(Page.GetByText("Loading the Transport Orders waiting for planning")).ToBeHiddenAsync();
 
-        var number = await SubmitAsync(Bookings.Valid(shipperReference));
+        var number = await SubmitAcceptedAsync(Bookings.Valid(shipperReference));
 
         var row = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipperReference });
         await Expect(row).ToBeVisibleAsync();
@@ -42,12 +37,4 @@ public sealed class WaitingForPlanningJourneyTests(TmsUiFixture tms) : BrowserPa
     }
 
     private ILocator Region(string name) => Page.GetByRole(AriaRole.Region, new() { Name = name });
-
-    private async Task<string> SubmitAsync(JsonObject booking)
-    {
-        using var response = await _tms.SubmitAsync(booking, TestContext.Current.CancellationToken);
-        response.StatusCode.Should().Be(HttpStatusCode.Created, await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
-        var accepted = await response.Content.ReadFromJsonAsync<JsonObject>(TestContext.Current.CancellationToken);
-        return accepted!["transportOrderNumber"]!.GetValue<string>();
-    }
 }

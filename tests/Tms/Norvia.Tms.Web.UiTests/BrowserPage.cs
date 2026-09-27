@@ -1,3 +1,6 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Playwright;
 
 namespace Norvia.Tms.Web.UiTests;
@@ -26,6 +29,15 @@ public abstract class BrowserPage(TmsUiFixture tms) : IAsyncLifetime
         });
         await _context.Tracing.StartAsync(new TracingStartOptions { Screenshots = true, Snapshots = true, Sources = true });
         Page = await _context.NewPageAsync();
+    }
+
+    /// <summary>Submits a booking the TMS accepts, and returns its Transport Order number.</summary>
+    protected async Task<string> SubmitAcceptedAsync(JsonObject booking)
+    {
+        using var response = await tms.SubmitAsync(booking, TestContext.Current.CancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.Created, await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        var accepted = await response.Content.ReadFromJsonAsync<JsonObject>(TestContext.Current.CancellationToken);
+        return accepted!["transportOrderNumber"]!.GetValue<string>();
     }
 
     public async ValueTask DisposeAsync()

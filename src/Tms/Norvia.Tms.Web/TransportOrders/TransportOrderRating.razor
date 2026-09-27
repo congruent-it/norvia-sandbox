@@ -6,12 +6,12 @@
     <dl class="detail-list">
         <dt>Rating result</dt>
         <dd>@RatingText.Of(Result)</dd>
-        @if (Charged is { } freightCharge)
+        @if (ShownFreightCharge is { } freightCharge)
         {
             <dt>Rate Card</dt>
             <dd>@freightCharge.RateCardVersion.RateCardId, version @freightCharge.RateCardVersion.Version</dd>
             <dt>Total</dt>
-            <dd>@RatingText.Euros(freightCharge.Total)</dd>
+            <dd>@RatingText.Amount(freightCharge.Total, freightCharge.Currency)</dd>
         }
         else if (Result == RatingResult.RatingFailed && Failure is { } failure)
         {
@@ -20,11 +20,11 @@
         }
     </dl>
 
-    @if (Charged is { } charged)
+    @if (ShownFreightCharge is { } shown)
     {
-        <FluentDataGrid Items="charged.ChargeLines.AsQueryable()" TGridItem="ChargeLineView" Class="flatly-table mt-3" aria-label="Charge lines">
+        <FluentDataGrid Items="shown.ChargeLines.AsQueryable()" TGridItem="ChargeLineView" Class="flatly-table mt-3" aria-label="Charge lines">
             <PropertyColumn Title="Charge line" Property="@(line => RatingText.ChargeLine(line.Type))" />
-            <PropertyColumn Title="Amount (without VAT)" Property="@(line => RatingText.Euros(line.Amount))" />
+            <PropertyColumn Title="Amount (without VAT)" Property="@(line => RatingText.Amount(line.Amount, shown.Currency))" />
         </FluentDataGrid>
     }
 </TransportOrderSection>
@@ -41,5 +41,6 @@
     [Parameter]
     public RatingFailureView? Failure { get; set; }
 
-    private FreightChargeView? Charged => Result == RatingResult.Rated ? FreightCharge : null;
+    // Only a Rated Transport Order has a Freight Charge to show.
+    private FreightChargeView? ShownFreightCharge => Result == RatingResult.Rated ? FreightCharge : null;
 }

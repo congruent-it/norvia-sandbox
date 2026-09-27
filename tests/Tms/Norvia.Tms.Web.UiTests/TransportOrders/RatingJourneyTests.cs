@@ -1,6 +1,3 @@
-using System.Net;
-using System.Net.Http.Json;
-using System.Text.Json.Nodes;
 using Microsoft.Playwright;
 using Norvia.Tms.Api.IntegrationTests.TransportOrders;
 using static Microsoft.Playwright.Assertions;
@@ -14,8 +11,6 @@ namespace Norvia.Tms.Web.UiTests.TransportOrders;
 /// </summary>
 public sealed class RatingJourneyTests(TmsUiFixture tms) : BrowserPage(tms)
 {
-    private readonly TmsUiFixture _tms = tms;
-
     [Fact]
     public async Task ATransportOrderAcceptedWhileTheListIsOpen_BecomesRatedWithoutARefresh_AndOpensWithItsFreightCharge()
     {
@@ -24,7 +19,7 @@ public sealed class RatingJourneyTests(TmsUiFixture tms) : BrowserPage(tms)
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Transport Orders waiting for planning" })).ToBeVisibleAsync();
         await Expect(Page.GetByText("Loading the Transport Orders waiting for planning")).ToBeHiddenAsync();
 
-        var number = await SubmitAsync(Bookings.Valid(shipperReference));
+        var number = await SubmitAcceptedAsync(Bookings.Valid(shipperReference));
 
         var row = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipperReference });
         await Expect(row.GetByRole(AriaRole.Gridcell, new() { Name = "Rated", Exact = true })).ToBeVisibleAsync();
@@ -38,13 +33,5 @@ public sealed class RatingJourneyTests(TmsUiFixture tms) : BrowserPage(tms)
         await Expect(rating).ToContainTextAsync("EUR 92.87");
         var chargeLines = rating.GetByRole(AriaRole.Table, new() { Name = "Charge lines" }).GetByRole(AriaRole.Row);
         await Expect(chargeLines.Filter(new() { HasText = "Freight" })).ToContainTextAsync("EUR 92.87");
-    }
-
-    private async Task<string> SubmitAsync(JsonObject booking)
-    {
-        using var response = await _tms.SubmitAsync(booking, TestContext.Current.CancellationToken);
-        response.StatusCode.Should().Be(HttpStatusCode.Created, await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
-        var accepted = await response.Content.ReadFromJsonAsync<JsonObject>(TestContext.Current.CancellationToken);
-        return accepted!["transportOrderNumber"]!.GetValue<string>();
     }
 }
