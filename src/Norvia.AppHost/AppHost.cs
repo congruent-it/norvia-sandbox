@@ -40,9 +40,11 @@ var tmsApi = builder.AddProject<Projects.Norvia_Tms_Api>("tms-api")
     .WithRoleAssignments(messaging, ServiceBusBuiltInRole.AzureServiceBusDataSender)
     .WithHttpHealthCheck("/health");
 
-// The TMS UI reads the TMS database through the query side.
+// The TMS UI reads the TMS database through the query side, and changes things only through the TMS API.
 var tmsWeb = builder.AddProject<Projects.Norvia_Tms_Web>("tms-web")
     .WithReference(tmsDatabase).WaitForCompletion(tmsMigrations)
+    .WithReference(tmsApi).WaitFor(tmsApi)
+    .WithEnvironment("TmsApi__BaseAddress", tmsApi.GetEndpoint("http"))
     .WithHttpHealthCheck("/health")
     .WithUrlForEndpoint("http", url => url.DisplayText = "TMS UI");
 
@@ -96,6 +98,14 @@ if (builder.ExecutionContext.IsPublishMode)
         .WithEnvironment("Authentication__Schemes__Bearer__ValidIssuer", estate.EntraIssuer)
         .WithEnvironment("Authentication__Schemes__Bearer__ValidAudiences__0", estate.TmsApiClientId)
         .WithEnvironment("IntakeCallers__ClientIdsByChannel__ShipperApi__0", estate.IntakeClientId);
+
+    // The TMS UI calls the TMS API as its own identity, which the estate grants the TMS API's manage role; it is the
+    // one caller that may re-rate.
+    var tmsUiIdentity = builder.AddAzureUserAssignedIdentity("tms-ui-identity")
+        .PublishAsExisting(estate.TmsUiIdentity, null);
+    tmsWeb.WithAzureUserAssignedIdentity(tmsUiIdentity)
+        .WithEnvironment("TmsApi__Entra__Scope", ReferenceExpression.Create($"{estate.TmsApiClientId}/.default"))
+        .WithEnvironment("TmsApi__Entra__ManagedIdentityClientId", estate.TmsUiClientId);
 
     // The TMS UI and the Partner portal have no login of their own, so in Azure they open to the presenter's browser
     // behind an Entra sign-in that only the presenter passes (ADR 0024). The apps don't know it is there.
@@ -198,6 +208,12 @@ else
             url.DisplayText = "API reference (Scalar)";
         });
 
+    // Locally the TMS UI signs its token for the TMS API itself, as Entra would issue it to its managed identity.
+    tmsWeb
+        .WithEnvironment("TmsApi__LocalTokens__Issuer", LocalTokens.Issuer)
+        .WithEnvironment("TmsApi__LocalTokens__Audience", LocalTokens.TmsAudience)
+        .WithEnvironment("TmsApi__LocalTokens__ClientId", LocalTokens.TmsUiClientId);
+
     // Locally a stand-in plays API Management and the intake Logic App (ADR 0023). The AppHost gives each Persona what
     // the estate gives it in Azure: a client ID, a subscription key for the run, and the submit role if it is a Shipper.
     var partnerApi = builder.AddProject<Projects.Norvia_Integration_LocalPartnerApi>("partner-api")
@@ -226,10 +242,11 @@ else
         }
     }
 
-    // All three sign or check tokens with the same local key, as JWT bearer configuration takes it: base64.
+    // They all sign or check tokens with the same local key, as JWT bearer configuration takes it: base64.
     foreach (var (holder, name) in new[]
     {
         (tmsApi.Resource as IResourceWithEnvironment, "Authentication__Schemes__Bearer__SigningKeys__0__Value"),
+        (tmsWeb.Resource, "TmsApi__LocalTokens__SigningKey"),
         (partnerApi.Resource, "PartnerApi__Tokens__SigningKey"),
         (partnerApi.Resource, "Tms__Tokens__SigningKey"),
         (partnerPortal.Resource, "PartnerApi__LocalTokens__SigningKey"),

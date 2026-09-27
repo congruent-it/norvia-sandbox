@@ -1,21 +1,19 @@
-using Norvia.Tms.Application.TransportOrders.List;
-
 namespace Norvia.Tms.Web.TransportOrders;
 
 /// <summary>
-/// Keeps a list of Transport Orders current while a page shows it, such as those waiting for planning or the Rejected
-/// bookings: it reads the list, then reads it again every <see cref="LiveListOptions.RefreshInterval"/>, so one that
+/// Keeps a list of Transport Orders current while a page shows it, such as those waiting for planning, the Rejected
+/// bookings or the rating exceptions: it reads the list, then reads it again every <see cref="LiveListOptions.RefreshInterval"/>, so one that
 /// arrives meanwhile appears without a refresh. The TMS UI reads through the query side only and never consumes events
 /// (ADR 0003), so it asks again.
 /// </summary>
 /// <param name="read">Reads the list, such as <see cref="ITransportOrderQueries.ListRejectedAsync"/>.</param>
 /// <param name="listName">What the list holds, for the log, such as "the Rejected bookings".</param>
-internal sealed partial class LiveTransportOrderList(
-    Func<CancellationToken, Task<IReadOnlyList<TransportOrderSummary>>> read,
+internal sealed partial class LiveTransportOrderList<TItem>(
+    Func<CancellationToken, Task<IReadOnlyList<TItem>>> read,
     string listName,
     TimeProvider time,
     TimeSpan refreshInterval,
-    ILogger<LiveTransportOrderList> logger)
+    ILogger<LiveTransportOrderList<TItem>> logger)
     : IAsyncDisposable
 {
     private readonly CancellationTokenSource _stopped = new();
@@ -25,9 +23,9 @@ internal sealed partial class LiveTransportOrderList(
     public event Func<Task>? Changed;
 
     /// <summary>The Transport Orders from the last read that succeeded; null until one has.</summary>
-    public IReadOnlyList<TransportOrderSummary>? TransportOrders { get; private set; }
+    public IReadOnlyList<TItem>? Items { get; private set; }
 
-    /// <summary>True when the last read failed; <see cref="TransportOrders"/> then still holds what was read before.</summary>
+    /// <summary>True when the last read failed; <see cref="Items"/> then still holds what was read before.</summary>
     public bool LastReadFailed { get; private set; }
 
     public void Start() => _refreshing = RefreshUntilStoppedAsync(_stopped.Token);
@@ -57,7 +55,7 @@ internal sealed partial class LiveTransportOrderList(
     {
         try
         {
-            TransportOrders = await read(cancellationToken);
+            Items = await read(cancellationToken);
             LastReadFailed = false;
         }
         catch (Exception exception) when (!cancellationToken.IsCancellationRequested)

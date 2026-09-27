@@ -27,6 +27,12 @@ public static class TransportOrderEndpoints
     /// <summary>The app role only the intake Logic App's managed identity holds, so nothing bypasses the integration layer.</summary>
     public const string IntakeRole = "TransportOrders.Intake";
 
+    /// <summary>
+    /// The app role only the TMS UI's managed identity holds: Norvia's staff change Transport Orders there, such as
+    /// Customer service's re-rate.
+    /// </summary>
+    public const string ManageRole = "TransportOrders.Manage";
+
     public static IEndpointRouteBuilder MapTransportOrders(this IEndpointRouteBuilder app)
     {
         var transportOrders = app.NewVersionedApi("TransportOrders")
@@ -62,11 +68,10 @@ public static class TransportOrderEndpoints
             .WithName("ListRatingExceptions")
             .WithSummary("List the rating exceptions: every Transport Order whose Rating failed, with its failure code and message.");
 
-        // Customer service re-rates from the TMS UI, so the re-rate takes the same authorization as the queries: any
-        // caller with a TMS token, until the TMS UI calls with a role of its own.
+        // Customer service re-rates from the TMS UI, which calls as its own identity with the manage role.
         transportOrders.MapPost("/{transportOrderNumber}/re-rate", ReRateAsync)
             .WithName("ReRateTransportOrder")
-            .RequireAuthorization()
+            .RequireAuthorization(policy => policy.RequireRole(ManageRole))
             .WithMetadata(new TrackedFlow(Flows.TransportOrderRating))
             .WithSummary("Re-rate a Transport Order whose Rating failed, typically after its Rate Card was corrected.")
             .WithDescription(

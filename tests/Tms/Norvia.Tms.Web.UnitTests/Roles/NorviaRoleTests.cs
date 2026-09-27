@@ -27,4 +27,19 @@ public sealed class NorviaRoleTests
     {
         NorviaRole.All.Select(role => role.Name).Should().Equal("Planner", "Customer service");
     }
+
+    [Fact]
+    public void Views_OfCustomerService_AreTheRejectedBookingsThenTheRatingExceptions()
+    {
+        NorviaRole.CustomerService.Views.Select(view => (view.Path, view.Title)).Should().Equal(
+            ("/rejected-bookings", "Rejected bookings"),
+            ("/rating-exceptions", "Rating exceptions"));
+    }
+
+    [Fact]
+    public void Home_IsTheRolesFirstView()
+    {
+        NorviaRole.CustomerService.Home.Should().Be("/rejected-bookings");
+        NorviaRole.Planner.Home.Should().Be("/transport-orders");
+    }
 }

@@ -51,6 +51,22 @@ public sealed class AppHostModelTests
     }
 
     [Fact]
+    public async Task Locally_TheTmsUi_ChangesThingsThroughTheTmsApi_WithATokenItSignsItself()
+    {
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(TestContext.Current.CancellationToken);
+
+        var tmsUi = await EnvironmentOfAsync(builder, "tms-web");
+
+        tmsUi.Should().Contain("TmsApi__BaseAddress", "{tms-api.bindings.http.url}")
+            .And.Contain("TmsApi__LocalTokens__Issuer", "https://norvia.local/tokens")
+            .And.Contain("TmsApi__LocalTokens__Audience", "api://norvia-tms")
+            .And.Contain("TmsApi__LocalTokens__ClientId", "norvia-local-tms-ui")
+            .And.ContainKey("TmsApi__LocalTokens__SigningKey");
+        tmsUi.Keys.Should().NotContain(key => key.StartsWith("TmsApi__Entra", StringComparison.Ordinal));
+        Resource(builder, "tms-web").Annotations.OfType<WaitAnnotation>().Should().Contain(wait => wait.Resource.Name == "tms-api");
+    }
+
+    [Fact]
     public async Task Locally_EveryPersona_HasOneSubscriptionKey_ThatTheLocalPartnerApiKnows()
     {
         await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(TestContext.Current.CancellationToken);
@@ -146,6 +162,23 @@ public sealed class AppHostModelTests
             .Should().ContainSingle().Which.IdentityResource.Should().BeOfType<AzureUserAssignedIdentityResource>().Which.Name.Should().Be("partner-portal-identity");
         builder.Resources.OfType<AzureUserAssignedIdentityResource>().Single(identity => identity.Name == "partner-portal-identity")
             .IsExisting().Should().BeTrue("the estate owns the identity, because the Personas' app registrations trust it");
+    }
+
+    [Fact]
+    public async Task InAzure_TheTmsUi_ChangesThingsThroughTheTmsApi_AsItsOwnIdentity()
+    {
+        await using var builder = await CreateForAzureAsync();
+
+        var tmsUi = await EnvironmentOfAsync(builder, "tms-web");
+
+        tmsUi.Should().Contain("TmsApi__BaseAddress", "{tms-api.bindings.http.url}")
+            .And.Contain("TmsApi__Entra__Scope", "{estate-tms-api-client-id.value}/.default")
+            .And.Contain("TmsApi__Entra__ManagedIdentityClientId", "{estate-tms-ui-client-id.value}");
+        tmsUi.Keys.Should().NotContain(key => key.StartsWith("TmsApi__LocalTokens", StringComparison.Ordinal), "only Entra issues tokens in Azure");
+        Resource(builder, "tms-web").Annotations.OfType<AppIdentityAnnotation>()
+            .Should().ContainSingle().Which.IdentityResource.Should().BeOfType<AzureUserAssignedIdentityResource>().Which.Name.Should().Be("tms-ui-identity");
+        builder.Resources.OfType<AzureUserAssignedIdentityResource>().Single(identity => identity.Name == "tms-ui-identity")
+            .IsExisting().Should().BeTrue("the estate owns the identity, because it grants it the TMS API's manage role");
     }
 
     [Fact]

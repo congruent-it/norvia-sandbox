@@ -131,7 +131,7 @@ public sealed class TransportOrderReRateTests(TmsFixture tms)
         var number = await tms.SubmitAcceptedAsync(Bookings.Valid(TmsCalls.NewReference()).DeliveredToDusseldorf(), TmsCalls.NewCorrelationId(), _cancellationToken);
         await tms.WaitForRatingResultAsync(number, "RatingFailed", _cancellationToken);
 
-        using var response = await tms.Tms.PostAsync(new Uri($"/v1/transport-orders/{number}/re-rate", UriKind.Relative), content: null, _cancellationToken);
+        using var response = await tms.TmsUi.PostAsync(new Uri($"/v1/transport-orders/{number}/re-rate", UriKind.Relative), content: null, _cancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         var problem = JsonNode.Parse(await response.Content.ReadAsStringAsync(_cancellationToken))!;

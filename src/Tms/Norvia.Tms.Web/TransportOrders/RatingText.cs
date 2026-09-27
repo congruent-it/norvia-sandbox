@@ -29,6 +29,19 @@ public static class RatingText
         _ => type,
     };
 
+    /// <summary>
+    /// Why Rating failed, in the glossary's words, for Customer service. The query side carries the stable failure code;
+    /// one the UI doesn't know yet is shown as it came rather than hidden.
+    /// </summary>
+    public static string Failure(string code) => code switch
+    {
+        nameof(RatingFailureCode.NoRateCard) => "No Rate Card",
+        nameof(RatingFailureCode.NoValidRateCardVersion) => "No valid Rate Card version",
+        nameof(RatingFailureCode.NoMatchingLane) => "No matching Lane",
+        nameof(RatingFailureCode.WeightAboveHighestBreak) => "Weight above the highest Weight Break",
+        _ => code,
+    };
+
     /// <summary>An amount of a Freight Charge in its currency, which is always EUR, without VAT.</summary>
     public static string Amount(decimal amount, string currency) => $"{currency} {amount.ToString("#,##0.00", Culture)}";
 }

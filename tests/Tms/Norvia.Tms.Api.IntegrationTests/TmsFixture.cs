@@ -31,6 +31,9 @@ public class TmsFixture : IAsyncLifetime
     private const string TestSubscription = "tms-api-integration-tests";
     public const string IntakeRole = "TransportOrders.Intake";
 
+    /// <summary>The app role only the TMS UI's managed identity holds: Customer service's re-rate goes through it.</summary>
+    public const string ManageRole = "TransportOrders.Manage";
+
     /// <summary>The client ID the TMS takes as the WMS handoff's caller. No WMS exists yet, so only the tests call as it.</summary>
     public const string WmsClientId = "norvia-test-wms";
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
@@ -44,6 +47,9 @@ public class TmsFixture : IAsyncLifetime
 
     /// <summary>A client holding the intake role, as the intake Logic App's managed identity does.</summary>
     public HttpClient Tms { get; private set; } = null!;
+
+    /// <summary>A client holding the manage role, as the TMS UI's managed identity does.</summary>
+    public HttpClient TmsUi { get; private set; } = null!;
 
     public IEnumerable<ServiceBusReceivedMessage> Published => _published;
 
@@ -80,6 +86,7 @@ public class TmsFixture : IAsyncLifetime
         await _app.ResourceNotifications.WaitForResourceHealthyAsync("tms-api", startup.Token);
 
         Tms = CreateTmsClient(IssueToken([IntakeRole]));
+        TmsUi = CreateTmsClient(IssueToken([ManageRole], clientId: LocalTokens.TmsUiClientId));
 
         _serviceBus = new ServiceBusClient(await _app.GetConnectionStringAsync("messaging", startup.Token));
         _processor = _serviceBus.CreateProcessor(TransportOrderEventsTopic, TestSubscription);

@@ -1,6 +1,7 @@
 using Norvia.Tms.Application.CanonicalModel;
 using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.List;
+using Norvia.Tms.Application.TransportOrders.RatingExceptions;
 using Norvia.Tms.Domain.TransportOrders;
 
 namespace Norvia.Tms.Web.UnitTests.TransportOrders;
@@ -70,6 +71,21 @@ internal static class Samples
         RatingResult = RatingResult.RatingFailed,
         RatingFailure = new RatingFailureView("NoMatchingLane", "No Lane of Rate Card RC-0001 goes from Rotterdam to DE 40210."),
     };
+
+    // Rating failed 11:31 on 24 September 2026 in Rotterdam (UTC+2), a minute after it was received.
+    public static RatingExceptionSummary RatingException(
+        string number = "TO-0000043",
+        string reference = "BD-2026-0043",
+        string code = "NoMatchingLane",
+        string message = "Rate Card RC-0001 version 1 has no Lane from Rotterdam to Düsseldorf.") => new(
+        Guid.NewGuid(),
+        number,
+        BrouwerDranken,
+        reference,
+        new DateTimeOffset(2026, 9, 26, 4, 0, 0, TimeSpan.Zero),
+        new DateTimeOffset(2026, 9, 24, 9, 30, 0, TimeSpan.Zero),
+        new RatingFailureView(code, message),
+        new DateTimeOffset(2026, 9, 24, 9, 31, 0, TimeSpan.Zero));
 
     // Received 11:30 on 24 September 2026 in Rotterdam (UTC+2).
     public static TransportOrderSummary RejectedSummary(string? reference = "BD-2026-0099") => new(

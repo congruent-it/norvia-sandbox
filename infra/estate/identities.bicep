@@ -16,6 +16,8 @@ param integrationConsoleRedirectUris string
 
 var intakeRole = 'TransportOrders.Intake'
 var intakeRoleId = guid('norvia-tms-api', environmentName, intakeRole)
+var manageRole = 'TransportOrders.Manage'
+var manageRoleId = guid('norvia-tms-api', environmentName, manageRole)
 var submitRole = 'TransportOrders.Submit'
 var submitRoleId = guid('norvia-partner-api', environmentName, submitRole)
 var triggerRole = 'TransportOrderIntake.Trigger'
@@ -61,6 +63,16 @@ resource tmsApi 'Microsoft.Graph/applications@v1.0' = {
       ]
       isEnabled: true
     }
+    {
+      id: manageRoleId
+      value: manageRole
+      displayName: 'Manage Transport Orders'
+      description: 'Change Transport Orders as Norvia\'s staff do in the TMS UI, such as re-rating one. Only the TMS UI holds it.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
   ]
 }
 
@@ -74,6 +86,20 @@ resource intakeRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
   resourceId: tmsApiPrincipal.id
   appRoleId: intakeRoleId
   principalId: intakeIdentity.properties.principalId
+}
+
+// The TMS UI's identity, which it calls the TMS API as. It is the one principal holding the manage role, so only the
+// TMS UI re-rates. Aspire deploys the TMS UI; the estate owns the identity because it grants it the role.
+resource tmsUiIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
+  name: 'id-tms-ui-${uniqueString(resourceGroup().id)}'
+  location: location
+  tags: tags
+}
+
+resource manageRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: tmsApiPrincipal.id
+  appRoleId: manageRoleId
+  principalId: tmsUiIdentity.properties.principalId
 }
 
 // The Partner portal's identity. The Persona registrations trust it, so the portal gets each Persona's token without a
@@ -303,6 +329,8 @@ output tmsApiClientId string = tmsApi.appId
 output intakeClientId string = intakeIdentity.properties.clientId
 output intakeIdentityId string = intakeIdentity.id
 output intakeIdentityName string = intakeIdentity.name
+output tmsUiIdentityName string = tmsUiIdentity.name
+output tmsUiClientId string = tmsUiIdentity.properties.clientId
 output partnerApiClientId string = partnerApi.appId
 @description('API Management\'s map from a Persona\'s client ID (the token\'s azp) to its Shipper ID: clientId=shipperId, empty for a Persona that is no Shipper.')
 output shipperByClientId array = [

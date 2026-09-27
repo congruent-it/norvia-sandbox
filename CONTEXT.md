@@ -236,6 +236,10 @@ _Avoid_: rating status, price status
 Why a Transport Order is Rating failed: a stable code (`NoRateCard`, `NoValidRateCardVersion`, `NoMatchingLane` or `WeightAboveHighestBreak`) and a plain-language message. The order stays Accepted, so a Shipper's pricing gap never rejects its booking.
 _Avoid_: rating error, pricing error, rejection (that is for a booking)
 
+**Rating exception**:
+A Transport Order whose Rating result is Rating failed, as Customer service follows it up in the TMS UI and re-rates it, typically after its Rate Card was corrected. It leaves the rating exceptions once a re-rate Rates it.
+_Avoid_: Exception (that is a Shipment going wrong, which the Planner resolves), pricing exception
+
 **Not rated separately**:
 The Rating result of a Fulfilment Transport Order (WMS channel). It is billed through the Fulfilment Contract, so it gets no Freight Charge of its own.
 _Avoid_: unrated, exempt

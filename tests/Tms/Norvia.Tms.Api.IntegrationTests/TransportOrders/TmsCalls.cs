@@ -38,13 +38,15 @@ internal static class TmsCalls
         return JsonNode.Parse(await response.Content.ReadAsStringAsync(cancellationToken))!;
     }
 
-    /// <summary>Re-rates the Transport Order as Customer service does, under the given idempotency key or a new one.</summary>
+    /// <summary>
+    /// Re-rates the Transport Order as Customer service does, through the TMS UI, under the given idempotency key or a new one.
+    /// </summary>
     public static async Task<HttpResponseMessage> ReRateAsync(
         this TmsFixture tms, string number, CancellationToken cancellationToken, string? idempotencyKey = null)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"/v1/transport-orders/{number}/re-rate", UriKind.Relative));
         request.Headers.Add("Idempotency-Key", idempotencyKey ?? Guid.NewGuid().ToString());
-        return await tms.Tms.SendAsync(request, cancellationToken);
+        return await tms.TmsUi.SendAsync(request, cancellationToken);
     }
 
     public static async Task<JsonArray> ListRatingExceptionsAsync(this TmsFixture tms, CancellationToken cancellationToken)

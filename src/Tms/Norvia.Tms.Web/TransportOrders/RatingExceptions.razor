@@ -1,0 +1,101 @@
+@page "/rating-exceptions"
+@rendermode InteractiveServer
+@using Microsoft.Extensions.Options
+@using Norvia.Tms.Application.TransportOrders.RatingExceptions
+@implements IAsyncDisposable
+@inject ITransportOrderQueries Queries
+@inject ITransportOrderCommands Commands
+@inject TimeProvider Time
+@inject IOptions<LiveListOptions> Options
+@inject ILogger<LiveTransportOrderList<RatingExceptionSummary>> Logger
+
+<PageTitle>Rating exceptions · Norvia TMS</PageTitle>
+
+<h1>Rating exceptions</h1>
+
+@if (_outcome is { } outcome)
+{
+    @* A Rated order is good news, read out politely; anything else needs Customer service to act. *@
+    <div role="@(outcome.Intent == MessageIntent.Success ? "status" : "alert")" class="mb-4">
+        <FluentMessageBar Intent="outcome.Intent" AllowDismiss="false">@outcome.Text</FluentMessageBar>
+    </div>
+}
+
+<LiveListStates Items="_list.Items" LastReadFailed="_list.LastReadFailed" Name="rating exceptions"
+                Empty="@("No Transport Order has Rating failed. An order whose Rate Card can't price it appears here as soon as it is rated.")" Context="exceptions">
+    @* Oldest first, as the query gives them: the longest-waiting exception is followed up first. The reason gets the
+       most room, since it is what Customer service reads, and long text wraps rather than being cut off. *@
+    <FluentDataGrid Items="exceptions.AsQueryable()" TGridItem="RatingExceptionSummary" Class="flatly-table" aria-label="Rating exceptions"
+                    GridTemplateColumns="1.4fr 1.2fr 1.3fr 1.2fr 3fr 1.3fr auto" MultiLine="true">
+        <TemplateColumn Title="Transport Order">
+            <a href="/transport-orders/@context.TransportOrderNumber">@context.TransportOrderNumber</a>
+        </TemplateColumn>
+        <PropertyColumn Title="Shipper" Property="@(exception => exception.Shipper.Name ?? exception.Shipper.Id)" />
+        <PropertyColumn Title="Shipper reference" Property="@(exception => SubmittedTransportOrder.Given(exception.ShipperReference))" />
+        <PropertyColumn Title="Failure" Property="@(exception => RatingText.Failure(exception.RatingFailure.Code))" />
+        <PropertyColumn Title="Reason" Property="@(exception => exception.RatingFailure.Message)" />
+        <PropertyColumn Title="Rating failed" Property="@(exception => NorviaTime.Format(exception.RatingFailedAt))" />
+        <TemplateColumn Title="Action">
+            <FluentButton Appearance="Appearance.Outline" OnClick="() => ReRateAsync(context.TransportOrderNumber)"
+                          Disabled="_reRating.Contains(context.TransportOrderNumber)"
+                          aria-label="@($"Re-rate {context.TransportOrderNumber}")">
+                Re-rate
+            </FluentButton>
+        </TemplateColumn>
+    </FluentDataGrid>
+</LiveListStates>
+
+@code {
+    private readonly CancellationTokenSource _closed = new();
+    private readonly HashSet<string> _reRating = [];
+    private LiveTransportOrderList<RatingExceptionSummary> _list = null!;
+    private (MessageIntent Intent, string Text)? _outcome;
+
+    protected override void OnInitialized()
+    {
+        _list = new LiveTransportOrderList<RatingExceptionSummary>(
+            Queries.ListRatingExceptionsAsync, "the rating exceptions", Time, Options.Value.RefreshInterval, Logger);
+        _list.Changed += () => InvokeAsync(StateHasChanged);
+        _list.Start();
+    }
+
+    // The list isn't changed here: it reads again shortly, and then drops a Rated order or shows the new reason.
+    private async Task ReRateAsync(string number)
+    {
+        if (!_reRating.Add(number))
+        {
+            return;
+        }
+
+        try
+        {
+            _outcome = await Commands.ReRateAsync(number, _closed.Token) switch
+            {
+                ReRateAnswer.Rated => (MessageIntent.Success, $"Transport Order {number} is now Rated."),
+                ReRateAnswer.FailedAgain again => (MessageIntent.Warning, $"Rating failed again for Transport Order {number}: {again.Failure.Message}"),
+                ReRateAnswer.Refused refused => (MessageIntent.Warning, $"Transport Order {number} wasn't re-rated: {refused.Reason}"),
+                var answer => throw new InvalidOperationException($"Unknown re-rate answer {answer}."),
+            };
+        }
+        catch (OperationCanceledException) when (_closed.IsCancellationRequested)
+        {
+            // The page closed while the TMS was answering.
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning(exception, "Re-rating Transport Order {TransportOrderNumber} failed", number);
+            _outcome = (MessageIntent.Error, $"Transport Order {number} couldn't be re-rated. Try again.");
+        }
+        finally
+        {
+            _reRating.Remove(number);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _closed.CancelAsync();
+        _closed.Dispose();
+        await _list.DisposeAsync();
+    }
+}

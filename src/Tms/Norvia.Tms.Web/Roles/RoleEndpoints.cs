@@ -3,8 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace Norvia.Tms.Web.Roles;
 
 /// <summary>
-/// The Role switcher's endpoints: the TMS UI's home opens the current role's view, and switching remembers the new role
-/// in a cookie and opens its view. No login: the role only chooses what the UI shows first.
+/// The Role switcher's endpoints: the TMS UI's home opens the current role's first view, and switching remembers the new
+/// role in a cookie and opens its first view. No login: the role only chooses what the UI shows first.
 /// </summary>
 public static class RoleEndpoints
 {
@@ -21,7 +21,7 @@ public static class RoleEndpoints
         return endpoints;
     }
 
-    public static IResult OpenHome(HttpRequest request) => TypedResults.Redirect(NorviaRole.Current(request).View);
+    public static IResult OpenHome(HttpRequest request) => TypedResults.Redirect(NorviaRole.Current(request).Home);
 
     public static IResult Switch(string role, HttpResponse response)
     {
@@ -41,6 +41,6 @@ public static class RoleEndpoints
             MaxAge = Remembered,
         });
         // A redirect after the post, so the browser opens the view with a GET and a reload doesn't post again.
-        return TypedResults.Redirect(chosen.View);
+        return TypedResults.Redirect(chosen.Home);
     }
 }
