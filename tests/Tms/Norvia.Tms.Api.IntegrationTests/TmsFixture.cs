@@ -18,7 +18,7 @@ namespace Norvia.Tms.Api.IntegrationTests;
 
 /// <summary>
 /// Runs the Norvia AppHost once for the whole test run (TMS, SQL and the Service Bus emulator) and records every
-/// message published to the Transport Order events topic through a subscription of its own. It holds the key the TMS
+/// message published to the Transport Order and Shipment events topics through subscriptions of its own. It holds the key the TMS
 /// trusts locally, so it issues tokens the way Entra would: <see cref="Tms"/> calls as the intake Logic App does.
 /// The TMS writes its logs as JSON with their scopes, which the fixture keeps so tests can follow a Message trail.
 /// The TMS reads a seed file of the tests' own, so the Rate Cards it rates against are the tests', not the demo's.
@@ -28,6 +28,7 @@ namespace Norvia.Tms.Api.IntegrationTests;
 public class TmsFixture : IAsyncLifetime
 {
     public const string TransportOrderEventsTopic = "transport-order-events";
+    public const string ShipmentEventsTopic = "shipment-events";
     private const string TestSubscription = "tms-api-integration-tests";
     public const string IntakeRole = "TransportOrders.Intake";
 
@@ -43,7 +44,7 @@ public class TmsFixture : IAsyncLifetime
     private readonly ConcurrentQueue<TmsLog> _tmsLogs = new();
     private DistributedApplication? _app;
     private ServiceBusClient? _serviceBus;
-    private ServiceBusProcessor? _processor;
+    private readonly List<ServiceBusProcessor> _processors = [];
 
     /// <summary>A client holding the intake role, as the intake Logic App's managed identity does.</summary>
     public HttpClient Tms { get; private set; } = null!;
@@ -69,8 +70,12 @@ public class TmsFixture : IAsyncLifetime
         var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(
             [$"Parameters:{LocalTokens.SigningKeyParameter}={_tokenSigningKey}"],
             startup.Token);
-        var topic = builder.Resources.OfType<AzureServiceBusTopicResource>().Single(t => t.TopicName == TransportOrderEventsTopic);
-        builder.CreateResourceBuilder(topic).AddServiceBusSubscription(TestSubscription);
+        foreach (var topicName in new[] { TransportOrderEventsTopic, ShipmentEventsTopic })
+        {
+            var topic = builder.Resources.OfType<AzureServiceBusTopicResource>().Single(t => t.TopicName == topicName);
+            builder.CreateResourceBuilder(topic).AddServiceBusSubscription($"{topicName}-{TestSubscription}", TestSubscription);
+        }
+
         var tmsApi = builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(r => r.Name == "tms-api"))
             // Aspire sets the formatter under this exact name, and environment names are case-sensitive on Linux.
             .WithEnvironment("LOGGING__CONSOLE__FORMATTERNAME", "json")
@@ -89,14 +94,18 @@ public class TmsFixture : IAsyncLifetime
         TmsUi = CreateTmsClient(IssueToken([ManageRole], clientId: LocalTokens.TmsUiClientId));
 
         _serviceBus = new ServiceBusClient(await _app.GetConnectionStringAsync("messaging", startup.Token));
-        _processor = _serviceBus.CreateProcessor(TransportOrderEventsTopic, TestSubscription);
-        _processor.ProcessMessageAsync += args =>
+        foreach (var topicName in new[] { TransportOrderEventsTopic, ShipmentEventsTopic })
         {
-            _published.Enqueue(args.Message);
-            return Task.CompletedTask;
-        };
-        _processor.ProcessErrorAsync += _ => Task.CompletedTask;
-        await _processor.StartProcessingAsync(startup.Token);
+            var processor = _serviceBus.CreateProcessor(topicName, TestSubscription);
+            processor.ProcessMessageAsync += args =>
+            {
+                _published.Enqueue(args.Message);
+                return Task.CompletedTask;
+            };
+            processor.ProcessErrorAsync += _ => Task.CompletedTask;
+            _processors.Add(processor);
+            await processor.StartProcessingAsync(startup.Token);
+        }
     }
 
     /// <summary>What the fixture sets on the TMS API on top of what the AppHost gives it, as environment variables.</summary>
@@ -202,9 +211,9 @@ public class TmsFixture : IAsyncLifetime
 
     public virtual async ValueTask DisposeAsync()
     {
-        if (_processor is not null)
+        foreach (var processor in _processors)
         {
-            await _processor.DisposeAsync();
+            await processor.DisposeAsync();
         }
 
         if (_serviceBus is not null)
@@ -213,6 +222,7 @@ public class TmsFixture : IAsyncLifetime
         }
 
         Tms?.Dispose();
+        TmsUi?.Dispose();
 
         if (_app is not null)
         {

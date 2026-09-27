@@ -82,10 +82,11 @@ public sealed class DependencyRuleTests
     [Theory]
     [InlineData("Norvia.Tms.Application.TransportOrders.Submit")]
     [InlineData("Norvia.Tms.Application.TransportOrders.Rate")]
+    [InlineData("Norvia.Tms.Application.TransportOrders.Assign")]
     public void Web_OnlyReadsThroughTheQuerySide_AndChangesThingsThroughTheTmsApi(string commands)
     {
         // The source-generated mediator knows every handler; the UI's own types must never send a command in process.
-        // A re-rate goes to the TMS API over HTTP, as any other caller's does.
+        // A re-rate or an assignment goes to the TMS API over HTTP, as any other caller's does.
         ShouldHold(Types.InAssembly(Web)
             .That().DoNotResideInNamespace("Mediator")
             .ShouldNot().HaveDependencyOn(commands));

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/shipment-planned.v1.schema.json",
+  "title": "ShipmentPlanned",
+  "description": "A Planner assigned an Accepted Transport Order to Own fleet or to a Carrier, so the TMS made its one Shipment, Planned, and set the Transport Order to Planned (Canonical Model event, version 1). Published on the Shipment events topic, under the correlation ID of the assignment, which starts a Message trail of its own; the Transport Order number links it to the Transport Order's intake. The message's assignedTo property repeats who carries the Shipment, for subscriptions to filter on.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "shipmentNumber", "transportOrderNumber", "shipperId", "assignedTo", "carrierId"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "const": "ShipmentPlanned" },
+    "eventVersion": { "const": 1 },
+    "occurredAt": { "description": "When the Shipment was planned.", "type": "string", "format": "date-time" },
+    "correlationId": { "description": "The assignment's own correlation ID, not the intake's.", "type": "string", "minLength": 1 },
+    "shipmentNumber": { "type": "string", "pattern": "^SH-[0-9]{7}$" },
+    "transportOrderNumber": { "description": "The Transport Order the Shipment carries out; each has exactly one Shipment.", "type": "string", "pattern": "^TO-[0-9]{7}$" },
+    "shipperId": { "description": "The Shipper of the Transport Order.", "type": "string", "minLength": 1 },
+    "assignedTo": { "description": "Who carries the Shipment: Norvia's Own fleet or a Carrier.", "enum": ["OwnFleet", "Carrier"] },
+    "carrierId": { "description": "The Carrier that carries the Shipment; null for Own fleet.", "type": ["string", "null"], "minLength": 1 }
+  },
+  "if": { "properties": { "assignedTo": { "const": "Carrier" } } },
+  "then": { "properties": { "carrierId": { "type": "string" } } },
+  "else": { "properties": { "carrierId": { "type": "null" } } }
+}

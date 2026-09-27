@@ -149,10 +149,13 @@ if (builder.ExecutionContext.IsPublishMode)
 }
 else
 {
-    // The emulator won't start a topic without a subscription. Monitoring is the consumer P1 names for its events.
-    messaging.RunAsEmulator(emulator => emulator.WithConfiguration(ResubmitAwareFilters.Apply))
-        .AddServiceBusTopic("transport-order-events")
+    // The emulator won't start a topic without a subscription. Monitoring is the consumer P1 and P3 name for their events.
+    messaging.RunAsEmulator(emulator => emulator.WithConfiguration(ResubmitAwareFilters.Apply));
+    messaging.AddServiceBusTopic("transport-order-events")
         .AddServiceBusSubscription("monitoring");
+    // Resource names are unique across the AppHost, so this monitoring subscription's resource is named for its topic.
+    messaging.AddServiceBusTopic("shipment-events")
+        .AddServiceBusSubscription("shipment-events-monitoring", subscriptionName: "monitoring");
 
     // Locally there is no Easy Auth, so the console signs the developer in as an Integration operator with both app
     // roles, as the estate assigns the presenter. It reads Azure with the developer's own sign-in.

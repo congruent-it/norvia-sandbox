@@ -1,5 +1,6 @@
 using Norvia.Tms.Application.CanonicalModel;
 using Norvia.Tms.Domain.RateCards;
+using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.Shippers;
 using Norvia.Tms.Domain.TransportOrders;
 
@@ -79,5 +80,14 @@ internal static class Samples
         order.Rate(null, Now.AddSeconds(2));
         order.ClearDomainEvents();
         return order;
+    }
+
+    /// <summary>The order's Shipment, as the Planner's assignment under the key made it.</summary>
+    public static Shipment Planned(TransportOrder order, CarriedBy carriedBy, long sequence = 3, string correlationId = "corr-planning", string key = "key-1")
+    {
+        var shipment = order.Plan(ShipmentNumber.FromSequence(sequence), carriedBy, new IdempotencyKey(key), new CorrelationId(correlationId), Now.AddHours(2))!;
+        order.ClearDomainEvents();
+        shipment.ClearDomainEvents();
+        return shipment;
     }
 }

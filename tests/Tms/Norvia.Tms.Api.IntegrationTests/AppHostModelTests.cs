@@ -24,6 +24,19 @@ public sealed class AppHostModelTests
     }
 
     [Theory]
+    [InlineData("transport-order-events")]
+    [InlineData("shipment-events")]
+    public async Task Locally_AnEventsTopic_HasAMonitoringSubscription(string topicName)
+    {
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(TestContext.Current.CancellationToken);
+
+        var topic = builder.Resources.OfType<AzureServiceBusTopicResource>().Should().ContainSingle(t => t.TopicName == topicName).Subject;
+
+        builder.Resources.OfType<AzureServiceBusSubscriptionResource>()
+            .Should().Contain(subscription => subscription.Parent == topic && subscription.SubscriptionName == "monitoring");
+    }
+
+    [Theory]
     [InlineData("tms-api", "tms-migrations")]
     [InlineData("tms-web", "tms-migrations")]
     [InlineData("partner-portal-web", "partner-portal-migrations")]

@@ -88,6 +88,10 @@ _Avoid_: open orders, backlog, unplanned orders
 The physical movement that carries out one Transport Order, including its tracking status. Each Transport Order has exactly one Shipment, and a Shipment never carries more than one Transport Order. Consolidation happens on a Trip, not inside a Shipment. The TMS owns it.
 _Avoid_: delivery, consignment, trip
 
+**Shipment number**:
+The number the TMS gives a Shipment when a Planner assigns its Transport Order, such as SH-0000042. It stays the Shipment's through reassignment and release, and the Transport Order shows it once Planned.
+_Avoid_: tracking number, consignment number
+
 **Fulfilment Order**:
 An instruction to pick and pack a Shipper's stock for a Consignee. The WMS owns it.
 _Avoid_: order, pick order, sales order
