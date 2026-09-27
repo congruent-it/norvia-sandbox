@@ -35,7 +35,7 @@ public sealed class AssignTransportOrderHandlerTests
         _transportOrders.SingleOrDefaultAsync(Arg.Is<TransportOrderToPlanSpec>(s => s.Number.Value == "TO-0000007"), Arg.Any<CancellationToken>())
             .Returns(order);
 
-        var result = await _handler.Handle(new AssignTransportOrderCommand("TO-0000007", "CAR-0001", "key-1"), CancellationToken.None);
+        var result = await _handler.Handle(new AssignTransportOrderCommand("TO-0000007", "CAR-0001", "key-1", "corr-planning"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value.ShipmentNumber.Should().Be("SH-0000012");
@@ -53,7 +53,7 @@ public sealed class AssignTransportOrderHandlerTests
     {
         _transportOrders.SingleOrDefaultAsync(Arg.Any<TransportOrderToPlanSpec>(), Arg.Any<CancellationToken>()).Returns(Samples.AcceptedOrder());
 
-        var result = await _handler.Handle(new AssignTransportOrderCommand("TO-0000007", CarrierId: null, "key-1"), CancellationToken.None);
+        var result = await _handler.Handle(new AssignTransportOrderCommand("TO-0000007", CarrierId: null, "key-1", "corr-planning"), CancellationToken.None);
 
         result.Value.CarriedBy.Should().Be(new CarriedByView(AssignedTo.OwnFleet, null));
     }
@@ -64,7 +64,7 @@ public sealed class AssignTransportOrderHandlerTests
         var order = Samples.AcceptedOrder();
         _transportOrders.SingleOrDefaultAsync(Arg.Any<TransportOrderToPlanSpec>(), Arg.Any<CancellationToken>()).Returns(order);
 
-        await _handler.Handle(new AssignTransportOrderCommand("TO-0000007", "CAR-0001", "key-1"), CancellationToken.None);
+        await _handler.Handle(new AssignTransportOrderCommand("TO-0000007", "CAR-0001", "key-1", "corr-planning"), CancellationToken.None);
 
         // Adding the Shipment saves the tracked Transport Order with it, and ShipmentPlanned's outbox message too.
         await _shipments.Received(1).AddAsync(
@@ -74,17 +74,17 @@ public sealed class AssignTransportOrderHandlerTests
     }
 
     [Fact]
-    public async Task Handle_AcceptedOrder_StartsANewMessageTrailForTheAssignment()
+    public async Task Handle_AcceptedOrder_PlansTheShipmentOnTheAssignmentsOwnTrail()
     {
         _transportOrders.SingleOrDefaultAsync(Arg.Any<TransportOrderToPlanSpec>(), Arg.Any<CancellationToken>())
             .Returns(Samples.AcceptedOrder(correlationId: "corr-intake"));
         Shipment? planned = null;
         await _shipments.AddAsync(Arg.Do<Shipment>(s => planned = s), Arg.Any<CancellationToken>());
 
-        var result = await _handler.Handle(new AssignTransportOrderCommand("TO-0000007", "CAR-0001", "key-1"), CancellationToken.None);
+        var result = await _handler.Handle(new AssignTransportOrderCommand("TO-0000007", "CAR-0001", "key-1", "corr-planning"), CancellationToken.None);
 
-        result.Value.CorrelationId.Should().NotBeNullOrWhiteSpace().And.NotBe("corr-intake");
-        planned!.CorrelationId.Value.Should().Be(result.Value.CorrelationId);
+        result.Value.CorrelationId.Should().Be("corr-planning");
+        planned!.CorrelationId.Should().Be(new CorrelationId("corr-planning"));
         planned.PlannedAt.Should().Be(Samples.Now.AddHours(3));
     }
 
@@ -96,7 +96,7 @@ public sealed class AssignTransportOrderHandlerTests
         _transportOrders.SingleOrDefaultAsync(Arg.Any<TransportOrderToPlanSpec>(), Arg.Any<CancellationToken>()).Returns(order);
         _shipments.SingleOrDefaultAsync(Arg.Is<ShipmentByNumberSpec>(s => s.Number == shipment.Number), Arg.Any<CancellationToken>()).Returns(shipment);
 
-        var result = await _handler.Handle(new AssignTransportOrderCommand("TO-0000007", "CAR-0001", "key-1"), CancellationToken.None);
+        var result = await _handler.Handle(new AssignTransportOrderCommand("TO-0000007", "CAR-0001", "key-1", "corr-retry"), CancellationToken.None);
 
         result.Value.Should().Be(new AssignTransportOrderResult(
             "SH-0000004",
@@ -117,7 +117,7 @@ public sealed class AssignTransportOrderHandlerTests
         Samples.Planned(order, CarriedBy.OwnFleet, key: "key-1");
         _transportOrders.SingleOrDefaultAsync(Arg.Any<TransportOrderToPlanSpec>(), Arg.Any<CancellationToken>()).Returns(order);
 
-        var result = await _handler.Handle(new AssignTransportOrderCommand("TO-0000007", "CAR-0001", "key-2"), CancellationToken.None);
+        var result = await _handler.Handle(new AssignTransportOrderCommand("TO-0000007", "CAR-0001", "key-2", "corr-other"), CancellationToken.None);
 
         result.Status.Should().Be(ResultStatus.Conflict);
         await _shipments.DidNotReceive().AddAsync(Arg.Any<Shipment>(), Arg.Any<CancellationToken>());
@@ -128,7 +128,7 @@ public sealed class AssignTransportOrderHandlerTests
     [InlineData("42")]
     public async Task Handle_UnknownOrMalformedNumber_ReturnsNotFound(string number)
     {
-        var result = await _handler.Handle(new AssignTransportOrderCommand(number, null, "key-1"), CancellationToken.None);
+        var result = await _handler.Handle(new AssignTransportOrderCommand(number, null, "key-1", "corr-planning"), CancellationToken.None);
 
         result.Status.Should().Be(ResultStatus.NotFound);
     }

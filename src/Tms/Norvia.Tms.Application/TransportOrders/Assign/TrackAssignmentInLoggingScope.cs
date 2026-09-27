@@ -9,9 +9,10 @@ namespace Norvia.Tms.Application.TransportOrders.Assign;
 
 /// <summary>
 /// Traces a Planner's assignment on its own Message trail (coding guidelines §7): the <c>correlationId</c> the TMS
-/// created for it, with <c>partyId</c>, <c>transportOrderNumber</c>, <c>shipmentNumber</c> and <c>outcome</c>, in the
-/// logging scope and on the request's trace, so the assignment is found by its Transport Order number. One the TMS
-/// refuses records Refused. The API's request scope carries <c>flow</c>.
+/// created for it and <c>transportOrderNumber</c> for the whole call, refused ones included, and <c>partyId</c>,
+/// <c>shipmentNumber</c> and <c>outcome</c> for its outcome, in the logging scope and on the request's trace, so the
+/// assignment is found by its Transport Order number. One the TMS refuses records Refused. A repeat's outcome is traced
+/// on the trail of the assignment it repeats. The API's request scope carries <c>flow</c>.
 /// </summary>
 public sealed partial class TrackAssignmentInLoggingScope(ILogger<TrackAssignmentInLoggingScope> logger)
     : IPipelineBehavior<AssignTransportOrderCommand, Result<AssignTransportOrderResult>>
@@ -24,11 +25,15 @@ public sealed partial class TrackAssignmentInLoggingScope(ILogger<TrackAssignmen
         ArgumentNullException.ThrowIfNull(message);
         ArgumentNullException.ThrowIfNull(next);
 
-        using var numbered = Track(new() { [TrackingKeys.TransportOrderNumber] = message.TransportOrderNumber });
+        using var trail = Track(new()
+        {
+            [TrackingKeys.CorrelationId] = message.CorrelationId,
+            [TrackingKeys.TransportOrderNumber] = message.TransportOrderNumber,
+        });
         var result = await next(message, cancellationToken);
         if (result.IsSuccess)
         {
-            LogOutcome(result.Value);
+            LogOutcome(message, result.Value);
         }
         else
         {
@@ -39,15 +44,21 @@ public sealed partial class TrackAssignmentInLoggingScope(ILogger<TrackAssignmen
         return result;
     }
 
-    private void LogOutcome(AssignTransportOrderResult outcome)
+    private void LogOutcome(AssignTransportOrderCommand message, AssignTransportOrderResult outcome)
     {
-        using var scope = Track(new()
+        var keys = new Dictionary<string, object?>
         {
-            [TrackingKeys.CorrelationId] = outcome.CorrelationId,
             [TrackingKeys.PartyId] = outcome.ShipperId,
             [TrackingKeys.ShipmentNumber] = outcome.ShipmentNumber,
             [TrackingKeys.Outcome] = TrackingKeys.Succeeded,
-        });
+        };
+        if (outcome.CorrelationId != message.CorrelationId)
+        {
+            // A repeat answers on the trail of the assignment it repeats.
+            keys[TrackingKeys.CorrelationId] = outcome.CorrelationId;
+        }
+
+        using var scope = Track(keys);
         var carriedBy = outcome.CarriedBy.Carrier?.Id ?? "Own fleet";
         if (outcome.Repeat)
         {

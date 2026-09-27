@@ -10,5 +10,9 @@ namespace Norvia.Tms.Application.TransportOrders.Assign;
 /// </summary>
 /// <param name="CarrierId">The Carrier to carry the Shipment; null assigns it to Own fleet.</param>
 /// <param name="AssignmentKey">The idempotency key that makes a retry of the assignment a repeat.</param>
-public sealed record AssignTransportOrderCommand(string TransportOrderNumber, string? CarrierId, string AssignmentKey)
+/// <param name="CorrelationId">
+/// The new Message trail the TMS starts for this assignment, as it starts in the TMS UI, not at API Management. A repeat
+/// answers with the trail of the assignment it repeats.
+/// </param>
+public sealed record AssignTransportOrderCommand(string TransportOrderNumber, string? CarrierId, string AssignmentKey, string CorrelationId)
     : ICommand<Result<AssignTransportOrderResult>>;

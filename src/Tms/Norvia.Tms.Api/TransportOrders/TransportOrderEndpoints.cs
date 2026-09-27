@@ -199,7 +199,9 @@ public static class TransportOrderEndpoints
         }
 
         var carrierId = assignment.AssignedTo == AssignedTo.Carrier ? assignment.CarrierId : null;
-        var result = await mediator.Send(new AssignTransportOrderCommand(transportOrderNumber, carrierId, idempotencyKey!), cancellationToken);
+        // The action starts in the TMS UI, not at API Management, so the TMS starts its Message trail.
+        var command = new AssignTransportOrderCommand(transportOrderNumber, carrierId, idempotencyKey!, CorrelationId.New().Value);
+        var result = await mediator.Send(command, cancellationToken);
         return result.Status switch
         {
             ResultStatus.Ok when result.Value.Repeat => TypedResults.Ok(result.Value),

@@ -10,7 +10,7 @@ namespace Norvia.Tms.Application.UnitTests.Shipments;
 
 public sealed class TrackAssignmentInLoggingScopeTests : IDisposable
 {
-    private static readonly AssignTransportOrderCommand Assign = new("TO-0000007", "CAR-0001", "key-1");
+    private static readonly AssignTransportOrderCommand Assign = new("TO-0000007", "CAR-0001", "key-1", "corr-planning");
 
     private static readonly AssignTransportOrderResult Planned = new(
         "SH-0000012",
@@ -68,13 +68,25 @@ public sealed class TrackAssignmentInLoggingScopeTests : IDisposable
     }
 
     [Fact]
+    public async Task Handle_RepeatUnderANewCallsTrail_LogsTheOutcomeOnTheRepeatedAssignmentsTrail()
+    {
+        await _behaviour.Handle(Assign with { CorrelationId = "corr-retry" }, Answering(Planned with { Repeat = true }), CancellationToken.None);
+
+        var outcome = _logs.Collector.GetSnapshot().Should().ContainSingle().Subject;
+        outcome.Scopes.OfType<IEnumerable<KeyValuePair<string, object?>>>().Last()
+            .Should().Contain(new KeyValuePair<string, object?>("correlationId", "corr-planning"));
+    }
+
+    [Fact]
     public async Task Handle_Refused_LogsTheRefusalWithTheTransportOrderNumber()
     {
         await _behaviour.Handle(Assign, Answering(Result.Conflict("Transport Order TO-0000007 is Planned.")), CancellationToken.None);
 
         var refused = _logs.Collector.GetSnapshot().Should().ContainSingle().Subject;
         refused.Message.Should().Contain("Transport Order TO-0000007 is Planned.");
-        ScopeKeysOf(refused).Should().Contain("transportOrderNumber", "TO-0000007").And.Contain("outcome", "Refused");
+        ScopeKeysOf(refused).Should().Contain("transportOrderNumber", "TO-0000007")
+            .And.Contain("correlationId", "corr-planning", "a refused assignment is on its own trail too")
+            .And.Contain("outcome", "Refused");
     }
 
     public void Dispose()

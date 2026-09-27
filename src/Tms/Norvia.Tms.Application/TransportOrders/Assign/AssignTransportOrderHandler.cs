@@ -36,7 +36,7 @@ public sealed class AssignTransportOrderHandler(
 
         var carriedBy = command.CarrierId is { } carrierId ? CarriedBy.Carrier(new CarrierId(carrierId)) : CarriedBy.OwnFleet;
         var shipmentNumber = await shipmentNumbers.NextAsync(cancellationToken);
-        if (order.Plan(shipmentNumber, carriedBy, key, CorrelationId.New(), time.GetUtcNow()) is not { } shipment)
+        if (order.Plan(shipmentNumber, carriedBy, key, new CorrelationId(command.CorrelationId), time.GetUtcNow()) is not { } shipment)
         {
             return Result.Conflict($"Transport Order {number} is {order.Status}; only an Accepted Transport Order can be planned.");
         }
