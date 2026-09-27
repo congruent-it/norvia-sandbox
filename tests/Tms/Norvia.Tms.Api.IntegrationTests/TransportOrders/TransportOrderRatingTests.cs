@@ -91,6 +91,20 @@ public sealed class TransportOrderRatingTests(TmsFixture tms)
         rated["partyId"].Should().Be("SHP-0001");
     }
 
+    [Fact]
+    public async Task Submit_OrderTheRateCardCovers_RatingRecordsItSucceeded()
+    {
+        var correlationId = TmsCalls.NewCorrelationId();
+        await tms.SubmitAcceptedAsync(Bookings.Valid(TmsCalls.NewReference()), correlationId, _cancellationToken);
+
+        var rated = await tms.TmsLogAsync(
+            log => log["correlationId"] == correlationId && log["flow"] == "transport-order-rating" && log["outcome"] is not null,
+            _cancellationToken);
+
+        rated["outcome"].Should().Be("Succeeded");
+        rated["failureCode"].Should().BeNull();
+    }
+
     internal static void ShouldBeTheFixturesFreightCharge(JsonNode freightCharge)
     {
         freightCharge["currency"]!.GetValue<string>().Should().Be("EUR");

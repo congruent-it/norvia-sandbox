@@ -163,5 +163,6 @@ public sealed class TransportOrderReRateTests(TmsFixture tms)
         failedAgain["partyId"].Should().Be("SHP-0001");
         failedAgain["transportOrderNumber"].Should().Be(number);
         failedAgain["failureCode"].Should().Be("NoMatchingLane");
+        failedAgain["outcome"].Should().Be("Succeeded");
     }
 }

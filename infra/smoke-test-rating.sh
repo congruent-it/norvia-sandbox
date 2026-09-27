@@ -10,8 +10,8 @@
 #   1. the Antwerp order is Rated, with a Freight Charge in EUR, and still waiting for planning;
 #   2. the Düsseldorf order is Rating failed with NoMatchingLane, is in the rating exceptions, and is still waiting for
 #      planning;
-#   3. each order's intake and rating are on one Message trail, under the intake's correlation ID, with the failure code
-#      for Düsseldorf's.
+#   3. each order's intake and rating are on one Message trail, under the intake's correlation ID, the rating with the
+#      outcome Succeeded, and with the failure code for Düsseldorf's.
 # The TMS's queries answer only a principal holding one of its roles, so a throwaway Container Apps job reads them as
 # the intake identity. It prints only what the checks need, which this script reads from Log Analytics: never a body,
 # as the Transport Orders hold the Consignee's personal data. It ends with the TMS UI's and the Integration console's
@@ -225,23 +225,25 @@ trail_keys() {
 | summarize flows = make_set_if(flow, isnotempty(flow)),
     numbers = make_set_if(tostring(Properties.transportOrderNumber), flow == 'transport-order-rating'),
     parties = make_set_if(tostring(Properties.partyId), flow == 'transport-order-rating'),
+    outcomes = make_set_if(tostring(Properties.outcome), flow == 'transport-order-rating' and isnotempty(tostring(Properties.outcome))),
     failureCodes = make_set_if(tostring(Properties.failureCode), flow == 'transport-order-rating' and isnotempty(tostring(Properties.failureCode)))" \
-    | jq -c '.[0] // empty | {flows: (.[0] | fromjson | sort), numbers: (.[1] | fromjson), parties: (.[2] | fromjson), failureCodes: (.[3] | fromjson)}'
+    | jq -c '.[0] // empty | {flows: (.[0] | fromjson | sort), numbers: (.[1] | fromjson), parties: (.[2] | fromjson), outcomes: (.[3] | fromjson),
+      failureCodes: (.[4] | fromjson)}'
 }
-# Found once the trail holds the intake and the rating, and the failure codes expected: ingestion may bring the rating's
-# rows in more than one batch.
+# Found once the trail holds the intake and the rating, the rating's outcome and the failure codes expected: ingestion may
+# bring the rating's rows in more than one batch.
 rating_on_trail() {
   trail_keys "$1" | jq -c --argjson codes "$2" \
-    'select(.flows == ["transport-order-intake", "transport-order-rating"] and .failureCodes == $codes)'
+    'select(.flows == ["transport-order-intake", "transport-order-rating"] and .outcomes == ["Succeeded"] and .failureCodes == $codes)'
 }
 check_trail() {
   local key=$1 number=$2 failure_codes=$3 correlation_id trail
   correlation_id=$(jq -r --arg key "$key" '.[$key].correlationId' <<<"$result")
   trail=$(until_found rating_on_trail "$correlation_id" "$failure_codes")
-  [ -n "$trail" ] || fail "the Message trail $correlation_id doesn't hold Transport Order $number's intake and rating with failure codes $failure_codes after 10 minutes: $(trail_keys "$correlation_id")"
+  [ -n "$trail" ] || fail "the Message trail $correlation_id doesn't hold Transport Order $number's intake and its rating that Succeeded with failure codes $failure_codes after 10 minutes: $(trail_keys "$correlation_id")"
   jq -e --arg number "$number" --arg party "$brouwer_dranken_id" '.numbers == [$number] and .parties == [$party]' <<<"$trail" >/dev/null \
     || fail "the rating on the Message trail $correlation_id isn't Transport Order $number's for $brouwer_dranken_id: $trail"
-  pass "Transport Order $number's intake and rating are on its Message trail $correlation_id$(jq -r '.failureCodes | if length > 0 then ", with failure code \(join(", "))" else "" end' <<<"$trail")"
+  pass "Transport Order $number's intake and rating are on its Message trail $correlation_id, the rating Succeeded$(jq -r '.failureCodes | if length > 0 then ", with failure code \(join(", "))" else "" end' <<<"$trail")"
 }
 check_trail rated "$rated_number" '[]'
 check_trail failed "$failed_number" '["NoMatchingLane"]'

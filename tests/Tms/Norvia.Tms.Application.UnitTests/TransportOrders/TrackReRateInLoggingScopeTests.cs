@@ -34,6 +34,7 @@ public sealed class TrackReRateInLoggingScopeTests : IDisposable
             ["correlationId"] = "corr-intake",
             ["partyId"] = "SHP-0001",
             ["transportOrderNumber"] = "TO-0000007",
+            ["outcome"] = "Succeeded",
         }).And.NotContainKey("failureCode");
     }
 
@@ -47,7 +48,8 @@ public sealed class TrackReRateInLoggingScopeTests : IDisposable
 
         var outcome = _logs.Collector.GetSnapshot().Should().ContainSingle().Subject;
         outcome.Level.Should().Be(LogLevel.Warning);
-        ScopeKeysOf(outcome).Should().Contain("failureCode", "NoMatchingLane");
+        ScopeKeysOf(outcome).Should().Contain("failureCode", "NoMatchingLane")
+            .And.Contain("outcome", "Succeeded", "Rating failed again is the re-rate's answer, not a failed flow");
     }
 
     [Fact]
@@ -60,7 +62,7 @@ public sealed class TrackReRateInLoggingScopeTests : IDisposable
 
         var outcome = _logs.Collector.GetSnapshot().Should().ContainSingle().Subject;
         outcome.Message.Should().Contain("TO-0000007").And.Contain("repeat");
-        ScopeKeysOf(outcome).Should().Contain("correlationId", "corr-intake");
+        ScopeKeysOf(outcome).Should().Contain("correlationId", "corr-intake").And.Contain("outcome", "Succeeded");
     }
 
     [Fact]
@@ -70,7 +72,17 @@ public sealed class TrackReRateInLoggingScopeTests : IDisposable
 
         var refused = _logs.Collector.GetSnapshot().Should().ContainSingle().Subject;
         refused.Message.Should().Contain("Transport Order TO-0000007 is Rated.");
-        ScopeKeysOf(refused).Should().Contain("transportOrderNumber", "TO-0000007");
+        ScopeKeysOf(refused).Should().Contain("transportOrderNumber", "TO-0000007").And.Contain("outcome", "Refused");
+    }
+
+    [Fact]
+    public async Task Handle_ReRateOfAnUnknownTransportOrder_LogsItAsRefused()
+    {
+        await _behaviour.Handle(ReRate, Answering(Result.NotFound("Transport Order TO-0000007 not found.")), CancellationToken.None);
+
+        var refused = _logs.Collector.GetSnapshot().Should().ContainSingle().Subject;
+        refused.Message.Should().Contain("Transport Order TO-0000007 not found.");
+        ScopeKeysOf(refused).Should().Contain("transportOrderNumber", "TO-0000007").And.Contain("outcome", "Refused");
     }
 
     [Fact]

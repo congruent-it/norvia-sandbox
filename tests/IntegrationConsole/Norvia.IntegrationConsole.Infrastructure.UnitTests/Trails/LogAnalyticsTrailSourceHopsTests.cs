@@ -130,6 +130,21 @@ public sealed class LogAnalyticsTrailSourceHopsTests
     }
 
     [Fact]
+    public async Task HopsAsync_ARatingThatFailed_HasTheOutcomeSucceeded_WithItsFailureCode()
+    {
+        // The TMS's rating worker rates outside any request, and Rating failed is its answer, not a failed flow (P2).
+        Answer(
+            Row("record", null, "rate", Now.AddSeconds(-2), null, null, "tms-api", flow: "transport-order-rating", transportOrderNumber: "TO-0000009"),
+            Row("record", null, "rate", Now.AddSeconds(-1), null, null, "tms-api", flow: "transport-order-rating", outcome: "Succeeded",
+                failureCode: "NoMatchingLane", transportOrderNumber: "TO-0000009"));
+
+        var hops = await HopsAsync(CorrelationId);
+
+        hops.Should().ContainSingle().Which.Should().BeEquivalentTo(
+            new { Flow = "transport-order-rating", Outcome = Outcome.Succeeded, FailureCode = "NoMatchingLane" });
+    }
+
+    [Fact]
     public async Task HopsAsync_QueriesNoRecordAFrameworkWrote()
     {
         // The Azure SDK logs in the application's logging scope, so its records carry the correlation ID too.
