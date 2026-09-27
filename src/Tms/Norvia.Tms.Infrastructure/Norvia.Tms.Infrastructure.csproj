@@ -10,4 +10,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Norvia.Tms.Application\Norvia.Tms.Application.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Norvia.Tms.Infrastructure.UnitTests" />
+  </ItemGroup>
 </Project>
