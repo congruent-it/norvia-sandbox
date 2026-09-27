@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Azure;
@@ -86,6 +87,17 @@ public sealed class AppHostModelTests
 
         sql.IsContainer().Should().BeFalse();
         builder.Resources.OfType<AzureSqlDatabaseResource>().Should().ContainSingle(database => database.Name == "tms");
+    }
+
+    [Fact]
+    public async Task InAzure_EveryDatabase_KeepsRunningOnceItsFreeAllowanceIsUsed()
+    {
+        await using var builder = await CreateForAzureAsync();
+
+        var bicep = builder.Resources.OfType<AzureSqlServerResource>().Single().GetBicepTemplateString();
+
+        Regex.Count(bicep, "useFreeLimit: true").Should().Be(2, "both databases stay on the free offer");
+        Regex.Count(bicep, "freeLimitExhaustionBehavior: 'BillOverUsage'").Should().Be(2, "a paused database fails the migrations and the demo");
     }
 
     [Fact]

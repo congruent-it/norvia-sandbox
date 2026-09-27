@@ -2,15 +2,25 @@ using System.Security.Cryptography;
 using System.Text;
 using Aspire.Hosting.Azure;
 using Azure.Provisioning.ServiceBus;
+using Azure.Provisioning.Sql;
 using Norvia.AppHost;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
 var seedFile = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", "seed", "norvia.seed.json"));
 
-// Locally SQL Server runs in a container. In Azure it is Azure SQL, and the database gets Aspire's default SKU:
-// serverless (GP_S_Gen5_2) on the free offer, which pauses rather than bills when the free limit is reached.
-var sql = builder.AddAzureSqlServer("sql").RunAsContainer();
+// Locally SQL Server runs in a container. In Azure it is Azure SQL, and each database gets Aspire's default SKU:
+// serverless (GP_S_Gen5_2) on the free offer. Once a month's free allowance is used, a database bills for what it uses
+// rather than pausing, as the free offer would by default: a paused database fails the migrations and the demo until
+// the month ends.
+var sql = builder.AddAzureSqlServer("sql").RunAsContainer()
+    .ConfigureInfrastructure(infrastructure =>
+    {
+        foreach (var database in infrastructure.GetProvisionableResources().OfType<SqlDatabase>())
+        {
+            database.FreeLimitExhaustionBehavior = FreeLimitExhaustionBehavior.BillOverUsage;
+        }
+    });
 var tmsDatabase = sql.AddDatabase("tms");
 // The Partner portal's own records of what each Persona sent Norvia. It never reads the TMS's database (ADR 0002).
 var partnerPortalDatabase = sql.AddDatabase("partner-portal");
