@@ -18,6 +18,7 @@ public sealed class ListTransportOrdersHandler(IReadRepository<TransportOrder> r
             order.Id.Value,
             order.Number?.Value,
             order.Status,
+            order.RatingResult,
             ShipperView.Of(order.ShipperId, shippers),
             order.Details.ShipperReference,
             order.Details.Collection?.Window?.Earliest,
