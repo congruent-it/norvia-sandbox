@@ -30,6 +30,7 @@ internal static class Samples
         Guid.NewGuid(),
         number,
         TransportOrderStatus.Accepted,
+        null,
         BrouwerDranken,
         IntakeChannel.ShipperApi,
         "corr-0042",

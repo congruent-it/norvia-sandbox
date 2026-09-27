@@ -10,6 +10,7 @@ public static class TrackingKeys
     public const string Flow = "flow";
     public const string PartyId = "partyId";
     public const string TransportOrderNumber = "transportOrderNumber";
+    public const string ShipmentNumber = "shipmentNumber";
     public const string Outcome = "outcome";
 
     /// <summary>The stable failure code, when there is one, such as a rating failure's <c>NoMatchingLane</c>.</summary>

@@ -6,17 +6,22 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Norvia.Tms.Application.Carriers;
 using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.RateCards;
+using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shippers;
 using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.Rate;
 using Norvia.Tms.Application.TransportOrders.Submit;
 using Norvia.Tms.Domain.TransportOrders;
+using Norvia.Tms.Infrastructure.Carriers;
 using Norvia.Tms.Infrastructure.Data;
 using Norvia.Tms.Infrastructure.Outbox;
 using Norvia.Tms.Infrastructure.RateCards;
 using Norvia.Tms.Infrastructure.Rating;
+using Norvia.Tms.Infrastructure.Seed;
+using Norvia.Tms.Infrastructure.Shipments;
 using Norvia.Tms.Infrastructure.Shippers;
 using Norvia.Tms.Infrastructure.TransportOrders;
 
@@ -47,10 +52,12 @@ public static class DependencyInjection
         builder.Services.AddScoped<IDomainEventDispatcher, MediatorDomainEventDispatcher>();
         builder.Services.AddScoped<IOutbox>(services => services.GetRequiredService<OutboxBuffer>());
         builder.Services.AddScoped<ITransportOrderNumbers, SqlTransportOrderNumbers>();
+        builder.Services.AddScoped<IShipmentNumbers, SqlShipmentNumbers>();
         builder.Services.AddScoped<IPipelineBehavior<SubmitTransportOrderCommand, Result<SubmitTransportOrderResult>>, RetrySubmissionThatLostARace>();
         builder.Services.AddSingleton<IShipperDirectory, SeedFileShipperDirectory>();
         builder.Services.AddSingleton<IRateCardDirectory, SeedFileRateCardDirectory>();
-        builder.Services.AddHostedService<LoadRateCardsOnStart>();
+        builder.Services.AddSingleton<ICarrierDirectory, SeedFileCarrierDirectory>();
+        builder.Services.AddHostedService<LoadSeedOnStart>();
 
         return builder;
     }

@@ -11,7 +11,7 @@ namespace Norvia.Tms.Infrastructure.RateCards;
 /// <summary>
 /// The TMS's read copy of the Shippers' Rate Cards, loaded once from the seed file, which plays the ERP until its sync
 /// exists (ADR 0006). A Shipper may have no Rate Card; one with two, or a Rate Card version whose Zones overlap, is a
-/// broken seed, and the TMS refuses to start on it (<see cref="LoadRateCardsOnStart"/>).
+/// broken seed, and the TMS refuses to start on it (<see cref="Seed.LoadSeedOnStart"/>).
 /// </summary>
 internal sealed class SeedFileRateCardDirectory : IRateCardDirectory
 {

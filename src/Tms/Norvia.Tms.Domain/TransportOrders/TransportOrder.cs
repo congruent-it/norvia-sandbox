@@ -1,5 +1,6 @@
 using Ardalis.SharedKernel;
 using Norvia.Tms.Domain.RateCards;
+using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.Shippers;
 using static System.FormattableString;
 
@@ -70,6 +71,38 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
 
     /// <summary>The key of the last re-rate, so that re-rate sent again is known as a repeat; null until one runs.</summary>
     public IdempotencyKey? LastReRateKey { get; private set; }
+
+    /// <summary>The number of the Transport Order's one Shipment, once it is Planned; null until then.</summary>
+    public ShipmentNumber? ShipmentNumber { get; private set; }
+
+    /// <summary>The key of the assignment that planned the Transport Order, so that assignment sent again is known as a repeat.</summary>
+    public IdempotencyKey? PlanningKey { get; private set; }
+
+    /// <summary>Whether the Transport Order was planned by the assignment sent under this key.</summary>
+    public bool WasPlannedUnder(IdempotencyKey key) => PlanningKey is not null && PlanningKey == key;
+
+    /// <summary>
+    /// Plans an Accepted Transport Order: it gets its one Shipment (ADR 0007), with the Shipment number and the status
+    /// Planned, carried by Own fleet or a Carrier, and becomes Planned, its last status. The Shipment is on the
+    /// assignment's own Message trail; the Transport Order keeps its intake's. Its rating result never blocks planning.
+    /// Returns null, changing nothing, for a Transport Order that isn't Accepted, as it has its Shipment already or never
+    /// gets one.
+    /// </summary>
+    public Shipment? Plan(ShipmentNumber shipmentNumber, CarriedBy carriedBy, IdempotencyKey key, CorrelationId correlationId, DateTimeOffset plannedAt)
+    {
+        ArgumentNullException.ThrowIfNull(shipmentNumber);
+        ArgumentNullException.ThrowIfNull(carriedBy);
+        ArgumentNullException.ThrowIfNull(key);
+        if (Status != TransportOrderStatus.Accepted)
+        {
+            return null;
+        }
+
+        Status = TransportOrderStatus.Planned;
+        ShipmentNumber = shipmentNumber;
+        PlanningKey = key;
+        return Shipment.Plan(shipmentNumber, this, carriedBy, correlationId, plannedAt);
+    }
 
     /// <summary>Whether a booking under this Transport Order's Shipper reference is the same booking sent again.</summary>
     public bool IsRepeatOf(TransportOrderDetails details) => Details.Equals(details);

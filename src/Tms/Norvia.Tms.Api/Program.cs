@@ -3,9 +3,12 @@ using Ardalis.Result;
 using Asp.Versioning;
 using Mediator;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Norvia.Tms.Api.Shipments;
 using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Api.TransportOrders;
+using Norvia.Tms.Application.TransportOrders.Assign;
 using Norvia.Tms.Application.TransportOrders.Rate;
 using Norvia.Tms.Application.TransportOrders.Submit;
 using Norvia.Tms.Domain.TransportOrders;
@@ -18,6 +21,7 @@ builder.AddServiceDefaults();
 builder.Services.AddScoped<IPipelineBehavior<SubmitTransportOrderCommand, Result<SubmitTransportOrderResult>>, TrackIntakeInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<SubmitTransportOrderCommand, Result<SubmitTransportOrderResult>>, TriggerRatingAfterAcceptance>();
 builder.Services.AddScoped<IPipelineBehavior<RateTransportOrderCommand, Result<RateTransportOrderResult>>, TrackReRateInLoggingScope>();
+builder.Services.AddScoped<IPipelineBehavior<AssignTransportOrderCommand, Result<AssignTransportOrderResult>>, TrackAssignmentInLoggingScope>();
 builder.AddTmsInfrastructure();
 builder.AddTmsOutboxPublisher();
 builder.AddTmsRatingWorker();
@@ -78,16 +82,20 @@ builder.Services
 
 var app = builder.Build();
 
+const int DuplicateKeyInUniqueIndex = 2601;
+
 // Outermost, so even a refused or failed call is traced under its correlation ID.
 app.UseMiddleware<TrackingScopeMiddleware>();
 app.UseExceptionHandler(new ExceptionHandlerOptions
 {
     // A request the API can't bind (malformed JSON, a field outside the Canonical Model) is the caller's error. A change
-    // that lost a race, such as two re-rates of one Transport Order, conflicts with the one that won.
+    // that lost a race, such as two re-rates or two assignments of one Transport Order, conflicts with the one that won:
+    // it finds the row changed, or a unique index, such as one Shipment per Transport Order, already taken.
     StatusCodeSelector = exception => exception switch
     {
         BadHttpRequestException badRequest => badRequest.StatusCode,
         DbUpdateConcurrencyException => StatusCodes.Status409Conflict,
+        DbUpdateException { InnerException: SqlException { Number: DuplicateKeyInUniqueIndex } } => StatusCodes.Status409Conflict,
         _ => StatusCodes.Status500InternalServerError,
     },
 });
@@ -103,6 +111,7 @@ if (app.Environment.IsDevelopment())
 }
 app.MapDefaultEndpoints();
 app.MapTransportOrders();
+app.MapShipments();
 
 await app.RunAsync();
 

@@ -44,6 +44,28 @@ resource monitoringFilter 'Microsoft.ServiceBus/namespaces/topics/subscriptions/
   }
 }
 
+resource shipmentEvents 'Microsoft.ServiceBus/namespaces/topics@2024-01-01' = {
+  parent: serviceBus
+  name: 'shipment-events'
+}
+
+// Monitoring is the consumer P3 names for Shipment events.
+resource shipmentMonitoring 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01' = {
+  parent: shipmentEvents
+  name: 'monitoring'
+}
+
+resource shipmentMonitoringFilter 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
+  parent: shipmentMonitoring
+  name: '$Default'
+  properties: {
+    filterType: 'SqlFilter'
+    sqlFilter: {
+      sqlExpression: 'resubmitTo IS NULL OR resubmitTo = \'monitoring\''
+    }
+  }
+}
+
 var serviceBusDataReceiver = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0')
 
 resource presenterReadsMessages 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(presenterPrincipalId)) {

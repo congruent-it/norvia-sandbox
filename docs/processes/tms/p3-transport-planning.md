@@ -86,11 +86,11 @@ Every active Carrier has a Partner portal Persona, so it can answer the bookings
 
 ## Correlation ID
 
-A Planner's action starts in the TMS UI, not at API Management. So the TMS creates a new correlation ID for each action on each Shipment: each assignment, reassignment and release, including each Shipment in a multi-select. The events carry it together with the Transport Order number. The Transport Order keeps its intake correlation ID, so tracing a booking through to release follows the Transport Order number. The P4 Logic App carries the release's correlation ID on into the Carrier booking.
+A Planner's action starts in the TMS UI, not at API Management. So the TMS creates a new correlation ID for each action on each Shipment: each assignment, reassignment and release, including each Shipment in a multi-select. The events carry it together with the Transport Order number. The Transport Order keeps its intake correlation ID, so tracing a booking through to release follows the Transport Order number. The TMS traces each action under the flow name `transport-planning`, with `transportOrderNumber` and `shipmentNumber` ([tracking contract](../../coding-guidelines.md#tracking-contract)). The P4 Logic App carries the release's correlation ID on into the Carrier booking.
 
 ## Events
 
-All three events go to a new topic for Shipment events, through the TMS's transactional outbox (ADR 0003). Each carries a property saying whether the Shipment is assigned to Own fleet or a Carrier, so subscriptions can filter on it. P3 publishes no `TransportOrderPlanned`, because `ShipmentPlanned` already says it.
+All three events go to a new topic for Shipment events, `shipment-events`, through the TMS's transactional outbox (ADR 0003). Each carries a property, `assignedTo` (`OwnFleet` or `Carrier`), saying whether the Shipment is assigned to Own fleet or a Carrier, so subscriptions can filter on it. The topic has a `monitoring` subscription, as the Transport Order events topic does. P3 publishes no `TransportOrderPlanned`, because `ShipmentPlanned` already says it.
 
 | Event | Carries | Consumers |
 |---|---|---|

@@ -16,10 +16,13 @@ public abstract record IntegrationEvent(Guid EventId, DateTimeOffset OccurredAt,
     [JsonIgnore]
     public string Topic => TopicName;
 
-    /// <summary>The tracking-contract keys the event knows (coding guidelines §7), plus its type and version.</summary>
+    /// <summary>
+    /// The tracking-contract keys the event knows (coding guidelines §7), plus its type and version and what its
+    /// subscriptions filter on.
+    /// </summary>
     [JsonIgnore]
     public IReadOnlyDictionary<string, object> ApplicationProperties =>
-        new Dictionary<string, object>(TrackingProperties())
+        new Dictionary<string, object>(TrackingProperties().Concat(FilterProperties()))
         {
             ["eventType"] = EventType,
             ["eventVersion"] = EventVersion,
@@ -30,4 +33,7 @@ public abstract record IntegrationEvent(Guid EventId, DateTimeOffset OccurredAt,
     protected abstract string TopicName { get; }
 
     protected abstract IEnumerable<KeyValuePair<string, object>> TrackingProperties();
+
+    /// <summary>Properties beyond the tracking contract that subscriptions filter on, such as who carries a Shipment.</summary>
+    protected virtual IEnumerable<KeyValuePair<string, object>> FilterProperties() => [];
 }

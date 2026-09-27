@@ -6,7 +6,9 @@ using Microsoft.AspNetCore.Mvc;
 using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Application.CanonicalModel;
 using Norvia.Tms.Application.IntegrationEvents;
+using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.TransportOrders;
+using Norvia.Tms.Application.TransportOrders.Assign;
 using Norvia.Tms.Application.TransportOrders.GetById;
 using Norvia.Tms.Application.TransportOrders.GetByNumber;
 using Norvia.Tms.Application.TransportOrders.List;
@@ -21,7 +23,7 @@ public static class TransportOrderEndpoints
 {
     public const string CorrelationIdHeader = TrackingScopeMiddleware.CorrelationIdHeader;
 
-    /// <summary>The caller's key for a re-rate, so a retry of it gets the same answer instead of a refusal.</summary>
+    /// <summary>The caller's key for a re-rate or an assignment, so a retry of it gets the same answer instead of a refusal.</summary>
     public const string IdempotencyKeyHeader = "Idempotency-Key";
 
     /// <summary>The app role only the intake Logic App's managed identity holds, so nothing bypasses the integration layer.</summary>
@@ -29,7 +31,7 @@ public static class TransportOrderEndpoints
 
     /// <summary>
     /// The app role only the TMS UI's managed identity holds: Norvia's staff change Transport Orders there, such as
-    /// Customer service's re-rate.
+    /// Customer service's re-rate and the Planner's assignment.
     /// </summary>
     public const string ManageRole = "TransportOrders.Manage";
 
@@ -80,6 +82,19 @@ public static class TransportOrderEndpoints
                 + "left as it is: a Rated order's Freight Charge stays frozen. A re-rate sent again under its Idempotency-Key "
                 + "is answered as before, flagged as a repeat, without rating again. Like the first rating, the re-rate continues the Message "
                 + "trail of the order's intake, so its event carries the intake's correlation ID.");
+
+        // The Planner assigns from the TMS UI, as Customer service re-rates. The action starts there, not at API Management,
+        // so the TMS starts a Message trail of its own for it.
+        transportOrders.MapPost("/{transportOrderNumber}/assign", AssignAsync)
+            .WithName("AssignTransportOrder")
+            .RequireAuthorization(policy => policy.RequireRole(ManageRole))
+            .WithMetadata(new TrackedFlow(Flows.TransportPlanning))
+            .WithSummary("Assign an Accepted Transport Order to Own fleet or to a Carrier, which plans its one Shipment.")
+            .WithDescription(
+                "Creates the Transport Order's Shipment with a Shipment number and the status Planned, sets the Transport Order to Planned "
+                + "and publishes ShipmentPlanned on the Shipment events topic, all in one transaction. The assignment gets a new correlation ID, "
+                + "which ShipmentPlanned carries with the Transport Order number. An assignment sent again under its Idempotency-Key "
+                + "is answered as before, flagged as a repeat, without planning again.");
 
         return app;
     }
@@ -155,6 +170,47 @@ public static class TransportOrderEndpoints
         IMediator mediator,
         CancellationToken cancellationToken) =>
         TypedResults.Ok(await mediator.Send(new ListRatingExceptionsQuery(), cancellationToken));
+
+    private static async Task<Results<Created<AssignTransportOrderResult>, Ok<AssignTransportOrderResult>, ProblemHttpResult, ValidationProblem>> AssignAsync(
+        string transportOrderNumber,
+        [FromHeader(Name = IdempotencyKeyHeader)] string? idempotencyKey,
+        AssignTransportOrderRequest assignment,
+        IMediator mediator,
+        CancellationToken cancellationToken)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Length > IdempotencyKey.MaxLength)
+        {
+            errors[IdempotencyKeyHeader] = [$"An assignment needs an {IdempotencyKeyHeader} of 1 to {IdempotencyKey.MaxLength} characters, the same for each retry."];
+        }
+
+        if (assignment.AssignedTo == AssignedTo.Carrier && string.IsNullOrWhiteSpace(assignment.CarrierId))
+        {
+            errors[nameof(assignment.CarrierId)] = ["An assignment to a Carrier names the Carrier."];
+        }
+        else if (assignment.AssignedTo == AssignedTo.OwnFleet && assignment.CarrierId is not null)
+        {
+            errors[nameof(assignment.CarrierId)] = ["An assignment to Own fleet names no Carrier."];
+        }
+
+        if (errors.Count > 0)
+        {
+            return TypedResults.ValidationProblem(errors);
+        }
+
+        var carrierId = assignment.AssignedTo == AssignedTo.Carrier ? assignment.CarrierId : null;
+        var result = await mediator.Send(new AssignTransportOrderCommand(transportOrderNumber, carrierId, idempotencyKey!), cancellationToken);
+        return result.Status switch
+        {
+            ResultStatus.Ok when result.Value.Repeat => TypedResults.Ok(result.Value),
+            ResultStatus.Ok => TypedResults.Created($"/v1/shipments/{result.Value.ShipmentNumber}", result.Value),
+            ResultStatus.NotFound => TypedResults.Problem(statusCode: StatusCodes.Status404NotFound, title: $"Transport Order {transportOrderNumber} not found."),
+            _ => TypedResults.Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "The Transport Order can't be assigned.",
+                detail: string.Join(" ", result.Errors)),
+        };
+    }
 
     private static async Task<Results<Ok<RateTransportOrderResult>, ProblemHttpResult, ValidationProblem>> ReRateAsync(
         string transportOrderNumber,

@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.Shippers;
 using Norvia.Tms.Domain.TransportOrders;
 
@@ -106,6 +107,15 @@ internal sealed class TransportOrderConfiguration : IEntityTypeConfiguration<Tra
 
         // A re-rate sent again under this key is a repeat, answered as before.
         builder.Property(order => order.LastReRateKey)
+            .HasConversion(key => key!.Value, value => new IdempotencyKey(value))
+            .HasMaxLength(IdempotencyKey.MaxLength);
+
+        // The Transport Order's one Shipment, once it is Planned, and the key of the assignment that planned it, so that
+        // assignment sent again is a repeat, answered as before.
+        builder.Property(order => order.ShipmentNumber)
+            .HasConversion(number => number!.Value, value => ShipmentNumber.Parse(value))
+            .HasMaxLength(10);
+        builder.Property(order => order.PlanningKey)
             .HasConversion(key => key!.Value, value => new IdempotencyKey(value))
             .HasMaxLength(IdempotencyKey.MaxLength);
 

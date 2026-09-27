@@ -22,6 +22,14 @@
       "addresses": []
     }
   ],
+  "carriers": [
+    {
+      "$comment": "The test host's own Carrier, so planning tests don't depend on the demo's Carriers.",
+      "id": "CAR-TEST-0001",
+      "name": "Proef Transport",
+      "active": true
+    }
+  ],
   "rateCards": [
     {
       "id": "RC-TEST-0001",

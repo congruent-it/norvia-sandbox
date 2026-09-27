@@ -38,6 +38,7 @@ public sealed class TransportOrderQueryTests
             order.Id.Value,
             "TO-0000005",
             TransportOrderStatus.Accepted,
+            null,
             new ShipperView("SHP-0001", "Brouwer Dranken"),
             IntakeChannel.ShipperApi,
             "corr-1",
@@ -47,6 +48,19 @@ public sealed class TransportOrderQueryTests
             null,
             null,
             CanonicalTransportOrder.From(order)));
+    }
+
+    [Fact]
+    public async Task Get_PlannedOrder_ShowsItAsPlannedWithItsShipmentNumber()
+    {
+        var order = Samples.AcceptedOrder(sequence: 5);
+        Samples.Planned(order, Domain.Shipments.CarriedBy.OwnFleet, sequence: 12);
+        _repository.FirstOrDefaultAsync(Arg.Any<TransportOrderByNumberSpec>(), Arg.Any<CancellationToken>()).Returns(order);
+
+        var result = await new GetTransportOrderHandler(_repository, _shippers).Handle(new GetTransportOrderQuery("TO-0000005"), CancellationToken.None);
+
+        result.Value.Status.Should().Be(TransportOrderStatus.Planned);
+        result.Value.ShipmentNumber.Should().Be("SH-0000012");
     }
 
     [Fact]
@@ -109,6 +123,7 @@ public sealed class TransportOrderQueryTests
             order.Id.Value,
             null,
             TransportOrderStatus.Rejected,
+            null,
             new ShipperView("SHP-0001", "Brouwer Dranken"),
             IntakeChannel.ShipperApi,
             "corr-2",
