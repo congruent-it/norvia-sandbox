@@ -4,6 +4,7 @@ using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.GetByNumber;
 using Norvia.Tms.Application.TransportOrders.GetRejectedBooking;
 using Norvia.Tms.Application.TransportOrders.List;
+using Norvia.Tms.Application.TransportOrders.RatingExceptions;
 using Norvia.Tms.Domain.TransportOrders;
 
 namespace Norvia.Tms.Web.TransportOrders;
@@ -19,6 +20,9 @@ internal sealed class TransportOrderQueries(IServiceScopeFactory scopes) : ITran
 
     public Task<IReadOnlyList<TransportOrderSummary>> ListRejectedAsync(CancellationToken cancellationToken) =>
         SendAsync(new ListTransportOrdersQuery(TransportOrderStatus.Rejected), cancellationToken);
+
+    public Task<IReadOnlyList<RatingExceptionSummary>> ListRatingExceptionsAsync(CancellationToken cancellationToken) =>
+        SendAsync(new ListRatingExceptionsQuery(), cancellationToken);
 
     public async Task<TransportOrderView?> FindAsync(string transportOrderNumber, CancellationToken cancellationToken) =>
         FoundOrNull(await SendAsync(new GetTransportOrderQuery(transportOrderNumber), cancellationToken), $"Transport Order {transportOrderNumber}");

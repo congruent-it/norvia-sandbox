@@ -5,13 +5,13 @@
 @inject ITransportOrderQueries Queries
 @inject TimeProvider Time
 @inject IOptions<LiveListOptions> Options
-@inject ILogger<LiveTransportOrderList> Logger
+@inject ILogger<LiveTransportOrderList<TransportOrderSummary>> Logger
 
 <PageTitle>Waiting for planning · Norvia TMS</PageTitle>
 
 <h1>Transport Orders waiting for planning</h1>
 
-@if (_list.TransportOrders is not { } transportOrders)
+@if (_list.Items is not { } transportOrders)
 {
     @if (_list.LastReadFailed)
     {
@@ -64,11 +64,11 @@ else
 }
 
 @code {
-    private LiveTransportOrderList _list = null!;
+    private LiveTransportOrderList<TransportOrderSummary> _list = null!;
 
     protected override void OnInitialized()
     {
-        _list = new LiveTransportOrderList(
+        _list = new LiveTransportOrderList<TransportOrderSummary>(
             Queries.ListWaitingForPlanningAsync, "the Transport Orders waiting for planning", Time, Options.Value.RefreshInterval, Logger);
         _list.Changed += () => InvokeAsync(StateHasChanged);
         _list.Start();

@@ -1,5 +1,6 @@
 using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.List;
+using Norvia.Tms.Application.TransportOrders.RatingExceptions;
 
 namespace Norvia.Tms.Web.TransportOrders;
 
@@ -20,4 +21,7 @@ public interface ITransportOrderQueries
     /// so it is found by its ID.
     /// </summary>
     Task<TransportOrderView?> FindRejectedAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>The rating exceptions: the Transport Orders whose Rating failed, which Customer service follows up.</summary>
+    Task<IReadOnlyList<RatingExceptionSummary>> ListRatingExceptionsAsync(CancellationToken cancellationToken);
 }

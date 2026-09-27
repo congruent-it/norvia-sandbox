@@ -37,6 +37,13 @@ public sealed class Estate(IDistributedApplicationBuilder builder)
     /// <summary>The intake Logic App's managed identity, the one caller on the Shipper API intake channel.</summary>
     public IResourceBuilder<ParameterResource> IntakeClientId { get; } = builder.AddParameter("estate-intake-client-id");
 
+    /// <summary>
+    /// The TMS UI's managed identity, the one principal holding the TMS API's manage role, which it re-rates with.
+    /// </summary>
+    public IResourceBuilder<ParameterResource> TmsUiIdentity { get; } = builder.AddParameter("estate-tms-ui-identity-name");
+
+    public IResourceBuilder<ParameterResource> TmsUiClientId { get; } = builder.AddParameter("estate-tms-ui-client-id");
+
     public IResourceBuilder<ParameterResource> EntraTenantId { get; } = builder.AddParameter("estate-entra-tenant-id");
 
     /// <summary>The Norvia Partner API in API Management: <c>https://&lt;API Management&gt;.azure-api.net/partner/v1</c>.</summary>

@@ -7,11 +7,14 @@
 <header class="bg-primary text-white">
     <nav aria-label="Main" class="mx-auto flex max-w-7xl flex-wrap items-center gap-x-8 gap-y-2 px-4 py-4">
         <a href="/" class="text-xl font-bold text-white no-underline hover:text-white">Norvia TMS</a>
-        <NavLink href="@_role.View" Match="NavLinkMatch.Prefix"
-                 class="text-white/75 no-underline hover:text-success"
-                 ActiveClass="!text-white">
-            @_role.ViewTitle
-        </NavLink>
+        @foreach (var view in _role.Views)
+        {
+            <NavLink href="@view.Path" Match="NavLinkMatch.Prefix"
+                     class="text-white/75 no-underline hover:text-success"
+                     ActiveClass="!text-white">
+                @view.Title
+            </NavLink>
+        }
         <div class="ml-auto">
             <RoleSwitcher Current="_role" />
         </div>

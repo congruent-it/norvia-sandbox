@@ -79,13 +79,16 @@ public sealed class DependencyRuleTests
             .ShouldNot().HaveDependencyOn(InfrastructureNamespace));
     }
 
-    [Fact]
-    public void Web_OnlyReadsThroughTheQuerySide()
+    [Theory]
+    [InlineData("Norvia.Tms.Application.TransportOrders.Submit")]
+    [InlineData("Norvia.Tms.Application.TransportOrders.Rate")]
+    public void Web_OnlyReadsThroughTheQuerySide_AndChangesThingsThroughTheTmsApi(string commands)
     {
-        // The source-generated mediator knows every handler; the UI's own types must never send a command.
+        // The source-generated mediator knows every handler; the UI's own types must never send a command in process.
+        // A re-rate goes to the TMS API over HTTP, as any other caller's does.
         ShouldHold(Types.InAssembly(Web)
             .That().DoNotResideInNamespace("Mediator")
-            .ShouldNot().HaveDependencyOn("Norvia.Tms.Application.TransportOrders.Submit"));
+            .ShouldNot().HaveDependencyOn(commands));
     }
 
     [Fact]

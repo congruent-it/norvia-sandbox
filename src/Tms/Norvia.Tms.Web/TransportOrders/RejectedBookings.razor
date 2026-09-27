@@ -5,13 +5,13 @@
 @inject ITransportOrderQueries Queries
 @inject TimeProvider Time
 @inject IOptions<LiveListOptions> Options
-@inject ILogger<LiveTransportOrderList> Logger
+@inject ILogger<LiveTransportOrderList<TransportOrderSummary>> Logger
 
 <PageTitle>Rejected bookings · Norvia TMS</PageTitle>
 
 <h1>Rejected bookings</h1>
 
-@if (_list.TransportOrders is not { } bookings)
+@if (_list.Items is not { } bookings)
 {
     @if (_list.LastReadFailed)
     {
@@ -63,11 +63,11 @@ else
 }
 
 @code {
-    private LiveTransportOrderList _list = null!;
+    private LiveTransportOrderList<TransportOrderSummary> _list = null!;
 
     protected override void OnInitialized()
     {
-        _list = new LiveTransportOrderList(Queries.ListRejectedAsync, "the Rejected bookings", Time, Options.Value.RefreshInterval, Logger);
+        _list = new LiveTransportOrderList<TransportOrderSummary>(Queries.ListRejectedAsync, "the Rejected bookings", Time, Options.Value.RefreshInterval, Logger);
         _list.Changed += () => InvokeAsync(StateHasChanged);
         _list.Start();
     }
