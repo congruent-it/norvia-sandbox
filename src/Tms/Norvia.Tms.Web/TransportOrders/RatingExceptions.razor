@@ -23,14 +23,16 @@
 
 <LiveListStates Items="_list.Items" LastReadFailed="_list.LastReadFailed" Name="rating exceptions"
                 Empty="@("No Transport Order has Rating failed. An order whose Rate Card can't price it appears here as soon as it is rated.")" Context="exceptions">
-    @* Oldest first, as the query gives them: the longest-waiting exception is followed up first. *@
-    <FluentDataGrid Items="exceptions.AsQueryable()" TGridItem="RatingExceptionSummary" Class="flatly-table" aria-label="Rating exceptions">
+    @* Oldest first, as the query gives them: the longest-waiting exception is followed up first. The reason gets the
+       most room, since it is what Customer service reads, and long text wraps rather than being cut off. *@
+    <FluentDataGrid Items="exceptions.AsQueryable()" TGridItem="RatingExceptionSummary" Class="flatly-table" aria-label="Rating exceptions"
+                    GridTemplateColumns="1.4fr 1.2fr 1.3fr 1.2fr 3fr 1.3fr auto" MultiLine="true">
         <TemplateColumn Title="Transport Order">
             <a href="/transport-orders/@context.TransportOrderNumber">@context.TransportOrderNumber</a>
         </TemplateColumn>
         <PropertyColumn Title="Shipper" Property="@(exception => exception.Shipper.Name ?? exception.Shipper.Id)" />
         <PropertyColumn Title="Shipper reference" Property="@(exception => SubmittedTransportOrder.Given(exception.ShipperReference))" />
-        <PropertyColumn Title="Failure" Property="@(exception => exception.RatingFailure.Code)" />
+        <PropertyColumn Title="Failure" Property="@(exception => RatingText.Failure(exception.RatingFailure.Code))" />
         <PropertyColumn Title="Reason" Property="@(exception => exception.RatingFailure.Message)" />
         <PropertyColumn Title="Rating failed" Property="@(exception => NorviaTime.Format(exception.RatingFailedAt))" />
         <TemplateColumn Title="Action">

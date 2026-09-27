@@ -95,7 +95,7 @@ public sealed class RatingExceptionsTests : TmsWebContext
             "TO-0000043",
             "Brouwer Dranken",
             "BD-2026-0043",
-            "NoMatchingLane",
+            "No matching Lane",
             "Rate Card RC-0001 version 1 has no Lane from Rotterdam to Düsseldorf.",
             "Thu 24 Sep 2026, 11:31");
     }

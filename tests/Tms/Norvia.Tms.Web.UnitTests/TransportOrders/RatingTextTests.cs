@@ -31,6 +31,17 @@ public sealed class RatingTextTests
     }
 
     [Theory]
+    [InlineData("NoRateCard", "No Rate Card")]
+    [InlineData("NoValidRateCardVersion", "No valid Rate Card version")]
+    [InlineData("NoMatchingLane", "No matching Lane")]
+    [InlineData("WeightAboveHighestBreak", "Weight above the highest Weight Break")]
+    [InlineData("RateCardSuspended", "RateCardSuspended")]
+    public void Failure_AFailureCode_NamesItInPlainWords_OrAsItCameWhenItIsNew(string code, string expected)
+    {
+        RatingText.Failure(code).Should().Be(expected);
+    }
+
+    [Theory]
     [InlineData(92.87, "EUR 92.87")]
     [InlineData(65, "EUR 65.00")]
     [InlineData(1234.5, "EUR 1,234.50")]

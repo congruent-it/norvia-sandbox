@@ -6,13 +6,14 @@ namespace Norvia.Tms.Web.UiTests.TransportOrders;
 
 /// <summary>
 /// Customer service works the rating exceptions. The demo seed's Brouwer Dranken Rate Card deliberately has no Lane into
-/// Germany, so a booking from Rotterdam to Düsseldorf fails with <c>NoMatchingLane</c>. Its Rate Card isn't corrected,
-/// so a re-rate, which the TMS UI sends through the TMS API, fails again and the order stays in the list.
+/// Germany, so a booking from Rotterdam to Düsseldorf fails with <c>NoMatchingLane</c>, which Customer service reads as
+/// "No matching Lane". Its Rate Card isn't corrected, so a re-rate, which the TMS UI sends through the TMS API, fails
+/// again and the order stays in the list.
 /// </summary>
 public sealed class RatingExceptionsJourneyTests(TmsUiFixture tms) : BrowserPage(tms)
 {
     [Fact]
-    public async Task AnOrderNoLaneCovers_IsListedForCustomerServiceWithNoMatchingLane_AndStaysThereWhenAReRateFailsAgain()
+    public async Task AnOrderNoLaneCovers_IsListedForCustomerServiceAsNoMatchingLane_AndStaysThereWhenAReRateFailsAgain()
     {
         var shipperReference = $"UI-{Guid.NewGuid():N}"[..20];
         var number = await SubmitAcceptedAsync(Bookings.Valid(shipperReference).DeliveredToDusseldorf());
@@ -24,12 +25,12 @@ public sealed class RatingExceptionsJourneyTests(TmsUiFixture tms) : BrowserPage
         await Expect(Heading("Rating exceptions")).ToBeVisibleAsync();
         var row = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipperReference });
         await Expect(row).ToContainTextAsync("Brouwer Dranken");
-        await Expect(row.GetByRole(AriaRole.Gridcell, new() { Name = "NoMatchingLane", Exact = true })).ToBeVisibleAsync();
+        await Expect(row.GetByRole(AriaRole.Gridcell, new() { Name = "No matching Lane", Exact = true })).ToBeVisibleAsync();
 
         await row.GetByRole(AriaRole.Button, new() { Name = $"Re-rate {number}" }).ClickAsync();
 
         await Expect(Page.GetByRole(AriaRole.Alert).Filter(new() { HasText = $"Rating failed again for Transport Order {number}" })).ToBeVisibleAsync();
-        await Expect(row.GetByRole(AriaRole.Gridcell, new() { Name = "NoMatchingLane", Exact = true })).ToBeVisibleAsync();
+        await Expect(row.GetByRole(AriaRole.Gridcell, new() { Name = "No matching Lane", Exact = true })).ToBeVisibleAsync();
 
         await row.GetByRole(AriaRole.Link, new() { Name = number }).ClickAsync();
 
