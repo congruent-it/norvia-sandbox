@@ -48,9 +48,9 @@ internal sealed class TransportOrderQueries(IServiceScopeFactory scopes) : ITran
 
     private static TView? FoundOrNull<TView>(Result<TView> result, string sought)
         where TView : class => result.Status switch
-    {
-        ResultStatus.Ok => result.Value,
-        ResultStatus.NotFound => null,
-        _ => throw new InvalidOperationException($"Reading {sought} failed with {result.Status}."),
-    };
+        {
+            ResultStatus.Ok => result.Value,
+            ResultStatus.NotFound => null,
+            _ => throw new InvalidOperationException($"Reading {sought} failed with {result.Status}."),
+        };
 }
