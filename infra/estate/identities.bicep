@@ -18,6 +18,8 @@ var intakeRole = 'TransportOrders.Intake'
 var intakeRoleId = guid('norvia-tms-api', environmentName, intakeRole)
 var manageRole = 'TransportOrders.Manage'
 var manageRoleId = guid('norvia-tms-api', environmentName, manageRole)
+var answerRole = 'CarrierBookings.Answer'
+var answerRoleId = guid('norvia-tms-api', environmentName, answerRole)
 var submitRole = 'TransportOrders.Submit'
 var submitRoleId = guid('norvia-partner-api', environmentName, submitRole)
 var triggerRole = 'TransportOrderIntake.Trigger'
@@ -68,6 +70,16 @@ resource tmsApi 'Microsoft.Graph/applications@v1.0' = {
       value: manageRole
       displayName: 'Manage Transport Orders'
       description: 'Change Transport Orders as Norvia\'s staff do in the TMS UI, such as re-rating one. Only the TMS UI holds it.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
+    {
+      id: answerRoleId
+      value: answerRole
+      displayName: 'Answer Carrier bookings'
+      description: 'Record a Carrier\'s confirmation or rejection of a Carrier booking (P4). Only the Carrier-answer Logic App holds it; that Logic App is a later ticket, so nothing is granted this role yet.'
       allowedMemberTypes: [
         'Application'
       ]

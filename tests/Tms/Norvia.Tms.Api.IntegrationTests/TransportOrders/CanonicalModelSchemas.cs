@@ -31,11 +31,19 @@ internal static class CanonicalModelSchemas
         return Load("shipment-released.v1.schema.json");
     });
 
+    private static readonly Lazy<JsonSchema> CarrierBookingConfirmedSchema = new(() => Load("carrier-booking-confirmed.v1.schema.json"));
+
+    private static readonly Lazy<JsonSchema> CarrierBookingRejectedSchema = new(() => Load("carrier-booking-rejected.v1.schema.json"));
+
     public static EvaluationResults ValidateShipmentPlanned(JsonNode body) => Validate(ShipmentPlannedSchema.Value, body);
 
     public static EvaluationResults ValidateShipmentReassigned(JsonNode body) => Validate(ShipmentReassignedSchema.Value, body);
 
     public static EvaluationResults ValidateShipmentReleased(JsonNode body) => Validate(ShipmentReleasedSchema.Value, body);
+
+    public static EvaluationResults ValidateCarrierBookingConfirmed(JsonNode body) => Validate(CarrierBookingConfirmedSchema.Value, body);
+
+    public static EvaluationResults ValidateCarrierBookingRejected(JsonNode body) => Validate(CarrierBookingRejectedSchema.Value, body);
 
     public static EvaluationResults ValidateTransportOrderAccepted(JsonNode body) => Validate(TransportOrderAcceptedSchema.Value, body);
 

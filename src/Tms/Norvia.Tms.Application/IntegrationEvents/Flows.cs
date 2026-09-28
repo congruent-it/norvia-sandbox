@@ -13,4 +13,7 @@ public static class Flows
     /// its own.
     /// </summary>
     public const string TransportPlanning = "transport-planning";
+
+    /// <summary>The Carrier's answer to a Carrier booking (P4), on the correlation ID the answer's own caller passes.</summary>
+    public const string CarrierBookingAnswer = "carrier-booking-answer";
 }

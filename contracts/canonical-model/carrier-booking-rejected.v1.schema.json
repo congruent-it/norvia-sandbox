@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/carrier-booking-rejected.v1.schema.json",
+  "title": "CarrierBookingRejected",
+  "description": "A Carrier rejected a Requested Carrier booking with a reason (Canonical Model event, version 1). The Carrier booking became Rejected and the Shipment went back to Planned; the Shipment's move carries no event of its own, as this event already says it. Published on the Shipment events topic, under the correlation ID of the answer, which API Management creates.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "carrierBookingNumber", "shipmentNumber", "carrierId", "reasonCode", "reasonText"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "const": "CarrierBookingRejected" },
+    "eventVersion": { "const": 1 },
+    "occurredAt": { "description": "When the Carrier's rejection was recorded.", "type": "string", "format": "date-time" },
+    "correlationId": { "description": "The answer's own correlation ID, not the release's.", "type": "string", "minLength": 1 },
+    "carrierBookingNumber": { "description": "The Carrier booking the Carrier rejected.", "type": "string", "pattern": "^CB-[0-9]{7}$" },
+    "shipmentNumber": { "description": "The Shipment the Carrier booking covers, now back in Planned.", "type": "string", "pattern": "^SH-[0-9]{7}$" },
+    "carrierId": { "description": "The Carrier that rejected the booking.", "type": "string", "minLength": 1 },
+    "reasonCode": {
+      "description": "The Carrier's stable reason for rejecting.",
+      "enum": ["NoCapacity", "LaneNotServed", "WindowNotFeasible", "GoodsNotAccepted", "Other"]
+    },
+    "reasonText": { "description": "The Carrier's reason in plain language, if it gave one.", "type": ["string", "null"], "minLength": 1 }
+  }
+}

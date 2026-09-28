@@ -51,5 +51,15 @@ internal sealed class CarrierBookingConfiguration : IEntityTypeConfiguration<Car
             .IsRequired();
 
         builder.Property(booking => booking.RequestedAt).IsRequired();
+
+        // All null while the booking is Requested; set together when the Carrier's answer is recorded (P4).
+        builder.Property(booking => booking.AnswerCorrelationId)
+            .HasConversion(id => id!.Value, value => new CorrelationId(value))
+            .HasMaxLength(128);
+        builder.Property(booking => booking.AnsweredAt);
+        builder.Property(booking => booking.CarrierBookingReference).HasMaxLength(50);
+        builder.Property(booking => booking.PlannedCollectionTime);
+        builder.Property(booking => booking.RejectionReason).HasConversion<string>().HasMaxLength(30);
+        builder.Property(booking => booking.RejectionReasonText).HasMaxLength(500);
     }
 }

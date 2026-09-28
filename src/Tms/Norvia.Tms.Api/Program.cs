@@ -5,6 +5,7 @@ using Mediator;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Norvia.Tms.Api.CarrierBookings;
 using Norvia.Tms.Api.Shipments;
 using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Api.TransportOrders;
@@ -117,6 +118,7 @@ if (app.Environment.IsDevelopment())
 app.MapDefaultEndpoints();
 app.MapTransportOrders();
 app.MapShipments();
+app.MapCarrierBookings();
 
 await app.RunAsync();
 
