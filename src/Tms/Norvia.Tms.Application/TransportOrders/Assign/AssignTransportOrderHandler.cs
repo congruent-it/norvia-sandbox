@@ -24,7 +24,7 @@ public sealed class AssignTransportOrderHandler(
         if (!TransportOrderNumber.TryParse(command.TransportOrderNumber, out var number)
             || await transportOrders.SingleOrDefaultAsync(new TransportOrderToPlanSpec(number), cancellationToken) is not { } order)
         {
-            return AssignmentRefused.Because(AssignmentRules.TransportOrderNotFound(command.TransportOrderNumber));
+            return AssignmentRefused.Because<AssignTransportOrderResult>(AssignmentRules.TransportOrderNotFound(command.TransportOrderNumber));
         }
 
         var key = new IdempotencyKey(command.AssignmentKey);
@@ -37,7 +37,7 @@ public sealed class AssignTransportOrderHandler(
         var carrierId = command.CarrierId is { } id ? new CarrierId(id) : null;
         if (AssignmentRules.Check(order, carrierId, carrierId is null ? null : carriers.Find(carrierId)) is { } refusal)
         {
-            return AssignmentRefused.Because(refusal);
+            return AssignmentRefused.Because<AssignTransportOrderResult>(refusal);
         }
 
         var carriedBy = carrierId is null ? CarriedBy.OwnFleet : CarriedBy.Carrier(carrierId);

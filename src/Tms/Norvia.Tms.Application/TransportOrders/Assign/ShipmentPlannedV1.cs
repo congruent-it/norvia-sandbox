@@ -40,7 +40,7 @@ public sealed record ShipmentPlannedV1(
             shipment.Number.Value,
             shipment.TransportOrderNumber.Value,
             shipment.ShipperId.Value,
-            (shipment.CarriedBy.IsOwnFleet ? Shipments.AssignedTo.OwnFleet : Shipments.AssignedTo.Carrier).ToString(),
+            shipment.CarriedBy.AssignedTo().ToString(),
             shipment.CarriedBy.CarrierId?.Value);
     }
 

@@ -36,14 +36,30 @@ public sealed class ShipmentQueryTests
 
         var result = await _handler.Handle(new GetShipmentQuery("SH-0000012"), CancellationToken.None);
 
-        result.Value.Should().Be(new ShipmentView(
+        result.Value.Should().BeEquivalentTo(new ShipmentView(
             "SH-0000012",
             ShipmentStatus.Planned,
             "TO-0000007",
             new ShipperView("SHP-0001", "Brouwer Dranken"),
             new CarriedByView(AssignedTo.Carrier, new CarrierView("CAR-0001", "Van Dijk Transport")),
             "corr-planning",
-            Samples.Now.AddHours(2)));
+            Samples.Now.AddHours(2),
+            [new ShipmentAssignmentView(new CarriedByView(AssignedTo.Carrier, new CarrierView("CAR-0001", "Van Dijk Transport")), "corr-planning", Samples.Now.AddHours(2))]));
+    }
+
+    [Fact]
+    public async Task Get_ReassignedShipment_ShowsTheHistoryOfAssignmentsInOrder()
+    {
+        var shipment = Samples.Planned(Samples.AcceptedOrder(), CarriedBy.Carrier(new CarrierId("CAR-0001")), correlationId: "corr-planning");
+        shipment.Reassign(CarriedBy.OwnFleet, new("key-r1"), new("corr-reassign"), Samples.Now.AddHours(3));
+        _repository.FirstOrDefaultAsync(Arg.Any<ShipmentByNumberSpec>(), Arg.Any<CancellationToken>()).Returns(shipment);
+
+        var result = await _handler.Handle(new GetShipmentQuery("SH-0000003"), CancellationToken.None);
+
+        result.Value.CarriedBy.Should().Be(new CarriedByView(AssignedTo.OwnFleet, null));
+        result.Value.Assignments.Should().Equal(
+            new ShipmentAssignmentView(new CarriedByView(AssignedTo.Carrier, new CarrierView("CAR-0001", "Van Dijk Transport")), "corr-planning", Samples.Now.AddHours(2)),
+            new ShipmentAssignmentView(new CarriedByView(AssignedTo.OwnFleet, null), "corr-reassign", Samples.Now.AddHours(3)));
     }
 
     [Fact]

@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Norvia.Tms.Api.Shipments;
 using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Api.TransportOrders;
+using Norvia.Tms.Application.Shipments.Reassign;
 using Norvia.Tms.Application.TransportOrders.Assign;
 using Norvia.Tms.Application.TransportOrders.Rate;
 using Norvia.Tms.Application.TransportOrders.Submit;
@@ -22,6 +23,7 @@ builder.Services.AddScoped<IPipelineBehavior<SubmitTransportOrderCommand, Result
 builder.Services.AddScoped<IPipelineBehavior<SubmitTransportOrderCommand, Result<SubmitTransportOrderResult>>, TriggerRatingAfterAcceptance>();
 builder.Services.AddScoped<IPipelineBehavior<RateTransportOrderCommand, Result<RateTransportOrderResult>>, TrackReRateInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<AssignTransportOrderCommand, Result<AssignTransportOrderResult>>, TrackAssignmentInLoggingScope>();
+builder.Services.AddScoped<IPipelineBehavior<ReassignShipmentCommand, Result<ReassignShipmentResult>>, TrackReassignmentInLoggingScope>();
 builder.AddTmsInfrastructure();
 builder.AddTmsOutboxPublisher();
 builder.AddTmsRatingWorker();
@@ -89,8 +91,9 @@ app.UseMiddleware<TrackingScopeMiddleware>();
 app.UseExceptionHandler(new ExceptionHandlerOptions
 {
     // A request the API can't bind (malformed JSON, a field outside the Canonical Model) is the caller's error. A change
-    // that lost a race, such as two re-rates or two assignments of one Transport Order, conflicts with the one that won:
-    // it finds the row changed, or a unique index, such as one Shipment per Transport Order, already taken.
+    // that lost a race, such as two re-rates, two assignments of one Transport Order or two reassignments of one Shipment,
+    // conflicts with the one that won: it finds the row changed, or a unique index, such as one Shipment per Transport
+    // Order, already taken.
     StatusCodeSelector = exception => exception switch
     {
         BadHttpRequestException badRequest => badRequest.StatusCode,

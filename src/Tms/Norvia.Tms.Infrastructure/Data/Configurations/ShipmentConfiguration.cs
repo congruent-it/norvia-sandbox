@@ -1,4 +1,6 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Norvia.Tms.Domain.Carriers;
 using Norvia.Tms.Domain.Shipments;
@@ -9,6 +11,8 @@ namespace Norvia.Tms.Infrastructure.Data.Configurations;
 
 internal sealed class ShipmentConfiguration : IEntityTypeConfiguration<Shipment>
 {
+    private static readonly JsonSerializerOptions AssignmentsJson = new(JsonSerializerDefaults.Web);
+
     public void Configure(EntityTypeBuilder<Shipment> builder)
     {
         builder.ToTable("Shipments");
@@ -54,6 +58,18 @@ internal sealed class ShipmentConfiguration : IEntityTypeConfiguration<Shipment>
                 .HasMaxLength(50)
                 .HasColumnName("CarrierId"));
 
+        // The history of assignments is read and written only with its Shipment, so it is one JSON column. A Shipment always
+        // has its planning's assignment, so the column is never empty.
+        builder.Property(shipment => shipment.Assignments)
+            .HasConversion(
+                assignments => JsonSerializer.Serialize(assignments.Select(StoredAssignment.Of), AssignmentsJson),
+                json => JsonSerializer.Deserialize<StoredAssignment[]>(json, AssignmentsJson)!.Select(stored => stored.ToAssignment()).ToArray(),
+                new ValueComparer<IReadOnlyList<ShipmentAssignment>>(
+                    (left, right) => left!.SequenceEqual(right!),
+                    assignments => assignments.Count,
+                    assignments => assignments.ToArray()))
+            .IsRequired();
+
         builder.Property(shipment => shipment.CorrelationId)
             .HasConversion(id => id.Value, value => new CorrelationId(value))
             .HasMaxLength(128)
@@ -62,4 +78,17 @@ internal sealed class ShipmentConfiguration : IEntityTypeConfiguration<Shipment>
         // Planning changes a Shipment after it is made (reassign, release), so two Planners' changes must not both land.
         builder.Property<byte[]>("RowVersion").IsRowVersion();
     }
+}
+
+/// <summary>A <see cref="ShipmentAssignment"/> as the JSON column stores it, in plain values: a null Carrier is Own fleet.</summary>
+internal sealed record StoredAssignment(string? CarrierId, string CorrelationId, DateTimeOffset AssignedAt, string? Key)
+{
+    public static StoredAssignment Of(ShipmentAssignment assignment) =>
+        new(assignment.CarriedBy.CarrierId?.Value, assignment.CorrelationId.Value, assignment.AssignedAt, assignment.Key?.Value);
+
+    public ShipmentAssignment ToAssignment() => new(
+        CarrierId is null ? CarriedBy.OwnFleet : CarriedBy.Carrier(new CarrierId(CarrierId)),
+        new CorrelationId(CorrelationId),
+        AssignedAt,
+        Key is null ? null : new IdempotencyKey(Key));
 }

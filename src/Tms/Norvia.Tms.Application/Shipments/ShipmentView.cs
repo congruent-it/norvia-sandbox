@@ -6,6 +6,7 @@ using Norvia.Tms.Domain.Shipments;
 namespace Norvia.Tms.Application.Shipments;
 
 /// <param name="CorrelationId">The Message trail of the assignment that planned the Shipment.</param>
+/// <param name="Assignments">The history of assignments, in order: the planning's first, then each reassignment's.</param>
 public sealed record ShipmentView(
     string ShipmentNumber,
     ShipmentStatus Status,
@@ -13,7 +14,8 @@ public sealed record ShipmentView(
     ShipperView Shipper,
     CarriedByView CarriedBy,
     string CorrelationId,
-    DateTimeOffset PlannedAt)
+    DateTimeOffset PlannedAt,
+    IReadOnlyList<ShipmentAssignmentView> Assignments)
 {
     public static ShipmentView Of(Shipment shipment, IShipperDirectory shippers, ICarrierDirectory carriers)
     {
@@ -25,6 +27,7 @@ public sealed record ShipmentView(
             ShipperView.Of(shipment.ShipperId, shippers),
             CarriedByView.Of(shipment.CarriedBy, carriers),
             shipment.CorrelationId.Value,
-            shipment.PlannedAt);
+            shipment.PlannedAt,
+            [.. shipment.Assignments.Select(assignment => ShipmentAssignmentView.Of(assignment, carriers))]);
     }
 }

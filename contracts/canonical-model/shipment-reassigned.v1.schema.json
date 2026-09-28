@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/shipment-reassigned.v1.schema.json",
+  "title": "ShipmentReassigned",
+  "description": "A Planner reassigned a Planned Shipment to Own fleet or another Carrier, to fix a mistake before release, and the TMS recorded it in the Shipment's history of assignments (Canonical Model event, version 1). The Shipment and its Shipment number stay the same. Carries what ShipmentPlanned carries, for the new assignment, plus who carried the Shipment before. Published on the Shipment events topic, under the correlation ID of the reassignment, which starts a Message trail of its own; the Transport Order number links it to the Transport Order's intake. The message's assignedTo property repeats who carries the Shipment now, for subscriptions to filter on.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "shipmentNumber", "transportOrderNumber", "shipperId", "assignedTo", "carrierId", "previousAssignedTo", "previousCarrierId"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "const": "ShipmentReassigned" },
+    "eventVersion": { "const": 1 },
+    "occurredAt": { "description": "When the Shipment was reassigned.", "type": "string", "format": "date-time" },
+    "correlationId": { "description": "The reassignment's own correlation ID, not the planning's or the intake's.", "type": "string", "minLength": 1 },
+    "shipmentNumber": { "description": "The Shipment's number, the same as when it was planned.", "type": "string", "pattern": "^SH-[0-9]{7}$" },
+    "transportOrderNumber": { "description": "The Transport Order the Shipment carries out; each has exactly one Shipment.", "type": "string", "pattern": "^TO-[0-9]{7}$" },
+    "shipperId": { "description": "The Shipper of the Transport Order.", "type": "string", "minLength": 1 },
+    "assignedTo": { "description": "Who carries the Shipment now: Norvia's Own fleet or a Carrier.", "enum": ["OwnFleet", "Carrier"] },
+    "carrierId": { "description": "The Carrier that carries the Shipment now; null for Own fleet.", "type": ["string", "null"], "minLength": 1 },
+    "previousAssignedTo": { "description": "Who carried the Shipment before the reassignment: Norvia's Own fleet or a Carrier.", "enum": ["OwnFleet", "Carrier"] },
+    "previousCarrierId": { "description": "The Carrier that carried the Shipment before the reassignment; null for Own fleet.", "type": ["string", "null"], "minLength": 1 }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "assignedTo": { "const": "Carrier" } } },
+      "then": { "properties": { "carrierId": { "type": "string" } } },
+      "else": { "properties": { "carrierId": { "type": "null" } } }
+    },
+    {
+      "if": { "properties": { "previousAssignedTo": { "const": "Carrier" } } },
+      "then": { "properties": { "previousCarrierId": { "type": "string" } } },
+      "else": { "properties": { "previousCarrierId": { "type": "null" } } }
+    }
+  ]
+}
