@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Norvia.Tms.Application.IntegrationEvents;
-using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Application.Shipments;
+using Norvia.Tms.Domain.Shipments;
 
 namespace Norvia.Tms.Application.TransportOrders.Assign;
 
