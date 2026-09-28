@@ -114,7 +114,9 @@ internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTr
 
     /// <summary>
     /// The request a span belongs to: the nearest span above it that served a call or received a message, within the
-    /// same application. Logs written during a database call in a request are the request's.
+    /// same application. Logs written during a database call in a request are the request's. With no such span, as for
+    /// a worker or a Blazor event, it is the topmost span the application started itself, which names what it did,
+    /// rather than a framework's, such as Blazor's for the event; or the topmost span when the application started none.
     /// </summary>
     private static string EntryOf(string spanId, Dictionary<string, Span> spans)
     {
@@ -123,6 +125,7 @@ internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTr
             return spanId;
         }
 
+        var own = span.IsFramework ? null : span;
         var seen = new HashSet<string>(StringComparer.Ordinal) { span.SpanId };
         while (span.Kind is not (ServerSpan or ConsumerSpan)
             && span.ParentSpanId is { } parentId
@@ -131,9 +134,10 @@ internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTr
             && seen.Add(parent.SpanId))
         {
             span = parent;
+            own = span.IsFramework ? own : span;
         }
 
-        return span.SpanId;
+        return span.Kind is ServerSpan or ConsumerSpan ? span.SpanId : (own ?? span).SpanId;
     }
 
     private static BusinessKey[] BusinessKeysOf(IEnumerable<TrackedRecord> records) =>
@@ -177,8 +181,7 @@ internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTr
             [
                 .. ItemsOf(DataOf(trace), "resourceSpans")
                     .SelectMany(resource => ItemsOf(resource, "scopeSpans")
-                        .SelectMany(scope => ItemsOf(scope, "spans"))
-                        .Select(span => Span.From(span, ServiceOf(resource))))
+                        .SelectMany(scope => ItemsOf(scope, "spans").Select(span => Span.From(span, ServiceOf(resource), CategoryOf(scope)))))
                     .OfType<Span>(),
             ];
     }
@@ -241,12 +244,13 @@ internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTr
 
     /// <summary>
     /// A span reduced to what places and names a hop: its parent, its application, its name, the method and path a
-    /// request called, and its times.
+    /// request called, its times, and whether a framework started it rather than the application.
     /// </summary>
     private sealed record Span(
-        string SpanId, string? ParentSpanId, string Resource, string Name, string? Method, string? Path, int Kind, DateTimeOffset Start, DateTimeOffset? End)
+        string SpanId, string? ParentSpanId, string Resource, string Name, string? Method, string? Path, int Kind, DateTimeOffset Start, DateTimeOffset? End, bool IsFramework)
     {
-        public static Span? From(JsonElement span, string resource) =>
+        // A span's scope is the activity source that started it, and the frameworks name theirs as their logging categories.
+        public static Span? From(JsonElement span, string resource, string? scope) =>
             StringOf(span, "spanId") is { Length: > 0 } spanId && TimeOf(span, "startTimeUnixNano") is { } start
                 ? new Span(
                     spanId,
@@ -257,7 +261,8 @@ internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTr
                     AttributeOf(span, "url.path"),
                     span.TryGetProperty("kind", out var kind) && kind.ValueKind == JsonValueKind.Number ? kind.GetInt32() : 0,
                     start,
-                    TimeOf(span, "endTimeUnixNano"))
+                    TimeOf(span, "endTimeUnixNano"),
+                    FrameworkLogs.Wrote(scope))
                 : null;
     }
 

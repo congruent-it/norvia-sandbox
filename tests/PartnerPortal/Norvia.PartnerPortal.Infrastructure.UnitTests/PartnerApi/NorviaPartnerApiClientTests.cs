@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging.Testing;
@@ -14,6 +15,9 @@ public sealed class NorviaPartnerApiClientTests : IDisposable
     private readonly StubHandler _partnerApi = new();
     private readonly IPersonaTokens _tokens = Substitute.For<IPersonaTokens>();
     private readonly FakeLogger<NorviaPartnerApiClient> _logger = new();
+    private readonly PortalActivities _activities = new("Norvia.PartnerPortal.Web.Tests");
+    private readonly List<Activity> _spans = [];
+    private readonly ActivityListener _listener;
     private readonly HttpClient _http;
     private readonly NorviaPartnerApiClient _client;
 
@@ -27,11 +31,20 @@ public sealed class NorviaPartnerApiClientTests : IDisposable
             PersonaClientIds = "brouwer-dranken=client-1;van-dijk-transport=client-2",
             SubscriptionKeys = new() { ["brouwer-dranken"] = "brouwer-key", ["van-dijk-transport"] = "van-dijk-key" },
         });
-        _client = new NorviaPartnerApiClient(_http, _tokens, options, _logger);
+        _client = new NorviaPartnerApiClient(_http, _tokens, options, _activities, _logger);
+        _listener = new ActivityListener
+        {
+            ShouldListenTo = source => source == _activities.Source,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStopped = _spans.Add,
+        };
+        ActivitySource.AddActivityListener(_listener);
     }
 
     public void Dispose()
     {
+        _listener.Dispose();
+        _activities.Dispose();
         _http.Dispose();
         _partnerApi.Dispose();
     }
@@ -240,6 +253,55 @@ public sealed class NorviaPartnerApiClientTests : IDisposable
             .And.Contain("transportOrderNumber", "TO-0000042");
     }
 
+    [Theory]
+    [InlineData(HttpStatusCode.Created, "PartnerApi/samples/responses/accepted.json")]
+    [InlineData(HttpStatusCode.OK, "PartnerApi/samples/responses/already-booked.json")]
+    public async Task SubmitAsync_Booked_RecordsItSucceeded(HttpStatusCode status, string answer)
+    {
+        _partnerApi.Answer(status, Contracts.Read(answer));
+
+        await SubmitAsync(Samples.FullBooking());
+
+        ScopeOf(_logger.LatestRecord).Should().Contain("outcome", "Succeeded")
+            .And.NotContainKey("failureCode", "a key that doesn't apply is left out, never sent empty");
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.UnprocessableEntity, "PartnerApi/samples/responses/rejected.json", "Refused", "TransportOrderRejected")]
+    [InlineData(HttpStatusCode.BadGateway, "PartnerApi/samples/responses/not-received.json", "Failed", "BookingNotReceived")]
+    public async Task SubmitAsync_NotBooked_RecordsTheOutcome_WithItsFailureCode_AsTheIntakesOtherHopsDo(
+        HttpStatusCode status, string answer, string outcome, string failureCode)
+    {
+        _partnerApi.Answer(status, Contracts.Read(answer));
+
+        await SubmitAsync(Samples.FullBooking());
+
+        ScopeOf(_logger.LatestRecord).Should().Contain("outcome", outcome).And.Contain("failureCode", failureCode);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_RefusedAtTheEdge_RecordsItRefused()
+    {
+        _partnerApi.Answer(HttpStatusCode.Forbidden, """{ "messageId": "corr-403", "text": "This client may not submit Transport Orders." }""", correlationId: "corr-403");
+
+        await SubmitAsync(Samples.FullBooking());
+
+        ScopeOf(_logger.LatestRecord).Should().Contain("outcome", "Refused").And.NotContainKey("failureCode");
+    }
+
+    [Fact]
+    public async Task SubmitAsync_SendsTheBookingInASpanOfItsOwn_WhichTheAnswersLogIsWrittenIn()
+    {
+        // The Integration console names the portal's hop after it, not after Blazor's span for the form's submit event.
+        _partnerApi.Answer(HttpStatusCode.Created, Contracts.Read("PartnerApi/samples/responses/accepted.json"));
+
+        await SubmitAsync(Samples.FullBooking());
+
+        var span = _spans.Should().ContainSingle().Subject;
+        span.DisplayName.Should().Be("Send booking");
+        _logger.LatestRecord.Timestamp.UtcDateTime.Should().BeOnOrAfter(span.StartTimeUtc).And.BeOnOrBefore(span.StartTimeUtc + span.Duration);
+    }
+
     [Fact]
     public async Task SubmitAsync_CancelledByTheCaller_Throws()
     {
@@ -251,6 +313,9 @@ public sealed class NorviaPartnerApiClientTests : IDisposable
 
         await submit.Should().ThrowAsync<OperationCanceledException>();
     }
+
+    private static Dictionary<string, object?> ScopeOf(FakeLogRecord record) =>
+        record.Scopes.OfType<IEnumerable<KeyValuePair<string, object?>>>().SelectMany(keys => keys).ToDictionary();
 
     private Task<NorviaAnswer> SubmitAsync(BookingRequest booking) =>
         _client.SubmitAsync(Samples.BrouwerDranken, booking, TestContext.Current.CancellationToken);

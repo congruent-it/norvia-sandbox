@@ -16,6 +16,7 @@ public sealed class DashboardTrailSourceTests : IDisposable
     private const string Trace = "4bf92f3577b34da6a3ce929d0e0e4736";
 
     // OTLP's span kinds.
+    private const int Internal = 1;
     private const int Server = 2;
     private const int Client = 3;
     private const int Consumer = 5;
@@ -196,6 +197,47 @@ public sealed class DashboardTrailSourceTests : IDisposable
         var hops = await HopsAsync(Booked);
 
         hops.Should().ContainSingle().Which.Name.Should().Be("tms-api: POST /v1/transport-orders/TO-0000042/assign");
+    }
+
+    [Fact]
+    public async Task HopsAsync_ACallFromABlazorEvent_IsNamedByTheApplicationsOwnSpan_NotByTheFrameworksEvent()
+    {
+        // A booking from the Partner portal: Blazor's span for the form's submit event, the portal's own span for sending
+        // the booking, and HttpClient's call to the Partner API, which the stand-in serves.
+        _dashboard
+            .AddSpan("partner-portal-web", Trace, "e0e0e0e0e0e0e0e0", null, "Event onsubmit -> Microsoft.AspNetCore.Components.Forms.EditForm.HandleSubmitAsync", Internal,
+                Now.AddSeconds(-11), Now.AddSeconds(-8), scope: "Microsoft.AspNetCore.Components")
+            .AddSpan("partner-portal-web", Trace, "f1f1f1f1f1f1f1f1", "e0e0e0e0e0e0e0e0", "Send booking", Internal,
+                Now.AddMilliseconds(-10_900), Now.AddMilliseconds(-8_500), scope: "Norvia.PartnerPortal.Web")
+            .AddSpan("partner-portal-web", Trace, "c0c0c0c0c0c0c0c0", "f1f1f1f1f1f1f1f1", "POST", Client,
+                Now.AddMilliseconds(-10_800), Now.AddMilliseconds(-8_600), scope: "System.Net.Http")
+            .AddSpan("partner-api", Trace, "a1a1a1a1a1a1a1a1", "c0c0c0c0c0c0c0c0", "POST /partner/v1/transport-orders", Server,
+                Now.AddSeconds(-10), Now.AddSeconds(-9), Called("POST", "/partner/v1/transport-orders"))
+            .Add("partner-portal-web", Now.AddMilliseconds(-8_550), new() { ["correlationId"] = Booked, ["flow"] = "transport-order-intake", ["outcome"] = "Succeeded" },
+                traceId: Trace, spanId: "f1f1f1f1f1f1f1f1", category: "Norvia.PartnerPortal.Infrastructure.PartnerApi.NorviaPartnerApiClient")
+            .Add("partner-api", Now.AddMilliseconds(-9_100), new() { ["correlationId"] = Booked, ["outcome"] = "Succeeded" }, traceId: Trace, spanId: "a1a1a1a1a1a1a1a1");
+
+        var hops = await HopsAsync(Booked);
+
+        hops.Should().BeEquivalentTo(
+        [
+            new { Id = "f1f1f1f1f1f1f1f1", CausedBy = (string?)null, Name = "partner-portal-web: Send booking", Outcome = (Outcome?)Outcome.Succeeded },
+            new { Id = "a1a1a1a1a1a1a1a1", CausedBy = (string?)"f1f1f1f1f1f1f1f1", Name = "partner-api: POST /partner/v1/transport-orders", Outcome = (Outcome?)Outcome.Succeeded },
+        ]);
+    }
+
+    [Fact]
+    public async Task HopsAsync_ARecordOnlyUnderAFrameworksSpan_IsNamedByThatSpan()
+    {
+        // Nothing of the application's own names the hop better.
+        _dashboard
+            .AddSpan("partner-portal-web", Trace, "e0e0e0e0e0e0e0e0", null, "Event onsubmit -> Microsoft.AspNetCore.Components.Forms.EditForm.HandleSubmitAsync", Internal,
+                Now.AddSeconds(-11), Now.AddSeconds(-8), scope: "Microsoft.AspNetCore.Components")
+            .Add("partner-portal-web", Now.AddSeconds(-9), new() { ["correlationId"] = Booked }, traceId: Trace, spanId: "e0e0e0e0e0e0e0e0");
+
+        var hops = await HopsAsync(Booked);
+
+        hops.Should().ContainSingle().Which.Name.Should().Be("partner-portal-web: Event onsubmit -> Microsoft.AspNetCore.Components.Forms.EditForm.HandleSubmitAsync");
     }
 
     [Fact]
