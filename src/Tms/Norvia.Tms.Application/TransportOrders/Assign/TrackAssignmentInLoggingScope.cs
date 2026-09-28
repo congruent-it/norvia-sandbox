@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Norvia.Tms.Application.IntegrationEvents;
+using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Application.Shipments;
 
 namespace Norvia.Tms.Application.TransportOrders.Assign;
@@ -9,7 +10,7 @@ namespace Norvia.Tms.Application.TransportOrders.Assign;
 /// does, with the Transport Order number for the whole call, as the call names no Shipment yet.
 /// </summary>
 public sealed partial class TrackAssignmentInLoggingScope(ILogger<TrackAssignmentInLoggingScope> logger)
-    : TrackPlanningInLoggingScope<AssignTransportOrderCommand, AssignTransportOrderResult>(logger, "Assignment")
+    : TrackPlanningInLoggingScope<AssignTransportOrderCommand, AssignTransportOrderResult>(logger, PlanningAction.Assignment)
 {
     protected override (string CorrelationId, string NumberKey, string Number) TrailOf(AssignTransportOrderCommand message)
     {

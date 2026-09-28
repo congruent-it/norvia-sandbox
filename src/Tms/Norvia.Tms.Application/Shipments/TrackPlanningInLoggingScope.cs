@@ -3,6 +3,7 @@ using Ardalis.Result;
 using Mediator;
 using Microsoft.Extensions.Logging;
 using Norvia.Tms.Application.IntegrationEvents;
+using Norvia.Tms.Domain.Shipments;
 
 namespace Norvia.Tms.Application.Shipments;
 
@@ -14,8 +15,8 @@ namespace Norvia.Tms.Application.Shipments;
 /// refuses records Refused, with its <c>failureCode</c>. A repeat's outcome is traced on the trail of the action it
 /// repeats. The API's request scope carries <c>flow</c>. Each action says only how its outcome reads.
 /// </summary>
-/// <param name="action">The action's name, such as "Release", for the repeat and refusal messages.</param>
-public abstract partial class TrackPlanningInLoggingScope<TCommand, TOutcome>(ILogger logger, string action)
+/// <param name="action">The action, which the repeat and refusal messages name.</param>
+public abstract partial class TrackPlanningInLoggingScope<TCommand, TOutcome>(ILogger logger, PlanningAction action)
     : IPipelineBehavior<TCommand, Result<TOutcome>>
     where TCommand : IMessage
     where TOutcome : IPlanningOutcome
@@ -114,8 +115,8 @@ public abstract partial class TrackPlanningInLoggingScope<TCommand, TOutcome>(IL
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "{Action} of Transport Order {TransportOrderNumber}, Shipment {ShipmentNumber}, answered as a repeat")]
-    private static partial void LogRepeat(ILogger logger, string action, string transportOrderNumber, string shipmentNumber);
+    private static partial void LogRepeat(ILogger logger, PlanningAction action, string transportOrderNumber, string shipmentNumber);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "{Action} refused with {FailureCode}: {Reason}")]
-    private static partial void LogRefused(ILogger logger, string action, string failureCode, string reason);
+    private static partial void LogRefused(ILogger logger, PlanningAction action, string failureCode, string reason);
 }

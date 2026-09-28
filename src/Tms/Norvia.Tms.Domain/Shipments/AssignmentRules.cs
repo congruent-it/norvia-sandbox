@@ -35,22 +35,21 @@ public static class AssignmentRules
     public static AssignmentRefusal? CheckReassignment(Shipment shipment, CarrierId? carrierId, Carrier? carrier)
     {
         ArgumentNullException.ThrowIfNull(shipment);
-        return CheckShipment(shipment, "reassigned") ?? CheckCarrier(carrierId, carrier) ?? CheckChange(shipment, carrierId);
+        return CheckShipment(shipment, PlanningAction.Reassignment) ?? CheckCarrier(carrierId, carrier) ?? CheckChange(shipment, carrierId);
     }
 
     /// <summary>Returns the rule the release breaks, or null when it breaks none: only a Planned Shipment can be released.</summary>
     public static AssignmentRefusal? CheckRelease(Shipment shipment)
     {
         ArgumentNullException.ThrowIfNull(shipment);
-        return CheckShipment(shipment, "released");
+        return CheckShipment(shipment, PlanningAction.Release);
     }
 
-    /// <param name="action">What is done to the Shipment, such as "released", for the message.</param>
-    private static AssignmentRefusal? CheckShipment(Shipment shipment, string action) => shipment.Status == ShipmentStatus.Planned
+    private static AssignmentRefusal? CheckShipment(Shipment shipment, PlanningAction action) => shipment.Status == ShipmentStatus.Planned
         ? null
         : new(
             AssignmentRefusalCode.ShipmentNotPlanned,
-            Invariant($"Shipment {shipment.Number} is {shipment.Status}. Only a Planned Shipment can be {action}."));
+            Invariant($"Shipment {shipment.Number} is {shipment.Status}. Only a Planned Shipment can be {action.Done()}."));
 
     private static AssignmentRefusal? CheckChange(Shipment shipment, CarrierId? carrierId) => shipment.CarriedBy.CarrierId == carrierId
         ? new(AssignmentRefusalCode.AssignmentUnchanged, Invariant($"Shipment {shipment.Number} is assigned to {shipment.CarriedBy} already."))

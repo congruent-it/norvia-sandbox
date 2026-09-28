@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Norvia.Tms.Application.IntegrationEvents;
+using Norvia.Tms.Domain.Shipments;
 
 namespace Norvia.Tms.Application.Shipments.Release;
 
@@ -8,7 +9,7 @@ namespace Norvia.Tms.Application.Shipments.Release;
 /// does, with the Shipment number for the whole call.
 /// </summary>
 public sealed partial class TrackReleaseInLoggingScope(ILogger<TrackReleaseInLoggingScope> logger)
-    : TrackPlanningInLoggingScope<ReleaseShipmentCommand, ReleaseShipmentResult>(logger, "Release")
+    : TrackPlanningInLoggingScope<ReleaseShipmentCommand, ReleaseShipmentResult>(logger, PlanningAction.Release)
 {
     protected override (string CorrelationId, string NumberKey, string Number) TrailOf(ReleaseShipmentCommand message)
     {

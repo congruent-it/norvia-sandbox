@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Norvia.Tms.Application.IntegrationEvents;
+using Norvia.Tms.Domain.Shipments;
 
 namespace Norvia.Tms.Application.Shipments.Reassign;
 
@@ -8,7 +9,7 @@ namespace Norvia.Tms.Application.Shipments.Reassign;
 /// does, with the Shipment number for the whole call.
 /// </summary>
 public sealed partial class TrackReassignmentInLoggingScope(ILogger<TrackReassignmentInLoggingScope> logger)
-    : TrackPlanningInLoggingScope<ReassignShipmentCommand, ReassignShipmentResult>(logger, "Reassignment")
+    : TrackPlanningInLoggingScope<ReassignShipmentCommand, ReassignShipmentResult>(logger, PlanningAction.Reassignment)
 {
     protected override (string CorrelationId, string NumberKey, string Number) TrailOf(ReassignShipmentCommand message)
     {

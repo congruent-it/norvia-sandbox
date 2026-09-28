@@ -10,6 +10,7 @@ using Norvia.Tms.Application.Shipments.GetByNumber;
 using Norvia.Tms.Application.Shipments.ListToRelease;
 using Norvia.Tms.Application.Shipments.Reassign;
 using Norvia.Tms.Application.Shipments.Release;
+using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TransportOrders;
 
 namespace Norvia.Tms.Api.Shipments;
@@ -83,7 +84,7 @@ public static class ShipmentEndpoints
         IMediator mediator,
         CancellationToken cancellationToken)
     {
-        var errors = AssignmentCalls.Check("A reassignment", idempotencyKey, reassignment.AssignedTo, reassignment.CarrierId);
+        var errors = AssignmentCalls.Check(PlanningAction.Reassignment, idempotencyKey, reassignment.AssignedTo, reassignment.CarrierId);
         if (errors.Count > 0)
         {
             return TypedResults.ValidationProblem(errors);
@@ -104,7 +105,7 @@ public static class ShipmentEndpoints
         IMediator mediator,
         CancellationToken cancellationToken)
     {
-        var errors = AssignmentCalls.Check("A release", idempotencyKey);
+        var errors = AssignmentCalls.Check(PlanningAction.Release, idempotencyKey);
         if (errors.Count > 0)
         {
             return TypedResults.ValidationProblem(errors);

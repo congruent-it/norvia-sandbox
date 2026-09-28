@@ -21,9 +21,6 @@ public sealed record ShipmentPlannedV1(
     string? CarrierId)
     : IntegrationEvent(EventId, OccurredAt, CorrelationId)
 {
-    /// <summary>The message property that says whether the Shipment is carried by Own fleet or a Carrier.</summary>
-    public const string AssignedToProperty = "assignedTo";
-
     public override string EventType => "ShipmentPlanned";
 
     public override int EventVersion => 1;
@@ -54,6 +51,6 @@ public sealed record ShipmentPlannedV1(
 
     protected override IEnumerable<KeyValuePair<string, object>> FilterProperties() =>
     [
-        new(AssignedToProperty, AssignedTo),
+        new(ShipmentEventProperties.AssignedTo, AssignedTo),
     ];
 }

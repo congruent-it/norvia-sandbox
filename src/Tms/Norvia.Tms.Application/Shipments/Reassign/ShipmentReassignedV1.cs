@@ -1,5 +1,4 @@
 using Norvia.Tms.Application.IntegrationEvents;
-using Norvia.Tms.Application.TransportOrders.Assign;
 using Norvia.Tms.Domain.Shipments;
 
 namespace Norvia.Tms.Application.Shipments.Reassign;
@@ -59,6 +58,6 @@ public sealed record ShipmentReassignedV1(
 
     protected override IEnumerable<KeyValuePair<string, object>> FilterProperties() =>
     [
-        new(ShipmentPlannedV1.AssignedToProperty, AssignedTo),
+        new(ShipmentEventProperties.AssignedTo, AssignedTo),
     ];
 }

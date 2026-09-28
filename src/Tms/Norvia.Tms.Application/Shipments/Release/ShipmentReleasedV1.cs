@@ -1,6 +1,5 @@
 using Norvia.Tms.Application.CanonicalModel;
 using Norvia.Tms.Application.IntegrationEvents;
-using Norvia.Tms.Application.TransportOrders.Assign;
 using Norvia.Tms.Domain.Shipments;
 
 namespace Norvia.Tms.Application.Shipments.Release;
@@ -58,6 +57,6 @@ public sealed record ShipmentReleasedV1(
     // P4's subscription filters on it, for Carrier Shipments only.
     protected override IEnumerable<KeyValuePair<string, object>> FilterProperties() =>
     [
-        new(ShipmentPlannedV1.AssignedToProperty, AssignedTo),
+        new(ShipmentEventProperties.AssignedTo, AssignedTo),
     ];
 }

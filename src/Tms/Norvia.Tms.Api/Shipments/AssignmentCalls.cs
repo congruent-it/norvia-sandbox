@@ -11,31 +11,29 @@ namespace Norvia.Tms.Api.Shipments;
 internal static class AssignmentCalls
 {
     /// <summary>The call's errors: an idempotency key, and a Carrier named exactly when the call assigns to one.</summary>
-    /// <param name="action">What the call does, such as "An assignment", for the messages.</param>
-    public static Dictionary<string, string[]> Check(string action, string? idempotencyKey, AssignedTo assignedTo, string? carrierId)
+    public static Dictionary<string, string[]> Check(PlanningAction action, string? idempotencyKey, AssignedTo assignedTo, string? carrierId)
     {
         var errors = Check(action, idempotencyKey);
         if (assignedTo == AssignedTo.Carrier && string.IsNullOrWhiteSpace(carrierId))
         {
-            errors["CarrierId"] = [$"{action} to a Carrier names the Carrier."];
+            errors["CarrierId"] = [$"{action.AsSubject()} to a Carrier names the Carrier."];
         }
         else if (assignedTo == AssignedTo.OwnFleet && carrierId is not null)
         {
-            errors["CarrierId"] = [$"{action} to Own fleet names no Carrier."];
+            errors["CarrierId"] = [$"{action.AsSubject()} to Own fleet names no Carrier."];
         }
 
         return errors;
     }
 
     /// <summary>The call's errors: an idempotency key, the same for each retry.</summary>
-    /// <param name="action">What the call does, such as "A release", for the message.</param>
-    public static Dictionary<string, string[]> Check(string action, string? idempotencyKey)
+    public static Dictionary<string, string[]> Check(PlanningAction action, string? idempotencyKey)
     {
         var errors = new Dictionary<string, string[]>();
         if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Length > IdempotencyKey.MaxLength)
         {
             errors[TransportOrderEndpoints.IdempotencyKeyHeader] =
-                [$"{action} needs an {TransportOrderEndpoints.IdempotencyKeyHeader} of 1 to {IdempotencyKey.MaxLength} characters, the same for each retry."];
+                [$"{action.AsSubject()} needs an {TransportOrderEndpoints.IdempotencyKeyHeader} of 1 to {IdempotencyKey.MaxLength} characters, the same for each retry."];
         }
 
         return errors;
