@@ -1,10 +1,12 @@
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Microsoft.Extensions.Time.Testing;
+using Norvia.Tms.Application.CarrierBookings;
 using Norvia.Tms.Application.Carriers;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shipments.Release;
 using Norvia.Tms.Application.UnitTests.TransportOrders;
+using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Carriers;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TransportOrders;
@@ -15,9 +17,12 @@ namespace Norvia.Tms.Application.UnitTests.Shipments;
 public sealed class ReleaseShipmentHandlerTests
 {
     private static readonly CarrierId VanDijk = new("CAR-0001");
+    private static readonly CarrierBookingNumber BookingNumber = CarrierBookingNumber.FromSequence(1);
 
     private readonly IRepository<Shipment> _shipments = Substitute.For<IRepository<Shipment>>();
     private readonly IRepository<TransportOrder> _transportOrders = Substitute.For<IRepository<TransportOrder>>();
+    private readonly IRepository<CarrierBooking> _carrierBookings = Substitute.For<IRepository<CarrierBooking>>();
+    private readonly ICarrierBookingNumbers _carrierBookingNumbers = Substitute.For<ICarrierBookingNumbers>();
     private readonly ICarrierDirectory _carriers = Substitute.For<ICarrierDirectory>();
     private readonly FakeTimeProvider _time = new(Samples.Now.AddHours(3));
     private readonly ReleaseShipmentHandler _handler;
@@ -25,11 +30,12 @@ public sealed class ReleaseShipmentHandlerTests
     public ReleaseShipmentHandlerTests()
     {
         _carriers.Find(VanDijk).Returns(new Carrier(VanDijk, "Van Dijk Transport", true));
-        _handler = new ReleaseShipmentHandler(_shipments, _transportOrders, _carriers, _time);
+        _carrierBookingNumbers.NextAsync(Arg.Any<CancellationToken>()).Returns(BookingNumber);
+        _handler = new ReleaseShipmentHandler(_shipments, _transportOrders, _carrierBookings, _carrierBookingNumbers, _carriers, _time);
     }
 
     [Fact]
-    public async Task Handle_PlannedCarrierShipment_ReleasesIt_AndSaysWhoCarriesIt()
+    public async Task Handle_PlannedCarrierShipment_ReleasesIt_AndCreatesItsCarrierBookingRequested()
     {
         var (order, shipment) = PlannedShipment(CarriedBy.Carrier(VanDijk));
 
@@ -41,11 +47,33 @@ public sealed class ReleaseShipmentHandlerTests
             ShipmentStatus.Released,
             new CarriedByView(AssignedTo.Carrier, new CarrierView("CAR-0001", "Van Dijk Transport")),
             "SHP-0001",
-            "corr-release"));
+            "corr-release",
+            "CB-0000001"));
         shipment.Status.Should().Be(ShipmentStatus.Released);
-        shipment.LastRelease.Should().Be(new ShipmentRelease(new("corr-release"), Samples.Now.AddHours(3), new("key-rel1")));
+        shipment.LastRelease.Should().Be(new ShipmentRelease(new("corr-release"), Samples.Now.AddHours(3), new("key-rel1"), BookingNumber));
         shipment.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<ShipmentReleasedEvent>()
             .Which.TransportOrder.Should().BeSameAs(order);
+        await _carrierBookings.Received(1).AddAsync(
+            Arg.Is<CarrierBooking>(booking =>
+                booking.Number == BookingNumber
+                && booking.ShipmentId == shipment.Id
+                && booking.ShipmentNumber == shipment.Number
+                && booking.CarrierId == VanDijk
+                && booking.Status == CarrierBookingStatus.Requested
+                && booking.CorrelationId == new CorrelationId("corr-release")),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_PlannedOwnFleetShipment_ReleasesIt_WithNoCarrierBookingNumber_AndCreatesNoCarrierBooking()
+    {
+        PlannedShipment(CarriedBy.OwnFleet);
+
+        var result = await _handler.Handle(new ReleaseShipmentCommand("SH-0000012", "key-rel1", "corr-release"), CancellationToken.None);
+
+        result.Value.CarrierBookingNumber.Should().BeNull();
+        await _carrierBookingNumbers.DidNotReceive().NextAsync(Arg.Any<CancellationToken>());
+        await _carrierBookings.DidNotReceive().AddAsync(Arg.Any<CarrierBooking>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -63,7 +91,7 @@ public sealed class ReleaseShipmentHandlerTests
     public async Task Handle_TheSameReleaseSentAgain_AnswersAsBeforeWithoutReleasingAgain()
     {
         var (order, shipment) = PlannedShipment(CarriedBy.Carrier(VanDijk));
-        shipment.Release(order, new("key-rel1"), new("corr-release"), Samples.Now.AddHours(3));
+        shipment.Release(order, new("key-rel1"), new("corr-release"), Samples.Now.AddHours(3), BookingNumber);
         shipment.ClearDomainEvents();
 
         var result = await _handler.Handle(new ReleaseShipmentCommand("SH-0000012", "key-rel1", "corr-retry"), CancellationToken.None);
@@ -75,16 +103,18 @@ public sealed class ReleaseShipmentHandlerTests
             new CarriedByView(AssignedTo.Carrier, new CarrierView("CAR-0001", "Van Dijk Transport")),
             "SHP-0001",
             "corr-release",
+            "CB-0000001",
             Repeat: true));
         shipment.DomainEvents.Should().BeEmpty();
         await _shipments.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+        await _carrierBookings.DidNotReceive().AddAsync(Arg.Any<CarrierBooking>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task Handle_ReleasedShipmentUnderAnotherKey_IsRefusedAsNotPlanned_AndChangesNothing()
     {
         var (order, shipment) = PlannedShipment(CarriedBy.Carrier(VanDijk));
-        shipment.Release(order, new("key-rel1"), new("corr-release"), Samples.Now.AddHours(3));
+        shipment.Release(order, new("key-rel1"), new("corr-release"), Samples.Now.AddHours(3), BookingNumber);
         shipment.ClearDomainEvents();
 
         var result = await _handler.Handle(new ReleaseShipmentCommand("SH-0000012", "key-rel2", "corr-release-2"), CancellationToken.None);

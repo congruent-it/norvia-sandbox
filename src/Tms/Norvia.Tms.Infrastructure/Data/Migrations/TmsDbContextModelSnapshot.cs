@@ -23,9 +23,57 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.HasSequence("CarrierBookingNumbers");
+
             modelBuilder.HasSequence("ShipmentNumbers");
 
             modelBuilder.HasSequence("TransportOrderNumbers");
+
+            modelBuilder.Entity("Norvia.Tms.Domain.CarrierBookings.CarrierBooking", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CarrierId")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("ShipmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ShipmentNumber")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Number")
+                        .IsUnique();
+
+                    b.HasIndex("ShipmentId");
+
+                    b.ToTable("CarrierBookings", (string)null);
+                });
 
             modelBuilder.Entity("Norvia.Tms.Domain.Shipments.Shipment", b =>
                 {
@@ -84,6 +132,11 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
 
                     b.ComplexProperty(typeof(Dictionary<string, object>), "LastRelease", "Norvia.Tms.Domain.Shipments.Shipment.LastRelease#ShipmentRelease", b1 =>
                         {
+                            b1.Property<string>("CarrierBookingNumber")
+                                .HasMaxLength(10)
+                                .HasColumnType("nvarchar(10)")
+                                .HasColumnName("CarrierBookingNumber");
+
                             b1.Property<string>("CorrelationId")
                                 .IsRequired()
                                 .HasMaxLength(128)
@@ -263,6 +316,15 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                         .HasFilter("[PublishedAt] IS NULL");
 
                     b.ToTable("OutboxMessages", (string)null);
+                });
+
+            modelBuilder.Entity("Norvia.Tms.Domain.CarrierBookings.CarrierBooking", b =>
+                {
+                    b.HasOne("Norvia.Tms.Domain.Shipments.Shipment", null)
+                        .WithMany()
+                        .HasForeignKey("ShipmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Norvia.Tms.Domain.Shipments.Shipment", b =>
