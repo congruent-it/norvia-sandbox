@@ -6,9 +6,12 @@ namespace Norvia.Tms.Api.IntegrationTests.TransportOrders;
 
 internal static class CanonicalModelSchemas
 {
+    // The events that carry a whole Transport Order refer to its schema, which the registry takes only once.
+    private static readonly Lazy<JsonSchema> TransportOrderSchema = new(() => Load("transport-order.v1.schema.json"));
+
     private static readonly Lazy<JsonSchema> TransportOrderAcceptedSchema = new(() =>
     {
-        Load("transport-order.v1.schema.json");
+        _ = TransportOrderSchema.Value;
         return Load("transport-order-accepted.v1.schema.json");
     });
 
@@ -22,9 +25,17 @@ internal static class CanonicalModelSchemas
 
     private static readonly Lazy<JsonSchema> ShipmentReassignedSchema = new(() => Load("shipment-reassigned.v1.schema.json"));
 
+    private static readonly Lazy<JsonSchema> ShipmentReleasedSchema = new(() =>
+    {
+        _ = TransportOrderSchema.Value;
+        return Load("shipment-released.v1.schema.json");
+    });
+
     public static EvaluationResults ValidateShipmentPlanned(JsonNode body) => Validate(ShipmentPlannedSchema.Value, body);
 
     public static EvaluationResults ValidateShipmentReassigned(JsonNode body) => Validate(ShipmentReassignedSchema.Value, body);
+
+    public static EvaluationResults ValidateShipmentReleased(JsonNode body) => Validate(ShipmentReleasedSchema.Value, body);
 
     public static EvaluationResults ValidateTransportOrderAccepted(JsonNode body) => Validate(TransportOrderAcceptedSchema.Value, body);
 

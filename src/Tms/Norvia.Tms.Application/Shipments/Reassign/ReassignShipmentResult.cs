@@ -15,4 +15,4 @@ public sealed record ReassignShipmentResult(
     CarriedByView PreviouslyCarriedBy,
     string ShipperId,
     string CorrelationId,
-    bool Repeat = false);
+    bool Repeat = false) : IPlanningOutcome;

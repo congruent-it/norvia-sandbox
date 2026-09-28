@@ -16,7 +16,7 @@ public sealed class ReassignShipmentHandler(IRepository<Shipment> shipments, ICa
         ArgumentNullException.ThrowIfNull(command);
 
         if (!ShipmentNumber.TryParse(command.ShipmentNumber, out var number)
-            || await shipments.SingleOrDefaultAsync(new ShipmentToReassignSpec(number), cancellationToken) is not { } shipment)
+            || await shipments.SingleOrDefaultAsync(new ShipmentToChangeSpec(number), cancellationToken) is not { } shipment)
         {
             return AssignmentRefused.Because<ReassignShipmentResult>(AssignmentRules.ShipmentNotFound(command.ShipmentNumber));
         }

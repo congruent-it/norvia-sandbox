@@ -6,7 +6,7 @@ using Norvia.Tms.Api.IntegrationTests.TransportOrders;
 
 namespace Norvia.Tms.Api.IntegrationTests.Planning;
 
-/// <summary>What the planning tests do at the TMS's boundary: assign as the TMS UI does, and read the query API.</summary>
+/// <summary>What the planning tests do at the TMS's boundary: assign, reassign and release as the TMS UI does, and read the query API.</summary>
 internal static class PlanningCalls
 {
     /// <summary>The test seed's own active Carrier.</summary>
@@ -88,6 +88,42 @@ internal static class PlanningCalls
         return JsonNode.Parse(body)!;
     }
 
+    /// <summary>Releases the Shipment as the Planner does, through the TMS UI, under the given idempotency key or a new one.</summary>
+    public static async Task<HttpResponseMessage> ReleaseAsync(
+        this TmsFixture tms, string shipmentNumber, CancellationToken cancellationToken, string? idempotencyKey = null)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"/v1/shipments/{shipmentNumber}/release", UriKind.Relative));
+        request.Headers.Add("Idempotency-Key", idempotencyKey ?? Guid.NewGuid().ToString());
+        return await tms.TmsUi.SendAsync(request, cancellationToken);
+    }
+
+    /// <summary>Releases the Shipment, which the TMS must do, and returns what it answered.</summary>
+    public static async Task<JsonNode> ReleasedAsync(this TmsFixture tms, string shipmentNumber, CancellationToken cancellationToken)
+    {
+        using var response = await tms.ReleaseAsync(shipmentNumber, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, body);
+        return JsonNode.Parse(body)!;
+    }
+
+    /// <summary>Releases the Shipment, which the TMS must refuse with the status, and returns its problem.</summary>
+    public static async Task<JsonNode> ReleaseRefusedAsync(this TmsFixture tms, string shipmentNumber, HttpStatusCode status, CancellationToken cancellationToken)
+    {
+        using var response = await tms.ReleaseAsync(shipmentNumber, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        response.StatusCode.Should().Be(status, body);
+        return JsonNode.Parse(body)!;
+    }
+
+    /// <summary>The Planner's list of Shipments to release, from the query API.</summary>
+    public static async Task<JsonArray> ListShipmentsToReleaseAsync(this TmsFixture tms, CancellationToken cancellationToken)
+    {
+        using var response = await tms.Tms.GetAsync(new Uri("/v1/shipments/to-release", UriKind.Relative), cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, body);
+        return JsonNode.Parse(body)!.AsArray();
+    }
+
     /// <summary>Submits a booking the TMS accepts and waits until it is rated, so later events on its trail are the planning's.</summary>
     public static async Task<string> SubmitAcceptedAsync(this TmsFixture tms, CancellationToken cancellationToken)
     {
@@ -109,6 +145,13 @@ internal static class PlanningCalls
     public static IReadOnlyList<ServiceBusReceivedMessage> ShipmentsReassigned(this TmsFixture tms, string shipmentNumber) =>
         [.. tms.Published.Where(m =>
             m.Subject == "ShipmentReassigned"
+            && m.ApplicationProperties.TryGetValue("shipmentNumber", out var number)
+            && Equals(number, shipmentNumber))];
+
+    /// <summary>Every ShipmentReleased published so far for the Shipment, whatever its correlation ID.</summary>
+    public static IReadOnlyList<ServiceBusReceivedMessage> ShipmentsReleased(this TmsFixture tms, string shipmentNumber) =>
+        [.. tms.Published.Where(m =>
+            m.Subject == "ShipmentReleased"
             && m.ApplicationProperties.TryGetValue("shipmentNumber", out var number)
             && Equals(number, shipmentNumber))];
 

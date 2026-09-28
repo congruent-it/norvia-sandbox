@@ -82,6 +82,25 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                                 .HasColumnName("CarrierId");
                         });
 
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "LastRelease", "Norvia.Tms.Domain.Shipments.Shipment.LastRelease#ShipmentRelease", b1 =>
+                        {
+                            b1.Property<string>("CorrelationId")
+                                .IsRequired()
+                                .HasMaxLength(128)
+                                .HasColumnType("nvarchar(128)")
+                                .HasColumnName("ReleaseCorrelationId");
+
+                            b1.Property<string>("Key")
+                                .IsRequired()
+                                .HasMaxLength(100)
+                                .HasColumnType("nvarchar(100)")
+                                .HasColumnName("ReleaseKey");
+
+                            b1.Property<DateTimeOffset>("ReleasedAt")
+                                .HasColumnType("datetimeoffset")
+                                .HasColumnName("ReleasedAt");
+                        });
+
                     b.HasKey("Id");
 
                     b.HasIndex("Number")

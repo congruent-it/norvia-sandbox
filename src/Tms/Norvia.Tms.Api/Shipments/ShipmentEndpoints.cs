@@ -7,7 +7,10 @@ using Norvia.Tms.Api.TransportOrders;
 using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shipments.GetByNumber;
+using Norvia.Tms.Application.Shipments.ListToRelease;
 using Norvia.Tms.Application.Shipments.Reassign;
+using Norvia.Tms.Application.Shipments.Release;
+using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TransportOrders;
 
 namespace Norvia.Tms.Api.Shipments;
@@ -20,7 +23,12 @@ public static class ShipmentEndpoints
             .MapGroup("/v{version:apiVersion}/shipments")
             .HasApiVersion(1);
 
-        // Like the Transport Order reads, this answers any caller with a TMS token until it gets its own role.
+        // Like the Transport Order reads, these answer any caller with a TMS token until they get their own role.
+        shipments.MapGet("/to-release", ListToReleaseAsync)
+            .RequireAuthorization()
+            .WithName("ListShipmentsToRelease")
+            .WithSummary("List the Shipments to release: the Planned Shipments, with who carries each, in the order they were planned.");
+
         shipments.MapGet("/{shipmentNumber}", GetAsync)
             .RequireAuthorization()
             .WithName("GetShipment")
@@ -40,6 +48,20 @@ public static class ShipmentEndpoints
                 + "Idempotency-Key is answered as before, flagged as a repeat, without reassigning again. A reassignment that breaks an assignment "
                 + "rule is refused, changing and publishing nothing, with a problem whose code says which: ShipmentNotFound (404), ShipmentNotPlanned "
                 + "or AssignmentUnchanged (409), UnknownCarrier or InactiveCarrier (422).");
+
+        // The Planner releases from the TMS UI, as they assign and reassign, on a Message trail of its own.
+        shipments.MapPost("/{shipmentNumber}/release", ReleaseAsync)
+            .WithName("ReleaseShipment")
+            .RequireAuthorization(policy => policy.RequireRole(TransportOrderEndpoints.ManageRole))
+            .WithMetadata(new TrackedFlow(Flows.TransportPlanning))
+            .WithSummary("Release a Planned Shipment, handing it over to its Carrier (P4) or to Own fleet's Trips (P11).")
+            .WithDescription(
+                "The Shipment becomes Released, after which it can't be reassigned or released again. The TMS publishes ShipmentReleased on "
+                + "the Shipment events topic, with the Transport Order's addresses, windows and goods lines and who carries it, in one "
+                + "transaction. Each release gets a new correlation ID, which ShipmentReleased carries with the Transport Order number. A "
+                + "release sent again under its Idempotency-Key is answered as before, flagged as a repeat, without releasing again. A release "
+                + "that breaks an assignment rule is refused, changing and publishing nothing, with a problem whose code says which: "
+                + "ShipmentNotFound (404) or ShipmentNotPlanned (409).");
 
         return app;
     }
@@ -62,7 +84,7 @@ public static class ShipmentEndpoints
         IMediator mediator,
         CancellationToken cancellationToken)
     {
-        var errors = AssignmentCalls.Check("A reassignment", idempotencyKey, reassignment.AssignedTo, reassignment.CarrierId);
+        var errors = AssignmentCalls.Check(PlanningAction.Reassignment, idempotencyKey, reassignment.AssignedTo, reassignment.CarrierId);
         if (errors.Count > 0)
         {
             return TypedResults.ValidationProblem(errors);
@@ -76,4 +98,29 @@ public static class ShipmentEndpoints
             ? TypedResults.Ok(result.Value)
             : AssignmentCalls.Refused(result, "The Shipment can't be reassigned.");
     }
+
+    private static async Task<Results<Ok<ReleaseShipmentResult>, ProblemHttpResult, ValidationProblem>> ReleaseAsync(
+        string shipmentNumber,
+        [FromHeader(Name = TransportOrderEndpoints.IdempotencyKeyHeader)] string? idempotencyKey,
+        IMediator mediator,
+        CancellationToken cancellationToken)
+    {
+        var errors = AssignmentCalls.Check(PlanningAction.Release, idempotencyKey);
+        if (errors.Count > 0)
+        {
+            return TypedResults.ValidationProblem(errors);
+        }
+
+        // The action starts in the TMS UI, not at API Management, so the TMS starts its Message trail.
+        var command = new ReleaseShipmentCommand(shipmentNumber, idempotencyKey!, CorrelationId.New().Value);
+        var result = await mediator.Send(command, cancellationToken);
+        return result.IsSuccess
+            ? TypedResults.Ok(result.Value)
+            : AssignmentCalls.Refused(result, "The Shipment can't be released.");
+    }
+
+    private static async Task<Ok<IReadOnlyList<ShipmentToReleaseSummary>>> ListToReleaseAsync(
+        IMediator mediator,
+        CancellationToken cancellationToken) =>
+        TypedResults.Ok(await mediator.Send(new ListShipmentsToReleaseQuery(), cancellationToken));
 }

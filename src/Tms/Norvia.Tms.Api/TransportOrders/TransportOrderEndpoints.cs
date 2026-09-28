@@ -16,6 +16,7 @@ using Norvia.Tms.Application.TransportOrders.List;
 using Norvia.Tms.Application.TransportOrders.Rate;
 using Norvia.Tms.Application.TransportOrders.RatingExceptions;
 using Norvia.Tms.Application.TransportOrders.Submit;
+using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TransportOrders;
 
 namespace Norvia.Tms.Api.TransportOrders;
@@ -181,7 +182,7 @@ public static class TransportOrderEndpoints
         IMediator mediator,
         CancellationToken cancellationToken)
     {
-        var errors = AssignmentCalls.Check("An assignment", idempotencyKey, assignment.AssignedTo, assignment.CarrierId);
+        var errors = AssignmentCalls.Check(PlanningAction.Assignment, idempotencyKey, assignment.AssignedTo, assignment.CarrierId);
         if (errors.Count > 0)
         {
             return TypedResults.ValidationProblem(errors);

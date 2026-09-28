@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/shipment-released.v1.schema.json",
+  "title": "ShipmentReleased",
+  "description": "A Planner released a Planned Shipment, handing it over to be carried out, so the TMS set it to Released, after which P3 can no longer change it (Canonical Model event, version 1). Carries the whole Shipment with its Transport Order's details (addresses, windows and goods lines) and who carries it, so P4 can book with the Carrier from the event alone; P4 adds the Carrier booking number. Published on the Shipment events topic, under the correlation ID of the release, which starts a Message trail of its own; the Transport Order number links it to the Transport Order's intake. The message's assignedTo property repeats who carries the Shipment, so P4's subscription takes Carrier Shipments only.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "shipmentNumber", "transportOrderNumber", "shipperId", "assignedTo", "carrierId", "transportOrder"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "const": "ShipmentReleased" },
+    "eventVersion": { "const": 1 },
+    "occurredAt": { "description": "When the Shipment was released.", "type": "string", "format": "date-time" },
+    "correlationId": { "description": "The release's own correlation ID, not the planning's or the intake's.", "type": "string", "minLength": 1 },
+    "shipmentNumber": { "description": "The Shipment's number, the same since it was planned.", "type": "string", "pattern": "^SH-[0-9]{7}$" },
+    "transportOrderNumber": { "description": "The Transport Order the Shipment carries out; each has exactly one Shipment.", "type": "string", "pattern": "^TO-[0-9]{7}$" },
+    "shipperId": { "description": "The Shipper of the Transport Order.", "type": "string", "minLength": 1 },
+    "assignedTo": { "description": "Who carries the Shipment: Norvia's Own fleet or a Carrier.", "enum": ["OwnFleet", "Carrier"] },
+    "carrierId": { "description": "The Carrier that carries the Shipment; null for Own fleet.", "type": ["string", "null"], "minLength": 1 },
+    "transportOrder": {
+      "description": "The Transport Order the Shipment carries out, with its addresses, windows and goods lines.",
+      "allOf": [
+        { "$ref": "transport-order.v1.schema.json" },
+        { "required": ["transportOrderNumber"] }
+      ]
+    }
+  },
+  "if": { "properties": { "assignedTo": { "const": "Carrier" } } },
+  "then": { "properties": { "carrierId": { "type": "string" } } },
+  "else": { "properties": { "carrierId": { "type": "null" } } }
+}
