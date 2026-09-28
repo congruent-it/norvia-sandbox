@@ -25,9 +25,9 @@ public sealed class ReleaseShipmentHandler(
         }
 
         var key = new IdempotencyKey(command.ReleaseKey);
-        if (shipment.WasReleasedUnder(key))
+        if (shipment.ReleaseUnder(key) is { } earlier)
         {
-            return ResultOf(shipment, repeat: true);
+            return ResultOf(shipment, earlier, repeat: true);
         }
 
         if (AssignmentRules.CheckRelease(shipment) is { } refusal)
@@ -38,22 +38,20 @@ public sealed class ReleaseShipmentHandler(
         // The release hands the Transport Order's details over with the Shipment, so ShipmentReleased carries them.
         var order = await transportOrders.SingleOrDefaultAsync(new TransportOrderByNumberSpec(shipment.TransportOrderNumber), cancellationToken)
             ?? throw new InvalidOperationException($"Shipment {number} carries out Transport Order {shipment.TransportOrderNumber}, which the TMS doesn't have.");
-        if (!shipment.Release(order, key, new CorrelationId(command.CorrelationId), time.GetUtcNow()))
-        {
-            throw new InvalidOperationException($"Shipment {number} passed the assignment rules but wasn't released.");
-        }
+        var release = shipment.Release(order, key, new CorrelationId(command.CorrelationId), time.GetUtcNow())
+            ?? throw new InvalidOperationException($"Shipment {number} passed the assignment rules but wasn't released.");
 
         // Saving the tracked Shipment stores ShipmentReleased's outbox message with it, in one transaction.
         await shipments.SaveChangesAsync(cancellationToken);
-        return ResultOf(shipment, repeat: false);
+        return ResultOf(shipment, release, repeat: false);
     }
 
-    private ReleaseShipmentResult ResultOf(Shipment shipment, bool repeat) => new(
+    private ReleaseShipmentResult ResultOf(Shipment shipment, ShipmentRelease release, bool repeat) => new(
         shipment.Number.Value,
         shipment.TransportOrderNumber.Value,
         shipment.Status,
         CarriedByView.Of(shipment.CarriedBy, carriers),
         shipment.ShipperId.Value,
-        shipment.LastRelease!.CorrelationId.Value,
+        release.CorrelationId.Value,
         repeat);
 }

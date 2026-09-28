@@ -25,8 +25,8 @@ public enum AssignmentRefusalCode
     ShipmentNotFound,
 
     /// <summary>
-    /// The Shipment isn't Planned, so it is released already: it can't be reassigned or released again, and changes go
-    /// through its Carrier booking.
+    /// The Shipment isn't Planned, so it is released already and handed over: it can't be reassigned or released again
+    /// by P3.
     /// </summary>
     ShipmentNotPlanned,
 

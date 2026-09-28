@@ -26,7 +26,7 @@ public sealed class ShipmentReleaseTests
 
         var released = shipment.Release(order, Key, Release, ReleasedAt);
 
-        released.Should().BeTrue();
+        released.Should().Be(new ShipmentRelease(Release, ReleasedAt, Key));
         shipment.Status.Should().Be(ShipmentStatus.Released);
         shipment.LastRelease.Should().Be(new ShipmentRelease(Release, ReleasedAt, Key));
         shipment.CarriedBy.Should().Be(VanDijk);
@@ -55,7 +55,7 @@ public sealed class ShipmentReleaseTests
 
         var released = shipment.Release(order, new IdempotencyKey("key-rel2"), new CorrelationId("corr-release-2"), ReleasedAt.AddMinutes(5));
 
-        released.Should().BeFalse();
+        released.Should().BeNull();
         shipment.LastRelease!.CorrelationId.Should().Be(Release);
         shipment.DomainEvents.Should().BeEmpty();
     }
@@ -87,15 +87,15 @@ public sealed class ShipmentReleaseTests
     }
 
     [Fact]
-    public void WasReleasedUnder_TheReleasesKey_IsTrue_AndAnotherKeyIsFalse()
+    public void ReleaseUnder_TheReleasesKey_FindsIt_AndAnotherKeyFindsNothing()
     {
         var (order, shipment) = Planned(VanDijk);
-        shipment.WasReleasedUnder(Key).Should().BeFalse();
+        shipment.ReleaseUnder(Key).Should().BeNull();
 
         shipment.Release(order, Key, Release, ReleasedAt);
 
-        shipment.WasReleasedUnder(new IdempotencyKey("key-rel1")).Should().BeTrue();
-        shipment.WasReleasedUnder(new IdempotencyKey("key-rel2")).Should().BeFalse();
+        shipment.ReleaseUnder(new IdempotencyKey("key-rel1")).Should().Be(new ShipmentRelease(Release, ReleasedAt, Key));
+        shipment.ReleaseUnder(new IdempotencyKey("key-rel2")).Should().BeNull();
     }
 
     [Fact]

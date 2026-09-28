@@ -100,11 +100,11 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
 
     /// <summary>
     /// Releases a Planned Shipment, handing it over to be carried out with its Transport Order's details: it becomes
-    /// Released, P3 can no longer change it, and ShipmentReleased is raised. Returns false, changing nothing, for a Shipment
-    /// that isn't Planned.
+    /// Released, P3 can no longer change it, and ShipmentReleased is raised. Returns the release, or null, changing nothing,
+    /// for a Shipment that isn't Planned.
     /// </summary>
     /// <param name="order">The Transport Order the Shipment carries out.</param>
-    public bool Release(TransportOrder order, IdempotencyKey key, CorrelationId correlationId, DateTimeOffset releasedAt)
+    public ShipmentRelease? Release(TransportOrder order, IdempotencyKey key, CorrelationId correlationId, DateTimeOffset releasedAt)
     {
         ArgumentNullException.ThrowIfNull(order);
         ArgumentNullException.ThrowIfNull(key);
@@ -115,18 +115,18 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
 
         if (Status != ShipmentStatus.Planned)
         {
-            return false;
+            return null;
         }
 
         var release = new ShipmentRelease(correlationId, releasedAt, key);
         Status = ShipmentStatus.Released;
         LastRelease = release;
         RegisterDomainEvent(new ShipmentReleasedEvent(this, order, release));
-        return true;
+        return release;
     }
 
-    /// <summary>Whether the Shipment was released by the release sent under this key.</summary>
-    public bool WasReleasedUnder(IdempotencyKey key) => LastRelease is not null && LastRelease.Key == key;
+    /// <summary>The release made under the key; null when none was.</summary>
+    public ShipmentRelease? ReleaseUnder(IdempotencyKey key) => LastRelease is { } release && release.Key == key ? release : null;
 
     /// <summary>The reassignment made under the key, with the assignment it replaced; null when none was.</summary>
     public (ShipmentAssignment Previous, ShipmentAssignment Reassignment)? ReassignmentUnder(IdempotencyKey key)
