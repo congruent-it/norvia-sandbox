@@ -43,9 +43,9 @@ public sealed record ShipmentReassignedV1(
             shipment.Number.Value,
             shipment.TransportOrderNumber.Value,
             shipment.ShipperId.Value,
-            AssignedToOf(reassigned.Reassignment.CarriedBy),
+            reassigned.Reassignment.CarriedBy.AssignedTo().ToString(),
             reassigned.Reassignment.CarriedBy.CarrierId?.Value,
-            AssignedToOf(reassigned.Previous.CarriedBy),
+            reassigned.Previous.CarriedBy.AssignedTo().ToString(),
             reassigned.Previous.CarriedBy.CarrierId?.Value);
     }
 
@@ -61,7 +61,4 @@ public sealed record ShipmentReassignedV1(
     [
         new(ShipmentPlannedV1.AssignedToProperty, AssignedTo),
     ];
-
-    private static string AssignedToOf(CarriedBy carriedBy) =>
-        (carriedBy.IsOwnFleet ? Shipments.AssignedTo.OwnFleet : Shipments.AssignedTo.Carrier).ToString();
 }

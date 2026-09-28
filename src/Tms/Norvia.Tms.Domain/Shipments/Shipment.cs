@@ -80,6 +80,7 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
     public bool Reassign(CarriedBy carriedBy, IdempotencyKey key, CorrelationId correlationId, DateTimeOffset reassignedAt)
     {
         ArgumentNullException.ThrowIfNull(carriedBy);
+        ArgumentNullException.ThrowIfNull(key);
         if (Status != ShipmentStatus.Planned || carriedBy == CarriedBy)
         {
             return false;
