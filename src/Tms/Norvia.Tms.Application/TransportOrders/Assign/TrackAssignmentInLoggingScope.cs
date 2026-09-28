@@ -11,7 +11,7 @@ namespace Norvia.Tms.Application.TransportOrders.Assign;
 /// Traces a Planner's assignment on its own Message trail (coding guidelines §7): the <c>correlationId</c> the TMS
 /// created for it and <c>transportOrderNumber</c> for the whole call, refused ones included, and <c>partyId</c>,
 /// <c>shipmentNumber</c> and <c>outcome</c> for its outcome, in the logging scope and on the request's trace, so the
-/// assignment is found by its Transport Order number. One the TMS refuses records Refused. A repeat's outcome is traced
+/// assignment is found by its Transport Order number. One the TMS refuses records Refused, with its <c>failureCode</c>. A repeat's outcome is traced
 /// on the trail of the assignment it repeats. The API's request scope carries <c>flow</c>.
 /// </summary>
 public sealed partial class TrackAssignmentInLoggingScope(ILogger<TrackAssignmentInLoggingScope> logger)
@@ -37,8 +37,7 @@ public sealed partial class TrackAssignmentInLoggingScope(ILogger<TrackAssignmen
         }
         else
         {
-            using var refused = Track(new() { [TrackingKeys.Outcome] = TrackingKeys.Refused });
-            LogRefused(logger, result.Errors);
+            LogRefusal(result);
         }
 
         return result;
@@ -70,6 +69,17 @@ public sealed partial class TrackAssignmentInLoggingScope(ILogger<TrackAssignmen
         }
     }
 
+    private void LogRefusal(Result<AssignTransportOrderResult> result)
+    {
+        var refusal = result.ValidationErrors.First();
+        using var refused = Track(new()
+        {
+            [TrackingKeys.Outcome] = TrackingKeys.Refused,
+            [TrackingKeys.FailureCode] = refusal.ErrorCode,
+        });
+        LogRefused(logger, refusal.ErrorCode, refusal.ErrorMessage);
+    }
+
     private IDisposable? Track(Dictionary<string, object?> keys)
     {
         foreach (var (key, value) in keys)
@@ -86,6 +96,6 @@ public sealed partial class TrackAssignmentInLoggingScope(ILogger<TrackAssignmen
     [LoggerMessage(Level = LogLevel.Information, Message = "Transport Order {TransportOrderNumber} assignment answered as a repeat: Shipment {ShipmentNumber}")]
     private static partial void LogRepeat(ILogger logger, string transportOrderNumber, string shipmentNumber);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Assignment refused: {Reason}")]
-    private static partial void LogRefused(ILogger logger, IEnumerable<string> reason);
+    [LoggerMessage(Level = LogLevel.Information, Message = "Assignment refused with {FailureCode}: {Reason}")]
+    private static partial void LogRefused(ILogger logger, string failureCode, string reason);
 }

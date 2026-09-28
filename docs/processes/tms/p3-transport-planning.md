@@ -59,13 +59,13 @@ When a Carrier booking ends Rejected, Not delivered or Withdrawn, P4 moves the S
 
 ## Assignment rules
 
-| Rule |
-|---|
-| The Transport Order is Accepted and not yet Planned (for an assignment) |
-| The Shipment is Planned (for a reassignment or a release) |
-| A chosen Carrier exists in the TMS's seed-loaded Carrier data and is active |
+| Rule | Failure codes |
+|---|---|
+| The Transport Order is Accepted and not yet Planned (for an assignment) | `TransportOrderNotFound`, `TransportOrderNotAccepted`, `TransportOrderAlreadyPlanned` |
+| The Shipment is Planned (for a reassignment or a release) | |
+| A chosen Carrier exists in the TMS's seed-loaded Carrier data and is active | `UnknownCarrier`, `InactiveCarrier` |
 
-There are no coverage rules. Nothing stops the Planner from putting a Rotterdam → Düsseldorf order on Own fleet. Each failure has a stable code and a readable message.
+There are no coverage rules. Nothing stops the Planner from putting a Rotterdam → Düsseldorf order on Own fleet. Each failure has a stable code and a readable message. A refused action stores and publishes nothing, and its trace records the outcome `Refused` with the failure code.
 
 A Shipment is never deleted, and a Transport Order never goes back from Planned to Accepted.
 

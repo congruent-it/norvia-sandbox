@@ -24,7 +24,7 @@ public sealed class AssignTransportOrderHandler(
         if (!TransportOrderNumber.TryParse(command.TransportOrderNumber, out var number)
             || await transportOrders.SingleOrDefaultAsync(new TransportOrderToPlanSpec(number), cancellationToken) is not { } order)
         {
-            return Result.NotFound();
+            return AssignmentRefused.Because(AssignmentRules.TransportOrderNotFound(command.TransportOrderNumber));
         }
 
         var key = new IdempotencyKey(command.AssignmentKey);
@@ -34,12 +34,16 @@ public sealed class AssignTransportOrderHandler(
             return ResultOf(planned, repeat: true);
         }
 
-        var carriedBy = command.CarrierId is { } carrierId ? CarriedBy.Carrier(new CarrierId(carrierId)) : CarriedBy.OwnFleet;
-        var shipmentNumber = await shipmentNumbers.NextAsync(cancellationToken);
-        if (order.Plan(shipmentNumber, carriedBy, key, new CorrelationId(command.CorrelationId), time.GetUtcNow()) is not { } shipment)
+        var carrierId = command.CarrierId is { } id ? new CarrierId(id) : null;
+        if (AssignmentRules.Check(order, carrierId, carrierId is null ? null : carriers.Find(carrierId)) is { } refusal)
         {
-            return Result.Conflict($"Transport Order {number} is {order.Status}; only an Accepted Transport Order can be planned.");
+            return AssignmentRefused.Because(refusal);
         }
+
+        var carriedBy = carrierId is null ? CarriedBy.OwnFleet : CarriedBy.Carrier(carrierId);
+        var shipmentNumber = await shipmentNumbers.NextAsync(cancellationToken);
+        var shipment = order.Plan(shipmentNumber, carriedBy, key, new CorrelationId(command.CorrelationId), time.GetUtcNow())
+            ?? throw new InvalidOperationException($"Transport Order {number} passed the assignment rules but wasn't planned.");
 
         // Adding the Shipment saves the tracked Transport Order's new status with it, and ShipmentPlanned's outbox
         // message, in one transaction.
