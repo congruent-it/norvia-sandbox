@@ -20,7 +20,8 @@ internal sealed record HopRow(
     string? Outcome,
     string? FailureCode,
     string? EventType,
-    IReadOnlyList<BusinessKey> BusinessKeys)
+    IReadOnlyList<BusinessKey> BusinessKeys,
+    bool InProcess = false)
 {
     public const string Request = "request";
     public const string Run = "run";
@@ -48,7 +49,8 @@ internal sealed record HopRow(
         Text(row, "outcome"),
         Text(row, "failureCode"),
         Text(row, "eventType"),
-        [.. TrackedBusinessKeys.All.Where(key => Text(row, key.Key) is not null).Select(key => new BusinessKey(key.Kind, Text(row, key.Key)!))]);
+        [.. TrackedBusinessKeys.All.Where(key => Text(row, key.Key) is not null).Select(key => new BusinessKey(key.Kind, Text(row, key.Key)!))],
+        row.GetBoolean("inProcess") ?? false);
 
     // A key that doesn't apply comes back empty from the query, and is left out as the tracking contract leaves it out.
     private static string? Text(LogsTableRow row, string column) => row.GetString(column) is { Length: > 0 } text ? text : null;

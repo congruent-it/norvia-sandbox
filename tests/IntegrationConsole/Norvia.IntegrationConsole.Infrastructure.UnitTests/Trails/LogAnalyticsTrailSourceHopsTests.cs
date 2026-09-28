@@ -40,6 +40,7 @@ public sealed class LogAnalyticsTrailSourceHopsTests
         LogsQueryModelFactory.LogsTableColumn("carrierBookingNumber", LogsColumnType.String),
         LogsQueryModelFactory.LogsTableColumn("tripNumber", LogsColumnType.String),
         LogsQueryModelFactory.LogsTableColumn("sourceMessageId", LogsColumnType.String),
+        LogsQueryModelFactory.LogsTableColumn("inProcess", LogsColumnType.Bool),
     ];
 
     private static readonly string[] FrameworkCategories = ["Azure.", "Microsoft.", "System."];
@@ -143,6 +144,79 @@ public sealed class LogAnalyticsTrailSourceHopsTests
             Outcome = Outcome.Succeeded,
             Duration = (TimeSpan?)null,
         });
+    }
+
+    [Fact]
+    public async Task HopsAsync_ABookingFromThePartnerPortal_IsAHopOfTheSpanItWasSentIn_FromItsStart_AndCausedTheApiManagementCall()
+    {
+        // Blazor's span for the form's submit event, the portal's own span for sending the booking, and HttpClient's call
+        // to API Management; the portal logs Norvia's answer once it has it, after the TMS has taken the booking.
+        Answer(
+            Link("event", null, Now.AddSeconds(-12), 4_000, "Event onsubmit -> Microsoft.AspNetCore.Components.Forms.EditForm.HandleSubmitAsync", "partner-portal-web", inProcess: true),
+            Link("send", "event", Now.AddSeconds(-11), 2_400, "Send booking", "partner-portal-web", inProcess: true),
+            Link("http", "send", Now.AddSeconds(-10.9), 2_200, "POST /partner/v1/transport-orders", "partner-portal-web", inProcess: false),
+            Row("request", "apim-req", "http", Now.AddSeconds(-10.8), 2_000, "Submit transport order", "apim-norvia", flow: "transport-order-intake"),
+            Row("request", "tms-req", "apim-req", Now.AddSeconds(-10), 1_600, "POST /v{version:apiVersion}/transport-orders/", "tms-api", flow: "transport-order-intake",
+                outcome: "Succeeded", path: "/v1/transport-orders"),
+            Row("record", null, "send", Now.AddSeconds(-8.6), null, null, "partner-portal-web", flow: "transport-order-intake", outcome: "Succeeded",
+                transportOrderNumber: "TO-0000016"));
+
+        var hops = await HopsAsync(CorrelationId);
+
+        hops.Should().BeEquivalentTo(
+        [
+            new
+            {
+                Id = "send", CausedBy = (string?)null, Name = "partner-portal-web: Send booking", Time = Now.AddSeconds(-11),
+                Duration = (TimeSpan?)TimeSpan.FromMilliseconds(2_400), Outcome = (Outcome?)Outcome.Succeeded,
+            },
+            new
+            {
+                Id = "apim-req", CausedBy = (string?)"send", Name = "apim-norvia: Submit transport order", Time = Now.AddSeconds(-10.8),
+                Duration = (TimeSpan?)TimeSpan.FromMilliseconds(2_000), Outcome = (Outcome?)null,
+            },
+            new
+            {
+                Id = "tms-req", CausedBy = (string?)"apim-req", Name = "tms-api: POST /v1/transport-orders", Time = Now.AddSeconds(-10),
+                Duration = (TimeSpan?)TimeSpan.FromMilliseconds(1_600), Outcome = (Outcome?)Outcome.Succeeded,
+            },
+        ]);
+    }
+
+    [Fact]
+    public async Task HopsAsync_ARatingLoggedDuringADatabaseCall_IsAHopOfTheRatingsSpan()
+    {
+        // The rating worker's span is in-process; the database call under it isn't.
+        Answer(
+            Link("rate", null, Now.AddSeconds(-3), 173, "Rate Transport Order", "tms-api", inProcess: true),
+            Link("sql", "rate", Now.AddSeconds(-2.95), 20, "norvia", "tms-api", inProcess: false),
+            Row("record", null, "sql", Now.AddSeconds(-2.94), null, null, "tms-api", flow: "transport-order-rating", transportOrderNumber: "TO-0000016"),
+            Row("record", null, "rate", Now.AddSeconds(-2.85), null, null, "tms-api", flow: "transport-order-rating", outcome: "Succeeded"));
+
+        var hops = await HopsAsync(CorrelationId);
+
+        hops.Should().ContainSingle().Which.Should().BeEquivalentTo(new
+        {
+            Id = "rate",
+            Name = "tms-api: Rate Transport Order",
+            Time = Now.AddSeconds(-3),
+            Duration = (TimeSpan?)TimeSpan.FromMilliseconds(173),
+            Outcome = (Outcome?)Outcome.Succeeded,
+            BusinessKeys = new[] { new BusinessKey(BusinessKeyKind.TransportOrderNumber, "TO-0000016") },
+        });
+    }
+
+    [Fact]
+    public async Task HopsAsync_QueriesTheLinksWithWhatPlacesAHopInThem()
+    {
+        await HopsAsync(CorrelationId);
+
+        await _client.Received(1).QueryWorkspaceAsync(
+            WorkspaceId,
+            Arg.Is<string>(query => query.Contains("inProcess = Type == \"InProc\"", StringComparison.Ordinal)),
+            Arg.Any<LogsQueryTimeRange>(),
+            Arg.Any<LogsQueryOptions>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -283,6 +357,15 @@ public sealed class LogAnalyticsTrailSourceHopsTests
         LogsQueryModelFactory.LogsTableRow(Columns,
         [
             kind, id, parentId, start, durationMs, name, path, role, runId, workflow, category,
-            flow, outcome, failureCode, eventType, transportOrderNumber, null, null, null, null,
+            flow, outcome, failureCode, eventType, transportOrderNumber, null, null, null, null, null,
+        ]);
+
+    // A dependency the query returns with what places a hop in it: an in-process one is a span an application or a
+    // framework started, such as the Partner portal's for sending a booking.
+    private static LogsTableRow Link(string id, string? parentId, DateTimeOffset start, double durationMs, string name, string role, bool inProcess) =>
+        LogsQueryModelFactory.LogsTableRow(Columns,
+        [
+            "link", id, parentId, start, durationMs, name, null, role, null, null, null,
+            null, null, null, null, null, null, null, null, null, inProcess,
         ]);
 }

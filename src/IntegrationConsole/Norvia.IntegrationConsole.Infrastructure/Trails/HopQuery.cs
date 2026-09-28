@@ -13,7 +13,9 @@ namespace Norvia.IntegrationConsole.Infrastructure.Trails;
 /// <c>resource</c> property);</item>
 /// <item><c>record</c>: a trace with tracking keys, such as an application's log in its logging scope or API
 /// Management's <c>trace</c> policy, which belongs to the hop above it;</item>
-/// <item><c>link</c>: a dependency's ID and parent, the steps between a hop and the hop it caused.</item>
+/// <item><c>link</c>: a dependency's ID and parent, the steps between a hop and the hop it caused, with its time, name
+/// and application, and whether it ran in process: a span an application or a framework started, such as the Partner
+/// portal's for sending a booking, which records written outside any call belong to.</item>
 /// </list>
 /// Only keys are read, never a column that could hold a body, and of a request's URL only its path, never its query.
 /// The time range is the query's own, set on the request.
@@ -68,7 +70,8 @@ internal static class HopQuery
         let operations = toscalar(union (calls | project OperationId), (runs | project OperationId) | summarize make_set(OperationId));
         let links = AppDependencies
             | where OperationId in (operations)
-            | project rowKind = "link", id = Id, parentId = ParentId;
+            | project rowKind = "link", id = Id, parentId = ParentId, start = TimeGenerated, durationMs = DurationMs, name = Name,
+                role = AppRoleName, inProcess = Type == "InProc";
         union (calls | project-away OperationId), (runs | project-away OperationId), links
         """;
 }
