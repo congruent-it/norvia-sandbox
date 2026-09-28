@@ -1,7 +1,10 @@
 using Norvia.Tms.Application.CanonicalModel;
+using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.List;
 using Norvia.Tms.Application.TransportOrders.RatingExceptions;
+using Norvia.Tms.Application.TransportOrders.ToPlan;
+using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TransportOrders;
 
 namespace Norvia.Tms.Web.UnitTests.TransportOrders;
@@ -10,20 +13,39 @@ internal static class Samples
 {
     public static readonly ShipperView BrouwerDranken = new("SHP-0001", "Brouwer Dranken");
 
-    // 06:00–10:00 on 26 September 2026 in Rotterdam, which is summer time (UTC+2).
-    public static TransportOrderSummary Summary(
+    // 06:00–10:00 on 26 September 2026 in Rotterdam, which is summer time (UTC+2), from Rotterdam to Utrecht.
+    public static TransportOrderToPlanSummary ToPlan(
         string number = "TO-0000042",
         string reference = "BD-2026-0042",
         RatingResult ratingResult = RatingResult.NotYetRated) => new(
-        Guid.NewGuid(),
         number,
-        TransportOrderStatus.Accepted,
         ratingResult,
         BrouwerDranken,
         reference,
+        new PlaceView("3087 BM", "Rotterdam", "NL"),
+        new PlaceView("3511 AW", "Utrecht", "NL"),
         new DateTimeOffset(2026, 9, 26, 4, 0, 0, TimeSpan.Zero),
         new DateTimeOffset(2026, 9, 26, 8, 0, 0, TimeSpan.Zero),
         new DateTimeOffset(2026, 9, 24, 9, 30, 0, TimeSpan.Zero));
+
+    public static readonly CarrierView VanDijk = new("CAR-0001", "Van Dijk Transport");
+
+    public static readonly CarrierView Kessler = new("CAR-0002", "Kessler Spedition");
+
+    // Planned for Van Dijk Transport at 11:45 on 24 September 2026 in Rotterdam (UTC+2), then reassigned to Kessler
+    // Spedition at 12:00.
+    public static ShipmentView Shipment(string number = "SH-0000012", ShipmentStatus status = ShipmentStatus.Planned) => new(
+        number,
+        status,
+        "TO-0000042",
+        BrouwerDranken,
+        new CarriedByView(AssignedTo.Carrier, Kessler),
+        "corr-planning",
+        new DateTimeOffset(2026, 9, 24, 9, 45, 0, TimeSpan.Zero),
+        [
+            new ShipmentAssignmentView(new CarriedByView(AssignedTo.Carrier, VanDijk), "corr-planning", new DateTimeOffset(2026, 9, 24, 9, 45, 0, TimeSpan.Zero)),
+            new ShipmentAssignmentView(new CarriedByView(AssignedTo.Carrier, Kessler), "corr-reassignment", new DateTimeOffset(2026, 9, 24, 10, 0, 0, TimeSpan.Zero)),
+        ]);
 
     // Collection 06:00–10:00 and delivery 12:00–16:00 on 26 September 2026 in Rotterdam (UTC+2).
     public static TransportOrderView View(string number = "TO-0000042") => new(

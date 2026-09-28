@@ -1,10 +1,14 @@
 using Ardalis.Result;
 using Mediator;
 using Microsoft.Extensions.DependencyInjection;
+using Norvia.Tms.Application.Carriers.ListActive;
+using Norvia.Tms.Application.Shipments;
+using Norvia.Tms.Application.Shipments.GetByNumber;
 using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.GetByNumber;
 using Norvia.Tms.Application.TransportOrders.GetRejectedBooking;
 using Norvia.Tms.Application.TransportOrders.List;
+using Norvia.Tms.Application.TransportOrders.ToPlan;
 using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Web.TransportOrders;
 
@@ -23,14 +27,46 @@ public sealed class TransportOrderQueriesTests : IDisposable
     }
 
     [Fact]
-    public async Task ListWaitingForPlanningAsync_ListsTheAcceptedTransportOrders()
+    public async Task ListWaitingForPlanningAsync_ListsTheTransportOrdersToPlan()
     {
-        IReadOnlyList<TransportOrderSummary> accepted = [Samples.Summary()];
-        _mediator.Send(new ListTransportOrdersQuery(TransportOrderStatus.Accepted), Arg.Any<CancellationToken>()).Returns(accepted);
+        IReadOnlyList<TransportOrderToPlanSummary> toPlan = [Samples.ToPlan()];
+        _mediator.Send(new ListTransportOrdersToPlanQuery(), Arg.Any<CancellationToken>()).Returns(toPlan);
 
         var orders = await _queries.ListWaitingForPlanningAsync(Xunit.TestContext.Current.CancellationToken);
 
-        orders.Should().BeSameAs(accepted);
+        orders.Should().BeSameAs(toPlan);
+    }
+
+    [Fact]
+    public async Task ListActiveCarriersAsync_ListsTheActiveCarriers()
+    {
+        IReadOnlyList<CarrierView> active = [Samples.Kessler, Samples.VanDijk];
+        _mediator.Send(new ListActiveCarriersQuery(), Arg.Any<CancellationToken>()).Returns(active);
+
+        var carriers = await _queries.ListActiveCarriersAsync(Xunit.TestContext.Current.CancellationToken);
+
+        carriers.Should().BeSameAs(active);
+    }
+
+    [Fact]
+    public async Task FindShipmentAsync_AKnownNumber_ReturnsTheShipment()
+    {
+        var view = Samples.Shipment("SH-0000012");
+        _mediator.Send(new GetShipmentQuery("SH-0000012"), Arg.Any<CancellationToken>()).Returns(Result.Success(view));
+
+        var shipment = await _queries.FindShipmentAsync("SH-0000012", Xunit.TestContext.Current.CancellationToken);
+
+        shipment.Should().BeSameAs(view);
+    }
+
+    [Fact]
+    public async Task FindShipmentAsync_AnUnknownNumber_ReturnsNull()
+    {
+        _mediator.Send(new GetShipmentQuery("SH-0000999"), Arg.Any<CancellationToken>()).Returns(Result<ShipmentView>.NotFound());
+
+        var shipment = await _queries.FindShipmentAsync("SH-0000999", Xunit.TestContext.Current.CancellationToken);
+
+        shipment.Should().BeNull();
     }
 
     [Fact]

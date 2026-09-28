@@ -1,14 +1,16 @@
+using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.List;
 using Norvia.Tms.Application.TransportOrders.RatingExceptions;
+using Norvia.Tms.Application.TransportOrders.ToPlan;
 
 namespace Norvia.Tms.Web.TransportOrders;
 
-/// <summary>What the TMS UI reads about Transport Orders, all of it through the TMS query side.</summary>
+/// <summary>What the TMS UI reads about Transport Orders and their Shipments, all of it through the TMS query side.</summary>
 public interface ITransportOrderQueries
 {
-    /// <summary>The Accepted Transport Orders, which wait for planning.</summary>
-    Task<IReadOnlyList<TransportOrderSummary>> ListWaitingForPlanningAsync(CancellationToken cancellationToken);
+    /// <summary>The Transport Orders waiting for planning: Accepted and not yet Planned, the earliest collection first.</summary>
+    Task<IReadOnlyList<TransportOrderToPlanSummary>> ListWaitingForPlanningAsync(CancellationToken cancellationToken);
 
     /// <summary>The Transport Order with this number, or null when there is none.</summary>
     Task<TransportOrderView?> FindAsync(string transportOrderNumber, CancellationToken cancellationToken);
@@ -24,4 +26,10 @@ public interface ITransportOrderQueries
 
     /// <summary>The rating exceptions: the Transport Orders whose Rating failed, which Customer service follows up.</summary>
     Task<IReadOnlyList<RatingExceptionSummary>> ListRatingExceptionsAsync(CancellationToken cancellationToken);
+
+    /// <summary>The Carriers a Planner may assign to: only the active ones, by name.</summary>
+    Task<IReadOnlyList<CarrierView>> ListActiveCarriersAsync(CancellationToken cancellationToken);
+
+    /// <summary>The Shipment with this number, or null when there is none.</summary>
+    Task<ShipmentView?> FindShipmentAsync(string shipmentNumber, CancellationToken cancellationToken);
 }

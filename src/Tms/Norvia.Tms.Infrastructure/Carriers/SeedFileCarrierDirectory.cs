@@ -28,6 +28,9 @@ internal sealed class SeedFileCarrierDirectory : ICarrierDirectory
 
     public Carrier? Find(CarrierId id) => _carriers.GetValueOrDefault(id);
 
+    public IReadOnlyList<Carrier> ListActive() =>
+        [.. _carriers.Values.Where(carrier => carrier.Active).OrderBy(carrier => carrier.Name, StringComparer.Ordinal)];
+
     private sealed record SeedFile(IReadOnlyList<SeedCarrier>? Carriers);
 
     private sealed record SeedCarrier(string Id, string Name, bool Active);

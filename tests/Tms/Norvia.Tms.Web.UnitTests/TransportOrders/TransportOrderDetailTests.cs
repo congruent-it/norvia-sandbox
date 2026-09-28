@@ -42,6 +42,32 @@ public sealed class TransportOrderDetailTests : TmsWebContext
     }
 
     [Fact]
+    public void Render_APlannedTransportOrder_ShowsItsShipmentLinkingToIt()
+    {
+        Queries.FindAsync("TO-0000042", Arg.Any<CancellationToken>())
+            .Returns(Samples.View("TO-0000042") with { Status = TransportOrderStatus.Planned, ShipmentNumber = "SH-0000012" });
+
+        var page = RenderDetail("TO-0000042");
+
+        page.WaitForAssertion(() => Definitions(page, "Transport Order").Should().Contain(new Dictionary<string, string>
+        {
+            ["Status"] = "Planned",
+            ["Shipment"] = "SH-0000012",
+        }));
+        Section(page, "Transport Order").QuerySelector("a[href='/shipments/SH-0000012']").Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Render_ATransportOrderNotYetPlanned_ShowsNoShipment()
+    {
+        Queries.FindAsync("TO-0000042", Arg.Any<CancellationToken>()).Returns(Samples.View("TO-0000042"));
+
+        var page = RenderDetail("TO-0000042");
+
+        page.WaitForAssertion(() => Definitions(page, "Transport Order").Should().NotContainKey("Shipment"));
+    }
+
+    [Fact]
     public void Render_ATransportOrderNotYetRated_SaysSoWithoutAFreightCharge()
     {
         Queries.FindAsync("TO-0000042", Arg.Any<CancellationToken>()).Returns(Samples.View("TO-0000042"));

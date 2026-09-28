@@ -1,0 +1,105 @@
+@page "/shipments/{ShipmentNumber}"
+@* Interactive like the Transport Order detail: Fluent UI's components don't survive static streaming rendering. *@
+@rendermode InteractiveServer
+@using Norvia.Tms.Application.Shipments
+@implements IDisposable
+@inject ITransportOrderQueries Queries
+@inject ILogger<ShipmentDetail> Logger
+
+<PageTitle>@ShipmentNumber · Norvia TMS</PageTitle>
+
+<p class="mb-2"><a href="/transport-orders">← Back to the Transport Orders waiting for planning</a></p>
+
+<h1>Shipment @ShipmentNumber</h1>
+
+@if (_failed)
+{
+    <div role="alert">
+        <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+            Shipment @ShipmentNumber couldn't be loaded. Reload the page to try again.
+        </FluentMessageBar>
+    </div>
+}
+else if (!_loaded)
+{
+    <FluentStack VerticalAlignment="VerticalAlignment.Center" role="status" Class="text-muted">
+        <FluentProgressRing />
+        <span>Loading Shipment @ShipmentNumber…</span>
+    </FluentStack>
+}
+else if (_shipment is null)
+{
+    <div role="status">
+        <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
+            There is no Shipment @ShipmentNumber.
+        </FluentMessageBar>
+    </div>
+}
+else
+{
+    <div class="mb-4 grid gap-4 md:grid-cols-3">
+        <TransportOrderSection Heading="Shipment">
+            <dl class="detail-list">
+                <dt>Status</dt>
+                <dd>@_shipment.Status</dd>
+                <dt>Carried by</dt>
+                <dd>@PlanningText.CarriedBy(_shipment.CarriedBy)</dd>
+                <dt>Transport Order</dt>
+                <dd><a href="/transport-orders/@_shipment.TransportOrderNumber">@_shipment.TransportOrderNumber</a></dd>
+                <dt>Shipper</dt>
+                <dd>@(_shipment.Shipper.Name ?? _shipment.Shipper.Id)</dd>
+                <dt>Planned</dt>
+                <dd>@NorviaTime.Format(_shipment.PlannedAt)</dd>
+                <dt>Correlation ID</dt>
+                <dd>@_shipment.CorrelationId</dd>
+            </dl>
+        </TransportOrderSection>
+
+        @* The planning first, then each reassignment, each on its own Message trail. *@
+        <div class="md:col-span-2">
+            <TransportOrderSection Heading="Assignments">
+                <FluentDataGrid Items="_shipment.Assignments.AsQueryable()" TGridItem="ShipmentAssignmentView" Class="flatly-table" aria-label="Assignments">
+                    <PropertyColumn Title="Carried by" Property="@(assignment => PlanningText.CarriedBy(assignment.CarriedBy))" />
+                    <PropertyColumn Title="Assigned" Property="@(assignment => NorviaTime.Format(assignment.AssignedAt))" />
+                    <PropertyColumn Title="Correlation ID" Property="@(assignment => assignment.CorrelationId)" />
+                </FluentDataGrid>
+            </TransportOrderSection>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _loaded;
+    private bool _failed;
+    private readonly CancellationTokenSource _closed = new();
+    private ShipmentView? _shipment;
+
+    [Parameter, EditorRequired]
+    public string ShipmentNumber { get; set; } = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loaded = _failed = false;
+        _shipment = null;
+        try
+        {
+            _shipment = await Queries.FindShipmentAsync(ShipmentNumber, _closed.Token);
+            _loaded = true;
+        }
+        catch (OperationCanceledException) when (_closed.IsCancellationRequested)
+        {
+            // The page closed while it was reading.
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning(exception, "Reading Shipment {ShipmentNumber} failed", ShipmentNumber);
+            _failed = true;
+        }
+    }
+
+    public void Dispose()
+    {
+        _closed.Cancel();
+        _closed.Dispose();
+    }
+}

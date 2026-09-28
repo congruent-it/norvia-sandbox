@@ -1,10 +1,14 @@
 using Ardalis.Result;
 using Mediator;
+using Norvia.Tms.Application.Carriers.ListActive;
+using Norvia.Tms.Application.Shipments;
+using Norvia.Tms.Application.Shipments.GetByNumber;
 using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.GetByNumber;
 using Norvia.Tms.Application.TransportOrders.GetRejectedBooking;
 using Norvia.Tms.Application.TransportOrders.List;
 using Norvia.Tms.Application.TransportOrders.RatingExceptions;
+using Norvia.Tms.Application.TransportOrders.ToPlan;
 using Norvia.Tms.Domain.TransportOrders;
 
 namespace Norvia.Tms.Web.TransportOrders;
@@ -15,8 +19,8 @@ namespace Norvia.Tms.Web.TransportOrders;
 /// </summary>
 internal sealed class TransportOrderQueries(IServiceScopeFactory scopes) : ITransportOrderQueries
 {
-    public Task<IReadOnlyList<TransportOrderSummary>> ListWaitingForPlanningAsync(CancellationToken cancellationToken) =>
-        SendAsync(new ListTransportOrdersQuery(TransportOrderStatus.Accepted), cancellationToken);
+    public Task<IReadOnlyList<TransportOrderToPlanSummary>> ListWaitingForPlanningAsync(CancellationToken cancellationToken) =>
+        SendAsync(new ListTransportOrdersToPlanQuery(), cancellationToken);
 
     public Task<IReadOnlyList<TransportOrderSummary>> ListRejectedAsync(CancellationToken cancellationToken) =>
         SendAsync(new ListTransportOrdersQuery(TransportOrderStatus.Rejected), cancellationToken);
@@ -24,11 +28,17 @@ internal sealed class TransportOrderQueries(IServiceScopeFactory scopes) : ITran
     public Task<IReadOnlyList<RatingExceptionSummary>> ListRatingExceptionsAsync(CancellationToken cancellationToken) =>
         SendAsync(new ListRatingExceptionsQuery(), cancellationToken);
 
+    public Task<IReadOnlyList<CarrierView>> ListActiveCarriersAsync(CancellationToken cancellationToken) =>
+        SendAsync(new ListActiveCarriersQuery(), cancellationToken);
+
     public async Task<TransportOrderView?> FindAsync(string transportOrderNumber, CancellationToken cancellationToken) =>
         FoundOrNull(await SendAsync(new GetTransportOrderQuery(transportOrderNumber), cancellationToken), $"Transport Order {transportOrderNumber}");
 
     public async Task<TransportOrderView?> FindRejectedAsync(Guid id, CancellationToken cancellationToken) =>
         FoundOrNull(await SendAsync(new GetRejectedBookingQuery(id), cancellationToken), $"Rejected booking {id}");
+
+    public async Task<ShipmentView?> FindShipmentAsync(string shipmentNumber, CancellationToken cancellationToken) =>
+        FoundOrNull(await SendAsync(new GetShipmentQuery(shipmentNumber), cancellationToken), $"Shipment {shipmentNumber}");
 
     private async Task<TResponse> SendAsync<TResponse>(IQuery<TResponse> query, CancellationToken cancellationToken)
     {
@@ -36,7 +46,8 @@ internal sealed class TransportOrderQueries(IServiceScopeFactory scopes) : ITran
         return await scope.ServiceProvider.GetRequiredService<IMediator>().Send(query, cancellationToken);
     }
 
-    private static TransportOrderView? FoundOrNull(Result<TransportOrderView> result, string sought) => result.Status switch
+    private static TView? FoundOrNull<TView>(Result<TView> result, string sought)
+        where TView : class => result.Status switch
     {
         ResultStatus.Ok => result.Value,
         ResultStatus.NotFound => null,

@@ -6,4 +6,7 @@ namespace Norvia.Tms.Application.Carriers;
 public interface ICarrierDirectory
 {
     Carrier? Find(CarrierId id);
+
+    /// <summary>The active Carriers, the only ones a Planner may choose, by name.</summary>
+    IReadOnlyList<Carrier> ListActive();
 }
