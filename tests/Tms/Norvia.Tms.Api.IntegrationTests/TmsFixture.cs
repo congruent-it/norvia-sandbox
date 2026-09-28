@@ -35,6 +35,9 @@ public class TmsFixture : IAsyncLifetime
     /// <summary>The app role only the TMS UI's managed identity holds: Customer service's re-rate goes through it.</summary>
     public const string ManageRole = "TransportOrders.Manage";
 
+    /// <summary>The app role only the Carrier-answer Logic App's managed identity holds (P4).</summary>
+    public const string AnswerRole = "CarrierBookings.Answer";
+
     /// <summary>The client ID the TMS takes as the WMS handoff's caller. No WMS exists yet, so only the tests call as it.</summary>
     public const string WmsClientId = "norvia-test-wms";
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
@@ -51,6 +54,9 @@ public class TmsFixture : IAsyncLifetime
 
     /// <summary>A client holding the manage role, as the TMS UI's managed identity does.</summary>
     public HttpClient TmsUi { get; private set; } = null!;
+
+    /// <summary>A client holding the answer role, as the Carrier-answer Logic App's managed identity will (P4, later ticket).</summary>
+    public HttpClient CarrierAnswer { get; private set; } = null!;
 
     public IEnumerable<ServiceBusReceivedMessage> Published => _published;
 
@@ -92,6 +98,7 @@ public class TmsFixture : IAsyncLifetime
 
         Tms = CreateTmsClient(IssueToken([IntakeRole]));
         TmsUi = CreateTmsClient(IssueToken([ManageRole], clientId: LocalTokens.TmsUiClientId));
+        CarrierAnswer = CreateTmsClient(IssueToken([AnswerRole], clientId: "norvia-test-carrier-answer-logic-app"));
 
         _serviceBus = new ServiceBusClient(await _app.GetConnectionStringAsync("messaging", startup.Token));
         foreach (var topicName in new[] { TransportOrderEventsTopic, ShipmentEventsTopic })
@@ -223,6 +230,7 @@ public class TmsFixture : IAsyncLifetime
 
         Tms?.Dispose();
         TmsUi?.Dispose();
+        CarrierAnswer?.Dispose();
 
         if (_app is not null)
         {

@@ -138,6 +138,38 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
         return release;
     }
 
+    /// <summary>
+    /// Confirms a Released Shipment as Booked, once its Carrier booking is Confirmed (P4). Raises no domain event of its
+    /// own: the Carrier booking's own event already says so. Returns false, changing nothing, for a Shipment that isn't
+    /// Released.
+    /// </summary>
+    public bool Book()
+    {
+        if (Status != ShipmentStatus.Released)
+        {
+            return false;
+        }
+
+        Status = ShipmentStatus.Booked;
+        return true;
+    }
+
+    /// <summary>
+    /// Sends a Released Shipment back to Planned, because its Carrier booking ended without confirmation (P4): rejected,
+    /// not delivered or withdrawn. Raises no domain event of its own: the Carrier booking's own event already says so.
+    /// Returns false, changing nothing, for a Shipment that isn't Released.
+    /// </summary>
+    public bool ReturnToPlanned()
+    {
+        if (Status != ShipmentStatus.Released)
+        {
+            return false;
+        }
+
+        Status = ShipmentStatus.Planned;
+        return true;
+    }
+
     /// <summary>The release made under the key; null when none was.</summary>
     public ShipmentRelease? ReleaseUnder(IdempotencyKey key) => LastRelease is { } release && release.Key == key ? release : null;
 

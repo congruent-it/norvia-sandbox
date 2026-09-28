@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/carrier-booking-confirmed.v1.schema.json",
+  "title": "CarrierBookingConfirmed",
+  "description": "A Carrier confirmed a Requested Carrier booking with its own booking reference and, optionally, a planned collection time (Canonical Model event, version 1). The Carrier booking became Confirmed and the Shipment Booked; the Shipment's move carries no event of its own. Published on the Shipment events topic, under the correlation ID of the answer, which API Management creates.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "eventType",
+    "eventVersion",
+    "occurredAt",
+    "correlationId",
+    "carrierBookingNumber",
+    "shipmentNumber",
+    "transportOrderNumber",
+    "carrierId",
+    "carrierBookingReference",
+    "plannedCollectionTime"
+  ],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "const": "CarrierBookingConfirmed" },
+    "eventVersion": { "const": 1 },
+    "occurredAt": { "description": "When the Carrier's confirmation was recorded.", "type": "string", "format": "date-time" },
+    "correlationId": { "description": "The answer's own correlation ID, not the release's.", "type": "string", "minLength": 1 },
+    "carrierBookingNumber": { "description": "The Carrier booking the Carrier confirmed.", "type": "string", "pattern": "^CB-[0-9]{7}$" },
+    "shipmentNumber": { "description": "The Shipment the Carrier booking covers, now Booked.", "type": "string", "pattern": "^SH-[0-9]{7}$" },
+    "transportOrderNumber": { "description": "The Transport Order the Shipment carries out.", "type": "string", "pattern": "^TO-[0-9]{7}$" },
+    "carrierId": { "description": "The Carrier that confirmed the booking.", "type": "string", "minLength": 1 },
+    "carrierBookingReference": { "description": "The Carrier's own reference for the booking.", "type": "string", "minLength": 1 },
+    "plannedCollectionTime": {
+      "description": "When the Carrier plans to collect, if it gave one.",
+      "type": ["string", "null"],
+      "format": "date-time"
+    }
+  }
+}
