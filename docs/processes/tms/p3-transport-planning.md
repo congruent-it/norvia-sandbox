@@ -99,6 +99,22 @@ All three events go to a new topic for Shipment events, `shipment-events`, throu
 | `ShipmentReassigned` | As `ShipmentPlanned`, plus who carried it before | Monitoring |
 | `ShipmentReleased` | The full Shipment with its Transport Order's details (addresses, windows, goods lines), Own fleet or the Carrier's ID, the Carrier booking number for a Carrier Shipment (P4), correlation ID | P4 Logic App, for Carrier Shipments only (subscription filter). None for Own fleet, since P11 runs inside the TMS |
 
+## Presenter smoke run
+
+After a deployment, and not in CI, the presenter checks Transport planning end to end on the deployed estate: booking, assigning, reassigning and releasing. Do it after the presenter smoke run of Rating ([docs/processes/tms/p2-rating.md](p2-rating.md#presenter-smoke-run)). The postdeploy hook prints each UI's address. Open the Partner portal and the TMS UI side by side.
+
+1. **Book.** In the Partner portal, choose Brouwer Dranken in the Persona switcher. The booking form opens with Brouwer Dranken's Rotterdam warehouse as the collection and Café De Zwaan in Utrecht as the delivery. Change the delivery to Getränke Schmitz GmbH (contact Jonas Schmitz, +49 211 555 0190), Kölner Landstraße 301, 40591 Düsseldorf, DE, and choose *Book transport*. Note the Transport Order number.
+2. **Assign to Van Dijk Transport.** In the TMS UI, open *Transport Orders waiting for planning*. The booking appears there, with its rating result Rating failed (the Rate Card has no Lane into Germany, as in Rating's smoke run; that never blocks planning). Select it, choose *Van Dijk Transport* under *Assign to*, and choose *Assign selected*. It leaves the list and a Shipment number appears in the outcome message.
+3. **Reassign to Kessler Spedition.** Open *Shipments to release*. The Shipment is listed, carried by Van Dijk Transport. Choose *Kessler Spedition* under *Reassign to* on its row and choose *Reassign*. The outcome message says it is now carried by Kessler Spedition, and the row updates without leaving the list.
+4. **Release.** Select the Shipment and choose *Release selected*. It leaves the list.
+5. **Check the TMS.** Run `infra/smoke-test-transport-planning.sh <Transport Order number>`. It reads the TMS as the intake identity, from a throwaway Container Apps job, and reads Application Insights, which is usually 1 to 5 minutes behind. It checks that the Transport Order is Planned with its Shipment, that the Shipment is Released and carried by Kessler Spedition, that its history of assignments shows Van Dijk Transport and then Kessler Spedition, that it has left both of the Planner's lists, and that the assignment, the reassignment and the release each ran on a Message trail of its own under the Transport Order number, publishing `ShipmentPlanned`, `ShipmentReassigned` and `ShipmentReleased` in turn on the Shipment events topic.
+
+   It prints `PASS` or `FAIL` per check, never a body, and ends with the pages to open below.
+6. **See it planned.** In the TMS UI, open the Shipment from the outcome message, or find it from the Transport Order. Its detail shows Released, carried by Kessler Spedition, and an Assignments history with two rows: Van Dijk Transport, then Kessler Spedition, each with its own correlation ID.
+7. **Follow the planning.** In the Integration console, search for the Transport Order number. Three trails come back, one per planning step: the assignment (`tms-api: POST /v1/transport-orders/<number>/assign`, then `tms-api: publish ShipmentPlanned`), the reassignment (`tms-api: POST /v1/shipments/<Shipment number>/reassign`, then `tms-api: publish ShipmentReassigned`) and the release (`tms-api: POST /v1/shipments/<Shipment number>/release`, then `tms-api: publish ShipmentReleased`). None of the three chains to the booking's own trail: a Planner's action always starts a trail of its own ([Correlation ID](#correlation-id)).
+
+If a check fails, file the gap as its own issue against P3, rather than working around it in the run book.
+
 ## Deferred
 
 These were left out on purpose while designing P3, each with its reason.
