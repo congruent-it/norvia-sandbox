@@ -92,8 +92,8 @@ if shipment_number:
 
 waiting = get("/v1/transport-orders?status=Accepted")
 to_release = get("/v1/shipments/to-release")
-result["stillWaitingForPlanning"] = not isinstance(waiting, list) or any(w["transportOrderNumber"] == number for w in waiting)
-result["stillToRelease"] = not isinstance(to_release, list) or (
+result["waitingForPlanning"] = waiting if not isinstance(waiting, list) else any(w["transportOrderNumber"] == number for w in waiting)
+result["toRelease"] = to_release if not isinstance(to_release, list) else (
     shipment_number is not None and any(s["shipmentNumber"] == shipment_number for s in to_release))
 print("SMOKE-RESULT " + json.dumps(result))
 PYTHON'
@@ -185,10 +185,10 @@ jq -e --arg van_dijk "$van_dijk_id" --arg kessler "$kessler_id" \
 pass "Shipment $shipment_number was planned to Van Dijk Transport and reassigned to Kessler Spedition"
 
 # 3. It has left both the Planner's lists.
-jq -e '.stillWaitingForPlanning == false' <<<"$result" >/dev/null \
-  || fail "Transport Order $number is still waiting for planning"
-jq -e '.stillToRelease == false' <<<"$result" >/dev/null \
-  || fail "Shipment $shipment_number is still in the Shipments to release"
+jq -e '.waitingForPlanning == false' <<<"$result" >/dev/null \
+  || fail "Transport Order $number is still waiting for planning, or the TMS answered $(jq -c '.waitingForPlanning' <<<"$result") for that list"
+jq -e '.toRelease == false' <<<"$result" >/dev/null \
+  || fail "Shipment $shipment_number is still in the Shipments to release, or the TMS answered $(jq -c '.toRelease' <<<"$result") for that list"
 pass "Transport Order $number and Shipment $shipment_number have left the Planner's lists"
 
 # 4. Each planning step on its own Message trail: the tracking contract's keys (coding guidelines §7), which the TMS
@@ -201,23 +201,27 @@ trail_summary() {
 union AppRequests, AppTraces, AppDependencies
 | where OperationId in (trail) and AppRoleName endswith 'tms-api'
 | summarize rows = count(),
+    flows = make_set_if(tostring(Properties.flow), isnotempty(tostring(Properties.flow))),
     outcomes = make_set_if(tostring(Properties.outcome), isnotempty(tostring(Properties.outcome))),
     shipmentNumbers = make_set_if(tostring(Properties.shipmentNumber), isnotempty(tostring(Properties.shipmentNumber))),
     parties = make_set_if(tostring(Properties.partyId), isnotempty(tostring(Properties.partyId))),
     transportOrderNumbers = make_set_if(tostring(Properties.transportOrderNumber), isnotempty(tostring(Properties.transportOrderNumber))),
     published = make_set_if(Name, isnotempty(Name) and Name startswith 'publish ')" \
-    | jq -c '.[0] | select((.[0] | tonumber) > 0) | {outcomes: (.[1] | fromjson), shipmentNumbers: (.[2] | fromjson),
-        parties: (.[3] | fromjson), transportOrderNumbers: (.[4] | fromjson), published: (.[5] | fromjson)}'
+    | jq -c '.[0] | select((.[0] | tonumber) > 0) | {flows: (.[1] | fromjson), outcomes: (.[2] | fromjson),
+        shipmentNumbers: (.[3] | fromjson), parties: (.[4] | fromjson), transportOrderNumbers: (.[5] | fromjson),
+        published: (.[6] | fromjson)}'
 }
-# Confirms one Message trail Succeeded for this Transport Order and Shipment, and published the one event named.
+# Confirms one Message trail of its own flow, Succeeded for this Transport Order and Shipment, that published the
+# one event named.
 check_trail() {
   local action=$1 correlation_id=$2 event=$3 summary
   summary=$(until_found trail_summary "$correlation_id")
   [ -n "$summary" ] || fail "the Message trail $correlation_id ($action of Transport Order $number) hasn't reached Application Insights after 10 minutes"
   jq -e --arg shipment "$shipment_number" --arg party "$brouwer_dranken_id" --arg number "$number" --arg event "publish $event" \
-    '.outcomes == ["Succeeded"] and .shipmentNumbers == [$shipment] and .parties == [$party] and .transportOrderNumbers == [$number] and .published == [$event]' \
+    '.flows == ["transport-planning"] and .outcomes == ["Succeeded"] and .shipmentNumbers == [$shipment]
+     and .parties == [$party] and .transportOrderNumbers == [$number] and .published == [$event]' \
     <<<"$summary" >/dev/null \
-    || fail "the Message trail $correlation_id doesn't show Transport Order $number's $action Succeeded for Shipment $shipment_number, $brouwer_dranken_id, publishing $event: $summary"
+    || fail "the Message trail $correlation_id doesn't show Transport Order $number's $action Succeeded on the transport-planning flow for Shipment $shipment_number, $brouwer_dranken_id, publishing $event: $summary"
   pass "Transport Order $number's $action published $event on its own Message trail $correlation_id"
 }
 assign_correlation_id=$(jq -r '.shipment.correlationId' <<<"$result")

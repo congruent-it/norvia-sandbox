@@ -111,7 +111,7 @@ After a deployment, and not in CI, the presenter checks Transport planning end t
 
    It prints `PASS` or `FAIL` per check, never a body, and ends with the pages to open below.
 6. **See it planned.** In the TMS UI, open the Shipment from the outcome message, or find it from the Transport Order. Its detail shows Released, carried by Kessler Spedition, and an Assignments history with two rows: Van Dijk Transport, then Kessler Spedition, each with its own correlation ID.
-7. **Follow the planning.** In the Integration console, search for the Transport Order number. Three trails come back, one per planning step: the assignment (`tms-api: POST /v1/transport-orders/<number>/assign`, then `tms-api: publish ShipmentPlanned`), the reassignment and the release, each the same shape with its own event. None of the three chains to the booking's own trail: a Planner's action always starts a trail of its own ([Correlation ID](#correlation-id)).
+7. **Follow the planning.** In the Integration console, search for the Transport Order number. Three trails come back, one per planning step: the assignment (`tms-api: POST /v1/transport-orders/<number>/assign`, then `tms-api: publish ShipmentPlanned`), the reassignment (`tms-api: POST /v1/shipments/<Shipment number>/reassign`, then `tms-api: publish ShipmentReassigned`) and the release (`tms-api: POST /v1/shipments/<Shipment number>/release`, then `tms-api: publish ShipmentReleased`). None of the three chains to the booking's own trail: a Planner's action always starts a trail of its own ([Correlation ID](#correlation-id)).
 
 If a check fails, file the gap as its own issue against P3, rather than working around it in the run book.
 
