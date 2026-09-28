@@ -20,4 +20,13 @@ public enum AssignmentRefusalCode
 
     /// <summary>The chosen Carrier is in the TMS's Carrier data, but not active.</summary>
     InactiveCarrier,
+
+    /// <summary>No Shipment has the number.</summary>
+    ShipmentNotFound,
+
+    /// <summary>The Shipment isn't Planned, so it is released already and changes go through its Carrier booking.</summary>
+    ShipmentNotPlanned,
+
+    /// <summary>The reassignment names who carries the Shipment already, so there is nothing to change.</summary>
+    AssignmentUnchanged,
 }

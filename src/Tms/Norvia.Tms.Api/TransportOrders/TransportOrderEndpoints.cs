@@ -3,6 +3,7 @@ using Ardalis.Result;
 using Mediator;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Norvia.Tms.Api.Shipments;
 using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Application.CanonicalModel;
 using Norvia.Tms.Application.IntegrationEvents;
@@ -15,7 +16,6 @@ using Norvia.Tms.Application.TransportOrders.List;
 using Norvia.Tms.Application.TransportOrders.Rate;
 using Norvia.Tms.Application.TransportOrders.RatingExceptions;
 using Norvia.Tms.Application.TransportOrders.Submit;
-using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TransportOrders;
 
 namespace Norvia.Tms.Api.TransportOrders;
@@ -181,21 +181,7 @@ public static class TransportOrderEndpoints
         IMediator mediator,
         CancellationToken cancellationToken)
     {
-        var errors = new Dictionary<string, string[]>();
-        if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Length > IdempotencyKey.MaxLength)
-        {
-            errors[IdempotencyKeyHeader] = [$"An assignment needs an {IdempotencyKeyHeader} of 1 to {IdempotencyKey.MaxLength} characters, the same for each retry."];
-        }
-
-        if (assignment.AssignedTo == AssignedTo.Carrier && string.IsNullOrWhiteSpace(assignment.CarrierId))
-        {
-            errors[nameof(assignment.CarrierId)] = ["An assignment to a Carrier names the Carrier."];
-        }
-        else if (assignment.AssignedTo == AssignedTo.OwnFleet && assignment.CarrierId is not null)
-        {
-            errors[nameof(assignment.CarrierId)] = ["An assignment to Own fleet names no Carrier."];
-        }
-
+        var errors = AssignmentCalls.Check("An assignment", idempotencyKey, assignment.AssignedTo, assignment.CarrierId);
         if (errors.Count > 0)
         {
             return TypedResults.ValidationProblem(errors);
@@ -212,20 +198,8 @@ public static class TransportOrderEndpoints
                 : TypedResults.Created($"/v1/shipments/{result.Value.ShipmentNumber}", result.Value);
         }
 
-        var refusal = result.ValidationErrors.First();
-        return TypedResults.Problem(
-            statusCode: StatusCodeOf(Enum.Parse<AssignmentRefusalCode>(refusal.ErrorCode)),
-            title: "The Transport Order can't be assigned.",
-            detail: refusal.ErrorMessage,
-            extensions: new Dictionary<string, object?> { ["code"] = refusal.ErrorCode });
+        return AssignmentCalls.Refused(result, "The Transport Order can't be assigned.");
     }
-
-    private static int StatusCodeOf(AssignmentRefusalCode code) => code switch
-    {
-        AssignmentRefusalCode.TransportOrderNotFound => StatusCodes.Status404NotFound,
-        AssignmentRefusalCode.UnknownCarrier or AssignmentRefusalCode.InactiveCarrier => StatusCodes.Status422UnprocessableEntity,
-        _ => StatusCodes.Status409Conflict,
-    };
 
     private static async Task<Results<Ok<RateTransportOrderResult>, ProblemHttpResult, ValidationProblem>> ReRateAsync(
         string transportOrderNumber,

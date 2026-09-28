@@ -34,6 +34,12 @@
       "id": "CAR-TEST-0002",
       "name": "Gesloten Vracht",
       "active": false
+    },
+    {
+      "$comment": "A second active Carrier, to show a Shipment reassigned from one Carrier to another.",
+      "id": "CAR-TEST-0003",
+      "name": "Reserve Transport",
+      "active": true
     }
   ],
   "rateCards": [

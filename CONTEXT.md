@@ -93,7 +93,7 @@ The number the TMS gives a Shipment when a Planner assigns its Transport Order, 
 _Avoid_: tracking number, consignment number
 
 **Assignment rule**:
-A rule a Planner's assignment of a Transport Order must meet before the TMS plans it: the Transport Order is Accepted and not yet Planned, and a chosen Carrier is known to the TMS and active. The TMS refuses an assignment that breaks one with a refusal (a stable code and a plain-language message), and plans nothing. There are no coverage rules, and the rating result never blocks an assignment.
+A rule a Planner's assignment of a Transport Order must meet before the TMS plans it: the Transport Order is Accepted and not yet Planned, and a chosen Carrier is known to the TMS and active. A reassignment of a Shipment meets the same Carrier rules, and the Shipment is Planned and goes to someone other than who carries it. The TMS refuses an assignment that breaks one with a refusal (a stable code and a plain-language message), and plans nothing. There are no coverage rules, and the rating result never blocks an assignment.
 _Avoid_: validation, planning check
 
 **Fulfilment Order**:

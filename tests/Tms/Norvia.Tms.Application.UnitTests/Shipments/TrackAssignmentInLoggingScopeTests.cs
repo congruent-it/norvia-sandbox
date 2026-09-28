@@ -80,7 +80,7 @@ public sealed class TrackAssignmentInLoggingScopeTests : IDisposable
     [Fact]
     public async Task Handle_Refused_LogsTheRefusalWithItsFailureCode_OnTheAssignmentsOwnTrail()
     {
-        var alreadyPlanned = AssignmentRefused.Because(new AssignmentRefusal(
+        var alreadyPlanned = AssignmentRefused.Because<AssignTransportOrderResult>(new AssignmentRefusal(
             AssignmentRefusalCode.TransportOrderAlreadyPlanned, "Transport Order TO-0000007 is Planned already, as Shipment SH-0000003."));
 
         await _behaviour.Handle(Assign, Answering(alreadyPlanned), CancellationToken.None);

@@ -15,6 +15,9 @@ internal static class PlanningCalls
     /// <summary>The test seed's inactive Carrier.</summary>
     public const string InactiveCarrierId = "CAR-TEST-0002";
 
+    /// <summary>The test seed's second active Carrier, to reassign to.</summary>
+    public const string OtherCarrierId = "CAR-TEST-0003";
+
     public static JsonObject ToCarrier(string carrierId = CarrierId) => new() { ["assignedTo"] = "Carrier", ["carrierId"] = carrierId };
 
     public static JsonObject ToOwnFleet() => new() { ["assignedTo"] = "OwnFleet" };
@@ -52,6 +55,39 @@ internal static class PlanningCalls
         return JsonNode.Parse(body)!;
     }
 
+    /// <summary>
+    /// Reassigns the Shipment as the Planner does, through the TMS UI, under the given idempotency key or a new one.
+    /// </summary>
+    public static async Task<HttpResponseMessage> ReassignAsync(
+        this TmsFixture tms, string shipmentNumber, JsonObject reassignment, CancellationToken cancellationToken, string? idempotencyKey = null)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"/v1/shipments/{shipmentNumber}/reassign", UriKind.Relative))
+        {
+            Content = JsonContent.Create(reassignment),
+        };
+        request.Headers.Add("Idempotency-Key", idempotencyKey ?? Guid.NewGuid().ToString());
+        return await tms.TmsUi.SendAsync(request, cancellationToken);
+    }
+
+    /// <summary>Reassigns the Shipment, which the TMS must do, and returns what it answered.</summary>
+    public static async Task<JsonNode> ReassignedAsync(this TmsFixture tms, string shipmentNumber, JsonObject reassignment, CancellationToken cancellationToken)
+    {
+        using var response = await tms.ReassignAsync(shipmentNumber, reassignment, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, body);
+        return JsonNode.Parse(body)!;
+    }
+
+    /// <summary>Reassigns the Shipment, which the TMS must refuse with the status, and returns its problem.</summary>
+    public static async Task<JsonNode> ReassignRefusedAsync(
+        this TmsFixture tms, string shipmentNumber, JsonObject reassignment, HttpStatusCode status, CancellationToken cancellationToken)
+    {
+        using var response = await tms.ReassignAsync(shipmentNumber, reassignment, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        response.StatusCode.Should().Be(status, body);
+        return JsonNode.Parse(body)!;
+    }
+
     /// <summary>Submits a booking the TMS accepts and waits until it is rated, so later events on its trail are the planning's.</summary>
     public static async Task<string> SubmitAcceptedAsync(this TmsFixture tms, CancellationToken cancellationToken)
     {
@@ -68,6 +104,13 @@ internal static class PlanningCalls
         response.StatusCode.Should().Be(HttpStatusCode.OK, body);
         return JsonNode.Parse(body)!;
     }
+
+    /// <summary>Every ShipmentReassigned published so far for the Shipment, whatever its correlation ID.</summary>
+    public static IReadOnlyList<ServiceBusReceivedMessage> ShipmentsReassigned(this TmsFixture tms, string shipmentNumber) =>
+        [.. tms.Published.Where(m =>
+            m.Subject == "ShipmentReassigned"
+            && m.ApplicationProperties.TryGetValue("shipmentNumber", out var number)
+            && Equals(number, shipmentNumber))];
 
     /// <summary>Every ShipmentPlanned published so far for the Transport Order, whatever its correlation ID.</summary>
     public static IReadOnlyList<ServiceBusReceivedMessage> ShipmentsPlannedFor(this TmsFixture tms, string transportOrderNumber) =>

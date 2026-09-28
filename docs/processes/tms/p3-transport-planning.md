@@ -47,7 +47,7 @@ P4 adds **Booked**, and sends a Carrier Shipment back to Planned when its bookin
 
 1. **See what needs planning.** The Planner opens the list of Transport Orders to plan: Accepted and not yet Planned, sorted by earliest collection time. Each row shows the Shipper, the collection and delivery places, the collection window and the rating result. The rating result is only information. It never filters or blocks. New Transport Orders appear without a page refresh, as in P1.
 2. **Assign.** The Planner selects one or more Transport Orders and assigns them to Own fleet or to a Carrier chosen from the active Carriers. For each Transport Order, the TMS checks the [assignment rules](#assignment-rules), creates its Shipment with a Shipment number and the status Planned, sets the Transport Order to Planned and publishes `ShipmentPlanned`, all in one transaction. In a multi-select, each Transport Order succeeds or fails on its own.
-3. **Reassign, if needed.** While a Shipment is Planned, the Planner can assign it to Own fleet or another Carrier. The Shipment and its Shipment number stay the same. The TMS records the change and publishes `ShipmentReassigned`.
+3. **Reassign, if needed.** While a Shipment is Planned, the Planner can assign it to Own fleet or another Carrier. The Shipment and its Shipment number stay the same. The TMS records the change in the Shipment's history of assignments and publishes `ShipmentReassigned`, in one transaction.
 4. **Release.** The Planner selects one or more Planned Shipments and releases them. Each one moves to Released and `ShipmentReleased` is published, each on its own. A Carrier Shipment is priced from its Carrier's Carrier Rate Card at release, and when that fails the Planner can release it with a Spot price ([P9](p9-freight-settlement.md#pricing-a-carrier-booking-at-release)).
 5. **Hand over.** For a Carrier Shipment, the release also creates its Carrier booking, and the P4 booking Logic App picks up `ShipmentReleased` and sends it to the Carrier ([P4](p4-carrier-booking.md)). For an Own fleet Shipment, [P11](p11-trip-dispatch.md) in the TMS takes it from the Released Shipments and puts it on a Trip. Neither is built yet.
 
@@ -62,8 +62,9 @@ When a Carrier booking ends Rejected, Not delivered or Withdrawn, P4 moves the S
 | Rule | Failure codes |
 |---|---|
 | The Transport Order is Accepted and not yet Planned (for an assignment) | `TransportOrderNotFound`, `TransportOrderNotAccepted`, `TransportOrderAlreadyPlanned` |
-| The Shipment is Planned (for a reassignment or a release) | |
+| The Shipment is Planned (for a reassignment or a release) | `ShipmentNotFound`, `ShipmentNotPlanned` |
 | A chosen Carrier exists in the TMS's seed-loaded Carrier data and is active | `UnknownCarrier`, `InactiveCarrier` |
+| A reassignment changes who carries the Shipment | `AssignmentUnchanged` |
 
 There are no coverage rules. Nothing stops the Planner from putting a Rotterdam → Düsseldorf order on Own fleet. Each failure has a stable code and a readable message. A refused action stores and publishes nothing, and its trace records the outcome `Refused` with the failure code.
 
