@@ -19,6 +19,7 @@ public sealed class DashboardTrailSourceTests : IDisposable
     private const int Internal = 1;
     private const int Server = 2;
     private const int Client = 3;
+    private const int Producer = 4;
     private const int Consumer = 5;
 
     private static readonly DateTimeOffset Now = new(2026, 9, 26, 10, 0, 0, TimeSpan.Zero);
@@ -282,6 +283,46 @@ public sealed class DashboardTrailSourceTests : IDisposable
             Flow = "transport-planning",
             Outcome = Outcome.Succeeded,
             Duration = (TimeSpan?)null,
+        });
+    }
+
+    [Fact]
+    public async Task HopsAsync_AnEventTheOutboxPublished_IsAHopOfItsPublishSpan_CausedByTheWorkThatRaisedIt()
+    {
+        // The TMS's outbox publishes in a span that continues the trace of what raised the event: the intake call raised
+        // TransportOrderAccepted, and the rating worker's span, a trace of its own, TransportOrderRated.
+        const string rating = "7c3e1f2a9b8d4c5e6f7a8b9c0d1e2f3a";
+        _dashboard
+            .AddSpan("tms-api", Trace, "b2b2b2b2b2b2b2b2", null, "POST /v{version:apiVersion}/transport-orders/", Server, Now.AddSeconds(-10), Now.AddSeconds(-8.4),
+                Called("POST", "/v1/transport-orders"))
+            .AddSpan("tms-api", Trace, "e1e1e1e1e1e1e1e1", "b2b2b2b2b2b2b2b2", "publish TransportOrderAccepted", Producer, Now.AddSeconds(-6), Now.AddSeconds(-5.9),
+                scope: "Norvia.Tms.Api")
+            .AddSpan("tms-api", rating, "r1r1r1r1r1r1r1r1", null, "Rate Transport Order", Internal, Now.AddSeconds(-8), Now.AddSeconds(-7.7), scope: "Norvia.Tms.Api")
+            .AddSpan("tms-api", rating, "e2e2e2e2e2e2e2e2", "r1r1r1r1r1r1r1r1", "publish TransportOrderRated", Producer, Now.AddSeconds(-5.9), Now.AddSeconds(-5.8),
+                scope: "Norvia.Tms.Api")
+            .Add("tms-api", Now.AddSeconds(-9), new() { ["correlationId"] = Booked, ["flow"] = "transport-order-intake", ["outcome"] = "Succeeded" },
+                traceId: Trace, spanId: "b2b2b2b2b2b2b2b2")
+            .Add("tms-api", Now.AddSeconds(-5.95), new() { ["correlationId"] = Booked, ["eventType"] = "TransportOrderAccepted", ["outcome"] = "Succeeded" },
+                traceId: Trace, spanId: "e1e1e1e1e1e1e1e1", category: "Norvia.Tms.Infrastructure.Outbox.OutboxPublisher")
+            .Add("tms-api", Now.AddSeconds(-7.8), new() { ["correlationId"] = Booked, ["flow"] = "transport-order-rating", ["outcome"] = "Succeeded" },
+                traceId: rating, spanId: "r1r1r1r1r1r1r1r1")
+            .Add("tms-api", Now.AddSeconds(-5.85), new() { ["correlationId"] = Booked, ["eventType"] = "TransportOrderRated", ["outcome"] = "Succeeded" },
+                traceId: rating, spanId: "e2e2e2e2e2e2e2e2", category: "Norvia.Tms.Infrastructure.Outbox.OutboxPublisher");
+
+        var hops = await HopsAsync(Booked);
+
+        hops.Should().BeEquivalentTo(
+        [
+            new { Id = "b2b2b2b2b2b2b2b2", CausedBy = (string?)null, Name = "tms-api: POST /v1/transport-orders" },
+            new { Id = "e1e1e1e1e1e1e1e1", CausedBy = (string?)"b2b2b2b2b2b2b2b2", Name = "tms-api: publish TransportOrderAccepted" },
+            new { Id = "r1r1r1r1r1r1r1r1", CausedBy = (string?)null, Name = "tms-api: Rate Transport Order" },
+            new { Id = "e2e2e2e2e2e2e2e2", CausedBy = (string?)"r1r1r1r1r1r1r1r1", Name = "tms-api: publish TransportOrderRated" },
+        ]);
+        hops.Single(hop => hop.Id == "e1e1e1e1e1e1e1e1").Should().BeEquivalentTo(new
+        {
+            Time = Now.AddSeconds(-6),
+            Duration = (TimeSpan?)TimeSpan.FromMilliseconds(100),
+            Outcome = (Outcome?)Outcome.Succeeded,
         });
     }
 

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Ardalis.SharedKernel;
 using Norvia.Tms.Application.IntegrationEvents;
@@ -24,6 +25,12 @@ internal sealed class OutboxMessage : IAggregateRoot
 
     public required DateTimeOffset CreatedAt { get; init; }
 
+    /// <summary>
+    /// The W3C trace context of the work that raised the event, such as the intake's request or the rating worker's
+    /// span, which publishing it continues; null when there was none.
+    /// </summary>
+    public string? TraceParent { get; init; }
+
     public DateTimeOffset? PublishedAt { get; private set; }
 
     public void MarkPublished(DateTimeOffset publishedAt) => PublishedAt = publishedAt;
@@ -40,6 +47,7 @@ internal sealed class OutboxMessage : IAggregateRoot
             Body = JsonSerializer.Serialize(integrationEvent, integrationEvent.GetType(), IntegrationEventJson.Options),
             ApplicationProperties = JsonSerializer.Serialize(integrationEvent.ApplicationProperties, IntegrationEventJson.Options),
             CreatedAt = createdAt,
+            TraceParent = Activity.Current is { IdFormat: ActivityIdFormat.W3C } raisedIn ? raisedIn.Id : null,
         };
     }
 }

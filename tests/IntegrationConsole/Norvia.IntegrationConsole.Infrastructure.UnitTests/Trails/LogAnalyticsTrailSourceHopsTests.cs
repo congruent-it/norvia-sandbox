@@ -256,6 +256,40 @@ public sealed class LogAnalyticsTrailSourceHopsTests
     }
 
     [Fact]
+    public async Task HopsAsync_AnEventTheOutboxPublished_IsAHopOfItsPublishSpan_CausedByTheWorkThatRaisedIt()
+    {
+        // The TMS's outbox publishes in a span that continues the trace of what raised the event: the intake call raised
+        // TransportOrderAccepted, the rating worker's span TransportOrderRated. A publish span is a dependency.
+        Answer(
+            Row("request", "tms-req", null, Now.AddSeconds(-10), 1_600, "POST /v{version:apiVersion}/transport-orders/", "[appseowsgwet24y3e]/tms-api",
+                flow: "transport-order-intake", outcome: "Succeeded", path: "/v1/transport-orders"),
+            Link("pub-accepted", "tms-req", Now.AddSeconds(-6), 100, "publish TransportOrderAccepted", "[appseowsgwet24y3e]/tms-api", inProcess: false),
+            Row("record", null, "pub-accepted", Now.AddSeconds(-5.95), null, null, "[appseowsgwet24y3e]/tms-api", flow: "transport-order-intake",
+                outcome: "Succeeded", eventType: "TransportOrderAccepted"),
+            Link("rate", null, Now.AddSeconds(-8), 300, "Rate Transport Order", "[appseowsgwet24y3e]/tms-api", inProcess: true),
+            Row("record", null, "rate", Now.AddSeconds(-7.8), null, null, "[appseowsgwet24y3e]/tms-api", flow: "transport-order-rating", outcome: "Succeeded"),
+            Link("pub-rated", "rate", Now.AddSeconds(-5.9), 100, "publish TransportOrderRated", "[appseowsgwet24y3e]/tms-api", inProcess: false),
+            Row("record", null, "pub-rated", Now.AddSeconds(-5.85), null, null, "[appseowsgwet24y3e]/tms-api", flow: "transport-order-rating",
+                outcome: "Succeeded", eventType: "TransportOrderRated"));
+
+        var hops = await HopsAsync(CorrelationId);
+
+        hops.Should().BeEquivalentTo(
+        [
+            new { Id = "tms-req", CausedBy = (string?)null, Name = "tms-api: POST /v1/transport-orders" },
+            new { Id = "pub-accepted", CausedBy = (string?)"tms-req", Name = "tms-api: publish TransportOrderAccepted" },
+            new { Id = "rate", CausedBy = (string?)null, Name = "tms-api: Rate Transport Order" },
+            new { Id = "pub-rated", CausedBy = (string?)"rate", Name = "tms-api: publish TransportOrderRated" },
+        ]);
+        hops.Single(hop => hop.Id == "pub-accepted").Should().BeEquivalentTo(new
+        {
+            Time = Now.AddSeconds(-6),
+            Duration = (TimeSpan?)TimeSpan.FromMilliseconds(100),
+            Outcome = (Outcome?)Outcome.Succeeded,
+        });
+    }
+
+    [Fact]
     public async Task HopsAsync_ARecordUnderNoCall_IsAHopOfItsOwn_AtItsTime()
     {
         // The TMS's rating worker rates outside any request.

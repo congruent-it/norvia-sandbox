@@ -4,7 +4,8 @@ namespace Norvia.IntegrationConsole.Infrastructure.Trails;
 
 /// <summary>
 /// Puts the <see cref="HopQuery"/>'s rows together into a trail's hops. Each call is a hop, each Logic App run is one
-/// hop however many rows it has, and each record adds its keys to the hop above it. A record written outside any call
+/// hop however many rows it has, and each record adds its keys to the hop above it. A published event is a hop of the
+/// span it was published in, which continues the trace of what raised it, so it is caused by that. A record written outside any call
 /// belongs to the nearest in-process span above it in its application, such as the Partner portal's for sending a
 /// booking or the TMS's for rating a Transport Order, which is then a hop with that span's time and name; or else it is
 /// a hop of its own.
@@ -21,9 +22,10 @@ internal static class TrailHops
 
         string? ParentOf(string id) => parents.GetValueOrDefault(id);
 
-        var spans = rows.Where(row => row.Kind == HopRow.Link && row.InProcess && row.Id is not null)
+        var links = rows.Where(row => row.Kind == HopRow.Link && row.Id is not null)
             .GroupBy(row => row.Id!, StringComparer.Ordinal)
-            .ToDictionary(span => span.Key, span => span.First(), StringComparer.Ordinal);
+            .ToDictionary(link => link.Key, link => link.First(), StringComparer.Ordinal);
+        var spans = links.Values.Where(link => link.InProcess).ToDictionary(link => link.Id!, StringComparer.Ordinal);
 
         var hops = new List<Hop>();
         hops.AddRange(rows.Where(row => row.Kind == HopRow.Request && row.Id is not null)
@@ -42,7 +44,26 @@ internal static class TrailHops
         for (var index = 0; index < records.Count; index++)
         {
             var record = records[index];
-            if (HopCauses.NearestHopAbove(record.ParentId, callIds, ParentOf) is { } above)
+            if (record.EventType is not null && record.ParentId is { } publishedIn)
+            {
+                if (!byId.TryGetValue(publishedIn, out var published))
+                {
+                    var span = links.GetValueOrDefault(publishedIn);
+                    published = new Hop(
+                        publishedIn,
+                        span?.ParentId,
+                        HopNames.OfRecords(record.Role ?? "unknown", record.EventType),
+                        span?.Start ?? record.Start,
+                        span?.End,
+                        null,
+                        []);
+                    byId[publishedIn] = published;
+                    hops.Add(published);
+                }
+
+                published.Rows.Add(record);
+            }
+            else if (HopCauses.NearestHopAbove(record.ParentId, callIds, ParentOf) is { } above)
             {
                 byId[above].Rows.Add(record);
             }

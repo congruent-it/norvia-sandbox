@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Nodes;
@@ -150,6 +151,22 @@ public sealed class TransportOrderIntakeTests(TmsFixture tms)
     }
 
     [Fact]
+    public async Task Submit_ValidTransportOrder_PublishesTheEventInTheIntakesTrace()
+    {
+        // The outbox sends the event later, outside the request, but in a span that continues the request's trace, so the
+        // Integration console shows the publish as caused by the intake call.
+        var correlationId = NewCorrelationId();
+        var traceId = ActivityTraceId.CreateRandom().ToHexString();
+        using var response = await SubmitAsync(Bookings.Valid(NewReference()), correlationId, $"00-{traceId}-{ActivitySpanId.CreateRandom().ToHexString()}-01");
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var published = (await tms.PublishedAsync(correlationId, "TransportOrderAccepted", _cancellationToken)).Should().ContainSingle().Subject;
+
+        published.ApplicationProperties.Should().ContainKey("Diagnostic-Id")
+            .WhoseValue.Should().BeOfType<string>().Which.Should().Contain(traceId);
+    }
+
+    [Fact]
     public async Task Submit_ValidTransportOrder_PublishesTheEventWithoutAnOutcome()
     {
         // The outcome is the publisher's own, not the event's: a subscriber's hop records its own.
@@ -268,13 +285,18 @@ public sealed class TransportOrderIntakeTests(TmsFixture tms)
         _ => node.DeepClone(),
     };
 
-    private async Task<HttpResponseMessage> SubmitAsync(JsonObject booking, string correlationId)
+    private async Task<HttpResponseMessage> SubmitAsync(JsonObject booking, string correlationId, string? traceParent = null)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("/v1/transport-orders", UriKind.Relative))
         {
             Content = JsonContent.Create(booking),
         };
         request.Headers.Add("X-Correlation-ID", correlationId);
+        if (traceParent is not null)
+        {
+            request.Headers.Add("traceparent", traceParent);
+        }
+
         return await tms.Tms.SendAsync(request, _cancellationToken);
     }
 

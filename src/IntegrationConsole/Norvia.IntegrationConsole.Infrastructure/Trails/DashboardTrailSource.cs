@@ -69,8 +69,11 @@ internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTr
             }
         }
 
-        // A record written outside any span is a hop of its own.
-        var hops = records.Select((record, index) => (Record: record, HopId: record.SpanId.Length > 0 ? EntryOf(record.SpanId, spans) : $"{record.Resource}#{index}"))
+        // A record written outside any span is a hop of its own. A published event is a hop of the span it was published
+        // in, which continues the trace of what raised the event, so it is caused by that, not a part of it.
+        var hops = records.Select((record, index) => (Record: record, HopId: record.SpanId.Length > 0
+                ? record.Keys.ContainsKey("eventType") && spans.ContainsKey(record.SpanId) ? record.SpanId : EntryOf(record.SpanId, spans)
+                : $"{record.Resource}#{index}"))
             .GroupBy(record => record.HopId, record => record.Record, StringComparer.Ordinal)
             .ToList();
         var hopIds = hops.Select(hop => hop.Key).ToHashSet(StringComparer.Ordinal);
@@ -101,7 +104,7 @@ internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTr
         return new RecordedHop(
             id,
             causedBy,
-            span is null
+            span is null || Distinct(records, "eventType").Length > 0
                 ? HopNames.OfRecords(records[0].Resource, Distinct(records, "eventType").FirstOrDefault())
                 : HopNames.OfCall(span.Resource, span.Name, span.Method, span.Path),
             Distinct(records, "flow").FirstOrDefault(),

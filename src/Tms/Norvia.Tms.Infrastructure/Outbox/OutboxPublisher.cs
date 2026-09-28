@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Ardalis.SharedKernel;
 using Azure.Messaging.ServiceBus;
@@ -11,16 +12,22 @@ namespace Norvia.Tms.Infrastructure.Outbox;
 
 /// <summary>
 /// Sends committed outbox messages to Service Bus, oldest first. Delivery is at least once: a message whose send
-/// succeeded but whose mark failed goes again, with the same message ID.
+/// succeeded but whose mark failed goes again, with the same message ID. Each is sent in a span of its own that continues
+/// the trace of the work that raised its event, so the Integration console shows the publish as caused by it, and whose
+/// ID the message carries as its <c>Diagnostic-Id</c>, Service Bus's trace context, for its subscribers.
 /// </summary>
 internal sealed partial class OutboxPublisher(
     IServiceScopeFactory scopes,
     ServiceBusClient serviceBus,
     TimeProvider time,
+    IHostEnvironment environment,
     IOptions<OutboxOptions> options,
     ILogger<OutboxPublisher> logger) : BackgroundService
 {
+    private const string DiagnosticIdProperty = "Diagnostic-Id";
+
     private readonly Dictionary<string, ServiceBusSender> _senders = [];
+    private readonly ActivitySource _activities = new(environment.ApplicationName);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -46,7 +53,13 @@ internal sealed partial class OutboxPublisher(
         {
             await sender.DisposeAsync();
         }
+
+        _activities.Dispose();
     }
+
+    // The trace context of the work that raised the event, or none, which starts a trace of the publish's own.
+    private static ActivityContext RaisedIn(OutboxMessage message) =>
+        ActivityContext.TryParse(message.TraceParent, traceState: null, out var raisedIn) ? raisedIn : default;
 
     private async Task PublishPendingAsync(CancellationToken cancellationToken)
     {
@@ -57,9 +70,16 @@ internal sealed partial class OutboxPublisher(
 
         foreach (var message in pending)
         {
+            using var span = _activities.StartActivity($"publish {message.EventType}", ActivityKind.Producer, RaisedIn(message));
             // The message's application properties are its tracking-contract keys, so its traces join its Message trail.
             using var trail = logger.BeginScope(ApplicationPropertiesOf(message));
-            await SenderFor(message.Topic).SendMessageAsync(ToServiceBusMessage(message), cancellationToken);
+            var serviceBusMessage = ToServiceBusMessage(message);
+            if ((span?.Id ?? message.TraceParent) is { } traceContext)
+            {
+                serviceBusMessage.ApplicationProperties[DiagnosticIdProperty] = traceContext;
+            }
+
+            await SenderFor(message.Topic).SendMessageAsync(serviceBusMessage, cancellationToken);
             message.MarkPublished(time.GetUtcNow());
             await outboxMessages.UpdateAsync(message, cancellationToken);
 
