@@ -51,7 +51,7 @@
         @* Own fleet, or one of the active Carriers: an inactive Carrier is never offered. *@
         <FluentSelect TOption="string" Label="Assign to" @bind-Value="_assignee" Width="16rem">
             <FluentOption TOption="string" Value="">Choose who carries them</FluentOption>
-            <FluentOption TOption="string" Value="@OwnFleet">@PlanningText.OwnFleet</FluentOption>
+            <FluentOption TOption="string" Value="@OwnFleetOption">@PlanningText.OwnFleet</FluentOption>
             @foreach (var carrier in _carriers ?? [])
             {
                 <FluentOption TOption="string" Value="@carrier.Id">@PlanningText.Carrier(carrier)</FluentOption>
@@ -100,7 +100,7 @@
 
 @code {
     // The picker's value for Own fleet; every other value is a Carrier's ID, and the empty value is no choice yet.
-    private const string OwnFleet = "own-fleet";
+    private const string OwnFleetOption = "own-fleet";
 
     private readonly CancellationTokenSource _closed = new();
     private readonly HashSet<string> _selected = [];
@@ -153,8 +153,8 @@
     private bool CanAssign(IReadOnlyList<TransportOrderToPlanSummary> transportOrders) =>
         !_assigning && !string.IsNullOrEmpty(_assignee) && SelectedIn(transportOrders).Count > 0;
 
-    // One call per Transport Order, one after the other, each with its own outcome: a refusal doesn't stop the rest. The
-    // list isn't changed here: it reads again shortly, and then drops each Planned order.
+    // Each Transport Order's outcome shows as it comes. The list isn't changed here: it reads again shortly, and then
+    // drops each Planned order.
     private async Task AssignAsync()
     {
         if (_list.Items is not { } transportOrders || !CanAssign(transportOrders))
@@ -162,7 +162,7 @@
             return;
         }
 
-        var carrierId = _assignee == OwnFleet ? null : _assignee;
+        var carrierId = _assignee == OwnFleetOption ? null : _assignee;
         var assignee = carrierId is null
             ? PlanningText.OwnFleet
             : _carriers?.FirstOrDefault(carrier => carrier.Id == carrierId) is { } carrier ? PlanningText.Carrier(carrier) : carrierId;
@@ -171,14 +171,10 @@
         _outcomes.Clear();
         try
         {
-            foreach (var number in SelectedIn(transportOrders))
+            var assignments = new TransportOrderAssignments(Commands, Logger);
+            await foreach (var (number, answer) in assignments.AssignEachAsync(SelectedIn(transportOrders), carrierId, _closed.Token))
             {
-                var answer = await AssignOneAsync(number, carrierId);
-                if (_closed.IsCancellationRequested)
-                {
-                    return;
-                }
-
+                // A Planned order leaves the selection; one that wasn't assigned stays selected, to try again.
                 if (answer is AssignAnswer.Planned)
                 {
                     _selected.Remove(number);
@@ -191,24 +187,6 @@
         finally
         {
             _assigning = false;
-        }
-    }
-
-    // What the TMS API answered, or null when it couldn't be reached or the page closed.
-    private async Task<AssignAnswer?> AssignOneAsync(string number, string? carrierId)
-    {
-        try
-        {
-            return await Commands.AssignAsync(number, carrierId, _closed.Token);
-        }
-        catch (OperationCanceledException) when (_closed.IsCancellationRequested)
-        {
-            return null;
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            Logger.LogWarning(exception, "Assigning Transport Order {TransportOrderNumber} failed", number);
-            return null;
         }
     }
 
