@@ -49,6 +49,11 @@ else
                 <dl class="detail-list">
                     <dt>Status</dt>
                     <dd>@_transportOrder.Status</dd>
+                    @if (_transportOrder.ShipmentNumber is { } shipmentNumber)
+                    {
+                        <dt>Shipment</dt>
+                        <dd><a href="/shipments/@shipmentNumber">@shipmentNumber</a></dd>
+                    }
                     <dt>Shipper</dt>
                     <dd>@(_transportOrder.Shipper.Name ?? _transportOrder.Shipper.Id)</dd>
                     <dt>Shipper reference</dt>

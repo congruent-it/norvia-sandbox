@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json.Nodes;
 using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Web.TmsApi;
 using Norvia.Tms.Web.TransportOrders;
@@ -112,6 +113,101 @@ public sealed class TmsApiClientTests : IDisposable
 
         await reRate.Should().ThrowAsync<HttpRequestException>();
     }
+
+    [Fact]
+    public async Task AssignAsync_ToACarrier_PostsTheCarrierToTheOrdersAssign_AsTheTmsUi_UnderAnIdempotencyKey()
+    {
+        _tmsApi.Answer(HttpStatusCode.Created, Assigned("SH-0000012"));
+
+        await AssignAsync("TO-0000042", "CAR-0002");
+
+        _tmsApi.Request!.Method.Should().Be(HttpMethod.Post);
+        _tmsApi.Request.RequestUri.Should().Be(new Uri("http://tms-api.example/v1/transport-orders/TO-0000042/assign"));
+        _tmsApi.Request.Headers.Authorization!.Parameter.Should().Be("tms-ui-token");
+        _tmsApi.Request.Headers.GetValues("Idempotency-Key").Should().ContainSingle().Which.Should().NotBeNullOrWhiteSpace();
+        JsonNode.Parse(_tmsApi.RequestBody!)!.ToJsonString().Should().Be("""{"assignedTo":"Carrier","carrierId":"CAR-0002"}""");
+    }
+
+    [Fact]
+    public async Task AssignAsync_ToOwnFleet_PostsOwnFleetWithoutACarrier()
+    {
+        _tmsApi.Answer(HttpStatusCode.Created, Assigned("SH-0000012"));
+
+        await AssignAsync("TO-0000042", carrierId: null);
+
+        JsonNode.Parse(_tmsApi.RequestBody!)!.ToJsonString().Should().Be("""{"assignedTo":"OwnFleet"}""");
+    }
+
+    [Fact]
+    public async Task AssignAsync_TwoAssignments_GoUnderKeysOfTheirOwn()
+    {
+        _tmsApi.Answer(HttpStatusCode.Created, Assigned("SH-0000012"));
+        await AssignAsync("TO-0000042", "CAR-0002");
+        var first = _tmsApi.Request!.Headers.GetValues("Idempotency-Key").Single();
+
+        await AssignAsync("TO-0000043", "CAR-0002");
+
+        _tmsApi.Request!.Headers.GetValues("Idempotency-Key").Single().Should().NotBe(first);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Created)]
+    [InlineData(HttpStatusCode.OK)] // A retry the TMS answers as a repeat.
+    public async Task AssignAsync_Assigned_IsPlannedWithItsShipmentNumber(HttpStatusCode status)
+    {
+        _tmsApi.Answer(status, Assigned("SH-0000012"));
+
+        var answer = await AssignAsync("TO-0000042", "CAR-0002");
+
+        answer.Should().Be(new AssignAnswer.Planned("SH-0000012"));
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.NotFound, "TransportOrderNotFound", "There is no Transport Order TO-0000042.")]
+    [InlineData(HttpStatusCode.Conflict, "TransportOrderAlreadyPlanned", "Transport Order TO-0000042 is Planned already.")]
+    [InlineData(HttpStatusCode.UnprocessableEntity, "InactiveCarrier", "Carrier CAR-0004 is not active.")]
+    public async Task AssignAsync_Refused_IsRefusedWithTheTmsReason(HttpStatusCode status, string code, string reason)
+    {
+        _tmsApi.Answer(
+            status,
+            $$"""{ "status": {{(int)status}}, "title": "The Transport Order can't be assigned.", "detail": "{{reason}}", "code": "{{code}}" }""",
+            "application/problem+json");
+
+        var answer = await AssignAsync("TO-0000042", "CAR-0004");
+
+        answer.Should().Be(new AssignAnswer.Refused(reason));
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.BadRequest)]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.Forbidden)]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    public async Task AssignAsync_AnyOtherAnswer_Fails(HttpStatusCode status)
+    {
+        _tmsApi.Answer(status, "{}", "application/problem+json");
+
+        var assign = () => AssignAsync("TO-0000042", "CAR-0002");
+
+        await assign.Should().ThrowAsync<HttpRequestException>();
+    }
+
+    private Task<AssignAnswer> AssignAsync(string number, string? carrierId) =>
+        _client.AssignAsync(number, carrierId, Xunit.TestContext.Current.CancellationToken);
+
+    // As the TMS API answers an assignment: AssignTransportOrderResult, with its enums as strings.
+    private static string Assigned(string shipmentNumber) =>
+        $$"""
+        {
+          "shipmentNumber": "{{shipmentNumber}}",
+          "transportOrderNumber": "TO-0000042",
+          "status": "Planned",
+          "carriedBy": { "assignedTo": "Carrier", "carrier": { "id": "CAR-0002", "name": "Kessler Spedition" } },
+          "shipperId": "SHP-0001",
+          "correlationId": "corr-planning",
+          "repeat": false
+        }
+        """;
 
     private Task<ReRateAnswer> ReRateAsync(string number) => _client.ReRateAsync(number, Xunit.TestContext.Current.CancellationToken);
 

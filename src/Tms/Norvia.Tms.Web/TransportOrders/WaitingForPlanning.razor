@@ -1,24 +1,97 @@
 @page "/transport-orders"
 @rendermode InteractiveServer
 @using Microsoft.Extensions.Options
+@using Norvia.Tms.Application.Shipments
+@using Norvia.Tms.Application.TransportOrders.ToPlan
 @implements IAsyncDisposable
 @inject ITransportOrderQueries Queries
+@inject ITransportOrderCommands Commands
 @inject TimeProvider Time
 @inject IOptions<LiveListOptions> Options
-@inject ILogger<LiveTransportOrderList<TransportOrderSummary>> Logger
+@inject ILogger<LiveTransportOrderList<TransportOrderToPlanSummary>> Logger
 
 <PageTitle>Waiting for planning · Norvia TMS</PageTitle>
 
 <h1>Transport Orders waiting for planning</h1>
 
+@if (_outcomes.Count > 0)
+{
+    @* Each Transport Order's own outcome: a refused one doesn't stop the others, and says why. *@
+    <ul aria-label="Assignment outcomes" class="mb-4 list-none space-y-2 p-0">
+        @foreach (var outcome in _outcomes)
+        {
+            <li role="@(outcome.Answer is AssignAnswer.Planned ? "status" : "alert")">
+                @switch (outcome.Answer)
+                {
+                    case AssignAnswer.Planned planned:
+                        <FluentMessageBar Intent="MessageIntent.Success" AllowDismiss="false">
+                            Transport Order @outcome.TransportOrderNumber is planned as Shipment
+                            <a href="/shipments/@planned.ShipmentNumber">@planned.ShipmentNumber</a>, carried by @(outcome.Assignee).
+                        </FluentMessageBar>
+                        break;
+                    case AssignAnswer.Refused refused:
+                        <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
+                            Transport Order @outcome.TransportOrderNumber wasn't assigned: @refused.Reason
+                        </FluentMessageBar>
+                        break;
+                    default:
+                        <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+                            Transport Order @outcome.TransportOrderNumber couldn't be assigned. Try again.
+                        </FluentMessageBar>
+                        break;
+                }
+            </li>
+        }
+    </ul>
+}
+
 <LiveListStates Items="_list.Items" LastReadFailed="_list.LastReadFailed" Name="Transport Orders waiting for planning"
                 Empty="No Transport Orders are waiting for planning. A Transport Order appears here as soon as it is accepted." Context="transportOrders">
-    <FluentDataGrid Items="transportOrders.AsQueryable()" TGridItem="TransportOrderSummary" Class="flatly-table" aria-label="Transport Orders waiting for planning">
+    <div role="group" aria-label="Assign" class="mb-4 flex flex-wrap items-end gap-4">
+        @* Own fleet, or one of the active Carriers: an inactive Carrier is never offered. *@
+        <FluentSelect TOption="string" Label="Assign to" @bind-Value="_assignee" Width="16rem">
+            <FluentOption TOption="string" Value="">Choose who carries them</FluentOption>
+            <FluentOption TOption="string" Value="@OwnFleetOption">@PlanningText.OwnFleet</FluentOption>
+            @foreach (var carrier in _carriers ?? [])
+            {
+                <FluentOption TOption="string" Value="@carrier.Id">@PlanningText.Carrier(carrier)</FluentOption>
+            }
+        </FluentSelect>
+        <FluentButton Appearance="Appearance.Accent" OnClick="AssignAsync" Disabled="!CanAssign(transportOrders)">
+            Assign selected (@SelectedIn(transportOrders).Count)
+        </FluentButton>
+        @if (_carriersFailed)
+        {
+            <div role="alert">
+                <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
+                    The Carriers couldn't be loaded, so only Own fleet can be chosen. Reload the page to try again.
+                </FluentMessageBar>
+            </div>
+        }
+        else if (_carriers is null)
+        {
+            <FluentStack VerticalAlignment="VerticalAlignment.Center" role="status" Width="auto">
+                <FluentProgressRing />
+                <span>Loading the Carriers…</span>
+            </FluentStack>
+        }
+    </div>
+
+    @* The earliest collection first, as the query gives them: what is collected first is planned first. *@
+    <FluentDataGrid Items="transportOrders.AsQueryable()" TGridItem="TransportOrderToPlanSummary" Class="flatly-table" aria-label="Transport Orders waiting for planning"
+                    GridTemplateColumns="auto 1.2fr 1.2fr 1.2fr 1fr 1fr 1.6fr 1fr" MultiLine="true">
+        <TemplateColumn Title="Select">
+            <FluentCheckbox Value="_selected.Contains(context.TransportOrderNumber)"
+                            ValueChanged="@((bool selected) => Select(context.TransportOrderNumber, selected))"
+                            aria-label="@($"Select {context.TransportOrderNumber}")" />
+        </TemplateColumn>
         <TemplateColumn Title="Transport Order">
             <a href="/transport-orders/@context.TransportOrderNumber">@context.TransportOrderNumber</a>
         </TemplateColumn>
         <PropertyColumn Title="Shipper" Property="@(transportOrder => transportOrder.Shipper.Name ?? transportOrder.Shipper.Id)" />
-        <PropertyColumn Title="Shipper reference" Property="@(transportOrder => transportOrder.ShipperReference)" />
+        <PropertyColumn Title="Shipper reference" Property="@(transportOrder => SubmittedTransportOrder.Given(transportOrder.ShipperReference))" />
+        <PropertyColumn Title="Collection" Property="@(transportOrder => PlanningText.Place(transportOrder.CollectionPlace))" />
+        <PropertyColumn Title="Delivery" Property="@(transportOrder => PlanningText.Place(transportOrder.DeliveryPlace))" />
         <PropertyColumn Title="Collection window" Property="@(transportOrder => NorviaTime.FormatWindow(transportOrder.CollectionEarliest, transportOrder.CollectionLatest))" />
         @* Shown beside the order, never as a filter: a Planner plans an order whatever its rating result. *@
         <PropertyColumn Title="Rating result" Property="@(transportOrder => RatingText.Of(transportOrder.RatingResult))" />
@@ -26,15 +99,101 @@
 </LiveListStates>
 
 @code {
-    private LiveTransportOrderList<TransportOrderSummary> _list = null!;
+    // The picker's value for Own fleet; every other value is a Carrier's ID, and the empty value is no choice yet.
+    private const string OwnFleetOption = "own-fleet";
 
-    protected override void OnInitialized()
+    private readonly CancellationTokenSource _closed = new();
+    private readonly HashSet<string> _selected = [];
+    private readonly List<AssignmentOutcome> _outcomes = [];
+    private LiveTransportOrderList<TransportOrderToPlanSummary> _list = null!;
+    private IReadOnlyList<CarrierView>? _carriers;
+    private bool _carriersFailed;
+    private string? _assignee = string.Empty;
+    private bool _assigning;
+
+    protected override async Task OnInitializedAsync()
     {
-        _list = new LiveTransportOrderList<TransportOrderSummary>(
+        _list = new LiveTransportOrderList<TransportOrderToPlanSummary>(
             Queries.ListWaitingForPlanningAsync, "the Transport Orders waiting for planning", Time, Options.Value.RefreshInterval, Logger);
         _list.Changed += () => InvokeAsync(StateHasChanged);
         _list.Start();
+
+        // Read once: Carrier data comes from the ERP's seed and doesn't change while the page is open.
+        try
+        {
+            _carriers = await Queries.ListActiveCarriersAsync(_closed.Token);
+        }
+        catch (OperationCanceledException) when (_closed.IsCancellationRequested)
+        {
+            // The page closed while it was reading.
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning(exception, "Reading the active Carriers failed");
+            _carriersFailed = true;
+        }
     }
 
-    public ValueTask DisposeAsync() => _list.DisposeAsync();
+    private void Select(string number, bool selected)
+    {
+        if (selected)
+        {
+            _selected.Add(number);
+        }
+        else
+        {
+            _selected.Remove(number);
+        }
+    }
+
+    // Only what the list still shows: a Transport Order planned meanwhile has left it, and isn't assigned again.
+    private List<string> SelectedIn(IReadOnlyList<TransportOrderToPlanSummary> transportOrders) =>
+        [.. transportOrders.Select(order => order.TransportOrderNumber).Where(_selected.Contains)];
+
+    private bool CanAssign(IReadOnlyList<TransportOrderToPlanSummary> transportOrders) =>
+        !_assigning && !string.IsNullOrEmpty(_assignee) && SelectedIn(transportOrders).Count > 0;
+
+    // Each Transport Order's outcome shows as it comes. The list isn't changed here: it reads again shortly, and then
+    // drops each Planned order.
+    private async Task AssignAsync()
+    {
+        if (_list.Items is not { } transportOrders || !CanAssign(transportOrders))
+        {
+            return;
+        }
+
+        var carrierId = _assignee == OwnFleetOption ? null : _assignee;
+        var assignee = carrierId is null
+            ? PlanningText.OwnFleet
+            : _carriers?.FirstOrDefault(carrier => carrier.Id == carrierId) is { } carrier ? PlanningText.Carrier(carrier) : carrierId;
+
+        _assigning = true;
+        _outcomes.Clear();
+        try
+        {
+            var assignments = new TransportOrderAssignments(Commands, Logger);
+            await foreach (var (number, answer) in assignments.AssignEachAsync(SelectedIn(transportOrders), carrierId, _closed.Token))
+            {
+                // A Planned order leaves the selection; one that wasn't assigned stays selected, to try again.
+                if (answer is AssignAnswer.Planned)
+                {
+                    _selected.Remove(number);
+                }
+
+                _outcomes.Add(new AssignmentOutcome(number, assignee, answer));
+                StateHasChanged();
+            }
+        }
+        finally
+        {
+            _assigning = false;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _closed.CancelAsync();
+        _closed.Dispose();
+        await _list.DisposeAsync();
+    }
 }
