@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 
 namespace Norvia.Integration.TransportOrderIntake.UnitTests.PartnerApi;
 
@@ -115,7 +116,7 @@ public sealed class SubmitTransportOrderPolicyTests
     }
 
     [Fact]
-    public void Inbound_APassedCall_IsTracedWithTheShipperBeforeTheLogicAppRecordsItsOutcome()
+    public void Inbound_APassedCall_IsTracedWithTheShipper()
     {
         var trace = SubmitTransportOrderPolicy.TrackedKeys(SubmitTransportOrderPolicy.Inbound.Elements("trace").Single());
 
@@ -133,6 +134,44 @@ public sealed class SubmitTransportOrderPolicyTests
 
         header.Attribute("exists-action")!.Value.Should().Be("override");
         header.Element("value")!.Value.Should().Be("@((string)context.Variables[\"correlationId\"])");
+    }
+
+    [Theory]
+    [InlineData("201", "Succeeded", null)]
+    [InlineData("200", "Succeeded", null)]
+    [InlineData("422", "Refused", "TransportOrderRejected")]
+    public void Outbound_TheAnswerFromTheLogicApp_IsTracedWithItsOutcome(string status, string outcome, string? failureCode)
+    {
+        // API Management's hop on the trail has the outcome of the answer the Shipper got, as the portal records it.
+        var when = SubmitTransportOrderPolicy.Outbound.Elements("choose").Elements("when")
+            .Single(when => when.Attribute("condition")!.Value.Contains($"StatusCode == {status}", StringComparison.Ordinal));
+
+        var trace = SubmitTransportOrderPolicy.TrackedKeys(when.Element("trace")!);
+
+        trace["correlationId"].Should().Be("@((string)context.Variables[\"correlationId\"])");
+        trace["flow"].Should().Be(Flow);
+        trace["outcome"].Should().Be(outcome);
+        if (failureCode is null)
+        {
+            trace.Should().NotContainKey("failureCode", "a key that doesn't apply is left out, never sent empty");
+        }
+        else
+        {
+            trace["failureCode"].Should().Be(failureCode);
+        }
+    }
+
+    [Fact]
+    public void Outbound_AnyOtherAnswer_IsTracedAsFailed_BecauseNothingWasBooked()
+    {
+        // NOT_RECEIVED (502), or whatever a failed run answers with: the Shipper sends the booking again.
+        var otherwise = SubmitTransportOrderPolicy.Outbound.Elements("choose").Elements("otherwise").Single();
+
+        var trace = SubmitTransportOrderPolicy.TrackedKeys(otherwise.Element("trace")!);
+
+        trace.Keys.Should().BeEquivalentTo("correlationId", "flow", "outcome", "failureCode");
+        trace["outcome"].Should().Be("Failed");
+        trace["failureCode"].Should().Be("BookingNotReceived");
     }
 
     [Fact]

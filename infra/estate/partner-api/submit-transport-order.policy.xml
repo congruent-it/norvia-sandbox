@@ -90,6 +90,35 @@
     <set-header name="X-Correlation-ID" exists-action="override">
       <value>@((string)context.Variables["correlationId"])</value>
     </set-header>
+    <!-- The outcome of the answer the Shipper got (contracts/partner-api/README.md, Responses), as API Management's hop. -->
+    <choose>
+      <when condition="@(context.Response.StatusCode == 201 || context.Response.StatusCode == 200)">
+        <trace source="norvia-partner-api" severity="information">
+          <message>Answered: booked</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="transport-order-intake" />
+          <metadata name="outcome" value="Succeeded" />
+        </trace>
+      </when>
+      <when condition="@(context.Response.StatusCode == 422)">
+        <trace source="norvia-partner-api" severity="information">
+          <message>Answered: rejected</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="transport-order-intake" />
+          <metadata name="outcome" value="Refused" />
+          <metadata name="failureCode" value="TransportOrderRejected" />
+        </trace>
+      </when>
+      <otherwise>
+        <trace source="norvia-partner-api" severity="information">
+          <message>Answered: not received</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="transport-order-intake" />
+          <metadata name="outcome" value="Failed" />
+          <metadata name="failureCode" value="BookingNotReceived" />
+        </trace>
+      </otherwise>
+    </choose>
   </outbound>
   <on-error>
     <base />
