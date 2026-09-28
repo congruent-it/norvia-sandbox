@@ -144,6 +144,14 @@
 }
 
 /*
+ * Tailwind's preflight zeroes the padding of every element, the options' hosts included, which puts their text against
+ * the edge of the list and under the selected option's marker. This gives back Fluent's own inset.
+ */
+fluent-option {
+    padding-inline: 0.75rem;
+}
+
+/*
  * Alerts as Flatly draws them: solid colour, white text, in light mode. Fluent scopes its own with an attribute
  * (.fluent-messagebar.intent-error[b-…], three classes' worth), so these add body and :not(.dark) to outrank it.
  */
