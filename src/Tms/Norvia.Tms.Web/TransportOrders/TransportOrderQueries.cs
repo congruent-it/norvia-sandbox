@@ -3,6 +3,7 @@ using Mediator;
 using Norvia.Tms.Application.Carriers.ListActive;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shipments.GetByNumber;
+using Norvia.Tms.Application.Shipments.ListToRelease;
 using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.GetByNumber;
 using Norvia.Tms.Application.TransportOrders.GetRejectedBooking;
@@ -39,6 +40,9 @@ internal sealed class TransportOrderQueries(IServiceScopeFactory scopes) : ITran
 
     public async Task<ShipmentView?> FindShipmentAsync(string shipmentNumber, CancellationToken cancellationToken) =>
         FoundOrNull(await SendAsync(new GetShipmentQuery(shipmentNumber), cancellationToken), $"Shipment {shipmentNumber}");
+
+    public Task<IReadOnlyList<ShipmentToReleaseSummary>> ListShipmentsToReleaseAsync(CancellationToken cancellationToken) =>
+        SendAsync(new ListShipmentsToReleaseQuery(), cancellationToken);
 
     private async Task<TResponse> SendAsync<TResponse>(IQuery<TResponse> query, CancellationToken cancellationToken)
     {

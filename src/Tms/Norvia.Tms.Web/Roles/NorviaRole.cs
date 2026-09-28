@@ -12,7 +12,8 @@ public sealed record NorviaRole(string Key, string Name, IReadOnlyList<RoleView>
     /// <summary>The cookie that remembers the role a browser last switched to.</summary>
     public const string CookieName = "norvia-tms-role";
 
-    public static readonly NorviaRole Planner = new("planner", "Planner", [new("/transport-orders", "Waiting for planning")]);
+    public static readonly NorviaRole Planner = new("planner", "Planner",
+        [new("/transport-orders", "Waiting for planning"), new("/shipments/to-release", "Shipments to release")]);
 
     public static readonly NorviaRole CustomerService = new("customer-service", "Customer service",
         [new("/rejected-bookings", "Rejected bookings"), new("/rating-exceptions", "Rating exceptions")]);

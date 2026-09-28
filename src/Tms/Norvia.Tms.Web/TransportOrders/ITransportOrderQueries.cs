@@ -1,4 +1,5 @@
 using Norvia.Tms.Application.Shipments;
+using Norvia.Tms.Application.Shipments.ListToRelease;
 using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.List;
 using Norvia.Tms.Application.TransportOrders.RatingExceptions;
@@ -32,4 +33,7 @@ public interface ITransportOrderQueries
 
     /// <summary>The Shipment with this number, or null when there is none.</summary>
     Task<ShipmentView?> FindShipmentAsync(string shipmentNumber, CancellationToken cancellationToken);
+
+    /// <summary>The Planner's Shipments to release: the Planned Shipments, with who carries each, in the order they were planned.</summary>
+    Task<IReadOnlyList<ShipmentToReleaseSummary>> ListShipmentsToReleaseAsync(CancellationToken cancellationToken);
 }

@@ -2,7 +2,9 @@ using System.Diagnostics;
 using System.Net;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging.Testing;
+using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.TransportOrders;
+using Norvia.Tms.Web.Shipments;
 using Norvia.Tms.Web.TmsApi;
 using Norvia.Tms.Web.TransportOrders;
 
@@ -266,6 +268,204 @@ public sealed class TmsApiClientTests : IDisposable
     }
 
     [Fact]
+    public async Task ReassignAsync_ToACarrier_PostsTheCarrierToTheShipmentsReassign_AsTheTmsUi_UnderAnIdempotencyKey()
+    {
+        _tmsApi.Answer(HttpStatusCode.OK, Reassigned());
+
+        await ReassignAsync("SH-0000012", "CAR-0001");
+
+        _tmsApi.Request!.Method.Should().Be(HttpMethod.Post);
+        _tmsApi.Request.RequestUri.Should().Be(new Uri("http://tms-api.example/v1/shipments/SH-0000012/reassign"));
+        _tmsApi.Request.Headers.Authorization!.Parameter.Should().Be("tms-ui-token");
+        _tmsApi.Request.Headers.GetValues("Idempotency-Key").Should().ContainSingle().Which.Should().NotBeNullOrWhiteSpace();
+        JsonNode.Parse(_tmsApi.RequestBody!)!.ToJsonString().Should().Be("""{"assignedTo":"Carrier","carrierId":"CAR-0001"}""");
+    }
+
+    [Fact]
+    public async Task ReassignAsync_ToOwnFleet_PostsOwnFleetWithoutACarrier()
+    {
+        _tmsApi.Answer(HttpStatusCode.OK, Reassigned(ownFleet: true));
+
+        await ReassignAsync("SH-0000012", carrierId: null);
+
+        JsonNode.Parse(_tmsApi.RequestBody!)!.ToJsonString().Should().Be("""{"assignedTo":"OwnFleet"}""");
+    }
+
+    [Fact]
+    public async Task ReassignAsync_Reassigned_IsReassignedWithWhoCarriesItNow()
+    {
+        _tmsApi.Answer(HttpStatusCode.OK, Reassigned());
+
+        var answer = await ReassignAsync("SH-0000012", "CAR-0001");
+
+        answer.Should().Be(new ReassignAnswer.Reassigned(new CarriedByView(AssignedTo.Carrier, new CarrierView("CAR-0001", "Van Dijk Transport"))));
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.NotFound, "ShipmentNotFound", "There is no Shipment SH-0000012.")]
+    [InlineData(HttpStatusCode.Conflict, "ShipmentNotPlanned", "Shipment SH-0000012 isn't Planned.")]
+    [InlineData(HttpStatusCode.UnprocessableEntity, "InactiveCarrier", "Carrier CAR-0004 is not active.")]
+    public async Task ReassignAsync_Refused_IsRefusedWithTheTmsReason(HttpStatusCode status, string code, string reason)
+    {
+        _tmsApi.Answer(
+            status,
+            $$"""{ "status": {{(int)status}}, "title": "The Shipment can't be reassigned.", "detail": "{{reason}}", "code": "{{code}}" }""",
+            "application/problem+json");
+
+        var answer = await ReassignAsync("SH-0000012", "CAR-0004");
+
+        answer.Should().Be(new ReassignAnswer.Refused(reason));
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.BadRequest)]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.Forbidden)]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    public async Task ReassignAsync_AnyOtherAnswer_Fails(HttpStatusCode status)
+    {
+        _tmsApi.Answer(status, "{}", "application/problem+json");
+
+        var reassign = () => ReassignAsync("SH-0000012", "CAR-0001");
+
+        await reassign.Should().ThrowAsync<HttpRequestException>();
+    }
+
+    [Fact]
+    public async Task ReassignAsync_Reassigned_RecordsItsOutcomeOnTheAssignmentsTrail()
+    {
+        _tmsApi.Answer(HttpStatusCode.OK, Reassigned());
+
+        await ReassignAsync("SH-0000012", "CAR-0001");
+
+        ScopeOf(_logger.LatestRecord).Should().Contain(new Dictionary<string, object?>
+        {
+            ["correlationId"] = "corr-reassignment",
+            ["flow"] = "transport-planning",
+            ["partyId"] = "SHP-0001",
+            ["transportOrderNumber"] = "TO-0000042",
+            ["shipmentNumber"] = "SH-0000012",
+            ["outcome"] = "Succeeded",
+        }).And.NotContainKey("failureCode");
+    }
+
+    [Fact]
+    public async Task ReassignAsync_Refused_RecordsItRefused_WithoutATransportOrderNumber()
+    {
+        // The problem doesn't name the Transport Order, so the trail carries only what the reassignment itself knows.
+        _tmsApi.Answer(
+            HttpStatusCode.Conflict,
+            """
+            {
+              "status": 409, "title": "The Shipment can't be reassigned.", "detail": "Shipment SH-0000012 isn't Planned.",
+              "code": "ShipmentNotPlanned", "correlationId": "corr-refused"
+            }
+            """,
+            "application/problem+json");
+
+        await ReassignAsync("SH-0000012", "CAR-0001");
+
+        ScopeOf(_logger.LatestRecord).Should().Contain(new Dictionary<string, object?>
+        {
+            ["correlationId"] = "corr-refused",
+            ["flow"] = "transport-planning",
+            ["shipmentNumber"] = "SH-0000012",
+            ["outcome"] = "Refused",
+            ["failureCode"] = "ShipmentNotPlanned",
+        }).And.NotContainKey("transportOrderNumber");
+    }
+
+    [Fact]
+    public async Task ReassignAsync_SendsTheReassignmentInASpanOfItsOwn()
+    {
+        _tmsApi.Answer(HttpStatusCode.OK, Reassigned());
+
+        await ReassignAsync("SH-0000012", "CAR-0001");
+
+        _spans.Should().ContainSingle().Which.DisplayName.Should().Be("Reassign Shipment");
+    }
+
+    [Fact]
+    public async Task ReleaseAsync_PostsToTheShipmentsRelease_AsTheTmsUi_UnderAnIdempotencyKey()
+    {
+        _tmsApi.Answer(HttpStatusCode.OK, Released());
+
+        await ReleaseAsync("SH-0000012");
+
+        _tmsApi.Request!.Method.Should().Be(HttpMethod.Post);
+        _tmsApi.Request.RequestUri.Should().Be(new Uri("http://tms-api.example/v1/shipments/SH-0000012/release"));
+        _tmsApi.Request.Headers.Authorization!.Parameter.Should().Be("tms-ui-token");
+        _tmsApi.Request.Headers.GetValues("Idempotency-Key").Should().ContainSingle().Which.Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public async Task ReleaseAsync_Released_IsReleased()
+    {
+        _tmsApi.Answer(HttpStatusCode.OK, Released());
+
+        var answer = await ReleaseAsync("SH-0000012");
+
+        answer.Should().Be(new ReleaseAnswer.Released());
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.NotFound, "ShipmentNotFound", "There is no Shipment SH-0000012.")]
+    [InlineData(HttpStatusCode.Conflict, "ShipmentNotPlanned", "Shipment SH-0000012 isn't Planned.")]
+    public async Task ReleaseAsync_Refused_IsRefusedWithTheTmsReason(HttpStatusCode status, string code, string reason)
+    {
+        _tmsApi.Answer(
+            status,
+            $$"""{ "status": {{(int)status}}, "title": "The Shipment can't be released.", "detail": "{{reason}}", "code": "{{code}}" }""",
+            "application/problem+json");
+
+        var answer = await ReleaseAsync("SH-0000012");
+
+        answer.Should().Be(new ReleaseAnswer.Refused(reason));
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.UnprocessableEntity)]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.Forbidden)]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    public async Task ReleaseAsync_AnyOtherAnswer_Fails(HttpStatusCode status)
+    {
+        _tmsApi.Answer(status, "{}", "application/problem+json");
+
+        var release = () => ReleaseAsync("SH-0000012");
+
+        await release.Should().ThrowAsync<HttpRequestException>();
+    }
+
+    [Fact]
+    public async Task ReleaseAsync_Released_RecordsItsOutcomeOnTheAssignmentsTrail()
+    {
+        _tmsApi.Answer(HttpStatusCode.OK, Released());
+
+        await ReleaseAsync("SH-0000012");
+
+        ScopeOf(_logger.LatestRecord).Should().Contain(new Dictionary<string, object?>
+        {
+            ["correlationId"] = "corr-release",
+            ["flow"] = "transport-planning",
+            ["partyId"] = "SHP-0001",
+            ["transportOrderNumber"] = "TO-0000042",
+            ["shipmentNumber"] = "SH-0000012",
+            ["outcome"] = "Succeeded",
+        }).And.NotContainKey("failureCode");
+    }
+
+    [Fact]
+    public async Task ReleaseAsync_SendsTheReleaseInASpanOfItsOwn()
+    {
+        _tmsApi.Answer(HttpStatusCode.OK, Released());
+
+        await ReleaseAsync("SH-0000012");
+
+        _spans.Should().ContainSingle().Which.DisplayName.Should().Be("Release Shipment");
+    }
+
+    [Fact]
     public async Task ReRateAsync_Rated_RecordsItsOutcomeOnTheIntakesTrail()
     {
         // A re-rate continues the Message trail of the order's intake, as its first rating does.
@@ -349,6 +549,40 @@ public sealed class TmsApiClientTests : IDisposable
         """;
 
     private Task<ReRateAnswer> ReRateAsync(string number) => _client.ReRateAsync(number, Xunit.TestContext.Current.CancellationToken);
+
+    private Task<ReassignAnswer> ReassignAsync(string shipmentNumber, string? carrierId) =>
+        _client.ReassignAsync(shipmentNumber, carrierId, Xunit.TestContext.Current.CancellationToken);
+
+    private Task<ReleaseAnswer> ReleaseAsync(string shipmentNumber) => _client.ReleaseAsync(shipmentNumber, Xunit.TestContext.Current.CancellationToken);
+
+    // As the TMS API answers a reassignment: ReassignShipmentResult, with its enums as strings.
+    private static string Reassigned(bool ownFleet = false) =>
+        $$"""
+        {
+          "shipmentNumber": "SH-0000012",
+          "transportOrderNumber": "TO-0000042",
+          "status": "Planned",
+          "carriedBy": {{(ownFleet ? """{ "assignedTo": "OwnFleet", "carrier": null }""" : """{ "assignedTo": "Carrier", "carrier": { "id": "CAR-0001", "name": "Van Dijk Transport" } }""")}},
+          "previouslyCarriedBy": { "assignedTo": "Carrier", "carrier": { "id": "CAR-0002", "name": "Kessler Spedition" } },
+          "shipperId": "SHP-0001",
+          "correlationId": "corr-reassignment",
+          "repeat": false
+        }
+        """;
+
+    // As the TMS API answers a release: ReleaseShipmentResult, with its enums as strings.
+    private static string Released() =>
+        """
+        {
+          "shipmentNumber": "SH-0000012",
+          "transportOrderNumber": "TO-0000042",
+          "status": "Released",
+          "carriedBy": { "assignedTo": "Carrier", "carrier": { "id": "CAR-0002", "name": "Kessler Spedition" } },
+          "shipperId": "SHP-0001",
+          "correlationId": "corr-release",
+          "repeat": false
+        }
+        """;
 
     // As the TMS API answers a re-rate: RateTransportOrderResult, with its enums as strings.
     private static string Answer(string ratingResult, (string Code, string Message)? failure = null) =>

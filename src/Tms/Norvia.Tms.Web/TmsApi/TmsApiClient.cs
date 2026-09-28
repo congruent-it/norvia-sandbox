@@ -8,15 +8,17 @@ using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Domain.TransportOrders;
+using Norvia.Tms.Web.Shipments;
 using Norvia.Tms.Web.TransportOrders;
 
 namespace Norvia.Tms.Web.TmsApi;
 
 /// <summary>
 /// Sends the TMS UI's commands to the TMS API as the TMS UI's own identity. The standard resilience handler retries a
-/// call, so each re-rate and each assignment goes under an idempotency key of its own that every retry of it repeats.
-/// Each command goes in a span of its own, which the Integration console names the TMS UI's hop after, and its answer is
-/// logged with the tracking contract's keys (coding guidelines §7), on the Message trail the answer names.
+/// call, so each re-rate, assignment, reassignment and release goes under an idempotency key of its own that every retry
+/// of it repeats. Each command goes in a span of its own, which the Integration console names the TMS UI's hop after,
+/// and its answer is logged with the tracking contract's keys (coding guidelines §7), on the Message trail the answer
+/// names.
 /// </summary>
 internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens, TmsUiActivities activities, ILogger<TmsApiClient> logger)
     : ITransportOrderCommands
@@ -103,6 +105,74 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
         }
     }
 
+    public async Task<ReassignAnswer> ReassignAsync(string shipmentNumber, string? carrierId, CancellationToken cancellationToken)
+    {
+        using var span = activities.Source.StartActivity("Reassign Shipment", ActivityKind.Internal);
+        using var request = await CommandAsync($"/v1/shipments/{Uri.EscapeDataString(shipmentNumber)}/reassign", cancellationToken);
+        request.Content = JsonContent.Create(new Reassignment(carrierId is null ? AssignedTo.OwnFleet : AssignedTo.Carrier, carrierId), options: Json);
+
+        using var response = await http.SendAsync(request, cancellationToken);
+        switch (response.StatusCode)
+        {
+            case HttpStatusCode.OK:
+                var reassigned = await response.Content.ReadFromJsonAsync<Reassigned>(Json, cancellationToken)
+                    ?? throw new HttpRequestException("The TMS API answered a reassignment without a body.");
+                using (Track(Flows.TransportPlanning, reassigned.TransportOrderNumber, TrackingKeys.Succeeded, null, reassigned.CorrelationId, reassigned.ShipperId, shipmentNumber))
+                {
+                    LogReassigned(shipmentNumber);
+                }
+
+                return new ReassignAnswer.Reassigned(reassigned.CarriedBy);
+            // A refused reassignment: its problem's detail is the refusal's readable message, and its code says which rule.
+            case HttpStatusCode.NotFound or HttpStatusCode.Conflict or HttpStatusCode.UnprocessableEntity:
+                return new ReassignAnswer.Refused(
+                    await RefuseShipmentCommandAsync(response, TmsCommand.Reassignment, shipmentNumber, "reassigned", cancellationToken));
+            default:
+                throw Unexpected(response, "a reassignment");
+        }
+    }
+
+    public async Task<ReleaseAnswer> ReleaseAsync(string shipmentNumber, CancellationToken cancellationToken)
+    {
+        using var span = activities.Source.StartActivity("Release Shipment", ActivityKind.Internal);
+        using var request = await CommandAsync($"/v1/shipments/{Uri.EscapeDataString(shipmentNumber)}/release", cancellationToken);
+
+        using var response = await http.SendAsync(request, cancellationToken);
+        switch (response.StatusCode)
+        {
+            case HttpStatusCode.OK:
+                var released = await response.Content.ReadFromJsonAsync<Released>(Json, cancellationToken)
+                    ?? throw new HttpRequestException("The TMS API answered a release without a body.");
+                using (Track(Flows.TransportPlanning, released.TransportOrderNumber, TrackingKeys.Succeeded, null, released.CorrelationId, released.ShipperId, shipmentNumber))
+                {
+                    LogReleased(shipmentNumber);
+                }
+
+                return new ReleaseAnswer.Released();
+            // A refused release: its problem's detail is the refusal's readable message, and its code says which rule.
+            case HttpStatusCode.NotFound or HttpStatusCode.Conflict:
+                return new ReleaseAnswer.Refused(
+                    await RefuseShipmentCommandAsync(response, TmsCommand.Release, shipmentNumber, "released", cancellationToken));
+            default:
+                throw Unexpected(response, "a release");
+        }
+    }
+
+    // What a refused reassignment or release shares: reading the problem, tracing the refusal on the trail it names, and
+    // answering with its readable reason.
+    private async Task<string> RefuseShipmentCommandAsync(
+        HttpResponseMessage response, TmsCommand command, string shipmentNumber, string action, CancellationToken cancellationToken)
+    {
+        var problem = await response.Content.ReadFromJsonAsync<Refusal>(Json, cancellationToken);
+        var reason = problem?.Detail ?? $"Shipment {shipmentNumber} can't be {action}.";
+        using (Track(Flows.TransportPlanning, null, TrackingKeys.Refused, problem?.Code, problem?.CorrelationId, shipmentNumber: shipmentNumber))
+        {
+            LogShipmentRefused(command, shipmentNumber, reason);
+        }
+
+        return reason;
+    }
+
     // A command as the TMS UI's own identity, under a new idempotency key that every retry of it repeats.
     private async Task<HttpRequestMessage> CommandAsync(string path, CancellationToken cancellationToken)
     {
@@ -114,20 +184,20 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
 
     /// <summary>
     /// The tracking contract's keys of a command's answer. Only an answer that names a correlation ID puts the TMS UI on
-    /// a Message trail, as a re-rate of an order that doesn't exist doesn't. A key that doesn't apply is left out, never
-    /// sent empty.
+    /// a Message trail, as a re-rate of an order that doesn't exist doesn't. A key that doesn't apply, such as the
+    /// Transport Order number on a refused reassignment, is left out, never sent empty.
     /// </summary>
     private IDisposable? Track(
-        string flow, string transportOrderNumber, string outcome, string? failureCode = null, string? correlationId = null, string? partyId = null, string? shipmentNumber = null)
+        string flow, string? transportOrderNumber, string outcome, string? failureCode = null, string? correlationId = null, string? partyId = null, string? shipmentNumber = null)
     {
         var keys = new Dictionary<string, object?>
         {
             [TrackingKeys.Flow] = flow,
-            [TrackingKeys.TransportOrderNumber] = transportOrderNumber,
             [TrackingKeys.Outcome] = outcome,
         };
         foreach (var (key, value) in new[]
         {
+            (TrackingKeys.TransportOrderNumber, transportOrderNumber),
             (TrackingKeys.FailureCode, failureCode),
             (TrackingKeys.CorrelationId, correlationId),
             (TrackingKeys.PartyId, partyId),
@@ -158,10 +228,21 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
     [LoggerMessage(Level = LogLevel.Information, Message = "{Command} of Transport Order {TransportOrderNumber} refused: {Reason}")]
     private partial void LogRefused(TmsCommand command, string transportOrderNumber, string reason);
 
+    [LoggerMessage(Level = LogLevel.Information, Message = "Shipment {ShipmentNumber} reassigned")]
+    private partial void LogReassigned(string shipmentNumber);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Shipment {ShipmentNumber} released")]
+    private partial void LogReleased(string shipmentNumber);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "{Command} of Shipment {ShipmentNumber} refused: {Reason}")]
+    private partial void LogShipmentRefused(TmsCommand command, string shipmentNumber, string reason);
+
     private enum TmsCommand
     {
         ReRate,
         Assignment,
+        Reassignment,
+        Release,
     }
 
     // What the TMS API answers a re-rate, as far as the TMS UI reads it.
@@ -176,4 +257,13 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
 
     // What the TMS API answers an assignment, as far as the TMS UI reads it.
     private sealed record Assigned(string ShipmentNumber, string? CorrelationId, string? ShipperId);
+
+    // What the TMS UI asks the TMS API to reassign a Shipment to.
+    private sealed record Reassignment(AssignedTo AssignedTo, string? CarrierId);
+
+    // What the TMS API answers a reassignment, as far as the TMS UI reads it.
+    private sealed record Reassigned(CarriedByView CarriedBy, string? TransportOrderNumber, string? CorrelationId, string? ShipperId);
+
+    // What the TMS API answers a release, as far as the TMS UI reads it.
+    private sealed record Released(string? TransportOrderNumber, string? CorrelationId, string? ShipperId);
 }

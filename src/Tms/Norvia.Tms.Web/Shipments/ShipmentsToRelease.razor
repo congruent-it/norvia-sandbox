@@ -1,0 +1,255 @@
+@page "/shipments/to-release"
+@rendermode InteractiveServer
+@using Microsoft.Extensions.Options
+@using Norvia.Tms.Application.Shipments
+@using Norvia.Tms.Application.Shipments.ListToRelease
+@using Norvia.Tms.Web.TransportOrders
+@implements IAsyncDisposable
+@inject ITransportOrderQueries Queries
+@inject ITransportOrderCommands Commands
+@inject TimeProvider Time
+@inject IOptions<LiveListOptions> Options
+@inject ILogger<LiveTransportOrderList<ShipmentToReleaseSummary>> Logger
+
+<PageTitle>Shipments to release · Norvia TMS</PageTitle>
+
+<h1>Shipments to release</h1>
+
+@if (_releaseOutcomes.Count > 0)
+{
+    @* Each Shipment's own release outcome: a refused one doesn't stop the others, and says why. *@
+    <ul aria-label="Release outcomes" class="mb-4 list-none space-y-2 p-0">
+        @foreach (var outcome in _releaseOutcomes)
+        {
+            <li role="@(outcome.Answer is ReleaseAnswer.Released ? "status" : "alert")">
+                @switch (outcome.Answer)
+                {
+                    case ReleaseAnswer.Released:
+                        <FluentMessageBar Intent="MessageIntent.Success" AllowDismiss="false">
+                            Shipment @outcome.ShipmentNumber is released.
+                        </FluentMessageBar>
+                        break;
+                    case ReleaseAnswer.Refused refused:
+                        <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
+                            Shipment @outcome.ShipmentNumber wasn't released: @refused.Reason
+                        </FluentMessageBar>
+                        break;
+                    default:
+                        <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+                            Shipment @outcome.ShipmentNumber couldn't be released. Try again.
+                        </FluentMessageBar>
+                        break;
+                }
+            </li>
+        }
+    </ul>
+}
+
+@if (_reassignOutcome is { } reassignOutcome)
+{
+    <div role="@(reassignOutcome.Intent == MessageIntent.Success ? "status" : "alert")" class="mb-4">
+        <FluentMessageBar Intent="reassignOutcome.Intent" AllowDismiss="false">@reassignOutcome.Text</FluentMessageBar>
+    </div>
+}
+
+<LiveListStates Items="_list.Items" LastReadFailed="_list.LastReadFailed" Name="Shipments to release"
+                Empty="No Shipments are waiting to be released. A Shipment appears here as soon as it is planned." Context="shipments">
+    <div role="group" aria-label="Release" class="mb-4 flex flex-wrap items-end gap-4">
+        <FluentButton Appearance="Appearance.Accent" OnClick="ReleaseAsync" Disabled="!CanRelease(shipments)">
+            Release selected (@SelectedIn(shipments).Count)
+        </FluentButton>
+        @if (_carriersFailed)
+        {
+            <div role="alert">
+                <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
+                    The Carriers couldn't be loaded, so a Shipment can only be reassigned to Own fleet. Reload the page to try again.
+                </FluentMessageBar>
+            </div>
+        }
+        else if (_carriers is null)
+        {
+            <FluentStack VerticalAlignment="VerticalAlignment.Center" role="status" Width="auto">
+                <FluentProgressRing />
+                <span>Loading the Carriers…</span>
+            </FluentStack>
+        }
+    </div>
+
+    @* Planned first, as the query gives them: the Shipment planned first is released first. *@
+    <FluentDataGrid Items="shipments.AsQueryable()" TGridItem="ShipmentToReleaseSummary" Class="flatly-table" aria-label="Shipments to release"
+                    GridTemplateColumns="auto 1fr 1fr 1.1fr 1.1fr 1fr 1.4fr auto" MultiLine="true">
+        <TemplateColumn Title="Select">
+            <FluentCheckbox Value="_selected.Contains(context.ShipmentNumber)"
+                            ValueChanged="@((bool selected) => Select(context.ShipmentNumber, selected))"
+                            aria-label="@($"Select {context.ShipmentNumber}")" />
+        </TemplateColumn>
+        <TemplateColumn Title="Shipment">
+            <a href="/shipments/@context.ShipmentNumber">@context.ShipmentNumber</a>
+        </TemplateColumn>
+        <TemplateColumn Title="Transport Order">
+            <a href="/transport-orders/@context.TransportOrderNumber">@context.TransportOrderNumber</a>
+        </TemplateColumn>
+        <PropertyColumn Title="Shipper" Property="@(shipment => shipment.Shipper.Name ?? shipment.Shipper.Id)" />
+        <PropertyColumn Title="Carried by" Property="@(shipment => PlanningText.CarriedBy(shipment.CarriedBy))" />
+        <PropertyColumn Title="Planned" Property="@(shipment => NorviaTime.Format(shipment.PlannedAt))" />
+        <TemplateColumn Title="Reassign to">
+            <FluentSelect TOption="string" Value="@ReassignToOf(context.ShipmentNumber)"
+                          ValueChanged="@((string value) => SetReassignTo(context.ShipmentNumber, value))"
+                          aria-label="@($"Reassign {context.ShipmentNumber} to")" Width="14rem">
+                <FluentOption TOption="string" Value="">Choose who carries it</FluentOption>
+                <FluentOption TOption="string" Value="@OwnFleetOption">@PlanningText.OwnFleet</FluentOption>
+                @foreach (var carrier in _carriers ?? [])
+                {
+                    <FluentOption TOption="string" Value="@carrier.Id">@PlanningText.Carrier(carrier)</FluentOption>
+                }
+            </FluentSelect>
+        </TemplateColumn>
+        <TemplateColumn Title="Action">
+            <FluentButton Appearance="Appearance.Outline" OnClick="() => ReassignAsync(context.ShipmentNumber)"
+                          Disabled="@(!CanReassign(context.ShipmentNumber))"
+                          aria-label="@($"Reassign {context.ShipmentNumber}")">
+                Reassign
+            </FluentButton>
+        </TemplateColumn>
+    </FluentDataGrid>
+</LiveListStates>
+
+@code {
+    // The picker's value for Own fleet; every other value is a Carrier's ID, and the empty value is no choice yet.
+    private const string OwnFleetOption = "own-fleet";
+
+    private readonly CancellationTokenSource _closed = new();
+    private readonly HashSet<string> _selected = [];
+    private readonly HashSet<string> _reassigning = [];
+    private readonly Dictionary<string, string> _reassignTo = [];
+    private readonly List<ReleaseOutcome> _releaseOutcomes = [];
+    private LiveTransportOrderList<ShipmentToReleaseSummary> _list = null!;
+    private IReadOnlyList<CarrierView>? _carriers;
+    private bool _carriersFailed;
+    private bool _releasing;
+    private (MessageIntent Intent, string Text)? _reassignOutcome;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _list = new LiveTransportOrderList<ShipmentToReleaseSummary>(
+            Queries.ListShipmentsToReleaseAsync, "the Shipments to release", Time, Options.Value.RefreshInterval, Logger);
+        _list.Changed += () => InvokeAsync(StateHasChanged);
+        _list.Start();
+
+        // Read once: Carrier data comes from the ERP's seed and doesn't change while the page is open.
+        try
+        {
+            _carriers = await Queries.ListActiveCarriersAsync(_closed.Token);
+        }
+        catch (OperationCanceledException) when (_closed.IsCancellationRequested)
+        {
+            // The page closed while it was reading.
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning(exception, "Reading the active Carriers failed");
+            _carriersFailed = true;
+        }
+    }
+
+    private void Select(string number, bool selected)
+    {
+        if (selected)
+        {
+            _selected.Add(number);
+        }
+        else
+        {
+            _selected.Remove(number);
+        }
+    }
+
+    // Only what the list still shows: a Shipment released meanwhile has left it, and isn't released again.
+    private List<string> SelectedIn(IReadOnlyList<ShipmentToReleaseSummary> shipments) =>
+        [.. shipments.Select(shipment => shipment.ShipmentNumber).Where(_selected.Contains)];
+
+    private bool CanRelease(IReadOnlyList<ShipmentToReleaseSummary> shipments) => !_releasing && SelectedIn(shipments).Count > 0;
+
+    private string ReassignToOf(string shipmentNumber) => _reassignTo.TryGetValue(shipmentNumber, out var value) ? value : string.Empty;
+
+    private void SetReassignTo(string shipmentNumber, string value) => _reassignTo[shipmentNumber] = value;
+
+    private bool CanReassign(string shipmentNumber) => !_reassigning.Contains(shipmentNumber) && !string.IsNullOrEmpty(ReassignToOf(shipmentNumber));
+
+    // Each Shipment's release outcome shows as it comes. The list isn't changed here: it reads again shortly, and then
+    // drops each Released Shipment.
+    private async Task ReleaseAsync()
+    {
+        if (_list.Items is not { } shipments || !CanRelease(shipments))
+        {
+            return;
+        }
+
+        _releasing = true;
+        _releaseOutcomes.Clear();
+        try
+        {
+            var releases = new ShipmentReleases(Commands, Logger);
+            await foreach (var (number, answer) in releases.ReleaseEachAsync(SelectedIn(shipments), _closed.Token))
+            {
+                // A Released Shipment leaves the selection; one that wasn't released stays selected, to try again.
+                if (answer is ReleaseAnswer.Released)
+                {
+                    _selected.Remove(number);
+                }
+
+                _releaseOutcomes.Add(new ReleaseOutcome(number, answer));
+                StateHasChanged();
+            }
+        }
+        finally
+        {
+            _releasing = false;
+        }
+    }
+
+    // The row isn't changed here: the list reads again shortly, and then shows who carries the Shipment now.
+    private async Task ReassignAsync(string shipmentNumber)
+    {
+        if (!CanReassign(shipmentNumber) || !_reassigning.Add(shipmentNumber))
+        {
+            return;
+        }
+
+        var value = ReassignToOf(shipmentNumber);
+        var carrierId = value == OwnFleetOption ? null : value;
+        var assignee = carrierId is null
+            ? PlanningText.OwnFleet
+            : _carriers?.FirstOrDefault(carrier => carrier.Id == carrierId) is { } carrier ? PlanningText.Carrier(carrier) : carrierId;
+
+        try
+        {
+            _reassignOutcome = await Commands.ReassignAsync(shipmentNumber, carrierId, _closed.Token) switch
+            {
+                ReassignAnswer.Reassigned => (MessageIntent.Success, $"Shipment {shipmentNumber} is now carried by {assignee}."),
+                ReassignAnswer.Refused refused => (MessageIntent.Warning, $"Shipment {shipmentNumber} wasn't reassigned: {refused.Reason}"),
+                var answer => throw new InvalidOperationException($"Unknown reassign answer {answer}."),
+            };
+        }
+        catch (OperationCanceledException) when (_closed.IsCancellationRequested)
+        {
+            // The page closed while the TMS was answering.
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning(exception, "Reassigning Shipment {ShipmentNumber} failed", shipmentNumber);
+            _reassignOutcome = (MessageIntent.Error, $"Shipment {shipmentNumber} couldn't be reassigned. Try again.");
+        }
+        finally
+        {
+            _reassigning.Remove(shipmentNumber);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _closed.CancelAsync();
+        _closed.Dispose();
+        await _list.DisposeAsync();
+    }
+}
