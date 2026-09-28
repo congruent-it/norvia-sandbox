@@ -1,5 +1,6 @@
 using Norvia.Tms.Application.CanonicalModel;
 using Norvia.Tms.Application.Shipments;
+using Norvia.Tms.Application.Shipments.ListToRelease;
 using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.List;
 using Norvia.Tms.Application.TransportOrders.RatingExceptions;
@@ -31,6 +32,14 @@ internal static class Samples
     public static readonly CarrierView VanDijk = new("CAR-0001", "Van Dijk Transport");
 
     public static readonly CarrierView Kessler = new("CAR-0002", "Kessler Spedition");
+
+    // Planned for Kessler Spedition at 11:45 on 24 September 2026 in Rotterdam (UTC+2).
+    public static ShipmentToReleaseSummary ToRelease(string shipmentNumber = "SH-0000012", string transportOrderNumber = "TO-0000042") => new(
+        shipmentNumber,
+        transportOrderNumber,
+        BrouwerDranken,
+        new CarriedByView(AssignedTo.Carrier, Kessler),
+        new DateTimeOffset(2026, 9, 24, 9, 45, 0, TimeSpan.Zero));
 
     // Planned for Van Dijk Transport at 11:45 on 24 September 2026 in Rotterdam (UTC+2), then reassigned to Kessler
     // Spedition at 12:00.

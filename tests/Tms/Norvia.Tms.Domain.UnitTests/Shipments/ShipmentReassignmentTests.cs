@@ -150,6 +150,16 @@ public sealed class ShipmentReassignmentTests
     }
 
     [Fact]
+    public void CheckReassignment_ToTheCarrierThatCarriesItAlready_IsRefusedAsUnchanged_NamingTheCarrier()
+    {
+        var refusal = AssignmentRules.CheckReassignment(
+            Planned(VanDijk), VanDijk.CarrierId, new Carrier(VanDijk.CarrierId!, "Van Dijk Transport", Active: true));
+
+        refusal!.Code.Should().Be(AssignmentRefusalCode.AssignmentUnchanged);
+        refusal.Message.Should().Be("Shipment SH-0000003 is assigned to Carrier CAR-0001 (Van Dijk Transport) already.");
+    }
+
+    [Fact]
     public void ShipmentNotFound_NamesTheNumber()
     {
         var refusal = AssignmentRules.ShipmentNotFound("SH-0000099");

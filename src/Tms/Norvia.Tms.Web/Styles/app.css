@@ -135,6 +135,23 @@
 }
 
 /*
+ * A FluentSelect inside a grid cell isn't a floating overlay: its open list grows in normal flow, so the cell's own
+ * clip (or scroll, under MultiLine) cuts it off. Only the cell holding an open select loses its clip; every other one
+ * keeps it.
+ */
+.flatly-table.fluent-data-grid td:has(fluent-select[open]) {
+    overflow: visible;
+}
+
+/*
+ * Tailwind's preflight zeroes the padding of every element, the options' hosts included, which puts their text against
+ * the edge of the list and under the selected option's marker. This gives back Fluent's own inset.
+ */
+fluent-option {
+    padding-inline: 0.75rem;
+}
+
+/*
  * Alerts as Flatly draws them: solid colour, white text, in light mode. Fluent scopes its own with an attribute
  * (.fluent-messagebar.intent-error[b-…], three classes' worth), so these add body and :not(.dark) to outrank it.
  */

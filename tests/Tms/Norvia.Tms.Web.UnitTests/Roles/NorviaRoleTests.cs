@@ -37,6 +37,14 @@ public sealed class NorviaRoleTests
     }
 
     [Fact]
+    public void Views_OfPlanner_AreWaitingForPlanningThenShipmentsToRelease()
+    {
+        NorviaRole.Planner.Views.Select(view => (view.Path, view.Title)).Should().Equal(
+            ("/transport-orders", "Waiting for planning"),
+            ("/shipments/to-release", "Shipments to release"));
+    }
+
+    [Fact]
     public void Home_IsTheRolesFirstView()
     {
         NorviaRole.CustomerService.Home.Should().Be("/rejected-bookings");
