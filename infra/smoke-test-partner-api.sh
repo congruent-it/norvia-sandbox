@@ -250,8 +250,8 @@ pass "Van Dijk Transport's booking is refused with 403 (correlation ID $refused_
 [ "$(runs "$refused_id")" = 0 ] || fail "an intake Logic App run started for Van Dijk Transport's refused booking"
 pass "no intake Logic App run started for Van Dijk Transport's booking"
 
-# 5. Application Insights. API Management and Logic Apps name themselves after their resource; the TMS after its
-# Container Apps environment too: [<environment>]/tms-api.
+# 5. Application Insights. API Management and Logic Apps name themselves after their resource, and the TMS is tms-api
+# (older telemetry reads [<environment>]/tms-api, after its Container Apps environment).
 roles_with() {
   logs "union AppRequests, AppTraces, AppDependencies
 | where TimeGenerated > ago(1h) and tostring(Properties) contains '$1'
