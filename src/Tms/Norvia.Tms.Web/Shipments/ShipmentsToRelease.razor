@@ -95,7 +95,7 @@
         <TemplateColumn Title="Reassign to">
             <FluentSelect TOption="string" Value="@ReassignToOf(context.ShipmentNumber)"
                           ValueChanged="@((string value) => SetReassignTo(context.ShipmentNumber, value))"
-                          aria-label="@($"Reassign {context.ShipmentNumber} to")" Width="14rem">
+                          aria-label="@($"Reassign {context.ShipmentNumber} to")" Width="100%">
                 <FluentOption TOption="string" Value="">Choose who carries it</FluentOption>
                 <FluentOption TOption="string" Value="@OwnFleetOption">@PlanningText.OwnFleet</FluentOption>
                 @foreach (var carrier in _carriers ?? [])
