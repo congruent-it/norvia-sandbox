@@ -9,7 +9,7 @@ namespace Norvia.Tms.Application.Shipments.Release;
 
 public sealed class ReleaseShipmentHandler(
     IRepository<Shipment> shipments,
-    IReadRepository<TransportOrder> transportOrders,
+    IRepository<TransportOrder> transportOrders,
     ICarrierDirectory carriers,
     TimeProvider time)
     : ICommandHandler<ReleaseShipmentCommand, Result<ReleaseShipmentResult>>

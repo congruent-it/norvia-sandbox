@@ -17,7 +17,7 @@ public sealed class ReleaseShipmentHandlerTests
     private static readonly CarrierId VanDijk = new("CAR-0001");
 
     private readonly IRepository<Shipment> _shipments = Substitute.For<IRepository<Shipment>>();
-    private readonly IReadRepository<TransportOrder> _transportOrders = Substitute.For<IReadRepository<TransportOrder>>();
+    private readonly IRepository<TransportOrder> _transportOrders = Substitute.For<IRepository<TransportOrder>>();
     private readonly ICarrierDirectory _carriers = Substitute.For<ICarrierDirectory>();
     private readonly FakeTimeProvider _time = new(Samples.Now.AddHours(3));
     private readonly ReleaseShipmentHandler _handler;
