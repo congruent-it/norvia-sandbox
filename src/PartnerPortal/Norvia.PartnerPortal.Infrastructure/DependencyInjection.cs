@@ -104,6 +104,7 @@ public static class DependencyInjection
             services.GetRequiredService<IOptions<PartnerApiOptions>>().Value.LocalTokens is null
                 ? ActivatorUtilities.CreateInstance<EntraPersonaTokens>(services)
                 : ActivatorUtilities.CreateInstance<LocalPersonaTokens>(services));
+        builder.Services.AddSingleton(_ => new PortalActivities(builder.Environment.ApplicationName));
 
         // Removing the default handler is still marked for evaluation, and is the one way to replace it for a single client.
 #pragma warning disable EXTEXP0001

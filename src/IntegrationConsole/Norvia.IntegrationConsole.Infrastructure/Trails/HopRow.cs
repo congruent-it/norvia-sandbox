@@ -11,6 +11,7 @@ internal sealed record HopRow(
     DateTimeOffset? Start,
     double? DurationMs,
     string? Name,
+    string? Path,
     string? Role,
     string? RunId,
     string? Workflow,
@@ -18,7 +19,9 @@ internal sealed record HopRow(
     string? Flow,
     string? Outcome,
     string? FailureCode,
-    IReadOnlyList<BusinessKey> BusinessKeys)
+    string? EventType,
+    IReadOnlyList<BusinessKey> BusinessKeys,
+    bool InProcess = false)
 {
     public const string Request = "request";
     public const string Run = "run";
@@ -37,6 +40,7 @@ internal sealed record HopRow(
         row.GetDateTimeOffset("start"),
         row.GetDouble("durationMs"),
         Text(row, "name"),
+        Text(row, "path"),
         Text(row, "role"),
         Text(row, "runId"),
         Text(row, "workflow"),
@@ -44,7 +48,9 @@ internal sealed record HopRow(
         Text(row, "flow"),
         Text(row, "outcome"),
         Text(row, "failureCode"),
-        [.. TrackedBusinessKeys.All.Where(key => Text(row, key.Key) is not null).Select(key => new BusinessKey(key.Kind, Text(row, key.Key)!))]);
+        Text(row, "eventType"),
+        [.. TrackedBusinessKeys.All.Where(key => Text(row, key.Key) is not null).Select(key => new BusinessKey(key.Kind, Text(row, key.Key)!))],
+        row.GetBoolean("inProcess") ?? false);
 
     // A key that doesn't apply comes back empty from the query, and is left out as the tracking contract leaves it out.
     private static string? Text(LogsTableRow row, string column) => row.GetString(column) is { Length: > 0 } text ? text : null;

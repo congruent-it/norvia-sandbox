@@ -15,7 +15,7 @@ public sealed class DashboardLogs : HttpMessageHandler
     private const string TracesPath = "/api/telemetry/traces/";
 
     private readonly Dictionary<string, List<(string Category, JsonObject Record)>> _recordsByResource = [];
-    private readonly List<(string Resource, JsonObject Span)> _spans = [];
+    private readonly List<(string Resource, string Scope, JsonObject Span)> _spans = [];
 
     public HttpStatusCode Status { get; set; } = HttpStatusCode.OK;
 
@@ -60,7 +60,11 @@ public sealed class DashboardLogs : HttpMessageHandler
         return this;
     }
 
-    /// <summary>A span of <paramref name="resource"/>; <paramref name="kind"/> is OTLP's, 2 for a server span.</summary>
+    /// <summary>
+    /// A span of <paramref name="resource"/>; <paramref name="kind"/> is OTLP's, 2 for a server span, and
+    /// <paramref name="attributes"/> its string attributes, such as a request's <c>url.path</c>. <paramref name="scope"/>
+    /// is the activity source that started it, which OTLP names the span's scope.
+    /// </summary>
     public DashboardLogs AddSpan(
         string resource,
         string traceId,
@@ -69,9 +73,17 @@ public sealed class DashboardLogs : HttpMessageHandler
         string name,
         int kind,
         DateTimeOffset start,
-        DateTimeOffset end)
+        DateTimeOffset end,
+        Dictionary<string, string>? attributes = null,
+        string scope = "Microsoft.AspNetCore")
     {
-        _spans.Add((resource, new JsonObject
+        var spanAttributes = new JsonArray();
+        foreach (var (key, value) in attributes ?? [])
+        {
+            spanAttributes.Add(new JsonObject { ["key"] = key, ["value"] = new JsonObject { ["stringValue"] = value } });
+        }
+
+        _spans.Add((resource, scope, new JsonObject
         {
             ["traceId"] = traceId,
             ["spanId"] = spanId,
@@ -80,7 +92,7 @@ public sealed class DashboardLogs : HttpMessageHandler
             ["kind"] = kind,
             ["startTimeUnixNano"] = UnixNano(start),
             ["endTimeUnixNano"] = UnixNano(end),
-            ["attributes"] = new JsonArray(),
+            ["attributes"] = spanAttributes,
         }));
         return this;
     }
@@ -123,19 +135,19 @@ public sealed class DashboardLogs : HttpMessageHandler
         return resourceLogs;
     }
 
-    private static JsonArray ResourceSpans(List<(string Resource, JsonObject Span)> spans) =>
+    private static JsonArray ResourceSpans(List<(string Resource, string Scope, JsonObject Span)> spans) =>
     [
         .. spans.GroupBy(span => span.Resource).Select(resource => new JsonObject
         {
             ["resource"] = Resource(resource.Key),
-            ["scopeSpans"] = new JsonArray
-            {
-                new JsonObject
+            ["scopeSpans"] = new JsonArray(
+            [
+                .. resource.GroupBy(span => span.Scope).Select(scope => new JsonObject
                 {
-                    ["scope"] = new JsonObject { ["name"] = "Microsoft.AspNetCore" },
-                    ["spans"] = new JsonArray([.. resource.Select(span => span.Span.DeepClone())]),
-                },
-            },
+                    ["scope"] = new JsonObject { ["name"] = scope.Key },
+                    ["spans"] = new JsonArray([.. scope.Select(span => span.Span.DeepClone())]),
+                }),
+            ]),
         }),
     ];
 

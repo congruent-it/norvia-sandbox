@@ -247,17 +247,18 @@ public sealed class TransportOrderAssignmentTests(TmsFixture tms)
     }
 
     [Fact]
-    public async Task Assign_Refused_TracesItOnItsOwnTrailAsRefused_WithTheFailureCode()
+    public async Task Assign_Refused_TracesItOnItsOwnTrailAsRefused_WithTheFailureCode_WhichTheProblemNames()
     {
+        // The TMS UI joins the refusal's trail by the correlation ID the problem names, as it joins an assignment's.
         var number = await tms.SubmitAcceptedAsync(_cancellationToken);
 
-        await tms.AssignRefusedAsync(number, PlanningCalls.ToCarrier(PlanningCalls.InactiveCarrierId), HttpStatusCode.UnprocessableEntity, _cancellationToken);
+        var problem = await tms.AssignRefusedAsync(number, PlanningCalls.ToCarrier(PlanningCalls.InactiveCarrierId), HttpStatusCode.UnprocessableEntity, _cancellationToken);
 
         var log = await tms.TmsLogAsync(
             log => log["transportOrderNumber"] == number && log.Text.Contains("refused", StringComparison.Ordinal),
             _cancellationToken);
         log["flow"].Should().Be("transport-planning");
-        log["correlationId"].Should().NotBeNullOrWhiteSpace();
+        log["correlationId"].Should().NotBeNullOrWhiteSpace().And.Be(problem["correlationId"]?.GetValue<string>());
         log["outcome"].Should().Be("Refused");
         log["failureCode"].Should().Be("InactiveCarrier");
     }

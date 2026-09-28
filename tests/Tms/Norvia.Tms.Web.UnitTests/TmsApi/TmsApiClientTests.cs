@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using System.Net;
 using System.Text.Json.Nodes;
+using Microsoft.Extensions.Logging.Testing;
 using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Web.TmsApi;
 using Norvia.Tms.Web.TransportOrders;
@@ -10,6 +12,10 @@ public sealed class TmsApiClientTests : IDisposable
 {
     private readonly StubHandler _tmsApi = new();
     private readonly ITmsApiTokens _tokens = Substitute.For<ITmsApiTokens>();
+    private readonly FakeLogger<TmsApiClient> _logger = new();
+    private readonly TmsUiActivities _activities = new("Norvia.Tms.Web.Tests");
+    private readonly List<Activity> _spans = [];
+    private readonly ActivityListener _listener;
     private readonly HttpClient _http;
     private readonly TmsApiClient _client;
 
@@ -17,11 +23,20 @@ public sealed class TmsApiClientTests : IDisposable
     {
         _http = new HttpClient(_tmsApi) { BaseAddress = new Uri("http://tms-api.example") };
         _tokens.GetTokenAsync(Arg.Any<CancellationToken>()).Returns("tms-ui-token");
-        _client = new TmsApiClient(_http, _tokens);
+        _client = new TmsApiClient(_http, _tokens, _activities, _logger);
+        _listener = new ActivityListener
+        {
+            ShouldListenTo = source => source == _activities.Source,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStopped = _spans.Add,
+        };
+        ActivitySource.AddActivityListener(_listener);
     }
 
     public void Dispose()
     {
+        _listener.Dispose();
+        _activities.Dispose();
         _http.Dispose();
         _tmsApi.Dispose();
     }
@@ -191,6 +206,130 @@ public sealed class TmsApiClientTests : IDisposable
 
         await assign.Should().ThrowAsync<HttpRequestException>();
     }
+
+    [Fact]
+    public async Task AssignAsync_Assigned_RecordsItsOutcomeOnTheAssignmentsTrail()
+    {
+        // The TMS starts the assignment's Message trail; the Planner's click joins it once the answer names it.
+        _tmsApi.Answer(HttpStatusCode.Created, Assigned("SH-0000012"));
+
+        await AssignAsync("TO-0000042", "CAR-0002");
+
+        ScopeOf(_logger.LatestRecord).Should().Contain(new Dictionary<string, object?>
+        {
+            ["correlationId"] = "corr-planning",
+            ["flow"] = "transport-planning",
+            ["partyId"] = "SHP-0001",
+            ["transportOrderNumber"] = "TO-0000042",
+            ["shipmentNumber"] = "SH-0000012",
+            ["outcome"] = "Succeeded",
+        }).And.NotContainKey("failureCode");
+    }
+
+    [Fact]
+    public async Task AssignAsync_Refused_RecordsItRefused_WithTheTmsCode_OnTheRefusalsTrail()
+    {
+        // The TMS traces a refused assignment on a trail of its own, which its problem names.
+        _tmsApi.Answer(
+            HttpStatusCode.Conflict,
+            """
+            {
+              "status": 409, "title": "The Transport Order can't be assigned.", "detail": "Transport Order TO-0000042 is Planned already.",
+              "code": "TransportOrderAlreadyPlanned", "correlationId": "corr-refused"
+            }
+            """,
+            "application/problem+json");
+
+        await AssignAsync("TO-0000042", "CAR-0002");
+
+        ScopeOf(_logger.LatestRecord).Should().Contain(new Dictionary<string, object?>
+        {
+            ["correlationId"] = "corr-refused",
+            ["flow"] = "transport-planning",
+            ["transportOrderNumber"] = "TO-0000042",
+            ["outcome"] = "Refused",
+            ["failureCode"] = "TransportOrderAlreadyPlanned",
+        });
+    }
+
+    [Fact]
+    public async Task AssignAsync_SendsTheAssignmentInASpanOfItsOwn_WhichTheAnswersLogIsWrittenIn()
+    {
+        // The Integration console names the TMS UI's hop after it, not after Blazor's span for the click.
+        _tmsApi.Answer(HttpStatusCode.Created, Assigned("SH-0000012"));
+
+        await AssignAsync("TO-0000042", "CAR-0002");
+
+        var span = _spans.Should().ContainSingle().Subject;
+        span.DisplayName.Should().Be("Assign Transport Order");
+        _logger.LatestRecord.Timestamp.UtcDateTime.Should().BeOnOrAfter(span.StartTimeUtc).And.BeOnOrBefore(span.StartTimeUtc + span.Duration);
+    }
+
+    [Fact]
+    public async Task ReRateAsync_Rated_RecordsItsOutcomeOnTheIntakesTrail()
+    {
+        // A re-rate continues the Message trail of the order's intake, as its first rating does.
+        _tmsApi.Answer(HttpStatusCode.OK, Answer("Rated"));
+
+        await ReRateAsync("TO-0000043");
+
+        ScopeOf(_logger.LatestRecord).Should().Contain(new Dictionary<string, object?>
+        {
+            ["correlationId"] = "corr-0043",
+            ["flow"] = "transport-order-rating",
+            ["partyId"] = "SHP-0001",
+            ["transportOrderNumber"] = "TO-0000043",
+            ["outcome"] = "Succeeded",
+        }).And.NotContainKey("failureCode");
+    }
+
+    [Fact]
+    public async Task ReRateAsync_FailedAgain_RecordsItSucceeded_WithTheNewFailureCode_AsTheTmsDoes()
+    {
+        // Rating failed is the rating's answer, not a failed flow.
+        _tmsApi.Answer(HttpStatusCode.OK, Answer("RatingFailed", failure: ("WeightAboveHighestBreak", "The Lane prices up to 5,000 kg only.")));
+
+        await ReRateAsync("TO-0000043");
+
+        ScopeOf(_logger.LatestRecord).Should().Contain("outcome", "Succeeded").And.Contain("failureCode", "WeightAboveHighestBreak");
+    }
+
+    [Fact]
+    public async Task ReRateAsync_Refused_RecordsItRefused_OnTheIntakesTrail()
+    {
+        _tmsApi.Answer(
+            HttpStatusCode.Conflict,
+            """
+            {
+              "status": 409, "title": "The Transport Order can't be re-rated.",
+              "detail": "Transport Order TO-0000043 is Rated; only a Transport Order whose Rating failed can be re-rated.", "correlationId": "corr-0043"
+            }
+            """,
+            "application/problem+json");
+
+        await ReRateAsync("TO-0000043");
+
+        ScopeOf(_logger.LatestRecord).Should().Contain(new Dictionary<string, object?>
+        {
+            ["correlationId"] = "corr-0043",
+            ["flow"] = "transport-order-rating",
+            ["transportOrderNumber"] = "TO-0000043",
+            ["outcome"] = "Refused",
+        });
+    }
+
+    [Fact]
+    public async Task ReRateAsync_SendsTheReRateInASpanOfItsOwn()
+    {
+        _tmsApi.Answer(HttpStatusCode.OK, Answer("Rated"));
+
+        await ReRateAsync("TO-0000043");
+
+        _spans.Should().ContainSingle().Which.DisplayName.Should().Be("Re-rate Transport Order");
+    }
+
+    private static Dictionary<string, object?> ScopeOf(FakeLogRecord record) =>
+        record.Scopes.OfType<IEnumerable<KeyValuePair<string, object?>>>().SelectMany(keys => keys).ToDictionary();
 
     private Task<AssignAnswer> AssignAsync(string number, string? carrierId) =>
         _client.AssignAsync(number, carrierId, Xunit.TestContext.Current.CancellationToken);

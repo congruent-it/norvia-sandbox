@@ -39,15 +39,18 @@ internal static class AssignmentCalls
         return errors;
     }
 
-    /// <summary>The problem for a refused call, with the refusal's code, and a status that says which rule it broke.</summary>
-    public static ProblemHttpResult Refused<T>(Result<T> result, string title)
+    /// <summary>
+    /// The problem for a refused call, with the refusal's code, a status that says which rule it broke, and the call's
+    /// own correlation ID, which the refusal is traced on, so the TMS UI can join its Message trail.
+    /// </summary>
+    public static ProblemHttpResult Refused<T>(Result<T> result, string title, string correlationId)
     {
         var refusal = result.ValidationErrors.First();
         return TypedResults.Problem(
             statusCode: StatusCodeOf(Enum.Parse<AssignmentRefusalCode>(refusal.ErrorCode)),
             title: title,
             detail: refusal.ErrorMessage,
-            extensions: new Dictionary<string, object?> { ["code"] = refusal.ErrorCode });
+            extensions: new Dictionary<string, object?> { ["code"] = refusal.ErrorCode, ["correlationId"] = correlationId });
     }
 
     private static int StatusCodeOf(AssignmentRefusalCode code) => code switch

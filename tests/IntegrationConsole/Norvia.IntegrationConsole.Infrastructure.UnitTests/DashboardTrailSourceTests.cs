@@ -16,8 +16,11 @@ public sealed class DashboardTrailSourceTests : IDisposable
     private const string Trace = "4bf92f3577b34da6a3ce929d0e0e4736";
 
     // OTLP's span kinds.
+    private const int Internal = 1;
     private const int Server = 2;
     private const int Client = 3;
+    private const int Producer = 4;
+    private const int Consumer = 5;
 
     private static readonly DateTimeOffset Now = new(2026, 9, 26, 10, 0, 0, TimeSpan.Zero);
 
@@ -133,9 +136,11 @@ public sealed class DashboardTrailSourceTests : IDisposable
     {
         // The stand-in's request calls the TMS; the TMS logs inside its request and inside a database call in it.
         _dashboard
-            .AddSpan("partner-api", Trace, "a1a1a1a1a1a1a1a1", null, "POST /partner/v1/transport-orders", Server, Now.AddSeconds(-10), Now.AddSeconds(-9))
+            .AddSpan("partner-api", Trace, "a1a1a1a1a1a1a1a1", null, "POST /partner/v1/transport-orders", Server, Now.AddSeconds(-10), Now.AddSeconds(-9),
+                Called("POST", "/partner/v1/transport-orders"))
             .AddSpan("partner-api", Trace, "c1c1c1c1c1c1c1c1", "a1a1a1a1a1a1a1a1", "POST", Client, Now.AddMilliseconds(-9800), Now.AddMilliseconds(-9200))
-            .AddSpan("tms-api", Trace, "b2b2b2b2b2b2b2b2", "c1c1c1c1c1c1c1c1", "POST /v1/transport-orders", Server, Now.AddMilliseconds(-9700), Now.AddMilliseconds(-9300))
+            .AddSpan("tms-api", Trace, "b2b2b2b2b2b2b2b2", "c1c1c1c1c1c1c1c1", "POST /v{version:apiVersion}/transport-orders/", Server, Now.AddMilliseconds(-9700), Now.AddMilliseconds(-9300),
+                Called("POST", "/v1/transport-orders"))
             .AddSpan("tms-api", Trace, "d3d3d3d3d3d3d3d3", "b2b2b2b2b2b2b2b2", "INSERT norvia", Client, Now.AddMilliseconds(-9600), Now.AddMilliseconds(-9500))
             .Add("partner-api", Now.AddMilliseconds(-9100), new() { ["correlationId"] = Booked, ["flow"] = "transport-order-intake", ["outcome"] = "Succeeded", ["transportOrderNumber"] = "TO-0000042" }, traceId: Trace, spanId: "a1a1a1a1a1a1a1a1")
             .Add("tms-api", Now.AddMilliseconds(-9650), new() { ["correlationId"] = Booked, ["flow"] = "transport-order-intake" }, traceId: Trace, spanId: "b2b2b2b2b2b2b2b2")
@@ -182,9 +187,149 @@ public sealed class DashboardTrailSourceTests : IDisposable
     }
 
     [Fact]
+    public async Task HopsAsync_APlannersAssignment_IsNamedByThePathCalled_NotByItsRouteTemplate()
+    {
+        // ASP.NET Core names a request's span by its route template; the path actually called is its url.path.
+        _dashboard
+            .AddSpan("tms-api", Trace, "b2b2b2b2b2b2b2b2", null, "POST /v{version:apiVersion}/transport-orders/{transportOrderNumber}/assign", Server,
+                Now.AddSeconds(-10), Now.AddSeconds(-9), Called("POST", "/v1/transport-orders/TO-0000042/assign"))
+            .Add("tms-api", Now.AddMilliseconds(-9500), new() { ["correlationId"] = Booked, ["flow"] = "transport-planning", ["outcome"] = "Succeeded" }, traceId: Trace, spanId: "b2b2b2b2b2b2b2b2");
+
+        var hops = await HopsAsync(Booked);
+
+        hops.Should().ContainSingle().Which.Name.Should().Be("tms-api: POST /v1/transport-orders/TO-0000042/assign");
+    }
+
+    [Fact]
+    public async Task HopsAsync_ACallFromABlazorEvent_IsNamedByTheApplicationsOwnSpan_NotByTheFrameworksEvent()
+    {
+        // A booking from the Partner portal: Blazor's span for the form's submit event, the portal's own span for sending
+        // the booking, and HttpClient's call to the Partner API, which the stand-in serves.
+        _dashboard
+            .AddSpan("partner-portal-web", Trace, "e0e0e0e0e0e0e0e0", null, "Event onsubmit -> Microsoft.AspNetCore.Components.Forms.EditForm.HandleSubmitAsync", Internal,
+                Now.AddSeconds(-11), Now.AddSeconds(-8), scope: "Microsoft.AspNetCore.Components")
+            .AddSpan("partner-portal-web", Trace, "f1f1f1f1f1f1f1f1", "e0e0e0e0e0e0e0e0", "Send booking", Internal,
+                Now.AddMilliseconds(-10_900), Now.AddMilliseconds(-8_500), scope: "Norvia.PartnerPortal.Web")
+            .AddSpan("partner-portal-web", Trace, "c0c0c0c0c0c0c0c0", "f1f1f1f1f1f1f1f1", "POST", Client,
+                Now.AddMilliseconds(-10_800), Now.AddMilliseconds(-8_600), scope: "System.Net.Http")
+            .AddSpan("partner-api", Trace, "a1a1a1a1a1a1a1a1", "c0c0c0c0c0c0c0c0", "POST /partner/v1/transport-orders", Server,
+                Now.AddSeconds(-10), Now.AddSeconds(-9), Called("POST", "/partner/v1/transport-orders"))
+            .Add("partner-portal-web", Now.AddMilliseconds(-8_550), new() { ["correlationId"] = Booked, ["flow"] = "transport-order-intake", ["outcome"] = "Succeeded" },
+                traceId: Trace, spanId: "f1f1f1f1f1f1f1f1", category: "Norvia.PartnerPortal.Infrastructure.PartnerApi.NorviaPartnerApiClient")
+            .Add("partner-api", Now.AddMilliseconds(-9_100), new() { ["correlationId"] = Booked, ["outcome"] = "Succeeded" }, traceId: Trace, spanId: "a1a1a1a1a1a1a1a1");
+
+        var hops = await HopsAsync(Booked);
+
+        hops.Should().BeEquivalentTo(
+        [
+            new { Id = "f1f1f1f1f1f1f1f1", CausedBy = (string?)null, Name = "partner-portal-web: Send booking", Outcome = (Outcome?)Outcome.Succeeded },
+            new { Id = "a1a1a1a1a1a1a1a1", CausedBy = (string?)"f1f1f1f1f1f1f1f1", Name = "partner-api: POST /partner/v1/transport-orders", Outcome = (Outcome?)Outcome.Succeeded },
+        ]);
+    }
+
+    [Fact]
+    public async Task HopsAsync_ARecordOnlyUnderAFrameworksSpan_IsNamedByThatSpan()
+    {
+        // Nothing of the application's own names the hop better.
+        _dashboard
+            .AddSpan("partner-portal-web", Trace, "e0e0e0e0e0e0e0e0", null, "Event onsubmit -> Microsoft.AspNetCore.Components.Forms.EditForm.HandleSubmitAsync", Internal,
+                Now.AddSeconds(-11), Now.AddSeconds(-8), scope: "Microsoft.AspNetCore.Components")
+            .Add("partner-portal-web", Now.AddSeconds(-9), new() { ["correlationId"] = Booked }, traceId: Trace, spanId: "e0e0e0e0e0e0e0e0");
+
+        var hops = await HopsAsync(Booked);
+
+        hops.Should().ContainSingle().Which.Name.Should().Be("partner-portal-web: Event onsubmit -> Microsoft.AspNetCore.Components.Forms.EditForm.HandleSubmitAsync");
+    }
+
+    [Fact]
+    public async Task HopsAsync_ASpanWithoutAPathCalled_IsNamedBySpanName()
+    {
+        // A message received has no path, as a request has.
+        _dashboard
+            .AddSpan("tms-api", Trace, "b2b2b2b2b2b2b2b2", null, "transport-orders receive", Consumer, Now.AddSeconds(-10), Now.AddSeconds(-9))
+            .Add("tms-api", Now.AddMilliseconds(-9500), new() { ["correlationId"] = Booked }, traceId: Trace, spanId: "b2b2b2b2b2b2b2b2");
+
+        var hops = await HopsAsync(Booked);
+
+        hops.Should().ContainSingle().Which.Name.Should().Be("tms-api: transport-orders receive");
+    }
+
+    [Fact]
+    public async Task HopsAsync_AnEventTheOutboxPublished_IsAHopNamedAfterTheEvent_ThatSucceeded()
+    {
+        // The TMS's outbox logs a published event outside any span, in the event's application properties and its outcome.
+        _dashboard.Add(
+            "tms-api",
+            Now.AddSeconds(-5),
+            new()
+            {
+                ["correlationId"] = Booked,
+                ["flow"] = "transport-planning",
+                ["partyId"] = "SHP-0001",
+                ["transportOrderNumber"] = "TO-0000042",
+                ["shipmentNumber"] = "SHP-0000007",
+                ["eventType"] = "ShipmentPlanned",
+                ["eventVersion"] = "1",
+                ["outcome"] = "Succeeded",
+            },
+            body: "Published ShipmentPlanned 0b6f3c1e-8a2d-4f5b-9c7e-1d2a3b4c5d6e for correlation ID " + Booked,
+            category: "Norvia.Tms.Infrastructure.Outbox.OutboxPublisher");
+
+        var hops = await HopsAsync(Booked);
+
+        hops.Should().ContainSingle().Which.Should().BeEquivalentTo(new
+        {
+            Name = "tms-api: publish ShipmentPlanned",
+            Flow = "transport-planning",
+            Outcome = Outcome.Succeeded,
+            Duration = (TimeSpan?)null,
+        });
+    }
+
+    [Fact]
+    public async Task HopsAsync_AnEventTheOutboxPublished_IsAHopOfItsPublishSpan_CausedByTheWorkThatRaisedIt()
+    {
+        // The TMS's outbox publishes in a span that continues the trace of what raised the event: the intake call raised
+        // TransportOrderAccepted, and the rating worker's span, a trace of its own, TransportOrderRated.
+        const string rating = "7c3e1f2a9b8d4c5e6f7a8b9c0d1e2f3a";
+        _dashboard
+            .AddSpan("tms-api", Trace, "b2b2b2b2b2b2b2b2", null, "POST /v{version:apiVersion}/transport-orders/", Server, Now.AddSeconds(-10), Now.AddSeconds(-8.4),
+                Called("POST", "/v1/transport-orders"))
+            .AddSpan("tms-api", Trace, "e1e1e1e1e1e1e1e1", "b2b2b2b2b2b2b2b2", "publish TransportOrderAccepted", Producer, Now.AddSeconds(-6), Now.AddSeconds(-5.9),
+                scope: "Norvia.Tms.Api")
+            .AddSpan("tms-api", rating, "r1r1r1r1r1r1r1r1", null, "Rate Transport Order", Internal, Now.AddSeconds(-8), Now.AddSeconds(-7.7), scope: "Norvia.Tms.Api")
+            .AddSpan("tms-api", rating, "e2e2e2e2e2e2e2e2", "r1r1r1r1r1r1r1r1", "publish TransportOrderRated", Producer, Now.AddSeconds(-5.9), Now.AddSeconds(-5.8),
+                scope: "Norvia.Tms.Api")
+            .Add("tms-api", Now.AddSeconds(-9), new() { ["correlationId"] = Booked, ["flow"] = "transport-order-intake", ["outcome"] = "Succeeded" },
+                traceId: Trace, spanId: "b2b2b2b2b2b2b2b2")
+            .Add("tms-api", Now.AddSeconds(-5.95), new() { ["correlationId"] = Booked, ["eventType"] = "TransportOrderAccepted", ["outcome"] = "Succeeded" },
+                traceId: Trace, spanId: "e1e1e1e1e1e1e1e1", category: "Norvia.Tms.Infrastructure.Outbox.OutboxPublisher")
+            .Add("tms-api", Now.AddSeconds(-7.8), new() { ["correlationId"] = Booked, ["flow"] = "transport-order-rating", ["outcome"] = "Succeeded" },
+                traceId: rating, spanId: "r1r1r1r1r1r1r1r1")
+            .Add("tms-api", Now.AddSeconds(-5.85), new() { ["correlationId"] = Booked, ["eventType"] = "TransportOrderRated", ["outcome"] = "Succeeded" },
+                traceId: rating, spanId: "e2e2e2e2e2e2e2e2", category: "Norvia.Tms.Infrastructure.Outbox.OutboxPublisher");
+
+        var hops = await HopsAsync(Booked);
+
+        hops.Should().BeEquivalentTo(
+        [
+            new { Id = "b2b2b2b2b2b2b2b2", CausedBy = (string?)null, Name = "tms-api: POST /v1/transport-orders" },
+            new { Id = "e1e1e1e1e1e1e1e1", CausedBy = (string?)"b2b2b2b2b2b2b2b2", Name = "tms-api: publish TransportOrderAccepted" },
+            new { Id = "r1r1r1r1r1r1r1r1", CausedBy = (string?)null, Name = "tms-api: Rate Transport Order" },
+            new { Id = "e2e2e2e2e2e2e2e2", CausedBy = (string?)"r1r1r1r1r1r1r1r1", Name = "tms-api: publish TransportOrderRated" },
+        ]);
+        hops.Single(hop => hop.Id == "e1e1e1e1e1e1e1e1").Should().BeEquivalentTo(new
+        {
+            Time = Now.AddSeconds(-6),
+            Duration = (TimeSpan?)TimeSpan.FromMilliseconds(100),
+            Outcome = (Outcome?)Outcome.Succeeded,
+        });
+    }
+
+    [Fact]
     public async Task HopsAsync_ARecordWrittenOutsideAnySpan_IsAHopOfItsOwn_AtItsTime()
     {
-        // The TMS's outbox logs a published event after the send's span has ended.
+        // Records that say nothing of what happened, written outside any span, name only their application.
         _dashboard
             .Add("tms-api", Now.AddSeconds(-5), new() { ["correlationId"] = Booked, ["flow"] = "transport-order-intake", ["outcome"] = "Succeeded" })
             .Add("tms-api", Now.AddSeconds(-4), new() { ["correlationId"] = Booked, ["flow"] = "transport-order-intake" });
@@ -261,6 +406,10 @@ public sealed class DashboardTrailSourceTests : IDisposable
 
         await open.Should().ThrowAsync<HttpRequestException>();
     }
+
+    // What ASP.NET Core records on a request's span besides its name.
+    private static Dictionary<string, string> Called(string method, string path) =>
+        new() { ["http.request.method"] = method, ["url.path"] = path };
 
     private Task<IReadOnlyList<RecordedHop>> HopsAsync(string correlationId, TimeSpan? within = null) =>
         Source().HopsAsync(new TrailLookup(correlationId, Now - (within ?? TimeSpan.FromHours(24)), Now), TestContext.Current.CancellationToken);

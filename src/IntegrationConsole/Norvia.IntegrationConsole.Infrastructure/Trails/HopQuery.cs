@@ -7,15 +7,18 @@ namespace Norvia.IntegrationConsole.Infrastructure.Trails;
 /// which <see cref="LogAnalyticsTrailSource"/> puts together into hops:
 /// <list type="bullet">
 /// <item><c>request</c>: a call to API Management or an application that recorded the correlation ID, in its own
-/// properties or, for API Management, as its logged <c>X-Correlation-ID</c> header;</item>
+/// properties or, for API Management, as its logged <c>X-Correlation-ID</c> header, with the path it called;</item>
 /// <item><c>run</c>: every trigger and action of a Logic App run whose tracked properties recorded it (Logic Apps
 /// Standard telemetry v2, where a run's rows share its run ID, kept with its workflow's name in the JSON of their
 /// <c>resource</c> property);</item>
 /// <item><c>record</c>: a trace with tracking keys, such as an application's log in its logging scope or API
 /// Management's <c>trace</c> policy, which belongs to the hop above it;</item>
-/// <item><c>link</c>: a dependency's ID and parent, the steps between a hop and the hop it caused.</item>
+/// <item><c>link</c>: a dependency's ID and parent, the steps between a hop and the hop it caused, with its time, name
+/// and application, and whether it ran in process: a span an application or a framework started, such as the Partner
+/// portal's for sending a booking, which records written outside any call belong to.</item>
 /// </list>
-/// Only keys are read, never a column that could hold a body. The time range is the query's own, set on the request.
+/// Only keys are read, never a column that could hold a body, and of a request's URL only its path, never its query.
+/// The time range is the query's own, set on the request.
 /// </summary>
 internal static class HopQuery
 {
@@ -26,12 +29,12 @@ internal static class HopQuery
         // The term index narrows each table to the rows mentioning the correlation ID before any JSON is parsed.
         let requests = AppRequests
             | where Properties has searched
-            | project TimeGenerated, source = "request", Id, ParentId, OperationId, Name, DurationMs, AppRoleName, Properties;
+            | project TimeGenerated, source = "request", Id, ParentId, OperationId, Name, path = tostring(parse_url(Url).Path), DurationMs, AppRoleName, Properties;
         // An application's own records, not those a framework wrote in its logging scope.
         let traces = AppTraces
             | where Properties has searched
             | where {{FrameworkLogs.NoneWrote("tostring(Properties.CategoryName)")}}
-            | project TimeGenerated, source = "record", Id = "", ParentId, OperationId, Name = "", DurationMs = real(null), AppRoleName, Properties;
+            | project TimeGenerated, source = "record", Id = "", ParentId, OperationId, Name = "", path = "", DurationMs = real(null), AppRoleName, Properties;
         let tracked = union requests, traces
             | extend tracked = parse_json(tostring(Properties.trackedProperties))
             | extend correlationId = coalesce(tostring(Properties.correlationId), tostring(tracked.correlationId),
@@ -54,10 +57,11 @@ internal static class HopQuery
                 sourceMessageId = tostring(tracked.sourceMessageId), OperationId;
         let calls = tracked
             | where isempty(runId)
-            | project rowKind = source, id = Id, parentId = ParentId, start = TimeGenerated, durationMs = DurationMs, name = Name,
+            | project rowKind = source, id = Id, parentId = ParentId, start = TimeGenerated, durationMs = DurationMs, name = Name, path,
                 role = AppRoleName, flow = coalesce(tostring(Properties.flow), tostring(tracked.flow)),
                 outcome = coalesce(tostring(Properties.outcome), tostring(tracked.outcome)),
                 failureCode = coalesce(tostring(Properties.failureCode), tostring(tracked.failureCode)),
+                eventType = tostring(Properties.eventType),
                 transportOrderNumber = coalesce(tostring(Properties.transportOrderNumber), tostring(tracked.transportOrderNumber)),
                 shipmentNumber = coalesce(tostring(Properties.shipmentNumber), tostring(tracked.shipmentNumber)),
                 carrierBookingNumber = coalesce(tostring(Properties.carrierBookingNumber), tostring(tracked.carrierBookingNumber)),
@@ -66,7 +70,8 @@ internal static class HopQuery
         let operations = toscalar(union (calls | project OperationId), (runs | project OperationId) | summarize make_set(OperationId));
         let links = AppDependencies
             | where OperationId in (operations)
-            | project rowKind = "link", id = Id, parentId = ParentId;
+            | project rowKind = "link", id = Id, parentId = ParentId, start = TimeGenerated, durationMs = DurationMs, name = Name,
+                role = AppRoleName, inProcess = DependencyType == "InProc";
         union (calls | project-away OperationId), (runs | project-away OperationId), links
         """;
 }

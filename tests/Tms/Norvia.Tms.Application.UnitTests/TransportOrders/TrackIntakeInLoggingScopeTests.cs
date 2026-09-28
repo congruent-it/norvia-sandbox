@@ -51,7 +51,9 @@ public sealed partial class TrackIntakeInLoggingScopeTests : IDisposable
         {
             ["partyId"] = "SHP-0001",
             ["transportOrderNumber"] = "TO-0000007",
+            ["outcome"] = "Succeeded",
         });
+        ScopeKeysOf(outcome).Should().NotContainKey("failureCode");
     }
 
     [Fact]
@@ -61,7 +63,7 @@ public sealed partial class TrackIntakeInLoggingScopeTests : IDisposable
 
         var outcome = _logs.Collector.GetSnapshot().Single(log => log.Category != "Handler");
         outcome.Message.Should().Contain("TO-0000007").And.Contain("repeat");
-        ScopeKeysOf(outcome).Should().ContainKey("transportOrderNumber");
+        ScopeKeysOf(outcome).Should().ContainKey("transportOrderNumber").And.Contain("outcome", "Succeeded");
     }
 
     [Fact]
@@ -72,6 +74,30 @@ public sealed partial class TrackIntakeInLoggingScopeTests : IDisposable
         var outcome = _logs.Collector.GetSnapshot().Single(log => log.Category != "Handler");
         outcome.Message.Should().Contain("InactiveShipper").And.Contain("GoodsLinesMissing");
         ScopeKeysOf(outcome).Should().NotContainKey("transportOrderNumber", "a key that doesn't apply is left out, never sent empty");
+    }
+
+    [Fact]
+    public async Task Handle_Rejected_RecordsItRefused_AsTheOtherHopsOfTheIntakeDo()
+    {
+        // The intake Logic App and the local Partner API record the TMS's 422 for a Rejected booking so too.
+        await _behaviour.Handle(Command(), HandlerThatLogs(SubmitTransportOrderResult.From(Samples.RejectedOrder())), CancellationToken.None);
+
+        var outcome = _logs.Collector.GetSnapshot().Single(log => log.Category != "Handler");
+        ScopeKeysOf(outcome).Should().Contain(new Dictionary<string, object?>
+        {
+            ["outcome"] = "Refused",
+            ["failureCode"] = "TransportOrderRejected",
+        });
+    }
+
+    [Fact]
+    public async Task Handle_Submission_RecordsNoOutcomeOnTheHandlersLogs()
+    {
+        // The outcome is known only once the handler has answered.
+        await _behaviour.Handle(Command(), HandlerThatLogs(Accepted()), CancellationToken.None);
+
+        var handlerLog = _logs.Collector.GetSnapshot().Single(log => log.Category == "Handler");
+        ScopeKeysOf(handlerLog).Should().NotContainKey("outcome");
     }
 
     [Fact]

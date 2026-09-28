@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Microsoft.Extensions.Logging;
@@ -10,12 +11,14 @@ namespace Norvia.PartnerPortal.Infrastructure.PartnerApi;
 
 /// <summary>
 /// Books through the Norvia Partner API as a Persona: its subscription key names the product, its token says which
-/// party it is (ADR 0005). The booking itself never names the party.
+/// party it is (ADR 0005). The booking itself never names the party. It sends each booking in a span of its own, which
+/// the Integration console names the portal's hop after.
 /// </summary>
 internal sealed partial class NorviaPartnerApiClient(
     HttpClient http,
     IPersonaTokens tokens,
     IOptions<PartnerApiOptions> options,
+    PortalActivities activities,
     ILogger<NorviaPartnerApiClient> logger)
     : INorviaPartnerApi
 {
@@ -23,6 +26,7 @@ internal sealed partial class NorviaPartnerApiClient(
     {
         ArgumentNullException.ThrowIfNull(persona);
 
+        using var span = activities.Source.StartActivity("Send booking", ActivityKind.Internal);
         NorviaAnswer answer;
         try
         {
@@ -56,11 +60,17 @@ internal sealed partial class NorviaPartnerApiClient(
 
     /// <summary>
     /// The tracking contract's keys the portal knows (coding guidelines §7), so its trace joins Norvia's Message trail.
-    /// Never what was booked: that holds the Consignee's personal data.
+    /// Never what was booked: that holds the Consignee's personal data. Its outcome reads Norvia's answer as the intake's
+    /// other hops read the TMS's.
     /// </summary>
     private static Dictionary<string, object?> TrackingKeysOf(Persona persona, NorviaAnswer answer)
     {
         var keys = new Dictionary<string, object?> { ["flow"] = "transport-order-intake", ["partyId"] = persona.PartyId };
+        foreach (var (key, value) in OutcomeOf(answer.Result))
+        {
+            keys[key] = value;
+        }
+
         if (answer.MessageId is { } correlationId)
         {
             keys["correlationId"] = correlationId;
@@ -73,6 +83,15 @@ internal sealed partial class NorviaPartnerApiClient(
 
         return keys;
     }
+
+    private static Dictionary<string, object?> OutcomeOf(BookingResult result) => result switch
+    {
+        BookingResult.Accepted or BookingResult.AlreadyBooked => new() { ["outcome"] = "Succeeded" },
+        BookingResult.Rejected => new() { ["outcome"] = "Refused", ["failureCode"] = "TransportOrderRejected" },
+        BookingResult.Refused => new() { ["outcome"] = "Refused" },
+        BookingResult.NotReceived => new() { ["outcome"] = "Failed", ["failureCode"] = "BookingNotReceived" },
+        _ => throw new ArgumentOutOfRangeException(nameof(result), result, "Every answer records its outcome."),
+    };
 
     private static string? CorrelationIdOf(HttpResponseMessage response) =>
         response.Headers.TryGetValues("X-Correlation-ID", out var values) ? values.FirstOrDefault() : null;

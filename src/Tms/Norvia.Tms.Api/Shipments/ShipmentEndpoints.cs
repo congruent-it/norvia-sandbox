@@ -46,7 +46,7 @@ public static class ShipmentEndpoints
                 + "and publishes ShipmentReassigned on the Shipment events topic, with who carried it before, in one transaction. Each reassignment "
                 + "gets a new correlation ID, which ShipmentReassigned carries with the Transport Order number. A reassignment sent again under its "
                 + "Idempotency-Key is answered as before, flagged as a repeat, without reassigning again. A reassignment that breaks an assignment "
-                + "rule is refused, changing and publishing nothing, with a problem whose code says which: ShipmentNotFound (404), ShipmentNotPlanned "
+                + "rule is refused, changing and publishing nothing, with a problem whose code says which, and whose correlationId names the Message trail the refusal is traced on: ShipmentNotFound (404), ShipmentNotPlanned "
                 + "or AssignmentUnchanged (409), UnknownCarrier or InactiveCarrier (422).");
 
         // The Planner releases from the TMS UI, as they assign and reassign, on a Message trail of its own.
@@ -60,7 +60,7 @@ public static class ShipmentEndpoints
                 + "the Shipment events topic, with the Transport Order's addresses, windows and goods lines and who carries it, in one "
                 + "transaction. Each release gets a new correlation ID, which ShipmentReleased carries with the Transport Order number. A "
                 + "release sent again under its Idempotency-Key is answered as before, flagged as a repeat, without releasing again. A release "
-                + "that breaks an assignment rule is refused, changing and publishing nothing, with a problem whose code says which: "
+                + "that breaks an assignment rule is refused, changing and publishing nothing, with a problem whose code says which, and whose correlationId names the Message trail the refusal is traced on: "
                 + "ShipmentNotFound (404) or ShipmentNotPlanned (409).");
 
         return app;
@@ -96,7 +96,7 @@ public static class ShipmentEndpoints
         var result = await mediator.Send(command, cancellationToken);
         return result.IsSuccess
             ? TypedResults.Ok(result.Value)
-            : AssignmentCalls.Refused(result, "The Shipment can't be reassigned.");
+            : AssignmentCalls.Refused(result, "The Shipment can't be reassigned.", command.CorrelationId);
     }
 
     private static async Task<Results<Ok<ReleaseShipmentResult>, ProblemHttpResult, ValidationProblem>> ReleaseAsync(
@@ -116,7 +116,7 @@ public static class ShipmentEndpoints
         var result = await mediator.Send(command, cancellationToken);
         return result.IsSuccess
             ? TypedResults.Ok(result.Value)
-            : AssignmentCalls.Refused(result, "The Shipment can't be released.");
+            : AssignmentCalls.Refused(result, "The Shipment can't be released.", command.CorrelationId);
     }
 
     private static async Task<Ok<IReadOnlyList<ShipmentToReleaseSummary>>> ListToReleaseAsync(

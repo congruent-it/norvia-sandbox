@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Nodes;
@@ -125,11 +126,56 @@ public sealed class TransportOrderIntakeTests(TmsFixture tms)
         var correlationId = NewCorrelationId();
         var number = await SubmitAcceptedAsync(Bookings.Valid(NewReference()), correlationId);
 
-        var published = await tms.TmsLogAsync(log => log["correlationId"] == correlationId && log["eventType"] == "TransportOrderAccepted", _cancellationToken);
+        var published = await tms.TmsLogAsync(
+            log => log["correlationId"] == correlationId && log["eventType"] == "TransportOrderAccepted" && log.Text.Contains("Published TransportOrderAccepted", StringComparison.Ordinal),
+            _cancellationToken);
 
         published["transportOrderNumber"].Should().Be(number);
         published["flow"].Should().Be("transport-order-intake");
         published["partyId"].Should().Be("SHP-0001");
+    }
+
+    [Fact]
+    public async Task Submit_ValidTransportOrder_PublishingTheEventRecordsItSucceeded()
+    {
+        // The Integration console shows the published event as a hop of its own, with this outcome.
+        var correlationId = NewCorrelationId();
+        await SubmitAcceptedAsync(Bookings.Valid(NewReference()), correlationId);
+
+        var published = await tms.TmsLogAsync(
+            log => log["correlationId"] == correlationId && log.Text.Contains("Published TransportOrderAccepted", StringComparison.Ordinal),
+            _cancellationToken);
+
+        published["outcome"].Should().Be("Succeeded");
+        published["eventType"].Should().Be("TransportOrderAccepted");
+    }
+
+    [Fact]
+    public async Task Submit_ValidTransportOrder_PublishesTheEventInTheIntakesTrace()
+    {
+        // The outbox sends the event later, outside the request, but in a span that continues the request's trace, so the
+        // Integration console shows the publish as caused by the intake call.
+        var correlationId = NewCorrelationId();
+        var traceId = ActivityTraceId.CreateRandom().ToHexString();
+        using var response = await SubmitAsync(Bookings.Valid(NewReference()), correlationId, $"00-{traceId}-{ActivitySpanId.CreateRandom().ToHexString()}-01");
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var published = (await tms.PublishedAsync(correlationId, "TransportOrderAccepted", _cancellationToken)).Should().ContainSingle().Subject;
+
+        published.ApplicationProperties.Should().ContainKey("Diagnostic-Id")
+            .WhoseValue.Should().BeOfType<string>().Which.Should().Contain(traceId);
+    }
+
+    [Fact]
+    public async Task Submit_ValidTransportOrder_PublishesTheEventWithoutAnOutcome()
+    {
+        // The outcome is the publisher's own, not the event's: a subscriber's hop records its own.
+        var correlationId = NewCorrelationId();
+        await SubmitAcceptedAsync(Bookings.Valid(NewReference()), correlationId);
+
+        var published = await tms.PublishedAsync(correlationId, "TransportOrderAccepted", _cancellationToken);
+
+        published.Should().ContainSingle().Which.ApplicationProperties.Should().NotContainKey("outcome");
     }
 
     [Fact]
@@ -239,13 +285,18 @@ public sealed class TransportOrderIntakeTests(TmsFixture tms)
         _ => node.DeepClone(),
     };
 
-    private async Task<HttpResponseMessage> SubmitAsync(JsonObject booking, string correlationId)
+    private async Task<HttpResponseMessage> SubmitAsync(JsonObject booking, string correlationId, string? traceParent = null)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("/v1/transport-orders", UriKind.Relative))
         {
             Content = JsonContent.Create(booking),
         };
         request.Headers.Add("X-Correlation-ID", correlationId);
+        if (traceParent is not null)
+        {
+            request.Headers.Add("traceparent", traceParent);
+        }
+
         return await tms.Tms.SendAsync(request, _cancellationToken);
     }
 

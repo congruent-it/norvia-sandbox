@@ -3,7 +3,8 @@ namespace Norvia.IntegrationConsole.Infrastructure.Trails;
 /// <summary>
 /// The logging categories of the frameworks an application runs on, such as the Azure SDK, ASP.NET Core and
 /// HttpClient. They log in the application's logging scope, so their records carry the tracking contract's keys too,
-/// but they are no hop of the trail's: an application's own records are.
+/// but they are no hop of the trail's: an application's own records are. Their activity sources are named alike, so a
+/// span's scope says whether a framework started it too.
 /// </summary>
 internal static class FrameworkLogs
 {

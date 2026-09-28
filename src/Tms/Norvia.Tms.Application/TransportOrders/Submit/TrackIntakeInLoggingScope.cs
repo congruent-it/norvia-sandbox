@@ -8,14 +8,18 @@ namespace Norvia.Tms.Application.TransportOrders.Submit;
 
 /// <summary>
 /// Adds the tracking-contract keys only the submission knows to the logging scope (coding guidelines §7): the Shipper
-/// as <c>partyId</c>, and the Transport Order number once the booking is accepted, for the outcome. The API's request
-/// scope already carries <c>correlationId</c> and <c>flow</c> for the whole intake call, refused calls included. Only
-/// keys and rejection codes are logged, never what the Shipper submitted: that holds the Consignee's name, address and
-/// phone number.
+/// as <c>partyId</c>, and for the outcome the Transport Order number once the booking is accepted, and <c>outcome</c>:
+/// Succeeded for an accepted booking or a repeat, Refused with the <c>failureCode</c> <c>TransportOrderRejected</c> for a
+/// Rejected booking, as the intake's other hops record the TMS's answer. The API's request scope already carries
+/// <c>correlationId</c> and <c>flow</c> for the whole intake call, refused calls included. Only keys and rejection codes
+/// are logged, never what the Shipper submitted: that holds the Consignee's name, address and phone number.
 /// </summary>
 public sealed partial class TrackIntakeInLoggingScope(ILogger<TrackIntakeInLoggingScope> logger)
     : IPipelineBehavior<SubmitTransportOrderCommand, Result<SubmitTransportOrderResult>>
 {
+    /// <summary>The failure code of a Rejected booking; its rejection reasons say why.</summary>
+    private const string TransportOrderRejected = "TransportOrderRejected";
+
     public async ValueTask<Result<SubmitTransportOrderResult>> Handle(
         SubmitTransportOrderCommand message,
         MessageHandlerDelegate<SubmitTransportOrderCommand, Result<SubmitTransportOrderResult>> next,
@@ -44,11 +48,20 @@ public sealed partial class TrackIntakeInLoggingScope(ILogger<TrackIntakeInLoggi
         if (outcome.TransportOrderNumber is not { } number)
         {
             var rejectionCodes = string.Join(", ", outcome.RejectionReasons.Select(reason => reason.Code));
+            using var refused = logger.BeginScope(new Dictionary<string, object?>
+            {
+                [TrackingKeys.Outcome] = TrackingKeys.Refused,
+                [TrackingKeys.FailureCode] = TransportOrderRejected,
+            });
             LogRejected(logger, rejectionCodes);
             return;
         }
 
-        using var numbered = logger.BeginScope(new Dictionary<string, object?> { [TrackingKeys.TransportOrderNumber] = number });
+        using var numbered = logger.BeginScope(new Dictionary<string, object?>
+        {
+            [TrackingKeys.TransportOrderNumber] = number,
+            [TrackingKeys.Outcome] = TrackingKeys.Succeeded,
+        });
         if (outcome.Repeat)
         {
             LogRepeat(logger, number);

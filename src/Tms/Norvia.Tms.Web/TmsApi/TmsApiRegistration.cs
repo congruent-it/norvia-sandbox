@@ -32,6 +32,7 @@ public static class TmsApiRegistration
                 _ => ActivatorUtilities.CreateInstance<LocalTmsApiTokens>(services),
             });
 
+        builder.Services.AddSingleton(_ => new TmsUiActivities(builder.Environment.ApplicationName));
         builder.Services.AddHttpClient<ITransportOrderCommands, TmsApiClient>((services, http) =>
             http.BaseAddress = services.GetRequiredService<IOptions<TmsApiOptions>>().Value.BaseAddress);
 

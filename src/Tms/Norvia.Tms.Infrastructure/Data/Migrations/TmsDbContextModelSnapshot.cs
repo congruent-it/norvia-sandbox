@@ -249,6 +249,10 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                         .HasMaxLength(260)
                         .HasColumnType("nvarchar(260)");
 
+                    b.Property<string>("TraceParent")
+                        .HasMaxLength(55)
+                        .HasColumnType("nvarchar(55)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("EventId")

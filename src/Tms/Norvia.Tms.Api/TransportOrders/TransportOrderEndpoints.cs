@@ -83,7 +83,7 @@ public static class TransportOrderEndpoints
                 + "when it fails again, another TransportOrderRatingFailed. An order that isn't Rating failed is refused with a 409 and "
                 + "left as it is: a Rated order's Freight Charge stays frozen. A re-rate sent again under its Idempotency-Key "
                 + "is answered as before, flagged as a repeat, without rating again. Like the first rating, the re-rate continues the Message "
-                + "trail of the order's intake, so its event carries the intake's correlation ID.");
+                + "trail of the order's intake, so its event carries the intake's correlation ID, and a refusal's problem names it as correlationId.");
 
         // The Planner assigns from the TMS UI, as Customer service re-rates. The action starts there, not at API Management,
         // so the TMS starts a Message trail of its own for it.
@@ -97,7 +97,7 @@ public static class TransportOrderEndpoints
                 + "and publishes ShipmentPlanned on the Shipment events topic, all in one transaction. The assignment gets a new correlation ID, "
                 + "which ShipmentPlanned carries with the Transport Order number. An assignment sent again under its Idempotency-Key "
                 + "is answered as before, flagged as a repeat, without planning again. An assignment that breaks an assignment rule is refused, "
-                + "changing and publishing nothing, with a problem whose code says which: TransportOrderNotFound (404), TransportOrderNotAccepted "
+                + "changing and publishing nothing, with a problem whose code says which, and whose correlationId names the Message trail the refusal is traced on: TransportOrderNotFound (404), TransportOrderNotAccepted "
                 + "or TransportOrderAlreadyPlanned (409), UnknownCarrier or InactiveCarrier (422). The rating result never blocks an assignment.");
 
         return app;
@@ -199,7 +199,7 @@ public static class TransportOrderEndpoints
                 : TypedResults.Created($"/v1/shipments/{result.Value.ShipmentNumber}", result.Value);
         }
 
-        return AssignmentCalls.Refused(result, "The Transport Order can't be assigned.");
+        return AssignmentCalls.Refused(result, "The Transport Order can't be assigned.", command.CorrelationId);
     }
 
     private static async Task<Results<Ok<RateTransportOrderResult>, ProblemHttpResult, ValidationProblem>> ReRateAsync(
@@ -221,10 +221,12 @@ public static class TransportOrderEndpoints
         {
             ResultStatus.Ok => TypedResults.Ok(result.Value),
             ResultStatus.NotFound => TypedResults.Problem(statusCode: StatusCodes.Status404NotFound, title: $"Transport Order {transportOrderNumber} not found."),
+            // A refusal names the intake's trail it is traced on, so the TMS UI can join it.
             _ => TypedResults.Problem(
                 statusCode: StatusCodes.Status409Conflict,
                 title: "The Transport Order can't be re-rated.",
-                detail: string.Join(" ", result.Errors)),
+                detail: string.Join(" ", result.Errors),
+                extensions: new Dictionary<string, object?> { ["correlationId"] = result.CorrelationId }),
         };
     }
 }
