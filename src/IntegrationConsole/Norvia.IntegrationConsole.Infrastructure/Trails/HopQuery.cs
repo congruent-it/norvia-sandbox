@@ -71,7 +71,7 @@ internal static class HopQuery
         let links = AppDependencies
             | where OperationId in (operations)
             | project rowKind = "link", id = Id, parentId = ParentId, start = TimeGenerated, durationMs = DurationMs, name = Name,
-                role = AppRoleName, inProcess = Type == "InProc";
+                role = AppRoleName, inProcess = DependencyType == "InProc";
         union (calls | project-away OperationId), (runs | project-away OperationId), links
         """;
 }

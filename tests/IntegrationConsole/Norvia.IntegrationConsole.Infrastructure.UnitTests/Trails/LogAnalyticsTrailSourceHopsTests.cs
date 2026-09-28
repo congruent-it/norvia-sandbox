@@ -209,14 +209,33 @@ public sealed class LogAnalyticsTrailSourceHopsTests
     [Fact]
     public async Task HopsAsync_QueriesTheLinksWithWhatPlacesAHopInThem()
     {
+        // In AppDependencies, Type is the table's name; what kind of dependency it is, InProc for a span, is DependencyType.
         await HopsAsync(CorrelationId);
 
         await _client.Received(1).QueryWorkspaceAsync(
             WorkspaceId,
-            Arg.Is<string>(query => query.Contains("inProcess = Type == \"InProc\"", StringComparison.Ordinal)),
+            Arg.Is<string>(query => query.Contains("inProcess = DependencyType == \"InProc\"", StringComparison.Ordinal)),
             Arg.Any<LogsQueryTimeRange>(),
             Arg.Any<LogsQueryOptions>(),
             Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task HopsAsync_AContainerAppsRoleName_IsTheAppsNameWithoutItsEnvironment()
+    {
+        // Container Apps' OpenTelemetry agent gives every app its environment's generated name as service.namespace,
+        // which Application Insights puts before the role name, however the app sets its resource attributes.
+        Answer(
+            Link("send", null, Now.AddSeconds(-11), 2_400, "Send booking", "[appseowsgwet24y3e]/partner-portal-web", inProcess: true),
+            Row("request", "tms-req", null, Now.AddSeconds(-10), 1_500, "POST /v{version:apiVersion}/transport-orders/", "[appseowsgwet24y3e]/tms-api",
+                path: "/v1/transport-orders"),
+            Row("record", null, "send", Now.AddSeconds(-8.6), null, null, "[appseowsgwet24y3e]/partner-portal-web", outcome: "Succeeded"),
+            Row("record", null, null, Now.AddSeconds(-8), null, null, "[appseowsgwet24y3e]/tms-api", eventType: "TransportOrderAccepted"));
+
+        var hops = await HopsAsync(CorrelationId);
+
+        hops.Select(hop => hop.Name).Should().BeEquivalentTo(
+            "partner-portal-web: Send booking", "tms-api: POST /v1/transport-orders", "tms-api: publish TransportOrderAccepted");
     }
 
     [Fact]
