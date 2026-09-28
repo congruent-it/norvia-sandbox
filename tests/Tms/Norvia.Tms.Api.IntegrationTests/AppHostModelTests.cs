@@ -158,22 +158,6 @@ public sealed class AppHostModelTests
         (await EnvironmentOfAsync(builder, tmsResource)).Should().ContainKey("APPLICATIONINSIGHTS_CONNECTION_STRING");
     }
 
-    [Theory]
-    [InlineData("tms-api")]
-    [InlineData("tms-web")]
-    [InlineData("tms-migrations")]
-    [InlineData("partner-portal-web")]
-    [InlineData("partner-portal-migrations")]
-    [InlineData("integration-console-web")]
-    public async Task InAzure_AnApp_IsNamedInItsTelemetryByItsResourceName_WithoutTheEnvironmentsNamespace(string resource)
-    {
-        // Container Apps' OpenTelemetry agent would give it service.namespace, the environment's generated name, which
-        // Application Insights puts before its role name: "[appseowsgwet24y3e]/tms-api" on every Message trail.
-        await using var builder = await CreateForAzureAsync();
-
-        (await EnvironmentOfAsync(builder, resource)).Should().Contain("OTEL_RESOURCE_ATTRIBUTES", $"service.name={resource}");
-    }
-
     [Fact]
     public async Task InAzure_ThePartnerPortal_BooksThroughApiManagement_AsTheIdentityThePersonasTrust()
     {

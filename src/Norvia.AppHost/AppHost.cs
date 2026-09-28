@@ -86,13 +86,9 @@ if (builder.ExecutionContext.IsPublishMode)
     messaging.PublishAsExisting(estate.ServiceBusNamespace, null);
 
     var insights = builder.AddAzureApplicationInsights("insights").PublishAsExisting(estate.ApplicationInsights, null);
-    // Container Apps' OpenTelemetry agent gives every app the environment's generated name as service.namespace, which
-    // Application Insights puts before the role name the Integration console shows each hop by. Setting the resource
-    // attributes here replaces the agent's.
     foreach (var project in new[] { tmsMigrations, tmsApi, tmsWeb, partnerPortalMigrations, partnerPortal, integrationConsole })
     {
-        project.WithReference(insights)
-            .WithEnvironment("OTEL_RESOURCE_ATTRIBUTES", $"service.name={project.Resource.Name}");
+        project.WithReference(insights);
     }
 
     // In Azure the TMS trusts Entra only, and only the intake Logic App's managed identity may submit (ADR 0005).
