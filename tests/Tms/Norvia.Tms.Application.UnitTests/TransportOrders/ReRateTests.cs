@@ -63,7 +63,7 @@ public sealed class ReRateTests
 
     [Theory]
     [MemberData(nameof(OrdersNotRatingFailed))]
-    public async Task Handle_OrderWhoseRatingDidNotFail_IsRefusedAsAConflict_AndSavesNothing(string ratingResult)
+    public async Task Handle_OrderWhoseRatingDidNotFail_IsRefusedOnItsIntakesTrail_AndSavesNothing(string ratingResult)
     {
         var order = ratingResult switch
         {
@@ -77,7 +77,9 @@ public sealed class ReRateTests
 
         var result = await _handler.Handle(new RateTransportOrderCommand("TO-0000007", ReRateKey: "key-1"), CancellationToken.None);
 
-        result.Status.Should().Be(ResultStatus.Conflict);
+        result.IsSuccess.Should().BeFalse();
+        result.Status.Should().NotBe(ResultStatus.NotFound);
+        result.CorrelationId.Should().Be(order.CorrelationId.Value, "a re-rate, refused or not, is on its intake's Message trail");
         result.Errors.Should().ContainSingle().Which.Should().Be(
             $"Transport Order TO-0000007 is {ratingResult}; only a Transport Order whose Rating failed can be re-rated.");
         order.RatingResult.Should().Be(Enum.Parse<RatingResult>(ratingResult));

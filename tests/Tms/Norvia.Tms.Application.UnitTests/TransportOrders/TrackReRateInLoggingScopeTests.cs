@@ -66,13 +66,14 @@ public sealed class TrackReRateInLoggingScopeTests : IDisposable
     }
 
     [Fact]
-    public async Task Handle_ReRateRefused_LogsTheRefusalWithTheTransportOrderNumber()
+    public async Task Handle_ReRateRefused_LogsTheRefusalOnTheIntakesTrail_WithTheTransportOrderNumber()
     {
-        await _behaviour.Handle(ReRate, Answering(Result.Conflict("Transport Order TO-0000007 is Rated.")), CancellationToken.None);
+        await _behaviour.Handle(ReRate, Answering(Result.Error(new ErrorList(["Transport Order TO-0000007 is Rated."], "corr-intake"))), CancellationToken.None);
 
         var refused = _logs.Collector.GetSnapshot().Should().ContainSingle().Subject;
         refused.Message.Should().Contain("Transport Order TO-0000007 is Rated.");
-        ScopeKeysOf(refused).Should().Contain("transportOrderNumber", "TO-0000007").And.Contain("outcome", "Refused");
+        ScopeKeysOf(refused).Should().Contain("transportOrderNumber", "TO-0000007").And.Contain("outcome", "Refused")
+            .And.Contain("correlationId", "corr-intake");
     }
 
     [Fact]
@@ -82,7 +83,8 @@ public sealed class TrackReRateInLoggingScopeTests : IDisposable
 
         var refused = _logs.Collector.GetSnapshot().Should().ContainSingle().Subject;
         refused.Message.Should().Contain("Transport Order TO-0000007 not found.");
-        ScopeKeysOf(refused).Should().Contain("transportOrderNumber", "TO-0000007").And.Contain("outcome", "Refused");
+        ScopeKeysOf(refused).Should().Contain("transportOrderNumber", "TO-0000007").And.Contain("outcome", "Refused")
+            .And.NotContainKey("correlationId", "an order that doesn't exist has no trail to join");
     }
 
     [Fact]

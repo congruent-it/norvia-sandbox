@@ -83,6 +83,7 @@ public sealed class TransportOrderReRateTests(TmsFixture tms)
         var problem = JsonNode.Parse(await response.Content.ReadAsStringAsync(_cancellationToken))!;
         problem["detail"]!.GetValue<string>().Should().Be(
             $"Transport Order {number} is Rated; only a Transport Order whose Rating failed can be re-rated.");
+        problem["correlationId"]!.GetValue<string>().Should().Be(intake, "the refusal is traced on the intake's trail, which the TMS UI joins");
         var after = await tms.GetTransportOrderAsync(number, _cancellationToken);
         JsonNode.DeepEquals(before, after).Should().BeTrue("a frozen Freight Charge stays frozen");
 

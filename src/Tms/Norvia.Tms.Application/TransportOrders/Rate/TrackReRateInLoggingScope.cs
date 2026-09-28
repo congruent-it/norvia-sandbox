@@ -10,8 +10,8 @@ namespace Norvia.Tms.Application.TransportOrders.Rate;
 /// Traces a re-rate on its Transport Order's Message trail (coding guidelines §7): the intake's <c>correlationId</c>, as
 /// rating continues the intake's trail, with <c>partyId</c>, <c>transportOrderNumber</c>, <c>outcome</c> and, when
 /// Rating fails again, <c>failureCode</c>, in the logging scope and on the request's trace. A re-rate that gives its
-/// answer records Succeeded, even when Rating failed again. One the TMS refuses, because the order isn't Rating failed
-/// or doesn't exist, records Refused. The API's request scope carries <c>flow</c>.
+/// answer records Succeeded, even when Rating failed again. One the TMS refuses records Refused: on the intake's trail
+/// when the order isn't Rating failed, on none when it doesn't exist. The API's request scope carries <c>flow</c>.
 /// The rating worker traces the first rating itself, so a first rating passes straight through.
 /// </summary>
 public sealed partial class TrackReRateInLoggingScope(ILogger<TrackReRateInLoggingScope> logger)
@@ -33,7 +33,13 @@ public sealed partial class TrackReRateInLoggingScope(ILogger<TrackReRateInLoggi
         var result = await next(message, cancellationToken);
         if (!result.IsSuccess)
         {
-            using var refused = Track(new() { [TrackingKeys.Outcome] = TrackingKeys.Refused });
+            var keys = new Dictionary<string, object?> { [TrackingKeys.Outcome] = TrackingKeys.Refused };
+            if (!string.IsNullOrWhiteSpace(result.CorrelationId))
+            {
+                keys[TrackingKeys.CorrelationId] = result.CorrelationId;
+            }
+
+            using var refused = Track(keys);
             LogRefused(logger, result.Errors);
         }
         else if (result.IsSuccess)

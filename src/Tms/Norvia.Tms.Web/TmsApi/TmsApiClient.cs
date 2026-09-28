@@ -4,7 +4,6 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Microsoft.AspNetCore.Mvc;
 using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.TransportOrders;
@@ -51,16 +50,17 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
                     ? new ReRateAnswer.FailedAgain(failure)
                     : new ReRateAnswer.Rated();
             case HttpStatusCode.Conflict:
-                return Refused(new ReRateAnswer.Refused(await ReasonAsync(response, $"Transport Order {transportOrderNumber} can't be re-rated.", cancellationToken)));
+                var problem = await response.Content.ReadFromJsonAsync<Refusal>(Json, cancellationToken);
+                return Refused(new ReRateAnswer.Refused(problem?.Detail ?? $"Transport Order {transportOrderNumber} can't be re-rated."), problem?.CorrelationId);
             case HttpStatusCode.NotFound:
-                return Refused(new ReRateAnswer.Refused($"There is no Transport Order {transportOrderNumber}."));
+                return Refused(new ReRateAnswer.Refused($"There is no Transport Order {transportOrderNumber}."), correlationId: null);
             default:
                 throw Unexpected(response, "a re-rate");
         }
 
-        ReRateAnswer Refused(ReRateAnswer.Refused refused)
+        ReRateAnswer Refused(ReRateAnswer.Refused refused, string? correlationId)
         {
-            using (Track(Flows.TransportOrderRating, transportOrderNumber, TrackingKeys.Refused))
+            using (Track(Flows.TransportOrderRating, transportOrderNumber, TrackingKeys.Refused, correlationId: correlationId))
             {
                 LogRefused(TmsCommand.ReRate, transportOrderNumber, refused.Reason);
             }
@@ -114,7 +114,8 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
 
     /// <summary>
     /// The tracking contract's keys of a command's answer. Only an answer that names a correlation ID puts the TMS UI on
-    /// a Message trail, as a refused re-rate doesn't. A key that doesn't apply is left out, never sent empty.
+    /// a Message trail, as a re-rate of an order that doesn't exist doesn't. A key that doesn't apply is left out, never
+    /// sent empty.
     /// </summary>
     private IDisposable? Track(
         string flow, string transportOrderNumber, string outcome, string? failureCode = null, string? correlationId = null, string? partyId = null, string? shipmentNumber = null)
@@ -142,12 +143,6 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
         return logger.BeginScope(keys);
     }
 
-    private static async Task<string> ReasonAsync(HttpResponseMessage response, string otherwise, CancellationToken cancellationToken)
-    {
-        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(Json, cancellationToken);
-        return problem?.Detail ?? otherwise;
-    }
-
     private static HttpRequestException Unexpected(HttpResponseMessage response, string command)
     {
         response.EnsureSuccessStatusCode();
@@ -172,8 +167,8 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
     // What the TMS API answers a re-rate, as far as the TMS UI reads it.
     private sealed record ReRated(RatingResult RatingResult, RatingFailureView? RatingFailure, string? CorrelationId, string? ShipperId);
 
-    // What the TMS API answers a refused assignment: a problem whose code says which assignment rule it broke, and whose
-    // correlation ID names the Message trail the TMS traced the refusal on.
+    // What the TMS API answers a refused command: a problem whose code says which assignment rule an assignment broke,
+    // and whose correlation ID names the Message trail the TMS traced the refusal on.
     private sealed record Refusal(string? Detail, string? Code, string? CorrelationId);
 
     // What the TMS UI asks the TMS API to assign a Transport Order to.

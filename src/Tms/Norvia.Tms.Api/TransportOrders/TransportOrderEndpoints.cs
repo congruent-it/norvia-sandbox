@@ -83,7 +83,7 @@ public static class TransportOrderEndpoints
                 + "when it fails again, another TransportOrderRatingFailed. An order that isn't Rating failed is refused with a 409 and "
                 + "left as it is: a Rated order's Freight Charge stays frozen. A re-rate sent again under its Idempotency-Key "
                 + "is answered as before, flagged as a repeat, without rating again. Like the first rating, the re-rate continues the Message "
-                + "trail of the order's intake, so its event carries the intake's correlation ID.");
+                + "trail of the order's intake, so its event carries the intake's correlation ID, and a refusal's problem names it as correlationId.");
 
         // The Planner assigns from the TMS UI, as Customer service re-rates. The action starts there, not at API Management,
         // so the TMS starts a Message trail of its own for it.
@@ -221,10 +221,12 @@ public static class TransportOrderEndpoints
         {
             ResultStatus.Ok => TypedResults.Ok(result.Value),
             ResultStatus.NotFound => TypedResults.Problem(statusCode: StatusCodes.Status404NotFound, title: $"Transport Order {transportOrderNumber} not found."),
+            // A refusal names the intake's trail it is traced on, so the TMS UI can join it.
             _ => TypedResults.Problem(
                 statusCode: StatusCodes.Status409Conflict,
                 title: "The Transport Order can't be re-rated.",
-                detail: string.Join(" ", result.Errors)),
+                detail: string.Join(" ", result.Errors),
+                extensions: new Dictionary<string, object?> { ["correlationId"] = result.CorrelationId }),
         };
     }
 }

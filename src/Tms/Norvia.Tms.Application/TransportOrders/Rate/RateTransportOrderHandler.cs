@@ -32,8 +32,10 @@ public sealed class RateTransportOrderHandler(IRepository<TransportOrder> reposi
                 await repository.SaveChangesAsync(cancellationToken);
                 break;
             case ReRateOutcome.Refused:
-                return Result.Conflict(
-                    $"Transport Order {number} is {order.RatingResult}; only a Transport Order whose Rating failed can be re-rated.");
+                // Refused on its intake's Message trail, as a re-rate is; a conflict can't carry a correlation ID.
+                return Result.Error(new ErrorList(
+                    [$"Transport Order {number} is {order.RatingResult}; only a Transport Order whose Rating failed can be re-rated."],
+                    order.CorrelationId.Value));
         }
 
         // A first rating of an order that is no longer Not yet rated changes nothing, and answers with where it stands.

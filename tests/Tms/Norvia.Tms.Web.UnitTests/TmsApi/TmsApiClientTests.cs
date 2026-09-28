@@ -295,6 +295,30 @@ public sealed class TmsApiClientTests : IDisposable
     }
 
     [Fact]
+    public async Task ReRateAsync_Refused_RecordsItRefused_OnTheIntakesTrail()
+    {
+        _tmsApi.Answer(
+            HttpStatusCode.Conflict,
+            """
+            {
+              "status": 409, "title": "The Transport Order can't be re-rated.",
+              "detail": "Transport Order TO-0000043 is Rated; only a Transport Order whose Rating failed can be re-rated.", "correlationId": "corr-0043"
+            }
+            """,
+            "application/problem+json");
+
+        await ReRateAsync("TO-0000043");
+
+        ScopeOf(_logger.LatestRecord).Should().Contain(new Dictionary<string, object?>
+        {
+            ["correlationId"] = "corr-0043",
+            ["flow"] = "transport-order-rating",
+            ["transportOrderNumber"] = "TO-0000043",
+            ["outcome"] = "Refused",
+        });
+    }
+
+    [Fact]
     public async Task ReRateAsync_SendsTheReRateInASpanOfItsOwn()
     {
         _tmsApi.Answer(HttpStatusCode.OK, Answer("Rated"));
