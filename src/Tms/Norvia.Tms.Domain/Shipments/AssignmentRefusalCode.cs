@@ -1,7 +1,7 @@
 namespace Norvia.Tms.Domain.Shipments;
 
 /// <summary>
-/// Why the TMS refused a Planner's assignment (P3). The names are stable codes that callers and monitoring rely on:
+/// Why the TMS refused a Planner's assignment, reassignment or release (P3). The names are stable codes that callers and monitoring rely on:
 /// never rename one, only add.
 /// </summary>
 public enum AssignmentRefusalCode
@@ -24,7 +24,10 @@ public enum AssignmentRefusalCode
     /// <summary>No Shipment has the number.</summary>
     ShipmentNotFound,
 
-    /// <summary>The Shipment isn't Planned, so it is released already and changes go through its Carrier booking.</summary>
+    /// <summary>
+    /// The Shipment isn't Planned, so it is released already: it can't be reassigned or released again, and changes go
+    /// through its Carrier booking.
+    /// </summary>
     ShipmentNotPlanned,
 
     /// <summary>The reassignment names who carries the Shipment already, so there is nothing to change.</summary>

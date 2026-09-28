@@ -8,7 +8,8 @@ namespace Norvia.Tms.Domain.Shipments;
 /// The physical movement that carries out one Transport Order. Each Transport Order has exactly one Shipment, and a
 /// Shipment never carries more than one Transport Order (ADR 0007). The TMS owns it. It is made only by planning its
 /// Transport Order (<see cref="TransportOrder.Plan"/>), and never deleted. While it is Planned, the Planner can
-/// reassign it; it keeps its Shipment number and records each assignment in its history.
+/// reassign it; it keeps its Shipment number and records each assignment in its history. Releasing it hands it over,
+/// after which P3 can no longer change it.
 /// </summary>
 public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
 {
@@ -55,6 +56,9 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
 
     public DateTimeOffset PlannedAt { get; private set; }
 
+    /// <summary>The Planner's release that handed the Shipment over; null while it is Planned and never released.</summary>
+    public ShipmentRelease? LastRelease { get; private set; }
+
     internal static Shipment Plan(
         ShipmentNumber number,
         TransportOrder order,
@@ -93,6 +97,36 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
         RegisterDomainEvent(new ShipmentReassignedEvent(this, previous, reassignment));
         return true;
     }
+
+    /// <summary>
+    /// Releases a Planned Shipment, handing it over to be carried out with its Transport Order's details: it becomes
+    /// Released, P3 can no longer change it, and ShipmentReleased is raised. Returns false, changing nothing, for a Shipment
+    /// that isn't Planned.
+    /// </summary>
+    /// <param name="order">The Transport Order the Shipment carries out.</param>
+    public bool Release(TransportOrder order, IdempotencyKey key, CorrelationId correlationId, DateTimeOffset releasedAt)
+    {
+        ArgumentNullException.ThrowIfNull(order);
+        ArgumentNullException.ThrowIfNull(key);
+        if (order.Id != TransportOrderId)
+        {
+            throw new ArgumentException($"Shipment {Number} carries out Transport Order {TransportOrderNumber}, not {order.Number}.", nameof(order));
+        }
+
+        if (Status != ShipmentStatus.Planned)
+        {
+            return false;
+        }
+
+        var release = new ShipmentRelease(correlationId, releasedAt, key);
+        Status = ShipmentStatus.Released;
+        LastRelease = release;
+        RegisterDomainEvent(new ShipmentReleasedEvent(this, order, release));
+        return true;
+    }
+
+    /// <summary>Whether the Shipment was released by the release sent under this key.</summary>
+    public bool WasReleasedUnder(IdempotencyKey key) => LastRelease is not null && LastRelease.Key == key;
 
     /// <summary>The reassignment made under the key, with the assignment it replaced; null when none was.</summary>
     public (ShipmentAssignment Previous, ShipmentAssignment Reassignment)? ReassignmentUnder(IdempotencyKey key)

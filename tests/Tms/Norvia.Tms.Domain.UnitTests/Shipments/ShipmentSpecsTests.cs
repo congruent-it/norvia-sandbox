@@ -30,6 +30,32 @@ public sealed class ShipmentSpecsTests
     }
 
     [Fact]
+    public void ShipmentToReleaseSpec_FindsOnlyTheShipmentWithThatNumber()
+    {
+        Shipment[] shipments = [Planned(1, 1), Planned(2, 2)];
+
+        var found = new ShipmentToReleaseSpec(ShipmentNumber.FromSequence(2)).Evaluate(shipments);
+
+        found.Should().ContainSingle().Which.Number.Should().Be(ShipmentNumber.FromSequence(2));
+    }
+
+    [Fact]
+    public void ShipmentsToReleaseSpec_FindsThePlannedShipments_InTheOrderTheyWerePlanned()
+    {
+        var first = Planned(1, 1);
+        var released = Accepted(2);
+        var releasedShipment = released.Plan(
+            ShipmentNumber.FromSequence(2), CarriedBy.OwnFleet, new IdempotencyKey("key"), new CorrelationId("corr"), Now.AddMinutes(1))!;
+        releasedShipment.Release(released, new IdempotencyKey("key-rel"), new CorrelationId("corr-rel"), Now.AddMinutes(2));
+        var last = Accepted(3).Plan(
+            ShipmentNumber.FromSequence(3), CarriedBy.OwnFleet, new IdempotencyKey("key"), new CorrelationId("corr"), Now.AddMinutes(3))!;
+
+        var found = new ShipmentsToReleaseSpec().Evaluate([last, releasedShipment, first]);
+
+        found.Select(shipment => shipment.Number).Should().Equal(first.Number, last.Number);
+    }
+
+    [Fact]
     public void TransportOrderToPlanSpec_FindsOnlyTheTransportOrderWithThatNumber()
     {
         TransportOrder[] orders = [Accepted(1), Accepted(2)];

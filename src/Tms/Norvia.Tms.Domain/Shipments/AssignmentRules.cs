@@ -6,8 +6,8 @@ namespace Norvia.Tms.Domain.Shipments;
 
 /// <summary>
 /// P3's assignment rules, checked before a Transport Order is planned, so a Planner never plans onto a Carrier Norvia
-/// doesn't use or plans the same Transport Order twice, and before a Planned Shipment is reassigned. There are no coverage
-/// rules for Own fleet, and the rating result never blocks planning.
+/// doesn't use or plans the same Transport Order twice, and before a Shipment is reassigned or released, so what has been
+/// handed over stays handed over. There are no coverage rules for Own fleet, and the rating result never blocks planning.
 /// </summary>
 public static class AssignmentRules
 {
@@ -35,14 +35,22 @@ public static class AssignmentRules
     public static AssignmentRefusal? CheckReassignment(Shipment shipment, CarrierId? carrierId, Carrier? carrier)
     {
         ArgumentNullException.ThrowIfNull(shipment);
-        return CheckShipment(shipment) ?? CheckCarrier(carrierId, carrier) ?? CheckChange(shipment, carrierId);
+        return CheckShipment(shipment, "reassigned") ?? CheckCarrier(carrierId, carrier) ?? CheckChange(shipment, carrierId);
     }
 
-    private static AssignmentRefusal? CheckShipment(Shipment shipment) => shipment.Status == ShipmentStatus.Planned
+    /// <summary>Returns the rule the release breaks, or null when it breaks none: only a Planned Shipment can be released.</summary>
+    public static AssignmentRefusal? CheckRelease(Shipment shipment)
+    {
+        ArgumentNullException.ThrowIfNull(shipment);
+        return CheckShipment(shipment, "released");
+    }
+
+    /// <param name="action">What is done to the Shipment, such as "released", for the message.</param>
+    private static AssignmentRefusal? CheckShipment(Shipment shipment, string action) => shipment.Status == ShipmentStatus.Planned
         ? null
         : new(
             AssignmentRefusalCode.ShipmentNotPlanned,
-            Invariant($"Shipment {shipment.Number} is {shipment.Status}. Only a Planned Shipment can be reassigned."));
+            Invariant($"Shipment {shipment.Number} is {shipment.Status}. Only a Planned Shipment can be {action}."));
 
     private static AssignmentRefusal? CheckChange(Shipment shipment, CarrierId? carrierId) => shipment.CarriedBy.CarrierId == carrierId
         ? new(AssignmentRefusalCode.AssignmentUnchanged, Invariant($"Shipment {shipment.Number} is assigned to {shipment.CarriedBy} already."))

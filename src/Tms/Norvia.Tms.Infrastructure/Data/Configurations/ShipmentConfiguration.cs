@@ -75,6 +75,20 @@ internal sealed class ShipmentConfiguration : IEntityTypeConfiguration<Shipment>
             .HasMaxLength(128)
             .IsRequired();
 
+        // The release that handed the Shipment over, in columns of its own; all null while the Shipment is Planned.
+        builder.ComplexProperty(shipment => shipment.LastRelease, release =>
+        {
+            release.Property(r => r.CorrelationId)
+                .HasConversion(id => id.Value, value => new CorrelationId(value))
+                .HasMaxLength(128)
+                .HasColumnName("ReleaseCorrelationId");
+            release.Property(r => r.ReleasedAt).HasColumnName("ReleasedAt");
+            release.Property(r => r.Key)
+                .HasConversion(key => key.Value, value => new IdempotencyKey(value))
+                .HasMaxLength(IdempotencyKey.MaxLength)
+                .HasColumnName("ReleaseKey");
+        });
+
         // Planning changes a Shipment after it is made (reassign, release), so two Planners' changes must not both land.
         builder.Property<byte[]>("RowVersion").IsRowVersion();
     }
