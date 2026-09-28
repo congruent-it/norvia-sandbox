@@ -35,7 +35,7 @@ public static class AssignmentRules
     public static AssignmentRefusal? CheckReassignment(Shipment shipment, CarrierId? carrierId, Carrier? carrier)
     {
         ArgumentNullException.ThrowIfNull(shipment);
-        return CheckShipment(shipment, PlanningAction.Reassignment) ?? CheckCarrier(carrierId, carrier) ?? CheckChange(shipment, carrierId);
+        return CheckShipment(shipment, PlanningAction.Reassignment) ?? CheckCarrier(carrierId, carrier) ?? CheckChange(shipment, carrierId, carrier);
     }
 
     /// <summary>Returns the rule the release breaks, or null when it breaks none: only a Planned Shipment can be released.</summary>
@@ -51,8 +51,9 @@ public static class AssignmentRules
             AssignmentRefusalCode.ShipmentNotPlanned,
             Invariant($"Shipment {shipment.Number} is {shipment.Status}. Only a Planned Shipment can be {action.Done()}."));
 
-    private static AssignmentRefusal? CheckChange(Shipment shipment, CarrierId? carrierId) => shipment.CarriedBy.CarrierId == carrierId
-        ? new(AssignmentRefusalCode.AssignmentUnchanged, Invariant($"Shipment {shipment.Number} is assigned to {shipment.CarriedBy} already."))
+    // carrier is the TMS's data for carrierId, already resolved and validated by CheckCarrier above.
+    private static AssignmentRefusal? CheckChange(Shipment shipment, CarrierId? carrierId, Carrier? carrier) => shipment.CarriedBy.CarrierId == carrierId
+        ? new(AssignmentRefusalCode.AssignmentUnchanged, Invariant($"Shipment {shipment.Number} is assigned to {Describe(carrierId, carrier)} already."))
         : null;
 
     private static AssignmentRefusal? CheckTransportOrder(TransportOrder order) => order.Status switch
@@ -80,6 +81,10 @@ public static class AssignmentRules
 
         return carrier.Active
             ? null
-            : new(AssignmentRefusalCode.InactiveCarrier, Invariant($"Carrier {carrierId} ({carrier.Name}) is not active, so it can't be chosen."));
+            : new(AssignmentRefusalCode.InactiveCarrier, Invariant($"{Describe(carrierId, carrier)} is not active, so it can't be chosen."));
     }
+
+    // A Carrier by name, not just its ID, so a refusal reads for a Planner who may not know the ID by heart.
+    private static string Describe(CarrierId? carrierId, Carrier? carrier) =>
+        carrierId is null ? "Own fleet" : Invariant($"Carrier {carrierId} ({carrier!.Name})");
 }
