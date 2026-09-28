@@ -11,4 +11,4 @@ public sealed record ReleaseShipmentResult(
     CarriedByView CarriedBy,
     string ShipperId,
     string CorrelationId,
-    bool Repeat = false);
+    bool Repeat = false) : IPlanningOutcome;

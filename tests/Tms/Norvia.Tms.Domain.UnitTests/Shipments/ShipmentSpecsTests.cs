@@ -20,21 +20,11 @@ public sealed class ShipmentSpecsTests
     }
 
     [Fact]
-    public void ShipmentToReassignSpec_FindsOnlyTheShipmentWithThatNumber()
+    public void ShipmentToChangeSpec_FindsOnlyTheShipmentWithThatNumber()
     {
         Shipment[] shipments = [Planned(1, 1), Planned(2, 2)];
 
-        var found = new ShipmentToReassignSpec(ShipmentNumber.FromSequence(2)).Evaluate(shipments);
-
-        found.Should().ContainSingle().Which.Number.Should().Be(ShipmentNumber.FromSequence(2));
-    }
-
-    [Fact]
-    public void ShipmentToReleaseSpec_FindsOnlyTheShipmentWithThatNumber()
-    {
-        Shipment[] shipments = [Planned(1, 1), Planned(2, 2)];
-
-        var found = new ShipmentToReleaseSpec(ShipmentNumber.FromSequence(2)).Evaluate(shipments);
+        var found = new ShipmentToChangeSpec(ShipmentNumber.FromSequence(2)).Evaluate(shipments);
 
         found.Should().ContainSingle().Which.Number.Should().Be(ShipmentNumber.FromSequence(2));
     }

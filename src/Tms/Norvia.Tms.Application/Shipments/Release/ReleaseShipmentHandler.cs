@@ -19,7 +19,7 @@ public sealed class ReleaseShipmentHandler(
         ArgumentNullException.ThrowIfNull(command);
 
         if (!ShipmentNumber.TryParse(command.ShipmentNumber, out var number)
-            || await shipments.SingleOrDefaultAsync(new ShipmentToReleaseSpec(number), cancellationToken) is not { } shipment)
+            || await shipments.SingleOrDefaultAsync(new ShipmentToChangeSpec(number), cancellationToken) is not { } shipment)
         {
             return AssignmentRefused.Because<ReleaseShipmentResult>(AssignmentRules.ShipmentNotFound(command.ShipmentNumber));
         }

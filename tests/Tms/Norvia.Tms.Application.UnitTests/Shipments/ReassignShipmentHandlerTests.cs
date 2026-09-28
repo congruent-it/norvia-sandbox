@@ -128,7 +128,7 @@ public sealed class ReassignShipmentHandlerTests
     private Shipment PlannedShipment(CarriedBy carriedBy)
     {
         var shipment = Samples.Planned(Samples.AcceptedOrder(sequence: 7), carriedBy, sequence: 12);
-        _shipments.SingleOrDefaultAsync(Arg.Is<ShipmentToReassignSpec>(s => s.Number == shipment.Number), Arg.Any<CancellationToken>())
+        _shipments.SingleOrDefaultAsync(Arg.Is<ShipmentToChangeSpec>(s => s.Number == shipment.Number), Arg.Any<CancellationToken>())
             .Returns(shipment);
         return shipment;
     }

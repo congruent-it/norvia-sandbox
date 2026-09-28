@@ -12,4 +12,4 @@ public sealed record AssignTransportOrderResult(
     CarriedByView CarriedBy,
     string ShipperId,
     string CorrelationId,
-    bool Repeat = false);
+    bool Repeat = false) : IPlanningOutcome;

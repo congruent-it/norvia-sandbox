@@ -115,7 +115,7 @@ public sealed class ReleaseShipmentHandlerTests
     public async Task Handle_ShipmentWhoseTransportOrderIsMissing_Throws()
     {
         var shipment = Samples.Planned(Samples.AcceptedOrder(sequence: 7), CarriedBy.OwnFleet, sequence: 12);
-        _shipments.SingleOrDefaultAsync(Arg.Any<ShipmentToReleaseSpec>(), Arg.Any<CancellationToken>()).Returns(shipment);
+        _shipments.SingleOrDefaultAsync(Arg.Any<ShipmentToChangeSpec>(), Arg.Any<CancellationToken>()).Returns(shipment);
 
         var release = async () => await _handler.Handle(new ReleaseShipmentCommand("SH-0000012", "key-rel1", "corr-release"), CancellationToken.None);
 
@@ -127,7 +127,7 @@ public sealed class ReleaseShipmentHandlerTests
     {
         var order = Samples.AcceptedOrder(sequence: 7);
         var shipment = Samples.Planned(order, carriedBy, sequence: 12);
-        _shipments.SingleOrDefaultAsync(Arg.Is<ShipmentToReleaseSpec>(s => s.Number == shipment.Number), Arg.Any<CancellationToken>())
+        _shipments.SingleOrDefaultAsync(Arg.Is<ShipmentToChangeSpec>(s => s.Number == shipment.Number), Arg.Any<CancellationToken>())
             .Returns(shipment);
         _transportOrders.SingleOrDefaultAsync(Arg.Is<TransportOrderByNumberSpec>(s => s.Number == order.Number), Arg.Any<CancellationToken>())
             .Returns(order);
