@@ -55,10 +55,12 @@ else
             </dl>
         </TransportOrderSection>
 
-        @* The planning first, then each reassignment, each on its own Message trail. *@
+        @* The planning first, then each reassignment, each on its own Message trail. The correlation ID is sized to fit
+           whole, as the Shipment card shows it, and wraps rather than being cut off on a narrow screen. *@
         <div class="md:col-span-2">
             <TransportOrderSection Heading="Assignments">
-                <FluentDataGrid Items="_shipment.Assignments.AsQueryable()" TGridItem="ShipmentAssignmentView" Class="flatly-table" aria-label="Assignments">
+                <FluentDataGrid Items="_shipment.Assignments.AsQueryable()" TGridItem="ShipmentAssignmentView" Class="flatly-table" aria-label="Assignments"
+                                GridTemplateColumns="1fr 1fr auto" MultiLine="true">
                     <PropertyColumn Title="Carried by" Property="@(assignment => PlanningText.CarriedBy(assignment.CarriedBy))" />
                     <PropertyColumn Title="Assigned" Property="@(assignment => NorviaTime.Format(assignment.AssignedAt))" />
                     <PropertyColumn Title="Correlation ID" Property="@(assignment => assignment.CorrelationId)" />
