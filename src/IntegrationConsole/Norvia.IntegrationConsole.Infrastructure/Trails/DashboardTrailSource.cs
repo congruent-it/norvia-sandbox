@@ -101,7 +101,9 @@ internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTr
         return new RecordedHop(
             id,
             causedBy,
-            span is null ? records[0].Resource : $"{span.Resource}: {span.Name}",
+            span is null
+                ? HopNames.OfRecords(records[0].Resource, Distinct(records, "eventType").FirstOrDefault())
+                : HopNames.OfCall(span.Resource, span.Name, span.Method, span.Path),
             Distinct(records, "flow").FirstOrDefault(),
             span?.Start ?? records[0].Time,
             span is { End: { } end } ? end - span.Start : null,
@@ -210,10 +212,14 @@ internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTr
             : [];
 
     private static string ServiceOf(JsonElement resource) =>
-        ItemsOf(resource.ValueKind == JsonValueKind.Object && resource.TryGetProperty("resource", out var attributes) ? attributes : default, "attributes")
-            .Where(attribute => attribute.TryGetProperty("key", out var key) && key.GetString() == "service.name")
+        AttributeOf(resource.ValueKind == JsonValueKind.Object && resource.TryGetProperty("resource", out var attributes) ? attributes : default, "service.name")
+            ?? "unknown";
+
+    private static string? AttributeOf(JsonElement element, string key) =>
+        ItemsOf(element, "attributes")
+            .Where(attribute => attribute.TryGetProperty("key", out var name) && name.GetString() == key)
             .Select(attribute => attribute.TryGetProperty("value", out var value) ? TextOf(value) : null)
-            .FirstOrDefault() ?? "unknown";
+            .FirstOrDefault();
 
     private static string? TextOf(JsonElement value) =>
         value.TryGetProperty("stringValue", out var text) ? text.GetString()
@@ -233,8 +239,12 @@ internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTr
             ? DateTimeOffset.UnixEpoch.AddTicks((long)(nanoseconds / 100))
             : null;
 
-    /// <summary>A span reduced to what places a hop: its parent, its application, its name and its times.</summary>
-    private sealed record Span(string SpanId, string? ParentSpanId, string Resource, string Name, int Kind, DateTimeOffset Start, DateTimeOffset? End)
+    /// <summary>
+    /// A span reduced to what places and names a hop: its parent, its application, its name, the method and path a
+    /// request called, and its times.
+    /// </summary>
+    private sealed record Span(
+        string SpanId, string? ParentSpanId, string Resource, string Name, string? Method, string? Path, int Kind, DateTimeOffset Start, DateTimeOffset? End)
     {
         public static Span? From(JsonElement span, string resource) =>
             StringOf(span, "spanId") is { Length: > 0 } spanId && TimeOf(span, "startTimeUnixNano") is { } start
@@ -243,6 +253,8 @@ internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTr
                     StringOf(span, "parentSpanId") is { Length: > 0 } parent ? parent : null,
                     resource,
                     StringOf(span, "name"),
+                    AttributeOf(span, "http.request.method"),
+                    AttributeOf(span, "url.path"),
                     span.TryGetProperty("kind", out var kind) && kind.ValueKind == JsonValueKind.Number ? kind.GetInt32() : 0,
                     start,
                     TimeOf(span, "endTimeUnixNano"))
@@ -253,7 +265,7 @@ internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTr
     private sealed record TrackedRecord(DateTimeOffset Time, string CorrelationId, string Resource, string TraceId, string SpanId, Dictionary<string, string> Keys)
     {
         private static readonly string[] TrackedKeys =
-            ["correlationId", "flow", "outcome", "failureCode", .. TrackedBusinessKeys.All.Select(key => key.Key)];
+            ["correlationId", "flow", "outcome", "failureCode", "eventType", .. TrackedBusinessKeys.All.Select(key => key.Key)];
 
         public bool Carries(string key) =>
             string.Equals(CorrelationId, key, StringComparison.OrdinalIgnoreCase)

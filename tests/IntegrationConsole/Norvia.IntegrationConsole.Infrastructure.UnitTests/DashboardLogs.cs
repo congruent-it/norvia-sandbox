@@ -60,7 +60,10 @@ public sealed class DashboardLogs : HttpMessageHandler
         return this;
     }
 
-    /// <summary>A span of <paramref name="resource"/>; <paramref name="kind"/> is OTLP's, 2 for a server span.</summary>
+    /// <summary>
+    /// A span of <paramref name="resource"/>; <paramref name="kind"/> is OTLP's, 2 for a server span, and
+    /// <paramref name="attributes"/> its string attributes, such as a request's <c>url.path</c>.
+    /// </summary>
     public DashboardLogs AddSpan(
         string resource,
         string traceId,
@@ -69,8 +72,15 @@ public sealed class DashboardLogs : HttpMessageHandler
         string name,
         int kind,
         DateTimeOffset start,
-        DateTimeOffset end)
+        DateTimeOffset end,
+        Dictionary<string, string>? attributes = null)
     {
+        var spanAttributes = new JsonArray();
+        foreach (var (key, value) in attributes ?? [])
+        {
+            spanAttributes.Add(new JsonObject { ["key"] = key, ["value"] = new JsonObject { ["stringValue"] = value } });
+        }
+
         _spans.Add((resource, new JsonObject
         {
             ["traceId"] = traceId,
@@ -80,7 +90,7 @@ public sealed class DashboardLogs : HttpMessageHandler
             ["kind"] = kind,
             ["startTimeUnixNano"] = UnixNano(start),
             ["endTimeUnixNano"] = UnixNano(end),
-            ["attributes"] = new JsonArray(),
+            ["attributes"] = spanAttributes,
         }));
         return this;
     }

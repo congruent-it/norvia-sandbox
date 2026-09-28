@@ -51,6 +51,7 @@ Search and the trail's outline come from Application Insights, so they can be a 
 ### Message trail
 
 - The trail's hops in time order, indented where it fans out, each with its flow, time, duration and outcome (`Succeeded`, `Refused`, `Retrying`, `DeadLettered`, `Failed`) and failure code.
+- Each hop is named after its application and what happened there: an application call by its method and the path actually called, such as `tms-api: POST /v1/transport-orders/TO-0000042/assign`, never its route template; a published event after the event, such as `tms-api: publish ShipmentPlanned`; and a Logic App run after its workflow.
 - The business keys the trail carried, each a link that searches for it.
 - A Logic App run opens its [run detail](#run-detail). A dead-lettered hop links to the message in its [dead-letter queue](#dead-letter-queues) while it's still there, or says whether it was resubmitted or discarded, and by whom (from the [audit](#audit)).
 - A resubmitted message continues the same trail, because it keeps its correlation ID. The trail shows the failed attempt and the later one.

@@ -125,11 +125,40 @@ public sealed class TransportOrderIntakeTests(TmsFixture tms)
         var correlationId = NewCorrelationId();
         var number = await SubmitAcceptedAsync(Bookings.Valid(NewReference()), correlationId);
 
-        var published = await tms.TmsLogAsync(log => log["correlationId"] == correlationId && log["eventType"] == "TransportOrderAccepted", _cancellationToken);
+        var published = await tms.TmsLogAsync(
+            log => log["correlationId"] == correlationId && log["eventType"] == "TransportOrderAccepted" && log.Text.Contains("Published TransportOrderAccepted", StringComparison.Ordinal),
+            _cancellationToken);
 
         published["transportOrderNumber"].Should().Be(number);
         published["flow"].Should().Be("transport-order-intake");
         published["partyId"].Should().Be("SHP-0001");
+    }
+
+    [Fact]
+    public async Task Submit_ValidTransportOrder_PublishingTheEventRecordsItSucceeded()
+    {
+        // The Integration console shows the published event as a hop of its own, with this outcome.
+        var correlationId = NewCorrelationId();
+        await SubmitAcceptedAsync(Bookings.Valid(NewReference()), correlationId);
+
+        var published = await tms.TmsLogAsync(
+            log => log["correlationId"] == correlationId && log.Text.Contains("Published TransportOrderAccepted", StringComparison.Ordinal),
+            _cancellationToken);
+
+        published["outcome"].Should().Be("Succeeded");
+        published["eventType"].Should().Be("TransportOrderAccepted");
+    }
+
+    [Fact]
+    public async Task Submit_ValidTransportOrder_PublishesTheEventWithoutAnOutcome()
+    {
+        // The outcome is the publisher's own, not the event's: a subscriber's hop records its own.
+        var correlationId = NewCorrelationId();
+        await SubmitAcceptedAsync(Bookings.Valid(NewReference()), correlationId);
+
+        var published = await tms.PublishedAsync(correlationId, "TransportOrderAccepted", _cancellationToken);
+
+        published.Should().ContainSingle().Which.ApplicationProperties.Should().NotContainKey("outcome");
     }
 
     [Fact]

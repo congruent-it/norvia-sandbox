@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Norvia.Tms.Application.IntegrationEvents;
 
 namespace Norvia.Tms.Infrastructure.Outbox;
 
@@ -61,7 +62,13 @@ internal sealed partial class OutboxPublisher(
             await SenderFor(message.Topic).SendMessageAsync(ToServiceBusMessage(message), cancellationToken);
             message.MarkPublished(time.GetUtcNow());
             await outboxMessages.UpdateAsync(message, cancellationToken);
-            LogPublished(message.EventType, message.EventId, message.CorrelationId);
+
+            // Publishing is a hop of its own on the trail, so it records its outcome; the message doesn't carry it. A
+            // failed send is retried on the next cycle, and records nothing yet.
+            using (logger.BeginScope(new Dictionary<string, object?> { [TrackingKeys.Outcome] = TrackingKeys.Succeeded }))
+            {
+                LogPublished(message.EventType, message.EventId, message.CorrelationId);
+            }
         }
     }
 

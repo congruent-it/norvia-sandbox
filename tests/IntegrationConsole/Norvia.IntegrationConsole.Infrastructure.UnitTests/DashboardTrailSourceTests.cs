@@ -18,6 +18,7 @@ public sealed class DashboardTrailSourceTests : IDisposable
     // OTLP's span kinds.
     private const int Server = 2;
     private const int Client = 3;
+    private const int Consumer = 5;
 
     private static readonly DateTimeOffset Now = new(2026, 9, 26, 10, 0, 0, TimeSpan.Zero);
 
@@ -133,9 +134,11 @@ public sealed class DashboardTrailSourceTests : IDisposable
     {
         // The stand-in's request calls the TMS; the TMS logs inside its request and inside a database call in it.
         _dashboard
-            .AddSpan("partner-api", Trace, "a1a1a1a1a1a1a1a1", null, "POST /partner/v1/transport-orders", Server, Now.AddSeconds(-10), Now.AddSeconds(-9))
+            .AddSpan("partner-api", Trace, "a1a1a1a1a1a1a1a1", null, "POST /partner/v1/transport-orders", Server, Now.AddSeconds(-10), Now.AddSeconds(-9),
+                Called("POST", "/partner/v1/transport-orders"))
             .AddSpan("partner-api", Trace, "c1c1c1c1c1c1c1c1", "a1a1a1a1a1a1a1a1", "POST", Client, Now.AddMilliseconds(-9800), Now.AddMilliseconds(-9200))
-            .AddSpan("tms-api", Trace, "b2b2b2b2b2b2b2b2", "c1c1c1c1c1c1c1c1", "POST /v1/transport-orders", Server, Now.AddMilliseconds(-9700), Now.AddMilliseconds(-9300))
+            .AddSpan("tms-api", Trace, "b2b2b2b2b2b2b2b2", "c1c1c1c1c1c1c1c1", "POST /v{version:apiVersion}/transport-orders/", Server, Now.AddMilliseconds(-9700), Now.AddMilliseconds(-9300),
+                Called("POST", "/v1/transport-orders"))
             .AddSpan("tms-api", Trace, "d3d3d3d3d3d3d3d3", "b2b2b2b2b2b2b2b2", "INSERT norvia", Client, Now.AddMilliseconds(-9600), Now.AddMilliseconds(-9500))
             .Add("partner-api", Now.AddMilliseconds(-9100), new() { ["correlationId"] = Booked, ["flow"] = "transport-order-intake", ["outcome"] = "Succeeded", ["transportOrderNumber"] = "TO-0000042" }, traceId: Trace, spanId: "a1a1a1a1a1a1a1a1")
             .Add("tms-api", Now.AddMilliseconds(-9650), new() { ["correlationId"] = Booked, ["flow"] = "transport-order-intake" }, traceId: Trace, spanId: "b2b2b2b2b2b2b2b2")
@@ -182,9 +185,68 @@ public sealed class DashboardTrailSourceTests : IDisposable
     }
 
     [Fact]
+    public async Task HopsAsync_APlannersAssignment_IsNamedByThePathCalled_NotByItsRouteTemplate()
+    {
+        // ASP.NET Core names a request's span by its route template; the path actually called is its url.path.
+        _dashboard
+            .AddSpan("tms-api", Trace, "b2b2b2b2b2b2b2b2", null, "POST /v{version:apiVersion}/transport-orders/{transportOrderNumber}/assign", Server,
+                Now.AddSeconds(-10), Now.AddSeconds(-9), Called("POST", "/v1/transport-orders/TO-0000042/assign"))
+            .Add("tms-api", Now.AddMilliseconds(-9500), new() { ["correlationId"] = Booked, ["flow"] = "transport-planning", ["outcome"] = "Succeeded" }, traceId: Trace, spanId: "b2b2b2b2b2b2b2b2");
+
+        var hops = await HopsAsync(Booked);
+
+        hops.Should().ContainSingle().Which.Name.Should().Be("tms-api: POST /v1/transport-orders/TO-0000042/assign");
+    }
+
+    [Fact]
+    public async Task HopsAsync_ASpanWithoutAPathCalled_IsNamedBySpanName()
+    {
+        // A message received has no path, as a request has.
+        _dashboard
+            .AddSpan("tms-api", Trace, "b2b2b2b2b2b2b2b2", null, "transport-orders receive", Consumer, Now.AddSeconds(-10), Now.AddSeconds(-9))
+            .Add("tms-api", Now.AddMilliseconds(-9500), new() { ["correlationId"] = Booked }, traceId: Trace, spanId: "b2b2b2b2b2b2b2b2");
+
+        var hops = await HopsAsync(Booked);
+
+        hops.Should().ContainSingle().Which.Name.Should().Be("tms-api: transport-orders receive");
+    }
+
+    [Fact]
+    public async Task HopsAsync_AnEventTheOutboxPublished_IsAHopNamedAfterTheEvent_ThatSucceeded()
+    {
+        // The TMS's outbox logs a published event outside any span, in the event's application properties and its outcome.
+        _dashboard.Add(
+            "tms-api",
+            Now.AddSeconds(-5),
+            new()
+            {
+                ["correlationId"] = Booked,
+                ["flow"] = "transport-planning",
+                ["partyId"] = "SHP-0001",
+                ["transportOrderNumber"] = "TO-0000042",
+                ["shipmentNumber"] = "SHP-0000007",
+                ["eventType"] = "ShipmentPlanned",
+                ["eventVersion"] = "1",
+                ["outcome"] = "Succeeded",
+            },
+            body: "Published ShipmentPlanned 0b6f3c1e-8a2d-4f5b-9c7e-1d2a3b4c5d6e for correlation ID " + Booked,
+            category: "Norvia.Tms.Infrastructure.Outbox.OutboxPublisher");
+
+        var hops = await HopsAsync(Booked);
+
+        hops.Should().ContainSingle().Which.Should().BeEquivalentTo(new
+        {
+            Name = "tms-api: publish ShipmentPlanned",
+            Flow = "transport-planning",
+            Outcome = Outcome.Succeeded,
+            Duration = (TimeSpan?)null,
+        });
+    }
+
+    [Fact]
     public async Task HopsAsync_ARecordWrittenOutsideAnySpan_IsAHopOfItsOwn_AtItsTime()
     {
-        // The TMS's outbox logs a published event after the send's span has ended.
+        // Records that say nothing of what happened, written outside any span, name only their application.
         _dashboard
             .Add("tms-api", Now.AddSeconds(-5), new() { ["correlationId"] = Booked, ["flow"] = "transport-order-intake", ["outcome"] = "Succeeded" })
             .Add("tms-api", Now.AddSeconds(-4), new() { ["correlationId"] = Booked, ["flow"] = "transport-order-intake" });
@@ -261,6 +323,10 @@ public sealed class DashboardTrailSourceTests : IDisposable
 
         await open.Should().ThrowAsync<HttpRequestException>();
     }
+
+    // What ASP.NET Core records on a request's span besides its name.
+    private static Dictionary<string, string> Called(string method, string path) =>
+        new() { ["http.request.method"] = method, ["url.path"] = path };
 
     private Task<IReadOnlyList<RecordedHop>> HopsAsync(string correlationId, TimeSpan? within = null) =>
         Source().HopsAsync(new TrailLookup(correlationId, Now - (within ?? TimeSpan.FromHours(24)), Now), TestContext.Current.CancellationToken);

@@ -21,7 +21,7 @@ internal static class TrailHops
 
         var hops = new List<Hop>();
         hops.AddRange(rows.Where(row => row.Kind == HopRow.Request && row.Id is not null)
-            .Select(row => new Hop(row.Id!, row.ParentId, $"{row.Role}: {row.Name}", row.Start, row.End, null, [row])));
+            .Select(row => new Hop(row.Id!, row.ParentId, HopNames.OfCall(row.Role ?? "unknown", row.Name ?? string.Empty, null, row.Path), row.Start, row.End, null, [row])));
         hops.AddRange(rows.Where(row => row.Kind == HopRow.Run && row.RunId is not null && row.Id is not null)
             .GroupBy(row => row.RunId!, StringComparer.Ordinal)
             .Select(Run));
@@ -46,7 +46,14 @@ internal static class TrailHops
         }
 
         hops.AddRange(alone.GroupBy(record => record.Id, record => record.Record, StringComparer.Ordinal)
-            .Select(together => new Hop(together.Key, null, together.First().Role ?? "unknown", together.Min(record => record.Start), null, null, [.. together])));
+            .Select(together => new Hop(
+                together.Key,
+                null,
+                HopNames.OfRecords(together.First().Role ?? "unknown", together.Select(record => record.EventType).FirstOrDefault(type => type is not null)),
+                together.Min(record => record.Start),
+                null,
+                null,
+                [.. together])));
 
         return [.. hops.Select(hop => hop.ToRecorded(HopCauses.Of(hop.Id, hop.ParentId, hopIds, ParentOf)))];
     }

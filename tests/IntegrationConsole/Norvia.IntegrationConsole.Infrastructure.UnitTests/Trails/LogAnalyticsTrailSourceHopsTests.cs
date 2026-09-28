@@ -26,6 +26,7 @@ public sealed class LogAnalyticsTrailSourceHopsTests
         LogsQueryModelFactory.LogsTableColumn("start", LogsColumnType.Datetime),
         LogsQueryModelFactory.LogsTableColumn("durationMs", LogsColumnType.Real),
         LogsQueryModelFactory.LogsTableColumn("name", LogsColumnType.String),
+        LogsQueryModelFactory.LogsTableColumn("path", LogsColumnType.String),
         LogsQueryModelFactory.LogsTableColumn("role", LogsColumnType.String),
         LogsQueryModelFactory.LogsTableColumn("runId", LogsColumnType.String),
         LogsQueryModelFactory.LogsTableColumn("workflow", LogsColumnType.String),
@@ -33,6 +34,7 @@ public sealed class LogAnalyticsTrailSourceHopsTests
         LogsQueryModelFactory.LogsTableColumn("flow", LogsColumnType.String),
         LogsQueryModelFactory.LogsTableColumn("outcome", LogsColumnType.String),
         LogsQueryModelFactory.LogsTableColumn("failureCode", LogsColumnType.String),
+        LogsQueryModelFactory.LogsTableColumn("eventType", LogsColumnType.String),
         LogsQueryModelFactory.LogsTableColumn("transportOrderNumber", LogsColumnType.String),
         LogsQueryModelFactory.LogsTableColumn("shipmentNumber", LogsColumnType.String),
         LogsQueryModelFactory.LogsTableColumn("carrierBookingNumber", LogsColumnType.String),
@@ -66,7 +68,8 @@ public sealed class LogAnalyticsTrailSourceHopsTests
     {
         Answer(
             // API Management's request, its trace policy's record, and its call to the Logic App.
-            Row("request", "apim-req", null, Now.AddSeconds(-10), 1_500, "Submit transport order", "apim-norvia", flow: "transport-order-intake"),
+            Row("request", "apim-req", null, Now.AddSeconds(-10), 1_500, "Submit transport order", "apim-norvia", flow: "transport-order-intake",
+                path: "/partner/v1/transport-orders"),
             Row("record", null, "apim-req", Now.AddSeconds(-10), null, null, "apim-norvia", outcome: "Succeeded"),
             Row("link", "apim-dep", "apim-req"),
             // The intake run: its trigger, its call to the TMS with its tracked properties, and the answer.
@@ -78,7 +81,8 @@ public sealed class LogAnalyticsTrailSourceHopsTests
                 category: "Workflow.Operations.Actions"),
             Row("link", "submit-dep", "submit"),
             // The TMS's request, and its log record written inside a database call.
-            Row("request", "tms-req", "submit-dep", Now.AddSeconds(-9.4), 300, "POST /v1/transport-orders", "tms-api", flow: "transport-order-intake"),
+            Row("request", "tms-req", "submit-dep", Now.AddSeconds(-9.4), 300, "POST /v{version:apiVersion}/transport-orders/", "tms-api", flow: "transport-order-intake",
+                path: "/v1/transport-orders"),
             Row("link", "tms-db", "tms-req"),
             Row("record", null, "tms-db", Now.AddSeconds(-9.3), null, null, "tms-api", transportOrderNumber: "TO-0000042"));
 
@@ -97,11 +101,56 @@ public sealed class LogAnalyticsTrailSourceHopsTests
     }
 
     [Fact]
+    public async Task HopsAsync_APlannersAssignment_IsNamedByThePathCalled_NotByItsRouteTemplate()
+    {
+        // ASP.NET Core names a request by its route template; the path actually called is its Url's.
+        Answer(Row("request", "tms-req", null, Now.AddSeconds(-10), 162, "POST /v{version:apiVersion}/transport-orders/{transportOrderNumber}/assign", "tms-api",
+            flow: "transport-planning", outcome: "Succeeded", path: "/v1/transport-orders/TO-0000042/assign"));
+
+        var hops = await HopsAsync(CorrelationId);
+
+        hops.Should().ContainSingle().Which.Name.Should().Be("tms-api: POST /v1/transport-orders/TO-0000042/assign");
+    }
+
+    [Fact]
+    public async Task HopsAsync_QueriesTheRequestsPath_NotItsWholeUrl()
+    {
+        // A query string could carry more than keys.
+        await HopsAsync(CorrelationId);
+
+        await _client.Received(1).QueryWorkspaceAsync(
+            WorkspaceId,
+            Arg.Is<string>(query => query.Contains("path = tostring(parse_url(Url).Path)", StringComparison.Ordinal)),
+            Arg.Any<LogsQueryTimeRange>(),
+            Arg.Any<LogsQueryOptions>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task HopsAsync_AnEventTheOutboxPublished_IsAHopNamedAfterTheEvent_ThatSucceeded()
+    {
+        // The outbox logs a published event after its send, outside any request, in the event's application properties
+        // and its outcome.
+        Answer(Row("record", null, null, Now.AddSeconds(-5), null, null, "tms-api", flow: "transport-planning", outcome: "Succeeded",
+            transportOrderNumber: "TO-0000042", eventType: "ShipmentPlanned"));
+
+        var hops = await HopsAsync(CorrelationId);
+
+        hops.Should().ContainSingle().Which.Should().BeEquivalentTo(new
+        {
+            Name = "tms-api: publish ShipmentPlanned",
+            Flow = "transport-planning",
+            Outcome = Outcome.Succeeded,
+            Duration = (TimeSpan?)null,
+        });
+    }
+
+    [Fact]
     public async Task HopsAsync_ARecordUnderNoCall_IsAHopOfItsOwn_AtItsTime()
     {
-        // The TMS's outbox publishes an event outside any request.
+        // The TMS's rating worker rates outside any request.
         Answer(
-            Row("record", null, "outbox-send", Now.AddSeconds(-5), null, null, "tms-api", flow: "transport-order-intake", outcome: "Succeeded"),
+            Row("record", null, "rate", Now.AddSeconds(-5), null, null, "tms-api", flow: "transport-order-rating", outcome: "Succeeded"),
             Row("record", null, null, Now.AddSeconds(-4), null, null, "tms-api", flow: "transport-order-intake"));
 
         var hops = await HopsAsync(CorrelationId);
@@ -114,11 +163,11 @@ public sealed class LogAnalyticsTrailSourceHopsTests
     [Fact]
     public async Task HopsAsync_RecordsUnderOneParentOutsideAnyHop_AreOneHop_AtTheFirstOnesTime()
     {
-        // The outbox's send is no call on the trail, yet everything logged under it is one thing that happened.
+        // A worker's own span is no call on the trail, yet everything logged under it is one thing that happened.
         Answer(
-            Row("record", null, "outbox-send", Now.AddSeconds(-4), null, null, "tms-api", flow: "transport-order-intake", outcome: "Succeeded"),
-            Row("record", null, "outbox-send", Now.AddSeconds(-5), null, null, "tms-api", flow: "transport-order-intake", transportOrderNumber: "TO-0000008"),
-            Row("record", null, "outbox-send", Now.AddSeconds(-3), null, null, "partner-portal-web", flow: "transport-order-intake"));
+            Row("record", null, "rate", Now.AddSeconds(-4), null, null, "tms-api", flow: "transport-order-rating", outcome: "Succeeded"),
+            Row("record", null, "rate", Now.AddSeconds(-5), null, null, "tms-api", flow: "transport-order-rating", transportOrderNumber: "TO-0000008"),
+            Row("record", null, "rate", Now.AddSeconds(-3), null, null, "partner-portal-web", flow: "transport-order-intake"));
 
         var hops = await HopsAsync(CorrelationId);
 
@@ -228,10 +277,12 @@ public sealed class LogAnalyticsTrailSourceHopsTests
         string? flow = null,
         string? outcome = null,
         string? failureCode = null,
-        string? transportOrderNumber = null) =>
+        string? transportOrderNumber = null,
+        string? path = null,
+        string? eventType = null) =>
         LogsQueryModelFactory.LogsTableRow(Columns,
         [
-            kind, id, parentId, start, durationMs, name, role, runId, workflow, category,
-            flow, outcome, failureCode, transportOrderNumber, null, null, null, null,
+            kind, id, parentId, start, durationMs, name, path, role, runId, workflow, category,
+            flow, outcome, failureCode, eventType, transportOrderNumber, null, null, null, null,
         ]);
 }
