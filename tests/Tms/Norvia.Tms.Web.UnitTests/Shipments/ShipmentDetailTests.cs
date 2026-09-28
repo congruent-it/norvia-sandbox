@@ -1,5 +1,7 @@
 using AngleSharp.Dom;
+using Norvia.Tms.Application.CarrierBookings;
 using Norvia.Tms.Application.Shipments;
+using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Web.Shipments;
 using Norvia.Tms.Web.UnitTests.TransportOrders;
@@ -53,6 +55,27 @@ public sealed class ShipmentDetailTests : TmsWebContext
         page.WaitForAssertion(() => Rows(page, "Assignments").Should().Equal(
             "Van Dijk Transport | Thu 24 Sep 2026, 11:45 | corr-planning",
             "Kessler Spedition | Thu 24 Sep 2026, 12:00 | corr-reassignment"));
+    }
+
+    [Fact]
+    public void Render_ACarrierShipmentWithACarrierBooking_ShowsItsNumberAndStatus()
+    {
+        Queries.FindShipmentAsync("SH-0000012", Arg.Any<CancellationToken>())
+            .Returns(Samples.Shipment("SH-0000012", carrierBookings: [new CarrierBookingView("CB-0000001", CarrierBookingStatus.Requested)]));
+
+        var page = RenderDetail("SH-0000012");
+
+        page.WaitForAssertion(() => Rows(page, "Carrier bookings").Should().Equal("CB-0000001 | Requested"));
+    }
+
+    [Fact]
+    public void Render_AShipmentWithNoCarrierBooking_ShowsNoCarrierBookingsSection()
+    {
+        Queries.FindShipmentAsync("SH-0000012", Arg.Any<CancellationToken>()).Returns(Samples.Shipment("SH-0000012"));
+
+        var page = RenderDetail("SH-0000012");
+
+        page.WaitForAssertion(() => page.FindAll("h2").Select(h => h.TextContent.Trim()).Should().NotContain("Carrier bookings"));
     }
 
     [Fact]

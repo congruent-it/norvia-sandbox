@@ -2,10 +2,10 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://norvia.example/canonical-model/shipment-released.v1.schema.json",
   "title": "ShipmentReleased",
-  "description": "A Planner released a Planned Shipment, handing it over to be carried out, so the TMS set it to Released, after which P3 can no longer change it (Canonical Model event, version 1). Carries the whole Shipment with its Transport Order's details (addresses, windows and goods lines) and who carries it, so P4 can book with the Carrier from the event alone; P4 adds the Carrier booking number. Published on the Shipment events topic, under the correlation ID of the release, which starts a Message trail of its own; the Transport Order number links it to the Transport Order's intake. The message's assignedTo property repeats who carries the Shipment, so P4's subscription takes Carrier Shipments only.",
+  "description": "A Planner released a Planned Shipment, handing it over to be carried out, so the TMS set it to Released, after which P3 can no longer change it (Canonical Model event, version 1). Carries the whole Shipment with its Transport Order's details (addresses, windows and goods lines) and who carries it, so P4 can book with the Carrier from the event alone. For a Carrier Shipment, the TMS creates the Carrier booking (Requested) at release, in the same transaction, and this event carries its Carrier booking number. Published on the Shipment events topic, under the correlation ID of the release, which starts a Message trail of its own; the Transport Order number links it to the Transport Order's intake. The message's assignedTo property repeats who carries the Shipment, so P4's subscription takes Carrier Shipments only.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "shipmentNumber", "transportOrderNumber", "shipperId", "assignedTo", "carrierId", "transportOrder"],
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "shipmentNumber", "transportOrderNumber", "shipperId", "assignedTo", "carrierId", "carrierBookingNumber", "transportOrder"],
   "properties": {
     "eventId": { "type": "string", "format": "uuid" },
     "eventType": { "const": "ShipmentReleased" },
@@ -17,6 +17,7 @@
     "shipperId": { "description": "The Shipper of the Transport Order.", "type": "string", "minLength": 1 },
     "assignedTo": { "description": "Who carries the Shipment: Norvia's Own fleet or a Carrier.", "enum": ["OwnFleet", "Carrier"] },
     "carrierId": { "description": "The Carrier that carries the Shipment; null for Own fleet.", "type": ["string", "null"], "minLength": 1 },
+    "carrierBookingNumber": { "description": "The Carrier booking the release created (P4), Requested; null for Own fleet.", "type": ["string", "null"], "pattern": "^CB-[0-9]{7}$" },
     "transportOrder": {
       "description": "The Transport Order the Shipment carries out, with its addresses, windows and goods lines.",
       "allOf": [
@@ -26,6 +27,6 @@
     }
   },
   "if": { "properties": { "assignedTo": { "const": "Carrier" } } },
-  "then": { "properties": { "carrierId": { "type": "string" } } },
-  "else": { "properties": { "carrierId": { "type": "null" } } }
+  "then": { "properties": { "carrierId": { "type": "string" }, "carrierBookingNumber": { "type": "string" } } },
+  "else": { "properties": { "carrierId": { "type": "null" }, "carrierBookingNumber": { "type": "null" } } }
 }

@@ -1,3 +1,4 @@
+using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Carriers;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.Shippers;
@@ -18,19 +19,54 @@ public sealed class ShipmentReleaseTests
     private static readonly CarriedBy VanDijk = CarriedBy.Carrier(new CarrierId("CAR-0001"));
     private static readonly CorrelationId Release = new("corr-release");
     private static readonly IdempotencyKey Key = new("key-rel1");
+    private static readonly CarrierBookingNumber BookingNumber = CarrierBookingNumber.FromSequence(42);
 
     [Fact]
-    public void Release_PlannedShipment_MakesItReleased_AndRecordsTheRelease()
+    public void Release_PlannedOwnFleetShipment_MakesItReleased_AndRecordsTheReleaseWithNoCarrierBookingNumber()
     {
-        var (order, shipment) = Planned(VanDijk);
+        var (order, shipment) = Planned(CarriedBy.OwnFleet);
 
         var released = shipment.Release(order, Key, Release, ReleasedAt);
 
-        released.Should().Be(new ShipmentRelease(Release, ReleasedAt, Key));
+        released.Should().Be(new ShipmentRelease(Release, ReleasedAt, Key, null));
         shipment.Status.Should().Be(ShipmentStatus.Released);
-        shipment.LastRelease.Should().Be(new ShipmentRelease(Release, ReleasedAt, Key));
-        shipment.CarriedBy.Should().Be(VanDijk);
+        shipment.LastRelease.Should().Be(new ShipmentRelease(Release, ReleasedAt, Key, null));
+        shipment.CarriedBy.Should().Be(CarriedBy.OwnFleet);
         shipment.CorrelationId.Should().Be(new CorrelationId("corr-planning"), "the release has its own trail, in its record");
+    }
+
+    [Fact]
+    public void Release_PlannedCarrierShipment_MakesItReleased_AndRecordsTheReleaseWithTheCarrierBookingNumber()
+    {
+        var (order, shipment) = Planned(VanDijk);
+
+        var released = shipment.Release(order, Key, Release, ReleasedAt, BookingNumber);
+
+        released.Should().Be(new ShipmentRelease(Release, ReleasedAt, Key, BookingNumber));
+        shipment.LastRelease.Should().Be(new ShipmentRelease(Release, ReleasedAt, Key, BookingNumber));
+        shipment.CarriedBy.Should().Be(VanDijk);
+    }
+
+    [Fact]
+    public void Release_CarrierShipmentWithNoCarrierBookingNumber_Throws()
+    {
+        var (order, shipment) = Planned(VanDijk);
+
+        var release = () => shipment.Release(order, Key, Release, ReleasedAt);
+
+        release.Should().Throw<ArgumentException>();
+        shipment.Status.Should().Be(ShipmentStatus.Planned);
+    }
+
+    [Fact]
+    public void Release_OwnFleetShipmentWithACarrierBookingNumber_Throws()
+    {
+        var (order, shipment) = Planned(CarriedBy.OwnFleet);
+
+        var release = () => shipment.Release(order, Key, Release, ReleasedAt, BookingNumber);
+
+        release.Should().Throw<ArgumentException>();
+        shipment.Status.Should().Be(ShipmentStatus.Planned);
     }
 
     [Fact]
@@ -43,14 +79,14 @@ public sealed class ShipmentReleaseTests
         var released = shipment.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<ShipmentReleasedEvent>().Subject;
         released.Shipment.Should().BeSameAs(shipment);
         released.TransportOrder.Should().BeSameAs(order);
-        released.Release.Should().Be(new ShipmentRelease(Release, ReleasedAt, Key));
+        released.Release.Should().Be(new ShipmentRelease(Release, ReleasedAt, Key, null));
     }
 
     [Fact]
     public void Release_ReleasedShipment_ChangesNothing()
     {
         var (order, shipment) = Planned(VanDijk);
-        shipment.Release(order, Key, Release, ReleasedAt);
+        shipment.Release(order, Key, Release, ReleasedAt, BookingNumber);
         shipment.ClearDomainEvents();
 
         var released = shipment.Release(order, new IdempotencyKey("key-rel2"), new CorrelationId("corr-release-2"), ReleasedAt.AddMinutes(5));
@@ -76,7 +112,7 @@ public sealed class ShipmentReleaseTests
     public void Reassign_ReleasedShipment_ChangesNothing()
     {
         var (order, shipment) = Planned(VanDijk);
-        shipment.Release(order, Key, Release, ReleasedAt);
+        shipment.Release(order, Key, Release, ReleasedAt, BookingNumber);
         shipment.ClearDomainEvents();
 
         var reassigned = shipment.Reassign(CarriedBy.OwnFleet, new IdempotencyKey("key-r1"), new CorrelationId("corr-reassign"), ReleasedAt.AddMinutes(5));
@@ -92,9 +128,9 @@ public sealed class ShipmentReleaseTests
         var (order, shipment) = Planned(VanDijk);
         shipment.ReleaseUnder(Key).Should().BeNull();
 
-        shipment.Release(order, Key, Release, ReleasedAt);
+        shipment.Release(order, Key, Release, ReleasedAt, BookingNumber);
 
-        shipment.ReleaseUnder(new IdempotencyKey("key-rel1")).Should().Be(new ShipmentRelease(Release, ReleasedAt, Key));
+        shipment.ReleaseUnder(new IdempotencyKey("key-rel1")).Should().Be(new ShipmentRelease(Release, ReleasedAt, Key, BookingNumber));
         shipment.ReleaseUnder(new IdempotencyKey("key-rel2")).Should().BeNull();
     }
 
@@ -108,7 +144,7 @@ public sealed class ShipmentReleaseTests
     public void CheckRelease_ReleasedShipment_IsRefusedAsNotPlanned()
     {
         var (order, shipment) = Planned(VanDijk);
-        shipment.Release(order, Key, Release, ReleasedAt);
+        shipment.Release(order, Key, Release, ReleasedAt, BookingNumber);
 
         var refusal = AssignmentRules.CheckRelease(shipment);
 
@@ -120,7 +156,7 @@ public sealed class ShipmentReleaseTests
     public void CheckReassignment_ReleasedShipment_IsRefusedAsNotPlanned()
     {
         var (order, shipment) = Planned(VanDijk);
-        shipment.Release(order, Key, Release, ReleasedAt);
+        shipment.Release(order, Key, Release, ReleasedAt, BookingNumber);
 
         var refusal = AssignmentRules.CheckReassignment(shipment, carrierId: null, carrier: null);
 

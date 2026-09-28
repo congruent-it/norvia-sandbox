@@ -11,6 +11,6 @@ Norvia's own message format ([CONTEXT.md](../../CONTEXT.md#integration)): one JS
 | [transport-order-rating-failed.v1](transport-order-rating-failed.v1.schema.json) | Event: the TMS couldn't rate an accepted Transport Order, with the failure code and message |
 | [shipment-planned.v1](shipment-planned.v1.schema.json) | Event: a Planner assigned a Transport Order to Own fleet or a Carrier, and the TMS made its Planned Shipment |
 | [shipment-reassigned.v1](shipment-reassigned.v1.schema.json) | Event: a Planner reassigned a Planned Shipment to Own fleet or another Carrier, with who carried it before |
-| [shipment-released.v1](shipment-released.v1.schema.json) | Event: a Planner released a Planned Shipment, handing it over with its Transport Order's addresses, windows and goods lines and who carries it |
+| [shipment-released.v1](shipment-released.v1.schema.json) | Event: a Planner released a Planned Shipment, handing it over with its Transport Order's addresses, windows and goods lines, who carries it, and its Carrier booking number for a Carrier Shipment |
 
 Conventions: property names in camelCase, timestamps as UTC with an offset, weights in kilograms as numbers, money in EUR without VAT as numbers rounded to cents, countries as ISO 3166-1 alpha-2 codes.

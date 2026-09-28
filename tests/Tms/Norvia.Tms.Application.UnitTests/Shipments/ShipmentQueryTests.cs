@@ -1,11 +1,13 @@
 using Ardalis.Result;
 using Ardalis.SharedKernel;
+using Norvia.Tms.Application.CarrierBookings;
 using Norvia.Tms.Application.Carriers;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shipments.GetByNumber;
 using Norvia.Tms.Application.Shippers;
 using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.UnitTests.TransportOrders;
+using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Carriers;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.Shippers;
@@ -16,6 +18,7 @@ namespace Norvia.Tms.Application.UnitTests.Shipments;
 public sealed class ShipmentQueryTests
 {
     private readonly IReadRepository<Shipment> _repository = Substitute.For<IReadRepository<Shipment>>();
+    private readonly IReadRepository<CarrierBooking> _carrierBookings = Substitute.For<IReadRepository<CarrierBooking>>();
     private readonly IShipperDirectory _shippers = Substitute.For<IShipperDirectory>();
     private readonly ICarrierDirectory _carriers = Substitute.For<ICarrierDirectory>();
     private readonly GetShipmentHandler _handler;
@@ -24,7 +27,8 @@ public sealed class ShipmentQueryTests
     {
         _shippers.Find(new ShipperId("SHP-0001")).Returns(new Shipper(new ShipperId("SHP-0001"), "Brouwer Dranken", true));
         _carriers.Find(new CarrierId("CAR-0001")).Returns(new Carrier(new CarrierId("CAR-0001"), "Van Dijk Transport", true));
-        _handler = new GetShipmentHandler(_repository, _shippers, _carriers);
+        _carrierBookings.ListAsync(Arg.Any<CarrierBookingsByShipmentSpec>(), Arg.Any<CancellationToken>()).Returns([]);
+        _handler = new GetShipmentHandler(_repository, _carrierBookings, _shippers, _carriers);
     }
 
     [Fact]
@@ -44,7 +48,23 @@ public sealed class ShipmentQueryTests
             new CarriedByView(AssignedTo.Carrier, new CarrierView("CAR-0001", "Van Dijk Transport")),
             "corr-planning",
             Samples.Now.AddHours(2),
-            [new ShipmentAssignmentView(new CarriedByView(AssignedTo.Carrier, new CarrierView("CAR-0001", "Van Dijk Transport")), "corr-planning", Samples.Now.AddHours(2))]));
+            [new ShipmentAssignmentView(new CarriedByView(AssignedTo.Carrier, new CarrierView("CAR-0001", "Van Dijk Transport")), "corr-planning", Samples.Now.AddHours(2))],
+            []));
+    }
+
+    [Fact]
+    public async Task Get_ShipmentWithACarrierBooking_ShowsItsNumberAndStatus()
+    {
+        var shipment = Samples.Planned(Samples.AcceptedOrder(sequence: 7), CarriedBy.Carrier(new CarrierId("CAR-0001")), sequence: 12);
+        _repository.FirstOrDefaultAsync(Arg.Any<ShipmentByNumberSpec>(), Arg.Any<CancellationToken>()).Returns(shipment);
+        var booking = CarrierBooking.Request(
+            CarrierBookingNumber.FromSequence(1), shipment.Id, shipment.Number, new CarrierId("CAR-0001"), new("corr-release"), Samples.Now.AddHours(3));
+        _carrierBookings.ListAsync(Arg.Is<CarrierBookingsByShipmentSpec>(s => s.ShipmentId == shipment.Id), Arg.Any<CancellationToken>())
+            .Returns([booking]);
+
+        var result = await _handler.Handle(new GetShipmentQuery("SH-0000012"), CancellationToken.None);
+
+        result.Value.CarrierBookings.Should().Equal(new CarrierBookingView("CB-0000001", CarrierBookingStatus.Requested));
     }
 
     [Fact]

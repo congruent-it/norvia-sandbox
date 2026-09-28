@@ -24,7 +24,14 @@ public sealed class ShipmentReleaseTests(TmsFixture tms)
         released["shipmentNumber"]!.GetValue<string>().Should().Be(shipmentNumber);
         released["status"]!.GetValue<string>().Should().Be("Released");
         released["carriedBy"]!["carrier"]!["id"]!.GetValue<string>().Should().Be(PlanningCalls.CarrierId);
-        (await tms.GetShipmentAsync(shipmentNumber, _cancellationToken))["status"]!.GetValue<string>().Should().Be("Released");
+        var carrierBookingNumber = released["carrierBookingNumber"]!.GetValue<string>();
+        carrierBookingNumber.Should().MatchRegex("^CB-[0-9]{7}$");
+        var shipment = await tms.GetShipmentAsync(shipmentNumber, _cancellationToken);
+        shipment["status"]!.GetValue<string>().Should().Be("Released");
+        var bookings = shipment["carrierBookings"]!.AsArray();
+        bookings.Should().ContainSingle();
+        bookings[0]!["carrierBookingNumber"]!.GetValue<string>().Should().Be(carrierBookingNumber);
+        bookings[0]!["status"]!.GetValue<string>().Should().Be("Requested");
         var message = await SingleReleasedAsync(released);
         var body = Valid(message);
         body["shipmentNumber"]!.GetValue<string>().Should().Be(shipmentNumber);
@@ -32,7 +39,9 @@ public sealed class ShipmentReleaseTests(TmsFixture tms)
         body["shipperId"]!.GetValue<string>().Should().Be("SHP-0001");
         body["assignedTo"]!.GetValue<string>().Should().Be("Carrier");
         body["carrierId"]!.GetValue<string>().Should().Be(PlanningCalls.CarrierId);
+        body["carrierBookingNumber"]!.GetValue<string>().Should().Be(carrierBookingNumber);
         message.ApplicationProperties.Should().Contain("assignedTo", "Carrier");
+        message.ApplicationProperties.Should().Contain("carrierBookingNumber", carrierBookingNumber);
 
         var order = body["transportOrder"]!;
         order["transportOrderNumber"]!.GetValue<string>().Should().Be(number);
@@ -46,17 +55,21 @@ public sealed class ShipmentReleaseTests(TmsFixture tms)
     }
 
     [Fact]
-    public async Task Release_PlannedOwnFleetShipment_PublishesShipmentReleasedForOwnFleet()
+    public async Task Release_PlannedOwnFleetShipment_PublishesShipmentReleasedForOwnFleet_AndCreatesNoCarrierBooking()
     {
         var (_, shipmentNumber) = await PlannedAsync(PlanningCalls.ToOwnFleet());
 
         var released = await tms.ReleasedAsync(shipmentNumber, _cancellationToken);
 
+        released["carrierBookingNumber"].Should().BeNull();
+        (await tms.GetShipmentAsync(shipmentNumber, _cancellationToken))["carrierBookings"]!.AsArray().Should().BeEmpty();
         var message = await SingleReleasedAsync(released);
         var body = Valid(message);
         body["assignedTo"]!.GetValue<string>().Should().Be("OwnFleet");
         body["carrierId"].Should().BeNull();
+        body["carrierBookingNumber"].Should().BeNull();
         message.ApplicationProperties.Should().Contain("assignedTo", "OwnFleet");
+        message.ApplicationProperties.Should().NotContainKey("carrierBookingNumber");
     }
 
     [Fact]

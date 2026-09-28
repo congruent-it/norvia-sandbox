@@ -1,6 +1,7 @@
 @page "/shipments/{ShipmentNumber}"
 @* Interactive like the Transport Order detail: Fluent UI's components don't survive static streaming rendering. *@
 @rendermode InteractiveServer
+@using Norvia.Tms.Application.CarrierBookings
 @using Norvia.Tms.Application.Shipments
 @implements IDisposable
 @inject ITransportOrderQueries Queries
@@ -67,6 +68,20 @@ else
                 </FluentDataGrid>
             </TransportOrderSection>
         </div>
+
+        @* Only a Carrier Shipment gets a Carrier booking (P4); this build only ever shows one, Requested. *@
+        @if (_shipment.CarrierBookings.Count > 0)
+        {
+            <div class="md:col-span-3">
+                <TransportOrderSection Heading="Carrier bookings">
+                    <FluentDataGrid Items="_shipment.CarrierBookings.AsQueryable()" TGridItem="CarrierBookingView" Class="flatly-table" aria-label="Carrier bookings"
+                                    GridTemplateColumns="1fr 1fr">
+                        <PropertyColumn Title="Carrier booking number" Property="@(booking => booking.CarrierBookingNumber)" />
+                        <PropertyColumn Title="Status" Property="@(booking => booking.Status)" />
+                    </FluentDataGrid>
+                </TransportOrderSection>
+            </div>
+        }
     </div>
 }
 

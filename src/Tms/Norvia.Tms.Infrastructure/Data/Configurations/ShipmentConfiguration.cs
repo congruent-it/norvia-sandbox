@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Carriers;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.Shippers;
@@ -87,6 +88,10 @@ internal sealed class ShipmentConfiguration : IEntityTypeConfiguration<Shipment>
                 .HasConversion(key => key.Value, value => new IdempotencyKey(value))
                 .HasMaxLength(IdempotencyKey.MaxLength)
                 .HasColumnName("ReleaseKey");
+            release.Property(r => r.CarrierBookingNumber)
+                .HasConversion(number => number!.Value, value => CarrierBookingNumber.Parse(value))
+                .HasMaxLength(10)
+                .HasColumnName("CarrierBookingNumber");
         });
 
         // Planning changes a Shipment after it is made (reassign, release), so two Planners' changes must not both land.

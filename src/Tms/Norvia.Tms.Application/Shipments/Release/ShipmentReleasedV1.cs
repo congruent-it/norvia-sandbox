@@ -6,11 +6,13 @@ namespace Norvia.Tms.Application.Shipments.Release;
 
 /// <summary>
 /// The Canonical Model event <c>ShipmentReleased</c>, version 1 (contracts/canonical-model/shipment-released.v1.schema.json).
-/// It carries the whole Shipment with its Transport Order's details, so P4 can book with the Carrier from the event alone,
-/// under the release's own correlation ID.
+/// It carries the whole Shipment with its Transport Order's details and, for a Carrier Shipment, the Carrier booking
+/// number the release created (P4), so P4's booking Logic App can act on the event alone, under the release's own
+/// correlation ID.
 /// </summary>
 /// <param name="AssignedTo"><c>OwnFleet</c> or <c>Carrier</c>.</param>
 /// <param name="CarrierId">The Carrier that carries the Shipment; null for Own fleet.</param>
+/// <param name="CarrierBookingNumber">The Carrier booking the release created; null for Own fleet.</param>
 /// <param name="TransportOrder">The Transport Order the Shipment carries out: its addresses, windows and goods lines.</param>
 public sealed record ShipmentReleasedV1(
     Guid EventId,
@@ -21,6 +23,7 @@ public sealed record ShipmentReleasedV1(
     string ShipperId,
     string AssignedTo,
     string? CarrierId,
+    string? CarrierBookingNumber,
     CanonicalTransportOrder TransportOrder)
     : IntegrationEvent(EventId, OccurredAt, CorrelationId)
 {
@@ -43,16 +46,26 @@ public sealed record ShipmentReleasedV1(
             shipment.ShipperId.Value,
             shipment.CarriedBy.AssignedTo().ToString(),
             shipment.CarriedBy.CarrierId?.Value,
+            released.Release.CarrierBookingNumber?.Value,
             CanonicalTransportOrder.From(released.TransportOrder));
     }
 
-    protected override IEnumerable<KeyValuePair<string, object>> TrackingProperties() =>
-    [
-        new(TrackingKeys.Flow, Flows.TransportPlanning),
-        new(TrackingKeys.PartyId, ShipperId),
-        new(TrackingKeys.TransportOrderNumber, TransportOrderNumber),
-        new(TrackingKeys.ShipmentNumber, ShipmentNumber),
-    ];
+    protected override IEnumerable<KeyValuePair<string, object>> TrackingProperties()
+    {
+        var properties = new List<KeyValuePair<string, object>>
+        {
+            new(TrackingKeys.Flow, Flows.TransportPlanning),
+            new(TrackingKeys.PartyId, ShipperId),
+            new(TrackingKeys.TransportOrderNumber, TransportOrderNumber),
+            new(TrackingKeys.ShipmentNumber, ShipmentNumber),
+        };
+        if (CarrierBookingNumber is not null)
+        {
+            properties.Add(new(TrackingKeys.CarrierBookingNumber, CarrierBookingNumber));
+        }
+
+        return properties;
+    }
 
     // P4's subscription filters on it, for Carrier Shipments only.
     protected override IEnumerable<KeyValuePair<string, object>> FilterProperties() =>

@@ -1,4 +1,5 @@
 using Norvia.Tms.Application.CanonicalModel;
+using Norvia.Tms.Application.CarrierBookings;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shipments.ListToRelease;
 using Norvia.Tms.Application.TransportOrders;
@@ -43,7 +44,10 @@ internal static class Samples
 
     // Planned for Van Dijk Transport at 11:45 on 24 September 2026 in Rotterdam (UTC+2), then reassigned to Kessler
     // Spedition at 12:00.
-    public static ShipmentView Shipment(string number = "SH-0000012", ShipmentStatus status = ShipmentStatus.Planned) => new(
+    public static ShipmentView Shipment(
+        string number = "SH-0000012",
+        ShipmentStatus status = ShipmentStatus.Planned,
+        IReadOnlyList<CarrierBookingView>? carrierBookings = null) => new(
         number,
         status,
         "TO-0000042",
@@ -54,7 +58,8 @@ internal static class Samples
         [
             new ShipmentAssignmentView(new CarriedByView(AssignedTo.Carrier, VanDijk), "corr-planning", new DateTimeOffset(2026, 9, 24, 9, 45, 0, TimeSpan.Zero)),
             new ShipmentAssignmentView(new CarriedByView(AssignedTo.Carrier, Kessler), "corr-reassignment", new DateTimeOffset(2026, 9, 24, 10, 0, 0, TimeSpan.Zero)),
-        ]);
+        ],
+        carrierBookings ?? []);
 
     // Collection 06:00–10:00 and delivery 12:00–16:00 on 26 September 2026 in Rotterdam (UTC+2).
     public static TransportOrderView View(string number = "TO-0000042") => new(

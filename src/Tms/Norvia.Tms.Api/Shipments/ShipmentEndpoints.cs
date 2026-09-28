@@ -32,7 +32,8 @@ public static class ShipmentEndpoints
         shipments.MapGet("/{shipmentNumber}", GetAsync)
             .RequireAuthorization()
             .WithName("GetShipment")
-            .WithSummary("Read a Shipment: its status, its Transport Order, who carries it, Own fleet or a Carrier, and its history of assignments.");
+            .WithSummary(
+                "Read a Shipment: its status, its Transport Order, who carries it, Own fleet or a Carrier, its history of assignments, and its Carrier bookings.");
 
         // The Planner reassigns from the TMS UI, as they assign. The action starts there, not at API Management, so the
         // TMS starts a Message trail of its own for it.
@@ -56,9 +57,10 @@ public static class ShipmentEndpoints
             .WithMetadata(new TrackedFlow(Flows.TransportPlanning))
             .WithSummary("Release a Planned Shipment, handing it over to its Carrier (P4) or to Own fleet's Trips (P11).")
             .WithDescription(
-                "The Shipment becomes Released, after which it can't be reassigned or released again. The TMS publishes ShipmentReleased on "
-                + "the Shipment events topic, with the Transport Order's addresses, windows and goods lines and who carries it, in one "
-                + "transaction. Each release gets a new correlation ID, which ShipmentReleased carries with the Transport Order number. A "
+                "The Shipment becomes Released, after which it can't be reassigned or released again. For a Carrier Shipment, the TMS also "
+                + "creates its Carrier booking, Requested, with a Carrier booking number. The TMS publishes ShipmentReleased on the Shipment "
+                + "events topic, with the Transport Order's addresses, windows and goods lines, who carries it, and the Carrier booking number "
+                + "for a Carrier Shipment, in one transaction. Each release gets a new correlation ID, which ShipmentReleased carries with the Transport Order number. A "
                 + "release sent again under its Idempotency-Key is answered as before, flagged as a repeat, without releasing again. A release "
                 + "that breaks an assignment rule is refused, changing and publishing nothing, with a problem whose code says which, and whose correlationId names the Message trail the refusal is traced on: "
                 + "ShipmentNotFound (404) or ShipmentNotPlanned (409).");

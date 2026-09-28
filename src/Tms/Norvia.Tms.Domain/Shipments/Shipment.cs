@@ -1,4 +1,5 @@
 using Ardalis.SharedKernel;
+using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Shippers;
 using Norvia.Tms.Domain.TransportOrders;
 
@@ -104,7 +105,11 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
     /// for a Shipment that isn't Planned.
     /// </summary>
     /// <param name="order">The Transport Order the Shipment carries out.</param>
-    public ShipmentRelease? Release(TransportOrder order, IdempotencyKey key, CorrelationId correlationId, DateTimeOffset releasedAt)
+    /// <param name="carrierBookingNumber">
+    /// The Carrier booking number the release creates (P4); required for a Carrier Shipment, and none for an Own fleet one.
+    /// </param>
+    public ShipmentRelease? Release(
+        TransportOrder order, IdempotencyKey key, CorrelationId correlationId, DateTimeOffset releasedAt, CarrierBookingNumber? carrierBookingNumber = null)
     {
         ArgumentNullException.ThrowIfNull(order);
         ArgumentNullException.ThrowIfNull(key);
@@ -118,7 +123,15 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
             return null;
         }
 
-        var release = new ShipmentRelease(correlationId, releasedAt, key);
+        if (CarriedBy.IsOwnFleet == (carrierBookingNumber is not null))
+        {
+            throw new ArgumentException(
+                $"Shipment {Number} is carried by {CarriedBy}, so its release needs "
+                + (CarriedBy.IsOwnFleet ? "no Carrier booking number." : "a Carrier booking number."),
+                nameof(carrierBookingNumber));
+        }
+
+        var release = new ShipmentRelease(correlationId, releasedAt, key, carrierBookingNumber);
         Status = ShipmentStatus.Released;
         LastRelease = release;
         RegisterDomainEvent(new ShipmentReleasedEvent(this, order, release));

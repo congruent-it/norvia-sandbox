@@ -1,7 +1,9 @@
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Mediator;
+using Norvia.Tms.Application.CarrierBookings;
 using Norvia.Tms.Application.Carriers;
+using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TransportOrders;
 
@@ -10,6 +12,8 @@ namespace Norvia.Tms.Application.Shipments.Release;
 public sealed class ReleaseShipmentHandler(
     IRepository<Shipment> shipments,
     IRepository<TransportOrder> transportOrders,
+    IRepository<CarrierBooking> carrierBookings,
+    ICarrierBookingNumbers carrierBookingNumbers,
     ICarrierDirectory carriers,
     TimeProvider time)
     : ICommandHandler<ReleaseShipmentCommand, Result<ReleaseShipmentResult>>
@@ -38,11 +42,26 @@ public sealed class ReleaseShipmentHandler(
         // The release hands the Transport Order's details over with the Shipment, so ShipmentReleased carries them.
         var order = await transportOrders.SingleOrDefaultAsync(new TransportOrderByNumberSpec(shipment.TransportOrderNumber), cancellationToken)
             ?? throw new InvalidOperationException($"Shipment {number} carries out Transport Order {shipment.TransportOrderNumber}, which the TMS doesn't have.");
-        var release = shipment.Release(order, key, new CorrelationId(command.CorrelationId), time.GetUtcNow())
+
+        // A Carrier Shipment gets its Carrier booking number before the release, so ShipmentReleased carries it (P4).
+        var carrierBookingNumber = shipment.CarriedBy.IsOwnFleet ? null : await carrierBookingNumbers.NextAsync(cancellationToken);
+        var release = shipment.Release(order, key, new CorrelationId(command.CorrelationId), time.GetUtcNow(), carrierBookingNumber)
             ?? throw new InvalidOperationException($"Shipment {number} passed the assignment rules but wasn't released.");
 
-        // Saving the tracked Shipment stores ShipmentReleased's outbox message with it, in one transaction.
-        await shipments.SaveChangesAsync(cancellationToken);
+        if (carrierBookingNumber is not null)
+        {
+            var booking = CarrierBooking.Request(
+                carrierBookingNumber, shipment.Id, shipment.Number, shipment.CarriedBy.CarrierId!, release.CorrelationId, release.ReleasedAt);
+
+            // Adding the Carrier booking saves the tracked Shipment's release and ShipmentReleased's outbox message with it,
+            // in one transaction (P4).
+            await carrierBookings.AddAsync(booking, cancellationToken);
+        }
+        else
+        {
+            await shipments.SaveChangesAsync(cancellationToken);
+        }
+
         return ResultOf(shipment, release, repeat: false);
     }
 
@@ -53,5 +72,6 @@ public sealed class ReleaseShipmentHandler(
         CarriedByView.Of(shipment.CarriedBy, carriers),
         shipment.ShipperId.Value,
         release.CorrelationId.Value,
+        release.CarrierBookingNumber?.Value,
         repeat);
 }
