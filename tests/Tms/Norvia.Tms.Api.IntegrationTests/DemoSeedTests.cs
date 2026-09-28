@@ -5,7 +5,7 @@ namespace Norvia.Tms.Api.IntegrationTests;
 /// <summary>
 /// The demo seed (seed/norvia.seed.json) as P2's demo needs it: Brouwer Dranken's Rate Card prices Benelux Lanes out
 /// of Rotterdam and has a deliberate gap into Germany, and Brouwer Dranken has an Antwerp address to book the Rated
-/// path to. The TMS UI reads the demo seed in the test host, so it starting at all shows the seed loads.
+/// path to. P3's demo has four Carriers, one of them inactive. The TMS UI reads the demo seed in the test host, so it starting at all shows the seed loads.
 /// </summary>
 public sealed class DemoSeedTests(TmsFixture tms)
 {
@@ -61,6 +61,29 @@ public sealed class DemoSeedTests(TmsFixture tms)
             && zone["postcodePrefixes"]!.AsArray().Any(prefix => antwerp["postcode"]!.GetValue<string>().StartsWith(prefix!.GetValue<string>(), StringComparison.Ordinal))).Subject!;
         version["lanes"]!.AsArray().Should().Contain(lane =>
             lane!["origin"]!.GetValue<string>() == "Rotterdam" && lane["destination"]!.GetValue<string>() == antwerpZone["name"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void Carriers_AreTheFourOfP3sDemo_OneOfThemInactive()
+    {
+        var carriers = DemoSeed()["carriers"]!.AsArray()
+            .ToDictionary(carrier => carrier!["name"]!.GetValue<string>(), carrier => carrier!["active"]!.GetValue<bool>());
+
+        carriers.Should().HaveCount(4);
+        carriers.Should().Contain("Van Dijk Transport", true).And.Contain("Kessler Spedition", true).And.Contain("PakketPunt Express", true);
+        carriers.Values.Should().ContainSingle(active => !active, "the demo shows an inactive Carrier can't be chosen");
+    }
+
+    [Fact]
+    public void Carriers_HaveIdsOfTheirOwn_AndEveryCarrierPersonaIsOne()
+    {
+        var ids = DemoSeed()["carriers"]!.AsArray().Select(carrier => carrier!["id"]!.GetValue<string>()).ToList();
+        var carrierPersonas = DemoSeed()["personas"]!.AsArray()
+            .Where(persona => persona!["party"]!["type"]!.GetValue<string>() == "Carrier")
+            .Select(persona => persona!["party"]!["id"]!.GetValue<string>());
+
+        ids.Should().OnlyHaveUniqueItems();
+        ids.Should().Contain(carrierPersonas, "the seed file is the only source of Carriers, so a Persona's Carrier is the TMS's");
     }
 
     private static JsonNode DemoSeed() =>

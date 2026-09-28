@@ -78,15 +78,23 @@ public sealed class TrackAssignmentInLoggingScopeTests : IDisposable
     }
 
     [Fact]
-    public async Task Handle_Refused_LogsTheRefusalWithTheTransportOrderNumber()
+    public async Task Handle_Refused_LogsTheRefusalWithItsFailureCode_OnTheAssignmentsOwnTrail()
     {
-        await _behaviour.Handle(Assign, Answering(Result.Conflict("Transport Order TO-0000007 is Planned.")), CancellationToken.None);
+        var alreadyPlanned = AssignmentRefused.Because(new AssignmentRefusal(
+            AssignmentRefusalCode.TransportOrderAlreadyPlanned, "Transport Order TO-0000007 is Planned already, as Shipment SH-0000003."));
+
+        await _behaviour.Handle(Assign, Answering(alreadyPlanned), CancellationToken.None);
 
         var refused = _logs.Collector.GetSnapshot().Should().ContainSingle().Subject;
-        refused.Message.Should().Contain("Transport Order TO-0000007 is Planned.");
-        ScopeKeysOf(refused).Should().Contain("transportOrderNumber", "TO-0000007")
-            .And.Contain("correlationId", "corr-planning", "a refused assignment is on its own trail too")
-            .And.Contain("outcome", "Refused");
+        refused.Message.Should().Contain("TransportOrderAlreadyPlanned").And.Contain("Transport Order TO-0000007 is Planned already");
+        ScopeKeysOf(refused).Should().Contain(new Dictionary<string, object?>
+        {
+            ["transportOrderNumber"] = "TO-0000007",
+            ["correlationId"] = "corr-planning",
+            ["outcome"] = "Refused",
+            ["failureCode"] = "TransportOrderAlreadyPlanned",
+        });
+        ScopeKeysOf(refused).Should().NotContainKey("shipmentNumber");
     }
 
     public void Dispose()

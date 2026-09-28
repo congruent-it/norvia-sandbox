@@ -28,6 +28,12 @@
       "id": "CAR-TEST-0001",
       "name": "Proef Transport",
       "active": true
+    },
+    {
+      "$comment": "An inactive Carrier, to show an assignment to it is refused.",
+      "id": "CAR-TEST-0002",
+      "name": "Gesloten Vracht",
+      "active": false
     }
   ],
   "rateCards": [

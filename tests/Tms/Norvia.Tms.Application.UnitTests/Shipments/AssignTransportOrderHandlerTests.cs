@@ -111,7 +111,7 @@ public sealed class AssignTransportOrderHandlerTests
     }
 
     [Fact]
-    public async Task Handle_PlannedOrderUnderAnotherKey_IsAConflictAndStoresNothing()
+    public async Task Handle_PlannedOrderUnderAnotherKey_IsRefusedAsAlreadyPlanned_AndStoresNothing()
     {
         var order = Samples.AcceptedOrder();
         Samples.Planned(order, CarriedBy.OwnFleet, key: "key-1");
@@ -119,17 +119,52 @@ public sealed class AssignTransportOrderHandlerTests
 
         var result = await _handler.Handle(new AssignTransportOrderCommand("TO-0000007", "CAR-0001", "key-2", "corr-other"), CancellationToken.None);
 
-        result.Status.Should().Be(ResultStatus.Conflict);
+        result.Status.Should().Be(ResultStatus.Invalid);
+        result.ValidationErrors.Should().ContainSingle().Which.ErrorCode.Should().Be(nameof(AssignmentRefusalCode.TransportOrderAlreadyPlanned));
         await _shipments.DidNotReceive().AddAsync(Arg.Any<Shipment>(), Arg.Any<CancellationToken>());
+        await _shipmentNumbers.DidNotReceive().NextAsync(Arg.Any<CancellationToken>());
     }
 
     [Theory]
     [InlineData("TO-0000099")]
     [InlineData("42")]
-    public async Task Handle_UnknownOrMalformedNumber_ReturnsNotFound(string number)
+    public async Task Handle_UnknownOrMalformedNumber_IsRefusedAsNotFound(string number)
     {
         var result = await _handler.Handle(new AssignTransportOrderCommand(number, null, "key-1", "corr-planning"), CancellationToken.None);
 
-        result.Status.Should().Be(ResultStatus.NotFound);
+        result.Status.Should().Be(ResultStatus.Invalid);
+        var refusal = result.ValidationErrors.Should().ContainSingle().Subject;
+        refusal.ErrorCode.Should().Be(nameof(AssignmentRefusalCode.TransportOrderNotFound));
+        refusal.ErrorMessage.Should().Contain(number);
+    }
+
+    [Fact]
+    public async Task Handle_UnknownCarrier_IsRefusedAsUnknownCarrier_AndLeavesTheOrderAccepted()
+    {
+        var order = Samples.AcceptedOrder();
+        _transportOrders.SingleOrDefaultAsync(Arg.Any<TransportOrderToPlanSpec>(), Arg.Any<CancellationToken>()).Returns(order);
+
+        var result = await _handler.Handle(new AssignTransportOrderCommand("TO-0000007", "CAR-9999", "key-1", "corr-planning"), CancellationToken.None);
+
+        result.Status.Should().Be(ResultStatus.Invalid);
+        result.ValidationErrors.Should().ContainSingle().Which.ErrorCode.Should().Be(nameof(AssignmentRefusalCode.UnknownCarrier));
+        order.Status.Should().Be(TransportOrderStatus.Accepted);
+        await _shipments.DidNotReceive().AddAsync(Arg.Any<Shipment>(), Arg.Any<CancellationToken>());
+        await _shipmentNumbers.DidNotReceive().NextAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_InactiveCarrier_IsRefusedAsInactiveCarrier_AndStoresNothing()
+    {
+        _carriers.Find(new CarrierId("CAR-0009")).Returns(new Carrier(new CarrierId("CAR-0009"), "Gesloten Vracht", false));
+        _transportOrders.SingleOrDefaultAsync(Arg.Any<TransportOrderToPlanSpec>(), Arg.Any<CancellationToken>()).Returns(Samples.AcceptedOrder());
+
+        var result = await _handler.Handle(new AssignTransportOrderCommand("TO-0000007", "CAR-0009", "key-1", "corr-planning"), CancellationToken.None);
+
+        result.Status.Should().Be(ResultStatus.Invalid);
+        var refusal = result.ValidationErrors.Should().ContainSingle().Subject;
+        refusal.ErrorCode.Should().Be(nameof(AssignmentRefusalCode.InactiveCarrier));
+        refusal.ErrorMessage.Should().Contain("CAR-0009");
+        await _shipments.DidNotReceive().AddAsync(Arg.Any<Shipment>(), Arg.Any<CancellationToken>());
     }
 }

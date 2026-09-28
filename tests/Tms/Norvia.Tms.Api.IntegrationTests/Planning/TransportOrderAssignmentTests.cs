@@ -190,11 +190,76 @@ public sealed class TransportOrderAssignmentTests(TmsFixture tms)
     }
 
     [Fact]
-    public async Task Assign_UnknownTransportOrder_IsNotFound()
+    public async Task Assign_UnknownTransportOrder_IsRefusedAsNotFound()
     {
-        using var response = await tms.AssignAsync("TO-9999999", PlanningCalls.ToOwnFleet(), _cancellationToken);
+        var problem = await tms.AssignRefusedAsync("TO-9999999", PlanningCalls.ToOwnFleet(), HttpStatusCode.NotFound, _cancellationToken);
 
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        problem["code"]!.GetValue<string>().Should().Be("TransportOrderNotFound");
+        problem["detail"]!.GetValue<string>().Should().Be("Transport Order TO-9999999 is not known to the TMS.");
+    }
+
+    [Fact]
+    public async Task Assign_PlannedOrderASecondTime_IsRefusedAsAlreadyPlanned_AndPlansNoSecondShipment()
+    {
+        var number = await tms.SubmitAcceptedAsync(_cancellationToken);
+        var assigned = await tms.AssignPlannedAsync(number, PlanningCalls.ToCarrier(), _cancellationToken);
+        var shipmentNumber = assigned["shipmentNumber"]!.GetValue<string>();
+        await tms.PublishedAsync(assigned["correlationId"]!.GetValue<string>(), "ShipmentPlanned", _cancellationToken);
+
+        var problem = await tms.AssignRefusedAsync(number, PlanningCalls.ToOwnFleet(), HttpStatusCode.Conflict, _cancellationToken);
+
+        problem["code"]!.GetValue<string>().Should().Be("TransportOrderAlreadyPlanned");
+        problem["detail"]!.GetValue<string>().Should().Contain(shipmentNumber);
+        (await tms.GetTransportOrderAsync(number, _cancellationToken))["shipmentNumber"]!.GetValue<string>().Should().Be(shipmentNumber);
+        (await tms.GetShipmentAsync(shipmentNumber, _cancellationToken))["carriedBy"]!["assignedTo"]!.GetValue<string>().Should().Be("Carrier");
+        await Task.Delay(TimeSpan.FromSeconds(3), _cancellationToken); // Let the outbox run, so an event would show up.
+        tms.ShipmentsPlannedFor(number).Should().ContainSingle("a refused assignment publishes nothing");
+    }
+
+    [Theory]
+    [InlineData("CAR-UNKNOWN", "UnknownCarrier")]
+    [InlineData(PlanningCalls.InactiveCarrierId, "InactiveCarrier")]
+    public async Task Assign_ToACarrierThatCantBeChosen_IsRefusedWithItsCode_AndChangesNothing(string carrierId, string code)
+    {
+        var number = await tms.SubmitAcceptedAsync(_cancellationToken);
+
+        var problem = await tms.AssignRefusedAsync(number, PlanningCalls.ToCarrier(carrierId), HttpStatusCode.UnprocessableEntity, _cancellationToken);
+
+        problem["code"]!.GetValue<string>().Should().Be(code);
+        problem["detail"]!.GetValue<string>().Should().Contain(carrierId);
+        var order = await tms.GetTransportOrderAsync(number, _cancellationToken);
+        order["status"]!.GetValue<string>().Should().Be("Accepted");
+        order["shipmentNumber"].Should().BeNull();
+        await Task.Delay(TimeSpan.FromSeconds(3), _cancellationToken); // Let the outbox run, so an event would show up.
+        tms.ShipmentsPlannedFor(number).Should().BeEmpty("a refused assignment publishes nothing");
+    }
+
+    [Fact]
+    public async Task Assign_RatingFailedOrder_PlansItAllTheSame()
+    {
+        var number = await tms.SubmitAcceptedAsync(Bookings.Valid(TmsCalls.NewReference()).DeliveredToDusseldorf(), TmsCalls.NewCorrelationId(), _cancellationToken);
+        await tms.WaitForRatingResultAsync(number, "RatingFailed", _cancellationToken);
+
+        var assigned = await tms.AssignPlannedAsync(number, PlanningCalls.ToCarrier(), _cancellationToken);
+
+        assigned["status"]!.GetValue<string>().Should().Be("Planned");
+        (await tms.GetTransportOrderAsync(number, _cancellationToken))["status"]!.GetValue<string>().Should().Be("Planned");
+    }
+
+    [Fact]
+    public async Task Assign_Refused_TracesItOnItsOwnTrailAsRefused_WithTheFailureCode()
+    {
+        var number = await tms.SubmitAcceptedAsync(_cancellationToken);
+
+        await tms.AssignRefusedAsync(number, PlanningCalls.ToCarrier(PlanningCalls.InactiveCarrierId), HttpStatusCode.UnprocessableEntity, _cancellationToken);
+
+        var log = await tms.TmsLogAsync(
+            log => log["transportOrderNumber"] == number && log.Text.Contains("refused", StringComparison.Ordinal),
+            _cancellationToken);
+        log["flow"].Should().Be("transport-planning");
+        log["correlationId"].Should().NotBeNullOrWhiteSpace();
+        log["outcome"].Should().Be("Refused");
+        log["failureCode"].Should().Be("InactiveCarrier");
     }
 
     [Fact]

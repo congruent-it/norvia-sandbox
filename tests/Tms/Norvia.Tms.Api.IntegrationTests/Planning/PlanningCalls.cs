@@ -12,6 +12,9 @@ internal static class PlanningCalls
     /// <summary>The test seed's own active Carrier.</summary>
     public const string CarrierId = "CAR-TEST-0001";
 
+    /// <summary>The test seed's inactive Carrier.</summary>
+    public const string InactiveCarrierId = "CAR-TEST-0002";
+
     public static JsonObject ToCarrier(string carrierId = CarrierId) => new() { ["assignedTo"] = "Carrier", ["carrierId"] = carrierId };
 
     public static JsonObject ToOwnFleet() => new() { ["assignedTo"] = "OwnFleet" };
@@ -36,6 +39,16 @@ internal static class PlanningCalls
         using var response = await tms.AssignAsync(number, assignment, cancellationToken);
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         response.StatusCode.Should().Be(HttpStatusCode.Created, body);
+        return JsonNode.Parse(body)!;
+    }
+
+    /// <summary>Assigns the Transport Order, which the TMS must refuse with the status, and returns its problem.</summary>
+    public static async Task<JsonNode> AssignRefusedAsync(
+        this TmsFixture tms, string number, JsonObject assignment, HttpStatusCode status, CancellationToken cancellationToken)
+    {
+        using var response = await tms.AssignAsync(number, assignment, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        response.StatusCode.Should().Be(status, body);
         return JsonNode.Parse(body)!;
     }
 

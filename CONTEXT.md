@@ -92,6 +92,10 @@ _Avoid_: delivery, consignment, trip
 The number the TMS gives a Shipment when a Planner assigns its Transport Order, such as SH-0000042. It stays the Shipment's through reassignment and release, and the Transport Order shows it once Planned.
 _Avoid_: tracking number, consignment number
 
+**Assignment rule**:
+A rule a Planner's assignment of a Transport Order must meet before the TMS plans it: the Transport Order is Accepted and not yet Planned, and a chosen Carrier is known to the TMS and active. The TMS refuses an assignment that breaks one with a refusal (a stable code and a plain-language message), and plans nothing. There are no coverage rules, and the rating result never blocks an assignment.
+_Avoid_: validation, planning check
+
 **Fulfilment Order**:
 An instruction to pick and pack a Shipper's stock for a Consignee. The WMS owns it.
 _Avoid_: order, pick order, sales order

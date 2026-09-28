@@ -15,6 +15,7 @@ using Norvia.Tms.Application.TransportOrders.List;
 using Norvia.Tms.Application.TransportOrders.Rate;
 using Norvia.Tms.Application.TransportOrders.RatingExceptions;
 using Norvia.Tms.Application.TransportOrders.Submit;
+using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TransportOrders;
 
 namespace Norvia.Tms.Api.TransportOrders;
@@ -94,7 +95,9 @@ public static class TransportOrderEndpoints
                 "Creates the Transport Order's Shipment with a Shipment number and the status Planned, sets the Transport Order to Planned "
                 + "and publishes ShipmentPlanned on the Shipment events topic, all in one transaction. The assignment gets a new correlation ID, "
                 + "which ShipmentPlanned carries with the Transport Order number. An assignment sent again under its Idempotency-Key "
-                + "is answered as before, flagged as a repeat, without planning again.");
+                + "is answered as before, flagged as a repeat, without planning again. An assignment that breaks an assignment rule is refused, "
+                + "changing and publishing nothing, with a problem whose code says which: TransportOrderNotFound (404), TransportOrderNotAccepted "
+                + "or TransportOrderAlreadyPlanned (409), UnknownCarrier or InactiveCarrier (422). The rating result never blocks an assignment.");
 
         return app;
     }
@@ -202,17 +205,27 @@ public static class TransportOrderEndpoints
         // The action starts in the TMS UI, not at API Management, so the TMS starts its Message trail.
         var command = new AssignTransportOrderCommand(transportOrderNumber, carrierId, idempotencyKey!, CorrelationId.New().Value);
         var result = await mediator.Send(command, cancellationToken);
-        return result.Status switch
+        if (result.IsSuccess)
         {
-            ResultStatus.Ok when result.Value.Repeat => TypedResults.Ok(result.Value),
-            ResultStatus.Ok => TypedResults.Created($"/v1/shipments/{result.Value.ShipmentNumber}", result.Value),
-            ResultStatus.NotFound => TypedResults.Problem(statusCode: StatusCodes.Status404NotFound, title: $"Transport Order {transportOrderNumber} not found."),
-            _ => TypedResults.Problem(
-                statusCode: StatusCodes.Status409Conflict,
-                title: "The Transport Order can't be assigned.",
-                detail: string.Join(" ", result.Errors)),
-        };
+            return result.Value.Repeat
+                ? TypedResults.Ok(result.Value)
+                : TypedResults.Created($"/v1/shipments/{result.Value.ShipmentNumber}", result.Value);
+        }
+
+        var refusal = result.ValidationErrors.First();
+        return TypedResults.Problem(
+            statusCode: StatusCodeOf(Enum.Parse<AssignmentRefusalCode>(refusal.ErrorCode)),
+            title: "The Transport Order can't be assigned.",
+            detail: refusal.ErrorMessage,
+            extensions: new Dictionary<string, object?> { ["code"] = refusal.ErrorCode });
     }
+
+    private static int StatusCodeOf(AssignmentRefusalCode code) => code switch
+    {
+        AssignmentRefusalCode.TransportOrderNotFound => StatusCodes.Status404NotFound,
+        AssignmentRefusalCode.UnknownCarrier or AssignmentRefusalCode.InactiveCarrier => StatusCodes.Status422UnprocessableEntity,
+        _ => StatusCodes.Status409Conflict,
+    };
 
     private static async Task<Results<Ok<RateTransportOrderResult>, ProblemHttpResult, ValidationProblem>> ReRateAsync(
         string transportOrderNumber,

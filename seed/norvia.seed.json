@@ -149,6 +149,21 @@
       "id": "CAR-0001",
       "name": "Van Dijk Transport",
       "active": true
+    },
+    {
+      "id": "CAR-0002",
+      "name": "Kessler Spedition",
+      "active": true
+    },
+    {
+      "id": "CAR-0003",
+      "name": "PakketPunt Express",
+      "active": true
+    },
+    {
+      "id": "CAR-0004",
+      "name": "Havenstad Koeriers",
+      "active": false
     }
   ],
   "personas": [
