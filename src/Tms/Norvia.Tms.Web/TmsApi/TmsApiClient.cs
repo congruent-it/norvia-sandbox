@@ -92,7 +92,7 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
             case HttpStatusCode.NotFound or HttpStatusCode.Conflict or HttpStatusCode.UnprocessableEntity:
                 var problem = await response.Content.ReadFromJsonAsync<Refusal>(Json, cancellationToken);
                 var reason = problem?.Detail ?? $"Transport Order {transportOrderNumber} can't be assigned.";
-                using (Track(Flows.TransportPlanning, transportOrderNumber, TrackingKeys.Refused, problem?.Code))
+                using (Track(Flows.TransportPlanning, transportOrderNumber, TrackingKeys.Refused, problem?.Code, problem?.CorrelationId))
                 {
                     LogRefused(TmsCommand.Assignment, transportOrderNumber, reason);
                 }
@@ -114,7 +114,7 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
 
     /// <summary>
     /// The tracking contract's keys of a command's answer. Only an answer that names a correlation ID puts the TMS UI on
-    /// a Message trail: a refusal names none. A key that doesn't apply is left out, never sent empty.
+    /// a Message trail, as a refused re-rate doesn't. A key that doesn't apply is left out, never sent empty.
     /// </summary>
     private IDisposable? Track(
         string flow, string transportOrderNumber, string outcome, string? failureCode = null, string? correlationId = null, string? partyId = null, string? shipmentNumber = null)
@@ -172,8 +172,9 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
     // What the TMS API answers a re-rate, as far as the TMS UI reads it.
     private sealed record ReRated(RatingResult RatingResult, RatingFailureView? RatingFailure, string? CorrelationId, string? ShipperId);
 
-    // What the TMS API answers a refused assignment: a problem whose code says which assignment rule it broke.
-    private sealed record Refusal(string? Detail, string? Code);
+    // What the TMS API answers a refused assignment: a problem whose code says which assignment rule it broke, and whose
+    // correlation ID names the Message trail the TMS traced the refusal on.
+    private sealed record Refusal(string? Detail, string? Code, string? CorrelationId);
 
     // What the TMS UI asks the TMS API to assign a Transport Order to.
     private sealed record Assignment(AssignedTo AssignedTo, string? CarrierId);

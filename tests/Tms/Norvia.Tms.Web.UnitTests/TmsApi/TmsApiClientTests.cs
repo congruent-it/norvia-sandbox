@@ -227,23 +227,29 @@ public sealed class TmsApiClientTests : IDisposable
     }
 
     [Fact]
-    public async Task AssignAsync_Refused_RecordsItRefused_WithTheTmsCode_OnNoTrail()
+    public async Task AssignAsync_Refused_RecordsItRefused_WithTheTmsCode_OnTheRefusalsTrail()
     {
-        // The TMS's refusal names no correlation ID, so the Planner's click can't join the refusal's trail.
+        // The TMS traces a refused assignment on a trail of its own, which its problem names.
         _tmsApi.Answer(
             HttpStatusCode.Conflict,
-            """{ "status": 409, "title": "The Transport Order can't be assigned.", "detail": "Transport Order TO-0000042 is Planned already.", "code": "TransportOrderAlreadyPlanned" }""",
+            """
+            {
+              "status": 409, "title": "The Transport Order can't be assigned.", "detail": "Transport Order TO-0000042 is Planned already.",
+              "code": "TransportOrderAlreadyPlanned", "correlationId": "corr-refused"
+            }
+            """,
             "application/problem+json");
 
         await AssignAsync("TO-0000042", "CAR-0002");
 
         ScopeOf(_logger.LatestRecord).Should().Contain(new Dictionary<string, object?>
         {
+            ["correlationId"] = "corr-refused",
             ["flow"] = "transport-planning",
             ["transportOrderNumber"] = "TO-0000042",
             ["outcome"] = "Refused",
             ["failureCode"] = "TransportOrderAlreadyPlanned",
-        }).And.NotContainKey("correlationId");
+        });
     }
 
     [Fact]

@@ -97,7 +97,7 @@ public static class TransportOrderEndpoints
                 + "and publishes ShipmentPlanned on the Shipment events topic, all in one transaction. The assignment gets a new correlation ID, "
                 + "which ShipmentPlanned carries with the Transport Order number. An assignment sent again under its Idempotency-Key "
                 + "is answered as before, flagged as a repeat, without planning again. An assignment that breaks an assignment rule is refused, "
-                + "changing and publishing nothing, with a problem whose code says which: TransportOrderNotFound (404), TransportOrderNotAccepted "
+                + "changing and publishing nothing, with a problem whose code says which, and whose correlationId names the Message trail the refusal is traced on: TransportOrderNotFound (404), TransportOrderNotAccepted "
                 + "or TransportOrderAlreadyPlanned (409), UnknownCarrier or InactiveCarrier (422). The rating result never blocks an assignment.");
 
         return app;
@@ -199,7 +199,7 @@ public static class TransportOrderEndpoints
                 : TypedResults.Created($"/v1/shipments/{result.Value.ShipmentNumber}", result.Value);
         }
 
-        return AssignmentCalls.Refused(result, "The Transport Order can't be assigned.");
+        return AssignmentCalls.Refused(result, "The Transport Order can't be assigned.", command.CorrelationId);
     }
 
     private static async Task<Results<Ok<RateTransportOrderResult>, ProblemHttpResult, ValidationProblem>> ReRateAsync(
