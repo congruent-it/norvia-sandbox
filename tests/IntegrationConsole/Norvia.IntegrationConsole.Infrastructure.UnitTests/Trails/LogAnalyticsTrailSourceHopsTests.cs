@@ -239,6 +239,23 @@ public sealed class LogAnalyticsTrailSourceHopsTests
     }
 
     [Fact]
+    public async Task HopsAsync_TheEstatesResources_AreNamedWithoutTheirTokenOrRegion_ButARunKeepsItsLogicAppsName()
+    {
+        // The estate names a resource after its purpose and uniqueString(resourceGroup().id); API Management adds its region.
+        Answer(
+            Row("request", "apim-req", null, Now.AddSeconds(-10), 1_500, "POST /partner/v1/transport-orders", "apim-norvia-eowsgwet24y3e West Europe",
+                path: "/partner/v1/transport-orders"),
+            Row("link", "apim-dep", "apim-req"),
+            Row("run", "trigger", "apim-dep", Now.AddSeconds(-9.9), 10, "When_a_Shipper_books", "logic-intake-eowsgwet24y3e", runId: "0858",
+                workflow: "transport-order-intake", category: "Workflow.Operations.Triggers"));
+
+        var hops = await HopsAsync(CorrelationId);
+
+        hops.Select(hop => hop.Name).Should().BeEquivalentTo("apim-norvia: POST /partner/v1/transport-orders", "logic-intake: transport-order-intake");
+        hops.Single(hop => hop.Run is not null).Run.Should().Be(new WorkflowRun("logic-intake-eowsgwet24y3e", "transport-order-intake", "0858"));
+    }
+
+    [Fact]
     public async Task HopsAsync_ARecordUnderNoCall_IsAHopOfItsOwn_AtItsTime()
     {
         // The TMS's rating worker rates outside any request.

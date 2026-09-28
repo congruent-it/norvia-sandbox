@@ -41,7 +41,7 @@ internal sealed record HopRow(
         row.GetDouble("durationMs"),
         Text(row, "name"),
         Text(row, "path"),
-        RoleOf(Text(row, "role")),
+        Text(row, "role"),
         Text(row, "runId"),
         Text(row, "workflow"),
         Text(row, "category"),
@@ -51,14 +51,6 @@ internal sealed record HopRow(
         Text(row, "eventType"),
         [.. TrackedBusinessKeys.All.Where(key => Text(row, key.Key) is not null).Select(key => new BusinessKey(key.Kind, Text(row, key.Key)!))],
         row.GetBoolean("inProcess") ?? false);
-
-    /// <summary>
-    /// The application a row is from. Container Apps' OpenTelemetry agent gives every app its environment's generated
-    /// name as <c>service.namespace</c>, which Application Insights puts before the role name, as in
-    /// <c>[appseowsgwet24y3e]/tms-api</c>; the app is the part after it.
-    /// </summary>
-    private static string? RoleOf(string? role) =>
-        role is ['[', ..] && role.IndexOf("]/", StringComparison.Ordinal) is var end and > 0 ? role[(end + 2)..] : role;
 
     // A key that doesn't apply comes back empty from the query, and is left out as the tracking contract leaves it out.
     private static string? Text(LogsTableRow row, string column) => row.GetString(column) is { Length: > 0 } text ? text : null;

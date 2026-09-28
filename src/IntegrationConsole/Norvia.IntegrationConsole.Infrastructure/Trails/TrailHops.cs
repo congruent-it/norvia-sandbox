@@ -50,7 +50,7 @@ internal static class TrailHops
             {
                 if (!byId.TryGetValue(span.Id!, out var hop))
                 {
-                    hop = new Hop(span.Id!, span.ParentId, $"{span.Role}: {span.Name}", span.Start, span.End, null, []);
+                    hop = new Hop(span.Id!, span.ParentId, HopNames.OfSpan(span.Role ?? "unknown", span.Name ?? string.Empty), span.Start, span.End, null, []);
                     byId[span.Id!] = hop;
                     hops.Add(hop);
                 }
@@ -99,7 +99,7 @@ internal static class TrailHops
         return new Hop(
             trigger.Id!,
             trigger.ParentId,
-            $"{trigger.Role}: {trigger.Workflow}",
+            HopNames.OfRun(trigger.Role ?? "unknown", trigger.Workflow ?? string.Empty),
             run.Min(row => row.Start),
             run.Max(row => row.End),
             new WorkflowRun(trigger.Role ?? string.Empty, trigger.Workflow ?? string.Empty, run.Key),
