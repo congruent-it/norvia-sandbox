@@ -5,8 +5,8 @@ using Norvia.Tms.Domain.TransportOrders;
 
 namespace Norvia.Tms.Domain.UnitTests.CarrierBookings;
 
-/// <summary>P4's answer rules: what the TMS refuses before it records the Carrier's answer.</summary>
-public sealed class CarrierBookingAnswerRulesTests
+/// <summary>P4's Carrier booking rules: what the TMS refuses before it records an answer, report or withdrawal.</summary>
+public sealed class CarrierBookingRulesTests
 {
     private static readonly CarrierId VanDijk = new("CAR-0001");
     private static readonly CorrelationId Release = new("corr-release");
@@ -17,7 +17,7 @@ public sealed class CarrierBookingAnswerRulesTests
     [Fact]
     public void BookingNotFound_NamesTheNumberTheCallerGave()
     {
-        var refusal = CarrierBookingAnswerRules.BookingNotFound("CB-9999999");
+        var refusal = CarrierBookingRules.BookingNotFound("CB-9999999");
 
         refusal.Code.Should().Be(CarrierBookingRefusalCode.BookingNotFound);
         refusal.Message.Should().Be("Carrier booking CB-9999999 is not known to the TMS.");
@@ -26,13 +26,13 @@ public sealed class CarrierBookingAnswerRulesTests
     [Fact]
     public void CheckCarrier_TheBookingsOwnCarrier_RefusesNothing()
     {
-        CarrierBookingAnswerRules.CheckCarrier(Requested(), VanDijk).Should().BeNull();
+        CarrierBookingRules.CheckCarrier(Requested(), VanDijk).Should().BeNull();
     }
 
     [Fact]
     public void CheckCarrier_AnotherCarrier_IsRefused_WithNoStableCode()
     {
-        var refusal = CarrierBookingAnswerRules.CheckCarrier(Requested(), new CarrierId("CAR-9999"));
+        var refusal = CarrierBookingRules.CheckCarrier(Requested(), new CarrierId("CAR-9999"));
 
         refusal!.Code.Should().BeNull("the design's answer rules give the wrong-Carrier rule no code, only \"Refused\"");
         refusal.Message.Should().Be("Carrier booking CB-0000042 belongs to Carrier CAR-0001, not CAR-9999.");
@@ -44,7 +44,7 @@ public sealed class CarrierBookingAnswerRulesTests
         var booking = Requested();
         booking.Reject(CarrierBookingRejectionReason.NoCapacity, reasonText: null, new CorrelationId("corr-answer"), RequestedAt.AddHours(1));
 
-        var refusal = CarrierBookingAnswerRules.NotOpen(booking);
+        var refusal = CarrierBookingRules.NotOpen(booking);
 
         refusal.Code.Should().Be(CarrierBookingRefusalCode.BookingNotOpen);
         refusal.Message.Should().Be("Carrier booking CB-0000042 is Rejected, not Requested.");

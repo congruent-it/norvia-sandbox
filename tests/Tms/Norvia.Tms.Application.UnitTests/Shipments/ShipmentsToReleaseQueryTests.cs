@@ -5,16 +5,21 @@ using Norvia.Tms.Application.Shipments.ListToRelease;
 using Norvia.Tms.Application.Shippers;
 using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.UnitTests.TransportOrders;
+using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Carriers;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.Shippers;
+using Norvia.Tms.Domain.TransportOrders;
 using NSubstitute;
 
 namespace Norvia.Tms.Application.UnitTests.Shipments;
 
 public sealed class ShipmentsToReleaseQueryTests
 {
+    private static readonly CarrierId VanDijk = new("CAR-0001");
+
     private readonly IReadRepository<Shipment> _repository = Substitute.For<IReadRepository<Shipment>>();
+    private readonly IReadRepository<CarrierBooking> _carrierBookings = Substitute.For<IReadRepository<CarrierBooking>>();
     private readonly IShipperDirectory _shippers = Substitute.For<IShipperDirectory>();
     private readonly ICarrierDirectory _carriers = Substitute.For<ICarrierDirectory>();
     private readonly ListShipmentsToReleaseHandler _handler;
@@ -22,14 +27,15 @@ public sealed class ShipmentsToReleaseQueryTests
     public ShipmentsToReleaseQueryTests()
     {
         _shippers.Find(new ShipperId("SHP-0001")).Returns(new Shipper(new ShipperId("SHP-0001"), "Brouwer Dranken", true));
-        _carriers.Find(new CarrierId("CAR-0001")).Returns(new Carrier(new CarrierId("CAR-0001"), "Van Dijk Transport", true));
-        _handler = new ListShipmentsToReleaseHandler(_repository, _shippers, _carriers);
+        _carriers.Find(VanDijk).Returns(new Carrier(VanDijk, "Van Dijk Transport", true));
+        _carrierBookings.ListAsync(Arg.Any<CarrierBookingsForShipmentsSpec>(), Arg.Any<CancellationToken>()).Returns([]);
+        _handler = new ListShipmentsToReleaseHandler(_repository, _carrierBookings, _shippers, _carriers);
     }
 
     [Fact]
     public async Task Handle_PlannedShipments_ListsEachWithWhoCarriesIt()
     {
-        var carrier = Samples.Planned(Samples.AcceptedOrder(sequence: 7), CarriedBy.Carrier(new CarrierId("CAR-0001")), sequence: 12);
+        var carrier = Samples.Planned(Samples.AcceptedOrder(sequence: 7), CarriedBy.Carrier(VanDijk), sequence: 12);
         var ownFleet = Samples.Planned(Samples.AcceptedOrder(sequence: 8), CarriedBy.OwnFleet, sequence: 13);
         _repository.ListAsync(Arg.Any<ShipmentsToReleaseSpec>(), Arg.Any<CancellationToken>()).Returns([carrier, ownFleet]);
 
@@ -58,5 +64,52 @@ public sealed class ShipmentsToReleaseQueryTests
         var shipments = await _handler.Handle(new ListShipmentsToReleaseQuery(), CancellationToken.None);
 
         shipments.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Handle_AShipmentThatCameBackRejected_ShowsTheLastCarrierBookingsOutcome()
+    {
+        var shipment = Samples.Planned(Samples.AcceptedOrder(sequence: 7), CarriedBy.Carrier(VanDijk), sequence: 12);
+        _repository.ListAsync(Arg.Any<ShipmentsToReleaseSpec>(), Arg.Any<CancellationToken>()).Returns([shipment]);
+        var rejected = CarrierBooking.Request(
+            CarrierBookingNumber.FromSequence(1), shipment.Id, shipment.Number, VanDijk, new CorrelationId("corr-release"), Samples.Now.AddHours(1));
+        rejected.Reject(CarrierBookingRejectionReason.NoCapacity, "No trucks on Friday.", new CorrelationId("corr-answer"), Samples.Now.AddHours(2));
+        _carrierBookings.ListAsync(Arg.Any<CarrierBookingsForShipmentsSpec>(), Arg.Any<CancellationToken>()).Returns([rejected]);
+
+        var shipments = await _handler.Handle(new ListShipmentsToReleaseQuery(), CancellationToken.None);
+
+        shipments.Should().ContainSingle().Which.LastCarrierBookingOutcome.Should().Be(
+            new LastCarrierBookingOutcome(
+                CarrierBookingStatus.Rejected, new CarrierView("CAR-0001", "Van Dijk Transport"), CarrierBookingRejectionReason.NoCapacity, "No trucks on Friday."));
+    }
+
+    [Fact]
+    public async Task Handle_AShipmentThatCameBackTwice_ShowsOnlyTheMostRecentBookingsOutcome()
+    {
+        var shipment = Samples.Planned(Samples.AcceptedOrder(sequence: 7), CarriedBy.Carrier(VanDijk), sequence: 12);
+        _repository.ListAsync(Arg.Any<ShipmentsToReleaseSpec>(), Arg.Any<CancellationToken>()).Returns([shipment]);
+        var withdrawn = CarrierBooking.Request(
+            CarrierBookingNumber.FromSequence(1), shipment.Id, shipment.Number, VanDijk, new CorrelationId("corr-release-1"), Samples.Now.AddHours(1));
+        withdrawn.Withdraw(new IdempotencyKey("key-withdraw"), new CorrelationId("corr-withdraw"), Samples.Now.AddHours(2));
+        var rejected = CarrierBooking.Request(
+            CarrierBookingNumber.FromSequence(2), shipment.Id, shipment.Number, VanDijk, new CorrelationId("corr-release-2"), Samples.Now.AddHours(3));
+        rejected.Reject(CarrierBookingRejectionReason.NoCapacity, null, new CorrelationId("corr-answer"), Samples.Now.AddHours(4));
+        // The spec orders most-recently-requested first; the substitute stands in for the spec, so it must too.
+        _carrierBookings.ListAsync(Arg.Any<CarrierBookingsForShipmentsSpec>(), Arg.Any<CancellationToken>()).Returns([rejected, withdrawn]);
+
+        var shipments = await _handler.Handle(new ListShipmentsToReleaseQuery(), CancellationToken.None);
+
+        shipments.Should().ContainSingle().Which.LastCarrierBookingOutcome!.Status.Should().Be(CarrierBookingStatus.Rejected);
+    }
+
+    [Fact]
+    public async Task Handle_AShipmentNeverReleased_HasNoLastCarrierBookingOutcome()
+    {
+        var shipment = Samples.Planned(Samples.AcceptedOrder(sequence: 7), CarriedBy.Carrier(VanDijk), sequence: 12);
+        _repository.ListAsync(Arg.Any<ShipmentsToReleaseSpec>(), Arg.Any<CancellationToken>()).Returns([shipment]);
+
+        var shipments = await _handler.Handle(new ListShipmentsToReleaseQuery(), CancellationToken.None);
+
+        shipments.Should().ContainSingle().Which.LastCarrierBookingOutcome.Should().BeNull();
     }
 }

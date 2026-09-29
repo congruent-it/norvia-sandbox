@@ -4,12 +4,13 @@ using static System.FormattableString;
 namespace Norvia.Tms.Domain.CarrierBookings;
 
 /// <summary>
-/// P4's answer rules, checked before the Carrier's confirmation or rejection is recorded. Whether an answer that
-/// doesn't pass is a repeat of what's already recorded, which succeeds instead of failing with <c>BookingNotOpen</c>,
-/// is for the caller to check against the specific answer, with <see cref="CarrierBooking.IsRepeatOfConfirm"/> or
-/// <see cref="CarrierBooking.IsRepeatOfReject"/>.
+/// P4's Carrier booking rules: BookingNotFound and NotOpen guard every operation on a booking (the Carrier's answer, the
+/// P4 booking Logic App's reports, the Planner's withdrawal); CheckCarrier is the answer's own, as only the Carrier
+/// booking's own Carrier may answer it. Whether an answer that doesn't pass NotOpen is a repeat of what's already
+/// recorded, which succeeds instead of failing with <c>BookingNotOpen</c>, is for the caller to check against the
+/// specific answer, with <see cref="CarrierBooking.IsRepeatOfConfirm"/> or <see cref="CarrierBooking.IsRepeatOfReject"/>.
 /// </summary>
-public static class CarrierBookingAnswerRules
+public static class CarrierBookingRules
 {
     public static CarrierBookingRefusal BookingNotFound(string carrierBookingNumber) =>
         new(CarrierBookingRefusalCode.BookingNotFound, Invariant($"Carrier booking {carrierBookingNumber} is not known to the TMS."));
@@ -24,7 +25,7 @@ public static class CarrierBookingAnswerRules
             : new(Code: null, Invariant($"Carrier booking {booking.Number} belongs to Carrier {booking.CarrierId}, not {carrierId}."));
     }
 
-    /// <summary>The refusal for an answer to a booking that isn't Requested and isn't a repeat of what's already recorded.</summary>
+    /// <summary>The refusal for an operation on a booking that isn't Requested (and, for an answer, isn't a repeat of what's already recorded).</summary>
     public static CarrierBookingRefusal NotOpen(CarrierBooking booking)
     {
         ArgumentNullException.ThrowIfNull(booking);

@@ -61,5 +61,19 @@ internal sealed class CarrierBookingConfiguration : IEntityTypeConfiguration<Car
         builder.Property(booking => booking.PlannedCollectionTime);
         builder.Property(booking => booking.RejectionReason).HasConversion<string>().HasMaxLength(30);
         builder.Property(booking => booking.RejectionReasonText).HasMaxLength(500);
+
+        builder.Property(booking => booking.SentAt);
+
+        builder.Property(booking => booking.NotDeliveredStatusCode);
+        builder.Property(booking => booking.NotDeliveredMessage).HasMaxLength(500);
+        builder.Property(booking => booking.NotDeliveredAt);
+
+        builder.Property(booking => booking.WithdrawalKey)
+            .HasConversion(key => key!.Value, value => new IdempotencyKey(value))
+            .HasMaxLength(IdempotencyKey.MaxLength);
+        builder.Property(booking => booking.WithdrawalCorrelationId)
+            .HasConversion(id => id!.Value, value => new CorrelationId(value))
+            .HasMaxLength(128);
+        builder.Property(booking => booking.WithdrawnAt);
     }
 }

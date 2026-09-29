@@ -1,6 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Nodes;
+using Azure.Messaging.ServiceBus;
+using Norvia.Tms.Api.IntegrationTests.Planning;
+using Norvia.Tms.Api.IntegrationTests.TransportOrders;
 
 namespace Norvia.Tms.Api.IntegrationTests.CarrierBookings;
 
@@ -136,4 +139,121 @@ internal static class CarrierBookingCalls
         response.StatusCode.Should().Be(status, body);
         return JsonNode.Parse(body)!;
     }
+
+    /// <summary>Reports the Carrier booking as sent, as the P4 booking Logic App does, under the given correlation ID or a new one.</summary>
+    public static async Task<HttpResponseMessage> ReportSentAsync(
+        this TmsFixture tms, string carrierBookingNumber, CancellationToken cancellationToken, string? correlationId = null)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"/v1/carrier-bookings/{carrierBookingNumber}/report-sent", UriKind.Relative));
+        request.Headers.Add("X-Correlation-ID", correlationId ?? Guid.NewGuid().ToString());
+        return await tms.CarrierReport.SendAsync(request, cancellationToken);
+    }
+
+    /// <summary>Reports the Carrier booking as sent, which the TMS must accept, and returns what it answered.</summary>
+    public static async Task<JsonNode> ReportedSentAsync(this TmsFixture tms, string carrierBookingNumber, CancellationToken cancellationToken, string? correlationId = null)
+    {
+        using var response = await tms.ReportSentAsync(carrierBookingNumber, cancellationToken, correlationId);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, body);
+        return JsonNode.Parse(body)!;
+    }
+
+    /// <summary>
+    /// Reports the Carrier booking as not delivered with a technical cause, as the P4 booking Logic App does, under the
+    /// given correlation ID or a new one.
+    /// </summary>
+    public static async Task<HttpResponseMessage> ReportNotDeliveredAsync(
+        this TmsFixture tms,
+        string carrierBookingNumber,
+        CancellationToken cancellationToken,
+        int statusCode = 503,
+        string message = "Service unavailable.",
+        string? correlationId = null)
+    {
+        var report = new JsonObject { ["statusCode"] = statusCode, ["message"] = message };
+        using var request =
+            new HttpRequestMessage(HttpMethod.Post, new Uri($"/v1/carrier-bookings/{carrierBookingNumber}/report-not-delivered", UriKind.Relative))
+            {
+                Content = JsonContent.Create(report),
+            };
+        request.Headers.Add("X-Correlation-ID", correlationId ?? Guid.NewGuid().ToString());
+        return await tms.CarrierReport.SendAsync(request, cancellationToken);
+    }
+
+    /// <summary>Reports the Carrier booking as not delivered, which the TMS must accept, and returns what it answered.</summary>
+    public static async Task<JsonNode> ReportedNotDeliveredAsync(
+        this TmsFixture tms,
+        string carrierBookingNumber,
+        CancellationToken cancellationToken,
+        int statusCode = 503,
+        string message = "Service unavailable.",
+        string? correlationId = null)
+    {
+        using var response = await tms.ReportNotDeliveredAsync(carrierBookingNumber, cancellationToken, statusCode, message, correlationId);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, body);
+        return JsonNode.Parse(body)!;
+    }
+
+    /// <summary>Withdraws the Carrier booking as the Planner does, through the TMS UI, under the given idempotency key or a new one.</summary>
+    public static async Task<HttpResponseMessage> WithdrawAsync(
+        this TmsFixture tms, string carrierBookingNumber, CancellationToken cancellationToken, string? idempotencyKey = null)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"/v1/carrier-bookings/{carrierBookingNumber}/withdraw", UriKind.Relative));
+        request.Headers.Add("Idempotency-Key", idempotencyKey ?? Guid.NewGuid().ToString());
+        return await tms.TmsUi.SendAsync(request, cancellationToken);
+    }
+
+    /// <summary>Withdraws the Carrier booking, which the TMS must do, and returns what it answered.</summary>
+    public static async Task<JsonNode> WithdrawnAsync(this TmsFixture tms, string carrierBookingNumber, CancellationToken cancellationToken, string? idempotencyKey = null)
+    {
+        using var response = await tms.WithdrawAsync(carrierBookingNumber, cancellationToken, idempotencyKey);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, body);
+        return JsonNode.Parse(body)!;
+    }
+
+    /// <summary>Withdraws the Carrier booking, which the TMS must refuse with the status, and returns its problem.</summary>
+    public static async Task<JsonNode> WithdrawRefusedAsync(
+        this TmsFixture tms, string carrierBookingNumber, HttpStatusCode status, CancellationToken cancellationToken, string? idempotencyKey = null)
+    {
+        using var response = await tms.WithdrawAsync(carrierBookingNumber, cancellationToken, idempotencyKey);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        response.StatusCode.Should().Be(status, body);
+        return JsonNode.Parse(body)!;
+    }
+
+    /// <summary>The Planner's list of Requested Carrier bookings awaiting an answer, from the query API.</summary>
+    public static async Task<JsonArray> ListBookingsAwaitingAnswerAsync(this TmsFixture tms, CancellationToken cancellationToken)
+    {
+        using var response = await tms.Tms.GetAsync(new Uri("/v1/shipments/bookings-awaiting-answer", UriKind.Relative), cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, body);
+        return JsonNode.Parse(body)!.AsArray();
+    }
+
+    /// <summary>A Carrier Shipment the Planner released, with its Requested Carrier booking.</summary>
+    public static async Task<(string CarrierBookingNumber, string ShipmentNumber)> ReleasedCarrierBookingAsync(this TmsFixture tms, CancellationToken cancellationToken)
+    {
+        var number = await tms.SubmitAcceptedAsync(cancellationToken);
+        var assigned = await tms.AssignPlannedAsync(number, PlanningCalls.ToCarrier(), cancellationToken);
+        await tms.PublishedAsync(assigned["correlationId"]!.GetValue<string>(), "ShipmentPlanned", cancellationToken);
+        var shipmentNumber = assigned["shipmentNumber"]!.GetValue<string>();
+
+        var released = await tms.ReleasedAsync(shipmentNumber, cancellationToken);
+        await tms.PublishedAsync(released["correlationId"]!.GetValue<string>(), "ShipmentReleased", cancellationToken);
+        return (released["carrierBookingNumber"]!.GetValue<string>(), shipmentNumber);
+    }
+
+    /// <summary>The named Carrier booking in a Shipment's JSON, as returned by the TMS's Shipment read.</summary>
+    public static JsonNode BookingOf(JsonNode shipment, string carrierBookingNumber) =>
+        shipment["carrierBookings"]!.AsArray().Single(booking => booking!["carrierBookingNumber"]!.GetValue<string>() == carrierBookingNumber)!;
+
+    /// <summary>Whether a published message names the given Shipment.</summary>
+    public static bool NamesShipment(ServiceBusReceivedMessage message, string shipmentNumber) =>
+        message.ApplicationProperties.TryGetValue("shipmentNumber", out var number) && Equals(number, shipmentNumber);
+
+    /// <summary>Whether a published message names the given Carrier booking.</summary>
+    public static bool NamesCarrierBooking(ServiceBusReceivedMessage message, string carrierBookingNumber) =>
+        message.ApplicationProperties.TryGetValue("carrierBookingNumber", out var number) && Equals(number, carrierBookingNumber);
 }

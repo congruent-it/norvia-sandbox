@@ -61,6 +61,25 @@ public sealed class CarrierBooking : EntityBase<CarrierBookingId>, IAggregateRoo
 
     public string? RejectionReasonText { get; private set; }
 
+    /// <summary>When the Carrier acknowledged receipt, reported by the P4 booking Logic App; null until then.</summary>
+    public DateTimeOffset? SentAt { get; private set; }
+
+    /// <summary>The technical cause's HTTP status code from the Carrier's endpoint; null unless <see cref="Status"/> is NotDelivered.</summary>
+    public int? NotDeliveredStatusCode { get; private set; }
+
+    /// <summary>The technical cause's message; null unless <see cref="Status"/> is NotDelivered.</summary>
+    public string? NotDeliveredMessage { get; private set; }
+
+    public DateTimeOffset? NotDeliveredAt { get; private set; }
+
+    /// <summary>The Planner's idempotency key for the withdrawal that ended it; null unless it was withdrawn.</summary>
+    public IdempotencyKey? WithdrawalKey { get; private set; }
+
+    /// <summary>The withdrawal's own Message trail; null unless it was withdrawn.</summary>
+    public CorrelationId? WithdrawalCorrelationId { get; private set; }
+
+    public DateTimeOffset? WithdrawnAt { get; private set; }
+
     /// <summary>
     /// Requests a Carrier booking for a Shipment's release, Requested. Raises no domain event of its own: the release
     /// that creates it announces both in <c>ShipmentReleased</c>.
@@ -137,4 +156,66 @@ public sealed class CarrierBooking : EntityBase<CarrierBookingId>, IAggregateRoo
     /// <summary>True when a rejection exactly repeats the one already recorded: the same reason code and text.</summary>
     public bool IsRepeatOfReject(CarrierBookingRejectionReason reason, string? reasonText) =>
         Status == CarrierBookingStatus.Rejected && RejectionReason == reason && RejectionReasonText == reasonText;
+
+    /// <summary>
+    /// Records that the P4 booking Logic App's request reached the Carrier, on a Requested booking. Raises no domain
+    /// event: a sent report publishes nothing. Returns false, changing nothing, for a booking that isn't Requested (for
+    /// example, withdrawn while the report was in flight).
+    /// </summary>
+    public bool MarkSent(DateTimeOffset sentAt)
+    {
+        if (Status != CarrierBookingStatus.Requested)
+        {
+            return false;
+        }
+
+        SentAt = sentAt;
+        return true;
+    }
+
+    /// <summary>
+    /// Records that the P4 booking Logic App's request never reached the Carrier, with its technical cause: the booking
+    /// becomes NotDelivered and raises <c>CarrierBookingNotDelivered</c>. Returns false, changing nothing, for a booking
+    /// that isn't Requested (for example, withdrawn while the report was in flight).
+    /// </summary>
+    public bool ReportNotDelivered(int statusCode, string message, CorrelationId correlationId, DateTimeOffset occurredAt)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(message);
+        ArgumentNullException.ThrowIfNull(correlationId);
+        if (Status != CarrierBookingStatus.Requested)
+        {
+            return false;
+        }
+
+        NotDeliveredStatusCode = statusCode;
+        NotDeliveredMessage = message;
+        NotDeliveredAt = occurredAt;
+        Status = CarrierBookingStatus.NotDelivered;
+        RegisterDomainEvent(new CarrierBookingNotDeliveredEvent(this, correlationId));
+        return true;
+    }
+
+    /// <summary>
+    /// The Planner takes a Requested booking back: it becomes Withdrawn and raises <c>CarrierBookingWithdrawn</c>.
+    /// Returns false, changing nothing, for a booking that isn't Requested.
+    /// </summary>
+    public bool Withdraw(IdempotencyKey key, CorrelationId correlationId, DateTimeOffset withdrawnAt)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        ArgumentNullException.ThrowIfNull(correlationId);
+        if (Status != CarrierBookingStatus.Requested)
+        {
+            return false;
+        }
+
+        WithdrawalKey = key;
+        WithdrawalCorrelationId = correlationId;
+        WithdrawnAt = withdrawnAt;
+        Status = CarrierBookingStatus.Withdrawn;
+        RegisterDomainEvent(new CarrierBookingWithdrawnEvent(this));
+        return true;
+    }
+
+    /// <summary>The withdrawal's own trail made under the key; null when none was.</summary>
+    public CorrelationId? WithdrawalUnder(IdempotencyKey key) => WithdrawalKey == key ? WithdrawalCorrelationId : null;
 }

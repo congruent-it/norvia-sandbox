@@ -16,4 +16,10 @@ public static class Flows
 
     /// <summary>The Carrier's answer to a Carrier booking (P4), on the correlation ID the answer's own caller passes.</summary>
     public const string CarrierBookingAnswer = "carrier-booking-answer";
+
+    /// <summary>
+    /// The P4 booking Logic App's report of a Carrier booking as sent or not delivered, which continues the Message
+    /// trail of the release that created it.
+    /// </summary>
+    public const string CarrierBookingReport = "carrier-booking-report";
 }

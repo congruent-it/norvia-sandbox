@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/carrier-booking-withdrawn.v1.schema.json",
+  "title": "CarrierBookingWithdrawn",
+  "description": "The Planner took a Requested Carrier booking back before the Carrier answered (Canonical Model event, version 1). The Carrier booking became Withdrawn and the Shipment went back to Planned; the Shipment's move carries no event of its own, as this event already says it. Published on the Shipment events topic, under the correlation ID the TMS starts for the withdrawal.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "carrierBookingNumber", "shipmentNumber", "carrierId"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "const": "CarrierBookingWithdrawn" },
+    "eventVersion": { "const": 1 },
+    "occurredAt": { "description": "When the withdrawal was recorded.", "type": "string", "format": "date-time" },
+    "correlationId": { "description": "The withdrawal's own correlation ID.", "type": "string", "minLength": 1 },
+    "carrierBookingNumber": { "description": "The Carrier booking the Planner withdrew.", "type": "string", "pattern": "^CB-[0-9]{7}$" },
+    "shipmentNumber": { "description": "The Shipment the Carrier booking covers, now back in Planned.", "type": "string", "pattern": "^SH-[0-9]{7}$" },
+    "carrierId": { "description": "The Carrier the withdrawn booking was addressed to.", "type": "string", "minLength": 1 }
+  }
+}

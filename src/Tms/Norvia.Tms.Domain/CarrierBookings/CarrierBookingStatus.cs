@@ -1,8 +1,6 @@
 namespace Norvia.Tms.Domain.CarrierBookings;
 
-/// <summary>
-/// P4's later tickets add Not delivered and Withdrawn (final, like Confirmed and Rejected), and P7 adds Cancelled.
-/// </summary>
+/// <summary>P7 adds Cancelled.</summary>
 public enum CarrierBookingStatus
 {
     /// <summary>Created at release. Waits for the Carrier's answer.</summary>
@@ -13,4 +11,10 @@ public enum CarrierBookingStatus
 
     /// <summary>The Carrier turned it down, with a reason. Final.</summary>
     Rejected,
+
+    /// <summary>The request never reached the Carrier, with the technical cause. Final.</summary>
+    NotDelivered,
+
+    /// <summary>The Planner took it back before the Carrier answered. Final.</summary>
+    Withdrawn,
 }

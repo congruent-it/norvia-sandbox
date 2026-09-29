@@ -55,6 +55,18 @@ public sealed class ShipmentSpecsTests
         found.Should().ContainSingle().Which.Number.Should().Be(TransportOrderNumber.FromSequence(2));
     }
 
+    [Fact]
+    public void ShipmentsByIdsSpec_FindsOnlyTheShipmentsWithThoseIds()
+    {
+        var first = Planned(1, 1);
+        var second = Planned(2, 2);
+        var third = Planned(3, 3);
+
+        var found = new ShipmentsByIdsSpec([first.Id, third.Id]).Evaluate([first, second, third]);
+
+        found.Select(shipment => shipment.Number).Should().BeEquivalentTo([first.Number, third.Number]);
+    }
+
     private static Shipment Planned(long orderSequence, long shipmentSequence) =>
         Accepted(orderSequence).Plan(
             ShipmentNumber.FromSequence(shipmentSequence), CarriedBy.OwnFleet, new IdempotencyKey("key"), new CorrelationId("corr"), Now)!;

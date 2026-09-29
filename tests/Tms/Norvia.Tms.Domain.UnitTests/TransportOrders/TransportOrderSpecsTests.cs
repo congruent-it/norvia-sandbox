@@ -147,6 +147,16 @@ public sealed class TransportOrderSpecsTests
         found.Should().ContainSingle().Which.Number.Should().Be(TransportOrderNumber.FromSequence(2));
     }
 
+    [Fact]
+    public void ByNumbers_Evaluated_FindsOnlyTheTransportOrdersWithThoseNumbers()
+    {
+        var orders = new[] { Accepted(1, Morning), Accepted(2, Morning), Accepted(3, Morning) };
+
+        var found = new TransportOrdersByNumbersSpec([TransportOrderNumber.FromSequence(1), TransportOrderNumber.FromSequence(3)]).Evaluate(orders);
+
+        found.Select(order => order.Number).Should().BeEquivalentTo([TransportOrderNumber.FromSequence(1), TransportOrderNumber.FromSequence(3)]);
+    }
+
     private static TransportOrder Rejected(DateTimeOffset receivedAt) => TransportOrder.Reject(
         new ShipperId("SHP-0001"),
         TransportOrderTests.SampleDetails(),

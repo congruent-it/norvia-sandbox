@@ -11,6 +11,9 @@ public enum PlanningAction
 
     /// <summary>Handing a Planned Shipment over to be carried out.</summary>
     Release,
+
+    /// <summary>Taking a Requested Carrier booking back before the Carrier answers (P4).</summary>
+    Withdrawal,
 }
 
 public static class PlanningActionWording
@@ -21,6 +24,7 @@ public static class PlanningActionWording
         PlanningAction.Assignment => "assigned",
         PlanningAction.Reassignment => "reassigned",
         PlanningAction.Release => "released",
+        PlanningAction.Withdrawal => "withdrawn",
         _ => throw new ArgumentOutOfRangeException(nameof(action), action, null),
     };
 
@@ -30,6 +34,7 @@ public static class PlanningActionWording
         PlanningAction.Assignment => "An assignment",
         PlanningAction.Reassignment => "A reassignment",
         PlanningAction.Release => "A release",
+        PlanningAction.Withdrawal => "A withdrawal",
         _ => throw new ArgumentOutOfRangeException(nameof(action), action, null),
     };
 }

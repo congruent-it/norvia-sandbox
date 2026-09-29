@@ -7,6 +7,7 @@ using Norvia.Tms.Api.TransportOrders;
 using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shipments.GetByNumber;
+using Norvia.Tms.Application.Shipments.ListAwaitingAnswer;
 using Norvia.Tms.Application.Shipments.ListToRelease;
 using Norvia.Tms.Application.Shipments.Reassign;
 using Norvia.Tms.Application.Shipments.Release;
@@ -27,7 +28,17 @@ public static class ShipmentEndpoints
         shipments.MapGet("/to-release", ListToReleaseAsync)
             .RequireAuthorization()
             .WithName("ListShipmentsToRelease")
-            .WithSummary("List the Shipments to release: the Planned Shipments, with who carries each, in the order they were planned.");
+            .WithSummary("List the Shipments to release: the Planned Shipments, with who carries each, in the order they were planned.")
+            .WithDescription("Each Shipment that came back from a Carrier booking shows its last one's outcome and reason, when it has one.");
+
+        shipments.MapGet("/bookings-awaiting-answer", ListBookingsAwaitingAnswerAsync)
+            .RequireAuthorization()
+            .WithName("ListCarrierBookingsAwaitingAnswer")
+            .WithSummary("List the Requested Carrier bookings awaiting an answer, sorted by earliest collection time.")
+            .WithDescription(
+                "Each booking shows its Shipment, Carrier, Carrier booking number, requested time, sent time or none yet, and whether it is "
+                + "overdue: Requested longer than the TMS's setting, or past its Shipment's collection window's earliest time, whichever comes "
+                + "first. Overdue is only a flag; nothing acts on it.");
 
         shipments.MapGet("/{shipmentNumber}", GetAsync)
             .RequireAuthorization()
@@ -125,4 +136,9 @@ public static class ShipmentEndpoints
         IMediator mediator,
         CancellationToken cancellationToken) =>
         TypedResults.Ok(await mediator.Send(new ListShipmentsToReleaseQuery(), cancellationToken));
+
+    private static async Task<Ok<IReadOnlyList<CarrierBookingAwaitingAnswerSummary>>> ListBookingsAwaitingAnswerAsync(
+        IMediator mediator,
+        CancellationToken cancellationToken) =>
+        TypedResults.Ok(await mediator.Send(new ListCarrierBookingsAwaitingAnswerQuery(), cancellationToken));
 }

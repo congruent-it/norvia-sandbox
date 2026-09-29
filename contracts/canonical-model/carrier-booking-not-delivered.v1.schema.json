@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/carrier-booking-not-delivered.v1.schema.json",
+  "title": "CarrierBookingNotDelivered",
+  "description": "The P4 booking Logic App's request for a Requested Carrier booking never reached the Carrier (Canonical Model event, version 1). The Carrier booking became NotDelivered and the Shipment went back to Planned; the Shipment's move carries no event of its own, as this event already says it. Published on the Shipment events topic, under the correlation ID of the release the report continues.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "carrierBookingNumber", "shipmentNumber", "carrierId", "statusCode", "message"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "const": "CarrierBookingNotDelivered" },
+    "eventVersion": { "const": 1 },
+    "occurredAt": { "description": "When the report was recorded.", "type": "string", "format": "date-time" },
+    "correlationId": { "description": "The release's own correlation ID, which the report continues.", "type": "string", "minLength": 1 },
+    "carrierBookingNumber": { "description": "The Carrier booking the request couldn't reach.", "type": "string", "pattern": "^CB-[0-9]{7}$" },
+    "shipmentNumber": { "description": "The Shipment the Carrier booking covers, now back in Planned.", "type": "string", "pattern": "^SH-[0-9]{7}$" },
+    "carrierId": { "description": "The Carrier the request was addressed to.", "type": "string", "minLength": 1 },
+    "statusCode": { "description": "The Carrier endpoint's HTTP status code, or the technical failure's own code.", "type": "integer" },
+    "message": { "description": "The technical cause in plain language.", "type": "string", "minLength": 1 }
+  }
+}
