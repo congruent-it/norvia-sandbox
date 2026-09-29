@@ -7,8 +7,7 @@ namespace Norvia.Tms.Domain.UnitTests.CarrierBookings;
 
 /// <summary>
 /// The TMS creates a Carrier booking at release (P4), Requested, waiting for the Carrier's answer, then records the
-/// Carrier's confirmation or rejection. This slice covers only the happy path: an answer for a booking that isn't
-/// Requested, field validation, idempotent repeats, sent/not-delivered reporting and withdrawal are later tickets.
+/// Carrier's confirmation or rejection. Sent/not-delivered reporting and withdrawal are later tickets.
 /// </summary>
 public sealed class CarrierBookingTests
 {
@@ -135,6 +134,66 @@ public sealed class CarrierBookingTests
         rejected.Should().BeFalse();
         booking.Status.Should().Be(CarrierBookingStatus.Confirmed);
         booking.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void IsRepeatOfConfirm_TheSameReferenceAndPlannedCollectionTime_IsTrue()
+    {
+        var booking = Requested();
+        var plannedCollectionTime = AnsweredAt.AddDays(1);
+        booking.Confirm("VDT-240917-0042", plannedCollectionTime, TransportOrderNumberOfTwelve, Answer, AnsweredAt);
+
+        booking.IsRepeatOfConfirm("VDT-240917-0042", plannedCollectionTime).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("VDT-240917-9999", null)]
+    [InlineData("VDT-240917-0042", 1)]
+    public void IsRepeatOfConfirm_ADifferentReferenceOrPlannedCollectionTime_IsFalse(string reference, int? plannedCollectionTimeOffsetDays)
+    {
+        var booking = Requested();
+        booking.Confirm("VDT-240917-0042", plannedCollectionTime: null, TransportOrderNumberOfTwelve, Answer, AnsweredAt);
+
+        booking.IsRepeatOfConfirm(reference, plannedCollectionTimeOffsetDays is { } days ? AnsweredAt.AddDays(days) : null).Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsRepeatOfConfirm_ARejectedBooking_IsFalse()
+    {
+        var booking = Requested();
+        booking.Reject(CarrierBookingRejectionReason.NoCapacity, reasonText: null, Answer, AnsweredAt);
+
+        booking.IsRepeatOfConfirm("VDT-240917-0042", plannedCollectionTime: null).Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsRepeatOfReject_TheSameReasonAndText_IsTrue()
+    {
+        var booking = Requested();
+        booking.Reject(CarrierBookingRejectionReason.NoCapacity, "No trucks on Friday.", Answer, AnsweredAt);
+
+        booking.IsRepeatOfReject(CarrierBookingRejectionReason.NoCapacity, "No trucks on Friday.").Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(CarrierBookingRejectionReason.LaneNotServed, "No trucks on Friday.")]
+    [InlineData(CarrierBookingRejectionReason.NoCapacity, "A different reason.")]
+    [InlineData(CarrierBookingRejectionReason.NoCapacity, null)]
+    public void IsRepeatOfReject_ADifferentReasonOrText_IsFalse(CarrierBookingRejectionReason reason, string? reasonText)
+    {
+        var booking = Requested();
+        booking.Reject(CarrierBookingRejectionReason.NoCapacity, "No trucks on Friday.", Answer, AnsweredAt);
+
+        booking.IsRepeatOfReject(reason, reasonText).Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsRepeatOfReject_AConfirmedBooking_IsFalse()
+    {
+        var booking = Requested();
+        booking.Confirm("VDT-240917-0042", plannedCollectionTime: null, TransportOrderNumberOfTwelve, Answer, AnsweredAt);
+
+        booking.IsRepeatOfReject(CarrierBookingRejectionReason.NoCapacity, reasonText: null).Should().BeFalse();
     }
 
     private static CarrierBooking Requested()

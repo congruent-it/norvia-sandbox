@@ -9,9 +9,10 @@ using Norvia.Tms.Api.IntegrationTests.TransportOrders;
 namespace Norvia.Tms.Api.IntegrationTests.CarrierBookings;
 
 /// <summary>
-/// A Carrier confirms or rejects a Requested Carrier booking (P4), on a Message trail of its own. This slice covers
-/// only the happy path: a well-formed confirmation or rejection for a Requested booking that exists. BookingNotFound,
-/// the wrong-Carrier check, BookingNotOpen, field validation, idempotent repeats and role enforcement are later tickets.
+/// A Carrier confirms or rejects a Requested Carrier booking (P4), on a Message trail of its own. This file covers the
+/// happy path: a well-formed confirmation or rejection for a Requested booking that exists. BookingNotFound, the
+/// wrong-Carrier check, BookingNotOpen, idempotent repeats and role enforcement are in
+/// <see cref="CarrierBookingAnswerRefusalTests"/> and <see cref="CarrierBookingAnswerAuthorizationTests"/>.
 /// </summary>
 public sealed class CarrierBookingAnswerTests(TmsFixture tms)
 {

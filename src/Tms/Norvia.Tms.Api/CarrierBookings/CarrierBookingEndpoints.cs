@@ -6,6 +6,7 @@ using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Api.TransportOrders;
 using Norvia.Tms.Application.CarrierBookings.Answer;
 using Norvia.Tms.Application.IntegrationEvents;
+using Norvia.Tms.Domain.CarrierBookings;
 
 namespace Norvia.Tms.Api.CarrierBookings;
 
@@ -30,16 +31,20 @@ public static class CarrierBookingEndpoints
             .WithSummary("Record the Carrier's confirmation or rejection of a Requested Carrier booking.")
             .WithDescription(
                 "A confirmation carries the Carrier's own booking reference (required) and, optionally, a planned collection time: the booking "
-                + "becomes Confirmed and the Shipment Booked. A rejection carries a reason code (required) and, optionally, a reason text: the "
-                + "booking becomes Rejected and the Shipment goes back to Planned. Either way, the matching event is published on the Shipment "
-                + "events topic in the same transaction; the Shipment's move publishes no event of its own. This build covers only the happy "
-                + "path: a booking that isn't Requested, an unknown booking number, field validation, idempotent repeats and the wrong Carrier "
-                + "answering are later tickets.");
+                + "becomes Confirmed and the Shipment Booked. A rejection carries a reason code (required, one of NoCapacity, LaneNotServed, "
+                + "WindowNotFeasible, GoodsNotAccepted or Other) and, for Other, a reason text (required): the booking becomes Rejected and the "
+                + "Shipment goes back to Planned. Either way, the matching event is published on the Shipment events topic in the same "
+                + "transaction; the Shipment's move publishes no event of its own. An answer sent again with the same outcome and content is "
+                + "answered as before, flagged as a repeat, without recording anything again or publishing a new event. An answer is refused, "
+                + "changing and publishing nothing, with a problem whose correlationId names the Message trail the refusal is traced on: "
+                + "BookingNotFound (404, with that code) or BookingNotOpen (409, with that code) for a conflicting answer to a booking that "
+                + "already has one, or the wrong Carrier answering (403, no code). A Carrier made inactive since the booking was sent can still "
+                + "answer it.");
 
         return app;
     }
 
-    private static async Task<Results<Ok<CarrierBookingAnswerResult>, ValidationProblem>> AnswerAsync(
+    private static async Task<Results<Ok<CarrierBookingAnswerResult>, ProblemHttpResult, ValidationProblem>> AnswerAsync(
         string carrierBookingNumber,
         [FromHeader(Name = TransportOrderEndpoints.CorrelationIdHeader)] string? correlationId,
         CarrierBookingAnswerRequest answer,
@@ -61,13 +66,13 @@ public static class CarrierBookingEndpoints
                 new RejectCarrierBookingCommand(carrierBookingNumber, answer.CarrierId, correlationId!, answer.ReasonCode!.Value, answer.ReasonText),
                 cancellationToken);
 
-        return TypedResults.Ok(result.Value);
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : Refused(result, correlationId!);
     }
 
     /// <summary>
     /// The call's errors: an <see cref="TransportOrderEndpoints.CorrelationIdHeader"/>, a confirmation's Carrier booking
-    /// reference, a rejection's reason code. Whether the reason code is one of the known ones, and whether <c>Other</c>
-    /// has its text, are a later ticket's field validation.
+    /// reference, a rejection's reason code and, for <c>Other</c>, its reason text. Whether the reason code is one of
+    /// the known ones is enforced by its type: an unknown one fails to parse as JSON, which is a client error too.
     /// </summary>
     private static Dictionary<string, string[]> Check(string? correlationId, CarrierBookingAnswerRequest answer)
     {
@@ -86,7 +91,40 @@ public static class CarrierBookingEndpoints
         {
             errors[nameof(CarrierBookingAnswerRequest.ReasonCode)] = ["A rejection needs a reason code."];
         }
+        else if (answer.Outcome == CarrierBookingAnswerOutcome.Rejected
+            && answer.ReasonCode == CarrierBookingRejectionReason.Other
+            && string.IsNullOrWhiteSpace(answer.ReasonText))
+        {
+            errors[nameof(CarrierBookingAnswerRequest.ReasonText)] = ["A rejection with reason Other needs its reason text."];
+        }
 
         return errors;
     }
+
+    /// <summary>
+    /// The problem for a refused answer, with a status that says which rule it broke, the refusal's own code where it has
+    /// one (the wrong Carrier answering has none), and the call's own correlation ID, which the refusal is traced on, so
+    /// the Integration console can join its Message trail.
+    /// </summary>
+    private static ProblemHttpResult Refused(Result<CarrierBookingAnswerResult> result, string correlationId)
+    {
+        var refusal = result.ValidationErrors.First();
+        var extensions = new Dictionary<string, object?> { ["correlationId"] = correlationId };
+        if (!string.IsNullOrEmpty(refusal.ErrorCode))
+        {
+            extensions["code"] = refusal.ErrorCode;
+        }
+
+        return TypedResults.Problem(
+            statusCode: string.IsNullOrEmpty(refusal.ErrorCode) ? StatusCodes.Status403Forbidden : StatusCodeOf(Enum.Parse<CarrierBookingRefusalCode>(refusal.ErrorCode)),
+            title: "The Carrier's answer can't be recorded.",
+            detail: refusal.ErrorMessage,
+            extensions: extensions);
+    }
+
+    private static int StatusCodeOf(CarrierBookingRefusalCode code) => code switch
+    {
+        CarrierBookingRefusalCode.BookingNotFound => StatusCodes.Status404NotFound,
+        _ => StatusCodes.Status409Conflict, // BookingNotOpen
+    };
 }

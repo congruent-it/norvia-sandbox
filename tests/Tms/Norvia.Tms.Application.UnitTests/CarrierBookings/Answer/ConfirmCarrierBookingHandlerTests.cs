@@ -1,3 +1,4 @@
+using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Microsoft.Extensions.Time.Testing;
 using Norvia.Tms.Application.CarrierBookings.Answer;
@@ -56,26 +57,73 @@ public sealed class ConfirmCarrierBookingHandlerTests
     }
 
     [Fact]
-    public async Task Handle_UnknownBookingNumber_Throws()
+    public async Task Handle_UnknownBookingNumber_IsRefused_WithBookingNotFound()
     {
-        var confirm = async () => await _handler.Handle(
+        var result = await _handler.Handle(
             new ConfirmCarrierBookingCommand("CB-9999999", "CAR-0001", "corr-answer", "VDT-240917-0042", null), CancellationToken.None);
 
-        await confirm.Should().ThrowAsync<InvalidOperationException>();
+        result.Status.Should().Be(ResultStatus.Invalid);
+        result.ValidationErrors.Should().ContainSingle().Which.ErrorCode.Should().Be(nameof(CarrierBookingRefusalCode.BookingNotFound));
+        await _carrierBookings.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task Handle_ABookingThatIsntRequested_Throws_AndDoesNotBookTheShipment()
+    public async Task Handle_AnAnswerFromAnotherCarrier_IsRefused_WithNoStableCode_AndChangesNothing()
+    {
+        var (booking, _) = ReleasedBooking();
+
+        var result = await _handler.Handle(
+            new ConfirmCarrierBookingCommand("CB-0000001", "CAR-9999", "corr-answer", "VDT-240917-0042", null), CancellationToken.None);
+
+        result.Status.Should().Be(ResultStatus.Invalid);
+        result.ValidationErrors.Should().ContainSingle().Which.ErrorCode.Should().BeEmpty("the wrong-Carrier rule has no stable code, only \"Refused\"");
+        booking.Status.Should().Be(CarrierBookingStatus.Requested, "the wrong Carrier's answer changed nothing");
+        await _carrierBookings.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_ADifferentConfirmationOfABookingAlreadyConfirmed_IsRefused_WithBookingNotOpen_AndChangesNothing()
     {
         var (booking, shipment) = ReleasedBooking();
-        booking.Confirm("VDT-240917-0041", null, shipment.TransportOrderNumber, new CorrelationId("corr-earlier-answer"), Samples.Now.AddHours(2));
-        shipment.Book();
+        await _handler.Handle(new ConfirmCarrierBookingCommand("CB-0000001", "CAR-0001", "corr-answer-1", "VDT-240917-0041", null), CancellationToken.None);
 
-        var confirm = async () => await _handler.Handle(
-            new ConfirmCarrierBookingCommand("CB-0000001", "CAR-0001", "corr-answer", "VDT-240917-0042", null), CancellationToken.None);
+        var result = await _handler.Handle(
+            new ConfirmCarrierBookingCommand("CB-0000001", "CAR-0001", "corr-answer-2", "VDT-240917-0042", null), CancellationToken.None);
 
-        await confirm.Should().ThrowAsync<InvalidOperationException>();
-        booking.CarrierBookingReference.Should().Be("VDT-240917-0041", "the later, invalid answer changed nothing");
+        result.Status.Should().Be(ResultStatus.Invalid);
+        result.ValidationErrors.Should().ContainSingle().Which.ErrorCode.Should().Be(nameof(CarrierBookingRefusalCode.BookingNotOpen));
+        booking.CarrierBookingReference.Should().Be("VDT-240917-0041", "the later, conflicting answer changed nothing");
+        shipment.Status.Should().Be(ShipmentStatus.Booked);
+    }
+
+    [Fact]
+    public async Task Handle_AConfirmationOfABookingAlreadyRejected_IsRefused_WithBookingNotOpen()
+    {
+        var (booking, _) = ReleasedBooking();
+        booking.Reject(CarrierBookingRejectionReason.NoCapacity, reasonText: null, new CorrelationId("corr-answer-1"), Samples.Now.AddHours(2));
+
+        var result = await _handler.Handle(
+            new ConfirmCarrierBookingCommand("CB-0000001", "CAR-0001", "corr-answer-2", "VDT-240917-0042", null), CancellationToken.None);
+
+        result.Status.Should().Be(ResultStatus.Invalid);
+        result.ValidationErrors.Should().ContainSingle().Which.ErrorCode.Should().Be(nameof(CarrierBookingRefusalCode.BookingNotOpen));
+    }
+
+    [Fact]
+    public async Task Handle_TheExactSameConfirmationRepeated_ReturnsTheOriginalResult_FlaggedAsARepeat_WithoutSavingAgain()
+    {
+        var plannedCollectionTime = Samples.Now.AddDays(1);
+        ReleasedBooking();
+        await _handler.Handle(
+            new ConfirmCarrierBookingCommand("CB-0000001", "CAR-0001", "corr-answer-1", "VDT-240917-0042", plannedCollectionTime), CancellationToken.None);
+        _carrierBookings.ClearReceivedCalls();
+
+        var result = await _handler.Handle(
+            new ConfirmCarrierBookingCommand("CB-0000001", "CAR-0001", "corr-answer-2", "VDT-240917-0042", plannedCollectionTime), CancellationToken.None);
+
+        result.Value.Should().Be(
+            new CarrierBookingAnswerResult("CB-0000001", CarrierBookingStatus.Confirmed, "SH-0000012", ShipmentStatus.Booked, "corr-answer-1", Repeat: true));
+        await _carrierBookings.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     private (CarrierBooking Booking, Shipment Shipment) ReleasedBooking()

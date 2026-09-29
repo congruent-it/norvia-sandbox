@@ -14,20 +14,32 @@ public sealed class ConfirmCarrierBookingHandler(IRepository<CarrierBooking> car
     {
         ArgumentNullException.ThrowIfNull(command);
 
-        var booking = await CarrierBookingLookup.ToChangeAsync(carrierBookings, command.CarrierBookingNumber, cancellationToken);
-        var shipment = await shipments.SingleOrDefaultAsync(new ShipmentToChangeSpec(booking.ShipmentNumber), cancellationToken)
+        var (booking, refusal) = await CarrierBookingAnswerLookup.ToAnswerAsync(carrierBookings, command.CarrierBookingNumber, command.CarrierId, cancellationToken);
+        if (refusal is not null)
+        {
+            return CarrierBookingAnswerRefused.Because<CarrierBookingAnswerResult>(refusal);
+        }
+
+        var shipment = await shipments.SingleOrDefaultAsync(new ShipmentToChangeSpec(booking!.ShipmentNumber), cancellationToken)
             ?? throw new InvalidOperationException($"Carrier booking {booking.Number} names Shipment {booking.ShipmentNumber}, which the TMS doesn't have.");
 
-        // This slice only ever answers a Requested booking (the happy path); BookingNotOpen's refusal is a later ticket.
+        if (booking.Status != CarrierBookingStatus.Requested)
+        {
+            // The booking already has an answer: the same one succeeds again as a repeat, a different one is refused.
+            return booking.IsRepeatOfConfirm(command.CarrierBookingReference, command.PlannedCollectionTime)
+                ? CarrierBookingAnswerResult.From(booking, shipment, repeat: true)
+                : CarrierBookingAnswerRefused.Because<CarrierBookingAnswerResult>(CarrierBookingAnswerRules.NotOpen(booking));
+        }
+
         if (!booking.Confirm(
                 command.CarrierBookingReference, command.PlannedCollectionTime, shipment.TransportOrderNumber, new CorrelationId(command.CorrelationId), time.GetUtcNow())
             || !shipment.Book())
         {
-            throw new InvalidOperationException($"Carrier booking {booking.Number} is {booking.Status}, not Requested.");
+            throw new InvalidOperationException($"Carrier booking {booking.Number} passed the answer rules but wasn't confirmed.");
         }
 
         // Confirming the booking saves the tracked Shipment's move to Booked with it, in one transaction (P4).
         await carrierBookings.SaveChangesAsync(cancellationToken);
-        return new CarrierBookingAnswerResult(booking.Number.Value, booking.Status, shipment.Number.Value, shipment.Status, command.CorrelationId);
+        return CarrierBookingAnswerResult.From(booking, shipment, repeat: false);
     }
 }
