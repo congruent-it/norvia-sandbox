@@ -1,6 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Nodes;
+using Azure.Messaging.ServiceBus;
+using Norvia.Tms.Api.IntegrationTests.Planning;
+using Norvia.Tms.Api.IntegrationTests.TransportOrders;
 
 namespace Norvia.Tms.Api.IntegrationTests.CarrierBookings;
 
@@ -228,4 +231,29 @@ internal static class CarrierBookingCalls
         response.StatusCode.Should().Be(HttpStatusCode.OK, body);
         return JsonNode.Parse(body)!.AsArray();
     }
+
+    /// <summary>A Carrier Shipment the Planner released, with its Requested Carrier booking.</summary>
+    public static async Task<(string CarrierBookingNumber, string ShipmentNumber)> ReleasedCarrierBookingAsync(this TmsFixture tms, CancellationToken cancellationToken)
+    {
+        var number = await tms.SubmitAcceptedAsync(cancellationToken);
+        var assigned = await tms.AssignPlannedAsync(number, PlanningCalls.ToCarrier(), cancellationToken);
+        await tms.PublishedAsync(assigned["correlationId"]!.GetValue<string>(), "ShipmentPlanned", cancellationToken);
+        var shipmentNumber = assigned["shipmentNumber"]!.GetValue<string>();
+
+        var released = await tms.ReleasedAsync(shipmentNumber, cancellationToken);
+        await tms.PublishedAsync(released["correlationId"]!.GetValue<string>(), "ShipmentReleased", cancellationToken);
+        return (released["carrierBookingNumber"]!.GetValue<string>(), shipmentNumber);
+    }
+
+    /// <summary>The named Carrier booking in a Shipment's JSON, as returned by the TMS's Shipment read.</summary>
+    public static JsonNode BookingOf(JsonNode shipment, string carrierBookingNumber) =>
+        shipment["carrierBookings"]!.AsArray().Single(booking => booking!["carrierBookingNumber"]!.GetValue<string>() == carrierBookingNumber)!;
+
+    /// <summary>Whether a published message names the given Shipment.</summary>
+    public static bool NamesShipment(ServiceBusReceivedMessage message, string shipmentNumber) =>
+        message.ApplicationProperties.TryGetValue("shipmentNumber", out var number) && Equals(number, shipmentNumber);
+
+    /// <summary>Whether a published message names the given Carrier booking.</summary>
+    public static bool NamesCarrierBooking(ServiceBusReceivedMessage message, string carrierBookingNumber) =>
+        message.ApplicationProperties.TryGetValue("carrierBookingNumber", out var number) && Equals(number, carrierBookingNumber);
 }

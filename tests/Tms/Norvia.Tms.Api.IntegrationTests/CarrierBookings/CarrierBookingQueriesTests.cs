@@ -14,7 +14,7 @@ public sealed class CarrierBookingQueriesTests(TmsFixture tms)
     [Fact]
     public async Task ShipmentsToRelease_AShipmentThatCameBackRejected_ShowsTheOutcomeAndReason()
     {
-        var (carrierBookingNumber, shipmentNumber) = await ReleasedAsync();
+        var (carrierBookingNumber, shipmentNumber) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
         await tms.RejectedAsync(carrierBookingNumber, PlanningCalls.CarrierId, "NoCapacity", _cancellationToken, "No trucks on Friday.");
 
         var toRelease = await tms.ListShipmentsToReleaseAsync(_cancellationToken);
@@ -30,7 +30,7 @@ public sealed class CarrierBookingQueriesTests(TmsFixture tms)
     [Fact]
     public async Task ShipmentsToRelease_AShipmentThatCameBackWithdrawn_ShowsTheOutcome_WithNoReason()
     {
-        var (carrierBookingNumber, shipmentNumber) = await ReleasedAsync();
+        var (carrierBookingNumber, shipmentNumber) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
         await tms.WithdrawnAsync(carrierBookingNumber, _cancellationToken);
 
         var toRelease = await tms.ListShipmentsToReleaseAsync(_cancellationToken);
@@ -57,7 +57,7 @@ public sealed class CarrierBookingQueriesTests(TmsFixture tms)
     [Fact]
     public async Task BookingsAwaitingAnswer_ListsARequestedBooking_NotYetSent()
     {
-        var (carrierBookingNumber, shipmentNumber) = await ReleasedAsync();
+        var (carrierBookingNumber, shipmentNumber) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
 
         var awaiting = await tms.ListBookingsAwaitingAnswerAsync(_cancellationToken);
 
@@ -71,7 +71,7 @@ public sealed class CarrierBookingQueriesTests(TmsFixture tms)
     [Fact]
     public async Task BookingsAwaitingAnswer_AfterItIsReportedSent_ShowsItsSentTime()
     {
-        var (carrierBookingNumber, _) = await ReleasedAsync();
+        var (carrierBookingNumber, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
         await tms.ReportedSentAsync(carrierBookingNumber, _cancellationToken);
 
         var awaiting = await tms.ListBookingsAwaitingAnswerAsync(_cancellationToken);
@@ -82,31 +82,18 @@ public sealed class CarrierBookingQueriesTests(TmsFixture tms)
     [Fact]
     public async Task BookingsAwaitingAnswer_ListsOnlyRequestedBookings_NotConfirmedRejectedNotDeliveredOrWithdrawnOnes()
     {
-        var (confirmedBooking, _) = await ReleasedAsync();
+        var (confirmedBooking, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
         await tms.ConfirmedAsync(confirmedBooking, PlanningCalls.CarrierId, "VDT-240917-0042", _cancellationToken);
-        var (rejectedBooking, _) = await ReleasedAsync();
+        var (rejectedBooking, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
         await tms.RejectedAsync(rejectedBooking, PlanningCalls.CarrierId, "NoCapacity", _cancellationToken);
-        var (withdrawnBooking, _) = await ReleasedAsync();
+        var (withdrawnBooking, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
         await tms.WithdrawnAsync(withdrawnBooking, _cancellationToken);
-        var (stillOpenBooking, _) = await ReleasedAsync();
+        var (stillOpenBooking, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
 
         var awaiting = await tms.ListBookingsAwaitingAnswerAsync(_cancellationToken);
 
         var numbers = awaiting.Select(b => b!["carrierBookingNumber"]!.GetValue<string>()).ToList();
         numbers.Should().Contain(stillOpenBooking)
             .And.NotContain([confirmedBooking, rejectedBooking, withdrawnBooking]);
-    }
-
-    /// <summary>A Carrier Shipment the Planner released, with its Requested Carrier booking.</summary>
-    private async Task<(string CarrierBookingNumber, string ShipmentNumber)> ReleasedAsync()
-    {
-        var number = await tms.SubmitAcceptedAsync(_cancellationToken);
-        var assigned = await tms.AssignPlannedAsync(number, PlanningCalls.ToCarrier(), _cancellationToken);
-        await tms.PublishedAsync(assigned["correlationId"]!.GetValue<string>(), "ShipmentPlanned", _cancellationToken);
-        var shipmentNumber = assigned["shipmentNumber"]!.GetValue<string>();
-
-        var released = await tms.ReleasedAsync(shipmentNumber, _cancellationToken);
-        await tms.PublishedAsync(released["correlationId"]!.GetValue<string>(), "ShipmentReleased", _cancellationToken);
-        return (released["carrierBookingNumber"]!.GetValue<string>(), shipmentNumber);
     }
 }

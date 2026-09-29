@@ -1,6 +1,4 @@
 using System.Net;
-using Norvia.Tms.Api.IntegrationTests.Planning;
-using Norvia.Tms.Api.IntegrationTests.TransportOrders;
 
 namespace Norvia.Tms.Api.IntegrationTests.CarrierBookings;
 
@@ -16,7 +14,7 @@ public sealed class CarrierBookingReportAndWithdrawAuthorizationTests(TmsFixture
     [Fact]
     public async Task ReportSent_WithoutAToken_IsUnauthorized()
     {
-        var carrierBookingNumber = await ReleasedAsync();
+        var (carrierBookingNumber, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
         using var caller = tms.CreateTmsClient(token: null);
 
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"/v1/carrier-bookings/{carrierBookingNumber}/report-sent", UriKind.Relative));
@@ -29,7 +27,7 @@ public sealed class CarrierBookingReportAndWithdrawAuthorizationTests(TmsFixture
     [Fact]
     public async Task ReportSent_TokenWithoutTheReportRole_IsForbidden()
     {
-        var carrierBookingNumber = await ReleasedAsync();
+        var (carrierBookingNumber, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
         using var caller = tms.CreateTmsClient(tms.IssueToken([TmsFixture.ManageRole]));
 
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"/v1/carrier-bookings/{carrierBookingNumber}/report-sent", UriKind.Relative));
@@ -42,7 +40,7 @@ public sealed class CarrierBookingReportAndWithdrawAuthorizationTests(TmsFixture
     [Fact]
     public async Task ReportSent_TokenWithTheReportRole_IsAccepted()
     {
-        var carrierBookingNumber = await ReleasedAsync();
+        var (carrierBookingNumber, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
 
         using var response = await tms.ReportSentAsync(carrierBookingNumber, _cancellationToken);
 
@@ -52,7 +50,7 @@ public sealed class CarrierBookingReportAndWithdrawAuthorizationTests(TmsFixture
     [Fact]
     public async Task Withdraw_WithoutAToken_IsUnauthorized()
     {
-        var carrierBookingNumber = await ReleasedAsync();
+        var (carrierBookingNumber, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
         using var caller = tms.CreateTmsClient(token: null);
 
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"/v1/carrier-bookings/{carrierBookingNumber}/withdraw", UriKind.Relative));
@@ -65,7 +63,7 @@ public sealed class CarrierBookingReportAndWithdrawAuthorizationTests(TmsFixture
     [Fact]
     public async Task Withdraw_TokenWithoutTheManageRole_IsForbidden()
     {
-        var carrierBookingNumber = await ReleasedAsync();
+        var (carrierBookingNumber, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
         using var caller = tms.CreateTmsClient(tms.IssueToken([TmsFixture.AnswerRole]));
 
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"/v1/carrier-bookings/{carrierBookingNumber}/withdraw", UriKind.Relative));
@@ -78,21 +76,10 @@ public sealed class CarrierBookingReportAndWithdrawAuthorizationTests(TmsFixture
     [Fact]
     public async Task Withdraw_TokenWithTheManageRole_IsAccepted()
     {
-        var carrierBookingNumber = await ReleasedAsync();
+        var (carrierBookingNumber, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
 
         using var response = await tms.WithdrawAsync(carrierBookingNumber, _cancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-    }
-
-    /// <summary>A Carrier Shipment the Planner released, with its Requested Carrier booking.</summary>
-    private async Task<string> ReleasedAsync()
-    {
-        var number = await tms.SubmitAcceptedAsync(_cancellationToken);
-        var assigned = await tms.AssignPlannedAsync(number, PlanningCalls.ToCarrier(), _cancellationToken);
-        await tms.PublishedAsync(assigned["correlationId"]!.GetValue<string>(), "ShipmentPlanned", _cancellationToken);
-        var released = await tms.ReleasedAsync(assigned["shipmentNumber"]!.GetValue<string>(), _cancellationToken);
-        await tms.PublishedAsync(released["correlationId"]!.GetValue<string>(), "ShipmentReleased", _cancellationToken);
-        return released["carrierBookingNumber"]!.GetValue<string>();
     }
 }

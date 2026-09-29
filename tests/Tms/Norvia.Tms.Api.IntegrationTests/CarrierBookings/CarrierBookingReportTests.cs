@@ -1,8 +1,8 @@
 using System.Net;
 using System.Text.Json.Nodes;
-using Azure.Messaging.ServiceBus;
 using Norvia.Tms.Api.IntegrationTests.Planning;
 using Norvia.Tms.Api.IntegrationTests.TransportOrders;
+using static Norvia.Tms.Api.IntegrationTests.CarrierBookings.CarrierBookingCalls;
 
 namespace Norvia.Tms.Api.IntegrationTests.CarrierBookings;
 
@@ -17,7 +17,7 @@ public sealed class CarrierBookingReportTests(TmsFixture tms)
     [Fact]
     public async Task ReportSent_ARequestedBooking_RecordsTheSentTime_AndPublishesNothing()
     {
-        var (carrierBookingNumber, shipmentNumber) = await ReleasedAsync();
+        var (carrierBookingNumber, shipmentNumber) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
 
         var reported = await tms.ReportedSentAsync(carrierBookingNumber, _cancellationToken);
 
@@ -25,13 +25,13 @@ public sealed class CarrierBookingReportTests(TmsFixture tms)
         reported["ignored"]!.GetValue<bool>().Should().BeFalse();
         var shipment = await tms.GetShipmentAsync(shipmentNumber, _cancellationToken);
         BookingOf(shipment, carrierBookingNumber)["sentAt"].Should().NotBeNull();
-        tms.Published.Count(m => Names(m, carrierBookingNumber)).Should().Be(1, "only ShipmentReleased names it; a sent report publishes nothing");
+        tms.Published.Count(m => NamesCarrierBooking(m, carrierBookingNumber)).Should().Be(1, "only ShipmentReleased names it; a sent report publishes nothing");
     }
 
     [Fact]
     public async Task ReportNotDelivered_ARequestedBooking_MovesItToNotDelivered_AndTheShipmentToPlanned_AndPublishesOneCarrierBookingNotDelivered()
     {
-        var (carrierBookingNumber, shipmentNumber) = await ReleasedAsync();
+        var (carrierBookingNumber, shipmentNumber) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
         var correlationId = Guid.NewGuid().ToString();
 
         var reported = await tms.ReportedNotDeliveredAsync(carrierBookingNumber, _cancellationToken, 503, "Service unavailable.", correlationId);
@@ -56,9 +56,9 @@ public sealed class CarrierBookingReportTests(TmsFixture tms)
     [Fact]
     public async Task ReportSent_ABookingWithdrawnWhileTheReportWasInFlight_IsIgnored_AndChangesNothing()
     {
-        var (carrierBookingNumber, shipmentNumber) = await ReleasedAsync();
+        var (carrierBookingNumber, shipmentNumber) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
         await tms.WithdrawnAsync(carrierBookingNumber, _cancellationToken);
-        var before = tms.Published.Count(m => Names(m, carrierBookingNumber));
+        var before = tms.Published.Count(m => NamesCarrierBooking(m, carrierBookingNumber));
 
         var reported = await tms.ReportedSentAsync(carrierBookingNumber, _cancellationToken);
 
@@ -66,15 +66,15 @@ public sealed class CarrierBookingReportTests(TmsFixture tms)
         reported["status"]!.GetValue<string>().Should().Be("Withdrawn");
         var shipment = await tms.GetShipmentAsync(shipmentNumber, _cancellationToken);
         BookingOf(shipment, carrierBookingNumber)["sentAt"].Should().BeNull();
-        tms.Published.Count(m => Names(m, carrierBookingNumber)).Should().Be(before);
+        tms.Published.Count(m => NamesCarrierBooking(m, carrierBookingNumber)).Should().Be(before);
     }
 
     [Fact]
     public async Task ReportNotDelivered_ABookingWithdrawnWhileTheReportWasInFlight_IsIgnored_AndChangesAndPublishesNothing()
     {
-        var (carrierBookingNumber, shipmentNumber) = await ReleasedAsync();
+        var (carrierBookingNumber, shipmentNumber) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
         await tms.WithdrawnAsync(carrierBookingNumber, _cancellationToken);
-        var before = tms.Published.Count(m => Names(m, carrierBookingNumber));
+        var before = tms.Published.Count(m => NamesCarrierBooking(m, carrierBookingNumber));
 
         var reported = await tms.ReportedNotDeliveredAsync(carrierBookingNumber, _cancellationToken);
 
@@ -82,7 +82,7 @@ public sealed class CarrierBookingReportTests(TmsFixture tms)
         reported["status"]!.GetValue<string>().Should().Be("Withdrawn");
         var shipment = await tms.GetShipmentAsync(shipmentNumber, _cancellationToken);
         shipment["status"]!.GetValue<string>().Should().Be("Planned", "the withdrawal already returned it, not this ignored report");
-        tms.Published.Count(m => Names(m, carrierBookingNumber)).Should().Be(before);
+        tms.Published.Count(m => NamesCarrierBooking(m, carrierBookingNumber)).Should().Be(before);
     }
 
     [Fact]
@@ -99,24 +99,5 @@ public sealed class CarrierBookingReportTests(TmsFixture tms)
         using var response = await tms.ReportNotDeliveredAsync("CB-9999999", _cancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
-    }
-
-    private static JsonNode BookingOf(JsonNode shipment, string carrierBookingNumber) =>
-        shipment["carrierBookings"]!.AsArray().Single(booking => booking!["carrierBookingNumber"]!.GetValue<string>() == carrierBookingNumber)!;
-
-    private static bool Names(ServiceBusReceivedMessage message, string carrierBookingNumber) =>
-        message.ApplicationProperties.TryGetValue("carrierBookingNumber", out var number) && Equals(number, carrierBookingNumber);
-
-    /// <summary>A Carrier Shipment the Planner released, with its Requested Carrier booking.</summary>
-    private async Task<(string CarrierBookingNumber, string ShipmentNumber)> ReleasedAsync()
-    {
-        var number = await tms.SubmitAcceptedAsync(_cancellationToken);
-        var assigned = await tms.AssignPlannedAsync(number, PlanningCalls.ToCarrier(), _cancellationToken);
-        await tms.PublishedAsync(assigned["correlationId"]!.GetValue<string>(), "ShipmentPlanned", _cancellationToken);
-        var shipmentNumber = assigned["shipmentNumber"]!.GetValue<string>();
-
-        var released = await tms.ReleasedAsync(shipmentNumber, _cancellationToken);
-        await tms.PublishedAsync(released["correlationId"]!.GetValue<string>(), "ShipmentReleased", _cancellationToken);
-        return (released["carrierBookingNumber"]!.GetValue<string>(), shipmentNumber);
     }
 }

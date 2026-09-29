@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json.Nodes;
 using Norvia.Tms.Api.IntegrationTests.Planning;
 using Norvia.Tms.Api.IntegrationTests.TransportOrders;
+using static Norvia.Tms.Api.IntegrationTests.CarrierBookings.CarrierBookingCalls;
 
 namespace Norvia.Tms.Api.IntegrationTests.CarrierBookings;
 
@@ -33,7 +34,7 @@ public sealed class CarrierBookingAnswerRefusalTests(TmsFixture tms)
     [Fact]
     public async Task Confirm_FromAnotherCarrier_IsRefused_WithNoStableCode_AndChangesNothing()
     {
-        var (carrierBookingNumber, shipmentNumber) = await ReleasedAsync();
+        var (carrierBookingNumber, shipmentNumber) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
 
         var problem = await tms.ConfirmRefusedAsync(
             carrierBookingNumber, PlanningCalls.OtherCarrierId, "VDT-240917-0042", HttpStatusCode.Forbidden, _cancellationToken);
@@ -46,7 +47,7 @@ public sealed class CarrierBookingAnswerRefusalTests(TmsFixture tms)
     [Fact]
     public async Task Reject_FromAnotherCarrier_IsRefused_WithNoStableCode_AndChangesNothing()
     {
-        var (carrierBookingNumber, shipmentNumber) = await ReleasedAsync();
+        var (carrierBookingNumber, shipmentNumber) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
 
         var problem = await tms.RejectRefusedAsync(
             carrierBookingNumber, PlanningCalls.OtherCarrierId, "NoCapacity", HttpStatusCode.Forbidden, _cancellationToken);
@@ -59,7 +60,7 @@ public sealed class CarrierBookingAnswerRefusalTests(TmsFixture tms)
     [Fact]
     public async Task Confirm_ABookingAlreadyConfirmedDifferently_IsRefused_WithBookingNotOpen()
     {
-        var (carrierBookingNumber, _) = await ReleasedAsync();
+        var (carrierBookingNumber, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
         await tms.ConfirmedAsync(carrierBookingNumber, PlanningCalls.CarrierId, "VDT-240917-0041", _cancellationToken);
 
         var problem = await tms.ConfirmRefusedAsync(
@@ -71,7 +72,7 @@ public sealed class CarrierBookingAnswerRefusalTests(TmsFixture tms)
     [Fact]
     public async Task Reject_ABookingAlreadyRejectedDifferently_IsRefused_WithBookingNotOpen()
     {
-        var (carrierBookingNumber, _) = await ReleasedAsync();
+        var (carrierBookingNumber, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
         await tms.RejectedAsync(carrierBookingNumber, PlanningCalls.CarrierId, "LaneNotServed", _cancellationToken);
 
         var problem = await tms.RejectRefusedAsync(carrierBookingNumber, PlanningCalls.CarrierId, "NoCapacity", HttpStatusCode.Conflict, _cancellationToken);
@@ -82,7 +83,7 @@ public sealed class CarrierBookingAnswerRefusalTests(TmsFixture tms)
     [Fact]
     public async Task Confirm_TheExactSameConfirmationRepeated_ReturnsTheOriginalResult_FlaggedAsARepeat_AndPublishesNoNewEvent()
     {
-        var (carrierBookingNumber, _) = await ReleasedAsync();
+        var (carrierBookingNumber, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
         var first = await tms.ConfirmedAsync(carrierBookingNumber, PlanningCalls.CarrierId, "VDT-240917-0042", _cancellationToken);
         var firstCorrelationId = first["correlationId"]!.GetValue<string>();
         await tms.PublishedAsync(firstCorrelationId, "CarrierBookingConfirmed", _cancellationToken);
@@ -98,7 +99,7 @@ public sealed class CarrierBookingAnswerRefusalTests(TmsFixture tms)
     [Fact]
     public async Task Reject_TheExactSameRejectionRepeated_ReturnsTheOriginalResult_FlaggedAsARepeat_AndPublishesNoNewEvent()
     {
-        var (carrierBookingNumber, _) = await ReleasedAsync();
+        var (carrierBookingNumber, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
         var first = await tms.RejectedAsync(carrierBookingNumber, PlanningCalls.CarrierId, "NoCapacity", _cancellationToken, "No trucks on Friday.");
         var firstCorrelationId = first["correlationId"]!.GetValue<string>();
         await tms.PublishedAsync(firstCorrelationId, "CarrierBookingRejected", _cancellationToken);
@@ -119,7 +120,7 @@ public sealed class CarrierBookingAnswerRefusalTests(TmsFixture tms)
     [Fact]
     public async Task Reject_WithAnUnknownReasonCode_IsABadRequest()
     {
-        var (carrierBookingNumber, _) = await ReleasedAsync();
+        var (carrierBookingNumber, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
 
         using var response = await tms.AnswerAsync(
             carrierBookingNumber,
@@ -132,7 +133,7 @@ public sealed class CarrierBookingAnswerRefusalTests(TmsFixture tms)
     [Fact]
     public async Task Reject_WithOtherAndNoReasonText_IsABadRequest()
     {
-        var (carrierBookingNumber, _) = await ReleasedAsync();
+        var (carrierBookingNumber, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
 
         using var response = await tms.AnswerAsync(
             carrierBookingNumber, new JsonObject { ["carrierId"] = PlanningCalls.CarrierId, ["outcome"] = "Rejected", ["reasonCode"] = "Other" }, _cancellationToken);
@@ -143,7 +144,7 @@ public sealed class CarrierBookingAnswerRefusalTests(TmsFixture tms)
     [Fact]
     public async Task Reject_WithOtherAndAReasonText_IsAccepted()
     {
-        var (carrierBookingNumber, _) = await ReleasedAsync();
+        var (carrierBookingNumber, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
 
         var rejected = await tms.RejectedAsync(carrierBookingNumber, PlanningCalls.CarrierId, "Other", _cancellationToken, "A one-off reason.");
 
@@ -167,7 +168,7 @@ public sealed class CarrierBookingAnswerRefusalTests(TmsFixture tms)
     [Fact]
     public async Task Confirm_RefusedForTheWrongCarrier_IsTracedAsRefused_WithNoFailureCode()
     {
-        var (carrierBookingNumber, _) = await ReleasedAsync();
+        var (carrierBookingNumber, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
         var correlationId = Guid.NewGuid().ToString();
 
         using var response = await tms.ConfirmAsync(
@@ -176,21 +177,5 @@ public sealed class CarrierBookingAnswerRefusalTests(TmsFixture tms)
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         var refusal = await tms.TmsLogAsync(log => log["correlationId"] == correlationId && log["outcome"] == "Refused", _cancellationToken);
         refusal["failureCode"].Should().BeNull("a key that doesn't apply is left out, never sent empty");
-    }
-
-    private static JsonNode BookingOf(JsonNode shipment, string carrierBookingNumber) =>
-        shipment["carrierBookings"]!.AsArray().Single(booking => booking!["carrierBookingNumber"]!.GetValue<string>() == carrierBookingNumber)!;
-
-    /// <summary>A Carrier Shipment the Planner released, with its Requested Carrier booking.</summary>
-    private async Task<(string CarrierBookingNumber, string ShipmentNumber)> ReleasedAsync()
-    {
-        var number = await tms.SubmitAcceptedAsync(_cancellationToken);
-        var assigned = await tms.AssignPlannedAsync(number, PlanningCalls.ToCarrier(), _cancellationToken);
-        await tms.PublishedAsync(assigned["correlationId"]!.GetValue<string>(), "ShipmentPlanned", _cancellationToken);
-        var shipmentNumber = assigned["shipmentNumber"]!.GetValue<string>();
-
-        var released = await tms.ReleasedAsync(shipmentNumber, _cancellationToken);
-        await tms.PublishedAsync(released["correlationId"]!.GetValue<string>(), "ShipmentReleased", _cancellationToken);
-        return (released["carrierBookingNumber"]!.GetValue<string>(), shipmentNumber);
     }
 }

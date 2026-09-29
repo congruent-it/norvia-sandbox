@@ -1,8 +1,8 @@
 using System.Net;
 using System.Text.Json.Nodes;
-using Azure.Messaging.ServiceBus;
 using Norvia.Tms.Api.IntegrationTests.Planning;
 using Norvia.Tms.Api.IntegrationTests.TransportOrders;
+using static Norvia.Tms.Api.IntegrationTests.CarrierBookings.CarrierBookingCalls;
 
 namespace Norvia.Tms.Api.IntegrationTests.CarrierBookings;
 
@@ -17,7 +17,7 @@ public sealed class CarrierBookingWithdrawTests(TmsFixture tms)
     [Fact]
     public async Task Withdraw_ARequestedBooking_MovesItToWithdrawn_AndTheShipmentToPlanned_AndPublishesOneCarrierBookingWithdrawn()
     {
-        var (carrierBookingNumber, shipmentNumber) = await ReleasedAsync();
+        var (carrierBookingNumber, shipmentNumber) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
 
         var withdrawn = await tms.WithdrawnAsync(carrierBookingNumber, _cancellationToken);
 
@@ -39,15 +39,15 @@ public sealed class CarrierBookingWithdrawTests(TmsFixture tms)
     [Fact]
     public async Task Withdraw_TheSameWithdrawalSentAgain_AnswersAsBeforeWithoutWithdrawingAgain()
     {
-        var (carrierBookingNumber, _) = await ReleasedAsync();
+        var (carrierBookingNumber, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
         var key = Guid.NewGuid().ToString();
         var first = await tms.WithdrawnAsync(carrierBookingNumber, _cancellationToken, key);
-        var before = tms.Published.Count(m => Names(m, carrierBookingNumber) && m.Subject == "CarrierBookingWithdrawn");
+        var before = tms.Published.Count(m => NamesCarrierBooking(m, carrierBookingNumber) && m.Subject == "CarrierBookingWithdrawn");
 
         var repeated = await tms.WithdrawnAsync(carrierBookingNumber, _cancellationToken, key);
 
         repeated["correlationId"]!.GetValue<string>().Should().Be(first["correlationId"]!.GetValue<string>());
-        tms.Published.Count(m => Names(m, carrierBookingNumber) && m.Subject == "CarrierBookingWithdrawn").Should().Be(before, "a repeat publishes no new event");
+        tms.Published.Count(m => NamesCarrierBooking(m, carrierBookingNumber) && m.Subject == "CarrierBookingWithdrawn").Should().Be(before, "a repeat publishes no new event");
     }
 
     [Fact]
@@ -61,7 +61,7 @@ public sealed class CarrierBookingWithdrawTests(TmsFixture tms)
     [Fact]
     public async Task Withdraw_ABookingAlreadyWithdrawnUnderADifferentKey_IsRefused_WithBookingNotOpen()
     {
-        var (carrierBookingNumber, _) = await ReleasedAsync();
+        var (carrierBookingNumber, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
         await tms.WithdrawnAsync(carrierBookingNumber, _cancellationToken);
 
         var problem = await tms.WithdrawRefusedAsync(carrierBookingNumber, HttpStatusCode.Conflict, _cancellationToken);
@@ -72,7 +72,7 @@ public sealed class CarrierBookingWithdrawTests(TmsFixture tms)
     [Fact]
     public async Task Withdraw_ABookingAlreadyConfirmed_IsRefused_WithBookingNotOpen()
     {
-        var (carrierBookingNumber, _) = await ReleasedAsync();
+        var (carrierBookingNumber, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
         await tms.ConfirmedAsync(carrierBookingNumber, PlanningCalls.CarrierId, "VDT-240917-0042", _cancellationToken);
 
         var problem = await tms.WithdrawRefusedAsync(carrierBookingNumber, HttpStatusCode.Conflict, _cancellationToken);
@@ -83,7 +83,7 @@ public sealed class CarrierBookingWithdrawTests(TmsFixture tms)
     [Fact]
     public async Task Confirm_AWithdrawnBooking_IsRefused_WithBookingNotOpen()
     {
-        var (carrierBookingNumber, _) = await ReleasedAsync();
+        var (carrierBookingNumber, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
         await tms.WithdrawnAsync(carrierBookingNumber, _cancellationToken);
 
         var problem = await tms.ConfirmRefusedAsync(carrierBookingNumber, PlanningCalls.CarrierId, "VDT-240917-0042", HttpStatusCode.Conflict, _cancellationToken);
@@ -94,7 +94,7 @@ public sealed class CarrierBookingWithdrawTests(TmsFixture tms)
     [Fact]
     public async Task ReportSent_AWithdrawnBooking_IsIgnored_AndChangesNothing()
     {
-        var (carrierBookingNumber, _) = await ReleasedAsync();
+        var (carrierBookingNumber, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
         await tms.WithdrawnAsync(carrierBookingNumber, _cancellationToken);
 
         var reported = await tms.ReportedSentAsync(carrierBookingNumber, _cancellationToken);
@@ -105,7 +105,7 @@ public sealed class CarrierBookingWithdrawTests(TmsFixture tms)
     [Fact]
     public async Task Withdraw_AfterABookingEndsUnconfirmed_ReleasingTheShipmentAgain_CreatesASecondCarrierBookingWithTheSameShipmentNumber()
     {
-        var (firstBookingNumber, shipmentNumber) = await ReleasedAsync();
+        var (firstBookingNumber, shipmentNumber) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
         await tms.WithdrawnAsync(firstBookingNumber, _cancellationToken);
 
         var released = await tms.ReleasedAsync(shipmentNumber, _cancellationToken);
@@ -116,24 +116,5 @@ public sealed class CarrierBookingWithdrawTests(TmsFixture tms)
         shipment["status"]!.GetValue<string>().Should().Be("Released");
         BookingOf(shipment, firstBookingNumber)["status"]!.GetValue<string>().Should().Be("Withdrawn");
         BookingOf(shipment, secondBookingNumber)["status"]!.GetValue<string>().Should().Be("Requested");
-    }
-
-    private static JsonNode BookingOf(JsonNode shipment, string carrierBookingNumber) =>
-        shipment["carrierBookings"]!.AsArray().Single(booking => booking!["carrierBookingNumber"]!.GetValue<string>() == carrierBookingNumber)!;
-
-    private static bool Names(ServiceBusReceivedMessage message, string carrierBookingNumber) =>
-        message.ApplicationProperties.TryGetValue("carrierBookingNumber", out var number) && Equals(number, carrierBookingNumber);
-
-    /// <summary>A Carrier Shipment the Planner released, with its Requested Carrier booking.</summary>
-    private async Task<(string CarrierBookingNumber, string ShipmentNumber)> ReleasedAsync()
-    {
-        var number = await tms.SubmitAcceptedAsync(_cancellationToken);
-        var assigned = await tms.AssignPlannedAsync(number, PlanningCalls.ToCarrier(), _cancellationToken);
-        await tms.PublishedAsync(assigned["correlationId"]!.GetValue<string>(), "ShipmentPlanned", _cancellationToken);
-        var shipmentNumber = assigned["shipmentNumber"]!.GetValue<string>();
-
-        var released = await tms.ReleasedAsync(shipmentNumber, _cancellationToken);
-        await tms.PublishedAsync(released["correlationId"]!.GetValue<string>(), "ShipmentReleased", _cancellationToken);
-        return (released["carrierBookingNumber"]!.GetValue<string>(), shipmentNumber);
     }
 }
