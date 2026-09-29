@@ -1,4 +1,5 @@
 using Ardalis.SharedKernel;
+using Norvia.Tms.Application.CarrierBookings;
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Carriers;
 
@@ -18,13 +19,13 @@ internal static class CarrierBookingAnswerLookup
     public static async Task<(CarrierBooking? Booking, CarrierBookingRefusal? Refusal)> ToAnswerAsync(
         IRepository<CarrierBooking> carrierBookings, string carrierBookingNumber, string carrierId, CancellationToken cancellationToken)
     {
-        if (!CarrierBookingNumber.TryParse(carrierBookingNumber, out var number)
-            || await carrierBookings.SingleOrDefaultAsync(new CarrierBookingByNumberSpec(number), cancellationToken) is not { } booking)
+        var (booking, refusal) = await CarrierBookingLookup.ToBookingAsync(carrierBookings, carrierBookingNumber, cancellationToken);
+        if (refusal is not null)
         {
-            return (null, CarrierBookingAnswerRules.BookingNotFound(carrierBookingNumber));
+            return (null, refusal);
         }
 
-        return CarrierBookingAnswerRules.CheckCarrier(booking, new CarrierId(carrierId)) is { } wrongCarrier
+        return CarrierBookingAnswerRules.CheckCarrier(booking!, new CarrierId(carrierId)) is { } wrongCarrier
             ? (null, wrongCarrier)
             : (booking, null);
     }

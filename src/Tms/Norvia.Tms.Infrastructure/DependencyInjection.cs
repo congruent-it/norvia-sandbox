@@ -15,6 +15,7 @@ using Norvia.Tms.Application.Shippers;
 using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.Rate;
 using Norvia.Tms.Application.TransportOrders.Submit;
+using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Infrastructure.CarrierBookings;
 using Norvia.Tms.Infrastructure.Carriers;
@@ -49,6 +50,10 @@ public static class DependencyInjection
 
         builder.Services.AddSingleton(services =>
             new TransportOrderRules(services.GetRequiredService<IOptions<TransportOrderRulesOptions>>().Value.MaxTotalWeightKg));
+
+        builder.Services.AddOptions<CarrierBookingOptions>().BindConfiguration(CarrierBookingOptions.SectionName)
+            .ValidateDataAnnotations().ValidateOnStart();
+        builder.Services.AddSingleton(services => new CarrierBookingRules(services.GetRequiredService<IOptions<CarrierBookingOptions>>().Value.OverdueAfter));
         builder.Services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
         builder.Services.AddScoped(typeof(IReadRepository<>), typeof(EfRepository<>));
         builder.Services.AddScoped<IDomainEventDispatcher, MediatorDomainEventDispatcher>();

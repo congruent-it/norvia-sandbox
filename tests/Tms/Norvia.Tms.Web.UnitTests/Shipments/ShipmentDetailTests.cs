@@ -63,7 +63,7 @@ public sealed class ShipmentDetailTests : TmsWebContext
         Queries.FindShipmentAsync("SH-0000012", Arg.Any<CancellationToken>())
             .Returns(Samples.Shipment(
                 "SH-0000012",
-                carrierBookings: [new CarrierBookingView("CB-0000001", CarrierBookingStatus.Requested, DateTimeOffset.UtcNow, null, null, null, null, null)]));
+                carrierBookings: [new CarrierBookingView("CB-0000001", CarrierBookingStatus.Requested, DateTimeOffset.UtcNow, null, null, null, null, null, null, null, null, null)]));
 
         var page = RenderDetail("SH-0000012");
 

@@ -196,6 +196,134 @@ public sealed class CarrierBookingTests
         booking.IsRepeatOfReject(CarrierBookingRejectionReason.NoCapacity, reasonText: null).Should().BeFalse();
     }
 
+    [Fact]
+    public void MarkSent_ARequestedBooking_RecordsTheSentTime_AndRaisesNoDomainEvent()
+    {
+        var booking = Requested();
+        var sentAt = RequestedAt.AddMinutes(5);
+
+        var sent = booking.MarkSent(sentAt);
+
+        sent.Should().BeTrue();
+        booking.SentAt.Should().Be(sentAt);
+        booking.Status.Should().Be(CarrierBookingStatus.Requested, "a sent report doesn't change the booking's status");
+        booking.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void MarkSent_ABookingThatIsNoLongerRequested_ChangesNothing()
+    {
+        var booking = Requested();
+        booking.Reject(CarrierBookingRejectionReason.NoCapacity, reasonText: null, Answer, AnsweredAt);
+        booking.ClearDomainEvents();
+
+        var sent = booking.MarkSent(AnsweredAt.AddMinutes(1));
+
+        sent.Should().BeFalse();
+        booking.SentAt.Should().BeNull();
+    }
+
+    [Fact]
+    public void ReportNotDelivered_ARequestedBooking_MovesItToNotDelivered_WithTheTechnicalCause()
+    {
+        var booking = Requested();
+        var reportedAt = RequestedAt.AddMinutes(10);
+        var reportCorrelationId = new CorrelationId("corr-report");
+
+        var reported = booking.ReportNotDelivered(503, "Service unavailable.", reportCorrelationId, reportedAt);
+
+        reported.Should().BeTrue();
+        booking.Status.Should().Be(CarrierBookingStatus.NotDelivered);
+        booking.NotDeliveredStatusCode.Should().Be(503);
+        booking.NotDeliveredMessage.Should().Be("Service unavailable.");
+        booking.NotDeliveredAt.Should().Be(reportedAt);
+    }
+
+    [Fact]
+    public void ReportNotDelivered_ARequestedBooking_RaisesCarrierBookingNotDelivered_WithTheReportsCorrelationId()
+    {
+        var booking = Requested();
+        var reportCorrelationId = new CorrelationId("corr-report");
+
+        booking.ReportNotDelivered(503, "Service unavailable.", reportCorrelationId, RequestedAt.AddMinutes(10));
+
+        var notDelivered = booking.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<CarrierBookingNotDeliveredEvent>().Subject;
+        notDelivered.Booking.Should().BeSameAs(booking);
+        notDelivered.CorrelationId.Should().Be(reportCorrelationId);
+    }
+
+    [Fact]
+    public void ReportNotDelivered_ABookingThatIsNoLongerRequested_ChangesNothing()
+    {
+        var booking = Requested();
+        booking.Confirm("VDT-240917-0042", plannedCollectionTime: null, TransportOrderNumberOfTwelve, Answer, AnsweredAt);
+        booking.ClearDomainEvents();
+
+        var reported = booking.ReportNotDelivered(503, "Service unavailable.", new CorrelationId("corr-report"), AnsweredAt.AddMinutes(1));
+
+        reported.Should().BeFalse();
+        booking.Status.Should().Be(CarrierBookingStatus.Confirmed);
+        booking.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Withdraw_ARequestedBooking_MovesItToWithdrawn()
+    {
+        var booking = Requested();
+        var key = new IdempotencyKey("key-withdraw-1");
+        var withdrawCorrelationId = new CorrelationId("corr-withdraw");
+        var withdrawnAt = RequestedAt.AddMinutes(15);
+
+        var withdrawn = booking.Withdraw(key, withdrawCorrelationId, withdrawnAt);
+
+        withdrawn.Should().BeTrue();
+        booking.Status.Should().Be(CarrierBookingStatus.Withdrawn);
+        booking.WithdrawnAt.Should().Be(withdrawnAt);
+        booking.WithdrawalUnder(key).Should().Be(withdrawCorrelationId);
+    }
+
+    [Fact]
+    public void Withdraw_ARequestedBooking_RaisesCarrierBookingWithdrawn()
+    {
+        var booking = Requested();
+
+        booking.Withdraw(new IdempotencyKey("key-withdraw-1"), new CorrelationId("corr-withdraw"), RequestedAt.AddMinutes(15));
+
+        var withdrawn = booking.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<CarrierBookingWithdrawnEvent>().Subject;
+        withdrawn.Booking.Should().BeSameAs(booking);
+    }
+
+    [Fact]
+    public void Withdraw_ABookingThatIsNoLongerRequested_ChangesNothing()
+    {
+        var booking = Requested();
+        booking.Reject(CarrierBookingRejectionReason.NoCapacity, reasonText: null, Answer, AnsweredAt);
+        booking.ClearDomainEvents();
+
+        var withdrawn = booking.Withdraw(new IdempotencyKey("key-withdraw-1"), new CorrelationId("corr-withdraw"), AnsweredAt.AddMinutes(1));
+
+        withdrawn.Should().BeFalse();
+        booking.Status.Should().Be(CarrierBookingStatus.Rejected);
+        booking.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void WithdrawalUnder_AnUnknownKey_IsNull()
+    {
+        var booking = Requested();
+        booking.Withdraw(new IdempotencyKey("key-withdraw-1"), new CorrelationId("corr-withdraw"), RequestedAt.AddMinutes(15));
+
+        booking.WithdrawalUnder(new IdempotencyKey("key-withdraw-2")).Should().BeNull();
+    }
+
+    [Fact]
+    public void WithdrawalUnder_ABookingNeverWithdrawn_IsNull()
+    {
+        var booking = Requested();
+
+        booking.WithdrawalUnder(new IdempotencyKey("key-withdraw-1")).Should().BeNull();
+    }
+
     private static CarrierBooking Requested()
     {
         var booking = CarrierBooking.Request(CarrierBookingNumber.FromSequence(42), Shipment, ShipmentNumberOfTwelve, VanDijk, Release, RequestedAt);

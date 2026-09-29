@@ -1,6 +1,7 @@
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Mediator;
+using Norvia.Tms.Application.CarrierBookings;
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TransportOrders;
@@ -17,7 +18,7 @@ public sealed class ConfirmCarrierBookingHandler(IRepository<CarrierBooking> car
         var (booking, refusal) = await CarrierBookingAnswerLookup.ToAnswerAsync(carrierBookings, command.CarrierBookingNumber, command.CarrierId, cancellationToken);
         if (refusal is not null)
         {
-            return CarrierBookingAnswerRefused.Because<CarrierBookingAnswerResult>(refusal);
+            return CarrierBookingRefused.Because<CarrierBookingAnswerResult>(refusal);
         }
 
         var shipment = await shipments.SingleOrDefaultAsync(new ShipmentToChangeSpec(booking!.ShipmentNumber), cancellationToken)
@@ -28,7 +29,7 @@ public sealed class ConfirmCarrierBookingHandler(IRepository<CarrierBooking> car
             // The booking already has an answer: the same one succeeds again as a repeat, a different one is refused.
             return booking.IsRepeatOfConfirm(command.CarrierBookingReference, command.PlannedCollectionTime)
                 ? CarrierBookingAnswerResult.From(booking, shipment, repeat: true)
-                : CarrierBookingAnswerRefused.Because<CarrierBookingAnswerResult>(CarrierBookingAnswerRules.NotOpen(booking));
+                : CarrierBookingRefused.Because<CarrierBookingAnswerResult>(CarrierBookingAnswerRules.NotOpen(booking));
         }
 
         if (!booking.Confirm(

@@ -55,6 +55,16 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
 
+                    b.Property<DateTimeOffset?>("NotDeliveredAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("NotDeliveredMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int?>("NotDeliveredStatusCode")
+                        .HasColumnType("int");
+
                     b.Property<string>("Number")
                         .IsRequired()
                         .HasMaxLength(10)
@@ -74,6 +84,9 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                     b.Property<DateTimeOffset>("RequestedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<DateTimeOffset?>("SentAt")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<Guid>("ShipmentId")
                         .HasColumnType("uniqueidentifier");
 
@@ -86,6 +99,17 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("WithdrawalCorrelationId")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("WithdrawalKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTimeOffset?>("WithdrawnAt")
+                        .HasColumnType("datetimeoffset");
 
                     b.HasKey("Id");
 
