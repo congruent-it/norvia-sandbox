@@ -53,7 +53,7 @@ public static class DependencyInjection
 
         builder.Services.AddOptions<CarrierBookingOptions>().BindConfiguration(CarrierBookingOptions.SectionName)
             .ValidateDataAnnotations().ValidateOnStart();
-        builder.Services.AddSingleton(services => new CarrierBookingRules(services.GetRequiredService<IOptions<CarrierBookingOptions>>().Value.OverdueAfter));
+        builder.Services.AddSingleton(services => new CarrierBookingOverdueRules(services.GetRequiredService<IOptions<CarrierBookingOptions>>().Value.OverdueAfter));
         builder.Services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
         builder.Services.AddScoped(typeof(IReadRepository<>), typeof(EfRepository<>));
         builder.Services.AddScoped<IDomainEventDispatcher, MediatorDomainEventDispatcher>();

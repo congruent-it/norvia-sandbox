@@ -1,13 +1,34 @@
+using Norvia.Tms.Domain.Carriers;
+using static System.FormattableString;
+
 namespace Norvia.Tms.Domain.CarrierBookings;
 
-/// <summary>P4's overdue rule for the Planner's list of bookings awaiting an answer.</summary>
-public sealed class CarrierBookingRules(TimeSpan overdueAfter)
+/// <summary>
+/// P4's Carrier booking rules: BookingNotFound and NotOpen guard every operation on a booking (the Carrier's answer, the
+/// P4 booking Logic App's reports, the Planner's withdrawal); CheckCarrier is the answer's own, as only the Carrier
+/// booking's own Carrier may answer it. Whether an answer that doesn't pass NotOpen is a repeat of what's already
+/// recorded, which succeeds instead of failing with <c>BookingNotOpen</c>, is for the caller to check against the
+/// specific answer, with <see cref="CarrierBooking.IsRepeatOfConfirm"/> or <see cref="CarrierBooking.IsRepeatOfReject"/>.
+/// </summary>
+public static class CarrierBookingRules
 {
-    /// <summary>
-    /// A Requested booking is overdue once it has waited longer than the TMS's setting, or once its Shipment's
-    /// collection window's earliest time has passed, whichever comes first. Overdue is only a flag: nothing acts on it.
-    /// </summary>
-    /// <param name="collectionWindowEarliest">The Shipment's Transport Order's collection window's earliest time, if it has one.</param>
-    public bool IsOverdue(DateTimeOffset requestedAt, DateTimeOffset? collectionWindowEarliest, DateTimeOffset now) =>
-        now - requestedAt >= overdueAfter || (collectionWindowEarliest is { } earliest && now >= earliest);
+    public static CarrierBookingRefusal BookingNotFound(string carrierBookingNumber) =>
+        new(CarrierBookingRefusalCode.BookingNotFound, Invariant($"Carrier booking {carrierBookingNumber} is not known to the TMS."));
+
+    /// <summary>Returns the wrong-Carrier refusal (no stable code, per the design's answer rules), or null when the Carrier answering is the booking's own.</summary>
+    public static CarrierBookingRefusal? CheckCarrier(CarrierBooking booking, CarrierId carrierId)
+    {
+        ArgumentNullException.ThrowIfNull(booking);
+        ArgumentNullException.ThrowIfNull(carrierId);
+        return booking.CarrierId == carrierId
+            ? null
+            : new(Code: null, Invariant($"Carrier booking {booking.Number} belongs to Carrier {booking.CarrierId}, not {carrierId}."));
+    }
+
+    /// <summary>The refusal for an operation on a booking that isn't Requested (and, for an answer, isn't a repeat of what's already recorded).</summary>
+    public static CarrierBookingRefusal NotOpen(CarrierBooking booking)
+    {
+        ArgumentNullException.ThrowIfNull(booking);
+        return new(CarrierBookingRefusalCode.BookingNotOpen, Invariant($"Carrier booking {booking.Number} is {booking.Status}, not Requested."));
+    }
 }

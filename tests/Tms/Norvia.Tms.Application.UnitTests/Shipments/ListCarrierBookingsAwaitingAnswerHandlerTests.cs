@@ -21,7 +21,7 @@ public sealed class ListCarrierBookingsAwaitingAnswerHandlerTests
     private readonly IReadRepository<Shipment> _shipments = Substitute.For<IReadRepository<Shipment>>();
     private readonly IReadRepository<TransportOrder> _transportOrders = Substitute.For<IReadRepository<TransportOrder>>();
     private readonly ICarrierDirectory _carriers = Substitute.For<ICarrierDirectory>();
-    private readonly CarrierBookingRules _rules = new(TimeSpan.FromHours(2));
+    private readonly CarrierBookingOverdueRules _rules = new(TimeSpan.FromHours(2));
     private readonly FakeTimeProvider _time = new(Samples.Now.AddHours(1).AddMinutes(30));
     private readonly List<CarrierBooking> _allBookings = [];
     private readonly List<Shipment> _allShipments = [];

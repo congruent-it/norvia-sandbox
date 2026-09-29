@@ -1,35 +1,55 @@
 using Norvia.Tms.Domain.CarrierBookings;
+using Norvia.Tms.Domain.Carriers;
+using Norvia.Tms.Domain.Shipments;
+using Norvia.Tms.Domain.TransportOrders;
 
 namespace Norvia.Tms.Domain.UnitTests.CarrierBookings;
 
-/// <summary>P4's overdue rule: a Requested booking's flag for the Planner's list of bookings awaiting an answer.</summary>
+/// <summary>P4's Carrier booking rules: what the TMS refuses before it records an answer, report or withdrawal.</summary>
 public sealed class CarrierBookingRulesTests
 {
-    private static readonly DateTimeOffset RequestedAt = new(2026, 9, 24, 8, 0, 0, TimeSpan.Zero);
-    private readonly CarrierBookingRules _rules = new(TimeSpan.FromHours(2));
+    private static readonly CarrierId VanDijk = new("CAR-0001");
+    private static readonly CorrelationId Release = new("corr-release");
+    private static readonly DateTimeOffset RequestedAt = new(2026, 9, 24, 12, 45, 0, TimeSpan.Zero);
+    private static readonly ShipmentId Shipment = ShipmentId.New();
+    private static readonly ShipmentNumber ShipmentNumberOfTwelve = ShipmentNumber.FromSequence(12);
 
     [Fact]
-    public void IsOverdue_RequestedLessThanTheSettingAgo_WithNoCollectionWindowPassed_IsFalse()
+    public void BookingNotFound_NamesTheNumberTheCallerGave()
     {
-        _rules.IsOverdue(RequestedAt, RequestedAt.AddHours(6), RequestedAt.AddHours(1)).Should().BeFalse();
+        var refusal = CarrierBookingRules.BookingNotFound("CB-9999999");
+
+        refusal.Code.Should().Be(CarrierBookingRefusalCode.BookingNotFound);
+        refusal.Message.Should().Be("Carrier booking CB-9999999 is not known to the TMS.");
     }
 
     [Fact]
-    public void IsOverdue_RequestedAtLeastTheSettingAgo_IsTrue()
+    public void CheckCarrier_TheBookingsOwnCarrier_RefusesNothing()
     {
-        _rules.IsOverdue(RequestedAt, RequestedAt.AddDays(1), RequestedAt.AddHours(2)).Should().BeTrue();
+        CarrierBookingRules.CheckCarrier(Requested(), VanDijk).Should().BeNull();
     }
 
     [Fact]
-    public void IsOverdue_TheCollectionWindowsEarliestTimeHasPassed_IsTrueEvenBeforeTheSetting()
+    public void CheckCarrier_AnotherCarrier_IsRefused_WithNoStableCode()
     {
-        _rules.IsOverdue(RequestedAt, RequestedAt.AddMinutes(30), RequestedAt.AddMinutes(31)).Should().BeTrue();
+        var refusal = CarrierBookingRules.CheckCarrier(Requested(), new CarrierId("CAR-9999"));
+
+        refusal!.Code.Should().BeNull("the design's answer rules give the wrong-Carrier rule no code, only \"Refused\"");
+        refusal.Message.Should().Be("Carrier booking CB-0000042 belongs to Carrier CAR-0001, not CAR-9999.");
     }
 
     [Fact]
-    public void IsOverdue_NoCollectionWindow_OnlyTheSettingMatters()
+    public void NotOpen_NamesTheBookingsCurrentStatus()
     {
-        _rules.IsOverdue(RequestedAt, collectionWindowEarliest: null, RequestedAt.AddMinutes(30)).Should().BeFalse();
-        _rules.IsOverdue(RequestedAt, collectionWindowEarliest: null, RequestedAt.AddHours(3)).Should().BeTrue();
+        var booking = Requested();
+        booking.Reject(CarrierBookingRejectionReason.NoCapacity, reasonText: null, new CorrelationId("corr-answer"), RequestedAt.AddHours(1));
+
+        var refusal = CarrierBookingRules.NotOpen(booking);
+
+        refusal.Code.Should().Be(CarrierBookingRefusalCode.BookingNotOpen);
+        refusal.Message.Should().Be("Carrier booking CB-0000042 is Rejected, not Requested.");
     }
+
+    private static CarrierBooking Requested() =>
+        CarrierBooking.Request(CarrierBookingNumber.FromSequence(42), Shipment, ShipmentNumberOfTwelve, VanDijk, Release, RequestedAt);
 }

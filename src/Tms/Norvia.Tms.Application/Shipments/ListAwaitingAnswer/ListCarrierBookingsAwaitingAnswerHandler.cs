@@ -12,7 +12,7 @@ public sealed class ListCarrierBookingsAwaitingAnswerHandler(
     IReadRepository<Shipment> shipments,
     IReadRepository<TransportOrder> transportOrders,
     ICarrierDirectory carriers,
-    CarrierBookingRules rules,
+    CarrierBookingOverdueRules rules,
     TimeProvider time)
     : IQueryHandler<ListCarrierBookingsAwaitingAnswerQuery, IReadOnlyList<CarrierBookingAwaitingAnswerSummary>>
 {

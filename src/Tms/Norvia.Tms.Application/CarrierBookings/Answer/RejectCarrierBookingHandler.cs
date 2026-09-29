@@ -29,7 +29,7 @@ public sealed class RejectCarrierBookingHandler(IRepository<CarrierBooking> carr
             // The booking already has an answer: the same one succeeds again as a repeat, a different one is refused.
             return booking.IsRepeatOfReject(command.ReasonCode, command.ReasonText)
                 ? CarrierBookingAnswerResult.From(booking, shipment, repeat: true)
-                : CarrierBookingRefused.Because<CarrierBookingAnswerResult>(CarrierBookingAnswerRules.NotOpen(booking));
+                : CarrierBookingRefused.Because<CarrierBookingAnswerResult>(CarrierBookingRules.NotOpen(booking));
         }
 
         if (!booking.Reject(command.ReasonCode, command.ReasonText, new CorrelationId(command.CorrelationId), time.GetUtcNow()) || !shipment.ReturnToPlanned())

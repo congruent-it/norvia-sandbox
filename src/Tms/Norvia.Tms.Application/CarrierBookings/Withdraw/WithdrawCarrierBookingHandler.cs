@@ -35,7 +35,7 @@ public sealed class WithdrawCarrierBookingHandler(IRepository<CarrierBooking> ca
 
         if (booking.Status != CarrierBookingStatus.Requested)
         {
-            return CarrierBookingRefused.Because<CarrierBookingWithdrawResult>(CarrierBookingAnswerRules.NotOpen(booking));
+            return CarrierBookingRefused.Because<CarrierBookingWithdrawResult>(CarrierBookingRules.NotOpen(booking));
         }
 
         if (!booking.Withdraw(key, new CorrelationId(command.CorrelationId), time.GetUtcNow()) || !shipment.ReturnToPlanned())

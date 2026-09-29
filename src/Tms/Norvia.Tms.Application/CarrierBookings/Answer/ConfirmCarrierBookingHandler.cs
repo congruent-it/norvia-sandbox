@@ -29,7 +29,7 @@ public sealed class ConfirmCarrierBookingHandler(IRepository<CarrierBooking> car
             // The booking already has an answer: the same one succeeds again as a repeat, a different one is refused.
             return booking.IsRepeatOfConfirm(command.CarrierBookingReference, command.PlannedCollectionTime)
                 ? CarrierBookingAnswerResult.From(booking, shipment, repeat: true)
-                : CarrierBookingRefused.Because<CarrierBookingAnswerResult>(CarrierBookingAnswerRules.NotOpen(booking));
+                : CarrierBookingRefused.Because<CarrierBookingAnswerResult>(CarrierBookingRules.NotOpen(booking));
         }
 
         if (!booking.Confirm(

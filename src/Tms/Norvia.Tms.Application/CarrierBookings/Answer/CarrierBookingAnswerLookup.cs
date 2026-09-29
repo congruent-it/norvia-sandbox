@@ -25,7 +25,7 @@ internal static class CarrierBookingAnswerLookup
             return (null, refusal);
         }
 
-        return CarrierBookingAnswerRules.CheckCarrier(booking!, new CarrierId(carrierId)) is { } wrongCarrier
+        return CarrierBookingRules.CheckCarrier(booking!, new CarrierId(carrierId)) is { } wrongCarrier
             ? (null, wrongCarrier)
             : (booking, null);
     }

@@ -15,7 +15,7 @@ internal static class CarrierBookingLookup
         if (!CarrierBookingNumber.TryParse(carrierBookingNumber, out var number)
             || await carrierBookings.SingleOrDefaultAsync(new CarrierBookingByNumberSpec(number), cancellationToken) is not { } booking)
         {
-            return (null, CarrierBookingAnswerRules.BookingNotFound(carrierBookingNumber));
+            return (null, CarrierBookingRules.BookingNotFound(carrierBookingNumber));
         }
 
         return (booking, null);
