@@ -8,8 +8,7 @@ namespace Norvia.Tms.Domain.CarrierBookings;
 /// <summary>
 /// A request to one Carrier to carry one Shipment, together with that Carrier's answer. A Shipment can have several
 /// Carrier bookings over its life, one after each that ends without being carried out, but only one open at a time
-/// (P4). The TMS owns it. This build covers only the happy path: an answer for a booking that isn't Requested, field
-/// validation, idempotent repeats, sent/not-delivered reporting and withdrawal are later tickets.
+/// (P4). The TMS owns it. Sent/not-delivered reporting and withdrawal are later tickets.
 /// </summary>
 public sealed class CarrierBooking : EntityBase<CarrierBookingId>, IAggregateRoot
 {
@@ -128,4 +127,14 @@ public sealed class CarrierBooking : EntityBase<CarrierBookingId>, IAggregateRoo
         RegisterDomainEvent(new CarrierBookingRejectedEvent(this));
         return true;
     }
+
+    /// <summary>True when a confirmation exactly repeats the one already recorded: the same reference and planned collection time.</summary>
+    public bool IsRepeatOfConfirm(string carrierBookingReference, DateTimeOffset? plannedCollectionTime) =>
+        Status == CarrierBookingStatus.Confirmed
+        && CarrierBookingReference == carrierBookingReference
+        && PlannedCollectionTime == plannedCollectionTime;
+
+    /// <summary>True when a rejection exactly repeats the one already recorded: the same reason code and text.</summary>
+    public bool IsRepeatOfReject(CarrierBookingRejectionReason reason, string? reasonText) =>
+        Status == CarrierBookingStatus.Rejected && RejectionReason == reason && RejectionReasonText == reasonText;
 }

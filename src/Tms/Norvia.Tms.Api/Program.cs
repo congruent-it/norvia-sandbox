@@ -9,6 +9,7 @@ using Norvia.Tms.Api.CarrierBookings;
 using Norvia.Tms.Api.Shipments;
 using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Api.TransportOrders;
+using Norvia.Tms.Application.CarrierBookings.Answer;
 using Norvia.Tms.Application.Shipments.Reassign;
 using Norvia.Tms.Application.Shipments.Release;
 using Norvia.Tms.Application.TransportOrders.Assign;
@@ -27,6 +28,10 @@ builder.Services.AddScoped<IPipelineBehavior<RateTransportOrderCommand, Result<R
 builder.Services.AddScoped<IPipelineBehavior<AssignTransportOrderCommand, Result<AssignTransportOrderResult>>, TrackAssignmentInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<ReassignShipmentCommand, Result<ReassignShipmentResult>>, TrackReassignmentInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<ReleaseShipmentCommand, Result<ReleaseShipmentResult>>, TrackReleaseInLoggingScope>();
+builder.Services
+    .AddScoped<IPipelineBehavior<ConfirmCarrierBookingCommand, Result<CarrierBookingAnswerResult>>, TrackCarrierBookingAnswerInLoggingScope<ConfirmCarrierBookingCommand>>();
+builder.Services
+    .AddScoped<IPipelineBehavior<RejectCarrierBookingCommand, Result<CarrierBookingAnswerResult>>, TrackCarrierBookingAnswerInLoggingScope<RejectCarrierBookingCommand>>();
 builder.AddTmsInfrastructure();
 builder.AddTmsOutboxPublisher();
 builder.AddTmsRatingWorker();
