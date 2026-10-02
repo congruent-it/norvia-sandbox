@@ -8,6 +8,8 @@ namespace Norvia.PartnerPortal.Infrastructure.UnitTests.Data;
 public sealed class CarrierBookingRequestConfigurationTests
 {
     private static readonly string[] UniqueKey = ["PersonaId", "CarrierBookingNumber"];
+    private static readonly string[] DueTime = ["AutoAnswerDueAt"];
+    private static readonly string[] PersonaKey = ["PersonaId"];
 
     private static PartnerPortalDbContext NewContext() =>
         new(new DbContextOptionsBuilder<PartnerPortalDbContext>().UseSqlServer("Server=unused").Options);
@@ -81,5 +83,39 @@ public sealed class CarrierBookingRequestConfigurationTests
         {
             entity.FindProperty(name)!.IsNullable.Should().BeTrue(name);
         }
+    }
+
+    [Fact]
+    public void TheAutomaticAnswer_IsStoredAsWordsAndDates_AndTheDueTimeIsIndexed()
+    {
+        using var context = NewContext();
+        var entity = context.Model.FindEntityType(typeof(CarrierBookingRequest))!;
+
+        entity.FindProperty(nameof(CarrierBookingRequest.AutoAnswerMode))!.GetProviderClrType().Should().Be<string>();
+        entity.FindProperty(nameof(CarrierBookingRequest.AutoAnswerReason))!.GetProviderClrType().Should().Be<string>();
+        entity.GetIndexes().Should().Contain(index => index.Properties.Select(property => property.Name).SequenceEqual(DueTime));
+    }
+
+    [Fact]
+    public void ThePolicyOfACarrierPersona_IsStoredOncePerPersona_AsColumnsOfItsOwn()
+    {
+        using var context = NewContext();
+        var entity = context.Model.FindEntityType(typeof(CarrierAnswerSettings))!;
+
+        entity.GetIndexes().Should().Contain(index => index.IsUnique && index.Properties.Select(property => property.Name).SequenceEqual(PersonaKey));
+        var policy = entity.FindComplexProperty(nameof(CarrierAnswerSettings.Policy))!.ComplexType;
+        policy.GetProperties().Select(property => property.GetColumnName()).Should().BeEquivalentTo("Mode", "RejectionReason", "DelayMilliseconds");
+    }
+
+    [Fact]
+    public void TheDelay_IsStoredInMilliseconds()
+    {
+        using var context = NewContext();
+        var delay = context.Model.FindEntityType(typeof(CarrierAnswerSettings))!
+            .FindComplexProperty(nameof(CarrierAnswerSettings.Policy))!.ComplexType.FindProperty(nameof(CarrierAnswerPolicy.Delay))!;
+        var converter = delay.GetValueConverter()!;
+
+        converter.ConvertToProvider(TimeSpan.FromSeconds(7)).Should().Be(7000L);
+        converter.ConvertFromProvider(7000L).Should().Be(TimeSpan.FromSeconds(7));
     }
 }

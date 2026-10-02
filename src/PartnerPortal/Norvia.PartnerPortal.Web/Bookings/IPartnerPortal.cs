@@ -1,6 +1,7 @@
 using Norvia.PartnerPortal.Application.Bookings;
 using Norvia.PartnerPortal.Application.CarrierBookings;
 using Norvia.PartnerPortal.Application.CarrierBookings.Answer;
+using Norvia.PartnerPortal.Application.CarrierBookings.AnswerSettings;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
 
@@ -28,4 +29,13 @@ public interface IPartnerPortal
     /// how the inbox now has the request; null when there is no such Carrier Persona or request.
     /// </summary>
     Task<AnsweredCarrierBooking?> AnswerCarrierBookingAsync(string personaId, string carrierBookingNumber, CarrierAnswer answer, CancellationToken cancellationToken);
+
+    /// <summary>How the Carrier Persona answers its booking requests now; null when there is no such Carrier Persona.</summary>
+    Task<CarrierAnswerSettingsView?> GetCarrierAnswerSettingsAsync(string personaId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Changes how the Carrier Persona answers the requests that reach it from now on, and returns the new settings;
+    /// null when there is no such Carrier Persona. A delay out of range throws, as the page limits it.
+    /// </summary>
+    Task<CarrierAnswerSettingsView?> ChangeCarrierAnswerSettingsAsync(string personaId, CarrierAnswerSettingsView settings, CancellationToken cancellationToken);
 }

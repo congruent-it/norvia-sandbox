@@ -56,10 +56,14 @@ public sealed class AppHostModelTests
         var portal = await EnvironmentOfAsync(builder, "partner-portal-web");
 
         portal.Should().Contain("PartnerApi__BaseAddress", "{partner-api.bindings.http.url}/partner/v1")
-            .And.Contain("PartnerApi__PersonaClientIds", "brouwer-dranken=norvia-local-persona-brouwer-dranken;van-dijk-transport=norvia-local-persona-van-dijk-transport")
+            .And.Contain("PartnerApi__PersonaClientIds", "brouwer-dranken=norvia-local-persona-brouwer-dranken;van-dijk-transport=norvia-local-persona-van-dijk-transport;kessler-spedition=norvia-local-persona-kessler-spedition;pakketpunt-express=norvia-local-persona-pakketpunt-express")
             .And.Contain("PartnerApi__LocalTokens__Roles__brouwer-dranken__0", "TransportOrders.Submit")
             .And.ContainKey("PartnerApi__LocalTokens__SigningKey");
-        portal.Should().Contain("PartnerApi__LocalTokens__Roles__van-dijk-transport__0", "CarrierBookings.Respond", "a Carrier Persona answers its booking requests");
+        foreach (var carrier in new[] { "van-dijk-transport", "kessler-spedition", "pakketpunt-express" })
+        {
+            portal.Should().Contain($"PartnerApi__LocalTokens__Roles__{carrier}__0", "CarrierBookings.Respond", "a Carrier Persona answers its booking requests");
+        }
+
         portal.Keys.Should().NotContain(key => key.StartsWith("PartnerApi__LocalTokens__Roles__brouwer-dranken__1", StringComparison.Ordinal), "a Shipper Persona holds no respond role");
         portal.Keys.Should().NotContain(key => key.StartsWith("PartnerApi__Entra", StringComparison.Ordinal));
     }
@@ -88,7 +92,7 @@ public sealed class AppHostModelTests
         var portal = await EnvironmentOfAsync(builder, "partner-portal-web");
         var partnerApi = await EnvironmentOfAsync(builder, "partner-api");
 
-        foreach (var persona in new[] { "brouwer-dranken", "van-dijk-transport" })
+        foreach (var persona in new[] { "brouwer-dranken", "van-dijk-transport", "kessler-spedition", "pakketpunt-express" })
         {
             var key = $"PartnerApi__SubscriptionKeys__{persona}";
             portal[key].Should().NotBeNullOrEmpty().And.Be(partnerApi[key]);
@@ -96,7 +100,9 @@ public sealed class AppHostModelTests
 
         partnerApi.Should().Contain("PartnerApi__ShippersByClientId__norvia-local-persona-brouwer-dranken", "SHP-0001");
         partnerApi.Keys.Should().NotContain(key => key.Contains("van-dijk-transport", StringComparison.Ordinal) && key.Contains("ShippersByClientId", StringComparison.Ordinal));
-        partnerApi.Should().Contain("PartnerApi__CarriersByClientId__norvia-local-persona-van-dijk-transport", "CAR-0001");
+        partnerApi.Should().Contain("PartnerApi__CarriersByClientId__norvia-local-persona-van-dijk-transport", "CAR-0001")
+            .And.Contain("PartnerApi__CarriersByClientId__norvia-local-persona-kessler-spedition", "CAR-0002")
+            .And.Contain("PartnerApi__CarriersByClientId__norvia-local-persona-pakketpunt-express", "CAR-0003");
         partnerApi.Keys.Should().NotContain(key => key.Contains("brouwer-dranken", StringComparison.Ordinal) && key.Contains("CarriersByClientId", StringComparison.Ordinal));
         partnerApi.Should().Contain("Tms__AnswerClientId", "norvia-local-answer-logic-app");
     }
@@ -222,7 +228,7 @@ public sealed class AppHostModelTests
         var portal = await EnvironmentOfAsync(builder, "partner-portal-web");
 
         builder.Resources.OfType<AzureKeyVaultResource>().Single().IsExisting().Should().BeTrue();
-        foreach (var persona in new[] { "brouwer-dranken", "van-dijk-transport" })
+        foreach (var persona in new[] { "brouwer-dranken", "van-dijk-transport", "kessler-spedition", "pakketpunt-express" })
         {
             portal[$"PartnerApi__SubscriptionKeys__{persona}"].Should().Contain($"subscription-key-{persona}");
         }
@@ -297,7 +303,7 @@ public sealed class AppHostModelTests
 
         var bicep = ContainerAppBicepOf(builder, demoUi);
 
-        bicep.Should().MatchRegex(@"excludedPaths: \[\s*'/health'\s*'/alive'(\s*'/carrier/v1/[^']+/bookings')?\s*\]");
+        bicep.Should().MatchRegex(@"excludedPaths: \[\s*'/health'\s*'/alive'(\s*'/carrier/v1/[^']+/bookings')*\s*\]");
     }
 
     [Fact]
@@ -315,7 +321,7 @@ public sealed class AppHostModelTests
         await using var builder = await CreateForAzureAsync();
 
         ContainerAppBicepOf(builder, "partner-portal-web").Should()
-            .MatchRegex(@"excludedPaths: \[\s*'/health'\s*'/alive'\s*'/carrier/v1/CAR-0001/bookings'\s*\]");
+            .MatchRegex(@"excludedPaths: \[\s*'/health'\s*'/alive'\s*'/carrier/v1/CAR-0001/bookings'\s*'/carrier/v1/CAR-0002/bookings'\s*'/carrier/v1/CAR-0003/bookings'\s*\]");
     }
 
     [Theory]

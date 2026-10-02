@@ -1,5 +1,6 @@
 using Microsoft.FluentUI.AspNetCore.Components;
 using Norvia.PartnerPortal.Application.Bookings.Submit;
+using Norvia.PartnerPortal.Application.CarrierBookings.AutoAnswer;
 using Norvia.PartnerPortal.Domain.Bookings;
 using Norvia.PartnerPortal.Infrastructure;
 using Norvia.PartnerPortal.Web.Bookings;
@@ -20,6 +21,10 @@ builder.Services.AddMediator(options =>
     options.Assemblies = [typeof(SubmitBookingCommand), typeof(Booking)];
 });
 builder.Services.AddSingleton<IPartnerPortal, PartnerPortalRequests>();
+// Carrier Personas that answer automatically do so through this worker, which the Carrier booking endpoint wakes.
+builder.Services.AddSingleton<AutoAnswerWorker>();
+builder.Services.AddSingleton<IAutoAnswerSignal>(services => services.GetRequiredService<AutoAnswerWorker>());
+builder.Services.AddHostedService(services => services.GetRequiredService<AutoAnswerWorker>());
 builder.Services.AddOptions<CarrierEndpointOptions>().BindConfiguration(CarrierEndpointOptions.SectionName);
 
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();

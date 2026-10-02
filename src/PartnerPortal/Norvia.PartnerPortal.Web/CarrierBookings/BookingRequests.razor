@@ -15,6 +15,11 @@
 
 <h1>Booking requests</h1>
 
+@if (_persona is not null && _persona.PartyType == PartyType.Carrier)
+{
+    <AnswerModePanel PersonaId="@PersonaId" />
+}
+
 @if (_loadFailed)
 {
     <div role="alert">
@@ -93,6 +98,10 @@ else
             else
             {
                 <span>@RequestStatusText.Of(context)</span>
+            }
+            @if (AnswerModeText.Waiting(context) is { } waiting)
+            {
+                <div class="mt-2 text-xs">@waiting</div>
             }
         </TemplateColumn>
     </FluentDataGrid>

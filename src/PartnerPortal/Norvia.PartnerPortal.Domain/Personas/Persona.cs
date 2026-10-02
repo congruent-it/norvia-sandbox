@@ -6,4 +6,6 @@ namespace Norvia.PartnerPortal.Domain.Personas;
 /// </summary>
 /// <param name="PartyId">The party's ID at Norvia, such as <c>SHP-0001</c>. Norvia takes it from the Persona's token, never from what the portal sends (ADR 0005).</param>
 /// <param name="SavedAddresses">The party's own address book, which demo bookings are filled in from.</param>
-public sealed record Persona(PersonaId Id, string DisplayName, PartyType PartyType, string PartyId, IReadOnlyList<SavedAddress> SavedAddresses);
+/// <param name="Carrier">What only a Carrier Persona has; null for a Shipper.</param>
+public sealed record Persona(
+    PersonaId Id, string DisplayName, PartyType PartyType, string PartyId, IReadOnlyList<SavedAddress> SavedAddresses, CarrierProfile? Carrier = null);

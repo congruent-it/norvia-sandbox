@@ -36,6 +36,11 @@ internal sealed class CarrierBookingRequestConfiguration : IEntityTypeConfigurat
         builder.Property(request => request.RejectionReason).HasConversion<string>().HasMaxLength(30);
         builder.Property(request => request.RejectionText).HasMaxLength(1000);
 
+        // The automatic answer the request arrived with: the policy then in force, which later changes to it don't touch.
+        builder.Property(request => request.AutoAnswerMode).HasConversion<string>().HasMaxLength(30);
+        builder.Property(request => request.AutoAnswerReason).HasConversion<string>().HasMaxLength(30);
+        builder.HasIndex(request => request.AutoAnswerDueAt);
+
         // The Carrier booking number is the key of a Persona's inbox, so a request that arrives twice is stored once.
         builder.HasIndex(request => new { request.PersonaId, request.CarrierBookingNumber }).IsUnique();
         builder.HasIndex(request => new { request.PersonaId, request.ReceivedAt });

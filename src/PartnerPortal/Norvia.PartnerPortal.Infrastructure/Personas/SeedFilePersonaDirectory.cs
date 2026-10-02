@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
 using Norvia.PartnerPortal.Application.Personas;
+using Norvia.PartnerPortal.Domain.CarrierBookings;
 using Norvia.PartnerPortal.Domain.Personas;
 
 namespace Norvia.PartnerPortal.Infrastructure.Personas;
@@ -47,7 +48,31 @@ internal sealed class SeedFilePersonaDirectory : IPersonaDirectory
             persona.Party.Type,
             persona.Party.Id,
             addresses?.Select(ToSavedAddress).ToArray()
-                ?? throw new InvalidDataException($"Persona '{persona.Id}' plays {persona.Party.Type} {persona.Party.Id}, which the seed file doesn't have."));
+                ?? throw new InvalidDataException($"Persona '{persona.Id}' plays {persona.Party.Type} {persona.Party.Id}, which the seed file doesn't have."),
+            ToCarrierProfile(persona));
+    }
+
+    // A Carrier Persona must say how it answers and what its references start with, and a Shipper Persona has no use for either.
+    private static CarrierProfile? ToCarrierProfile(SeedPersona persona)
+    {
+        if (persona.Party.Type != PartyType.Carrier)
+        {
+            return null;
+        }
+
+        if (persona.Carrier is not { } carrier)
+        {
+            throw new InvalidDataException($"Carrier Persona '{persona.Id}' needs a 'carrier' section with its booking reference prefix and answer mode.");
+        }
+
+        if (string.IsNullOrWhiteSpace(carrier.BookingReferencePrefix))
+        {
+            throw new InvalidDataException($"Carrier Persona '{persona.Id}' needs a booking reference prefix.");
+        }
+
+        return new CarrierProfile(
+            carrier.BookingReferencePrefix,
+            new CarrierAnswerPolicy(carrier.Answer.Mode, carrier.Answer.RejectionReason, TimeSpan.FromSeconds(carrier.Answer.DelaySeconds)));
     }
 
     private static SavedAddress ToSavedAddress(SeedAddress address) =>
@@ -60,7 +85,11 @@ internal sealed class SeedFilePersonaDirectory : IPersonaDirectory
 
     private sealed record SeedCarrier(string Id);
 
-    private sealed record SeedPersona(string Id, string DisplayName, SeedParty Party);
+    private sealed record SeedPersona(string Id, string DisplayName, SeedParty Party, SeedCarrierPersona? Carrier);
+
+    private sealed record SeedCarrierPersona(string BookingReferencePrefix, SeedAnswer Answer);
+
+    private sealed record SeedAnswer(CarrierAnswerMode Mode, CarrierRejectionReason RejectionReason, double DelaySeconds);
 
     private sealed record SeedParty(PartyType Type, string Id);
 
