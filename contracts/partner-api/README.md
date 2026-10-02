@@ -6,6 +6,7 @@ The format in which a Shipper books a Transport-only transport through the Norvi
 |---|---|
 | [booking.v1](booking.v1.schema.json) | A booking, as the Shipper sends it |
 | [booking-response.v1](booking-response.v1.schema.json) | Norvia's answer: Accepted, Already booked, Rejected or Not received |
+| [carrier-booking.v1](carrier-booking.v1.schema.json) | A booking request, as Norvia's P4 booking Logic App sends it to a Carrier's booking endpoint (the other direction: see [Carrier booking](#carrier-booking)) |
 
 The booking never names the Shipper. API Management takes it from the token and passes it to the Logic App ([ADR 0005](../../docs/adr/0005-partner-identity-comes-from-the-token.md)).
 
@@ -89,3 +90,21 @@ The trigger accepts only API Management. Easy Auth lets through only a token of 
 | `unreadable` | Values the map can't read, left out for the TMS to reject. It breaks the booking schema on purpose |
 
 The dates are in 2030, so the samples stay bookable for years. [samples/responses](samples/responses) holds a sample of each response. `Norvia.Integration.TransportOrderIntake.UnitTests` runs the map on every sample booking, compares the result with its expected Transport Order and validates it against the Canonical Model schema. It also checks that every sample keeps to the Partner API's schemas.
+
+## Carrier booking
+
+The other way round, [P4](../../docs/processes/tms/p4-carrier-booking.md#carrier-booking-format): once a Planner releases a Shipment to a Carrier, the P4 booking Logic App maps the Canonical Model `ShipmentReleased` to the [carrier-booking.v1](carrier-booking.v1.schema.json) format and sends it to the Carrier Persona's booking endpoint. The map is `CarrierBookingMap`, run as a local function of the Logic App like the intake map ([ADR 0019](../../docs/adr/0019-the-intake-map-is-dotnet-code-run-as-a-logic-apps-local-function.md)). It is tested against the sample pairs in `samples/carrier-bookings`.
+
+| Canonical Model `ShipmentReleased` | Carrier booking | What the map does |
+|---|---|---|
+| `carrierBookingNumber`, `shipmentNumber` | The same | Copies them |
+| `transportOrder.collection.address`, `transportOrder.delivery.address` | `collectionStreet`, `collectionPostcode`, `collectionCity`, `collectionCountry`; the same for `delivery` | Flattens the address |
+| `country`: ISO 3166-1 alpha-2 | ISO 3166-1 alpha-3 | Translates the code |
+| `window.earliest`, `latest`: UTC with offset | `collectFrom`, `collectUntil`, `deliverFrom`, `deliverUntil`: local date/time without an offset | Converts to the time zone of the address's country, daylight saving time included |
+| `transportOrder.delivery.consignee.name` | `consigneeName` | Copies the name only: no contact, phone or email |
+| `transportOrder.goodsLines[]` | `goods[]` | Flattens `dimensionsCm` into `lengthCm`, `widthCm` and `heightCm` |
+| `shipperId`, `transportOrder.shipperReference`, `transportOrder.instructions`, anything of the Freight Charge | Left out | Towards the Carrier, Norvia is the customer |
+
+A value the Carrier format can't hold is left out, as in the intake map. The Carrier answers a request it can't use.
+
+The request carries the release's correlation ID in `X-Correlation-ID` and the Carrier's credential in `X-Api-Key`. The Carrier booking number is the key: a request sent again is acknowledged and ignored.

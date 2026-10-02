@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/partner-api/carrier-booking.v1.schema.json",
+  "title": "CarrierBooking",
+  "description": "A booking request, as Norvia's P4 booking Logic App sends it to a Carrier's booking endpoint (Carrier booking format, version 1). It differs from the Canonical Model on purpose: its own field names, flat address fields, local date/times without an offset in the time zone of the address they belong to, and ISO 3166 alpha-3 country codes. It never names the Shipper and carries nothing from the Shipper's Rate Card. The Carrier booking number is its key: a request sent again is ignored.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["carrierBookingNumber", "shipmentNumber"],
+  "properties": {
+    "carrierBookingNumber": { "description": "The Carrier booking, the key of the request.", "type": "string", "pattern": "^CB-[0-9]{7}$" },
+    "shipmentNumber": { "description": "The Shipment to carry.", "type": "string", "pattern": "^SH-[0-9]{7}$" },
+    "collectionStreet": { "type": "string" },
+    "collectionPostcode": { "type": "string" },
+    "collectionCity": { "type": "string" },
+    "collectionCountry": { "$ref": "#/$defs/alpha3" },
+    "collectFrom": { "$ref": "#/$defs/localTime" },
+    "collectUntil": { "$ref": "#/$defs/localTime" },
+    "deliveryStreet": { "type": "string" },
+    "deliveryPostcode": { "type": "string" },
+    "deliveryCity": { "type": "string" },
+    "deliveryCountry": { "$ref": "#/$defs/alpha3" },
+    "deliverFrom": { "$ref": "#/$defs/localTime" },
+    "deliverUntil": { "$ref": "#/$defs/localTime" },
+    "consigneeName": { "description": "Who receives the goods, the only thing the Carrier is told about the Consignee.", "type": "string" },
+    "goods": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/goodsLine" }
+    }
+  },
+  "$defs": {
+    "alpha3": { "description": "ISO 3166-1 alpha-3 country code.", "type": "string", "pattern": "^[A-Z]{3}$" },
+    "localTime": {
+      "description": "Local date/time at the address the window belongs to, without an offset.",
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$"
+    },
+    "goodsLine": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "packageType": { "description": "One of pallet, parcel, crate or loose.", "type": "string" },
+        "quantity": { "type": "integer" },
+        "weightKg": { "description": "Weight of the whole line in kilograms.", "type": "number" },
+        "lengthCm": { "type": "number" },
+        "widthCm": { "type": "number" },
+        "heightCm": { "type": "number" }
+      }
+    }
+  }
+}

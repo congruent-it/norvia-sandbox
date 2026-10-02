@@ -20,6 +20,8 @@ var manageRole = 'TransportOrders.Manage'
 var manageRoleId = guid('norvia-tms-api', environmentName, manageRole)
 var answerRole = 'CarrierBookings.Answer'
 var answerRoleId = guid('norvia-tms-api', environmentName, answerRole)
+var reportRole = 'CarrierBookings.Report'
+var reportRoleId = guid('norvia-tms-api', environmentName, reportRole)
 var submitRole = 'TransportOrders.Submit'
 var submitRoleId = guid('norvia-partner-api', environmentName, submitRole)
 var triggerRole = 'TransportOrderIntake.Trigger'
@@ -85,6 +87,16 @@ resource tmsApi 'Microsoft.Graph/applications@v1.0' = {
       ]
       isEnabled: true
     }
+    {
+      id: reportRoleId
+      value: reportRole
+      displayName: 'Report Carrier bookings'
+      description: 'Report that a Carrier booking\'s request was sent to the Carrier, or never reached it (P4). Only the P4 booking Logic App holds it.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
   ]
 }
 
@@ -98,6 +110,20 @@ resource intakeRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
   resourceId: tmsApiPrincipal.id
   appRoleId: intakeRoleId
   principalId: intakeIdentity.properties.principalId
+}
+
+// The P4 booking Logic App's identity, which it runs as. It is the one principal holding the report role, so nothing
+// reports a Carrier booking's delivery to the TMS without passing the integration layer.
+resource bookingIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
+  name: 'id-booking-${uniqueString(resourceGroup().id)}'
+  location: location
+  tags: tags
+}
+
+resource reportRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: tmsApiPrincipal.id
+  appRoleId: reportRoleId
+  principalId: bookingIdentity.properties.principalId
 }
 
 // The TMS UI's identity, which it calls the TMS API as. It is the one principal holding the manage role, so only the
@@ -341,6 +367,10 @@ output tmsApiClientId string = tmsApi.appId
 output intakeClientId string = intakeIdentity.properties.clientId
 output intakeIdentityId string = intakeIdentity.id
 output intakeIdentityName string = intakeIdentity.name
+output bookingIdentityId string = bookingIdentity.id
+output bookingIdentityName string = bookingIdentity.name
+output bookingPrincipalId string = bookingIdentity.properties.principalId
+output bookingClientId string = bookingIdentity.properties.clientId
 output tmsUiIdentityName string = tmsUiIdentity.name
 output tmsUiClientId string = tmsUiIdentity.properties.clientId
 output partnerApiClientId string = partnerApi.appId

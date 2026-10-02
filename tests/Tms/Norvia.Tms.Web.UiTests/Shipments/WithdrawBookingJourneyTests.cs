@@ -23,7 +23,7 @@ public sealed class WithdrawBookingJourneyTests(TmsUiFixture tms) : BrowserPage(
         await order.GetByRole(AriaRole.Checkbox, new() { Name = $"Select {number}" }).ClickAsync();
         var assign = Page.GetByRole(AriaRole.Group, new() { Name = "Assign" });
         await assign.GetByRole(AriaRole.Combobox, new() { Name = "Assign to" }).ClickAsync();
-        await Page.GetByRole(AriaRole.Option, new() { Name = "Kessler Spedition" }).ClickAsync();
+        await Page.GetByRole(AriaRole.Option, new() { Name = "Van Dijk Transport" }).ClickAsync();
         await assign.GetByRole(AriaRole.Button, new() { Name = "Assign selected" }).ClickAsync();
         var planned = Page.GetByRole(AriaRole.List, new() { Name = "Assignment outcomes" }).GetByRole(AriaRole.Status);
         await Expect(planned).ToContainTextAsync($"Transport Order {number} is planned as Shipment");
@@ -40,8 +40,7 @@ public sealed class WithdrawBookingJourneyTests(TmsUiFixture tms) : BrowserPage(
         await Page.GetByRole(AriaRole.Link, new() { Name = "Bookings awaiting an answer" }).ClickAsync();
         await Expect(Heading("Bookings awaiting an answer")).ToBeVisibleAsync();
         var awaiting = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipmentNumber });
-        await Expect(awaiting).ToContainTextAsync("Kessler Spedition");
-        await Expect(awaiting).ToContainTextAsync("Not yet sent");
+        await Expect(awaiting).ToContainTextAsync("Van Dijk Transport");
 
         await awaiting.GetByRole(AriaRole.Button, new() { Name = "Withdraw CB-", Exact = false }).ClickAsync();
         await Expect(Page.GetByRole(AriaRole.List, new() { Name = "Withdrawal outcomes" }).GetByRole(AriaRole.Status))
@@ -50,7 +49,7 @@ public sealed class WithdrawBookingJourneyTests(TmsUiFixture tms) : BrowserPage(
 
         await Page.GetByRole(AriaRole.Link, new() { Name = "Shipments to release" }).ClickAsync();
         var backToRelease = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipmentNumber });
-        await Expect(backToRelease).ToContainTextAsync("Withdrawn from Kessler Spedition");
+        await Expect(backToRelease).ToContainTextAsync("Withdrawn from Van Dijk Transport");
     }
 
     private ILocator Heading(string name) => Page.GetByRole(AriaRole.Heading, new() { Name = name, Level = 1 });

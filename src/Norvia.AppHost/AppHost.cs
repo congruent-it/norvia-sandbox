@@ -109,11 +109,14 @@ if (builder.ExecutionContext.IsPublishMode)
 
     // The TMS UI and the Partner portal have no login of their own, so in Azure they open to the presenter's browser
     // behind an Entra sign-in that only the presenter passes (ADR 0024). The apps don't know it is there.
-    foreach (var demoUi in new[] { tmsWeb, partnerPortal })
+    // The one exception is each Carrier Persona's booking endpoint: the P4 booking Logic App is no browser, and the
+    // endpoint asks it for the Carrier's own credential.
+    var carrierEndpoints = personas.Where(persona => !persona.IsShipper).Select(persona => $"/carrier/v1/{persona.PartyId}/bookings").ToList();
+    foreach (var (demoUi, pathsOutsideTheGate) in new[] { (tmsWeb, []), (partnerPortal, carrierEndpoints) })
     {
         demoUi.WithExternalHttpEndpoints()
             .PublishAsAzureContainerApp((infrastructure, app) =>
-                infrastructure.Add(EntraSignIn.For(infrastructure, app, estate.DemoUisClientId, estate.EntraIssuer)));
+                infrastructure.Add(EntraSignIn.For(infrastructure, app, estate.DemoUisClientId, estate.EntraIssuer, pathsOutsideTheGate)));
     }
 
     // The Integration console opens to the operators' browsers. Easy Auth signs them in to the console's own app
@@ -146,6 +149,13 @@ if (builder.ExecutionContext.IsPublishMode)
     {
         partnerPortal.WithEnvironment($"PartnerApi__SubscriptionKeys__{persona.Id}", partnerPortalSecrets.Resource.GetSecret($"subscription-key-{persona.Id}"));
     }
+
+    // Each Carrier Persona's booking endpoint asks its caller, the P4 booking Logic App, for the credential the estate
+    // keeps in the same vault as carrier-endpoint-key-<Carrier ID>.
+    foreach (var carrier in personas.Where(persona => !persona.IsShipper))
+    {
+        partnerPortal.WithEnvironment($"CarrierEndpoint__ApiKeys__{carrier.PartyId}", partnerPortalSecrets.Resource.GetSecret($"carrier-endpoint-key-{carrier.PartyId}"));
+    }
 }
 else
 {
@@ -154,8 +164,10 @@ else
     messaging.AddServiceBusTopic("transport-order-events")
         .AddServiceBusSubscription("monitoring");
     // Resource names are unique across the AppHost, so this monitoring subscription's resource is named for its topic.
-    messaging.AddServiceBusTopic("shipment-events")
-        .AddServiceBusSubscription("shipment-events-monitoring", subscriptionName: "monitoring");
+    var shipmentEvents = messaging.AddServiceBusTopic("shipment-events");
+    shipmentEvents.AddServiceBusSubscription("shipment-events-monitoring", subscriptionName: "monitoring");
+    // The P4 booking Logic App's subscription: Carrier Shipments only (see ResubmitAwareFilters).
+    shipmentEvents.AddServiceBusSubscription("carrier-booking");
 
     // Locally there is no Easy Auth, so the console signs the developer in as an Integration operator with both app
     // roles, as the estate assigns the presenter. It reads Azure with the developer's own sign-in.
@@ -228,6 +240,26 @@ else
         .WithEnvironment("Tms__Tokens__Issuer", LocalTokens.Issuer)
         .WithEnvironment("Tms__Tokens__Audience", LocalTokens.TmsAudience)
         .WithEnvironment("Tms__Tokens__ClientId", LocalTokens.IntakeLogicAppClientId);
+    // Locally a worker plays the P4 booking Logic App (ADR 0030). It reads the booking subscription, sends each Carrier
+    // Persona's booking request to the Persona's endpoint in the Partner portal with a credential for the run, and
+    // reports the outcome to the TMS as the identity holding the report role.
+    var bookingWorker = builder.AddProject<Projects.Norvia_Integration_LocalBookingWorker>("booking-worker")
+        .WithReference(messaging).WaitFor(messaging)
+        .WithReference(tmsApi).WaitFor(tmsApi)
+        .WithEnvironment("Booking__TmsBaseAddress", tmsApi.GetEndpoint("http"))
+        .WithEnvironment("Booking__TmsTokens__Issuer", LocalTokens.Issuer)
+        .WithEnvironment("Booking__TmsTokens__Audience", LocalTokens.TmsAudience)
+        .WithEnvironment("Booking__TmsTokens__ClientId", LocalTokens.BookingLogicAppClientId);
+    foreach (var persona in personas.Where(persona => !persona.IsShipper))
+    {
+        var carrierApiKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
+        bookingWorker
+            .WithEnvironment($"Booking__Carriers__{persona.PartyId}__Address", ReferenceExpression.Create($"{partnerPortal.GetEndpoint("http")}/carrier/v1/{persona.PartyId}/bookings"))
+            .WithEnvironment($"Booking__Carriers__{persona.PartyId}__ApiKey", carrierApiKey);
+        // The Persona's endpoint asks its caller for the same credential, as Key Vault holds it in Azure.
+        partnerPortal.WithEnvironment($"CarrierEndpoint__ApiKeys__{persona.PartyId}", carrierApiKey);
+    }
+
     partnerPortal.WaitFor(partnerApi)
         .WithEnvironment("PartnerApi__BaseAddress", ReferenceExpression.Create($"{partnerApi.GetEndpoint("http")}/partner/v1"))
         .WithEnvironment("PartnerApi__PersonaClientIds", string.Join(';', personas.Select(persona => $"{persona.Id}={LocalTokens.PersonaClientId(persona.Id)}")))
@@ -252,6 +284,7 @@ else
         (tmsWeb.Resource, "TmsApi__LocalTokens__SigningKey"),
         (partnerApi.Resource, "PartnerApi__Tokens__SigningKey"),
         (partnerApi.Resource, "Tms__Tokens__SigningKey"),
+        (bookingWorker.Resource, "Booking__TmsTokens__SigningKey"),
         (partnerPortal.Resource, "PartnerApi__LocalTokens__SigningKey"),
     })
     {

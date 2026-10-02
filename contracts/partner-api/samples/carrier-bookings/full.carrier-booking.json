@@ -1,0 +1,21 @@
+{
+  "carrierBookingNumber": "CB-0000001",
+  "shipmentNumber": "SH-0000042",
+  "collectionStreet": "Waalhaven Oostzijde 88",
+  "collectionPostcode": "3087 BM",
+  "collectionCity": "Rotterdam",
+  "collectionCountry": "NLD",
+  "collectFrom": "2030-10-02T07:30:00",
+  "collectUntil": "2030-10-02T11:00:00",
+  "deliveryStreet": "Kölner Landstraße 301",
+  "deliveryPostcode": "40591",
+  "deliveryCity": "Düsseldorf",
+  "deliveryCountry": "DEU",
+  "deliverFrom": "2030-10-03T08:00:00",
+  "deliverUntil": "2030-10-03T16:30:00",
+  "consigneeName": "Getränke Schmitz GmbH",
+  "goods": [
+    { "packageType": "pallet", "quantity": 4, "weightKg": 2400, "lengthCm": 120, "widthCm": 80, "heightCm": 160 },
+    { "packageType": "parcel", "quantity": 3, "weightKg": 12 }
+  ]
+}

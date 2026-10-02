@@ -66,7 +66,10 @@ public sealed partial class BookingJourneyTests(PartnerPortalUiFixture norvia) :
     [Fact]
     public async Task AsACarrier_BookingATransportOrder_IsRefused()
     {
-        await OpenBookingFormAsync("Van Dijk Transport");
+        // A Carrier's portal starts at its inbox and offers no booking form, but the form's address still works for it.
+        await Portal.GotoAsync(new Uri(_norvia.PartnerPortal, "/personas/van-dijk-transport/bookings/new").ToString());
+        await Expect(Portal.GetByRole(AriaRole.Heading, new() { Name = "Book a transport", Level = 1 })).ToBeVisibleAsync();
+        await Expect(Portal.GetByRole(AriaRole.Main)).ToContainTextAsync("As Van Dijk Transport");
 
         await BookAsync();
 

@@ -1,0 +1,146 @@
+@page "/personas/{PersonaId}/booking-requests"
+@* Interactive like the other pages: Fluent UI's components don't survive static streaming rendering. *@
+@rendermode InteractiveServer
+@inject IPartnerPortal Portal
+@inject NavigationManager Navigation
+@inject ILogger<BookingRequests> Logger
+@inject TimeProvider Time
+@implements IAsyncDisposable
+
+<PageTitle>Booking requests · @(_persona?.DisplayName ?? PersonaId) · Partner portal</PageTitle>
+
+<h1>Booking requests</h1>
+
+@if (_loadFailed)
+{
+    <div role="alert">
+        <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+            The booking requests couldn't be loaded. Reload the page to try again.
+        </FluentMessageBar>
+    </div>
+}
+else if (_requests is null)
+{
+    <FluentStack VerticalAlignment="VerticalAlignment.Center" role="status">
+        <FluentProgressRing />
+        <span>Loading the booking requests…</span>
+    </FluentStack>
+}
+else if (_requests.Count == 0)
+{
+    <div role="status">
+        <FluentMessageBar Intent="MessageIntent.Info" AllowDismiss="false">
+            Norvia hasn't asked @_persona!.DisplayName to carry anything yet.
+        </FluentMessageBar>
+    </div>
+}
+else
+{
+    <p class="mb-6">Every request Norvia sent @_persona!.DisplayName, the latest first. All of them are still open.</p>
+    @* Wide columns for what wraps (addresses, goods), narrow ones for what doesn't; multi-line, so a row grows to fit its text. *@
+    <FluentDataGrid Items="_requests.AsQueryable()" TGridItem="CarrierBookingRequestView" Class="lux-table" aria-label="Booking requests"
+                    GridTemplateColumns="1.1fr 1.5fr 1fr 1.8fr 1.8fr 1.3fr 1.8fr" MultiLine="true">
+        <PropertyColumn Title="Received" Property="@(request => PortalTime.Format(request.ReceivedAt))" />
+        <PropertyColumn Title="Booking number" Property="@(request => request.CarrierBookingNumber)" />
+        <PropertyColumn Title="Shipment" Property="@(request => request.ShipmentNumber)" />
+        <TemplateColumn Title="Collect">
+            <Stop Value="context.Details.Collection" />
+        </TemplateColumn>
+        <TemplateColumn Title="Deliver">
+            <Stop Value="context.Details.Delivery" />
+        </TemplateColumn>
+        <PropertyColumn Title="Consignee" Property="@(request => request.Details.ConsigneeName ?? "")" />
+        <TemplateColumn Title="Goods">
+            <ul class="m-0 list-disc pl-4">
+                @foreach (var line in context.Details.Goods)
+                {
+                    <li>@GoodsText.Of(line)</li>
+                }
+            </ul>
+        </TemplateColumn>
+    </FluentDataGrid>
+}
+
+@code {
+    /// <summary>How often the inbox reads itself again, so a request shows as it arrives without a page refresh.</summary>
+    public static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(2);
+
+    private readonly CancellationTokenSource _stopped = new();
+    private Task? _refreshing;
+    private PersonaView? _persona;
+    private IReadOnlyList<CarrierBookingRequestView>? _requests;
+    private bool _loadFailed;
+
+    [Parameter]
+    public string PersonaId { get; set; } = string.Empty;
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _refreshing = RefreshUntilStoppedAsync(_stopped.Token);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _stopped.CancelAsync();
+        if (_refreshing is not null)
+        {
+            await _refreshing;
+        }
+
+        _stopped.Dispose();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _requests = null;
+        try
+        {
+            _persona = PersonaChoice.Find(PersonaId, await Portal.ListPersonasAsync(CancellationToken.None));
+            if (_persona is null || _persona.PartyType != PartyType.Carrier)
+            {
+                Navigation.NotFound();
+                return;
+            }
+
+            _requests = await Portal.ListCarrierBookingRequestsAsync(PersonaId, CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            PageLog.BookingRequestsLoadFailed(Logger, exception, PersonaId);
+            _loadFailed = true;
+        }
+    }
+
+    // A read that fails keeps what the inbox shows and tries again on the next tick.
+    private async Task RefreshUntilStoppedAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(RefreshInterval, Time);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                if (_persona is null || _persona.PartyType != PartyType.Carrier || _requests is null)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    _requests = await Portal.ListCarrierBookingRequestsAsync(PersonaId, cancellationToken);
+                    await InvokeAsync(StateHasChanged);
+                }
+                catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+                {
+                    PageLog.BookingRequestsLoadFailed(Logger, exception, PersonaId);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The page is gone.
+        }
+    }
+}

@@ -1,0 +1,32 @@
+{
+  "eventId": "5c2c7f0e-3a4c-4d0a-9f3e-5a7a1c0c9b11",
+  "eventType": "ShipmentReleased",
+  "eventVersion": 1,
+  "occurredAt": "2030-10-01T08:00:00+00:00",
+  "correlationId": "release-1",
+  "shipmentNumber": "SH-0000042",
+  "transportOrderNumber": "TO-0000007",
+  "shipperId": "SHP-0001",
+  "assignedTo": "Carrier",
+  "carrierId": "CAR-0001",
+  "carrierBookingNumber": "CB-0000001",
+  "transportOrder": {
+    "transportOrderNumber": "TO-0000007",
+    "shipperId": "SHP-0001",
+    "shipperReference": "BD-2030-0002",
+    "collection": {
+      "address": { "street": "Waalhaven Oostzijde 88", "postcode": "3087 BM", "city": "Rotterdam", "country": "NL" },
+      "window": { "earliest": "2030-10-02T05:30:00+00:00", "latest": "2030-10-02T09:00:00+00:00" }
+    },
+    "delivery": {
+      "address": { "street": "Kölner Landstraße 301", "postcode": "40591", "city": "Düsseldorf", "country": "DE" },
+      "consignee": { "name": "Getränke Schmitz GmbH", "contactName": "Jonas Schmitz", "phone": "+49 211 555 0190", "email": "wareneingang@getraenke-schmitz.example" },
+      "window": { "earliest": "2030-10-03T06:00:00+00:00", "latest": "2030-10-03T14:30:00+00:00" }
+    },
+    "goodsLines": [
+      { "packageType": "pallet", "quantity": 4, "weightKg": 2400, "dimensionsCm": { "length": 120, "width": 80, "height": 160 } },
+      { "packageType": "parcel", "quantity": 3, "weightKg": 12 }
+    ],
+    "instructions": "Deliver at dock 3. Call Jonas 30 minutes before arrival."
+  }
+}

@@ -1,5 +1,6 @@
 using AngleSharp.Dom;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Time.Testing;
 using Microsoft.FluentUI.AspNetCore.Components;
 using Norvia.PartnerPortal.Web.Bookings;
 
@@ -13,8 +14,11 @@ public abstract class PortalWebContext : BunitContext
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddFluentUIComponents();
         Services.AddSingleton(Portal);
+        Services.AddSingleton<TimeProvider>(Time);
         Portal.ListPersonasAsync(Arg.Any<CancellationToken>()).Returns(Samples.Personas);
     }
+
+    protected FakeTimeProvider Time { get; } = new();
 
     protected IPartnerPortal Portal { get; } = Substitute.For<IPartnerPortal>();
 

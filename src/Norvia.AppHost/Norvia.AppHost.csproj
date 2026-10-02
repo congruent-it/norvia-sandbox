@@ -13,6 +13,7 @@
     <PackageReference Include="Aspire.Hosting.Azure.Sql" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Integration\Norvia.Integration.LocalBookingWorker\Norvia.Integration.LocalBookingWorker.csproj" />
     <ProjectReference Include="..\Integration\Norvia.Integration.LocalPartnerApi\Norvia.Integration.LocalPartnerApi.csproj" />
     <ProjectReference Include="..\IntegrationConsole\Norvia.IntegrationConsole.Web\Norvia.IntegrationConsole.Web.csproj" />
     <ProjectReference Include="..\PartnerPortal\Norvia.PartnerPortal.Migrations\Norvia.PartnerPortal.Migrations.csproj" />

@@ -277,7 +277,25 @@ public sealed class AppHostModelTests
 
         var bicep = ContainerAppBicepOf(builder, demoUi);
 
-        bicep.Should().MatchRegex(@"excludedPaths: \[\s*'/health'\s*'/alive'\s*\]");
+        bicep.Should().MatchRegex(@"excludedPaths: \[\s*'/health'\s*'/alive'(\s*'/carrier/v1/[^']+/bookings')?\s*\]");
+    }
+
+    [Fact]
+    public async Task InAzure_TheTmsUi_LeavesNothingButItsHealthProbesOutsideTheGate()
+    {
+        await using var builder = await CreateForAzureAsync();
+
+        ContainerAppBicepOf(builder, "tms-web").Should().MatchRegex(@"excludedPaths: \[\s*'/health'\s*'/alive'\s*\]");
+    }
+
+    [Fact]
+    public async Task InAzure_ThePartnerPortal_AlsoLeavesEachCarriersBookingEndpointOutsideTheGate()
+    {
+        // The P4 booking Logic App is no browser, and the endpoint asks it for the Carrier's own credential (ADR 0024).
+        await using var builder = await CreateForAzureAsync();
+
+        ContainerAppBicepOf(builder, "partner-portal-web").Should()
+            .MatchRegex(@"excludedPaths: \[\s*'/health'\s*'/alive'\s*'/carrier/v1/CAR-0001/bookings'\s*\]");
     }
 
     [Theory]

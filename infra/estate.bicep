@@ -33,6 +33,15 @@ param integrationConsoleRedirectUris string = ''
 Logic App keeps it when the estate is deployed again.''')
 param tmsBaseUrl string = ''
 
+@secure()
+@description('''A random value the Carrier endpoints' credentials are derived from. The deployment hook (provision-estate.sh) makes it
+once and keeps it in the azd environment.''')
+param carrierEndpointKeySeed string
+
+@description('''The Partner portal's address, empty before the apps are first deployed. azd's postdeploy hook stores it, so the P4
+booking Logic App keeps it when the estate is deployed again.''')
+param partnerPortalBaseUrl string = ''
+
 var tags = {
   'azd-env-name': environmentName
 }
@@ -60,6 +69,7 @@ module messaging 'estate/messaging.bicep' = {
     location: location
     tags: tags
     presenterPrincipalId: presenterPrincipalId
+    bookingPrincipalId: identities.outputs.bookingPrincipalId
   }
 }
 
@@ -93,6 +103,25 @@ module intakeLogicApp 'estate/intake-logic-app.bicep' = {
   }
 }
 
+module bookingLogicApp 'estate/booking-logic-app.bicep' = {
+  scope: resourceGroup
+  params: {
+    location: location
+    tags: tags
+    integrationRetentionDays: integrationRetentionDays
+    bookingIdentityName: identities.outputs.bookingIdentityName
+    tmsApiClientId: identities.outputs.tmsApiClientId
+    tmsBaseUrl: tmsBaseUrl
+    partnerPortalBaseUrl: partnerPortalBaseUrl
+    applicationInsightsName: monitoring.outputs.applicationInsightsName
+    serviceBusName: messaging.outputs.namespaceName
+    planName: intakeLogicApp.outputs.planName
+    contentKeyVaultName: intakeLogicApp.outputs.keyVaultName
+    carrierKeyVaultName: partnerApi.outputs.partnerPortalKeyVaultName
+    integrationConsolePrincipalId: identities.outputs.integrationConsolePrincipalId
+  }
+}
+
 module partnerApi 'estate/partner-api.bicep' = {
   scope: resourceGroup
   params: {
@@ -106,6 +135,8 @@ module partnerApi 'estate/partner-api.bicep' = {
     intakeTriggerAudience: identities.outputs.intakeTriggerAudience
     applicationInsightsName: monitoring.outputs.applicationInsightsName
     partnerPortalPrincipalId: identities.outputs.partnerPortalPrincipalId
+    bookingPrincipalId: identities.outputs.bookingPrincipalId
+    carrierEndpointKeySeed: carrierEndpointKeySeed
   }
 }
 
@@ -123,9 +154,12 @@ output ESTATE_ENTRA_TENANT_ID string = identities.outputs.entraTenantId
 output ESTATE_TMS_API_CLIENT_ID string = identities.outputs.tmsApiClientId
 output ESTATE_INTAKE_CLIENT_ID string = identities.outputs.intakeClientId
 output ESTATE_INTAKE_IDENTITY_ID string = identities.outputs.intakeIdentityId
+output ESTATE_BOOKING_IDENTITY_NAME string = identities.outputs.bookingIdentityName
+output ESTATE_BOOKING_CLIENT_ID string = identities.outputs.bookingClientId
 output ESTATE_TMS_UI_IDENTITY_NAME string = identities.outputs.tmsUiIdentityName
 output ESTATE_TMS_UI_CLIENT_ID string = identities.outputs.tmsUiClientId
 output ESTATE_INTAKE_LOGIC_APP string = intakeLogicApp.outputs.logicAppName
+output ESTATE_BOOKING_LOGIC_APP string = bookingLogicApp.outputs.logicAppName
 output ESTATE_API_MANAGEMENT string = partnerApi.outputs.apiManagementName
 output ESTATE_PARTNER_API_URL string = partnerApi.outputs.partnerApiUrl
 output ESTATE_PARTNER_API_CLIENT_ID string = identities.outputs.partnerApiClientId

@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
 using Aspire.Hosting;
+using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Testing;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
@@ -33,6 +34,9 @@ public sealed class TmsUiFixture : IAsyncLifetime
 
     public Uri TmsUi { get; private set; } = null!;
 
+    /// <summary>The Partner portal, where a Carrier Persona's inbox shows the booking requests the booking worker sent it.</summary>
+    public Uri PartnerPortal { get; private set; } = null!;
+
     public IBrowser Browser { get; private set; } = null!;
 
     public async ValueTask InitializeAsync()
@@ -52,10 +56,14 @@ public sealed class TmsUiFixture : IAsyncLifetime
         await _app.StartAsync(startup.Token);
         await _app.ResourceNotifications.WaitForResourceHealthyAsync("tms-api", startup.Token);
         await _app.ResourceNotifications.WaitForResourceHealthyAsync("tms-web", startup.Token);
+        // A released Shipment's booking goes through the worker that plays the P4 booking Logic App (ADR 0030) to the portal.
+        await _app.ResourceNotifications.WaitForResourceHealthyAsync("partner-portal-web", startup.Token);
+        await _app.ResourceNotifications.WaitForResourceAsync("booking-worker", KnownResourceStates.Running, startup.Token);
 
         Intake = _app.CreateHttpClient("tms-api");
         Intake.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", IssueIntakeToken());
         TmsUi = _app.GetEndpoint("tms-web", "http");
+        PartnerPortal = _app.GetEndpoint("partner-portal-web", "http");
 
         _playwright = await Playwright.CreateAsync();
         Browser = await _playwright.Chromium.LaunchAsync();

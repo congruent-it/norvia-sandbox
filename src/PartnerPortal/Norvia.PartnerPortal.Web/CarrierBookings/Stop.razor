@@ -1,0 +1,14 @@
+@* An address and the window it is visited in, as the Carrier reads them: the window in the address's own time. *@
+<address class="not-italic">
+    @StopText.Address(Value)
+    @if (StopText.Window(Value) is { } window)
+    {
+        <br />
+        <span class="text-xs text-muted">@window</span>
+    }
+</address>
+
+@code {
+    [Parameter, EditorRequired]
+    public CarrierBookingStop Value { get; set; } = null!;
+}

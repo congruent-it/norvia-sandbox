@@ -3,6 +3,7 @@ using Norvia.PartnerPortal.Application.Bookings.Submit;
 using Norvia.PartnerPortal.Domain.Bookings;
 using Norvia.PartnerPortal.Infrastructure;
 using Norvia.PartnerPortal.Web.Bookings;
+using Norvia.PartnerPortal.Web.CarrierBookings;
 using Norvia.PartnerPortal.Web.Components;
 using Norvia.PartnerPortal.Web.Personas;
 
@@ -19,6 +20,7 @@ builder.Services.AddMediator(options =>
     options.Assemblies = [typeof(SubmitBookingCommand), typeof(Booking)];
 });
 builder.Services.AddSingleton<IPartnerPortal, PartnerPortalRequests>();
+builder.Services.AddOptions<CarrierEndpointOptions>().BindConfiguration(CarrierEndpointOptions.SectionName);
 
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddFluentUIComponents();
@@ -36,6 +38,7 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 app.MapPersonaSwitcher();
+app.MapCarrierBookingEndpoint();
 app.MapDefaultEndpoints();
 
 await app.RunAsync();

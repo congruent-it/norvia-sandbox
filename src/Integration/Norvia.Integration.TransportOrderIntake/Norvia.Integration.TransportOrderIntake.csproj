@@ -6,5 +6,8 @@
   <ItemGroup>
     <!-- The tests check that the booking schema allows exactly the country spellings the map knows. -->
     <InternalsVisibleTo Include="Norvia.Integration.TransportOrderIntake.UnitTests" />
+    <!-- The booking map reads countries and time zones from the same table, in the other direction. -->
+    <InternalsVisibleTo Include="Norvia.Integration.CarrierBooking" />
+    <InternalsVisibleTo Include="Norvia.Integration.CarrierBooking.UnitTests" />
   </ItemGroup>
 </Project>

@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <Include>[Norvia.Integration.CarrierBooking]*</Include>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="coverlet.msbuild" PrivateAssets="all" />
+    <PackageReference Include="JsonSchema.Net" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+    <PackageReference Include="xunit.v3.mtp-off" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="AwesomeAssertions" />
+    <ProjectReference Include="..\..\..\src\Integration\Norvia.Integration.CarrierBooking\Norvia.Integration.CarrierBooking.csproj" />
+  </ItemGroup>
+  <!-- Embedded, so the unit tests read the contracts and the workflow without touching the file system (coding guidelines §10). -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\..\contracts\partner-api\carrier-booking.v1.schema.json" LogicalName="PartnerApi/carrier-booking.v1.schema.json" />
+    <EmbeddedResource Include="..\..\..\contracts\canonical-model\*.json" LogicalName="CanonicalModel/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\carrier-bookings\*.json" LogicalName="PartnerApi/samples/carrier-bookings/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\src\Integration\BookingLogicApp\*.json" LogicalName="BookingLogicApp/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\src\Integration\BookingLogicApp\carrier-booking\workflow.json" LogicalName="BookingLogicApp/carrier-booking/workflow.json" />
+  </ItemGroup>
+</Project>
