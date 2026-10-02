@@ -64,7 +64,8 @@ public sealed class ShipmentQueryTests
 
         var result = await _handler.Handle(new GetShipmentQuery("SH-0000012"), CancellationToken.None);
 
-        result.Value.CarrierBookings.Should().Equal(CarrierBookingView.Of(booking));
+        result.Value.CarrierBookings.Should().Equal(CarrierBookingView.Of(booking, _carriers));
+        result.Value.CarrierBookings.Single().Carrier.Should().Be(new CarrierView("CAR-0001", "Van Dijk Transport"));
     }
 
     [Fact]

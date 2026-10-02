@@ -1,4 +1,5 @@
 using Norvia.Tms.Application.Shipments;
+using Norvia.Tms.Application.Shipments.ListAwaitingAnswer;
 using Norvia.Tms.Application.Shipments.ListToRelease;
 using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.List;
@@ -36,4 +37,7 @@ public interface ITransportOrderQueries
 
     /// <summary>The Planner's Shipments to release: the Planned Shipments, with who carries each, in the order they were planned.</summary>
     Task<IReadOnlyList<ShipmentToReleaseSummary>> ListShipmentsToReleaseAsync(CancellationToken cancellationToken);
+
+    /// <summary>The Planner's Carrier bookings awaiting an answer: the Requested ones, the earliest collection first, each flagged when overdue.</summary>
+    Task<IReadOnlyList<CarrierBookingAwaitingAnswerSummary>> ListCarrierBookingsAwaitingAnswerAsync(CancellationToken cancellationToken);
 }

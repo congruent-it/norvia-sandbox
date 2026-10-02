@@ -1,0 +1,130 @@
+@page "/shipments/awaiting-answer"
+@rendermode InteractiveServer
+@using Microsoft.Extensions.Options
+@using Norvia.Tms.Application.Shipments.ListAwaitingAnswer
+@using Norvia.Tms.Web.TransportOrders
+@implements IAsyncDisposable
+@inject ITransportOrderQueries Queries
+@inject ITransportOrderCommands Commands
+@inject TimeProvider Time
+@inject IOptions<LiveListOptions> Options
+@inject ILogger<LiveTransportOrderList<CarrierBookingAwaitingAnswerSummary>> Logger
+
+<PageTitle>Bookings awaiting an answer · Norvia TMS</PageTitle>
+
+<h1>Bookings awaiting an answer</h1>
+
+@if (_outcomes.Count > 0)
+{
+    @* Each withdrawal's own outcome: a refused one doesn't affect the others, and says why. *@
+    <ul aria-label="Withdrawal outcomes" class="mb-4 list-none space-y-2 p-0">
+        @foreach (var (number, answer) in _outcomes)
+        {
+            <li role="@(answer is WithdrawAnswer.Withdrawn ? "status" : "alert")">
+                @switch (answer)
+                {
+                    case WithdrawAnswer.Withdrawn:
+                        <FluentMessageBar Intent="MessageIntent.Success" AllowDismiss="false">
+                            Carrier booking @number is withdrawn. Its Shipment is back in Shipments to release.
+                        </FluentMessageBar>
+                        break;
+                    case WithdrawAnswer.Refused refused:
+                        <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
+                            Carrier booking @number wasn't withdrawn: @refused.Reason
+                        </FluentMessageBar>
+                        break;
+                    default:
+                        <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+                            Carrier booking @number couldn't be withdrawn. Try again.
+                        </FluentMessageBar>
+                        break;
+                }
+            </li>
+        }
+    </ul>
+}
+
+<LiveListStates Items="_list.Items" LastReadFailed="_list.LastReadFailed" Name="bookings awaiting an answer"
+                Empty="No Carrier bookings are waiting for an answer. A booking appears here as soon as a Shipment is released to a Carrier." Context="bookings">
+    @* The earliest collection first, as the query gives them: that booking needs its answer first. *@
+    <FluentDataGrid Items="bookings.AsQueryable()" TGridItem="CarrierBookingAwaitingAnswerSummary" Class="flatly-table" aria-label="Bookings awaiting an answer"
+                    GridTemplateColumns="1fr 1fr 1fr 1.2fr 1.2fr 1.2fr auto auto" MultiLine="true">
+        <TemplateColumn Title="Shipment">
+            <a href="/shipments/@context.ShipmentNumber">@context.ShipmentNumber</a>
+        </TemplateColumn>
+        <PropertyColumn Title="Carrier" Property="@(booking => PlanningText.Carrier(booking.Carrier))" />
+        <PropertyColumn Title="Carrier booking" Property="@(booking => booking.CarrierBookingNumber)" />
+        <PropertyColumn Title="Collection" Property="@(booking => NorviaTime.Format(booking.EarliestCollectionTime))" />
+        <PropertyColumn Title="Requested" Property="@(booking => NorviaTime.Format(booking.RequestedAt))" />
+        <PropertyColumn Title="Sent" Property="@(booking => CarrierBookingText.Sent(booking.SentAt))" />
+        <TemplateColumn Title="Overdue">
+            @if (context.Overdue)
+            {
+                <strong>Overdue</strong>
+            }
+        </TemplateColumn>
+        <TemplateColumn Title="Action">
+            <FluentButton Appearance="Appearance.Outline" OnClick="() => WithdrawAsync(context.CarrierBookingNumber)"
+                          Disabled="@_withdrawing.Contains(context.CarrierBookingNumber)"
+                          aria-label="@($"Withdraw {context.CarrierBookingNumber}")">
+                Withdraw
+            </FluentButton>
+        </TemplateColumn>
+    </FluentDataGrid>
+</LiveListStates>
+
+@code {
+    private readonly CancellationTokenSource _closed = new();
+    private readonly HashSet<string> _withdrawing = [];
+    private readonly List<(string Number, WithdrawAnswer? Answer)> _outcomes = [];
+    private LiveTransportOrderList<CarrierBookingAwaitingAnswerSummary> _list = null!;
+
+    protected override void OnInitialized()
+    {
+        _list = new LiveTransportOrderList<CarrierBookingAwaitingAnswerSummary>(
+            Queries.ListCarrierBookingsAwaitingAnswerAsync, "the bookings awaiting an answer", Time, Options.Value.RefreshInterval, Logger);
+        _list.Changed += () => InvokeAsync(StateHasChanged);
+        _list.Start();
+    }
+
+    // The row isn't dropped here: the list reads again shortly, and then no longer has the Withdrawn booking.
+    private async Task WithdrawAsync(string number)
+    {
+        if (!_withdrawing.Add(number))
+        {
+            return;
+        }
+
+        try
+        {
+            Record(number, await Commands.WithdrawAsync(number, _closed.Token));
+        }
+        catch (OperationCanceledException) when (_closed.IsCancellationRequested)
+        {
+            // The page closed while the TMS was answering.
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning(exception, "Withdrawing Carrier booking {CarrierBookingNumber} failed", number);
+            Record(number, null);
+        }
+        finally
+        {
+            _withdrawing.Remove(number);
+        }
+    }
+
+    // One outcome per booking, the latest: trying a booking again replaces what it said before.
+    private void Record(string number, WithdrawAnswer? answer)
+    {
+        _outcomes.RemoveAll(outcome => outcome.Number == number);
+        _outcomes.Add((number, answer));
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _closed.CancelAsync();
+        _closed.Dispose();
+        await _list.DisposeAsync();
+    }
+}

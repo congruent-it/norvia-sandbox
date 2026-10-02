@@ -466,6 +466,105 @@ public sealed class TmsApiClientTests : IDisposable
     }
 
     [Fact]
+    public async Task WithdrawAsync_PostsToTheCarrierBookingsWithdraw_AsTheTmsUi_UnderAnIdempotencyKey()
+    {
+        _tmsApi.Answer(HttpStatusCode.OK, Withdrawn());
+
+        await WithdrawAsync("CB-0000007");
+
+        _tmsApi.Request!.Method.Should().Be(HttpMethod.Post);
+        _tmsApi.Request.RequestUri.Should().Be(new Uri("http://tms-api.example/v1/carrier-bookings/CB-0000007/withdraw"));
+        _tmsApi.Request.Headers.Authorization!.Parameter.Should().Be("tms-ui-token");
+        _tmsApi.Request.Headers.GetValues("Idempotency-Key").Should().ContainSingle().Which.Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public async Task WithdrawAsync_Withdrawn_IsWithdrawn()
+    {
+        _tmsApi.Answer(HttpStatusCode.OK, Withdrawn());
+
+        var answer = await WithdrawAsync("CB-0000007");
+
+        answer.Should().Be(new WithdrawAnswer.Withdrawn());
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.NotFound, "BookingNotFound", "There is no Carrier booking CB-0000007.")]
+    [InlineData(HttpStatusCode.Conflict, "BookingNotOpen", "Carrier booking CB-0000007 is Confirmed, so it can't be withdrawn.")]
+    public async Task WithdrawAsync_Refused_IsRefusedWithTheTmsReason(HttpStatusCode status, string code, string reason)
+    {
+        _tmsApi.Answer(
+            status,
+            $$"""{ "status": {{(int)status}}, "title": "The Carrier booking can't be withdrawn.", "detail": "{{reason}}", "code": "{{code}}" }""",
+            "application/problem+json");
+
+        var answer = await WithdrawAsync("CB-0000007");
+
+        answer.Should().Be(new WithdrawAnswer.Refused(reason));
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.UnprocessableEntity)]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.Forbidden)]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    public async Task WithdrawAsync_AnyOtherAnswer_Fails(HttpStatusCode status)
+    {
+        _tmsApi.Answer(status, "{}", "application/problem+json");
+
+        var withdraw = () => WithdrawAsync("CB-0000007");
+
+        await withdraw.Should().ThrowAsync<HttpRequestException>();
+    }
+
+    [Fact]
+    public async Task WithdrawAsync_Withdrawn_RecordsItsOutcomeOnThePlanningTrail()
+    {
+        _tmsApi.Answer(HttpStatusCode.OK, Withdrawn());
+
+        await WithdrawAsync("CB-0000007");
+
+        ScopeOf(_logger.LatestRecord).Should().Contain(new Dictionary<string, object?>
+        {
+            ["correlationId"] = "corr-withdrawal",
+            ["flow"] = "transport-planning",
+            ["shipmentNumber"] = "SH-0000012",
+            ["carrierBookingNumber"] = "CB-0000007",
+            ["outcome"] = "Succeeded",
+        }).And.NotContainKey("failureCode");
+    }
+
+    [Fact]
+    public async Task WithdrawAsync_Refused_RecordsItRefusedWithItsCode()
+    {
+        _tmsApi.Answer(
+            HttpStatusCode.Conflict,
+            """{ "status": 409, "detail": "Already answered.", "code": "BookingNotOpen", "correlationId": "corr-refused" }""",
+            "application/problem+json");
+
+        await WithdrawAsync("CB-0000007");
+
+        ScopeOf(_logger.LatestRecord).Should().Contain(new Dictionary<string, object?>
+        {
+            ["correlationId"] = "corr-refused",
+            ["flow"] = "transport-planning",
+            ["carrierBookingNumber"] = "CB-0000007",
+            ["outcome"] = "Refused",
+            ["failureCode"] = "BookingNotOpen",
+        });
+    }
+
+    [Fact]
+    public async Task WithdrawAsync_SendsTheWithdrawalInASpanOfItsOwn()
+    {
+        _tmsApi.Answer(HttpStatusCode.OK, Withdrawn());
+
+        await WithdrawAsync("CB-0000007");
+
+        _spans.Should().ContainSingle().Which.DisplayName.Should().Be("Withdraw Carrier booking");
+    }
+
+    [Fact]
     public async Task ReRateAsync_Rated_RecordsItsOutcomeOnTheIntakesTrail()
     {
         // A re-rate continues the Message trail of the order's intake, as its first rating does.
@@ -566,6 +665,22 @@ public sealed class TmsApiClientTests : IDisposable
           "previouslyCarriedBy": { "assignedTo": "Carrier", "carrier": { "id": "CAR-0002", "name": "Kessler Spedition" } },
           "shipperId": "SHP-0001",
           "correlationId": "corr-reassignment",
+          "repeat": false
+        }
+        """;
+
+    private Task<WithdrawAnswer> WithdrawAsync(string carrierBookingNumber) =>
+        _client.WithdrawAsync(carrierBookingNumber, Xunit.TestContext.Current.CancellationToken);
+
+    // As the TMS API answers a withdrawal: CarrierBookingWithdrawResult, with its enums as strings.
+    private static string Withdrawn() =>
+        """
+        {
+          "carrierBookingNumber": "CB-0000007",
+          "status": "Withdrawn",
+          "shipmentNumber": "SH-0000012",
+          "shipmentStatus": "Planned",
+          "correlationId": "corr-withdrawal",
           "repeat": false
         }
         """;

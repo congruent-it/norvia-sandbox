@@ -37,11 +37,12 @@ public sealed class NorviaRoleTests
     }
 
     [Fact]
-    public void Views_OfPlanner_AreWaitingForPlanningThenShipmentsToRelease()
+    public void Views_OfPlanner_AreWaitingForPlanningThenShipmentsToReleaseThenBookingsAwaitingAnAnswer()
     {
         NorviaRole.Planner.Views.Select(view => (view.Path, view.Title)).Should().Equal(
             ("/transport-orders", "Waiting for planning"),
-            ("/shipments/to-release", "Shipments to release"));
+            ("/shipments/to-release", "Shipments to release"),
+            ("/shipments/awaiting-answer", "Bookings awaiting an answer"));
     }
 
     [Fact]
