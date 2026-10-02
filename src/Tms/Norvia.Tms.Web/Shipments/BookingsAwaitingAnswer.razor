@@ -97,16 +97,12 @@
 
         try
         {
-            Record(number, await Commands.WithdrawAsync(number, _closed.Token));
-        }
-        catch (OperationCanceledException) when (_closed.IsCancellationRequested)
-        {
-            // The page closed while the TMS was answering.
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            Logger.LogWarning(exception, "Withdrawing Carrier booking {CarrierBookingNumber} failed", number);
-            Record(number, null);
+            // Null when the TMS API couldn't be reached, or the page closed meanwhile, which the page then isn't there to show.
+            var answer = await new CarrierBookingWithdrawals(Commands, Logger).WithdrawAsync(number, _closed.Token);
+            if (!_closed.IsCancellationRequested)
+            {
+                Record(number, answer);
+            }
         }
         finally
         {
