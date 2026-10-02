@@ -4,15 +4,17 @@ using System.Net.Http.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Norvia.PartnerPortal.Application.Bookings;
+using Norvia.PartnerPortal.Application.CarrierBookings.Answer;
 using Norvia.PartnerPortal.Domain.Bookings;
+using Norvia.PartnerPortal.Domain.CarrierBookings;
 using Norvia.PartnerPortal.Domain.Personas;
 
 namespace Norvia.PartnerPortal.Infrastructure.PartnerApi;
 
 /// <summary>
-/// Books through the Norvia Partner API as a Persona: its subscription key names the product, its token says which
-/// party it is (ADR 0005). The booking itself never names the party. It sends each booking in a span of its own, which
-/// the Integration console names the portal's hop after.
+/// Books and answers through the Norvia Partner API as a Persona: its subscription key names the product, its token says
+/// which party it is (ADR 0005). A booking or an answer itself never names the party. It sends each in a span of its
+/// own, which the Integration console names the portal's hop after.
 /// </summary>
 internal sealed partial class NorviaPartnerApiClient(
     HttpClient http,
@@ -58,6 +60,54 @@ internal sealed partial class NorviaPartnerApiClient(
         return answer;
     }
 
+    public async Task<NorviaReply> AnswerAsync(
+        Persona persona, string carrierBookingNumber, string shipmentNumber, CarrierAnswer answer, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(persona);
+
+        using var span = activities.Source.StartActivity("Send Carrier answer", ActivityKind.Internal);
+        NorviaReply reply;
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("carrier-answers", UriKind.Relative))
+            {
+                Content = JsonContent.Create(CarrierAnswerFormat.ToJson(carrierBookingNumber, answer)),
+            };
+            // Buffered, so it goes out with its length: the Carrier-answer Logic App's trigger gets no body from a chunked one.
+            await request.Content.LoadIntoBufferAsync(cancellationToken);
+            request.Headers.Add("Ocp-Apim-Subscription-Key", options.Value.SubscriptionKeyOf(persona.Id));
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await tokens.GetTokenAsync(persona.Id, cancellationToken));
+
+            using var response = await http.SendAsync(request, cancellationToken);
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            reply = PartnerAnswers.ReadReply((int)response.StatusCode, body, CorrelationIdOf(response));
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Unreachable, too slow, or no token to call with: nothing reached Norvia, so nothing was recorded.
+            LogAnswerNotSent(exception, persona.Id.Value, carrierBookingNumber);
+            reply = NorviaReply.NotReceived(messageId: null);
+        }
+
+        using (logger.BeginScope(TrackingKeysOf(persona, carrierBookingNumber, shipmentNumber, reply)))
+        {
+            LogAnswerReplied(persona.Id.Value, carrierBookingNumber, reply.Result);
+        }
+
+        return reply;
+    }
+
+    private static Dictionary<string, object?> TrackingKeysOf(Persona persona, string carrierBookingNumber, string shipmentNumber, NorviaReply reply)
+    {
+        var keys = CarrierAnswerTracking.KeysOf(persona, carrierBookingNumber, shipmentNumber, reply.MessageId);
+        foreach (var (key, value) in CarrierAnswerTracking.OutcomeOf(reply.Result))
+        {
+            keys[key] = value;
+        }
+
+        return keys;
+    }
+
     /// <summary>
     /// The tracking contract's keys the portal knows (coding guidelines §7), so its trace joins Norvia's Message trail.
     /// Never what was booked: that holds the Consignee's personal data. Its outcome reads Norvia's answer as the intake's
@@ -101,4 +151,10 @@ internal sealed partial class NorviaPartnerApiClient(
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Norvia answered a booking by Persona {PersonaId}: {Result}")]
     private partial void LogAnswered(string personaId, BookingResult result);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "An answer by Persona {PersonaId} to {CarrierBookingNumber} didn't reach the Norvia Partner API")]
+    private partial void LogAnswerNotSent(Exception exception, string personaId, string carrierBookingNumber);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Norvia replied to an answer by Persona {PersonaId} to {CarrierBookingNumber}: {Result}")]
+    private partial void LogAnswerReplied(string personaId, string carrierBookingNumber, CarrierAnswerResult result);
 }

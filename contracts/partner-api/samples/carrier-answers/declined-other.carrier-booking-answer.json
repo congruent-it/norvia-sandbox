@@ -1,0 +1,6 @@
+{
+  "carrierId": "CAR-0001",
+  "outcome": "Rejected",
+  "reasonCode": "Other",
+  "reasonText": "No trucks on Friday"
+}

@@ -20,5 +20,6 @@
   <!-- Embedded, so the tests read the contracts without touching the file system (coding guidelines §10). -->
   <ItemGroup>
     <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\bookings\*.json" LogicalName="PartnerApi/samples/bookings/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\carrier-answers\*.json" LogicalName="PartnerApi/samples/carrier-answers/%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

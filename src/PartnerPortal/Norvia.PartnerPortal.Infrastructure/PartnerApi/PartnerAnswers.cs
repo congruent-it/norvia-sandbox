@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Norvia.PartnerPortal.Domain.Bookings;
+using Norvia.PartnerPortal.Domain.CarrierBookings;
 
 namespace Norvia.PartnerPortal.Infrastructure.PartnerApi;
 
@@ -28,6 +29,32 @@ internal static class PartnerAnswers
             _ => NorviaAnswer.NotReceived(messageId),
         };
     }
+
+    /// <summary>
+    /// Reads Norvia's reply to a Carrier's answer (contracts/partner-api/README.md, Carrier answer, and API Management's
+    /// refusals). A reply that doesn't say the answer was recorded, or why not, means it wasn't received: nothing was
+    /// recorded, and answering again is safe.
+    /// </summary>
+    public static NorviaReply ReadReply(int statusCode, string body, string? correlationId)
+    {
+        var json = Parse(body);
+        var messageId = Text(json, "messageId") ?? correlationId;
+
+        return (statusCode, Text(json, "result")) switch
+        {
+            (200, "RECORDED") => NorviaReply.Recorded(messageId, json?["repeated"] is JsonValue repeated && repeated.TryGetValue<bool>(out var value) && value),
+            (409, "BOOKING_NOT_OPEN") => Refusal(CarrierAnswerResult.BookingNotOpen, json, messageId, "Norvia no longer has this booking open."),
+            (404, "BOOKING_NOT_FOUND") => Refusal(CarrierAnswerResult.BookingNotFound, json, messageId, "Norvia has no such booking."),
+            (403, "NOT_ALLOWED") => Refusal(CarrierAnswerResult.NotAllowed, json, messageId, "This booking is not yours to answer."),
+            (400, "INVALID") => Refusal(CarrierAnswerResult.Invalid, json, messageId, "Norvia can't use this answer."),
+            (403, _) => NorviaReply.Refusal(CarrierAnswerResult.Refused, Text(json, "text") ?? UnrecognisedCredentials, messageId),
+            (401, _) => NorviaReply.Refusal(CarrierAnswerResult.Refused, UnrecognisedCredentials, messageId),
+            _ => NorviaReply.NotReceived(messageId),
+        };
+    }
+
+    private static NorviaReply Refusal(CarrierAnswerResult result, JsonObject? json, string? messageId, string fallbackText) =>
+        NorviaReply.Refusal(result, Text(json, "text") ?? fallbackText, messageId);
 
     private static List<RejectionReason>? Reasons(JsonObject? json)
     {

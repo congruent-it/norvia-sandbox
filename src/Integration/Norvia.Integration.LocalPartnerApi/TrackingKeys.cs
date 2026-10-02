@@ -10,11 +10,16 @@ internal static class TrackingKeys
     public const string Flow = "flow";
     public const string PartyId = "partyId";
     public const string TransportOrderNumber = "transportOrderNumber";
+    public const string ShipmentNumber = "shipmentNumber";
+    public const string CarrierBookingNumber = "carrierBookingNumber";
     public const string Outcome = "outcome";
     public const string FailureCode = "failureCode";
 
     /// <summary>The <see cref="Flow"/> of a booking, from the edge to the TMS's answer.</summary>
     public const string TransportOrderIntake = "transport-order-intake";
+
+    /// <summary>The <see cref="Flow"/> of a Carrier's answer, from the edge to the TMS's answer.</summary>
+    public const string CarrierAnswer = "carrier-answer";
 
     /// <summary>The <see cref="Outcome"/>s the stand-in records.</summary>
     public const string Succeeded = "Succeeded";

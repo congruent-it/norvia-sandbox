@@ -1,0 +1,141 @@
+<policies>
+  <inbound>
+    <base />
+    <set-variable name="correlationId" value="@(Guid.NewGuid().ToString())" />
+    <validate-azure-ad-token tenant-id="{{entra-tenant-id}}" output-token-variable-name="partnerToken">
+      <audiences>
+        <audience>{{partner-api-client-id}}</audience>
+      </audiences>
+    </validate-azure-ad-token>
+    <choose>
+      <when condition="@(!((Jwt)context.Variables[&quot;partnerToken&quot;]).Claims.GetValueOrDefault(&quot;roles&quot;, &quot;&quot;).Split(',').Contains(&quot;CarrierBookings.Respond&quot;))">
+        <trace source="norvia-partner-api" severity="information">
+          <message>This client may not answer Carrier bookings.</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="carrier-answer" />
+          <metadata name="outcome" value="Refused" />
+          <metadata name="failureCode" value="NotAllowedToRespond" />
+        </trace>
+        <return-response>
+          <set-status code="403" reason="Forbidden" />
+          <set-header name="X-Correlation-ID" exists-action="override">
+            <value>@((string)context.Variables["correlationId"])</value>
+          </set-header>
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+          </set-header>
+          <set-body>@(new JObject(
+            new JProperty("messageId", (string)context.Variables["correlationId"]),
+            new JProperty("text", "This client may not answer Carrier bookings.")).ToString())</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <set-variable name="carrierId" value="@{
+      var clientId = ((Jwt)context.Variables[&quot;partnerToken&quot;]).Claims.GetValueOrDefault(&quot;azp&quot;, &quot;&quot;);
+      foreach (var entry in &quot;{{carriers-by-client-id}}&quot;.Split(';'))
+      {
+        var pair = entry.Split('=');
+        if (pair.Length == 2 &amp;&amp; pair[0] == clientId) { return pair[1]; }
+      }
+      return &quot;&quot;;
+    }" />
+    <choose>
+      <when condition="@(string.IsNullOrEmpty((string)context.Variables[&quot;carrierId&quot;]))">
+        <trace source="norvia-partner-api" severity="information">
+          <message>No Carrier is registered for this client.</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="carrier-answer" />
+          <metadata name="outcome" value="Refused" />
+          <metadata name="failureCode" value="NoCarrierForClient" />
+        </trace>
+        <return-response>
+          <set-status code="403" reason="Forbidden" />
+          <set-header name="X-Correlation-ID" exists-action="override">
+            <value>@((string)context.Variables["correlationId"])</value>
+          </set-header>
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+          </set-header>
+          <set-body>@(new JObject(
+            new JProperty("messageId", (string)context.Variables["correlationId"]),
+            new JProperty("text", "No Carrier is registered for this client.")).ToString())</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <set-header name="X-Carrier-ID" exists-action="override">
+      <value>@((string)context.Variables["carrierId"])</value>
+    </set-header>
+    <set-header name="X-Correlation-ID" exists-action="override">
+      <value>@((string)context.Variables["correlationId"])</value>
+    </set-header>
+    <trace source="norvia-partner-api" severity="information">
+      <message>Passed to the Carrier-answer Logic App</message>
+      <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+      <metadata name="flow" value="carrier-answer" />
+      <metadata name="partyId" value="@((string)context.Variables[&quot;carrierId&quot;])" />
+    </trace>
+    <set-backend-service backend-id="answer-logic-app" />
+    <rewrite-uri template="/api/carrier-answer/triggers/When_a_Carrier_answers/invoke" copy-unmatched-params="false" />
+    <set-query-parameter name="api-version" exists-action="override">
+      <value>2022-05-01</value>
+    </set-query-parameter>
+    <authentication-managed-identity resource="{{answer-trigger-audience}}" client-id="{{api-management-identity-client-id}}" />
+  </inbound>
+  <backend>
+    <base />
+  </backend>
+  <outbound>
+    <base />
+    <!-- Also on an answer from a failed run, which comes from the Logic Apps runtime without the workflow's headers. -->
+    <set-header name="X-Correlation-ID" exists-action="override">
+      <value>@((string)context.Variables["correlationId"])</value>
+    </set-header>
+    <!-- The outcome of the answer the Carrier got (contracts/partner-api/README.md, Carrier answer), as API Management's hop. -->
+    <choose>
+      <when condition="@(context.Response.StatusCode == 200)">
+        <trace source="norvia-partner-api" severity="information">
+          <message>Answered: recorded</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="carrier-answer" />
+          <metadata name="partyId" value="@((string)context.Variables[&quot;carrierId&quot;])" />
+          <metadata name="outcome" value="Succeeded" />
+        </trace>
+      </when>
+      <when condition="@(context.Response.StatusCode == 400 || context.Response.StatusCode == 403 || context.Response.StatusCode == 404 || context.Response.StatusCode == 409)">
+        <trace source="norvia-partner-api" severity="information">
+          <message>Answered: refused</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="carrier-answer" />
+          <metadata name="partyId" value="@((string)context.Variables[&quot;carrierId&quot;])" />
+          <metadata name="outcome" value="Refused" />
+          <metadata name="failureCode" value="@(context.Response.StatusCode == 400 ? &quot;CarrierAnswerUnreadable&quot; : context.Response.StatusCode == 403 ? &quot;CarrierNotAllowed&quot; : context.Response.StatusCode == 404 ? &quot;BookingNotFound&quot; : &quot;BookingNotOpen&quot;)" />
+        </trace>
+      </when>
+      <otherwise>
+        <trace source="norvia-partner-api" severity="information">
+          <message>Answered: not received</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="carrier-answer" />
+          <metadata name="partyId" value="@((string)context.Variables[&quot;carrierId&quot;])" />
+          <metadata name="outcome" value="Failed" />
+          <metadata name="failureCode" value="AnswerNotReceived" />
+        </trace>
+      </otherwise>
+    </choose>
+  </outbound>
+  <on-error>
+    <base />
+    <!-- API Management checks the subscription key before the inbound section runs. -->
+    <set-variable name="correlationId" value="@(context.Variables.ContainsKey(&quot;correlationId&quot;) ? (string)context.Variables[&quot;correlationId&quot;] : Guid.NewGuid().ToString())" />
+    <trace source="norvia-partner-api" severity="information">
+      <message>@(context.LastError.Message)</message>
+      <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+      <metadata name="flow" value="carrier-answer" />
+      <metadata name="outcome" value="@(context.Response.StatusCode == 401 || context.Response.StatusCode == 403 ? &quot;Refused&quot; : &quot;Failed&quot;)" />
+      <metadata name="failureCode" value="@(string.IsNullOrEmpty(context.LastError.Reason) ? context.LastError.Source : context.LastError.Reason)" />
+    </trace>
+    <set-header name="X-Correlation-ID" exists-action="override">
+      <value>@((string)context.Variables["correlationId"])</value>
+    </set-header>
+  </on-error>
+</policies>

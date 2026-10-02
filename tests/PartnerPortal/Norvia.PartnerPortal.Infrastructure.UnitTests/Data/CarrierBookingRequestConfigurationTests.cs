@@ -59,4 +59,27 @@ public sealed class CarrierBookingRequestConfigurationTests
         entity.GetIndexes().Should().Contain(index =>
             index.IsUnique && index.Properties.Select(property => property.Name).SequenceEqual(UniqueKey));
     }
+
+    [Fact]
+    public void StatusAndRejectionReason_AreStoredAsTheirNames_SoTheTableStaysReadable()
+    {
+        using var context = NewContext();
+        var entity = context.Model.FindEntityType(typeof(CarrierBookingRequest))!;
+
+        entity.FindProperty(nameof(CarrierBookingRequest.Status))!.GetProviderClrType().Should().Be<string>();
+        entity.FindProperty(nameof(CarrierBookingRequest.RejectionReason))!.GetProviderClrType().Should().Be<string>();
+    }
+
+    [Fact]
+    public void TheAnswersColumns_AreOptional_ExceptTheStatus()
+    {
+        using var context = NewContext();
+        var entity = context.Model.FindEntityType(typeof(CarrierBookingRequest))!;
+
+        entity.FindProperty(nameof(CarrierBookingRequest.Status))!.IsNullable.Should().BeFalse();
+        foreach (var name in new[] { "ClosedAt", "AnswerCorrelationId", "CarrierBookingReference", "PlannedCollection", "RejectionReason", "RejectionText" })
+        {
+            entity.FindProperty(name)!.IsNullable.Should().BeTrue(name);
+        }
+    }
 }

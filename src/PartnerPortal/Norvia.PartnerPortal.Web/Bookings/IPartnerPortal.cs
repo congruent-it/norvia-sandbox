@@ -1,6 +1,8 @@
 using Norvia.PartnerPortal.Application.Bookings;
 using Norvia.PartnerPortal.Application.CarrierBookings;
+using Norvia.PartnerPortal.Application.CarrierBookings.Answer;
 using Norvia.PartnerPortal.Application.Personas;
+using Norvia.PartnerPortal.Domain.CarrierBookings;
 
 namespace Norvia.PartnerPortal.Web.Bookings;
 
@@ -20,4 +22,10 @@ public interface IPartnerPortal
 
     /// <summary>The booking requests in the Carrier Persona's inbox, the latest first.</summary>
     Task<IReadOnlyList<CarrierBookingRequestView>> ListCarrierBookingRequestsAsync(string personaId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Sends the Carrier Persona's answer to one of the requests in its inbox to Norvia, and returns what Norvia replied and
+    /// how the inbox now has the request; null when there is no such Carrier Persona or request.
+    /// </summary>
+    Task<AnsweredCarrierBooking?> AnswerCarrierBookingAsync(string personaId, string carrierBookingNumber, CarrierAnswer answer, CancellationToken cancellationToken);
 }

@@ -17,4 +17,7 @@ internal static partial class PageLog
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Loading the bookings of Persona {PersonaId} failed")]
     public static partial void BookingsLoadFailed(ILogger logger, Exception exception, string personaId);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Sending or recording Persona {PersonaId}'s answer to {CarrierBookingNumber} failed")]
+    public static partial void AnswerFailed(ILogger logger, Exception exception, string personaId, string carrierBookingNumber);
 }

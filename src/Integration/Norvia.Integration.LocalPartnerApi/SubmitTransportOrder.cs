@@ -30,8 +30,8 @@ internal static partial class SubmitTransportOrder
         var logger = loggers.CreateLogger(typeof(SubmitTransportOrder));
         using var trail = logger.BeginScope(new Dictionary<string, object?> { [TrackingKeys.CorrelationId] = correlationId, [TrackingKeys.Flow] = TrackingKeys.TransportOrderIntake });
 
-        var check = await edge.CheckAsync(context.Request, context.RequestAborted);
-        if (check.ShipperId is not { } shipperId)
+        var check = await edge.CheckAsync(context.Request, EdgeRule.SubmitTransportOrder, context.RequestAborted);
+        if (check.PartyId is not { } shipperId)
         {
             // As the policy's trace metadata records a refusal.
             using var refused = logger.BeginScope(TrackingKeys.OutcomeOf(TrackingKeys.Refused, check.FailureCode));

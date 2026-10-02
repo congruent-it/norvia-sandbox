@@ -6,18 +6,18 @@ namespace Norvia.Integration.LocalPartnerApi;
 
 /// <summary>
 /// What API Management checks at the edge, in the policy's order (infra/estate/partner-api/submit-transport-order.policy.xml):
-/// the subscription key, a token for the Norvia Partner API, the role to submit, and a Shipper for the token's client.
-/// The Shipper comes from the token, never from the booking (ADR 0005).
+/// the subscription key, a token for the Norvia Partner API, the operation's role, and a party for the token's client.
+/// The Shipper or Carrier comes from the token, never from the payload (ADR 0005). The checks are the operation's
+/// <see cref="EdgeRule"/>; infra/estate/partner-api/ holds the policies they play.
 /// </summary>
 internal sealed class PartnerEdge(IOptions<PartnerApiOptions> options)
 {
-    public const string SubmitRole = "TransportOrders.Submit";
-
     private readonly JsonWebTokenHandler _tokens = new();
 
-    public async Task<EdgeCheck> CheckAsync(HttpRequest request, CancellationToken cancellationToken)
+    public async Task<EdgeCheck> CheckAsync(HttpRequest request, EdgeRule rule, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(rule);
         cancellationToken.ThrowIfCancellationRequested();
         var partnerApi = options.Value;
         var key = request.Headers["Ocp-Apim-Subscription-Key"].ToString();
@@ -44,13 +44,13 @@ internal sealed class PartnerEdge(IOptions<PartnerApiOptions> options)
             return EdgeCheck.Unauthorized("Unauthorized. Access token is missing or invalid.");
         }
 
-        if (!partnerToken.Claims.Any(claim => claim.Type == "roles" && claim.Value == SubmitRole))
+        if (!partnerToken.Claims.Any(claim => claim.Type == "roles" && claim.Value == rule.Role))
         {
-            return EdgeCheck.Forbidden("This client may not submit Transport Orders.", "NotAllowedToSubmit");
+            return EdgeCheck.Forbidden(rule.NotAllowedText, rule.NotAllowedCode);
         }
 
-        return partnerToken.TryGetClaim("azp", out var client) && partnerApi.ShippersByClientId.GetValueOrDefault(client.Value) is { } shipperId
-            ? EdgeCheck.Passed(shipperId)
-            : EdgeCheck.Forbidden("No Shipper is registered for this client.", "NoShipperForClient");
+        return partnerToken.TryGetClaim("azp", out var client) && rule.PartiesByClientId(partnerApi).GetValueOrDefault(client.Value) is { } partyId
+            ? EdgeCheck.Passed(partyId)
+            : EdgeCheck.Forbidden(rule.NoPartyText, rule.NoPartyCode);
     }
 }

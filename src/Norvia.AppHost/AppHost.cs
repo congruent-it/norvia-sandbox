@@ -13,7 +13,8 @@ var seedFile = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..
 // serverless (GP_S_Gen5_2) on the free offer. Once a month's free allowance is used, a database bills for what it uses
 // rather than pausing, as the free offer would by default: a paused database fails the migrations and the demo until
 // the month ends.
-var sql = builder.AddAzureSqlServer("sql").RunAsContainer()
+// Locally DbGate runs beside it, to inspect the databases (it is part of the local run only).
+var sql = builder.AddAzureSqlServer("sql").RunAsContainer(container => container.WithDbGate())
     .ConfigureInfrastructure(infrastructure =>
     {
         foreach (var database in infrastructure.GetProvisionableResources().OfType<SqlDatabase>())
@@ -229,8 +230,9 @@ else
         .WithEnvironment("TmsApi__LocalTokens__Audience", LocalTokens.TmsAudience)
         .WithEnvironment("TmsApi__LocalTokens__ClientId", LocalTokens.TmsUiClientId);
 
-    // Locally a stand-in plays API Management and the intake Logic App (ADR 0023). The AppHost gives each Persona what
-    // the estate gives it in Azure: a client ID, a subscription key for the run, and the submit role if it is a Shipper.
+    // Locally a stand-in plays API Management and the intake and Carrier-answer Logic Apps (ADR 0023). The AppHost gives
+    // each Persona what the estate gives it in Azure: a client ID, a subscription key for the run, and the submit role if it
+    // is a Shipper or the respond role if it is a Carrier.
     var partnerApi = builder.AddProject<Projects.Norvia_Integration_LocalPartnerApi>("partner-api")
         .WithReference(tmsApi).WaitFor(tmsApi)
         .WithHttpHealthCheck("/health")
@@ -239,7 +241,8 @@ else
         .WithEnvironment("Tms__BaseAddress", tmsApi.GetEndpoint("http"))
         .WithEnvironment("Tms__Tokens__Issuer", LocalTokens.Issuer)
         .WithEnvironment("Tms__Tokens__Audience", LocalTokens.TmsAudience)
-        .WithEnvironment("Tms__Tokens__ClientId", LocalTokens.IntakeLogicAppClientId);
+        .WithEnvironment("Tms__Tokens__ClientId", LocalTokens.IntakeLogicAppClientId)
+        .WithEnvironment("Tms__AnswerClientId", LocalTokens.AnswerLogicAppClientId);
     // Locally a worker plays the P4 booking Logic App (ADR 0030). It reads the booking subscription, sends each Carrier
     // Persona's booking request to the Persona's endpoint in the Partner portal with a credential for the run, and
     // reports the outcome to the TMS as the identity holding the report role.
@@ -274,6 +277,12 @@ else
         {
             partnerApi.WithEnvironment($"PartnerApi__ShippersByClientId__{LocalTokens.PersonaClientId(persona.Id)}", persona.PartyId);
             partnerPortal.WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__0", LocalTokens.SubmitRole);
+        }
+        else
+        {
+            // A Carrier Persona answers the booking requests in its inbox, for the Carrier its client stands for.
+            partnerApi.WithEnvironment($"PartnerApi__CarriersByClientId__{LocalTokens.PersonaClientId(persona.Id)}", persona.PartyId);
+            partnerPortal.WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__0", LocalTokens.RespondRole);
         }
     }
 

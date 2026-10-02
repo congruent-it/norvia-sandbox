@@ -26,6 +26,7 @@ public sealed class LocalPartnerApiFactory : WebApplicationFactory<Program>
     public const string PartnerApiAudience = "api://norvia-partner-api";
     public const string TmsAudience = "api://norvia-tms";
     public const string IntakeClientId = "norvia-local-intake-logic-app";
+    public const string AnswerClientId = "norvia-local-answer-logic-app";
 
     public byte[] SigningKey { get; } = RandomNumberGenerator.GetBytes(64);
 
@@ -42,6 +43,7 @@ public sealed class LocalPartnerApiFactory : WebApplicationFactory<Program>
             ["PartnerApi:SubscriptionKeys:brouwer-dranken"] = BrouwerKey,
             ["PartnerApi:SubscriptionKeys:van-dijk-transport"] = VanDijkKey,
             ["PartnerApi:ShippersByClientId:" + BrouwerClientId] = "SHP-0001",
+            ["PartnerApi:CarriersByClientId:" + VanDijkClientId] = "CAR-0001",
             ["PartnerApi:Tokens:Issuer"] = Issuer,
             ["PartnerApi:Tokens:Audience"] = PartnerApiAudience,
             ["PartnerApi:Tokens:SigningKey"] = signingKey,
@@ -50,6 +52,7 @@ public sealed class LocalPartnerApiFactory : WebApplicationFactory<Program>
             ["Tms:Tokens:Audience"] = TmsAudience,
             ["Tms:Tokens:ClientId"] = IntakeClientId,
             ["Tms:Tokens:SigningKey"] = signingKey,
+            ["Tms:AnswerClientId"] = AnswerClientId,
         })
         {
             builder.UseSetting(name, value);
@@ -59,6 +62,7 @@ public sealed class LocalPartnerApiFactory : WebApplicationFactory<Program>
         {
             services.AddLogging(logging => logging.AddFakeLogging());
             services.AddHttpClient<TmsIntake>().ConfigurePrimaryHttpMessageHandler(() => Tms);
+            services.AddHttpClient<TmsCarrierAnswers>().ConfigurePrimaryHttpMessageHandler(() => Tms);
             // Retries straight away, so a test of an unreachable TMS doesn't wait out the backoff.
             services.ConfigureAll<HttpStandardResilienceOptions>(options => options.Retry.Delay = TimeSpan.Zero);
         });
@@ -91,9 +95,13 @@ public sealed class LocalPartnerApiFactory : WebApplicationFactory<Program>
         });
     }
 
-    public static string Sample(string name)
+    public static string Sample(string name) => Embedded($"PartnerApi/samples/bookings/{name}");
+
+    public static string CarrierAnswerSample(string name) => Embedded($"PartnerApi/samples/carrier-answers/{name}");
+
+    private static string Embedded(string name)
     {
-        using var stream = typeof(LocalPartnerApiFactory).Assembly.GetManifestResourceStream($"PartnerApi/samples/bookings/{name}")
+        using var stream = typeof(LocalPartnerApiFactory).Assembly.GetManifestResourceStream(name)
             ?? throw new InvalidOperationException($"{name} is not an embedded sample.");
         using var reader = new StreamReader(stream, Encoding.UTF8);
         return reader.ReadToEnd();

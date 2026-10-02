@@ -1,11 +1,15 @@
 @page "/personas/{PersonaId}/booking-requests"
-@* Interactive like the other pages: Fluent UI's components don't survive static streaming rendering. *@
-@rendermode InteractiveServer
+@*
+    Interactive like the other pages: Fluent UI's components don't survive static streaming rendering. Not prerendered: a
+    prerendered inbox shows Confirm and Reject before they work, and a click on them then is lost.
+*@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inject IPartnerPortal Portal
 @inject NavigationManager Navigation
 @inject ILogger<BookingRequests> Logger
 @inject TimeProvider Time
 @implements IAsyncDisposable
+@using Norvia.PartnerPortal.Application.CarrierBookings.Answer
 
 <PageTitle>Booking requests · @(_persona?.DisplayName ?? PersonaId) · Partner portal</PageTitle>
 
@@ -36,10 +40,30 @@ else if (_requests.Count == 0)
 }
 else
 {
-    <p class="mb-6">Every request Norvia sent @_persona!.DisplayName, the latest first. All of them are still open.</p>
+    <p class="mb-6">Every request Norvia sent @_persona!.DisplayName, the latest first. Confirm or reject each open one.</p>
+    @if (_notice is not null)
+    {
+        <div role="@(_notice.Intent == MessageIntent.Error || _notice.Intent == MessageIntent.Warning ? "alert" : "status")" class="mb-6 max-w-3xl">
+            <FluentMessageBar Intent="_notice.Intent" AllowDismiss="false">
+                @_notice.Text
+                @if (_notice.MessageId is not null)
+                {
+                    <span class="block mt-2 text-xs">Norvia's ID for this answer: @_notice.MessageId</span>
+                }
+            </FluentMessageBar>
+        </div>
+    }
+    @if (_failed)
+    {
+        <div role="alert" class="mb-6 max-w-3xl">
+            <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+                The answer couldn't be sent or recorded. Check the inbox before you answer again: Norvia answers the same answer again as before.
+            </FluentMessageBar>
+        </div>
+    }
     @* Wide columns for what wraps (addresses, goods), narrow ones for what doesn't; multi-line, so a row grows to fit its text. *@
     <FluentDataGrid Items="_requests.AsQueryable()" TGridItem="CarrierBookingRequestView" Class="lux-table" aria-label="Booking requests"
-                    GridTemplateColumns="1.1fr 1.5fr 1fr 1.8fr 1.8fr 1.3fr 1.8fr" MultiLine="true">
+                    GridTemplateColumns="1.1fr 1.5fr 1fr 1.8fr 1.8fr 1.3fr 1.8fr 1.8fr" MultiLine="true">
         <PropertyColumn Title="Received" Property="@(request => PortalTime.Format(request.ReceivedAt))" />
         <PropertyColumn Title="Booking number" Property="@(request => request.CarrierBookingNumber)" />
         <PropertyColumn Title="Shipment" Property="@(request => request.ShipmentNumber)" />
@@ -58,7 +82,28 @@ else
                 }
             </ul>
         </TemplateColumn>
+        <TemplateColumn Title="Answer">
+            @if (context.IsOpen)
+            {
+                <div class="flex flex-wrap gap-2">
+                    <FluentButton Appearance="Appearance.Accent" OnClick="() => Choose(context, AnswerKind.Confirm)" aria-label="@($"Confirm {context.CarrierBookingNumber}")">Confirm</FluentButton>
+                    <FluentButton Appearance="Appearance.Outline" OnClick="() => Choose(context, AnswerKind.Reject)" aria-label="@($"Reject {context.CarrierBookingNumber}")">Reject</FluentButton>
+                </div>
+            }
+            else
+            {
+                <span>@RequestStatusText.Of(context)</span>
+            }
+        </TemplateColumn>
     </FluentDataGrid>
+
+    @if (OpenRequestBeingAnswered is { } answering)
+    {
+        <div class="mt-8">
+            <AnswerPanel @key="@($"{answering.CarrierBookingNumber}-{_kind}")" Request="answering" Kind="_kind" Sending="_sending"
+                         OnAnswer="AnswerAsync" OnCancel="Cancel" />
+        </div>
+    }
 }
 
 @code {
@@ -70,9 +115,62 @@ else
     private PersonaView? _persona;
     private IReadOnlyList<CarrierBookingRequestView>? _requests;
     private bool _loadFailed;
+    private string? _answeringNumber;
+    private AnswerKind _kind;
+    private bool _sending;
+    private bool _failed;
+    private AnswerNotice? _notice;
 
     [Parameter]
     public string PersonaId { get; set; } = string.Empty;
+
+    // The request being answered, as the inbox has it now: once it closes, its form goes.
+    private CarrierBookingRequestView? OpenRequestBeingAnswered =>
+        _requests?.FirstOrDefault(request => request.CarrierBookingNumber == _answeringNumber && request.IsOpen);
+
+    private void Choose(CarrierBookingRequestView request, AnswerKind kind)
+    {
+        _answeringNumber = request.CarrierBookingNumber;
+        _kind = kind;
+        _notice = null;
+        _failed = false;
+    }
+
+    private void Cancel() => _answeringNumber = null;
+
+    private async Task AnswerAsync(CarrierAnswer answer)
+    {
+        var number = _answeringNumber!;
+        _sending = true;
+        _notice = null;
+        _failed = false;
+        try
+        {
+            if (await Portal.AnswerCarrierBookingAsync(PersonaId, number, answer, CancellationToken.None) is { } answered)
+            {
+                _notice = AnswerNotice.Of(number, answer, answered);
+                _requests = [.. _requests!.Select(request => request.CarrierBookingNumber == number ? answered.Request : request)];
+                if (!_notice.AnswerAgain)
+                {
+                    _answeringNumber = null;
+                }
+            }
+            else
+            {
+                Navigation.NotFound();
+            }
+        }
+        catch (Exception exception)
+        {
+            // Norvia unreachable is a reply, not this: here the portal itself failed, for example to keep its record.
+            PageLog.AnswerFailed(Logger, exception, PersonaId, number);
+            _failed = true;
+        }
+        finally
+        {
+            _sending = false;
+        }
+    }
 
     protected override void OnAfterRender(bool firstRender)
     {

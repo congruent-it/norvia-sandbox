@@ -7,6 +7,8 @@ The format in which a Shipper books a Transport-only transport through the Norvi
 | [booking.v1](booking.v1.schema.json) | A booking, as the Shipper sends it |
 | [booking-response.v1](booking-response.v1.schema.json) | Norvia's answer: Accepted, Already booked, Rejected or Not received |
 | [carrier-booking.v1](carrier-booking.v1.schema.json) | A booking request, as Norvia's P4 booking Logic App sends it to a Carrier's booking endpoint (the other direction: see [Carrier booking](#carrier-booking)) |
+| [carrier-answer.v1](carrier-answer.v1.schema.json) | A Carrier's confirmation or rejection of a booking request, as the Carrier sends it to the Norvia Partner API (see [Carrier answer](#carrier-answer)) |
+| [carrier-answer-response.v1](carrier-answer-response.v1.schema.json) | Norvia's answer to a Carrier's answer: Recorded, Booking not open, Booking not found, Not allowed, Invalid or Not received |
 
 The booking never names the Shipper. API Management takes it from the token and passes it to the Logic App ([ADR 0005](../../docs/adr/0005-partner-identity-comes-from-the-token.md)).
 
@@ -108,3 +110,42 @@ The other way round, [P4](../../docs/processes/tms/p4-carrier-booking.md#carrier
 A value the Carrier format can't hold is left out, as in the intake map. The Carrier answers a request it can't use.
 
 The request carries the release's correlation ID in `X-Correlation-ID` and the Carrier's credential in `X-Api-Key`. The Carrier booking number is the key: a request sent again is acknowledged and ignored.
+
+## Carrier answer
+
+A Carrier answers the booking request in its inbox with `POST {partner API URL}/carrier-answers`, through API Management like a Shipper's booking ([P4](../../docs/processes/tms/p4-carrier-booking.md)). The Carrier-answer Logic App maps the answer to the Canonical Model [carrier-booking-answer.v1](../canonical-model/carrier-booking-answer.v1.schema.json), records it with the TMS, and relays the TMS's response in the format below. The map is `CarrierAnswerMap` and the relay `CarrierAnswerResponses`, run as local functions of the Logic App like the intake map ([ADR 0019](../../docs/adr/0019-the-intake-map-is-dotnet-code-run-as-a-logic-apps-local-function.md)). They are tested against the sample pairs in `samples/carrier-answers` and `samples/carrier-answer-responses`.
+
+The answer never names the Carrier. API Management takes it from the token's `azp` claim ([ADR 0005](../../docs/adr/0005-partner-identity-comes-from-the-token.md)), so a Carrier can only answer its own bookings; the TMS refuses the answer of any other Carrier. Every call carries the headers of [Calling the Norvia Partner API](#calling-the-norvia-partner-api), but the token must hold the app role `CarrierBookings.Respond`, which only Carrier Personas hold. API Management creates a **new correlation ID for each answer**, which the TMS stores on the Carrier booking beside the release's and the answer events carry.
+
+| Carrier answer | Canonical Model `CarrierBookingAnswer` | What the map does |
+|---|---|---|
+| `carrierBookingNumber` | The path of the TMS call | Checks it reads `CB-` and seven digits |
+| `decision`: `CONFIRMED` or `DECLINED` | `outcome`: `Confirmed` or `Rejected` | Translates it. Any other decision is `INVALID`: left out, it would reach the TMS as the default outcome |
+| `bookingRef` | `carrierBookingReference` | Copies it. A confirmation without one is `INVALID` |
+| `plannedCollection`: a date and time with its UTC offset | `plannedCollectionTime`: UTC with an offset | Converts it. Without an offset it is `INVALID`: it names no instant |
+| `declineReason`: `NO_CAPACITY`, `LANE_NOT_SERVED`, `WINDOW_NOT_FEASIBLE`, `GOODS_NOT_ACCEPTED`, `OTHER` | `reasonCode`: `NoCapacity`, `LaneNotServed`, `WindowNotFeasible`, `GoodsNotAccepted`, `Other` | Translates it. An unknown code is `INVALID` |
+| `declineText` | `reasonText` | Copies it. A rejection for `OTHER` without one is `INVALID` |
+| Anything else, a `carrierId` included | Left out | The Carrier comes from the token alone |
+
+An `INVALID` answer never reaches the TMS.
+
+### Carrier answer responses
+
+`messageId` is the correlation ID of the answer, by which Norvia finds every trace of it.
+
+| `result` | HTTP status | When | Carries |
+|---|---|---|---|
+| `RECORDED` | 200 | The TMS recorded the answer: the booking is Confirmed or Rejected. `repeated` is true when the same answer was recorded before, and nothing was recorded again | `carrierBookingNumber`, `decision`, `repeated` |
+| `BOOKING_NOT_OPEN` | 409 | The booking isn't Requested any more: Norvia withdrew it while the Carrier was answering, or it already has a different answer (`BookingNotOpen` at the TMS) | `carrierBookingNumber`, `text` |
+| `BOOKING_NOT_FOUND` | 404 | Norvia has no such booking | `carrierBookingNumber`, `text` |
+| `NOT_ALLOWED` | 403 | The booking is another Carrier's | `carrierBookingNumber`, `text` |
+| `INVALID` | 400 | The answer breaks the rules above. Nothing was sent to the TMS | `carrierBookingNumber` when it named one, `text` saying why |
+| `NOT_RECEIVED` | 502 | The TMS couldn't be reached, even after the Logic App's retries, or answered something the integration layer can't pass on. Nothing was recorded, so the Carrier answers again | `carrierBookingNumber`, `text` |
+
+An answer the Logic App can't relay in full, such as a `200` without the booking's decision, is `NOT_RECEIVED` too, because relaying part of it would change its meaning. The run of a `NOT_RECEIVED` or `INVALID` answer fails, with the failure code `TmsUnavailable`, `TmsCallRefused` or `CarrierAnswerUnreadable`, for the Integration operator to find by its `messageId`. A refusal the TMS gave (`BOOKING_NOT_OPEN`, `BOOKING_NOT_FOUND`, `NOT_ALLOWED`) is a business outcome the Carrier has been told, so its run succeeds.
+
+API Management answers a call it refuses itself, as for a booking: `401` for a missing or invalid subscription key or token, and `403` with `messageId` and `text` for a token without the role `CarrierBookings.Respond`, or whose client is no Carrier.
+
+### How API Management calls the Carrier-answer Logic App
+
+API Management passes the answer to the Logic App's HTTP trigger as the Carrier sent it, with two headers of its own that replace any the Carrier sent: `X-Carrier-ID` (the Carrier ID it took from the token) and `X-Correlation-ID` (the new correlation ID, which becomes the run's client tracking ID and the response's `messageId`). The trigger accepts only API Management, as the intake's does ([ADR 0020](../../docs/adr/0020-only-api-management-may-call-the-intake-logic-app.md)). The Logic App passes the answer to the map base64-encoded, so no field of it can stand in for the `X-Carrier-ID` it passes alongside.

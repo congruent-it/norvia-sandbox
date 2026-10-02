@@ -15,4 +15,8 @@ public static class PortalTime
 
     /// <summary>A local time at an address, as the Carrier booking format gives it. It is already the address's own time, so it isn't converted.</summary>
     public static string FormatLocal(DateTime localTime) => localTime.ToString(Layout, CultureInfo.InvariantCulture);
+
+    /// <summary>A time a person typed, as the portal shows times (Rotterdam's), with its UTC offset.</summary>
+    public static DateTimeOffset ToOffset(DateTime typed) =>
+        new(DateTime.SpecifyKind(typed, DateTimeKind.Unspecified), Rotterdam.GetUtcOffset(DateTime.SpecifyKind(typed, DateTimeKind.Unspecified)));
 }

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Options;
 using Norvia.PartnerPortal.Application.Bookings;
 using Norvia.PartnerPortal.Domain.Bookings;
+using Norvia.PartnerPortal.Domain.CarrierBookings;
 using Norvia.PartnerPortal.Domain.Personas;
 using Norvia.PartnerPortal.Infrastructure.PartnerApi;
 
@@ -316,6 +317,229 @@ public sealed class NorviaPartnerApiClientTests : IDisposable
 
     private static Dictionary<string, object?> ScopeOf(FakeLogRecord record) =>
         record.Scopes.OfType<IEnumerable<KeyValuePair<string, object?>>>().SelectMany(keys => keys).ToDictionary();
+
+    private static readonly CarrierAnswer Confirmation = new CarrierAnswer.Confirmation("VDT-77812", new DateTimeOffset(2030, 10, 2, 8, 30, 0, TimeSpan.FromHours(2)));
+
+    private Task<NorviaReply> AnswerAsync(CarrierAnswer answer, string number = "CB-0000042") =>
+        _client.AnswerAsync(Samples.VanDijkTransport, number, "SH-0000007", answer, CancellationToken.None);
+
+    [Fact]
+    public async Task AnswerAsync_PostsTheAnswerToCarrierAnswers_AsThePersona()
+    {
+        _tokens.GetTokenAsync(Samples.VanDijkTransport.Id, Arg.Any<CancellationToken>()).Returns("van-dijk-token");
+        _partnerApi.Answer(HttpStatusCode.OK, Contracts.Read("PartnerApi/samples/carrier-answer-responses/recorded.json"));
+
+        await AnswerAsync(Confirmation);
+
+        _partnerApi.Request!.Method.Should().Be(HttpMethod.Post);
+        _partnerApi.Request.RequestUri.Should().Be(new Uri("https://apim.example/partner/v1/carrier-answers"));
+        _partnerApi.Request.Headers.GetValues("Ocp-Apim-Subscription-Key").Should().Equal("van-dijk-key");
+        _partnerApi.Request.Headers.Authorization!.Parameter.Should().Be("van-dijk-token");
+        _partnerApi.RequestContentLength.Should().Be(System.Text.Encoding.UTF8.GetByteCount(_partnerApi.RequestBody!));
+    }
+
+    [Fact]
+    public async Task AnswerAsync_AConfirmation_IsSentInTheCarrierAnswerFormat_WithoutNamingTheCarrier()
+    {
+        _tokens.GetTokenAsync(Samples.VanDijkTransport.Id, Arg.Any<CancellationToken>()).Returns("van-dijk-token");
+        _partnerApi.Answer(HttpStatusCode.OK, Contracts.Read("PartnerApi/samples/carrier-answer-responses/recorded.json"));
+
+        await AnswerAsync(Confirmation);
+
+        var sent = JsonNode.Parse(_partnerApi.RequestBody!);
+        JsonNode.DeepEquals(sent, JsonNode.Parse("""
+            { "carrierBookingNumber": "CB-0000042", "decision": "CONFIRMED", "bookingRef": "VDT-77812", "plannedCollection": "2030-10-02T08:30:00+02:00" }
+            """)).Should().BeTrue(sent!.ToJsonString());
+        Contracts.CarrierAnswerSchemaErrors(sent).Should().BeEmpty();
+        sent!.ToJsonString().Should().NotContain("CAR-0001");
+    }
+
+    [Theory]
+    [InlineData(CarrierRejectionReason.NoCapacity, null, """{ "carrierBookingNumber": "CB-0000042", "decision": "DECLINED", "declineReason": "NO_CAPACITY" }""")]
+    [InlineData(CarrierRejectionReason.LaneNotServed, "Not our lane", """{ "carrierBookingNumber": "CB-0000042", "decision": "DECLINED", "declineReason": "LANE_NOT_SERVED", "declineText": "Not our lane" }""")]
+    [InlineData(CarrierRejectionReason.WindowNotFeasible, null, """{ "carrierBookingNumber": "CB-0000042", "decision": "DECLINED", "declineReason": "WINDOW_NOT_FEASIBLE" }""")]
+    [InlineData(CarrierRejectionReason.GoodsNotAccepted, null, """{ "carrierBookingNumber": "CB-0000042", "decision": "DECLINED", "declineReason": "GOODS_NOT_ACCEPTED" }""")]
+    [InlineData(CarrierRejectionReason.Other, "No trucks on Friday", """{ "carrierBookingNumber": "CB-0000042", "decision": "DECLINED", "declineReason": "OTHER", "declineText": "No trucks on Friday" }""")]
+    public async Task AnswerAsync_ARejection_IsSentWithTheCarriersOwnReasonCode(CarrierRejectionReason reason, string? text, string expected)
+    {
+        _partnerApi.Answer(HttpStatusCode.OK, Contracts.Read("PartnerApi/samples/carrier-answer-responses/recorded.json"));
+
+        await AnswerAsync(new CarrierAnswer.Rejection(reason, text));
+
+        var sent = JsonNode.Parse(_partnerApi.RequestBody!);
+        JsonNode.DeepEquals(sent, JsonNode.Parse(expected)).Should().BeTrue(sent!.ToJsonString());
+        Contracts.CarrierAnswerSchemaErrors(sent).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task AnswerAsync_AConfirmationWithoutAPlannedTime_LeavesItOut()
+    {
+        _partnerApi.Answer(HttpStatusCode.OK, Contracts.Read("PartnerApi/samples/carrier-answer-responses/recorded.json"));
+
+        await AnswerAsync(new CarrierAnswer.Confirmation("VDT-1"));
+
+        JsonNode.Parse(_partnerApi.RequestBody!)!.AsObject().ContainsKey("plannedCollection").Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task AnswerAsync_Recorded_IsRecorded_WithNorviasMessageId()
+    {
+        _partnerApi.Answer(HttpStatusCode.OK, Contracts.Read("PartnerApi/samples/carrier-answer-responses/recorded.json"));
+
+        var reply = await AnswerAsync(Confirmation);
+
+        reply.Should().Be(NorviaReply.Recorded("5b1c2a52-6a52-4d8e-9d52-0d8f6f3f7b11"));
+    }
+
+    [Fact]
+    public async Task AnswerAsync_RecordedBefore_IsRecordedAndRepeated()
+    {
+        _partnerApi.Answer(HttpStatusCode.OK, Contracts.Read("PartnerApi/samples/carrier-answer-responses/recorded-repeated.json"));
+
+        var reply = await AnswerAsync(Confirmation);
+
+        reply.Repeated.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Conflict, "booking-not-open.json", CarrierAnswerResult.BookingNotOpen)]
+    [InlineData(HttpStatusCode.NotFound, "booking-not-found.json", CarrierAnswerResult.BookingNotFound)]
+    [InlineData(HttpStatusCode.Forbidden, "not-allowed.json", CarrierAnswerResult.NotAllowed)]
+    [InlineData(HttpStatusCode.BadRequest, "invalid.json", CarrierAnswerResult.Invalid)]
+    public async Task AnswerAsync_ARefusalOfNorvia_IsKeptInNorviasWords(HttpStatusCode status, string sample, CarrierAnswerResult result)
+    {
+        var body = Contracts.Read($"PartnerApi/samples/carrier-answer-responses/{sample}");
+        _partnerApi.Answer(status, body);
+
+        var reply = await AnswerAsync(Confirmation);
+
+        reply.Result.Should().Be(result);
+        reply.Text.Should().Be(JsonNode.Parse(body)!["text"]!.GetValue<string>());
+        reply.MessageId.Should().Be(JsonNode.Parse(body)!["messageId"]!.GetValue<string>());
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Conflict, "{}", CarrierAnswerResult.NotReceived)]
+    [InlineData(HttpStatusCode.OK, """{ "result": "RECORDED" }""", CarrierAnswerResult.Recorded)]
+    [InlineData(HttpStatusCode.BadGateway, "", CarrierAnswerResult.NotReceived)]
+    [InlineData(HttpStatusCode.InternalServerError, "<html>boom</html>", CarrierAnswerResult.NotReceived)]
+    [InlineData(HttpStatusCode.OK, """{ "result": "SOMETHING_NEW" }""", CarrierAnswerResult.NotReceived)]
+    public async Task AnswerAsync_AReplyThatDoesntSayItWasRecorded_IsNotReceived(HttpStatusCode status, string body, CarrierAnswerResult expected)
+    {
+        _partnerApi.Answer(status, body, correlationId: "corr-x");
+
+        var reply = await AnswerAsync(Confirmation);
+
+        reply.Result.Should().Be(expected);
+        reply.MessageId.Should().Be("corr-x");
+    }
+
+    [Fact]
+    public async Task AnswerAsync_Refused403AtTheEdge_IsRefusedInNorviasWords()
+    {
+        _partnerApi.Answer(HttpStatusCode.Forbidden, """{ "messageId": "corr-403", "text": "This client may not answer Carrier bookings." }""", correlationId: "corr-403");
+
+        var reply = await AnswerAsync(Confirmation);
+
+        reply.Should().Be(NorviaReply.Refusal(CarrierAnswerResult.Refused, "This client may not answer Carrier bookings.", "corr-403"));
+    }
+
+    [Fact]
+    public async Task AnswerAsync_UnauthorizedAtTheEdge_IsRefused()
+    {
+        _partnerApi.Answer(HttpStatusCode.Unauthorized, """{ "statusCode": 401 }""", correlationId: "corr-401");
+
+        var reply = await AnswerAsync(Confirmation);
+
+        reply.Result.Should().Be(CarrierAnswerResult.Refused);
+        reply.Text.Should().Be(PartnerAnswers.UnrecognisedCredentials);
+    }
+
+    [Fact]
+    public async Task AnswerAsync_NorviaUnreachable_IsNotReceived()
+    {
+        _partnerApi.Fail(new HttpRequestException("Connection refused"));
+
+        (await AnswerAsync(Confirmation)).Should().Be(NorviaReply.NotReceived(null));
+    }
+
+    [Fact]
+    public async Task AnswerAsync_NoTokenForThePersona_IsNotReceived_AndSendsNothing()
+    {
+        _tokens.GetTokenAsync(Samples.VanDijkTransport.Id, Arg.Any<CancellationToken>()).Returns<string>(_ => throw new InvalidOperationException("Entra said no."));
+
+        (await AnswerAsync(Confirmation)).Should().Be(NorviaReply.NotReceived(null));
+        _partnerApi.Request.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task AnswerAsync_Replied_LogsTheTrackingKeys_SoTheTraceJoinsNorviasMessageTrail()
+    {
+        _partnerApi.Answer(HttpStatusCode.OK, Contracts.Read("PartnerApi/samples/carrier-answer-responses/recorded.json"));
+
+        await AnswerAsync(Confirmation);
+
+        ScopeOf(_logger.LatestRecord).Should().Contain("flow", "carrier-answer")
+            .And.Contain("partyId", "CAR-0001")
+            .And.Contain("carrierBookingNumber", "CB-0000042")
+            .And.Contain("shipmentNumber", "SH-0000007")
+            .And.Contain("correlationId", "5b1c2a52-6a52-4d8e-9d52-0d8f6f3f7b11")
+            .And.Contain("outcome", "Succeeded")
+            .And.NotContainKey("failureCode");
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Conflict, "booking-not-open.json", "Refused", "BookingNotOpen")]
+    [InlineData(HttpStatusCode.NotFound, "booking-not-found.json", "Refused", "BookingNotFound")]
+    [InlineData(HttpStatusCode.Forbidden, "not-allowed.json", "Refused", "CarrierNotAllowed")]
+    [InlineData(HttpStatusCode.BadRequest, "invalid.json", "Refused", "CarrierAnswerUnreadable")]
+    [InlineData(HttpStatusCode.BadGateway, "not-received.json", "Failed", "AnswerNotReceived")]
+    public async Task AnswerAsync_NotRecorded_RecordsTheOutcomeWithItsFailureCode(HttpStatusCode status, string sample, string outcome, string failureCode)
+    {
+        _partnerApi.Answer(status, Contracts.Read($"PartnerApi/samples/carrier-answer-responses/{sample}"));
+
+        await AnswerAsync(Confirmation);
+
+        ScopeOf(_logger.LatestRecord).Should().Contain("outcome", outcome).And.Contain("failureCode", failureCode);
+    }
+
+    [Fact]
+    public async Task AnswerAsync_RefusedAtTheEdge_RecordsItRefused_WithoutAFailureCode()
+    {
+        _partnerApi.Answer(HttpStatusCode.Forbidden, """{ "messageId": "corr-403", "text": "No." }""", correlationId: "corr-403");
+
+        await AnswerAsync(Confirmation);
+
+        ScopeOf(_logger.LatestRecord).Should().Contain("outcome", "Refused").And.NotContainKey("failureCode");
+    }
+
+    [Fact]
+    public async Task AnswerAsync_NorviaNeverReplied_LogsNoCorrelationId()
+    {
+        _partnerApi.Fail(new HttpRequestException("Connection refused"));
+
+        await AnswerAsync(Confirmation);
+
+        ScopeOf(_logger.LatestRecord).Should().NotContainKey("correlationId");
+    }
+
+    [Fact]
+    public async Task AnswerAsync_SendsTheAnswerInASpanOfItsOwn()
+    {
+        _partnerApi.Answer(HttpStatusCode.OK, Contracts.Read("PartnerApi/samples/carrier-answer-responses/recorded.json"));
+
+        await AnswerAsync(Confirmation);
+
+        _spans.Should().ContainSingle().Which.OperationName.Should().Be("Send Carrier answer");
+    }
+
+    [Fact]
+    public async Task AnswerAsync_WithoutAPersona_Throws()
+    {
+        var answer = () => _client.AnswerAsync(null!, "CB-1", "SH-1", Confirmation, CancellationToken.None);
+
+        await answer.Should().ThrowAsync<ArgumentNullException>();
+    }
 
     private Task<NorviaAnswer> SubmitAsync(BookingRequest booking) =>
         _client.SubmitAsync(Samples.BrouwerDranken, booking, TestContext.Current.CancellationToken);

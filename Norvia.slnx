@@ -5,6 +5,7 @@
   </Folder>
   <Folder Name="/src/Integration/">
     <Project Path="src/Integration/Norvia.Integration.TransportOrderIntake/Norvia.Integration.TransportOrderIntake.csproj" />
+    <Project Path="src/Integration/Norvia.Integration.CarrierAnswer.Functions/Norvia.Integration.CarrierAnswer.Functions.csproj" />
     <Project Path="src/Integration/Norvia.Integration.CarrierBooking/Norvia.Integration.CarrierBooking.csproj" />
     <Project Path="src/Integration/Norvia.Integration.CarrierBooking.Functions/Norvia.Integration.CarrierBooking.Functions.csproj" />
     <Project Path="src/Integration/Norvia.Integration.LocalBookingWorker/Norvia.Integration.LocalBookingWorker.csproj" />
