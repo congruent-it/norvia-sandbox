@@ -1,6 +1,9 @@
 @page "/personas/{PersonaId}/booking-requests"
-@* Interactive like the other pages: Fluent UI's components don't survive static streaming rendering. *@
-@rendermode InteractiveServer
+@*
+    Interactive like the other pages: Fluent UI's components don't survive static streaming rendering. Not prerendered: a
+    prerendered inbox shows Confirm and Reject before they work, and a click on them then is lost.
+*@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inject IPartnerPortal Portal
 @inject NavigationManager Navigation
 @inject ILogger<BookingRequests> Logger
