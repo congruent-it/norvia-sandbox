@@ -20,7 +20,7 @@ internal static class CarrierAnswerTracking
     {
         var keys = mapped.Problem is not null
             ? TrackingKeys.OutcomeOf(TrackingKeys.Refused, "CarrierAnswerUnreadable")
-            : OutcomeOf(tmsStatusCode);
+            : TmsOutcome(tmsStatusCode);
         var tms = Parse(tmsResponse);
         if (mapped.CarrierBookingNumber is { } number)
         {
@@ -34,16 +34,6 @@ internal static class CarrierAnswerTracking
 
         return keys;
     }
-
-    private static Dictionary<string, object?> OutcomeOf(int tmsStatusCode) => tmsStatusCode switch
-    {
-        200 => TrackingKeys.OutcomeOf(TrackingKeys.Succeeded),
-        403 => TrackingKeys.OutcomeOf(TrackingKeys.Refused, "CarrierNotAllowed"),
-        404 => TrackingKeys.OutcomeOf(TrackingKeys.Refused, "BookingNotFound"),
-        409 => TrackingKeys.OutcomeOf(TrackingKeys.Refused, "BookingNotOpen"),
-        >= 400 and < 500 and not 408 and not 429 => TrackingKeys.OutcomeOf(TrackingKeys.Failed, "TmsCallRefused"),
-        _ => TrackingKeys.OutcomeOf(TrackingKeys.Failed, "TmsUnavailable"),
-    };
 
     private static JsonObject? Parse(string tmsResponse)
     {
@@ -59,4 +49,10 @@ internal static class CarrierAnswerTracking
 
     private static string? TextIn(JsonObject? node, string name) =>
         node?[name] is JsonValue value && value.TryGetValue<string>(out var text) ? text : null;
+
+    private static Dictionary<string, object?> TmsOutcome(int tmsStatusCode)
+    {
+        var (outcome, failureCode) = TmsAnswerOutcome.Of(tmsStatusCode);
+        return TrackingKeys.OutcomeOf(outcome, failureCode);
+    }
 }

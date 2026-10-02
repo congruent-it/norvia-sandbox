@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Norvia.PartnerPortal.Application.Bookings;
+using Norvia.PartnerPortal.Application.CarrierBookings.Answer;
 using Norvia.PartnerPortal.Domain.Bookings;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
 using Norvia.PartnerPortal.Domain.Personas;
@@ -96,44 +97,16 @@ internal sealed partial class NorviaPartnerApiClient(
         return reply;
     }
 
-    /// <summary>
-    /// The tracking contract's keys the portal knows of an answer (coding guidelines §7), so its trace joins Norvia's Message
-    /// trail by the answer's correlation ID, the Carrier booking number and the Shipment number. Never what the Carrier
-    /// said: that is its own business.
-    /// </summary>
     private static Dictionary<string, object?> TrackingKeysOf(Persona persona, string carrierBookingNumber, string shipmentNumber, NorviaReply reply)
     {
-        var keys = new Dictionary<string, object?>
-        {
-            ["flow"] = "carrier-answer",
-            ["partyId"] = persona.PartyId,
-            ["carrierBookingNumber"] = carrierBookingNumber,
-            ["shipmentNumber"] = shipmentNumber,
-        };
-        foreach (var (key, value) in OutcomeOf(reply.Result))
+        var keys = CarrierAnswerTracking.KeysOf(persona, carrierBookingNumber, shipmentNumber, reply.MessageId);
+        foreach (var (key, value) in CarrierAnswerTracking.OutcomeOf(reply.Result))
         {
             keys[key] = value;
         }
 
-        if (reply.MessageId is { } correlationId)
-        {
-            keys["correlationId"] = correlationId;
-        }
-
         return keys;
     }
-
-    private static Dictionary<string, object?> OutcomeOf(CarrierAnswerResult result) => result switch
-    {
-        CarrierAnswerResult.Recorded => new() { ["outcome"] = "Succeeded" },
-        CarrierAnswerResult.BookingNotOpen => new() { ["outcome"] = "Refused", ["failureCode"] = "BookingNotOpen" },
-        CarrierAnswerResult.BookingNotFound => new() { ["outcome"] = "Refused", ["failureCode"] = "BookingNotFound" },
-        CarrierAnswerResult.NotAllowed => new() { ["outcome"] = "Refused", ["failureCode"] = "CarrierNotAllowed" },
-        CarrierAnswerResult.Invalid => new() { ["outcome"] = "Refused", ["failureCode"] = "CarrierAnswerUnreadable" },
-        CarrierAnswerResult.Refused => new() { ["outcome"] = "Refused" },
-        CarrierAnswerResult.NotReceived => new() { ["outcome"] = "Failed", ["failureCode"] = "AnswerNotReceived" },
-        _ => throw new ArgumentOutOfRangeException(nameof(result), result, "Every reply records its outcome."),
-    };
 
     /// <summary>
     /// The tracking contract's keys the portal knows (coding guidelines §7), so its trace joins Norvia's Message trail.

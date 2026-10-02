@@ -32,16 +32,9 @@ public static class CarrierAnswerResponses
             403 => Refusal(403, "NOT_ALLOWED", number, "This booking is not yours to answer.", correlationId, null),
             404 => Refusal(404, "BOOKING_NOT_FOUND", number, $"Norvia has no booking {number}.", correlationId, null),
             409 => Refusal(409, "BOOKING_NOT_OPEN", number, NotOpenText, correlationId, null),
-            _ => Refusal(502, "NOT_RECEIVED", number, NotReceivedText, correlationId, WhyNotReceived(tmsStatusCode)),
+            _ => Refusal(502, "NOT_RECEIVED", number, NotReceivedText, correlationId, TmsAnswerOutcome.WhyNotReceived(tmsStatusCode)),
         };
     }
-
-    /// <summary>
-    /// A server error, a timeout, throttling or no answer means the TMS couldn't be reached. Any other client error means
-    /// the integration layer sent something the TMS won't take, which is not the Carrier's fault either.
-    /// </summary>
-    private static string WhyNotReceived(int tmsStatusCode) =>
-        tmsStatusCode is >= 400 and < 500 and not 408 and not 429 ? "TmsCallRefused" : "TmsUnavailable";
 
     // An answer the relay can't pass on in full would change its meaning, so the Carrier hears it wasn't received.
     private static BookingResponse? Recorded(MappedCarrierAnswer mapped, JsonNode? tms, string correlationId)

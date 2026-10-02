@@ -57,7 +57,7 @@ public sealed partial class AnswerCarrierBookingHandler(
         catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {
             // Norvia has replied, and its reply stands: losing the portal's own record of it mustn't hide it.
-            using (logger.BeginScope(TrackingKeysOf(carrier, request, reply)))
+            using (logger.BeginScope(CarrierAnswerTracking.KeysOf(carrier, request.CarrierBookingNumber, request.ShipmentNumber, reply.MessageId)))
             {
                 LogNotRecorded(exception, carrier.Id.Value, request.CarrierBookingNumber, reply.Result);
             }
@@ -66,24 +66,6 @@ public sealed partial class AnswerCarrierBookingHandler(
         }
 
         return new AnsweredCarrierBooking(CarrierBookingRequestView.From(request), reply);
-    }
-
-    /// <summary>The tracking contract's keys the portal knows (coding guidelines §7), so the error joins Norvia's Message trail.</summary>
-    private static Dictionary<string, object?> TrackingKeysOf(Persona carrier, CarrierBookingRequest request, NorviaReply reply)
-    {
-        var keys = new Dictionary<string, object?>
-        {
-            ["flow"] = "carrier-answer",
-            ["partyId"] = carrier.PartyId,
-            ["carrierBookingNumber"] = request.CarrierBookingNumber,
-            ["shipmentNumber"] = request.ShipmentNumber,
-        };
-        if (reply.MessageId is { } correlationId)
-        {
-            keys["correlationId"] = correlationId;
-        }
-
-        return keys;
     }
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Norvia replied {Result} to Persona {PersonaId}'s answer to {CarrierBookingNumber}, but the portal couldn't record it")]
