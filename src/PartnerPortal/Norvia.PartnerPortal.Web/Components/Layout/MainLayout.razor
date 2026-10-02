@@ -11,14 +11,24 @@
         <a href="/" class="text-base tracking-[0.25em] text-primary no-underline hover:text-primary">Partner portal</a>
         @if (_current is not null)
         {
-            <NavLink href="@PersonaChoice.NewBookingPath(_current.Id)" Match="NavLinkMatch.All"
-                     class="text-muted no-underline hover:text-primary" ActiveClass="!text-primary">
-                Book a transport
-            </NavLink>
-            <NavLink href="@PersonaChoice.BookingsPath(_current.Id)" Match="NavLinkMatch.All"
-                     class="text-muted no-underline hover:text-primary" ActiveClass="!text-primary">
-                My bookings
-            </NavLink>
+            @if (_current.PartyType == PartyType.Carrier)
+            {
+                <NavLink href="@PersonaChoice.BookingRequestsPath(_current.Id)" Match="NavLinkMatch.All"
+                         class="text-muted no-underline hover:text-primary" ActiveClass="!text-primary">
+                    Booking requests
+                </NavLink>
+            }
+            else
+            {
+                <NavLink href="@PersonaChoice.NewBookingPath(_current.Id)" Match="NavLinkMatch.All"
+                         class="text-muted no-underline hover:text-primary" ActiveClass="!text-primary">
+                    Book a transport
+                </NavLink>
+                <NavLink href="@PersonaChoice.BookingsPath(_current.Id)" Match="NavLinkMatch.All"
+                         class="text-muted no-underline hover:text-primary" ActiveClass="!text-primary">
+                    My bookings
+                </NavLink>
+            }
             <div class="ml-auto">
                 <PersonaSwitcher Personas="_personas" Current="_current" />
             </div>

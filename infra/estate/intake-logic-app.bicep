@@ -261,4 +261,6 @@ resource integrationConsoleReadsRunHistory 'Microsoft.Authorization/roleAssignme
 }
 
 output logicAppName string = logicApp.name
+output planName string = plan.name
+output keyVaultName string = keyVault.name
 output logicAppHostName string = logicApp.properties.defaultHostName

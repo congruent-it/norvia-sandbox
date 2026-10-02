@@ -49,6 +49,48 @@ namespace Norvia.PartnerPortal.Infrastructure.Data.Migrations
 
                     b.ToTable("Bookings", (string)null);
                 });
+
+            modelBuilder.Entity("Norvia.PartnerPortal.Domain.CarrierBookings.CarrierBookingRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CarrierBookingNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Details")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PersonaId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ShipmentNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PersonaId", "CarrierBookingNumber")
+                        .IsUnique();
+
+                    b.HasIndex("PersonaId", "ReceivedAt");
+
+                    b.ToTable("CarrierBookingRequests", (string)null);
+                });
 #pragma warning restore 612, 618
         }
     }

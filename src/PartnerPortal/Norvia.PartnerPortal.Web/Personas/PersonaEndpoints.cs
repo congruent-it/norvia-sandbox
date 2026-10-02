@@ -4,8 +4,8 @@ using Norvia.PartnerPortal.Web.Bookings;
 namespace Norvia.PartnerPortal.Web.Personas;
 
 /// <summary>
-/// The Persona switcher's endpoints: the portal's home opens the current Persona's booking form, and switching
-/// remembers the new Persona in a cookie and opens its booking form. No login: the portal plays every party in a demo.
+/// The Persona switcher's endpoints: the portal's home opens the current Persona's start page, and switching
+/// remembers the new Persona in a cookie and opens its start page: a Shipper's booking form, a Carrier's inbox. No login: the portal plays every party in a demo.
 /// </summary>
 public static class PersonaEndpoints
 {
@@ -28,7 +28,7 @@ public static class PersonaEndpoints
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(portal);
         var personas = await portal.ListPersonasAsync(request.HttpContext.RequestAborted);
-        return TypedResults.Redirect(PersonaChoice.NewBookingPath(PersonaChoice.Current(request, personas).Id));
+        return TypedResults.Redirect(PersonaChoice.HomePath(PersonaChoice.Current(request, personas)));
     }
 
     public static async Task<IResult> SwitchAsync(string persona, HttpResponse response, IPartnerPortal portal)
@@ -50,6 +50,6 @@ public static class PersonaEndpoints
             MaxAge = Remembered,
         });
         // A redirect after the post, so the browser opens the form with a GET and a reload doesn't post again.
-        return TypedResults.Redirect(PersonaChoice.NewBookingPath(chosen.Id));
+        return TypedResults.Redirect(PersonaChoice.HomePath(chosen));
     }
 }

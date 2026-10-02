@@ -20,25 +20,36 @@ public sealed class PersonaEndpointsTests
     }
 
     [Fact]
-    public async Task OpenHome_AfterSwitching_OpensThatPersonasBookingForm()
+    public async Task OpenHome_AfterSwitchingToACarrier_OpensItsInbox()
     {
         var context = new DefaultHttpContext();
         context.Request.Headers.Cookie = $"{PersonaChoice.CookieName}=van-dijk-transport";
 
         var result = await PersonaEndpoints.OpenHomeAsync(context.Request, _portal);
 
-        result.Should().BeOfType<RedirectHttpResult>().Which.Url.Should().Be("/personas/van-dijk-transport/bookings/new");
+        result.Should().BeOfType<RedirectHttpResult>().Which.Url.Should().Be("/personas/van-dijk-transport/booking-requests");
     }
 
     [Fact]
-    public async Task Switch_ToAPersona_RemembersItAndOpensItsBookingForm()
+    public async Task Switch_ToAShipper_RemembersItAndOpensItsBookingForm()
+    {
+        var context = new DefaultHttpContext();
+
+        var result = await PersonaEndpoints.SwitchAsync("brouwer-dranken", context.Response, _portal);
+
+        result.Should().BeOfType<RedirectHttpResult>().Which.Url.Should().Be("/personas/brouwer-dranken/bookings/new");
+        context.Response.Headers.SetCookie.ToString().Should().StartWith($"{PersonaChoice.CookieName}=brouwer-dranken").And.Contain("httponly");
+    }
+
+    [Fact]
+    public async Task Switch_ToACarrier_RemembersItAndOpensItsInbox()
     {
         var context = new DefaultHttpContext();
 
         var result = await PersonaEndpoints.SwitchAsync("van-dijk-transport", context.Response, _portal);
 
-        result.Should().BeOfType<RedirectHttpResult>().Which.Url.Should().Be("/personas/van-dijk-transport/bookings/new");
-        context.Response.Headers.SetCookie.ToString().Should().StartWith($"{PersonaChoice.CookieName}=van-dijk-transport").And.Contain("httponly");
+        result.Should().BeOfType<RedirectHttpResult>().Which.Url.Should().Be("/personas/van-dijk-transport/booking-requests");
+        context.Response.Headers.SetCookie.ToString().Should().StartWith($"{PersonaChoice.CookieName}=van-dijk-transport");
     }
 
     [Fact]

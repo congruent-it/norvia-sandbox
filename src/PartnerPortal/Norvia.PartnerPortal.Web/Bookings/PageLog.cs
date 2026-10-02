@@ -12,6 +12,9 @@ internal static partial class PageLog
     [LoggerMessage(Level = LogLevel.Error, Message = "Reading the Personas for the navbar failed")]
     public static partial void PersonasFailed(ILogger logger, Exception exception);
 
+    [LoggerMessage(Level = LogLevel.Error, Message = "Loading the booking requests of Persona {PersonaId} failed")]
+    public static partial void BookingRequestsLoadFailed(ILogger logger, Exception exception, string personaId);
+
     [LoggerMessage(Level = LogLevel.Error, Message = "Loading the bookings of Persona {PersonaId} failed")]
     public static partial void BookingsLoadFailed(ILogger logger, Exception exception, string personaId);
 }

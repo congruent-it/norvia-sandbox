@@ -10,3 +10,5 @@ coverage.cobertura.xml
 .estate-outputs.json
 # The intake Logic App's local functions, written there by building their project.
 src/Integration/IntakeLogicApp/lib/
+# The booking Logic App's local functions, written there by building their project.
+src/Integration/BookingLogicApp/lib/

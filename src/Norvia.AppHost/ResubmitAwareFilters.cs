@@ -8,6 +8,15 @@ using System.Text.Json.Nodes;
 /// </summary>
 internal static class ResubmitAwareFilters
 {
+    /// <summary>
+    /// The conditions of the subscriptions that take only some of their topic's messages, by subscription name. The
+    /// estate Bicep gives the same subscriptions the same conditions.
+    /// </summary>
+    private static readonly Dictionary<string, string> Conditions = new()
+    {
+        ["carrier-booking"] = "assignedTo = 'Carrier'",
+    };
+
     public static void Apply(JsonNode configuration)
     {
         var subscriptions = configuration["UserConfig"]?["Namespaces"]?.AsArray()
@@ -34,7 +43,9 @@ internal static class ResubmitAwareFilters
                         ["FilterType"] = "Sql",
                         ["SqlFilter"] = new JsonObject
                         {
-                            ["SqlExpression"] = $"resubmitTo IS NULL OR resubmitTo = '{name}'",
+                            ["SqlExpression"] = Conditions.TryGetValue(name, out var condition)
+                                ? $"({condition} AND resubmitTo IS NULL) OR resubmitTo = '{name}'"
+                                : $"resubmitTo IS NULL OR resubmitTo = '{name}'",
                         },
                     },
                 },

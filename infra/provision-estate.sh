@@ -26,6 +26,14 @@ trap 'rm -rf "$work"' EXIT
 ESTATE_PRESENTER_PRINCIPAL_ID=$(az ad signed-in-user show --query id --output tsv 2>/dev/null || true)
 export ESTATE_PRESENTER_PRINCIPAL_ID
 
+# The Carrier endpoints' credentials are derived from one random seed, made once. A new seed would change every
+# credential the Partner portal has read from Key Vault, until it restarted.
+if [ -z "${ESTATE_CARRIER_ENDPOINT_KEY_SEED:-}" ]; then
+  ESTATE_CARRIER_ENDPOINT_KEY_SEED=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
+  azd env set ESTATE_CARRIER_ENDPOINT_KEY_SEED "$ESTATE_CARRIER_ENDPOINT_KEY_SEED"
+fi
+export ESTATE_CARRIER_ENDPOINT_KEY_SEED
+
 # A new managed identity can take a minute to reach Microsoft Graph, which then refuses to grant it an app role.
 # Deploying again is safe, so a first attempt that fails is retried.
 for attempt in 1 2 3; do

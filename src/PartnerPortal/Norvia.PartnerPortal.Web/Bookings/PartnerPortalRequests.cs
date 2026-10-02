@@ -4,6 +4,8 @@ using Norvia.PartnerPortal.Application.Bookings;
 using Norvia.PartnerPortal.Application.Bookings.Draft;
 using Norvia.PartnerPortal.Application.Bookings.List;
 using Norvia.PartnerPortal.Application.Bookings.Submit;
+using Norvia.PartnerPortal.Application.CarrierBookings;
+using Norvia.PartnerPortal.Application.CarrierBookings.List;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Application.Personas.List;
 
@@ -29,6 +31,9 @@ internal sealed class PartnerPortalRequests(IServiceScopeFactory scopes) : IPart
 
     public Task<IReadOnlyList<BookingView>> ListBookingsAsync(string personaId, CancellationToken cancellationToken) =>
         SendAsync(new ListBookingsQuery(personaId), cancellationToken);
+
+    public Task<IReadOnlyList<CarrierBookingRequestView>> ListCarrierBookingRequestsAsync(string personaId, CancellationToken cancellationToken) =>
+        SendAsync(new ListCarrierBookingRequestsQuery(personaId), cancellationToken);
 
     private async Task<TResponse> SendAsync<TResponse>(IQuery<TResponse> query, CancellationToken cancellationToken)
     {

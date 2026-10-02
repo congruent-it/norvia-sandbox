@@ -1,4 +1,5 @@
 using Norvia.PartnerPortal.Application.Bookings;
+using Norvia.PartnerPortal.Application.CarrierBookings;
 using Norvia.PartnerPortal.Application.Personas;
 
 namespace Norvia.PartnerPortal.Web.Bookings;
@@ -16,4 +17,7 @@ public interface IPartnerPortal
 
     /// <summary>The bookings the Persona sent, the latest first.</summary>
     Task<IReadOnlyList<BookingView>> ListBookingsAsync(string personaId, CancellationToken cancellationToken);
+
+    /// <summary>The booking requests in the Carrier Persona's inbox, the latest first.</summary>
+    Task<IReadOnlyList<CarrierBookingRequestView>> ListCarrierBookingRequestsAsync(string personaId, CancellationToken cancellationToken);
 }

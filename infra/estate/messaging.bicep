@@ -5,6 +5,9 @@ param location string
 param tags object
 param presenterPrincipalId string
 
+@description('The P4 booking Logic App\'s identity, which receives from its own subscription and from nothing else.')
+param bookingPrincipalId string
+
 resource serviceBus 'Microsoft.ServiceBus/namespaces@2024-01-01' = {
   name: 'sb-norvia-${uniqueString(resourceGroup().id)}'
   location: location
@@ -66,6 +69,25 @@ resource shipmentMonitoringFilter 'Microsoft.ServiceBus/namespaces/topics/subscr
   }
 }
 
+// The P4 booking Logic App's subscription: Carrier Shipments only, as the message's assignedTo property says. Its filter
+// also routes resubmits from the console, like every subscription's (coding guidelines §7). The AppHost's emulator gives
+// the same subscription the same condition (ResubmitAwareFilters).
+resource carrierBooking 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01' = {
+  parent: shipmentEvents
+  name: 'carrier-booking'
+}
+
+resource carrierBookingFilter 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
+  parent: carrierBooking
+  name: '$Default'
+  properties: {
+    filterType: 'SqlFilter'
+    sqlFilter: {
+      sqlExpression: '(assignedTo = \'Carrier\' AND resubmitTo IS NULL) OR resubmitTo = \'carrier-booking\''
+    }
+  }
+}
+
 var serviceBusDataReceiver = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0')
 
 resource presenterReadsMessages 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(presenterPrincipalId)) {
@@ -75,6 +97,17 @@ resource presenterReadsMessages 'Microsoft.Authorization/roleAssignments@2022-04
     principalId: presenterPrincipalId
     roleDefinitionId: serviceBusDataReceiver
     principalType: 'User'
+  }
+}
+
+// Scoped to the subscription, so the booking Logic App reads Carrier Shipments and no other message.
+resource bookingReceivesItsMessages 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(carrierBooking.id, bookingPrincipalId, serviceBusDataReceiver)
+  scope: carrierBooking
+  properties: {
+    principalId: bookingPrincipalId
+    roleDefinitionId: serviceBusDataReceiver
+    principalType: 'ServicePrincipal'
   }
 }
 

@@ -1,0 +1,147 @@
+using System.Security.Cryptography;
+using System.Text;
+using Mediator;
+using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
+using Norvia.PartnerPortal.Application.CarrierBookings.Receive;
+using Norvia.PartnerPortal.Domain.CarrierBookings;
+
+namespace Norvia.PartnerPortal.Web.CarrierBookings;
+
+/// <summary>
+/// A Carrier Persona's booking endpoint: where Norvia's P4 booking Logic App sends a booking request. It answers a
+/// success once the request is in the Carrier's inbox, and the same for a request the inbox has already.
+/// </summary>
+public static partial class CarrierBookingEndpoint
+{
+    public const string CorrelationIdHeader = "X-Correlation-ID";
+    public const string ApiKeyHeader = "X-Api-Key";
+    private const string Flow = "carrier-booking";
+
+    public static IEndpointRouteBuilder MapCarrierBookingEndpoint(this IEndpointRouteBuilder endpoints)
+    {
+        // Anonymous like the rest of the portal; what it asks of the caller is the Carrier's credential, checked below.
+        endpoints.MapPost("/carrier/v1/{carrierId}/bookings", ReceiveAsync).AllowAnonymous();
+        return endpoints;
+    }
+
+    public static async Task<Results<Ok<ReceiveCarrierBookingResult>, ProblemHttpResult, UnauthorizedHttpResult>> ReceiveAsync(
+        string carrierId,
+        [FromHeader(Name = ApiKeyHeader)] string? apiKey,
+        [FromHeader(Name = CorrelationIdHeader)] string? correlationId,
+        CarrierBookingRequestBody body,
+        IMediator mediator,
+        IOptions<CarrierEndpointOptions> options,
+        ILoggerFactory loggers,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        ArgumentNullException.ThrowIfNull(mediator);
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(loggers);
+
+        var logger = loggers.CreateLogger(typeof(CarrierBookingEndpoint));
+        using var trail = logger.BeginScope(TrackingKeys(carrierId, correlationId, body));
+
+        // Who the caller is comes first, so an unknown Carrier and a wrong credential look the same from outside.
+        if (!IsCredentialOf(carrierId, apiKey, options.Value))
+        {
+            using var refused = logger.BeginScope(Outcome("Refused", "CredentialInvalid"));
+            LogRefused(logger, carrierId);
+            return TypedResults.Unauthorized();
+        }
+
+        if (Problems(correlationId, body) is { Count: > 0 } problems)
+        {
+            using var invalid = logger.BeginScope(Outcome("Failed", "BookingRequestInvalid"));
+            LogInvalid(logger, carrierId);
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status400BadRequest, title: "The booking request is incomplete.", detail: string.Join(' ', problems));
+        }
+
+        var result = await mediator.Send(
+            new ReceiveCarrierBookingCommand(carrierId, body.CarrierBookingNumber!, body.ShipmentNumber!, correlationId!, DetailsOf(body)), cancellationToken);
+        if (!result.IsSuccess)
+        {
+            using var unknown = logger.BeginScope(Outcome("Failed", "CarrierUnknown"));
+            LogUnknownCarrier(logger, carrierId);
+            return TypedResults.Problem(statusCode: StatusCodes.Status404NotFound, title: "There is no such Carrier.");
+        }
+
+        using var received = logger.BeginScope(Outcome("Succeeded", failureCode: null));
+        LogReceived(logger, result.Value.Repeated);
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static bool IsCredentialOf(string carrierId, string? apiKey, CarrierEndpointOptions options) =>
+        !string.IsNullOrEmpty(apiKey)
+        && options.ApiKeys.TryGetValue(carrierId, out var expected)
+        && !string.IsNullOrEmpty(expected)
+        && CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(apiKey), Encoding.UTF8.GetBytes(expected));
+
+    private static List<string> Problems(string? correlationId, CarrierBookingRequestBody body)
+    {
+        var problems = new List<string>();
+        if (string.IsNullOrWhiteSpace(correlationId))
+        {
+            problems.Add($"The request needs an {CorrelationIdHeader}.");
+        }
+
+        if (string.IsNullOrWhiteSpace(body.CarrierBookingNumber))
+        {
+            problems.Add("The request needs a carrierBookingNumber.");
+        }
+
+        if (string.IsNullOrWhiteSpace(body.ShipmentNumber))
+        {
+            problems.Add("The request needs a shipmentNumber.");
+        }
+
+        return problems;
+    }
+
+    private static CarrierBookingDetails DetailsOf(CarrierBookingRequestBody body) => new(
+        new CarrierBookingStop(body.CollectionStreet, body.CollectionPostcode, body.CollectionCity, body.CollectionCountry, body.CollectFrom, body.CollectUntil),
+        new CarrierBookingStop(body.DeliveryStreet, body.DeliveryPostcode, body.DeliveryCity, body.DeliveryCountry, body.DeliverFrom, body.DeliverUntil),
+        body.ConsigneeName,
+        [.. (body.Goods ?? []).Select(line => new CarrierBookingGoodsLine(
+            line.PackageType, line.Quantity, line.WeightKg, line.LengthCm, line.WidthCm, line.HeightCm))]);
+
+    // The tracking contract's keys the request carries (coding guidelines §7); a key that doesn't apply is left out.
+    private static Dictionary<string, object?> TrackingKeys(string carrierId, string? correlationId, CarrierBookingRequestBody body)
+    {
+        var keys = new Dictionary<string, object?> { ["flow"] = Flow, ["partyId"] = carrierId };
+        if (!string.IsNullOrWhiteSpace(correlationId))
+        {
+            keys["correlationId"] = correlationId;
+        }
+
+        if (!string.IsNullOrWhiteSpace(body.ShipmentNumber))
+        {
+            keys["shipmentNumber"] = body.ShipmentNumber;
+        }
+
+        if (!string.IsNullOrWhiteSpace(body.CarrierBookingNumber))
+        {
+            keys["carrierBookingNumber"] = body.CarrierBookingNumber;
+        }
+
+        return keys;
+    }
+
+    private static Dictionary<string, object?> Outcome(string outcome, string? failureCode) =>
+        failureCode is null ? new() { ["outcome"] = outcome } : new() { ["outcome"] = outcome, ["failureCode"] = failureCode };
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Refused a booking request for Carrier {CarrierId}: the credential is missing or wrong")]
+    private static partial void LogRefused(ILogger logger, string carrierId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Refused an incomplete booking request for Carrier {CarrierId}")]
+    private static partial void LogInvalid(ILogger logger, string carrierId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "No Carrier Persona has the ID {CarrierId}")]
+    private static partial void LogUnknownCarrier(ILogger logger, string carrierId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Put the booking request in the Carrier's inbox (repeated: {Repeated})")]
+    private static partial void LogReceived(ILogger logger, bool repeated);
+}

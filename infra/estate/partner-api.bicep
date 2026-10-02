@@ -29,6 +29,14 @@ param applicationInsightsName string
 @description('The Partner portal\'s identity, the one principal that may read the Personas\' subscription keys.')
 param partnerPortalPrincipalId string
 
+@description('The P4 booking Logic App\'s identity, which may read the Carrier endpoints\' credentials and nothing else in the vault.')
+param bookingPrincipalId string
+
+@secure()
+@description('''A random value the Carrier endpoints' credentials are derived from, one per Carrier Persona. The deployment hook makes it
+once and keeps it in the azd environment, so deploying the estate again keeps the credentials the apps already hold.''')
+param carrierEndpointKeySeed string
+
 var resourceToken = uniqueString(resourceGroup().id)
 
 resource apiManagementIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
@@ -228,7 +236,8 @@ resource personaSubscriptions 'Microsoft.ApiManagement/service/subscriptions@202
 ]
 
 // The Partner portal books as each Persona with its subscription key (ADR 0005), which it reads from here with its own
-// identity. Nothing else may read them.
+// identity. It also reads the credential each Carrier Persona's booking endpoint asks of its caller. Nothing else may
+// read the subscription keys; the P4 booking Logic App reads only the Carrier endpoint credentials.
 resource partnerPortalSecrets 'Microsoft.KeyVault/vaults@2024-11-01' = {
   name: 'kv-portal-${resourceToken}'
   location: location
@@ -253,6 +262,25 @@ resource subscriptionKeys 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = [
   }
 ]
 
+// The Carrier Personas are the seed file's, as in identities.bicep. Each one's booking endpoint in the Partner portal has
+// a credential of its own, named after the Carrier's ID at Norvia, which is what the endpoint's address names.
+var carrierIds = map(
+  filter(loadJsonContent('../../seed/norvia.seed.json').personas, persona => persona.party.type == 'Carrier'),
+  persona => persona.party.id
+)
+
+// Derived from the seed and the Carrier's ID, as 64 hex digits from two GUIDs. Nobody reads the seed back out of the
+// vault, and only the portal and the booking Logic App read these.
+resource carrierEndpointKeys 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = [
+  for carrierId in carrierIds: {
+    parent: partnerPortalSecrets
+    name: 'carrier-endpoint-key-${carrierId}'
+    properties: {
+      value: replace('${guid(carrierEndpointKeySeed, carrierId, 'carrier-endpoint-key')}${guid(carrierId, carrierEndpointKeySeed, 'carrier-endpoint-key')}', '-', '')
+    }
+  }
+]
+
 var keyVaultSecretsUser = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
 
 resource partnerPortalReadsTheKeys 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
@@ -264,6 +292,19 @@ resource partnerPortalReadsTheKeys 'Microsoft.Authorization/roleAssignments@2022
     principalType: 'ServicePrincipal'
   }
 }
+
+// Scoped to each secret, so the booking Logic App can't read a Persona's subscription key.
+resource bookingReadsTheCarrierEndpointKeys 'Microsoft.Authorization/roleAssignments@2022-04-01' = [
+  for (carrierId, i) in carrierIds: {
+    name: guid(carrierEndpointKeys[i].id, bookingPrincipalId, keyVaultSecretsUser)
+    scope: carrierEndpointKeys[i]
+    properties: {
+      principalId: bookingPrincipalId
+      roleDefinitionId: keyVaultSecretsUser
+      principalType: 'ServicePrincipal'
+    }
+  }
+]
 
 output apiManagementName string = apiManagement.name
 output partnerPortalKeyVaultName string = partnerPortalSecrets.name

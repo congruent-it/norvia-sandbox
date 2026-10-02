@@ -1,4 +1,5 @@
 using Norvia.PartnerPortal.Application.Personas;
+using Norvia.PartnerPortal.Domain.Personas;
 
 namespace Norvia.PartnerPortal.Web.Personas;
 
@@ -17,6 +18,15 @@ public static class PersonaChoice
     public static string NewBookingPath(string personaId) => $"/personas/{Uri.EscapeDataString(personaId)}/bookings/new";
 
     public static string BookingsPath(string personaId) => $"/personas/{Uri.EscapeDataString(personaId)}/bookings";
+
+    public static string BookingRequestsPath(string personaId) => $"/personas/{Uri.EscapeDataString(personaId)}/booking-requests";
+
+    /// <summary>Where a Persona's work starts: a Shipper books a transport, a Carrier opens its inbox.</summary>
+    public static string HomePath(PersonaView persona)
+    {
+        ArgumentNullException.ThrowIfNull(persona);
+        return persona.PartyType == PartyType.Carrier ? BookingRequestsPath(persona.Id) : NewBookingPath(persona.Id);
+    }
 
     /// <summary>The Persona whose page this is; elsewhere the one last switched to, or the first.</summary>
     public static PersonaView Current(HttpRequest request, IReadOnlyList<PersonaView> personas)

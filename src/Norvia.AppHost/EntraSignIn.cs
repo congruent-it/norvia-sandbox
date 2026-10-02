@@ -6,7 +6,8 @@ namespace Norvia.AppHost;
 /// <summary>
 /// Easy Auth in front of a container app: every browser signs in to an Entra app registration of the estate's first, and
 /// Entra issues a token only to the users assigned to it. The demo UIs use it as a gate for the presenter (ADR 0024); the
-/// Integration console reads the operator and their app roles from it (ADR 0026).
+/// Integration console reads the operator and their app roles from it (ADR 0026). A path outside the gate is one a caller
+/// that is no browser must reach, such as a Carrier Persona's booking endpoint, which asks for a credential of its own.
 /// </summary>
 internal static class EntraSignIn
 {
@@ -17,7 +18,8 @@ internal static class EntraSignIn
         AzureResourceInfrastructure infrastructure,
         ContainerApp app,
         IResourceBuilder<ParameterResource> appRegistrationClientId,
-        IResourceBuilder<ParameterResource> entraIssuer)
+        IResourceBuilder<ParameterResource> entraIssuer,
+        IEnumerable<string>? pathsOutsideTheGate = null)
     {
         var clientId = appRegistrationClientId.AsProvisioningParameter(infrastructure);
         return new ContainerAppAuthConfig("authConfig")
@@ -30,7 +32,7 @@ internal static class EntraSignIn
             {
                 UnauthenticatedClientAction = ContainerAppUnauthenticatedClientActionV2.RedirectToLoginPage,
                 RedirectToProvider = "azureactivedirectory",
-                ExcludedPaths = [.. HealthProbePaths],
+                ExcludedPaths = [.. HealthProbePaths, .. pathsOutsideTheGate ?? []],
             },
             HttpSettings = new ContainerAppHttpSettings { RequireHttps = true },
             IdentityProviders = new ContainerAppIdentityProvidersConfiguration
