@@ -4,8 +4,8 @@ namespace Norvia.PartnerPortal.Domain.CarrierBookings;
 public static class BookingReferencePattern
 {
     /// <summary>
-    /// <c>VDT-240917-0042</c>: the Carrier's prefix, the day it confirmed and a sequence taken from the Carrier booking number,
-    /// which is unique, so the Carrier's references are too.
+    /// <c>VDT-240917-0042</c>: the Carrier's prefix, the day it confirmed and the last four digits of the Carrier booking number
+    /// as the sequence, so a reference repeats only after 10,000 bookings.
     /// </summary>
     public static string Generate(string prefix, DateTimeOffset confirmedAt, string carrierBookingNumber)
     {

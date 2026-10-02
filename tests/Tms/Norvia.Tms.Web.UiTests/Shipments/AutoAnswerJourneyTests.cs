@@ -17,12 +17,12 @@ public sealed class AutoAnswerJourneyTests(TmsUiFixture tms) : BrowserPage(tms)
     {
         var (shipmentNumber, bookingNumber) = await ReleaseToCarrierAsync("Kessler Spedition");
 
-        await OpenWhenAsync($"/shipments/{shipmentNumber}", async page =>
-        {
-            await Expect(page.GetByRole(AriaRole.Row).Filter(new() { HasText = bookingNumber }))
-                .ToContainTextAsync(new Regex(@"Carrier booking reference KES-\d{6}-\d{4}"), new() { Timeout = 1000 });
-            await Expect(page.GetByText("Booked", new() { Exact = true }).First).ToBeVisibleAsync(new() { Timeout = 1000 });
-        });
+        // The portal's inbox refreshes itself, so it says when the Persona has answered; the TMS's pages are read after that.
+        await WaitForAnswerAsync("kessler-spedition", bookingNumber, "Confirmed");
+        await Page.GotoAsync($"/shipments/{shipmentNumber}");
+        await Expect(Page.GetByRole(AriaRole.Row).Filter(new() { HasText = bookingNumber }))
+            .ToContainTextAsync(new Regex(@"Carrier booking reference KES-\d{6}-\d{4}"));
+        await Expect(Page.GetByText("Booked", new() { Exact = true }).First).ToBeVisibleAsync();
     }
 
     [Fact]
@@ -40,10 +40,11 @@ public sealed class AutoAnswerJourneyTests(TmsUiFixture tms) : BrowserPage(tms)
         await Expect(modePanel.GetByRole(AriaRole.Status)).ToContainTextAsync("Saved");
         try
         {
-            var (shipmentNumber, _) = await ReleaseToCarrierAsync("PakketPunt Express");
+            var (shipmentNumber, bookingNumber) = await ReleaseToCarrierAsync("PakketPunt Express");
 
-            await OpenWhenAsync("/shipments/to-release", page =>
-                Expect(page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipmentNumber })).ToContainTextAsync("Rejected by PakketPunt Express", new() { Timeout = 1000 }));
+            await WaitForAnswerAsync("pakketpunt-express", bookingNumber, "Rejected");
+            await Page.GotoAsync("/shipments/to-release");
+            await Expect(Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipmentNumber })).ToContainTextAsync("Rejected by PakketPunt Express");
         }
         finally
         {
@@ -53,21 +54,10 @@ public sealed class AutoAnswerJourneyTests(TmsUiFixture tms) : BrowserPage(tms)
         }
     }
 
-    // The TMS's pages don't refresh themselves, and the answer arrives after the Persona's delay: open the page again until it shows.
-    private async Task OpenWhenAsync(string path, Func<IPage, Task> expectation)
+    private async Task WaitForAnswerAsync(string persona, string bookingNumber, string answer)
     {
-        for (var attempt = 1; ; attempt++)
-        {
-            await Page.GotoAsync(path);
-            try
-            {
-                await expectation(Page);
-                return;
-            }
-            catch (PlaywrightException) when (attempt < 15)
-            {
-                await Task.Delay(TimeSpan.FromSeconds(2));
-            }
-        }
+        var inbox = await Page.Context.NewPageAsync();
+        await inbox.GotoAsync(new Uri(_tms.PartnerPortal, $"/personas/{persona}/booking-requests").ToString());
+        await Expect(inbox.GetByRole(AriaRole.Row).Filter(new() { HasText = bookingNumber })).ToContainTextAsync(answer, new() { Timeout = 30_000 });
     }
 }
