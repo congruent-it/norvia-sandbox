@@ -176,6 +176,25 @@ All events go to the topic for Shipment events, through the TMS's transactional 
 
 A sent report and a repeated answer publish no event.
 
+## Presenter smoke run
+
+After a deployment, and not in CI, the presenter checks Carrier booking end to end on the deployed estate: a release that a Carrier rejects on its own, a second release that another Carrier confirms by hand, and the Shipment Booked. Do it after the presenter smoke run of Transport planning ([docs/processes/tms/p3-transport-planning.md](p3-transport-planning.md#presenter-smoke-run)), whose booking it repeats. The postdeploy hook prints each UI's address. Open the Partner portal and the TMS UI side by side.
+
+1. **Set Kessler Spedition to Auto-reject.** In the Partner portal, choose Kessler Spedition in the Persona switcher and open its Carrier page. In *Answer mode*, set *Mode* to *Auto-reject*, choose a *Rejection reason* such as No capacity, keep a delay of a few seconds, and choose *Save answer mode*.
+2. **Book and plan.** As in P3's run, book Rotterdam to Düsseldorf as Brouwer Dranken (delivery Getränke Schmitz GmbH, Kölner Landstraße 301, 40591 Düsseldorf, DE) and note the Transport Order number. In the TMS UI, assign it to Kessler Spedition.
+3. **Release to Kessler Spedition.** In *Shipments to release*, select the Shipment and choose *Release selected*. It leaves the list and may appear for a moment in *Bookings awaiting an answer*, Requested, with its Carrier booking number and a Sent time once the P4 booking Logic App has delivered it.
+4. **See the auto-reject.** After the delay, the Shipment is back in *Shipments to release*, showing its last Carrier booking's outcome, "Rejected by Kessler Spedition: NoCapacity". In the Partner portal, Kessler Spedition's inbox shows the request as rejected.
+5. **Release again to Van Dijk Transport.** On the Shipment's row choose *Van Dijk Transport* under *Reassign to* and choose *Reassign*, then select it and choose *Release selected*. A new Carrier booking number appears in *Bookings awaiting an answer*, with Van Dijk Transport as its Carrier and, within moments, a Sent time instead of "not yet sent". Van Dijk Transport answers by hand, so it stays there.
+6. **Confirm as Van Dijk Transport.** In the Partner portal, choose Van Dijk Transport in the Persona switcher. Its inbox lists the open request. Choose *Confirm*, enter a Carrier booking reference such as `VDT-SMOKE-0001` and confirm. The inbox shows it confirmed.
+7. **See it Booked.** In the TMS UI, the booking has left *Bookings awaiting an answer* and the Shipment's detail shows Booked, carried by Van Dijk Transport, with two Carrier bookings: Kessler Spedition's Rejected with its reason, then Van Dijk Transport's Confirmed with the reference entered.
+8. **Check the TMS.** Run `infra/smoke-test-carrier-booking.sh <Transport Order number>`. It reads the TMS as the intake identity, from a throwaway Container Apps job, and reads Application Insights, which is usually 1 to 5 minutes behind. It checks that the Shipment is Booked and carried by Van Dijk Transport, that it has left both of the Planner's lists, that its Carrier bookings are Kessler Spedition's Rejected, with a reason code, and Van Dijk Transport's Confirmed, with a Carrier booking reference, each reported sent, that each booking's release published `ShipmentReleased` and had its sent report recorded, and that each answer ran on a Message trail of its own, Succeeded for that Carrier, publishing `CarrierBookingRejected` and `CarrierBookingConfirmed` in turn on the Shipment events topic.
+
+   It prints `PASS` or `FAIL` per check, never a body, and ends with the pages to open below.
+9. **Follow it.** In the Integration console, search for the Shipment number, then for each Carrier booking number. A booking's search shows its release (`tms-api: POST /v1/shipments/<Shipment number>/release`, `tms-api: publish ShipmentReleased`, the P4 booking Logic App's run, and the `report-sent` call to the TMS) and, as a trail of its own, its answer (API Management, the Carrier-answer Logic App's run, `tms-api: POST /v1/carrier-bookings/<Carrier booking number>/answer` and `tms-api: publish CarrierBookingRejected` or `CarrierBookingConfirmed`). Application Insights holds the same rows: query `union AppRequests, AppTraces, AppDependencies` by the Shipment number or a Carrier booking number in `Properties.shipmentNumber` or `Properties.carrierBookingNumber`.
+10. **Restore Kessler Spedition.** In the Partner portal, set its *Mode* back to *Auto-confirm*, so the next run and the other demos find it as seeded.
+
+If a check fails, file the gap as its own issue against P4, rather than working around it in the run book.
+
 ## Deferred
 
 These were left out on purpose while designing P4, each with its reason.
