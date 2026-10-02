@@ -2,6 +2,7 @@ using AngleSharp.Dom;
 using Microsoft.FluentUI.AspNetCore.Components;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shipments.ListToRelease;
+using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Web.Shipments;
 using Norvia.Tms.Web.UnitTests.TransportOrders;
 
@@ -39,6 +40,28 @@ public sealed class ShipmentsToReleaseTests : TmsWebContext
         cells[3].Should().Be("Brouwer Dranken");
         cells[4].Should().Be("Kessler Spedition");
         cells[5].Should().Be("Thu 24 Sep 2026, 11:45");
+    }
+
+    [Fact]
+    public void Render_AShipmentThatCameBackFromACarrier_ShowsItsLastCarrierBookingOutcomeAndReason()
+    {
+        Queries.ListShipmentsToReleaseAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            Samples.ToRelease("SH-0000012") with
+            {
+                LastCarrierBookingOutcome = new LastCarrierBookingOutcome(
+                    CarrierBookingStatus.Rejected, Samples.Kessler, CarrierBookingRejectionReason.NoCapacity, "Fully booked until Friday."),
+            },
+            Samples.ToRelease("SH-0000013"),
+        ]);
+
+        var page = Render<ShipmentsToRelease>();
+
+        page.WaitForAssertion(() =>
+        {
+            CellsOf(page, "SH-0000012")[6].Should().Be("Rejected by Kessler Spedition: Fully booked until Friday.");
+            CellsOf(page, "SH-0000013")[6].Should().BeEmpty();
+        });
     }
 
     [Fact]
@@ -343,6 +366,9 @@ public sealed class ShipmentsToReleaseTests : TmsWebContext
     }
 
     // Fluent UI's checkbox takes its new value after the event returns, so this waits until it shows it.
+    private static List<string> CellsOf(IRenderedComponent<ShipmentsToRelease> page, string shipmentNumber) =>
+        [.. page.Find($"tr:has(a[href='/shipments/{shipmentNumber}'])").QuerySelectorAll("td").Select(cell => cell.TextContent.Trim())];
+
     private static void Select(IRenderedComponent<ShipmentsToRelease> page, string number, bool selected = true)
     {
         var checkbox = $"fluent-checkbox[aria-label='Select {number}']";

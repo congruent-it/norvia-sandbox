@@ -24,11 +24,11 @@ public sealed class MainLayoutTests : BunitContext
     }
 
     [Fact]
-    public void Render_AsThePlanner_LinksToTheTransportOrdersWaitingForPlanningAndTheShipmentsToRelease()
+    public void Render_AsThePlanner_LinksToWaitingForPlanningShipmentsToReleaseAndBookingsAwaitingAnAnswer()
     {
         var layout = RenderAs("planner");
 
-        MainNavigation(layout).Should().Equal(("/transport-orders", "Waiting for planning"), ("/shipments/to-release", "Shipments to release"));
+        MainNavigation(layout).Should().Equal(("/transport-orders", "Waiting for planning"), ("/shipments/to-release", "Shipments to release"), ("/shipments/awaiting-answer", "Bookings awaiting an answer"));
     }
 
     private IRenderedComponent<MainLayout> RenderAs(string role)

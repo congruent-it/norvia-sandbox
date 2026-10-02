@@ -13,7 +13,11 @@ public sealed record NorviaRole(string Key, string Name, IReadOnlyList<RoleView>
     public const string CookieName = "norvia-tms-role";
 
     public static readonly NorviaRole Planner = new("planner", "Planner",
-        [new("/transport-orders", "Waiting for planning"), new("/shipments/to-release", "Shipments to release")]);
+        [
+            new("/transport-orders", "Waiting for planning"),
+            new("/shipments/to-release", "Shipments to release"),
+            new("/shipments/awaiting-answer", "Bookings awaiting an answer"),
+        ]);
 
     public static readonly NorviaRole CustomerService = new("customer-service", "Customer service",
         [new("/rejected-bookings", "Rejected bookings"), new("/rating-exceptions", "Rating exceptions")]);

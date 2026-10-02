@@ -27,4 +27,10 @@ public interface ITransportOrderCommands
     /// each Shipment with a call of its own, so each succeeds or is refused on its own.
     /// </summary>
     Task<ReleaseAnswer> ReleaseAsync(string shipmentNumber, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Withdraws one Requested Carrier booking before the Carrier answers, which puts its Shipment back to Planned. Each
+    /// withdrawal is a call of its own, so one is refused on its own.
+    /// </summary>
+    Task<WithdrawAnswer> WithdrawAsync(string carrierBookingNumber, CancellationToken cancellationToken);
 }

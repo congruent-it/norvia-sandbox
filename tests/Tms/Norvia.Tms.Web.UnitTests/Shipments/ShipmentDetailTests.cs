@@ -58,16 +58,36 @@ public sealed class ShipmentDetailTests : TmsWebContext
     }
 
     [Fact]
-    public void Render_ACarrierShipmentWithACarrierBooking_ShowsItsNumberAndStatus()
+    public void Render_ARequestedCarrierBooking_ShowsItsNumberStatusRequestedAndNotYetSent()
     {
         Queries.FindShipmentAsync("SH-0000012", Arg.Any<CancellationToken>())
-            .Returns(Samples.Shipment(
-                "SH-0000012",
-                carrierBookings: [new CarrierBookingView("CB-0000001", CarrierBookingStatus.Requested, DateTimeOffset.UtcNow, null, null, null, null, null, null, null, null, null)]));
+            .Returns(Samples.Shipment("SH-0000012", carrierBookings: [Booking("CB-0000001", CarrierBookingStatus.Requested)]));
 
         var page = RenderDetail("SH-0000012");
 
-        page.WaitForAssertion(() => Rows(page, "Carrier bookings").Should().Equal("CB-0000001 | Requested"));
+        page.WaitForAssertion(() => Rows(page, "Carrier bookings").Should().Equal("CB-0000001 | Kessler Spedition | Requested | Thu 24 Sep 2026, 11:45 | Not yet sent | "));
+    }
+
+    [Fact]
+    public void Render_TheCarrierBookingHistory_ShowsEachWithItsSentTimeAndItsReasonOrCarrierBookingReference()
+    {
+        Queries.FindShipmentAsync("SH-0000012", Arg.Any<CancellationToken>())
+            .Returns(Samples.Shipment("SH-0000012", ShipmentStatus.Released, carrierBookings:
+            [
+                Booking("CB-0000001", CarrierBookingStatus.Rejected) with
+                {
+                    SentAt = new DateTimeOffset(2026, 9, 24, 9, 46, 0, TimeSpan.Zero),
+                    ReasonCode = CarrierBookingRejectionReason.NoCapacity,
+                    ReasonText = "Fully booked until Friday.",
+                },
+                Booking("CB-0000002", CarrierBookingStatus.Confirmed) with { CarrierBookingReference = "KS-7781" },
+            ]));
+
+        var page = RenderDetail("SH-0000012");
+
+        page.WaitForAssertion(() => Rows(page, "Carrier bookings").Should().Equal(
+            "CB-0000001 | Kessler Spedition | Rejected | Thu 24 Sep 2026, 11:45 | Thu 24 Sep 2026, 11:46 | Fully booked until Friday.",
+            "CB-0000002 | Kessler Spedition | Confirmed | Thu 24 Sep 2026, 11:45 | Not yet sent | Carrier booking reference KS-7781"));
     }
 
     [Fact]
@@ -112,6 +132,9 @@ public sealed class ShipmentDetailTests : TmsWebContext
         page.WaitForAssertion(() => page.Find("[role=alert]").TextContent.Should()
             .Contain("Shipment SH-0000012 couldn't be loaded. Reload the page to try again."));
     }
+
+    private static CarrierBookingView Booking(string number, CarrierBookingStatus status) =>
+        new(number, Samples.Kessler, status, new DateTimeOffset(2026, 9, 24, 9, 45, 0, TimeSpan.Zero), null, null, null, null, null, null, null, null, null);
 
     private IRenderedComponent<ShipmentDetail> RenderDetail(string number) =>
         Render<ShipmentDetail>(parameters => parameters.Add(page => page.ShipmentNumber, number));

@@ -69,15 +69,19 @@ else
             </TransportOrderSection>
         </div>
 
-        @* Only a Carrier Shipment gets a Carrier booking (P4); this build only ever shows one, Requested. *@
+        @* Only a Carrier Shipment gets a Carrier booking (P4), in the order they were requested. *@
         @if (_shipment.CarrierBookings.Count > 0)
         {
             <div class="md:col-span-3">
                 <TransportOrderSection Heading="Carrier bookings">
                     <FluentDataGrid Items="_shipment.CarrierBookings.AsQueryable()" TGridItem="CarrierBookingView" Class="flatly-table" aria-label="Carrier bookings"
-                                    GridTemplateColumns="1fr 1fr">
+                                    GridTemplateColumns="1fr 1.2fr 1fr 1.2fr 1.2fr 2fr" MultiLine="true">
                         <PropertyColumn Title="Carrier booking number" Property="@(booking => booking.CarrierBookingNumber)" />
+                        <PropertyColumn Title="Carrier" Property="@(booking => PlanningText.Carrier(booking.Carrier))" />
                         <PropertyColumn Title="Status" Property="@(booking => booking.Status)" />
+                        <PropertyColumn Title="Requested" Property="@(booking => NorviaTime.Format(booking.RequestedAt))" />
+                        <PropertyColumn Title="Sent" Property="@(booking => CarrierBookingText.Sent(booking.SentAt))" />
+                        <PropertyColumn Title="Outcome" Property="@(booking => CarrierBookingText.Detail(booking))" />
                     </FluentDataGrid>
                 </TransportOrderSection>
             </div>

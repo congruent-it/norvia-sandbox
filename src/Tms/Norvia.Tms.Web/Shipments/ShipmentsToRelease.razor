@@ -77,7 +77,7 @@
 
     @* Planned first, as the query gives them: the Shipment planned first is released first. *@
     <FluentDataGrid Items="shipments.AsQueryable()" TGridItem="ShipmentToReleaseSummary" Class="flatly-table" aria-label="Shipments to release"
-                    GridTemplateColumns="auto 1fr 1fr 1.1fr 1.1fr 1fr 1.4fr auto" MultiLine="true">
+                    GridTemplateColumns="auto 1fr 1fr 1.1fr 1.1fr 1fr 1.6fr 1.4fr auto" MultiLine="true">
         <TemplateColumn Title="Select">
             <FluentCheckbox Value="_selected.Contains(context.ShipmentNumber)"
                             ValueChanged="@((bool selected) => Select(context.ShipmentNumber, selected))"
@@ -92,6 +92,12 @@
         <PropertyColumn Title="Shipper" Property="@(shipment => shipment.Shipper.Name ?? shipment.Shipper.Id)" />
         <PropertyColumn Title="Carried by" Property="@(shipment => PlanningText.CarriedBy(shipment.CarriedBy))" />
         <PropertyColumn Title="Planned" Property="@(shipment => NorviaTime.Format(shipment.PlannedAt))" />
+        <TemplateColumn Title="Last Carrier booking">
+            @if (context.LastCarrierBookingOutcome is { } outcome)
+            {
+                @CarrierBookingText.LastOutcome(outcome)
+            }
+        </TemplateColumn>
         <TemplateColumn Title="Reassign to">
             <FluentSelect TOption="string" Value="@ReassignToOf(context.ShipmentNumber)"
                           ValueChanged="@((string value) => SetReassignTo(context.ShipmentNumber, value))"

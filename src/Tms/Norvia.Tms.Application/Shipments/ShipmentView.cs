@@ -37,6 +37,6 @@ public sealed record ShipmentView(
             shipment.CorrelationId.Value,
             shipment.PlannedAt,
             [.. shipment.Assignments.Select(assignment => ShipmentAssignmentView.Of(assignment, carriers))],
-            [.. carrierBookings.Select(CarrierBookingView.Of)]);
+            [.. carrierBookings.Select(booking => CarrierBookingView.Of(booking, carriers))]);
     }
 }
