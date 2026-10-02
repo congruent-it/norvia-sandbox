@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/partner-api/carrier-answer.v1.schema.json",
+  "title": "CarrierAnswer",
+  "description": "A Carrier's answer to a booking request, as the Carrier sends it to the Norvia Partner API (Carrier answer format, version 1). It differs from the Canonical Model on purpose: its own field names, its own decision and reason vocabulary, and a time with an offset. It never names the Carrier: API Management takes the Carrier from the token (ADR 0005).",
+  "type": "object",
+  "required": ["carrierBookingNumber", "decision"],
+  "properties": {
+    "carrierBookingNumber": { "description": "The Carrier booking the Carrier answers, as the request named it.", "type": "string", "pattern": "^CB-[0-9]{7}$" }
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/confirmed" },
+    { "$ref": "#/$defs/declined" }
+  ],
+  "$defs": {
+    "confirmed": {
+      "description": "The Carrier takes the booking. By confirming, it accepts the Carrier cost in the request (ADR 0013).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["carrierBookingNumber", "decision", "bookingRef"],
+      "properties": {
+        "carrierBookingNumber": true,
+        "decision": { "const": "CONFIRMED" },
+        "bookingRef": { "description": "The Carrier's own reference for the booking.", "type": "string", "minLength": 1, "pattern": "\\S" },
+        "plannedCollection": {
+          "description": "When the Carrier plans to collect, with its UTC offset. Optional.",
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$"
+        }
+      }
+    },
+    "declined": {
+      "description": "The Carrier turns the booking down. The reason text is required for OTHER.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["carrierBookingNumber", "decision", "declineReason"],
+      "properties": {
+        "carrierBookingNumber": true,
+        "decision": { "const": "DECLINED" },
+        "declineReason": { "enum": ["NO_CAPACITY", "LANE_NOT_SERVED", "WINDOW_NOT_FEASIBLE", "GOODS_NOT_ACCEPTED", "OTHER"] },
+        "declineText": { "description": "The reason in plain language. Required when declineReason is OTHER.", "type": "string", "minLength": 1, "pattern": "\\S" }
+      },
+      "if": { "properties": { "declineReason": { "const": "OTHER" } } },
+      "then": { "required": ["declineText"] }
+    }
+  }
+}

@@ -1,0 +1,76 @@
+@* The form to confirm or reject one request, under the list. A Carrier answers one request at a time. *@
+<section aria-label="@Heading" class="mb-8 max-w-3xl border border-border p-6">
+    <h2 class="mt-0">@Heading</h2>
+    @if (Kind == AnswerKind.Confirm)
+    {
+        <EditForm Model="_confirm" OnValidSubmit="ConfirmAsync" FormName="@FormName">
+            <DataAnnotationsValidator />
+            <div class="grid gap-4">
+                <div>
+                    <FluentTextField Label="Carrier booking reference" @bind-Value="_confirm.BookingReference" />
+                    <FluentValidationMessage For="() => _confirm.BookingReference" />
+                </div>
+                <div>
+                    <label for="@PlannedId" class="lux-label">Planned collection time (optional, Amsterdam time)</label>
+                    <InputDate Type="InputDateType.DateTimeLocal" id="@PlannedId" class="lux-input" @bind-Value="_confirm.PlannedCollection" />
+                </div>
+            </div>
+            <p class="mt-4 text-sm">By confirming, you accept the Carrier cost in the request.</p>
+            <div class="mt-4 flex flex-wrap items-center gap-4">
+                <FluentButton Type="ButtonType.Submit" Appearance="Appearance.Accent" Disabled="Sending">Confirm booking</FluentButton>
+                <FluentButton Appearance="Appearance.Outline" OnClick="OnCancel" Disabled="Sending">Cancel</FluentButton>
+            </div>
+        </EditForm>
+    }
+    else
+    {
+        <EditForm Model="_reject" OnValidSubmit="RejectAsync" FormName="@FormName">
+            <DataAnnotationsValidator />
+            <div class="grid gap-4">
+                <FluentSelect TOption="string" Label="Reason" Items="ReasonNames" @bind-Value="_reject.ReasonName"
+                              OptionText="@(name => RequestStatusText.Reason(Enum.Parse<CarrierRejectionReason>(name)))" />
+                <div>
+                    <FluentTextArea Label="Reason text" @bind-Value="_reject.Text" Rows="3" />
+                    <FluentValidationMessage For="() => _reject.Text" />
+                </div>
+            </div>
+            <div class="mt-4 flex flex-wrap items-center gap-4">
+                <FluentButton Type="ButtonType.Submit" Appearance="Appearance.Accent" Disabled="Sending">Reject booking</FluentButton>
+                <FluentButton Appearance="Appearance.Outline" OnClick="OnCancel" Disabled="Sending">Cancel</FluentButton>
+            </div>
+        </EditForm>
+    }
+</section>
+
+@code {
+    private static readonly IReadOnlyList<string> ReasonNames = [.. Enum.GetNames<CarrierRejectionReason>()];
+
+    private readonly ConfirmForm _confirm = new();
+    private readonly RejectForm _reject = new();
+
+    private string Heading => $"{(Kind == AnswerKind.Confirm ? "Confirm" : "Reject")} {Request.CarrierBookingNumber}";
+
+    private string FormName => Kind == AnswerKind.Confirm ? "confirm" : "reject";
+
+    private string PlannedId => $"planned-collection-{Request.CarrierBookingNumber}";
+
+    [Parameter, EditorRequired]
+    public CarrierBookingRequestView Request { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public AnswerKind Kind { get; set; }
+
+    /// <summary>Whether the answer is on its way to Norvia.</summary>
+    [Parameter]
+    public bool Sending { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback<CarrierAnswer> OnAnswer { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback OnCancel { get; set; }
+
+    private Task ConfirmAsync() => OnAnswer.InvokeAsync(_confirm.ToAnswer());
+
+    private Task RejectAsync() => OnAnswer.InvokeAsync(_reject.ToAnswer());
+}

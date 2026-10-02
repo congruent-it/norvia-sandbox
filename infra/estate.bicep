@@ -30,7 +30,7 @@ postdeploy hook stores it, so the console's app registration keeps it when the e
 param integrationConsoleRedirectUris string = ''
 
 @description('''The TMS API's address, empty before the apps are first deployed. azd's postdeploy hook stores it, so the intake
-Logic App keeps it when the estate is deployed again.''')
+and Carrier-answer Logic Apps keep it when the estate is deployed again.''')
 param tmsBaseUrl string = ''
 
 @secure()
@@ -103,6 +103,26 @@ module intakeLogicApp 'estate/intake-logic-app.bicep' = {
   }
 }
 
+module answerLogicApp 'estate/answer-logic-app.bicep' = {
+  scope: resourceGroup
+  params: {
+    location: location
+    tags: tags
+    integrationRetentionDays: integrationRetentionDays
+    answerIdentityName: identities.outputs.answerIdentityName
+    tmsApiClientId: identities.outputs.tmsApiClientId
+    tmsBaseUrl: tmsBaseUrl
+    applicationInsightsName: monitoring.outputs.applicationInsightsName
+    planName: intakeLogicApp.outputs.planName
+    contentKeyVaultName: intakeLogicApp.outputs.keyVaultName
+    apiManagementPrincipalId: identities.outputs.apiManagementPrincipalId
+    apiManagementClientId: identities.outputs.apiManagementClientId
+    answerTriggerClientId: identities.outputs.answerTriggerClientId
+    answerTriggerAudience: identities.outputs.answerTriggerAudience
+    integrationConsolePrincipalId: identities.outputs.integrationConsolePrincipalId
+  }
+}
+
 module bookingLogicApp 'estate/booking-logic-app.bicep' = {
   scope: resourceGroup
   params: {
@@ -130,9 +150,12 @@ module partnerApi 'estate/partner-api.bicep' = {
     apiManagementIdentityName: identities.outputs.apiManagementIdentityName
     partnerApiClientId: identities.outputs.partnerApiClientId
     shippersByClientId: join(filter(identities.outputs.shipperByClientId, entry => !empty(entry)), ';')
+    carriersByClientId: join(filter(identities.outputs.carrierByClientId, entry => !empty(entry)), ';')
     personaClientIds: identities.outputs.personaClientIds
     intakeLogicAppHostName: intakeLogicApp.outputs.logicAppHostName
     intakeTriggerAudience: identities.outputs.intakeTriggerAudience
+    answerLogicAppHostName: answerLogicApp.outputs.logicAppHostName
+    answerTriggerAudience: identities.outputs.answerTriggerAudience
     applicationInsightsName: monitoring.outputs.applicationInsightsName
     partnerPortalPrincipalId: identities.outputs.partnerPortalPrincipalId
     bookingPrincipalId: identities.outputs.bookingPrincipalId
@@ -160,6 +183,9 @@ output ESTATE_TMS_UI_IDENTITY_NAME string = identities.outputs.tmsUiIdentityName
 output ESTATE_TMS_UI_CLIENT_ID string = identities.outputs.tmsUiClientId
 output ESTATE_INTAKE_LOGIC_APP string = intakeLogicApp.outputs.logicAppName
 output ESTATE_BOOKING_LOGIC_APP string = bookingLogicApp.outputs.logicAppName
+output ESTATE_ANSWER_LOGIC_APP string = answerLogicApp.outputs.logicAppName
+output ESTATE_ANSWER_CLIENT_ID string = identities.outputs.answerClientId
+output ESTATE_ANSWER_IDENTITY_NAME string = identities.outputs.answerIdentityName
 output ESTATE_API_MANAGEMENT string = partnerApi.outputs.apiManagementName
 output ESTATE_PARTNER_API_URL string = partnerApi.outputs.partnerApiUrl
 output ESTATE_PARTNER_API_CLIENT_ID string = identities.outputs.partnerApiClientId

@@ -1,8 +1,6 @@
 using System.Net.Http.Headers;
 using System.Text;
 using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.JsonWebTokens;
-using Microsoft.IdentityModel.Tokens;
 
 namespace Norvia.Integration.LocalPartnerApi;
 
@@ -37,22 +35,7 @@ internal sealed partial class TmsIntake(HttpClient http, IOptions<TmsOptions> op
         }
     }
 
-    // A token as Entra issues it to the intake Logic App's managed identity.
-    private string IntakeToken()
-    {
-        var tokens = options.Value.Tokens;
-        var now = time.GetUtcNow().UtcDateTime;
-        return new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
-        {
-            Issuer = tokens.Issuer,
-            Audience = tokens.Audience,
-            IssuedAt = now,
-            NotBefore = now,
-            Expires = now.AddMinutes(10),
-            Claims = new Dictionary<string, object> { ["azp"] = tokens.ClientId!, ["roles"] = new[] { IntakeRole } },
-            SigningCredentials = new SigningCredentials(tokens.Key, SecurityAlgorithms.HmacSha256),
-        });
-    }
+    private string IntakeToken() => TmsTokens.Create(options.Value.Tokens, time, options.Value.Tokens.ClientId!, IntakeRole);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "The TMS couldn't be reached")]
     private partial void LogTmsUnreachable(Exception exception);

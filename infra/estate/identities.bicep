@@ -22,10 +22,14 @@ var answerRole = 'CarrierBookings.Answer'
 var answerRoleId = guid('norvia-tms-api', environmentName, answerRole)
 var reportRole = 'CarrierBookings.Report'
 var reportRoleId = guid('norvia-tms-api', environmentName, reportRole)
+var respondRole = 'CarrierBookings.Respond'
+var respondRoleId = guid('norvia-partner-api', environmentName, respondRole)
 var submitRole = 'TransportOrders.Submit'
 var submitRoleId = guid('norvia-partner-api', environmentName, submitRole)
 var triggerRole = 'TransportOrderIntake.Trigger'
 var triggerRoleId = guid('norvia-intake-trigger', environmentName, triggerRole)
+var answerTriggerRole = 'CarrierAnswer.Trigger'
+var answerTriggerRoleId = guid('norvia-answer-trigger', environmentName, answerTriggerRole)
 var demoUisRole = 'DemoUis.Use'
 var demoUisRoleId = guid('norvia-demo-uis', environmentName, demoUisRole)
 var consoleReadRole = 'IntegrationConsole.Read'
@@ -81,7 +85,7 @@ resource tmsApi 'Microsoft.Graph/applications@v1.0' = {
       id: answerRoleId
       value: answerRole
       displayName: 'Answer Carrier bookings'
-      description: 'Record a Carrier\'s confirmation or rejection of a Carrier booking (P4). Only the Carrier-answer Logic App holds it; that Logic App is a later ticket, so nothing is granted this role yet.'
+      description: 'Record a Carrier\'s confirmation or rejection of a Carrier booking (P4). Only the Carrier-answer Logic App holds it.'
       allowedMemberTypes: [
         'Application'
       ]
@@ -124,6 +128,20 @@ resource reportRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
   resourceId: tmsApiPrincipal.id
   appRoleId: reportRoleId
   principalId: bookingIdentity.properties.principalId
+}
+
+// The Carrier-answer Logic App's identity, which it runs as. It is the one principal holding the answer role, so nothing
+// records a Carrier's answer in the TMS without passing the integration layer.
+resource answerIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
+  name: 'id-answer-${uniqueString(resourceGroup().id)}'
+  location: location
+  tags: tags
+}
+
+resource answerRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: tmsApiPrincipal.id
+  appRoleId: answerRoleId
+  principalId: answerIdentity.properties.principalId
 }
 
 // The TMS UI's identity, which it calls the TMS API as. It is the one principal holding the manage role, so only the
@@ -177,6 +195,16 @@ resource partnerApi 'Microsoft.Graph/applications@v1.0' = {
       ]
       isEnabled: true
     }
+    {
+      id: respondRoleId
+      value: respondRole
+      displayName: 'Answer Carrier bookings'
+      description: 'Confirm or reject a Carrier booking request as a Carrier. Only Carrier Personas hold it.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
   ]
 }
 
@@ -222,6 +250,15 @@ resource submitRoleGrants 'Microsoft.Graph/appRoleAssignedTo@v1.0' = [
   }
 ]
 
+// Carrier Personas may answer Carrier bookings; the others may not.
+resource respondRoleGrants 'Microsoft.Graph/appRoleAssignedTo@v1.0' = [
+  for (persona, i) in personas: if (persona.party.type == 'Carrier') {
+    resourceId: partnerApiPrincipal.id
+    appRoleId: respondRoleId
+    principalId: personaPrincipals[i].id
+  }
+]
+
 // What Easy Auth on the intake Logic App validates API Management's tokens for.
 resource intakeTrigger 'Microsoft.Graph/applications@v1.0' = {
   uniqueName: 'norvia-intake-trigger-${environmentName}'
@@ -253,6 +290,40 @@ resource intakeTriggerPrincipal 'Microsoft.Graph/servicePrincipals@v1.0' = {
 resource triggerRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
   resourceId: intakeTriggerPrincipal.id
   appRoleId: triggerRoleId
+  principalId: apiManagementIdentity.properties.principalId
+}
+
+// What Easy Auth on the Carrier-answer Logic App validates API Management's tokens for.
+resource answerTrigger 'Microsoft.Graph/applications@v1.0' = {
+  uniqueName: 'norvia-answer-trigger-${environmentName}'
+  displayName: 'Norvia Carrier-answer Logic App trigger (${environmentName})'
+  signInAudience: 'AzureADMyOrg'
+  identifierUris: [
+    'api://${tenant().tenantId}/norvia-answer-trigger-${environmentName}'
+  ]
+  appRoles: [
+    {
+      id: answerTriggerRoleId
+      value: answerTriggerRole
+      displayName: 'Trigger Carrier answers'
+      description: 'Call the Carrier-answer Logic App\'s trigger. Only API Management holds it.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
+  ]
+}
+
+resource answerTriggerPrincipal 'Microsoft.Graph/servicePrincipals@v1.0' = {
+  appId: answerTrigger.appId
+  // Entra issues tokens for the trigger only to API Management.
+  appRoleAssignmentRequired: true
+}
+
+resource answerTriggerRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: answerTriggerPrincipal.id
+  appRoleId: answerTriggerRoleId
   principalId: apiManagementIdentity.properties.principalId
 }
 
@@ -367,6 +438,9 @@ output tmsApiClientId string = tmsApi.appId
 output intakeClientId string = intakeIdentity.properties.clientId
 output intakeIdentityId string = intakeIdentity.id
 output intakeIdentityName string = intakeIdentity.name
+output answerIdentityId string = answerIdentity.id
+output answerIdentityName string = answerIdentity.name
+output answerClientId string = answerIdentity.properties.clientId
 output bookingIdentityId string = bookingIdentity.id
 output bookingIdentityName string = bookingIdentity.name
 output bookingPrincipalId string = bookingIdentity.properties.principalId
@@ -377,6 +451,10 @@ output partnerApiClientId string = partnerApi.appId
 @description('API Management\'s map from a Persona\'s client ID (the token\'s azp) to its Shipper ID: clientId=shipperId, empty for a Persona that is no Shipper.')
 output shipperByClientId array = [
   for (persona, i) in personas: persona.party.type == 'Shipper' ? '${personaApps[i].appId}=${persona.party.id}' : ''
+]
+@description('API Management\'s map from a Persona\'s client ID (the token\'s azp) to its Carrier ID: clientId=carrierId, empty for a Persona that is no Carrier.')
+output carrierByClientId array = [
+  for (persona, i) in personas: persona.party.type == 'Carrier' ? '${personaApps[i].appId}=${persona.party.id}' : ''
 ]
 @description('Each Persona\'s client ID: personaId=clientId.')
 output personaClientIds array = [for (persona, i) in personas: '${persona.id}=${personaApps[i].appId}']
@@ -389,6 +467,8 @@ output apiManagementPrincipalId string = apiManagementIdentity.properties.princi
 output apiManagementClientId string = apiManagementIdentity.properties.clientId
 output intakeTriggerClientId string = intakeTrigger.appId
 output intakeTriggerAudience string = intakeTrigger.identifierUris[0]
+output answerTriggerClientId string = answerTrigger.appId
+output answerTriggerAudience string = answerTrigger.identifierUris[0]
 output demoUisClientId string = demoUis.appId
 output integrationConsoleClientId string = integrationConsole.appId
 output integrationConsoleIdentityName string = integrationConsoleIdentity.name

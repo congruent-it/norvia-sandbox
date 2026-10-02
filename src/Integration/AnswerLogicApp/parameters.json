@@ -1,0 +1,18 @@
+{
+  "tmsBaseUrl": {
+    "type": "String",
+    "value": "@appsetting('TMS_BASE_URL')"
+  },
+  "tmsAudience": {
+    "type": "String",
+    "value": "@appsetting('TMS_API_CLIENT_ID')"
+  },
+  "answerIdentityId": {
+    "type": "String",
+    "value": "@appsetting('ANSWER_IDENTITY_ID')"
+  },
+  "apiManagementPrincipalId": {
+    "type": "String",
+    "value": "@appsetting('API_MANAGEMENT_PRINCIPAL_ID')"
+  }
+}

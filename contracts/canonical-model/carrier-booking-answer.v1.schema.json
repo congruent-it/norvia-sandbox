@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/carrier-booking-answer.v1.schema.json",
+  "title": "CarrierBookingAnswer",
+  "description": "A Carrier's confirmation or rejection of a Requested Carrier booking, as the Carrier-answer Logic App sends it to the TMS Carrier booking API's answer operation (Canonical Model command, version 1). The Carrier booking number is in the operation's path and the correlation ID, which API Management creates for the answer, in X-Correlation-ID. The Carrier comes from the token, never from the Carrier's payload.",
+  "type": "object",
+  "required": ["carrierId", "outcome"],
+  "properties": {
+    "carrierId": { "description": "The Carrier answering, from the token's azp claim (ADR 0005).", "type": "string", "minLength": 1 },
+    "outcome": { "enum": ["Confirmed", "Rejected"] }
+  },
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "required": ["carrierId", "outcome", "carrierBookingReference"],
+      "properties": {
+        "carrierId": true,
+        "outcome": { "const": "Confirmed" },
+        "carrierBookingReference": { "description": "The Carrier's own reference for the booking.", "type": "string", "minLength": 1, "pattern": "\\S" },
+        "plannedCollectionTime": { "description": "When the Carrier plans to collect: UTC, with its offset.", "type": "string", "format": "date-time", "pattern": "\\+00:00$" }
+      }
+    },
+    {
+      "additionalProperties": false,
+      "required": ["carrierId", "outcome", "reasonCode"],
+      "properties": {
+        "carrierId": true,
+        "outcome": { "const": "Rejected" },
+        "reasonCode": { "enum": ["NoCapacity", "LaneNotServed", "WindowNotFeasible", "GoodsNotAccepted", "Other"] },
+        "reasonText": { "description": "The reason in plain language. Required when the reason code is Other.", "type": "string", "minLength": 1, "pattern": "\\S" }
+      },
+      "if": { "properties": { "reasonCode": { "const": "Other" } } },
+      "then": { "required": ["reasonText"] }
+    }
+  ]
+}

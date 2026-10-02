@@ -20,9 +20,16 @@ param shippersByClientId string
 @description('The Personas, whose subscriptions are created here: personaId=clientId pairs.')
 param personaClientIds array
 
+@description('The Carrier client IDs mapped to their Carrier IDs, as clientId=carrierId pairs separated by semicolons.')
+param carriersByClientId string
+
 @description('The intake Logic App\'s host name, and the audience of the tokens its Easy Auth accepts.')
 param intakeLogicAppHostName string
 param intakeTriggerAudience string
+
+@description('The Carrier-answer Logic App\'s host name, and the audience of the tokens its Easy Auth accepts.')
+param answerLogicAppHostName string
+param answerTriggerAudience string
 
 param applicationInsightsName string
 
@@ -74,13 +81,15 @@ var namedValues = {
   'entra-tenant-id': tenant().tenantId
   'partner-api-client-id': partnerApiClientId
   'shippers-by-client-id': shippersByClientId
+  'carriers-by-client-id': carriersByClientId
   'intake-trigger-audience': intakeTriggerAudience
+  'answer-trigger-audience': answerTriggerAudience
   'api-management-identity-client-id': apiManagementIdentity.properties.clientId
 }
 
 resource policyValues 'Microsoft.ApiManagement/service/namedValues@2024-05-01' = [
   // The loop runs over the names, which are known before the deployment starts; the values aren't.
-  for name in ['entra-tenant-id', 'partner-api-client-id', 'shippers-by-client-id', 'intake-trigger-audience', 'api-management-identity-client-id']: {
+  for name in ['entra-tenant-id', 'partner-api-client-id', 'shippers-by-client-id', 'carriers-by-client-id', 'intake-trigger-audience', 'answer-trigger-audience', 'api-management-identity-client-id']: {
     parent: apiManagement
     name: name
     properties: {
@@ -146,6 +155,7 @@ resource diagnostics 'Microsoft.ApiManagement/service/diagnostics@2024-05-01' = 
         headers: [
           'X-Correlation-ID'
           'X-Shipper-ID'
+          'X-Carrier-ID'
         ]
       }
     }
@@ -158,6 +168,16 @@ resource intakeLogicApp 'Microsoft.ApiManagement/service/backends@2024-05-01' = 
   properties: {
     description: 'The intake Logic App (P1.9). The policy names the trigger.'
     url: 'https://${intakeLogicAppHostName}'
+    protocol: 'http'
+  }
+}
+
+resource answerLogicApp 'Microsoft.ApiManagement/service/backends@2024-05-01' = {
+  parent: apiManagement
+  name: 'answer-logic-app'
+  properties: {
+    description: 'The Carrier-answer Logic App (P4.7). The policy names the trigger.'
+    url: 'https://${answerLogicAppHostName}'
     protocol: 'http'
   }
 }
@@ -201,6 +221,30 @@ resource submitTransportOrderPolicy 'Microsoft.ApiManagement/service/apis/operat
   dependsOn: [
     policyValues
     intakeLogicApp
+  ]
+}
+
+resource answerCarrierBooking 'Microsoft.ApiManagement/service/apis/operations@2024-05-01' = {
+  parent: partnerApi
+  name: 'answer-carrier-booking'
+  properties: {
+    displayName: 'Answer Carrier booking'
+    description: 'Confirm or reject a Carrier booking request as a Carrier (contracts/partner-api).'
+    method: 'POST'
+    urlTemplate: '/carrier-answers'
+  }
+}
+
+resource answerCarrierBookingPolicy 'Microsoft.ApiManagement/service/apis/operations/policies@2024-05-01' = {
+  parent: answerCarrierBooking
+  name: 'policy'
+  properties: {
+    format: 'rawxml'
+    value: loadTextContent('partner-api/answer-carrier-booking.policy.xml')
+  }
+  dependsOn: [
+    policyValues
+    answerLogicApp
   ]
 }
 

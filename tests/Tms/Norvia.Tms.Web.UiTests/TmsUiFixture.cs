@@ -59,6 +59,8 @@ public sealed class TmsUiFixture : IAsyncLifetime
         // A released Shipment's booking goes through the worker that plays the P4 booking Logic App (ADR 0030) to the portal.
         await _app.ResourceNotifications.WaitForResourceHealthyAsync("partner-portal-web", startup.Token);
         await _app.ResourceNotifications.WaitForResourceAsync("booking-worker", KnownResourceStates.Running, startup.Token);
+        // A Carrier's answer goes through the stand-in that plays API Management and the Carrier-answer Logic App (ADR 0023).
+        await _app.ResourceNotifications.WaitForResourceHealthyAsync("partner-api", startup.Token);
 
         Intake = _app.CreateHttpClient("tms-api");
         Intake.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", IssueIntakeToken());

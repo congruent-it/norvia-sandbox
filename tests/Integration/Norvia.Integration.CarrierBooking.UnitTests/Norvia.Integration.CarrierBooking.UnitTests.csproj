@@ -18,9 +18,14 @@
   </ItemGroup>
   <!-- Embedded, so the unit tests read the contracts and the workflow without touching the file system (coding guidelines §10). -->
   <ItemGroup>
-    <EmbeddedResource Include="..\..\..\contracts\partner-api\carrier-booking.v1.schema.json" LogicalName="PartnerApi/carrier-booking.v1.schema.json" />
+    <EmbeddedResource Include="..\..\..\contracts\partner-api\*.schema.json" LogicalName="PartnerApi/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\contracts\canonical-model\*.json" LogicalName="CanonicalModel/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\carrier-bookings\*.json" LogicalName="PartnerApi/samples/carrier-bookings/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\carrier-answers\*.json" LogicalName="PartnerApi/samples/carrier-answers/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\carrier-answer-responses\*.json" LogicalName="PartnerApi/samples/carrier-answer-responses/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\infra\estate\partner-api\answer-carrier-booking.policy.xml" LogicalName="PartnerApiPolicies/answer-carrier-booking.policy.xml" />
+    <EmbeddedResource Include="..\..\..\src\Integration\AnswerLogicApp\*.json" LogicalName="AnswerLogicApp/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\src\Integration\AnswerLogicApp\carrier-answer\workflow.json" LogicalName="AnswerLogicApp/carrier-answer/workflow.json" />
     <EmbeddedResource Include="..\..\..\src\Integration\BookingLogicApp\*.json" LogicalName="BookingLogicApp/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\src\Integration\BookingLogicApp\carrier-booking\workflow.json" LogicalName="BookingLogicApp/carrier-booking/workflow.json" />
   </ItemGroup>

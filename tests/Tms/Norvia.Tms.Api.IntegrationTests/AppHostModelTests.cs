@@ -59,7 +59,8 @@ public sealed class AppHostModelTests
             .And.Contain("PartnerApi__PersonaClientIds", "brouwer-dranken=norvia-local-persona-brouwer-dranken;van-dijk-transport=norvia-local-persona-van-dijk-transport")
             .And.Contain("PartnerApi__LocalTokens__Roles__brouwer-dranken__0", "TransportOrders.Submit")
             .And.ContainKey("PartnerApi__LocalTokens__SigningKey");
-        portal.Keys.Should().NotContain("PartnerApi__LocalTokens__Roles__van-dijk-transport__0", "a Carrier Persona holds no submit role");
+        portal.Should().Contain("PartnerApi__LocalTokens__Roles__van-dijk-transport__0", "CarrierBookings.Respond", "a Carrier Persona answers its booking requests");
+        portal.Keys.Should().NotContain(key => key.StartsWith("PartnerApi__LocalTokens__Roles__brouwer-dranken__1", StringComparison.Ordinal), "a Shipper Persona holds no respond role");
         portal.Keys.Should().NotContain(key => key.StartsWith("PartnerApi__Entra", StringComparison.Ordinal));
     }
 
@@ -95,6 +96,9 @@ public sealed class AppHostModelTests
 
         partnerApi.Should().Contain("PartnerApi__ShippersByClientId__norvia-local-persona-brouwer-dranken", "SHP-0001");
         partnerApi.Keys.Should().NotContain(key => key.Contains("van-dijk-transport", StringComparison.Ordinal) && key.Contains("ShippersByClientId", StringComparison.Ordinal));
+        partnerApi.Should().Contain("PartnerApi__CarriersByClientId__norvia-local-persona-van-dijk-transport", "CAR-0001");
+        partnerApi.Keys.Should().NotContain(key => key.Contains("brouwer-dranken", StringComparison.Ordinal) && key.Contains("CarriersByClientId", StringComparison.Ordinal));
+        partnerApi.Should().Contain("Tms__AnswerClientId", "norvia-local-answer-logic-app");
     }
 
     [Fact]

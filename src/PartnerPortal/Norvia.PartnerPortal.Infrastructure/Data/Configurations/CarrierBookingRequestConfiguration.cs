@@ -29,6 +29,13 @@ internal sealed class CarrierBookingRequestConfiguration : IEntityTypeConfigurat
         builder.Property(request => request.ShipmentNumber).HasMaxLength(50).IsRequired();
         builder.Property(request => request.CorrelationId).HasMaxLength(200).IsRequired();
 
+        // The words of the answer, as enum names that stay readable in the table and survive a reordering of the enums.
+        builder.Property(request => request.Status).HasConversion<string>().HasMaxLength(30).IsRequired();
+        builder.Property(request => request.AnswerCorrelationId).HasMaxLength(200);
+        builder.Property(request => request.CarrierBookingReference).HasMaxLength(200);
+        builder.Property(request => request.RejectionReason).HasConversion<string>().HasMaxLength(30);
+        builder.Property(request => request.RejectionText).HasMaxLength(1000);
+
         // The Carrier booking number is the key of a Persona's inbox, so a request that arrives twice is stored once.
         builder.HasIndex(request => new { request.PersonaId, request.CarrierBookingNumber }).IsUnique();
         builder.HasIndex(request => new { request.PersonaId, request.ReceivedAt });
