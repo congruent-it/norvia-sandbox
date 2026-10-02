@@ -22,32 +22,13 @@ env:
 
 jobs:
   build:
-    name: Build, format, unit and architecture tests
+    name: Build, format, Bicep and vulnerable packages
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-dotnet@v5
-        with:
-          global-json-file: global.json
-
-      # The TMS UI's, the Partner portal's and the Integration console's stylesheets are built with Tailwind CSS during the
-      # .NET build (ADR 0018, ADR 0022, ADR 0025).
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: |
-            src/Tms/Norvia.Tms.Web/package-lock.json
-            src/PartnerPortal/Norvia.PartnerPortal.Web/package-lock.json
-            src/IntegrationConsole/Norvia.IntegrationConsole.Web/package-lock.json
-
-      - uses: actions/cache@v4
-        with:
-          path: ${{ env.NUGET_PACKAGES }}
-          key: nuget-${{ runner.os }}-${{ hashFiles('global.json', 'Directory.Packages.props', '**/*.csproj', 'dotnet-tools.json') }}
-          restore-keys: nuget-${{ runner.os }}-
+      - uses: ./.github/actions/setup
 
       - name: Restore
         run: |
@@ -79,24 +60,27 @@ jobs:
             exit 1
           fi
 
-      # Each unit test project enforces the 80% line coverage threshold itself (Directory.Build.props).
-      - name: Unit and architecture tests
+      # Every application's tests run in its leg of the integration job. A test project outside every leg would run
+      # nowhere, so a new application's tests either join a leg (or tests/Integration) or fail here.
+      - name: Check that every test project is claimed by a leg
+        run: |
+          claimed=$(yq '.jobs.integration.strategy.matrix.include[].directory' .github/workflows/ci.yml; echo Integration)
+          unclaimed=$(find tests -name '*.csproj' | cut -d/ -f2 | sort -u | grep -vxF "$claimed" || true)
+          if [ -n "$unclaimed" ]; then
+            echo "::error::Test projects under tests/ that no integration leg runs: $unclaimed"
+            exit 1
+          fi
+
+      # The Integration functions have unit tests only, so they run here. Each project enforces the 80% line coverage
+      # threshold itself (Directory.Build.props).
+      - name: Unit tests of the Integration functions
         run: |
           failed=0
-          for project in $(find tests -name '*.UnitTests.csproj' -o -name '*.ArchitectureTests.csproj' | sort); do
+          for project in $(find tests/Integration -name '*.UnitTests.csproj' | sort); do
             dotnet test "$project" --no-build --configuration "$CONFIGURATION" \
               --logger trx --results-directory TestResults || failed=1
           done
           exit $failed
-
-      - name: Coverage summary
-        if: always()
-        run: |
-          if find tests -name coverage.cobertura.xml | grep -q .; then
-            dotnet reportgenerator -reports:"tests/**/coverage.cobertura.xml" -targetdir:TestResults/coverage \
-              -reporttypes:"MarkdownSummaryGithub;Cobertura"
-            cat TestResults/coverage/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
-          fi
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -105,60 +89,67 @@ jobs:
           path: TestResults/
           if-no-files-found: ignore
 
+  # One leg per application, each on a runner of its own with its own Docker daemon, so the AppHosts of the legs
+  # can't clash. There are no path filters: every gate runs on every PR. The AppHost references every application, so
+  # each leg builds the whole solution.
   integration:
-    name: Integration and UI tests (Aspire, SQL Server, Service Bus emulator, Playwright)
+    name: Tests (${{ matrix.application }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - application: TMS
+            directory: Tms
+          - application: Partner portal
+            directory: PartnerPortal
+          - application: Integration console
+            directory: IntegrationConsole
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-dotnet@v5
-        with:
-          global-json-file: global.json
-
-      # The TMS UI's, the Partner portal's and the Integration console's stylesheets are built with Tailwind CSS during the
-      # .NET build (ADR 0018, ADR 0022, ADR 0025).
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: |
-            src/Tms/Norvia.Tms.Web/package-lock.json
-            src/PartnerPortal/Norvia.PartnerPortal.Web/package-lock.json
-            src/IntegrationConsole/Norvia.IntegrationConsole.Web/package-lock.json
-
-      - uses: actions/cache@v4
-        with:
-          path: ${{ env.NUGET_PACKAGES }}
-          key: nuget-${{ runner.os }}-${{ hashFiles('global.json', 'Directory.Packages.props', '**/*.csproj', 'dotnet-tools.json') }}
-          restore-keys: nuget-${{ runner.os }}-
+      - uses: ./.github/actions/setup
 
       - name: Build
-        run: dotnet build Norvia.slnx --configuration "$CONFIGURATION"
+        run: |
+          dotnet tool restore
+          dotnet build Norvia.slnx --configuration "$CONFIGURATION"
 
       # Chromium's system libraries need root, so they are installed here rather than by the UI test fixtures. Every UI
-      # test project uses the same Playwright version, so one install serves them all.
+      # test project uses the same Playwright version, so the leg's own project's script serves.
       - name: Install Playwright's Chromium
-        run: pwsh tests/Tms/Norvia.Tms.Web.UiTests/bin/"$CONFIGURATION"/net10.0/playwright.ps1 install --with-deps chromium
+        run: pwsh tests/${{ matrix.directory }}/*.UiTests/bin/"$CONFIGURATION"/net10.0/playwright.ps1 install --with-deps chromium
 
-      # The test host starts the AppHost, which runs SQL Server and the Service Bus emulator in Docker. UI tests keep
-      # a Playwright trace and video of every failed test.
-      - name: Integration and UI tests
+      # The integration and UI tests start the AppHost, which runs SQL Server and the Service Bus emulator in Docker. UI
+      # tests keep a Playwright trace and video of every failed test. Each project enforces the 80% line coverage
+      # threshold itself (Directory.Build.props).
+      - name: Unit, architecture, integration and UI tests
         env:
           NORVIA_TEST_LOG_FILE: ${{ github.workspace }}/TestResults/tms-api.log
           NORVIA_UI_TEST_ARTIFACTS: ${{ github.workspace }}/TestResults
         run: |
           mkdir -p TestResults
           failed=0
-          for project in $(find tests -name '*.IntegrationTests.csproj' -o -name '*.UiTests.csproj' | sort); do
+          for project in $(find tests/${{ matrix.directory }} \( -name '*.UnitTests.csproj' -o -name '*.ArchitectureTests.csproj' \
+              -o -name '*.IntegrationTests.csproj' -o -name '*.UiTests.csproj' \) | sort); do
             dotnet test "$project" --no-build --configuration "$CONFIGURATION" \
               --logger trx --results-directory TestResults || failed=1
           done
           exit $failed
 
+      - name: Coverage summary
+        if: always()
+        run: |
+          if find tests/${{ matrix.directory }} -name coverage.cobertura.xml | grep -q .; then
+            dotnet reportgenerator -reports:"tests/${{ matrix.directory }}/**/coverage.cobertura.xml" -targetdir:TestResults/coverage \
+              -reporttypes:"MarkdownSummaryGithub;Cobertura"
+            cat TestResults/coverage/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: integration-test-results
+          name: integration-test-results-${{ matrix.directory }}
           path: TestResults/
           if-no-files-found: ignore

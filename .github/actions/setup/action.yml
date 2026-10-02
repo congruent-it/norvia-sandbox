@@ -1,0 +1,27 @@
+# The setup the build job and every integration leg share: .NET, Node (for Tailwind) and the NuGet cache.
+name: Set up the build
+description: Installs .NET and Node and restores the NuGet cache.
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-dotnet@v5
+      with:
+        global-json-file: global.json
+
+    # The TMS UI's, the Partner portal's and the Integration console's stylesheets are built with Tailwind CSS during the
+    # .NET build (ADR 0018, ADR 0022, ADR 0025).
+    - uses: actions/setup-node@v5
+      with:
+        node-version: 22
+        cache: npm
+        cache-dependency-path: |
+          src/Tms/Norvia.Tms.Web/package-lock.json
+          src/PartnerPortal/Norvia.PartnerPortal.Web/package-lock.json
+          src/IntegrationConsole/Norvia.IntegrationConsole.Web/package-lock.json
+
+    - uses: actions/cache@v4
+      with:
+        path: ${{ env.NUGET_PACKAGES }}
+        key: nuget-${{ runner.os }}-${{ hashFiles('global.json', 'Directory.Packages.props', '**/*.csproj', 'dotnet-tools.json') }}
+        restore-keys: nuget-${{ runner.os }}-
