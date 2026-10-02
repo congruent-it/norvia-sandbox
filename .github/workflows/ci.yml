@@ -82,6 +82,15 @@ jobs:
           done
           exit $failed
 
+      - name: Coverage summary
+        if: always()
+        run: |
+          if find tests/Integration -name coverage.cobertura.xml | grep -q .; then
+            dotnet reportgenerator -reports:"tests/Integration/**/coverage.cobertura.xml" -targetdir:TestResults/coverage \
+              -reporttypes:"MarkdownSummaryGithub;Cobertura"
+            cat TestResults/coverage/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
