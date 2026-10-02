@@ -13,7 +13,8 @@ var seedFile = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..
 // serverless (GP_S_Gen5_2) on the free offer. Once a month's free allowance is used, a database bills for what it uses
 // rather than pausing, as the free offer would by default: a paused database fails the migrations and the demo until
 // the month ends.
-var sql = builder.AddAzureSqlServer("sql").RunAsContainer()
+// Locally DbGate runs beside it, to inspect the databases (it is part of the local run only).
+var sql = builder.AddAzureSqlServer("sql").RunAsContainer(container => container.WithDbGate())
     .ConfigureInfrastructure(infrastructure =>
     {
         foreach (var database in infrastructure.GetProvisionableResources().OfType<SqlDatabase>())

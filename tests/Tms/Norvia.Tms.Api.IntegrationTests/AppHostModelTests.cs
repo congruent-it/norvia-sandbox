@@ -102,6 +102,22 @@ public sealed class AppHostModelTests
     }
 
     [Fact]
+    public async Task Locally_ADatabaseViewer_RunsBesideSql_ToInspectTheDatabases()
+    {
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(TestContext.Current.CancellationToken);
+
+        builder.Resources.Should().Contain(resource => resource.Name.Contains("dbgate", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task InAzure_NoDatabaseViewerIsDeployed()
+    {
+        await using var builder = await CreateForAzureAsync();
+
+        builder.Resources.Should().NotContain(resource => resource.Name.Contains("dbgate", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task InAzure_ServiceBus_IsTheEstatesNamespace_WithTheEstatesTopics()
     {
         await using var builder = await CreateForAzureAsync();
