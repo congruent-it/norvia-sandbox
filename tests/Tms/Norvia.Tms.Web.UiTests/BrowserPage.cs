@@ -1,7 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using Microsoft.Playwright;
+using Norvia.Tms.Api.IntegrationTests.TransportOrders;
+using static Microsoft.Playwright.Assertions;
 
 namespace Norvia.Tms.Web.UiTests;
 
@@ -38,6 +41,43 @@ public abstract class BrowserPage(TmsUiFixture tms) : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.Created, await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         var accepted = await response.Content.ReadFromJsonAsync<JsonObject>(TestContext.Current.CancellationToken);
         return accepted!["transportOrderNumber"]!.GetValue<string>();
+    }
+
+    /// <summary>
+    /// Plans a new Transport Order to the Carrier and releases it, and waits until its request is sent to the Carrier's inbox.
+    /// Leaves the Page on the TMS's list of bookings awaiting an answer.
+    /// </summary>
+    protected async Task<(string ShipmentNumber, string BookingNumber)> ReleaseToCarrierAsync(string carrierName)
+    {
+        var shipperReference = $"UI-{Guid.NewGuid():N}"[..20];
+        var number = await SubmitAcceptedAsync(Bookings.Valid(shipperReference));
+
+        await Page.GotoAsync("/");
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Planner" }).ClickAsync();
+        var order = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipperReference });
+        await order.GetByRole(AriaRole.Checkbox, new() { Name = $"Select {number}" }).ClickAsync();
+        var assign = Page.GetByRole(AriaRole.Group, new() { Name = "Assign" });
+        await assign.GetByRole(AriaRole.Combobox, new() { Name = "Assign to" }).ClickAsync();
+        await Page.GetByRole(AriaRole.Option, new() { Name = carrierName }).ClickAsync();
+        await assign.GetByRole(AriaRole.Button, new() { Name = "Assign selected" }).ClickAsync();
+        var planned = Page.GetByRole(AriaRole.List, new() { Name = "Assignment outcomes" }).GetByRole(AriaRole.Status);
+        await Expect(planned).ToContainTextAsync($"Transport Order {number} is planned as Shipment");
+        var shipmentNumber = (await planned.GetByRole(AriaRole.Link).TextContentAsync())!;
+
+        await Page.GetByRole(AriaRole.Link, new() { Name = "Shipments to release" }).ClickAsync();
+        var toRelease = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipmentNumber });
+        await toRelease.GetByRole(AriaRole.Checkbox, new() { Name = $"Select {shipmentNumber}" }).ClickAsync();
+        await Page.GetByRole(AriaRole.Group, new() { Name = "Release" }).GetByRole(AriaRole.Button, new() { Name = "Release selected" }).ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.List, new() { Name = "Release outcomes" }).GetByRole(AriaRole.Status))
+            .ToContainTextAsync($"Shipment {shipmentNumber} is released.");
+
+        await Page.GetByRole(AriaRole.Link, new() { Name = "Bookings awaiting an answer" }).ClickAsync();
+        var awaiting = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipmentNumber });
+        await Expect(awaiting).ToContainTextAsync(carrierName);
+        var withdraw = awaiting.GetByRole(AriaRole.Button, new() { Name = "Withdraw CB-", Exact = false });
+        var bookingNumber = Regex.Match(await withdraw.GetAttributeAsync("aria-label") ?? await withdraw.InnerTextAsync(), @"CB-\d{7}").Value;
+        bookingNumber.Should().NotBeEmpty();
+        return (shipmentNumber, bookingNumber);
     }
 
     public async ValueTask DisposeAsync()

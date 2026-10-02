@@ -33,6 +33,23 @@ public sealed class BookingRequestsTests : PortalWebContext
     }
 
     [Fact]
+    public void Render_ARequestWithAnAutomaticAnswerComingUp_SaysWhen()
+    {
+        Portal.ListCarrierBookingRequestsAsync("van-dijk-transport", Arg.Any<CancellationToken>()).Returns(
+            [Request() with { AutoAnswerMode = CarrierAnswerMode.AutoConfirm, AutoAnswerDueAt = new DateTimeOffset(2026, 10, 2, 9, 0, 5, TimeSpan.Zero) }]);
+
+        RenderPage().Find("tbody tr").TextContent.Should().Contain("Auto-confirms at 11:00:05");
+    }
+
+    [Fact]
+    public void Render_ShowsTheCarriersAnswerMode_EvenWithNoRequests()
+    {
+        Portal.ListCarrierBookingRequestsAsync("van-dijk-transport", Arg.Any<CancellationToken>()).Returns([]);
+
+        RenderPage().Find("[aria-label='Answer mode']").TextContent.Should().Contain("Save answer mode");
+    }
+
+    [Fact]
     public void Render_AsRequestsArrive_ShowsThemWithoutAReload()
     {
         Portal.ListCarrierBookingRequestsAsync("van-dijk-transport", Arg.Any<CancellationToken>()).Returns([], [Request("CB-0000001")]);

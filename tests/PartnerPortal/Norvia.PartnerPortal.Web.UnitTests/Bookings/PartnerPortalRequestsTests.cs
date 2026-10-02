@@ -7,6 +7,7 @@ using Norvia.PartnerPortal.Application.Bookings.List;
 using Norvia.PartnerPortal.Application.Bookings.Submit;
 using Norvia.PartnerPortal.Application.CarrierBookings;
 using Norvia.PartnerPortal.Application.CarrierBookings.Answer;
+using Norvia.PartnerPortal.Application.CarrierBookings.AnswerSettings;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Application.Personas.List;
 using Norvia.PartnerPortal.Domain.Bookings;
@@ -88,5 +89,29 @@ public sealed class PartnerPortalRequestsTests : IDisposable
         var draft = () => _portal.DraftBookingAsync("brouwer-dranken", Xunit.TestContext.Current.CancellationToken);
 
         await draft.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task GetCarrierAnswerSettingsAsync_ReadsTheSettings_OrIsNullWithoutThePersona()
+    {
+        var settings = new CarrierAnswerSettingsView(CarrierAnswerMode.AutoConfirm, CarrierRejectionReason.NoCapacity, 5);
+        _mediator.Send(new GetCarrierAnswerSettingsQuery("kessler-spedition"), Arg.Any<CancellationToken>()).Returns(Result.Success(settings));
+        _mediator.Send(new GetCarrierAnswerSettingsQuery("nobody"), Arg.Any<CancellationToken>()).Returns(Result<CarrierAnswerSettingsView>.NotFound());
+
+        (await _portal.GetCarrierAnswerSettingsAsync("kessler-spedition", Xunit.TestContext.Current.CancellationToken)).Should().Be(settings);
+        (await _portal.GetCarrierAnswerSettingsAsync("nobody", Xunit.TestContext.Current.CancellationToken)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ChangeCarrierAnswerSettingsAsync_ChangesTheSettings_OrIsNullWithoutThePersona()
+    {
+        var settings = new CarrierAnswerSettingsView(CarrierAnswerMode.AutoReject, CarrierRejectionReason.LaneNotServed, 3);
+        _mediator.Send(new ChangeCarrierAnswerSettingsCommand("kessler-spedition", CarrierAnswerMode.AutoReject, CarrierRejectionReason.LaneNotServed, 3), Arg.Any<CancellationToken>())
+            .Returns(Result.Success(settings));
+        _mediator.Send(new ChangeCarrierAnswerSettingsCommand("nobody", CarrierAnswerMode.AutoReject, CarrierRejectionReason.LaneNotServed, 3), Arg.Any<CancellationToken>())
+            .Returns(Result<CarrierAnswerSettingsView>.NotFound());
+
+        (await _portal.ChangeCarrierAnswerSettingsAsync("kessler-spedition", settings, Xunit.TestContext.Current.CancellationToken)).Should().Be(settings);
+        (await _portal.ChangeCarrierAnswerSettingsAsync("nobody", settings, Xunit.TestContext.Current.CancellationToken)).Should().BeNull();
     }
 }

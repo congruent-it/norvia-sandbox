@@ -13,6 +13,10 @@ public static class PortalTime
     public static string Format(DateTimeOffset moment) =>
         TimeZoneInfo.ConvertTime(moment, Rotterdam).ToString(Layout, CultureInfo.InvariantCulture);
 
+    /// <summary>The time of day with seconds, for what happens within a minute of the demo.</summary>
+    public static string FormatTimeOfDay(DateTimeOffset moment) =>
+        TimeZoneInfo.ConvertTime(moment, Rotterdam).ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+
     /// <summary>A local time at an address, as the Carrier booking format gives it. It is already the address's own time, so it isn't converted.</summary>
     public static string FormatLocal(DateTime localTime) => localTime.ToString(Layout, CultureInfo.InvariantCulture);
 

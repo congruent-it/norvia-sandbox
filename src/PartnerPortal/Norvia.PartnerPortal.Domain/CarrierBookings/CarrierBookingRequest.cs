@@ -57,6 +57,14 @@ public sealed class CarrierBookingRequest : EntityBase<CarrierBookingRequestId>,
 
     public string? RejectionText { get; private set; }
 
+    /// <summary>The mode the Carrier's policy had when the request arrived, if it was an automatic one. It stays the request's whatever the policy becomes.</summary>
+    public CarrierAnswerMode? AutoAnswerMode { get; private set; }
+
+    public CarrierRejectionReason? AutoAnswerReason { get; private set; }
+
+    /// <summary>When the automatic answer is due; null for a request answered by hand, and once the request is closed.</summary>
+    public DateTimeOffset? AutoAnswerDueAt { get; private set; }
+
     public bool IsOpen => Status == CarrierBookingRequestStatus.Open;
 
     public static CarrierBookingRequest Receive(
@@ -65,14 +73,17 @@ public sealed class CarrierBookingRequest : EntityBase<CarrierBookingRequestId>,
         string shipmentNumber,
         string correlationId,
         DateTimeOffset receivedAt,
-        CarrierBookingDetails details)
+        CarrierBookingDetails details,
+        ScheduledAnswer? scheduledAnswer = null)
     {
         ArgumentNullException.ThrowIfNull(personaId);
         ArgumentException.ThrowIfNullOrWhiteSpace(carrierBookingNumber);
         ArgumentException.ThrowIfNullOrWhiteSpace(shipmentNumber);
         ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
         ArgumentNullException.ThrowIfNull(details);
-        return new CarrierBookingRequest(CarrierBookingRequestId.New(), personaId, carrierBookingNumber, shipmentNumber, correlationId, receivedAt, details);
+        var request = new CarrierBookingRequest(CarrierBookingRequestId.New(), personaId, carrierBookingNumber, shipmentNumber, correlationId, receivedAt, details);
+        request.SetSchedule(scheduledAnswer);
+        return request;
     }
 
     /// <summary>
@@ -120,9 +131,47 @@ public sealed class CarrierBookingRequest : EntityBase<CarrierBookingRequestId>,
         return true;
     }
 
+    /// <summary>
+    /// The automatic answer that is due at <paramref name="now"/>, confirming with a reference made from
+    /// <paramref name="referencePrefix"/>; null when the request is closed, wasn't scheduled or isn't due yet.
+    /// </summary>
+    public CarrierAnswer? AutoAnswerDue(string referencePrefix, DateTimeOffset now)
+    {
+        if (!IsOpen || AutoAnswerMode is not { } mode || AutoAnswerDueAt is not { } dueAt || dueAt > now)
+        {
+            return null;
+        }
+
+        return mode switch
+        {
+            CarrierAnswerMode.AutoConfirm => new CarrierAnswer.Confirmation(BookingReferencePattern.Generate(referencePrefix, now, CarrierBookingNumber)),
+            CarrierAnswerMode.AutoReject => new CarrierAnswer.Rejection(
+                AutoAnswerReason ?? CarrierRejectionReason.NoCapacity,
+                AutoAnswerReason == CarrierRejectionReason.Other ? "Rejected automatically by the Persona's answer mode." : null),
+            _ => throw new InvalidOperationException($"{mode} schedules no answer."),
+        };
+    }
+
+    /// <summary>Puts the automatic answer off to <paramref name="until"/>, after an attempt that left the request open.</summary>
+    public void DeferAutoAnswer(DateTimeOffset until)
+    {
+        if (IsOpen && AutoAnswerDueAt is not null)
+        {
+            AutoAnswerDueAt = until;
+        }
+    }
+
+    private void SetSchedule(ScheduledAnswer? scheduled)
+    {
+        AutoAnswerMode = scheduled?.Mode;
+        AutoAnswerReason = scheduled?.RejectionReason;
+        AutoAnswerDueAt = scheduled?.DueAt;
+    }
+
     private void Close(string? answerCorrelationId, DateTimeOffset at)
     {
         ClosedAt = at;
+        AutoAnswerDueAt = null;
         AnswerCorrelationId = answerCorrelationId;
     }
 }

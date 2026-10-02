@@ -1,4 +1,5 @@
 using System.Text;
+using Norvia.PartnerPortal.Domain.CarrierBookings;
 using Norvia.PartnerPortal.Domain.Personas;
 using Norvia.PartnerPortal.Infrastructure.Personas;
 
@@ -16,7 +17,49 @@ public sealed class SeedFilePersonaDirectoryTests
         TheSeedFile().All.Select(persona => (persona.Id.Value, persona.DisplayName, persona.PartyType, persona.PartyId))
             .Should().Equal(
                 ("brouwer-dranken", "Brouwer Dranken", PartyType.Shipper, "SHP-0001"),
-                ("van-dijk-transport", "Van Dijk Transport", PartyType.Carrier, "CAR-0001"));
+                ("van-dijk-transport", "Van Dijk Transport", PartyType.Carrier, "CAR-0001"),
+                ("kessler-spedition", "Kessler Spedition", PartyType.Carrier, "CAR-0002"),
+                ("pakketpunt-express", "PakketPunt Express", PartyType.Carrier, "CAR-0003"));
+    }
+
+    [Theory]
+    [InlineData("van-dijk-transport", "VDT", CarrierAnswerMode.Manual)]
+    [InlineData("kessler-spedition", "KES", CarrierAnswerMode.AutoConfirm)]
+    [InlineData("pakketpunt-express", "PKT", CarrierAnswerMode.AutoConfirm)]
+    public void Find_ACarrierPersona_HasItsReferencePrefix_AndDefaultAnswerMode(string persona, string prefix, CarrierAnswerMode mode)
+    {
+        var carrier = TheSeedFile().Find(new PersonaId(persona))!.Carrier!;
+
+        carrier.BookingReferencePrefix.Should().Be(prefix);
+        carrier.DefaultAnswerPolicy.Mode.Should().Be(mode);
+        carrier.DefaultAnswerPolicy.Delay.Should().BePositive();
+    }
+
+    [Fact]
+    public void Find_AShipperPersona_HasNoCarrierProfile() =>
+        TheSeedFile().Find(new PersonaId("brouwer-dranken"))!.Carrier.Should().BeNull();
+
+    [Fact]
+    public void New_ACarrierPersonaWithoutItsCarrierSection_Throws()
+    {
+        var read = () => Read("""
+            { "shippers": [], "carriers": [{ "id": "CAR-0001" }],
+              "personas": [{ "id": "ghost", "displayName": "Ghost", "party": { "type": "Carrier", "id": "CAR-0001" } }] }
+            """);
+
+        read.Should().Throw<InvalidDataException>().WithMessage("*ghost*carrier*");
+    }
+
+    [Fact]
+    public void New_ACarrierPersonaWithoutAReferencePrefix_Throws()
+    {
+        var read = () => Read("""
+            { "shippers": [], "carriers": [{ "id": "CAR-0001" }],
+              "personas": [{ "id": "ghost", "displayName": "Ghost", "party": { "type": "Carrier", "id": "CAR-0001" },
+                "carrier": { "bookingReferencePrefix": " ", "answer": { "mode": "Manual", "rejectionReason": "NoCapacity", "delaySeconds": 5 } } }] }
+            """);
+
+        read.Should().Throw<InvalidDataException>().WithMessage("*prefix*");
     }
 
     [Fact]

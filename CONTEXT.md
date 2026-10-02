@@ -319,6 +319,10 @@ _Avoid_: Shipper API (that is the intake channel), gateway, public API
 One fictional party (a specific Shipper or Carrier) as played in the Partner portal, with its own identity towards Norvia.
 _Avoid_: user, role, tenant
 
+**Answer mode**:
+How a Carrier Persona answers the booking requests that reach its inbox: Manual, Auto-confirm, or Auto-reject with a chosen reason code, after a delay. The presenter sets it on the Persona's own page in the Partner portal, and a request keeps the mode it arrived with. An automatic answer goes through API Management exactly as a Confirm or Reject does.
+_Avoid_: auto-reply, bot mode
+
 **Persona switcher**:
 The control in the Partner portal that chooses which Persona the presenter plays. Everything done after choosing one is done as that party, towards Norvia.
 _Avoid_: login, impersonation, role switcher (that is for Norvia's own users)

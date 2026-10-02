@@ -2,6 +2,8 @@ using AngleSharp.Dom;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using Microsoft.FluentUI.AspNetCore.Components;
+using Norvia.PartnerPortal.Application.CarrierBookings.AnswerSettings;
+using Norvia.PartnerPortal.Domain.CarrierBookings;
 using Norvia.PartnerPortal.Web.Bookings;
 
 namespace Norvia.PartnerPortal.Web.UnitTests;
@@ -16,6 +18,8 @@ public abstract class PortalWebContext : BunitContext
         Services.AddSingleton(Portal);
         Services.AddSingleton<TimeProvider>(Time);
         Portal.ListPersonasAsync(Arg.Any<CancellationToken>()).Returns(Samples.Personas);
+        Portal.GetCarrierAnswerSettingsAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new CarrierAnswerSettingsView(CarrierAnswerMode.Manual, CarrierRejectionReason.NoCapacity, 5));
     }
 
     protected FakeTimeProvider Time { get; } = new();

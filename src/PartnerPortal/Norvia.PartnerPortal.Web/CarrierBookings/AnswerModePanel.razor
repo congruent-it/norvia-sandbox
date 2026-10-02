@@ -1,0 +1,137 @@
+@* How this Carrier Persona answers the booking requests that reach it: set on its own page, never on the presenter panel. *@
+@inject IPartnerPortal Portal
+@inject ILogger<AnswerModePanel> Logger
+
+<div role="group" aria-label="Answer mode" class="mb-8 max-w-3xl border border-border p-6">
+    <h2 class="mt-0">Answer mode</h2>
+    @if (_loadFailed)
+    {
+        <div role="alert">
+            <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+                The answer mode couldn't be loaded. Reload the page to try again.
+            </FluentMessageBar>
+        </div>
+    }
+    else if (_form is null)
+    {
+        <div role="status">Loading the answer mode…</div>
+    }
+    else
+    {
+        <p class="mt-0 text-sm">
+            How this Carrier answers the requests that reach it from now on. A request already in the inbox keeps the mode it arrived with.
+        </p>
+        <EditForm Model="_form" OnValidSubmit="SaveAsync" FormName="answer-mode">
+            <DataAnnotationsValidator />
+            <div class="grid gap-4">
+                <div>
+                    <label for="@ModeId" class="lux-label">Mode</label>
+                    <InputSelect TValue="CarrierAnswerMode" id="@ModeId" class="lux-input" @bind-Value="_form.Mode">
+                        @foreach (var mode in Enum.GetValues<CarrierAnswerMode>())
+                        {
+                            <option value="@mode">@AnswerModeText.Of(mode)</option>
+                        }
+                    </InputSelect>
+                </div>
+                @if (_form.Mode == CarrierAnswerMode.AutoReject)
+                {
+                    <div>
+                        <label for="@ReasonId" class="lux-label">Rejection reason</label>
+                        <InputSelect TValue="CarrierRejectionReason" id="@ReasonId" class="lux-input" @bind-Value="_form.Reason">
+                            @foreach (var reason in Enum.GetValues<CarrierRejectionReason>())
+                            {
+                                <option value="@reason">@RequestStatusText.Reason(reason)</option>
+                            }
+                        </InputSelect>
+                    </div>
+                }
+                @if (_form.Mode != CarrierAnswerMode.Manual)
+                {
+                    <div>
+                        <label for="@DelayId" class="lux-label">Delay before the answer (seconds)</label>
+                        <InputNumber TValue="int" id="@DelayId" class="lux-input" @bind-Value="_form.DelaySeconds" />
+                        <FluentValidationMessage For="() => _form.DelaySeconds" />
+                    </div>
+                }
+            </div>
+            <div class="mt-4 flex flex-wrap items-center gap-4">
+                <FluentButton Type="ButtonType.Submit" Appearance="Appearance.Accent" Disabled="_saving">Save answer mode</FluentButton>
+            </div>
+        </EditForm>
+        @if (_saved)
+        {
+            <div role="status" class="mt-4">
+                <FluentMessageBar Intent="MessageIntent.Success" AllowDismiss="false">
+                    Saved. The next request is answered this way.
+                </FluentMessageBar>
+            </div>
+        }
+        @if (_saveFailed)
+        {
+            <div role="alert" class="mt-4">
+                <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+                    The answer mode couldn't be saved. Try again.
+                </FluentMessageBar>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private const string ModeId = "answer-mode";
+    private const string ReasonId = "answer-rejection-reason";
+    private const string DelayId = "answer-delay-seconds";
+
+    private AnswerModeForm? _form;
+    private bool _loadFailed;
+    private bool _saving;
+    private bool _saved;
+    private bool _saveFailed;
+
+    [Parameter, EditorRequired]
+    public string PersonaId { get; set; } = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _form = null;
+        _saved = false;
+        try
+        {
+            _form = await Portal.GetCarrierAnswerSettingsAsync(PersonaId, CancellationToken.None) is { } settings ? AnswerModeForm.From(settings) : null;
+            _loadFailed = _form is null;
+        }
+        catch (Exception exception)
+        {
+            PageLog.AnswerModeLoadFailed(Logger, exception, PersonaId);
+            _loadFailed = true;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _saved = false;
+        _saveFailed = false;
+        try
+        {
+            if (await Portal.ChangeCarrierAnswerSettingsAsync(PersonaId, _form!.ToSettings(), CancellationToken.None) is { } settings)
+            {
+                _form = AnswerModeForm.From(settings);
+                _saved = true;
+            }
+            else
+            {
+                _saveFailed = true;
+            }
+        }
+        catch (Exception exception)
+        {
+            PageLog.AnswerModeSaveFailed(Logger, exception, PersonaId);
+            _saveFailed = true;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}
