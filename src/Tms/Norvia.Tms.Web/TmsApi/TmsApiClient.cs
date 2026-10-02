@@ -126,7 +126,7 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
             // A refused reassignment: its problem's detail is the refusal's readable message, and its code says which rule.
             case HttpStatusCode.NotFound or HttpStatusCode.Conflict or HttpStatusCode.UnprocessableEntity:
                 return new ReassignAnswer.Refused(
-                    await RefuseShipmentCommandAsync(response, TmsCommand.Reassignment, shipmentNumber, "reassigned", cancellationToken));
+                    await RefuseAsync(response, TmsCommand.Reassignment, $"Shipment {shipmentNumber}", "reassigned", shipmentNumber, cancellationToken: cancellationToken));
             default:
                 throw Unexpected(response, "a reassignment");
         }
@@ -152,7 +152,7 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
             // A refused release: its problem's detail is the refusal's readable message, and its code says which rule.
             case HttpStatusCode.NotFound or HttpStatusCode.Conflict:
                 return new ReleaseAnswer.Refused(
-                    await RefuseShipmentCommandAsync(response, TmsCommand.Release, shipmentNumber, "released", cancellationToken));
+                    await RefuseAsync(response, TmsCommand.Release, $"Shipment {shipmentNumber}", "released", shipmentNumber, cancellationToken: cancellationToken));
             default:
                 throw Unexpected(response, "a release");
         }
@@ -177,29 +177,24 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
                 return new WithdrawAnswer.Withdrawn();
             // A refused withdrawal: its problem's detail is the refusal's readable message, and its code says which rule.
             case HttpStatusCode.NotFound or HttpStatusCode.Conflict:
-                var problem = await response.Content.ReadFromJsonAsync<Refusal>(Json, cancellationToken);
-                var reason = problem?.Detail ?? $"Carrier booking {carrierBookingNumber} can't be withdrawn.";
-                using (Track(Flows.TransportPlanning, null, TrackingKeys.Refused, problem?.Code, problem?.CorrelationId, carrierBookingNumber: carrierBookingNumber))
-                {
-                    LogWithdrawalRefused(carrierBookingNumber, reason);
-                }
-
-                return new WithdrawAnswer.Refused(reason);
+                return new WithdrawAnswer.Refused(
+                    await RefuseAsync(response, TmsCommand.Withdrawal, $"Carrier booking {carrierBookingNumber}", "withdrawn", carrierBookingNumber: carrierBookingNumber, cancellationToken: cancellationToken));
             default:
                 throw Unexpected(response, "a withdrawal");
         }
     }
 
-    // What a refused reassignment or release shares: reading the problem, tracing the refusal on the trail it names, and
-    // answering with its readable reason.
-    private async Task<string> RefuseShipmentCommandAsync(
-        HttpResponseMessage response, TmsCommand command, string shipmentNumber, string action, CancellationToken cancellationToken)
+    // What a refused reassignment, release or withdrawal shares: reading the problem, tracing the refusal on the trail it
+    // names, and answering with its readable reason.
+    private async Task<string> RefuseAsync(
+        HttpResponseMessage response, TmsCommand command, string subject, string action, string? shipmentNumber = null, string? carrierBookingNumber = null,
+        CancellationToken cancellationToken = default)
     {
         var problem = await response.Content.ReadFromJsonAsync<Refusal>(Json, cancellationToken);
-        var reason = problem?.Detail ?? $"Shipment {shipmentNumber} can't be {action}.";
-        using (Track(Flows.TransportPlanning, null, TrackingKeys.Refused, problem?.Code, problem?.CorrelationId, shipmentNumber: shipmentNumber))
+        var reason = problem?.Detail ?? $"{subject} can't be {action}.";
+        using (Track(Flows.TransportPlanning, null, TrackingKeys.Refused, problem?.Code, problem?.CorrelationId, shipmentNumber: shipmentNumber, carrierBookingNumber: carrierBookingNumber))
         {
-            LogShipmentRefused(command, shipmentNumber, reason);
+            LogRefusedSubject(command, subject, reason);
         }
 
         return reason;
@@ -270,11 +265,8 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
     [LoggerMessage(Level = LogLevel.Information, Message = "Carrier booking {CarrierBookingNumber} withdrawn")]
     private partial void LogWithdrawn(string carrierBookingNumber);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Withdrawal of Carrier booking {CarrierBookingNumber} refused: {Reason}")]
-    private partial void LogWithdrawalRefused(string carrierBookingNumber, string reason);
-
-    [LoggerMessage(Level = LogLevel.Information, Message = "{Command} of Shipment {ShipmentNumber} refused: {Reason}")]
-    private partial void LogShipmentRefused(TmsCommand command, string shipmentNumber, string reason);
+    [LoggerMessage(Level = LogLevel.Information, Message = "{Command} of {Subject} refused: {Reason}")]
+    private partial void LogRefusedSubject(TmsCommand command, string subject, string reason);
 
     private enum TmsCommand
     {
@@ -282,6 +274,7 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
         Assignment,
         Reassignment,
         Release,
+        Withdrawal,
     }
 
     // What the TMS API answers a re-rate, as far as the TMS UI reads it.
