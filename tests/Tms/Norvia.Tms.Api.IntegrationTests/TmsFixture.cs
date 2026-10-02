@@ -82,6 +82,8 @@ public class TmsFixture : IAsyncLifetime
         var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(
             [$"Parameters:{LocalTokens.SigningKeyParameter}={_tokenSigningKey}"],
             startup.Token);
+        // The tests play the P4 booking Logic App themselves, with CarrierReport, so no worker may report on a booking too (ADR 0030).
+        builder.Resources.Remove(builder.Resources.Single(resource => resource.Name == "booking-worker"));
         foreach (var topicName in new[] { TransportOrderEventsTopic, ShipmentEventsTopic })
         {
             var topic = builder.Resources.OfType<AzureServiceBusTopicResource>().Single(t => t.TopicName == topicName);
