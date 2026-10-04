@@ -107,7 +107,7 @@ public sealed class TrackingEventRecordTests(ControlledClockTmsFixture tms) : IC
         recorded["repeat"]!.GetValue<bool>().Should().BeFalse();
         recorded["movedShipment"]!.GetValue<bool>().Should().BeFalse();
         recorded["shipmentStatus"]!.GetValue<string>().Should().Be("Collected");
-        await Task.Delay(TimeSpan.FromSeconds(2), _cancellationToken); // Lets the outbox run, so a message that shouldn't be sent would show up.
+        await TmsFixture.SettleOutboxAsync(_cancellationToken);
         tms.Published.Where(m => m.CorrelationId == correlationId).Should().BeEmpty("a change that wasn't made isn't published");
         tms.Published.Count(m => m.Subject == "ShipmentCollected" && CarrierBookingCalls.NamesShipment(m, shipmentNumber)).Should().Be(1);
     }

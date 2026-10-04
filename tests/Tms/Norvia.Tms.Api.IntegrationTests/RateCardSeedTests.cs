@@ -43,7 +43,7 @@ public sealed class RateCardSeedTests
         CollectLogs(app, "tms-api", logs, timeout.Token);
         while (!logs.Any(line => line.Contains("Zones overlap", StringComparison.Ordinal)))
         {
-            await Task.Delay(TimeSpan.FromMilliseconds(200), timeout.Token);
+            await Task.Delay(TmsFixture.PollInterval, timeout.Token);
         }
 
         logs.Should().Contain(line => line.Contains("Rotterdam and Rijnmond both claim NL 31", StringComparison.Ordinal));

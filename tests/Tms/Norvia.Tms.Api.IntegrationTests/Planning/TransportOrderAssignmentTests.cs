@@ -162,7 +162,7 @@ public sealed class TransportOrderAssignmentTests(TmsFixture tms)
         repeat["shipmentNumber"]!.GetValue<string>().Should().Be(planned["shipmentNumber"]!.GetValue<string>());
         repeat["correlationId"]!.GetValue<string>().Should().Be(planned["correlationId"]!.GetValue<string>());
         repeat["repeat"]!.GetValue<bool>().Should().BeTrue();
-        await Task.Delay(TimeSpan.FromSeconds(3), _cancellationToken); // Let the outbox run, so an event would show up.
+        await TmsFixture.SettleOutboxAsync(_cancellationToken);
         tms.ShipmentsPlannedFor(number).Should().ContainSingle("a retry plans nothing, so it publishes nothing");
     }
 
@@ -212,7 +212,7 @@ public sealed class TransportOrderAssignmentTests(TmsFixture tms)
         problem["detail"]!.GetValue<string>().Should().Contain(shipmentNumber);
         (await tms.GetTransportOrderAsync(number, _cancellationToken))["shipmentNumber"]!.GetValue<string>().Should().Be(shipmentNumber);
         (await tms.GetShipmentAsync(shipmentNumber, _cancellationToken))["carriedBy"]!["assignedTo"]!.GetValue<string>().Should().Be("Carrier");
-        await Task.Delay(TimeSpan.FromSeconds(3), _cancellationToken); // Let the outbox run, so an event would show up.
+        await TmsFixture.SettleOutboxAsync(_cancellationToken);
         tms.ShipmentsPlannedFor(number).Should().ContainSingle("a refused assignment publishes nothing");
     }
 
@@ -230,7 +230,7 @@ public sealed class TransportOrderAssignmentTests(TmsFixture tms)
         var order = await tms.GetTransportOrderAsync(number, _cancellationToken);
         order["status"]!.GetValue<string>().Should().Be("Accepted");
         order["shipmentNumber"].Should().BeNull();
-        await Task.Delay(TimeSpan.FromSeconds(3), _cancellationToken); // Let the outbox run, so an event would show up.
+        await TmsFixture.SettleOutboxAsync(_cancellationToken);
         tms.ShipmentsPlannedFor(number).Should().BeEmpty("a refused assignment publishes nothing");
     }
 

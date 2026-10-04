@@ -102,7 +102,7 @@ public sealed class TransportOrderIntakeAuthorizationTests(TmsFixture tms)
         timeout.CancelAfter(Timeout);
         while (!tms.Published.Any(message => message.CorrelationId == marker))
         {
-            await Task.Delay(TimeSpan.FromMilliseconds(200), timeout.Token);
+            await Task.Delay(TmsFixture.PollInterval, timeout.Token);
         }
     }
 

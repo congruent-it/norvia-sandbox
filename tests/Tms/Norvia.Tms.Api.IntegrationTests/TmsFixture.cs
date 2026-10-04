@@ -46,6 +46,15 @@ public class TmsFixture : IAsyncLifetime
 
     /// <summary>The client ID the TMS takes as the WMS handoff's caller. No WMS exists yet, so only the tests call as it.</summary>
     public const string WmsClientId = "norvia-test-wms";
+
+    /// <summary>How often the TMS's outbox looks for a message to publish; quick, so tests don't wait for it.</summary>
+    private static readonly TimeSpan OutboxPollingInterval = TimeSpan.FromMilliseconds(100);
+
+    /// <summary>How long the outbox runs after an event arrives, a few cycles, so a duplicate or an event that shouldn't be sent would show up.</summary>
+    private static readonly TimeSpan OutboxSettleTime = OutboxPollingInterval * 8;
+
+    /// <summary>How often a test looks again for something it waits for.</summary>
+    public static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(50);
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
     private readonly string _tokenSigningKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
@@ -137,11 +146,15 @@ public class TmsFixture : IAsyncLifetime
         ["Seed__Path"] = Path.Combine(AppContext.BaseDirectory, "Seed", "tms.test-seed.json"),
         ["IntakeCallers__ClientIdsByChannel__Wms__0"] = WmsClientId,
         ["Rating__SweepInterval"] = "01:00:00",
+        ["Outbox__PollingInterval"] = OutboxPollingInterval.ToString("c", System.Globalization.CultureInfo.InvariantCulture),
 
         // A test run has no dashboard to take the TMS's telemetry, and a TMS that stops keeps trying to flush it there
         // for seconds, too long for a restart. Tests read the TMS's console logs instead.
         ["OTEL_EXPORTER_OTLP_ENDPOINT"] = "",
     };
+
+    /// <summary>Lets the outbox run a few cycles, so an event that shouldn't be sent, or a duplicate, would show up.</summary>
+    public static Task SettleOutboxAsync(CancellationToken cancellationToken) => Task.Delay(OutboxSettleTime, cancellationToken);
 
     /// <summary>Waits for the TMS to write a log that matches, as logs arrive a moment after the call.</summary>
     public async Task<TmsLog> TmsLogAsync(Func<TmsLog, bool> match, CancellationToken cancellationToken)
@@ -150,7 +163,7 @@ public class TmsFixture : IAsyncLifetime
         timeout.CancelAfter(TimeSpan.FromSeconds(30));
         while (!_tmsLogs.Any(match))
         {
-            await Task.Delay(TimeSpan.FromMilliseconds(200), timeout.Token);
+            await Task.Delay(PollInterval, timeout.Token);
         }
 
         return _tmsLogs.First(match);

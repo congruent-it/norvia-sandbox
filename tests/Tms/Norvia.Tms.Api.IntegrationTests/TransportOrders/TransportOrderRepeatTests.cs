@@ -12,7 +12,6 @@ namespace Norvia.Tms.Api.IntegrationTests.TransportOrders;
 public sealed class TransportOrderRepeatTests(TmsFixture tms)
 {
     private static readonly TimeSpan EventTimeout = TimeSpan.FromSeconds(30);
-    private static readonly TimeSpan OutboxSettleTime = TimeSpan.FromSeconds(3);
     private readonly CancellationToken _cancellationToken = TestContext.Current.CancellationToken;
 
     [Fact]
@@ -45,7 +44,7 @@ public sealed class TransportOrderRepeatTests(TmsFixture tms)
         using var again = await SubmitAsync(booking, againCorrelationId);
         again.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        await Task.Delay(OutboxSettleTime, _cancellationToken);
+        await TmsFixture.SettleOutboxAsync(_cancellationToken);
         tms.Published.Should().NotContain(m => m.CorrelationId == againCorrelationId);
         tms.Published.Where(m => m.Subject == "TransportOrderAccepted" && Equals(m.ApplicationProperties.GetValueOrDefault("transportOrderNumber"), number))
             .Should().ContainSingle("the original acceptance is the only acceptance of this Transport Order");
@@ -199,10 +198,10 @@ public sealed class TransportOrderRepeatTests(TmsFixture tms)
         timeout.CancelAfter(EventTimeout);
         while (!tms.Published.Any(m => m.CorrelationId == correlationId))
         {
-            await Task.Delay(TimeSpan.FromMilliseconds(200), timeout.Token);
+            await Task.Delay(TmsFixture.PollInterval, timeout.Token);
         }
 
-        await Task.Delay(OutboxSettleTime, _cancellationToken);
+        await TmsFixture.SettleOutboxAsync(_cancellationToken);
         return [.. tms.Published.Where(m => m.CorrelationId == correlationId)];
     }
 }
