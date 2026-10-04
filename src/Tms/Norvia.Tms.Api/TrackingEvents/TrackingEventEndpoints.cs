@@ -71,7 +71,7 @@ public static class TrackingEventEndpoints
                 correlationId!),
             cancellationToken);
 
-        return result.IsSuccess ? TypedResults.Ok(result.Value) : Refused(result, correlationId!);
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : RefusalProblem.Of<TrackingEventRefusalCode, RecordTrackingResult>(result, "The Tracking event can't be recorded.", correlationId!, StatusCodeOf);
     }
 
     /// <summary>The call's errors: the <see cref="TransportOrderEndpoints.CorrelationIdHeader"/>, and the fields the Canonical Model requires beyond their type.</summary>
@@ -115,17 +115,6 @@ public static class TrackingEventEndpoints
         }
 
         return errors;
-    }
-
-    /// <summary>The problem for a refused call, with a status that says which rule it broke, its stable code and the call's own correlation ID.</summary>
-    private static ProblemHttpResult Refused(Result<RecordTrackingResult> result, string correlationId)
-    {
-        var refusal = result.ValidationErrors.First();
-        return TypedResults.Problem(
-            statusCode: StatusCodeOf(Enum.Parse<TrackingEventRefusalCode>(refusal.ErrorCode)),
-            title: "The Tracking event can't be recorded.",
-            detail: refusal.ErrorMessage,
-            extensions: new Dictionary<string, object?> { ["code"] = refusal.ErrorCode, ["correlationId"] = correlationId });
     }
 
     private static int StatusCodeOf(TrackingEventRefusalCode code) => code switch
