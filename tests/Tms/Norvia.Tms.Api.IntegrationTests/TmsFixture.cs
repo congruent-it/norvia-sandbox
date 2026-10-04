@@ -58,6 +58,7 @@ public class TmsFixture : IAsyncLifetime
     public static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(50);
 
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan StartAttemptTimeout = TimeSpan.FromMinutes(3);
     private const int StartAttempts = 3;
     private readonly string _tokenSigningKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
@@ -95,21 +96,35 @@ public class TmsFixture : IAsyncLifetime
 
     public async ValueTask InitializeAsync()
     {
-        using var startup = new CancellationTokenSource(StartupTimeout);
+        using var startup = new CancellationTokenSource(StartAttempts * StartAttemptTimeout);
 
-        // The Service Bus emulator now and then crashes as it starts (exit code 139), which leaves the TMS API waiting for
-        // it for good. A crashed container ends the attempt at once, and the AppHost starts again from scratch.
+        // The AppHost now and then doesn't come up on a CI runner: the Service Bus emulator crashes as it starts (exit
+        // code 139), or something else keeps the TMS API waiting for good. A crashed container ends the attempt at once,
+        // a slow one after StartAttemptTimeout, and the AppHost starts again from scratch. What each attempt found is kept.
         for (var attempt = 1; ; attempt++)
         {
+            using var attemptTimeout = CancellationTokenSource.CreateLinkedTokenSource(startup.Token);
+            attemptTimeout.CancelAfter(StartAttemptTimeout);
             try
             {
-                await StartAppAsync(startup.Token);
+                await StartAppAsync(attemptTimeout.Token);
                 break;
             }
-            catch (ContainerExitedException) when (attempt < StartAttempts)
+            catch (Exception ex) when (ex is ContainerExitedException || (ex is OperationCanceledException && !startup.IsCancellationRequested))
             {
+                var description = await DescribeResourcesAsync();
+                var logFile = Environment.GetEnvironmentVariable("NORVIA_TEST_LOG_FILE");
+                if (!string.IsNullOrEmpty(logFile))
+                {
+                    await File.AppendAllTextAsync(logFile, $"AppHost start attempt {attempt} failed: {ex.Message}{Environment.NewLine}{description}{Environment.NewLine}", CancellationToken.None);
+                }
+
                 await _app!.DisposeAsync();
                 _app = null;
+                if (attempt == StartAttempts)
+                {
+                    throw new InvalidOperationException($"The AppHost did not start in {attempt} attempts. The last found:{Environment.NewLine}{description}", ex);
+                }
             }
         }
 
@@ -184,6 +199,51 @@ public class TmsFixture : IAsyncLifetime
         // The attempt succeeded, so the watch for an exit ends without failing anything.
         await attempt.CancelAsync();
         await exited.ContinueWith(_ => { }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
+    }
+
+    /// <summary>What every resource of the AppHost is doing, with the end of the log of those that are not running.</summary>
+    private async Task<string> DescribeResourcesAsync()
+    {
+        var model = _app!.Services.GetRequiredService<DistributedApplicationModel>();
+        var logger = _app.Services.GetRequiredService<ResourceLoggerService>();
+        var description = new StringBuilder();
+        foreach (var resource in model.Resources)
+        {
+            if (!_app.ResourceNotifications.TryGetCurrentState(resource.Name, out var current))
+            {
+                description.AppendLine(CultureInfo.InvariantCulture, $"{resource.Name}: no state");
+                continue;
+            }
+
+            var state = current.Snapshot.State?.Text;
+            description.AppendLine(CultureInfo.InvariantCulture, $"{resource.Name}: {state}, health {current.Snapshot.HealthStatus}, exit code {current.Snapshot.ExitCode}");
+            if (state is "Running" or "Finished" or null)
+            {
+                continue;
+            }
+
+            using var replay = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            var lines = new List<string>();
+            try
+            {
+                await foreach (var batch in logger.WatchAsync(resource).WithCancellation(replay.Token))
+                {
+                    lines.AddRange(batch.Select(line => line.Content));
+                    break;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // No log was written.
+            }
+
+            foreach (var line in lines.TakeLast(25))
+            {
+                description.AppendLine(CultureInfo.InvariantCulture, $"    {line}");
+            }
+        }
+
+        return description.ToString();
     }
 
     private async Task WaitForAContainerToExitAsync(CancellationToken cancellationToken)
