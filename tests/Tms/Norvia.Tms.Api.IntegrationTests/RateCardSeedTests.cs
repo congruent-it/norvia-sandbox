@@ -12,7 +12,7 @@ namespace Norvia.Tms.Api.IntegrationTests;
 /// A Rate Card whose Zones overlap is a broken seed: the TMS refuses to start on it rather than rate against it. The
 /// test runs an AppHost of its own, whose TMS API reads a seed where two Zones claim the same postcode prefix.
 /// </summary>
-[Trait("AppHost", "Own")]
+[Trait("AppHost", "Own1")]
 public sealed class RateCardSeedTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromMinutes(5);
