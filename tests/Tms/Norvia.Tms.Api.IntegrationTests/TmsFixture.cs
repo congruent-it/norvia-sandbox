@@ -58,6 +58,7 @@ public class TmsFixture : IAsyncLifetime
     public static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(50);
 
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
+    private const int StartAttempts = 3;
     private readonly string _tokenSigningKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
     private readonly ConcurrentQueue<ServiceBusReceivedMessage> _published = new();
@@ -96,9 +97,48 @@ public class TmsFixture : IAsyncLifetime
     {
         using var startup = new CancellationTokenSource(StartupTimeout);
 
+        // The Service Bus emulator now and then crashes as it starts (exit code 139), which leaves the TMS API waiting for
+        // it for good. A crashed container ends the attempt at once, and the AppHost starts again from scratch.
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                await StartAppAsync(startup.Token);
+                break;
+            }
+            catch (ContainerExitedException) when (attempt < StartAttempts)
+            {
+                await _app!.DisposeAsync();
+                _app = null;
+            }
+        }
+
+        Tms = CreateTmsClient(IssueToken([IntakeRole]));
+        TmsUi = CreateTmsClient(IssueToken([ManageRole], clientId: LocalTokens.TmsUiClientId));
+        CarrierAnswer = CreateTmsClient(IssueToken([AnswerRole], clientId: "norvia-test-carrier-answer-logic-app"));
+        CarrierReport = CreateTmsClient(IssueToken([ReportRole], clientId: "norvia-test-p4-booking-logic-app"));
+        TrackingRecord = CreateTmsClient(IssueToken([TrackingRecordRole], clientId: "norvia-test-carrier-tracking-logic-app"));
+
+        _serviceBus = new ServiceBusClient(await _app!.GetConnectionStringAsync("messaging", startup.Token));
+        foreach (var topicName in new[] { TransportOrderEventsTopic, ShipmentEventsTopic })
+        {
+            var processor = _serviceBus.CreateProcessor(topicName, TestSubscription);
+            processor.ProcessMessageAsync += args =>
+            {
+                _published.Enqueue(args.Message);
+                return Task.CompletedTask;
+            };
+            processor.ProcessErrorAsync += _ => Task.CompletedTask;
+            _processors.Add(processor);
+            await processor.StartProcessingAsync(startup.Token);
+        }
+    }
+
+    private async Task StartAppAsync(CancellationToken cancellationToken)
+    {
         var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(
             [$"Parameters:{LocalTokens.SigningKeyParameter}={_tokenSigningKey}"],
-            startup.Token);
+            cancellationToken);
         builder.RemoveWhatTheTmsApiTestsDontUse();
         foreach (var topicName in new[] { TransportOrderEventsTopic, ShipmentEventsTopic })
         {
@@ -115,30 +155,47 @@ public class TmsFixture : IAsyncLifetime
             tmsApi.WithEnvironment(name, value);
         }
 
-        _app = await builder.BuildAsync(startup.Token);
-        await _app.StartAsync(startup.Token);
-        CollectTmsLogs();
-        await _app.ResourceNotifications.WaitForResourceHealthyAsync("tms-api", startup.Token);
+        _app = await builder.BuildAsync(cancellationToken);
 
-        Tms = CreateTmsClient(IssueToken([IntakeRole]));
-        TmsUi = CreateTmsClient(IssueToken([ManageRole], clientId: LocalTokens.TmsUiClientId));
-        CarrierAnswer = CreateTmsClient(IssueToken([AnswerRole], clientId: "norvia-test-carrier-answer-logic-app"));
-        CarrierReport = CreateTmsClient(IssueToken([ReportRole], clientId: "norvia-test-p4-booking-logic-app"));
-        TrackingRecord = CreateTmsClient(IssueToken([TrackingRecordRole], clientId: "norvia-test-carrier-tracking-logic-app"));
-
-        _serviceBus = new ServiceBusClient(await _app.GetConnectionStringAsync("messaging", startup.Token));
-        foreach (var topicName in new[] { TransportOrderEventsTopic, ShipmentEventsTopic })
+        // Starting completes only once every resource has, so a container that exits is watched for meanwhile.
+        using var attempt = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var starting = _app.StartAsync(attempt.Token);
+        var healthy = _app.ResourceNotifications.WaitForResourceHealthyAsync("tms-api", attempt.Token);
+        var exited = WaitForAContainerToExitAsync(attempt.Token);
+        var started = Task.WhenAll(starting, healthy);
+        try
         {
-            var processor = _serviceBus.CreateProcessor(topicName, TestSubscription);
-            processor.ProcessMessageAsync += args =>
+            if (await Task.WhenAny(started, exited) == exited)
             {
-                _published.Enqueue(args.Message);
-                return Task.CompletedTask;
-            };
-            processor.ProcessErrorAsync += _ => Task.CompletedTask;
-            _processors.Add(processor);
-            await processor.StartProcessingAsync(startup.Token);
+                await exited;
+            }
+
+            await started;
+            CollectTmsLogs();
         }
+        catch
+        {
+            // Ends the waits that would never finish, as what they wait for has gone.
+            await attempt.CancelAsync();
+            await Task.WhenAll(started, exited).ContinueWith(_ => { }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
+            throw;
+        }
+
+        // The attempt succeeded, so the watch for an exit ends without failing anything.
+        await attempt.CancelAsync();
+        await exited.ContinueWith(_ => { }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
+    }
+
+    private async Task WaitForAContainerToExitAsync(CancellationToken cancellationToken)
+    {
+        var containerResources = _app!.Services.GetRequiredService<DistributedApplicationModel>().Resources.Where(resource => resource.Annotations.OfType<ContainerImageAnnotation>().Any());
+        var exits = containerResources.Select(async container =>
+        {
+            var exited = await _app.ResourceNotifications.WaitForResourceAsync(
+                container.Name, state => KnownResourceStates.TerminalStates.Contains(state.Snapshot.State?.Text), cancellationToken);
+            throw new ContainerExitedException(container.Name, exited.Snapshot.ExitCode);
+        });
+        await await Task.WhenAny(exits);
     }
 
     /// <summary>What the fixture sets on the TMS API on top of what the AppHost gives it, as environment variables.</summary>
@@ -272,3 +329,6 @@ public class TmsFixture : IAsyncLifetime
         GC.SuppressFinalize(this);
     }
 }
+
+internal sealed class ContainerExitedException(string container, int? exitCode)
+    : Exception($"Container '{container}' exited during startup with exit code {exitCode}.");
