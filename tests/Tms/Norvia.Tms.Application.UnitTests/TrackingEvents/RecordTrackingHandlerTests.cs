@@ -162,7 +162,17 @@ public sealed class RecordTrackingHandlerTests
         DateTimeOffset? eventTime = null,
         DateTimeOffset? eta = null,
         string correlationId = "corr-tracking") =>
-        new(source ?? VanDijkSource, sourceEventId, reference, TrackingEventType.Collected, eventTime ?? Samples.Now.AddDays(1), Location, eta, "Dock 4", correlationId);
+        new(
+            new TrackingReport(
+                source ?? VanDijkSource,
+                sourceEventId,
+                reference,
+                TrackingEventType.Collected,
+                eventTime ?? Samples.Now.AddDays(1),
+                Location,
+                eta,
+                "Dock 4"),
+            correlationId);
 
     private Shipment BookedShipment()
     {

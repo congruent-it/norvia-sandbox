@@ -177,21 +177,10 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
     /// and raises <c>ShipmentCollectedEvent</c>; on any other Shipment it is only logged, changing nothing and raising
     /// nothing, as the status only moves forward.
     /// </summary>
-    public TrackingEvent Record(
-        TrackingSource source,
-        string sourceEventId,
-        string? carrierBookingReference,
-        TrackingEventType type,
-        DateTimeOffset eventTime,
-        TrackingLocation location,
-        DateTimeOffset? eta,
-        string? remark,
-        CorrelationId correlationId,
-        DateTimeOffset receivedAt)
+    public TrackingEvent Record(TrackingReport report, CorrelationId correlationId, DateTimeOffset receivedAt)
     {
-        var trackingEvent = TrackingEvent.Record(
-            this, source, sourceEventId, carrierBookingReference, type, eventTime, location, eta, remark, correlationId, receivedAt);
-        if (type == TrackingEventType.Collected && Status == ShipmentStatus.Booked)
+        var trackingEvent = TrackingEvent.Record(this, report, correlationId, receivedAt);
+        if (report.Type == TrackingEventType.Collected && Status == ShipmentStatus.Booked)
         {
             Status = ShipmentStatus.Collected;
             trackingEvent.MarkMovedShipment();

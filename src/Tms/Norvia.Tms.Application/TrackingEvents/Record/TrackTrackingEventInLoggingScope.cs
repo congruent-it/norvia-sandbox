@@ -26,7 +26,7 @@ public sealed partial class TrackTrackingEventInLoggingScope(ILogger<TrackTracki
         ArgumentNullException.ThrowIfNull(next);
 
         var call = new Dictionary<string, object?> { [TrackingKeys.CorrelationId] = message.CorrelationId };
-        if (message.Source.CarrierId is { } carrierId)
+        if (message.Report.Source.CarrierId is { } carrierId)
         {
             call[TrackingKeys.PartyId] = carrierId.Value;
         }
@@ -39,7 +39,7 @@ public sealed partial class TrackTrackingEventInLoggingScope(ILogger<TrackTracki
         }
         else
         {
-            LogRefusal(message.SourceEventId, result);
+            LogRefusal(message.Report.EventId, result);
         }
 
         return result;

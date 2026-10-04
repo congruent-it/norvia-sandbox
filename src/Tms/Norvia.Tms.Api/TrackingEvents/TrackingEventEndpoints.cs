@@ -54,24 +54,27 @@ public static class TrackingEventEndpoints
             return TypedResults.ValidationProblem(errors);
         }
 
+        var result = await mediator.Send(new RecordTrackingCommand(ToReport(trackingEvent), correlationId!), cancellationToken);
+
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : RefusalProblem.Of<TrackingEventRefusalCode, RecordTrackingResult>(result, "The Tracking event can't be recorded.", correlationId!, StatusCodeOf);
+    }
+
+    /// <summary>What the Canonical Model event reports, as the domain takes it: the source is a Carrier or Own fleet.</summary>
+    private static TrackingReport ToReport(TrackingEventRequest trackingEvent)
+    {
         var source = trackingEvent.Source.Type == TrackingSourceType.Carrier
             ? TrackingSource.Carrier(new CarrierId(trackingEvent.Source.CarrierId!))
             : TrackingSource.OwnFleet;
         var location = trackingEvent.Location;
-        var result = await mediator.Send(
-            new RecordTrackingCommand(
-                source,
-                trackingEvent.EventId,
-                trackingEvent.CarrierBookingReference,
-                trackingEvent.Type,
-                trackingEvent.EventTime,
-                new TrackingLocation(location.Place, location.Postcode, location.CountryCode),
-                trackingEvent.Eta,
-                trackingEvent.Remark,
-                correlationId!),
-            cancellationToken);
-
-        return result.IsSuccess ? TypedResults.Ok(result.Value) : RefusalProblem.Of<TrackingEventRefusalCode, RecordTrackingResult>(result, "The Tracking event can't be recorded.", correlationId!, StatusCodeOf);
+        return new TrackingReport(
+            source,
+            trackingEvent.EventId,
+            trackingEvent.CarrierBookingReference,
+            trackingEvent.Type,
+            trackingEvent.EventTime,
+            new TrackingLocation(location.Place, location.Postcode, location.CountryCode),
+            trackingEvent.Eta,
+            trackingEvent.Remark);
     }
 
     /// <summary>The call's errors: the <see cref="TransportOrderEndpoints.CorrelationIdHeader"/>, and the fields the Canonical Model requires beyond their type.</summary>

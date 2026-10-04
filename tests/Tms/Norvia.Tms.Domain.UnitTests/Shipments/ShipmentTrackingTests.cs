@@ -85,7 +85,9 @@ public sealed class ShipmentTrackingTests
 
     private static TrackingEvent Collected(Shipment shipment, DateTimeOffset? eta, string sourceEventId = "evt-1") =>
         shipment.Record(
-            Source, sourceEventId, "VDT-1", TrackingEventType.Collected, EventTime, Location, eta, "Dock 4", new CorrelationId("corr-tracking"), ReceivedAt);
+            new TrackingReport(Source, sourceEventId, "VDT-1", TrackingEventType.Collected, EventTime, Location, eta, "Dock 4"),
+            new CorrelationId("corr-tracking"),
+            ReceivedAt);
 
     private static Shipment Booked()
     {

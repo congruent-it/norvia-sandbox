@@ -72,39 +72,29 @@ public sealed class TrackingEvent : EntityBase<TrackingEventId>, IAggregateRoot
     /// <summary>Whether the event moved the Shipment's status; an event that doesn't is only logged.</summary>
     public bool MovedShipment { get; private set; }
 
-    internal static TrackingEvent Record(
-        Shipment shipment,
-        TrackingSource source,
-        string sourceEventId,
-        string? carrierBookingReference,
-        TrackingEventType type,
-        DateTimeOffset eventTime,
-        TrackingLocation location,
-        DateTimeOffset? eta,
-        string? remark,
-        CorrelationId correlationId,
-        DateTimeOffset receivedAt)
+    internal static TrackingEvent Record(Shipment shipment, TrackingReport report, CorrelationId correlationId, DateTimeOffset receivedAt)
     {
         ArgumentNullException.ThrowIfNull(shipment);
-        ArgumentNullException.ThrowIfNull(source);
-        ArgumentException.ThrowIfNullOrWhiteSpace(sourceEventId);
-        ArgumentNullException.ThrowIfNull(location);
+        ArgumentNullException.ThrowIfNull(report);
+        ArgumentException.ThrowIfNullOrWhiteSpace(report.EventId);
+        ArgumentNullException.ThrowIfNull(report.Source);
+        ArgumentNullException.ThrowIfNull(report.Location);
         ArgumentNullException.ThrowIfNull(correlationId);
         return new TrackingEvent(
             TrackingEventId.New(),
             shipment.Id,
             shipment.Number,
-            source,
-            sourceEventId,
-            carrierBookingReference,
-            type,
-            eventTime,
-            eta,
-            remark,
+            report.Source,
+            report.EventId,
+            report.CarrierBookingReference,
+            report.Type,
+            report.EventTime,
+            report.Eta,
+            report.Remark,
             correlationId,
             receivedAt)
         {
-            Location = location,
+            Location = report.Location,
         };
     }
 

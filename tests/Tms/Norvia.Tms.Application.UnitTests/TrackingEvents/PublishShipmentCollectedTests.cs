@@ -65,14 +65,15 @@ public sealed class PublishShipmentCollectedTests
         shipment.ClearDomainEvents();
 
         shipment.Record(
-            TrackingSource.Carrier(new CarrierId("CAR-0001")),
-            "evt-1",
-            "VDT-1",
-            TrackingEventType.Collected,
-            EventTime,
-            new TrackingLocation("Rotterdam", "3011 AA", "NL"),
-            eta,
-            remark: null,
+            new TrackingReport(
+                TrackingSource.Carrier(new CarrierId("CAR-0001")),
+                "evt-1",
+                "VDT-1",
+                TrackingEventType.Collected,
+                EventTime,
+                new TrackingLocation("Rotterdam", "3011 AA", "NL"),
+                eta,
+                Remark: null),
             new CorrelationId("corr-tracking"),
             Samples.Now.AddDays(2));
         return (ShipmentCollectedEvent)shipment.DomainEvents.Single();
