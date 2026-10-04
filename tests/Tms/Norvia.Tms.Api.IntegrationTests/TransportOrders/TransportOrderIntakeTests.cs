@@ -13,7 +13,6 @@ namespace Norvia.Tms.Api.IntegrationTests.TransportOrders;
 public sealed class TransportOrderIntakeTests(TmsFixture tms)
 {
     private static readonly TimeSpan EventTimeout = TimeSpan.FromSeconds(30);
-    private static readonly TimeSpan OutboxSettleTime = TimeSpan.FromSeconds(3);
     private readonly CancellationToken _cancellationToken = TestContext.Current.CancellationToken;
 
     [Fact]
@@ -318,10 +317,10 @@ public sealed class TransportOrderIntakeTests(TmsFixture tms)
         timeout.CancelAfter(EventTimeout);
         while (!tms.Published.Any(m => m.CorrelationId == correlationId))
         {
-            await Task.Delay(TimeSpan.FromMilliseconds(200), timeout.Token);
+            await Task.Delay(TmsFixture.PollInterval, timeout.Token);
         }
 
-        await Task.Delay(OutboxSettleTime, _cancellationToken);
+        await TmsFixture.SettleOutboxAsync(_cancellationToken);
         return [.. tms.Published.Where(m => m.CorrelationId == correlationId)];
     }
 }

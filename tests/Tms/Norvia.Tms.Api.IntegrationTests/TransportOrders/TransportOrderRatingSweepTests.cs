@@ -4,6 +4,7 @@ namespace Norvia.Tms.Api.IntegrationTests.TransportOrders;
 /// On a TMS whose acceptances never trigger Rating, the rating worker's timer sweep still rates every Transport Order
 /// left Not yet rated, as after a crash between acceptance and Rating.
 /// </summary>
+[Trait("AppHost", "Own2")]
 public sealed class TransportOrderRatingSweepTests(SweepOnlyTmsFixture tms) : IClassFixture<SweepOnlyTmsFixture>
 {
     private readonly CancellationToken _cancellationToken = TestContext.Current.CancellationToken;

@@ -87,7 +87,7 @@ public sealed class TransportOrderReRateTests(TmsFixture tms)
         var after = await tms.GetTransportOrderAsync(number, _cancellationToken);
         JsonNode.DeepEquals(before, after).Should().BeTrue("a frozen Freight Charge stays frozen");
 
-        await Task.Delay(TimeSpan.FromSeconds(3), _cancellationToken); // Let the outbox run, so an event would show up.
+        await TmsFixture.SettleOutboxAsync(_cancellationToken);
         tms.Published.Count(m => m.CorrelationId == intake).Should().Be(publishedBefore);
     }
 
@@ -121,7 +121,7 @@ public sealed class TransportOrderReRateTests(TmsFixture tms)
         var result = JsonNode.Parse(body)!;
         result["ratingResult"]!.GetValue<string>().Should().Be("RatingFailed");
         result["repeat"]!.GetValue<bool>().Should().BeTrue();
-        await Task.Delay(TimeSpan.FromSeconds(3), _cancellationToken); // Let the outbox run, so an event would show up.
+        await TmsFixture.SettleOutboxAsync(_cancellationToken);
         tms.Published.Count(m => m.CorrelationId == intake && m.Subject == "TransportOrderRatingFailed").Should().Be(
             2, "a retry rates nothing, so it publishes nothing");
     }

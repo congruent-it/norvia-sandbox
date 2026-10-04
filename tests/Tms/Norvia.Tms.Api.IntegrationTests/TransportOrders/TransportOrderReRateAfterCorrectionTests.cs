@@ -8,6 +8,7 @@ namespace Norvia.Tms.Api.IntegrationTests.TransportOrders;
 /// given Lanes into Düsseldorf and the TMS restarted, and a re-rate then rates them. Rate Cards aren't reloaded while the
 /// TMS runs, which is why it restarts.
 /// </summary>
+[Trait("AppHost", "Own3")]
 public sealed class TransportOrderReRateAfterCorrectionTests(CorrectableSeedTmsFixture tms) : IClassFixture<CorrectableSeedTmsFixture>
 {
     private readonly CancellationToken _cancellationToken = TestContext.Current.CancellationToken;

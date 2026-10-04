@@ -9,7 +9,6 @@ namespace Norvia.Tms.Api.IntegrationTests.TransportOrders;
 internal static class TmsCalls
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
-    private static readonly TimeSpan OutboxSettleTime = TimeSpan.FromSeconds(3);
 
     public static string NewReference() => $"BD-{Guid.NewGuid():N}"[..20];
 
@@ -68,10 +67,10 @@ internal static class TmsCalls
         timeout.CancelAfter(Timeout);
         while (tms.Published.Count(m => m.CorrelationId == correlationId && m.Subject == eventType) < count)
         {
-            await Task.Delay(TimeSpan.FromMilliseconds(200), timeout.Token);
+            await Task.Delay(TmsFixture.PollInterval, timeout.Token);
         }
 
-        await Task.Delay(OutboxSettleTime, cancellationToken);
+        await TmsFixture.SettleOutboxAsync(cancellationToken);
         return [.. tms.Published.Where(m => m.CorrelationId == correlationId && m.Subject == eventType)];
     }
 
@@ -88,7 +87,7 @@ internal static class TmsCalls
                 return order;
             }
 
-            await Task.Delay(TimeSpan.FromMilliseconds(200), timeout.Token);
+            await Task.Delay(TmsFixture.PollInterval, timeout.Token);
         }
     }
 
@@ -103,10 +102,10 @@ internal static class TmsCalls
         timeout.CancelAfter(Timeout);
         while (!tms.Published.Any(m => m.CorrelationId == correlationId && m.Subject == eventType))
         {
-            await Task.Delay(TimeSpan.FromMilliseconds(200), timeout.Token);
+            await Task.Delay(TmsFixture.PollInterval, timeout.Token);
         }
 
-        await Task.Delay(OutboxSettleTime, cancellationToken);
+        await TmsFixture.SettleOutboxAsync(cancellationToken);
         return [.. tms.Published.Where(m => m.CorrelationId == correlationId && m.Subject == eventType)];
     }
 }

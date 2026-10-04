@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
@@ -46,7 +48,20 @@ public class TmsFixture : IAsyncLifetime
 
     /// <summary>The client ID the TMS takes as the WMS handoff's caller. No WMS exists yet, so only the tests call as it.</summary>
     public const string WmsClientId = "norvia-test-wms";
+
+    /// <summary>How often the TMS's outbox looks for a message to publish; quick, so tests don't wait for it.</summary>
+    private static readonly TimeSpan OutboxPollingInterval = TimeSpan.FromMilliseconds(100);
+
+    /// <summary>How long the outbox runs after an event arrives, a few cycles, so a duplicate or an event that shouldn't be sent would show up.</summary>
+    private static readonly TimeSpan OutboxSettleTime = OutboxPollingInterval * 8;
+
+    /// <summary>How often a test looks again for something it waits for.</summary>
+    public static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(50);
+
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan StartAttemptTimeout = TimeSpan.FromMinutes(3);
+    private static readonly TimeSpan StallTimeout = TimeSpan.FromSeconds(60);
+    private const int StartAttempts = 3;
     private readonly string _tokenSigningKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
     private readonly ConcurrentQueue<ServiceBusReceivedMessage> _published = new();
@@ -83,13 +98,65 @@ public class TmsFixture : IAsyncLifetime
 
     public async ValueTask InitializeAsync()
     {
-        using var startup = new CancellationTokenSource(StartupTimeout);
+        using var startup = new CancellationTokenSource(StartAttempts * StartAttemptTimeout);
 
+        // The AppHost now and then doesn't come up on a CI runner: the Service Bus emulator crashes as it starts (exit
+        // code 139), or something else keeps the TMS API waiting for good. A crashed container ends the attempt at once,
+        // a slow one after StartAttemptTimeout, and the AppHost starts again from scratch. What each attempt found is kept.
+        for (var attempt = 1; ; attempt++)
+        {
+            using var attemptTimeout = CancellationTokenSource.CreateLinkedTokenSource(startup.Token);
+            attemptTimeout.CancelAfter(StartAttemptTimeout);
+            try
+            {
+                await StartAppAsync(attemptTimeout.Token);
+                break;
+            }
+            catch (Exception ex) when (ex is ContainerExitedException or StartStalledException || (ex is OperationCanceledException && !startup.IsCancellationRequested))
+            {
+                var description = await DescribeResourcesAsync();
+                var logFile = Environment.GetEnvironmentVariable("NORVIA_TEST_LOG_FILE");
+                if (!string.IsNullOrEmpty(logFile))
+                {
+                    await File.AppendAllTextAsync(logFile, $"AppHost start attempt {attempt} failed: {ex.Message}{Environment.NewLine}{description}{Environment.NewLine}", CancellationToken.None);
+                }
+
+                await _app!.DisposeAsync();
+                _app = null;
+                if (attempt == StartAttempts)
+                {
+                    throw new InvalidOperationException($"The AppHost did not start in {attempt} attempts. The last found:{Environment.NewLine}{description}", ex);
+                }
+            }
+        }
+
+        Tms = CreateTmsClient(IssueToken([IntakeRole]));
+        TmsUi = CreateTmsClient(IssueToken([ManageRole], clientId: LocalTokens.TmsUiClientId));
+        CarrierAnswer = CreateTmsClient(IssueToken([AnswerRole], clientId: "norvia-test-carrier-answer-logic-app"));
+        CarrierReport = CreateTmsClient(IssueToken([ReportRole], clientId: "norvia-test-p4-booking-logic-app"));
+        TrackingRecord = CreateTmsClient(IssueToken([TrackingRecordRole], clientId: "norvia-test-carrier-tracking-logic-app"));
+
+        _serviceBus = new ServiceBusClient(await _app!.GetConnectionStringAsync("messaging", startup.Token));
+        foreach (var topicName in new[] { TransportOrderEventsTopic, ShipmentEventsTopic })
+        {
+            var processor = _serviceBus.CreateProcessor(topicName, TestSubscription);
+            processor.ProcessMessageAsync += args =>
+            {
+                _published.Enqueue(args.Message);
+                return Task.CompletedTask;
+            };
+            processor.ProcessErrorAsync += _ => Task.CompletedTask;
+            _processors.Add(processor);
+            await processor.StartProcessingAsync(startup.Token);
+        }
+    }
+
+    private async Task StartAppAsync(CancellationToken cancellationToken)
+    {
         var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(
             [$"Parameters:{LocalTokens.SigningKeyParameter}={_tokenSigningKey}"],
-            startup.Token);
-        // The tests play the P4 booking Logic App themselves, with CarrierReport, so no worker may report on a booking too (ADR 0030).
-        builder.Resources.Remove(builder.Resources.Single(resource => resource.Name == "booking-worker"));
+            cancellationToken);
+        builder.RemoveWhatTheTmsApiTestsDontUse();
         foreach (var topicName in new[] { TransportOrderEventsTopic, ShipmentEventsTopic })
         {
             var topic = builder.Resources.OfType<AzureServiceBusTopicResource>().Single(t => t.TopicName == topicName);
@@ -105,30 +172,148 @@ public class TmsFixture : IAsyncLifetime
             tmsApi.WithEnvironment(name, value);
         }
 
-        _app = await builder.BuildAsync(startup.Token);
-        await _app.StartAsync(startup.Token);
-        CollectTmsLogs();
-        await _app.ResourceNotifications.WaitForResourceHealthyAsync("tms-api", startup.Token);
+        _app = await builder.BuildAsync(cancellationToken);
 
-        Tms = CreateTmsClient(IssueToken([IntakeRole]));
-        TmsUi = CreateTmsClient(IssueToken([ManageRole], clientId: LocalTokens.TmsUiClientId));
-        CarrierAnswer = CreateTmsClient(IssueToken([AnswerRole], clientId: "norvia-test-carrier-answer-logic-app"));
-        CarrierReport = CreateTmsClient(IssueToken([ReportRole], clientId: "norvia-test-p4-booking-logic-app"));
-        TrackingRecord = CreateTmsClient(IssueToken([TrackingRecordRole], clientId: "norvia-test-carrier-tracking-logic-app"));
-
-        _serviceBus = new ServiceBusClient(await _app.GetConnectionStringAsync("messaging", startup.Token));
-        foreach (var topicName in new[] { TransportOrderEventsTopic, ShipmentEventsTopic })
+        // Starting completes only once every resource has, so a container that exits is watched for meanwhile.
+        using var attempt = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var starting = _app.StartAsync(attempt.Token);
+        var healthy = _app.ResourceNotifications.WaitForResourceHealthyAsync("tms-api", attempt.Token);
+        var exited = Task.WhenAny(WaitForAContainerToExitAsync(attempt.Token), WaitForTheStartToStallAsync(attempt.Token)).Unwrap();
+        var started = Task.WhenAll(starting, healthy);
+        try
         {
-            var processor = _serviceBus.CreateProcessor(topicName, TestSubscription);
-            processor.ProcessMessageAsync += args =>
+            if (await Task.WhenAny(started, exited) == exited)
             {
-                _published.Enqueue(args.Message);
-                return Task.CompletedTask;
-            };
-            processor.ProcessErrorAsync += _ => Task.CompletedTask;
-            _processors.Add(processor);
-            await processor.StartProcessingAsync(startup.Token);
+                await exited;
+            }
+
+            await started;
+            CollectTmsLogs();
         }
+        catch
+        {
+            // Ends the waits that would never finish, as what they wait for has gone.
+            await attempt.CancelAsync();
+            await Task.WhenAll(started, exited).ContinueWith(_ => { }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
+            throw;
+        }
+
+        // The attempt succeeded, so the watch for an exit ends without failing anything.
+        await attempt.CancelAsync();
+        await exited.ContinueWith(_ => { }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
+    }
+
+    /// <summary>What every resource of the AppHost is doing, with the end of the log of those that are not running.</summary>
+    private async Task<string> DescribeResourcesAsync()
+    {
+        var model = _app!.Services.GetRequiredService<DistributedApplicationModel>();
+        var logger = _app.Services.GetRequiredService<ResourceLoggerService>();
+        var description = new StringBuilder();
+        foreach (var resource in model.Resources)
+        {
+            if (!_app.ResourceNotifications.TryGetCurrentState(resource.Name, out var current))
+            {
+                description.AppendLine(CultureInfo.InvariantCulture, $"{resource.Name}: no state");
+                continue;
+            }
+
+            var state = current.Snapshot.State?.Text;
+            description.AppendLine(CultureInfo.InvariantCulture, $"{resource.Name}: {state}, health {current.Snapshot.HealthStatus}, exit code {current.Snapshot.ExitCode}");
+            if (state is "Running" or "Finished" or null)
+            {
+                continue;
+            }
+
+            using var replay = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            var lines = new List<string>();
+            try
+            {
+                await foreach (var batch in logger.WatchAsync(resource).WithCancellation(replay.Token))
+                {
+                    lines.AddRange(batch.Select(line => line.Content));
+                    break;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // No log was written.
+            }
+
+            foreach (var line in lines.TakeLast(25))
+            {
+                description.AppendLine(CultureInfo.InvariantCulture, $"    {line}");
+            }
+        }
+
+        description.AppendLine("Machine:");
+        description.AppendLine(await RunAsync("sh", "-c", "uptime; free -m; ps -eo pid,pcpu,pmem,etime,args --sort=-pcpu | cut -c1-200 | head -15"));
+        return description.ToString();
+    }
+
+    private static async Task<string> RunAsync(string fileName, params string[] arguments)
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            var start = new ProcessStartInfo(fileName) { RedirectStandardOutput = true, RedirectStandardError = true };
+            foreach (var argument in arguments)
+            {
+                start.ArgumentList.Add(argument);
+            }
+
+            using var process = Process.Start(start)!;
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var output = await process.StandardOutput.ReadToEndAsync(timeout.Token);
+            await process.WaitForExitAsync(timeout.Token);
+            return output;
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or System.ComponentModel.Win32Exception)
+        {
+            return $"({ex.Message})";
+        }
+    }
+
+    // Now and then a resource keeps waiting for one that is running and healthy (the migrations for SQL Server, on a CI
+    // runner's first start), which no timeout of Aspire's ends. When no resource has changed for a minute and none is
+    // still starting, nothing will, so the attempt ends.
+    private async Task WaitForTheStartToStallAsync(CancellationToken cancellationToken)
+    {
+        var model = _app!.Services.GetRequiredService<DistributedApplicationModel>();
+        var lastSignature = string.Empty;
+        var lastChange = DateTime.UtcNow;
+        while (true)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+            var states = model.Resources
+                .Select(resource => _app.ResourceNotifications.TryGetCurrentState(resource.Name, out var current) ? current.Snapshot : null)
+                .ToList();
+            var signature = string.Join(';', states.Select(snapshot => $"{snapshot?.State?.Text}/{snapshot?.HealthStatus}"));
+            if (signature != lastSignature || states.Any(snapshot => snapshot?.State?.Text == "Starting"))
+            {
+                lastSignature = signature;
+                lastChange = DateTime.UtcNow;
+            }
+            else if (DateTime.UtcNow - lastChange > StallTimeout)
+            {
+                throw new StartStalledException(StallTimeout);
+            }
+        }
+    }
+
+    private async Task WaitForAContainerToExitAsync(CancellationToken cancellationToken)
+    {
+        var containerResources = _app!.Services.GetRequiredService<DistributedApplicationModel>().Resources.Where(resource => resource.Annotations.OfType<ContainerImageAnnotation>().Any());
+        var exits = containerResources.Select(async container =>
+        {
+            var exited = await _app.ResourceNotifications.WaitForResourceAsync(
+                container.Name, state => KnownResourceStates.TerminalStates.Contains(state.Snapshot.State?.Text), cancellationToken);
+            throw new ContainerExitedException(container.Name, exited.Snapshot.ExitCode);
+        });
+        await await Task.WhenAny(exits);
     }
 
     /// <summary>What the fixture sets on the TMS API on top of what the AppHost gives it, as environment variables.</summary>
@@ -137,11 +322,15 @@ public class TmsFixture : IAsyncLifetime
         ["Seed__Path"] = Path.Combine(AppContext.BaseDirectory, "Seed", "tms.test-seed.json"),
         ["IntakeCallers__ClientIdsByChannel__Wms__0"] = WmsClientId,
         ["Rating__SweepInterval"] = "01:00:00",
+        ["Outbox__PollingInterval"] = OutboxPollingInterval.ToString("c", CultureInfo.InvariantCulture),
 
         // A test run has no dashboard to take the TMS's telemetry, and a TMS that stops keeps trying to flush it there
         // for seconds, too long for a restart. Tests read the TMS's console logs instead.
         ["OTEL_EXPORTER_OTLP_ENDPOINT"] = "",
     };
+
+    /// <summary>Lets the outbox run a few cycles, so an event that shouldn't be sent, or a duplicate, would show up.</summary>
+    public static Task SettleOutboxAsync(CancellationToken cancellationToken) => Task.Delay(OutboxSettleTime, cancellationToken);
 
     /// <summary>Waits for the TMS to write a log that matches, as logs arrive a moment after the call.</summary>
     public async Task<TmsLog> TmsLogAsync(Func<TmsLog, bool> match, CancellationToken cancellationToken)
@@ -150,7 +339,7 @@ public class TmsFixture : IAsyncLifetime
         timeout.CancelAfter(TimeSpan.FromSeconds(30));
         while (!_tmsLogs.Any(match))
         {
-            await Task.Delay(TimeSpan.FromMilliseconds(200), timeout.Token);
+            await Task.Delay(PollInterval, timeout.Token);
         }
 
         return _tmsLogs.First(match);
@@ -258,3 +447,9 @@ public class TmsFixture : IAsyncLifetime
         GC.SuppressFinalize(this);
     }
 }
+
+internal sealed class ContainerExitedException(string container, int? exitCode)
+    : Exception($"Container '{container}' exited during startup with exit code {exitCode}.");
+
+internal sealed class StartStalledException(TimeSpan quietFor)
+    : Exception($"No resource of the AppHost changed for {quietFor.TotalSeconds:0} s while it started.");

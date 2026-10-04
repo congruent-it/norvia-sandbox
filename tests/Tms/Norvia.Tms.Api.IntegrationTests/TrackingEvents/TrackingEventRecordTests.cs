@@ -14,6 +14,7 @@ namespace Norvia.Tms.Api.IntegrationTests.TrackingEvents;
 /// it (P5), and a Collected event moves a Booked Shipment to Collected. The TMS runs with a clock the test sets, so what
 /// the TMS says about time (when it recorded the event, whether an event time is in the future) is the test's to decide.
 /// </summary>
+[Trait("AppHost", "Own1")]
 public sealed class TrackingEventRecordTests(ControlledClockTmsFixture tms) : IClassFixture<ControlledClockTmsFixture>, IDisposable
 {
     private static readonly TimeSpan ClockSkew = TimeSpan.FromMinutes(5);
@@ -107,7 +108,7 @@ public sealed class TrackingEventRecordTests(ControlledClockTmsFixture tms) : IC
         recorded["repeat"]!.GetValue<bool>().Should().BeFalse();
         recorded["movedShipment"]!.GetValue<bool>().Should().BeFalse();
         recorded["shipmentStatus"]!.GetValue<string>().Should().Be("Collected");
-        await Task.Delay(TimeSpan.FromSeconds(2), _cancellationToken); // Lets the outbox run, so a message that shouldn't be sent would show up.
+        await TmsFixture.SettleOutboxAsync(_cancellationToken);
         tms.Published.Where(m => m.CorrelationId == correlationId).Should().BeEmpty("a change that wasn't made isn't published");
         tms.Published.Count(m => m.Subject == "ShipmentCollected" && CarrierBookingCalls.NamesShipment(m, shipmentNumber)).Should().Be(1);
     }

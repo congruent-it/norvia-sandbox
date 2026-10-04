@@ -12,6 +12,7 @@ namespace Norvia.Tms.Api.IntegrationTests;
 /// A Rate Card whose Zones overlap is a broken seed: the TMS refuses to start on it rather than rate against it. The
 /// test runs an AppHost of its own, whose TMS API reads a seed where two Zones claim the same postcode prefix.
 /// </summary>
+[Trait("AppHost", "Own1")]
 public sealed class RateCardSeedTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromMinutes(5);
@@ -25,6 +26,7 @@ public sealed class RateCardSeedTests
         var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(
             [$"Parameters:{LocalTokens.SigningKeyParameter}={Convert.ToHexString(RandomNumberGenerator.GetBytes(32))}"],
             timeout.Token);
+        builder.RemoveWhatTheTmsApiTestsDontUse();
         builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(r => r.Name == "tms-api"))
             .WithEnvironment("Seed__Path", Path.Combine(AppContext.BaseDirectory, "Seed", "tms.overlapping-zones-seed.json"));
         await using var app = await builder.BuildAsync(timeout.Token);
@@ -43,7 +45,7 @@ public sealed class RateCardSeedTests
         CollectLogs(app, "tms-api", logs, timeout.Token);
         while (!logs.Any(line => line.Contains("Zones overlap", StringComparison.Ordinal)))
         {
-            await Task.Delay(TimeSpan.FromMilliseconds(200), timeout.Token);
+            await Task.Delay(TmsFixture.PollInterval, timeout.Token);
         }
 
         logs.Should().Contain(line => line.Contains("Rotterdam and Rijnmond both claim NL 31", StringComparison.Ordinal));

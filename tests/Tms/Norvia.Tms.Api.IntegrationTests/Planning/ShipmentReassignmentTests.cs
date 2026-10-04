@@ -85,7 +85,7 @@ public sealed class ShipmentReassignmentTests(TmsFixture tms)
         var shipment = await tms.GetShipmentAsync(shipmentNumber, _cancellationToken);
         shipment["carriedBy"]!["carrier"]!["id"]!.GetValue<string>().Should().Be(PlanningCalls.CarrierId);
         shipment["assignments"]!.AsArray().Should().ContainSingle();
-        await Task.Delay(TimeSpan.FromSeconds(3), _cancellationToken); // Let the outbox run, so an event would show up.
+        await TmsFixture.SettleOutboxAsync(_cancellationToken);
         tms.ShipmentsReassigned(shipmentNumber).Should().BeEmpty("a refused reassignment publishes nothing");
     }
 
@@ -185,7 +185,7 @@ public sealed class ShipmentReassignmentTests(TmsFixture tms)
         var repeat = JsonNode.Parse(body)!;
         repeat["correlationId"]!.GetValue<string>().Should().Be(reassigned["correlationId"]!.GetValue<string>());
         repeat["repeat"]!.GetValue<bool>().Should().BeTrue();
-        await Task.Delay(TimeSpan.FromSeconds(3), _cancellationToken); // Let the outbox run, so an event would show up.
+        await TmsFixture.SettleOutboxAsync(_cancellationToken);
         tms.ShipmentsReassigned(shipmentNumber).Should().ContainSingle("a retry reassigns nothing, so it publishes nothing");
     }
 

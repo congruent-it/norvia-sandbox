@@ -42,11 +42,13 @@ public sealed class CarrierBookingWithdrawTests(TmsFixture tms)
         var (carrierBookingNumber, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
         var key = Guid.NewGuid().ToString();
         var first = await tms.WithdrawnAsync(carrierBookingNumber, _cancellationToken, key);
+        await tms.PublishedAsync(first["correlationId"]!.GetValue<string>(), "CarrierBookingWithdrawn", _cancellationToken); // The first event is out before the count.
         var before = tms.Published.Count(m => NamesCarrierBooking(m, carrierBookingNumber) && m.Subject == "CarrierBookingWithdrawn");
 
         var repeated = await tms.WithdrawnAsync(carrierBookingNumber, _cancellationToken, key);
 
         repeated["correlationId"]!.GetValue<string>().Should().Be(first["correlationId"]!.GetValue<string>());
+        await TmsFixture.SettleOutboxAsync(_cancellationToken);
         tms.Published.Count(m => NamesCarrierBooking(m, carrierBookingNumber) && m.Subject == "CarrierBookingWithdrawn").Should().Be(before, "a repeat publishes no new event");
     }
 
