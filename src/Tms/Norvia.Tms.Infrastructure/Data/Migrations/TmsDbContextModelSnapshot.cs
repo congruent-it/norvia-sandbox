@@ -211,6 +211,93 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                     b.ToTable("Shipments", (string)null);
                 });
 
+            modelBuilder.Entity("Norvia.Tms.Domain.TrackingEvents.TrackingEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CarrierBookingReference")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTimeOffset?>("Eta")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("EventTime")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("MovedShipment")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Remark")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid>("ShipmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ShipmentNumber")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("SourceId");
+
+                    b.Property<string>("SourceEventId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "Location", "Norvia.Tms.Domain.TrackingEvents.TrackingEvent.Location#TrackingLocation", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<string>("CountryCode")
+                                .IsRequired()
+                                .HasMaxLength(2)
+                                .HasColumnType("nvarchar(2)")
+                                .HasColumnName("LocationCountryCode");
+
+                            b1.Property<string>("Place")
+                                .IsRequired()
+                                .HasMaxLength(100)
+                                .HasColumnType("nvarchar(100)")
+                                .HasColumnName("LocationPlace");
+
+                            b1.Property<string>("Postcode")
+                                .IsRequired()
+                                .HasMaxLength(20)
+                                .HasColumnType("nvarchar(20)")
+                                .HasColumnName("LocationPostcode");
+                        });
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ShipmentId");
+
+                    b.HasIndex("Source", "SourceEventId")
+                        .IsUnique();
+
+                    b.ToTable("TrackingEvents", (string)null);
+                });
+
             modelBuilder.Entity("Norvia.Tms.Domain.TransportOrders.TransportOrder", b =>
                 {
                     b.Property<Guid>("Id")
@@ -378,6 +465,15 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                     b.HasOne("Norvia.Tms.Domain.TransportOrders.TransportOrder", null)
                         .WithOne()
                         .HasForeignKey("Norvia.Tms.Domain.Shipments.Shipment", "TransportOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Norvia.Tms.Domain.TrackingEvents.TrackingEvent", b =>
+                {
+                    b.HasOne("Norvia.Tms.Domain.Shipments.Shipment", null)
+                        .WithMany()
+                        .HasForeignKey("ShipmentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

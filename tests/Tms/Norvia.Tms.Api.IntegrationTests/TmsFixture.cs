@@ -41,6 +41,9 @@ public class TmsFixture : IAsyncLifetime
     /// <summary>The app role only the P4 booking Logic App's managed identity holds, for its sent and not-delivered reports.</summary>
     public const string ReportRole = "CarrierBookings.Report";
 
+    /// <summary>The app role of the Carrier-tracking Logic App's managed identity, which records Tracking events (P5).</summary>
+    public const string TrackingRecordRole = "TrackingEvents.Record";
+
     /// <summary>The client ID the TMS takes as the WMS handoff's caller. No WMS exists yet, so only the tests call as it.</summary>
     public const string WmsClientId = "norvia-test-wms";
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
@@ -63,6 +66,9 @@ public class TmsFixture : IAsyncLifetime
 
     /// <summary>A client holding the report role, as the P4 booking Logic App's managed identity will (P4, later ticket).</summary>
     public HttpClient CarrierReport { get; private set; } = null!;
+
+    /// <summary>A client holding the record role, as the Carrier-tracking Logic App's managed identity will (P5, later ticket).</summary>
+    public HttpClient TrackingRecord { get; private set; } = null!;
 
     public IEnumerable<ServiceBusReceivedMessage> Published => _published;
 
@@ -108,6 +114,7 @@ public class TmsFixture : IAsyncLifetime
         TmsUi = CreateTmsClient(IssueToken([ManageRole], clientId: LocalTokens.TmsUiClientId));
         CarrierAnswer = CreateTmsClient(IssueToken([AnswerRole], clientId: "norvia-test-carrier-answer-logic-app"));
         CarrierReport = CreateTmsClient(IssueToken([ReportRole], clientId: "norvia-test-p4-booking-logic-app"));
+        TrackingRecord = CreateTmsClient(IssueToken([TrackingRecordRole], clientId: "norvia-test-carrier-tracking-logic-app"));
 
         _serviceBus = new ServiceBusClient(await _app.GetConnectionStringAsync("messaging", startup.Token));
         foreach (var topicName in new[] { TransportOrderEventsTopic, ShipmentEventsTopic })
@@ -240,6 +247,8 @@ public class TmsFixture : IAsyncLifetime
         Tms?.Dispose();
         TmsUi?.Dispose();
         CarrierAnswer?.Dispose();
+        CarrierReport?.Dispose();
+        TrackingRecord?.Dispose();
 
         if (_app is not null)
         {

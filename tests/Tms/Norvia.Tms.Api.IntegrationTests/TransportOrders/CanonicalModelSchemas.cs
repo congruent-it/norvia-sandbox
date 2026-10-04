@@ -39,6 +39,26 @@ internal static class CanonicalModelSchemas
 
     private static readonly Lazy<JsonSchema> CarrierBookingWithdrawnSchema = new(() => Load("carrier-booking-withdrawn.v1.schema.json"));
 
+    private static readonly Lazy<JsonSchema> TrackingEventSchema = new(() => Load("tracking-event.v1.schema.json"));
+
+    private static readonly Lazy<JsonSchema> ShipmentCollectedSchema = new(() => Load("shipment-collected.v1.schema.json"));
+
+    private static readonly Lazy<JsonSchema> ShipmentInTransitSchema = new(() => Load("shipment-in-transit.v1.schema.json"));
+
+    private static readonly Lazy<JsonSchema> ShipmentDeliveredSchema = new(() => Load("shipment-delivered.v1.schema.json"));
+
+    private static readonly Lazy<JsonSchema> ShipmentExceptionReportedSchema = new(() => Load("shipment-exception-reported.v1.schema.json"));
+
+    public static EvaluationResults ValidateTrackingEvent(JsonNode body) => Validate(TrackingEventSchema.Value, body);
+
+    public static EvaluationResults ValidateShipmentCollected(JsonNode body) => Validate(ShipmentCollectedSchema.Value, body);
+
+    public static EvaluationResults ValidateShipmentInTransit(JsonNode body) => Validate(ShipmentInTransitSchema.Value, body);
+
+    public static EvaluationResults ValidateShipmentDelivered(JsonNode body) => Validate(ShipmentDeliveredSchema.Value, body);
+
+    public static EvaluationResults ValidateShipmentExceptionReported(JsonNode body) => Validate(ShipmentExceptionReportedSchema.Value, body);
+
     public static EvaluationResults ValidateShipmentPlanned(JsonNode body) => Validate(ShipmentPlannedSchema.Value, body);
 
     public static EvaluationResults ValidateShipmentReassigned(JsonNode body) => Validate(ShipmentReassignedSchema.Value, body);
