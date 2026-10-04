@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
@@ -55,6 +56,7 @@ public class TmsFixture : IAsyncLifetime
 
     /// <summary>How often a test looks again for something it waits for.</summary>
     public static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(50);
+
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
     private readonly string _tokenSigningKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
@@ -146,7 +148,7 @@ public class TmsFixture : IAsyncLifetime
         ["Seed__Path"] = Path.Combine(AppContext.BaseDirectory, "Seed", "tms.test-seed.json"),
         ["IntakeCallers__ClientIdsByChannel__Wms__0"] = WmsClientId,
         ["Rating__SweepInterval"] = "01:00:00",
-        ["Outbox__PollingInterval"] = OutboxPollingInterval.ToString("c", System.Globalization.CultureInfo.InvariantCulture),
+        ["Outbox__PollingInterval"] = OutboxPollingInterval.ToString("c", CultureInfo.InvariantCulture),
 
         // A test run has no dashboard to take the TMS's telemetry, and a TMS that stops keeps trying to flush it there
         // for seconds, too long for a restart. Tests read the TMS's console logs instead.
