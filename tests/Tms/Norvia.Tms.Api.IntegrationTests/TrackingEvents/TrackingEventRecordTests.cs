@@ -14,6 +14,7 @@ namespace Norvia.Tms.Api.IntegrationTests.TrackingEvents;
 /// it (P5), and a Collected event moves a Booked Shipment to Collected. The TMS runs with a clock the test sets, so what
 /// the TMS says about time (when it recorded the event, whether an event time is in the future) is the test's to decide.
 /// </summary>
+[Trait("AppHost", "Own")]
 public sealed class TrackingEventRecordTests(ControlledClockTmsFixture tms) : IClassFixture<ControlledClockTmsFixture>, IDisposable
 {
     private static readonly TimeSpan ClockSkew = TimeSpan.FromMinutes(5);

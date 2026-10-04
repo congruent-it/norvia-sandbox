@@ -99,7 +99,8 @@ jobs:
           if-no-files-found: ignore
 
   # One leg per application, each on a runner of its own with its own Docker daemon, so the AppHosts of the legs
-  # can't clash. There are no path filters: every gate runs on every PR. The AppHost references every application, so
+  # can't clash. The TMS has three legs, as its integration tests start six AppHosts: the tests that share the first
+  # one, the tests whose fixtures start an AppHost of their own (trait AppHost=Own), and the UI tests. There are no path filters: every gate runs on every PR. The AppHost references every application, so
   # each leg builds the whole solution.
   integration:
     name: Tests (${{ matrix.application }})
@@ -111,10 +112,21 @@ jobs:
         include:
           - application: TMS
             directory: Tms
+            kinds: UnitTests ArchitectureTests IntegrationTests
+            filter: AppHost!=Own
+          - application: TMS (own AppHosts)
+            directory: Tms
+            kinds: IntegrationTests
+            filter: AppHost=Own
+          - application: TMS (UI)
+            directory: Tms
+            kinds: UiTests
           - application: Partner portal
             directory: PartnerPortal
+            kinds: UnitTests ArchitectureTests IntegrationTests UiTests
           - application: Integration console
             directory: IntegrationConsole
+            kinds: UnitTests ArchitectureTests IntegrationTests UiTests
     steps:
       - uses: actions/checkout@v5
 
@@ -128,6 +140,7 @@ jobs:
       # Chromium's system libraries need root, so they are installed here rather than by the UI test fixtures. Every UI
       # test project uses the same Playwright version, so the leg's own project's script serves.
       - name: Install Playwright's Chromium
+        if: contains(matrix.kinds, 'UiTests')
         run: pwsh tests/${{ matrix.directory }}/*.UiTests/bin/"$CONFIGURATION"/net10.0/playwright.ps1 install --with-deps chromium
 
       # The integration and UI tests start the AppHost, which runs SQL Server and the Service Bus emulator in Docker. UI
@@ -137,13 +150,15 @@ jobs:
         env:
           NORVIA_TEST_LOG_FILE: ${{ github.workspace }}/TestResults/tms-api.log
           NORVIA_UI_TEST_ARTIFACTS: ${{ github.workspace }}/TestResults
+          FILTER: ${{ matrix.filter }}
         run: |
           mkdir -p TestResults
           failed=0
-          for project in $(find tests/${{ matrix.directory }} \( -name '*.UnitTests.csproj' -o -name '*.ArchitectureTests.csproj' \
-              -o -name '*.IntegrationTests.csproj' -o -name '*.UiTests.csproj' \) | sort); do
-            dotnet test "$project" --no-build --configuration "$CONFIGURATION" \
-              --logger trx --results-directory TestResults || failed=1
+          for kind in ${{ matrix.kinds }}; do
+            for project in $(find tests/${{ matrix.directory }} -name "*.$kind.csproj" | sort); do
+              dotnet test "$project" --no-build --configuration "$CONFIGURATION" ${FILTER:+--filter "$FILTER"} \
+                --logger trx --results-directory TestResults || failed=1
+            done
           done
           exit $failed
 
@@ -159,6 +174,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: integration-test-results-${{ matrix.directory }}
+          name: integration-test-results-${{ matrix.directory }}-${{ strategy.job-index }}
           path: TestResults/
           if-no-files-found: ignore

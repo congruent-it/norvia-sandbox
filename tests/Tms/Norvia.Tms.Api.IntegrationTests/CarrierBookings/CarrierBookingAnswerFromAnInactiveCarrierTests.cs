@@ -8,6 +8,7 @@ namespace Norvia.Tms.Api.IntegrationTests.CarrierBookings;
 /// Whether a Carrier is active matters only when the Planner assigns it (P3), not when it answers: a Carrier made
 /// inactive after its booking was sent can still confirm or reject it.
 /// </summary>
+[Trait("AppHost", "Own")]
 public sealed class CarrierBookingAnswerFromAnInactiveCarrierTests(CorrectableSeedTmsFixture tms) : IClassFixture<CorrectableSeedTmsFixture>
 {
     private readonly CancellationToken _cancellationToken = TestContext.Current.CancellationToken;
