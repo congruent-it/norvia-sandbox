@@ -12,7 +12,13 @@ public sealed class ControlledClockTmsFixture : TmsFixture
     private readonly string _clockFile = Path.Combine(Path.GetTempPath(), $"norvia-tms-clock-{Guid.NewGuid():N}.txt");
 
     /// <summary>Sets the TMS's clock to the instant, and holds it there.</summary>
-    public void SetClock(DateTimeOffset now) => File.WriteAllText(_clockFile, now.ToString("O", CultureInfo.InvariantCulture));
+    public void SetClock(DateTimeOffset now)
+    {
+        // Written aside and moved over, so the TMS never reads a half-written file.
+        var aside = $"{_clockFile}.tmp";
+        File.WriteAllText(aside, now.ToString("O", CultureInfo.InvariantCulture));
+        File.Move(aside, _clockFile, overwrite: true);
+    }
 
     /// <summary>Gives the TMS the system's time again.</summary>
     public void ResetClock() => File.Delete(_clockFile);
