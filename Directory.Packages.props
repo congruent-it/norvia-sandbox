@@ -3,15 +3,15 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
   <ItemGroup Label="Aspire">
-    <PackageVersion Include="Aspire.Hosting.Azure.AppContainers" Version="13.5.4" />
-    <PackageVersion Include="Aspire.Hosting.Azure.KeyVault" Version="13.5.4" />
-    <PackageVersion Include="Aspire.Hosting.Azure.ApplicationInsights" Version="13.5.4" />
-    <PackageVersion Include="Aspire.Hosting.Azure.ServiceBus" Version="13.5.4" />
-    <PackageVersion Include="Aspire.Hosting.Azure.Sql" Version="13.5.4" />
-    <PackageVersion Include="Aspire.Hosting.Testing" Version="13.5.4" />
+    <PackageVersion Include="Aspire.Hosting.Azure.AppContainers" Version="13.6.0" />
+    <PackageVersion Include="Aspire.Hosting.Azure.KeyVault" Version="13.6.0" />
+    <PackageVersion Include="Aspire.Hosting.Azure.ApplicationInsights" Version="13.6.0" />
+    <PackageVersion Include="Aspire.Hosting.Azure.ServiceBus" Version="13.6.0" />
+    <PackageVersion Include="Aspire.Hosting.Azure.Sql" Version="13.6.0" />
+    <PackageVersion Include="Aspire.Hosting.Testing" Version="13.6.0" />
     <PackageVersion Include="CommunityToolkit.Aspire.Hosting.SqlServer.Extensions" Version="13.6.0" />
-    <PackageVersion Include="Aspire.Azure.Messaging.ServiceBus" Version="13.5.4" />
-    <PackageVersion Include="Aspire.Microsoft.EntityFrameworkCore.SqlServer" Version="13.5.4" />
+    <PackageVersion Include="Aspire.Azure.Messaging.ServiceBus" Version="13.6.0" />
+    <PackageVersion Include="Aspire.Microsoft.EntityFrameworkCore.SqlServer" Version="13.6.0" />
   </ItemGroup>
   <ItemGroup Label="Service defaults">
     <PackageVersion Include="Azure.Monitor.OpenTelemetry.AspNetCore" Version="1.6.0" />
