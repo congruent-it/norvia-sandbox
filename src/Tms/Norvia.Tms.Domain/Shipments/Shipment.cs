@@ -1,6 +1,7 @@
 using Ardalis.SharedKernel;
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Shippers;
+using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.TransportOrders;
 
 namespace Norvia.Tms.Domain.Shipments;
@@ -168,6 +169,25 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
 
         Status = ShipmentStatus.Planned;
         return true;
+    }
+
+    /// <summary>
+    /// Takes in a Tracking event reported for the Shipment (P5): the event is made, to be kept as a log on the Shipment,
+    /// and the status moves forward where the event warrants it. A Collected event moves a Booked Shipment to Collected
+    /// and raises <c>ShipmentCollectedEvent</c>; on any other Shipment it is only logged, changing nothing and raising
+    /// nothing, as the status only moves forward.
+    /// </summary>
+    public TrackingEvent Record(TrackingReport report, CorrelationId correlationId, DateTimeOffset receivedAt)
+    {
+        var trackingEvent = TrackingEvent.Record(this, report, correlationId, receivedAt);
+        if (report.Type == TrackingEventType.Collected && Status == ShipmentStatus.Booked)
+        {
+            Status = ShipmentStatus.Collected;
+            trackingEvent.MarkMovedShipment();
+            RegisterDomainEvent(new ShipmentCollectedEvent(this, trackingEvent));
+        }
+
+        return trackingEvent;
     }
 
     /// <summary>The release made under the key; null when none was.</summary>

@@ -22,6 +22,8 @@ var answerRole = 'CarrierBookings.Answer'
 var answerRoleId = guid('norvia-tms-api', environmentName, answerRole)
 var reportRole = 'CarrierBookings.Report'
 var reportRoleId = guid('norvia-tms-api', environmentName, reportRole)
+var recordRole = 'TrackingEvents.Record'
+var recordRoleId = guid('norvia-tms-api', environmentName, recordRole)
 var respondRole = 'CarrierBookings.Respond'
 var respondRoleId = guid('norvia-partner-api', environmentName, respondRole)
 var submitRole = 'TransportOrders.Submit'
@@ -96,6 +98,16 @@ resource tmsApi 'Microsoft.Graph/applications@v1.0' = {
       value: reportRole
       displayName: 'Report Carrier bookings'
       description: 'Report that a Carrier booking\'s request was sent to the Carrier, or never reached it (P4). Only the P4 booking Logic App holds it.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
+    {
+      id: recordRoleId
+      value: recordRole
+      displayName: 'Record Tracking events'
+      description: 'Record a Tracking event reported for a Shipment (P5). Only the Carrier-tracking Logic App will hold it, and later the Driver reports Logic App (P12); no identity holds it yet.'
       allowedMemberTypes: [
         'Application'
       ]

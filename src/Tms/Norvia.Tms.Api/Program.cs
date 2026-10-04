@@ -8,12 +8,14 @@ using Microsoft.EntityFrameworkCore;
 using Norvia.Tms.Api.CarrierBookings;
 using Norvia.Tms.Api.Shipments;
 using Norvia.Tms.Api.Tracking;
+using Norvia.Tms.Api.TrackingEvents;
 using Norvia.Tms.Api.TransportOrders;
 using Norvia.Tms.Application.CarrierBookings.Answer;
 using Norvia.Tms.Application.CarrierBookings.Report;
 using Norvia.Tms.Application.CarrierBookings.Withdraw;
 using Norvia.Tms.Application.Shipments.Reassign;
 using Norvia.Tms.Application.Shipments.Release;
+using Norvia.Tms.Application.TrackingEvents.Record;
 using Norvia.Tms.Application.TransportOrders.Assign;
 using Norvia.Tms.Application.TransportOrders.Rate;
 using Norvia.Tms.Application.TransportOrders.Submit;
@@ -40,6 +42,7 @@ builder.Services
     .AddScoped<IPipelineBehavior<ReportCarrierBookingNotDeliveredCommand, Result<CarrierBookingReportResult>>,
         TrackCarrierBookingReportInLoggingScope<ReportCarrierBookingNotDeliveredCommand>>();
 builder.Services.AddScoped<IPipelineBehavior<WithdrawCarrierBookingCommand, Result<CarrierBookingWithdrawResult>>, TrackCarrierBookingWithdrawalInLoggingScope>();
+builder.Services.AddScoped<IPipelineBehavior<RecordTrackingCommand, Result<RecordTrackingResult>>, TrackTrackingEventInLoggingScope>();
 builder.AddTmsInfrastructure();
 builder.AddTmsOutboxPublisher();
 builder.AddTmsRatingWorker();
@@ -132,6 +135,7 @@ app.MapDefaultEndpoints();
 app.MapTransportOrders();
 app.MapShipments();
 app.MapCarrierBookings();
+app.MapTrackingEvents();
 
 await app.RunAsync();
 

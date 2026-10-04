@@ -17,5 +17,10 @@ Norvia's own message format ([CONTEXT.md](../../CONTEXT.md#integration)): one JS
 | [carrier-booking-rejected.v1](carrier-booking-rejected.v1.schema.json) | Event: a Carrier rejected a Requested Carrier booking with a reason, sending the Shipment back to Planned |
 | [carrier-booking-not-delivered.v1](carrier-booking-not-delivered.v1.schema.json) | Event: a Carrier booking request never reached the Carrier, with the technical cause, sending the Shipment back to Planned |
 | [carrier-booking-withdrawn.v1](carrier-booking-withdrawn.v1.schema.json) | Event: the Planner withdrew a Requested Carrier booking before the Carrier answered, sending the Shipment back to Planned |
+| [tracking-event.v1](tracking-event.v1.schema.json) | Command: a Tracking event a Carrier (or later Own fleet) reported for a Shipment, as the Carrier-tracking Logic App sends it to the TMS Tracking event API's record operation, naming its source |
+| [shipment-collected.v1](shipment-collected.v1.schema.json) | Event: a Tracking event moved a Booked Shipment to Collected |
+| [shipment-in-transit.v1](shipment-in-transit.v1.schema.json) | Event: a Tracking event moved a Shipment to In transit |
+| [shipment-delivered.v1](shipment-delivered.v1.schema.json) | Event: a Tracking event moved a Shipment to Delivered |
+| [shipment-exception-reported.v1](shipment-exception-reported.v1.schema.json) | Event: an exception Tracking event was recorded for a Shipment, with the exception type and remark |
 
 Conventions: property names in camelCase, timestamps as UTC with an offset, weights in kilograms as numbers, money in EUR without VAT as numbers rounded to cents, countries as ISO 3166-1 alpha-2 codes.

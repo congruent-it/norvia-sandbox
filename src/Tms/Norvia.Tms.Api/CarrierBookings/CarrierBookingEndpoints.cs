@@ -214,25 +214,10 @@ public static class CarrierBookingEndpoints
     }
 
     /// <summary>
-    /// The problem for a refused call, with a status that says which rule it broke, the refusal's own code where it has
-    /// one (the wrong Carrier answering has none), and the call's own correlation ID, which the refusal is traced on, so
-    /// the Integration console can join its Message trail.
+    /// The problem for a refused call. The wrong Carrier answering is the one refusal with no code, and is forbidden.
     /// </summary>
-    private static ProblemHttpResult Refused<T>(Result<T> result, string title, string correlationId)
-    {
-        var refusal = result.ValidationErrors.First();
-        var extensions = new Dictionary<string, object?> { ["correlationId"] = correlationId };
-        if (!string.IsNullOrEmpty(refusal.ErrorCode))
-        {
-            extensions["code"] = refusal.ErrorCode;
-        }
-
-        return TypedResults.Problem(
-            statusCode: string.IsNullOrEmpty(refusal.ErrorCode) ? StatusCodes.Status403Forbidden : StatusCodeOf(Enum.Parse<CarrierBookingRefusalCode>(refusal.ErrorCode)),
-            title: title,
-            detail: refusal.ErrorMessage,
-            extensions: extensions);
-    }
+    private static ProblemHttpResult Refused<T>(Result<T> result, string title, string correlationId) =>
+        RefusalProblem.Of<CarrierBookingRefusalCode, T>(result, title, correlationId, StatusCodeOf, StatusCodes.Status403Forbidden);
 
     private static int StatusCodeOf(CarrierBookingRefusalCode code) => code switch
     {

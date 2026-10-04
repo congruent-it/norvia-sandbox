@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/shipment-collected.v1.schema.json",
+  "title": "ShipmentCollected",
+  "description": "A Tracking event moved a Booked Shipment to Collected: the goods have been picked up. Published on the Shipment events topic, under the correlation ID of the Tracking event, which API Management creates, through the TMS's transactional outbox (Canonical Model event, version 1).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "eventType",
+    "eventVersion",
+    "occurredAt",
+    "correlationId",
+    "shipmentNumber",
+    "transportOrderNumber",
+    "carrierId",
+    "carrierBookingReference",
+    "eventTime",
+    "location",
+    "eta"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "eventType": {
+      "const": "ShipmentCollected"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "occurredAt": {
+      "description": "When the TMS recorded the Tracking event.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "correlationId": {
+      "description": "The Tracking event's own correlation ID, which API Management creates.",
+      "type": "string",
+      "minLength": 1
+    },
+    "shipmentNumber": {
+      "type": "string",
+      "pattern": "^SH-[0-9]{7}$"
+    },
+    "transportOrderNumber": {
+      "description": "The Transport Order the Shipment carries out.",
+      "type": "string",
+      "pattern": "^TO-[0-9]{7}$"
+    },
+    "carrierId": {
+      "description": "The Carrier that reported the event; null when Own fleet did.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "carrierBookingReference": {
+      "description": "The Carrier's own reference for the booking; null for an Own fleet event, which names its Trip instead (P12).",
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "eventTime": {
+      "description": "When it happened, with the offset of where.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "location": {
+      "description": "Where the event happened.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "place",
+        "postcode",
+        "countryCode"
+      ],
+      "properties": {
+        "place": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "postcode": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "countryCode": {
+          "description": "ISO 3166-1 alpha-2.",
+          "type": "string",
+          "pattern": "^[A-Z]{2}$"
+        }
+      }
+    },
+    "eta": {
+      "description": "The ETA the event gave; null when it gave none.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    }
+  }
+}

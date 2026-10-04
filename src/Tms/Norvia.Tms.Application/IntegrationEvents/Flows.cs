@@ -22,4 +22,10 @@ public static class Flows
     /// trail of the release that created it.
     /// </summary>
     public const string CarrierBookingReport = "carrier-booking-report";
+
+    /// <summary>
+    /// A Carrier's Tracking event (P5), recorded on the correlation ID API Management creates for it. The TMS stores it on
+    /// the Tracking event, and the events it publishes carry it.
+    /// </summary>
+    public const string CarrierTracking = "carrier-tracking";
 }

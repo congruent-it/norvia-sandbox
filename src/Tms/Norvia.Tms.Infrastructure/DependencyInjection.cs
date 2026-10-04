@@ -16,9 +16,11 @@ using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.Rate;
 using Norvia.Tms.Application.TransportOrders.Submit;
 using Norvia.Tms.Domain.CarrierBookings;
+using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Infrastructure.CarrierBookings;
 using Norvia.Tms.Infrastructure.Carriers;
+using Norvia.Tms.Infrastructure.Clock;
 using Norvia.Tms.Infrastructure.Data;
 using Norvia.Tms.Infrastructure.Outbox;
 using Norvia.Tms.Infrastructure.RateCards;
@@ -26,6 +28,7 @@ using Norvia.Tms.Infrastructure.Rating;
 using Norvia.Tms.Infrastructure.Seed;
 using Norvia.Tms.Infrastructure.Shipments;
 using Norvia.Tms.Infrastructure.Shippers;
+using Norvia.Tms.Infrastructure.TrackingEvents;
 using Norvia.Tms.Infrastructure.TransportOrders;
 
 namespace Norvia.Tms.Infrastructure;
@@ -54,6 +57,9 @@ public static class DependencyInjection
         builder.Services.AddOptions<CarrierBookingOptions>().BindConfiguration(CarrierBookingOptions.SectionName)
             .ValidateDataAnnotations().ValidateOnStart();
         builder.Services.AddSingleton(services => new CarrierBookingOverdueRules(services.GetRequiredService<IOptions<CarrierBookingOptions>>().Value.OverdueAfter));
+        builder.Services.AddOptions<TrackingEventOptions>().BindConfiguration(TrackingEventOptions.SectionName)
+            .ValidateDataAnnotations().ValidateOnStart();
+        builder.Services.AddSingleton(services => new TrackingEventRules(services.GetRequiredService<IOptions<TrackingEventOptions>>().Value.ClockSkew));
         builder.Services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
         builder.Services.AddScoped(typeof(IReadRepository<>), typeof(EfRepository<>));
         builder.Services.AddScoped<IDomainEventDispatcher, MediatorDomainEventDispatcher>();
@@ -133,7 +139,16 @@ public static class DependencyInjection
         builder.Services.AddDbContext<TmsDbContext>(options =>
             options.UseSqlServer(builder.Configuration.GetConnectionString(DatabaseConnectionName)));
         builder.EnrichSqlServerDbContext<TmsDbContext>();
-        builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton(ClockFor(builder.Environment, builder.Configuration));
         builder.Services.AddScoped<OutboxBuffer>();
     }
+
+    /// <summary>
+    /// The system's clock, or, on a development host told where, a clock a test host sets by writing a file
+    /// (<c>Clock:ControlFile</c>): never in a deployed environment, where nothing may set the TMS's time.
+    /// </summary>
+    internal static TimeProvider ClockFor(IHostEnvironment environment, IConfiguration configuration) =>
+        environment.IsDevelopment() && configuration["Clock:ControlFile"] is { Length: > 0 } path
+            ? new FileControlledTimeProvider(path)
+            : TimeProvider.System;
 }

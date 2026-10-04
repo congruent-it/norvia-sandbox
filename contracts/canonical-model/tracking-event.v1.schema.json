@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/tracking-event.v1.schema.json",
+  "title": "TrackingEvent",
+  "description": "One report that something happened to a Shipment, as the Carrier-tracking Logic App sends it to the TMS Tracking event API's record operation (Canonical Model command, version 1). The correlation ID, which API Management creates for the event, is in X-Correlation-ID. The event names its source: a Carrier ID, which comes from API Management's token check (ADR 0005) and never from the Carrier's own payload, or Own fleet. Only the types the TMS can record so far are listed; each later P5 ticket adds its own.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "source",
+    "carrierBookingReference",
+    "type",
+    "eventTime",
+    "location"
+  ],
+  "properties": {
+    "eventId": {
+      "description": "The source's own ID for the event, unique per source: sent again, it is recognised as a repeat.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "source": {
+      "description": "Who reported the event.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "carrierId"
+          ],
+          "properties": {
+            "type": {
+              "const": "Carrier"
+            },
+            "carrierId": {
+              "description": "The reporting Carrier.",
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ],
+          "properties": {
+            "type": {
+              "const": "OwnFleet"
+            }
+          }
+        }
+      ]
+    },
+    "carrierBookingReference": {
+      "description": "The Carrier's own reference for its booking. With the Carrier, it finds the Shipment.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "type": {
+      "enum": [
+        "Collected"
+      ]
+    },
+    "eventTime": {
+      "description": "When it happened, with the offset of where it happened. Not in the future, beyond a small clock-skew allowance.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "location": {
+      "description": "Where the event happened.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "place",
+        "postcode",
+        "countryCode"
+      ],
+      "properties": {
+        "place": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "postcode": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "countryCode": {
+          "description": "ISO 3166-1 alpha-2.",
+          "type": "string",
+          "pattern": "^[A-Z]{2}$"
+        }
+      }
+    },
+    "eta": {
+      "description": "The ETA the reporter gave, if any.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "remark": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    }
+  }
+}

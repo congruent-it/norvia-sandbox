@@ -13,4 +13,7 @@ public enum ShipmentStatus
 
     /// <summary>Its Carrier booking is Confirmed (P4). P5 takes it from here. P3 and P4 can no longer change it.</summary>
     Booked,
+
+    /// <summary>The goods have been picked up (P5): a Tracking event reported it. The status only moves forward.</summary>
+    Collected,
 }
