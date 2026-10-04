@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Globalization;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
@@ -244,7 +245,36 @@ public class TmsFixture : IAsyncLifetime
             }
         }
 
+        description.AppendLine("Machine:");
+        description.AppendLine(await RunAsync("sh", "-c", "uptime; free -m; ps -eo pid,pcpu,pmem,etime,args --sort=-pcpu | cut -c1-200 | head -15"));
         return description.ToString();
+    }
+
+    private static async Task<string> RunAsync(string fileName, params string[] arguments)
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            var start = new ProcessStartInfo(fileName) { RedirectStandardOutput = true, RedirectStandardError = true };
+            foreach (var argument in arguments)
+            {
+                start.ArgumentList.Add(argument);
+            }
+
+            using var process = Process.Start(start)!;
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var output = await process.StandardOutput.ReadToEndAsync(timeout.Token);
+            await process.WaitForExitAsync(timeout.Token);
+            return output;
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or System.ComponentModel.Win32Exception)
+        {
+            return $"({ex.Message})";
+        }
     }
 
     // Now and then a resource keeps waiting for one that is running and healthy (the migrations for SQL Server, on a CI
