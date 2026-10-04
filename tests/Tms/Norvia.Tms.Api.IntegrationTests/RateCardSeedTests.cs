@@ -25,6 +25,7 @@ public sealed class RateCardSeedTests
         var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(
             [$"Parameters:{LocalTokens.SigningKeyParameter}={Convert.ToHexString(RandomNumberGenerator.GetBytes(32))}"],
             timeout.Token);
+        builder.RemoveWhatTheTmsApiTestsDontUse();
         builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(r => r.Name == "tms-api"))
             .WithEnvironment("Seed__Path", Path.Combine(AppContext.BaseDirectory, "Seed", "tms.overlapping-zones-seed.json"));
         await using var app = await builder.BuildAsync(timeout.Token);
