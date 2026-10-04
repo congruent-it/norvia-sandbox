@@ -59,6 +59,7 @@ public class TmsFixture : IAsyncLifetime
 
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan StartAttemptTimeout = TimeSpan.FromMinutes(3);
+    private static readonly TimeSpan StallTimeout = TimeSpan.FromSeconds(60);
     private const int StartAttempts = 3;
     private readonly string _tokenSigningKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
@@ -110,7 +111,7 @@ public class TmsFixture : IAsyncLifetime
                 await StartAppAsync(attemptTimeout.Token);
                 break;
             }
-            catch (Exception ex) when (ex is ContainerExitedException || (ex is OperationCanceledException && !startup.IsCancellationRequested))
+            catch (Exception ex) when (ex is ContainerExitedException or StartStalledException || (ex is OperationCanceledException && !startup.IsCancellationRequested))
             {
                 var description = await DescribeResourcesAsync();
                 var logFile = Environment.GetEnvironmentVariable("NORVIA_TEST_LOG_FILE");
@@ -176,7 +177,7 @@ public class TmsFixture : IAsyncLifetime
         using var attempt = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var starting = _app.StartAsync(attempt.Token);
         var healthy = _app.ResourceNotifications.WaitForResourceHealthyAsync("tms-api", attempt.Token);
-        var exited = WaitForAContainerToExitAsync(attempt.Token);
+        var exited = Task.WhenAny(WaitForAContainerToExitAsync(attempt.Token), WaitForTheStartToStallAsync(attempt.Token)).Unwrap();
         var started = Task.WhenAll(starting, healthy);
         try
         {
@@ -244,6 +245,33 @@ public class TmsFixture : IAsyncLifetime
         }
 
         return description.ToString();
+    }
+
+    // Now and then a resource keeps waiting for one that is running and healthy (the migrations for SQL Server, on a CI
+    // runner's first start), which no timeout of Aspire's ends. When no resource has changed for a minute and none is
+    // still starting, nothing will, so the attempt ends.
+    private async Task WaitForTheStartToStallAsync(CancellationToken cancellationToken)
+    {
+        var model = _app!.Services.GetRequiredService<DistributedApplicationModel>();
+        var lastSignature = string.Empty;
+        var lastChange = DateTime.UtcNow;
+        while (true)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+            var states = model.Resources
+                .Select(resource => _app.ResourceNotifications.TryGetCurrentState(resource.Name, out var current) ? current.Snapshot : null)
+                .ToList();
+            var signature = string.Join(';', states.Select(snapshot => $"{snapshot?.State?.Text}/{snapshot?.HealthStatus}"));
+            if (signature != lastSignature || states.Any(snapshot => snapshot?.State?.Text == "Starting"))
+            {
+                lastSignature = signature;
+                lastChange = DateTime.UtcNow;
+            }
+            else if (DateTime.UtcNow - lastChange > StallTimeout)
+            {
+                throw new StartStalledException(StallTimeout);
+            }
+        }
     }
 
     private async Task WaitForAContainerToExitAsync(CancellationToken cancellationToken)
@@ -392,3 +420,6 @@ public class TmsFixture : IAsyncLifetime
 
 internal sealed class ContainerExitedException(string container, int? exitCode)
     : Exception($"Container '{container}' exited during startup with exit code {exitCode}.");
+
+internal sealed class StartStalledException(TimeSpan quietFor)
+    : Exception($"No resource of the AppHost changed for {quietFor.TotalSeconds:0} s while it started.");
