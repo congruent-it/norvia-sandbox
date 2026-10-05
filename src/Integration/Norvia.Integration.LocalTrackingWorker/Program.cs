@@ -9,6 +9,10 @@ builder.AddAzureServiceBusClient("messaging");
 
 builder.Services.AddOptions<TrackingWorkerOptions>().BindConfiguration(TrackingWorkerOptions.SectionName)
     .ValidateDataAnnotations()
+    // Data annotations don't look inside the token options, so they are checked here too.
+    .Validate(options => !string.IsNullOrWhiteSpace(options.TmsTokens.Issuer) && !string.IsNullOrWhiteSpace(options.TmsTokens.Audience)
+        && !string.IsNullOrWhiteSpace(options.TmsTokens.ClientId) && !string.IsNullOrWhiteSpace(options.TmsTokens.SigningKey),
+        "Tracking:TmsTokens needs an Issuer, an Audience, a ClientId and a SigningKey.")
     .ValidateOnStart();
 builder.Services.AddSingleton(TimeProvider.System);
 
