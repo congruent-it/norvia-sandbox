@@ -4,6 +4,7 @@ namespace Norvia.Tms.Application.ProofsOfDelivery.Read;
 
 /// <summary>A Shipment's Proof of delivery as the API shows it, with its files, which are read through <see cref="ProofOfDeliveryFileView.Id"/>.</summary>
 /// <param name="DeliveryTime">When the goods were delivered, with the offset of where.</param>
+/// <param name="IsCurrent">False for one a later Proof of delivery replaced; it is kept, and its files can still be read.</param>
 /// <param name="Source">The Carrier ID, or Own fleet.</param>
 public sealed record ProofOfDeliveryView(
     Guid Id,
@@ -19,7 +20,8 @@ public sealed record ProofOfDeliveryView(
     string? Remark,
     DateTimeOffset ReceivedAt,
     string CorrelationId,
-    IReadOnlyList<ProofOfDeliveryFileView> Files)
+    IReadOnlyList<ProofOfDeliveryFileView> Files,
+    bool IsCurrent)
 {
     public static ProofOfDeliveryView Of(ProofOfDelivery proofOfDelivery)
     {
@@ -38,7 +40,8 @@ public sealed record ProofOfDeliveryView(
             proofOfDelivery.Remark,
             proofOfDelivery.ReceivedAt,
             proofOfDelivery.CorrelationId.Value,
-            [.. proofOfDelivery.Files.Select(file => new ProofOfDeliveryFileView(file.Id, file.Name, file.ContentType, file.SizeBytes))]);
+            [.. proofOfDelivery.Files.Select(file => new ProofOfDeliveryFileView(file.Id, file.Name, file.ContentType, file.SizeBytes))],
+            proofOfDelivery.IsCurrent);
     }
 }
 

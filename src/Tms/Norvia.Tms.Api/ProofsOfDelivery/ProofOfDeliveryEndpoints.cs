@@ -58,7 +58,7 @@ public static class ProofOfDeliveryEndpoints
         proofsOfDelivery.MapGet("/shipments/{shipmentNumber}/proof-of-delivery/files/{fileId:guid}", GetFileAsync)
             .RequireAuthorization()
             .WithName("GetShipmentProofOfDeliveryFile")
-            .WithSummary("Read one file of a Shipment's current Proof of delivery, with the content type it was sent with.");
+            .WithSummary("Read one file of a Shipment's Proofs of delivery, current or superseded, with the content type it was sent with.");
 
         return app;
     }

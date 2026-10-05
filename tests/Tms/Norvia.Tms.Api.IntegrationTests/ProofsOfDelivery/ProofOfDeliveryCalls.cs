@@ -99,6 +99,10 @@ internal static class ProofOfDeliveryCalls
         return await tms.Tms.GetAsync(new Uri($"/v1/shipments/{shipmentNumber}/proof-of-delivery/files/{fileId}", UriKind.Relative), cancellationToken);
     }
 
+    /// <summary>Every Proof of delivery on a Shipment's timeline, current and superseded, from the API.</summary>
+    public static async Task<JsonArray> GetProofsOnTimelineAsync(this TmsFixture tms, string shipmentNumber, CancellationToken cancellationToken) =>
+        (await tms.GetTimelineAsync(shipmentNumber, cancellationToken))["proofsOfDelivery"]!.AsArray();
+
     /// <summary>The Delivered Shipments without a current Proof of delivery, from the API.</summary>
     public static async Task<JsonArray> ListDeliveredWithoutProofAsync(this TmsFixture tms, CancellationToken cancellationToken)
     {

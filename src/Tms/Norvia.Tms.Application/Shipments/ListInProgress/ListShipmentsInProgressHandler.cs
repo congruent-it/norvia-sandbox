@@ -1,6 +1,7 @@
 using Ardalis.SharedKernel;
 using Mediator;
 using Norvia.Tms.Application.Carriers;
+using Norvia.Tms.Domain.ProofsOfDelivery;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.TransportOrders;
@@ -11,6 +12,7 @@ public sealed class ListShipmentsInProgressHandler(
     IReadRepository<Shipment> shipments,
     IReadRepository<TrackingEvent> trackingEvents,
     IReadRepository<TransportOrder> transportOrders,
+    IReadRepository<ProofOfDelivery> proofsOfDelivery,
     ICarrierDirectory carriers,
     ShipmentStaleRules staleRules,
     TimeProvider time)
@@ -28,18 +30,19 @@ public sealed class ListShipmentsInProgressHandler(
 
         var eventsByShipment = (await trackingEvents.ListAsync(new TrackingEventsForShipmentsSpec([.. inProgress.Select(shipment => shipment.Id)]), cancellationToken))
             .ToLookup(trackingEvent => trackingEvent.ShipmentId);
+        var shipmentIdsWithProof = (await proofsOfDelivery.ListAsync(new CurrentProofsOfDeliveryForShipmentsSpec([.. inProgress.Select(shipment => shipment.Id)]), cancellationToken)).ToHashSet();
         var orderNumbers = inProgress.Select(shipment => shipment.TransportOrderNumber).Distinct().ToList();
         var detailsByOrder = (await transportOrders.ListAsync(new TransportOrdersByNumbersSpec(orderNumbers), cancellationToken))
             .ToDictionary(order => order.Number!, order => order.Details);
 
         var now = time.GetUtcNow();
         return [.. inProgress
-            .Select(shipment => Summarize(shipment, [.. eventsByShipment[shipment.Id]], detailsByOrder.GetValueOrDefault(shipment.TransportOrderNumber), now))
+            .Select(shipment => Summarize(shipment, [.. eventsByShipment[shipment.Id]], detailsByOrder.GetValueOrDefault(shipment.TransportOrderNumber), shipmentIdsWithProof.Contains(shipment.Id), now))
             .OrderByDescending(summary => summary.IsStale)
             .ThenBy(summary => summary.Eta ?? DateTimeOffset.MaxValue)];
     }
 
-    private ShipmentInProgressSummary Summarize(Shipment shipment, List<TrackingEvent> events, TransportOrderDetails? details, DateTimeOffset now)
+    private ShipmentInProgressSummary Summarize(Shipment shipment, List<TrackingEvent> events, TransportOrderDetails? details, bool hasProofOfDelivery, DateTimeOffset now)
     {
         var deliveryWindow = details?.Delivery?.Window;
         var last = events.MaxBy(trackingEvent => trackingEvent.ReceivedAt);
@@ -50,6 +53,7 @@ public sealed class ListShipmentsInProgressHandler(
             shipment.Status,
             last is null ? null : LastTrackingEventView.Of(last),
             ShipmentEta.Of(events, deliveryWindow),
-            isStale);
+            isStale,
+            hasProofOfDelivery);
     }
 }

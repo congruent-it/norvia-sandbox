@@ -31,7 +31,7 @@ public sealed class ReadProofOfDeliveryHandlerTests
 
         result.Value.Should().BeEquivalentTo(new ProofOfDeliveryView(
             proofOfDelivery.Id.Value, "SH-0000012", "CAR-0001", "doc-1", "J. Becker", DeliveryTime, "Düsseldorf", "40213", "DE",
-            DeliveryCondition.Clean, "Signed at the dock", proofOfDelivery.ReceivedAt, "corr-pod", [new ProofOfDeliveryFileView(Cmr().Id, "cmr.pdf", "application/pdf", 4)]));
+            DeliveryCondition.Clean, "Signed at the dock", proofOfDelivery.ReceivedAt, "corr-pod", [new ProofOfDeliveryFileView(Cmr().Id, "cmr.pdf", "application/pdf", 4)], true));
     }
 
     [Theory]
@@ -95,12 +95,28 @@ public sealed class ReadProofOfDeliveryHandlerTests
         result.Status.Should().Be(ResultStatus.NotFound);
     }
 
+    [Fact]
+    public async Task GetFile_StreamsAFileOfASupersededProofOfDeliveryToo()
+    {
+        var superseded = ProofOfDelivery.Record(_shipment, Report(files: [Cmr()]), new CorrelationId("corr-1"), new DateTimeOffset(2026, 9, 26, 8, 0, 0, TimeSpan.Zero));
+        var current = ProofOfDelivery.Record(
+            _shipment, Report(documentId: "doc-2", files: [Cmr() with { Id = Guid.NewGuid() }]), new CorrelationId("corr-2"), new DateTimeOffset(2026, 9, 26, 9, 0, 0, TimeSpan.Zero), superseded);
+        _proofsOfDelivery.ListAsync(Arg.Is<ProofsOfDeliveryForShipmentSpec>(s => s.ShipmentId == _shipment.Id), Arg.Any<CancellationToken>()).Returns([superseded, current]);
+        using var content = new MemoryStream([1, 2, 3, 4]);
+        _files.OpenReadAsync(_shipment.Number, Cmr(), Arg.Any<CancellationToken>()).Returns(content);
+
+        var result = await Handler().Handle(new GetProofOfDeliveryFileQuery("SH-0000012", Cmr().Id), CancellationToken.None);
+
+        result.Value.Should().Be(new ProofOfDeliveryFileContent("cmr.pdf", "application/pdf", content));
+    }
+
     private GetProofOfDeliveryFileHandler Handler() => new(_shipments, _proofsOfDelivery, _files);
 
     private ProofOfDelivery HasCurrent()
     {
         var proofOfDelivery = ProofOfDelivery.Record(_shipment, Report(), new CorrelationId("corr-pod"), new DateTimeOffset(2026, 9, 26, 8, 0, 0, TimeSpan.Zero));
         _proofsOfDelivery.SingleOrDefaultAsync(Arg.Is<CurrentProofOfDeliverySpec>(s => s.ShipmentId == _shipment.Id), Arg.Any<CancellationToken>()).Returns(proofOfDelivery);
+        _proofsOfDelivery.ListAsync(Arg.Is<ProofsOfDeliveryForShipmentSpec>(s => s.ShipmentId == _shipment.Id), Arg.Any<CancellationToken>()).Returns([proofOfDelivery]);
         return proofOfDelivery;
     }
 }

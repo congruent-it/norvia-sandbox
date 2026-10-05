@@ -154,6 +154,7 @@ public sealed class ShipmentsInProgressTests : TmsWebContext
         ShipmentStatus.Collected,
         new LastTrackingEventView(TrackingEventType.Collected, new DateTimeOffset(2026, 9, 26, 4, 0, 0, TimeSpan.Zero), "Rotterdam", "3011 AA", "NL"),
         new DateTimeOffset(2026, 9, 27, 10, 0, 0, TimeSpan.Zero),
+        false,
         false);
 
     private static List<string> CellsOf(IRenderedComponent<ShipmentsInProgress> page, string shipmentNumber) =>
