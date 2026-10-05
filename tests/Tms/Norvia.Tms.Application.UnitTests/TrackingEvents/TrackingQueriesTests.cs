@@ -1,5 +1,6 @@
 using Ardalis.Result;
 using Ardalis.SharedKernel;
+using Microsoft.Extensions.Time.Testing;
 using Norvia.Tms.Application.Carriers;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shipments.ListInProgress;
@@ -11,7 +12,6 @@ using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.Shippers;
 using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.TransportOrders;
-using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 
 namespace Norvia.Tms.Application.UnitTests.TrackingEvents;

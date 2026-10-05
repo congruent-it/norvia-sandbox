@@ -34,7 +34,7 @@ public sealed class ListShipmentsInProgressHandler(
 
         var now = time.GetUtcNow();
         return [.. inProgress
-            .Select(shipment => Summarize(shipment, eventsByShipment[shipment.Id].ToList(), detailsByOrder.GetValueOrDefault(shipment.TransportOrderNumber), now))
+            .Select(shipment => Summarize(shipment, [.. eventsByShipment[shipment.Id]], detailsByOrder.GetValueOrDefault(shipment.TransportOrderNumber), now))
             .OrderByDescending(summary => summary.IsStale)
             .ThenBy(summary => summary.Eta ?? DateTimeOffset.MaxValue)];
     }
