@@ -3,7 +3,6 @@
 @rendermode InteractiveServer
 @using Norvia.Tms.Application.CarrierBookings
 @using Norvia.Tms.Application.Shipments
-@using Norvia.Tms.Application.TrackingEvents.Timeline
 @implements IDisposable
 @inject ITransportOrderQueries Queries
 @inject ILogger<ShipmentDetail> Logger
@@ -88,35 +87,9 @@ else
             </div>
         }
 
-        @* What the Carriers reported, in event-time order, each with when it arrived and whether it moved the status. *@
+        @* What the Carriers reported, in event-time order. It reads for itself, so a timeline that can't be read doesn't hide the Shipment. *@
         <div class="md:col-span-3">
-            <TransportOrderSection Heading="Tracking timeline">
-                @if (_timelineFailed)
-                {
-                    <div role="alert">
-                        <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
-                            The Tracking timeline couldn't be loaded. Reload the page to try again.
-                        </FluentMessageBar>
-                    </div>
-                }
-                else if (_timeline is not { Count: > 0 })
-                {
-                    <p class="!mb-0" role="status">No Tracking events have been reported for this Shipment.</p>
-                }
-                else
-                {
-                    <FluentDataGrid Items="_timeline.AsQueryable()" TGridItem="TrackingTimelineEntry" Class="flatly-table" aria-label="Tracking timeline"
-                                    GridTemplateColumns="1fr 1.2fr 1.4fr 1.2fr auto 1.2fr 1.6fr" MultiLine="true">
-                        <PropertyColumn Title="Event" Property="@(entry => TrackingText.Type(entry.Type))" />
-                        <PropertyColumn Title="Happened" Property="@(entry => NorviaTime.Format(entry.EventTime))" />
-                        <PropertyColumn Title="Place" Property="@(entry => TrackingText.Place(entry.Place, entry.Postcode, entry.CountryCode))" />
-                        <PropertyColumn Title="Arrived" Property="@(entry => NorviaTime.Format(entry.ReceivedAt))" />
-                        <PropertyColumn Title="Moved the status" Property="@(entry => entry.MovedShipment ? "Yes" : "No")" />
-                        <PropertyColumn Title="ETA" Property="@(entry => NorviaTime.Format(entry.Eta))" />
-                        <PropertyColumn Title="Remark" Property="@(entry => entry.Remark ?? string.Empty)" />
-                    </FluentDataGrid>
-                }
-            </TransportOrderSection>
+            <TrackingTimeline ShipmentNumber="@ShipmentNumber" />
         </div>
     </div>
 }
@@ -126,25 +99,17 @@ else
     private bool _failed;
     private readonly CancellationTokenSource _closed = new();
     private ShipmentView? _shipment;
-    private IReadOnlyList<TrackingTimelineEntry>? _timeline;
-    private bool _timelineFailed;
 
     [Parameter, EditorRequired]
     public string ShipmentNumber { get; set; } = string.Empty;
 
     protected override async Task OnParametersSetAsync()
     {
-        _loaded = _failed = _timelineFailed = false;
+        _loaded = _failed = false;
         _shipment = null;
-        _timeline = null;
         try
         {
             _shipment = await Queries.FindShipmentAsync(ShipmentNumber, _closed.Token);
-            if (_shipment is not null)
-            {
-                await LoadTimelineAsync();
-            }
-
             _loaded = true;
         }
         catch (OperationCanceledException) when (_closed.IsCancellationRequested)
@@ -155,20 +120,6 @@ else
         {
             Logger.LogWarning(exception, "Reading Shipment {ShipmentNumber} failed", ShipmentNumber);
             _failed = true;
-        }
-    }
-
-    // Apart from the Shipment itself: a timeline that can't be read doesn't hide the Shipment.
-    private async Task LoadTimelineAsync()
-    {
-        try
-        {
-            _timeline = await Queries.FindTrackingTimelineAsync(ShipmentNumber, _closed.Token);
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            Logger.LogWarning(exception, "Reading the Tracking timeline of Shipment {ShipmentNumber} failed", ShipmentNumber);
-            _timelineFailed = true;
         }
     }
 
