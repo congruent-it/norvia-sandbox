@@ -41,7 +41,7 @@ public sealed record ProofOfDeliveryRules(TimeSpan ClockSkew)
 
         for (var i = 0; i < files.Count; i++)
         {
-            if (contents[i].Length > MaxFileBytes)
+            if (files[i].SizeBytes > MaxFileBytes || contents[i].Length > MaxFileBytes)
             {
                 return NotAccepted(Invariant($"File {files[i].Name} is over 10 MB."));
             }

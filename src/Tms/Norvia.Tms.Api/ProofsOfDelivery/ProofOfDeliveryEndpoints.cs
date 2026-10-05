@@ -88,9 +88,18 @@ public static class ProofOfDeliveryEndpoints
         var described = new List<ProofOfDeliveryFile>();
         foreach (var file in form.Files.Where(file => file.Name == ProofOfDeliveryReader.FilesPart))
         {
-            using var content = new MemoryStream();
-            await file.CopyToAsync(content, cancellationToken);
-            contents.Add(content.ToArray());
+            // A file the TMS will refuse for its count or size is described but never buffered: the refusal needs only its size.
+            if (described.Count >= ProofOfDeliveryRules.MaxFiles || file.Length > ProofOfDeliveryRules.MaxFileBytes)
+            {
+                contents.Add(ReadOnlyMemory<byte>.Empty);
+            }
+            else
+            {
+                using var content = new MemoryStream();
+                await file.CopyToAsync(content, cancellationToken);
+                contents.Add(content.ToArray());
+            }
+
             described.Add(ProofOfDeliveryFile.New(file.FileName, file.ContentType, file.Length));
         }
 
