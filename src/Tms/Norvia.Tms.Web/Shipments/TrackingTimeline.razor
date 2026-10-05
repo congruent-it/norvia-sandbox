@@ -1,10 +1,11 @@
+@using Norvia.Tms.Application.ProofsOfDelivery.Read
 @using Norvia.Tms.Application.TrackingEvents.Timeline
 @using Norvia.Tms.Web.TransportOrders
 @implements IDisposable
 @inject ITransportOrderQueries Queries
 @inject ILogger<TrackingTimeline> Logger
 
-@* A Shipment's Tracking events in event-time order, each with when it arrived and whether it moved the status. *@
+@* A Shipment's Tracking events in event-time order, each with when it arrived and whether it moved the status, and its Proofs of delivery with their files. *@
 <TransportOrderSection Heading="Tracking timeline">
     @if (_failed)
     {
@@ -14,13 +15,13 @@
             </FluentMessageBar>
         </div>
     }
-    else if (_timeline is not { Count: > 0 })
+    else if (_timeline is not { TrackingEvents.Count: > 0 })
     {
         <p class="!mb-0" role="status">No Tracking events have been reported for this Shipment.</p>
     }
     else
     {
-        <FluentDataGrid Items="_timeline.AsQueryable()" TGridItem="TrackingTimelineEntry" Class="flatly-table" aria-label="Tracking timeline"
+        <FluentDataGrid Items="_timeline.TrackingEvents.AsQueryable()" TGridItem="TrackingTimelineEntry" Class="flatly-table" aria-label="Tracking timeline"
                         GridTemplateColumns="1fr 1.2fr 1.4fr 1.2fr auto 1.2fr 1.6fr" MultiLine="true">
             <PropertyColumn Title="Event" Property="@(entry => TrackingText.Type(entry.Type))" />
             <PropertyColumn Title="Happened" Property="@(entry => NorviaTime.Format(entry.EventTime))" />
@@ -33,9 +34,47 @@
     }
 </TransportOrderSection>
 
+<TransportOrderSection Heading="Proofs of delivery">
+    @if (_failed)
+    {
+        <p class="!mb-0" role="status">The Proofs of delivery couldn't be loaded either.</p>
+    }
+    else if (_timeline is null)
+    {
+        <p class="!mb-0" role="status">Loading the Proofs of delivery…</p>
+    }
+    else if (_timeline.ProofsOfDelivery.Count == 0)
+    {
+        <p class="!mb-0" role="status">No Proof of delivery has been received for this Shipment.</p>
+    }
+    else
+    {
+        @* A superseded Proof of delivery is struck through but kept, and its files can still be opened. *@
+        <FluentDataGrid Items="_timeline.ProofsOfDelivery.AsQueryable()" TGridItem="ProofOfDeliveryView" Class="flatly-table" aria-label="Proofs of delivery"
+                        GridTemplateColumns="1.2fr 1.4fr 1fr 1.4fr 2fr" MultiLine="true">
+            <TemplateColumn Title="Received by">@Struck(context, context.ReceivedBy)</TemplateColumn>
+            <TemplateColumn Title="Delivered">@Struck(context, NorviaTime.Format(context.DeliveryTime))</TemplateColumn>
+            <TemplateColumn Title="Condition">@Struck(context, ProofOfDeliveryText.Condition(context.Condition))</TemplateColumn>
+            <TemplateColumn Title="Remark">@Struck(context, context.Remark ?? string.Empty)</TemplateColumn>
+            <TemplateColumn Title="Files">
+                <ul class="m-0 list-none space-y-1 p-0">
+                    @foreach (var file in context.Files)
+                    {
+                        <li>
+                            <a href="@ProofOfDeliveryFileEndpoints.PathOf(context.ShipmentNumber, file.Id)" target="_blank" rel="noopener">@file.Name</a>
+                            (<a href="@ProofOfDeliveryFileEndpoints.PathOf(context.ShipmentNumber, file.Id, download: true)" download="@file.Name" aria-label="Download @file.Name">download</a>,
+                            @ProofOfDeliveryText.Size(file.SizeBytes))
+                        </li>
+                    }
+                </ul>
+            </TemplateColumn>
+        </FluentDataGrid>
+    }
+</TransportOrderSection>
+
 @code {
     private readonly CancellationTokenSource _closed = new();
-    private IReadOnlyList<TrackingTimelineEntry>? _timeline;
+    private ShipmentTimeline? _timeline;
     private bool _failed;
 
     [Parameter, EditorRequired]
@@ -59,6 +98,20 @@
             _failed = true;
         }
     }
+
+    // A superseded one is struck through, as a deleted text that assistive technology announces.
+    private static RenderFragment Struck(ProofOfDeliveryView proof, string text) => builder =>
+    {
+        if (proof.IsCurrent)
+        {
+            builder.AddContent(0, text);
+            return;
+        }
+
+        builder.OpenElement(1, "del");
+        builder.AddContent(2, text);
+        builder.CloseElement();
+    };
 
     public void Dispose()
     {

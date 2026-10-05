@@ -1,3 +1,4 @@
+using Norvia.Tms.Application.ProofsOfDelivery.ListMissing;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shipments.ListAwaitingAnswer;
 using Norvia.Tms.Application.Shipments.ListInProgress;
@@ -46,6 +47,9 @@ public interface ITransportOrderQueries
     /// <summary>The Planner's Shipments in progress: the Booked, Collected and In transit ones, Stale first and then by ETA.</summary>
     Task<IReadOnlyList<ShipmentInProgressSummary>> ListShipmentsInProgressAsync(CancellationToken cancellationToken);
 
-    /// <summary>The Shipment's Tracking events in event-time order, or null when there is no such Shipment.</summary>
-    Task<IReadOnlyList<TrackingTimelineEntry>?> FindTrackingTimelineAsync(string shipmentNumber, CancellationToken cancellationToken);
+    /// <summary>The Planner's Delivered Shipments without a current Proof of delivery: the flagged ones first, then the oldest delivered.</summary>
+    Task<IReadOnlyList<DeliveredShipmentWithoutProofOfDeliverySummary>> ListDeliveredShipmentsWithoutProofOfDeliveryAsync(CancellationToken cancellationToken);
+
+    /// <summary>The Shipment's Tracking events in event-time order and its Proofs of delivery, or null when there is no such Shipment.</summary>
+    Task<ShipmentTimeline?> FindTrackingTimelineAsync(string shipmentNumber, CancellationToken cancellationToken);
 }

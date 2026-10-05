@@ -1,3 +1,4 @@
+using Norvia.Tms.Application.TrackingEvents.Timeline;
 using AngleSharp.Dom;
 using Norvia.Tms.Application.CarrierBookings;
 using Norvia.Tms.Application.Shipments;
@@ -137,7 +138,7 @@ public sealed class ShipmentDetailTests : TmsWebContext
     public void Render_AShipment_ShowsItsTrackingTimeline()
     {
         Queries.FindShipmentAsync("SH-0000012", Arg.Any<CancellationToken>()).Returns(Samples.Shipment("SH-0000012"));
-        Queries.FindTrackingTimelineAsync("SH-0000012", Arg.Any<CancellationToken>()).Returns([]);
+        Queries.FindTrackingTimelineAsync("SH-0000012", Arg.Any<CancellationToken>()).Returns(new ShipmentTimeline([], []));
 
         var page = RenderDetail("SH-0000012");
 

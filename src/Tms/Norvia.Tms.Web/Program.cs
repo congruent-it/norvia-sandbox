@@ -4,6 +4,7 @@ using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Infrastructure;
 using Norvia.Tms.Web.Components;
 using Norvia.Tms.Web.Roles;
+using Norvia.Tms.Web.Shipments;
 using Norvia.Tms.Web.TmsApi;
 using Norvia.Tms.Web.TransportOrders;
 
@@ -41,6 +42,7 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 app.MapRoleSwitcher();
+app.MapProofOfDeliveryFiles();
 app.MapDefaultEndpoints();
 
 await app.RunAsync();

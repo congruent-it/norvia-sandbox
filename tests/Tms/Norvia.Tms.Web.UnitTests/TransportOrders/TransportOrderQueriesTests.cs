@@ -2,6 +2,7 @@ using Ardalis.Result;
 using Mediator;
 using Microsoft.Extensions.DependencyInjection;
 using Norvia.Tms.Application.Carriers.ListActive;
+using Norvia.Tms.Application.ProofsOfDelivery.ListMissing;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shipments.GetByNumber;
 using Norvia.Tms.Application.Shipments.ListInProgress;
@@ -62,10 +63,21 @@ public sealed class TransportOrderQueriesTests : IDisposable
     }
 
     [Fact]
+    public async Task ListDeliveredShipmentsWithoutProofOfDeliveryAsync_ReturnsWhatTheQueryGives()
+    {
+        IReadOnlyList<DeliveredShipmentWithoutProofOfDeliverySummary> delivered = [];
+        _mediator.Send(new ListDeliveredShipmentsWithoutProofOfDeliveryQuery(), Arg.Any<CancellationToken>()).Returns(delivered);
+
+        var shipments = await _queries.ListDeliveredShipmentsWithoutProofOfDeliveryAsync(Xunit.TestContext.Current.CancellationToken);
+
+        shipments.Should().BeSameAs(delivered);
+    }
+
+    [Fact]
     public async Task FindTrackingTimelineAsync_AKnownShipment_ReturnsItsTimeline()
     {
-        IReadOnlyList<TrackingTimelineEntry> timeline = [];
-        _mediator.Send(new GetTrackingTimelineQuery("SH-0000012"), Arg.Any<CancellationToken>()).Returns(Result.Success(new ShipmentTimeline(timeline, [])));
+        var timeline = new ShipmentTimeline([], []);
+        _mediator.Send(new GetTrackingTimelineQuery("SH-0000012"), Arg.Any<CancellationToken>()).Returns(Result.Success(timeline));
 
         var found = await _queries.FindTrackingTimelineAsync("SH-0000012", Xunit.TestContext.Current.CancellationToken);
 
