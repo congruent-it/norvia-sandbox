@@ -70,6 +70,3 @@ public abstract record ShipmentProgressV1(
         new(ShipmentEventProperties.AssignedTo, (CarrierId is null ? AssignedTo.OwnFleet : AssignedTo.Carrier).ToString()),
     ];
 }
-
-/// <summary>Where a Tracking event happened, as the Canonical Model names it.</summary>
-public sealed record TrackingLocationV1(string Place, string Postcode, string CountryCode);

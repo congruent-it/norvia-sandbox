@@ -181,7 +181,7 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
     public TrackingEvent Record(TrackingReport report, CorrelationId correlationId, DateTimeOffset receivedAt)
     {
         var trackingEvent = TrackingEvent.Record(this, report, correlationId, receivedAt);
-        var target = StatusOf(report.Type);
+        var target = TargetStatusOf(report.Type);
         if (Status >= ShipmentStatus.Booked && target > Status)
         {
             Status = target;
@@ -190,14 +190,15 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
             {
                 ShipmentStatus.Collected => new ShipmentCollectedEvent(this, trackingEvent),
                 ShipmentStatus.InTransit => new ShipmentInTransitEvent(this, trackingEvent),
-                _ => new ShipmentDeliveredEvent(this, trackingEvent),
+                ShipmentStatus.Delivered => new ShipmentDeliveredEvent(this, trackingEvent),
+                _ => throw new InvalidOperationException($"A Tracking event doesn't move a Shipment to {target}."),
             });
         }
 
         return trackingEvent;
     }
 
-    private static ShipmentStatus StatusOf(TrackingEventType type) => type switch
+    private static ShipmentStatus TargetStatusOf(TrackingEventType type) => type switch
     {
         TrackingEventType.Collected => ShipmentStatus.Collected,
         TrackingEventType.Departed or TrackingEventType.Arrived or TrackingEventType.OutForDelivery => ShipmentStatus.InTransit,
