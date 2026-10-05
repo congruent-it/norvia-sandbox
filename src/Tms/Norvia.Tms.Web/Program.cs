@@ -14,6 +14,7 @@ builder.AddServiceDefaults();
 // The TMS UI reads through the TMS query side, in process. It changes things only through the TMS API, as its own
 // identity, and takes in nothing and publishes nothing: the TMS API does, and runs the outbox publisher (ADR 0028).
 builder.AddTmsInfrastructure();
+builder.AddTmsProofOfDeliveryStorage();
 builder.Services.AddMediator(options =>
 {
     options.ServiceLifetime = ServiceLifetime.Scoped;

@@ -9,6 +9,7 @@ using Microsoft.Extensions.Options;
 using Norvia.Tms.Application.CarrierBookings;
 using Norvia.Tms.Application.Carriers;
 using Norvia.Tms.Application.IntegrationEvents;
+using Norvia.Tms.Application.ProofsOfDelivery;
 using Norvia.Tms.Application.RateCards;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shippers;
@@ -24,6 +25,7 @@ using Norvia.Tms.Infrastructure.Carriers;
 using Norvia.Tms.Infrastructure.Clock;
 using Norvia.Tms.Infrastructure.Data;
 using Norvia.Tms.Infrastructure.Outbox;
+using Norvia.Tms.Infrastructure.ProofsOfDelivery;
 using Norvia.Tms.Infrastructure.RateCards;
 using Norvia.Tms.Infrastructure.Rating;
 using Norvia.Tms.Infrastructure.Seed;
@@ -38,6 +40,7 @@ public static class DependencyInjection
 {
     public const string DatabaseConnectionName = "tms";
     public const string MessagingConnectionName = "messaging";
+    public const string BlobStorageConnectionName = "blobs";
 
     public static IHostApplicationBuilder AddTmsInfrastructure(this IHostApplicationBuilder builder)
     {
@@ -97,6 +100,20 @@ public static class DependencyInjection
         builder.Services.AddSingleton<RatingSignal>();
         builder.Services.AddSingleton<IRatingTrigger>(services => services.GetRequiredService<RatingSignal>());
         builder.Services.AddHostedService<RatingWorker>();
+
+        return builder;
+    }
+
+    /// <summary>
+    /// Keeps Proof of delivery files in the TMS's own blob storage (P6). The TMS API stores the files and the TMS UI
+    /// reads them in process (ADR 0028).
+    /// </summary>
+    public static IHostApplicationBuilder AddTmsProofOfDeliveryStorage(this IHostApplicationBuilder builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.AddAzureBlobServiceClient(BlobStorageConnectionName);
+        builder.Services.AddSingleton<IProofOfDeliveryFiles, AzureBlobProofOfDeliveryFiles>();
 
         return builder;
     }

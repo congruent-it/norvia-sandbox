@@ -24,6 +24,8 @@ var reportRole = 'CarrierBookings.Report'
 var reportRoleId = guid('norvia-tms-api', environmentName, reportRole)
 var recordRole = 'TrackingEvents.Record'
 var recordRoleId = guid('norvia-tms-api', environmentName, recordRole)
+var recordProofRole = 'ProofsOfDelivery.Record'
+var recordProofRoleId = guid('norvia-tms-api', environmentName, recordProofRole)
 var trackingSubmitRole = 'Tracking.Submit'
 var trackingSubmitRoleId = guid('norvia-partner-api', environmentName, trackingSubmitRole)
 var respondRole = 'CarrierBookings.Respond'
@@ -110,6 +112,16 @@ resource tmsApi 'Microsoft.Graph/applications@v1.0' = {
       value: recordRole
       displayName: 'Record Tracking events'
       description: 'Record a Tracking event reported for a Shipment (P5). Only the Carrier-tracking Logic App holds it, and later the Driver reports Logic App (P12).'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
+    {
+      id: recordProofRoleId
+      value: recordProofRole
+      displayName: 'Record Proofs of delivery'
+      description: 'Record a Proof of delivery with its files for a Shipment (P6). Only the Carrier Proof of delivery Logic App will hold it, and later the Driver reports Logic App (P12).'
       allowedMemberTypes: [
         'Application'
       ]

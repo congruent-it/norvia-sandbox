@@ -123,6 +123,44 @@ public sealed class AppHostModelTests
     }
 
     [Fact]
+    public async Task Locally_Azurite_StandsInForTheTmsBlobStorage_AndTheTmsWaitsForIt()
+    {
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(TestContext.Current.CancellationToken);
+
+        var storage = builder.Resources.OfType<AzureStorageResource>().Single();
+        storage.IsEmulator.Should().BeTrue();
+        Resource(builder, "tms-api").Annotations.OfType<WaitAnnotation>().Should().Contain(wait => wait.Resource.Name == "blobs");
+        (await EnvironmentOfAsync(builder, "tms-api")).Keys.Should().Contain("ConnectionStrings__blobs");
+    }
+
+    [Fact]
+    public async Task InAzure_TheTms_HasABlobContainerForProofOfDeliveryFiles_WhoseBlobsMoveToCoolAfter30Days()
+    {
+        await using var builder = await CreateForAzureAsync();
+
+        builder.Resources.OfType<AzureBlobStorageContainerResource>().Should().ContainSingle(container => container.BlobContainerName == "proofs-of-delivery");
+        var bicep = builder.Resources.OfType<AzureStorageResource>().Single().GetBicepTemplateString();
+        bicep.Should().Contain("Microsoft.Storage/storageAccounts/managementPolicies@")
+            .And.Contain("tierToCool")
+            .And.MatchRegex(@"daysAfterModificationGreaterThan: 30\b")
+            .And.Contain("proofs-of-delivery/");
+        bicep.Should().NotContain("tierToArchive", "the files are kept, never archived or deleted").And.NotContain("delete:");
+    }
+
+    [Fact]
+    public async Task InAzure_TheTmsApi_CanWriteItsBlobs_AndTheTmsUiOnlyReadThem()
+    {
+        await using var builder = await CreateForAzureAsync();
+
+        (await EnvironmentOfAsync(builder, "tms-api")).Keys.Should().Contain("ConnectionStrings__blobs");
+        (await EnvironmentOfAsync(builder, "tms-web")).Keys.Should().Contain("ConnectionStrings__blobs");
+        Resource(builder, "tms-api").Annotations.OfType<Aspire.Hosting.Azure.RoleAssignmentAnnotation>()
+            .Should().ContainSingle(role => role.Target is AzureStorageResource).Which.Roles.Select(r => r.Name).Should().Equal("StorageBlobDataContributor");
+        Resource(builder, "tms-web").Annotations.OfType<Aspire.Hosting.Azure.RoleAssignmentAnnotation>()
+            .Should().ContainSingle(role => role.Target is AzureStorageResource).Which.Roles.Select(r => r.Name).Should().Equal("StorageBlobDataReader");
+    }
+
+    [Fact]
     public async Task Locally_ADatabaseViewer_RunsBesideSql_ToInspectTheDatabases()
     {
         await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(TestContext.Current.CancellationToken);

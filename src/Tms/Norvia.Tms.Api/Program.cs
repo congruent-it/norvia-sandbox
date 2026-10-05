@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Norvia.Tms.Api.CarrierBookings;
+using Norvia.Tms.Api.ProofsOfDelivery;
 using Norvia.Tms.Api.Shipments;
 using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Api.TrackingEvents;
@@ -13,6 +14,7 @@ using Norvia.Tms.Api.TransportOrders;
 using Norvia.Tms.Application.CarrierBookings.Answer;
 using Norvia.Tms.Application.CarrierBookings.Report;
 using Norvia.Tms.Application.CarrierBookings.Withdraw;
+using Norvia.Tms.Application.ProofsOfDelivery.Record;
 using Norvia.Tms.Application.Shipments.Reassign;
 using Norvia.Tms.Application.Shipments.Release;
 using Norvia.Tms.Application.TrackingEvents.Record;
@@ -43,7 +45,9 @@ builder.Services
         TrackCarrierBookingReportInLoggingScope<ReportCarrierBookingNotDeliveredCommand>>();
 builder.Services.AddScoped<IPipelineBehavior<WithdrawCarrierBookingCommand, Result<CarrierBookingWithdrawResult>>, TrackCarrierBookingWithdrawalInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<RecordTrackingCommand, Result<RecordTrackingResult>>, TrackTrackingEventInLoggingScope>();
+builder.Services.AddScoped<IPipelineBehavior<RecordProofOfDeliveryCommand, Result<RecordProofOfDeliveryResult>>, TrackProofOfDeliveryInLoggingScope>();
 builder.AddTmsInfrastructure();
+builder.AddTmsProofOfDeliveryStorage();
 builder.AddTmsOutboxPublisher();
 builder.AddTmsRatingWorker();
 
@@ -136,6 +140,7 @@ app.MapTransportOrders();
 app.MapShipments();
 app.MapCarrierBookings();
 app.MapTrackingEvents();
+app.MapProofsOfDelivery();
 
 await app.RunAsync();
 

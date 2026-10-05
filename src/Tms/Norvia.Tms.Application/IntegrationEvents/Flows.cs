@@ -28,4 +28,10 @@ public static class Flows
     /// the Tracking event, and the events it publishes carry it.
     /// </summary>
     public const string CarrierTracking = "carrier-tracking";
+
+    /// <summary>
+    /// A Carrier's Proof of delivery (P6), recorded on the correlation ID API Management creates for it. The TMS stores it
+    /// on the Proof of delivery, and the event it publishes carries it.
+    /// </summary>
+    public const string CarrierProofOfDelivery = "carrier-proof-of-delivery";
 }
