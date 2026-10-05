@@ -119,8 +119,18 @@ public sealed class ProofOfDelivery : EntityBase<ProofOfDeliveryId>, IAggregateR
         {
             Location = report.Location,
         };
-        replaces?.IsCurrent = false;
+        replaces?.Supersede();
         proofOfDelivery.RegisterDomainEvent(new ProofOfDeliveryReceivedEvent(shipment, proofOfDelivery, replacesEarlier: replaces is not null));
         return proofOfDelivery;
     }
+
+    /// <summary>Whether a report is this Proof of delivery sent again: the same source under the same document ID.</summary>
+    public bool IsRepeatOf(ProofOfDeliveryReport report)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+        return Source == report.Source && DocumentId == report.DocumentId;
+    }
+
+    /// <summary>A later Proof of delivery replaced it as the Shipment's current one. It is kept, and nothing of it is merged.</summary>
+    private void Supersede() => IsCurrent = false;
 }

@@ -75,6 +75,16 @@ public sealed class ProofOfDeliveryTests
     }
 
     [Fact]
+    public void IsRepeatOf_IsTrueOnlyForTheSameSourceAndDocumentId()
+    {
+        var proofOfDelivery = ProofOfDelivery.Record(BookedShipment(), Report(), new CorrelationId("corr-pod"), ReceivedAt);
+
+        proofOfDelivery.IsRepeatOf(Report()).Should().BeTrue();
+        proofOfDelivery.IsRepeatOf(Report() with { DocumentId = "doc-other" }).Should().BeFalse();
+        proofOfDelivery.IsRepeatOf(Report() with { Source = ProofOfDeliverySource.OwnFleet }).Should().BeFalse();
+    }
+
+    [Fact]
     public void Record_WithNoFiles_IsABug()
     {
         var act = () => ProofOfDelivery.Record(BookedShipment(), Report(files: []), new CorrelationId("corr-pod"), ReceivedAt);

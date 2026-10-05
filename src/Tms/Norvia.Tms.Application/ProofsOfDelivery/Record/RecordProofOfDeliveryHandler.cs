@@ -35,7 +35,7 @@ public sealed class RecordProofOfDeliveryHandler(
 
         // A Carrier's retry of a document ID it already sent is harmless: it gets the original result and nothing is published.
         var original = await proofsOfDelivery.SingleOrDefaultAsync(new ProofOfDeliveryByDocumentIdSpec(report.Source, report.DocumentId), cancellationToken);
-        if (original is not null)
+        if (original?.IsRepeatOf(report) is true)
         {
             var originalShipment = await shipments.SingleOrDefaultAsync(new ShipmentByNumberSpec(original.ShipmentNumber), cancellationToken)
                 ?? throw new InvalidOperationException($"Proof of delivery {original.Id} names Shipment {original.ShipmentNumber}, which the TMS doesn't have.");
