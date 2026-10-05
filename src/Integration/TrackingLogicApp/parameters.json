@@ -1,0 +1,14 @@
+{
+  "tmsBaseUrl": {
+    "type": "String",
+    "value": "@appsetting('TMS_BASE_URL')"
+  },
+  "tmsAudience": {
+    "type": "String",
+    "value": "@appsetting('TMS_API_CLIENT_ID')"
+  },
+  "trackingIdentityId": {
+    "type": "String",
+    "value": "@appsetting('TRACKING_IDENTITY_ID')"
+  }
+}

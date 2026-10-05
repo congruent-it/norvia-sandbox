@@ -108,6 +108,21 @@ public sealed class AppHostModelTests
     }
 
     [Fact]
+    public async Task Locally_ATrackingWorker_PlaysTheCarrierTrackingLogicApp_AsTheIdentityHoldingTheRecordRole_AndTheQueueIsThere()
+    {
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(TestContext.Current.CancellationToken);
+
+        var worker = await EnvironmentOfAsync(builder, "tracking-worker");
+        var portal = await EnvironmentOfAsync(builder, "partner-portal-web");
+
+        worker.Should().Contain("Tracking__TmsTokens__ClientId", "norvia-local-tracking-logic-app")
+            .And.Contain("Tracking__TmsTokens__Audience", "api://norvia-tms")
+            .And.ContainKey("Tracking__TmsTokens__SigningKey");
+        builder.Resources.OfType<AzureServiceBusQueueResource>().Should().ContainSingle(queue => queue.QueueName == "carrier-tracking");
+        portal.Should().Contain("PartnerApi__LocalTokens__Roles__van-dijk-transport__1", "Tracking.Submit");
+    }
+
+    [Fact]
     public async Task Locally_ADatabaseViewer_RunsBesideSql_ToInspectTheDatabases()
     {
         await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(TestContext.Current.CancellationToken);
@@ -239,7 +254,7 @@ public sealed class AppHostModelTests
     {
         await using var builder = await CreateForAzureAsync();
 
-        builder.Resources.Should().NotContain(resource => resource.Name == "partner-api");
+        builder.Resources.Should().NotContain(resource => resource.Name == "partner-api" || resource.Name == "tracking-worker");
     }
 
     [Fact]

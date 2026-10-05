@@ -155,6 +155,12 @@ API Management passes the answer to the Logic App's HTTP trigger as the Carrier 
 
 A Carrier reports what happened to a Shipment with a tracking message in the [carrier-tracking.v1](carrier-tracking.v1.schema.json) format ([P5](../../docs/processes/tms/p5-shipment-tracking.md#carrier-tracking-format)). The Carrier-tracking Logic App maps it to the Canonical Model [Tracking event](../canonical-model/tracking-event.v1.schema.json) before calling the TMS. The map is `CarrierTrackingMap`, run as a local function like the others ([ADR 0019](../../docs/adr/0019-the-intake-map-is-dotnet-code-run-as-a-logic-apps-local-function.md)). It is tested against the sample pairs in `samples/carrier-tracking`, with no Azure.
 
+### How a Carrier submits it
+
+`POST /partner/v1/carrier-tracking` with the subscription key and a token holding the app role `Tracking.Submit`. API Management checks both, takes the Carrier from the token's `azp`, creates the correlation ID and puts the message, as sent, on the tracking queue. It then answers `202 Accepted` with `{ "messageId": "<correlation ID>" }` and the same `X-Correlation-ID` header. The Carrier learns nothing more ([ADR 0008](../../docs/adr/0008-carrier-tracking-events-are-accepted-asynchronously.md)). A token without the role, or for a client that is no Carrier, gets `403`; if the message can't be put on the queue the answer is `503` and the Carrier sends it again. No Logic App is called: the Carrier-tracking Logic App reads the queue. Locally the Partner API stand-in answers the same ([ADR 0031](../../docs/adr/0031-locally-a-stand-in-and-a-hosted-worker-play-the-carrier-tracking-path.md)).
+
+The message carries the application properties `correlationId`, `partyId` (the Carrier ID), `sourceMessageId` (the Carrier's `eventId`, when it has one) and `flow` = `carrier-tracking`, so a message Service Bus dead-letters itself can still be found by the Integration console.
+
 The message never names the Carrier: API Management takes it from the token ([ADR 0005](../../docs/adr/0005-partner-identity-comes-from-the-token.md)).
 
 | Carrier tracking | Canonical Model `TrackingEvent` | What the map does |

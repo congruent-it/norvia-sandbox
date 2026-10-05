@@ -16,6 +16,8 @@
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />
+    <Using Include="Norvia.Integration.UnitTests" />
+    <Compile Include="..\Shared\StubHttp.cs" Link="StubHttp.cs" />
     <Using Include="AwesomeAssertions" />
     <ProjectReference Include="..\..\..\src\Integration\Norvia.Integration.LocalBookingWorker\Norvia.Integration.LocalBookingWorker.csproj" />
   </ItemGroup>

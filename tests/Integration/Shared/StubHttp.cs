@@ -1,7 +1,7 @@
 using System.Net;
 using System.Text;
 
-namespace Norvia.Integration.LocalBookingWorker.UnitTests;
+namespace Norvia.Integration.UnitTests;
 
 /// <summary>Stands in for an HTTP endpoint: answers each request with the next of what the test queued, and keeps what it got.</summary>
 public sealed class StubHttp(TimeProvider time) : HttpMessageHandler

@@ -1,0 +1,290 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "triggers": {
+      "When_a_Carrier_tracking_message_is_available": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "queueName": "carrier-tracking",
+            "isSessionsEnabled": false
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBus",
+            "operationId": "peekLockQueueMessages",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "correlation": {
+          "clientTrackingId": "@{triggerOutputs()?['body']?['userProperties']?['correlationId']}"
+        }
+      }
+    },
+    "actions": {
+      "Track_the_event": {
+        "type": "Compose",
+        "inputs": {
+          "correlationId": "@triggerBody()?['userProperties']?['correlationId']",
+          "partyId": "@triggerBody()?['userProperties']?['partyId']",
+          "sourceMessageId": "@triggerBody()?['userProperties']?['sourceMessageId']"
+        },
+        "runAfter": {},
+        "trackedProperties": {
+          "correlationId": "@action()?['inputs']?['correlationId']",
+          "flow": "carrier-tracking",
+          "partyId": "@action()?['inputs']?['partyId']",
+          "sourceMessageId": "@action()?['inputs']?['sourceMessageId']"
+        }
+      },
+      "Map_the_event": {
+        "type": "InvokeFunction",
+        "inputs": {
+          "functionName": "MapCarrierTracking",
+          "parameters": {
+            "carrierTracking": "@{triggerBody()?['contentData']}",
+            "carrierId": "@{outputs('Track_the_event')?['partyId']}"
+          }
+        },
+        "runAfter": {
+          "Track_the_event": [
+            "Succeeded"
+          ]
+        },
+        "trackedProperties": {
+          "correlationId": "@outputs('Track_the_event')?['correlationId']",
+          "flow": "carrier-tracking",
+          "outcome": "@if(equals(action()?['status'], 'Failed'), 'DeadLettered', null)",
+          "failureCode": "@if(equals(action()?['status'], 'Failed'), 'UnmappableTrackingMessage', null)"
+        }
+      },
+      "Dead_letter_the_unmappable_message": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "lockToken": "@triggerBody()?['lockToken']",
+            "deadLetterReason": "UnmappableTrackingMessage",
+            "deadLetterErrorDescription": "The Carrier's tracking message could not be mapped: its status code is not in the Carrier tracking code list."
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBus",
+            "operationId": "deadLetterQueueMessage",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "runAfter": {
+          "Map_the_event": [
+            "Failed"
+          ]
+        },
+        "trackedProperties": {
+          "correlationId": "@outputs('Track_the_event')?['correlationId']",
+          "flow": "carrier-tracking",
+          "partyId": "@outputs('Track_the_event')?['partyId']",
+          "sourceMessageId": "@outputs('Track_the_event')?['sourceMessageId']",
+          "outcome": "DeadLettered",
+          "failureCode": "UnmappableTrackingMessage"
+        }
+      },
+      "Fail_the_run_on_the_unmappable_message": {
+        "type": "Terminate",
+        "inputs": {
+          "runStatus": "Failed",
+          "runError": {
+            "code": "UnmappableTrackingMessage",
+            "message": "The Carrier's tracking message could not be mapped, so it was dead-lettered."
+          }
+        },
+        "runAfter": {
+          "Dead_letter_the_unmappable_message": [
+            "Succeeded",
+            "Failed"
+          ]
+        }
+      },
+      "Record_in_the_TMS": {
+        "type": "Http",
+        "inputs": {
+          "method": "POST",
+          "uri": "@{parameters('tmsBaseUrl')}/v1/tracking-events",
+          "headers": {
+            "Content-Type": "application/json",
+            "X-Correlation-ID": "@{outputs('Track_the_event')?['correlationId']}"
+          },
+          "authentication": {
+            "type": "ManagedServiceIdentity",
+            "identity": "@parameters('trackingIdentityId')",
+            "audience": "@parameters('tmsAudience')"
+          },
+          "body": "@json(body('Map_the_event'))",
+          "retryPolicy": {
+            "type": "none"
+          }
+        },
+        "runAfter": {
+          "Map_the_event": [
+            "Succeeded"
+          ]
+        },
+        "trackedProperties": {
+          "correlationId": "@outputs('Track_the_event')?['correlationId']",
+          "flow": "carrier-tracking",
+          "partyId": "@outputs('Track_the_event')?['partyId']",
+          "sourceMessageId": "@outputs('Track_the_event')?['sourceMessageId']",
+          "shipmentNumber": "@actions('Record_in_the_TMS')?['outputs']?['body']?['shipmentNumber']",
+          "carrierBookingNumber": "@json(body('Map_the_event'))?['carrierBookingNumber']",
+          "outcome": "@if(and(greaterOrEquals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', if(or(equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 500)), 'Retrying', 'DeadLettered'))",
+          "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 500)), 'TmsUnavailable', coalesce(actions('Record_in_the_TMS')?['outputs']?['body']?['code'], 'TmsCallRefused')))"
+        }
+      },
+      "Settle_the_message": {
+        "type": "If",
+        "expression": {
+          "and": [
+            {
+              "greaterOrEquals": [
+                "@coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0)",
+                200
+              ]
+            },
+            {
+              "less": [
+                "@coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0)",
+                300
+              ]
+            }
+          ]
+        },
+        "actions": {
+          "Complete_the_message": {
+            "type": "ServiceProvider",
+            "inputs": {
+              "parameters": {
+                "lockToken": "@triggerBody()?['lockToken']"
+              },
+              "serviceProviderConfiguration": {
+                "connectionName": "serviceBus",
+                "operationId": "completeQueueMessage",
+                "serviceProviderId": "/serviceProviders/serviceBus"
+              }
+            },
+            "runAfter": {}
+          }
+        },
+        "else": {
+          "actions": {
+            "Settle_the_refused_or_unreached_message": {
+              "type": "If",
+              "expression": {
+                "and": [
+                  {
+                    "not": {
+                      "equals": [
+                        "@or(equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 500))",
+                        true
+                      ]
+                    }
+                  }
+                ]
+              },
+              "actions": {
+                "Dead_letter_the_refused_message": {
+                  "type": "ServiceProvider",
+                  "inputs": {
+                    "parameters": {
+                      "lockToken": "@triggerBody()?['lockToken']",
+                      "deadLetterReason": "@coalesce(actions('Record_in_the_TMS')?['outputs']?['body']?['code'], 'TmsCallRefused')",
+                      "deadLetterErrorDescription": "@coalesce(actions('Record_in_the_TMS')?['outputs']?['body']?['detail'], actions('Record_in_the_TMS')?['outputs']?['body']?['title'], 'The TMS refused the Tracking event.')"
+                    },
+                    "serviceProviderConfiguration": {
+                      "connectionName": "serviceBus",
+                      "operationId": "deadLetterQueueMessage",
+                      "serviceProviderId": "/serviceProviders/serviceBus"
+                    }
+                  },
+                  "runAfter": {},
+                  "trackedProperties": {
+                    "correlationId": "@outputs('Track_the_event')?['correlationId']",
+                    "flow": "carrier-tracking",
+                    "partyId": "@outputs('Track_the_event')?['partyId']",
+                    "sourceMessageId": "@outputs('Track_the_event')?['sourceMessageId']",
+                    "outcome": "DeadLettered",
+                    "failureCode": "@coalesce(actions('Record_in_the_TMS')?['outputs']?['body']?['code'], 'TmsCallRefused')"
+                  }
+                },
+                "Fail_the_run_on_the_refused_message": {
+                  "type": "Terminate",
+                  "inputs": {
+                    "runStatus": "Failed",
+                    "runError": {
+                      "code": "TmsCallRefused",
+                      "message": "The TMS refused the Tracking event, so the message was dead-lettered."
+                    }
+                  },
+                  "runAfter": {
+                    "Dead_letter_the_refused_message": [
+                      "Succeeded",
+                      "Failed"
+                    ]
+                  }
+                }
+              },
+              "else": {
+                "actions": {
+                  "Abandon_the_message_to_retry": {
+                    "type": "ServiceProvider",
+                    "inputs": {
+                      "parameters": {
+                        "lockToken": "@triggerBody()?['lockToken']"
+                      },
+                      "serviceProviderConfiguration": {
+                        "connectionName": "serviceBus",
+                        "operationId": "abandonQueueMessage",
+                        "serviceProviderId": "/serviceProviders/serviceBus"
+                      }
+                    },
+                    "runAfter": {},
+                    "trackedProperties": {
+                      "correlationId": "@outputs('Track_the_event')?['correlationId']",
+                      "flow": "carrier-tracking",
+                      "partyId": "@outputs('Track_the_event')?['partyId']",
+                      "sourceMessageId": "@outputs('Track_the_event')?['sourceMessageId']",
+                      "outcome": "Retrying",
+                      "failureCode": "TmsUnavailable"
+                    }
+                  },
+                  "Fail_the_run_on_the_unreached_TMS": {
+                    "type": "Terminate",
+                    "inputs": {
+                      "runStatus": "Failed",
+                      "runError": {
+                        "code": "TmsUnavailable",
+                        "message": "The TMS could not be reached, so the message goes back on the queue."
+                      }
+                    },
+                    "runAfter": {
+                      "Abandon_the_message_to_retry": [
+                        "Succeeded",
+                        "Failed"
+                      ]
+                    }
+                  }
+                }
+              },
+              "runAfter": {}
+            }
+          }
+        },
+        "runAfter": {
+          "Record_in_the_TMS": [
+            "Succeeded",
+            "Failed",
+            "TimedOut"
+          ]
+        }
+      }
+    },
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

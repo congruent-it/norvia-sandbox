@@ -29,8 +29,8 @@ param demoUiRedirectUris string = ''
 postdeploy hook stores it, so the console's app registration keeps it when the estate is deployed again.''')
 param integrationConsoleRedirectUris string = ''
 
-@description('''The TMS API's address, empty before the apps are first deployed. azd's postdeploy hook stores it, so the intake
-and Carrier-answer Logic Apps keep it when the estate is deployed again.''')
+@description('''The TMS API's address, empty before the apps are first deployed. azd's postdeploy hook stores it, so the intake,
+Carrier-answer and Carrier-tracking Logic Apps keep it when the estate is deployed again.''')
 param tmsBaseUrl string = ''
 
 @secure()
@@ -70,6 +70,8 @@ module messaging 'estate/messaging.bicep' = {
     tags: tags
     presenterPrincipalId: presenterPrincipalId
     bookingPrincipalId: identities.outputs.bookingPrincipalId
+    trackingPrincipalId: identities.outputs.trackingPrincipalId
+    apiManagementPrincipalId: identities.outputs.apiManagementPrincipalId
   }
 }
 
@@ -142,6 +144,23 @@ module bookingLogicApp 'estate/booking-logic-app.bicep' = {
   }
 }
 
+module trackingLogicApp 'estate/tracking-logic-app.bicep' = {
+  scope: resourceGroup
+  params: {
+    location: location
+    tags: tags
+    integrationRetentionDays: integrationRetentionDays
+    trackingIdentityName: identities.outputs.trackingIdentityName
+    tmsApiClientId: identities.outputs.tmsApiClientId
+    tmsBaseUrl: tmsBaseUrl
+    applicationInsightsName: monitoring.outputs.applicationInsightsName
+    serviceBusName: messaging.outputs.namespaceName
+    planName: intakeLogicApp.outputs.planName
+    contentKeyVaultName: intakeLogicApp.outputs.keyVaultName
+    integrationConsolePrincipalId: identities.outputs.integrationConsolePrincipalId
+  }
+}
+
 module partnerApi 'estate/partner-api.bicep' = {
   scope: resourceGroup
   params: {
@@ -156,6 +175,8 @@ module partnerApi 'estate/partner-api.bicep' = {
     intakeTriggerAudience: identities.outputs.intakeTriggerAudience
     answerLogicAppHostName: answerLogicApp.outputs.logicAppHostName
     answerTriggerAudience: identities.outputs.answerTriggerAudience
+    serviceBusName: messaging.outputs.namespaceName
+    trackingQueueName: messaging.outputs.queueName
     applicationInsightsName: monitoring.outputs.applicationInsightsName
     partnerPortalPrincipalId: identities.outputs.partnerPortalPrincipalId
     bookingPrincipalId: identities.outputs.bookingPrincipalId
@@ -186,6 +207,9 @@ output ESTATE_BOOKING_LOGIC_APP string = bookingLogicApp.outputs.logicAppName
 output ESTATE_ANSWER_LOGIC_APP string = answerLogicApp.outputs.logicAppName
 output ESTATE_ANSWER_CLIENT_ID string = identities.outputs.answerClientId
 output ESTATE_ANSWER_IDENTITY_NAME string = identities.outputs.answerIdentityName
+output ESTATE_TRACKING_LOGIC_APP string = trackingLogicApp.outputs.logicAppName
+output ESTATE_TRACKING_CLIENT_ID string = identities.outputs.trackingClientId
+output ESTATE_TRACKING_IDENTITY_NAME string = identities.outputs.trackingIdentityName
 output ESTATE_API_MANAGEMENT string = partnerApi.outputs.apiManagementName
 output ESTATE_PARTNER_API_URL string = partnerApi.outputs.partnerApiUrl
 output ESTATE_PARTNER_API_CLIENT_ID string = identities.outputs.partnerApiClientId

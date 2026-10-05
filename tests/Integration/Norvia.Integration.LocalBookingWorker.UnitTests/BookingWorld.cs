@@ -3,6 +3,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 
+using Norvia.Integration.LocalSupport;
+
 namespace Norvia.Integration.LocalBookingWorker.UnitTests;
 
 /// <summary>The flow with the Carrier's endpoint and the TMS stood in for, and a clock the test moves.</summary>

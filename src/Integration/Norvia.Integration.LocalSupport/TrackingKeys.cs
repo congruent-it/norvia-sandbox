@@ -1,10 +1,10 @@
-namespace Norvia.Integration.LocalPartnerApi;
+namespace Norvia.Integration.LocalSupport;
 
 /// <summary>
-/// The keys of the tracking contract (coding guidelines §7) under the names API Management's traces and the intake
-/// Logic App's tracked properties give them, so the stand-in's traces join a Message trail as theirs do (ADR 0023).
+/// The keys of the tracking contract (coding guidelines §7) under the names API Management's traces and the Logic Apps'
+/// tracked properties give them, so the stand-ins' traces join a Message trail as theirs do (ADR 0023, ADR 0030, ADR 0031).
 /// </summary>
-internal static class TrackingKeys
+public static class TrackingKeys
 {
     public const string CorrelationId = "correlationId";
     public const string Flow = "flow";
@@ -12,6 +12,7 @@ internal static class TrackingKeys
     public const string TransportOrderNumber = "transportOrderNumber";
     public const string ShipmentNumber = "shipmentNumber";
     public const string CarrierBookingNumber = "carrierBookingNumber";
+    public const string SourceMessageId = "sourceMessageId";
     public const string Outcome = "outcome";
     public const string FailureCode = "failureCode";
 
@@ -21,9 +22,17 @@ internal static class TrackingKeys
     /// <summary>The <see cref="Flow"/> of a Carrier's answer, from the edge to the TMS's answer.</summary>
     public const string CarrierAnswer = "carrier-answer";
 
-    /// <summary>The <see cref="Outcome"/>s the stand-in records.</summary>
+    /// <summary>The <see cref="Flow"/> of a Carrier booking, from the release to the report to the TMS.</summary>
+    public const string CarrierBooking = "carrier-booking";
+
+    /// <summary>The <see cref="Flow"/> of a Carrier's tracking message, from the edge to the TMS.</summary>
+    public const string CarrierTracking = "carrier-tracking";
+
+    /// <summary>The <see cref="Outcome"/>s the stand-ins record.</summary>
     public const string Succeeded = "Succeeded";
     public const string Refused = "Refused";
+    public const string Retrying = "Retrying";
+    public const string DeadLettered = "DeadLettered";
     public const string Failed = "Failed";
 
     /// <summary>An outcome and, when there is one, its failure code; a key that doesn't apply is left out, never sent empty.</summary>

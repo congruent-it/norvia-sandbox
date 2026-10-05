@@ -11,6 +11,8 @@ It creates the correlation ID. Then it does the intake Logic App's work with the
 
 It plays the Carrier's side too: `POST /partner/v1/carrier-answers` answers as API Management and the Carrier-answer Logic App do (P4). It checks the same four things, with the role `CarrierBookings.Respond` and a Carrier for the token's `azp` in place of the Shipper's, creates a new correlation ID for the answer, and does the Logic App's work with the Logic App's own code: `CarrierAnswerMap` maps the answer, the TMS's answer operation is called as the identity holding `CarrierBookings.Answer`, and `CarrierAnswerResponses` relays the TMS's response, `BookingNotOpen` included.
 
+It accepts a Carrier's tracking message too: `POST /partner/v1/carrier-tracking` checks the same four things with the role `Tracking.Submit`, puts the message on the tracking queue with the tracking contract's application properties and answers `202 Accepted`. The Carrier-tracking Logic App's side is played by a worker (ADR 0031).
+
 Tokens are local too: the AppHost's `local-token-signing-key` signs them, as it does for the TMS. Locally the Partner portal issues each Persona's token itself, as Entra would, with the role `TransportOrders.Submit` for Shipper Personas and `CarrierBookings.Respond` for Carrier Personas. The AppHost reads the Personas from the seed file, gives each one a client ID and a subscription key for the run, and passes them to both apps. That is what `identities.bicep` and `partner-api.bicep` do in Azure.
 
 ## Considered Options
@@ -21,6 +23,6 @@ Tokens are local too: the AppHost's `local-token-signing-key` signs them, as it 
 
 ## Consequences
 
-- The stand-in is a second implementation of the API Management policy in `infra/estate/partner-api/`. A change to the policy's checks, headers or answers must be made in both. The policies' own tests (`SubmitTransportOrderPolicyTests`, `AnswerCarrierBookingPolicyTests`) and the stand-in's tests check the same list. The Carrier-answer Logic App's steps are likewise in two places: its workflow and the stand-in's handler. `AnswerWorkflowTests` checks the workflow's definition, and the stand-in's tests check the map's and the relay's output and the correlation ID on the TMS call.
+- The stand-in is a second implementation of the API Management policy in `infra/estate/partner-api/`. A change to the policy's checks, headers or answers must be made in both. The policies' own tests (`SubmitTransportOrderPolicyTests`, `AnswerCarrierBookingPolicyTests`, `SubmitCarrierTrackingPolicyTests`) and the stand-in's tests check the same list. The Carrier-answer Logic App's steps are likewise in two places: its workflow and the stand-in's handler. `AnswerWorkflowTests` checks the workflow's definition, and the stand-in's tests check the map's and the relay's output and the correlation ID on the TMS call.
 - The stand-in retries the TMS through the standard resilience handler rather than the workflow's retry policy, and it writes no Logic App run history. Locally, the trail is in the Aspire dashboard's telemetry, where the Integration console searches it (ADR 0027), so the stand-in logs the tracking keys the policy's traces and the workflow's tracked properties record.
 - It runs only locally. `azd` never deploys it; in Azure the Partner portal is given API Management's address instead.

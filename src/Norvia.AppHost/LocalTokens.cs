@@ -5,6 +5,7 @@ namespace Norvia.AppHost;
 /// The Aspire test host sets that key and issues its own tokens, with or without the intake role. The local intake
 /// Logic App's client ID stands in for its managed identity, which in Azure is the only caller on the Shipper API channel.
 /// The local booking worker's client ID stands in for the P4 booking Logic App's, the one holder of the report role.
+/// The local tracking worker's client ID stands in for the Carrier-tracking Logic App's, the one holder of the record role.
 /// The local answer Logic App's client ID, which the stand-in Partner API signs its token with, is the one holder of the answer role.
 /// The TMS UI signs its own token for the TMS API with the key too, as its managed identity holding the manage role.
 /// The local Partner API trusts the same key for the Personas' tokens, which the Partner portal signs itself (ADR 0023).
@@ -17,6 +18,7 @@ public static class LocalTokens
     public const string IntakeLogicAppClientId = "norvia-local-intake-logic-app";
     public const string BookingLogicAppClientId = "norvia-local-booking-logic-app";
     public const string AnswerLogicAppClientId = "norvia-local-answer-logic-app";
+    public const string TrackingLogicAppClientId = "norvia-local-tracking-logic-app";
     public const string TmsUiClientId = "norvia-local-tms-ui";
     public const string PartnerApiAudience = "api://norvia-partner-api";
 
@@ -25,6 +27,9 @@ public static class LocalTokens
 
     /// <summary>The app role a Carrier Persona holds on the Norvia Partner API, as the estate grants it in Entra.</summary>
     public const string RespondRole = "CarrierBookings.Respond";
+
+    /// <summary>The app role a Carrier Persona holds on the Norvia Partner API to report tracking, as the estate grants it in Entra.</summary>
+    public const string TrackingSubmitRole = "Tracking.Submit";
 
     /// <summary>A Persona's local client ID, which stands in for its Entra client app.</summary>
     public static string PersonaClientId(string personaId) => $"norvia-local-persona-{personaId}";

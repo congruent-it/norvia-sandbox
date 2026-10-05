@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Norvia.Integration.CarrierBooking;
+using Norvia.Integration.LocalSupport;
 using Norvia.Integration.TransportOrderIntake;
 
 namespace Norvia.Integration.LocalPartnerApi;

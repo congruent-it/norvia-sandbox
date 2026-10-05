@@ -1,9 +1,9 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.IdentityModel.Tokens;
 
-namespace Norvia.Integration.LocalPartnerApi;
+namespace Norvia.Integration.LocalSupport;
 
-/// <summary>Tokens as the AppHost's local key signs them where Entra would (ADR 0023).</summary>
+/// <summary>Tokens as the AppHost's local key signs them where Entra would (ADR 0023, ADR 0030, ADR 0031).</summary>
 public sealed class LocalTokenOptions
 {
     [Required]
@@ -12,7 +12,7 @@ public sealed class LocalTokenOptions
     [Required]
     public string Audience { get; set; } = string.Empty;
 
-    /// <summary>The client the tokens are issued to; only for tokens this app issues itself.</summary>
+    /// <summary>The client the tokens are issued to; each stand-in names the Logic App it plays, or the Persona it signs for.</summary>
     public string? ClientId { get; set; }
 
     /// <summary>The AppHost's local signing key, base64-encoded.</summary>

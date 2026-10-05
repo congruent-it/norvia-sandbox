@@ -1,0 +1,63 @@
+using System.Text.Json.Nodes;
+
+namespace Norvia.Integration.CarrierBooking.UnitTests.TrackingLogicApp;
+
+/// <summary>The Carrier-tracking Logic App's files, src/Integration/TrackingLogicApp: its workflow, parameters, connections and host settings.</summary>
+internal static class TrackingWorkflow
+{
+    public const string Flow = "carrier-tracking";
+    public const string Tracking = "Track_the_event";
+    public const string Map = "Map_the_event";
+    public const string TmsCall = "Record_in_the_TMS";
+    public const string Settle = "Settle_the_message";
+
+    private static readonly Lazy<JsonObject> Parsed = new(() => Read("TrackingLogicApp/carrier-tracking/workflow.json"));
+
+    public static string WorkflowText => Contracts.Read("TrackingLogicApp/carrier-tracking/workflow.json");
+
+    public static JsonObject Definition => Parsed.Value["definition"]!.AsObject();
+
+    public static JsonObject Trigger => Definition["triggers"]!.AsObject().Single().Value!.AsObject();
+
+    public static JsonObject Actions => Definition["actions"]!.AsObject();
+
+    public static JsonObject Action(string name) =>
+        Find(Actions, name) ?? throw new InvalidOperationException($"The workflow has no action {name}.");
+
+    /// <summary>Every trigger and action in the workflow, nested ones included.</summary>
+    public static IEnumerable<(string Name, JsonObject Operation)> Operations()
+    {
+        yield return ("trigger", Trigger);
+        foreach (var action in AllActions(Actions))
+        {
+            yield return action;
+        }
+    }
+
+    public static JsonObject WorkflowFile() => Read("TrackingLogicApp/carrier-tracking/workflow.json");
+
+    public static string Kind => WorkflowFile()["kind"]!.GetValue<string>();
+
+    public static JsonObject HostFile => Read("TrackingLogicApp/host.json");
+
+    public static JsonObject ParametersFile => Read("TrackingLogicApp/parameters.json");
+
+    private static IEnumerable<(string Name, JsonObject Operation)> AllActions(JsonObject actions)
+    {
+        foreach (var (name, node) in actions)
+        {
+            var action = node!.AsObject();
+            yield return (name, action);
+            foreach (var nested in new[] { action["actions"], action["else"]?["actions"] }.OfType<JsonObject>().SelectMany(AllActions))
+            {
+                yield return nested;
+            }
+        }
+    }
+
+    private static JsonObject? Find(JsonObject actions, string name) =>
+        AllActions(actions).Where(action => action.Name == name).Select(action => action.Operation).FirstOrDefault();
+
+    private static JsonObject Read(string path) =>
+        JsonNode.Parse(Contracts.Read(path))?.AsObject() ?? throw new InvalidOperationException($"{path} holds no JSON object.");
+}

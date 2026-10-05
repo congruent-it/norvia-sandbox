@@ -2,6 +2,8 @@ using System.Text.Json.Nodes;
 using Microsoft.Extensions.Options;
 using Norvia.Integration.CarrierBooking;
 
+using Norvia.Integration.LocalSupport;
+
 namespace Norvia.Integration.LocalBookingWorker;
 
 /// <summary>How the flow's run ended: <see cref="Done"/>, or the way it failed, as the workflow's run would fail.</summary>

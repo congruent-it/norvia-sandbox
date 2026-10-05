@@ -169,6 +169,10 @@ else
     shipmentEvents.AddServiceBusSubscription("shipment-events-monitoring", subscriptionName: "monitoring");
     // The P4 booking Logic App's subscription: Carrier Shipments only (see ResubmitAwareFilters).
     shipmentEvents.AddServiceBusSubscription("carrier-booking");
+    // The tracking queue API Management puts a Carrier's tracking message on and the Carrier-tracking Logic App reads
+    // (ADR 0008). A message the TMS refuses is dead-lettered; one it can't be given to is delivered again up to the
+    // maximum delivery count, then dead-lettered by Service Bus itself. The estate Bicep sets the same count.
+    messaging.AddServiceBusQueue("carrier-tracking").WithProperties(queue => queue.MaxDeliveryCount = 10);
 
     // Locally there is no Easy Auth, so the console signs the developer in as an Integration operator with both app
     // roles, as the estate assigns the presenter. It reads Azure with the developer's own sign-in.
@@ -230,11 +234,12 @@ else
         .WithEnvironment("TmsApi__LocalTokens__Audience", LocalTokens.TmsAudience)
         .WithEnvironment("TmsApi__LocalTokens__ClientId", LocalTokens.TmsUiClientId);
 
-    // Locally a stand-in plays API Management and the intake and Carrier-answer Logic Apps (ADR 0023). The AppHost gives
+    // Locally a stand-in plays API Management and the intake and Carrier-answer Logic Apps (ADR 0023), and puts a Carrier's tracking message on the tracking queue. The AppHost gives
     // each Persona what the estate gives it in Azure: a client ID, a subscription key for the run, and the submit role if it
     // is a Shipper or the respond role if it is a Carrier.
     var partnerApi = builder.AddProject<Projects.Norvia_Integration_LocalPartnerApi>("partner-api")
         .WithReference(tmsApi).WaitFor(tmsApi)
+        .WithReference(messaging).WaitFor(messaging)
         .WithHttpHealthCheck("/health")
         .WithEnvironment("PartnerApi__Tokens__Issuer", LocalTokens.Issuer)
         .WithEnvironment("PartnerApi__Tokens__Audience", LocalTokens.PartnerApiAudience)
@@ -253,6 +258,15 @@ else
         .WithEnvironment("Booking__TmsTokens__Issuer", LocalTokens.Issuer)
         .WithEnvironment("Booking__TmsTokens__Audience", LocalTokens.TmsAudience)
         .WithEnvironment("Booking__TmsTokens__ClientId", LocalTokens.BookingLogicAppClientId);
+    // Locally a worker plays the Carrier-tracking Logic App too (ADR 0031). It reads the tracking queue API Management's
+    // stand-in fills and records each Tracking event with the TMS as the identity holding the record role.
+    var trackingWorker = builder.AddProject<Projects.Norvia_Integration_LocalTrackingWorker>("tracking-worker")
+        .WithReference(messaging).WaitFor(messaging)
+        .WithReference(tmsApi).WaitFor(tmsApi)
+        .WithEnvironment("Tracking__TmsBaseAddress", tmsApi.GetEndpoint("http"))
+        .WithEnvironment("Tracking__TmsTokens__Issuer", LocalTokens.Issuer)
+        .WithEnvironment("Tracking__TmsTokens__Audience", LocalTokens.TmsAudience)
+        .WithEnvironment("Tracking__TmsTokens__ClientId", LocalTokens.TrackingLogicAppClientId);
     foreach (var persona in personas.Where(persona => !persona.IsShipper))
     {
         var carrierApiKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
@@ -283,6 +297,7 @@ else
             // A Carrier Persona answers the booking requests in its inbox, for the Carrier its client stands for.
             partnerApi.WithEnvironment($"PartnerApi__CarriersByClientId__{LocalTokens.PersonaClientId(persona.Id)}", persona.PartyId);
             partnerPortal.WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__0", LocalTokens.RespondRole);
+            partnerPortal.WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__1", LocalTokens.TrackingSubmitRole);
         }
     }
 
@@ -294,6 +309,7 @@ else
         (partnerApi.Resource, "PartnerApi__Tokens__SigningKey"),
         (partnerApi.Resource, "Tms__Tokens__SigningKey"),
         (bookingWorker.Resource, "Booking__TmsTokens__SigningKey"),
+        (trackingWorker.Resource, "Tracking__TmsTokens__SigningKey"),
         (partnerPortal.Resource, "PartnerApi__LocalTokens__SigningKey"),
     })
     {
