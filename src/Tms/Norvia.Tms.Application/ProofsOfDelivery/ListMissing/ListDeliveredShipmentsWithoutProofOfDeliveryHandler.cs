@@ -29,26 +29,25 @@ public sealed class ListDeliveredShipmentsWithoutProofOfDeliveryHandler(
         }
 
         var ids = delivered.Select(shipment => shipment.Id).ToList();
-        var withProof = (await proofsOfDelivery.ListAsync(new CurrentProofsOfDeliveryForShipmentsSpec(ids), cancellationToken))
-            .Select(proofOfDelivery => proofOfDelivery.ShipmentId)
-            .ToHashSet();
-        var deliveredEvents = (await trackingEvents.ListAsync(new DeliveredTrackingEventsForShipmentsSpec(ids), cancellationToken))
-            .ToLookup(trackingEvent => trackingEvent.ShipmentId);
+        var withProof = (await proofsOfDelivery.ListAsync(new CurrentProofsOfDeliveryForShipmentsSpec(ids), cancellationToken)).ToHashSet();
+        var deliveredAtByShipment = (await trackingEvents.ListAsync(new DeliveredTrackingEventsForShipmentsSpec(ids), cancellationToken))
+            .GroupBy(row => row.ShipmentId)
+            .ToDictionary(rows => rows.Key, rows => rows.Min(row => row.EventTime));
 
         var now = time.GetUtcNow();
         return [.. delivered
             .Where(shipment => !withProof.Contains(shipment.Id))
-            .Select(shipment => Summarize(shipment, DeliveredAt(shipment, deliveredEvents[shipment.Id]), now))
+            .Select(shipment => Summarize(shipment, DeliveredAt(shipment, deliveredAtByShipment), now))
             .OrderByDescending(summary => summary.IsProofOfDeliveryMissing)
             .ThenBy(summary => summary.DeliveredAt)
             .ThenBy(summary => summary.ShipmentNumber, StringComparer.Ordinal)];
     }
 
-    private DeliveredShipmentWithoutProofOfDeliverySummary Summarize(Shipment shipment, DateTimeOffset deliveredAt, DateTimeOffset now) =>
+    private DeliveredShipmentWithoutProofOfDeliverySummary Summarize(DeliveredShipmentRow shipment, DateTimeOffset deliveredAt, DateTimeOffset now) =>
         new(shipment.Number.Value, CarriedByView.Of(shipment.CarriedBy, carriers), deliveredAt, rules.IsMissing(deliveredAt, now));
 
-    /// <summary>The event time of the Delivered event that made the Shipment Delivered; a later repeat of it doesn't move it.</summary>
-    private static DateTimeOffset DeliveredAt(Shipment shipment, IEnumerable<TrackingEvent> deliveredEvents) =>
-        deliveredEvents.Where(trackingEvent => trackingEvent.MovedShipment).Select(trackingEvent => (DateTimeOffset?)trackingEvent.EventTime).FirstOrDefault()
-        ?? throw new InvalidOperationException($"Shipment {shipment.Number} is Delivered, but no Delivered Tracking event moved it there.");
+    private static DateTimeOffset DeliveredAt(DeliveredShipmentRow shipment, Dictionary<ShipmentId, DateTimeOffset> deliveredAtByShipment) =>
+        deliveredAtByShipment.TryGetValue(shipment.Id, out var deliveredAt)
+            ? deliveredAt
+            : throw new InvalidOperationException($"Shipment {shipment.Number} is Delivered, but no Delivered Tracking event moved it there.");
 }

@@ -67,19 +67,6 @@ public sealed class ProofOfDeliveryTests
     }
 
     [Fact]
-    public void CurrentProofsOfDeliveryForShipmentsSpec_FindsTheCurrentOnesOfTheNamedShipmentsOnly()
-    {
-        var shipment = BookedShipment();
-        var other = BookedShipment(sequence: 13);
-        var current = ProofOfDelivery.Record(shipment, Report(), new CorrelationId("corr-pod"), ReceivedAt);
-        var forAnother = ProofOfDelivery.Record(other, Report(), new CorrelationId("corr-other"), ReceivedAt);
-
-        var found = new CurrentProofsOfDeliveryForShipmentsSpec([shipment.Id]).Evaluate([forAnother, current]);
-
-        found.Should().ContainSingle().Which.Should().BeSameAs(current);
-    }
-
-    [Fact]
     public void RulesCheckShipment_RefusesAShipmentThatIsNotBookedYet_AndAcceptsTheRest()
     {
         var planned = PlannedShipment();

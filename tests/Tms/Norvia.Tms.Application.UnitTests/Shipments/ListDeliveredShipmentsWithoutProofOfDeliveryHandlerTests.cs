@@ -25,9 +25,9 @@ public sealed class ListDeliveredShipmentsWithoutProofOfDeliveryHandlerTests
     private readonly IReadRepository<ProofOfDelivery> _proofs = Substitute.For<IReadRepository<ProofOfDelivery>>();
     private readonly ICarrierDirectory _carriers = Substitute.For<ICarrierDirectory>();
     private readonly FakeTimeProvider _time = new(DeliveredAt);
-    private readonly List<Shipment> _allShipments = [];
-    private readonly List<TrackingEvent> _allEvents = [];
-    private readonly List<ProofOfDelivery> _allProofs = [];
+    private readonly List<DeliveredShipmentRow> _allShipments = [];
+    private readonly List<DeliveredEventRow> _allEvents = [];
+    private readonly List<ShipmentId> _allProofs = [];
     private readonly ListDeliveredShipmentsWithoutProofOfDeliveryHandler _handler;
 
     public ListDeliveredShipmentsWithoutProofOfDeliveryHandlerTests()
@@ -66,7 +66,7 @@ public sealed class ListDeliveredShipmentsWithoutProofOfDeliveryHandlerTests
     public async Task Handle_AShipmentWithACurrentProof_LeavesTheList()
     {
         var shipment = Delivered(sequence: 12, deliveredAt: DeliveredAt);
-        _allProofs.Add(Proof(shipment));
+        _allProofs.Add(shipment.Id);
 
         var listed = await _handler.Handle(new ListDeliveredShipmentsWithoutProofOfDeliveryQuery(), CancellationToken.None);
 
@@ -102,20 +102,9 @@ public sealed class ListDeliveredShipmentsWithoutProofOfDeliveryHandlerTests
     }
 
     [Fact]
-    public async Task Handle_ADeliveredEventThatDidntMoveTheShipment_DoesntSetTheDeliveredTime()
-    {
-        var shipment = Delivered(sequence: 12, deliveredAt: DeliveredAt);
-        _allEvents.Add(DeliveredEvent(shipment, "repeat", DeliveredAt.AddHours(5)));
-
-        var listed = await _handler.Handle(new ListDeliveredShipmentsWithoutProofOfDeliveryQuery(), CancellationToken.None);
-
-        listed.Should().ContainSingle().Which.DeliveredAt.Should().Be(DeliveredAt);
-    }
-
-    [Fact]
     public async Task Handle_ADeliveredShipmentNoEventMovedThere_IsABug()
     {
-        _allShipments.Add(Booked(sequence: 12));
+        _allShipments.Add(Row(Booked(sequence: 12)));
 
         var act = async () => await _handler.Handle(new ListDeliveredShipmentsWithoutProofOfDeliveryQuery(), CancellationToken.None);
 
@@ -125,10 +114,12 @@ public sealed class ListDeliveredShipmentsWithoutProofOfDeliveryHandlerTests
     private Shipment Delivered(long sequence, DateTimeOffset deliveredAt)
     {
         var shipment = Booked(sequence);
-        _allShipments.Add(shipment);
-        _allEvents.Add(DeliveredEvent(shipment, "delivered", deliveredAt));
+        _allShipments.Add(Row(shipment));
+        _allEvents.Add(new(shipment.Id, deliveredAt));
         return shipment;
     }
+
+    private static DeliveredShipmentRow Row(Shipment shipment) => new(shipment.Id, shipment.Number, shipment.CarriedBy);
 
     private static Shipment Booked(long sequence)
     {
@@ -144,6 +135,43 @@ public sealed class ListDeliveredShipmentsWithoutProofOfDeliveryHandlerTests
             new(TrackingSource.Carrier(VanDijk), sourceEventId, "VDT-1", null, TrackingEventType.Delivered, eventTime, new TrackingLocation("Düsseldorf", "40213", "DE"), null, null),
             new CorrelationId("corr-tracking"),
             eventTime.AddMinutes(1));
+
+    [Fact]
+    public void DeliveredTrackingEventsForShipmentsSpec_FindsOnlyTheDeliveredEventThatMovedTheNamedShipments()
+    {
+        var shipment = Booked(sequence: 12);
+        var other = Booked(sequence: 13);
+        var moved = DeliveredEvent(shipment, "delivered", DeliveredAt);
+        var repeat = DeliveredEvent(shipment, "repeat", DeliveredAt.AddHours(5));
+        var forAnother = DeliveredEvent(other, "other", DeliveredAt);
+
+        var found = new DeliveredTrackingEventsForShipmentsSpec([shipment.Id]).Evaluate([moved, repeat, forAnother]);
+
+        found.Should().ContainSingle().Which.Should().Be(new DeliveredEventRow(shipment.Id, DeliveredAt));
+    }
+
+    [Fact]
+    public void DeliveredShipmentsSpec_FindsOnlyDeliveredShipments_WithWhatTheListNeeds()
+    {
+        var delivered = Booked(sequence: 12);
+        DeliveredEvent(delivered, "delivered", DeliveredAt);
+        var booked = Booked(sequence: 13);
+
+        var found = new DeliveredShipmentsSpec().Evaluate([booked, delivered]);
+
+        found.Should().ContainSingle().Which.Should().Be(Row(delivered));
+    }
+
+    [Fact]
+    public void CurrentProofsOfDeliveryForShipmentsSpec_FindsTheCurrentOnesOfTheNamedShipmentsOnly()
+    {
+        var shipment = Booked(sequence: 12);
+        var other = Booked(sequence: 13);
+
+        var found = new CurrentProofsOfDeliveryForShipmentsSpec([shipment.Id]).Evaluate([Proof(shipment), Proof(other)]);
+
+        found.Should().Equal(shipment.Id);
+    }
 
     private static ProofOfDelivery Proof(Shipment shipment) =>
         ProofOfDelivery.Record(
