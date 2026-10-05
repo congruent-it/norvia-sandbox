@@ -242,6 +242,22 @@ public sealed class TrackingEventRecordTests(ControlledClockTmsFixture tms) : IC
     }
 
     [Fact]
+    public async Task Record_AnEventWithSeveralProblems_ListsThemAll_AndCodesTheFirst()
+    {
+        var (_, reference) = await tms.BookedShipmentAsync(_cancellationToken);
+        var trackingEvent = Collected(reference, _now.AddMinutes(-1));
+        trackingEvent["type"] = "Teleported";
+        trackingEvent.Remove("eventTime");
+        trackingEvent.Remove("location");
+
+        var problem = await tms.RecordRefusedAsync(trackingEvent, HttpStatusCode.BadRequest, _cancellationToken);
+
+        problem["code"]!.GetValue<string>().Should().Be("UnknownEventType");
+        problem["errors"]!.AsArray().Select(error => error!["code"]!.GetValue<string>())
+            .Should().Equal("UnknownEventType", "MissingRequiredField", "MissingRequiredField");
+    }
+
+    [Fact]
     public async Task Record_WithOnlyTheCarrierBookingNumber_FindsTheShipmentByIt()
     {
         var (shipmentNumber, number, reference) = await tms.BookedShipmentWithNumberAsync(_cancellationToken);
