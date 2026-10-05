@@ -31,6 +31,10 @@ param intakeTriggerAudience string
 param answerLogicAppHostName string
 param answerTriggerAudience string
 
+@description('The Service Bus namespace and the tracking queue API Management puts a Carrier\'s tracking message on.')
+param serviceBusName string
+param trackingQueueName string
+
 param applicationInsightsName string
 
 @description('The Partner portal\'s identity, the one principal that may read the Personas\' subscription keys.')
@@ -85,11 +89,13 @@ var namedValues = {
   'intake-trigger-audience': intakeTriggerAudience
   'answer-trigger-audience': answerTriggerAudience
   'api-management-identity-client-id': apiManagementIdentity.properties.clientId
+  'service-bus-namespace': serviceBusName
+  'tracking-queue-name': trackingQueueName
 }
 
 resource policyValues 'Microsoft.ApiManagement/service/namedValues@2024-05-01' = [
   // The loop runs over the names, which are known before the deployment starts; the values aren't.
-  for name in ['entra-tenant-id', 'partner-api-client-id', 'shippers-by-client-id', 'carriers-by-client-id', 'intake-trigger-audience', 'answer-trigger-audience', 'api-management-identity-client-id']: {
+  for name in ['entra-tenant-id', 'partner-api-client-id', 'shippers-by-client-id', 'carriers-by-client-id', 'intake-trigger-audience', 'answer-trigger-audience', 'api-management-identity-client-id', 'service-bus-namespace', 'tracking-queue-name']: {
     parent: apiManagement
     name: name
     properties: {
@@ -245,6 +251,31 @@ resource answerCarrierBookingPolicy 'Microsoft.ApiManagement/service/apis/operat
   dependsOn: [
     policyValues
     answerLogicApp
+  ]
+}
+
+// A Carrier's tracking message is accepted at the edge and put on the tracking queue (ADR 0008). No Logic App is called: the
+// Carrier-tracking Logic App reads the queue.
+resource submitCarrierTracking 'Microsoft.ApiManagement/service/apis/operations@2024-05-01' = {
+  parent: partnerApi
+  name: 'submit-carrier-tracking'
+  properties: {
+    displayName: 'Submit Carrier tracking'
+    description: 'Report what happened to a Shipment as a Carrier. Accepted with 202 and processed later (contracts/partner-api).'
+    method: 'POST'
+    urlTemplate: '/carrier-tracking'
+  }
+}
+
+resource submitCarrierTrackingPolicy 'Microsoft.ApiManagement/service/apis/operations/policies@2024-05-01' = {
+  parent: submitCarrierTracking
+  name: 'policy'
+  properties: {
+    format: 'rawxml'
+    value: loadTextContent('partner-api/submit-carrier-tracking.policy.xml')
+  }
+  dependsOn: [
+    policyValues
   ]
 }
 

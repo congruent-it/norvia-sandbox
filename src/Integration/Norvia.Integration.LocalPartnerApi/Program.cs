@@ -5,6 +5,7 @@ using Norvia.Integration.LocalPartnerApi;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+builder.AddAzureServiceBusClient("messaging");
 
 // Data annotations don't look inside the token options, so they are checked here too.
 builder.Services.AddOptions<PartnerApiOptions>().BindConfiguration(PartnerApiOptions.SectionName)
@@ -19,6 +20,7 @@ builder.Services.AddOptions<TmsOptions>().BindConfiguration(TmsOptions.SectionNa
     .ValidateOnStart();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<PartnerEdge>();
+builder.Services.AddSingleton<ITrackingQueue, ServiceBusTrackingQueue>();
 builder.Services.AddHttpClient<TmsIntake>((services, http) =>
     http.BaseAddress = services.GetRequiredService<IOptions<TmsOptions>>().Value.BaseAddress);
 builder.Services.AddHttpClient<TmsCarrierAnswers>((services, http) =>
@@ -29,5 +31,6 @@ var app = builder.Build();
 app.MapDefaultEndpoints();
 app.MapSubmitTransportOrder();
 app.MapAnswerCarrierBooking();
+app.MapSubmitCarrierTracking();
 
 await app.RunAsync();

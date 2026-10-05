@@ -9,6 +9,7 @@ internal static class TrackingKeys
     public const string CorrelationId = "correlationId";
     public const string Flow = "flow";
     public const string PartyId = "partyId";
+    public const string SourceMessageId = "sourceMessageId";
     public const string TransportOrderNumber = "transportOrderNumber";
     public const string ShipmentNumber = "shipmentNumber";
     public const string CarrierBookingNumber = "carrierBookingNumber";
@@ -20,6 +21,9 @@ internal static class TrackingKeys
 
     /// <summary>The <see cref="Flow"/> of a Carrier's answer, from the edge to the TMS's answer.</summary>
     public const string CarrierAnswer = "carrier-answer";
+
+    /// <summary>The <see cref="Flow"/> of a Carrier's tracking message, from the edge to the tracking queue.</summary>
+    public const string CarrierTracking = "carrier-tracking";
 
     /// <summary>The <see cref="Outcome"/>s the stand-in records.</summary>
     public const string Succeeded = "Succeeded";

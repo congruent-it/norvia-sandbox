@@ -32,6 +32,8 @@ public sealed class LocalPartnerApiFactory : WebApplicationFactory<Program>
 
     public StubTms Tms { get; } = new();
 
+    internal StubTrackingQueue TrackingQueue { get; } = new();
+
     /// <summary>What the stand-in logged, with its scopes: the tracking keys its traces carry (coding guidelines §7).</summary>
     public FakeLogCollector Logs => Services.GetRequiredService<FakeLogCollector>();
 
@@ -61,6 +63,7 @@ public sealed class LocalPartnerApiFactory : WebApplicationFactory<Program>
         builder.ConfigureTestServices(services =>
         {
             services.AddLogging(logging => logging.AddFakeLogging());
+            services.AddSingleton<ITrackingQueue>(TrackingQueue);
             services.AddHttpClient<TmsIntake>().ConfigurePrimaryHttpMessageHandler(() => Tms);
             services.AddHttpClient<TmsCarrierAnswers>().ConfigurePrimaryHttpMessageHandler(() => Tms);
             // Retries straight away, so a test of an unreachable TMS doesn't wait out the backoff.
@@ -96,6 +99,8 @@ public sealed class LocalPartnerApiFactory : WebApplicationFactory<Program>
     }
 
     public static string Sample(string name) => Embedded($"PartnerApi/samples/bookings/{name}");
+
+    public static string CarrierTrackingSample(string name) => Embedded($"PartnerApi/samples/carrier-tracking/{name}");
 
     public static string CarrierAnswerSample(string name) => Embedded($"PartnerApi/samples/carrier-answers/{name}");
 

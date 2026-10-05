@@ -8,7 +8,9 @@
     <Project Path="src/Integration/Norvia.Integration.CarrierAnswer.Functions/Norvia.Integration.CarrierAnswer.Functions.csproj" />
     <Project Path="src/Integration/Norvia.Integration.CarrierBooking/Norvia.Integration.CarrierBooking.csproj" />
     <Project Path="src/Integration/Norvia.Integration.CarrierBooking.Functions/Norvia.Integration.CarrierBooking.Functions.csproj" />
+    <Project Path="src/Integration/Norvia.Integration.CarrierTracking.Functions/Norvia.Integration.CarrierTracking.Functions.csproj" />
     <Project Path="src/Integration/Norvia.Integration.LocalBookingWorker/Norvia.Integration.LocalBookingWorker.csproj" />
+    <Project Path="src/Integration/Norvia.Integration.LocalTrackingWorker/Norvia.Integration.LocalTrackingWorker.csproj" />
     <Project Path="src/Integration/Norvia.Integration.LocalPartnerApi/Norvia.Integration.LocalPartnerApi.csproj" />
     <Project Path="src/Integration/Norvia.Integration.TransportOrderIntake.Functions/Norvia.Integration.TransportOrderIntake.Functions.csproj" />
   </Folder>
@@ -36,6 +38,7 @@
   <Folder Name="/tests/Integration/">
     <Project Path="tests/Integration/Norvia.Integration.CarrierBooking.UnitTests/Norvia.Integration.CarrierBooking.UnitTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.LocalBookingWorker.UnitTests/Norvia.Integration.LocalBookingWorker.UnitTests.csproj" />
+    <Project Path="tests/Integration/Norvia.Integration.LocalTrackingWorker.UnitTests/Norvia.Integration.LocalTrackingWorker.UnitTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.LocalPartnerApi.UnitTests/Norvia.Integration.LocalPartnerApi.UnitTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.TransportOrderIntake.UnitTests/Norvia.Integration.TransportOrderIntake.UnitTests.csproj" />
   </Folder>

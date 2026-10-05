@@ -17,6 +17,10 @@ public sealed class PartnerApiOptions
     /// <summary>The Carrier each Carrier Persona's client answers for, by client ID (the token's <c>azp</c>).</summary>
     public Dictionary<string, string> CarriersByClientId { get; set; } = [];
 
+    /// <summary>The Service Bus queue the Carrier-tracking Logic App reads, which API Management puts a Carrier's tracking message on.</summary>
+    [Required]
+    public string TrackingQueue { get; set; } = "carrier-tracking";
+
     [Required]
     public LocalTokenOptions Tokens { get; set; } = new();
 }

@@ -29,4 +29,13 @@ internal sealed record EdgeRule(
         options => options.CarriersByClientId,
         "No Carrier is registered for this client.",
         "NoCarrierForClient");
+
+    /// <summary>infra/estate/partner-api/submit-carrier-tracking.policy.xml</summary>
+    public static EdgeRule SubmitCarrierTracking { get; } = new(
+        "Tracking.Submit",
+        "This client may not submit tracking.",
+        "NotAllowedToSubmitTracking",
+        options => options.CarriersByClientId,
+        "No Carrier is registered for this client.",
+        "NoCarrierForClient");
 }

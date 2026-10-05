@@ -24,6 +24,8 @@ var reportRole = 'CarrierBookings.Report'
 var reportRoleId = guid('norvia-tms-api', environmentName, reportRole)
 var recordRole = 'TrackingEvents.Record'
 var recordRoleId = guid('norvia-tms-api', environmentName, recordRole)
+var trackingSubmitRole = 'Tracking.Submit'
+var trackingSubmitRoleId = guid('norvia-partner-api', environmentName, trackingSubmitRole)
 var respondRole = 'CarrierBookings.Respond'
 var respondRoleId = guid('norvia-partner-api', environmentName, respondRole)
 var submitRole = 'TransportOrders.Submit'
@@ -107,7 +109,7 @@ resource tmsApi 'Microsoft.Graph/applications@v1.0' = {
       id: recordRoleId
       value: recordRole
       displayName: 'Record Tracking events'
-      description: 'Record a Tracking event reported for a Shipment (P5). Only the Carrier-tracking Logic App will hold it, and later the Driver reports Logic App (P12); no identity holds it yet.'
+      description: 'Record a Tracking event reported for a Shipment (P5). Only the Carrier-tracking Logic App holds it, and later the Driver reports Logic App (P12).'
       allowedMemberTypes: [
         'Application'
       ]
@@ -154,6 +156,20 @@ resource answerRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
   resourceId: tmsApiPrincipal.id
   appRoleId: answerRoleId
   principalId: answerIdentity.properties.principalId
+}
+
+// The Carrier-tracking Logic App's identity, which it runs as. It is the one principal holding the record role, so nothing
+// records a Carrier's Tracking event in the TMS without passing the integration layer.
+resource trackingIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
+  name: 'id-tracking-${uniqueString(resourceGroup().id)}'
+  location: location
+  tags: tags
+}
+
+resource recordRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: tmsApiPrincipal.id
+  appRoleId: recordRoleId
+  principalId: trackingIdentity.properties.principalId
 }
 
 // The TMS UI's identity, which it calls the TMS API as. It is the one principal holding the manage role, so only the
@@ -217,6 +233,16 @@ resource partnerApi 'Microsoft.Graph/applications@v1.0' = {
       ]
       isEnabled: true
     }
+    {
+      id: trackingSubmitRoleId
+      value: trackingSubmitRole
+      displayName: 'Submit Carrier tracking'
+      description: 'Report what happened to a Shipment as a Carrier, with a tracking message. Only Carrier Personas hold it.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
   ]
 }
 
@@ -267,6 +293,15 @@ resource respondRoleGrants 'Microsoft.Graph/appRoleAssignedTo@v1.0' = [
   for (persona, i) in personas: if (persona.party.type == 'Carrier') {
     resourceId: partnerApiPrincipal.id
     appRoleId: respondRoleId
+    principalId: personaPrincipals[i].id
+  }
+]
+
+// Carrier Personas may report tracking too; the others may not.
+resource trackingSubmitRoleGrants 'Microsoft.Graph/appRoleAssignedTo@v1.0' = [
+  for (persona, i) in personas: if (persona.party.type == 'Carrier') {
+    resourceId: partnerApiPrincipal.id
+    appRoleId: trackingSubmitRoleId
     principalId: personaPrincipals[i].id
   }
 ]
@@ -453,6 +488,10 @@ output intakeIdentityName string = intakeIdentity.name
 output answerIdentityId string = answerIdentity.id
 output answerIdentityName string = answerIdentity.name
 output answerClientId string = answerIdentity.properties.clientId
+output trackingIdentityId string = trackingIdentity.id
+output trackingIdentityName string = trackingIdentity.name
+output trackingPrincipalId string = trackingIdentity.properties.principalId
+output trackingClientId string = trackingIdentity.properties.clientId
 output bookingIdentityId string = bookingIdentity.id
 output bookingIdentityName string = bookingIdentity.name
 output bookingPrincipalId string = bookingIdentity.properties.principalId

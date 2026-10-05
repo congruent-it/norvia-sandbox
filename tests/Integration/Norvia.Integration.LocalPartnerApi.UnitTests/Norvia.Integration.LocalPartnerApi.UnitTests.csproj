@@ -21,5 +21,6 @@
   <ItemGroup>
     <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\bookings\*.json" LogicalName="PartnerApi/samples/bookings/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\carrier-answers\*.json" LogicalName="PartnerApi/samples/carrier-answers/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\carrier-tracking\*.json" LogicalName="PartnerApi/samples/carrier-tracking/%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>
