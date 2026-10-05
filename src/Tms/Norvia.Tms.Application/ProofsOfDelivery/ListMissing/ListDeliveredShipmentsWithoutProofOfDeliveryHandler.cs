@@ -40,7 +40,8 @@ public sealed class ListDeliveredShipmentsWithoutProofOfDeliveryHandler(
             .Where(shipment => !withProof.Contains(shipment.Id))
             .Select(shipment => Summarize(shipment, DeliveredAt(shipment, deliveredEvents[shipment.Id]), now))
             .OrderByDescending(summary => summary.IsProofOfDeliveryMissing)
-            .ThenBy(summary => summary.DeliveredAt)];
+            .ThenBy(summary => summary.DeliveredAt)
+            .ThenBy(summary => summary.ShipmentNumber, StringComparer.Ordinal)];
     }
 
     private DeliveredShipmentWithoutProofOfDeliverySummary Summarize(Shipment shipment, DateTimeOffset deliveredAt, DateTimeOffset now) =>
