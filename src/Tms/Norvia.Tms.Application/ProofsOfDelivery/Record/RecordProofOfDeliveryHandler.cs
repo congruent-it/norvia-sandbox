@@ -33,6 +33,15 @@ public sealed class RecordProofOfDeliveryHandler(
             return ProofOfDeliveryRefused.Because<RecordProofOfDeliveryResult>(ProofOfDeliveryRules.ShipmentNotFound(report.CarrierBookingReference));
         }
 
+        // A Carrier's retry of a document ID it already sent is harmless: it gets the original result and nothing is published.
+        var original = await proofsOfDelivery.SingleOrDefaultAsync(new ProofOfDeliveryByDocumentIdSpec(report.Source, report.DocumentId), cancellationToken);
+        if (original is not null)
+        {
+            var originalShipment = await shipments.SingleOrDefaultAsync(new ShipmentByNumberSpec(original.ShipmentNumber), cancellationToken)
+                ?? throw new InvalidOperationException($"Proof of delivery {original.Id} names Shipment {original.ShipmentNumber}, which the TMS doesn't have.");
+            return RecordProofOfDeliveryResult.RepeatOf(originalShipment, original);
+        }
+
         var booking = await carrierBookings.SingleOrDefaultAsync(
             new ConfirmedCarrierBookingByReferenceSpec(carrierId, report.CarrierBookingReference), cancellationToken);
         if (booking is null && report.CarrierBookingNumber is { } number)
@@ -66,7 +75,9 @@ public sealed class RecordProofOfDeliveryHandler(
         }
 
         // The record and the event it raises, which goes to the outbox, are saved in one transaction.
-        var proofOfDelivery = ProofOfDelivery.Record(shipment, report, new CorrelationId(command.CorrelationId), time.GetUtcNow());
+        // A new document ID for a Shipment that already has a current Proof of delivery replaces it: the earlier one is kept, superseded.
+        var replaced = await proofsOfDelivery.SingleOrDefaultAsync(new CurrentProofOfDeliveryToReplaceSpec(shipment.Id), cancellationToken);
+        var proofOfDelivery = ProofOfDelivery.Record(shipment, report, new CorrelationId(command.CorrelationId), time.GetUtcNow(), replaced);
         await proofsOfDelivery.AddAsync(proofOfDelivery, cancellationToken);
         await proofsOfDelivery.SaveChangesAsync(cancellationToken);
         return RecordProofOfDeliveryResult.From(shipment, proofOfDelivery);

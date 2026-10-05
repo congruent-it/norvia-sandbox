@@ -97,6 +97,43 @@ public sealed class RecordProofOfDeliveryHandlerTests
     }
 
     [Fact]
+    public async Task Handle_ARepeatOfTheCarriersDocumentId_ReturnsTheOriginalFlaggedAsARepeat_AndRecordsAndStoresNothing()
+    {
+        var shipment = Found(ShipmentStatus.Delivered);
+        var original = ProofOfDelivery.Record(shipment, Report(), new CorrelationId("corr-original"), Samples.Now);
+        _proofsOfDelivery.SingleOrDefaultAsync(Arg.Is<ProofOfDeliveryByDocumentIdSpec>(s => s.Source == Report().Source && s.DocumentId == "doc-1"), Arg.Any<CancellationToken>())
+            .Returns(original);
+
+        var result = await _handler.Handle(Command(), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.IsRepeat.Should().BeTrue();
+        result.Value.ProofOfDeliveryId.Should().Be(original.Id.Value);
+        result.Value.CorrelationId.Should().Be("corr-original");
+        await _files.DidNotReceiveWithAnyArgs().StoreAsync(default!, default!, default, TestContext.Current.CancellationToken);
+        await _proofsOfDelivery.DidNotReceiveWithAnyArgs().AddAsync(default!, TestContext.Current.CancellationToken);
+        await _proofsOfDelivery.DidNotReceiveWithAnyArgs().SaveChangesAsync(TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task Handle_ANewDocumentIdForAShipmentWithACurrentOne_SupersedesIt_AndRecordsTheNewOneAsReplacing()
+    {
+        var shipment = Found(ShipmentStatus.Delivered);
+        var earlier = ProofOfDelivery.Record(shipment, Report(documentId: "doc-0"), new CorrelationId("corr-old"), Samples.Now);
+        _proofsOfDelivery.SingleOrDefaultAsync(Arg.Is<CurrentProofOfDeliveryToReplaceSpec>(s => s.ShipmentId == shipment.Id), Arg.Any<CancellationToken>()).Returns(earlier);
+
+        var result = await _handler.Handle(Command(), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.IsRepeat.Should().BeFalse();
+        earlier.IsCurrent.Should().BeFalse();
+        var recorded = (ProofOfDelivery)_proofsOfDelivery.ReceivedCalls().Single(call => call.GetMethodInfo().Name == nameof(IRepository<ProofOfDelivery>.AddAsync)).GetArguments()[0]!;
+        recorded.IsCurrent.Should().BeTrue();
+        recorded.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<ProofOfDeliveryReceivedEvent>().Which.ReplacesEarlier.Should().BeTrue();
+        await _proofsOfDelivery.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Handle_WithOnlyTheCarrierBookingNumber_FindsTheShipmentByIt()
     {
         var shipment = Found(ShipmentStatus.Booked);

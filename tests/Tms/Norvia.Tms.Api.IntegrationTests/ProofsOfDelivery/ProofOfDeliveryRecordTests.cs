@@ -302,6 +302,87 @@ public sealed class ProofOfDeliveryRecordTests(TmsFixture tms) : IClassFixture<T
     }
 
     [Fact]
+    public async Task Record_ARepeatOfTheCarriersDocumentId_ReturnsTheOriginalResultFlaggedAsARepeat_AndPublishesNothing()
+    {
+        var (shipmentNumber, reference) = await tms.DeliveredShipmentAsync(_cancellationToken);
+        var repeated = $"doc-{Guid.NewGuid()}";
+        var firstTrail = TmsCalls.NewCorrelationId();
+        var original = await tms.RecordedProofAsync(Metadata(reference, documentId: repeated), [Cmr()], _cancellationToken, firstTrail);
+        await tms.PublishedAsync(firstTrail, "ProofOfDeliveryReceived", 1, _cancellationToken);
+        var retryTrail = TmsCalls.NewCorrelationId();
+
+        var repeat = await tms.RecordedProofAsync(Metadata(reference, documentId: repeated), [Cmr()], _cancellationToken, retryTrail);
+
+        original["isRepeat"]!.GetValue<bool>().Should().BeFalse();
+        repeat["isRepeat"]!.GetValue<bool>().Should().BeTrue();
+        repeat["proofOfDeliveryId"]!.GetValue<string>().Should().Be(original["proofOfDeliveryId"]!.GetValue<string>());
+        repeat["correlationId"]!.GetValue<string>().Should().Be(firstTrail, "the result is the original one");
+        await TmsFixture.SettleOutboxAsync(_cancellationToken);
+        tms.Published.Where(m => m.CorrelationId == retryTrail).Should().BeEmpty();
+        tms.Published.Count(m => m.Subject == "ProofOfDeliveryReceived" && CarrierBookingCalls.NamesShipment(m, shipmentNumber)).Should().Be(1);
+        (await CurrentProofAsync(shipmentNumber))["id"]!.GetValue<string>().Should().Be(original["proofOfDeliveryId"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task Record_ANewDocumentIdForAShipmentWithACurrentProof_ReplacesIt_WithNothingMerged_AndTheEventSaysSo()
+    {
+        var (shipmentNumber, reference) = await tms.DeliveredShipmentAsync(_cancellationToken);
+        var (oldDocument, newDocument) = ($"doc-{Guid.NewGuid()}", $"doc-{Guid.NewGuid()}");
+        var first = await tms.RecordedProofAsync(Metadata(reference, documentId: oldDocument), [Cmr("blurry.pdf")], _cancellationToken);
+        var secondTrail = TmsCalls.NewCorrelationId();
+        var clearer = Metadata(reference, documentId: newDocument);
+        clearer["receivedBy"] = "A. Schmidt";
+        clearer.Remove("remark");
+
+        var second = await tms.RecordedProofAsync(clearer, [Cmr("clear.pdf"), Cmr("back.pdf")], _cancellationToken, secondTrail);
+
+        second["isRepeat"]!.GetValue<bool>().Should().BeFalse();
+        second["proofOfDeliveryId"]!.GetValue<string>().Should().NotBe(first["proofOfDeliveryId"]!.GetValue<string>());
+        var current = await CurrentProofAsync(shipmentNumber);
+        current["id"]!.GetValue<string>().Should().Be(second["proofOfDeliveryId"]!.GetValue<string>());
+        current["receivedBy"]!.GetValue<string>().Should().Be("A. Schmidt");
+        current["remark"].Should().BeNull("nothing of the earlier one is merged");
+        current["files"]!.AsArray().Select(f => f!["name"]!.GetValue<string>()).Should().Equal("clear.pdf", "back.pdf");
+        var messages = await tms.PublishedAsync(secondTrail, "ProofOfDeliveryReceived", 1, _cancellationToken);
+        JsonNode.Parse(messages.Single().Body.ToString())!["replacesEarlier"]!.GetValue<bool>().Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Record_AfterAReplacement_ARepeatOfTheSupersededDocumentId_ChangesNothing()
+    {
+        var (shipmentNumber, reference) = await tms.DeliveredShipmentAsync(_cancellationToken);
+        var (oldDocument, newDocument) = ($"doc-{Guid.NewGuid()}", $"doc-{Guid.NewGuid()}");
+        var first = await tms.RecordedProofAsync(Metadata(reference, documentId: oldDocument), [Cmr()], _cancellationToken);
+        var second = await tms.RecordedProofAsync(Metadata(reference, documentId: newDocument), [Cmr()], _cancellationToken);
+
+        var repeat = await tms.RecordedProofAsync(Metadata(reference, documentId: oldDocument), [Cmr()], _cancellationToken);
+
+        repeat["isRepeat"]!.GetValue<bool>().Should().BeTrue();
+        repeat["proofOfDeliveryId"]!.GetValue<string>().Should().Be(first["proofOfDeliveryId"]!.GetValue<string>());
+        (await CurrentProofAsync(shipmentNumber))["id"]!.GetValue<string>().Should().Be(second["proofOfDeliveryId"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task Record_AProofWithReservations_IsPublishedWithItsCondition_AndCreatesNoDamagedTrackingEvent()
+    {
+        var (shipmentNumber, reference) = await tms.DeliveredShipmentAsync(_cancellationToken);
+        var correlationId = TmsCalls.NewCorrelationId();
+        var metadata = Metadata(reference);
+        metadata["condition"] = "Reservations";
+        metadata["remark"] = "Two pallets damaged";
+
+        await tms.RecordedProofAsync(metadata, [Cmr()], _cancellationToken, correlationId);
+
+        var message = (await tms.PublishedAsync(correlationId, "ProofOfDeliveryReceived", 1, _cancellationToken)).Single();
+        var body = JsonNode.Parse(message.Body.ToString())!;
+        body["condition"]!.GetValue<string>().Should().Be("Reservations");
+        body["remark"]!.GetValue<string>().Should().Be("Two pallets damaged");
+        (await CurrentProofAsync(shipmentNumber))["condition"]!.GetValue<string>().Should().Be("Reservations");
+        await TmsFixture.SettleOutboxAsync(_cancellationToken);
+        tms.Published.Should().NotContain(m => m.Subject == "ShipmentExceptionReported" && CarrierBookingCalls.NamesShipment(m, shipmentNumber));
+    }
+
+    [Fact]
     public async Task Record_ByACallerWithoutTheRecordRole_IsForbidden()
     {
         var (_, reference) = await tms.DeliveredShipmentAsync(_cancellationToken);

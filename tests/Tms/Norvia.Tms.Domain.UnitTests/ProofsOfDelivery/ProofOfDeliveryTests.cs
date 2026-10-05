@@ -46,6 +46,35 @@ public sealed class ProofOfDeliveryTests
     }
 
     [Fact]
+    public void Record_ReplacingTheCurrentOne_SupersedesIt_AndSaysSoInTheEvent()
+    {
+        var shipment = BookedShipment();
+        var earlier = ProofOfDelivery.Record(shipment, Report(), new CorrelationId("corr-old"), ReceivedAt);
+
+        var later = ProofOfDelivery.Record(shipment, Report(), new CorrelationId("corr-new"), ReceivedAt.AddHours(1), replaces: earlier);
+
+        earlier.IsCurrent.Should().BeFalse();
+        later.IsCurrent.Should().BeTrue();
+        later.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<ProofOfDeliveryReceivedEvent>().Which.ReplacesEarlier.Should().BeTrue();
+        later.CorrelationId.Value.Should().Be("corr-new");
+    }
+
+    [Fact]
+    public void Record_ReplacingASupersededOneOrAnotherShipmentsOne_IsABug()
+    {
+        var shipment = BookedShipment();
+        var superseded = ProofOfDelivery.Record(shipment, Report(), new CorrelationId("corr-old"), ReceivedAt);
+        ProofOfDelivery.Record(shipment, Report(), new CorrelationId("corr-new"), ReceivedAt, replaces: superseded);
+        var ofAnother = ProofOfDelivery.Record(BookedShipment(sequence: 13), Report(), new CorrelationId("corr-other"), ReceivedAt);
+
+        var replaceSuperseded = () => ProofOfDelivery.Record(shipment, Report(), new CorrelationId("corr-x"), ReceivedAt, replaces: superseded);
+        var replaceAnothers = () => ProofOfDelivery.Record(shipment, Report(), new CorrelationId("corr-x"), ReceivedAt, replaces: ofAnother);
+
+        replaceSuperseded.Should().Throw<ArgumentException>();
+        replaceAnothers.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
     public void Record_WithNoFiles_IsABug()
     {
         var act = () => ProofOfDelivery.Record(BookedShipment(), Report(files: []), new CorrelationId("corr-pod"), ReceivedAt);

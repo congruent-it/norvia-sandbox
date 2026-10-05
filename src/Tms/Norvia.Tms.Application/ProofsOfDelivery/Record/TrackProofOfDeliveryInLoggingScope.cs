@@ -55,6 +55,12 @@ public sealed partial class TrackProofOfDeliveryInLoggingScope(ILogger<TrackProo
             [TrackingKeys.ShipmentNumber] = outcome.ShipmentNumber,
             [TrackingKeys.Outcome] = TrackingKeys.Succeeded,
         });
+        if (outcome.IsRepeat)
+        {
+            LogRepeated(logger, outcome.DocumentId, outcome.ShipmentNumber);
+            return;
+        }
+
         LogRecorded(logger, outcome.DocumentId, outcome.ShipmentNumber, outcome.ShipmentStatus, outcome.NumberOfFiles);
     }
 
@@ -81,6 +87,9 @@ public sealed partial class TrackProofOfDeliveryInLoggingScope(ILogger<TrackProo
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Proof of delivery {DocumentId} recorded for Shipment {ShipmentNumber}, which stays {ShipmentStatus} ({NumberOfFiles} files)")]
     private static partial void LogRecorded(ILogger logger, string documentId, string shipmentNumber, ShipmentStatus shipmentStatus, int numberOfFiles);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Proof of delivery {DocumentId} for Shipment {ShipmentNumber} was recorded before: nothing published")]
+    private static partial void LogRepeated(ILogger logger, string documentId, string shipmentNumber);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Proof of delivery {DocumentId} refused: {Reason}")]
     private static partial void LogRefused(ILogger logger, string documentId, string reason);
