@@ -10,7 +10,8 @@ namespace Norvia.Tms.Domain.UnitTests.Shipments;
 
 /// <summary>
 /// A Shipment takes in the Tracking events reported for it (P5): a Collected event moves a Booked Shipment to Collected
-/// and raises ShipmentCollected; on any other Shipment it is only logged, as the status only moves forward.
+/// and raises ShipmentCollected; Departed, Arrived and Out for delivery move it to In transit and Delivered to Delivered,
+/// and any step can be skipped. An event whose status isn't further along than the Shipment's is only logged.
 /// </summary>
 public sealed class ShipmentTrackingTests
 {
@@ -83,9 +84,107 @@ public sealed class ShipmentTrackingTests
         shipment.DomainEvents.Should().BeEmpty();
     }
 
+    [Theory]
+    [InlineData(TrackingEventType.Departed)]
+    [InlineData(TrackingEventType.Arrived)]
+    [InlineData(TrackingEventType.OutForDelivery)]
+    public void Record_ADepartedArrivedOrOutForDeliveryEvent_MovesTheShipmentToInTransit_AndRaisesShipmentInTransit(TrackingEventType type)
+    {
+        var shipment = Booked();
+
+        var trackingEvent = Report(shipment, type);
+
+        shipment.Status.Should().Be(ShipmentStatus.InTransit);
+        trackingEvent.MovedShipment.Should().BeTrue();
+        var raised = shipment.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<ShipmentInTransitEvent>().Subject;
+        raised.Shipment.Should().BeSameAs(shipment);
+        raised.TrackingEvent.Should().BeSameAs(trackingEvent);
+    }
+
+    [Fact]
+    public void Record_DeliveredOnACollectedShipment_MovesItToDelivered_AndRaisesShipmentDelivered()
+    {
+        var shipment = Booked();
+        Collected(shipment, eta: null);
+        shipment.ClearDomainEvents();
+
+        var trackingEvent = Report(shipment, TrackingEventType.Delivered, "evt-2");
+
+        shipment.Status.Should().Be(ShipmentStatus.Delivered);
+        trackingEvent.MovedShipment.Should().BeTrue();
+        var raised = shipment.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<ShipmentDeliveredEvent>().Subject;
+        raised.TrackingEvent.Should().BeSameAs(trackingEvent);
+    }
+
+    [Theory]
+    [InlineData(TrackingEventType.Departed, ShipmentStatus.InTransit)]
+    [InlineData(TrackingEventType.Delivered, ShipmentStatus.Delivered)]
+    public void Record_SkippingSteps_MovesToTheStatusLandedOn_AndRaisesOnlyItsEvent(TrackingEventType type, ShipmentStatus expected)
+    {
+        var shipment = Booked();
+
+        Report(shipment, type);
+
+        shipment.Status.Should().Be(expected);
+        shipment.DomainEvents.Should().ContainSingle();
+    }
+
+    [Theory]
+    [InlineData(TrackingEventType.Collected)]
+    [InlineData(TrackingEventType.Departed)]
+    [InlineData(TrackingEventType.Arrived)]
+    public void Record_ALateEventWhoseStatusIsNotFurtherAlong_IsOnlyLogged(TrackingEventType type)
+    {
+        var shipment = Booked();
+        Report(shipment, TrackingEventType.OutForDelivery);
+        shipment.ClearDomainEvents();
+
+        var late = Report(shipment, type, "evt-late", EventTime.AddHours(-3));
+
+        shipment.Status.Should().Be(ShipmentStatus.InTransit);
+        late.MovedShipment.Should().BeFalse();
+        shipment.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Record_ALateDeliveredBeforeAnEarlierEventsStatus_StillMovesTheShipmentForward()
+    {
+        var shipment = Booked();
+        Report(shipment, TrackingEventType.Departed);
+        shipment.ClearDomainEvents();
+
+        var delivered = Report(shipment, TrackingEventType.Delivered, "evt-2", EventTime.AddHours(-3));
+
+        shipment.Status.Should().Be(ShipmentStatus.Delivered);
+        delivered.MovedShipment.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(TrackingEventType.Collected)]
+    [InlineData(TrackingEventType.Departed)]
+    [InlineData(TrackingEventType.Delivered)]
+    public void Record_AnyEventAfterDelivered_IsOnlyLogged(TrackingEventType type)
+    {
+        var shipment = Booked();
+        Report(shipment, TrackingEventType.Delivered);
+        shipment.ClearDomainEvents();
+
+        var after = Report(shipment, type, "evt-after", EventTime.AddHours(1));
+
+        shipment.Status.Should().Be(ShipmentStatus.Delivered);
+        after.MovedShipment.Should().BeFalse();
+        shipment.DomainEvents.Should().BeEmpty();
+    }
+
     private static TrackingEvent Collected(Shipment shipment, DateTimeOffset? eta, string sourceEventId = "evt-1") =>
         shipment.Record(
             new TrackingReport(Source, sourceEventId, "VDT-1", TrackingEventType.Collected, EventTime, Location, eta, "Dock 4"),
+            new CorrelationId("corr-tracking"),
+            ReceivedAt);
+
+    private static TrackingEvent Report(Shipment shipment, TrackingEventType type, string sourceEventId = "evt-1", DateTimeOffset? eventTime = null) =>
+        shipment.Record(
+            new TrackingReport(Source, sourceEventId, "VDT-1", type, eventTime ?? EventTime, Location, Eta: null, Remark: null),
             new CorrelationId("corr-tracking"),
             ReceivedAt);
 

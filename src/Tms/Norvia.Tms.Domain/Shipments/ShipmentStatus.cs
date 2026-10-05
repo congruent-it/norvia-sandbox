@@ -16,4 +16,10 @@ public enum ShipmentStatus
 
     /// <summary>The goods have been picked up (P5): a Tracking event reported it. The status only moves forward.</summary>
     Collected,
+
+    /// <summary>The goods are on their way to the delivery address (P5): a Tracking event said Departed, Arrived or Out for delivery.</summary>
+    InTransit,
+
+    /// <summary>The goods have been delivered (P5). Final for P5: later Tracking events are logged and change nothing.</summary>
+    Delivered,
 }
