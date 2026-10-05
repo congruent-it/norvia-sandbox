@@ -47,7 +47,7 @@ public sealed partial class SendTrackingHandler(
         var reply = await partnerApi.SubmitTrackingAsync(carrier, request.ShipmentNumber, trackingEvent, cancellationToken);
 
         // An exception leaves the Shipment as it is, so there is nothing to keep.
-        if (!reply.IsAccepted || !request.ReportTracking(command.Type) || !TrackingRules.IsProgress(command.Type))
+        if (!reply.IsAccepted || !request.ReportTracking(command.Type, time.GetUtcNow()) || !TrackingRules.IsProgress(command.Type))
         {
             return new SentTrackingEvent(CarrierShipmentView.From(request), trackingEvent, reply);
         }

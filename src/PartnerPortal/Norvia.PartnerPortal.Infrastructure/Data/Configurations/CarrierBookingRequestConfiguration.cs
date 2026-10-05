@@ -43,6 +43,12 @@ internal sealed class CarrierBookingRequestConfiguration : IEntityTypeConfigurat
         builder.Property(request => request.AutoAnswerReason).HasConversion<string>().HasMaxLength(30);
         builder.HasIndex(request => request.AutoAnswerDueAt);
 
+        // The automatic Tracking events a confirmed Shipment goes on with: the delay then in force, and when the next is due.
+        builder.Property(request => request.AutoProgressDelay)
+            .HasColumnName("AutoProgressDelayMilliseconds")
+            .HasConversion(delay => delay == null ? (long?)null : (long)delay.Value.TotalMilliseconds, value => value == null ? (TimeSpan?)null : TimeSpan.FromMilliseconds(value.Value));
+        builder.HasIndex(request => request.AutoProgressDueAt);
+
         // The Carrier booking number is the key of a Persona's inbox, so a request that arrives twice is stored once.
         builder.HasIndex(request => new { request.PersonaId, request.CarrierBookingNumber }).IsUnique();
         builder.HasIndex(request => new { request.PersonaId, request.ReceivedAt });

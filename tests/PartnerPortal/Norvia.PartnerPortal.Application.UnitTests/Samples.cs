@@ -17,10 +17,12 @@ internal static class Samples
     public static readonly Persona BrouwerDranken = new(new PersonaId("brouwer-dranken"), "Brouwer Dranken", PartyType.Shipper, "SHP-0001", [Warehouse, Cafe]);
 
     public static readonly Persona VanDijkTransport = new(new PersonaId("van-dijk-transport"), "Van Dijk Transport", PartyType.Carrier, "CAR-0001", [],
-        new CarrierProfile("VDT", new CarrierAnswerPolicy(CarrierAnswerMode.Manual, CarrierRejectionReason.NoCapacity, TimeSpan.FromSeconds(5))));
+        new CarrierProfile("VDT", new CarrierAnswerPolicy(CarrierAnswerMode.Manual, CarrierRejectionReason.NoCapacity, TimeSpan.FromSeconds(5)),
+            new CarrierTrackingPolicy(TrackingMode.Manual, TimeSpan.FromSeconds(5))));
 
     public static readonly Persona KesslerSpedition = new(new PersonaId("kessler-spedition"), "Kessler Spedition", PartyType.Carrier, "CAR-0002", [],
-        new CarrierProfile("KES", new CarrierAnswerPolicy(CarrierAnswerMode.AutoConfirm, CarrierRejectionReason.NoCapacity, TimeSpan.FromSeconds(5))));
+        new CarrierProfile("KES", new CarrierAnswerPolicy(CarrierAnswerMode.AutoConfirm, CarrierRejectionReason.NoCapacity, TimeSpan.FromSeconds(5)),
+            new CarrierTrackingPolicy(TrackingMode.AutoProgress, TimeSpan.FromSeconds(5))));
 
     public static BookingRequest Booking(string shipperReference = "BD-2030-0001") => new()
     {

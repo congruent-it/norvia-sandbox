@@ -65,6 +65,12 @@ public sealed class CarrierBookingRequest : EntityBase<CarrierBookingRequestId>,
     /// <summary>When the automatic answer is due; null for a request answered by hand, and once the request is closed.</summary>
     public DateTimeOffset? AutoAnswerDueAt { get; private set; }
 
+    /// <summary>The delay between the automatic Tracking events, if the Persona's policy was auto-progress when it confirmed. It stays the request's whatever the policy becomes.</summary>
+    public TimeSpan? AutoProgressDelay { get; private set; }
+
+    /// <summary>When the next automatic Tracking event is due; null for a request sent by hand, and once the Shipment is Delivered.</summary>
+    public DateTimeOffset? AutoProgressDueAt { get; private set; }
+
     /// <summary>The last progress Tracking event the Persona sent for the Shipment; null until it sends one.</summary>
     public TrackingEventType? LastProgress { get; private set; }
 
@@ -124,10 +130,11 @@ public sealed class CarrierBookingRequest : EntityBase<CarrierBookingRequestId>,
     }
 
     /// <summary>
-    /// Records a Tracking event sent for the Shipment of a Confirmed request. Progress moves the Shipment on; an exception
-    /// changes nothing. Returns false, changing nothing, when the request isn't Confirmed or the event isn't a valid next one.
+    /// Records a Tracking event sent for the Shipment of a Confirmed request. Progress moves the Shipment on, and puts the
+    /// next automatic event a delay after <paramref name="sentAt"/>; an exception changes nothing. Returns false, changing
+    /// nothing, when the request isn't Confirmed or the event isn't a valid next one.
     /// </summary>
-    public bool ReportTracking(TrackingEventType type)
+    public bool ReportTracking(TrackingEventType type, DateTimeOffset? sentAt = null)
     {
         if (Status != CarrierBookingRequestStatus.Confirmed || !TrackingRules.IsOffered(LastProgress, type))
         {
@@ -137,9 +144,41 @@ public sealed class CarrierBookingRequest : EntityBase<CarrierBookingRequestId>,
         if (TrackingRules.IsProgress(type))
         {
             LastProgress = type;
+            if (AutoProgressDelay is { } delay && sentAt is { } at)
+            {
+                AutoProgressDueAt = TrackingRules.NextAutomatic(type) is null ? null : at + delay;
+            }
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Starts the automatic Tracking events of a Confirmed Shipment, the first a <paramref name="delay"/> after
+    /// <paramref name="confirmedAt"/>. A null delay is a Persona that sends by hand, and schedules nothing.
+    /// </summary>
+    public void ScheduleAutoProgress(TimeSpan? delay, DateTimeOffset confirmedAt)
+    {
+        if (Status != CarrierBookingRequestStatus.Confirmed || delay is not { } after)
+        {
+            return;
+        }
+
+        AutoProgressDelay = after;
+        AutoProgressDueAt = TrackingRules.NextAutomatic(LastProgress) is null ? null : confirmedAt + after;
+    }
+
+    /// <summary>The automatic Tracking event that is due at <paramref name="now"/>; null when none was scheduled or it isn't due yet.</summary>
+    public TrackingEventType? AutoProgressDue(DateTimeOffset now) =>
+        Status == CarrierBookingRequestStatus.Confirmed && AutoProgressDueAt is { } dueAt && dueAt <= now ? TrackingRules.NextAutomatic(LastProgress) : null;
+
+    /// <summary>Puts the automatic Tracking event off to <paramref name="until"/>, after an attempt that didn't move the Shipment on.</summary>
+    public void DeferAutoProgress(DateTimeOffset until)
+    {
+        if (AutoProgressDueAt is not null)
+        {
+            AutoProgressDueAt = until;
+        }
     }
 
     /// <summary>Records that Norvia no longer has the request open, as it said when the Carrier answered late. Only an Open request is withdrawn.</summary>

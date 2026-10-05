@@ -13,6 +13,9 @@ namespace Norvia.PartnerPortal.Infrastructure.Personas;
 /// </summary>
 internal sealed class SeedFilePersonaDirectory : IPersonaDirectory
 {
+    // What a Carrier Persona without a 'tracking' section sends by: by hand, with the delay it would have in auto-progress.
+    private static readonly TimeSpan DefaultTrackingDelay = TimeSpan.FromSeconds(5);
+
     private static readonly JsonSerializerOptions SeedJson = new(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter() } };
 
     public SeedFilePersonaDirectory(IOptions<SeedOptions> options)
@@ -72,7 +75,10 @@ internal sealed class SeedFilePersonaDirectory : IPersonaDirectory
 
         return new CarrierProfile(
             carrier.BookingReferencePrefix,
-            new CarrierAnswerPolicy(carrier.Answer.Mode, carrier.Answer.RejectionReason, TimeSpan.FromSeconds(carrier.Answer.DelaySeconds)));
+            new CarrierAnswerPolicy(carrier.Answer.Mode, carrier.Answer.RejectionReason, TimeSpan.FromSeconds(carrier.Answer.DelaySeconds)),
+            carrier.Tracking is { } tracking
+                ? new CarrierTrackingPolicy(tracking.Mode, TimeSpan.FromSeconds(tracking.DelaySeconds))
+                : new CarrierTrackingPolicy(TrackingMode.Manual, DefaultTrackingDelay));
     }
 
     private static SavedAddress ToSavedAddress(SeedAddress address) =>
@@ -87,7 +93,9 @@ internal sealed class SeedFilePersonaDirectory : IPersonaDirectory
 
     private sealed record SeedPersona(string Id, string DisplayName, SeedParty Party, SeedCarrierPersona? Carrier);
 
-    private sealed record SeedCarrierPersona(string BookingReferencePrefix, SeedAnswer Answer);
+    private sealed record SeedCarrierPersona(string BookingReferencePrefix, SeedAnswer Answer, SeedTracking? Tracking);
+
+    private sealed record SeedTracking(TrackingMode Mode, double DelaySeconds);
 
     private sealed record SeedAnswer(CarrierAnswerMode Mode, CarrierRejectionReason RejectionReason, double DelaySeconds);
 

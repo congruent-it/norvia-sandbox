@@ -10,6 +10,7 @@
 @inject TimeProvider Time
 @implements IAsyncDisposable
 @using Norvia.PartnerPortal.Application.CarrierBookings.Answer
+@using Norvia.PartnerPortal.Web.CarrierShipments
 
 <PageTitle>Booking requests · @(_persona?.DisplayName ?? PersonaId) · Partner portal</PageTitle>
 
@@ -18,6 +19,7 @@
 @if (_persona is not null && _persona.PartyType == PartyType.Carrier)
 {
     <AnswerModePanel PersonaId="@PersonaId" />
+    <TrackingModePanel PersonaId="@PersonaId" />
 }
 
 @if (_loadFailed)

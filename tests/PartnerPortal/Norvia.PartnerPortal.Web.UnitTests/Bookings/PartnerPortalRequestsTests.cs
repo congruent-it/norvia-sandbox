@@ -11,6 +11,7 @@ using Norvia.PartnerPortal.Application.CarrierBookings.AnswerSettings;
 using Norvia.PartnerPortal.Application.CarrierShipments;
 using Norvia.PartnerPortal.Application.CarrierShipments.List;
 using Norvia.PartnerPortal.Application.CarrierShipments.Send;
+using Norvia.PartnerPortal.Application.CarrierShipments.TrackingSettings;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Application.Personas.List;
 using Norvia.PartnerPortal.Domain.Bookings;
@@ -139,5 +140,28 @@ public sealed class PartnerPortalRequestsTests : IDisposable
 
         (await _portal.ChangeCarrierAnswerSettingsAsync("kessler-spedition", settings, Xunit.TestContext.Current.CancellationToken)).Should().Be(settings);
         (await _portal.ChangeCarrierAnswerSettingsAsync("nobody", settings, Xunit.TestContext.Current.CancellationToken)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetCarrierTrackingSettingsAsync_ReadsTheSettings_OrIsNullWithoutThePersona()
+    {
+        var settings = new CarrierTrackingSettingsView(TrackingMode.AutoProgress, 5);
+        _mediator.Send(new GetCarrierTrackingSettingsQuery("kessler-spedition"), Arg.Any<CancellationToken>()).Returns(Result.Success(settings));
+        _mediator.Send(new GetCarrierTrackingSettingsQuery("nobody"), Arg.Any<CancellationToken>()).Returns(Result<CarrierTrackingSettingsView>.NotFound());
+
+        (await _portal.GetCarrierTrackingSettingsAsync("kessler-spedition", Xunit.TestContext.Current.CancellationToken)).Should().Be(settings);
+        (await _portal.GetCarrierTrackingSettingsAsync("nobody", Xunit.TestContext.Current.CancellationToken)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ChangeCarrierTrackingSettingsAsync_ChangesTheSettings_OrIsNullWithoutThePersona()
+    {
+        var settings = new CarrierTrackingSettingsView(TrackingMode.AutoProgress, 3);
+        _mediator.Send(new ChangeCarrierTrackingSettingsCommand("kessler-spedition", TrackingMode.AutoProgress, 3), Arg.Any<CancellationToken>()).Returns(Result.Success(settings));
+        _mediator.Send(new ChangeCarrierTrackingSettingsCommand("nobody", TrackingMode.AutoProgress, 3), Arg.Any<CancellationToken>())
+            .Returns(Result<CarrierTrackingSettingsView>.NotFound());
+
+        (await _portal.ChangeCarrierTrackingSettingsAsync("kessler-spedition", settings, Xunit.TestContext.Current.CancellationToken)).Should().Be(settings);
+        (await _portal.ChangeCarrierTrackingSettingsAsync("nobody", settings, Xunit.TestContext.Current.CancellationToken)).Should().BeNull();
     }
 }

@@ -1,0 +1,125 @@
+@* How this Carrier Persona sends the Tracking events of the Shipments it confirms: set on its own page, next to its answer mode. *@
+@inject IPartnerPortal Portal
+@inject ILogger<TrackingModePanel> Logger
+
+<div role="group" aria-label="Tracking mode" class="mb-8 max-w-3xl border border-border p-6">
+    <h2 class="mt-0">Tracking mode</h2>
+    @if (_loadFailed)
+    {
+        <div role="alert">
+            <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+                The tracking mode couldn't be loaded. Reload the page to try again.
+            </FluentMessageBar>
+        </div>
+    }
+    else if (_form is null)
+    {
+        <div role="status">Loading the tracking mode…</div>
+    }
+    else
+    {
+        <p class="mt-0 text-sm">
+            How this Carrier sends Tracking events for the Shipments it confirms from now on. In auto-progress it sends Collected, Departed,
+            Out for delivery and Delivered in turn after confirmation. A Shipment already confirmed keeps the mode it was confirmed with.
+        </p>
+        <EditForm Model="_form" OnValidSubmit="SaveAsync" FormName="tracking-mode">
+            <DataAnnotationsValidator />
+            <div class="grid gap-4">
+                <div>
+                    <label for="@ModeId" class="lux-label">Mode</label>
+                    <InputSelect TValue="TrackingMode" id="@ModeId" class="lux-input" @bind-Value="_form.Mode">
+                        @foreach (var mode in Enum.GetValues<TrackingMode>())
+                        {
+                            <option value="@mode">@TrackingModeText.Of(mode)</option>
+                        }
+                    </InputSelect>
+                </div>
+                @if (_form.Mode != TrackingMode.Manual)
+                {
+                    <div>
+                        <label for="@DelayId" class="lux-label">Delay between Tracking events (seconds)</label>
+                        <InputNumber TValue="int" id="@DelayId" class="lux-input" @bind-Value="_form.DelaySeconds" />
+                        <FluentValidationMessage For="() => _form.DelaySeconds" />
+                    </div>
+                }
+            </div>
+            <div class="mt-4 flex flex-wrap items-center gap-4">
+                <FluentButton Type="ButtonType.Submit" Appearance="Appearance.Accent" Disabled="_saving">Save tracking mode</FluentButton>
+            </div>
+        </EditForm>
+        @if (_saved)
+        {
+            <div role="status" class="mt-4">
+                <FluentMessageBar Intent="MessageIntent.Success" AllowDismiss="false">
+                    Saved. The next Shipment you confirm sends its Tracking events this way.
+                </FluentMessageBar>
+            </div>
+        }
+        @if (_saveFailed)
+        {
+            <div role="alert" class="mt-4">
+                <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+                    The tracking mode couldn't be saved. Try again.
+                </FluentMessageBar>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private const string ModeId = "tracking-mode";
+    private const string DelayId = "tracking-delay-seconds";
+
+    private TrackingModeForm? _form;
+    private bool _loadFailed;
+    private bool _saving;
+    private bool _saved;
+    private bool _saveFailed;
+
+    [Parameter, EditorRequired]
+    public string PersonaId { get; set; } = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _form = null;
+        _saved = false;
+        try
+        {
+            _form = await Portal.GetCarrierTrackingSettingsAsync(PersonaId, CancellationToken.None) is { } settings ? TrackingModeForm.From(settings) : null;
+            _loadFailed = _form is null;
+        }
+        catch (Exception exception)
+        {
+            PageLog.TrackingModeLoadFailed(Logger, exception, PersonaId);
+            _loadFailed = true;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _saved = false;
+        _saveFailed = false;
+        try
+        {
+            if (await Portal.ChangeCarrierTrackingSettingsAsync(PersonaId, _form!.ToSettings(), CancellationToken.None) is { } settings)
+            {
+                _form = TrackingModeForm.From(settings);
+                _saved = true;
+            }
+            else
+            {
+                _saveFailed = true;
+            }
+        }
+        catch (Exception exception)
+        {
+            PageLog.TrackingModeSaveFailed(Logger, exception, PersonaId);
+            _saveFailed = true;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

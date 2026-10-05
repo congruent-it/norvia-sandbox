@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Time.Testing;
 using Norvia.PartnerPortal.Application.Bookings;
 using Norvia.PartnerPortal.Application.CarrierBookings.Answer;
+using Norvia.PartnerPortal.Application.CarrierShipments.AutoProgress;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
 using Norvia.PartnerPortal.Domain.Personas;
@@ -16,6 +17,8 @@ public sealed class AnswerCarrierBookingHandlerTests
     private static readonly CarrierAnswer Rejection = new CarrierAnswer.Rejection(CarrierRejectionReason.NoCapacity, "No trucks on Friday");
 
     private readonly IRepository<CarrierBookingRequest> _repository = Substitute.For<IRepository<CarrierBookingRequest>>();
+    private readonly IRepository<CarrierTrackingSettings> _trackingSettings = Substitute.For<IRepository<CarrierTrackingSettings>>();
+    private readonly IAutoProgressSignal _autoProgress = Substitute.For<IAutoProgressSignal>();
     private readonly INorviaPartnerApi _partnerApi = Substitute.For<INorviaPartnerApi>();
     private readonly IPersonaDirectory _personas = Substitute.For<IPersonaDirectory>();
     private readonly FakeTimeProvider _time = new(Samples.Now);
@@ -27,11 +30,12 @@ public sealed class AnswerCarrierBookingHandlerTests
     {
         _personas.Find(Samples.VanDijkTransport.Id).Returns(Samples.VanDijkTransport);
         _personas.Find(Samples.BrouwerDranken.Id).Returns(Samples.BrouwerDranken);
+        _personas.Find(Samples.KesslerSpedition.Id).Returns(Samples.KesslerSpedition);
         _request = CarrierBookingRequest.Receive(
             Samples.VanDijkTransport.Id, "CB-0000001", "SH-0000042", "release-1", Samples.Now.AddHours(-1),
             new CarrierBookingDetails(new CarrierBookingStop(null, null, "Rotterdam", "NLD", null, null), new CarrierBookingStop(null, null, "Utrecht", "NLD", null, null), null, []));
         _repository.FirstOrDefaultAsync(Arg.Is<CarrierBookingRequestToAnswerSpec>(spec => spec != null), Arg.Any<CancellationToken>()).Returns(_request);
-        _handler = new AnswerCarrierBookingHandler(_repository, _partnerApi, _personas, _time, _logger);
+        _handler = new AnswerCarrierBookingHandler(_repository, _trackingSettings, _partnerApi, _personas, _autoProgress, _time, _logger);
     }
 
     private ValueTask<Result<AnsweredCarrierBooking>> Answer(CarrierAnswer answer, string persona = "van-dijk-transport") =>
@@ -183,5 +187,56 @@ public sealed class AnswerCarrierBookingHandlerTests
         _repository.FirstOrDefaultAsync(Arg.Any<CarrierBookingRequestToAnswerSpec>(), Arg.Any<CancellationToken>()).Returns((CarrierBookingRequest?)null);
 
         (await Answer(Confirmation)).Status.Should().Be(ResultStatus.NotFound);
+    }
+
+    [Fact]
+    public async Task Handle_AConfirmationByAPersonaInAutoProgress_SchedulesTheFirstTrackingEventADelayLater_AndWakesTheWorker()
+    {
+        var request = CarrierBookingRequest.Receive(
+            Samples.KesslerSpedition.Id, "CB-0000002", "SH-0000043", "release-2", Samples.Now.AddHours(-1),
+            new CarrierBookingDetails(new CarrierBookingStop(null, null, "Rotterdam", "NLD", null, null), new CarrierBookingStop(null, null, "Utrecht", "NLD", null, null), null, []));
+        _repository.FirstOrDefaultAsync(Arg.Is<CarrierBookingRequestToAnswerSpec>(spec => spec != null), Arg.Any<CancellationToken>()).Returns(request);
+        _partnerApi.AnswerAsync(Samples.KesslerSpedition, "CB-0000002", "SH-0000043", Arg.Any<CarrierAnswer>(), Arg.Any<CancellationToken>()).Returns(NorviaReply.Recorded("answer-1"));
+
+        await _handler.Handle(new AnswerCarrierBookingCommand("kessler-spedition", "CB-0000002", Confirmation), CancellationToken.None);
+
+        request.AutoProgressDueAt.Should().Be(Samples.Now.AddSeconds(5));
+        _autoProgress.Received(1).ShipmentConfirmed();
+    }
+
+    [Fact]
+    public async Task Handle_AConfirmationUnderTheTrackingModeThePresenterChose_FollowsItOverTheSeedDefault()
+    {
+        NorviaReplies(NorviaReply.Recorded("answer-1"));
+        _trackingSettings.FirstOrDefaultAsync(Arg.Any<CarrierTrackingSettingsOfPersonaSpec>(), Arg.Any<CancellationToken>())
+            .Returns(CarrierTrackingSettings.Choose(Samples.VanDijkTransport.Id, new CarrierTrackingPolicy(TrackingMode.AutoProgress, TimeSpan.FromSeconds(2))));
+
+        await Answer(Confirmation);
+
+        _request.AutoProgressDueAt.Should().Be(Samples.Now.AddSeconds(2));
+    }
+
+    [Fact]
+    public async Task Handle_AConfirmationByAManualPersona_SchedulesNothing_AndWakesNoOne()
+    {
+        NorviaReplies(NorviaReply.Recorded("answer-1"));
+
+        await Answer(Confirmation);
+
+        _request.AutoProgressDueAt.Should().BeNull();
+        _autoProgress.DidNotReceive().ShipmentConfirmed();
+    }
+
+    [Fact]
+    public async Task Handle_ARejection_SchedulesNothing()
+    {
+        NorviaReplies(NorviaReply.Recorded("answer-1"));
+        _trackingSettings.FirstOrDefaultAsync(Arg.Any<CarrierTrackingSettingsOfPersonaSpec>(), Arg.Any<CancellationToken>())
+            .Returns(CarrierTrackingSettings.Choose(Samples.VanDijkTransport.Id, new CarrierTrackingPolicy(TrackingMode.AutoProgress, TimeSpan.FromSeconds(2))));
+
+        await Answer(Rejection);
+
+        _request.AutoProgressDueAt.Should().BeNull();
+        _autoProgress.DidNotReceive().ShipmentConfirmed();
     }
 }
