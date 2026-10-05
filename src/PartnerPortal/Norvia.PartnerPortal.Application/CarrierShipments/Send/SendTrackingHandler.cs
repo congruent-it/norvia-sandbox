@@ -43,7 +43,7 @@ public sealed partial class SendTrackingHandler(
         }
 
         var trackingEvent = new CarrierTrackingEvent(
-            Guid.NewGuid().ToString("N"), reference, request.CarrierBookingNumber, command.Type, time.GetUtcNow(), place, postcode, country);
+            Guid.CreateVersion7(time.GetUtcNow()).ToString("N"), reference, request.CarrierBookingNumber, command.Type, time.GetUtcNow(), place, postcode, country);
         var reply = await partnerApi.SubmitTrackingAsync(carrier, request.ShipmentNumber, trackingEvent, cancellationToken);
 
         // An exception leaves the Shipment as it is, so there is nothing to keep.
