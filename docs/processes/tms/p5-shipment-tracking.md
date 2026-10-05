@@ -199,6 +199,22 @@ A Tracking event that skips steps publishes only the event for the status it lan
 
 Delivered doesn't wait for a Proof of delivery. [P6](p6-proof-of-delivery.md) attaches it separately and never changes the status. Invoicing does wait for it: a Transport Order is Billable only once it has a current Proof of delivery ([P9](p9-freight-settlement.md#conditions), ADR 0012).
 
+## Presenter smoke run
+
+After a deployment, and not in CI, the presenter checks Shipment tracking end to end on the deployed estate, before the headline incident breaks it. Do it after the presenter smoke run of Carrier booking ([docs/processes/tms/p4-carrier-booking.md](p4-carrier-booking.md#presenter-smoke-run)), whose Booked Shipment it tracks. Open the TMS UI and the Integration console side by side.
+
+1. **Get a Booked Shipment.** Follow P4's run to step 7: Rotterdam to Düsseldorf as Brouwer Dranken, confirmed by Van Dijk Transport. Note the Transport Order number. In the TMS UI, the Shipment is in *Shipments in progress*, Booked, with no Tracking event yet. Then set Kessler Spedition back to *Auto-confirm*, as P4's last step says.
+2. **Run the check.** Run `infra/smoke-test-shipment-tracking.sh <Transport Order number>`. It posts as Van Dijk Transport, through API Management, from a throwaway Container Apps job running as the Partner portal. It reads the TMS as the intake identity and Application Insights, which is usually 1 to 5 minutes behind. It checks that:
+   - `PU`, `DEP` and `POD` each return `202 Accepted`, and the Shipment moves through Collected, In transit and Delivered, in the Planner's *Shipments in progress* until it is Delivered, with the three Tracking events on its timeline, each moving the status;
+   - a Tracking event for a reference no Carrier booking has is accepted and lands on the `carrier-tracking` queue's dead-letter queue with `ShipmentNotFound`;
+   - each accepted call is in Application Insights by its correlation ID, from API Management, the Carrier-tracking Logic App and the TMS.
+3. **Stop the TMS.** The script then points the Carrier-tracking Logic App's `TMS_BASE_URL` at an address that answers nothing, and sends a `POD`. It still returns `202 Accepted`. The message is delivered again from the queue until, after the queue's maximum delivery count (10), Service Bus dead-letters it with `MaxDeliveryCountExceeded`. The script puts `TMS_BASE_URL` back, even when a check fails.
+4. **Resubmit it.** The script prints the Integration console's link for the message. In the console, open the dead-letter queue of `carrier-tracking`, open the message and choose *Resubmit*. Press Enter in the script. The TMS records it: the Shipment's timeline holds a second Delivered event, which moved nothing. This is the dead-letter step the headline incident relies on.
+
+The script prints `PASS` or `FAIL` per check, never a body, a token or a key, and ends with the pages to open. Dead-lettered messages are read with the presenter's own Service Bus Data Receiver right, by locking and releasing them, so the unknown reference's message stays on the queue for the console. Discard it there afterwards.
+
+If a check fails, file the gap as its own issue against P5, rather than working around it in the run book.
+
 ## Deferred
 
 These were left out on purpose while designing P5, each with its reason.
