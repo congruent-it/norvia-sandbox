@@ -11,6 +11,7 @@ using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.Shippers;
 using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.TransportOrders;
+using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 
 namespace Norvia.Tms.Application.UnitTests.TrackingEvents;
@@ -25,6 +26,7 @@ public sealed class TrackingQueriesTests
     private readonly IReadRepository<TrackingEvent> _events = Substitute.For<IReadRepository<TrackingEvent>>();
     private readonly IReadRepository<TransportOrder> _orders = Substitute.For<IReadRepository<TransportOrder>>();
     private readonly ICarrierDirectory _carriers = Substitute.For<ICarrierDirectory>();
+    private readonly FakeTimeProvider _time = new(Samples.Now);
     private readonly List<TransportOrder> _allOrders = [];
 
     public TrackingQueriesTests()
@@ -53,7 +55,7 @@ public sealed class TrackingQueriesTests
         var listed = await InProgressHandler().Handle(new ListShipmentsInProgressQuery(), CancellationToken.None);
 
         listed.Should().ContainSingle().Which.Should().Be(new ShipmentInProgressSummary(
-            "SH-0000012", new CarriedByView(AssignedTo.Carrier, new CarrierView("CAR-0001", "Van Dijk Transport")), ShipmentStatus.Booked, null, Latest));
+            "SH-0000012", new CarriedByView(AssignedTo.Carrier, new CarrierView("CAR-0001", "Van Dijk Transport")), ShipmentStatus.Booked, null, Latest, false));
     }
 
     [Fact]
@@ -72,6 +74,76 @@ public sealed class TrackingQueriesTests
         summary.Status.Should().Be(ShipmentStatus.InTransit);
         summary.LastTrackingEvent.Should().Be(new LastTrackingEventView(TrackingEventType.Arrived, Samples.Now.AddHours(2), "Rotterdam", "3011 AA", "NL"));
         summary.Eta.Should().Be(Samples.Now.AddDays(1));
+    }
+
+    [Fact]
+    public async Task ListInProgress_NotCollectedTheThresholdAfterTheCollectionWindow_IsStale_AndClearsWhenACollectedEventArrives()
+    {
+        var shipment = Booked(sequence: 12);
+        _shipments.ListAsync(Arg.Any<ShipmentsInProgressSpec>(), Arg.Any<CancellationToken>()).Returns([shipment]);
+        var collectionLatest = Samples.Now.AddDays(1).AddHours(4);
+
+        _time.SetUtcNow(collectionLatest.AddHours(2).AddTicks(-1));
+        (await InProgressHandler().Handle(new ListShipmentsInProgressQuery(), CancellationToken.None)).Single().IsStale.Should().BeFalse();
+
+        _time.SetUtcNow(collectionLatest.AddHours(2));
+        (await InProgressHandler().Handle(new ListShipmentsInProgressQuery(), CancellationToken.None)).Single().IsStale.Should().BeTrue();
+
+        var collected = Report(shipment, TrackingEventType.Collected, "a", _time.GetUtcNow(), _time.GetUtcNow(), null);
+        _events.ListAsync(Arg.Any<TrackingEventsForShipmentsSpec>(), Arg.Any<CancellationToken>()).Returns([collected]);
+        (await InProgressHandler().Handle(new ListShipmentsInProgressQuery(), CancellationToken.None)).Single().IsStale.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ListInProgress_SilentInTransitForTheLimit_IsStale_AndClearsWhenAnotherEventArrives()
+    {
+        var shipment = Booked(sequence: 12);
+        _shipments.ListAsync(Arg.Any<ShipmentsInProgressSpec>(), Arg.Any<CancellationToken>()).Returns([shipment]);
+        var departed = Report(shipment, TrackingEventType.Departed, "a", Samples.Now, Samples.Now, null);
+        _events.ListAsync(Arg.Any<TrackingEventsForShipmentsSpec>(), Arg.Any<CancellationToken>()).Returns([departed]);
+
+        _time.SetUtcNow(Samples.Now.AddHours(24).AddTicks(-1));
+        (await InProgressHandler().Handle(new ListShipmentsInProgressQuery(), CancellationToken.None)).Single().IsStale.Should().BeFalse();
+
+        _time.SetUtcNow(Samples.Now.AddHours(24));
+        (await InProgressHandler().Handle(new ListShipmentsInProgressQuery(), CancellationToken.None)).Single().IsStale.Should().BeTrue();
+
+        var arrived = Report(shipment, TrackingEventType.Arrived, "b", _time.GetUtcNow(), _time.GetUtcNow(), null);
+        _events.ListAsync(Arg.Any<TrackingEventsForShipmentsSpec>(), Arg.Any<CancellationToken>()).Returns([departed, arrived]);
+        (await InProgressHandler().Handle(new ListShipmentsInProgressQuery(), CancellationToken.None)).Single().IsStale.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ListInProgress_NotDeliveredTheThresholdAfterTheDeliveryWindow_IsStale()
+    {
+        var shipment = Booked(sequence: 12);
+        _shipments.ListAsync(Arg.Any<ShipmentsInProgressSpec>(), Arg.Any<CancellationToken>()).Returns([shipment]);
+        var arrived = Report(shipment, TrackingEventType.Arrived, "a", Latest.AddHours(2), Latest.AddHours(2), null);
+        _events.ListAsync(Arg.Any<TrackingEventsForShipmentsSpec>(), Arg.Any<CancellationToken>()).Returns([arrived]);
+
+        _time.SetUtcNow(Latest.AddHours(2).AddTicks(-1));
+        (await InProgressHandler().Handle(new ListShipmentsInProgressQuery(), CancellationToken.None)).Single().IsStale.Should().BeFalse();
+
+        _time.SetUtcNow(Latest.AddHours(2));
+        (await InProgressHandler().Handle(new ListShipmentsInProgressQuery(), CancellationToken.None)).Single().IsStale.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ListInProgress_ListsStaleFirst_ThenByEta()
+    {
+        var fresh = Booked(sequence: 12, orderSequence: 7);
+        var stale = Booked(sequence: 13, orderSequence: 8);
+        var freshSoon = Booked(sequence: 14, orderSequence: 9);
+        _shipments.ListAsync(Arg.Any<ShipmentsInProgressSpec>(), Arg.Any<CancellationToken>()).Returns([fresh, stale, freshSoon]);
+        var freshEvent = Report(fresh, TrackingEventType.Departed, "a", Samples.Now, Samples.Now, Samples.Now.AddDays(2));
+        var freshSoonEvent = Report(freshSoon, TrackingEventType.Departed, "b", Samples.Now, Samples.Now, Samples.Now.AddDays(1));
+        var staleEvent = Report(stale, TrackingEventType.Departed, "c", Samples.Now.AddHours(-30), Samples.Now.AddHours(-30), Samples.Now.AddDays(5));
+        _events.ListAsync(Arg.Any<TrackingEventsForShipmentsSpec>(), Arg.Any<CancellationToken>()).Returns([freshEvent, freshSoonEvent, staleEvent]);
+
+        var listed = await InProgressHandler().Handle(new ListShipmentsInProgressQuery(), CancellationToken.None);
+
+        listed.Select(summary => summary.ShipmentNumber).Should().Equal("SH-0000013", "SH-0000014", "SH-0000012");
+        listed.Select(summary => summary.IsStale).Should().Equal(true, false, false);
     }
 
     [Fact]
@@ -130,7 +202,7 @@ public sealed class TrackingQueriesTests
         result.Status.Should().Be(ResultStatus.NotFound);
     }
 
-    private ListShipmentsInProgressHandler InProgressHandler() => new(_shipments, _events, _orders, _carriers);
+    private ListShipmentsInProgressHandler InProgressHandler() => new(_shipments, _events, _orders, _carriers, new ShipmentStaleRules(TimeSpan.FromHours(2), TimeSpan.FromHours(24), TimeSpan.FromHours(2)), _time);
 
     private GetTrackingTimelineHandler TimelineHandler() => new(_shipments, _events);
 

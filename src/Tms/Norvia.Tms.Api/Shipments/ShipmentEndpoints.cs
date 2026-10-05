@@ -45,10 +45,11 @@ public static class ShipmentEndpoints
         shipments.MapGet("/in-progress", ListInProgressAsync)
             .RequireAuthorization()
             .WithName("ListShipmentsInProgress")
-            .WithSummary("List the Shipments on their way: Booked, Collected and In transit, with the last Tracking event and the ETA of each.")
+            .WithSummary("List the Shipments on their way: Booked, Collected and In transit, Stale ones first, then by ETA.")
             .WithDescription(
                 "Each Shipment shows its number, who carries it, its status, its last Tracking event (type, time and place), or none yet, and its "
-                + "ETA: the last ETA a Carrier reported, or the delivery window's latest time when none did. A Delivered Shipment leaves the list.");
+                + "ETA: the last ETA a Carrier reported, or the delivery window's latest time when none did. A Stale Shipment, whose next expected Tracking event is late, is flagged and listed first, then the rest by ETA. "
+                + "A Delivered Shipment leaves the list.");
 
         shipments.MapGet("/{shipmentNumber}/tracking-events", GetTrackingTimelineAsync)
             .RequireAuthorization()

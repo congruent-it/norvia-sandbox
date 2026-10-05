@@ -11,7 +11,9 @@ public sealed class ListShipmentsInProgressHandler(
     IReadRepository<Shipment> shipments,
     IReadRepository<TrackingEvent> trackingEvents,
     IReadRepository<TransportOrder> transportOrders,
-    ICarrierDirectory carriers)
+    ICarrierDirectory carriers,
+    ShipmentStaleRules staleRules,
+    TimeProvider time)
     : IQueryHandler<ListShipmentsInProgressQuery, IReadOnlyList<ShipmentInProgressSummary>>
 {
     public async ValueTask<IReadOnlyList<ShipmentInProgressSummary>> Handle(ListShipmentsInProgressQuery query, CancellationToken cancellationToken)
@@ -27,20 +29,27 @@ public sealed class ListShipmentsInProgressHandler(
         var eventsByShipment = (await trackingEvents.ListAsync(new TrackingEventsForShipmentsSpec([.. inProgress.Select(shipment => shipment.Id)]), cancellationToken))
             .ToLookup(trackingEvent => trackingEvent.ShipmentId);
         var orderNumbers = inProgress.Select(shipment => shipment.TransportOrderNumber).Distinct().ToList();
-        var deliveryWindowByOrder = (await transportOrders.ListAsync(new TransportOrdersByNumbersSpec(orderNumbers), cancellationToken))
-            .ToDictionary(order => order.Number!, order => order.Details.Delivery?.Window);
+        var detailsByOrder = (await transportOrders.ListAsync(new TransportOrdersByNumbersSpec(orderNumbers), cancellationToken))
+            .ToDictionary(order => order.Number!, order => order.Details);
 
-        return [.. inProgress.Select(shipment => Summarize(shipment, eventsByShipment[shipment.Id].ToList(), deliveryWindowByOrder.GetValueOrDefault(shipment.TransportOrderNumber)))];
+        var now = time.GetUtcNow();
+        return [.. inProgress
+            .Select(shipment => Summarize(shipment, eventsByShipment[shipment.Id].ToList(), detailsByOrder.GetValueOrDefault(shipment.TransportOrderNumber), now))
+            .OrderByDescending(summary => summary.IsStale)
+            .ThenBy(summary => summary.Eta ?? DateTimeOffset.MaxValue)];
     }
 
-    private ShipmentInProgressSummary Summarize(Shipment shipment, List<TrackingEvent> events, TimeWindow? deliveryWindow)
+    private ShipmentInProgressSummary Summarize(Shipment shipment, List<TrackingEvent> events, TransportOrderDetails? details, DateTimeOffset now)
     {
+        var deliveryWindow = details?.Delivery?.Window;
         var last = events.MaxBy(trackingEvent => trackingEvent.ReceivedAt);
+        var isStale = staleRules.IsStale(shipment.Status, details?.Collection?.Window?.Latest, deliveryWindow?.Latest, last?.ReceivedAt, now);
         return new(
             shipment.Number.Value,
             CarriedByView.Of(shipment.CarriedBy, carriers),
             shipment.Status,
             last is null ? null : LastTrackingEventView.Of(last),
-            ShipmentEta.Of(events, deliveryWindow));
+            ShipmentEta.Of(events, deliveryWindow),
+            isStale);
     }
 }
