@@ -69,6 +69,7 @@ public sealed class PublishShipmentCollectedTests
                 TrackingSource.Carrier(new CarrierId("CAR-0001")),
                 "evt-1",
                 "VDT-1",
+                null,
                 TrackingEventType.Collected,
                 EventTime,
                 new TrackingLocation("Rotterdam", "3011 AA", "NL"),

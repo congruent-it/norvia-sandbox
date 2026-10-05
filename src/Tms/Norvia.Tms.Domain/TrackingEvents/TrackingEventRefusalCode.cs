@@ -17,4 +17,10 @@ public enum TrackingEventRefusalCode
 
     /// <summary>The event time is in the future, beyond the clock-skew allowance.</summary>
     EventTimeInTheFuture,
+
+    /// <summary>The event's type isn't one the TMS knows. A client error.</summary>
+    UnknownEventType,
+
+    /// <summary>The event lacks a field the Canonical Model requires. A client error.</summary>
+    MissingRequiredField,
 }

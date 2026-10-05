@@ -212,6 +212,90 @@ public sealed class TrackingEventRecordTests(ControlledClockTmsFixture tms) : IC
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest, description);
     }
 
+    public static TheoryData<string, Action<JsonObject>, string> RefusedWithACode => new()
+    {
+        { "a type the TMS doesn't know", body => body["type"] = "Teleported", "UnknownEventType" },
+        { "a numeric type", body => body["type"] = "1", "UnknownEventType" },
+        { "no type", body => body.Remove("type"), "MissingRequiredField" },
+        { "no event ID", body => body.Remove("eventId"), "MissingRequiredField" },
+        { "no event time", body => body.Remove("eventTime"), "MissingRequiredField" },
+        { "no location", body => body.Remove("location"), "MissingRequiredField" },
+        { "neither a booking reference nor a number", body => body.Remove("carrierBookingReference"), "MissingRequiredField" },
+    };
+
+    [Theory]
+    [MemberData(nameof(RefusedWithACode))]
+#pragma warning disable xUnit1026 // The description names the case in the test's output.
+    public async Task Record_AnEventTheTmsCantRead_IsRefusedAsAClientError_WithAStableCode(string description, Action<JsonObject> spoil, string code)
+#pragma warning restore xUnit1026
+    {
+        var (shipmentNumber, reference) = await tms.BookedShipmentAsync(_cancellationToken);
+        var trackingEvent = Collected(reference, _now.AddMinutes(-1));
+        spoil(trackingEvent);
+        var correlationId = TmsCalls.NewCorrelationId();
+
+        var problem = await tms.RecordRefusedAsync(trackingEvent, HttpStatusCode.BadRequest, _cancellationToken, correlationId);
+
+        problem["code"]!.GetValue<string>().Should().Be(code, description);
+        problem["correlationId"]!.GetValue<string>().Should().Be(correlationId);
+        (await tms.GetShipmentAsync(shipmentNumber, _cancellationToken))["status"]!.GetValue<string>().Should().Be("Booked");
+    }
+
+    [Fact]
+    public async Task Record_WithOnlyTheCarrierBookingNumber_FindsTheShipmentByIt()
+    {
+        var (shipmentNumber, number, reference) = await tms.BookedShipmentWithNumberAsync(_cancellationToken);
+        var trackingEvent = Collected(reference, _now.AddMinutes(-1));
+        trackingEvent.Remove("carrierBookingReference");
+        trackingEvent["carrierBookingNumber"] = number;
+        CanonicalModelSchemas.ValidateTrackingEvent(trackingEvent).IsValid.Should().BeTrue();
+        var correlationId = TmsCalls.NewCorrelationId();
+
+        var recorded = await tms.RecordedAsync(trackingEvent, _cancellationToken, correlationId);
+
+        recorded["shipmentNumber"]!.GetValue<string>().Should().Be(shipmentNumber);
+        var message = (await tms.PublishedAsync(correlationId, "ShipmentCollected", _cancellationToken)).Should().ContainSingle().Subject;
+        JsonNode.Parse(message.Body.ToString())!["carrierBookingReference"]!.GetValue<string>().Should().Be(reference);
+    }
+
+    [Fact]
+    public async Task Record_ACarrierBookingNumberOfAnotherCarriersBooking_IsRefused_WithShipmentNotFound()
+    {
+        var (_, number, _) = await tms.BookedShipmentWithNumberAsync(_cancellationToken);
+        var trackingEvent = Collected("unused", _now.AddMinutes(-1), source: CarrierSource(PlanningCalls.OtherCarrierId));
+        trackingEvent.Remove("carrierBookingReference");
+        trackingEvent["carrierBookingNumber"] = number;
+
+        var problem = await tms.RecordRefusedAsync(trackingEvent, HttpStatusCode.NotFound, _cancellationToken);
+
+        problem["code"]!.GetValue<string>().Should().Be("ShipmentNotFound");
+    }
+
+    [Theory]
+    [InlineData("CollectionFailed")]
+    [InlineData("DeliveryFailed")]
+    [InlineData("Damaged")]
+    public async Task Record_AnException_ChangesNoStatus_AndPublishesShipmentExceptionReported(string type)
+    {
+        var (shipmentNumber, reference) = await tms.BookedShipmentAsync(_cancellationToken);
+        var trackingEvent = Event(type, reference, _now.AddMinutes(-1));
+        CanonicalModelSchemas.ValidateTrackingEvent(trackingEvent).IsValid.Should().BeTrue();
+        var correlationId = TmsCalls.NewCorrelationId();
+
+        var recorded = await tms.RecordedAsync(trackingEvent, _cancellationToken, correlationId);
+
+        recorded["shipmentStatus"]!.GetValue<string>().Should().Be("Booked");
+        recorded["movedShipment"]!.GetValue<bool>().Should().BeFalse();
+        (await tms.GetShipmentAsync(shipmentNumber, _cancellationToken))["status"]!.GetValue<string>().Should().Be("Booked");
+        var message = (await tms.PublishedAsync(correlationId, "ShipmentExceptionReported", _cancellationToken)).Should().ContainSingle().Subject;
+        var body = JsonNode.Parse(message.Body.ToString())!;
+        var results = CanonicalModelSchemas.ValidateShipmentExceptionReported(body);
+        results.IsValid.Should().BeTrue(CanonicalModelSchemas.Errors(results));
+        body["exceptionType"]!.GetValue<string>().Should().Be(type);
+        body["remark"]!.GetValue<string>().Should().Be($"{type} at dock 4");
+        body["shipmentNumber"]!.GetValue<string>().Should().Be(shipmentNumber);
+    }
+
     [Fact]
     public async Task Record_WithoutACorrelationId_IsABadRequest()
     {

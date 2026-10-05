@@ -88,10 +88,18 @@ internal static class TrackingEventCalls
     public static async Task<(string ShipmentNumber, string CarrierBookingReference)> BookedShipmentAsync(
         this TmsFixture tms, CancellationToken cancellationToken)
     {
+        var (shipmentNumber, _, reference) = await tms.BookedShipmentWithNumberAsync(cancellationToken);
+        return (shipmentNumber, reference);
+    }
+
+    /// <summary>A Booked Carrier Shipment, with the TMS's Carrier booking number and the Carrier's own booking reference.</summary>
+    public static async Task<(string ShipmentNumber, string CarrierBookingNumber, string CarrierBookingReference)> BookedShipmentWithNumberAsync(
+        this TmsFixture tms, CancellationToken cancellationToken)
+    {
         var (carrierBookingNumber, shipmentNumber) = await tms.ReleasedCarrierBookingAsync(cancellationToken);
         var reference = $"VDT-{Guid.NewGuid():N}"[..20];
         var confirmed = await tms.ConfirmedAsync(carrierBookingNumber, PlanningCalls.CarrierId, reference, cancellationToken);
         confirmed["shipmentStatus"]!.GetValue<string>().Should().Be("Booked");
-        return (shipmentNumber, reference);
+        return (shipmentNumber, carrierBookingNumber, reference);
     }
 }

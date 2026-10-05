@@ -1,5 +1,4 @@
 using System.Text.Json.Serialization;
-using Norvia.Tms.Domain.TrackingEvents;
 
 namespace Norvia.Tms.Api.TrackingEvents;
 
@@ -11,14 +10,21 @@ namespace Norvia.Tms.Api.TrackingEvents;
 /// <param name="EventId">The reporter's own ID for the event, unique per source: sent again, it is recognised as a repeat.</param>
 /// <param name="Source">Who reported it. The Carrier comes from API Management's token check (ADR 0005), never from the Carrier's own payload.</param>
 /// <param name="CarrierBookingReference">The Carrier's own reference for its booking: with the Carrier, it finds the Shipment.</param>
+/// <param name="CarrierBookingNumber">The TMS's own Carrier booking number, used only when the reference isn't given or doesn't match.</param>
+/// <param name="Type">The Tracking event type's name; a string, so an unknown one is refused with a code of its own.</param>
 /// <param name="EventTime">When it happened, with the offset of where it happened.</param>
+/// <remarks>
+/// What the Canonical Model requires is nullable here and checked by the endpoint, so a missing field is refused with a
+/// stable code instead of the framework's bare 400.
+/// </remarks>
 public sealed record TrackingEventRequest(
-    [property: JsonRequired] string EventId,
-    [property: JsonRequired] TrackingSourceRequest Source,
-    [property: JsonRequired] string CarrierBookingReference,
-    [property: JsonRequired] TrackingEventType Type,
-    [property: JsonRequired] DateTimeOffset EventTime,
-    [property: JsonRequired] TrackingLocationRequest Location,
+    string? EventId = null,
+    TrackingSourceRequest? Source = null,
+    string? CarrierBookingReference = null,
+    string? CarrierBookingNumber = null,
+    string? Type = null,
+    DateTimeOffset? EventTime = null,
+    TrackingLocationRequest? Location = null,
     DateTimeOffset? Eta = null,
     string? Remark = null);
 
@@ -33,7 +39,4 @@ public enum TrackingSourceType
 
 /// <summary>Where a Tracking event happened.</summary>
 /// <param name="CountryCode">ISO 3166-1 alpha-2.</param>
-public sealed record TrackingLocationRequest(
-    [property: JsonRequired] string Place,
-    [property: JsonRequired] string Postcode,
-    [property: JsonRequired] string CountryCode);
+public sealed record TrackingLocationRequest(string? Place = null, string? Postcode = null, string? CountryCode = null);

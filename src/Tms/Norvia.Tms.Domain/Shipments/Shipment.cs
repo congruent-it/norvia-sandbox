@@ -175,12 +175,18 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
     /// Takes in a Tracking event reported for the Shipment (P5): the event is made, to be kept as a log on the Shipment,
     /// and the status moves forward where the event warrants it. The status only moves forward: an event moves a Booked or
     /// later Shipment to its type's status when that is further along than the current one, and any step can be skipped.
-    /// It raises the event for the status landed on only. Any other event, such as a late one or one after Delivered, is
+    /// It raises the event for the status landed on only. An exception never moves the status: it raises ShipmentExceptionReported. Any other event, such as a late one or one after Delivered, is
     /// only logged, changing nothing and raising nothing.
     /// </summary>
     public TrackingEvent Record(TrackingReport report, CorrelationId correlationId, DateTimeOffset receivedAt)
     {
         var trackingEvent = TrackingEvent.Record(this, report, correlationId, receivedAt);
+        if (report.Type.IsException())
+        {
+            RegisterDomainEvent(new ShipmentExceptionReportedEvent(this, trackingEvent));
+            return trackingEvent;
+        }
+
         var target = TargetStatusOf(report.Type);
         if (Status >= ShipmentStatus.Booked && target > Status)
         {

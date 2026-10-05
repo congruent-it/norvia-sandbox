@@ -8,11 +8,13 @@ namespace Norvia.Tms.Domain.TrackingEvents;
 /// <param name="Source">Who reported it.</param>
 /// <param name="EventId">The reporter's own ID for the event, unique per source.</param>
 /// <param name="CarrierBookingReference">The Carrier's own reference for the booking the event is about; null for an Own fleet event.</param>
+/// <param name="CarrierBookingNumber">The TMS's own number for the Carrier booking, which finds the Shipment only when the reference doesn't.</param>
 /// <param name="EventTime">When it happened, with the offset of where.</param>
 public sealed record TrackingReport(
     TrackingSource Source,
     string EventId,
     string? CarrierBookingReference,
+    string? CarrierBookingNumber,
     TrackingEventType Type,
     DateTimeOffset EventTime,
     TrackingLocation Location,
