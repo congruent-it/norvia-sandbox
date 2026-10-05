@@ -1,8 +1,10 @@
 using AngleSharp.Dom;
 using Norvia.Tms.Application.CarrierBookings;
 using Norvia.Tms.Application.Shipments;
+using Norvia.Tms.Application.TrackingEvents.Timeline;
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Shipments;
+using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Web.Shipments;
 using Norvia.Tms.Web.UnitTests.TransportOrders;
 
@@ -132,6 +134,51 @@ public sealed class ShipmentDetailTests : TmsWebContext
         page.WaitForAssertion(() => page.Find("[role=alert]").TextContent.Should()
             .Contain("Shipment SH-0000012 couldn't be loaded. Reload the page to try again."));
     }
+
+    [Fact]
+    public void Render_AShipmentWithTrackingEvents_ShowsTheTimelineInTheOrderTheQueryGives()
+    {
+        Queries.FindShipmentAsync("SH-0000012", Arg.Any<CancellationToken>()).Returns(Samples.Shipment("SH-0000012", ShipmentStatus.InTransit));
+        Queries.FindTrackingTimelineAsync("SH-0000012", Arg.Any<CancellationToken>()).Returns(
+        [
+            Entry(TrackingEventType.Collected, new DateTimeOffset(2026, 9, 26, 6, 0, 0, TimeSpan.Zero), moved: true),
+            Entry(TrackingEventType.Damaged, new DateTimeOffset(2026, 9, 26, 7, 0, 0, TimeSpan.Zero), moved: false) with { Remark = "Pallet dented" },
+        ]);
+
+        var page = RenderDetail("SH-0000012");
+
+        page.WaitForAssertion(() => Rows(page, "Tracking timeline").Should().Equal(
+            "Collected | Sat 26 Sep 2026, 08:00 | Rotterdam, 3011 AA, NL | Sat 26 Sep 2026, 08:05 | Yes | Not given | ",
+            "Damaged | Sat 26 Sep 2026, 09:00 | Rotterdam, 3011 AA, NL | Sat 26 Sep 2026, 09:05 | No | Not given | Pallet dented"));
+    }
+
+    [Fact]
+    public void Render_AShipmentNoCarrierHasReportedOn_SaysSoInsteadOfAnEmptyTable()
+    {
+        Queries.FindShipmentAsync("SH-0000012", Arg.Any<CancellationToken>()).Returns(Samples.Shipment("SH-0000012"));
+        Queries.FindTrackingTimelineAsync("SH-0000012", Arg.Any<CancellationToken>()).Returns([]);
+
+        var page = RenderDetail("SH-0000012");
+
+        page.WaitForAssertion(() => Section(page, "Tracking timeline").TextContent.Should().Contain("No Tracking events have been reported for this Shipment."));
+        Section(page, "Tracking timeline").QuerySelectorAll("table").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Render_WhenTheTimelineCantBeRead_ShowsAnErrorInItsSectionAndStillTheShipment()
+    {
+        Queries.FindShipmentAsync("SH-0000012", Arg.Any<CancellationToken>()).Returns(Samples.Shipment("SH-0000012"));
+        Queries.FindTrackingTimelineAsync("SH-0000012", Arg.Any<CancellationToken>()).Returns<IReadOnlyList<TrackingTimelineEntry>?>(_ => throw new TimeoutException("The database didn't answer."));
+
+        var page = RenderDetail("SH-0000012");
+
+        page.WaitForAssertion(() => Section(page, "Tracking timeline").TextContent.Should().Contain("The Tracking timeline couldn't be loaded."));
+        Definitions(page, "Shipment")["Status"].Should().Be("Planned");
+    }
+
+    // Reported at 08:00 and 09:00 in Rotterdam (UTC+2), received five minutes later.
+    private static TrackingTimelineEntry Entry(TrackingEventType type, DateTimeOffset eventTime, bool moved) =>
+        new(type, eventTime, "Rotterdam", "3011 AA", "NL", null, null, eventTime.AddMinutes(5), moved);
 
     private static CarrierBookingView Booking(string number, CarrierBookingStatus status) =>
         new(number, Samples.Kessler, status, new DateTimeOffset(2026, 9, 24, 9, 45, 0, TimeSpan.Zero), null, null, null, null, null, null, null, null, null);

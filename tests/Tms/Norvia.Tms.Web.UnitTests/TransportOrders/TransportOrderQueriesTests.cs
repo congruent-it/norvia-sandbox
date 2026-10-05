@@ -4,6 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Norvia.Tms.Application.Carriers.ListActive;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shipments.GetByNumber;
+using Norvia.Tms.Application.Shipments.ListInProgress;
+using Norvia.Tms.Application.TrackingEvents.Timeline;
 using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.GetByNumber;
 using Norvia.Tms.Application.TransportOrders.GetRejectedBooking;
@@ -46,6 +48,38 @@ public sealed class TransportOrderQueriesTests : IDisposable
         var carriers = await _queries.ListActiveCarriersAsync(Xunit.TestContext.Current.CancellationToken);
 
         carriers.Should().BeSameAs(active);
+    }
+
+    [Fact]
+    public async Task ListShipmentsInProgressAsync_ListsTheShipmentsInProgress()
+    {
+        IReadOnlyList<ShipmentInProgressSummary> inProgress = [];
+        _mediator.Send(new ListShipmentsInProgressQuery(), Arg.Any<CancellationToken>()).Returns(inProgress);
+
+        var shipments = await _queries.ListShipmentsInProgressAsync(Xunit.TestContext.Current.CancellationToken);
+
+        shipments.Should().BeSameAs(inProgress);
+    }
+
+    [Fact]
+    public async Task FindTrackingTimelineAsync_AKnownShipment_ReturnsItsTimeline()
+    {
+        IReadOnlyList<TrackingTimelineEntry> timeline = [];
+        _mediator.Send(new GetTrackingTimelineQuery("SH-0000012"), Arg.Any<CancellationToken>()).Returns(Result.Success(timeline));
+
+        var found = await _queries.FindTrackingTimelineAsync("SH-0000012", Xunit.TestContext.Current.CancellationToken);
+
+        found.Should().BeSameAs(timeline);
+    }
+
+    [Fact]
+    public async Task FindTrackingTimelineAsync_AnUnknownShipment_ReturnsNull()
+    {
+        _mediator.Send(new GetTrackingTimelineQuery("SH-0000999"), Arg.Any<CancellationToken>()).Returns(Result<IReadOnlyList<TrackingTimelineEntry>>.NotFound());
+
+        var found = await _queries.FindTrackingTimelineAsync("SH-0000999", Xunit.TestContext.Current.CancellationToken);
+
+        found.Should().BeNull();
     }
 
     [Fact]
