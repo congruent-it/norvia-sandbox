@@ -3,6 +3,7 @@ using System.Text;
 using Aspire.Hosting.Azure;
 using Azure.Provisioning.ServiceBus;
 using Azure.Provisioning.Sql;
+using Azure.Provisioning.Storage;
 using Norvia.AppHost;
 
 var builder = DistributedApplication.CreateBuilder(args);
@@ -29,6 +30,13 @@ var partnerPortalDatabase = sql.AddDatabase("partner-portal");
 // The estate Bicep owns Service Bus in Azure (ADR 0004); locally the emulator stands in for it.
 var messaging = builder.AddAzureServiceBus("messaging");
 
+// The TMS keeps Proof of delivery files in a blob container of its own (ADR 0002). Locally Azurite stands in for the storage
+// account. In Azure a lifecycle rule moves the files to the cool tier after 30 days; they are never deleted.
+var storage = builder.AddAzureStorage("storage").RunAsEmulator()
+    .ConfigureInfrastructure(infrastructure => ProofOfDeliveryStorage.AddLifecycleRule(infrastructure));
+var blobs = storage.AddBlobs("blobs");
+storage.AddBlobContainer(ProofOfDeliveryStorage.ContainerName);
+
 // Migrations are a deployment step, not something the TMS does at startup (coding guidelines §5). Locally the TMS
 // waits for them; in Azure they are a Container Apps job that azd's postdeploy hook starts.
 var tmsMigrations = builder.AddProject<Projects.Norvia_Tms_Migrations>("tms-migrations")
@@ -39,12 +47,16 @@ var tmsApi = builder.AddProject<Projects.Norvia_Tms_Api>("tms-api")
     .WithReference(tmsDatabase).WaitForCompletion(tmsMigrations)
     .WithReference(messaging).WaitFor(messaging)
     .WithRoleAssignments(messaging, ServiceBusBuiltInRole.AzureServiceBusDataSender)
+    .WithReference(blobs).WaitFor(blobs)
+    .WithRoleAssignments(storage, StorageBuiltInRole.StorageBlobDataContributor)
     .WithHttpHealthCheck("/health");
 
 // The TMS UI reads the TMS database through the query side, and changes things only through the TMS API (ADR 0028).
 var tmsWeb = builder.AddProject<Projects.Norvia_Tms_Web>("tms-web")
     .WithReference(tmsDatabase).WaitForCompletion(tmsMigrations)
     .WithReference(tmsApi).WaitFor(tmsApi)
+    .WithReference(blobs).WaitFor(blobs)
+    .WithRoleAssignments(storage, StorageBuiltInRole.StorageBlobDataReader)
     .WithEnvironment("TmsApi__BaseAddress", tmsApi.GetEndpoint("http"))
     .WithHttpHealthCheck("/health")
     .WithUrlForEndpoint("http", url => url.DisplayText = "TMS UI");

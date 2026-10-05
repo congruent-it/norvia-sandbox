@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/proof-of-delivery-received.v1.schema.json",
+  "title": "ProofOfDeliveryReceived",
+  "description": "A Proof of delivery was recorded as a Shipment's current one, including one that replaces an earlier one. It never changes the Shipment's status. It carries no file content and no link: consumers read the files through the TMS. Published on the Shipment events topic, under the correlation ID of the Proof of delivery, which API Management creates, through the TMS's transactional outbox (Canonical Model event, version 1).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "eventType",
+    "eventVersion",
+    "occurredAt",
+    "correlationId",
+    "shipmentNumber",
+    "transportOrderNumber",
+    "carrierId",
+    "carrierBookingReference",
+    "receivedBy",
+    "deliveryTime",
+    "condition",
+    "remark",
+    "numberOfFiles",
+    "replacesEarlier"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "eventType": {
+      "const": "ProofOfDeliveryReceived"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "occurredAt": {
+      "description": "When the TMS recorded the Proof of delivery.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "correlationId": {
+      "description": "The Proof of delivery's own correlation ID, which API Management creates.",
+      "type": "string",
+      "minLength": 1
+    },
+    "shipmentNumber": {
+      "type": "string",
+      "pattern": "^SH-[0-9]{7}$"
+    },
+    "transportOrderNumber": {
+      "description": "The Transport Order the Shipment carries out.",
+      "type": "string",
+      "pattern": "^TO-[0-9]{7}$"
+    },
+    "carrierId": {
+      "description": "The Carrier that sent the Proof of delivery; null when Own fleet did.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "carrierBookingReference": {
+      "description": "The Carrier's own reference for the booking; null for an Own fleet Proof of delivery, which names its Trip instead (P12).",
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "receivedBy": {
+      "description": "The name of the person who signed.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "deliveryTime": {
+      "description": "When the goods were delivered, with the offset of where.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "condition": {
+      "description": "Whether the Consignee took the goods clean or with reservations.",
+      "enum": [
+        "Clean",
+        "Reservations"
+      ]
+    },
+    "remark": {
+      "description": "The sender's remark; null when it gave none. Required with Reservations.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "numberOfFiles": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "replacesEarlier": {
+      "description": "Whether the Proof of delivery replaced an earlier current one.",
+      "type": "boolean"
+    }
+  }
+}
