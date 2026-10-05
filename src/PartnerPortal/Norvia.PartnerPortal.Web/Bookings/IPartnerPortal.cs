@@ -2,6 +2,8 @@ using Norvia.PartnerPortal.Application.Bookings;
 using Norvia.PartnerPortal.Application.CarrierBookings;
 using Norvia.PartnerPortal.Application.CarrierBookings.Answer;
 using Norvia.PartnerPortal.Application.CarrierBookings.AnswerSettings;
+using Norvia.PartnerPortal.Application.CarrierShipments;
+using Norvia.PartnerPortal.Application.CarrierShipments.Send;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
 
@@ -38,4 +40,13 @@ public interface IPartnerPortal
     /// null when there is no such Carrier Persona. A delay out of range throws, as the page limits it.
     /// </summary>
     Task<CarrierAnswerSettingsView?> ChangeCarrierAnswerSettingsAsync(string personaId, CarrierAnswerSettingsView settings, CancellationToken cancellationToken);
+
+    /// <summary>The Carrier Persona's Booked, Collected and In transit Shipments, the latest first.</summary>
+    Task<IReadOnlyList<CarrierShipmentView>> ListCarrierShipmentsAsync(string personaId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Sends a Tracking event for one of the Carrier Persona's Shipments to Norvia, and returns what the Partner API replied
+    /// and how the Shipment now stands; null when there is no such Carrier Persona or Shipment.
+    /// </summary>
+    Task<SentTrackingEvent?> SendTrackingEventAsync(string personaId, string carrierBookingNumber, TrackingEventType type, CancellationToken cancellationToken);
 }

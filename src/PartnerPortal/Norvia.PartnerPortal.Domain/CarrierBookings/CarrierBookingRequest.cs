@@ -65,6 +65,11 @@ public sealed class CarrierBookingRequest : EntityBase<CarrierBookingRequestId>,
     /// <summary>When the automatic answer is due; null for a request answered by hand, and once the request is closed.</summary>
     public DateTimeOffset? AutoAnswerDueAt { get; private set; }
 
+    /// <summary>The last progress Tracking event the Persona sent for the Shipment; null until it sends one.</summary>
+    public TrackingEventType? LastProgress { get; private set; }
+
+    public ShipmentStage Stage => TrackingRules.StageOf(LastProgress);
+
     public bool IsOpen => Status == CarrierBookingRequestStatus.Open;
 
     public static CarrierBookingRequest Receive(
@@ -115,6 +120,25 @@ public sealed class CarrierBookingRequest : EntityBase<CarrierBookingRequestId>,
         }
 
         Close(answerCorrelationId, answeredAt);
+        return true;
+    }
+
+    /// <summary>
+    /// Records a Tracking event sent for the Shipment of a Confirmed request. Progress moves the Shipment on; an exception
+    /// changes nothing. Returns false, changing nothing, when the request isn't Confirmed or the event isn't a valid next one.
+    /// </summary>
+    public bool ReportTracking(TrackingEventType type)
+    {
+        if (Status != CarrierBookingRequestStatus.Confirmed || !TrackingRules.IsOffered(LastProgress, type))
+        {
+            return false;
+        }
+
+        if (TrackingRules.IsProgress(type))
+        {
+            LastProgress = type;
+        }
+
         return true;
     }
 

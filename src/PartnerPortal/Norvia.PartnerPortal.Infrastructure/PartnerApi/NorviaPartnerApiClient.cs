@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Norvia.PartnerPortal.Application.Bookings;
 using Norvia.PartnerPortal.Application.CarrierBookings.Answer;
+using Norvia.PartnerPortal.Application.CarrierShipments;
 using Norvia.PartnerPortal.Domain.Bookings;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
 using Norvia.PartnerPortal.Domain.Personas;
@@ -97,6 +98,48 @@ internal sealed partial class NorviaPartnerApiClient(
         return reply;
     }
 
+    public async Task<TrackingReply> SubmitTrackingAsync(
+        Persona persona, string shipmentNumber, CarrierTrackingEvent trackingEvent, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(persona);
+        ArgumentNullException.ThrowIfNull(trackingEvent);
+
+        using var span = activities.Source.StartActivity("Send Tracking event", ActivityKind.Internal);
+        TrackingReply reply;
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("carrier-tracking", UriKind.Relative))
+            {
+                Content = JsonContent.Create(CarrierTrackingFormat.ToJson(trackingEvent)),
+            };
+            request.Headers.Add("Ocp-Apim-Subscription-Key", options.Value.SubscriptionKeyOf(persona.Id));
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await tokens.GetTokenAsync(persona.Id, cancellationToken));
+
+            using var response = await http.SendAsync(request, cancellationToken);
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            reply = PartnerAnswers.ReadTrackingReply((int)response.StatusCode, body, CorrelationIdOf(response));
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Unreachable, too slow, or no token to call with: nothing reached Norvia, so nothing was sent.
+            LogTrackingNotSent(exception, persona.Id.Value, trackingEvent.CarrierBookingNumber);
+            reply = TrackingReply.NotReceived(messageId: null);
+        }
+
+        var keys = TrackingEventTracking.KeysOf(persona, shipmentNumber, trackingEvent, reply.MessageId);
+        foreach (var (key, value) in TrackingEventTracking.OutcomeOf(reply.Result))
+        {
+            keys[key] = value;
+        }
+
+        using (logger.BeginScope(keys))
+        {
+            LogTrackingReplied(persona.Id.Value, trackingEvent.CarrierBookingNumber, reply.Result);
+        }
+
+        return reply;
+    }
+
     private static Dictionary<string, object?> TrackingKeysOf(Persona persona, string carrierBookingNumber, string shipmentNumber, NorviaReply reply)
     {
         var keys = CarrierAnswerTracking.KeysOf(persona, carrierBookingNumber, shipmentNumber, reply.MessageId);
@@ -157,4 +200,10 @@ internal sealed partial class NorviaPartnerApiClient(
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Norvia replied to an answer by Persona {PersonaId} to {CarrierBookingNumber}: {Result}")]
     private partial void LogAnswerReplied(string personaId, string carrierBookingNumber, CarrierAnswerResult result);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "A Tracking event by Persona {PersonaId} for {CarrierBookingNumber} didn't reach the Norvia Partner API")]
+    private partial void LogTrackingNotSent(Exception exception, string personaId, string carrierBookingNumber);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "The Norvia Partner API replied to a Tracking event by Persona {PersonaId} for {CarrierBookingNumber}: {Result}")]
+    private partial void LogTrackingReplied(string personaId, string carrierBookingNumber, TrackingResult result);
 }

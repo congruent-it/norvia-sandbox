@@ -1,0 +1,210 @@
+@page "/personas/{PersonaId}/shipments"
+@*
+    Interactive like the other pages, and not prerendered, so a button never shows before it works. The Persona's Shipments
+    come from the requests it confirmed, so a newly confirmed one shows without a page refresh.
+*@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject IPartnerPortal Portal
+@inject NavigationManager Navigation
+@inject ILogger<Shipments> Logger
+@inject TimeProvider Time
+@implements IAsyncDisposable
+@using Norvia.PartnerPortal.Application.CarrierShipments
+
+<PageTitle>Shipments · @(_persona?.DisplayName ?? PersonaId) · Partner portal</PageTitle>
+
+<h1>Shipments</h1>
+
+@if (_loadFailed)
+{
+    <div role="alert">
+        <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+            The Shipments couldn't be loaded. Reload the page to try again.
+        </FluentMessageBar>
+    </div>
+}
+else if (_shipments is null)
+{
+    <FluentStack VerticalAlignment="VerticalAlignment.Center" role="status">
+        <FluentProgressRing />
+        <span>Loading the Shipments…</span>
+    </FluentStack>
+}
+else if (_shipments.Count == 0)
+{
+    <div role="status">
+        <FluentMessageBar Intent="MessageIntent.Info" AllowDismiss="false">
+            @_persona!.DisplayName has no Booked, Collected or In transit Shipment. Confirm a booking request to get one.
+        </FluentMessageBar>
+    </div>
+}
+else
+{
+    <p class="mb-6">The Shipments @_persona!.DisplayName has confirmed and not yet delivered. Report what happened to each as a Carrier would.</p>
+    @if (_notice is not null)
+    {
+        <div role="@(_notice.Intent == MessageIntent.Error || _notice.Intent == MessageIntent.Warning ? "alert" : "status")" class="mb-6 max-w-3xl">
+            <FluentMessageBar Intent="_notice.Intent" AllowDismiss="false">
+                @_notice.Text
+                @if (_notice.MessageId is not null)
+                {
+                    <span class="block mt-2 text-xs">Norvia's ID for this Tracking event: @_notice.MessageId</span>
+                }
+            </FluentMessageBar>
+        </div>
+    }
+    @if (_failed)
+    {
+        <div role="alert" class="mb-6 max-w-3xl">
+            <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+                The Tracking event couldn't be sent or recorded. Check the Shipment before you send it again.
+            </FluentMessageBar>
+        </div>
+    }
+    <FluentDataGrid Items="_shipments.AsQueryable()" TGridItem="CarrierShipmentView" Class="lux-table" aria-label="Shipments"
+                    GridTemplateColumns="1.2fr 1fr 1.2fr 1.8fr 1.8fr 1fr 3fr" MultiLine="true">
+        <PropertyColumn Title="Booking number" Property="@(shipment => shipment.CarrierBookingNumber)" />
+        <PropertyColumn Title="Shipment" Property="@(shipment => shipment.ShipmentNumber)" />
+        <PropertyColumn Title="Your reference" Property="@(shipment => shipment.CarrierBookingReference ?? "")" />
+        <TemplateColumn Title="Collect">
+            <Stop Value="context.Details.Collection" />
+        </TemplateColumn>
+        <TemplateColumn Title="Deliver">
+            <Stop Value="context.Details.Delivery" />
+        </TemplateColumn>
+        <PropertyColumn Title="Status" Property="@(shipment => TrackingEventText.Stage(shipment.Stage))" />
+        <TemplateColumn Title="Report">
+            <div class="flex flex-wrap gap-2">
+                @foreach (var type in context.NextProgress)
+                {
+                    <FluentButton Appearance="Appearance.Accent" Disabled="_sending" OnClick="() => SendAsync(context, type)"
+                                  aria-label="@($"{TrackingEventText.Button(type)} for {context.CarrierBookingNumber}")">@TrackingEventText.Button(type)</FluentButton>
+                }
+                @foreach (var type in context.Exceptions)
+                {
+                    <FluentButton Appearance="Appearance.Outline" Disabled="_sending" OnClick="() => SendAsync(context, type)"
+                                  aria-label="@($"{TrackingEventText.Button(type)} for {context.CarrierBookingNumber}")">@TrackingEventText.Button(type)</FluentButton>
+                }
+            </div>
+        </TemplateColumn>
+    </FluentDataGrid>
+}
+
+@code {
+    /// <summary>How often the list reads itself again, so a newly confirmed Shipment shows without a page refresh.</summary>
+    public static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(2);
+
+    private readonly CancellationTokenSource _stopped = new();
+    private Task? _refreshing;
+    private PersonaView? _persona;
+    private IReadOnlyList<CarrierShipmentView>? _shipments;
+    private bool _loadFailed;
+    private bool _sending;
+    private bool _failed;
+    private TrackingNotice? _notice;
+
+    [Parameter]
+    public string PersonaId { get; set; } = string.Empty;
+
+    private async Task SendAsync(CarrierShipmentView shipment, TrackingEventType type)
+    {
+        _sending = true;
+        _notice = null;
+        _failed = false;
+        try
+        {
+            if (await Portal.SendTrackingEventAsync(PersonaId, shipment.CarrierBookingNumber, type, CancellationToken.None) is { } sent)
+            {
+                _notice = TrackingNotice.Of(sent);
+                // A Delivered Shipment leaves the list; the others show their new stage and what comes next.
+                _shipments = [.. _shipments!
+                    .Select(current => current.CarrierBookingNumber == shipment.CarrierBookingNumber ? sent.Shipment : current)
+                    .Where(current => current.Stage != ShipmentStage.Delivered)];
+            }
+            else
+            {
+                Navigation.NotFound();
+            }
+        }
+        catch (Exception exception)
+        {
+            // Norvia unreachable is a reply, not this: here the portal itself failed, or the Shipment had moved on.
+            PageLog.TrackingFailed(Logger, exception, PersonaId, shipment.CarrierBookingNumber);
+            _failed = true;
+        }
+        finally
+        {
+            _sending = false;
+        }
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _refreshing = RefreshUntilStoppedAsync(_stopped.Token);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _stopped.CancelAsync();
+        if (_refreshing is not null)
+        {
+            await _refreshing;
+        }
+
+        _stopped.Dispose();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _shipments = null;
+        try
+        {
+            _persona = PersonaChoice.Find(PersonaId, await Portal.ListPersonasAsync(CancellationToken.None));
+            if (_persona is null || _persona.PartyType != PartyType.Carrier)
+            {
+                Navigation.NotFound();
+                return;
+            }
+
+            _shipments = await Portal.ListCarrierShipmentsAsync(PersonaId, CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            PageLog.ShipmentsLoadFailed(Logger, exception, PersonaId);
+            _loadFailed = true;
+        }
+    }
+
+    // A read that fails keeps what the list shows and tries again on the next tick. A read never overlaps a send's own update.
+    private async Task RefreshUntilStoppedAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(RefreshInterval, Time);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                if (_persona is null || _persona.PartyType != PartyType.Carrier || _shipments is null || _sending)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    _shipments = await Portal.ListCarrierShipmentsAsync(PersonaId, cancellationToken);
+                    await InvokeAsync(StateHasChanged);
+                }
+                catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+                {
+                    PageLog.ShipmentsLoadFailed(Logger, exception, PersonaId);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The page is gone.
+        }
+    }
+}

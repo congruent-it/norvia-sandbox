@@ -131,6 +131,10 @@ namespace Norvia.PartnerPortal.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("LastProgress")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
                     b.Property<string>("PersonaId")
                         .IsRequired()
                         .HasMaxLength(100)

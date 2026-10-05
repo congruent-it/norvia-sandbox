@@ -53,6 +53,24 @@ internal static class PartnerAnswers
         };
     }
 
+    /// <summary>
+    /// Reads API Management's answer to a Tracking event (contracts/partner-api/README.md, Carrier tracking): 202 Accepted
+    /// and nothing more. Anything else that isn't a refusal of the Persona's credentials means it wasn't received.
+    /// </summary>
+    public static TrackingReply ReadTrackingReply(int statusCode, string body, string? correlationId)
+    {
+        var json = Parse(body);
+        var messageId = Text(json, "messageId") ?? correlationId;
+
+        return statusCode switch
+        {
+            202 => TrackingReply.Accepted(messageId),
+            403 => TrackingReply.Refused(Text(json, "text") ?? UnrecognisedCredentials, messageId),
+            401 => TrackingReply.Refused(UnrecognisedCredentials, messageId),
+            _ => TrackingReply.NotReceived(messageId),
+        };
+    }
+
     private static NorviaReply Refusal(CarrierAnswerResult result, JsonObject? json, string? messageId, string fallbackText) =>
         NorviaReply.Refusal(result, Text(json, "text") ?? fallbackText, messageId);
 

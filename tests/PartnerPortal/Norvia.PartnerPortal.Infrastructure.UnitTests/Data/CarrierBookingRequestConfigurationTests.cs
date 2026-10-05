@@ -53,6 +53,16 @@ public sealed class CarrierBookingRequestConfigurationTests
     }
 
     [Fact]
+    public void LastProgress_IsStoredAsItsName_AndTheStageIsDerivedNotStored()
+    {
+        using var context = NewContext();
+        var entity = context.Model.FindEntityType(typeof(CarrierBookingRequest))!;
+
+        entity.FindProperty(nameof(CarrierBookingRequest.LastProgress))!.GetProviderClrType().Should().Be<string>();
+        entity.FindProperty(nameof(CarrierBookingRequest.Stage)).Should().BeNull();
+    }
+
+    [Fact]
     public void CarrierBookingNumber_IsUniquePerPersona_SoARepeatedRequestIsStoredOnce()
     {
         using var context = NewContext();

@@ -8,6 +8,7 @@ namespace Norvia.PartnerPortal.Infrastructure.UnitTests;
 internal static class Contracts
 {
     private static readonly Lazy<JsonSchema> CarrierAnswerSchema = new(() => JsonSchema.FromText(Read("PartnerApi/carrier-answer.v1.schema.json")));
+    private static readonly Lazy<JsonSchema> CarrierTrackingSchema = new(() => JsonSchema.FromText(Read("PartnerApi/carrier-tracking.v1.schema.json")));
     private static readonly Lazy<JsonSchema> BookingSchema = new(() => JsonSchema.FromText(Read("PartnerApi/booking.v1.schema.json")));
 
     public static string Read(string path)
@@ -22,6 +23,9 @@ internal static class Contracts
 
     /// <summary>What breaks the Norvia Partner API's Carrier answer schema, or nothing.</summary>
     public static IEnumerable<string> CarrierAnswerSchemaErrors(JsonNode? answer) => Errors(CarrierAnswerSchema.Value, answer);
+
+    /// <summary>What breaks the Norvia Partner API's Carrier tracking schema, or nothing.</summary>
+    public static IEnumerable<string> CarrierTrackingSchemaErrors(JsonNode? message) => Errors(CarrierTrackingSchema.Value, message);
 
     private static IEnumerable<string> Errors(JsonSchema schema, JsonNode? instance)
     {

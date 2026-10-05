@@ -8,6 +8,9 @@ using Norvia.PartnerPortal.Application.Bookings.Submit;
 using Norvia.PartnerPortal.Application.CarrierBookings;
 using Norvia.PartnerPortal.Application.CarrierBookings.Answer;
 using Norvia.PartnerPortal.Application.CarrierBookings.AnswerSettings;
+using Norvia.PartnerPortal.Application.CarrierShipments;
+using Norvia.PartnerPortal.Application.CarrierShipments.List;
+using Norvia.PartnerPortal.Application.CarrierShipments.Send;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Application.Personas.List;
 using Norvia.PartnerPortal.Domain.Bookings;
@@ -70,6 +73,29 @@ public sealed class PartnerPortalRequestsTests : IDisposable
 
         (await _portal.AnswerCarrierBookingAsync("van-dijk-transport", "CB-0000001", answer, Xunit.TestContext.Current.CancellationToken)).Should().BeSameAs(answered);
         (await _portal.AnswerCarrierBookingAsync("van-dijk-transport", "CB-0000009", answer, Xunit.TestContext.Current.CancellationToken)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ListCarrierShipmentsAsync_ListsThePersonasShipments()
+    {
+        IReadOnlyList<CarrierShipmentView> shipments = [];
+        _mediator.Send(new ListCarrierShipmentsQuery("van-dijk-transport"), Arg.Any<CancellationToken>()).Returns(shipments);
+
+        (await _portal.ListCarrierShipmentsAsync("van-dijk-transport", Xunit.TestContext.Current.CancellationToken)).Should().BeSameAs(shipments);
+    }
+
+    [Fact]
+    public async Task SendTrackingEventAsync_SendsTheEventAsThePersona_AndReturnsWhatBecameOfIt_OrNullForNone()
+    {
+        var details = new CarrierBookingDetails(new CarrierBookingStop(null, null, null, null, null, null), new CarrierBookingStop(null, null, null, null, null, null), null, []);
+        var shipment = new CarrierShipmentView("CB-0000001", "SH-0000001", "VDT-1", details, ShipmentStage.Collected, [], []);
+        var sent = new SentTrackingEvent(
+            shipment, new CarrierTrackingEvent("evt-1", "VDT-1", "CB-0000001", TrackingEventType.Collected, Samples.SentAt, "Rotterdam", "3087 BM", "NLD"), TrackingReply.Accepted("m-1"));
+        _mediator.Send(new SendTrackingCommand("van-dijk-transport", "CB-0000001", TrackingEventType.Collected), Arg.Any<CancellationToken>()).Returns(Result.Success(sent));
+        _mediator.Send(new SendTrackingCommand("van-dijk-transport", "CB-0000009", TrackingEventType.Collected), Arg.Any<CancellationToken>()).Returns(Result<SentTrackingEvent>.NotFound());
+
+        (await _portal.SendTrackingEventAsync("van-dijk-transport", "CB-0000001", TrackingEventType.Collected, Xunit.TestContext.Current.CancellationToken)).Should().BeSameAs(sent);
+        (await _portal.SendTrackingEventAsync("van-dijk-transport", "CB-0000009", TrackingEventType.Collected, Xunit.TestContext.Current.CancellationToken)).Should().BeNull();
     }
 
     [Fact]
