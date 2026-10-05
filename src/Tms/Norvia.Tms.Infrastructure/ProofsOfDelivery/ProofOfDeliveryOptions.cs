@@ -13,4 +13,11 @@ public sealed class ProofOfDeliveryOptions
     /// </summary>
     [Range(typeof(TimeSpan), "00:00:00", "01:00:00")]
     public TimeSpan ClockSkew { get; init; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// How long after a Shipment's Delivered Tracking event its Proof of delivery may stay away before the Planner's list
+    /// flags it missing (P6).
+    /// </summary>
+    [Range(typeof(TimeSpan), "00:00:00.100", "30.00:00:00")]
+    public TimeSpan MissingAfter { get; init; } = TimeSpan.FromHours(48);
 }

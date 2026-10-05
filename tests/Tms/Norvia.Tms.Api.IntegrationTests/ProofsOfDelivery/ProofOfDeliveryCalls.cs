@@ -98,4 +98,14 @@ internal static class ProofOfDeliveryCalls
         ArgumentNullException.ThrowIfNull(tms);
         return await tms.Tms.GetAsync(new Uri($"/v1/shipments/{shipmentNumber}/proof-of-delivery/files/{fileId}", UriKind.Relative), cancellationToken);
     }
+
+    /// <summary>The Delivered Shipments without a current Proof of delivery, from the API.</summary>
+    public static async Task<JsonArray> ListDeliveredWithoutProofAsync(this TmsFixture tms, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(tms);
+        using var response = await tms.Tms.GetAsync(new Uri("/v1/shipments/delivered-without-proof-of-delivery", UriKind.Relative), cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, body);
+        return JsonNode.Parse(body)!.AsArray();
+    }
 }
