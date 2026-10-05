@@ -28,7 +28,7 @@ public sealed class MainLayoutTests : BunitContext
     {
         var layout = RenderAs("planner");
 
-        MainNavigation(layout).Should().Equal(("/transport-orders", "Waiting for planning"), ("/shipments/to-release", "Shipments to release"), ("/shipments/awaiting-answer", "Bookings awaiting an answer"), ("/shipments/in-progress", "Shipments in progress"));
+        MainNavigation(layout).Should().Equal(("/transport-orders", "Waiting for planning"), ("/shipments/to-release", "Shipments to release"), ("/shipments/awaiting-answer", "Bookings awaiting an answer"), ("/shipments/in-progress", "Shipments in progress"), ("/shipments/delivered-without-proof-of-delivery", "Delivered without Proof of delivery"));
     }
 
     private IRenderedComponent<MainLayout> RenderAs(string role)

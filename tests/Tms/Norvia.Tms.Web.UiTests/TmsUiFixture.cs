@@ -25,6 +25,8 @@ public sealed class TmsUiFixture : IAsyncLifetime
     private const string IntakeRole = "TransportOrders.Intake";
     private const string AnswerRole = "CarrierBookings.Answer";
     private const string TrackingRecordRole = "TrackingEvents.Record";
+    private const string ProofOfDeliveryRecordRole = "ProofsOfDelivery.Record";
+    private const string ProofOfDeliveryLogicAppClientId = "norvia-local-proof-of-delivery-logic-app";
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
     private readonly string _tokenSigningKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
@@ -39,6 +41,9 @@ public sealed class TmsUiFixture : IAsyncLifetime
 
     /// <summary>A client for the TMS API holding the record role, as the Carrier-tracking Logic App's managed identity does.</summary>
     public HttpClient TrackingRecord { get; private set; } = null!;
+
+    /// <summary>A client for the TMS API holding the Proof of delivery record role, as the Carrier Proof of delivery Logic App's managed identity does.</summary>
+    public HttpClient ProofOfDeliveryRecord { get; private set; } = null!;
 
     public Uri TmsUi { get; private set; } = null!;
 
@@ -76,6 +81,8 @@ public sealed class TmsUiFixture : IAsyncLifetime
         Answer.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", IssueToken(AnswerRole, LocalTokens.AnswerLogicAppClientId));
         TrackingRecord = _app.CreateHttpClient("tms-api");
         TrackingRecord.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", IssueToken(TrackingRecordRole, LocalTokens.TrackingLogicAppClientId));
+        ProofOfDeliveryRecord = _app.CreateHttpClient("tms-api");
+        ProofOfDeliveryRecord.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", IssueToken(ProofOfDeliveryRecordRole, ProofOfDeliveryLogicAppClientId));
         TmsUi = _app.GetEndpoint("tms-web", "http");
         PartnerPortal = _app.GetEndpoint("partner-portal-web", "http");
 
@@ -104,6 +111,18 @@ public sealed class TmsUiFixture : IAsyncLifetime
     /// <summary>Records a Canonical Model Tracking event, as the Carrier-tracking Logic App does, each on a trail of its own.</summary>
     public async Task<HttpResponseMessage> RecordTrackingAsync(JsonObject trackingEvent, CancellationToken cancellationToken) =>
         await PostAsync(TrackingRecord, "/v1/tracking-events", trackingEvent, cancellationToken);
+
+    /// <summary>Records a Canonical Model Proof of delivery with one file, as the Carrier Proof of delivery Logic App does, on a trail of its own.</summary>
+    public async Task<HttpResponseMessage> RecordProofOfDeliveryAsync(JsonObject metadata, string fileName, byte[] file, CancellationToken cancellationToken)
+    {
+        using var form = new MultipartFormDataContent { { new StringContent(metadata.ToJsonString()), "metadata" } };
+        var content = new ByteArrayContent(file);
+        content.Headers.ContentType = MediaTypeHeaderValue.Parse("application/pdf");
+        form.Add(content, "files", fileName);
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("/v1/proofs-of-delivery", UriKind.Relative)) { Content = form };
+        request.Headers.Add("X-Correlation-ID", Guid.NewGuid().ToString());
+        return await ProofOfDeliveryRecord.SendAsync(request, cancellationToken);
+    }
 
     private static async Task<HttpResponseMessage> PostAsync(HttpClient caller, string path, JsonObject body, CancellationToken cancellationToken)
     {
@@ -136,6 +155,7 @@ public sealed class TmsUiFixture : IAsyncLifetime
         Intake?.Dispose();
         Answer?.Dispose();
         TrackingRecord?.Dispose();
+        ProofOfDeliveryRecord?.Dispose();
 
         if (_app is not null)
         {

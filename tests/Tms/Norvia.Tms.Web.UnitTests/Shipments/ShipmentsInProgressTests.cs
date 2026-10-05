@@ -29,7 +29,7 @@ public sealed class ShipmentsInProgressTests : TmsWebContext
         var page = Render<ShipmentsInProgress>();
 
         page.WaitForAssertion(() => CellsOf(page, "SH-0000012").Should().Equal(
-            "SH-0000012", "Kessler Spedition", "Collected", "Collected, Sat 26 Sep 2026, 06:00, Rotterdam, 3011 AA, NL", "Sun 27 Sep 2026, 12:00", ""));
+            "SH-0000012", "Kessler Spedition", "Collected", "Collected, Sat 26 Sep 2026, 06:00, Rotterdam, 3011 AA, NL", "Sun 27 Sep 2026, 12:00", "", ""));
         page.Find("a[href='/shipments/SH-0000012']");
     }
 
@@ -41,7 +41,7 @@ public sealed class ShipmentsInProgressTests : TmsWebContext
 
         var page = Render<ShipmentsInProgress>();
 
-        page.WaitForAssertion(() => CellsOf(page, "SH-0000012").Skip(2).Should().Equal("Booked", "None yet", "Not given", ""));
+        page.WaitForAssertion(() => CellsOf(page, "SH-0000012").Skip(2).Should().Equal("Booked", "None yet", "Not given", "", ""));
     }
 
     [Fact]
@@ -66,6 +66,21 @@ public sealed class ShipmentsInProgressTests : TmsWebContext
         {
             CellsOf(page, "SH-0000012")[5].Should().Be("Stale");
             CellsOf(page, "SH-0000013")[5].Should().BeEmpty();
+        });
+    }
+
+    [Fact]
+    public void Render_AShipmentWithAnEarlyProofOfDelivery_MarksIt()
+    {
+        Queries.ListShipmentsInProgressAsync(Arg.Any<CancellationToken>())
+            .Returns([Collected("SH-0000012") with { HasProofOfDelivery = true }, Collected("SH-0000013")]);
+
+        var page = Render<ShipmentsInProgress>();
+
+        page.WaitForAssertion(() =>
+        {
+            CellsOf(page, "SH-0000012")[6].Should().Be("Proof of delivery received");
+            CellsOf(page, "SH-0000013")[6].Should().BeEmpty();
         });
     }
 

@@ -17,7 +17,7 @@
                 Empty="No Shipments are in progress. A Shipment appears here once a Carrier has confirmed its booking, and leaves when it is Delivered." Context="shipments">
     @* Stale first, then by ETA, as the query gives them: what has gone quiet needs the Planner first. The list only reads; a Shipment is opened for its timeline. *@
     <FluentDataGrid Items="shipments.AsQueryable()" TGridItem="ShipmentInProgressSummary" Class="flatly-table" aria-label="Shipments in progress"
-                    GridTemplateColumns="1fr 1.2fr 1fr 2.6fr 1.2fr auto" MultiLine="true">
+                    GridTemplateColumns="1fr 1.2fr 1fr 2.6fr 1.2fr auto 1.4fr" MultiLine="true">
         <TemplateColumn Title="Shipment">
             <a href="/shipments/@context.ShipmentNumber">@context.ShipmentNumber</a>
         </TemplateColumn>
@@ -29,6 +29,13 @@
             @if (context.IsStale)
             {
                 <strong>Stale</strong>
+            }
+        </TemplateColumn>
+        <TemplateColumn Title="Proof of delivery">
+            @* Only a marker: the Delivered Tracking event, which may have been lost, still moves the Shipment's status. *@
+            @if (context.HasProofOfDelivery)
+            {
+                <strong>@ProofOfDeliveryText.EarlyMarker</strong>
             }
         </TemplateColumn>
     </FluentDataGrid>

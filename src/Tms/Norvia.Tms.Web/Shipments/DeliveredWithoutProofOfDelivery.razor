@@ -1,0 +1,47 @@
+@page "/shipments/delivered-without-proof-of-delivery"
+@rendermode InteractiveServer
+@using Microsoft.Extensions.Options
+@using Norvia.Tms.Application.ProofsOfDelivery.ListMissing
+@using Norvia.Tms.Web.TransportOrders
+@implements IAsyncDisposable
+@inject ITransportOrderQueries Queries
+@inject TimeProvider Time
+@inject IOptions<LiveListOptions> Options
+@inject ILogger<LiveTransportOrderList<DeliveredShipmentWithoutProofOfDeliverySummary>> Logger
+
+<PageTitle>Delivered without Proof of delivery · Norvia TMS</PageTitle>
+
+<h1>Delivered without Proof of delivery</h1>
+
+<LiveListStates Items="_list.Items" LastReadFailed="_list.LastReadFailed" Name="Shipments delivered without Proof of delivery"
+                Empty="Every Delivered Shipment has its Proof of delivery. A Shipment appears here once a Carrier has delivered it, until its Proof of delivery arrives." Context="shipments">
+    @* Flagged first, then the oldest delivered, as the query gives them. The list only reads; a Shipment is opened for its timeline. *@
+    <FluentDataGrid Items="shipments.AsQueryable()" TGridItem="DeliveredShipmentWithoutProofOfDeliverySummary" Class="flatly-table" aria-label="Delivered without Proof of delivery"
+                    GridTemplateColumns="1fr 1.2fr 1.4fr 1.2fr" MultiLine="true">
+        <TemplateColumn Title="Shipment">
+            <a href="/shipments/@context.ShipmentNumber">@context.ShipmentNumber</a>
+        </TemplateColumn>
+        <PropertyColumn Title="Carrier" Property="@(shipment => PlanningText.CarriedBy(shipment.CarriedBy))" />
+        <PropertyColumn Title="Delivered" Property="@(shipment => NorviaTime.Format(shipment.DeliveredAt))" />
+        <TemplateColumn Title="Proof of delivery">
+            @if (context.IsProofOfDeliveryMissing)
+            {
+                <strong>Missing</strong>
+            }
+        </TemplateColumn>
+    </FluentDataGrid>
+</LiveListStates>
+
+@code {
+    private LiveTransportOrderList<DeliveredShipmentWithoutProofOfDeliverySummary> _list = null!;
+
+    protected override void OnInitialized()
+    {
+        _list = new LiveTransportOrderList<DeliveredShipmentWithoutProofOfDeliverySummary>(
+            Queries.ListDeliveredShipmentsWithoutProofOfDeliveryAsync, "the Shipments delivered without Proof of delivery", Time, Options.Value.RefreshInterval, Logger);
+        _list.Changed += () => InvokeAsync(StateHasChanged);
+        _list.Start();
+    }
+
+    public async ValueTask DisposeAsync() => await _list.DisposeAsync();
+}

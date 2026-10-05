@@ -1,6 +1,8 @@
 using Ardalis.Result;
 using Mediator;
 using Norvia.Tms.Application.Carriers.ListActive;
+using Norvia.Tms.Application.ProofsOfDelivery.ListMissing;
+using Norvia.Tms.Application.ProofsOfDelivery.Read;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shipments.GetByNumber;
 using Norvia.Tms.Application.Shipments.ListAwaitingAnswer;
@@ -53,8 +55,11 @@ internal sealed class TransportOrderQueries(IServiceScopeFactory scopes) : ITran
     public Task<IReadOnlyList<ShipmentInProgressSummary>> ListShipmentsInProgressAsync(CancellationToken cancellationToken) =>
         SendAsync(new ListShipmentsInProgressQuery(), cancellationToken);
 
-    public async Task<IReadOnlyList<TrackingTimelineEntry>?> FindTrackingTimelineAsync(string shipmentNumber, CancellationToken cancellationToken) =>
-        FoundOrNull(await SendAsync(new GetTrackingTimelineQuery(shipmentNumber), cancellationToken), $"the timeline of Shipment {shipmentNumber}")?.TrackingEvents;
+    public Task<IReadOnlyList<DeliveredShipmentWithoutProofOfDeliverySummary>> ListDeliveredShipmentsWithoutProofOfDeliveryAsync(CancellationToken cancellationToken) =>
+        SendAsync(new ListDeliveredShipmentsWithoutProofOfDeliveryQuery(), cancellationToken);
+
+    public async Task<ShipmentTimeline?> FindTrackingTimelineAsync(string shipmentNumber, CancellationToken cancellationToken) =>
+        FoundOrNull(await SendAsync(new GetTrackingTimelineQuery(shipmentNumber), cancellationToken), $"the timeline of Shipment {shipmentNumber}");
 
     private async Task<TResponse> SendAsync<TResponse>(IQuery<TResponse> query, CancellationToken cancellationToken)
     {
