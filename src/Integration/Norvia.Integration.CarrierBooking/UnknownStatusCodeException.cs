@@ -7,7 +7,9 @@ namespace Norvia.Integration.CarrierBooking;
 public sealed class UnknownStatusCodeException : Exception
 {
     public UnknownStatusCodeException(string? statusCode)
-        : base($"The status code '{statusCode}' isn't in the Carrier tracking code list.")
+        : base(statusCode is null
+            ? "The tracking message has no readable status code: it isn't a JSON object with a statusCode."
+            : $"The status code '{statusCode}' isn't in the Carrier tracking code list.")
     {
         StatusCode = statusCode;
     }
