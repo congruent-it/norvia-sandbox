@@ -8,9 +8,11 @@ using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shipments.GetByNumber;
 using Norvia.Tms.Application.Shipments.ListAwaitingAnswer;
+using Norvia.Tms.Application.Shipments.ListInProgress;
 using Norvia.Tms.Application.Shipments.ListToRelease;
 using Norvia.Tms.Application.Shipments.Reassign;
 using Norvia.Tms.Application.Shipments.Release;
+using Norvia.Tms.Application.TrackingEvents.Timeline;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TransportOrders;
 
@@ -39,6 +41,20 @@ public static class ShipmentEndpoints
                 "Each booking shows its Shipment, Carrier, Carrier booking number, requested time, sent time or none yet, and whether it is "
                 + "overdue: Requested longer than the TMS's setting, or past its Shipment's collection window's earliest time, whichever comes "
                 + "first. Overdue is only a flag; nothing acts on it.");
+
+        shipments.MapGet("/in-progress", ListInProgressAsync)
+            .RequireAuthorization()
+            .WithName("ListShipmentsInProgress")
+            .WithSummary("List the Shipments on their way: Booked, Collected and In transit, with the last Tracking event and the ETA of each.")
+            .WithDescription(
+                "Each Shipment shows its number, who carries it, its status, its last Tracking event (type, time and place), or none yet, and its "
+                + "ETA: the last ETA a Carrier reported, or the delivery window's latest time when none did. A Delivered Shipment leaves the list.");
+
+        shipments.MapGet("/{shipmentNumber}/tracking-events", GetTrackingTimelineAsync)
+            .RequireAuthorization()
+            .WithName("GetShipmentTrackingTimeline")
+            .WithSummary("Read what the Carriers reported for a Shipment: its Tracking events in event-time order.")
+            .WithDescription("Each event shows its type, time, place, ETA and remark, when the TMS received it, and whether it moved the Shipment's status.");
 
         shipments.MapGet("/{shipmentNumber}", GetAsync)
             .RequireAuthorization()
@@ -141,4 +157,20 @@ public static class ShipmentEndpoints
         IMediator mediator,
         CancellationToken cancellationToken) =>
         TypedResults.Ok(await mediator.Send(new ListCarrierBookingsAwaitingAnswerQuery(), cancellationToken));
+
+    private static async Task<Ok<IReadOnlyList<ShipmentInProgressSummary>>> ListInProgressAsync(
+        IMediator mediator,
+        CancellationToken cancellationToken) =>
+        TypedResults.Ok(await mediator.Send(new ListShipmentsInProgressQuery(), cancellationToken));
+
+    private static async Task<Results<Ok<IReadOnlyList<TrackingTimelineEntry>>, ProblemHttpResult>> GetTrackingTimelineAsync(
+        string shipmentNumber,
+        IMediator mediator,
+        CancellationToken cancellationToken)
+    {
+        var result = await mediator.Send(new GetTrackingTimelineQuery(shipmentNumber), cancellationToken);
+        return result.Status == ResultStatus.NotFound
+            ? TypedResults.Problem(statusCode: StatusCodes.Status404NotFound, title: $"Shipment {shipmentNumber} not found.")
+            : TypedResults.Ok(result.Value);
+    }
 }
