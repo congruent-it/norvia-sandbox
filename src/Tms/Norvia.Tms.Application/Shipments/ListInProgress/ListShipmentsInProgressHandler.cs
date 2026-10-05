@@ -35,7 +35,7 @@ public sealed class ListShipmentsInProgressHandler(
 
     private ShipmentInProgressSummary Summarize(Shipment shipment, List<TrackingEvent> events, TimeWindow? deliveryWindow)
     {
-        var last = events.OrderByDescending(trackingEvent => trackingEvent.EventTime).ThenByDescending(trackingEvent => trackingEvent.ReceivedAt).FirstOrDefault();
+        var last = events.MaxBy(trackingEvent => trackingEvent.ReceivedAt);
         return new(
             shipment.Number.Value,
             CarriedByView.Of(shipment.CarriedBy, carriers),

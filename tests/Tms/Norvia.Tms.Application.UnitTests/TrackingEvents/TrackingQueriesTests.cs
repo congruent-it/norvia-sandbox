@@ -57,7 +57,7 @@ public sealed class TrackingQueriesTests
     }
 
     [Fact]
-    public async Task ListInProgress_ShowsTheLastEventByEventTime_AndTheEtaOfTheLastToArriveThatCarriedOne()
+    public async Task ListInProgress_ShowsTheLastEventToArrive_AndTheEtaOfTheLastToArriveThatCarriedOne()
     {
         var shipment = Booked(sequence: 12);
         _shipments.ListAsync(Arg.Any<ShipmentsInProgressSpec>(), Arg.Any<CancellationToken>()).Returns([shipment]);
@@ -70,7 +70,7 @@ public sealed class TrackingQueriesTests
 
         var summary = listed.Should().ContainSingle().Subject;
         summary.Status.Should().Be(ShipmentStatus.InTransit);
-        summary.LastTrackingEvent.Should().Be(new LastTrackingEventView(TrackingEventType.Departed, Samples.Now.AddHours(3), "Rotterdam", "3011 AA", "NL"));
+        summary.LastTrackingEvent.Should().Be(new LastTrackingEventView(TrackingEventType.Arrived, Samples.Now.AddHours(2), "Rotterdam", "3011 AA", "NL"));
         summary.Eta.Should().Be(Samples.Now.AddDays(1));
     }
 
