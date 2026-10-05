@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Api.TransportOrders;
 using Norvia.Tms.Application.IntegrationEvents;
+using Norvia.Tms.Application.ProofsOfDelivery.ListMissing;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shipments.GetByNumber;
 using Norvia.Tms.Application.Shipments.ListAwaitingAnswer;
@@ -50,6 +51,15 @@ public static class ShipmentEndpoints
                 "Each Shipment shows its number, who carries it, its status, its last Tracking event (type, time and place), or none yet, and its "
                 + "ETA: the last ETA a Carrier reported, or the delivery window's latest time when none did. A Stale Shipment, whose next expected Tracking event is late, is flagged and listed first, then the rest by ETA. "
                 + "A Delivered Shipment leaves the list.");
+
+        shipments.MapGet("/delivered-without-proof-of-delivery", ListDeliveredWithoutProofOfDeliveryAsync)
+            .RequireAuthorization()
+            .WithName("ListDeliveredShipmentsWithoutProofOfDelivery")
+            .WithSummary("List the Delivered Shipments without a current Proof of delivery: flagged ones first, then the oldest delivered.")
+            .WithDescription(
+                "Each Shipment shows its number, who carries it, when it was delivered (the event time of its Delivered Tracking event), and whether its "
+                + "Proof of delivery is missing: the TMS's setting (48 hours by default) has passed since then. A Shipment leaves the list, and its flag clears, when a "
+                + "Proof of delivery arrives. Missing is only a flag; nothing acts on it and nothing is published.");
 
         shipments.MapGet("/{shipmentNumber}/tracking-events", GetTrackingTimelineAsync)
             .RequireAuthorization()
@@ -158,6 +168,11 @@ public static class ShipmentEndpoints
         IMediator mediator,
         CancellationToken cancellationToken) =>
         TypedResults.Ok(await mediator.Send(new ListCarrierBookingsAwaitingAnswerQuery(), cancellationToken));
+
+    private static async Task<Ok<IReadOnlyList<DeliveredShipmentWithoutProofOfDeliverySummary>>> ListDeliveredWithoutProofOfDeliveryAsync(
+        IMediator mediator,
+        CancellationToken cancellationToken) =>
+        TypedResults.Ok(await mediator.Send(new ListDeliveredShipmentsWithoutProofOfDeliveryQuery(), cancellationToken));
 
     private static async Task<Ok<IReadOnlyList<ShipmentInProgressSummary>>> ListInProgressAsync(
         IMediator mediator,
