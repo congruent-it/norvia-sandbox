@@ -9,9 +9,11 @@ namespace Norvia.Tms.Application.Shipments.ListInProgress;
 /// The last ETA a Carrier reported, or the Transport Order's delivery window's latest time when none was; null when
 /// neither exists.
 /// </param>
+/// <param name="IsStale">Whether its next expected Tracking event is late. Only a flag for the Planner; Stale Shipments are listed first.</param>
 public sealed record ShipmentInProgressSummary(
     string ShipmentNumber,
     CarriedByView CarriedBy,
     ShipmentStatus Status,
     LastTrackingEventView? LastTrackingEvent,
-    DateTimeOffset? Eta);
+    DateTimeOffset? Eta,
+    bool IsStale);

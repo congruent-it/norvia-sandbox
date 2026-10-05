@@ -53,6 +53,21 @@ public sealed class TrackingQueryTests(ControlledClockTmsFixture tms) : IClassFi
     }
 
     [Fact]
+    public async Task InProgress_AShipmentSilentForADay_IsStale_AndClearsWhenAnotherEventArrives()
+    {
+        var (shipmentNumber, reference) = await tms.BookedShipmentAsync(_cancellationToken);
+        tms.SetClock(_now);
+        await tms.RecordedAsync(Collected(reference, _now.AddHours(-3)), _cancellationToken);
+        InProgressEntry(await tms.ListShipmentsInProgressAsync(_cancellationToken), shipmentNumber)["isStale"]!.GetValue<bool>().Should().BeFalse();
+
+        tms.SetClock(_now.AddHours(24));
+        InProgressEntry(await tms.ListShipmentsInProgressAsync(_cancellationToken), shipmentNumber)["isStale"]!.GetValue<bool>().Should().BeTrue();
+
+        await tms.RecordedAsync(Event("Departed", reference, _now.AddHours(24).AddMinutes(-1)), _cancellationToken);
+        InProgressEntry(await tms.ListShipmentsInProgressAsync(_cancellationToken), shipmentNumber)["isStale"]!.GetValue<bool>().Should().BeFalse();
+    }
+
+    [Fact]
     public async Task InProgress_ADeliveredShipment_LeavesTheList()
     {
         var (shipmentNumber, reference) = await tms.BookedShipmentAsync(_cancellationToken);
