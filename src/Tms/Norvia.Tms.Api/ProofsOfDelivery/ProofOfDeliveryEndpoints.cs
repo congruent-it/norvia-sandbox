@@ -44,7 +44,9 @@ public static class ProofOfDeliveryEndpoints
                 + "source: a Carrier ID (from API Management, never from the Carrier's payload) or Own fleet. The Shipment is the one on that "
                 + "Carrier's Confirmed Carrier booking with the Carrier booking reference. The TMS keeps the files in its own storage, records "
                 + "the Proof of delivery as the Shipment's current one with the correlation ID, and publishes ProofOfDeliveryReceived in the "
-                + "same transaction as the record. It never changes the Shipment's status. A Proof of delivery is refused, changing and "
+                + "same transaction as the record. A document ID the source already recorded is a repeat: the answer is the original result with "
+                + "isRepeat set, and nothing is recorded or published. A new document ID for a Shipment with a current Proof of delivery makes the "
+                + "new one current and supersedes the earlier, with nothing merged; the event says it replaces an earlier one. It never changes the Shipment's status. A Proof of delivery is refused, changing and "
                 + "publishing nothing, with a problem whose code says why: ShipmentNotFound (404), ShipmentNotInTransport (409), "
                 + "MissingRequiredField (400), DeliveryTimeInTheFuture (400), FileNotAccepted (400); and 400 for an input that isn't the Canonical Model.");
 

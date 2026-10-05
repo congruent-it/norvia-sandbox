@@ -79,9 +79,10 @@ public sealed class ProofOfDelivery : EntityBase<ProofOfDeliveryId>, IAggregateR
 
     /// <summary>
     /// Records a Proof of delivery as the Shipment's current one and raises ProofOfDeliveryReceived. The Shipment's status
-    /// stays as it is.
+    /// stays as it is. A current one it replaces is superseded, and nothing of it is merged into the new one.
     /// </summary>
-    public static ProofOfDelivery Record(Shipment shipment, ProofOfDeliveryReport report, CorrelationId correlationId, DateTimeOffset receivedAt)
+    public static ProofOfDelivery Record(
+        Shipment shipment, ProofOfDeliveryReport report, CorrelationId correlationId, DateTimeOffset receivedAt, ProofOfDelivery? replaces = null)
     {
         ArgumentNullException.ThrowIfNull(shipment);
         ArgumentNullException.ThrowIfNull(report);
@@ -94,6 +95,11 @@ public sealed class ProofOfDelivery : EntityBase<ProofOfDeliveryId>, IAggregateR
         if (report.Files.Count == 0)
         {
             throw new ArgumentException("A Proof of delivery needs at least one file.", nameof(report));
+        }
+
+        if (replaces is not null && (replaces.ShipmentId != shipment.Id || !replaces.IsCurrent))
+        {
+            throw new ArgumentException("Only the Shipment's current Proof of delivery can be replaced.", nameof(replaces));
         }
 
         var proofOfDelivery = new ProofOfDelivery(
@@ -113,7 +119,18 @@ public sealed class ProofOfDelivery : EntityBase<ProofOfDeliveryId>, IAggregateR
         {
             Location = report.Location,
         };
-        proofOfDelivery.RegisterDomainEvent(new ProofOfDeliveryReceivedEvent(shipment, proofOfDelivery, replacesEarlier: false));
+        replaces?.Supersede();
+        proofOfDelivery.RegisterDomainEvent(new ProofOfDeliveryReceivedEvent(shipment, proofOfDelivery, replacesEarlier: replaces is not null));
         return proofOfDelivery;
     }
+
+    /// <summary>Whether a report is this Proof of delivery sent again: the same source under the same document ID.</summary>
+    public bool IsRepeatOf(ProofOfDeliveryReport report)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+        return Source == report.Source && DocumentId == report.DocumentId;
+    }
+
+    /// <summary>A later Proof of delivery replaced it as the Shipment's current one. It is kept, and nothing of it is merged.</summary>
+    private void Supersede() => IsCurrent = false;
 }

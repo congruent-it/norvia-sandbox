@@ -53,10 +53,10 @@ internal static class ProofsOfDeliverySamples
 
     public static ProofOfDeliveryFile Cmr() => new(Guid.Parse("0197a1b2-0000-7000-8000-000000000001"), "cmr.pdf", "application/pdf", 4);
 
-    public static ProofOfDeliveryReport Report(ProofOfDeliverySource? source = null, string reference = "VDT-1", IReadOnlyList<ProofOfDeliveryFile>? files = null) =>
+    public static ProofOfDeliveryReport Report(ProofOfDeliverySource? source = null, string reference = "VDT-1", IReadOnlyList<ProofOfDeliveryFile>? files = null, string documentId = "doc-1") =>
         new(
             source ?? ProofOfDeliverySource.Carrier(VanDijk),
-            "doc-1",
+            documentId,
             reference,
             "J. Becker",
             DeliveryTime,
