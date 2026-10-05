@@ -103,7 +103,7 @@ public sealed class RecordProofOfDeliveryHandlerTests
         _carrierBookings.SingleOrDefaultAsync(Arg.Is<ConfirmedCarrierBookingByNumberSpec>(s => s.Number == BookingNumber && s.CarrierId == VanDijk), Arg.Any<CancellationToken>())
             .Returns(ConfirmedBooking(shipment));
 
-        var result = await _handler.Handle(Command(Report(reference: "UNKNOWN") with { CarrierBookingNumber = BookingNumber.ToString() }), CancellationToken.None);
+        var result = await _handler.Handle(Command(Report(reference: "UNKNOWN") with { CarrierBookingNumber = BookingNumber }), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
     }
@@ -152,6 +152,19 @@ public sealed class RecordProofOfDeliveryHandlerTests
         var result = await _handler.Handle(new RecordProofOfDeliveryCommand(Report(), [big], "corr-pod"), CancellationToken.None);
 
         await AssertRefusedAsync(result, ProofOfDeliveryRefusalCode.FileNotAccepted);
+    }
+
+    [Fact]
+    public async Task Handle_StoresAFileAsWhatItsContentIs_NotAsWhatTheSenderDeclared()
+    {
+        Found(ShipmentStatus.Delivered);
+        byte[] png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1];
+        var file = new ProofOfDeliveryFile(Guid.NewGuid(), "photo.jpg", "image/jpeg", png.Length);
+
+        var result = await _handler.Handle(new RecordProofOfDeliveryCommand(Report(files: [file]), [png], "corr-pod"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        await _files.Received(1).StoreAsync(Arg.Any<ShipmentNumber>(), Arg.Is<ProofOfDeliveryFile>(stored => stored.ContentType == "image/png"), Arg.Any<ReadOnlyMemory<byte>>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

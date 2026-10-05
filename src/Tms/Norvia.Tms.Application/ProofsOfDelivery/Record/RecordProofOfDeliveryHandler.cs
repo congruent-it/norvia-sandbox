@@ -35,7 +35,7 @@ public sealed class RecordProofOfDeliveryHandler(
 
         var booking = await carrierBookings.SingleOrDefaultAsync(
             new ConfirmedCarrierBookingByReferenceSpec(carrierId, report.CarrierBookingReference), cancellationToken);
-        if (booking is null && CarrierBookingNumber.TryParse(report.CarrierBookingNumber, out var number))
+        if (booking is null && report.CarrierBookingNumber is { } number)
         {
             booking = await carrierBookings.SingleOrDefaultAsync(new ConfirmedCarrierBookingByNumberSpec(carrierId, number), cancellationToken);
         }
@@ -55,6 +55,8 @@ public sealed class RecordProofOfDeliveryHandler(
         {
             return ProofOfDeliveryRefused.Because<RecordProofOfDeliveryResult>(refusal);
         }
+
+        report = report with { Files = ProofOfDeliveryRules.Judged(report.Files, command.Files) };
 
         // The files go to storage first, so a Proof of delivery is never recorded without them. One that fails to save
         // leaves its files behind, unreferenced, which does no harm.

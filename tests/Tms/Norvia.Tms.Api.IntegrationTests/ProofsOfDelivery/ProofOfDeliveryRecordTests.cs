@@ -197,7 +197,12 @@ public sealed class ProofOfDeliveryRecordTests(TmsFixture tms) : IClassFixture<T
     {
         var (_, reference) = await tms.DeliveredShipmentAsync(_cancellationToken);
 
-        await tms.RecordedProofAsync(Metadata(reference, deliveryTime: DateTimeOffset.UtcNow.AddMinutes(1)), [Cmr()], _cancellationToken);
+        var deliveryTime = DateTimeOffset.UtcNow.AddMinutes(1);
+
+        var recorded = await tms.RecordedProofAsync(Metadata(reference, deliveryTime: deliveryTime), [Cmr()], _cancellationToken);
+
+        var proof = await CurrentProofAsync(recorded["shipmentNumber"]!.GetValue<string>());
+        DateTimeOffset.Parse(proof["deliveryTime"]!.GetValue<string>(), CultureInfo.InvariantCulture).Should().BeCloseTo(deliveryTime, TimeSpan.FromSeconds(1));
     }
 
     [Fact]
@@ -221,7 +226,18 @@ public sealed class ProofOfDeliveryRecordTests(TmsFixture tms) : IClassFixture<T
         metadata["condition"] = "Reservations";
         metadata["remark"] = "Two pallets damaged";
 
-        await tms.RecordedProofAsync(metadata, [Cmr()], _cancellationToken);
+        var recorded = await tms.RecordedProofAsync(metadata, [Cmr()], _cancellationToken);
+
+        var proof = await CurrentProofAsync(recorded["shipmentNumber"]!.GetValue<string>());
+        proof["condition"]!.GetValue<string>().Should().Be("Reservations");
+        proof["remark"]!.GetValue<string>().Should().Be("Two pallets damaged");
+    }
+
+    private async Task<JsonNode> CurrentProofAsync(string shipmentNumber)
+    {
+        using var response = await tms.GetProofAsync(shipmentNumber, _cancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        return JsonNode.Parse(await response.Content.ReadAsStringAsync(_cancellationToken))!;
     }
 
     [Fact]
@@ -264,19 +280,26 @@ public sealed class ProofOfDeliveryRecordTests(TmsFixture tms) : IClassFixture<T
     }
 
     [Fact]
-    public async Task Record_FivePdfJpegAndPngFiles_AreAccepted_JudgedByTheirContent()
+    public async Task Record_FiveFiles_AreAccepted()
     {
         var (_, reference) = await tms.DeliveredShipmentAsync(_cancellationToken);
-        byte[] jpeg = [0xFF, 0xD8, 0xFF, 0xE0, .. new byte[16]];
-        byte[] png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, .. new byte[16]];
 
-        // A PNG called .jpg and declared as a JPEG is kept as the PNG it is.
-        var recorded = await tms.RecordedProofAsync(
-            Metadata(reference), [Cmr(), new SentFile("a.jpg", "image/jpeg", jpeg), new SentFile("b.jpg", "image/jpeg", png), Cmr("c.pdf"), Cmr("d.pdf")], _cancellationToken);
+        var recorded = await tms.RecordedProofAsync(Metadata(reference), [.. Enumerable.Range(0, 5).Select(i => Cmr($"cmr-{i}.pdf"))], _cancellationToken);
 
         recorded["numberOfFiles"]!.GetValue<int>().Should().Be(5);
     }
 
+    [Fact]
+    public async Task Record_APngNamedJpgAndDeclaredAsJpeg_IsKeptAsThePngItIs()
+    {
+        var (shipmentNumber, reference) = await tms.DeliveredShipmentAsync(_cancellationToken);
+        byte[] png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, .. new byte[16]];
+
+        await tms.RecordedProofAsync(Metadata(reference), [new SentFile("a.jpg", "image/jpeg", png)], _cancellationToken);
+
+        var proof = await CurrentProofAsync(shipmentNumber);
+        proof["files"]!.AsArray().Should().ContainSingle().Which!["contentType"]!.GetValue<string>().Should().Be("image/png");
+    }
 
     [Fact]
     public async Task Record_ByACallerWithoutTheRecordRole_IsForbidden()

@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
+using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Carriers;
 using Norvia.Tms.Domain.ProofsOfDelivery;
 using Norvia.Tms.Domain.TrackingEvents;
@@ -156,7 +157,7 @@ internal static class ProofOfDeliveryReader
             return false;
         }
 
-        report = new ProofOfDeliveryReport(source, documentId, reference, receivedBy, deliveryTime, place, knownCondition, metadata.Remark, files, metadata.CarrierBookingNumber);
+        report = new ProofOfDeliveryReport(source, documentId, reference, receivedBy, deliveryTime, place, knownCondition, metadata.Remark, files, CarrierBookingNumber.TryParse(metadata.CarrierBookingNumber, out var number) ? number : null);
         return true;
     }
 

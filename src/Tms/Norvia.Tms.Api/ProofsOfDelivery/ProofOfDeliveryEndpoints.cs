@@ -91,7 +91,7 @@ public static class ProofOfDeliveryEndpoints
             using var content = new MemoryStream();
             await file.CopyToAsync(content, cancellationToken);
             contents.Add(content.ToArray());
-            described.Add(ProofOfDeliveryFile.New(file.FileName, ProofOfDeliveryFileKind.Detect(contents[^1].Span) ?? file.ContentType, file.Length));
+            described.Add(ProofOfDeliveryFile.New(file.FileName, file.ContentType, file.Length));
         }
 
         if (!ProofOfDeliveryReader.TryRead(metadata, described, out var report, out var problems))

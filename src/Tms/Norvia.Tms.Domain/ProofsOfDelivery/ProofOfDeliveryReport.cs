@@ -1,3 +1,4 @@
+using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.TrackingEvents;
 
 namespace Norvia.Tms.Domain.ProofsOfDelivery;
@@ -24,4 +25,4 @@ public sealed record ProofOfDeliveryReport(
     DeliveryCondition Condition,
     string? Remark,
     IReadOnlyList<ProofOfDeliveryFile> Files,
-    string? CarrierBookingNumber = null);
+    CarrierBookingNumber? CarrierBookingNumber = null);

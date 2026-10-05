@@ -55,5 +55,9 @@ public sealed record ProofOfDeliveryRules(TimeSpan ClockSkew)
         return null;
     }
 
+    /// <summary>The files as stored: each described by what its content is, not by what the sender declared.</summary>
+    public static IReadOnlyList<ProofOfDeliveryFile> Judged(IReadOnlyList<ProofOfDeliveryFile> files, IReadOnlyList<ReadOnlyMemory<byte>> contents) =>
+        [.. files.Select((file, i) => file with { ContentType = ProofOfDeliveryFileKind.Detect(contents[i].Span) ?? file.ContentType })];
+
     private static ProofOfDeliveryRefusal NotAccepted(string message) => new(ProofOfDeliveryRefusalCode.FileNotAccepted, message);
 }
