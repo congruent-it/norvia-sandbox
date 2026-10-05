@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/partner-api/carrier-tracking.v1.schema.json",
+  "title": "CarrierTracking",
+  "description": "A Carrier's tracking message, as the Carrier sends it to the Norvia Partner API (Carrier tracking format, version 1). It differs from the Canonical Model on purpose: its own field names, flat location fields, a local event time without an offset, alpha-3 country codes and a shared status code list. It never names the Carrier: API Management takes the Carrier from the token (ADR 0005).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["bookingRef", "eventId", "statusCode", "eventTime", "place", "postcode", "country"],
+  "properties": {
+    "bookingRef": { "description": "The Carrier's own reference for its booking.", "type": "string", "minLength": 1, "pattern": "\\S" },
+    "carrierBookingNumber": { "description": "The Norvia Carrier booking number, such as CB-0000042. Used only when the reference doesn't match.", "type": "string", "pattern": "^CB-[0-9]{7}$" },
+    "eventId": { "description": "The Carrier's own ID for the event, unique per Carrier.", "type": "string", "minLength": 1, "pattern": "\\S" },
+    "statusCode": { "enum": ["PU", "DEP", "ARR", "OFD", "POD", "NPU", "NDL", "DMG"] },
+    "eventTime": {
+      "description": "When it happened, local to the location, without an offset.",
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$"
+    },
+    "place": { "type": "string", "minLength": 1, "pattern": "\\S" },
+    "postcode": { "type": "string", "minLength": 1, "pattern": "\\S" },
+    "country": { "description": "ISO 3166-1 alpha-3.", "type": "string", "pattern": "^[A-Z]{3}$" },
+    "eta": {
+      "description": "The ETA, with its UTC offset (UTC is fine). Optional. Unlike the event time it carries an offset, as the message holds no delivery address to read a local time in.",
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$"
+    },
+    "remark": { "type": "string", "minLength": 1, "pattern": "\\S" }
+  }
+}

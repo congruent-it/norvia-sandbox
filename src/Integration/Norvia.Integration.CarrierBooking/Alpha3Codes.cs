@@ -53,5 +53,9 @@ internal static class Alpha3Codes
 
     public static IEnumerable<string> Alpha2 => ByAlpha2.Keys;
 
+    private static readonly Dictionary<string, string> ByAlpha3 = ByAlpha2.ToDictionary(pair => pair.Value, pair => pair.Key, StringComparer.Ordinal);
+
+    public static string? Alpha2Of(string? alpha3) => alpha3 is not null && ByAlpha3.TryGetValue(alpha3, out var alpha2) ? alpha2 : null;
+
     public static string? Of(string? alpha2) => alpha2 is not null && ByAlpha2.TryGetValue(alpha2, out var alpha3) ? alpha3 : null;
 }

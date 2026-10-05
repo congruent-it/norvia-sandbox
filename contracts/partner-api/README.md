@@ -9,6 +9,7 @@ The format in which a Shipper books a Transport-only transport through the Norvi
 | [carrier-booking.v1](carrier-booking.v1.schema.json) | A booking request, as Norvia's P4 booking Logic App sends it to a Carrier's booking endpoint (the other direction: see [Carrier booking](#carrier-booking)) |
 | [carrier-answer.v1](carrier-answer.v1.schema.json) | A Carrier's confirmation or rejection of a booking request, as the Carrier sends it to the Norvia Partner API (see [Carrier answer](#carrier-answer)) |
 | [carrier-answer-response.v1](carrier-answer-response.v1.schema.json) | Norvia's answer to a Carrier's answer: Recorded, Booking not open, Booking not found, Not allowed, Invalid or Not received |
+| [carrier-tracking.v1](carrier-tracking.v1.schema.json) | A Carrier's tracking message, as the Carrier sends it to the Norvia Partner API (see [Carrier tracking](#carrier-tracking)) |
 
 The booking never names the Shipper. API Management takes it from the token and passes it to the Logic App ([ADR 0005](../../docs/adr/0005-partner-identity-comes-from-the-token.md)).
 
@@ -149,3 +150,24 @@ API Management answers a call it refuses itself, as for a booking: `401` for a m
 ### How API Management calls the Carrier-answer Logic App
 
 API Management passes the answer to the Logic App's HTTP trigger as the Carrier sent it, with two headers of its own that replace any the Carrier sent: `X-Carrier-ID` (the Carrier ID it took from the token) and `X-Correlation-ID` (the new correlation ID, which becomes the run's client tracking ID and the response's `messageId`). The trigger accepts only API Management, as the intake's does ([ADR 0020](../../docs/adr/0020-only-api-management-may-call-the-intake-logic-app.md)). The Logic App passes the answer to the map base64-encoded, so no field of it can stand in for the `X-Carrier-ID` it passes alongside.
+
+## Carrier tracking
+
+A Carrier reports what happened to a Shipment with a tracking message in the [carrier-tracking.v1](carrier-tracking.v1.schema.json) format ([P5](../../docs/processes/tms/p5-shipment-tracking.md#carrier-tracking-format)). The Carrier-tracking Logic App maps it to the Canonical Model [Tracking event](../canonical-model/tracking-event.v1.schema.json) before calling the TMS. The map is `CarrierTrackingMap`, run as a local function like the others ([ADR 0019](../../docs/adr/0019-the-intake-map-is-dotnet-code-run-as-a-logic-apps-local-function.md)). It is tested against the sample pairs in `samples/carrier-tracking`, with no Azure.
+
+The message never names the Carrier: API Management takes it from the token ([ADR 0005](../../docs/adr/0005-partner-identity-comes-from-the-token.md)).
+
+| Carrier tracking | Canonical Model `TrackingEvent` | What the map does |
+|---|---|---|
+| `bookingRef` | `carrierBookingReference` | Copies it |
+| `carrierBookingNumber` | `carrierBookingNumber` | Copies it |
+| `eventId` | `eventId` | Copies it |
+| `statusCode`: `PU`, `DEP`, `ARR`, `OFD`, `POD`, `NPU`, `NDL`, `DMG` | `type`: `Collected`, `Departed`, `Arrived`, `OutForDelivery`, `Delivered`, `CollectionFailed`, `DeliveryFailed`, `Damaged` | Translates it. Any other code fails the run, so the message is dead-lettered |
+| `eventTime`: local date/time without an offset | `eventTime`: with the offset | Reads it in the time zone of the location's country, daylight saving time included |
+| `place`, `postcode`, `country` | `location.place`, `location.postcode`, `location.countryCode` | Nests the flat fields |
+| `country`: ISO 3166-1 alpha-3 | ISO 3166-1 alpha-2 | Translates the code |
+| `eta`: a date and time with its UTC offset, UTC being fine | `eta`: UTC with an offset | Converts it. Unlike the event time it isn't local: the message holds no delivery address to read a local time in. Without an offset it is left out |
+| `remark` | `remark` | Copies it |
+| Anything else, a `carrierId` included | Left out | The Carrier comes from the token alone |
+
+A value the map can't read, other than the status code, is left out, and the TMS's Tracking event rules report what is missing.

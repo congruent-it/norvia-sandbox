@@ -1,0 +1,10 @@
+{
+  "bookingRef": "VDT-77812",
+  "eventId": "VDT-EVT-1003",
+  "statusCode": "NDL",
+  "eventTime": "2030-07-15T14:10:00",
+  "place": "Lisboa",
+  "postcode": "1100-148",
+  "country": "PRT",
+  "remark": "Nobody at the address"
+}

@@ -1,0 +1,8 @@
+{
+  "eventId": "VDT-EVT-1001",
+  "source": { "type": "Carrier", "carrierId": "CAR-0001" },
+  "carrierBookingReference": "VDT-77812",
+  "type": "Collected",
+  "eventTime": "2030-10-02T08:45:00+02:00",
+  "location": { "place": "Rotterdam", "postcode": "3011 AA", "countryCode": "NL" }
+}

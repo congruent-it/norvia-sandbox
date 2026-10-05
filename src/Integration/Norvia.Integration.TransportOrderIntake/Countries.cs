@@ -6,8 +6,9 @@ namespace Norvia.Integration.TransportOrderIntake;
 /// It doesn't decide where Norvia carries goods: a known country is passed on whether Norvia serves it or not.
 /// </summary>
 /// <remarks>
-/// Countries with more than one time zone use their mainland's (Portugal without the Azores, Spain without the
-/// Canary Islands). Russia, whose European part alone spans several time zones, isn't known.
+/// Countries with more than one time zone use their mainland's, except for the islands whose postcodes say they are
+/// elsewhere (the Azores, the Canary Islands): <see cref="At"/> gives those their own. Russia, whose European part alone
+/// spans several time zones, isn't known.
 /// </remarks>
 internal static class Countries
 {
@@ -60,11 +61,38 @@ internal static class Countries
         (new("GB", "Europe/London", "GMT Standard Time"), ["United Kingdom", "UK", "Great Britain", "England", "Scotland", "Wales", "Northern Ireland"]),
     ];
 
+    /// <summary>The parts of a country in another time zone than its mainland, found by postcode prefix.</summary>
+    private static readonly (string Code, Func<string, bool> HasPostcode, Country Region)[] Regions =
+    [
+        // Azores: 95xx to 99xx.
+        ("PT", postcode => postcode.Length >= 2 && postcode[0] == '9' && postcode[1] >= '5', new("PT", "Atlantic/Azores", "Azores Standard Time")),
+        // Canary Islands: the provinces of Las Palmas (35) and Santa Cruz de Tenerife (38).
+        ("ES", postcode => postcode.StartsWith("35", StringComparison.Ordinal) || postcode.StartsWith("38", StringComparison.Ordinal), new("ES", "Atlantic/Canary", "GMT Standard Time")),
+    ];
+
     private static readonly Dictionary<string, Country> ByName = Known
         .SelectMany(known => known.Names.Append(known.Country.Code).Select(name => (name, known.Country)))
         .ToDictionary(entry => entry.name, entry => entry.Country, StringComparer.OrdinalIgnoreCase);
 
     public static IEnumerable<Country> All => Known.Select(known => known.Country);
+
+    /// <summary>Every time zone the map reads local times in, the regional ones included.</summary>
+    public static IEnumerable<Country> AllTimeZones => All.Concat(Regions.Select(region => region.Region));
+
+    /// <summary>
+    /// The country as it is at a postcode: the country itself, or the region of it in another time zone that the
+    /// postcode lies in. A postcode that is missing or not one of the region's leaves the mainland.
+    /// </summary>
+    public static Country? At(Country? country, string? postcode)
+    {
+        if (country is null || string.IsNullOrWhiteSpace(postcode))
+        {
+            return country;
+        }
+
+        var trimmed = postcode.Trim();
+        return Regions.FirstOrDefault(region => region.Code == country.Code && region.HasPostcode(trimmed)).Region ?? country;
+    }
 
     /// <summary>Every way of writing a country the map reads: each name and each code.</summary>
     public static IEnumerable<string> Spellings => ByName.Keys;

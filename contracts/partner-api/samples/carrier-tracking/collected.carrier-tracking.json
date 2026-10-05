@@ -1,0 +1,9 @@
+{
+  "bookingRef": "VDT-77812",
+  "eventId": "VDT-EVT-1001",
+  "statusCode": "PU",
+  "eventTime": "2030-10-02T08:45:00",
+  "place": "Rotterdam",
+  "postcode": "3011 AA",
+  "country": "NLD"
+}

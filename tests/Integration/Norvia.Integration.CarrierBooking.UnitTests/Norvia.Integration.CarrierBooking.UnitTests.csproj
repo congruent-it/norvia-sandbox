@@ -23,6 +23,7 @@
     <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\carrier-bookings\*.json" LogicalName="PartnerApi/samples/carrier-bookings/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\carrier-answers\*.json" LogicalName="PartnerApi/samples/carrier-answers/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\carrier-answer-responses\*.json" LogicalName="PartnerApi/samples/carrier-answer-responses/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\carrier-tracking\*.json" LogicalName="PartnerApi/samples/carrier-tracking/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\infra\estate\partner-api\answer-carrier-booking.policy.xml" LogicalName="PartnerApiPolicies/answer-carrier-booking.policy.xml" />
     <EmbeddedResource Include="..\..\..\src\Integration\AnswerLogicApp\*.json" LogicalName="AnswerLogicApp/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\src\Integration\AnswerLogicApp\carrier-answer\workflow.json" LogicalName="AnswerLogicApp/carrier-answer/workflow.json" />

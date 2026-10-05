@@ -18,8 +18,8 @@ public static class IntakeMap
         ArgumentNullException.ThrowIfNull(partnerBooking);
         var booking = new PartnerFields(partnerBooking);
 
-        var collectionCountry = Countries.Find(booking.Text("pickupCountry"));
-        var deliveryCountry = Countries.Find(booking.Text("receiverCountry"));
+        var collectionCountry = Countries.At(Countries.Find(booking.Text("pickupCountry")), booking.Text("pickupPostalCode"));
+        var deliveryCountry = Countries.At(Countries.Find(booking.Text("receiverCountry")), booking.Text("receiverPostalCode"));
 
         var transportOrder = new JsonObject
         {

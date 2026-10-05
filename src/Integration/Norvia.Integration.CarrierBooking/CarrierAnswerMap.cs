@@ -30,14 +30,14 @@ public static class CarrierAnswerMap
     public static MappedCarrierAnswer ToCarrierBookingAnswer(string carrierAnswer, string carrierId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(carrierId);
-        var answer = Parse(carrierAnswer);
-        var number = Text(answer, "carrierBookingNumber");
+        var answer = JsonFields.Parse(carrierAnswer);
+        var number = JsonFields.Text(answer, "carrierBookingNumber");
         if (number is null || !IsCarrierBookingNumber(number))
         {
             return MappedCarrierAnswer.Invalid(null, "The answer needs the carrierBookingNumber of the request it answers, such as CB-0000042.");
         }
 
-        return Text(answer, "decision") switch
+        return JsonFields.Text(answer, "decision") switch
         {
             "CONFIRMED" => Confirmed(answer!, number, carrierId),
             "DECLINED" => Declined(answer!, number, carrierId),
@@ -47,13 +47,13 @@ public static class CarrierAnswerMap
 
     private static MappedCarrierAnswer Confirmed(JsonObject answer, string number, string carrierId)
     {
-        if (Text(answer, "bookingRef") is not { } reference)
+        if (JsonFields.Text(answer, "bookingRef") is not { } reference)
         {
             return MappedCarrierAnswer.Invalid(number, "A confirmation needs the Carrier's own booking reference (bookingRef).");
         }
 
         var body = new JsonObject { ["carrierId"] = carrierId, ["outcome"] = "Confirmed", ["carrierBookingReference"] = reference };
-        if (Text(answer, "plannedCollection") is { } planned)
+        if (JsonFields.Text(answer, "plannedCollection") is { } planned)
         {
             // Kind says whether the text carried an offset: without one the time is Unspecified, and no instant.
             if (!DateTime.TryParse(planned, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var instant) || instant.Kind == DateTimeKind.Unspecified)
@@ -69,7 +69,7 @@ public static class CarrierAnswerMap
 
     private static MappedCarrierAnswer Declined(JsonObject answer, string number, string carrierId)
     {
-        if (Text(answer, "declineReason") is not { } code)
+        if (JsonFields.Text(answer, "declineReason") is not { } code)
         {
             return MappedCarrierAnswer.Invalid(number, "A rejection needs a declineReason.");
         }
@@ -79,7 +79,7 @@ public static class CarrierAnswerMap
             return MappedCarrierAnswer.Invalid(number, "The declineReason must be NO_CAPACITY, LANE_NOT_SERVED, WINDOW_NOT_FEASIBLE, GOODS_NOT_ACCEPTED or OTHER.");
         }
 
-        var text = Text(answer, "declineText");
+        var text = JsonFields.Text(answer, "declineText");
         if (reasonCode == "Other" && text is null)
         {
             return MappedCarrierAnswer.Invalid(number, "A rejection with declineReason OTHER needs its declineText.");
@@ -96,19 +96,4 @@ public static class CarrierAnswerMap
 
     private static bool IsCarrierBookingNumber(string number) =>
         number.Length == 10 && number.StartsWith("CB-", StringComparison.Ordinal) && number.AsSpan(3).IndexOfAnyExceptInRange('0', '9') < 0;
-
-    private static JsonObject? Parse(string json)
-    {
-        try
-        {
-            return JsonNode.Parse(json) as JsonObject;
-        }
-        catch (System.Text.Json.JsonException)
-        {
-            return null;
-        }
-    }
-
-    private static string? Text(JsonObject? node, string name) =>
-        node?[name] is JsonValue value && value.TryGetValue<string>(out var text) && !string.IsNullOrWhiteSpace(text) ? text : null;
 }

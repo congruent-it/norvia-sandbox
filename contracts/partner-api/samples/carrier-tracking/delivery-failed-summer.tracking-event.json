@@ -1,0 +1,9 @@
+{
+  "eventId": "VDT-EVT-1003",
+  "source": { "type": "Carrier", "carrierId": "CAR-0001" },
+  "carrierBookingReference": "VDT-77812",
+  "type": "DeliveryFailed",
+  "eventTime": "2030-07-15T14:10:00+01:00",
+  "location": { "place": "Lisboa", "postcode": "1100-148", "countryCode": "PT" },
+  "remark": "Nobody at the address"
+}
