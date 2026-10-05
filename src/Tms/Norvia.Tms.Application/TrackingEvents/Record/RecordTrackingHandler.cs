@@ -23,15 +23,22 @@ public sealed class RecordTrackingHandler(
         var report = command.Report;
 
         // Own fleet reports through P12, which finds its Shipment by Trip, not by a Carrier booking reference.
-        if (report.Source.CarrierId is not { } carrierId || report.CarrierBookingReference is not { } reference)
+        if (report.Source.CarrierId is not { } carrierId)
         {
-            return TrackingEventRefused.Because<RecordTrackingResult>(TrackingEventRules.ShipmentNotFound(report.CarrierBookingReference ?? string.Empty));
+            return TrackingEventRefused.Because<RecordTrackingResult>(TrackingEventRules.ShipmentNotFound(report.CarrierBookingReference ?? report.CarrierBookingNumber ?? string.Empty));
         }
 
-        var booking = await carrierBookings.SingleOrDefaultAsync(new ConfirmedCarrierBookingByReferenceSpec(carrierId, reference), cancellationToken);
+        var booking = report.CarrierBookingReference is { } reference
+            ? await carrierBookings.SingleOrDefaultAsync(new ConfirmedCarrierBookingByReferenceSpec(carrierId, reference), cancellationToken)
+            : null;
+        if (booking is null && CarrierBookingNumber.TryParse(report.CarrierBookingNumber, out var number))
+        {
+            booking = await carrierBookings.SingleOrDefaultAsync(new ConfirmedCarrierBookingByNumberSpec(carrierId, number), cancellationToken);
+        }
+
         if (booking is null)
         {
-            return TrackingEventRefused.Because<RecordTrackingResult>(TrackingEventRules.ShipmentNotFound(reference));
+            return TrackingEventRefused.Because<RecordTrackingResult>(TrackingEventRules.ShipmentNotFound(report.CarrierBookingReference ?? report.CarrierBookingNumber ?? string.Empty));
         }
 
         var shipment = await shipments.SingleOrDefaultAsync(new ShipmentToChangeSpec(booking.ShipmentNumber), cancellationToken)
@@ -50,7 +57,7 @@ public sealed class RecordTrackingHandler(
             return TrackingEventRefused.Because<RecordTrackingResult>(refusal);
         }
 
-        var trackingEvent = shipment.Record(report, new CorrelationId(command.CorrelationId), now);
+        var trackingEvent = shipment.Record(report with { CarrierBookingReference = booking.CarrierBookingReference }, new CorrelationId(command.CorrelationId), now);
 
         // The tracked Shipment's move saves with the event, and the event it raises goes to the outbox, in one transaction.
         await trackingEvents.AddAsync(trackingEvent, cancellationToken);

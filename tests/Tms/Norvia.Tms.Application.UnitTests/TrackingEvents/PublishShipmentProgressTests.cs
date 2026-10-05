@@ -25,6 +25,20 @@ public sealed class PublishShipmentProgressTests
         _outbox.Received(1).Add(Arg.Is<ShipmentInTransitV1>(e => Said(e) && e.EventType == "ShipmentInTransit"));
     }
 
+    [Theory]
+    [InlineData(TrackingEventType.CollectionFailed, "CollectionFailed")]
+    [InlineData(TrackingEventType.DeliveryFailed, "DeliveryFailed")]
+    [InlineData(TrackingEventType.Damaged, "Damaged")]
+    public async Task Handle_AnException_PublishesShipmentExceptionReported_WithTheExceptionTypeAndRemark(TrackingEventType type, string exceptionType)
+    {
+        var reported = Moved<ShipmentExceptionReportedEvent>(type, remark: "Consignee closed");
+
+        await new PublishShipmentExceptionReported(_outbox).Handle(reported, CancellationToken.None);
+
+        _outbox.Received(1).Add(Arg.Is<ShipmentExceptionReportedV1>(e =>
+            Said(e) && e.EventType == "ShipmentExceptionReported" && e.ExceptionType == exceptionType && e.Remark == "Consignee closed"));
+    }
+
     [Fact]
     public async Task Handle_Delivered_PublishesShipmentDelivered_WithWhatTheEventSaid()
     {
@@ -66,7 +80,7 @@ public sealed class PublishShipmentProgressTests
         && e.CorrelationId == "corr-tracking"
         && e.OccurredAt == Samples.Now.AddDays(2);
 
-    private static TEvent Moved<TEvent>(TrackingEventType type)
+    private static TEvent Moved<TEvent>(TrackingEventType type, string? remark = null)
     {
         var order = Samples.AcceptedOrder(sequence: 7);
         var shipment = Samples.Planned(order, CarriedBy.Carrier(new CarrierId("CAR-0001")), sequence: 12);
@@ -76,7 +90,7 @@ public sealed class PublishShipmentProgressTests
 
         shipment.Record(
             new TrackingReport(
-                TrackingSource.Carrier(new CarrierId("CAR-0001")), "evt-1", "VDT-1", type, EventTime, new TrackingLocation("Rotterdam", "3011 AA", "NL"), Eta: null, Remark: null),
+                TrackingSource.Carrier(new CarrierId("CAR-0001")), "evt-1", "VDT-1", null, type, EventTime, new TrackingLocation("Rotterdam", "3011 AA", "NL"), Eta: null, Remark: remark),
             new CorrelationId("corr-tracking"),
             Samples.Now.AddDays(2));
         return (TEvent)shipment.DomainEvents.Single();

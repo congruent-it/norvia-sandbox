@@ -51,6 +51,61 @@ public sealed class RecordTrackingHandlerTests
     }
 
     [Fact]
+    public async Task Handle_WithNoBookingReference_FindsTheShipmentByTheCarrierBookingNumber()
+    {
+        var shipment = BookedShipment();
+        _carrierBookings.SingleOrDefaultAsync(Arg.Is<ConfirmedCarrierBookingByNumberSpec>(s => s.Number == BookingNumber && s.CarrierId == VanDijk), Arg.Any<CancellationToken>())
+            .Returns(ConfirmedBooking(shipment));
+
+        var result = await _handler.Handle(Collected(reference: null, number: BookingNumber.Value), CancellationToken.None);
+
+        result.Value.ShipmentStatus.Should().Be(ShipmentStatus.Collected);
+        var recorded = (TrackingEvent)_trackingEvents.ReceivedCalls().Single(call => call.GetMethodInfo().Name == nameof(IRepository<TrackingEvent>.AddAsync)).GetArguments()[0]!;
+        recorded.CarrierBookingReference.Should().Be("VDT-1", "the event keeps the Carrier's own reference the booking was confirmed with");
+    }
+
+    [Fact]
+    public async Task Handle_WithAReferenceThatDoesNotMatch_FallsBackToTheCarrierBookingNumber()
+    {
+        var shipment = BookedShipment();
+        _carrierBookings.SingleOrDefaultAsync(Arg.Is<ConfirmedCarrierBookingByNumberSpec>(s => s.Number == BookingNumber), Arg.Any<CancellationToken>())
+            .Returns(ConfirmedBooking(shipment));
+
+        var result = await _handler.Handle(Collected(reference: "WRONG", number: BookingNumber.Value), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData(null, "not-a-number")]
+    [InlineData("WRONG", "CB-0000099")]
+    public async Task Handle_WithNeitherAMatchingReferenceNorNumber_IsRefused_WithShipmentNotFound(string? reference, string? number)
+    {
+        BookedShipment();
+
+        var result = await _handler.Handle(Collected(reference: reference, number: number), CancellationToken.None);
+
+        result.ValidationErrors.Should().ContainSingle().Which.ErrorCode.Should().Be("ShipmentNotFound");
+        await _trackingEvents.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(TrackingEventType.CollectionFailed)]
+    [InlineData(TrackingEventType.DeliveryFailed)]
+    [InlineData(TrackingEventType.Damaged)]
+    public async Task Handle_AnException_IsRecorded_WithoutMovingTheShipment_AndRaisesShipmentExceptionReported(TrackingEventType type)
+    {
+        var shipment = BookedShipment();
+
+        var result = await _handler.Handle(Collected(type: type), CancellationToken.None);
+
+        result.Value.Should().Be(new RecordTrackingResult("SH-0000012", ShipmentStatus.Booked, "evt-1", MovedShipment: false, "corr-tracking"));
+        shipment.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<ShipmentExceptionReportedEvent>();
+        await _trackingEvents.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Handle_CollectedForAShipmentAlreadyCollected_RecordsIt_WithoutMovingTheShipment()
     {
         var shipment = BookedShipment();
@@ -184,17 +239,20 @@ public sealed class RecordTrackingHandlerTests
 
     private static RecordTrackingCommand Collected(
         string sourceEventId = "evt-1",
-        string reference = "VDT-1",
+        string? reference = "VDT-1",
+        string? number = null,
         TrackingSource? source = null,
         DateTimeOffset? eventTime = null,
         DateTimeOffset? eta = null,
-        string correlationId = "corr-tracking") =>
+        string correlationId = "corr-tracking",
+        TrackingEventType type = TrackingEventType.Collected) =>
         new(
             new TrackingReport(
                 source ?? VanDijkSource,
                 sourceEventId,
                 reference,
-                TrackingEventType.Collected,
+                number,
+                type,
                 eventTime ?? Samples.Now.AddDays(1),
                 Location,
                 eta,

@@ -1,8 +1,7 @@
 namespace Norvia.Tms.Domain.TrackingEvents;
 
 /// <summary>
-/// What a Tracking event reports (P5). Only the types the TMS can record so far are here; each later P5 ticket adds its own
-/// (the exceptions). The names are stable: never rename one, only add.
+/// What a Tracking event reports (P5). Progress types move the Shipment's status; exception types never do. The names are stable: never rename one, only add.
 /// </summary>
 public enum TrackingEventType
 {
@@ -20,4 +19,13 @@ public enum TrackingEventType
 
     /// <summary>The goods have been delivered. Moves the Shipment to Delivered.</summary>
     Delivered,
+
+    /// <summary>The Carrier couldn't collect the goods. An exception: it never changes the status.</summary>
+    CollectionFailed,
+
+    /// <summary>The Carrier couldn't deliver the goods. An exception: it never changes the status.</summary>
+    DeliveryFailed,
+
+    /// <summary>The goods were damaged on the way. An exception: it never changes the status.</summary>
+    Damaged,
 }

@@ -118,8 +118,8 @@ The mapping table lives in the Carrier-tracking Logic App, not in the TMS. A Car
 | The Carrier booking reference (or number) is known for the Carrier from the token | `ShipmentNotFound` |
 | That Carrier is the Carrier on the Shipment's Confirmed Carrier booking | `ShipmentNotFound` |
 | The Shipment is Booked or later | `ShipmentNotInTransport` |
-| The event time is not in the future, beyond a small clock-skew allowance | Client error |
-| The status code maps to a known Tracking event type, and the required fields are present | Client error |
+| The event time is not in the future, beyond a small clock-skew allowance | `EventTimeInTheFuture` (client error) |
+| The status code maps to a known Tracking event type, and the required fields are present | `UnknownEventType` or `MissingRequiredField` (client error) |
 
 A Carrier's events for one of its old bookings, one that was Rejected, Withdrawn or Cancelled (P7) before the Shipment went to someone else, are refused, not logged. For a Cancelled booking that holds even when the event time is before the cancellation (ADR 0010).
 

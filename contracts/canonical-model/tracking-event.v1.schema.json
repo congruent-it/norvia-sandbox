@@ -2,13 +2,12 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://norvia.example/canonical-model/tracking-event.v1.schema.json",
   "title": "TrackingEvent",
-  "description": "One report that something happened to a Shipment, as the Carrier-tracking Logic App sends it to the TMS Tracking event API's record operation (Canonical Model command, version 1). The correlation ID, which API Management creates for the event, is in X-Correlation-ID. The event names its source: a Carrier ID, which comes from API Management's token check (ADR 0005) and never from the Carrier's own payload, or Own fleet. Only the types the TMS can record so far are listed; each later P5 ticket adds its own (the exceptions).",
+  "description": "One report that something happened to a Shipment, as the Carrier-tracking Logic App sends it to the TMS Tracking event API's record operation (Canonical Model command, version 1). The correlation ID, which API Management creates for the event, is in X-Correlation-ID. The event names its source: a Carrier ID, which comes from API Management's token check (ADR 0005) and never from the Carrier's own payload, or Own fleet. The exception types (CollectionFailed, DeliveryFailed, Damaged) never change the Shipment's status.",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "eventId",
     "source",
-    "carrierBookingReference",
     "type",
     "eventTime",
     "location"
@@ -57,9 +56,14 @@
       ]
     },
     "carrierBookingReference": {
-      "description": "The Carrier's own reference for its booking. With the Carrier, it finds the Shipment.",
+      "description": "The Carrier's own reference for its booking. With the Carrier, it finds the Shipment. Required unless the Carrier booking number is given.",
       "type": "string",
       "minLength": 1,
+      "pattern": "\\S"
+    },
+    "carrierBookingNumber": {
+      "description": "The TMS's own Carrier booking number, such as CB-0000042. Used only when the booking reference isn't given or doesn't match.",
+      "type": "string",
       "pattern": "\\S"
     },
     "type": {
@@ -68,7 +72,10 @@
         "Departed",
         "Arrived",
         "OutForDelivery",
-        "Delivered"
+        "Delivered",
+        "CollectionFailed",
+        "DeliveryFailed",
+        "Damaged"
       ]
     },
     "eventTime": {
@@ -113,5 +120,17 @@
       "minLength": 1,
       "pattern": "\\S"
     }
-  }
+  },
+  "anyOf": [
+    {
+      "required": [
+        "carrierBookingReference"
+      ]
+    },
+    {
+      "required": [
+        "carrierBookingNumber"
+      ]
+    }
+  ]
 }

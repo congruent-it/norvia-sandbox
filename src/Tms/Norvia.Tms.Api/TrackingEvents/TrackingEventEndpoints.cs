@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Ardalis.Result;
 using Mediator;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -36,96 +37,159 @@ public static class TrackingEventEndpoints
                 + "stores the event with the correlation ID and the source's event ID. The Shipment's status only moves forward, and steps "
                 + "can be skipped: Collected moves it to Collected, Departed, Arrived and OutForDelivery to InTransit, Delivered to Delivered, "
                 + "publishing ShipmentCollected, ShipmentInTransit or ShipmentDelivered (only the one for the status landed on) in the same "
-                + "transaction. A late event, or one after Delivered, is stored and moves and publishes nothing. An event sent "
+                + "transaction. A late event, or one after Delivered, is stored and moves and publishes nothing. CollectionFailed, DeliveryFailed and Damaged are exceptions: stored, never moving the status, and published as ShipmentExceptionReported with the exception type and remark. The Carrier booking number finds the Shipment when no booking reference is given or it doesn't match. An event sent "
                 + "again under the same event ID is answered as before, flagged as a repeat, without recording or publishing anything. An event is "
                 + "refused, changing and publishing nothing, with a problem whose code says why: ShipmentNotFound (404), ShipmentNotInTransport "
-                + "(409) or EventTimeInTheFuture (400); and 400 for an input that isn't the Canonical Model.");
+                + "(409), EventTimeInTheFuture, UnknownEventType or MissingRequiredField (400); and 400 for an input that isn't the Canonical Model.");
 
         return app;
     }
 
-    private static async Task<Results<Ok<RecordTrackingResult>, ProblemHttpResult, ValidationProblem>> RecordAsync(
+    private static async Task<Results<Ok<RecordTrackingResult>, ProblemHttpResult>> RecordAsync(
         [FromHeader(Name = TransportOrderEndpoints.CorrelationIdHeader)] string? correlationId,
         TrackingEventRequest trackingEvent,
         IMediator mediator,
         CancellationToken cancellationToken)
     {
-        var errors = Check(correlationId, trackingEvent);
-        if (errors.Count > 0)
-        {
-            return TypedResults.ValidationProblem(errors);
-        }
-
-        var result = await mediator.Send(new RecordTrackingCommand(ToReport(trackingEvent), correlationId!), cancellationToken);
-
-        return result.IsSuccess ? TypedResults.Ok(result.Value) : RefusalProblem.Of<TrackingEventRefusalCode, RecordTrackingResult>(result, "The Tracking event can't be recorded.", correlationId!, StatusCodeOf);
-    }
-
-    /// <summary>What the Canonical Model event reports, as the domain takes it: the source is a Carrier or Own fleet.</summary>
-    private static TrackingReport ToReport(TrackingEventRequest trackingEvent)
-    {
-        var source = trackingEvent.Source.Type == TrackingSourceType.Carrier
-            ? TrackingSource.Carrier(new CarrierId(trackingEvent.Source.CarrierId!))
-            : TrackingSource.OwnFleet;
-        var location = trackingEvent.Location;
-        return new TrackingReport(
-            source,
-            trackingEvent.EventId,
-            trackingEvent.CarrierBookingReference,
-            trackingEvent.Type,
-            trackingEvent.EventTime,
-            new TrackingLocation(location.Place, location.Postcode, location.CountryCode),
-            trackingEvent.Eta,
-            trackingEvent.Remark);
-    }
-
-    /// <summary>The call's errors: the <see cref="TransportOrderEndpoints.CorrelationIdHeader"/>, and the fields the Canonical Model requires beyond their type.</summary>
-    private static Dictionary<string, string[]> Check(string? correlationId, TrackingEventRequest trackingEvent)
-    {
-        var errors = new Dictionary<string, string[]>();
         if (string.IsNullOrWhiteSpace(correlationId))
         {
-            errors[TransportOrderEndpoints.CorrelationIdHeader] = [$"Recording a Tracking event needs an {TransportOrderEndpoints.CorrelationIdHeader}."];
+            return Invalid([Missing($"Recording a Tracking event needs an {TransportOrderEndpoints.CorrelationIdHeader}.")], string.Empty);
         }
+
+        if (!TryRead(trackingEvent, out var report, out var problems))
+        {
+            return Invalid(problems, correlationId);
+        }
+
+        var result = await mediator.Send(new RecordTrackingCommand(report, correlationId), cancellationToken);
+
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : RefusalProblem.Of<TrackingEventRefusalCode, RecordTrackingResult>(result, "The Tracking event can't be recorded.", correlationId, StatusCodeOf);
+    }
+
+    /// <summary>
+    /// A 400 for an event the TMS can't read. Its <c>code</c> is the first problem's, and <c>errors</c> lists every
+    /// problem with its own code and message.
+    /// </summary>
+    private static ProblemHttpResult Invalid(IReadOnlyList<ReadProblem> problems, string correlationId) =>
+        TypedResults.Problem(
+            statusCode: StatusCodes.Status400BadRequest,
+            title: "The Tracking event can't be recorded.",
+            detail: problems[0].Message,
+            extensions: new Dictionary<string, object?>
+            {
+                ["code"] = problems[0].Code.ToString(),
+                ["correlationId"] = correlationId,
+                ["errors"] = problems.Select(problem => new { code = problem.Code.ToString(), message = problem.Message }).ToArray(),
+            });
+
+    private static ReadProblem Missing(string message) => new(TrackingEventRefusalCode.MissingRequiredField, message);
+
+    /// <summary>
+    /// Reads the Canonical Model event as the domain takes it, beyond its JSON shape: the fields it requires, and a type
+    /// the TMS knows. Either returns the report, or every problem found, in the order of the event's fields.
+    /// </summary>
+    private static bool TryRead(
+        TrackingEventRequest trackingEvent,
+        [NotNullWhen(true)] out TrackingReport? report,
+        out IReadOnlyList<ReadProblem> problems)
+    {
+        var found = new List<ReadProblem>();
+        report = null;
+        problems = found;
 
         if (string.IsNullOrWhiteSpace(trackingEvent.EventId))
         {
-            errors[nameof(TrackingEventRequest.EventId)] = ["A Tracking event needs its source's own event ID."];
+            found.Add(Missing("A Tracking event needs its source's own event ID."));
         }
 
-        if (string.IsNullOrWhiteSpace(trackingEvent.CarrierBookingReference))
+        TrackingSource? source = null;
+        if (trackingEvent.Source is not { } sourceRequest)
         {
-            errors[nameof(TrackingEventRequest.CarrierBookingReference)] = ["A Tracking event needs the Carrier's own booking reference."];
+            found.Add(Missing("A Tracking event needs its source."));
+        }
+        else if (sourceRequest.Type == TrackingSourceType.Carrier)
+        {
+            if (string.IsNullOrWhiteSpace(sourceRequest.CarrierId))
+            {
+                found.Add(Missing("A Carrier source needs the Carrier ID."));
+            }
+            else
+            {
+                source = TrackingSource.Carrier(new CarrierId(sourceRequest.CarrierId));
+            }
+        }
+        else if (sourceRequest.CarrierId is not null)
+        {
+            found.Add(Missing("An Own fleet source names no Carrier."));
+        }
+        else
+        {
+            source = TrackingSource.OwnFleet;
         }
 
-        var source = trackingEvent.Source;
-        if (source.Type == TrackingSourceType.Carrier && string.IsNullOrWhiteSpace(source.CarrierId))
+        if (string.IsNullOrWhiteSpace(trackingEvent.CarrierBookingReference) && string.IsNullOrWhiteSpace(trackingEvent.CarrierBookingNumber))
         {
-            errors[$"{nameof(TrackingEventRequest.Source)}.{nameof(TrackingSourceRequest.CarrierId)}"] = ["A Carrier source needs the Carrier ID."];
-        }
-        else if (source.Type == TrackingSourceType.OwnFleet && source.CarrierId is not null)
-        {
-            errors[$"{nameof(TrackingEventRequest.Source)}.{nameof(TrackingSourceRequest.CarrierId)}"] = ["An Own fleet source names no Carrier."];
+            found.Add(Missing("A Tracking event needs the Carrier's own booking reference, or else the Carrier booking number."));
         }
 
-        var location = trackingEvent.Location;
-        if (string.IsNullOrWhiteSpace(location.Place) || string.IsNullOrWhiteSpace(location.Postcode))
+        TrackingEventType? type = null;
+        if (string.IsNullOrWhiteSpace(trackingEvent.Type))
         {
-            errors[nameof(TrackingEventRequest.Location)] = ["A location needs its place and postcode."];
+            found.Add(Missing("A Tracking event needs its type."));
+        }
+        else if (Enum.TryParse<TrackingEventType>(trackingEvent.Type, out var parsed) && Enum.IsDefined(parsed) && !trackingEvent.Type.All(char.IsAsciiDigit))
+        {
+            type = parsed;
+        }
+        else
+        {
+            found.Add(new(TrackingEventRefusalCode.UnknownEventType, $"'{trackingEvent.Type}' isn't a Tracking event type the TMS knows."));
         }
 
-        if (location.CountryCode is not { Length: 2 } || !location.CountryCode.All(char.IsAsciiLetterUpper))
+        if (trackingEvent.EventTime is null)
         {
-            errors[$"{nameof(TrackingEventRequest.Location)}.{nameof(TrackingLocationRequest.CountryCode)}"] = ["A location needs its country as an ISO 3166-1 alpha-2 code."];
+            found.Add(Missing("A Tracking event needs the time it happened."));
         }
 
-        return errors;
+        TrackingLocation? place = null;
+        if (trackingEvent.Location is not { } location || string.IsNullOrWhiteSpace(location.Place) || string.IsNullOrWhiteSpace(location.Postcode))
+        {
+            found.Add(Missing("A location needs its place and postcode."));
+        }
+        else if (location.CountryCode is not { Length: 2 } || !location.CountryCode.All(char.IsAsciiLetterUpper))
+        {
+            found.Add(Missing("A location needs its country as an ISO 3166-1 alpha-2 code."));
+        }
+        else
+        {
+            place = new TrackingLocation(location.Place, location.Postcode, location.CountryCode);
+        }
+
+        if (found.Count > 0 || trackingEvent.EventId is not { } eventId || source is null || type is not { } knownType || trackingEvent.EventTime is not { } eventTime || place is null)
+        {
+            return false;
+        }
+
+        report = new TrackingReport(
+            source,
+            eventId,
+            trackingEvent.CarrierBookingReference,
+            trackingEvent.CarrierBookingNumber,
+            knownType,
+            eventTime,
+            place,
+            trackingEvent.Eta,
+            trackingEvent.Remark);
+        return true;
     }
+
+    /// <summary>One thing wrong with an event the TMS can't read, with the stable code of its kind.</summary>
+    private readonly record struct ReadProblem(TrackingEventRefusalCode Code, string Message);
 
     private static int StatusCodeOf(TrackingEventRefusalCode code) => code switch
     {
         TrackingEventRefusalCode.ShipmentNotFound => StatusCodes.Status404NotFound,
-        TrackingEventRefusalCode.EventTimeInTheFuture => StatusCodes.Status400BadRequest,
+        TrackingEventRefusalCode.EventTimeInTheFuture or TrackingEventRefusalCode.UnknownEventType or TrackingEventRefusalCode.MissingRequiredField => StatusCodes.Status400BadRequest,
         _ => StatusCodes.Status409Conflict, // ShipmentNotInTransport
     };
 }

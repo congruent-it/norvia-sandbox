@@ -117,6 +117,35 @@ public sealed class ShipmentTrackingTests
     }
 
     [Theory]
+    [InlineData(TrackingEventType.CollectionFailed)]
+    [InlineData(TrackingEventType.DeliveryFailed)]
+    [InlineData(TrackingEventType.Damaged)]
+    public void Record_AnException_ChangesNoStatus_AndRaisesOnlyShipmentExceptionReported(TrackingEventType type)
+    {
+        var shipment = Booked();
+
+        var trackingEvent = Report(shipment, type);
+
+        shipment.Status.Should().Be(ShipmentStatus.Booked);
+        trackingEvent.MovedShipment.Should().BeFalse();
+        var raised = shipment.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<ShipmentExceptionReportedEvent>().Subject;
+        raised.TrackingEvent.Should().BeSameAs(trackingEvent);
+    }
+
+    [Fact]
+    public void Record_AnExceptionAfterDelivered_StillRaisesShipmentExceptionReported()
+    {
+        var shipment = Booked();
+        Report(shipment, TrackingEventType.Delivered);
+        shipment.ClearDomainEvents();
+
+        Report(shipment, TrackingEventType.Damaged, "evt-2");
+
+        shipment.Status.Should().Be(ShipmentStatus.Delivered);
+        shipment.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<ShipmentExceptionReportedEvent>();
+    }
+
+    [Theory]
     [InlineData(TrackingEventType.Departed, ShipmentStatus.InTransit)]
     [InlineData(TrackingEventType.Delivered, ShipmentStatus.Delivered)]
     public void Record_SkippingSteps_MovesToTheStatusLandedOn_AndRaisesOnlyItsEvent(TrackingEventType type, ShipmentStatus expected)
@@ -178,13 +207,13 @@ public sealed class ShipmentTrackingTests
 
     private static TrackingEvent Collected(Shipment shipment, DateTimeOffset? eta, string sourceEventId = "evt-1") =>
         shipment.Record(
-            new TrackingReport(Source, sourceEventId, "VDT-1", TrackingEventType.Collected, EventTime, Location, eta, "Dock 4"),
+            new TrackingReport(Source, sourceEventId, "VDT-1", null, TrackingEventType.Collected, EventTime, Location, eta, "Dock 4"),
             new CorrelationId("corr-tracking"),
             ReceivedAt);
 
     private static TrackingEvent Report(Shipment shipment, TrackingEventType type, string sourceEventId = "evt-1", DateTimeOffset? eventTime = null) =>
         shipment.Record(
-            new TrackingReport(Source, sourceEventId, "VDT-1", type, eventTime ?? EventTime, Location, Eta: null, Remark: null),
+            new TrackingReport(Source, sourceEventId, "VDT-1", null, type, eventTime ?? EventTime, Location, Eta: null, Remark: null),
             new CorrelationId("corr-tracking"),
             ReceivedAt);
 
