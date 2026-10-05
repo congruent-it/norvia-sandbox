@@ -33,8 +33,10 @@ public static class TrackingEventEndpoints
             .WithDescription(
                 "Takes only the Canonical Model. The event names its source: a Carrier ID (from API Management, never from the Carrier's payload) "
                 + "or Own fleet. The Shipment is the one on that Carrier's Confirmed Carrier booking with the Carrier booking reference. The TMS "
-                + "stores the event with the correlation ID and the source's event ID, and a Collected event moves a Booked Shipment to "
-                + "Collected, publishing ShipmentCollected in the same transaction; an event that moves nothing publishes nothing. An event sent "
+                + "stores the event with the correlation ID and the source's event ID. The Shipment's status only moves forward, and steps "
+                + "can be skipped: Collected moves it to Collected, Departed, Arrived and OutForDelivery to InTransit, Delivered to Delivered, "
+                + "publishing ShipmentCollected, ShipmentInTransit or ShipmentDelivered (only the one for the status landed on) in the same "
+                + "transaction. A late event, or one after Delivered, is stored and moves and publishes nothing. An event sent "
                 + "again under the same event ID is answered as before, flagged as a repeat, without recording or publishing anything. An event is "
                 + "refused, changing and publishing nothing, with a problem whose code says why: ShipmentNotFound (404), ShipmentNotInTransport "
                 + "(409) or EventTimeInTheFuture (400); and 400 for an input that isn't the Canonical Model.");

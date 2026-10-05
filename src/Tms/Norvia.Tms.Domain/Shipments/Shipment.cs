@@ -173,22 +173,37 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
 
     /// <summary>
     /// Takes in a Tracking event reported for the Shipment (P5): the event is made, to be kept as a log on the Shipment,
-    /// and the status moves forward where the event warrants it. A Collected event moves a Booked Shipment to Collected
-    /// and raises <c>ShipmentCollectedEvent</c>; on any other Shipment it is only logged, changing nothing and raising
-    /// nothing, as the status only moves forward.
+    /// and the status moves forward where the event warrants it. The status only moves forward: an event moves a Booked or
+    /// later Shipment to its type's status when that is further along than the current one, and any step can be skipped.
+    /// It raises the event for the status landed on only. Any other event, such as a late one or one after Delivered, is
+    /// only logged, changing nothing and raising nothing.
     /// </summary>
     public TrackingEvent Record(TrackingReport report, CorrelationId correlationId, DateTimeOffset receivedAt)
     {
         var trackingEvent = TrackingEvent.Record(this, report, correlationId, receivedAt);
-        if (report.Type == TrackingEventType.Collected && Status == ShipmentStatus.Booked)
+        var target = StatusOf(report.Type);
+        if (Status >= ShipmentStatus.Booked && target > Status)
         {
-            Status = ShipmentStatus.Collected;
+            Status = target;
             trackingEvent.MarkMovedShipment();
-            RegisterDomainEvent(new ShipmentCollectedEvent(this, trackingEvent));
+            RegisterDomainEvent(target switch
+            {
+                ShipmentStatus.Collected => new ShipmentCollectedEvent(this, trackingEvent),
+                ShipmentStatus.InTransit => new ShipmentInTransitEvent(this, trackingEvent),
+                _ => new ShipmentDeliveredEvent(this, trackingEvent),
+            });
         }
 
         return trackingEvent;
     }
+
+    private static ShipmentStatus StatusOf(TrackingEventType type) => type switch
+    {
+        TrackingEventType.Collected => ShipmentStatus.Collected,
+        TrackingEventType.Departed or TrackingEventType.Arrived or TrackingEventType.OutForDelivery => ShipmentStatus.InTransit,
+        TrackingEventType.Delivered => ShipmentStatus.Delivered,
+        _ => throw new ArgumentOutOfRangeException(nameof(type), type, "The TMS doesn't know what status this Tracking event type moves a Shipment to."),
+    };
 
     /// <summary>The release made under the key; null when none was.</summary>
     public ShipmentRelease? ReleaseUnder(IdempotencyKey key) => LastRelease is { } release && release.Key == key ? release : null;

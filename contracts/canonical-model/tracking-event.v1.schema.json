@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://norvia.example/canonical-model/tracking-event.v1.schema.json",
   "title": "TrackingEvent",
-  "description": "One report that something happened to a Shipment, as the Carrier-tracking Logic App sends it to the TMS Tracking event API's record operation (Canonical Model command, version 1). The correlation ID, which API Management creates for the event, is in X-Correlation-ID. The event names its source: a Carrier ID, which comes from API Management's token check (ADR 0005) and never from the Carrier's own payload, or Own fleet. Only the types the TMS can record so far are listed; each later P5 ticket adds its own.",
+  "description": "One report that something happened to a Shipment, as the Carrier-tracking Logic App sends it to the TMS Tracking event API's record operation (Canonical Model command, version 1). The correlation ID, which API Management creates for the event, is in X-Correlation-ID. The event names its source: a Carrier ID, which comes from API Management's token check (ADR 0005) and never from the Carrier's own payload, or Own fleet. Only the types the TMS can record so far are listed; each later P5 ticket adds its own (the exceptions).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -64,7 +64,11 @@
     },
     "type": {
       "enum": [
-        "Collected"
+        "Collected",
+        "Departed",
+        "Arrived",
+        "OutForDelivery",
+        "Delivered"
       ]
     },
     "eventTime": {

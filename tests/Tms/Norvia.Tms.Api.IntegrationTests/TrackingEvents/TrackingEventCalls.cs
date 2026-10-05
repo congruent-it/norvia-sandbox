@@ -17,6 +17,16 @@ internal static class TrackingEventCalls
         DateTimeOffset eventTime,
         string? eventId = null,
         JsonObject? source = null,
+        DateTimeOffset? eta = null) =>
+        Event("Collected", carrierBookingReference, eventTime, eventId, source, eta);
+
+    /// <summary>A Canonical Model Tracking event of the type for the Carrier's booking reference, at a location in Rotterdam.</summary>
+    public static JsonObject Event(
+        string type,
+        string carrierBookingReference,
+        DateTimeOffset eventTime,
+        string? eventId = null,
+        JsonObject? source = null,
         DateTimeOffset? eta = null)
     {
         var trackingEvent = new JsonObject
@@ -24,10 +34,10 @@ internal static class TrackingEventCalls
             ["eventId"] = eventId ?? Guid.NewGuid().ToString(),
             ["source"] = source ?? CarrierSource(),
             ["carrierBookingReference"] = carrierBookingReference,
-            ["type"] = "Collected",
+            ["type"] = type,
             ["eventTime"] = JsonValue.Create(eventTime),
             ["location"] = new JsonObject { ["place"] = "Rotterdam", ["postcode"] = "3011 AA", ["countryCode"] = "NL" },
-            ["remark"] = "Collected at dock 4",
+            ["remark"] = $"{type} at dock 4",
         };
         if (eta is not null)
         {
