@@ -29,7 +29,6 @@ set -euo pipefail
 eval "$(azd env get-values)"
 resource_group=${AZURE_RESOURCE_GROUP:-rg-$AZURE_ENV_NAME}
 number=${1:-}
-brouwer_dranken_id=SHP-0001
 van_dijk_id=CAR-0001
 queue=carrier-tracking
 
@@ -52,10 +51,12 @@ echo "Transport Order: $number"
 tracking_logic_app=$AZURE_ESTATE_TRACKING_LOGIC_APP
 # Put back whatever the Logic App was calling, if the run ends while it is pointed away from the TMS.
 restore_tms=
-job=
+job_file=$(mktemp)
 job_definition=$(mktemp --suffix=.yaml)
 cleanup() {
-  rm -f "$job_definition"
+  local job
+  job=$(cat "$job_file")
+  rm -f "$job_definition" "$job_file"
   [ -z "$job" ] || az containerapp job delete --name "$job" --resource-group "$resource_group" --yes --output none 2>/dev/null || true
   if [ -n "$restore_tms" ]; then
     az logicapp config appsettings set --subscription "$AZURE_SUBSCRIPTION_ID" --name "$tracking_logic_app" --resource-group "$resource_group" \
@@ -113,6 +114,9 @@ def tms(path):
     return body if status == 200 else {"httpStatus": status}
 
 order = tms("/v1/transport-orders/" + os.environ["NUMBER"])
+if not order.get("shipmentNumber"):
+    print("SMOKE-RESULT " + json.dumps({"shipmentNumber": None}))
+    raise SystemExit(0)
 shipment_number = order.get("shipmentNumber")
 shipment = tms("/v1/shipments/" + shipment_number) if shipment_number else {}
 confirmed = [b for b in shipment.get("carrierBookings", []) if b["status"] == "Confirmed"]
@@ -120,7 +124,7 @@ result = {"shipmentNumber": shipment_number, "status": shipment.get("status"), "
           "reference": confirmed[0]["carrierBookingReference"] if confirmed else None, "steps": []}
 
 # Event times are local to Rotterdam or Duesseldorf, so one read as UTC is always in the past, and never later than the next.
-base = datetime.now(timezone.utc).replace(tzinfo=None, microsecond=0) - timedelta(hours=2)
+base = datetime.now(timezone.utc).replace(tzinfo=None, microsecond=0) - timedelta(hours=2) + timedelta(minutes=int(os.environ["OFFSET_MINUTES"]))
 for index, step in enumerate(json.loads(os.environ["STEPS"])):
     reference = step["bookingRef"] or result["reference"]
     event = {"bookingRef": reference, "eventId": "SMOKE-%s-%d" % (os.environ["RUN"], index), "statusCode": step["statusCode"],
@@ -140,12 +144,20 @@ for index, step in enumerate(json.loads(os.environ["STEPS"])):
         seen["inProgress"] = isinstance(in_progress, list) and any(s["shipmentNumber"] == shipment_number for s in in_progress)
     result["steps"].append(seen)
 
-timeline = tms("/v1/shipments/%s/tracking-events" % shipment_number) if shipment_number else {}
+wanted = int(os.environ["AWAIT_DELIVERED"])
+for _ in range(60 if wanted else 0):
+    timeline = tms("/v1/shipments/%s/tracking-events" % shipment_number)
+    if isinstance(timeline, list) and sum(e["type"] == "Delivered" for e in timeline) >= wanted:
+        break
+    time.sleep(10)
+timeline = tms("/v1/shipments/%s/tracking-events" % shipment_number)
 result["timeline"] = timeline if isinstance(timeline, dict) else [{"type": e["type"], "moved": e["movedShipment"]} for e in timeline]
 print("SMOKE-RESULT " + json.dumps(result))
 PYTHON'
 run_steps() {
-  job="smoke-shipment-tracking-$(date +%s)"
+  local job="smoke-shipment-tracking-$(date +%s)"
+  echo "$job" > "$job_file"
+  run=$(date +%Y%m%d%H%M%S%N)
   jq -n \
     --arg location "$AZURE_LOCATION" \
     --arg portalIdentity "$AZURE_ESTATE_PARTNER_PORTAL_IDENTITY_ID" --arg intakeIdentity "$AZURE_ESTATE_INTAKE_IDENTITY_ID" \
@@ -154,7 +166,7 @@ run_steps() {
     --arg vanDijk "$van_dijk_client_id" --arg vanDijkKey "$van_dijk_key" \
     --arg portalClientId "$AZURE_ESTATE_PARTNER_PORTAL_CLIENT_ID" --arg intakeClientId "$AZURE_ESTATE_INTAKE_CLIENT_ID" \
     --arg tms "$tms" --arg tmsApiClientId "$AZURE_ESTATE_TMS_API_CLIENT_ID" --arg number "$number" \
-    --arg run "$run" --arg steps "$1" '{
+    --arg run "$run" --arg offset "$2" --arg awaitDelivered "$3" --arg steps "$1" '{
       location: $location,
       identity: { type: "UserAssigned", userAssignedIdentities: { ($portalIdentity): {}, ($intakeIdentity): {} } },
       properties: {
@@ -183,6 +195,8 @@ run_steps() {
               { name: "TMS_API_CLIENT_ID", value: $tmsApiClientId },
               { name: "NUMBER", value: $number },
               { name: "RUN", value: $run },
+              { name: "OFFSET_MINUTES", value: $offset },
+              { name: "AWAIT_DELIVERED", value: $awaitDelivered },
               { name: "STEPS", value: $steps }
             ],
             resources: { cpu: 0.5, memory: "1Gi" }
@@ -208,7 +222,7 @@ run_steps() {
   }
   until_found job_result
   az containerapp job delete --name "$ran" --resource-group "$resource_group" --yes --output none 2>/dev/null || true
-  job=
+  : > "$job_file"
 }
 
 # The messages on the tracking queue's dead-letter queue, as the presenter: each is locked and released again, never settled.
@@ -238,14 +252,12 @@ dead_letter_reason() {
   dead_letters | jq -r --arg id "$1" 'select(.correlationId == $id) | .reason' | head -1
 }
 
-run=$(date +%Y%m%d%H%M%S)
-
 # 1 to 3. Van Dijk Transport's tracking, and a Tracking event for a reference that no Carrier booking has.
 result=$(run_steps "$(jq -nc '[
   {name: "PU", statusCode: "PU", bookingRef: null, wait: "Collected"},
   {name: "DEP", statusCode: "DEP", bookingRef: null, wait: "In transit"},
   {name: "POD", statusCode: "POD", bookingRef: null, wait: "Delivered"},
-  {name: "unknown", statusCode: "PU", bookingRef: "SMOKE-NO-SUCH-REFERENCE", wait: null}]')")
+  {name: "unknown", statusCode: "PU", bookingRef: "SMOKE-NO-SUCH-REFERENCE", wait: null}]')" 0 0)
 [ -n "$result" ] || fail "the job's results didn't reach Log Analytics in 10 minutes"
 shipment_number=$(jq -r '.shipmentNumber // empty' <<<"$result")
 [ -n "$shipment_number" ] || fail "Transport Order $number has no Shipment, or the TMS doesn't answer for it"
@@ -310,13 +322,13 @@ done
 found "the unknown reference's Tracking event, by correlation ID $unknown_id," "$unknown_id" "$AZURE_ESTATE_API_MANAGEMENT" "$tracking_logic_app" tms-api
 
 # 5. With the TMS unreachable, a POD is retried from the queue and dead-lettered by Service Bus after the maximum delivery
-# count. The Shipment is Delivered, so the TMS only logs the POD again once it is resubmitted, with an event ID of its own.
+# count. The Shipment is Delivered, so the TMS only logs the POD again once it is resubmitted,.
 echo "Pointing the Carrier-tracking Logic App away from the TMS..."
 restore_tms=yes
 az logicapp config appsettings set --subscription "$AZURE_SUBSCRIPTION_ID" --name "$tracking_logic_app" --resource-group "$resource_group" \
   --settings "TMS_BASE_URL=https://tms-api.stopped.invalid" --output none
 sleep 60
-outage=$(run_steps "$(jq -nc '[{name: "POD", statusCode: "POD", bookingRef: null, wait: null}]')")
+outage=$(run_steps "$(jq -nc '[{name: "POD", statusCode: "POD", bookingRef: null, wait: null}]')" 60 0)
 [ -n "$outage" ] || fail "the job's results didn't reach Log Analytics in 10 minutes"
 jq -e '.steps[0].httpStatus == 202' <<<"$outage" >/dev/null || fail "the POD sent while the TMS was stopped didn't get 202 Accepted: $(jq -c '.steps[0]' <<<"$outage")"
 outage_id=$(jq -r '.steps[0].correlationId' <<<"$outage")
@@ -336,16 +348,11 @@ echo "The TMS is back. Resubmit the POD in the Integration console, from the dea
 echo "  $console/?key=$outage_id"
 if [ -t 0 ]; then
   read -r -p "Press Enter once it is resubmitted (the TMS needs the Carrier-tracking Logic App to have restarted first)... "
-  recorded() {
-    local timeline
-    timeline=$(run_steps '[]' | jq -c '.timeline | map(select(.type == "Delivered")) | length') || return 0
-    [ "$timeline" -ge 2 ] && echo "$timeline"
-  }
-  count=$(until_found recorded)
-  [ -n "$count" ] || fail "the resubmitted POD isn't in Shipment $shipment_number's timeline after 10 minutes"
+  count=$(run_steps '[]' 0 2 | jq -r '.timeline | map(select(.type == "Delivered")) | length')
+  [ "$count" -ge 2 ] || fail "the resubmitted POD isn't in Shipment $shipment_number's timeline after 10 minutes"
   pass "the resubmitted POD was recorded: Shipment $shipment_number's timeline holds $count Delivered events"
 else
-  echo "Not a terminal, so the resubmission isn't checked. Check Shipment $shipment_number's timeline for a second Delivered event."
+  echo "NOT CHECKED: this isn't a terminal, so the resubmission was not waited for. Check Shipment $shipment_number's timeline for a second Delivered event."
 fi
 
 tms_ui="https://$(az containerapp show --name tms-web --resource-group "$resource_group" \
