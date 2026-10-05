@@ -44,6 +44,23 @@ public sealed class TrackingEventProgressTests(ControlledClockTmsFixture tms) : 
         body["carrierBookingReference"]!.GetValue<string>().Should().Be(reference);
     }
 
+    [Theory]
+    [InlineData("Departed")]
+    [InlineData("Arrived")]
+    [InlineData("OutForDelivery")]
+    public async Task Record_AnInTransitEventStraightAfterBooked_MovesItToInTransit_AndPublishesOnlyShipmentInTransit(string type)
+    {
+        var (shipmentNumber, reference) = await tms.BookedShipmentAsync(_cancellationToken);
+        var correlationId = TmsCalls.NewCorrelationId();
+
+        var recorded = await tms.RecordedAsync(Event(type, reference, _now.AddMinutes(-1)), _cancellationToken, correlationId);
+
+        recorded["shipmentStatus"]!.GetValue<string>().Should().Be("InTransit");
+        await tms.PublishedAsync(correlationId, "ShipmentInTransit", _cancellationToken);
+        tms.Published.Where(m => CarrierBookingCalls.NamesShipment(m, shipmentNumber) && m.Subject == "ShipmentCollected")
+            .Should().BeEmpty("the step skipped publishes nothing");
+    }
+
     [Fact]
     public async Task Record_TheWholeJourney_PublishesOneEventPerMove_AndDeliveredIsFinal()
     {

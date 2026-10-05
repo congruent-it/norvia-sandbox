@@ -155,6 +155,33 @@ public sealed class RecordTrackingHandlerTests
         await _trackingEvents.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task Handle_DeliveredForABookedShipment_StoresTheEvent_MovesTheShipment_AndRaisesTheEvent_InOneSave()
+    {
+        var shipment = BookedShipment();
+        var command = Collected() with { Report = Collected().Report with { Type = TrackingEventType.Delivered } };
+
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        result.Value.ShipmentStatus.Should().Be(ShipmentStatus.Delivered);
+        shipment.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<ShipmentDeliveredEvent>();
+        // The event, the Shipment's move and the event it raised (which goes to the outbox) all save together, or not at all.
+        await _trackingEvents.Received(1).AddAsync(Arg.Any<TrackingEvent>(), Arg.Any<CancellationToken>());
+        await _trackingEvents.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        await _shipments.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_WhenSavingFails_TheFailureIsNotSwallowed_SoNothingIsCommitted()
+    {
+        BookedShipment();
+        _trackingEvents.SaveChangesAsync(Arg.Any<CancellationToken>()).Returns<int>(_ => throw new InvalidOperationException("the save failed"));
+
+        var handling = async () => await _handler.Handle(Collected(), CancellationToken.None);
+
+        await handling.Should().ThrowAsync<InvalidOperationException>();
+    }
+
     private static RecordTrackingCommand Collected(
         string sourceEventId = "evt-1",
         string reference = "VDT-1",
