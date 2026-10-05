@@ -16,7 +16,7 @@ namespace Norvia.Tms.Application.UnitTests.ProofsOfDelivery;
 
 public sealed class RecordProofOfDeliveryHandlerTests
 {
-    private static readonly byte[] CmrContent = [1, 2, 3, 4];
+    private static readonly byte[] CmrContent = [.. "%PDF-1.7"u8];
 
     private readonly IRepository<ProofOfDelivery> _proofsOfDelivery = Substitute.For<IRepository<ProofOfDelivery>>();
     private readonly IRepository<CarrierBooking> _carrierBookings = Substitute.For<IRepository<CarrierBooking>>();
@@ -27,7 +27,7 @@ public sealed class RecordProofOfDeliveryHandlerTests
 
     public RecordProofOfDeliveryHandlerTests()
     {
-        _handler = new RecordProofOfDeliveryHandler(_proofsOfDelivery, _carrierBookings, _shipments, _files, _time);
+        _handler = new RecordProofOfDeliveryHandler(_proofsOfDelivery, _carrierBookings, _shipments, _files, new ProofOfDeliveryRules(TimeSpan.FromMinutes(5)), _time);
     }
 
     [Fact]
@@ -94,6 +94,89 @@ public sealed class RecordProofOfDeliveryHandlerTests
         var result = await _handler.Handle(Command(), CancellationToken.None);
 
         await AssertRefusedAsync(result, ProofOfDeliveryRefusalCode.ShipmentNotInTransport);
+    }
+
+    [Fact]
+    public async Task Handle_WithOnlyTheCarrierBookingNumber_FindsTheShipmentByIt()
+    {
+        var shipment = Found(ShipmentStatus.Booked);
+        _carrierBookings.SingleOrDefaultAsync(Arg.Is<ConfirmedCarrierBookingByNumberSpec>(s => s.Number == BookingNumber && s.CarrierId == VanDijk), Arg.Any<CancellationToken>())
+            .Returns(ConfirmedBooking(shipment));
+
+        var result = await _handler.Handle(Command(Report(reference: "UNKNOWN") with { CarrierBookingNumber = BookingNumber }), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Handle_ForADeliveryTimeBeyondTheClockSkew_IsRefused()
+    {
+        Found(ShipmentStatus.Delivered);
+
+        var result = await _handler.Handle(Command(Report() with { DeliveryTime = _time.GetUtcNow().AddMinutes(6) }), CancellationToken.None);
+
+        await AssertRefusedAsync(result, ProofOfDeliveryRefusalCode.DeliveryTimeInTheFuture);
+    }
+
+    [Fact]
+    public async Task Handle_ForADeliveryTimeWithinTheClockSkew_RecordsIt()
+    {
+        Found(ShipmentStatus.Delivered);
+
+        var result = await _handler.Handle(Command(Report() with { DeliveryTime = _time.GetUtcNow().AddMinutes(4) }), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(6)]
+    public async Task Handle_ForTooFewOrTooManyFiles_IsRefusedWithFileNotAccepted(int count)
+    {
+        Found(ShipmentStatus.Delivered);
+        var command = new RecordProofOfDeliveryCommand(
+            Report(files: [.. Enumerable.Repeat(Cmr(), count)]), [.. Enumerable.Repeat<ReadOnlyMemory<byte>>(CmrContent, count)], "corr-pod");
+
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        await AssertRefusedAsync(result, ProofOfDeliveryRefusalCode.FileNotAccepted);
+    }
+
+    [Fact]
+    public async Task Handle_ForAFileOver10MB_IsRefusedWithFileNotAccepted()
+    {
+        Found(ShipmentStatus.Delivered);
+        var big = new byte[(10 * 1024 * 1024) + 1];
+        CmrContent.CopyTo(big, 0);
+
+        var result = await _handler.Handle(new RecordProofOfDeliveryCommand(Report(), [big], "corr-pod"), CancellationToken.None);
+
+        await AssertRefusedAsync(result, ProofOfDeliveryRefusalCode.FileNotAccepted);
+    }
+
+    [Fact]
+    public async Task Handle_StoresAFileAsWhatItsContentIs_NotAsWhatTheSenderDeclared()
+    {
+        Found(ShipmentStatus.Delivered);
+        byte[] png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1];
+        var file = new ProofOfDeliveryFile(Guid.NewGuid(), "photo.jpg", "image/jpeg", png.Length);
+
+        var result = await _handler.Handle(new RecordProofOfDeliveryCommand(Report(files: [file]), [png], "corr-pod"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        await _files.Received(1).StoreAsync(Arg.Any<ShipmentNumber>(), Arg.Is<ProofOfDeliveryFile>(stored => stored.ContentType == "image/png"), Arg.Any<ReadOnlyMemory<byte>>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_ForAHeicFileNamedJpg_IsRefusedWithFileNotAccepted()
+    {
+        Found(ShipmentStatus.Delivered);
+        byte[] heic = [0, 0, 0, 0x18, .. "ftypheic"u8];
+        var file = new ProofOfDeliveryFile(Guid.NewGuid(), "photo.jpg", "image/jpeg", heic.Length);
+
+        var result = await _handler.Handle(new RecordProofOfDeliveryCommand(Report(files: [file]), [heic], "corr-pod"), CancellationToken.None);
+
+        await AssertRefusedAsync(result, ProofOfDeliveryRefusalCode.FileNotAccepted);
     }
 
     [Fact]

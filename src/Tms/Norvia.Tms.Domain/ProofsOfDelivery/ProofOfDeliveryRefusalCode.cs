@@ -14,4 +14,10 @@ public enum ProofOfDeliveryRefusalCode
 
     /// <summary>The Proof of delivery lacks a part the Canonical Model requires. A client error.</summary>
     MissingRequiredField,
+
+    /// <summary>The delivery time is in the future, beyond the clock-skew allowance. A client error.</summary>
+    DeliveryTimeInTheFuture,
+
+    /// <summary>The files aren't 1 to 5, each 10 MB or less and a PDF, JPEG or PNG by their content.</summary>
+    FileNotAccepted,
 }

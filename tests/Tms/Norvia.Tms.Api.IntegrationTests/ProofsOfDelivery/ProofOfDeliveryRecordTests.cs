@@ -131,13 +131,174 @@ public sealed class ProofOfDeliveryRecordTests(TmsFixture tms) : IClassFixture<T
     }
 
     [Fact]
-    public async Task Record_WithoutAFile_IsRefused_WithMissingRequiredField()
+    public async Task Record_WithOnlyTheCarrierBookingNumber_FindsTheShipmentByIt()
+    {
+        var (shipmentNumber, number, _) = await tms.BookedShipmentWithNumberAsync(_cancellationToken);
+        var metadata = Metadata("DOES-NOT-MATCH");
+        metadata["carrierBookingNumber"] = number;
+
+        var recorded = await tms.RecordedProofAsync(metadata, [Cmr()], _cancellationToken);
+
+        recorded["shipmentNumber"]!.GetValue<string>().Should().Be(shipmentNumber);
+    }
+
+    [Fact]
+    public async Task Record_ByAnotherCarrierWithTheReferenceOfAShipmentNotItsOwn_IsRefused_WithShipmentNotFound()
     {
         var (_, reference) = await tms.DeliveredShipmentAsync(_cancellationToken);
 
-        var problem = await tms.RecordProofRefusedAsync(Metadata(reference), [], HttpStatusCode.BadRequest, _cancellationToken);
+        var problem = await tms.RecordProofRefusedAsync(
+            Metadata(reference, source: TrackingEventCalls.CarrierSource(PlanningCalls.OtherCarrierId)), [Cmr()], HttpStatusCode.NotFound, _cancellationToken);
+
+        problem["code"]!.GetValue<string>().Should().Be("ShipmentNotFound");
+    }
+
+    [Fact]
+    public async Task Record_ForARejectedCarrierBooking_IsRefused_WithShipmentNotFound()
+    {
+        var (number, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
+        await tms.RejectedAsync(number, PlanningCalls.CarrierId, "NoCapacity", _cancellationToken);
+        var metadata = Metadata("DOES-NOT-MATCH");
+        metadata["carrierBookingNumber"] = number;
+
+        var problem = await tms.RecordProofRefusedAsync(metadata, [Cmr()], HttpStatusCode.NotFound, _cancellationToken);
+
+        problem["code"]!.GetValue<string>().Should().Be("ShipmentNotFound");
+    }
+
+    [Fact]
+    public async Task Record_ForAReleasedShipmentWhoseBookingIsNotConfirmedYet_IsRefused_WithShipmentNotFound()
+    {
+        var (number, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
+        var metadata = Metadata("DOES-NOT-MATCH");
+        metadata["carrierBookingNumber"] = number;
+
+        var problem = await tms.RecordProofRefusedAsync(metadata, [Cmr()], HttpStatusCode.NotFound, _cancellationToken);
+
+        problem["code"]!.GetValue<string>().Should().Be("ShipmentNotFound", "a Released Shipment's booking isn't Confirmed yet, so the Carrier has no booking to find it by");
+    }
+
+    [Fact]
+    public async Task Record_ADeliveryTimeInTheFuture_IsRefused_AndPublishesNothing()
+    {
+        var (_, reference) = await tms.DeliveredShipmentAsync(_cancellationToken);
+        var correlationId = TmsCalls.NewCorrelationId();
+
+        var problem = await tms.RecordProofRefusedAsync(
+            Metadata(reference, deliveryTime: DateTimeOffset.UtcNow.AddHours(1)), [Cmr()], HttpStatusCode.BadRequest, _cancellationToken, correlationId);
+
+        problem["code"]!.GetValue<string>().Should().Be("DeliveryTimeInTheFuture");
+        await TmsFixture.SettleOutboxAsync(_cancellationToken);
+        tms.Published.Where(m => m.CorrelationId == correlationId).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Record_ADeliveryTimeJustAheadOfTheClock_WithinTheSkew_IsAccepted()
+    {
+        var (_, reference) = await tms.DeliveredShipmentAsync(_cancellationToken);
+
+        var deliveryTime = DateTimeOffset.UtcNow.AddMinutes(1);
+
+        var recorded = await tms.RecordedProofAsync(Metadata(reference, deliveryTime: deliveryTime), [Cmr()], _cancellationToken);
+
+        var proof = await CurrentProofAsync(recorded["shipmentNumber"]!.GetValue<string>());
+        DateTimeOffset.Parse(proof["deliveryTime"]!.GetValue<string>(), CultureInfo.InvariantCulture).Should().BeCloseTo(deliveryTime, TimeSpan.FromSeconds(1));
+    }
+
+    [Fact]
+    public async Task Record_WithReservationsButNoRemark_IsRefused_WithMissingRequiredField()
+    {
+        var (_, reference) = await tms.DeliveredShipmentAsync(_cancellationToken);
+        var metadata = Metadata(reference);
+        metadata["condition"] = "Reservations";
+        metadata.Remove("remark");
+
+        var problem = await tms.RecordProofRefusedAsync(metadata, [Cmr()], HttpStatusCode.BadRequest, _cancellationToken);
 
         problem["code"]!.GetValue<string>().Should().Be("MissingRequiredField");
+    }
+
+    [Fact]
+    public async Task Record_WithReservationsAndARemark_IsAccepted()
+    {
+        var (_, reference) = await tms.DeliveredShipmentAsync(_cancellationToken);
+        var metadata = Metadata(reference);
+        metadata["condition"] = "Reservations";
+        metadata["remark"] = "Two pallets damaged";
+
+        var recorded = await tms.RecordedProofAsync(metadata, [Cmr()], _cancellationToken);
+
+        var proof = await CurrentProofAsync(recorded["shipmentNumber"]!.GetValue<string>());
+        proof["condition"]!.GetValue<string>().Should().Be("Reservations");
+        proof["remark"]!.GetValue<string>().Should().Be("Two pallets damaged");
+    }
+
+    private async Task<JsonNode> CurrentProofAsync(string shipmentNumber)
+    {
+        using var response = await tms.GetProofAsync(shipmentNumber, _cancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        return JsonNode.Parse(await response.Content.ReadAsStringAsync(_cancellationToken))!;
+    }
+
+    [Fact]
+    public async Task Record_WithoutAField_IsRefused_WithMissingRequiredField()
+    {
+        var (_, reference) = await tms.DeliveredShipmentAsync(_cancellationToken);
+        var metadata = Metadata(reference);
+        metadata.Remove("receivedBy");
+
+        var problem = await tms.RecordProofRefusedAsync(metadata, [Cmr()], HttpStatusCode.BadRequest, _cancellationToken);
+
+        problem["code"]!.GetValue<string>().Should().Be("MissingRequiredField");
+    }
+
+    public static TheoryData<string, int> BadFileSets => new()
+    {
+        { "none", 0 },
+        { "six", 6 },
+        { "over 10 MB", 1 },
+        { "heic named jpg", 1 },
+    };
+
+    [Theory]
+    [MemberData(nameof(BadFileSets))]
+    public async Task Record_WithFilesThatBreakTheFileRules_IsRefused_WithFileNotAccepted_AndStoresNothing(string kind, int count)
+    {
+        var (shipmentNumber, reference) = await tms.DeliveredShipmentAsync(_cancellationToken);
+        var files = kind switch
+        {
+            "over 10 MB" => [new SentFile("big.pdf", "application/pdf", [.. "%PDF-"u8, .. new byte[(10 * 1024 * 1024) + 1]])],
+            "heic named jpg" => [new SentFile("photo.jpg", "image/jpeg", [0, 0, 0, 0x18, .. "ftypheic"u8, .. new byte[64]])],
+            _ => Enumerable.Range(0, count).Select(i => Cmr($"cmr-{i}.pdf")).ToList(),
+        };
+
+        var problem = await tms.RecordProofRefusedAsync(Metadata(reference), files, HttpStatusCode.BadRequest, _cancellationToken);
+
+        problem["code"]!.GetValue<string>().Should().Be("FileNotAccepted");
+        using var current = await tms.GetProofAsync(shipmentNumber, _cancellationToken);
+        current.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Record_FiveFiles_AreAccepted()
+    {
+        var (_, reference) = await tms.DeliveredShipmentAsync(_cancellationToken);
+
+        var recorded = await tms.RecordedProofAsync(Metadata(reference), [.. Enumerable.Range(0, 5).Select(i => Cmr($"cmr-{i}.pdf"))], _cancellationToken);
+
+        recorded["numberOfFiles"]!.GetValue<int>().Should().Be(5);
+    }
+
+    [Fact]
+    public async Task Record_APngNamedJpgAndDeclaredAsJpeg_IsKeptAsThePngItIs()
+    {
+        var (shipmentNumber, reference) = await tms.DeliveredShipmentAsync(_cancellationToken);
+        byte[] png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, .. new byte[16]];
+
+        await tms.RecordedProofAsync(Metadata(reference), [new SentFile("a.jpg", "image/jpeg", png)], _cancellationToken);
+
+        var proof = await CurrentProofAsync(shipmentNumber);
+        proof["files"]!.AsArray().Should().ContainSingle().Which!["contentType"]!.GetValue<string>().Should().Be("image/png");
     }
 
     [Fact]

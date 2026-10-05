@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
+using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Carriers;
 using Norvia.Tms.Domain.ProofsOfDelivery;
 using Norvia.Tms.Domain.TrackingEvents;
@@ -139,9 +140,9 @@ internal static class ProofOfDeliveryReader
             found.Add(Missing($"'{metadata.Condition}' isn't a condition the TMS knows: Clean or Reservations."));
         }
 
-        if (files.Count == 0)
+        if (condition == DeliveryCondition.Reservations && string.IsNullOrWhiteSpace(metadata.Remark))
         {
-            found.Add(Missing("A Proof of delivery needs at least one file, in a 'files' part."));
+            found.Add(Missing("A Proof of delivery with reservations needs a remark."));
         }
 
         if (found.Count > 0
@@ -156,7 +157,7 @@ internal static class ProofOfDeliveryReader
             return false;
         }
 
-        report = new ProofOfDeliveryReport(source, documentId, reference, receivedBy, deliveryTime, place, knownCondition, metadata.Remark, files);
+        report = new ProofOfDeliveryReport(source, documentId, reference, receivedBy, deliveryTime, place, knownCondition, metadata.Remark, files, CarrierBookingNumber.TryParse(metadata.CarrierBookingNumber, out var number) ? number : null);
         return true;
     }
 
