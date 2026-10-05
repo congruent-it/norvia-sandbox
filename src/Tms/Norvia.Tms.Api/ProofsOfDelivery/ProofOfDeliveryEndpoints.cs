@@ -55,10 +55,16 @@ public static class ProofOfDeliveryEndpoints
             .WithName("GetShipmentProofOfDelivery")
             .WithSummary("Read a Shipment's current Proof of delivery: who signed, when and where, the condition and its files.");
 
+        proofsOfDelivery.MapGet("/shipments/{shipmentNumber}/proofs-of-delivery", ListAsync)
+            .RequireAuthorization()
+            .WithName("ListShipmentProofsOfDelivery")
+            .WithSummary("Read every Proof of delivery of a Shipment for its timeline, current and superseded, in delivery-time order.")
+            .WithDescription("Each shows who signed, when and where, the condition, the remark and its files, and whether it is the current one.");
+
         proofsOfDelivery.MapGet("/shipments/{shipmentNumber}/proof-of-delivery/files/{fileId:guid}", GetFileAsync)
             .RequireAuthorization()
             .WithName("GetShipmentProofOfDeliveryFile")
-            .WithSummary("Read one file of a Shipment's current Proof of delivery, with the content type it was sent with.");
+            .WithSummary("Read one file of a Shipment's Proofs of delivery, current or superseded, with the content type it was sent with.");
 
         return app;
     }
@@ -125,6 +131,17 @@ public static class ProofOfDeliveryEndpoints
         var result = await mediator.Send(new GetProofOfDeliveryQuery(shipmentNumber), cancellationToken);
         return result.Status == ResultStatus.NotFound
             ? TypedResults.Problem(statusCode: StatusCodes.Status404NotFound, title: $"Shipment {shipmentNumber} has no Proof of delivery.")
+            : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<IReadOnlyList<ProofOfDeliveryView>>, ProblemHttpResult>> ListAsync(
+        string shipmentNumber,
+        IMediator mediator,
+        CancellationToken cancellationToken)
+    {
+        var result = await mediator.Send(new GetProofsOfDeliveryTimelineQuery(shipmentNumber), cancellationToken);
+        return result.Status == ResultStatus.NotFound
+            ? TypedResults.Problem(statusCode: StatusCodes.Status404NotFound, title: $"Shipment {shipmentNumber} not found.")
             : TypedResults.Ok(result.Value);
     }
 

@@ -9,6 +9,7 @@ using Norvia.Tms.Application.UnitTests.TransportOrders;
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Carriers;
 using Norvia.Tms.Domain.Shipments;
+using Norvia.Tms.Domain.ProofsOfDelivery;
 using Norvia.Tms.Domain.Shippers;
 using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.TransportOrders;
@@ -25,12 +26,14 @@ public sealed class TrackingQueriesTests
     private readonly IReadRepository<Shipment> _shipments = Substitute.For<IReadRepository<Shipment>>();
     private readonly IReadRepository<TrackingEvent> _events = Substitute.For<IReadRepository<TrackingEvent>>();
     private readonly IReadRepository<TransportOrder> _orders = Substitute.For<IReadRepository<TransportOrder>>();
+    private readonly IReadRepository<ProofOfDelivery> _proofsOfDelivery = Substitute.For<IReadRepository<ProofOfDelivery>>();
     private readonly ICarrierDirectory _carriers = Substitute.For<ICarrierDirectory>();
     private readonly FakeTimeProvider _time = new(Samples.Now);
     private readonly List<TransportOrder> _allOrders = [];
 
     public TrackingQueriesTests()
     {
+        _proofsOfDelivery.ListAsync(Arg.Any<CurrentProofsOfDeliveryForShipmentsSpec>(), Arg.Any<CancellationToken>()).Returns([]);
         _carriers.Find(VanDijk).Returns(new Carrier(VanDijk, "Van Dijk Transport", true));
         _events.ListAsync(Arg.Any<TrackingEventsForShipmentsSpec>(), Arg.Any<CancellationToken>()).Returns([]);
         _orders.ListAsync(Arg.Any<TransportOrdersByNumbersSpec>(), Arg.Any<CancellationToken>()).Returns(_ => _allOrders);
@@ -55,7 +58,7 @@ public sealed class TrackingQueriesTests
         var listed = await InProgressHandler().Handle(new ListShipmentsInProgressQuery(), CancellationToken.None);
 
         listed.Should().ContainSingle().Which.Should().Be(new ShipmentInProgressSummary(
-            "SH-0000012", new CarriedByView(AssignedTo.Carrier, new CarrierView("CAR-0001", "Van Dijk Transport")), ShipmentStatus.Booked, null, Latest, false));
+            "SH-0000012", new CarriedByView(AssignedTo.Carrier, new CarrierView("CAR-0001", "Van Dijk Transport")), ShipmentStatus.Booked, null, Latest, false, false));
     }
 
     [Fact]
@@ -161,6 +164,19 @@ public sealed class TrackingQueriesTests
     }
 
     [Fact]
+    public async Task ListInProgress_MarksOnlyTheShipmentsWithACurrentProofOfDelivery()
+    {
+        var first = Booked(sequence: 12, orderSequence: 7);
+        var second = Booked(sequence: 13, orderSequence: 8);
+        _shipments.ListAsync(Arg.Any<ShipmentsInProgressSpec>(), Arg.Any<CancellationToken>()).Returns([first, second]);
+        _proofsOfDelivery.ListAsync(Arg.Any<CurrentProofsOfDeliveryForShipmentsSpec>(), Arg.Any<CancellationToken>()).Returns([second.Id]);
+
+        var listed = await InProgressHandler().Handle(new ListShipmentsInProgressQuery(), CancellationToken.None);
+
+        listed.Select(summary => summary.HasProofOfDelivery).Should().Equal(false, true);
+    }
+
+    [Fact]
     public async Task Timeline_ListsTheEventsAsTheSpecOrdersThem_WithArrivalAndWhetherEachMovedTheStatus()
     {
         var shipment = Booked(sequence: 12);
@@ -202,7 +218,7 @@ public sealed class TrackingQueriesTests
         result.Status.Should().Be(ResultStatus.NotFound);
     }
 
-    private ListShipmentsInProgressHandler InProgressHandler() => new(_shipments, _events, _orders, _carriers, new ShipmentStaleRules(TimeSpan.FromHours(2), TimeSpan.FromHours(24), TimeSpan.FromHours(2)), _time);
+    private ListShipmentsInProgressHandler InProgressHandler() => new(_shipments, _events, _orders, _proofsOfDelivery, _carriers, new ShipmentStaleRules(TimeSpan.FromHours(2), TimeSpan.FromHours(24), TimeSpan.FromHours(2)), _time);
 
     private GetTrackingTimelineHandler TimelineHandler() => new(_shipments, _events);
 

@@ -18,8 +18,9 @@ public sealed class GetProofOfDeliveryFileHandler(
 
         if (!ShipmentNumber.TryParse(query.ShipmentNumber, out var number)
             || await shipments.FirstOrDefaultAsync(new ShipmentByNumberSpec(number), cancellationToken) is not { } shipment
-            || await proofsOfDelivery.SingleOrDefaultAsync(new CurrentProofOfDeliverySpec(shipment.Id), cancellationToken) is not { } proofOfDelivery
-            || proofOfDelivery.Files.FirstOrDefault(file => file.Id == query.FileId) is not { } file
+            || (await proofsOfDelivery.ListAsync(new ProofsOfDeliveryForShipmentSpec(shipment.Id), cancellationToken))
+                .SelectMany(proofOfDelivery => proofOfDelivery.Files)
+                .FirstOrDefault(file => file.Id == query.FileId) is not { } file
             || await files.OpenReadAsync(shipment.Number, file, cancellationToken) is not { } content)
         {
             return Result.NotFound();
