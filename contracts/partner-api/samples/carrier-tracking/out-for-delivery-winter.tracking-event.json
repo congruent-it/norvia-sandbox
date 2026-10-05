@@ -1,0 +1,11 @@
+{
+  "eventId": "VDT-EVT-1002",
+  "source": { "type": "Carrier", "carrierId": "CAR-0001" },
+  "carrierBookingReference": "VDT-77812",
+  "carrierBookingNumber": "CB-0000042",
+  "type": "OutForDelivery",
+  "eventTime": "2030-12-10T07:30:00+00:00",
+  "location": { "place": "London", "postcode": "EC1A 1BB", "countryCode": "GB" },
+  "eta": "2030-12-10T11:00:00+00:00",
+  "remark": "Driver has the consignee's gate code"
+}

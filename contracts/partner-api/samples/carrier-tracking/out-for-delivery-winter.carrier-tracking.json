@@ -1,0 +1,12 @@
+{
+  "bookingRef": "VDT-77812",
+  "carrierBookingNumber": "CB-0000042",
+  "eventId": "VDT-EVT-1002",
+  "statusCode": "OFD",
+  "eventTime": "2030-12-10T07:30:00",
+  "place": "London",
+  "postcode": "EC1A 1BB",
+  "country": "GBR",
+  "eta": "2030-12-10T11:00:00",
+  "remark": "Driver has the consignee's gate code"
+}
