@@ -41,7 +41,9 @@ public sealed class ProofOfDeliveryPlannerQueryTests(TmsFixture tms) : IClassFix
         clearer["remark"] = "One pallet damaged";
         await tms.RecordedProofAsync(clearer, [clear], _cancellationToken);
 
-        var timeline = await tms.GetProofsOnTimelineAsync(shipmentNumber, _cancellationToken);
+        var shipmentTimeline = await tms.GetTimelineAsync(shipmentNumber, _cancellationToken);
+        shipmentTimeline["trackingEvents"]!.AsArray().Select(entry => entry!["type"]!.GetValue<string>()).Should().Equal("Delivered");
+        var timeline = shipmentTimeline["proofsOfDelivery"]!.AsArray();
 
         timeline.Select(proof => proof!["isCurrent"]!.GetValue<bool>()).Should().Equal(false, true);
         var (superseded, current) = (timeline[0]!, timeline[1]!);
@@ -67,7 +69,7 @@ public sealed class ProofOfDeliveryPlannerQueryTests(TmsFixture tms) : IClassFix
         var (shipmentNumber, _) = await tms.BookedShipmentAsync(_cancellationToken);
 
         (await tms.GetProofsOnTimelineAsync(shipmentNumber, _cancellationToken)).Should().BeEmpty();
-        using var unknown = await tms.Tms.GetAsync(new Uri("/v1/shipments/SH-9999999/proofs-of-delivery", UriKind.Relative), _cancellationToken);
+        using var unknown = await tms.Tms.GetAsync(new Uri("/v1/shipments/SH-9999999/tracking-events", UriKind.Relative), _cancellationToken);
         unknown.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 

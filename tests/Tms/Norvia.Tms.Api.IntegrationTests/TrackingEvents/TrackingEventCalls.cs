@@ -114,12 +114,16 @@ internal static class TrackingEventCalls
     }
 
     /// <summary>A Shipment's Tracking events in event-time order, from the query API.</summary>
-    public static async Task<JsonArray> GetTrackingTimelineAsync(this TmsFixture tms, string shipmentNumber, CancellationToken cancellationToken)
+    public static async Task<JsonArray> GetTrackingTimelineAsync(this TmsFixture tms, string shipmentNumber, CancellationToken cancellationToken) =>
+        (await tms.GetTimelineAsync(shipmentNumber, cancellationToken))["trackingEvents"]!.AsArray();
+
+    /// <summary>A Shipment's timeline, with its Tracking events and its Proofs of delivery, from the query API.</summary>
+    public static async Task<JsonNode> GetTimelineAsync(this TmsFixture tms, string shipmentNumber, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(tms);
         using var response = await tms.Tms.GetAsync(new Uri($"/v1/shipments/{shipmentNumber}/tracking-events", UriKind.Relative), cancellationToken);
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         response.StatusCode.Should().Be(HttpStatusCode.OK, body);
-        return JsonNode.Parse(body)!.AsArray();
+        return JsonNode.Parse(body)!;
     }
 }

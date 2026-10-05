@@ -110,43 +110,6 @@ public sealed class ReadProofOfDeliveryHandlerTests
         result.Value.Should().Be(new ProofOfDeliveryFileContent("cmr.pdf", "application/pdf", content));
     }
 
-    [Fact]
-    public async Task Timeline_ListsEveryProofOfDelivery_FlaggingTheCurrentOne()
-    {
-        var superseded = ProofOfDelivery.Record(_shipment, Report(), new CorrelationId("corr-1"), new DateTimeOffset(2026, 9, 26, 8, 0, 0, TimeSpan.Zero));
-        var current = ProofOfDelivery.Record(_shipment, Report(documentId: "doc-2"), new CorrelationId("corr-2"), new DateTimeOffset(2026, 9, 26, 9, 0, 0, TimeSpan.Zero), superseded);
-        _proofsOfDelivery.ListAsync(Arg.Any<ProofsOfDeliveryForShipmentSpec>(), Arg.Any<CancellationToken>()).Returns([superseded, current]);
-
-        var result = await new GetProofsOfDeliveryTimelineHandler(_shipments, _proofsOfDelivery)
-            .Handle(new GetProofsOfDeliveryTimelineQuery("SH-0000012"), CancellationToken.None);
-
-        result.Value.Select(view => (view.DocumentId, view.IsCurrent)).Should().Equal(("doc-1", false), ("doc-2", true));
-        result.Value.Should().OnlyContain(view => view.Files.Count == 1 && view.ReceivedBy == "J. Becker");
-    }
-
-    [Fact]
-    public async Task Timeline_ForAShipmentWithNoProofOfDelivery_IsEmpty()
-    {
-        _proofsOfDelivery.ListAsync(Arg.Any<ProofsOfDeliveryForShipmentSpec>(), Arg.Any<CancellationToken>()).Returns([]);
-
-        var result = await new GetProofsOfDeliveryTimelineHandler(_shipments, _proofsOfDelivery)
-            .Handle(new GetProofsOfDeliveryTimelineQuery("SH-0000012"), CancellationToken.None);
-
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Should().BeEmpty();
-    }
-
-    [Theory]
-    [InlineData("not-a-number")]
-    [InlineData("SH-0000099")]
-    public async Task Timeline_ForAShipmentThatDoesNotExist_IsNotFound(string shipmentNumber)
-    {
-        var result = await new GetProofsOfDeliveryTimelineHandler(_shipments, _proofsOfDelivery)
-            .Handle(new GetProofsOfDeliveryTimelineQuery(shipmentNumber), CancellationToken.None);
-
-        result.Status.Should().Be(ResultStatus.NotFound);
-    }
-
     private GetProofOfDeliveryFileHandler Handler() => new(_shipments, _proofsOfDelivery, _files);
 
     private ProofOfDelivery HasCurrent()

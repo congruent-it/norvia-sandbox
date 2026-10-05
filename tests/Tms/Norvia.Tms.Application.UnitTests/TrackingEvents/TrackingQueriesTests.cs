@@ -34,6 +34,7 @@ public sealed class TrackingQueriesTests
     public TrackingQueriesTests()
     {
         _proofsOfDelivery.ListAsync(Arg.Any<CurrentProofsOfDeliveryForShipmentsSpec>(), Arg.Any<CancellationToken>()).Returns([]);
+        _proofsOfDelivery.ListAsync(Arg.Any<ProofsOfDeliveryForShipmentSpec>(), Arg.Any<CancellationToken>()).Returns([]);
         _carriers.Find(VanDijk).Returns(new Carrier(VanDijk, "Van Dijk Transport", true));
         _events.ListAsync(Arg.Any<TrackingEventsForShipmentsSpec>(), Arg.Any<CancellationToken>()).Returns([]);
         _orders.ListAsync(Arg.Any<TransportOrdersByNumbersSpec>(), Arg.Any<CancellationToken>()).Returns(_ => _allOrders);
@@ -188,11 +189,30 @@ public sealed class TrackingQueriesTests
         var result = await TimelineHandler().Handle(new GetTrackingTimelineQuery("SH-0000012"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
-        result.Value.Should().Equal(
+        result.Value.TrackingEvents.Should().Equal(
             new TrackingTimelineEntry(
                 TrackingEventType.Collected, Samples.Now.AddHours(1), "Rotterdam", "3011 AA", "NL", Samples.Now.AddDays(2), "Collected", Samples.Now.AddHours(2), true),
             new TrackingTimelineEntry(
                 TrackingEventType.Collected, Samples.Now.AddHours(2), "Rotterdam", "3011 AA", "NL", null, "Collected", Samples.Now.AddHours(2), false));
+    }
+
+    [Fact]
+    public async Task Timeline_AlsoListsEachProofOfDelivery_CurrentAndSuperseded_AsTheSpecOrdersThem()
+    {
+        var shipment = Booked(sequence: 12);
+        _shipments.FirstOrDefaultAsync(Arg.Any<ShipmentByNumberSpec>(), Arg.Any<CancellationToken>()).Returns(shipment);
+        _events.ListAsync(Arg.Any<TrackingTimelineSpec>(), Arg.Any<CancellationToken>()).Returns([]);
+        var report = new ProofOfDeliveryReport(
+            ProofOfDeliverySource.Carrier(VanDijk), "doc-1", "VDT-1", "J. Becker", Samples.Now.AddHours(-3), new TrackingLocation("Rotterdam", "3011 AA", "NL"),
+            DeliveryCondition.Clean, null, [new ProofOfDeliveryFile(Guid.NewGuid(), "cmr.pdf", "application/pdf", 4)]);
+        var superseded = ProofOfDelivery.Record(shipment, report, new CorrelationId("corr-1"), Samples.Now);
+        var current = ProofOfDelivery.Record(shipment, report with { DocumentId = "doc-2", ReceivedBy = "A. Schmidt" }, new CorrelationId("corr-2"), Samples.Now.AddHours(1), superseded);
+        _proofsOfDelivery.ListAsync(Arg.Is<ProofsOfDeliveryForShipmentSpec>(spec => spec.ShipmentId == shipment.Id), Arg.Any<CancellationToken>()).Returns([superseded, current]);
+
+        var result = await TimelineHandler().Handle(new GetTrackingTimelineQuery("SH-0000012"), CancellationToken.None);
+
+        result.Value.ProofsOfDelivery.Select(proof => (proof.DocumentId, proof.ReceivedBy, proof.IsCurrent, proof.Files.Count))
+            .Should().Equal(("doc-1", "J. Becker", false, 1), ("doc-2", "A. Schmidt", true, 1));
     }
 
     [Fact]
@@ -203,7 +223,8 @@ public sealed class TrackingQueriesTests
 
         var result = await TimelineHandler().Handle(new GetTrackingTimelineQuery("SH-0000012"), CancellationToken.None);
 
-        result.Value.Should().BeEmpty();
+        result.Value.TrackingEvents.Should().BeEmpty();
+        result.Value.ProofsOfDelivery.Should().BeEmpty();
     }
 
     [Theory]
@@ -220,7 +241,7 @@ public sealed class TrackingQueriesTests
 
     private ListShipmentsInProgressHandler InProgressHandler() => new(_shipments, _events, _orders, _proofsOfDelivery, _carriers, new ShipmentStaleRules(TimeSpan.FromHours(2), TimeSpan.FromHours(24), TimeSpan.FromHours(2)), _time);
 
-    private GetTrackingTimelineHandler TimelineHandler() => new(_shipments, _events);
+    private GetTrackingTimelineHandler TimelineHandler() => new(_shipments, _events, _proofsOfDelivery);
 
     private static TrackingEvent Report(
         Shipment shipment, TrackingEventType type, string id, DateTimeOffset eventTime, DateTimeOffset receivedAt, DateTimeOffset? eta) =>

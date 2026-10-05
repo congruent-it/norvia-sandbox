@@ -65,7 +65,7 @@ public sealed class TransportOrderQueriesTests : IDisposable
     public async Task FindTrackingTimelineAsync_AKnownShipment_ReturnsItsTimeline()
     {
         IReadOnlyList<TrackingTimelineEntry> timeline = [];
-        _mediator.Send(new GetTrackingTimelineQuery("SH-0000012"), Arg.Any<CancellationToken>()).Returns(Result.Success(timeline));
+        _mediator.Send(new GetTrackingTimelineQuery("SH-0000012"), Arg.Any<CancellationToken>()).Returns(Result.Success(new ShipmentTimeline(timeline, [])));
 
         var found = await _queries.FindTrackingTimelineAsync("SH-0000012", Xunit.TestContext.Current.CancellationToken);
 
@@ -75,7 +75,7 @@ public sealed class TransportOrderQueriesTests : IDisposable
     [Fact]
     public async Task FindTrackingTimelineAsync_AnUnknownShipment_ReturnsNull()
     {
-        _mediator.Send(new GetTrackingTimelineQuery("SH-0000999"), Arg.Any<CancellationToken>()).Returns(Result<IReadOnlyList<TrackingTimelineEntry>>.NotFound());
+        _mediator.Send(new GetTrackingTimelineQuery("SH-0000999"), Arg.Any<CancellationToken>()).Returns(Result<ShipmentTimeline>.NotFound());
 
         var found = await _queries.FindTrackingTimelineAsync("SH-0000999", Xunit.TestContext.Current.CancellationToken);
 

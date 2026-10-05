@@ -54,7 +54,7 @@ internal sealed class TransportOrderQueries(IServiceScopeFactory scopes) : ITran
         SendAsync(new ListShipmentsInProgressQuery(), cancellationToken);
 
     public async Task<IReadOnlyList<TrackingTimelineEntry>?> FindTrackingTimelineAsync(string shipmentNumber, CancellationToken cancellationToken) =>
-        FoundOrNull(await SendAsync(new GetTrackingTimelineQuery(shipmentNumber), cancellationToken), $"the Tracking timeline of Shipment {shipmentNumber}");
+        FoundOrNull(await SendAsync(new GetTrackingTimelineQuery(shipmentNumber), cancellationToken), $"the timeline of Shipment {shipmentNumber}")?.TrackingEvents;
 
     private async Task<TResponse> SendAsync<TResponse>(IQuery<TResponse> query, CancellationToken cancellationToken)
     {

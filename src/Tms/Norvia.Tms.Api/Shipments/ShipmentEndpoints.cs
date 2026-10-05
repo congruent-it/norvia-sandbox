@@ -64,8 +64,11 @@ public static class ShipmentEndpoints
         shipments.MapGet("/{shipmentNumber}/tracking-events", GetTrackingTimelineAsync)
             .RequireAuthorization()
             .WithName("GetShipmentTrackingTimeline")
-            .WithSummary("Read what the Carriers reported for a Shipment: its Tracking events in event-time order.")
-            .WithDescription("Each event shows its type, time, place, ETA and remark, when the TMS received it, and whether it moved the Shipment's status.");
+            .WithSummary("Read a Shipment's timeline: what the Carriers reported, and the Proofs of delivery that came in.")
+            .WithDescription(
+                "trackingEvents are in event-time order: each shows its type, time, place, ETA and remark, when the TMS received it, and whether it moved the "
+                + "Shipment's status. proofsOfDelivery are in delivery-time order, current and superseded: each shows who received, the delivery time, "
+                + "condition, remark and its files, which are read through the Proof of delivery file call, and whether it is the current one.");
 
         shipments.MapGet("/{shipmentNumber}", GetAsync)
             .RequireAuthorization()
@@ -179,7 +182,7 @@ public static class ShipmentEndpoints
         CancellationToken cancellationToken) =>
         TypedResults.Ok(await mediator.Send(new ListShipmentsInProgressQuery(), cancellationToken));
 
-    private static async Task<Results<Ok<IReadOnlyList<TrackingTimelineEntry>>, ProblemHttpResult>> GetTrackingTimelineAsync(
+    private static async Task<Results<Ok<ShipmentTimeline>, ProblemHttpResult>> GetTrackingTimelineAsync(
         string shipmentNumber,
         IMediator mediator,
         CancellationToken cancellationToken)

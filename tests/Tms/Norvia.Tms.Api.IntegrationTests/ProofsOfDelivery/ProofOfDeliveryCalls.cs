@@ -99,15 +99,9 @@ internal static class ProofOfDeliveryCalls
         return await tms.Tms.GetAsync(new Uri($"/v1/shipments/{shipmentNumber}/proof-of-delivery/files/{fileId}", UriKind.Relative), cancellationToken);
     }
 
-    /// <summary>Every Proof of delivery of a Shipment, current and superseded, for its timeline, from the API.</summary>
-    public static async Task<JsonArray> GetProofsOnTimelineAsync(this TmsFixture tms, string shipmentNumber, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(tms);
-        using var response = await tms.Tms.GetAsync(new Uri($"/v1/shipments/{shipmentNumber}/proofs-of-delivery", UriKind.Relative), cancellationToken);
-        var body = await response.Content.ReadAsStringAsync(cancellationToken);
-        response.StatusCode.Should().Be(HttpStatusCode.OK, body);
-        return JsonNode.Parse(body)!.AsArray();
-    }
+    /// <summary>Every Proof of delivery on a Shipment's timeline, current and superseded, from the API.</summary>
+    public static async Task<JsonArray> GetProofsOnTimelineAsync(this TmsFixture tms, string shipmentNumber, CancellationToken cancellationToken) =>
+        (await tms.GetTimelineAsync(shipmentNumber, cancellationToken))["proofsOfDelivery"]!.AsArray();
 
     /// <summary>The Delivered Shipments without a current Proof of delivery, from the API.</summary>
     public static async Task<JsonArray> ListDeliveredWithoutProofAsync(this TmsFixture tms, CancellationToken cancellationToken)
