@@ -102,4 +102,24 @@ internal static class TrackingEventCalls
         confirmed["shipmentStatus"]!.GetValue<string>().Should().Be("Booked");
         return (shipmentNumber, carrierBookingNumber, reference);
     }
+
+    /// <summary>The Shipments on their way, from the query API.</summary>
+    public static async Task<JsonArray> ListShipmentsInProgressAsync(this TmsFixture tms, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(tms);
+        using var response = await tms.Tms.GetAsync(new Uri("/v1/shipments/in-progress", UriKind.Relative), cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, body);
+        return JsonNode.Parse(body)!.AsArray();
+    }
+
+    /// <summary>A Shipment's Tracking events in event-time order, from the query API.</summary>
+    public static async Task<JsonArray> GetTrackingTimelineAsync(this TmsFixture tms, string shipmentNumber, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(tms);
+        using var response = await tms.Tms.GetAsync(new Uri($"/v1/shipments/{shipmentNumber}/tracking-events", UriKind.Relative), cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, body);
+        return JsonNode.Parse(body)!.AsArray();
+    }
 }
