@@ -44,5 +44,6 @@ public sealed class PersonaChoiceTests
     {
         PersonaChoice.NewBookingPath("brouwer-dranken").Should().Be("/personas/brouwer-dranken/bookings/new");
         PersonaChoice.BookingsPath("brouwer-dranken").Should().Be("/personas/brouwer-dranken/bookings");
+        PersonaChoice.ShipmentsPath("van-dijk-transport").Should().Be("/personas/van-dijk-transport/shipments");
     }
 }

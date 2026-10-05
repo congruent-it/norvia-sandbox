@@ -21,6 +21,8 @@ public static class PersonaChoice
 
     public static string BookingRequestsPath(string personaId) => $"/personas/{Uri.EscapeDataString(personaId)}/booking-requests";
 
+    public static string ShipmentsPath(string personaId) => $"/personas/{Uri.EscapeDataString(personaId)}/shipments";
+
     /// <summary>Where a Persona's work starts: a Shipper books a transport, a Carrier opens its inbox.</summary>
     public static string HomePath(PersonaView persona)
     {

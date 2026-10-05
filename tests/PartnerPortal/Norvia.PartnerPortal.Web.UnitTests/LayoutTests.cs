@@ -33,6 +33,7 @@ public sealed class LayoutTests : PortalWebContext
             .Add(component => component.Body, (RenderFragment)(builder => builder.AddContent(0, "the page"))));
 
         layout.FindAll("nav a").Select(link => link.GetAttribute("href")).Should().Contain("/personas/van-dijk-transport/booking-requests")
+            .And.Contain("/personas/van-dijk-transport/shipments")
             .And.NotContain("/personas/van-dijk-transport/bookings/new");
         layout.Find("button[aria-pressed=true]").TextContent.Trim().Should().Be("Van Dijk Transport");
     }

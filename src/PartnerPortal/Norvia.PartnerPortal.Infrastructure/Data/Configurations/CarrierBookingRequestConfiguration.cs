@@ -34,6 +34,8 @@ internal sealed class CarrierBookingRequestConfiguration : IEntityTypeConfigurat
         builder.Property(request => request.AnswerCorrelationId).HasMaxLength(200);
         builder.Property(request => request.CarrierBookingReference).HasMaxLength(200);
         builder.Property(request => request.RejectionReason).HasConversion<string>().HasMaxLength(30);
+        builder.Property(request => request.LastProgress).HasConversion<string>().HasMaxLength(30);
+        builder.Ignore(request => request.Stage);
         builder.Property(request => request.RejectionText).HasMaxLength(1000);
 
         // The automatic answer the request arrived with: the policy then in force, which later changes to it don't touch.

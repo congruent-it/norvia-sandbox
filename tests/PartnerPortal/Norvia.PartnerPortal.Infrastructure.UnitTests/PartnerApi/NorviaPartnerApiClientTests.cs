@@ -541,6 +541,101 @@ public sealed class NorviaPartnerApiClientTests : IDisposable
         await answer.Should().ThrowAsync<ArgumentNullException>();
     }
 
+    private static readonly CarrierTrackingEvent Delivered = new(
+        "evt-1", "VDT-77812", "CB-0000042", TrackingEventType.Delivered, new DateTimeOffset(2030, 7, 2, 10, 15, 30, TimeSpan.Zero), "Utrecht", "3511 AW", "NLD");
+
+    private Task<TrackingReply> SubmitTrackingAsync() =>
+        _client.SubmitTrackingAsync(Samples.VanDijkTransport, "SH-0000007", Delivered, CancellationToken.None);
+
+    [Fact]
+    public async Task SubmitTrackingAsync_PostsTheEventToCarrierTracking_AsThePersona_InTheCarrierTrackingFormat()
+    {
+        _tokens.GetTokenAsync(Samples.VanDijkTransport.Id, Arg.Any<CancellationToken>()).Returns("van-dijk-token");
+        _partnerApi.Answer(HttpStatusCode.Accepted, """{ "messageId": "corr-7" }""", "corr-7");
+
+        await SubmitTrackingAsync();
+
+        _partnerApi.Request!.Method.Should().Be(HttpMethod.Post);
+        _partnerApi.Request.RequestUri.Should().Be(new Uri("https://apim.example/partner/v1/carrier-tracking"));
+        _partnerApi.Request.Headers.GetValues("Ocp-Apim-Subscription-Key").Should().Equal("van-dijk-key");
+        _partnerApi.Request.Headers.Authorization!.Parameter.Should().Be("van-dijk-token");
+        var sent = JsonNode.Parse(_partnerApi.RequestBody!);
+        Contracts.CarrierTrackingSchemaErrors(sent).Should().BeEmpty();
+        sent!["statusCode"]!.GetValue<string>().Should().Be("POD");
+        sent["eventId"]!.GetValue<string>().Should().Be("evt-1");
+    }
+
+    [Fact]
+    public async Task SubmitTrackingAsync_202_IsAccepted_WithNorviasMessageId()
+    {
+        _tokens.GetTokenAsync(Samples.VanDijkTransport.Id, Arg.Any<CancellationToken>()).Returns("van-dijk-token");
+        _partnerApi.Answer(HttpStatusCode.Accepted, """{ "messageId": "corr-7" }""");
+
+        (await SubmitTrackingAsync()).Should().Be(TrackingReply.Accepted("corr-7"));
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Forbidden, """{ "messageId": "corr-8", "text": "Not a Carrier." }""", "Not a Carrier.")]
+    [InlineData(HttpStatusCode.Unauthorized, "", PartnerAnswers.UnrecognisedCredentials)]
+    public async Task SubmitTrackingAsync_TheCredentialsRefused_IsRefused(HttpStatusCode status, string body, string text)
+    {
+        _tokens.GetTokenAsync(Samples.VanDijkTransport.Id, Arg.Any<CancellationToken>()).Returns("van-dijk-token");
+        _partnerApi.Answer(status, body, "corr-8");
+
+        var reply = await SubmitTrackingAsync();
+
+        reply.Result.Should().Be(TrackingResult.Refused);
+        reply.Text.Should().Be(text);
+    }
+
+    [Fact]
+    public async Task SubmitTrackingAsync_Unavailable_IsNotReceived()
+    {
+        _tokens.GetTokenAsync(Samples.VanDijkTransport.Id, Arg.Any<CancellationToken>()).Returns("van-dijk-token");
+        _partnerApi.Answer(HttpStatusCode.ServiceUnavailable, "", "corr-9");
+
+        (await SubmitTrackingAsync()).Should().Be(TrackingReply.NotReceived("corr-9"));
+    }
+
+    [Fact]
+    public async Task SubmitTrackingAsync_NorviaUnreachable_IsNotReceived()
+    {
+        _partnerApi.Fail(new HttpRequestException("Connection refused"));
+
+        (await SubmitTrackingAsync()).Should().Be(TrackingReply.NotReceived(null));
+    }
+
+    [Fact]
+    public async Task SubmitTrackingAsync_LogsTheTrackingContractsKeys_AndTheEventsOwnId()
+    {
+        _tokens.GetTokenAsync(Samples.VanDijkTransport.Id, Arg.Any<CancellationToken>()).Returns("van-dijk-token");
+        _partnerApi.Answer(HttpStatusCode.Accepted, """{ "messageId": "corr-7" }""");
+
+        await SubmitTrackingAsync();
+
+        ScopeOf(_logger.LatestRecord).Should().Contain(new Dictionary<string, object?>
+        {
+            ["flow"] = "carrier-tracking",
+            ["partyId"] = "CAR-0001",
+            ["carrierBookingNumber"] = "CB-0000042",
+            ["shipmentNumber"] = "SH-0000007",
+            ["sourceMessageId"] = "evt-1",
+            ["correlationId"] = "corr-7",
+            ["outcome"] = "Succeeded",
+        });
+    }
+
+    [Fact]
+    public async Task SubmitTrackingAsync_SendsTheEventInASpanOfItsOwn()
+    {
+        _tokens.GetTokenAsync(Samples.VanDijkTransport.Id, Arg.Any<CancellationToken>()).Returns("van-dijk-token");
+        _partnerApi.Answer(HttpStatusCode.Accepted, """{ "messageId": "corr-7" }""");
+
+        await SubmitTrackingAsync();
+
+        _spans.Should().ContainSingle().Which.OperationName.Should().Be("Send Tracking event");
+    }
+
     private Task<NorviaAnswer> SubmitAsync(BookingRequest booking) =>
         _client.SubmitAsync(Samples.BrouwerDranken, booking, TestContext.Current.CancellationToken);
 }
