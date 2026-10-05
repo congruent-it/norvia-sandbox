@@ -91,10 +91,10 @@ A Tracking event carries:
 | Status code | Yes |
 | Event time, local to the location | Yes |
 | Location: place, postcode, country | Yes |
-| ETA, local to the delivery address | No |
+| ETA, with its UTC offset | No |
 | Remark | No |
 
-The event time is read in the time zone of the event's location. The Canonical Model carries it with its offset.
+The event time is read in the time zone of the event's location. The Canonical Model carries it with its offset. The ETA is the exception to the local times of the booking format: the message holds no delivery address, so the Carrier sends it with its UTC offset, and it is carried as UTC.
 
 All Carriers use one shared code list:
 

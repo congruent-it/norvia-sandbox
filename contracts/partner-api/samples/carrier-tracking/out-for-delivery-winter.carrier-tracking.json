@@ -7,6 +7,6 @@
   "place": "London",
   "postcode": "EC1A 1BB",
   "country": "GBR",
-  "eta": "2030-12-10T11:00:00",
+  "eta": "2030-12-10T12:00:00+01:00",
   "remark": "Driver has the consignee's gate code"
 }

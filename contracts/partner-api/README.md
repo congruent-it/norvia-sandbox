@@ -166,7 +166,7 @@ The message never names the Carrier: API Management takes it from the token ([AD
 | `eventTime`: local date/time without an offset | `eventTime`: with the offset | Reads it in the time zone of the location's country, daylight saving time included |
 | `place`, `postcode`, `country` | `location.place`, `location.postcode`, `location.countryCode` | Nests the flat fields |
 | `country`: ISO 3166-1 alpha-3 | ISO 3166-1 alpha-2 | Translates the code |
-| `eta`: local date/time without an offset | `eta`: with the offset | The message holds no delivery address, so it reads it in the time zone of the location's country |
+| `eta`: a date and time with its UTC offset, UTC being fine | `eta`: UTC with an offset | Converts it. Unlike the event time it isn't local: the message holds no delivery address to read a local time in. Without an offset it is left out |
 | `remark` | `remark` | Copies it |
 | Anything else, a `carrierId` included | Left out | The Carrier comes from the token alone |
 

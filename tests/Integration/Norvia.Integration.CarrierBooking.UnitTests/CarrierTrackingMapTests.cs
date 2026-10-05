@@ -56,13 +56,20 @@ public sealed class CarrierTrackingMapTests
         Map(Message(eventTime: local, country: country))["eventTime"]!.GetValue<string>().Should().Be(expected);
     }
 
-    [Fact]
-    public void ToTrackingEvent_TheEta_IsReadInTheLocationsTimeZone()
+    [Theory]
+    [InlineData("2030-07-15T16:00:00+02:00", "2030-07-15T14:00:00+00:00")]
+    [InlineData("2030-07-15T16:00:00Z", "2030-07-15T16:00:00+00:00")]
+    public void ToTrackingEvent_TheEtaWithItsOffset_IsEmittedInUtc(string eta, string expected)
     {
-        // The message holds no delivery address, so the location's time zone stands in for it.
-        var tracking = Map(Message(country: "GBR", extra: """, "eta": "2030-07-15T16:00:00" """));
+        var tracking = Map(Message(extra: $$""", "eta": "{{eta}}" """));
 
-        tracking["eta"]!.GetValue<string>().Should().Be("2030-07-15T16:00:00+01:00");
+        tracking["eta"]!.GetValue<string>().Should().Be(expected);
+    }
+
+    [Fact]
+    public void ToTrackingEvent_AnEtaWithoutAnOffset_IsLeftOutAsItNamesNoInstant()
+    {
+        Map(Message(extra: """, "eta": "2030-07-15T16:00:00" """)).ContainsKey("eta").Should().BeFalse();
     }
 
     [Theory]

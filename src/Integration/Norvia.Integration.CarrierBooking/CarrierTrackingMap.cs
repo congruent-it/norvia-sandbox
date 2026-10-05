@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json.Nodes;
 using Norvia.Integration.TransportOrderIntake;
 
@@ -11,8 +12,8 @@ namespace Norvia.Integration.CarrierBooking;
 /// <remarks>
 /// The mapping table lives here, not in the TMS: a status code that isn't in it fails the run. Any other value the map
 /// can't read (a country it doesn't know, a time in another format) is left out, as in the intake map, and the TMS's
-/// Tracking event rules report what is then missing with their stable codes. The message holds no delivery address, so
-/// the ETA is read in the time zone of the event's location.
+/// Tracking event rules report what is then missing with their stable codes. The ETA is the one time that isn't local:
+/// the message holds no delivery address to read it in, so it carries its UTC offset and leaves as UTC.
 /// </remarks>
 public static class CarrierTrackingMap
 {
@@ -58,12 +59,18 @@ public static class CarrierTrackingMap
                 ["postcode"] = Text(message, "postcode"),
                 ["countryCode"] = alpha2,
             }),
-            ["eta"] = LocalTimes.ToLocalOffset(Text(message, "eta"), country),
+            ["eta"] = ToUtc(Text(message, "eta")),
             ["remark"] = Text(message, "remark"),
         };
 
         return WithoutNulls(trackingEvent);
     }
+
+    // Kind says whether the text carried an offset: without one the time is Unspecified, and no instant.
+    private static string? ToUtc(string? time) =>
+        DateTime.TryParse(time, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var instant) && instant.Kind != DateTimeKind.Unspecified
+            ? instant.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'+00:00'", CultureInfo.InvariantCulture)
+            : null;
 
     private static JsonObject WithoutNulls(JsonObject node)
     {
