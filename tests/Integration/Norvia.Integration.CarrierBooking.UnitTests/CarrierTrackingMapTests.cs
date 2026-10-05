@@ -82,6 +82,30 @@ public sealed class CarrierTrackingMapTests
         Map(Message(country: alpha3))["location"]!["countryCode"]!.GetValue<string>().Should().Be(alpha2);
     }
 
+    [Theory]
+    [InlineData("PRT", "1100-148", "2030-07-15T10:00:00+01:00")]
+    [InlineData("PRT", "9500-123", "2030-07-15T10:00:00+00:00")]
+    [InlineData("PRT", "9000-001", "2030-07-15T10:00:00+01:00")]
+    [InlineData("ESP", "28001", "2030-07-15T10:00:00+02:00")]
+    [InlineData("ESP", "35001", "2030-07-15T10:00:00+01:00")]
+    [InlineData("ESP", "38001", "2030-07-15T10:00:00+01:00")]
+    public void ToTrackingEvent_AnIslandRegionInAnotherTimeZone_IsReadInItsOwn(string country, string postcode, string expected)
+    {
+        var tracking = Map($$"""{ "bookingRef": "R-1", "eventId": "E-1", "statusCode": "PU", "eventTime": "2030-07-15T10:00:00", "place": "X", "postcode": "{{postcode}}", "country": "{{country}}" }""");
+
+        tracking["eventTime"]!.GetValue<string>().Should().Be(expected);
+    }
+
+    [Fact]
+    public void StatusCodes_TheMapKnows_AreExactlyTheOnesTheCarrierTrackingSchemaAllows()
+    {
+        // The two lists live apart, so neither may drift from the other.
+        var schema = JsonNode.Parse(Contracts.Read("PartnerApi/carrier-tracking.v1.schema.json"))!;
+        var schemaAllows = schema["properties"]!["statusCode"]!["enum"]!.AsArray().Select(code => code!.GetValue<string>());
+
+        CarrierTrackingMap.StatusCodes.Should().BeEquivalentTo(schemaAllows);
+    }
+
     [Fact]
     public void ToTrackingEvent_TheCarrierIsTheOneOfTheToken_NeverOneThePayloadNames()
     {

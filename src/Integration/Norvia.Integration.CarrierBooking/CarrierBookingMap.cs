@@ -17,7 +17,7 @@ public static class CarrierBookingMap
     /// <returns>The booking request, or null when the text isn't a <c>ShipmentReleased</c> for a Carrier booking.</returns>
     public static JsonObject? ToCarrierBooking(string shipmentReleased)
     {
-        if (Parse(shipmentReleased) is not { } release || Text(release, "carrierBookingNumber") is not { } bookingNumber)
+        if (JsonFields.Parse(shipmentReleased) is not { } release || JsonFields.Text(release, "carrierBookingNumber") is not { } bookingNumber)
         {
             return null;
         }
@@ -25,36 +25,35 @@ public static class CarrierBookingMap
         var transportOrder = release["transportOrder"] as JsonObject;
         var collection = transportOrder?["collection"] as JsonObject;
         var delivery = transportOrder?["delivery"] as JsonObject;
-        var collectionCountry = Countries.Find(Text(collection?["address"] as JsonObject, "country"));
-        var deliveryCountry = Countries.Find(Text(delivery?["address"] as JsonObject, "country"));
+        var collectionCountry = TimeZoneCountry(collection?["address"] as JsonObject);
+        var deliveryCountry = TimeZoneCountry(delivery?["address"] as JsonObject);
 
         var booking = new JsonObject
         {
             ["carrierBookingNumber"] = bookingNumber,
-            ["shipmentNumber"] = Text(release, "shipmentNumber"),
-            ["collectionStreet"] = Text(collection?["address"] as JsonObject, "street"),
-            ["collectionPostcode"] = Text(collection?["address"] as JsonObject, "postcode"),
-            ["collectionCity"] = Text(collection?["address"] as JsonObject, "city"),
+            ["shipmentNumber"] = JsonFields.Text(release, "shipmentNumber"),
+            ["collectionStreet"] = JsonFields.Text(collection?["address"] as JsonObject, "street"),
+            ["collectionPostcode"] = JsonFields.Text(collection?["address"] as JsonObject, "postcode"),
+            ["collectionCity"] = JsonFields.Text(collection?["address"] as JsonObject, "city"),
             ["collectionCountry"] = Alpha3Codes.Of(collectionCountry?.Code),
-            ["collectFrom"] = LocalTimes.FromUtc(Text(collection?["window"] as JsonObject, "earliest"), collectionCountry),
-            ["collectUntil"] = LocalTimes.FromUtc(Text(collection?["window"] as JsonObject, "latest"), collectionCountry),
-            ["deliveryStreet"] = Text(delivery?["address"] as JsonObject, "street"),
-            ["deliveryPostcode"] = Text(delivery?["address"] as JsonObject, "postcode"),
-            ["deliveryCity"] = Text(delivery?["address"] as JsonObject, "city"),
+            ["collectFrom"] = LocalTimes.FromUtc(JsonFields.Text(collection?["window"] as JsonObject, "earliest"), collectionCountry),
+            ["collectUntil"] = LocalTimes.FromUtc(JsonFields.Text(collection?["window"] as JsonObject, "latest"), collectionCountry),
+            ["deliveryStreet"] = JsonFields.Text(delivery?["address"] as JsonObject, "street"),
+            ["deliveryPostcode"] = JsonFields.Text(delivery?["address"] as JsonObject, "postcode"),
+            ["deliveryCity"] = JsonFields.Text(delivery?["address"] as JsonObject, "city"),
             ["deliveryCountry"] = Alpha3Codes.Of(deliveryCountry?.Code),
-            ["deliverFrom"] = LocalTimes.FromUtc(Text(delivery?["window"] as JsonObject, "earliest"), deliveryCountry),
-            ["deliverUntil"] = LocalTimes.FromUtc(Text(delivery?["window"] as JsonObject, "latest"), deliveryCountry),
-            ["consigneeName"] = Text((delivery?["consignee"]) as JsonObject, "name"),
+            ["deliverFrom"] = LocalTimes.FromUtc(JsonFields.Text(delivery?["window"] as JsonObject, "earliest"), deliveryCountry),
+            ["deliverUntil"] = LocalTimes.FromUtc(JsonFields.Text(delivery?["window"] as JsonObject, "latest"), deliveryCountry),
+            ["consigneeName"] = JsonFields.Text((delivery?["consignee"]) as JsonObject, "name"),
             ["goods"] = Goods(transportOrder?["goodsLines"] as JsonArray),
         };
 
-        foreach (var name in booking.Where(property => property.Value is null).Select(property => property.Key).ToList())
-        {
-            booking.Remove(name);
-        }
-
-        return booking;
+        return JsonFields.WithoutNulls(booking);
     }
+
+    /// <summary>The country of an address, as it is at the address's postcode, so its local times are in the right time zone.</summary>
+    private static Country? TimeZoneCountry(JsonObject? address) =>
+        Countries.At(Countries.Find(JsonFields.Text(address, "country")), JsonFields.Text(address, "postcode"));
 
     private static JsonArray? Goods(JsonArray? goodsLines)
     {
@@ -69,36 +68,16 @@ public static class CarrierBookingMap
             var dimensions = line["dimensionsCm"] as JsonObject;
             var item = new JsonObject
             {
-                ["packageType"] = Text(line, "packageType"),
+                ["packageType"] = JsonFields.Text(line, "packageType"),
                 ["quantity"] = line["quantity"]?.DeepClone(),
                 ["weightKg"] = line["weightKg"]?.DeepClone(),
                 ["lengthCm"] = dimensions?["length"]?.DeepClone(),
                 ["widthCm"] = dimensions?["width"]?.DeepClone(),
                 ["heightCm"] = dimensions?["height"]?.DeepClone(),
             };
-            foreach (var name in item.Where(property => property.Value is null).Select(property => property.Key).ToList())
-            {
-                item.Remove(name);
-            }
-
-            goods.Add(item);
+            goods.Add(JsonFields.WithoutNulls(item));
         }
 
         return goods;
     }
-
-    private static JsonObject? Parse(string json)
-    {
-        try
-        {
-            return JsonNode.Parse(json) as JsonObject;
-        }
-        catch (System.Text.Json.JsonException)
-        {
-            return null;
-        }
-    }
-
-    private static string? Text(JsonObject? node, string name) =>
-        node?[name] is JsonValue value && value.TryGetValue<string>(out var text) && !string.IsNullOrWhiteSpace(text) ? text : null;
 }

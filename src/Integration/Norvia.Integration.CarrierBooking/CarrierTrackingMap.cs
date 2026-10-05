@@ -29,41 +29,44 @@ public static class CarrierTrackingMap
         ["DMG"] = "Damaged",
     };
 
+    /// <summary>The status codes of the shared code list.</summary>
+    internal static IEnumerable<string> StatusCodes => EventTypes.Keys;
+
     /// <param name="carrierTracking">The Carrier's tracking message as JSON text.</param>
     /// <param name="carrierId">The Carrier ID API Management took from the token.</param>
     /// <exception cref="UnknownStatusCodeException">The status code isn't in the code list.</exception>
     public static JsonObject ToTrackingEvent(string carrierTracking, string carrierId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(carrierId);
-        var message = Parse(carrierTracking);
-        var code = Text(message, "statusCode");
+        var message = JsonFields.Parse(carrierTracking);
+        var code = JsonFields.Text(message, "statusCode");
         if (code is null || !EventTypes.TryGetValue(code, out var type))
         {
             throw new UnknownStatusCodeException(code);
         }
 
-        var alpha2 = Alpha3Codes.Alpha2Of(Text(message, "country"));
-        var country = Countries.Find(alpha2);
+        var alpha2 = Alpha3Codes.Alpha2Of(JsonFields.Text(message, "country"));
+        var country = Countries.At(Countries.Find(alpha2), JsonFields.Text(message, "postcode"));
 
         var trackingEvent = new JsonObject
         {
-            ["eventId"] = Text(message, "eventId"),
+            ["eventId"] = JsonFields.Text(message, "eventId"),
             ["source"] = new JsonObject { ["type"] = "Carrier", ["carrierId"] = carrierId },
-            ["carrierBookingReference"] = Text(message, "bookingRef"),
-            ["carrierBookingNumber"] = Text(message, "carrierBookingNumber"),
+            ["carrierBookingReference"] = JsonFields.Text(message, "bookingRef"),
+            ["carrierBookingNumber"] = JsonFields.Text(message, "carrierBookingNumber"),
             ["type"] = type,
-            ["eventTime"] = LocalTimes.ToLocalOffset(Text(message, "eventTime"), country),
-            ["location"] = WithoutNulls(new JsonObject
+            ["eventTime"] = LocalTimes.ToLocalOffset(JsonFields.Text(message, "eventTime"), country),
+            ["location"] = JsonFields.WithoutNulls(new JsonObject
             {
-                ["place"] = Text(message, "place"),
-                ["postcode"] = Text(message, "postcode"),
+                ["place"] = JsonFields.Text(message, "place"),
+                ["postcode"] = JsonFields.Text(message, "postcode"),
                 ["countryCode"] = alpha2,
             }),
-            ["eta"] = ToUtc(Text(message, "eta")),
-            ["remark"] = Text(message, "remark"),
+            ["eta"] = ToUtc(JsonFields.Text(message, "eta")),
+            ["remark"] = JsonFields.Text(message, "remark"),
         };
 
-        return WithoutNulls(trackingEvent);
+        return JsonFields.WithoutNulls(trackingEvent);
     }
 
     // Kind says whether the text carried an offset: without one the time is Unspecified, and no instant.
@@ -71,29 +74,4 @@ public static class CarrierTrackingMap
         DateTime.TryParse(time, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var instant) && instant.Kind != DateTimeKind.Unspecified
             ? instant.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'+00:00'", CultureInfo.InvariantCulture)
             : null;
-
-    private static JsonObject WithoutNulls(JsonObject node)
-    {
-        foreach (var name in node.Where(property => property.Value is null).Select(property => property.Key).ToList())
-        {
-            node.Remove(name);
-        }
-
-        return node;
-    }
-
-    private static JsonObject? Parse(string json)
-    {
-        try
-        {
-            return JsonNode.Parse(json) as JsonObject;
-        }
-        catch (System.Text.Json.JsonException)
-        {
-            return null;
-        }
-    }
-
-    private static string? Text(JsonObject? node, string name) =>
-        node?[name] is JsonValue value && value.TryGetValue<string>(out var text) && !string.IsNullOrWhiteSpace(text) ? text : null;
 }
