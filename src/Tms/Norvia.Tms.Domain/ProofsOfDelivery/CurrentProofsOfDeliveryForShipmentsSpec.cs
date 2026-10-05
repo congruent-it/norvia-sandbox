@@ -10,6 +10,7 @@ public sealed class CurrentProofsOfDeliveryForShipmentsSpec : Specification<Proo
     {
         ArgumentNullException.ThrowIfNull(shipmentIds);
         Query.Where(proofOfDelivery => shipmentIds.Contains(proofOfDelivery.ShipmentId) && proofOfDelivery.IsCurrent)
+            .AsNoTracking()
             .Select(proofOfDelivery => proofOfDelivery.ShipmentId);
     }
 }

@@ -30,14 +30,14 @@ public sealed class ListShipmentsInProgressHandler(
 
         var eventsByShipment = (await trackingEvents.ListAsync(new TrackingEventsForShipmentsSpec([.. inProgress.Select(shipment => shipment.Id)]), cancellationToken))
             .ToLookup(trackingEvent => trackingEvent.ShipmentId);
-        var withProof = (await proofsOfDelivery.ListAsync(new CurrentProofsOfDeliveryForShipmentsSpec([.. inProgress.Select(shipment => shipment.Id)]), cancellationToken)).ToHashSet();
+        var shipmentIdsWithProof = (await proofsOfDelivery.ListAsync(new CurrentProofsOfDeliveryForShipmentsSpec([.. inProgress.Select(shipment => shipment.Id)]), cancellationToken)).ToHashSet();
         var orderNumbers = inProgress.Select(shipment => shipment.TransportOrderNumber).Distinct().ToList();
         var detailsByOrder = (await transportOrders.ListAsync(new TransportOrdersByNumbersSpec(orderNumbers), cancellationToken))
             .ToDictionary(order => order.Number!, order => order.Details);
 
         var now = time.GetUtcNow();
         return [.. inProgress
-            .Select(shipment => Summarize(shipment, [.. eventsByShipment[shipment.Id]], detailsByOrder.GetValueOrDefault(shipment.TransportOrderNumber), withProof.Contains(shipment.Id), now))
+            .Select(shipment => Summarize(shipment, [.. eventsByShipment[shipment.Id]], detailsByOrder.GetValueOrDefault(shipment.TransportOrderNumber), shipmentIdsWithProof.Contains(shipment.Id), now))
             .OrderByDescending(summary => summary.IsStale)
             .ThenBy(summary => summary.Eta ?? DateTimeOffset.MaxValue)];
     }

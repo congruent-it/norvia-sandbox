@@ -19,7 +19,7 @@ public sealed class GetProofsOfDeliveryTimelineHandler(IReadRepository<Shipment>
             return Result.NotFound();
         }
 
-        var all = await proofsOfDelivery.ListAsync(new ProofsOfDeliveryForShipmentSpec(shipment.Id), cancellationToken);
-        return Result.Success<IReadOnlyList<ProofOfDeliveryView>>([.. all.Select(ProofOfDeliveryView.Of)]);
+        var proofs = await proofsOfDelivery.ListAsync(new ProofsOfDeliveryForShipmentSpec(shipment.Id), cancellationToken);
+        return Result.Success<IReadOnlyList<ProofOfDeliveryView>>([.. proofs.Select(ProofOfDeliveryView.Of)]);
     }
 }
