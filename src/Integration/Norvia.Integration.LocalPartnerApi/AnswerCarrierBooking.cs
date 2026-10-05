@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Norvia.Integration.CarrierBooking;
 using Norvia.Integration.TransportOrderIntake;
 
+using Norvia.Integration.LocalSupport;
+
 namespace Norvia.Integration.LocalPartnerApi;
 
 /// <summary>

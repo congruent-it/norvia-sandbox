@@ -1,5 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 
+using Norvia.Integration.LocalSupport;
+
 namespace Norvia.Integration.LocalBookingWorker;
 
 /// <summary>What the booking Logic App has as parameters and Key Vault secrets in Azure, given to the worker for the run.</summary>

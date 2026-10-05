@@ -4,6 +4,8 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
+using Norvia.Integration.LocalSupport;
+
 namespace Norvia.Integration.LocalTrackingWorker;
 
 /// <summary>
@@ -25,7 +27,7 @@ internal sealed partial class TmsTrackingEvents(HttpClient http, IOptions<Tracki
                 Content = new StringContent(trackingEvent, Encoding.UTF8, "application/json"),
             };
             request.Headers.Add("X-Correlation-ID", correlationId);
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", RecordToken());
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", TmsTokens.Create(options.Value.TmsTokens, time, options.Value.TmsTokens.ClientId!, RecordRole));
 
             using var response = await http.SendAsync(request, cancellationToken);
             return ((int)response.StatusCode, await response.Content.ReadAsStringAsync(cancellationToken));
@@ -35,23 +37,6 @@ internal sealed partial class TmsTrackingEvents(HttpClient http, IOptions<Tracki
             LogTmsUnreachable(exception);
             return (0, string.Empty);
         }
-    }
-
-    // A token as Entra issues it to the Carrier-tracking Logic App's managed identity.
-    private string RecordToken()
-    {
-        var tokens = options.Value.TmsTokens;
-        var now = time.GetUtcNow().UtcDateTime;
-        return new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
-        {
-            Issuer = tokens.Issuer,
-            Audience = tokens.Audience,
-            IssuedAt = now,
-            NotBefore = now,
-            Expires = now.AddMinutes(10),
-            Claims = new Dictionary<string, object> { ["azp"] = tokens.ClientId, ["roles"] = new[] { RecordRole } },
-            SigningCredentials = new SigningCredentials(tokens.Key, SecurityAlgorithms.HmacSha256),
-        });
     }
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "The TMS couldn't be reached")]

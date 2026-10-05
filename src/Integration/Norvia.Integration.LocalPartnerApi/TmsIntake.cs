@@ -2,6 +2,8 @@ using System.Net.Http.Headers;
 using System.Text;
 using Microsoft.Extensions.Options;
 
+using Norvia.Integration.LocalSupport;
+
 namespace Norvia.Integration.LocalPartnerApi;
 
 /// <summary>

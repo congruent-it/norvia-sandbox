@@ -1,5 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 
+using Norvia.Integration.LocalSupport;
+
 namespace Norvia.Integration.LocalPartnerApi;
 
 /// <summary>What API Management knows in Azure: the partners' subscriptions, their Shippers and Carriers, and whose tokens to trust.</summary>

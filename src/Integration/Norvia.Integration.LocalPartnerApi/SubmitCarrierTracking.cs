@@ -1,6 +1,8 @@
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Http.HttpResults;
 
+using Norvia.Integration.LocalSupport;
+
 namespace Norvia.Integration.LocalPartnerApi;
 
 /// <summary>

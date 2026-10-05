@@ -3,6 +3,8 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json.Nodes;
 
+using Norvia.Integration.LocalSupport;
+
 namespace Norvia.Integration.LocalPartnerApi.UnitTests;
 
 /// <summary>

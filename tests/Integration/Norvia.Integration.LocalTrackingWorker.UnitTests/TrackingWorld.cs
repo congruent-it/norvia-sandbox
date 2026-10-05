@@ -4,6 +4,8 @@ using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 
+using Norvia.Integration.LocalSupport;
+
 namespace Norvia.Integration.LocalTrackingWorker.UnitTests;
 
 /// <summary>The flow with the TMS stood in for.</summary>

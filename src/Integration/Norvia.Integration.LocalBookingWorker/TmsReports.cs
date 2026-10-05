@@ -4,6 +4,8 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
+using Norvia.Integration.LocalSupport;
+
 namespace Norvia.Integration.LocalBookingWorker;
 
 /// <summary>
@@ -32,7 +34,7 @@ internal sealed partial class TmsReports(HttpClient http, IOptions<BookingWorker
                 Content = content,
             };
             request.Headers.Add("X-Correlation-ID", correlationId);
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", ReportToken());
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", TmsTokens.Create(options.Value.TmsTokens, time, options.Value.TmsTokens.ClientId!, ReportRole));
 
             using var response = await http.SendAsync(request, cancellationToken);
             return (int)response.StatusCode;
@@ -42,23 +44,6 @@ internal sealed partial class TmsReports(HttpClient http, IOptions<BookingWorker
             LogTmsUnreachable(exception);
             return 0;
         }
-    }
-
-    // A token as Entra issues it to the booking Logic App's managed identity.
-    private string ReportToken()
-    {
-        var tokens = options.Value.TmsTokens;
-        var now = time.GetUtcNow().UtcDateTime;
-        return new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
-        {
-            Issuer = tokens.Issuer,
-            Audience = tokens.Audience,
-            IssuedAt = now,
-            NotBefore = now,
-            Expires = now.AddMinutes(10),
-            Claims = new Dictionary<string, object> { ["azp"] = tokens.ClientId, ["roles"] = new[] { ReportRole } },
-            SigningCredentials = new SigningCredentials(tokens.Key, SecurityAlgorithms.HmacSha256),
-        });
     }
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "The TMS couldn't be reached")]

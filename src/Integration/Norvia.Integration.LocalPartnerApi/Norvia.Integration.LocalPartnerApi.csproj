@@ -8,6 +8,7 @@
     <ProjectReference Include="..\..\Norvia.ServiceDefaults\Norvia.ServiceDefaults.csproj" />
     <ProjectReference Include="..\Norvia.Integration.TransportOrderIntake\Norvia.Integration.TransportOrderIntake.csproj" />
     <ProjectReference Include="..\Norvia.Integration.CarrierBooking\Norvia.Integration.CarrierBooking.csproj" />
+    <ProjectReference Include="..\Norvia.Integration.LocalSupport\Norvia.Integration.LocalSupport.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Norvia.Integration.LocalPartnerApi.UnitTests" />

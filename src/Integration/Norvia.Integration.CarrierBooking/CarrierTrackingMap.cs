@@ -34,15 +34,28 @@ public static class CarrierTrackingMap
 
     /// <param name="carrierTracking">The Carrier's tracking message as JSON text.</param>
     /// <param name="carrierId">The Carrier ID API Management took from the token.</param>
-    /// <exception cref="UnknownStatusCodeException">The status code isn't in the code list.</exception>
+    /// <exception cref="UnknownStatusCodeException">The status code isn't in the code list, which fails the local function's action and so the run.</exception>
     public static JsonObject ToTrackingEvent(string carrierTracking, string carrierId)
+    {
+        var result = Map(carrierTracking, carrierId);
+        return result.TrackingEvent ?? throw new UnknownStatusCodeException(result.UnknownStatusCode);
+    }
+
+    /// <summary>
+    /// Maps the message, answering a status code that isn't in the code list as a result instead of an exception, as an
+    /// expected outcome of the Carrier's message (ADR 0008). The local worker settles by it; the workflow's local function
+    /// goes through <see cref="ToTrackingEvent"/>.
+    /// </summary>
+    /// <param name="carrierTracking">The Carrier's tracking message as JSON text.</param>
+    /// <param name="carrierId">The Carrier ID API Management took from the token.</param>
+    public static TrackingMapResult Map(string carrierTracking, string carrierId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(carrierId);
         var message = JsonFields.Parse(carrierTracking);
         var code = JsonFields.Text(message, "statusCode");
         if (code is null || !EventTypes.TryGetValue(code, out var type))
         {
-            throw new UnknownStatusCodeException(code);
+            return TrackingMapResult.UnknownStatus(code);
         }
 
         var alpha2 = Alpha3Codes.Alpha2Of(JsonFields.Text(message, "country"));
@@ -66,7 +79,7 @@ public static class CarrierTrackingMap
             ["remark"] = JsonFields.Text(message, "remark"),
         };
 
-        return JsonFields.WithoutNulls(trackingEvent);
+        return TrackingMapResult.Mapped(JsonFields.WithoutNulls(trackingEvent));
     }
 
     // Kind says whether the text carried an offset: without one the time is Unspecified, and no instant.

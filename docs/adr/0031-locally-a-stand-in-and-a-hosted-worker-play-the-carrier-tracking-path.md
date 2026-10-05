@@ -19,4 +19,5 @@ The tracking contract's keys (coding guidelines §7) go into the worker's and th
 
 - The stand-in is a second implementation of the policy and the worker a second implementation of the workflow. A change to the policy's checks, headers or application properties, or to the workflow's settling rules or tracked properties, must be made in both. `SubmitCarrierTrackingPolicyTests` and `TrackingWorkflowTests` read the Azure side, and the stand-in's and the worker's unit tests check the same list.
 - The workflow's Service Bus operation IDs (`peekLockQueueMessages`, `completeQueueMessage`, `abandonQueueMessage`, `deadLetterQueueMessage`) can't be run without a Logic Apps runtime. The unit tests read the definition; only a deployed run proves them.
+- The tracking contract's keys, the local token options and the local TMS token are one shared project, `Norvia.Integration.LocalSupport`, used by the Partner API stand-in and both workers. The worker settles by `CarrierTrackingMap.Map`'s result, not by catching the exception the workflow's local function throws.
 - Neither runs in Azure: `azd` never deploys them.

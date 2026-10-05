@@ -11,6 +11,7 @@
     <Project Path="src/Integration/Norvia.Integration.CarrierTracking.Functions/Norvia.Integration.CarrierTracking.Functions.csproj" />
     <Project Path="src/Integration/Norvia.Integration.LocalBookingWorker/Norvia.Integration.LocalBookingWorker.csproj" />
     <Project Path="src/Integration/Norvia.Integration.LocalTrackingWorker/Norvia.Integration.LocalTrackingWorker.csproj" />
+    <Project Path="src/Integration/Norvia.Integration.LocalSupport/Norvia.Integration.LocalSupport.csproj" />
     <Project Path="src/Integration/Norvia.Integration.LocalPartnerApi/Norvia.Integration.LocalPartnerApi.csproj" />
     <Project Path="src/Integration/Norvia.Integration.TransportOrderIntake.Functions/Norvia.Integration.TransportOrderIntake.Functions.csproj" />
   </Folder>

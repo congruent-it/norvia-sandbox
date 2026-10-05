@@ -1,6 +1,8 @@
 using System.Text.Json.Nodes;
 using Norvia.Integration.CarrierBooking;
 
+using Norvia.Integration.LocalSupport;
+
 namespace Norvia.Integration.LocalTrackingWorker;
 
 /// <summary>How the flow's run ended, and so what happens to the queue message: the Logic App's settling steps.</summary>
@@ -18,6 +20,9 @@ internal sealed record TrackingRun(TrackingSettlement Settlement, string? DeadLe
 /// </summary>
 internal sealed partial class CarrierTrackingFlow(TmsTrackingEvents tms, ILogger<CarrierTrackingFlow> logger)
 {
+    /// <summary>The dead-letter reason, and failure code, of a message the map can't read.</summary>
+    internal const string UnmappableTrackingMessage = "UnmappableTrackingMessage";
+
     /// <param name="body">The queue message's body: the Carrier's tracking message as it was sent.</param>
     /// <param name="properties">The message's application properties, which API Management set.</param>
     public async Task<TrackingRun> RunAsync(string body, IReadOnlyDictionary<string, object> properties, CancellationToken cancellationToken)
@@ -40,23 +45,20 @@ internal sealed partial class CarrierTrackingFlow(TmsTrackingEvents tms, ILogger
         }
 
         using var trail = logger.BeginScope(keys);
-        JsonObject trackingEvent;
-        try
-        {
-            trackingEvent = CarrierTrackingMap.ToTrackingEvent(body, carrierId ?? string.Empty);
-        }
-        catch (Exception exception) when (exception is UnknownStatusCodeException or ArgumentException)
+        // The Carrier comes from the message's partyId, which API Management set from the token; without one nothing can be mapped.
+        var mapped = carrierId is null ? TrackingMapResult.UnknownStatus(null) : CarrierTrackingMap.Map(body, carrierId);
+        if (mapped.TrackingEvent is not { } trackingEvent)
         {
             const string Description = "The Carrier's tracking message could not be mapped: its status code is not in the Carrier tracking code list.";
-            using var unmappable = logger.BeginScope(Outcome("DeadLettered", TrackingKeys.UnmappableTrackingMessage));
-            LogUnmappable(exception);
-            return new(TrackingSettlement.DeadLetter, TrackingKeys.UnmappableTrackingMessage, Description);
+            using var unmappable = logger.BeginScope(TrackingKeys.OutcomeOf(TrackingKeys.DeadLettered, UnmappableTrackingMessage));
+            LogUnmappable();
+            return new(TrackingSettlement.DeadLetter, UnmappableTrackingMessage, Description);
         }
 
         var (status, answer) = await tms.RecordAsync(trackingEvent.ToJsonString(), correlationId, cancellationToken);
         var outcome = TmsTrackingOutcome.Of(status, answer);
 
-        var recorded = Outcome(outcome.Outcome, outcome.FailureCode);
+        var recorded = TrackingKeys.OutcomeOf(outcome.Outcome, outcome.FailureCode);
         if (outcome.ShipmentNumber is not null)
         {
             recorded[TrackingKeys.ShipmentNumber] = outcome.ShipmentNumber;
@@ -74,17 +76,11 @@ internal sealed partial class CarrierTrackingFlow(TmsTrackingEvents tms, ILogger
             : new(outcome.Settlement);
     }
 
-    // A key that doesn't apply is left out, never sent empty.
-    private static Dictionary<string, object?> Outcome(string outcome, string? failureCode) =>
-        failureCode is null
-            ? new() { [TrackingKeys.Outcome] = outcome }
-            : new() { [TrackingKeys.Outcome] = outcome, [TrackingKeys.FailureCode] = failureCode };
-
     private static string? Property(IReadOnlyDictionary<string, object> properties, string name) =>
         properties.TryGetValue(name, out var value) && value?.ToString() is { Length: > 0 } text ? text : null;
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "The tracking message can't be mapped; it is dead-lettered and the run fails")]
-    private partial void LogUnmappable(Exception exception);
+    private partial void LogUnmappable();
 
     [LoggerMessage(Level = LogLevel.Information, Message = "The TMS answered {StatusCode}; the message is settled as {Settlement}")]
     private partial void LogRecorded(int statusCode, TrackingSettlement settlement);

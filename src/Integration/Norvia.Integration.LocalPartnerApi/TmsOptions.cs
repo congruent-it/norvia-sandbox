@@ -1,5 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 
+using Norvia.Integration.LocalSupport;
+
 namespace Norvia.Integration.LocalPartnerApi;
 
 /// <summary>Where the TMS is, and the identities the intake and Carrier-answer Logic Apps call it as.</summary>

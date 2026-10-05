@@ -1,5 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 
+using Norvia.Integration.LocalSupport;
+
 namespace Norvia.Integration.LocalTrackingWorker;
 
 /// <summary>What the Carrier-tracking Logic App has as parameters in Azure, given to the worker for the run.</summary>
