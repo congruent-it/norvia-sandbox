@@ -18,6 +18,7 @@ using Norvia.Tms.Application.TransportOrders.Rate;
 using Norvia.Tms.Application.TransportOrders.Submit;
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Shipments;
+using Norvia.Tms.Domain.ProofsOfDelivery;
 using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Infrastructure.CarrierBookings;
@@ -64,6 +65,9 @@ public static class DependencyInjection
         builder.Services.AddOptions<TrackingEventOptions>().BindConfiguration(TrackingEventOptions.SectionName)
             .ValidateDataAnnotations().ValidateOnStart();
         builder.Services.AddSingleton(services => new TrackingEventRules(services.GetRequiredService<IOptions<TrackingEventOptions>>().Value.ClockSkew));
+        builder.Services.AddOptions<ProofOfDeliveryOptions>().BindConfiguration(ProofOfDeliveryOptions.SectionName)
+            .ValidateDataAnnotations().ValidateOnStart();
+        builder.Services.AddSingleton(services => new ProofOfDeliveryRules(services.GetRequiredService<IOptions<ProofOfDeliveryOptions>>().Value.ClockSkew));
         builder.Services.AddOptions<ShipmentStaleOptions>().BindConfiguration(ShipmentStaleOptions.SectionName)
             .ValidateDataAnnotations().ValidateOnStart();
         builder.Services.AddSingleton(services =>

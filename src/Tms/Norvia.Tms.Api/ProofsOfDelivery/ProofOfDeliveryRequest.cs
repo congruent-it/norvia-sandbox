@@ -10,6 +10,7 @@ namespace Norvia.Tms.Api.ProofsOfDelivery;
 /// <param name="DocumentId">The sender's own ID for the Proof of delivery, unique per source.</param>
 /// <param name="Source">Who sent it. The Carrier comes from API Management's token check (ADR 0005), never from the Carrier's own payload.</param>
 /// <param name="CarrierBookingReference">The Carrier's own reference for its booking, which with the Carrier finds the Shipment.</param>
+/// <param name="CarrierBookingNumber">The TMS's own Carrier booking number, used only when the reference doesn't match.</param>
 /// <param name="ReceivedBy">The name of the person who signed.</param>
 /// <param name="DeliveryTime">When the goods were delivered, with the offset of where.</param>
 /// <param name="Condition">The condition's name, <c>Clean</c> or <c>Reservations</c>; a string, so an unknown one is refused with a code of its own.</param>
@@ -21,6 +22,7 @@ public sealed record ProofOfDeliveryRequest(
     string? DocumentId = null,
     ProofOfDeliverySourceRequest? Source = null,
     string? CarrierBookingReference = null,
+    string? CarrierBookingNumber = null,
     string? ReceivedBy = null,
     DateTimeOffset? DeliveryTime = null,
     ProofOfDeliveryLocationRequest? Location = null,

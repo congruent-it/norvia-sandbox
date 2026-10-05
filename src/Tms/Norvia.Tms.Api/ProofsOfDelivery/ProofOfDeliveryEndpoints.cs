@@ -46,7 +46,7 @@ public static class ProofOfDeliveryEndpoints
                 + "the Proof of delivery as the Shipment's current one with the correlation ID, and publishes ProofOfDeliveryReceived in the "
                 + "same transaction as the record. It never changes the Shipment's status. A Proof of delivery is refused, changing and "
                 + "publishing nothing, with a problem whose code says why: ShipmentNotFound (404), ShipmentNotInTransport (409), "
-                + "MissingRequiredField (400); and 400 for an input that isn't the Canonical Model.");
+                + "MissingRequiredField (400), DeliveryTimeInTheFuture (400), FileNotAccepted (400); and 400 for an input that isn't the Canonical Model.");
 
         proofsOfDelivery.MapGet("/shipments/{shipmentNumber}/proof-of-delivery", GetAsync)
             .RequireAuthorization()
@@ -91,7 +91,7 @@ public static class ProofOfDeliveryEndpoints
             using var content = new MemoryStream();
             await file.CopyToAsync(content, cancellationToken);
             contents.Add(content.ToArray());
-            described.Add(ProofOfDeliveryFile.New(file.FileName, file.ContentType, file.Length));
+            described.Add(ProofOfDeliveryFile.New(file.FileName, ProofOfDeliveryFileKind.Detect(contents[^1].Span) ?? file.ContentType, file.Length));
         }
 
         if (!ProofOfDeliveryReader.TryRead(metadata, described, out var report, out var problems))
@@ -145,7 +145,7 @@ public static class ProofOfDeliveryEndpoints
     private static int StatusCodeOf(ProofOfDeliveryRefusalCode code) => code switch
     {
         ProofOfDeliveryRefusalCode.ShipmentNotFound => StatusCodes.Status404NotFound,
-        ProofOfDeliveryRefusalCode.MissingRequiredField => StatusCodes.Status400BadRequest,
+        ProofOfDeliveryRefusalCode.MissingRequiredField or ProofOfDeliveryRefusalCode.DeliveryTimeInTheFuture or ProofOfDeliveryRefusalCode.FileNotAccepted => StatusCodes.Status400BadRequest,
         _ => StatusCodes.Status409Conflict, // ShipmentNotInTransport
     };
 }

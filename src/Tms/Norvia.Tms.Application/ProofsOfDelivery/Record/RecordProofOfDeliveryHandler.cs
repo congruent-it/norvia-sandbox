@@ -13,6 +13,7 @@ public sealed class RecordProofOfDeliveryHandler(
     IRepository<CarrierBooking> carrierBookings,
     IRepository<Shipment> shipments,
     IProofOfDeliveryFiles files,
+    ProofOfDeliveryRules rules,
     TimeProvider time)
     : ICommandHandler<RecordProofOfDeliveryCommand, Result<RecordProofOfDeliveryResult>>
 {
@@ -34,6 +35,11 @@ public sealed class RecordProofOfDeliveryHandler(
 
         var booking = await carrierBookings.SingleOrDefaultAsync(
             new ConfirmedCarrierBookingByReferenceSpec(carrierId, report.CarrierBookingReference), cancellationToken);
+        if (booking is null && CarrierBookingNumber.TryParse(report.CarrierBookingNumber, out var number))
+        {
+            booking = await carrierBookings.SingleOrDefaultAsync(new ConfirmedCarrierBookingByNumberSpec(carrierId, number), cancellationToken);
+        }
+
         if (booking is null)
         {
             return ProofOfDeliveryRefused.Because<RecordProofOfDeliveryResult>(ProofOfDeliveryRules.ShipmentNotFound(report.CarrierBookingReference));
@@ -42,7 +48,10 @@ public sealed class RecordProofOfDeliveryHandler(
         var shipment = await shipments.SingleOrDefaultAsync(new ShipmentByNumberSpec(booking.ShipmentNumber), cancellationToken)
             ?? throw new InvalidOperationException($"Carrier booking {booking.Number} names Shipment {booking.ShipmentNumber}, which the TMS doesn't have.");
 
-        if (ProofOfDeliveryRules.CheckShipment(shipment) is { } refusal)
+        var refusal = ProofOfDeliveryRules.CheckShipment(shipment)
+            ?? rules.CheckDeliveryTime(report.DeliveryTime, time.GetUtcNow())
+            ?? ProofOfDeliveryRules.CheckFiles(report.Files, command.Files);
+        if (refusal is not null)
         {
             return ProofOfDeliveryRefused.Because<RecordProofOfDeliveryResult>(refusal);
         }

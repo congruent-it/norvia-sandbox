@@ -13,6 +13,7 @@ namespace Norvia.Tms.Domain.ProofsOfDelivery;
 /// <param name="ReceivedBy">The name of the person who signed.</param>
 /// <param name="DeliveryTime">When the goods were delivered, with the offset of where.</param>
 /// <param name="Files">The files, already described: the content is kept apart.</param>
+/// <param name="CarrierBookingNumber">The TMS's own Carrier booking number, used only when the reference doesn't match.</param>
 public sealed record ProofOfDeliveryReport(
     ProofOfDeliverySource Source,
     string DocumentId,
@@ -22,4 +23,5 @@ public sealed record ProofOfDeliveryReport(
     TrackingLocation Location,
     DeliveryCondition Condition,
     string? Remark,
-    IReadOnlyList<ProofOfDeliveryFile> Files);
+    IReadOnlyList<ProofOfDeliveryFile> Files,
+    string? CarrierBookingNumber = null);
