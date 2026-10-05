@@ -50,6 +50,14 @@ public sealed class BookingRequestsTests : PortalWebContext
     }
 
     [Fact]
+    public void Render_ForACarrier_ShowsTheTrackingModeNextToTheAnswerMode()
+    {
+        Portal.ListCarrierBookingRequestsAsync("van-dijk-transport", Arg.Any<CancellationToken>()).Returns([]);
+
+        RenderPage().Find("[aria-label='Tracking mode']").TextContent.Should().Contain("Save tracking mode");
+    }
+
+    [Fact]
     public void Render_AsRequestsArrive_ShowsThemWithoutAReload()
     {
         Portal.ListCarrierBookingRequestsAsync("van-dijk-transport", Arg.Any<CancellationToken>()).Returns([], [Request("CB-0000001")]);

@@ -7,11 +7,11 @@ public sealed class TrackingRulesTests
     [Theory]
     [InlineData(null, new[] { TrackingEventType.Collected, TrackingEventType.Delivered })]
     [InlineData(TrackingEventType.Collected, new[] { TrackingEventType.Departed, TrackingEventType.Delivered })]
-    [InlineData(TrackingEventType.Departed, new[] { TrackingEventType.Arrived, TrackingEventType.Delivered })]
+    [InlineData(TrackingEventType.Departed, new[] { TrackingEventType.Arrived, TrackingEventType.OutForDelivery, TrackingEventType.Delivered })]
     [InlineData(TrackingEventType.Arrived, new[] { TrackingEventType.OutForDelivery, TrackingEventType.Delivered })]
     [InlineData(TrackingEventType.OutForDelivery, new[] { TrackingEventType.Delivered })]
     [InlineData(TrackingEventType.Delivered, new TrackingEventType[0])]
-    public void NextProgress_IsTheNextStep_AndDeliveredAtAnyTime(TrackingEventType? last, TrackingEventType[] expected) =>
+    public void NextProgress_IsTheNextStep_OutForDeliveryInPlaceOfArrived_AndDeliveredAtAnyTime(TrackingEventType? last, TrackingEventType[] expected) =>
         TrackingRules.NextProgress(last).Should().Equal(expected);
 
     [Fact]
@@ -38,4 +38,25 @@ public sealed class TrackingRulesTests
     [InlineData(TrackingEventType.DeliveryFailed)]
     [InlineData(TrackingEventType.Damaged)]
     public void StageAfter_AnException_IsNone(TrackingEventType exception) => TrackingRules.StageAfter(exception).Should().BeNull();
+
+    [Theory]
+    [InlineData(null, TrackingEventType.Collected)]
+    [InlineData(TrackingEventType.Collected, TrackingEventType.Departed)]
+    [InlineData(TrackingEventType.Departed, TrackingEventType.OutForDelivery)]
+    [InlineData(TrackingEventType.Arrived, TrackingEventType.OutForDelivery)]
+    [InlineData(TrackingEventType.OutForDelivery, TrackingEventType.Delivered)]
+    public void NextAutomatic_IsTheNextOfCollectedDepartedOutForDeliveryAndDelivered(TrackingEventType? last, TrackingEventType expected) =>
+        TrackingRules.NextAutomatic(last).Should().Be(expected);
+
+    [Fact]
+    public void NextAutomatic_OnceDelivered_IsNone() => TrackingRules.NextAutomatic(TrackingEventType.Delivered).Should().BeNull();
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(TrackingEventType.Collected)]
+    [InlineData(TrackingEventType.Departed)]
+    [InlineData(TrackingEventType.Arrived)]
+    [InlineData(TrackingEventType.OutForDelivery)]
+    public void NextAutomatic_IsAlwaysOfferedNext(TrackingEventType? last) =>
+        TrackingRules.IsOffered(last, TrackingRules.NextAutomatic(last)!.Value).Should().BeTrue();
 }

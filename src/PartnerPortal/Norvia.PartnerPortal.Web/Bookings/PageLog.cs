@@ -27,6 +27,12 @@ internal static partial class PageLog
     [LoggerMessage(Level = LogLevel.Error, Message = "Saving the answer mode of Persona {PersonaId} failed")]
     public static partial void AnswerModeSaveFailed(ILogger logger, Exception exception, string personaId);
 
+    [LoggerMessage(Level = LogLevel.Error, Message = "Loading the tracking mode of Persona {PersonaId} failed")]
+    public static partial void TrackingModeLoadFailed(ILogger logger, Exception exception, string personaId);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Saving the tracking mode of Persona {PersonaId} failed")]
+    public static partial void TrackingModeSaveFailed(ILogger logger, Exception exception, string personaId);
+
     [LoggerMessage(Level = LogLevel.Error, Message = "Loading the Shipments of Persona {PersonaId} failed")]
     public static partial void ShipmentsLoadFailed(ILogger logger, Exception exception, string personaId);
 

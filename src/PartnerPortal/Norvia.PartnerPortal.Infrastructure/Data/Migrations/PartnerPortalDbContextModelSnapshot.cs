@@ -110,6 +110,13 @@ namespace Norvia.PartnerPortal.Infrastructure.Data.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
+                    b.Property<long?>("AutoProgressDelay")
+                        .HasColumnType("bigint")
+                        .HasColumnName("AutoProgressDelayMilliseconds");
+
+                    b.Property<DateTimeOffset?>("AutoProgressDueAt")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<string>("CarrierBookingNumber")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -168,12 +175,47 @@ namespace Norvia.PartnerPortal.Infrastructure.Data.Migrations
 
                     b.HasIndex("AutoAnswerDueAt");
 
+                    b.HasIndex("AutoProgressDueAt");
+
                     b.HasIndex("PersonaId", "CarrierBookingNumber")
                         .IsUnique();
 
                     b.HasIndex("PersonaId", "ReceivedAt");
 
                     b.ToTable("CarrierBookingRequests", (string)null);
+                });
+
+            modelBuilder.Entity("Norvia.PartnerPortal.Domain.CarrierBookings.CarrierTrackingSettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("PersonaId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "Policy", "Norvia.PartnerPortal.Domain.CarrierBookings.CarrierTrackingSettings.Policy#CarrierTrackingPolicy", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<long>("Delay")
+                                .HasColumnType("bigint")
+                                .HasColumnName("DelayMilliseconds");
+
+                            b1.Property<string>("Mode")
+                                .IsRequired()
+                                .HasMaxLength(30)
+                                .HasColumnType("nvarchar(30)")
+                                .HasColumnName("Mode");
+                        });
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PersonaId")
+                        .IsUnique();
+
+                    b.ToTable("CarrierTrackingSettings", (string)null);
                 });
 #pragma warning restore 612, 618
         }

@@ -3,6 +3,8 @@ using Ardalis.SharedKernel;
 using Mediator;
 using Microsoft.Extensions.Logging;
 using Norvia.PartnerPortal.Application.Bookings;
+using Norvia.PartnerPortal.Application.CarrierShipments.AutoProgress;
+using Norvia.PartnerPortal.Application.CarrierShipments.TrackingSettings;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
 using Norvia.PartnerPortal.Domain.Personas;
@@ -11,8 +13,10 @@ namespace Norvia.PartnerPortal.Application.CarrierBookings.Answer;
 
 public sealed partial class AnswerCarrierBookingHandler(
     IRepository<CarrierBookingRequest> repository,
+    IRepository<CarrierTrackingSettings> trackingSettings,
     INorviaPartnerApi partnerApi,
     IPersonaDirectory personas,
+    IAutoProgressSignal autoProgress,
     TimeProvider time,
     ILogger<AnswerCarrierBookingHandler> logger)
     : ICommandHandler<AnswerCarrierBookingCommand, Result<AnsweredCarrierBooking>>
@@ -50,6 +54,13 @@ public sealed partial class AnswerCarrierBookingHandler(
             return new AnsweredCarrierBooking(CarrierBookingRequestView.From(request), reply);
         }
 
+        // The tracking policy in force at confirmation stays the Shipment's, so changing it later doesn't touch one in flight.
+        if (request.Status == CarrierBookingRequestStatus.Confirmed)
+        {
+            var policy = CarrierTrackingPolicies.InForce(carrier, await trackingSettings.FirstOrDefaultAsync(new CarrierTrackingSettingsOfPersonaSpec(carrier.Id), cancellationToken));
+            request.ScheduleAutoProgress(policy.AutoProgressDelay, time.GetUtcNow());
+        }
+
         try
         {
             await repository.UpdateAsync(request, cancellationToken);
@@ -63,6 +74,11 @@ public sealed partial class AnswerCarrierBookingHandler(
             }
 
             return new AnsweredCarrierBooking(CarrierBookingRequestView.From(request), reply, Recorded: false);
+        }
+
+        if (request.AutoProgressDueAt is not null)
+        {
+            autoProgress.ShipmentConfirmed();
         }
 
         return new AnsweredCarrierBooking(CarrierBookingRequestView.From(request), reply);

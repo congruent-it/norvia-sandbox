@@ -35,6 +35,30 @@ public sealed class SeedFilePersonaDirectoryTests
         carrier.DefaultAnswerPolicy.Delay.Should().BePositive();
     }
 
+    [Theory]
+    [InlineData("van-dijk-transport", TrackingMode.Manual)]
+    [InlineData("kessler-spedition", TrackingMode.AutoProgress)]
+    [InlineData("pakketpunt-express", TrackingMode.AutoProgress)]
+    public void Find_ACarrierPersona_HasItsDefaultTrackingMode_WithADelayOfAFewSeconds(string persona, TrackingMode mode)
+    {
+        var tracking = TheSeedFile().Find(new PersonaId(persona))!.Carrier!.DefaultTrackingPolicy;
+
+        tracking.Mode.Should().Be(mode);
+        tracking.Delay.Should().BePositive().And.BeLessThanOrEqualTo(TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
+    public void Find_ACarrierPersonaWithoutATrackingSection_SendsByHand()
+    {
+        var seed = Read("""
+            { "shippers": [], "carriers": [{ "id": "CAR-0001" }],
+              "personas": [{ "id": "plain", "displayName": "Plain", "party": { "type": "Carrier", "id": "CAR-0001" },
+                "carrier": { "bookingReferencePrefix": "PLN", "answer": { "mode": "Manual", "rejectionReason": "NoCapacity", "delaySeconds": 5 } } }] }
+            """);
+
+        seed.Find(new PersonaId("plain"))!.Carrier!.DefaultTrackingPolicy.Mode.Should().Be(TrackingMode.Manual);
+    }
+
     [Fact]
     public void Find_AShipperPersona_HasNoCarrierProfile() =>
         TheSeedFile().Find(new PersonaId("brouwer-dranken"))!.Carrier.Should().BeNull();

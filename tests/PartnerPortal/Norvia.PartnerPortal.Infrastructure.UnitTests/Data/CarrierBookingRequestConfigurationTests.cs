@@ -9,6 +9,7 @@ public sealed class CarrierBookingRequestConfigurationTests
 {
     private static readonly string[] UniqueKey = ["PersonaId", "CarrierBookingNumber"];
     private static readonly string[] DueTime = ["AutoAnswerDueAt"];
+    private static readonly string[] AutoProgressDueTime = ["AutoProgressDueAt"];
     private static readonly string[] PersonaKey = ["PersonaId"];
 
     private static PartnerPortalDbContext NewContext() =>
@@ -125,6 +126,35 @@ public sealed class CarrierBookingRequestConfigurationTests
             .FindComplexProperty(nameof(CarrierAnswerSettings.Policy))!.ComplexType.FindProperty(nameof(CarrierAnswerPolicy.Delay))!;
         var converter = delay.GetValueConverter()!;
 
+        converter.ConvertToProvider(TimeSpan.FromSeconds(7)).Should().Be(7000L);
+        converter.ConvertFromProvider(7000L).Should().Be(TimeSpan.FromSeconds(7));
+    }
+
+    [Fact]
+    public void TheAutomaticTrackingEvents_AreStoredAsMillisecondsAndADate_AndTheDueTimeIsIndexed()
+    {
+        using var context = NewContext();
+        var entity = context.Model.FindEntityType(typeof(CarrierBookingRequest))!;
+        var converter = entity.FindProperty(nameof(CarrierBookingRequest.AutoProgressDelay))!.GetValueConverter()!;
+
+        converter.ConvertToProvider(TimeSpan.FromSeconds(7)).Should().Be(7000L);
+        converter.ConvertToProvider(null).Should().BeNull();
+        converter.ConvertFromProvider(7000L).Should().Be(TimeSpan.FromSeconds(7));
+        converter.ConvertFromProvider(null).Should().BeNull();
+        entity.GetIndexes().Should().Contain(index => index.Properties.Select(property => property.Name).SequenceEqual(AutoProgressDueTime));
+    }
+
+    [Fact]
+    public void TheTrackingPolicyOfACarrierPersona_IsStoredOncePerPersona_AsColumnsOfItsOwn()
+    {
+        using var context = NewContext();
+        var entity = context.Model.FindEntityType(typeof(CarrierTrackingSettings))!;
+
+        entity.GetIndexes().Should().Contain(index => index.IsUnique && index.Properties.Select(property => property.Name).SequenceEqual(PersonaKey));
+        var policy = entity.FindComplexProperty(nameof(CarrierTrackingSettings.Policy))!.ComplexType;
+        policy.GetProperties().Select(property => property.GetColumnName()).Should().BeEquivalentTo("Mode", "DelayMilliseconds");
+        policy.FindProperty(nameof(CarrierTrackingPolicy.Mode))!.GetProviderClrType().Should().Be<string>();
+        var converter = policy.FindProperty(nameof(CarrierTrackingPolicy.Delay))!.GetValueConverter()!;
         converter.ConvertToProvider(TimeSpan.FromSeconds(7)).Should().Be(7000L);
         converter.ConvertFromProvider(7000L).Should().Be(TimeSpan.FromSeconds(7));
     }

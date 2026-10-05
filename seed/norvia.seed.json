@@ -179,22 +179,22 @@
       "displayName": "Van Dijk Transport",
       "party": { "type": "Carrier", "id": "CAR-0001" },
       "clientAppRegistration": "norvia-persona-van-dijk-transport",
-      "carrier": { "bookingReferencePrefix": "VDT", "answer": { "mode": "Manual", "rejectionReason": "NoCapacity", "delaySeconds": 5 } }
+      "carrier": { "bookingReferencePrefix": "VDT", "answer": { "mode": "Manual", "rejectionReason": "NoCapacity", "delaySeconds": 5 }, "tracking": { "mode": "Manual", "delaySeconds": 5 } }
     },
     {
-      "$comment": "Confirms every request after a few seconds, so a demo shows a booking answered without touching the portal (P4).",
+      "$comment": "Confirms every request after a few seconds, so a demo shows a booking answered without touching the portal (P4); it then sends its Tracking events by itself too (P5).",
       "id": "kessler-spedition",
       "displayName": "Kessler Spedition",
       "party": { "type": "Carrier", "id": "CAR-0002" },
       "clientAppRegistration": "norvia-persona-kessler-spedition",
-      "carrier": { "bookingReferencePrefix": "KES", "answer": { "mode": "AutoConfirm", "rejectionReason": "NoCapacity", "delaySeconds": 5 } }
+      "carrier": { "bookingReferencePrefix": "KES", "answer": { "mode": "AutoConfirm", "rejectionReason": "NoCapacity", "delaySeconds": 5 }, "tracking": { "mode": "AutoProgress", "delaySeconds": 5 } }
     },
     {
       "id": "pakketpunt-express",
       "displayName": "PakketPunt Express",
       "party": { "type": "Carrier", "id": "CAR-0003" },
       "clientAppRegistration": "norvia-persona-pakketpunt-express",
-      "carrier": { "bookingReferencePrefix": "PKT", "answer": { "mode": "AutoConfirm", "rejectionReason": "NoCapacity", "delaySeconds": 5 } }
+      "carrier": { "bookingReferencePrefix": "PKT", "answer": { "mode": "AutoConfirm", "rejectionReason": "NoCapacity", "delaySeconds": 5 }, "tracking": { "mode": "AutoProgress", "delaySeconds": 5 } }
     }
   ]
 }

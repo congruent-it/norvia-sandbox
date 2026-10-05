@@ -11,6 +11,7 @@ using Norvia.PartnerPortal.Application.CarrierBookings.List;
 using Norvia.PartnerPortal.Application.CarrierShipments;
 using Norvia.PartnerPortal.Application.CarrierShipments.List;
 using Norvia.PartnerPortal.Application.CarrierShipments.Send;
+using Norvia.PartnerPortal.Application.CarrierShipments.TrackingSettings;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Application.Personas.List;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
@@ -70,6 +71,18 @@ internal sealed class PartnerPortalRequests(IServiceScopeFactory scopes) : IPart
         await using var scope = scopes.CreateAsyncScope();
         return FoundOrNull(await scope.ServiceProvider.GetRequiredService<IMediator>()
             .Send(new SendTrackingCommand(personaId, carrierBookingNumber, type), cancellationToken));
+    }
+
+    public async Task<CarrierTrackingSettingsView?> GetCarrierTrackingSettingsAsync(string personaId, CancellationToken cancellationToken) =>
+        FoundOrNull(await SendAsync(new GetCarrierTrackingSettingsQuery(personaId), cancellationToken));
+
+    public async Task<CarrierTrackingSettingsView?> ChangeCarrierTrackingSettingsAsync(
+        string personaId, CarrierTrackingSettingsView settings, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        await using var scope = scopes.CreateAsyncScope();
+        return FoundOrNull(await scope.ServiceProvider.GetRequiredService<IMediator>()
+            .Send(new ChangeCarrierTrackingSettingsCommand(personaId, settings.Mode, settings.DelaySeconds), cancellationToken));
     }
 
     private async Task<TResponse> SendAsync<TResponse>(IQuery<TResponse> query, CancellationToken cancellationToken)
