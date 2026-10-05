@@ -86,6 +86,11 @@ else
                 </TransportOrderSection>
             </div>
         }
+
+        @* What the Carriers reported, in event-time order. It reads for itself, so a timeline that can't be read doesn't hide the Shipment. *@
+        <div class="md:col-span-3">
+            <TrackingTimeline ShipmentNumber="@ShipmentNumber" />
+        </div>
     </div>
 }
 

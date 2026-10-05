@@ -1,6 +1,8 @@
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shipments.ListAwaitingAnswer;
+using Norvia.Tms.Application.Shipments.ListInProgress;
 using Norvia.Tms.Application.Shipments.ListToRelease;
+using Norvia.Tms.Application.TrackingEvents.Timeline;
 using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.List;
 using Norvia.Tms.Application.TransportOrders.RatingExceptions;
@@ -40,4 +42,10 @@ public interface ITransportOrderQueries
 
     /// <summary>The Planner's Carrier bookings awaiting an answer: the Requested ones, the earliest collection first, each flagged when overdue.</summary>
     Task<IReadOnlyList<CarrierBookingAwaitingAnswerSummary>> ListCarrierBookingsAwaitingAnswerAsync(CancellationToken cancellationToken);
+
+    /// <summary>The Planner's Shipments in progress: the Booked, Collected and In transit ones, Stale first and then by ETA.</summary>
+    Task<IReadOnlyList<ShipmentInProgressSummary>> ListShipmentsInProgressAsync(CancellationToken cancellationToken);
+
+    /// <summary>The Shipment's Tracking events in event-time order, or null when there is no such Shipment.</summary>
+    Task<IReadOnlyList<TrackingTimelineEntry>?> FindTrackingTimelineAsync(string shipmentNumber, CancellationToken cancellationToken);
 }

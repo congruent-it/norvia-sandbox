@@ -1,0 +1,49 @@
+@page "/shipments/in-progress"
+@rendermode InteractiveServer
+@using Microsoft.Extensions.Options
+@using Norvia.Tms.Application.Shipments.ListInProgress
+@using Norvia.Tms.Web.TransportOrders
+@implements IAsyncDisposable
+@inject ITransportOrderQueries Queries
+@inject TimeProvider Time
+@inject IOptions<LiveListOptions> Options
+@inject ILogger<LiveTransportOrderList<ShipmentInProgressSummary>> Logger
+
+<PageTitle>Shipments in progress · Norvia TMS</PageTitle>
+
+<h1>Shipments in progress</h1>
+
+<LiveListStates Items="_list.Items" LastReadFailed="_list.LastReadFailed" Name="Shipments in progress"
+                Empty="No Shipments are in progress. A Shipment appears here once a Carrier has confirmed its booking, and leaves when it is Delivered." Context="shipments">
+    @* Stale first, then by ETA, as the query gives them: what has gone quiet needs the Planner first. The list only reads; a Shipment is opened for its timeline. *@
+    <FluentDataGrid Items="shipments.AsQueryable()" TGridItem="ShipmentInProgressSummary" Class="flatly-table" aria-label="Shipments in progress"
+                    GridTemplateColumns="1fr 1.2fr 1fr 2.6fr 1.2fr auto" MultiLine="true">
+        <TemplateColumn Title="Shipment">
+            <a href="/shipments/@context.ShipmentNumber">@context.ShipmentNumber</a>
+        </TemplateColumn>
+        <PropertyColumn Title="Carrier" Property="@(shipment => PlanningText.CarriedBy(shipment.CarriedBy))" />
+        <PropertyColumn Title="Status" Property="@(shipment => TrackingText.Status(shipment.Status))" />
+        <PropertyColumn Title="Last Tracking event" Property="@(shipment => TrackingText.Last(shipment.LastTrackingEvent))" />
+        <PropertyColumn Title="ETA" Property="@(shipment => NorviaTime.Format(shipment.Eta))" />
+        <TemplateColumn Title="Stale">
+            @if (context.IsStale)
+            {
+                <strong>Stale</strong>
+            }
+        </TemplateColumn>
+    </FluentDataGrid>
+</LiveListStates>
+
+@code {
+    private LiveTransportOrderList<ShipmentInProgressSummary> _list = null!;
+
+    protected override void OnInitialized()
+    {
+        _list = new LiveTransportOrderList<ShipmentInProgressSummary>(
+            Queries.ListShipmentsInProgressAsync, "the Shipments in progress", Time, Options.Value.RefreshInterval, Logger);
+        _list.Changed += () => InvokeAsync(StateHasChanged);
+        _list.Start();
+    }
+
+    public async ValueTask DisposeAsync() => await _list.DisposeAsync();
+}

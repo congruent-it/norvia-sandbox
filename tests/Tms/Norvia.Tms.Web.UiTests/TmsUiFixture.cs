@@ -23,6 +23,8 @@ namespace Norvia.Tms.Web.UiTests;
 public sealed class TmsUiFixture : IAsyncLifetime
 {
     private const string IntakeRole = "TransportOrders.Intake";
+    private const string AnswerRole = "CarrierBookings.Answer";
+    private const string TrackingRecordRole = "TrackingEvents.Record";
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
     private readonly string _tokenSigningKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
@@ -31,6 +33,12 @@ public sealed class TmsUiFixture : IAsyncLifetime
 
     /// <summary>A client for the TMS intake API holding the intake role, as the intake Logic App's managed identity does.</summary>
     public HttpClient Intake { get; private set; } = null!;
+
+    /// <summary>A client for the TMS API holding the answer role, as the Carrier-answer Logic App's managed identity does.</summary>
+    public HttpClient Answer { get; private set; } = null!;
+
+    /// <summary>A client for the TMS API holding the record role, as the Carrier-tracking Logic App's managed identity does.</summary>
+    public HttpClient TrackingRecord { get; private set; } = null!;
 
     public Uri TmsUi { get; private set; } = null!;
 
@@ -63,7 +71,11 @@ public sealed class TmsUiFixture : IAsyncLifetime
         await _app.ResourceNotifications.WaitForResourceHealthyAsync("partner-api", startup.Token);
 
         Intake = _app.CreateHttpClient("tms-api");
-        Intake.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", IssueIntakeToken());
+        Intake.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", IssueToken(IntakeRole, LocalTokens.IntakeLogicAppClientId));
+        Answer = _app.CreateHttpClient("tms-api");
+        Answer.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", IssueToken(AnswerRole, LocalTokens.AnswerLogicAppClientId));
+        TrackingRecord = _app.CreateHttpClient("tms-api");
+        TrackingRecord.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", IssueToken(TrackingRecordRole, LocalTokens.TrackingLogicAppClientId));
         TmsUi = _app.GetEndpoint("tms-web", "http");
         PartnerPortal = _app.GetEndpoint("partner-portal-web", "http");
 
@@ -82,14 +94,32 @@ public sealed class TmsUiFixture : IAsyncLifetime
         return await Intake.SendAsync(request, cancellationToken);
     }
 
-    // A token as Entra issues it to the intake Logic App's managed identity, signed with the key the TMS trusts locally.
-    private string IssueIntakeToken() =>
+    /// <summary>Confirms a Carrier booking, as the Carrier-answer Logic App does for a Carrier's answer, each on a trail of its own.</summary>
+    public async Task<HttpResponseMessage> ConfirmAsync(string carrierId, string carrierBookingNumber, string carrierBookingReference, CancellationToken cancellationToken)
+    {
+        var answer = new JsonObject { ["carrierId"] = carrierId, ["outcome"] = "Confirmed", ["carrierBookingReference"] = carrierBookingReference };
+        return await PostAsync(Answer, $"/v1/carrier-bookings/{carrierBookingNumber}/answer", answer, cancellationToken);
+    }
+
+    /// <summary>Records a Canonical Model Tracking event, as the Carrier-tracking Logic App does, each on a trail of its own.</summary>
+    public async Task<HttpResponseMessage> RecordTrackingAsync(JsonObject trackingEvent, CancellationToken cancellationToken) =>
+        await PostAsync(TrackingRecord, "/v1/tracking-events", trackingEvent, cancellationToken);
+
+    private static async Task<HttpResponseMessage> PostAsync(HttpClient caller, string path, JsonObject body, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(path, UriKind.Relative)) { Content = JsonContent.Create(body) };
+        request.Headers.Add("X-Correlation-ID", Guid.NewGuid().ToString());
+        return await caller.SendAsync(request, cancellationToken);
+    }
+
+    // A token as Entra issues it to a Logic App's managed identity, signed with the key the TMS trusts locally.
+    private string IssueToken(string role, string clientId) =>
         new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
         {
             Issuer = LocalTokens.Issuer,
             Audience = LocalTokens.TmsAudience,
             Expires = DateTime.UtcNow.AddHours(1),
-            Claims = new Dictionary<string, object> { ["azp"] = LocalTokens.IntakeLogicAppClientId, ["roles"] = new[] { IntakeRole } },
+            Claims = new Dictionary<string, object> { ["azp"] = clientId, ["roles"] = new[] { role } },
             SigningCredentials = new SigningCredentials(
                 new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_tokenSigningKey)),
                 SecurityAlgorithms.HmacSha256),
@@ -104,6 +134,8 @@ public sealed class TmsUiFixture : IAsyncLifetime
 
         _playwright?.Dispose();
         Intake?.Dispose();
+        Answer?.Dispose();
+        TrackingRecord?.Dispose();
 
         if (_app is not null)
         {

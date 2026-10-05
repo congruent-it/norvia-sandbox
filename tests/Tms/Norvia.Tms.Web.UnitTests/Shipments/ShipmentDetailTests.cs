@@ -133,6 +133,17 @@ public sealed class ShipmentDetailTests : TmsWebContext
             .Contain("Shipment SH-0000012 couldn't be loaded. Reload the page to try again."));
     }
 
+    [Fact]
+    public void Render_AShipment_ShowsItsTrackingTimeline()
+    {
+        Queries.FindShipmentAsync("SH-0000012", Arg.Any<CancellationToken>()).Returns(Samples.Shipment("SH-0000012"));
+        Queries.FindTrackingTimelineAsync("SH-0000012", Arg.Any<CancellationToken>()).Returns([]);
+
+        var page = RenderDetail("SH-0000012");
+
+        page.WaitForAssertion(() => Section(page, "Tracking timeline").TextContent.Should().Contain("No Tracking events have been reported"));
+    }
+
     private static CarrierBookingView Booking(string number, CarrierBookingStatus status) =>
         new(number, Samples.Kessler, status, new DateTimeOffset(2026, 9, 24, 9, 45, 0, TimeSpan.Zero), null, null, null, null, null, null, null, null, null);
 

@@ -4,7 +4,9 @@ using Norvia.Tms.Application.Carriers.ListActive;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shipments.GetByNumber;
 using Norvia.Tms.Application.Shipments.ListAwaitingAnswer;
+using Norvia.Tms.Application.Shipments.ListInProgress;
 using Norvia.Tms.Application.Shipments.ListToRelease;
+using Norvia.Tms.Application.TrackingEvents.Timeline;
 using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.GetByNumber;
 using Norvia.Tms.Application.TransportOrders.GetRejectedBooking;
@@ -47,6 +49,12 @@ internal sealed class TransportOrderQueries(IServiceScopeFactory scopes) : ITran
 
     public Task<IReadOnlyList<CarrierBookingAwaitingAnswerSummary>> ListCarrierBookingsAwaitingAnswerAsync(CancellationToken cancellationToken) =>
         SendAsync(new ListCarrierBookingsAwaitingAnswerQuery(), cancellationToken);
+
+    public Task<IReadOnlyList<ShipmentInProgressSummary>> ListShipmentsInProgressAsync(CancellationToken cancellationToken) =>
+        SendAsync(new ListShipmentsInProgressQuery(), cancellationToken);
+
+    public async Task<IReadOnlyList<TrackingTimelineEntry>?> FindTrackingTimelineAsync(string shipmentNumber, CancellationToken cancellationToken) =>
+        FoundOrNull(await SendAsync(new GetTrackingTimelineQuery(shipmentNumber), cancellationToken), $"the Tracking timeline of Shipment {shipmentNumber}");
 
     private async Task<TResponse> SendAsync<TResponse>(IQuery<TResponse> query, CancellationToken cancellationToken)
     {

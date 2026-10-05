@@ -17,6 +17,7 @@ public sealed record NorviaRole(string Key, string Name, IReadOnlyList<RoleView>
             new("/transport-orders", "Waiting for planning"),
             new("/shipments/to-release", "Shipments to release"),
             new("/shipments/awaiting-answer", "Bookings awaiting an answer"),
+            new("/shipments/in-progress", "Shipments in progress"),
         ]);
 
     public static readonly NorviaRole CustomerService = new("customer-service", "Customer service",
