@@ -120,7 +120,7 @@ public sealed class RecordProofOfDeliveryHandlerTests
     {
         var shipment = Found(ShipmentStatus.Delivered);
         var earlier = ProofOfDelivery.Record(shipment, Report(documentId: "doc-0"), new CorrelationId("corr-old"), Samples.Now);
-        _proofsOfDelivery.SingleOrDefaultAsync(Arg.Is<CurrentProofOfDeliveryToReplaceSpec>(s => s.ShipmentId == shipment.Id), Arg.Any<CancellationToken>()).Returns(earlier);
+        _proofsOfDelivery.SingleOrDefaultAsync(Arg.Is<TrackedCurrentProofOfDeliverySpec>(s => s.ShipmentId == shipment.Id), Arg.Any<CancellationToken>()).Returns(earlier);
 
         var result = await _handler.Handle(Command(), CancellationToken.None);
 
