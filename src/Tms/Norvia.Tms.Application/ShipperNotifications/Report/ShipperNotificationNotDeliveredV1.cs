@@ -19,6 +19,7 @@ public sealed record ShipperNotificationNotDeliveredV1(
     string NotificationId,
     string ExceptionNumber,
     string ShipmentNumber,
+    string TransportOrderNumber,
     string ShipperId,
     int StatusCode,
     string Message)
@@ -41,6 +42,7 @@ public sealed record ShipperNotificationNotDeliveredV1(
             notification.Id.ToString(),
             notification.ExceptionNumber.Value,
             notification.ShipmentNumber.Value,
+            notification.TransportOrderNumber.Value,
             notification.ShipperId.Value,
             notification.NotDeliveredStatusCode ?? throw NotReported(notification),
             notification.NotDeliveredMessage ?? throw NotReported(notification));
@@ -53,6 +55,7 @@ public sealed record ShipperNotificationNotDeliveredV1(
     [
         new(TrackingKeys.Flow, Flows.ExceptionHandling),
         new(TrackingKeys.PartyId, ShipperId),
+        new(TrackingKeys.TransportOrderNumber, TransportOrderNumber),
         new(TrackingKeys.ShipmentNumber, ShipmentNumber),
     ];
 }

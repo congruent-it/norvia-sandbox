@@ -5,6 +5,3 @@ namespace Norvia.Tms.Application.Exceptions.ShipperNotificationTemplate;
 
 /// <summary>The message the Planner's Notify Shipper starts with for the Exception's type (P7), which the Planner can edit.</summary>
 public sealed record ShipperNotificationTemplateQuery(string ExceptionNumber) : IQuery<Result<ShipperNotificationTemplateResult>>;
-
-/// <summary>The message Notify Shipper is prefilled with.</summary>
-public sealed record ShipperNotificationTemplateResult(string ExceptionNumber, string Message);
