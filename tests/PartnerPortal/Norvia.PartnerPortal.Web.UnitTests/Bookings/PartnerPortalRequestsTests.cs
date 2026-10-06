@@ -11,12 +11,14 @@ using Norvia.PartnerPortal.Application.CarrierBookings.AnswerSettings;
 using Norvia.PartnerPortal.Application.CarrierShipments;
 using Norvia.PartnerPortal.Application.CarrierShipments.List;
 using Norvia.PartnerPortal.Application.CarrierShipments.Send;
+using Norvia.PartnerPortal.Application.CarrierShipments.SendProofOfDelivery;
 using Norvia.PartnerPortal.Application.CarrierShipments.TrackingSettings;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Application.Personas.List;
 using Norvia.PartnerPortal.Domain.Bookings;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
 using Norvia.PartnerPortal.Web.Bookings;
+using Norvia.PartnerPortal.Web.CarrierShipments;
 
 namespace Norvia.PartnerPortal.Web.UnitTests.Bookings;
 
@@ -97,6 +99,25 @@ public sealed class PartnerPortalRequestsTests : IDisposable
 
         (await _portal.SendTrackingEventAsync("van-dijk-transport", "CB-0000001", TrackingEventType.Collected, Xunit.TestContext.Current.CancellationToken)).Should().BeSameAs(sent);
         (await _portal.SendTrackingEventAsync("van-dijk-transport", "CB-0000009", TrackingEventType.Collected, Xunit.TestContext.Current.CancellationToken)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task SendProofOfDeliveryAsync_SendsTheDraftAsThePersona_AndReturnsWhatBecameOfIt_OrNullForNone()
+    {
+        var details = new CarrierBookingDetails(new CarrierBookingStop(null, null, null, null, null, null), new CarrierBookingStop(null, null, null, null, null, null), null, []);
+        var shipment = new CarrierShipmentView("CB-0000001", "SH-0000001", "VDT-1", details, ShipmentStage.Delivered, [], []);
+        var files = new[] { new ProofOfDeliveryUpload("cmr.pdf", "application/pdf", [1]) };
+        var sent = new SentProofOfDelivery(
+            shipment, new CarrierProofOfDelivery("doc-1", "VDT-1", "CB-0000001", "J. Jansen", Samples.SentAt, "Utrecht", "3511 AW", "NLD", ProofOfDeliveryCondition.Clean, null, []),
+            TrackingReply.Accepted("m-1"));
+        var draft = new ProofOfDeliveryDraft("J. Jansen", ProofOfDeliveryCondition.Clean, null, files);
+        _mediator.Send(new SendProofOfDeliveryCommand("van-dijk-transport", "CB-0000001", "J. Jansen", ProofOfDeliveryCondition.Clean, null, files), Arg.Any<CancellationToken>())
+            .Returns(Result.Success(sent));
+        _mediator.Send(new SendProofOfDeliveryCommand("van-dijk-transport", "CB-0000009", "J. Jansen", ProofOfDeliveryCondition.Clean, null, files), Arg.Any<CancellationToken>())
+            .Returns(Result<SentProofOfDelivery>.NotFound());
+
+        (await _portal.SendProofOfDeliveryAsync("van-dijk-transport", "CB-0000001", draft, Xunit.TestContext.Current.CancellationToken)).Should().BeSameAs(sent);
+        (await _portal.SendProofOfDeliveryAsync("van-dijk-transport", "CB-0000009", draft, Xunit.TestContext.Current.CancellationToken)).Should().BeNull();
     }
 
     [Fact]

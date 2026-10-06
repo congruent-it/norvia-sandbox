@@ -49,7 +49,7 @@ public sealed class ShipmentsTests : PortalWebContext
         var page = RenderShipments(Shipment());
 
         ButtonsOf(page).Should().Equal(
-            "Collected (PU)", "Delivered (POD)", "Collection failed (NPU)", "Delivery failed (NDL)", "Damaged (DMG)");
+            "Collected (PU)", "Delivered (POD)", "Collection failed (NPU)", "Delivery failed (NDL)", "Damaged (DMG)", "Send Proof of delivery");
     }
 
     [Fact]
@@ -57,7 +57,7 @@ public sealed class ShipmentsTests : PortalWebContext
     {
         var page = RenderShipments(Shipment(lastProgress: TrackingEventType.Collected));
 
-        ButtonsOf(page).Should().Equal("Departed (DEP)", "Delivered (POD)", "Delivery failed (NDL)", "Damaged (DMG)");
+        ButtonsOf(page).Should().Equal("Departed (DEP)", "Delivered (POD)", "Delivery failed (NDL)", "Damaged (DMG)", "Send Proof of delivery");
     }
 
     [Fact]
@@ -65,13 +65,13 @@ public sealed class ShipmentsTests : PortalWebContext
     {
         var page = RenderShipments(Shipment(lastProgress: TrackingEventType.Arrived));
 
-        ButtonsOf(page).Should().Equal("Out for delivery (OFD)", "Delivered (POD)", "Delivery failed (NDL)", "Damaged (DMG)");
+        ButtonsOf(page).Should().Equal("Out for delivery (OFD)", "Delivered (POD)", "Delivery failed (NDL)", "Damaged (DMG)", "Send Proof of delivery");
     }
 
     [Fact]
     public void Render_WithNoShipments_SaysSo()
     {
-        RenderShipments().Find("[role=status]").TextContent.Should().Contain("no Booked, Collected or In transit Shipment");
+        RenderShipments().Find("[role=status]").TextContent.Should().Contain("has no Shipment");
     }
 
     [Fact]
@@ -110,7 +110,7 @@ public sealed class ShipmentsTests : PortalWebContext
     }
 
     [Fact]
-    public void Click_Delivered_TakesTheShipmentOffTheList()
+    public void Click_Delivered_KeepsTheShipmentOnTheList_ForItsProofOfDelivery()
     {
         var delivered = Shipment(lastProgress: TrackingEventType.Delivered);
         Portal.SendTrackingEventAsync("van-dijk-transport", "CB-0000001", TrackingEventType.Delivered, Arg.Any<CancellationToken>())
@@ -119,7 +119,13 @@ public sealed class ShipmentsTests : PortalWebContext
 
         page.Find("[aria-label=\"Delivered (POD) for CB-0000001\"]").Click();
 
-        page.WaitForAssertion(() => page.FindAll("tbody tr").Should().ContainSingle().Which.TextContent.Should().Contain("CB-0000002"));
+        page.WaitForAssertion(() =>
+        {
+            var rows = page.FindAll("tbody tr");
+            rows.Should().HaveCount(2);
+            rows[0].TextContent.Should().Contain("Delivered");
+            rows[0].QuerySelectorAll("fluent-button").Select(button => button.TextContent.Trim()).Should().Equal("Send Proof of delivery");
+        });
     }
 
     [Fact]
@@ -155,7 +161,7 @@ public sealed class ShipmentsTests : PortalWebContext
     {
         Portal.ListCarrierShipmentsAsync("van-dijk-transport", Arg.Any<CancellationToken>()).Returns([], [Shipment("CB-0000001")]);
         var page = Render<Shipments>(parameters => parameters.Add(component => component.PersonaId, "van-dijk-transport"));
-        page.Find("[role=status]").TextContent.Should().Contain("no Booked");
+        page.Find("[role=status]").TextContent.Should().Contain("has no Shipment");
 
         Time.Advance(Shipments.RefreshInterval);
 

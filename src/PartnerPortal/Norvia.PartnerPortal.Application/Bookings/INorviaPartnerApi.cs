@@ -27,4 +27,11 @@ public interface INorviaPartnerApi
     /// unreachable is a reply, not an error: <see cref="TrackingResult.NotReceived"/>.
     /// </summary>
     Task<TrackingReply> SubmitTrackingAsync(Persona persona, string shipmentNumber, CarrierTrackingEvent trackingEvent, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Sends a Proof of delivery as the Carrier Persona, with its own token and subscription key, its files in the one body.
+    /// The Carrier is the one in the token, never named by the Proof of delivery (ADR 0005). The Shipment number is for the
+    /// portal's own trace: it is not sent. Norvia unreachable is a reply, not an error: <see cref="TrackingResult.NotReceived"/>.
+    /// </summary>
+    Task<TrackingReply> SubmitProofOfDeliveryAsync(Persona persona, string shipmentNumber, CarrierProofOfDelivery proof, CancellationToken cancellationToken);
 }

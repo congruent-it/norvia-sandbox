@@ -12,6 +12,10 @@
   <ItemGroup>
     <None Include="..\..\..\seed\norvia.seed.json" Link="seed\norvia.seed.json" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
+  <!-- The sample CMR a presenter can attach to a Proof of delivery instead of a file of their own. -->
+  <ItemGroup>
+    <EmbeddedResource Include="CarrierShipments/sample-cmr.pdf" LogicalName="sample-cmr.pdf" />
+  </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Norvia.PartnerPortal.Web.UnitTests" />
   </ItemGroup>

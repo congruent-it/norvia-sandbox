@@ -4,9 +4,11 @@ using Norvia.PartnerPortal.Application.CarrierBookings.Answer;
 using Norvia.PartnerPortal.Application.CarrierBookings.AnswerSettings;
 using Norvia.PartnerPortal.Application.CarrierShipments;
 using Norvia.PartnerPortal.Application.CarrierShipments.Send;
+using Norvia.PartnerPortal.Application.CarrierShipments.SendProofOfDelivery;
 using Norvia.PartnerPortal.Application.CarrierShipments.TrackingSettings;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
+using Norvia.PartnerPortal.Web.CarrierShipments;
 
 namespace Norvia.PartnerPortal.Web.Bookings;
 
@@ -42,7 +44,7 @@ public interface IPartnerPortal
     /// </summary>
     Task<CarrierAnswerSettingsView?> ChangeCarrierAnswerSettingsAsync(string personaId, CarrierAnswerSettingsView settings, CancellationToken cancellationToken);
 
-    /// <summary>The Carrier Persona's Booked, Collected and In transit Shipments, the latest first.</summary>
+    /// <summary>The Carrier Persona's Shipments, Booked or later and Delivered ones too, the latest first.</summary>
     Task<IReadOnlyList<CarrierShipmentView>> ListCarrierShipmentsAsync(string personaId, CancellationToken cancellationToken);
 
     /// <summary>
@@ -50,6 +52,13 @@ public interface IPartnerPortal
     /// and how the Shipment now stands; null when there is no such Carrier Persona or Shipment.
     /// </summary>
     Task<SentTrackingEvent?> SendTrackingEventAsync(string personaId, string carrierBookingNumber, TrackingEventType type, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Sends a Proof of delivery for one of the Carrier Persona's Shipments to Norvia, and returns what the Partner API
+    /// replied; null when there is no such Carrier Persona or Shipment.
+    /// </summary>
+    Task<SentProofOfDelivery?> SendProofOfDeliveryAsync(
+        string personaId, string carrierBookingNumber, ProofOfDeliveryDraft draft, CancellationToken cancellationToken);
 
     /// <summary>How the Carrier Persona sends Tracking events now; null when there is no such Carrier Persona.</summary>
     Task<CarrierTrackingSettingsView?> GetCarrierTrackingSettingsAsync(string personaId, CancellationToken cancellationToken);

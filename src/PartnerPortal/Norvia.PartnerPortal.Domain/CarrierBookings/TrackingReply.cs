@@ -1,6 +1,6 @@
 namespace Norvia.PartnerPortal.Domain.CarrierBookings;
 
-/// <summary>What Norvia's Partner API answered to a Tracking event. It accepts one and says no more (ADR 0008).</summary>
+/// <summary>What Norvia's Partner API answered to a Tracking event or a Proof of delivery. It accepts one and says no more (ADR 0008).</summary>
 public sealed record TrackingReply
 {
     private TrackingReply(TrackingResult result, string? messageId, string? text)

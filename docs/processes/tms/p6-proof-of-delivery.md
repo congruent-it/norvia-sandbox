@@ -122,7 +122,7 @@ The timeline shows Proofs of delivery alongside the Tracking events, in time ord
 
 ## Partner portal
 
-Each Shipment in a Carrier Persona's list offers **Send Proof of delivery** once it is Booked. The form asks for received by, condition, remark and files: uploaded, or a sample CMR bundled with the portal.
+Each Shipment in a Carrier Persona's list, Delivered ones included, offers **Send Proof of delivery** once it is Booked. The form asks for received by, condition, remark (required with reservations) and files, 1 to 5: uploaded, or a sample CMR bundled with the portal. Nothing is sent until the presenter sends it.
 
 The tracking modes from P5 decide whether one is sent automatically:
 

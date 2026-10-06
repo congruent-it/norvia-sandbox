@@ -1,6 +1,6 @@
 namespace Norvia.PartnerPortal.Domain.CarrierBookings;
 
-/// <summary>What the Norvia Partner API answered to a Tracking event.</summary>
+/// <summary>What the Norvia Partner API answered to a Tracking event or a Proof of delivery.</summary>
 public enum TrackingResult
 {
     /// <summary>API Management took the event in. Whether the TMS records it is for Norvia to see.</summary>
