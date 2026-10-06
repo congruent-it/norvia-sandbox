@@ -28,11 +28,17 @@ public sealed class LocalPartnerApiFactory : WebApplicationFactory<Program>
     public const string IntakeClientId = "norvia-local-intake-logic-app";
     public const string AnswerClientId = "norvia-local-answer-logic-app";
 
+    public LocalPartnerApiFactory() => ProofOfDeliveryQueue = new(InboundProofsOfDelivery);
+
     public byte[] SigningKey { get; } = RandomNumberGenerator.GetBytes(64);
 
     public StubTms Tms { get; } = new();
 
     internal StubTrackingQueue TrackingQueue { get; } = new();
+
+    internal StubInboundProofsOfDelivery InboundProofsOfDelivery { get; } = new();
+
+    internal StubProofOfDeliveryQueue ProofOfDeliveryQueue { get; }
 
     /// <summary>What the stand-in logged, with its scopes: the tracking keys its traces carry (coding guidelines §7).</summary>
     public FakeLogCollector Logs => Services.GetRequiredService<FakeLogCollector>();
@@ -64,6 +70,8 @@ public sealed class LocalPartnerApiFactory : WebApplicationFactory<Program>
         {
             services.AddLogging(logging => logging.AddFakeLogging());
             services.AddSingleton<ITrackingQueue>(TrackingQueue);
+            services.AddSingleton<IInboundProofsOfDelivery>(InboundProofsOfDelivery);
+            services.AddSingleton<IProofOfDeliveryQueue>(ProofOfDeliveryQueue);
             services.AddHttpClient<TmsIntake>().ConfigurePrimaryHttpMessageHandler(() => Tms);
             services.AddHttpClient<TmsCarrierAnswers>().ConfigurePrimaryHttpMessageHandler(() => Tms);
             // Retries straight away, so a test of an unreachable TMS doesn't wait out the backoff.
@@ -101,6 +109,8 @@ public sealed class LocalPartnerApiFactory : WebApplicationFactory<Program>
     public static string Sample(string name) => Embedded($"PartnerApi/samples/bookings/{name}");
 
     public static string CarrierTrackingSample(string name) => Embedded($"PartnerApi/samples/carrier-tracking/{name}");
+
+    public static string CarrierProofOfDeliverySample(string name) => Embedded($"PartnerApi/samples/carrier-proofs-of-delivery/{name}");
 
     public static string CarrierAnswerSample(string name) => Embedded($"PartnerApi/samples/carrier-answers/{name}");
 

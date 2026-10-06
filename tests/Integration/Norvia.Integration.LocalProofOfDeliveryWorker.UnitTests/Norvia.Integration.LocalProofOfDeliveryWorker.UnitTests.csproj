@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <Include>[Norvia.Integration.LocalProofOfDeliveryWorker]*</Include>
+    <!-- Program.cs is the composition root (coding guidelines §10). -->
+    <ExcludeByFile>**/Program.cs</ExcludeByFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="coverlet.msbuild" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.Testing" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+    <PackageReference Include="xunit.v3.mtp-off" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="Norvia.Integration.UnitTests" />
+    <Compile Include="..\Shared\StubHttp.cs" Link="StubHttp.cs" />
+    <Using Include="AwesomeAssertions" />
+    <ProjectReference Include="..\..\..\src\Integration\Norvia.Integration.LocalProofOfDeliveryWorker\Norvia.Integration.LocalProofOfDeliveryWorker.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\carrier-proofs-of-delivery\*.carrier-proof-of-delivery.json" LogicalName="PartnerApi/samples/carrier-proofs-of-delivery/%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

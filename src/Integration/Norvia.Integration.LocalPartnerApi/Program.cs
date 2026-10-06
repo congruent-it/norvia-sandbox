@@ -6,6 +6,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 builder.AddAzureServiceBusClient("messaging");
+builder.AddAzureBlobServiceClient("blobs");
 
 // Data annotations don't look inside the token options, so they are checked here too.
 builder.Services.AddOptions<PartnerApiOptions>().BindConfiguration(PartnerApiOptions.SectionName)
@@ -21,6 +22,8 @@ builder.Services.AddOptions<TmsOptions>().BindConfiguration(TmsOptions.SectionNa
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<PartnerEdge>();
 builder.Services.AddSingleton<ITrackingQueue, ServiceBusTrackingQueue>();
+builder.Services.AddSingleton<IInboundProofsOfDelivery, BlobInboundProofsOfDelivery>();
+builder.Services.AddSingleton<IProofOfDeliveryQueue, ServiceBusProofOfDeliveryQueue>();
 builder.Services.AddHttpClient<TmsIntake>((services, http) =>
     http.BaseAddress = services.GetRequiredService<IOptions<TmsOptions>>().Value.BaseAddress);
 builder.Services.AddHttpClient<TmsCarrierAnswers>((services, http) =>
@@ -32,5 +35,6 @@ app.MapDefaultEndpoints();
 app.MapSubmitTransportOrder();
 app.MapAnswerCarrierBooking();
 app.MapSubmitCarrierTracking();
+app.MapSubmitCarrierProofOfDelivery();
 
 await app.RunAsync();

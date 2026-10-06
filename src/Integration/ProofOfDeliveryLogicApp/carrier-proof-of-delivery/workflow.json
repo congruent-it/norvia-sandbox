@@ -1,0 +1,389 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "triggers": {
+      "When_a_Carrier_Proof_of_delivery_is_available": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "queueName": "carrier-proof-of-delivery",
+            "isSessionsEnabled": false
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBus",
+            "operationId": "peekLockQueueMessages",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "correlation": {
+          "clientTrackingId": "@{triggerOutputs()?['body']?['userProperties']?['correlationId']}"
+        }
+      }
+    },
+    "actions": {
+      "Track_the_message": {
+        "type": "Compose",
+        "inputs": {
+          "correlationId": "@triggerBody()?['userProperties']?['correlationId']",
+          "partyId": "@triggerBody()?['userProperties']?['partyId']",
+          "sourceMessageId": "@triggerBody()?['userProperties']?['sourceMessageId']",
+          "blobName": "@json(base64ToString(triggerBody()?['contentData']))?['blobName']"
+        },
+        "runAfter": {},
+        "trackedProperties": {
+          "correlationId": "@action()?['inputs']?['correlationId']",
+          "flow": "carrier-proof-of-delivery",
+          "partyId": "@action()?['inputs']?['partyId']",
+          "sourceMessageId": "@action()?['inputs']?['sourceMessageId']"
+        }
+      },
+      "Read_the_blob": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "containerName": "@parameters('inboundContainer')",
+            "blobName": "@{outputs('Track_the_message')?['blobName']}"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "AzureBlob",
+            "operationId": "readBlob",
+            "serviceProviderId": "/serviceProviders/AzureBlob"
+          }
+        },
+        "runAfter": {
+          "Track_the_message": [
+            "Succeeded"
+          ]
+        },
+        "trackedProperties": {
+          "correlationId": "@outputs('Track_the_message')?['correlationId']",
+          "flow": "carrier-proof-of-delivery",
+          "partyId": "@outputs('Track_the_message')?['partyId']",
+          "sourceMessageId": "@outputs('Track_the_message')?['sourceMessageId']",
+          "outcome": "@if(equals(action()?['status'], 'Failed'), 'DeadLettered', null)",
+          "failureCode": "@if(equals(action()?['status'], 'Failed'), 'ProofOfDeliveryBlobMissing', null)"
+        }
+      },
+      "Dead_letter_the_missing_blob": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "lockToken": "@triggerBody()?['lockToken']",
+            "deadLetterReason": "ProofOfDeliveryBlobMissing",
+            "deadLetterErrorDescription": "The Proof of delivery's blob could not be read from the inbound container."
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBus",
+            "operationId": "deadLetterQueueMessage",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "runAfter": {
+          "Read_the_blob": [
+            "Failed"
+          ]
+        },
+        "trackedProperties": {
+          "correlationId": "@outputs('Track_the_message')?['correlationId']",
+          "flow": "carrier-proof-of-delivery",
+          "partyId": "@outputs('Track_the_message')?['partyId']",
+          "sourceMessageId": "@outputs('Track_the_message')?['sourceMessageId']",
+          "outcome": "DeadLettered",
+          "failureCode": "ProofOfDeliveryBlobMissing"
+        }
+      },
+      "Fail_the_run_on_the_missing_blob": {
+        "type": "Terminate",
+        "inputs": {
+          "runStatus": "Failed",
+          "runError": {
+            "code": "ProofOfDeliveryBlobMissing",
+            "message": "The Proof of delivery's blob could not be read, so the message was dead-lettered."
+          }
+        },
+        "runAfter": {
+          "Dead_letter_the_missing_blob": [
+            "Succeeded",
+            "Failed"
+          ]
+        }
+      },
+      "Map_the_proof_of_delivery": {
+        "type": "InvokeFunction",
+        "inputs": {
+          "functionName": "MapCarrierProofOfDelivery",
+          "parameters": {
+            "carrierProofOfDelivery": "@{body('Read_the_blob')?['content']}",
+            "carrierId": "@{outputs('Track_the_message')?['partyId']}"
+          }
+        },
+        "runAfter": {
+          "Read_the_blob": [
+            "Succeeded"
+          ]
+        },
+        "trackedProperties": {
+          "correlationId": "@outputs('Track_the_message')?['correlationId']",
+          "flow": "carrier-proof-of-delivery",
+          "partyId": "@outputs('Track_the_message')?['partyId']",
+          "sourceMessageId": "@outputs('Track_the_message')?['sourceMessageId']",
+          "outcome": "@if(equals(action()?['status'], 'Failed'), 'DeadLettered', null)",
+          "failureCode": "@if(equals(action()?['status'], 'Failed'), 'UnmappableProofOfDelivery', null)"
+        }
+      },
+      "Dead_letter_the_unmappable_message": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "lockToken": "@triggerBody()?['lockToken']",
+            "deadLetterReason": "UnmappableProofOfDelivery",
+            "deadLetterErrorDescription": "The Carrier's Proof of delivery could not be mapped: its content is not a Proof of delivery the map can read."
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBus",
+            "operationId": "deadLetterQueueMessage",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "runAfter": {
+          "Map_the_proof_of_delivery": [
+            "Failed"
+          ]
+        },
+        "trackedProperties": {
+          "correlationId": "@outputs('Track_the_message')?['correlationId']",
+          "flow": "carrier-proof-of-delivery",
+          "partyId": "@outputs('Track_the_message')?['partyId']",
+          "sourceMessageId": "@outputs('Track_the_message')?['sourceMessageId']",
+          "outcome": "DeadLettered",
+          "failureCode": "UnmappableProofOfDelivery"
+        }
+      },
+      "Fail_the_run_on_the_unmappable_message": {
+        "type": "Terminate",
+        "inputs": {
+          "runStatus": "Failed",
+          "runError": {
+            "code": "UnmappableProofOfDelivery",
+            "message": "The Carrier's Proof of delivery could not be mapped, so it was dead-lettered."
+          }
+        },
+        "runAfter": {
+          "Dead_letter_the_unmappable_message": [
+            "Succeeded",
+            "Failed"
+          ]
+        }
+      },
+      "Record_in_the_TMS": {
+        "type": "Http",
+        "inputs": {
+          "method": "POST",
+          "uri": "@{parameters('tmsBaseUrl')}/v1/proofs-of-delivery",
+          "headers": {
+            "X-Correlation-ID": "@{outputs('Track_the_message')?['correlationId']}"
+          },
+          "authentication": {
+            "type": "ManagedServiceIdentity",
+            "identity": "@parameters('proofOfDeliveryIdentityId')",
+            "audience": "@parameters('tmsAudience')"
+          },
+          "body": "@json(body('Map_the_proof_of_delivery'))",
+          "retryPolicy": {
+            "type": "none"
+          }
+        },
+        "runAfter": {
+          "Map_the_proof_of_delivery": [
+            "Succeeded"
+          ]
+        },
+        "trackedProperties": {
+          "correlationId": "@outputs('Track_the_message')?['correlationId']",
+          "flow": "carrier-proof-of-delivery",
+          "partyId": "@outputs('Track_the_message')?['partyId']",
+          "sourceMessageId": "@outputs('Track_the_message')?['sourceMessageId']",
+          "shipmentNumber": "@actions('Record_in_the_TMS')?['outputs']?['body']?['shipmentNumber']",
+          "carrierBookingNumber": "@json(body('Map_the_proof_of_delivery'))?['$multipart']?[0]?['body']?['carrierBookingNumber']",
+          "outcome": "@if(and(greaterOrEquals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', if(or(equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 500)), 'Retrying', 'DeadLettered'))",
+          "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 500)), 'TmsUnavailable', coalesce(actions('Record_in_the_TMS')?['outputs']?['body']?['code'], 'TmsCallRefused')))"
+        }
+      },
+      "Settle_the_message": {
+        "type": "If",
+        "expression": {
+          "and": [
+            {
+              "greaterOrEquals": [
+                "@coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0)",
+                200
+              ]
+            },
+            {
+              "less": [
+                "@coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0)",
+                300
+              ]
+            }
+          ]
+        },
+        "actions": {
+          "Delete_the_blob": {
+            "type": "ServiceProvider",
+            "inputs": {
+              "parameters": {
+                "containerName": "@parameters('inboundContainer')",
+                "blobName": "@{outputs('Track_the_message')?['blobName']}"
+              },
+              "serviceProviderConfiguration": {
+                "connectionName": "AzureBlob",
+                "operationId": "deleteBlob",
+                "serviceProviderId": "/serviceProviders/AzureBlob"
+              }
+            },
+            "runAfter": {},
+            "trackedProperties": {
+              "correlationId": "@outputs('Track_the_message')?['correlationId']",
+              "flow": "carrier-proof-of-delivery",
+              "partyId": "@outputs('Track_the_message')?['partyId']",
+              "sourceMessageId": "@outputs('Track_the_message')?['sourceMessageId']",
+              "outcome": "Succeeded"
+            }
+          },
+          "Complete_the_message": {
+            "type": "ServiceProvider",
+            "inputs": {
+              "parameters": {
+                "lockToken": "@triggerBody()?['lockToken']"
+              },
+              "serviceProviderConfiguration": {
+                "connectionName": "serviceBus",
+                "operationId": "completeQueueMessage",
+                "serviceProviderId": "/serviceProviders/serviceBus"
+              }
+            },
+            "runAfter": {
+              "Delete_the_blob": [
+                "Succeeded"
+              ]
+            }
+          }
+        },
+        "else": {
+          "actions": {
+            "Settle_the_refused_or_unreached_message": {
+              "type": "If",
+              "expression": {
+                "and": [
+                  {
+                    "not": {
+                      "equals": [
+                        "@or(equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 500))",
+                        true
+                      ]
+                    }
+                  }
+                ]
+              },
+              "actions": {
+                "Dead_letter_the_refused_message": {
+                  "type": "ServiceProvider",
+                  "inputs": {
+                    "parameters": {
+                      "lockToken": "@triggerBody()?['lockToken']",
+                      "deadLetterReason": "@coalesce(actions('Record_in_the_TMS')?['outputs']?['body']?['code'], 'TmsCallRefused')",
+                      "deadLetterErrorDescription": "@coalesce(actions('Record_in_the_TMS')?['outputs']?['body']?['detail'], actions('Record_in_the_TMS')?['outputs']?['body']?['title'], 'The TMS refused the Proof of delivery.')"
+                    },
+                    "serviceProviderConfiguration": {
+                      "connectionName": "serviceBus",
+                      "operationId": "deadLetterQueueMessage",
+                      "serviceProviderId": "/serviceProviders/serviceBus"
+                    }
+                  },
+                  "runAfter": {},
+                  "trackedProperties": {
+                    "correlationId": "@outputs('Track_the_message')?['correlationId']",
+                    "flow": "carrier-proof-of-delivery",
+                    "partyId": "@outputs('Track_the_message')?['partyId']",
+                    "sourceMessageId": "@outputs('Track_the_message')?['sourceMessageId']",
+                    "outcome": "DeadLettered",
+                    "failureCode": "@coalesce(actions('Record_in_the_TMS')?['outputs']?['body']?['code'], 'TmsCallRefused')"
+                  }
+                },
+                "Fail_the_run_on_the_refused_message": {
+                  "type": "Terminate",
+                  "inputs": {
+                    "runStatus": "Failed",
+                    "runError": {
+                      "code": "TmsCallRefused",
+                      "message": "The TMS refused the Proof of delivery, so the message was dead-lettered and the blob kept."
+                    }
+                  },
+                  "runAfter": {
+                    "Dead_letter_the_refused_message": [
+                      "Succeeded",
+                      "Failed"
+                    ]
+                  }
+                }
+              },
+              "else": {
+                "actions": {
+                  "Abandon_the_message_to_retry": {
+                    "type": "ServiceProvider",
+                    "inputs": {
+                      "parameters": {
+                        "lockToken": "@triggerBody()?['lockToken']"
+                      },
+                      "serviceProviderConfiguration": {
+                        "connectionName": "serviceBus",
+                        "operationId": "abandonQueueMessage",
+                        "serviceProviderId": "/serviceProviders/serviceBus"
+                      }
+                    },
+                    "runAfter": {},
+                    "trackedProperties": {
+                      "correlationId": "@outputs('Track_the_message')?['correlationId']",
+                      "flow": "carrier-proof-of-delivery",
+                      "partyId": "@outputs('Track_the_message')?['partyId']",
+                      "sourceMessageId": "@outputs('Track_the_message')?['sourceMessageId']",
+                      "outcome": "Retrying",
+                      "failureCode": "TmsUnavailable"
+                    }
+                  },
+                  "Fail_the_run_on_the_unreached_TMS": {
+                    "type": "Terminate",
+                    "inputs": {
+                      "runStatus": "Failed",
+                      "runError": {
+                        "code": "TmsUnavailable",
+                        "message": "The TMS could not be reached, so the message goes back on the queue."
+                      }
+                    },
+                    "runAfter": {
+                      "Abandon_the_message_to_retry": [
+                        "Succeeded",
+                        "Failed"
+                      ]
+                    }
+                  }
+                }
+              },
+              "runAfter": {}
+            }
+          }
+        },
+        "runAfter": {
+          "Record_in_the_TMS": [
+            "Succeeded",
+            "Failed",
+            "TimedOut"
+          ]
+        }
+      }
+    },
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

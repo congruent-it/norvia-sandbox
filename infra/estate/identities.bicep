@@ -28,6 +28,8 @@ var recordProofRole = 'ProofsOfDelivery.Record'
 var recordProofRoleId = guid('norvia-tms-api', environmentName, recordProofRole)
 var trackingSubmitRole = 'Tracking.Submit'
 var trackingSubmitRoleId = guid('norvia-partner-api', environmentName, trackingSubmitRole)
+var proofSubmitRole = 'ProofsOfDelivery.Submit'
+var proofSubmitRoleId = guid('norvia-partner-api', environmentName, proofSubmitRole)
 var respondRole = 'CarrierBookings.Respond'
 var respondRoleId = guid('norvia-partner-api', environmentName, respondRole)
 var submitRole = 'TransportOrders.Submit'
@@ -184,6 +186,21 @@ resource recordRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
   principalId: trackingIdentity.properties.principalId
 }
 
+// The Carrier Proof of delivery Logic App's identity, which it runs as. It is the one principal holding the Proof of delivery
+// record role (P12's Driver reports Logic App will hold it too), so nothing records a Carrier's Proof of delivery in the TMS
+// without passing the integration layer.
+resource proofOfDeliveryIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
+  name: 'id-proof-of-delivery-${uniqueString(resourceGroup().id)}'
+  location: location
+  tags: tags
+}
+
+resource recordProofRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: tmsApiPrincipal.id
+  appRoleId: recordProofRoleId
+  principalId: proofOfDeliveryIdentity.properties.principalId
+}
+
 // The TMS UI's identity, which it calls the TMS API as. It is the one principal holding the manage role, so only the
 // TMS UI re-rates. Aspire deploys the TMS UI; the estate owns the identity because it grants it the role.
 resource tmsUiIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
@@ -255,6 +272,16 @@ resource partnerApi 'Microsoft.Graph/applications@v1.0' = {
       ]
       isEnabled: true
     }
+    {
+      id: proofSubmitRoleId
+      value: proofSubmitRole
+      displayName: 'Submit Carrier Proofs of delivery'
+      description: 'Prove a delivery as a Carrier, with a Proof of delivery and its files. Only Carrier Personas hold it.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
   ]
 }
 
@@ -314,6 +341,15 @@ resource trackingSubmitRoleGrants 'Microsoft.Graph/appRoleAssignedTo@v1.0' = [
   for (persona, i) in personas: if (persona.party.type == 'Carrier') {
     resourceId: partnerApiPrincipal.id
     appRoleId: trackingSubmitRoleId
+    principalId: personaPrincipals[i].id
+  }
+]
+
+// Carrier Personas may submit Proofs of delivery too; the others may not.
+resource proofSubmitRoleGrants 'Microsoft.Graph/appRoleAssignedTo@v1.0' = [
+  for (persona, i) in personas: if (persona.party.type == 'Carrier') {
+    resourceId: partnerApiPrincipal.id
+    appRoleId: proofSubmitRoleId
     principalId: personaPrincipals[i].id
   }
 ]
@@ -504,6 +540,10 @@ output trackingIdentityId string = trackingIdentity.id
 output trackingIdentityName string = trackingIdentity.name
 output trackingPrincipalId string = trackingIdentity.properties.principalId
 output trackingClientId string = trackingIdentity.properties.clientId
+output proofOfDeliveryIdentityId string = proofOfDeliveryIdentity.id
+output proofOfDeliveryIdentityName string = proofOfDeliveryIdentity.name
+output proofOfDeliveryPrincipalId string = proofOfDeliveryIdentity.properties.principalId
+output proofOfDeliveryClientId string = proofOfDeliveryIdentity.properties.clientId
 output bookingIdentityId string = bookingIdentity.id
 output bookingIdentityName string = bookingIdentity.name
 output bookingPrincipalId string = bookingIdentity.properties.principalId

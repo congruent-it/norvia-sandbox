@@ -1,0 +1,18 @@
+{
+  "tmsBaseUrl": {
+    "type": "String",
+    "value": "@appsetting('TMS_BASE_URL')"
+  },
+  "tmsAudience": {
+    "type": "String",
+    "value": "@appsetting('TMS_API_CLIENT_ID')"
+  },
+  "proofOfDeliveryIdentityId": {
+    "type": "String",
+    "value": "@appsetting('PROOF_OF_DELIVERY_IDENTITY_ID')"
+  },
+  "inboundContainer": {
+    "type": "String",
+    "value": "@appsetting('INBOUND_CONTAINER')"
+  }
+}

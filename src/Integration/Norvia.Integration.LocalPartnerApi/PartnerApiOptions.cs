@@ -23,6 +23,14 @@ public sealed class PartnerApiOptions
     [Required]
     public string TrackingQueue { get; set; } = "carrier-tracking";
 
+    /// <summary>The Service Bus queue the Carrier Proof of delivery Logic App reads, which API Management puts a Proof of delivery's blob reference on.</summary>
+    [Required]
+    public string ProofOfDeliveryQueue { get; set; } = "carrier-proof-of-delivery";
+
+    /// <summary>The blob container API Management stores a Carrier's Proof of delivery in, the claim check's transit (ADR 0009).</summary>
+    [Required]
+    public string InboundContainer { get; set; } = "inbound-proofs-of-delivery";
+
     [Required]
     public LocalTokenOptions Tokens { get; set; } = new();
 }

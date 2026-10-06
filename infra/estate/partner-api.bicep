@@ -35,6 +35,11 @@ param answerTriggerAudience string
 param serviceBusName string
 param trackingQueueName string
 
+@description('The Proof of delivery queue API Management puts a Carrier\'s Proof of delivery reference on, and the inbound container (in the storage account of that name) it stores the body in first (ADR 0009).')
+param proofOfDeliveryQueueName string
+param inboundStorageAccountName string
+param inboundContainerName string
+
 param applicationInsightsName string
 
 @description('The Partner portal\'s identity, the one principal that may read the Personas\' subscription keys.')
@@ -91,11 +96,14 @@ var namedValues = {
   'api-management-identity-client-id': apiManagementIdentity.properties.clientId
   'service-bus-namespace': serviceBusName
   'tracking-queue-name': trackingQueueName
+  'proof-of-delivery-queue-name': proofOfDeliveryQueueName
+  'inbound-storage-account': inboundStorageAccountName
+  'inbound-container-name': inboundContainerName
 }
 
 resource policyValues 'Microsoft.ApiManagement/service/namedValues@2024-05-01' = [
   // The loop runs over the names, which are known before the deployment starts; the values aren't.
-  for name in ['entra-tenant-id', 'partner-api-client-id', 'shippers-by-client-id', 'carriers-by-client-id', 'intake-trigger-audience', 'answer-trigger-audience', 'api-management-identity-client-id', 'service-bus-namespace', 'tracking-queue-name']: {
+  for name in ['entra-tenant-id', 'partner-api-client-id', 'shippers-by-client-id', 'carriers-by-client-id', 'intake-trigger-audience', 'answer-trigger-audience', 'api-management-identity-client-id', 'service-bus-namespace', 'tracking-queue-name', 'proof-of-delivery-queue-name', 'inbound-storage-account', 'inbound-container-name']: {
     parent: apiManagement
     name: name
     properties: {
@@ -273,6 +281,32 @@ resource submitCarrierTrackingPolicy 'Microsoft.ApiManagement/service/apis/opera
   properties: {
     format: 'rawxml'
     value: loadTextContent('partner-api/submit-carrier-tracking.policy.xml')
+  }
+  dependsOn: [
+    policyValues
+  ]
+}
+
+// A Carrier's Proof of delivery is accepted at the edge by claim check (ADR 0009): API Management stores the body unparsed in the
+// inbound container and puts only the blob's reference on the Proof of delivery queue. No Logic App is called: the Carrier Proof of
+// delivery Logic App reads the queue.
+resource submitCarrierProofOfDelivery 'Microsoft.ApiManagement/service/apis/operations@2024-05-01' = {
+  parent: partnerApi
+  name: 'submit-carrier-proof-of-delivery'
+  properties: {
+    displayName: 'Submit Carrier Proof of delivery'
+    description: 'Prove a delivery as a Carrier, with the files. At most 25 MB; accepted with 202 and processed later (contracts/partner-api).'
+    method: 'POST'
+    urlTemplate: '/carrier-proofs-of-delivery'
+  }
+}
+
+resource submitCarrierProofOfDeliveryPolicy 'Microsoft.ApiManagement/service/apis/operations/policies@2024-05-01' = {
+  parent: submitCarrierProofOfDelivery
+  name: 'policy'
+  properties: {
+    format: 'rawxml'
+    value: loadTextContent('partner-api/submit-carrier-proof-of-delivery.policy.xml')
   }
   dependsOn: [
     policyValues

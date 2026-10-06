@@ -11,7 +11,10 @@ param bookingPrincipalId string
 @description('The Carrier-tracking Logic App\'s identity, which receives from the tracking queue and from nothing else.')
 param trackingPrincipalId string
 
-@description('API Management\'s identity, which sends to the tracking queue and to nothing else.')
+@description('The Carrier Proof of delivery Logic App\'s identity, which receives from the Proof of delivery queue and from nothing else.')
+param proofOfDeliveryPrincipalId string
+
+@description('API Management\'s identity, which sends to the tracking queue and the Proof of delivery queue and to nothing else.')
 param apiManagementPrincipalId string
 
 resource serviceBus 'Microsoft.ServiceBus/namespaces@2024-01-01' = {
@@ -153,5 +156,41 @@ resource trackingReceivesItsMessages 'Microsoft.Authorization/roleAssignments@20
   }
 }
 
+// The queue API Management puts a Carrier's Proof of delivery reference on and the Carrier Proof of delivery Logic App reads
+// (ADR 0009). The message is only the reference to a blob in the inbound container. A message the TMS refuses is dead-lettered
+// by the Logic App with the failure code; one that can't be recorded is delivered again, and after the maximum delivery count
+// Service Bus dead-letters it itself. The AppHost's emulator queue has the same count. The lock outlasts a call that carries
+// files of up to 25 MB.
+resource carrierProofOfDelivery 'Microsoft.ServiceBus/namespaces/queues@2024-01-01' = {
+  parent: serviceBus
+  name: 'carrier-proof-of-delivery'
+  properties: {
+    maxDeliveryCount: 10
+    lockDuration: 'PT5M'
+    deadLetteringOnMessageExpiration: true
+  }
+}
+
+resource apiManagementSendsProofsOfDelivery 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(carrierProofOfDelivery.id, apiManagementPrincipalId, serviceBusDataSender)
+  scope: carrierProofOfDelivery
+  properties: {
+    principalId: apiManagementPrincipalId
+    roleDefinitionId: serviceBusDataSender
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource proofOfDeliveryReceivesItsMessages 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(carrierProofOfDelivery.id, proofOfDeliveryPrincipalId, serviceBusDataReceiver)
+  scope: carrierProofOfDelivery
+  properties: {
+    principalId: proofOfDeliveryPrincipalId
+    roleDefinitionId: serviceBusDataReceiver
+    principalType: 'ServicePrincipal'
+  }
+}
+
 output queueName string = carrierTracking.name
+output proofOfDeliveryQueueName string = carrierProofOfDelivery.name
 output namespaceName string = serviceBus.name

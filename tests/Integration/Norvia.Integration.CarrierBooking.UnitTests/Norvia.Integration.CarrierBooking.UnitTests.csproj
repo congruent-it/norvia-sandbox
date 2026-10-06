@@ -27,6 +27,9 @@
     <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\carrier-proofs-of-delivery\*.json" LogicalName="PartnerApi/samples/carrier-proofs-of-delivery/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\infra\estate\partner-api\answer-carrier-booking.policy.xml" LogicalName="PartnerApiPolicies/answer-carrier-booking.policy.xml" />
     <EmbeddedResource Include="..\..\..\infra\estate\partner-api\submit-carrier-tracking.policy.xml" LogicalName="PartnerApiPolicies/submit-carrier-tracking.policy.xml" />
+    <EmbeddedResource Include="..\..\..\infra\estate\partner-api\submit-carrier-proof-of-delivery.policy.xml" LogicalName="PartnerApiPolicies/submit-carrier-proof-of-delivery.policy.xml" />
+    <EmbeddedResource Include="..\..\..\src\Integration\ProofOfDeliveryLogicApp\*.json" LogicalName="ProofOfDeliveryLogicApp/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\src\Integration\ProofOfDeliveryLogicApp\carrier-proof-of-delivery\workflow.json" LogicalName="ProofOfDeliveryLogicApp/carrier-proof-of-delivery/workflow.json" />
     <EmbeddedResource Include="..\..\..\src\Integration\TrackingLogicApp\*.json" LogicalName="TrackingLogicApp/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\src\Integration\TrackingLogicApp\carrier-tracking\workflow.json" LogicalName="TrackingLogicApp/carrier-tracking/workflow.json" />
     <EmbeddedResource Include="..\..\..\src\Integration\AnswerLogicApp\*.json" LogicalName="AnswerLogicApp/%(Filename)%(Extension)" />
