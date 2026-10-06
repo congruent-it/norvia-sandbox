@@ -1,6 +1,4 @@
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Carriers;
@@ -12,8 +10,6 @@ namespace Norvia.Tms.Infrastructure.Data.Configurations;
 
 internal sealed class ShipmentConfiguration : IEntityTypeConfiguration<Shipment>
 {
-    private static readonly JsonSerializerOptions AssignmentsJson = new(JsonSerializerDefaults.Web);
-
     public void Configure(EntityTypeBuilder<Shipment> builder)
     {
         builder.ToTable("Shipments");
@@ -62,25 +58,13 @@ internal sealed class ShipmentConfiguration : IEntityTypeConfiguration<Shipment>
         // The history of assignments is read and written only with its Shipment, so it is one JSON column. A Shipment always
         // has its planning's assignment, so the column is never empty.
         builder.Property(shipment => shipment.Assignments)
-            .HasConversion(
-                assignments => JsonSerializer.Serialize(assignments.Select(StoredAssignment.Of), AssignmentsJson),
-                json => JsonSerializer.Deserialize<StoredAssignment[]>(json, AssignmentsJson)!.Select(stored => stored.ToAssignment()).ToArray(),
-                new ValueComparer<IReadOnlyList<ShipmentAssignment>>(
-                    (left, right) => left!.SequenceEqual(right!),
-                    assignments => assignments.Count,
-                    assignments => assignments.ToArray()))
+            .HasJsonList(StoredAssignment.Of, stored => stored.ToAssignment())
             .IsRequired();
 
         // The delivery windows the Planner agreed are read and written only with their Shipment, like its assignments, so they are
         // one JSON column too. It is empty until the Planner agrees one.
         builder.Property(shipment => shipment.AgreedDeliveryWindows)
-            .HasConversion(
-                windows => JsonSerializer.Serialize(windows.Select(StoredAgreedDeliveryWindow.Of), AssignmentsJson),
-                json => JsonSerializer.Deserialize<StoredAgreedDeliveryWindow[]>(json, AssignmentsJson)!.Select(stored => stored.ToWindow()).ToArray(),
-                new ValueComparer<IReadOnlyList<AgreedDeliveryWindow>>(
-                    (left, right) => left!.SequenceEqual(right!),
-                    windows => windows.Count,
-                    windows => windows.ToArray()))
+            .HasJsonList(StoredAgreedDeliveryWindow.Of, stored => stored.ToWindow())
             .HasDefaultValueSql("N'[]'")
             .IsRequired();
 
@@ -130,7 +114,7 @@ internal sealed record StoredAgreedDeliveryWindow(
     DateTimeOffset Earliest, DateTimeOffset Latest, string ExceptionNumber, string CorrelationId, DateTimeOffset AgreedAt, string Key)
 {
     public static StoredAgreedDeliveryWindow Of(AgreedDeliveryWindow agreed) =>
-        new(agreed.Earliest, agreed.Latest, agreed.ExceptionNumber, agreed.CorrelationId.Value, agreed.AgreedAt, agreed.Key.Value);
+        new(agreed.Earliest, agreed.Latest, agreed.ExceptionNumber.Value, agreed.CorrelationId.Value, agreed.AgreedAt, agreed.Key.Value);
 
-    public AgreedDeliveryWindow ToWindow() => new(Earliest, Latest, ExceptionNumber, new CorrelationId(CorrelationId), AgreedAt, new IdempotencyKey(Key));
+    public AgreedDeliveryWindow ToWindow() => new(Earliest, Latest, Norvia.Tms.Domain.Exceptions.ExceptionNumber.Parse(ExceptionNumber), new CorrelationId(CorrelationId), AgreedAt, new IdempotencyKey(Key));
 }

@@ -43,7 +43,7 @@ public sealed class AgreeDeliveryWindowHandlerTests
 
         result.Value.Should().Be(new AgreeDeliveryWindowResult("EX-0000005", "SH-0000012", Earliest, Latest, "corr-agree"));
         shipment.AgreedDeliveryWindows.Should().ContainSingle().Which.Should().Be(
-            new AgreedDeliveryWindow(Earliest, Latest, "EX-0000005", new CorrelationId("corr-agree"), Samples.Now.AddDays(3), new IdempotencyKey("key-agree")));
+            new AgreedDeliveryWindow(Earliest, Latest, ExceptionNumber.FromSequence(5), new CorrelationId("corr-agree"), Samples.Now.AddDays(3), new IdempotencyKey("key-agree")));
         shipment.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<ShipmentDeliveryWindowAgreedEvent>();
         exception.Status.Should().Be(ExceptionStatus.Open);
         await _exceptions.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());

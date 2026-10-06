@@ -41,7 +41,7 @@ public sealed record ShipmentDeliveryWindowAgreedV1(
             agreed.Shipment.TransportOrderNumber.Value,
             window.Earliest,
             window.Latest,
-            window.ExceptionNumber);
+            window.ExceptionNumber.Value);
     }
 
     protected override IEnumerable<KeyValuePair<string, object>> TrackingProperties() =>

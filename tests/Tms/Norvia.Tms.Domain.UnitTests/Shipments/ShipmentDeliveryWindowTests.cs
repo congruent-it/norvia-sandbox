@@ -16,7 +16,7 @@ public sealed class ShipmentDeliveryWindowTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 24, 10, 15, 0, TimeSpan.Zero);
     private static readonly ExceptionNumber Number = ExceptionNumber.FromSequence(5);
-    private static readonly TimeWindow OrderWindow = new(Now.AddDays(1), Now.AddDays(1).AddHours(4));
+    private static readonly TransportOrderDetails OrderDetails = TransportOrderTests.SampleDetails();
     private static readonly TimeWindow Agreed = new(Now.AddDays(3), Now.AddDays(3).AddHours(4));
 
     [Theory]
@@ -30,7 +30,7 @@ public sealed class ShipmentDeliveryWindowTests
 
         refusal.Should().BeNull();
         var agreed = shipment.AgreedDeliveryWindows.Should().ContainSingle().Subject;
-        agreed.Should().Be(new AgreedDeliveryWindow(Agreed.Earliest!.Value, Agreed.Latest!.Value, "EX-0000005", new CorrelationId("corr-agree"), Now, new IdempotencyKey("key-agree")));
+        agreed.Should().Be(new AgreedDeliveryWindow(Agreed.Earliest!.Value, Agreed.Latest!.Value, Number, new CorrelationId("corr-agree"), Now, new IdempotencyKey("key-agree")));
         var raised = shipment.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<ShipmentDeliveryWindowAgreedEvent>().Subject;
         raised.Shipment.Should().BeSameAs(shipment);
         raised.Agreed.Should().Be(agreed);
@@ -84,7 +84,7 @@ public sealed class ShipmentDeliveryWindowTests
         shipment.AgreeDeliveryWindow(later, Number, new IdempotencyKey("key-2"), new CorrelationId("corr-2"), Now.AddHours(1));
 
         shipment.AgreedDeliveryWindows.Select(a => a.Window).Should().Equal(Agreed, later);
-        shipment.DeliveryWindowOf(OrderWindow).Should().Be(later);
+        shipment.DeliveryWindowOf(OrderDetails).Should().Be(later);
     }
 
     [Fact]
@@ -102,7 +102,7 @@ public sealed class ShipmentDeliveryWindowTests
     {
         var shipment = OnItsWay(TrackingEventType.Collected);
 
-        shipment.DeliveryWindowOf(OrderWindow).Should().Be(OrderWindow);
+        shipment.DeliveryWindowOf(OrderDetails).Should().Be(OrderDetails.Delivery!.Window);
         shipment.DeliveryWindowOf(null).Should().BeNull();
     }
 

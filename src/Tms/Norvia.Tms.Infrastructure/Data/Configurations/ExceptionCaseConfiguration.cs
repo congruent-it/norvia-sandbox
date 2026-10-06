@@ -1,6 +1,4 @@
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Norvia.Tms.Domain.Carriers;
 using Norvia.Tms.Domain.Exceptions;
@@ -12,8 +10,6 @@ namespace Norvia.Tms.Infrastructure.Data.Configurations;
 
 internal sealed class ExceptionCaseConfiguration : IEntityTypeConfiguration<ExceptionCase>
 {
-    private static readonly JsonSerializerOptions JsonColumns = new(JsonSerializerDefaults.Web);
-
     public void Configure(EntityTypeBuilder<ExceptionCase> builder)
     {
         builder.ToTable("Exceptions");
@@ -79,24 +75,12 @@ internal sealed class ExceptionCaseConfiguration : IEntityTypeConfiguration<Exce
         // The causes are read and written only with their Exception, so they are one JSON column. An Exception always has the
         // cause that opened it, so the column is never empty.
         builder.Property(exception => exception.Causes)
-            .HasConversion(
-                causes => JsonSerializer.Serialize(causes, JsonColumns),
-                json => JsonSerializer.Deserialize<ExceptionCause[]>(json, JsonColumns)!,
-                new ValueComparer<IReadOnlyList<ExceptionCause>>(
-                    (left, right) => left!.SequenceEqual(right!),
-                    causes => causes.Count,
-                    causes => causes.ToArray()))
+            .HasJsonList()
             .IsRequired();
 
         // The notes are read and written only with their Exception too.
         builder.Property(exception => exception.Notes)
-            .HasConversion(
-                notes => JsonSerializer.Serialize(notes, JsonColumns),
-                json => JsonSerializer.Deserialize<ExceptionNote[]>(json, JsonColumns)!,
-                new ValueComparer<IReadOnlyList<ExceptionNote>>(
-                    (left, right) => left!.SequenceEqual(right!),
-                    notes => notes.Count,
-                    notes => notes.ToArray()))
+            .HasJsonList()
             .HasDefaultValueSql("N'[]'")
             .IsRequired();
 

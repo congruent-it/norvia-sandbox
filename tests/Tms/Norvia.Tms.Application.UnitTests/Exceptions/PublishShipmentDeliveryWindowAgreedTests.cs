@@ -2,6 +2,7 @@ using Norvia.Tms.Application.Exceptions.AgreeDeliveryWindow;
 using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.UnitTests.TransportOrders;
 using Norvia.Tms.Domain.Carriers;
+using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TransportOrders;
 using NSubstitute;
@@ -46,7 +47,7 @@ public sealed class PublishShipmentDeliveryWindowAgreedTests
     {
         var order = Samples.AcceptedOrder(sequence: 7);
         var shipment = Samples.Planned(order, CarriedBy.Carrier(new CarrierId("CAR-0001")), sequence: 12);
-        var window = new AgreedDeliveryWindow(Earliest, Earliest.AddHours(4), "EX-0000005", new CorrelationId("corr-agree"), Samples.Now.AddDays(3), new IdempotencyKey("key-agree"));
+        var window = new AgreedDeliveryWindow(Earliest, Earliest.AddHours(4), ExceptionNumber.FromSequence(5), new CorrelationId("corr-agree"), Samples.Now.AddDays(3), new IdempotencyKey("key-agree"));
         return new ShipmentDeliveryWindowAgreedEvent(shipment, window);
     }
 }

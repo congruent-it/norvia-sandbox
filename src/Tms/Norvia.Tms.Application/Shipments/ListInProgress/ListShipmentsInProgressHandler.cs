@@ -44,7 +44,7 @@ public sealed class ListShipmentsInProgressHandler(
 
     private ShipmentInProgressSummary Summarize(Shipment shipment, List<TrackingEvent> events, TransportOrderDetails? details, bool hasProofOfDelivery, DateTimeOffset now)
     {
-        var deliveryWindow = shipment.DeliveryWindowOf(details?.Delivery?.Window);
+        var deliveryWindow = shipment.DeliveryWindowOf(details);
         var last = events.MaxBy(trackingEvent => trackingEvent.ReceivedAt);
         var isStale = staleRules.IsStale(shipment.Status, details?.Collection?.Window?.Latest, deliveryWindow?.Latest, last?.ReceivedAt, now);
         return new(

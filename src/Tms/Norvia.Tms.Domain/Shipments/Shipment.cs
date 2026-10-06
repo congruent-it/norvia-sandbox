@@ -218,9 +218,11 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
 
     /// <summary>
     /// The delivery window that counts for Late delivery, Stale and the fallback ETA (P7): the last agreed one, and otherwise
-    /// the Transport Order's.
+    /// the delivery window of the Transport Order's details. Whoever needs the Shipment's delivery window asks here, so none uses
+    /// the Shipper's by mistake.
     /// </summary>
-    public TimeWindow? DeliveryWindowOf(TimeWindow? orderWindow) => AgreedDeliveryWindows.Count > 0 ? AgreedDeliveryWindows[^1].Window : orderWindow;
+    public TimeWindow? DeliveryWindowOf(TransportOrderDetails? orderDetails) =>
+        AgreedDeliveryWindows.Count > 0 ? AgreedDeliveryWindows[^1].Window : orderDetails?.Delivery?.Window;
 
     /// <summary>
     /// Sets an agreed delivery window on a Collected or In transit Shipment, from an open Exception, after the Planner agreed a
@@ -254,7 +256,7 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
             return new(ExceptionRefusalCode.DeliveryWindowInvalid, "The delivery window ends in the past.");
         }
 
-        var agreed = new AgreedDeliveryWindow(earliest, latest, exceptionNumber.Value, correlationId, agreedAt, key);
+        var agreed = new AgreedDeliveryWindow(earliest, latest, exceptionNumber, correlationId, agreedAt, key);
         AgreedDeliveryWindows = [.. AgreedDeliveryWindows, agreed];
         RegisterDomainEvent(new ShipmentDeliveryWindowAgreedEvent(this, agreed));
         return null;
