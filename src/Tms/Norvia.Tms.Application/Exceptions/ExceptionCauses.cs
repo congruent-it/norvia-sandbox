@@ -21,7 +21,29 @@ public sealed class ExceptionCauses(IRepository<ExceptionCase> exceptions, IExce
             return;
         }
 
+        await OpenAsync(shipment, cause, cancellationToken);
+    }
+
+    private async Task OpenAsync(Shipment shipment, ExceptionCause cause, CancellationToken cancellationToken) =>
         await exceptions.AddAsync(ExceptionCase.Open(await exceptionNumbers.NextAsync(cancellationToken), shipment, cause), cancellationToken);
+
+    /// <summary>
+    /// For a check that runs again and again and finds the same thing: opens an Exception for the cause unless the Shipment has
+    /// an open one of the type already. That one gains the cause only when its cause was cleared, which removes the marker. It
+    /// saves nothing, like <see cref="OpenOrAddAsync"/>.
+    /// </summary>
+    public async Task OpenUnlessOpenAsync(Shipment shipment, ExceptionCause cause, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(shipment);
+        ArgumentNullException.ThrowIfNull(cause);
+        if (await exceptions.SingleOrDefaultAsync(new OpenExceptionOfTypeForShipmentSpec(shipment.Id, cause.Type), cancellationToken) is not { } open)
+        {
+            await OpenAsync(shipment, cause, cancellationToken);
+        }
+        else if (open.CauseCleared)
+        {
+            open.AddCause(cause);
+        }
     }
 
     /// <summary>

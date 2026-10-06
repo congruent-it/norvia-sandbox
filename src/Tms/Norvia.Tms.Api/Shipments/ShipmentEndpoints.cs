@@ -6,6 +6,7 @@ using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Api.TransportOrders;
 using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.ProofsOfDelivery.ListMissing;
+using Norvia.Tms.Application.Exceptions.CheckLate;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shipments.GetByNumber;
 using Norvia.Tms.Application.Shipments.ListAwaitingAnswer;
@@ -179,8 +180,13 @@ public static class ShipmentEndpoints
 
     private static async Task<Ok<IReadOnlyList<ShipmentInProgressSummary>>> ListInProgressAsync(
         IMediator mediator,
-        CancellationToken cancellationToken) =>
-        TypedResults.Ok(await mediator.Send(new ListShipmentsInProgressQuery(), cancellationToken));
+        CancellationToken cancellationToken)
+    {
+        // The time-based check that flags a Shipment Stale also opens a Late delivery Exception when its delivery window has
+        // passed (P7). It runs first, so the list's Exception markers are up to date.
+        await mediator.Send(new CheckLateDeliveriesCommand(), cancellationToken);
+        return TypedResults.Ok(await mediator.Send(new ListShipmentsInProgressQuery(), cancellationToken));
+    }
 
     private static async Task<Results<Ok<ShipmentTimeline>, ProblemHttpResult>> GetTrackingTimelineAsync(
         string shipmentNumber,

@@ -14,6 +14,7 @@ public sealed class RecordTrackingHandler(
     IRepository<TrackingEvent> trackingEvents,
     IRepository<CarrierBooking> carrierBookings,
     IRepository<Shipment> shipments,
+    IReadRepository<TransportOrder> transportOrders,
     ExceptionCauses exceptionCauses,
     TrackingEventRules rules,
     TimeProvider time)
@@ -66,15 +67,40 @@ public sealed class RecordTrackingHandler(
         {
             await exceptionCauses.OpenOrAddAsync(shipment, cause, cancellationToken);
         }
-        else if (ExceptionTypes.ClearedBy(trackingEvent.Type) is { } cleared)
+        else
         {
-            await exceptionCauses.ClearAsync(shipment, cleared, cancellationToken);
+            foreach (var cleared in ExceptionTypes.ClearedBy(trackingEvent.Type))
+            {
+                await exceptionCauses.ClearAsync(shipment, cleared, cancellationToken);
+            }
         }
+
+        await CheckLateDeliveryAsync(shipment, trackingEvent, now, cancellationToken);
 
         // The tracked Shipment's move and the Exception the event opened save with the event, and the events they raise go
         // to the outbox, in one transaction.
         await trackingEvents.AddAsync(trackingEvent, cancellationToken);
         await trackingEvents.SaveChangesAsync(cancellationToken);
         return RecordTrackingResult.From(shipment, trackingEvent, repeat: false);
+    }
+
+    // An ETA after the delivery window is a cause of Late delivery, and a later one inside it clears the cause. A Delivered
+    // Shipment isn't checked: the Delivered event itself has cleared it.
+    private async Task CheckLateDeliveryAsync(Shipment shipment, TrackingEvent trackingEvent, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        if (trackingEvent.Eta is not { } eta || shipment.Status == ShipmentStatus.Delivered)
+        {
+            return;
+        }
+
+        var order = await transportOrders.SingleOrDefaultAsync(new TransportOrderByNumberSpec(shipment.TransportOrderNumber), cancellationToken);
+        if (LateDeliveryRules.IsEtaLate(eta, order?.Details.Delivery?.Window))
+        {
+            await exceptionCauses.OpenOrAddAsync(shipment, ExceptionCause.LateEta(trackingEvent, now), cancellationToken);
+        }
+        else
+        {
+            await exceptionCauses.ClearAsync(shipment, ExceptionType.LateDelivery, cancellationToken);
+        }
     }
 }

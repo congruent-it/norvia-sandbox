@@ -307,18 +307,20 @@ public sealed class ExceptionCaseTests
         exception.CauseCleared.Should().BeFalse();
     }
 
-    [Theory]
-    [InlineData(TrackingEventType.Collected, ExceptionType.CollectionFailed)]
-    [InlineData(TrackingEventType.Delivered, ExceptionType.DeliveryFailed)]
-    public void ClearedBy_ATrackingEventThatClearsACause_IsTheTypeItClears(TrackingEventType type, ExceptionType expected) =>
-        ExceptionTypes.ClearedBy(type).Should().Be(expected);
+    [Fact]
+    public void ClearedBy_Collected_IsCollectionFailed() =>
+        ExceptionTypes.ClearedBy(TrackingEventType.Collected).Should().Equal(ExceptionType.CollectionFailed);
+
+    [Fact]
+    public void ClearedBy_Delivered_IsDeliveryFailedAndLateDelivery() =>
+        ExceptionTypes.ClearedBy(TrackingEventType.Delivered).Should().BeEquivalentTo([ExceptionType.DeliveryFailed, ExceptionType.LateDelivery]);
 
     [Theory]
     [InlineData(TrackingEventType.Departed)]
     [InlineData(TrackingEventType.Damaged)]
     [InlineData(TrackingEventType.DeliveryFailed)]
     public void ClearedBy_AnyOtherTrackingEvent_IsNone(TrackingEventType type) =>
-        ExceptionTypes.ClearedBy(type).Should().BeNull();
+        ExceptionTypes.ClearedBy(type).Should().BeEmpty();
 
     [Fact]
     public void ClearedBy_ACleanProofOfDelivery_IsReservations_AndOneWithReservationsIsNone()

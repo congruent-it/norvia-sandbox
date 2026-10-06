@@ -25,6 +25,7 @@ public sealed class RecordTrackingHandlerTests
     private readonly IRepository<TrackingEvent> _trackingEvents = Substitute.For<IRepository<TrackingEvent>>();
     private readonly IRepository<CarrierBooking> _carrierBookings = Substitute.For<IRepository<CarrierBooking>>();
     private readonly IRepository<Shipment> _shipments = Substitute.For<IRepository<Shipment>>();
+    private readonly IReadRepository<TransportOrder> _transportOrders = Substitute.For<IReadRepository<TransportOrder>>();
     private readonly IRepository<ExceptionCase> _exceptions = Substitute.For<IRepository<ExceptionCase>>();
     private readonly IExceptionNumbers _exceptionNumbers = Substitute.For<IExceptionNumbers>();
     private readonly FakeTimeProvider _time = new(Samples.Now.AddDays(2));
@@ -33,7 +34,7 @@ public sealed class RecordTrackingHandlerTests
     public RecordTrackingHandlerTests()
     {
         _exceptionNumbers.NextAsync(Arg.Any<CancellationToken>()).Returns(ExceptionNumber.FromSequence(9));
-        _handler = new RecordTrackingHandler(_trackingEvents, _carrierBookings, _shipments, new ExceptionCauses(_exceptions, _exceptionNumbers), new TrackingEventRules(TimeSpan.FromMinutes(5)), _time);
+        _handler = new RecordTrackingHandler(_trackingEvents, _carrierBookings, _shipments, _transportOrders, new ExceptionCauses(_exceptions, _exceptionNumbers), new TrackingEventRules(TimeSpan.FromMinutes(5)), _time);
     }
 
     [Fact]
@@ -257,6 +258,88 @@ public sealed class RecordTrackingHandlerTests
         await _exceptions.DidNotReceive().AddAsync(Arg.Any<ExceptionCase>(), Arg.Any<CancellationToken>());
     }
 
+    private static readonly DateTimeOffset WindowLatest = Samples.Now.AddDays(1).AddHours(10);
+
+    [Fact]
+    public async Task Handle_AnEtaAfterTheDeliveryWindow_OpensALateDeliveryException_OnTheEventsTrail_WithOneExceptionOpened()
+    {
+        BookedShipment();
+
+        await _handler.Handle(Collected(type: TrackingEventType.Departed, eta: WindowLatest.AddMinutes(1), correlationId: "corr-late"), CancellationToken.None);
+
+        var opened = OpenedException();
+        opened.Type.Should().Be(ExceptionType.LateDelivery);
+        opened.CorrelationId.Should().Be(new CorrelationId("corr-late"));
+        opened.Causes.Should().ContainSingle().Which.Kind.Should().Be(ExceptionCauseKind.TrackingEvent);
+        opened.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<ExceptionOpenedEvent>();
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-30)]
+    public async Task Handle_AnEtaInsideTheDeliveryWindow_OpensNoException(int minutesFromLatest)
+    {
+        BookedShipment();
+
+        await _handler.Handle(Collected(type: TrackingEventType.Departed, eta: WindowLatest.AddMinutes(minutesFromLatest)), CancellationToken.None);
+
+        await _exceptions.DidNotReceive().AddAsync(Arg.Any<ExceptionCase>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_AnotherLateEtaWhileLateDeliveryIsOpen_AddsACause_AndPublishesNothing()
+    {
+        var shipment = BookedShipment();
+        var open = OpenExceptions.LateDelivery();
+        _exceptions.SingleOrDefaultAsync(Arg.Is<OpenExceptionOfTypeForShipmentSpec>(s => s.ShipmentId == shipment.Id && s.Type == ExceptionType.LateDelivery), Arg.Any<CancellationToken>())
+            .Returns(open);
+
+        await _handler.Handle(Collected(type: TrackingEventType.Departed, eta: WindowLatest.AddHours(3), sourceEventId: "evt-2"), CancellationToken.None);
+
+        open.Causes.Should().HaveCount(2);
+        open.DomainEvents.Should().BeEmpty();
+        await _exceptions.DidNotReceive().AddAsync(Arg.Any<ExceptionCase>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_AnEtaBackInsideTheWindow_MarksTheOpenLateDeliveryCauseCleared()
+    {
+        var shipment = BookedShipment();
+        var open = OpenExceptions.LateDelivery();
+        _exceptions.SingleOrDefaultAsync(Arg.Is<OpenExceptionOfTypeForShipmentSpec>(s => s.ShipmentId == shipment.Id && s.Type == ExceptionType.LateDelivery), Arg.Any<CancellationToken>())
+            .Returns(open);
+
+        await _handler.Handle(Collected(type: TrackingEventType.Departed, eta: WindowLatest.AddHours(-1)), CancellationToken.None);
+
+        open.CauseCleared.Should().BeTrue();
+        open.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Handle_ADeliveredEventWithALateEta_IsNotCheckedForLateDelivery_AndClearsAnOpenOne()
+    {
+        var shipment = BookedShipment();
+        var open = OpenExceptions.LateDelivery();
+        _exceptions.SingleOrDefaultAsync(Arg.Is<OpenExceptionOfTypeForShipmentSpec>(s => s.ShipmentId == shipment.Id && s.Type == ExceptionType.LateDelivery), Arg.Any<CancellationToken>())
+            .Returns(open);
+
+        await _handler.Handle(Collected(type: TrackingEventType.Delivered, eta: WindowLatest.AddHours(5)), CancellationToken.None);
+
+        open.CauseCleared.Should().BeTrue();
+        await _exceptions.DidNotReceive().AddAsync(Arg.Any<ExceptionCase>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_ALateEtaAfterDelivered_OpensNoLateDelivery()
+    {
+        BookedShipment();
+        await _handler.Handle(Collected(type: TrackingEventType.Delivered, sourceEventId: "evt-del"), CancellationToken.None);
+
+        await _handler.Handle(Collected(type: TrackingEventType.Departed, eta: WindowLatest.AddHours(5), sourceEventId: "evt-late"), CancellationToken.None);
+
+        await _exceptions.DidNotReceive().AddAsync(Arg.Any<ExceptionCase>(), Arg.Any<CancellationToken>());
+    }
+
     private ExceptionCase OpenedException() =>
         (ExceptionCase)_exceptions.ReceivedCalls().Single(call => call.GetMethodInfo().Name == nameof(IRepository<ExceptionCase>.AddAsync)).GetArguments()[0]!;
 
@@ -441,6 +524,8 @@ public sealed class RecordTrackingHandlerTests
             .Returns(booking);
         _shipments.SingleOrDefaultAsync(Arg.Is<ShipmentToChangeSpec>(s => s.Number == shipment.Number), Arg.Any<CancellationToken>())
             .Returns(shipment);
+        _transportOrders.SingleOrDefaultAsync(Arg.Is<TransportOrderByNumberSpec>(s => s.Number == order.Number), Arg.Any<CancellationToken>())
+            .Returns(order);
         return shipment;
     }
 

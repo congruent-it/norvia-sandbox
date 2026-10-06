@@ -19,6 +19,7 @@ using Norvia.Tms.Application.TransportOrders.Rate;
 using Norvia.Tms.Application.TransportOrders.Submit;
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.ProofsOfDelivery;
+using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.TransportOrders;
@@ -79,6 +80,9 @@ public static class DependencyInjection
             var options = services.GetRequiredService<IOptions<ShipmentStaleOptions>>().Value;
             return new ShipmentStaleRules(options.CollectionGrace, options.SilenceLimit, options.DeliveryGrace);
         });
+        builder.Services.AddOptions<LateDeliveryOptions>().BindConfiguration(LateDeliveryOptions.SectionName)
+            .ValidateDataAnnotations().ValidateOnStart();
+        builder.Services.AddSingleton(services => new LateDeliveryRules(services.GetRequiredService<IOptions<LateDeliveryOptions>>().Value.Grace));
         builder.Services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
         builder.Services.AddScoped(typeof(IReadRepository<>), typeof(EfRepository<>));
         builder.Services.AddScoped<IDomainEventDispatcher, MediatorDomainEventDispatcher>();

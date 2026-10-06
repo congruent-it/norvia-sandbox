@@ -21,12 +21,12 @@ public static class ExceptionTypes
         _ => null,
     };
 
-    /// <summary>The type of Exception whose cause a Tracking event of the type clears; null for one that clears none.</summary>
-    public static ExceptionType? ClearedBy(TrackingEventType type) => type switch
+    /// <summary>The types of Exception whose cause a Tracking event of the type clears; none for one that clears none.</summary>
+    public static IReadOnlyList<ExceptionType> ClearedBy(TrackingEventType type) => type switch
     {
-        TrackingEventType.Collected => ExceptionType.CollectionFailed,
-        TrackingEventType.Delivered => ExceptionType.DeliveryFailed,
-        _ => null,
+        TrackingEventType.Collected => [ExceptionType.CollectionFailed],
+        TrackingEventType.Delivered => [ExceptionType.DeliveryFailed, ExceptionType.LateDelivery],
+        _ => [],
     };
 
     /// <summary>The type of Exception whose cause a Proof of delivery in the condition clears; null for one that clears none.</summary>

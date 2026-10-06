@@ -17,4 +17,7 @@ public enum ExceptionType
 
     /// <summary>A Proof of delivery recorded with the condition "with reservations". Apart from Damaged, since reservations are often a shortage.</summary>
     Reservations = 4,
+
+    /// <summary>A Tracking event whose ETA is after the delivery window's latest time, or that time passing, plus the TMS's grace, without the Shipment being Delivered.</summary>
+    LateDelivery = 5,
 }

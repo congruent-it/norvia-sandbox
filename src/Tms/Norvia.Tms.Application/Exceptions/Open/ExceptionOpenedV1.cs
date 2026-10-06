@@ -12,7 +12,7 @@ namespace Norvia.Tms.Application.Exceptions.Open;
 /// <param name="OccurredAt">When the TMS opened the Exception.</param>
 /// <param name="ShipperId">The Shipper of the Transport Order the Shipment carries out.</param>
 /// <param name="CarrierId">The Carrier that carries the Shipment; null for Own fleet.</param>
-/// <param name="ExceptionType">What went wrong: <c>CollectionFailed</c>, <c>DeliveryFailed</c>, <c>Damaged</c> or <c>Reservations</c>.</param>
+/// <param name="ExceptionType">What went wrong: <c>CollectionFailed</c>, <c>DeliveryFailed</c>, <c>Damaged</c>, <c>Reservations</c> or <c>LateDelivery</c>.</param>
 /// <param name="Cause">What opened it.</param>
 /// <param name="AfterDelivered">True when the Shipment was Delivered already when the cause arrived.</param>
 public sealed record ExceptionOpenedV1(
