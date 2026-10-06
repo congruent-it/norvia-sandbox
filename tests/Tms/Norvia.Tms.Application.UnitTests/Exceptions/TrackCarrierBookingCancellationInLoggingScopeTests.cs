@@ -10,7 +10,7 @@ namespace Norvia.Tms.Application.UnitTests.Exceptions;
 
 public sealed class TrackCarrierBookingCancellationInLoggingScopeTests : IDisposable
 {
-        private static readonly CancelCarrierBookingCommand Cancel = new("EX-0000005", "No show", "key-cancel", "corr-cancel");
+    private static readonly CancelCarrierBookingCommand Cancel = new("EX-0000005", "No show", "key-cancel", "corr-cancel");
 
     private readonly FakeLoggerProvider _logs = new();
     private readonly ILoggerFactory _loggerFactory;

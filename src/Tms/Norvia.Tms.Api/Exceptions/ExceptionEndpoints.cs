@@ -1,6 +1,6 @@
 using Mediator;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Api.TransportOrders;
 using Norvia.Tms.Application.Exceptions.AddNote;
