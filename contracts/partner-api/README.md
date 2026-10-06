@@ -10,6 +10,7 @@ The format in which a Shipper books a Transport-only transport through the Norvi
 | [carrier-answer.v1](carrier-answer.v1.schema.json) | A Carrier's confirmation or rejection of a booking request, as the Carrier sends it to the Norvia Partner API (see [Carrier answer](#carrier-answer)) |
 | [carrier-answer-response.v1](carrier-answer-response.v1.schema.json) | Norvia's answer to a Carrier's answer: Recorded, Booking not open, Booking not found, Not allowed, Invalid or Not received |
 | [carrier-tracking.v1](carrier-tracking.v1.schema.json) | A Carrier's tracking message, as the Carrier sends it to the Norvia Partner API (see [Carrier tracking](#carrier-tracking)) |
+| [carrier-proof-of-delivery.v1](carrier-proof-of-delivery.v1.schema.json) | A Carrier's Proof of delivery with its files base64-encoded, as the Carrier sends it to the Norvia Partner API (see [Carrier Proof of delivery](#carrier-proof-of-delivery)) |
 
 The booking never names the Shipper. API Management takes it from the token and passes it to the Logic App ([ADR 0005](../../docs/adr/0005-partner-identity-comes-from-the-token.md)).
 
@@ -177,3 +178,25 @@ The message never names the Carrier: API Management takes it from the token ([AD
 | Anything else, a `carrierId` included | Left out | The Carrier comes from the token alone |
 
 A value the map can't read, other than the status code, is left out, and the TMS's Tracking event rules report what is missing.
+
+## Carrier Proof of delivery
+
+A Carrier proves a delivery with a message in the [carrier-proof-of-delivery.v1](carrier-proof-of-delivery.v1.schema.json) format ([P6](../../docs/processes/tms/p6-proof-of-delivery.md#carrier-proof-of-delivery-format)). The Carrier Proof of delivery Logic App maps it to the Canonical Model [Proof of delivery](../canonical-model/proof-of-delivery.v1.schema.json) metadata and decodes its files before calling the TMS. The map is `CarrierProofOfDeliveryMap`, run as a local function like the others ([ADR 0019](../../docs/adr/0019-the-intake-map-is-dotnet-code-run-as-a-logic-apps-local-function.md)). It is tested against the sample pairs in `samples/carrier-proofs-of-delivery`, with no Azure.
+
+The message never names the Carrier: API Management takes it from the token ([ADR 0005](../../docs/adr/0005-partner-identity-comes-from-the-token.md)).
+
+| Carrier Proof of delivery | Canonical Model `ProofOfDelivery` | What the map does |
+|---|---|---|
+| `bookingRef` | `carrierBookingReference` | Copies it |
+| `carrierBookingNumber` | `carrierBookingNumber` | Copies it |
+| `documentId` | `documentId` | Copies it |
+| `receivedBy` | `receivedBy` | Copies it |
+| `deliveryTime`: local date/time without an offset | `deliveryTime`: with the offset | Reads it in the time zone of the location's country, daylight saving time included |
+| `place`, `postcode`, `country` | `location.place`, `location.postcode`, `location.countryCode` | Nests the flat fields |
+| `country`: ISO 3166-1 alpha-3 | ISO 3166-1 alpha-2 | Translates the code |
+| `condition`: `CLEAN`, `RESERVATIONS` | `condition`: `Clean`, `Reservations` | Translates it |
+| `remark` | `remark` | Copies it. Required with `RESERVATIONS` |
+| `files[]`: `name`, `contentType`, `content` (base64) | `files[]`: `name`, `contentType`, and the decoded bytes for the call's `files` parts | Decodes the content; the metadata carries no content |
+| Anything else, a `carrierId` included | Left out | The Carrier comes from the token alone |
+
+Content the map can't read fails the run, so the message is dead-lettered: not a JSON object, a missing or unreadable required field, an unknown condition or country, reservations without a remark, no files or more than five, or a file that isn't valid base64. A file's type and size are the TMS's to judge (`FileNotAccepted`).

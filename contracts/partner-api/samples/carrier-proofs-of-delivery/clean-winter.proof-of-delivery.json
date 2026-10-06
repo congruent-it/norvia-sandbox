@@ -1,0 +1,13 @@
+{
+  "documentId": "VDT-POD-2001",
+  "source": { "type": "Carrier", "carrierId": "CAR-0001" },
+  "carrierBookingReference": "VDT-77812",
+  "carrierBookingNumber": "CB-0000042",
+  "receivedBy": "A. de Vries",
+  "deliveryTime": "2030-12-10T10:15:00+00:00",
+  "location": { "place": "London", "postcode": "EC1A 1BB", "countryCode": "GB" },
+  "condition": "Clean",
+  "files": [
+    { "name": "cmr.pdf", "contentType": "application/pdf" }
+  ]
+}
