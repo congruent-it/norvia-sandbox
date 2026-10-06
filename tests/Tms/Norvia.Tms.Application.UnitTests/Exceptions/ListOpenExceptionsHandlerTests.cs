@@ -36,7 +36,7 @@ public sealed class ListOpenExceptionsHandlerTests
     public async Task Handle_ListsEachOpenException_WithItsShipmentShipperAndWhoCarried_AndItsNumberOfCauses()
     {
         var carrier = OpenExceptions.DeliveryFailed();
-        carrier.AddCause(OpenCause(carrier, "evt-2"), Samples.Now.AddDays(2));
+        carrier.AddCause(ExceptionCause.From(OpenCause(carrier, "evt-2"), Samples.Now.AddDays(2))!);
         var ownFleet = OpenExceptions.DeliveryFailed(CarriedBy.OwnFleet, orderSequence: 8, shipmentSequence: 13, number: 6);
         _exceptions.ListAsync(Arg.Any<OpenExceptionsSpec>(), Arg.Any<CancellationToken>()).Returns([carrier, ownFleet]);
 

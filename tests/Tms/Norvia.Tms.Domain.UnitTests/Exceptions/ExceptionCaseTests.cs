@@ -27,7 +27,7 @@ public sealed class ExceptionCaseTests
         var shipment = Booked();
         var cause = DeliveryFailed(shipment, "evt-ndl", "corr-cause");
 
-        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, cause, ReceivedAt);
+        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, Cause(cause));
 
         exception.Number.Value.Should().Be("EX-0000005");
         exception.Status.Should().Be(ExceptionStatus.Open);
@@ -49,12 +49,13 @@ public sealed class ExceptionCaseTests
         var shipment = Booked();
         var cause = DeliveryFailed(shipment);
 
-        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, cause, ReceivedAt);
+        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, Cause(cause));
 
         var raised = exception.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<ExceptionOpenedEvent>().Subject;
         raised.Exception.Should().BeSameAs(exception);
         raised.Cause.Should().Be(exception.Causes.Single());
-        raised.Cause.TrackingEventId.Should().Be(cause.Id);
+        raised.Cause.Kind.Should().Be(ExceptionCauseKind.TrackingEvent);
+        raised.Cause.CauseId.Should().Be(cause.Id.Value);
     }
 
     [Fact]
@@ -63,7 +64,7 @@ public sealed class ExceptionCaseTests
         var shipment = Booked();
         shipment.Record(new TrackingReport(Source, "evt-del", "VDT-1", null, TrackingEventType.Delivered, ReceivedAt, Location, null, null), new CorrelationId("c"), ReceivedAt);
 
-        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, DeliveryFailed(shipment), ReceivedAt);
+        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, Cause(DeliveryFailed(shipment)));
 
         exception.AfterDelivered.Should().BeTrue();
         shipment.Status.Should().Be(ShipmentStatus.Delivered);
@@ -104,10 +105,10 @@ public sealed class ExceptionCaseTests
         var shipment = Booked();
         var cause = Report(shipment, type, "evt-x", "corr-x");
 
-        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, cause, ReceivedAt);
+        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, Cause(cause));
 
         exception.Type.Should().Be(expected);
-        exception.Causes.Should().ContainSingle().Which.TrackingEventId.Should().Be(cause.Id);
+        exception.Causes.Should().ContainSingle().Which.CauseId.Should().Be(cause.Id.Value);
         exception.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<ExceptionOpenedEvent>();
     }
 
@@ -117,16 +118,15 @@ public sealed class ExceptionCaseTests
         var shipment = Booked();
         var cause = ProofWith(shipment, DeliveryCondition.Reservations, "doc-1", "corr-pod");
 
-        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, cause, ReceivedAt);
+        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, Cause(cause));
 
         exception.Type.Should().Be(ExceptionType.Reservations);
         exception.CorrelationId.Should().Be(new CorrelationId("corr-pod"));
         exception.AfterDelivered.Should().BeFalse();
         var only = exception.Causes.Should().ContainSingle().Which;
-        only.ProofOfDeliveryId.Should().Be(cause.Id);
-        only.TrackingEventId.Should().BeNull();
+        only.Kind.Should().Be(ExceptionCauseKind.ProofOfDelivery);
+        only.CauseId.Should().Be(cause.Id.Value);
         only.SourceEventId.Should().Be("doc-1");
-        only.IsProofOfDelivery.Should().BeTrue();
         exception.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<ExceptionOpenedEvent>().Which.Cause.Should().Be(only);
     }
 
@@ -136,7 +136,7 @@ public sealed class ExceptionCaseTests
         var shipment = Booked();
         shipment.Record(new TrackingReport(Source, "evt-del", "VDT-1", null, TrackingEventType.Delivered, ReceivedAt, Location, null, null), new CorrelationId("c"), ReceivedAt);
 
-        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, ProofWith(shipment, DeliveryCondition.Reservations), ReceivedAt);
+        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, Cause(ProofWith(shipment, DeliveryCondition.Reservations)));
 
         exception.AfterDelivered.Should().BeFalse("the marker is for Exceptions opened by Tracking events; a Proof of delivery usually comes after Delivered");
     }
@@ -146,7 +146,7 @@ public sealed class ExceptionCaseTests
     {
         var shipment = Booked();
 
-        var open = () => ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, ProofWith(shipment, DeliveryCondition.Clean), ReceivedAt);
+        var open = () => ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, Cause(ProofWith(shipment, DeliveryCondition.Clean)));
 
         open.Should().Throw<ArgumentException>();
     }
@@ -155,10 +155,10 @@ public sealed class ExceptionCaseTests
     public void AddCause_ForAnotherProofOfDeliveryWithReservations_JoinsTheOpenException_AndRaisesNothing()
     {
         var shipment = Booked();
-        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, ProofWith(shipment, DeliveryCondition.Reservations, "doc-1"), ReceivedAt);
+        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, Cause(ProofWith(shipment, DeliveryCondition.Reservations, "doc-1")));
         exception.ClearDomainEvents();
 
-        exception.AddCause(ProofWith(shipment, DeliveryCondition.Reservations, "doc-2"), ReceivedAt.AddHours(1));
+        exception.AddCause(Cause(ProofWith(shipment, DeliveryCondition.Reservations, "doc-2"), ReceivedAt.AddHours(1)));
 
         exception.Causes.Select(cause => cause.SourceEventId).Should().Equal("doc-1", "doc-2");
         exception.DomainEvents.Should().BeEmpty();
@@ -168,23 +168,32 @@ public sealed class ExceptionCaseTests
     public void AddCause_OfAnotherType_Throws()
     {
         var shipment = Booked();
-        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, DeliveryFailed(shipment), ReceivedAt);
+        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, Cause(DeliveryFailed(shipment)));
 
-        var addTrackingEvent = () => exception.AddCause(Report(shipment, TrackingEventType.Damaged, "evt-dmg", "c"), ReceivedAt);
-        var addProof = () => exception.AddCause(ProofWith(shipment, DeliveryCondition.Reservations), ReceivedAt);
+        var addTrackingEvent = () => exception.AddCause(Cause(Report(shipment, TrackingEventType.Damaged, "evt-dmg", "c")));
+        var addProof = () => exception.AddCause(Cause(ProofWith(shipment, DeliveryCondition.Reservations)));
 
         addTrackingEvent.Should().Throw<ArgumentException>();
         addProof.Should().Throw<ArgumentException>();
     }
 
     [Fact]
+    public void From_ACauseThatOpensNoException_IsNone()
+    {
+        var shipment = Booked();
+
+        ExceptionCause.From(Report(shipment, TrackingEventType.Collected, "evt-col", "c"), ReceivedAt).Should().BeNull();
+        ExceptionCause.From(ProofWith(shipment, DeliveryCondition.Clean), ReceivedAt).Should().BeNull();
+    }
+
+    [Fact]
     public void AddCause_ForAnotherDeliveryFailed_JoinsTheOpenException_AndRaisesNothing()
     {
         var shipment = Booked();
-        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, DeliveryFailed(shipment), ReceivedAt);
+        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, Cause(DeliveryFailed(shipment)));
         exception.ClearDomainEvents();
 
-        exception.AddCause(DeliveryFailed(shipment, "evt-2", "corr-2"), ReceivedAt.AddHours(1));
+        exception.AddCause(Cause(DeliveryFailed(shipment, "evt-2", "corr-2"), ReceivedAt.AddHours(1)));
 
         exception.Causes.Select(cause => cause.SourceEventId).Should().Equal("evt-ndl", "evt-2");
         exception.CorrelationId.Should().Be(new CorrelationId("corr-cause"), "the Exception keeps the correlation ID of the cause that opened it");
@@ -195,7 +204,7 @@ public sealed class ExceptionCaseTests
     public void Resolve_AnOpenException_RecordsOutcomeAndRemark_AndRaisesExceptionResolved()
     {
         var shipment = Booked();
-        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, DeliveryFailed(shipment), ReceivedAt);
+        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, Cause(DeliveryFailed(shipment)));
         exception.ClearDomainEvents();
 
         var refusal = exception.Resolve(ExceptionOutcome.Redelivered, "Phoned Kessler, redelivery Thursday", new CorrelationId("corr-resolve"), ReceivedAt.AddDays(1));
@@ -213,7 +222,7 @@ public sealed class ExceptionCaseTests
     public void Resolve_AResolvedException_IsRefused_WithExceptionNotOpen_AndChangesNothing()
     {
         var shipment = Booked();
-        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, DeliveryFailed(shipment), ReceivedAt);
+        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, Cause(DeliveryFailed(shipment)));
         exception.Resolve(ExceptionOutcome.NoActionNeeded, "First", new CorrelationId("corr-1"), ReceivedAt);
         exception.ClearDomainEvents();
 
@@ -231,7 +240,7 @@ public sealed class ExceptionCaseTests
     public void Resolve_WithoutARemark_Throws_BecauseTheBoundaryChecksItFirst(string remark)
     {
         var shipment = Booked();
-        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, DeliveryFailed(shipment), ReceivedAt);
+        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, Cause(DeliveryFailed(shipment)));
 
         var resolve = () => exception.Resolve(ExceptionOutcome.NoActionNeeded, remark, new CorrelationId("c"), ReceivedAt);
 
@@ -242,7 +251,7 @@ public sealed class ExceptionCaseTests
     public void Resolve_WithAnOutcomeOutsideTheList_Throws()
     {
         var shipment = Booked();
-        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, DeliveryFailed(shipment), ReceivedAt);
+        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, Cause(DeliveryFailed(shipment)));
 
         var resolve = () => exception.Resolve((ExceptionOutcome)99, "remark", new CorrelationId("c"), ReceivedAt);
 
@@ -260,6 +269,10 @@ public sealed class ExceptionCaseTests
         var parse = () => ExceptionNumber.Parse("nope");
         parse.Should().Throw<FormatException>();
     }
+
+    private static ExceptionCause Cause(TrackingEvent trackingEvent, DateTimeOffset? at = null) => ExceptionCause.From(trackingEvent, at ?? ReceivedAt)!;
+
+    private static ExceptionCause Cause(ProofOfDelivery proofOfDelivery, DateTimeOffset? at = null) => ExceptionCause.From(proofOfDelivery, at ?? ReceivedAt)!;
 
     private static TrackingEvent DeliveryFailed(Shipment shipment, string sourceEventId = "evt-ndl", string correlationId = "corr-cause") =>
         Report(shipment, TrackingEventType.DeliveryFailed, sourceEventId, correlationId);

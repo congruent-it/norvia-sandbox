@@ -49,7 +49,7 @@ public sealed record ExceptionOpenedV1(
             exception.ShipperId.Value,
             exception.CarrierId?.Value,
             exception.Type.ToString(),
-            new ExceptionCauseV1(opened.Cause.IsProofOfDelivery ? ExceptionCauseV1.ProofOfDelivery : ExceptionCauseV1.TrackingEvent, opened.Cause.SourceEventId),
+            new ExceptionCauseV1(opened.Cause.Kind.ToString(), opened.Cause.SourceEventId),
             exception.AfterDelivered);
     }
 
@@ -58,7 +58,7 @@ public sealed record ExceptionOpenedV1(
     {
         var properties = new List<KeyValuePair<string, object>>
         {
-            new(TrackingKeys.Flow, Cause.Kind == ExceptionCauseV1.ProofOfDelivery ? Flows.CarrierProofOfDelivery : Flows.CarrierTracking),
+            new(TrackingKeys.Flow, Cause.Kind == nameof(ExceptionCauseKind.ProofOfDelivery) ? Flows.CarrierProofOfDelivery : Flows.CarrierTracking),
             new(TrackingKeys.TransportOrderNumber, TransportOrderNumber),
             new(TrackingKeys.ShipmentNumber, ShipmentNumber),
         };

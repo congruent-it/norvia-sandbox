@@ -6,11 +6,11 @@ namespace Norvia.Tms.Domain.Exceptions;
 /// </summary>
 public enum ExceptionType
 {
-    /// <summary>A Collection failed Tracking event (Carrier code <c>NPU</c>).</summary>
-    CollectionFailed = 2,
-
     /// <summary>A Delivery failed Tracking event (Carrier code <c>NDL</c>).</summary>
     DeliveryFailed = 1,
+
+    /// <summary>A Collection failed Tracking event (Carrier code <c>NPU</c>).</summary>
+    CollectionFailed = 2,
 
     /// <summary>A Damaged Tracking event (Carrier code <c>DMG</c>).</summary>
     Damaged = 3,

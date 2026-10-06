@@ -3,6 +3,7 @@ using Ardalis.SharedKernel;
 using Mediator;
 using Norvia.Tms.Application.Exceptions;
 using Norvia.Tms.Domain.CarrierBookings;
+using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Domain.ProofsOfDelivery;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TransportOrders;
@@ -81,7 +82,11 @@ public sealed class RecordProofOfDeliveryHandler(
         var replaced = await proofsOfDelivery.SingleOrDefaultAsync(new TrackedCurrentProofOfDeliverySpec(shipment.Id), cancellationToken);
         var now = time.GetUtcNow();
         var proofOfDelivery = ProofOfDelivery.Record(shipment, report, new CorrelationId(command.CorrelationId), now, replaced);
-        await exceptionCauses.OpenOrAddAsync(shipment, proofOfDelivery, now, cancellationToken);
+        if (ExceptionCause.From(proofOfDelivery, now) is { } cause)
+        {
+            await exceptionCauses.OpenOrAddAsync(shipment, cause, cancellationToken);
+        }
+
         await proofsOfDelivery.AddAsync(proofOfDelivery, cancellationToken);
         await proofsOfDelivery.SaveChangesAsync(cancellationToken);
         return RecordProofOfDeliveryResult.From(shipment, proofOfDelivery);

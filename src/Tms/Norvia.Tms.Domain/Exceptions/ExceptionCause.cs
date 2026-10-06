@@ -6,24 +6,29 @@ namespace Norvia.Tms.Domain.Exceptions;
 
 /// <summary>
 /// One cause of an Exception (P7): the Tracking event or Proof of delivery that opened it, or a later one of the same type
-/// that joined it. Exactly one of <paramref name="TrackingEventId"/> and <paramref name="ProofOfDeliveryId"/> is set.
+/// that joined it. It knows the type of Exception it causes, so an Exception takes any cause the same way.
 /// </summary>
+/// <param name="Kind">Whether the cause is a Tracking event or a Proof of delivery.</param>
+/// <param name="CauseId">The ID of the Tracking event or Proof of delivery.</param>
 /// <param name="SourceEventId">The sender's own ID for the cause: the Carrier's event ID of a Tracking event, or the document ID of a Proof of delivery.</param>
 public sealed record ExceptionCause(
-    TrackingEventId? TrackingEventId, ProofOfDeliveryId? ProofOfDeliveryId, string SourceEventId, CorrelationId CorrelationId, DateTimeOffset AddedAt)
+    ExceptionType Type, ExceptionCauseKind Kind, Guid CauseId, string SourceEventId, CorrelationId CorrelationId, DateTimeOffset AddedAt)
 {
-    /// <summary>Whether the cause is a Proof of delivery, as opposed to a Tracking event.</summary>
-    public bool IsProofOfDelivery => ProofOfDeliveryId is not null;
-
-    public static ExceptionCause Of(TrackingEvent trackingEvent, DateTimeOffset addedAt)
+    /// <summary>The cause a Tracking event is; null for one that causes no Exception.</summary>
+    public static ExceptionCause? From(TrackingEvent trackingEvent, DateTimeOffset addedAt)
     {
         ArgumentNullException.ThrowIfNull(trackingEvent);
-        return new(trackingEvent.Id, null, trackingEvent.SourceEventId, trackingEvent.CorrelationId, addedAt);
+        return ExceptionTypes.OpenedBy(trackingEvent.Type) is { } type
+            ? new(type, ExceptionCauseKind.TrackingEvent, trackingEvent.Id.Value, trackingEvent.SourceEventId, trackingEvent.CorrelationId, addedAt)
+            : null;
     }
 
-    public static ExceptionCause Of(ProofOfDelivery proofOfDelivery, DateTimeOffset addedAt)
+    /// <summary>The cause a Proof of delivery is; null for one that causes no Exception.</summary>
+    public static ExceptionCause? From(ProofOfDelivery proofOfDelivery, DateTimeOffset addedAt)
     {
         ArgumentNullException.ThrowIfNull(proofOfDelivery);
-        return new(null, proofOfDelivery.Id, proofOfDelivery.DocumentId, proofOfDelivery.CorrelationId, addedAt);
+        return ExceptionTypes.OpenedBy(proofOfDelivery.Condition) is { } type
+            ? new(type, ExceptionCauseKind.ProofOfDelivery, proofOfDelivery.Id.Value, proofOfDelivery.DocumentId, proofOfDelivery.CorrelationId, addedAt)
+            : null;
     }
 }

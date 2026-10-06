@@ -1,9 +1,7 @@
 using Ardalis.SharedKernel;
 using Norvia.Tms.Domain.Carriers;
-using Norvia.Tms.Domain.ProofsOfDelivery;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.Shippers;
-using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.TransportOrders;
 using static System.FormattableString;
 
@@ -87,34 +85,15 @@ public sealed class ExceptionCase : EntityBase<ExceptionId>, IAggregateRoot
     public CorrelationId? ResolutionCorrelationId { get; private set; }
 
     /// <summary>
-    /// Opens the Exception a Tracking event of the Shipment causes, with the event as its first cause and its correlation ID,
-    /// and raises ExceptionOpened. The Exception is marked after Delivered when the Shipment was Delivered already.
+    /// Opens the Exception its first cause makes, with the cause's correlation ID, and raises ExceptionOpened. The Exception is
+    /// marked after Delivered when a Tracking event causes it and the Shipment was Delivered already. A Proof of delivery
+    /// usually comes after Delivered, so it never marks one.
     /// </summary>
-    public static ExceptionCase Open(ExceptionNumber number, Shipment shipment, TrackingEvent cause, DateTimeOffset openedAt)
-    {
-        ArgumentNullException.ThrowIfNull(cause);
-        var type = ExceptionTypes.OpenedBy(cause.Type)
-            ?? throw new ArgumentException(Invariant($"A {cause.Type} Tracking event opens no Exception."), nameof(cause));
-        return Open(number, shipment, type, ExceptionCause.Of(cause, openedAt), shipment.Status == ShipmentStatus.Delivered);
-    }
-
-    /// <summary>
-    /// Opens the Reservations Exception a Proof of delivery of the Shipment causes, with the Proof of delivery as its first
-    /// cause and its correlation ID, and raises ExceptionOpened. A Proof of delivery usually comes after Delivered, so it
-    /// never marks the Exception after Delivered.
-    /// </summary>
-    public static ExceptionCase Open(ExceptionNumber number, Shipment shipment, ProofOfDelivery cause, DateTimeOffset openedAt)
-    {
-        ArgumentNullException.ThrowIfNull(cause);
-        var type = ExceptionTypes.OpenedBy(cause.Condition)
-            ?? throw new ArgumentException(Invariant($"A {cause.Condition} Proof of delivery opens no Exception."), nameof(cause));
-        return Open(number, shipment, type, ExceptionCause.Of(cause, openedAt), afterDelivered: false);
-    }
-
-    private static ExceptionCase Open(ExceptionNumber number, Shipment shipment, ExceptionType type, ExceptionCause cause, bool afterDelivered)
+    public static ExceptionCase Open(ExceptionNumber number, Shipment shipment, ExceptionCause cause)
     {
         ArgumentNullException.ThrowIfNull(number);
         ArgumentNullException.ThrowIfNull(shipment);
+        ArgumentNullException.ThrowIfNull(cause);
         var exception = new ExceptionCase(
             ExceptionId.New(),
             number,
@@ -123,8 +102,8 @@ public sealed class ExceptionCase : EntityBase<ExceptionId>, IAggregateRoot
             shipment.TransportOrderNumber,
             shipment.ShipperId,
             shipment.CarriedBy.CarrierId,
-            type,
-            afterDelivered,
+            cause.Type,
+            cause.Kind == ExceptionCauseKind.TrackingEvent && shipment.Status == ShipmentStatus.Delivered,
             cause.CorrelationId,
             cause.AddedAt)
         {
@@ -134,28 +113,16 @@ public sealed class ExceptionCase : EntityBase<ExceptionId>, IAggregateRoot
         return exception;
     }
 
-    /// <summary>Adds a later Tracking event of the Exception's type as a cause. It raises nothing.</summary>
-    public void AddCause(TrackingEvent cause, DateTimeOffset addedAt)
+    /// <summary>Adds a later cause of the Exception's type. It raises nothing.</summary>
+    public void AddCause(ExceptionCause cause)
     {
         ArgumentNullException.ThrowIfNull(cause);
-        if (ExceptionTypes.OpenedBy(cause.Type) != Type)
+        if (cause.Type != Type)
         {
-            throw new ArgumentException(Invariant($"A {cause.Type} Tracking event is no cause of a {Type} Exception."), nameof(cause));
+            throw new ArgumentException(Invariant($"A {cause.Type} cause is no cause of a {Type} Exception."), nameof(cause));
         }
 
-        Causes = [.. Causes, ExceptionCause.Of(cause, addedAt)];
-    }
-
-    /// <summary>Adds a later Proof of delivery of the Exception's type as a cause. It raises nothing.</summary>
-    public void AddCause(ProofOfDelivery cause, DateTimeOffset addedAt)
-    {
-        ArgumentNullException.ThrowIfNull(cause);
-        if (ExceptionTypes.OpenedBy(cause.Condition) != Type)
-        {
-            throw new ArgumentException(Invariant($"A {cause.Condition} Proof of delivery is no cause of a {Type} Exception."), nameof(cause));
-        }
-
-        Causes = [.. Causes, ExceptionCause.Of(cause, addedAt)];
+        Causes = [.. Causes, cause];
     }
 
     /// <summary>

@@ -3,6 +3,7 @@ using Ardalis.SharedKernel;
 using Mediator;
 using Norvia.Tms.Application.Exceptions;
 using Norvia.Tms.Domain.CarrierBookings;
+using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.TransportOrders;
@@ -61,7 +62,10 @@ public sealed class RecordTrackingHandler(
 
         var trackingEvent = shipment.Record(report with { CarrierBookingReference = booking.CarrierBookingReference }, new CorrelationId(command.CorrelationId), now);
 
-        await exceptionCauses.OpenOrAddAsync(shipment, trackingEvent, now, cancellationToken);
+        if (ExceptionCause.From(trackingEvent, now) is { } cause)
+        {
+            await exceptionCauses.OpenOrAddAsync(shipment, cause, cancellationToken);
+        }
 
         // The tracked Shipment's move and the Exception the event opened save with the event, and the events they raise go
         // to the outbox, in one transaction.

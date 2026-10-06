@@ -40,7 +40,7 @@ internal static class OpenExceptions
                 "Consignee closed"),
             new CorrelationId("corr-cause"),
             at ?? Samples.Now.AddDays(1));
-        return ExceptionCase.Open(ExceptionNumber.FromSequence(number), shipment, cause, at ?? Samples.Now.AddDays(1));
+        return ExceptionCase.Open(ExceptionNumber.FromSequence(number), shipment, ExceptionCause.From(cause, at ?? Samples.Now.AddDays(1))!);
     }
 
     /// <summary>A Reservations Exception a Proof of delivery with reservations opened.</summary>
@@ -64,6 +64,6 @@ internal static class OpenExceptions
                 [new ProofOfDeliveryFile(Guid.NewGuid(), "cmr.pdf", "application/pdf", 4)]),
             new CorrelationId("corr-pod"),
             Samples.Now.AddDays(1));
-        return ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, proof, Samples.Now.AddDays(1));
+        return ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, ExceptionCause.From(proof, Samples.Now.AddDays(1))!);
     }
 }
