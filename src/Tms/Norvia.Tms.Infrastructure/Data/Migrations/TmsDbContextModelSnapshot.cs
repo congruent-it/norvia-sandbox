@@ -25,6 +25,8 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
 
             modelBuilder.HasSequence("CarrierBookingNumbers");
 
+            modelBuilder.HasSequence("ExceptionNumbers");
+
             modelBuilder.HasSequence("ShipmentNumbers");
 
             modelBuilder.HasSequence("TransportOrderNumbers");
@@ -119,6 +121,97 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                     b.HasIndex("ShipmentId");
 
                     b.ToTable("CarrierBookings", (string)null);
+                });
+
+            modelBuilder.Entity("Norvia.Tms.Domain.Exceptions.ExceptionCase", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("AfterDelivered")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("CarrierId")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Causes")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<DateTimeOffset>("OpenedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Outcome")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("Remark")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("ResolutionCorrelationId")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTimeOffset?>("ResolvedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<Guid>("ShipmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ShipmentNumber")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("ShipperId")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("TransportOrderNumber")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Number")
+                        .IsUnique();
+
+                    b.HasIndex("ShipmentId", "Type")
+                        .IsUnique()
+                        .HasFilter("[Status] = 'Open'");
+
+                    b.HasIndex("Status", "OpenedAt");
+
+                    b.ToTable("Exceptions", (string)null);
                 });
 
             modelBuilder.Entity("Norvia.Tms.Domain.ProofsOfDelivery.ProofOfDelivery", b =>
@@ -546,6 +639,15 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                 });
 
             modelBuilder.Entity("Norvia.Tms.Domain.CarrierBookings.CarrierBooking", b =>
+                {
+                    b.HasOne("Norvia.Tms.Domain.Shipments.Shipment", null)
+                        .WithMany()
+                        .HasForeignKey("ShipmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Norvia.Tms.Domain.Exceptions.ExceptionCase", b =>
                 {
                     b.HasOne("Norvia.Tms.Domain.Shipments.Shipment", null)
                         .WithMany()

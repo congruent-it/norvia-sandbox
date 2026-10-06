@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/exception-resolved.v1.schema.json",
+  "title": "ExceptionResolved",
+  "description": "The Planner resolved an Exception with an outcome and a remark (Canonical Model event, version 1). The Exception leaves the list of Open Exceptions. Published on the Shipment events topic, under the correlation ID of the resolution, which starts a Message trail of its own because it starts in the TMS UI; the Exception number links it to the Exception's opening.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "exceptionNumber", "shipmentNumber", "transportOrderNumber", "exceptionType", "outcome", "remark"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "const": "ExceptionResolved" },
+    "eventVersion": { "const": 1 },
+    "occurredAt": { "description": "When the Planner resolved the Exception.", "type": "string", "format": "date-time" },
+    "correlationId": { "description": "The resolution's own correlation ID, not the opening cause's.", "type": "string", "minLength": 1 },
+    "exceptionNumber": { "type": "string", "pattern": "^EX-[0-9]{7}$" },
+    "shipmentNumber": { "type": "string", "pattern": "^SH-[0-9]{7}$" },
+    "transportOrderNumber": { "description": "The Transport Order the Shipment carries out.", "type": "string", "pattern": "^TO-[0-9]{7}$" },
+    "exceptionType": { "enum": ["DeliveryFailed"] },
+    "outcome": { "enum": ["NoActionNeeded", "Redelivered", "Replanned", "ReturnedToShipper", "ClaimHandledOutsideTms"] },
+    "remark": { "description": "What the Planner did or concluded; required for every outcome.", "type": "string", "minLength": 1, "pattern": "\\S" }
+  }
+}
