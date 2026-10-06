@@ -31,7 +31,7 @@ eval "$(azd env get-values)"
 resource_group=${AZURE_RESOURCE_GROUP:-rg-$AZURE_ENV_NAME}
 number=${1:-}
 van_dijk_id=CAR-0001
-queue=${AZURE_ESTATE_PROOF_OF_DELIVERY_QUEUE:-carrier-proof-of-delivery}
+queue=carrier-proof-of-delivery
 repo=$(cd "$(dirname "$0")/.." && pwd)
 sample_cmr=$repo/src/PartnerPortal/Norvia.PartnerPortal.Web/CarrierShipments/sample-cmr.pdf
 
@@ -172,9 +172,15 @@ for index, step in enumerate(json.loads(os.environ["STEPS"])):
                 if isinstance(timeline, dict) and any(p["documentId"] == document_id for p in timeline.get("proofsOfDelivery", [])):
                     break
                 time.sleep(5)
-            seen["listed"] = is_listed(shipment_number)
+            # The list reads what the timeline does, but is asked again for a few seconds before it is taken as still listed.
+            for _ in range(6):
+                seen["listed"] = is_listed(shipment_number)
+                if not seen["listed"]:
+                    break
+                time.sleep(5)
     else:
-        # Just over the 25 MB API Management allows; the body is never parsed, so it need not be a valid Proof of delivery.
+        # Just over the 25 MB API Management allows, built in memory (hence the long job timeout); the body is never parsed, so it
+        # need not be a valid Proof of delivery.
         status, headers, _ = partner("/carrier-proofs-of-delivery", ("{\"documentId\": \"SMOKE-%s-oversize\", \"padding\": \"%s\"}" % (run, "A" * (25 * 1024 * 1024 + 1))).encode())
         seen.update(httpStatus=status, correlationId=headers.get("x-correlation-id"))
     result["steps"].append(seen)
@@ -332,7 +338,7 @@ jq -e '.steps[] | select(.name == "cmr") | .httpStatus == 202' <<<"$result" >/de
 [ -n "$cmr_id" ] || fail "API Management's 202 for the Proof of delivery carries no correlation ID"
 pass "the Proof of delivery with the sample CMR returned 202 Accepted (correlation ID $cmr_id)"
 jq -e '.steps[] | select(.name == "cmr") | .listed == false' <<<"$result" >/dev/null \
-  || fail "Shipment $shipment_number is still in 'Delivered without Proof of delivery' 3 minutes after its Proof of delivery was accepted"
+  || fail "Shipment $shipment_number is still in 'Delivered without Proof of delivery' once its Proof of delivery was on the timeline"
 pass "Shipment $shipment_number has left 'Delivered without Proof of delivery'"
 cmr_document=$(jq -r '.steps[] | select(.name == "cmr") | .documentId' <<<"$result")
 jq -e --arg document "$cmr_document" --argjson bytes "$cmr_bytes" '.proofs | any(.documentId == $document and .current
@@ -343,7 +349,7 @@ pass "Shipment $shipment_number's timeline holds the Proof of delivery as the cu
 
 # 3. The blob is gone once the TMS has it.
 [ "$(until_found blob_gone "$cmr_id")" = gone ] \
-  || fail "the Proof of delivery's blob $cmr_id is still in the $inbound_container container after 10 minutes, or the presenter can't read it"
+  || fail "the Proof of delivery's blob $cmr_id is still in the $inbound_container container after the wait, or the presenter can't read it"
 pass "the Proof of delivery's blob is gone from the $inbound_container container"
 
 # 4. The unknown reference is accepted, then dead-lettered with ShipmentNotFound, and its blob stays for investigation.
