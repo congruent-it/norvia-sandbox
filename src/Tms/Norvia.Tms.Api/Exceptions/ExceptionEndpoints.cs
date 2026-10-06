@@ -5,9 +5,11 @@ using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Api.TransportOrders;
 using Norvia.Tms.Application.Exceptions.AddNote;
 using Norvia.Tms.Application.Exceptions.AgreeDeliveryWindow;
+using Norvia.Tms.Application.Exceptions.CancelCarrierBooking;
 using Norvia.Tms.Application.Exceptions.ListOpen;
 using Norvia.Tms.Application.Exceptions.Resolve;
 using Norvia.Tms.Application.IntegrationEvents;
+using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Domain.TransportOrders;
 
@@ -70,6 +72,21 @@ public static class ExceptionEndpoints
                 + "The TMS publishes ShipmentDeliveryWindowAgreed on the Shipment events topic in one transaction, under a new correlation ID, which the answer and the event carry. "
                 + "An agreement that breaks a rule is refused, changing and publishing nothing, with a problem whose code says which, and whose correlationId names the Message trail the refusal is traced on: "
                 + "ExceptionNotFound (404), ExceptionNotOpen (409), ShipmentNotInTransport (409) or DeliveryWindowInvalid (400, for a window that ends in the past).");
+
+        // Like a resolution, the cancellation starts in the TMS UI and gets a Message trail of its own.
+        exceptions.MapPost("/{exceptionNumber}/cancel-carrier-booking", CancelCarrierBookingAsync)
+            .WithName("CancelCarrierBooking")
+            .RequireAuthorization(policy => policy.RequireRole(TransportOrderEndpoints.ManageRole))
+            .WithMetadata(new TrackedFlow(Flows.ExceptionHandling))
+            .WithSummary("Cancel the Confirmed Carrier booking of the Shipment of an Open Exception.")
+            .WithDescription(
+                "Before collection, the Planner cancels the Confirmed Carrier booking of a Booked Shipment when the Carrier won't make its collection. "
+                + $"The reason is required, and at most {CarrierBooking.MaxCancellationReasonLength} characters; otherwise the call is a 400. "
+                + "An Idempotency-Key is required: the same cancellation sent again under it is answered as before, flagged as a repeat, without cancelling or publishing again. "
+                + "In one transaction the Carrier booking becomes Cancelled, the Shipment goes back to Planned and the TMS publishes CarrierBookingCancelled on the Shipment events topic, "
+                + "under a new correlation ID, which the answer and the event carry. The Exception stays Open, and the Shipment returns to the Shipments to release as Cancelled by Norvia with the reason. "
+                + "A cancellation that breaks a rule is refused, changing and publishing nothing, with a problem whose code says which, and whose correlationId names the Message trail the refusal is traced on: "
+                + "ExceptionNotFound (404), ExceptionNotOpen (409), ShipmentAlreadyCollected (409) or NoConfirmedCarrierBooking (409).");
 
         return app;
     }
@@ -177,6 +194,41 @@ public static class ExceptionEndpoints
             : RefusalProblem.Of<ExceptionRefusalCode, AgreeDeliveryWindowResult>(result, "The delivery window can't be agreed.", command.CorrelationId, StatusCodeOf);
     }
 
+    private static async Task<Results<Ok<CancelCarrierBookingResult>, ProblemHttpResult, ValidationProblem>> CancelCarrierBookingAsync(
+        string exceptionNumber,
+        CancelCarrierBookingRequest request,
+        [FromHeader(Name = TransportOrderEndpoints.IdempotencyKeyHeader)] string? idempotencyKey,
+        IMediator mediator,
+        CancellationToken cancellationToken)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Length > IdempotencyKey.MaxLength)
+        {
+            errors[TransportOrderEndpoints.IdempotencyKeyHeader] =
+                [$"Cancelling a Carrier booking needs an {TransportOrderEndpoints.IdempotencyKeyHeader} of 1 to {IdempotencyKey.MaxLength} characters, the same for each retry."];
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Reason))
+        {
+            errors[nameof(CancelCarrierBookingRequest.Reason)] = ["Cancelling a Carrier booking needs a reason."];
+        }
+        else if (request.Reason.Length > CarrierBooking.MaxCancellationReasonLength)
+        {
+            errors[nameof(CancelCarrierBookingRequest.Reason)] = [$"A reason is at most {CarrierBooking.MaxCancellationReasonLength} characters."];
+        }
+
+        if (errors.Count > 0 || idempotencyKey is null || request.Reason is null)
+        {
+            return TypedResults.ValidationProblem(errors);
+        }
+
+        var command = new CancelCarrierBookingCommand(exceptionNumber, request.Reason, idempotencyKey, CorrelationId.New().Value);
+        var result = await mediator.Send(command, cancellationToken);
+        return result.IsSuccess
+            ? TypedResults.Ok(result.Value)
+            : RefusalProblem.Of<ExceptionRefusalCode, CancelCarrierBookingResult>(result, "The Carrier booking can't be cancelled.", command.CorrelationId, StatusCodeOf);
+    }
+
     private static Dictionary<string, string[]> Check(ResolveExceptionRequest request, out ExceptionOutcome outcome)
     {
         var errors = new Dictionary<string, string[]>();
@@ -201,7 +253,10 @@ public static class ExceptionEndpoints
     private static int StatusCodeOf(ExceptionRefusalCode code) => code switch
     {
         ExceptionRefusalCode.ExceptionNotFound => StatusCodes.Status404NotFound,
-        ExceptionRefusalCode.ExceptionNotOpen or ExceptionRefusalCode.ShipmentNotInTransport => StatusCodes.Status409Conflict,
+        ExceptionRefusalCode.ExceptionNotOpen
+            or ExceptionRefusalCode.ShipmentNotInTransport
+            or ExceptionRefusalCode.ShipmentAlreadyCollected
+            or ExceptionRefusalCode.NoConfirmedCarrierBooking => StatusCodes.Status409Conflict,
         ExceptionRefusalCode.DeliveryWindowInvalid => StatusCodes.Status400BadRequest,
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, "The API doesn't know this refusal's status."),
     };

@@ -17,4 +17,10 @@ public enum ExceptionRefusalCode
 
     /// <summary>The delivery window lacks a time, ends before it starts, or ends in the past.</summary>
     DeliveryWindowInvalid,
+
+    /// <summary>The Shipment has no Carrier, or its Carrier booking isn't Confirmed, so there is nothing to cancel.</summary>
+    NoConfirmedCarrierBooking,
+
+    /// <summary>The Shipment is Collected or later: after collection a Carrier booking can't be cancelled (ADR 0010).</summary>
+    ShipmentAlreadyCollected,
 }

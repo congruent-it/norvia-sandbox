@@ -20,6 +20,7 @@ public static class CarrierBookingText
             CarrierBookingStatus.Rejected => $"Rejected by {carrier}: {Reason(outcome.ReasonCode, outcome.ReasonText)}",
             CarrierBookingStatus.NotDelivered => $"Not delivered to {carrier}",
             CarrierBookingStatus.Withdrawn => $"Withdrawn from {carrier}",
+            CarrierBookingStatus.Cancelled => $"Cancelled by Norvia: {outcome.ReasonText}",
             _ => $"{outcome.Status} by {carrier}",
         };
     }

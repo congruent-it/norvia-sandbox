@@ -17,6 +17,7 @@ using Norvia.Tms.Application.CarrierBookings.Report;
 using Norvia.Tms.Application.CarrierBookings.Withdraw;
 using Norvia.Tms.Application.Exceptions.AddNote;
 using Norvia.Tms.Application.Exceptions.AgreeDeliveryWindow;
+using Norvia.Tms.Application.Exceptions.CancelCarrierBooking;
 using Norvia.Tms.Application.Exceptions.Resolve;
 using Norvia.Tms.Application.ProofsOfDelivery.Record;
 using Norvia.Tms.Application.Shipments.Reassign;
@@ -53,6 +54,7 @@ builder.Services.AddScoped<IPipelineBehavior<RecordProofOfDeliveryCommand, Resul
 builder.Services.AddScoped<IPipelineBehavior<ResolveExceptionCommand, Result<ResolveExceptionResult>>, TrackExceptionResolutionInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<AddExceptionNoteCommand, Result<AddExceptionNoteResult>>, TrackExceptionNoteInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<AgreeDeliveryWindowCommand, Result<AgreeDeliveryWindowResult>>, TrackDeliveryWindowAgreementInLoggingScope>();
+builder.Services.AddScoped<IPipelineBehavior<CancelCarrierBookingCommand, Result<CancelCarrierBookingResult>>, TrackCarrierBookingCancellationInLoggingScope>();
 builder.AddTmsInfrastructure();
 builder.AddTmsProofOfDeliveryStorage();
 builder.AddTmsOutboxPublisher();

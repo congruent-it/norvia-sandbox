@@ -7,6 +7,7 @@ using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.UnitTests.TransportOrders;
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Carriers;
+using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.Shippers;
 using Norvia.Tms.Domain.TransportOrders;
@@ -81,6 +82,24 @@ public sealed class ShipmentsToReleaseQueryTests
         shipments.Should().ContainSingle().Which.LastCarrierBookingOutcome.Should().Be(
             new LastCarrierBookingOutcome(
                 CarrierBookingStatus.Rejected, new CarrierView("CAR-0001", "Van Dijk Transport"), CarrierBookingRejectionReason.NoCapacity, "No trucks on Friday."));
+    }
+
+    [Fact]
+    public async Task Handle_AShipmentWhoseConfirmedBookingNorviaCancelled_ShowsItCancelledWithTheReason()
+    {
+        var order = Samples.AcceptedOrder(sequence: 7);
+        var shipment = Samples.Planned(order, CarriedBy.Carrier(VanDijk), sequence: 12);
+        _repository.ListAsync(Arg.Any<ShipmentsToReleaseSpec>(), Arg.Any<CancellationToken>()).Returns([shipment]);
+        var cancelled = CarrierBooking.Request(
+            CarrierBookingNumber.FromSequence(1), shipment.Id, shipment.Number, VanDijk, new CorrelationId("corr-release"), Samples.Now.AddHours(1));
+        cancelled.Confirm("VDT-1", null, order.Number!, new CorrelationId("corr-answer"), Samples.Now.AddHours(2));
+        cancelled.Cancel("Carrier won't make its collection", ExceptionNumber.FromSequence(5), new IdempotencyKey("key-cancel"), new CorrelationId("corr-cancel"), Samples.Now.AddHours(3));
+        _carrierBookings.ListAsync(Arg.Any<CarrierBookingsForShipmentsSpec>(), Arg.Any<CancellationToken>()).Returns([cancelled]);
+
+        var shipments = await _handler.Handle(new ListShipmentsToReleaseQuery(), CancellationToken.None);
+
+        shipments.Should().ContainSingle().Which.LastCarrierBookingOutcome.Should().Be(
+            new LastCarrierBookingOutcome(CarrierBookingStatus.Cancelled, new CarrierView("CAR-0001", "Van Dijk Transport"), null, "Carrier won't make its collection"));
     }
 
     [Fact]

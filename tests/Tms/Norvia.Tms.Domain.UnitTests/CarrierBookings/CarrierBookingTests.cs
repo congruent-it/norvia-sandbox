@@ -1,5 +1,6 @@
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Carriers;
+using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TransportOrders;
 
@@ -322,6 +323,82 @@ public sealed class CarrierBookingTests
         var booking = Requested();
 
         booking.WithdrawalUnder(new IdempotencyKey("key-withdraw-1")).Should().BeNull();
+    }
+
+    [Fact]
+    public void Cancel_AConfirmedBooking_MovesItToCancelled_WithTheReasonAndTheExceptionItWasCancelledFrom()
+    {
+        var booking = Confirmed();
+        var key = new IdempotencyKey("key-cancel-1");
+        var cancelledAt = AnsweredAt.AddHours(5);
+
+        var cancelled = booking.Cancel("Carrier won't make its collection", ExceptionNumber.FromSequence(5), key, new CorrelationId("corr-cancel"), cancelledAt);
+
+        cancelled.Should().BeTrue();
+        booking.Status.Should().Be(CarrierBookingStatus.Cancelled);
+        booking.CancellationReasonText.Should().Be("Carrier won't make its collection");
+        booking.CancellationExceptionNumber.Should().Be(ExceptionNumber.FromSequence(5));
+        booking.CancelledAt.Should().Be(cancelledAt);
+        booking.CancellationUnder(key).Should().Be(new CorrelationId("corr-cancel"));
+        booking.CarrierBookingReference.Should().Be("VDT-240917-0042", "the Carrier's reference stays on the cancelled booking");
+    }
+
+    [Fact]
+    public void Cancel_AConfirmedBooking_RaisesCarrierBookingCancelled()
+    {
+        var booking = Confirmed();
+
+        booking.Cancel("No show", ExceptionNumber.FromSequence(5), new IdempotencyKey("key-cancel-1"), new CorrelationId("corr-cancel"), AnsweredAt.AddHours(5));
+
+        booking.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<CarrierBookingCancelledEvent>().Which.Booking.Should().BeSameAs(booking);
+    }
+
+    [Theory]
+    [InlineData(CarrierBookingStatus.Requested)]
+    [InlineData(CarrierBookingStatus.Rejected)]
+    [InlineData(CarrierBookingStatus.Withdrawn)]
+    [InlineData(CarrierBookingStatus.Cancelled)]
+    public void Cancel_ABookingThatIsNotConfirmed_ChangesNothing(CarrierBookingStatus status)
+    {
+        var booking = Requested();
+        switch (status)
+        {
+            case CarrierBookingStatus.Rejected:
+                booking.Reject(CarrierBookingRejectionReason.NoCapacity, null, Answer, AnsweredAt);
+                break;
+            case CarrierBookingStatus.Withdrawn:
+                booking.Withdraw(new IdempotencyKey("key-withdraw-1"), new CorrelationId("corr-withdraw"), AnsweredAt);
+                break;
+            case CarrierBookingStatus.Cancelled:
+                booking.Confirm("VDT-240917-0042", null, TransportOrderNumberOfTwelve, Answer, AnsweredAt);
+                booking.Cancel("First", ExceptionNumber.FromSequence(5), new IdempotencyKey("key-cancel-1"), new CorrelationId("corr-cancel"), AnsweredAt);
+                break;
+        }
+
+        booking.ClearDomainEvents();
+
+        var cancelled = booking.Cancel("Again", ExceptionNumber.FromSequence(6), new IdempotencyKey("key-cancel-2"), new CorrelationId("corr-cancel-2"), AnsweredAt.AddHours(1));
+
+        cancelled.Should().BeFalse();
+        booking.Status.Should().Be(status);
+        booking.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void CancellationUnder_AnUnknownKey_IsNull()
+    {
+        var booking = Confirmed();
+        booking.Cancel("No show", ExceptionNumber.FromSequence(5), new IdempotencyKey("key-cancel-1"), new CorrelationId("corr-cancel"), AnsweredAt.AddHours(5));
+
+        booking.CancellationUnder(new IdempotencyKey("key-cancel-2")).Should().BeNull();
+    }
+
+    private static CarrierBooking Confirmed()
+    {
+        var booking = Requested();
+        booking.Confirm("VDT-240917-0042", null, TransportOrderNumberOfTwelve, Answer, AnsweredAt);
+        booking.ClearDomainEvents();
+        return booking;
     }
 
     private static CarrierBooking Requested()

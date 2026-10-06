@@ -48,6 +48,14 @@ public sealed class CarrierBookingTextTests
     }
 
     [Fact]
+    public void LastOutcome_Cancelled_SaysNorviaCancelledItAndGivesTheReason()
+    {
+        var outcome = new LastCarrierBookingOutcome(CarrierBookingStatus.Cancelled, Samples.Kessler, null, "Carrier won't make its collection");
+
+        CarrierBookingText.LastOutcome(outcome).Should().Be("Cancelled by Norvia: Carrier won't make its collection");
+    }
+
+    [Fact]
     public void Detail_Confirmed_GivesTheCarrierBookingReference()
     {
         CarrierBookingText.Detail(Booking(CarrierBookingStatus.Confirmed) with { CarrierBookingReference = "KS-7781" })
