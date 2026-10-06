@@ -86,6 +86,10 @@ public sealed class RecordProofOfDeliveryHandler(
         {
             await exceptionCauses.OpenOrAddAsync(shipment, cause, cancellationToken);
         }
+        else if (ExceptionTypes.ClearedBy(proofOfDelivery.Condition) is { } cleared)
+        {
+            await exceptionCauses.ClearAsync(shipment, cleared, cancellationToken);
+        }
 
         await proofsOfDelivery.AddAsync(proofOfDelivery, cancellationToken);
         await proofsOfDelivery.SaveChangesAsync(cancellationToken);

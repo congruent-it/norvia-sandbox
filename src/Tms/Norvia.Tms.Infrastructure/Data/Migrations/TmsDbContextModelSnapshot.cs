@@ -135,6 +135,9 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<bool>("CauseCleared")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Causes")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");

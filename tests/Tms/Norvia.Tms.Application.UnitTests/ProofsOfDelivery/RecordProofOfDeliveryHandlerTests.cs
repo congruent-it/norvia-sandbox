@@ -104,6 +104,23 @@ public sealed class RecordProofOfDeliveryHandlerTests
         await _exceptions.DidNotReceive().AddAsync(Arg.Any<ExceptionCase>(), Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task Handle_ACleanProofOfDeliveryAfterOneWithReservations_MarksTheReservationsExceptionCauseCleared_WithoutPublishing()
+    {
+        var shipment = Found(ShipmentStatus.Delivered);
+        await _handler.Handle(Command(Report(condition: DeliveryCondition.Reservations)), CancellationToken.None);
+        var open = OpenedException();
+        open.ClearDomainEvents();
+        _exceptions.SingleOrDefaultAsync(Arg.Is<OpenExceptionOfTypeForShipmentSpec>(s => s.ShipmentId == shipment.Id && s.Type == ExceptionType.Reservations), Arg.Any<CancellationToken>())
+            .Returns(open);
+
+        await _handler.Handle(Command(Report(documentId: "doc-2", condition: DeliveryCondition.Clean)), CancellationToken.None);
+
+        open.CauseCleared.Should().BeTrue();
+        open.Status.Should().Be(ExceptionStatus.Open);
+        open.DomainEvents.Should().BeEmpty();
+    }
+
     private ExceptionCase OpenedException() =>
         (ExceptionCase)_exceptions.ReceivedCalls().Single(call => call.GetMethodInfo().Name == nameof(IRepository<ExceptionCase>.AddAsync)).GetArguments()[0]!;
 

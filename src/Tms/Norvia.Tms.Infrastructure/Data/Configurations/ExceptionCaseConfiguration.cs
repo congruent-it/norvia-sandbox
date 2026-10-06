@@ -67,6 +67,7 @@ internal sealed class ExceptionCaseConfiguration : IEntityTypeConfiguration<Exce
         builder.HasIndex(exception => new { exception.Status, exception.OpenedAt });
 
         builder.Property(exception => exception.AfterDelivered);
+        builder.Property(exception => exception.CauseCleared);
 
         builder.Property(exception => exception.CorrelationId)
             .HasConversion(id => id.Value, value => new CorrelationId(value))
