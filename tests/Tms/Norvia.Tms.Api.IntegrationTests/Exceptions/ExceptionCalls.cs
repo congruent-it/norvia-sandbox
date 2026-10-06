@@ -54,6 +54,34 @@ internal static class ExceptionCalls
         return await tms.TmsUi.SendAsync(request, cancellationToken);
     }
 
+    /// <summary>Adds a note as the Planner does, through the TMS UI.</summary>
+    public static async Task<HttpResponseMessage> AddNoteAsync(
+        this TmsFixture tms, string exceptionNumber, JsonObject note, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(tms);
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"/v1/exceptions/{exceptionNumber}/notes", UriKind.Relative))
+        {
+            Content = JsonContent.Create(note),
+        };
+        return await tms.TmsUi.SendAsync(request, cancellationToken);
+    }
+
+    public static JsonObject Note(string? text = "Phoned Kessler, redelivery Thursday", string? planner = "Anna de Vries")
+    {
+        var note = new JsonObject();
+        if (text is not null)
+        {
+            note["text"] = text;
+        }
+
+        if (planner is not null)
+        {
+            note["planner"] = planner;
+        }
+
+        return note;
+    }
+
     public static JsonObject Resolution(string? outcome = "Redelivered", string? remark = "Phoned the Consignee, redelivery Thursday")
     {
         var resolution = new JsonObject();

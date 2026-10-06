@@ -88,6 +88,18 @@ internal sealed class ExceptionCaseConfiguration : IEntityTypeConfiguration<Exce
                     causes => causes.ToArray()))
             .IsRequired();
 
+        // The notes are read and written only with their Exception too.
+        builder.Property(exception => exception.Notes)
+            .HasConversion(
+                notes => JsonSerializer.Serialize(notes, CausesJson),
+                json => JsonSerializer.Deserialize<ExceptionNote[]>(json, CausesJson)!,
+                new ValueComparer<IReadOnlyList<ExceptionNote>>(
+                    (left, right) => left!.SequenceEqual(right!),
+                    notes => notes.Count,
+                    notes => notes.ToArray()))
+            .HasDefaultValueSql("N'[]'")
+            .IsRequired();
+
         builder.Property(exception => exception.Outcome).HasConversion<string>().HasMaxLength(30);
         builder.Property(exception => exception.Remark).HasMaxLength(2000);
         builder.Property(exception => exception.ResolvedAt);

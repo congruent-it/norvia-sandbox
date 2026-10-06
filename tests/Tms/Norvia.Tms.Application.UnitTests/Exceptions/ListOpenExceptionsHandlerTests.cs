@@ -52,7 +52,8 @@ public sealed class ListOpenExceptionsHandlerTests
                 Samples.Now.AddDays(1),
                 NumberOfCauses: 2,
                 AfterDelivered: false,
-                CauseCleared: false),
+                CauseCleared: false,
+                Notes: []),
             new OpenExceptionSummary(
                 "EX-0000006",
                 "SH-0000013",
@@ -62,7 +63,21 @@ public sealed class ListOpenExceptionsHandlerTests
                 Samples.Now.AddDays(1),
                 NumberOfCauses: 1,
                 AfterDelivered: false,
-                CauseCleared: false));
+                CauseCleared: false,
+                Notes: []));
+    }
+
+    [Fact]
+    public async Task Handle_ListsTheNotesOfAnException_InTheOrderTheyWereAdded()
+    {
+        var exception = OpenExceptions.DeliveryFailed();
+        exception.AddNote("First", "Anna", new CorrelationId("c1"), Samples.Now.AddDays(2));
+        exception.AddNote("Second", "Bram", new CorrelationId("c2"), Samples.Now.AddDays(3));
+        _exceptions.ListAsync(Arg.Any<OpenExceptionsSpec>(), Arg.Any<CancellationToken>()).Returns([exception]);
+
+        var open = await _handler.Handle(new ListOpenExceptionsQuery(), CancellationToken.None);
+
+        open.Single().Notes.Select(note => (note.Text, note.Planner)).Should().Equal(("First", "Anna"), ("Second", "Bram"));
     }
 
     [Fact]

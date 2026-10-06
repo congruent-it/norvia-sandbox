@@ -2,6 +2,7 @@ using Mediator;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Api.TransportOrders;
+using Norvia.Tms.Application.Exceptions.AddNote;
 using Norvia.Tms.Application.Exceptions.ListOpen;
 using Norvia.Tms.Application.Exceptions.Resolve;
 using Norvia.Tms.Application.IntegrationEvents;
@@ -40,6 +41,19 @@ public static class ExceptionEndpoints
                 + "changing and publishing nothing, with a problem whose code says which, and whose correlationId names the Message trail the refusal is traced on: "
                 + "ExceptionNotFound (404) or ExceptionNotOpen (409).");
 
+        // A note, like a resolution, starts in the TMS UI and gets a Message trail of its own.
+        exceptions.MapPost("/{exceptionNumber}/notes", AddNoteAsync)
+            .WithName("AddExceptionNote")
+            .RequireAuthorization(policy => policy.RequireRole(TransportOrderEndpoints.ManageRole))
+            .WithMetadata(new TrackedFlow(Flows.ExceptionHandling))
+            .WithSummary("Add a note to an Open Exception.")
+            .WithDescription(
+                "The note is free text, so a phone call or an agreement made outside the TMS is on record, and both it and the Planner's name are required; "
+                + "otherwise the call is a 400. The TMS records the note with the Planner and the time, under a new correlation ID which the answer carries, "
+                + "and publishes nothing. The Exception stays Open, and the list of Open Exceptions returns its notes. A note that breaks a rule is refused, "
+                + "changing nothing, with a problem whose code says which, and whose correlationId names the Message trail the refusal is traced on: "
+                + "ExceptionNotFound (404) or ExceptionNotOpen (409).");
+
         return app;
     }
 
@@ -66,6 +80,35 @@ public static class ExceptionEndpoints
         return result.IsSuccess
             ? TypedResults.Ok(result.Value)
             : RefusalProblem.Of<ExceptionRefusalCode, ResolveExceptionResult>(result, "The Exception can't be resolved.", command.CorrelationId, StatusCodeOf);
+    }
+
+    private static async Task<Results<Ok<AddExceptionNoteResult>, ProblemHttpResult, ValidationProblem>> AddNoteAsync(
+        string exceptionNumber,
+        AddExceptionNoteRequest request,
+        IMediator mediator,
+        CancellationToken cancellationToken)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (string.IsNullOrWhiteSpace(request.Text))
+        {
+            errors[nameof(AddExceptionNoteRequest.Text)] = ["A note needs its text."];
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Planner))
+        {
+            errors[nameof(AddExceptionNoteRequest.Planner)] = ["A note needs the Planner who wrote it."];
+        }
+
+        if (errors.Count > 0)
+        {
+            return TypedResults.ValidationProblem(errors);
+        }
+
+        var command = new AddExceptionNoteCommand(exceptionNumber, request.Text!, request.Planner!, CorrelationId.New().Value);
+        var result = await mediator.Send(command, cancellationToken);
+        return result.IsSuccess
+            ? TypedResults.Ok(result.Value)
+            : RefusalProblem.Of<ExceptionRefusalCode, AddExceptionNoteResult>(result, "The note can't be added.", command.CorrelationId, StatusCodeOf);
     }
 
     private static Dictionary<string, string[]> Check(ResolveExceptionRequest request, out ExceptionOutcome outcome)
