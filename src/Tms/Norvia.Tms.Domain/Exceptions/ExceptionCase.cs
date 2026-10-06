@@ -81,6 +81,9 @@ public sealed class ExceptionCase : EntityBase<ExceptionId>, IAggregateRoot
     /// </summary>
     public bool CauseCleared { get; private set; }
 
+    /// <summary>The Planner's notes, in the order they were added.</summary>
+    public IReadOnlyList<ExceptionNote> Notes { get; private set; } = [];
+
     public ExceptionOutcome? Outcome { get; private set; }
 
     public string? Remark { get; private set; }
@@ -142,6 +145,26 @@ public sealed class ExceptionCase : EntityBase<ExceptionId>, IAggregateRoot
         {
             CauseCleared = true;
         }
+    }
+
+    /// <summary>
+    /// Adds a Planner's note to an open Exception and raises nothing. Returns the refusal, adding nothing, for an Exception that
+    /// isn't open. The text and the Planner are checked at the boundary first.
+    /// </summary>
+    public ExceptionRefusal? AddNote(string text, string planner, CorrelationId correlationId, DateTimeOffset addedAt)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(text);
+        ArgumentException.ThrowIfNullOrWhiteSpace(planner);
+        ArgumentNullException.ThrowIfNull(correlationId);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(text.Length, ExceptionNote.MaxTextLength);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(planner.Length, ExceptionNote.MaxPlannerLength);
+        if (Status != ExceptionStatus.Open)
+        {
+            return new(ExceptionRefusalCode.ExceptionNotOpen, Invariant($"Exception {Number} is {Status}, not Open."));
+        }
+
+        Notes = [.. Notes, new ExceptionNote(text, planner, correlationId, addedAt)];
+        return null;
     }
 
     /// <summary>

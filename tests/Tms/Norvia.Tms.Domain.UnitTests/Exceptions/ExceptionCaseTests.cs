@@ -219,6 +219,70 @@ public sealed class ExceptionCaseTests
     }
 
     [Fact]
+    public void AddNote_ToAnOpenException_RecordsItWithThePlannerTimeAndCorrelationId_AndRaisesNothing()
+    {
+        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), Booked(), Cause(DeliveryFailed(Booked())));
+        exception.ClearDomainEvents();
+
+        var refusal = exception.AddNote("Phoned Kessler, redelivery Thursday", "Anna de Vries", new CorrelationId("corr-note"), ReceivedAt.AddHours(2));
+
+        refusal.Should().BeNull();
+        exception.Notes.Should().ContainSingle().Which.Should().Be(
+            new ExceptionNote("Phoned Kessler, redelivery Thursday", "Anna de Vries", new CorrelationId("corr-note"), ReceivedAt.AddHours(2)));
+        exception.Status.Should().Be(ExceptionStatus.Open);
+        exception.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void AddNote_Twice_KeepsBothInTheOrderTheyCame()
+    {
+        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), Booked(), Cause(DeliveryFailed(Booked())));
+
+        exception.AddNote("First", "Anna", new CorrelationId("c1"), ReceivedAt.AddHours(1));
+        exception.AddNote("Second", "Anna", new CorrelationId("c2"), ReceivedAt.AddHours(2));
+
+        exception.Notes.Select(note => note.Text).Should().Equal("First", "Second");
+    }
+
+    [Fact]
+    public void AddNote_ToAResolvedException_IsRefused_WithExceptionNotOpen_AndAddsNothing()
+    {
+        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), Booked(), Cause(DeliveryFailed(Booked())));
+        exception.Resolve(ExceptionOutcome.NoActionNeeded, "Done", new CorrelationId("c"), ReceivedAt);
+
+        var refusal = exception.AddNote("Too late", "Anna", new CorrelationId("c2"), ReceivedAt.AddDays(1));
+
+        refusal.Should().NotBeNull();
+        refusal!.Code.Should().Be(ExceptionRefusalCode.ExceptionNotOpen);
+        exception.Notes.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void AddNote_WithATextOrPlannerOverTheLimit_Throws()
+    {
+        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), Booked(), Cause(DeliveryFailed(Booked())));
+
+        var tooLongText = () => exception.AddNote(new string('x', ExceptionNote.MaxTextLength + 1), "Anna", new CorrelationId("c"), ReceivedAt);
+        var tooLongPlanner = () => exception.AddNote("Text", new string('x', ExceptionNote.MaxPlannerLength + 1), new CorrelationId("c"), ReceivedAt);
+
+        tooLongText.Should().Throw<ArgumentOutOfRangeException>();
+        tooLongPlanner.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("  ")]
+    public void AddNote_WithoutText_Throws_BecauseTheBoundaryChecksItFirst(string? text)
+    {
+        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), Booked(), Cause(DeliveryFailed(Booked())));
+
+        var add = () => exception.AddNote(text!, "Anna", new CorrelationId("c"), ReceivedAt);
+
+        add.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
     public void Resolve_AResolvedException_IsRefused_WithExceptionNotOpen_AndChangesNothing()
     {
         var shipment = Booked();

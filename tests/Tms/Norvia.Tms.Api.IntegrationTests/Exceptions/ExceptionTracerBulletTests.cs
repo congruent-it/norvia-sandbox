@@ -176,6 +176,67 @@ public sealed class ExceptionTracerBulletTests(TmsFixture tms) : IClassFixture<T
     }
 
     [Fact]
+    public async Task AddNote_ToAnOpenException_IsReturnedByTheList_OnANewCorrelationId_AndPublishesNothing()
+    {
+        var (shipmentNumber, _, openingCorrelationId) = await tms.DeliveryFailedShipmentAsync(_cancellationToken);
+        var exceptionNumber = (await tms.OpenExceptionsOfAsync(shipmentNumber, _cancellationToken)).Single()["exceptionNumber"]!.GetValue<string>();
+        await tms.PublishedAsync(openingCorrelationId, "ExceptionOpened", _cancellationToken);
+
+        using var response = await tms.AddNoteAsync(exceptionNumber, Note(), _cancellationToken);
+
+        var body = await response.Content.ReadAsStringAsync(_cancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, body);
+        var added = JsonNode.Parse(body)!;
+        var noteCorrelationId = added["correlationId"]!.GetValue<string>();
+        noteCorrelationId.Should().NotBe(openingCorrelationId, "each Planner action gets a new correlation ID from the TMS");
+        var open = (await tms.OpenExceptionsOfAsync(shipmentNumber, _cancellationToken)).Should().ContainSingle().Subject;
+        var note = open["notes"]!.AsArray().Should().ContainSingle().Subject!;
+        note["text"]!.GetValue<string>().Should().Be("Phoned Kessler, redelivery Thursday");
+        note["planner"]!.GetValue<string>().Should().Be("Anna de Vries");
+        note["addedAt"]!.GetValue<DateTimeOffset>().Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromMinutes(2));
+        await TmsFixture.SettleOutboxAsync(_cancellationToken);
+        tms.Published.Should().NotContain(m => m.CorrelationId == noteCorrelationId, "a note publishes nothing");
+    }
+
+    [Fact]
+    public async Task AddNote_WithoutTextOrPlanner_IsRefused_AndAddsNothing()
+    {
+        var (shipmentNumber, _, _) = await tms.DeliveryFailedShipmentAsync(_cancellationToken);
+        var exceptionNumber = (await tms.OpenExceptionsOfAsync(shipmentNumber, _cancellationToken)).Single()["exceptionNumber"]!.GetValue<string>();
+
+        using var withoutText = await tms.AddNoteAsync(exceptionNumber, Note(text: " "), _cancellationToken);
+        using var withoutPlanner = await tms.AddNoteAsync(exceptionNumber, Note(planner: null), _cancellationToken);
+
+        withoutText.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        withoutPlanner.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        using var tooLong = await tms.AddNoteAsync(exceptionNumber, Note(text: new string('x', 2001)), _cancellationToken);
+        tooLong.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await tms.OpenExceptionsOfAsync(shipmentNumber, _cancellationToken)).Single()["notes"]!.AsArray().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task AddNote_ToAResolvedException_IsRefused_WithExceptionNotOpen()
+    {
+        var (shipmentNumber, _, _) = await tms.DeliveryFailedShipmentAsync(_cancellationToken);
+        var exceptionNumber = (await tms.OpenExceptionsOfAsync(shipmentNumber, _cancellationToken)).Single()["exceptionNumber"]!.GetValue<string>();
+        await tms.ResolvedAsync(exceptionNumber, Resolution(), _cancellationToken);
+
+        using var response = await tms.AddNoteAsync(exceptionNumber, Note(), _cancellationToken);
+
+        var body = await response.Content.ReadAsStringAsync(_cancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict, body);
+        JsonNode.Parse(body)!["code"]!.GetValue<string>().Should().Be("ExceptionNotOpen");
+    }
+
+    [Fact]
+    public async Task AddNote_ToAnUnknownException_IsRefused_WithExceptionNotFound()
+    {
+        using var response = await tms.AddNoteAsync("EX-9999999", Note(), _cancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
     public async Task Resolve_NeedsTheManageRole()
     {
         using var withoutToken = tms.CreateTmsClient(token: null);

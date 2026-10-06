@@ -12,7 +12,7 @@ namespace Norvia.Tms.Infrastructure.Data.Configurations;
 
 internal sealed class ExceptionCaseConfiguration : IEntityTypeConfiguration<ExceptionCase>
 {
-    private static readonly JsonSerializerOptions CausesJson = new(JsonSerializerDefaults.Web);
+    private static readonly JsonSerializerOptions JsonColumns = new(JsonSerializerDefaults.Web);
 
     public void Configure(EntityTypeBuilder<ExceptionCase> builder)
     {
@@ -80,12 +80,24 @@ internal sealed class ExceptionCaseConfiguration : IEntityTypeConfiguration<Exce
         // cause that opened it, so the column is never empty.
         builder.Property(exception => exception.Causes)
             .HasConversion(
-                causes => JsonSerializer.Serialize(causes, CausesJson),
-                json => JsonSerializer.Deserialize<ExceptionCause[]>(json, CausesJson)!,
+                causes => JsonSerializer.Serialize(causes, JsonColumns),
+                json => JsonSerializer.Deserialize<ExceptionCause[]>(json, JsonColumns)!,
                 new ValueComparer<IReadOnlyList<ExceptionCause>>(
                     (left, right) => left!.SequenceEqual(right!),
                     causes => causes.Count,
                     causes => causes.ToArray()))
+            .IsRequired();
+
+        // The notes are read and written only with their Exception too.
+        builder.Property(exception => exception.Notes)
+            .HasConversion(
+                notes => JsonSerializer.Serialize(notes, JsonColumns),
+                json => JsonSerializer.Deserialize<ExceptionNote[]>(json, JsonColumns)!,
+                new ValueComparer<IReadOnlyList<ExceptionNote>>(
+                    (left, right) => left!.SequenceEqual(right!),
+                    notes => notes.Count,
+                    notes => notes.ToArray()))
+            .HasDefaultValueSql("N'[]'")
             .IsRequired();
 
         builder.Property(exception => exception.Outcome).HasConversion<string>().HasMaxLength(30);

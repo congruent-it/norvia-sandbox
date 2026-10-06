@@ -15,6 +15,7 @@ using Norvia.Tms.Api.TransportOrders;
 using Norvia.Tms.Application.CarrierBookings.Answer;
 using Norvia.Tms.Application.CarrierBookings.Report;
 using Norvia.Tms.Application.CarrierBookings.Withdraw;
+using Norvia.Tms.Application.Exceptions.AddNote;
 using Norvia.Tms.Application.Exceptions.Resolve;
 using Norvia.Tms.Application.ProofsOfDelivery.Record;
 using Norvia.Tms.Application.Shipments.Reassign;
@@ -49,6 +50,7 @@ builder.Services.AddScoped<IPipelineBehavior<WithdrawCarrierBookingCommand, Resu
 builder.Services.AddScoped<IPipelineBehavior<RecordTrackingCommand, Result<RecordTrackingResult>>, TrackTrackingEventInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<RecordProofOfDeliveryCommand, Result<RecordProofOfDeliveryResult>>, TrackProofOfDeliveryInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<ResolveExceptionCommand, Result<ResolveExceptionResult>>, TrackExceptionResolutionInLoggingScope>();
+builder.Services.AddScoped<IPipelineBehavior<AddExceptionNoteCommand, Result<AddExceptionNoteResult>>, TrackExceptionNoteInLoggingScope>();
 builder.AddTmsInfrastructure();
 builder.AddTmsProofOfDeliveryStorage();
 builder.AddTmsOutboxPublisher();
