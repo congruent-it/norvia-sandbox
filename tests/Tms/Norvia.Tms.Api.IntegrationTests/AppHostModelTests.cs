@@ -174,7 +174,9 @@ public sealed class AppHostModelTests
             .And.ContainKey("ProofOfDelivery__TmsTokens__SigningKey");
         builder.Resources.OfType<AzureServiceBusQueueResource>().Should().ContainSingle(queue => queue.QueueName == "carrier-proof-of-delivery");
         builder.Resources.OfType<AzureBlobStorageContainerResource>().Should().Contain(container => container.BlobContainerName == "inbound-proofs-of-delivery");
-        portal.Should().Contain("PartnerApi__LocalTokens__Roles__van-dijk-transport__2", "ProofsOfDelivery.Submit");
+        portal.Should().Contain("PartnerApi__LocalTokens__Roles__van-dijk-transport__2", "ProofsOfDelivery.Submit")
+            .And.Contain("PartnerApi__LocalTokens__Roles__kessler-spedition__2", "ProofsOfDelivery.Submit")
+            .And.Contain("PartnerApi__LocalTokens__Roles__pakketpunt-express__2", "ProofsOfDelivery.Submit");
     }
 
     [Fact]

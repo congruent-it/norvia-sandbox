@@ -2,6 +2,7 @@ using Microsoft.FluentUI.AspNetCore.Components;
 using Norvia.PartnerPortal.Application.Bookings.Submit;
 using Norvia.PartnerPortal.Application.CarrierBookings.AutoAnswer;
 using Norvia.PartnerPortal.Application.CarrierShipments.AutoProgress;
+using Norvia.PartnerPortal.Application.CarrierShipments.SendProofOfDelivery;
 using Norvia.PartnerPortal.Domain.Bookings;
 using Norvia.PartnerPortal.Infrastructure;
 using Norvia.PartnerPortal.Web.Bookings;
@@ -28,6 +29,7 @@ builder.Services.AddSingleton<AutoAnswerWorker>();
 builder.Services.AddSingleton<IAutoAnswerSignal>(services => services.GetRequiredService<AutoAnswerWorker>());
 builder.Services.AddHostedService(services => services.GetRequiredService<AutoAnswerWorker>());
 // Carrier Personas in auto-progress send their Tracking events through this worker, which a confirmation wakes.
+builder.Services.AddSingleton<ISampleCmr, BundledSampleCmr>();
 builder.Services.AddSingleton<AutoProgressWorker>();
 builder.Services.AddSingleton<IAutoProgressSignal>(services => services.GetRequiredService<AutoProgressWorker>());
 builder.Services.AddHostedService(services => services.GetRequiredService<AutoProgressWorker>());

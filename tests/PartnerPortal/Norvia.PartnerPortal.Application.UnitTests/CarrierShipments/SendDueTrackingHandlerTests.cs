@@ -6,6 +6,7 @@ using Microsoft.Extensions.Time.Testing;
 using Norvia.PartnerPortal.Application.CarrierShipments;
 using Norvia.PartnerPortal.Application.CarrierShipments.AutoProgress;
 using Norvia.PartnerPortal.Application.CarrierShipments.Send;
+using Norvia.PartnerPortal.Application.CarrierShipments.SendProofOfDelivery;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
 
@@ -18,11 +19,14 @@ namespace Norvia.PartnerPortal.Application.UnitTests.CarrierShipments;
 public sealed class SendDueTrackingHandlerTests
 {
     private static readonly TimeSpan Delay = TimeSpan.FromSeconds(5);
+    private static readonly ProofOfDeliveryUpload Cmr = new("sample-cmr.pdf", "application/pdf", "%PDF-1.4"u8.ToArray());
 
     private readonly IRepository<CarrierBookingRequest> _repository = Substitute.For<IRepository<CarrierBookingRequest>>();
+    private readonly IReadRepository<CarrierBookingRequest> _readRepository = Substitute.For<IReadRepository<CarrierBookingRequest>>();
     private readonly RecordingPartnerApi _partnerApi = new();
     private readonly IPersonaDirectory _personas = Substitute.For<IPersonaDirectory>();
     private readonly IMediator _mediator = Substitute.For<IMediator>();
+    private readonly ISampleCmr _sampleCmr = Substitute.For<ISampleCmr>();
     private readonly FakeTimeProvider _time = new(Samples.Now);
     private readonly CarrierBookingRequest _request;
     private readonly SendDueTrackingHandler _handler;
@@ -32,16 +36,25 @@ public sealed class SendDueTrackingHandlerTests
         _personas.Find(Samples.KesslerSpedition.Id).Returns(Samples.KesslerSpedition);
         _request = ConfirmedRequest(Delay);
         _repository.FirstOrDefaultAsync(Arg.Any<CarrierBookingRequestToAnswerSpec>(), Arg.Any<CancellationToken>()).Returns(_request);
+        _readRepository.FirstOrDefaultAsync(Arg.Any<CarrierBookingRequestToAnswerSpec>(), Arg.Any<CancellationToken>()).Returns(_request);
         _repository.ListAsync(Arg.Any<CarrierBookingRequestsDueForAutoProgressSpec>(), Arg.Any<CancellationToken>())
-            .Returns(_ => _request.AutoProgressDue(_time.GetUtcNow()) is null ? [] : [_request]);
+            .Returns(_ => _request.AutoProgressDueAt <= _time.GetUtcNow() ? [_request] : []);
         _repository.FirstOrDefaultAsync(Arg.Any<NextAutoProgressSpec>(), Arg.Any<CancellationToken>()).Returns(_ => _request.AutoProgressDueAt is null ? null : _request);
 
         var send = new SendTrackingHandler(_repository, _partnerApi, _personas, _time, new FakeLogger<SendTrackingHandler>());
 #pragma warning disable CA2012 // NSubstitute configures the call by reading its return value, which is never consumed.
         _mediator.Send(Arg.Any<SendTrackingCommand>(), Arg.Any<CancellationToken>()).Returns(call => Forward(send, call.Arg<SendTrackingCommand>(), call.Arg<CancellationToken>()));
 #pragma warning restore CA2012
-        _handler = new SendDueTrackingHandler(_repository, _mediator, _time, new FakeLogger<SendDueTrackingHandler>());
+        _sampleCmr.Read().Returns(Cmr);
+        var sendProof = new SendProofOfDeliveryHandler(_readRepository, _partnerApi, _personas, _time);
+#pragma warning disable CA2012
+        _mediator.Send(Arg.Any<SendProofOfDeliveryCommand>(), Arg.Any<CancellationToken>()).Returns(call => ForwardProof(sendProof, call.Arg<SendProofOfDeliveryCommand>(), call.Arg<CancellationToken>()));
+#pragma warning restore CA2012
+        _handler = new SendDueTrackingHandler(_repository, _mediator, _sampleCmr, _time, new FakeLogger<SendDueTrackingHandler>());
     }
+
+    private static async ValueTask<Result<SentProofOfDelivery>> ForwardProof(SendProofOfDeliveryHandler send, SendProofOfDeliveryCommand command, CancellationToken cancellationToken) =>
+        await send.Handle(command, cancellationToken);
 
     private static async ValueTask<Result<SentTrackingEvent>> Forward(SendTrackingHandler send, SendTrackingCommand command, CancellationToken cancellationToken) =>
         await send.Handle(command, cancellationToken);
@@ -86,20 +99,68 @@ public sealed class SendDueTrackingHandlerTests
         _request.Stage.Should().Be(ShipmentStage.Delivered);
     }
 
-    [Fact]
-    public async Task Handle_AfterDelivered_SendsNothingMore_AndHasNoNextDueTime()
+    private async Task DeliverAsync()
     {
         for (var step = 0; step < 4; step++)
         {
             _time.Advance(Delay);
             await Sweep();
         }
+    }
+
+    [Fact]
+    public async Task Handle_ADelayAfterDelivered_SendsACleanProofOfDeliveryWithTheSampleCmr_ThroughTheSamePathAsAManualOne()
+    {
+        await DeliverAsync();
+        var afterDelivered = await Sweep();
+        afterDelivered.NextDueAt.Should().Be(_request.AutoProgressDueAt, "the Proof of delivery is the next thing due");
+        _partnerApi.ProofsOfDelivery.Should().BeEmpty("the delay hasn't passed");
+
+        _time.Advance(Delay);
+        var outcome = await Sweep();
+
+        var (persona, shipmentNumber, proof) = _partnerApi.ProofsOfDelivery.Should().ContainSingle().Subject;
+        persona.Should().Be(Samples.KesslerSpedition);
+        shipmentNumber.Should().Be("SH-0000042");
+        proof.Condition.Should().Be(ProofOfDeliveryCondition.Clean);
+        proof.Remark.Should().BeNull();
+        proof.Files.Should().ContainSingle().Which.Name.Should().Be("sample-cmr.pdf");
+        proof.CarrierBookingNumber.Should().Be("CB-0000001");
+        outcome.NextDueAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Handle_AfterTheProofOfDelivery_SendsNothingMore_AndHasNoNextDueTime()
+    {
+        await DeliverAsync();
+        _time.Advance(Delay);
+        await Sweep();
 
         _time.Advance(Delay);
         var outcome = await Sweep();
 
         _partnerApi.TrackingEvents.Should().HaveCount(4);
+        _partnerApi.ProofsOfDelivery.Should().HaveCount(1);
         outcome.NextDueAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Handle_WhenNorviaDoesNotTakeTheProofOfDelivery_TriesAgainShortly_AndSendsItOnceItDoes()
+    {
+        await DeliverAsync();
+        _partnerApi.Reply = TrackingReply.NotReceived(null);
+        _time.Advance(Delay);
+
+        var outcome = await Sweep();
+
+        outcome.NextDueAt.Should().Be(_time.GetUtcNow() + SendDueTrackingHandler.RetryAfter);
+
+        _partnerApi.Reply = TrackingReply.Accepted("corr-2");
+        _time.Advance(SendDueTrackingHandler.RetryAfter);
+        var retried = await Sweep();
+
+        _partnerApi.ProofsOfDelivery.Should().HaveCount(2);
+        retried.NextDueAt.Should().BeNull();
     }
 
     [Fact]
