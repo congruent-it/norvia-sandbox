@@ -1,0 +1,23 @@
+using Mediator;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Norvia.Tms.Application;
+
+namespace Norvia.Tms.Infrastructure.Data;
+
+internal sealed class EfConflictRetrier(IMediator mediator, IServiceScopeFactory scopes) : IConflictRetrier
+{
+    public async Task<TResult> RunAsync<TResult>(Func<IMediator, Task<TResult>> send)
+    {
+        ArgumentNullException.ThrowIfNull(send);
+        try
+        {
+            return await send(mediator);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            await using var scope = scopes.CreateAsyncScope();
+            return await send(scope.ServiceProvider.GetRequiredService<IMediator>());
+        }
+    }
+}

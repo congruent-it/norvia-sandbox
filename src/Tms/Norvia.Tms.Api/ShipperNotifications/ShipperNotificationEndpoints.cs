@@ -1,9 +1,9 @@
 using Mediator;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Api.TransportOrders;
+using Norvia.Tms.Application;
 using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.ShipperNotifications.Report;
 using Norvia.Tms.Domain.Exceptions;
@@ -48,8 +48,7 @@ public static class ShipperNotificationEndpoints
     private static async Task<Results<Ok<ShipperNotificationReportResult>, ProblemHttpResult, ValidationProblem>> ReportSentAsync(
         string notificationId,
         [FromHeader(Name = TransportOrderEndpoints.CorrelationIdHeader)] string? correlationId,
-        IMediator mediator,
-        IServiceScopeFactory scopes,
+        IConflictRetrier retrier,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(correlationId))
@@ -57,7 +56,7 @@ public static class ShipperNotificationEndpoints
             return TypedResults.ValidationProblem(CorrelationIdMissing());
         }
 
-        var result = await SendAsync(new ReportShipperNotificationSentCommand(notificationId, correlationId), mediator, scopes, cancellationToken);
+        var result = await retrier.RunAsync(mediator => mediator.Send(new ReportShipperNotificationSentCommand(notificationId, correlationId), cancellationToken).AsTask());
         return result.IsSuccess ? TypedResults.Ok(result.Value) : Refused(result, correlationId);
     }
 
@@ -65,8 +64,7 @@ public static class ShipperNotificationEndpoints
         string notificationId,
         [FromHeader(Name = TransportOrderEndpoints.CorrelationIdHeader)] string? correlationId,
         ShipperNotificationNotDeliveredRequest report,
-        IMediator mediator,
-        IServiceScopeFactory scopes,
+        IConflictRetrier retrier,
         CancellationToken cancellationToken)
     {
         var errors = new Dictionary<string, string[]>();
@@ -85,28 +83,8 @@ public static class ShipperNotificationEndpoints
             return TypedResults.ValidationProblem(errors);
         }
 
-        var result = await SendAsync(new ReportShipperNotificationNotDeliveredCommand(notificationId, correlationId, report.StatusCode, message), mediator, scopes, cancellationToken);
+        var result = await retrier.RunAsync(mediator => mediator.Send(new ReportShipperNotificationNotDeliveredCommand(notificationId, correlationId, report.StatusCode, message), cancellationToken).AsTask());
         return result.IsSuccess ? TypedResults.Ok(result.Value) : Refused(result, correlationId);
-    }
-
-    /// <summary>
-    /// Sends the report. When another report for the same notification wins the race, the save conflicts: the report is sent once
-    /// more in a scope of its own, which reads the notification as the winner left it, so a notification no longer Requested
-    /// answers "ignored" rather than an error.
-    /// </summary>
-    private static async Task<Ardalis.Result.Result<ShipperNotificationReportResult>> SendAsync<TCommand>(
-        TCommand command, IMediator mediator, IServiceScopeFactory scopes, CancellationToken cancellationToken)
-        where TCommand : IMessage, ICommand<Ardalis.Result.Result<ShipperNotificationReportResult>>
-    {
-        try
-        {
-            return await mediator.Send(command, cancellationToken);
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            await using var scope = scopes.CreateAsyncScope();
-            return await scope.ServiceProvider.GetRequiredService<IMediator>().Send(command, cancellationToken);
-        }
     }
 
     private static Dictionary<string, string[]> CorrelationIdMissing() =>
