@@ -36,15 +36,18 @@ public sealed record CarrierBookingCancelledV1(
         var booking = cancelled.Booking;
         return new(
             Guid.CreateVersion7(),
-            booking.CancelledAt!.Value,
-            booking.CancellationCorrelationId!.Value,
+            booking.CancelledAt ?? throw NotCancelled(booking),
+            booking.CancellationCorrelationId?.Value ?? throw NotCancelled(booking),
             booking.Number.Value,
-            booking.CarrierBookingReference!,
+            booking.CarrierBookingReference ?? throw NotCancelled(booking),
             booking.ShipmentNumber.Value,
             booking.CarrierId.Value,
-            booking.CancellationExceptionNumber!.Value,
-            booking.CancellationReasonText!);
+            booking.CancellationExceptionNumber?.Value ?? throw NotCancelled(booking),
+            booking.CancellationReasonText ?? throw NotCancelled(booking));
     }
+
+    private static InvalidOperationException NotCancelled(CarrierBooking booking) =>
+        new($"Carrier booking {booking.Number} raised CarrierBookingCancelled without its cancellation or confirmation recorded.");
 
     protected override IEnumerable<KeyValuePair<string, object>> TrackingProperties() =>
     [

@@ -34,7 +34,7 @@ public sealed class CancelCarrierBookingHandler(
         var key = new IdempotencyKey(command.CancellationKey);
         if (bookings.FirstOrDefault(booking => booking.CancellationUnder(key) is not null) is { } earlier)
         {
-            return ResultOf(exception, earlier, earlier.CancellationCorrelationId!.Value, repeat: true);
+            return ResultOf(exception, earlier, earlier.CancellationCorrelationId?.Value ?? throw new InvalidOperationException($"Carrier booking {earlier.Number} was cancelled without a correlation ID."), repeat: true);
         }
 
         if (exception.Status != ExceptionStatus.Open)
@@ -43,18 +43,19 @@ public sealed class CancelCarrierBookingHandler(
                 new(ExceptionRefusalCode.ExceptionNotOpen, Invariant($"Exception {exception.Number} is {exception.Status}, not Open.")));
         }
 
-        // After collection the Carrier holds the goods, so nothing is cancelled (ADR 0010).
-        if (shipment.Status >= ShipmentStatus.Collected)
-        {
-            return ExceptionRefused.Because<CancelCarrierBookingResult>(
-                new(ExceptionRefusalCode.ShipmentAlreadyCollected, Invariant($"Shipment {shipment.Number} is {shipment.Status}, so its Carrier booking can't be cancelled after collection.")));
-        }
-
+        // Own fleet and a Shipment without a Confirmed booking have nothing to cancel, whatever their status.
         var booking = bookings.FirstOrDefault(booking => booking.Status == CarrierBookingStatus.Confirmed);
-        if (booking is null || shipment.Status != ShipmentStatus.Booked)
+        if (booking is null)
         {
             return ExceptionRefused.Because<CancelCarrierBookingResult>(
                 new(ExceptionRefusalCode.NoConfirmedCarrierBooking, Invariant($"Shipment {shipment.Number} has no Confirmed Carrier booking to cancel.")));
+        }
+
+        // After collection the Carrier holds the goods, so nothing is cancelled (ADR 0010).
+        if (shipment.Status != ShipmentStatus.Booked)
+        {
+            return ExceptionRefused.Because<CancelCarrierBookingResult>(
+                new(ExceptionRefusalCode.ShipmentAlreadyCollected, Invariant($"Shipment {shipment.Number} is {shipment.Status}, so its Carrier booking can't be cancelled after collection.")));
         }
 
         if (!booking.Cancel(command.ReasonText, exception.Number, key, new CorrelationId(command.CorrelationId), time.GetUtcNow())
