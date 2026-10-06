@@ -66,6 +66,10 @@ public sealed class RecordTrackingHandler(
         {
             await exceptionCauses.OpenOrAddAsync(shipment, cause, cancellationToken);
         }
+        else if (ExceptionTypes.ClearedBy(trackingEvent.Type) is { } cleared)
+        {
+            await exceptionCauses.ClearAsync(shipment, cleared, cancellationToken);
+        }
 
         // The tracked Shipment's move and the Exception the event opened save with the event, and the events they raise go
         // to the outbox, in one transaction.

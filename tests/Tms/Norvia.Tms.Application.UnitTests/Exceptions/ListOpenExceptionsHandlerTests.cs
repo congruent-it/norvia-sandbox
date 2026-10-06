@@ -51,7 +51,8 @@ public sealed class ListOpenExceptionsHandlerTests
                 ExceptionType.DeliveryFailed,
                 Samples.Now.AddDays(1),
                 NumberOfCauses: 2,
-                AfterDelivered: false),
+                AfterDelivered: false,
+                CauseCleared: false),
             new OpenExceptionSummary(
                 "EX-0000006",
                 "SH-0000013",
@@ -60,7 +61,20 @@ public sealed class ListOpenExceptionsHandlerTests
                 ExceptionType.DeliveryFailed,
                 Samples.Now.AddDays(1),
                 NumberOfCauses: 1,
-                AfterDelivered: false));
+                AfterDelivered: false,
+                CauseCleared: false));
+    }
+
+    [Fact]
+    public async Task Handle_AnExceptionWhoseCauseIsCleared_StaysListed_MarkedCauseCleared()
+    {
+        var cleared = OpenExceptions.DeliveryFailed();
+        cleared.MarkCauseCleared();
+        _exceptions.ListAsync(Arg.Any<OpenExceptionsSpec>(), Arg.Any<CancellationToken>()).Returns([cleared]);
+
+        var open = await _handler.Handle(new ListOpenExceptionsQuery(), CancellationToken.None);
+
+        open.Should().ContainSingle().Which.CauseCleared.Should().BeTrue();
     }
 
     [Fact]

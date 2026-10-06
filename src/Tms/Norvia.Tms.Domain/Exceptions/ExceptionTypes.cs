@@ -20,4 +20,19 @@ public static class ExceptionTypes
         DeliveryCondition.Reservations => ExceptionType.Reservations,
         _ => null,
     };
+
+    /// <summary>The type of Exception whose cause a Tracking event of the type clears; null for one that clears none.</summary>
+    public static ExceptionType? ClearedBy(TrackingEventType type) => type switch
+    {
+        TrackingEventType.Collected => ExceptionType.CollectionFailed,
+        TrackingEventType.Delivered => ExceptionType.DeliveryFailed,
+        _ => null,
+    };
+
+    /// <summary>The type of Exception whose cause a Proof of delivery in the condition clears; null for one that clears none.</summary>
+    public static ExceptionType? ClearedBy(DeliveryCondition condition) => condition switch
+    {
+        DeliveryCondition.Clean => ExceptionType.Reservations,
+        _ => null,
+    };
 }

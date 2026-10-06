@@ -75,6 +75,12 @@ public sealed class ExceptionCase : EntityBase<ExceptionId>, IAggregateRoot
     /// <summary>The causes, in the order they came: the one that opened the Exception first.</summary>
     public IReadOnlyList<ExceptionCause> Causes { get; private set; } = [];
 
+    /// <summary>
+    /// Whether the cause no longer holds, for example a Collection failed Exception after the Shipment was Collected. It is only
+    /// a marker: the Exception stays Open until the Planner resolves it. A later cause of the type removes it.
+    /// </summary>
+    public bool CauseCleared { get; private set; }
+
     public ExceptionOutcome? Outcome { get; private set; }
 
     public string? Remark { get; private set; }
@@ -123,6 +129,19 @@ public sealed class ExceptionCase : EntityBase<ExceptionId>, IAggregateRoot
         }
 
         Causes = [.. Causes, cause];
+        CauseCleared = false;
+    }
+
+    /// <summary>
+    /// Marks the cause cleared. The Exception stays Open and nothing is raised. A Damaged Exception is never marked, as only the
+    /// Planner can judge damage, and neither is one that isn't open.
+    /// </summary>
+    public void MarkCauseCleared()
+    {
+        if (Type != ExceptionType.Damaged && Status == ExceptionStatus.Open)
+        {
+            CauseCleared = true;
+        }
     }
 
     /// <summary>

@@ -8,6 +8,7 @@ namespace Norvia.Tms.Application.Exceptions.ListOpen;
 /// <param name="CarriedBy">Who carried the Shipment when the Exception opened: the Carrier, or Own fleet.</param>
 /// <param name="NumberOfCauses">How many causes it has: the one that opened it and every later one of its type.</param>
 /// <param name="AfterDelivered">Whether the Shipment was Delivered already when the Exception opened.</param>
+/// <param name="CauseCleared">Whether the cause no longer holds. The Exception stays Open until the Planner resolves it.</param>
 public sealed record OpenExceptionSummary(
     string ExceptionNumber,
     string ShipmentNumber,
@@ -16,4 +17,5 @@ public sealed record OpenExceptionSummary(
     ExceptionType Type,
     DateTimeOffset OpenedAt,
     int NumberOfCauses,
-    bool AfterDelivered);
+    bool AfterDelivered,
+    bool CauseCleared);

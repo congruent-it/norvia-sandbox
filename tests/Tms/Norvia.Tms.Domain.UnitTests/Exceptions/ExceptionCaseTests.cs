@@ -259,6 +259,75 @@ public sealed class ExceptionCaseTests
     }
 
     [Fact]
+    public void MarkCauseCleared_MarksTheCause_KeepsTheExceptionOpen_AndRaisesNothing()
+    {
+        var shipment = Booked();
+        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, Cause(DeliveryFailed(shipment)));
+        exception.ClearDomainEvents();
+
+        exception.MarkCauseCleared();
+
+        exception.CauseCleared.Should().BeTrue();
+        exception.Status.Should().Be(ExceptionStatus.Open);
+        exception.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void MarkCauseCleared_ForADamagedException_NeverMarksIt()
+    {
+        var shipment = Booked();
+        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, Cause(Report(shipment, TrackingEventType.Damaged, "evt-dmg", "corr-dmg")));
+
+        exception.MarkCauseCleared();
+
+        exception.CauseCleared.Should().BeFalse();
+    }
+
+    [Fact]
+    public void MarkCauseCleared_ForAResolvedException_DoesNotMarkIt()
+    {
+        var shipment = Booked();
+        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, Cause(DeliveryFailed(shipment)));
+        exception.Resolve(ExceptionOutcome.NoActionNeeded, "Checked", new CorrelationId("c"), ReceivedAt);
+
+        exception.MarkCauseCleared();
+
+        exception.CauseCleared.Should().BeFalse();
+    }
+
+    [Fact]
+    public void AddCause_RemovesTheCauseClearedMarker()
+    {
+        var shipment = Booked();
+        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, Cause(DeliveryFailed(shipment)));
+        exception.MarkCauseCleared();
+
+        exception.AddCause(Cause(DeliveryFailed(shipment, "evt-ndl-2", "corr-2")));
+
+        exception.CauseCleared.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(TrackingEventType.Collected, ExceptionType.CollectionFailed)]
+    [InlineData(TrackingEventType.Delivered, ExceptionType.DeliveryFailed)]
+    public void ClearedBy_ATrackingEventThatClearsACause_IsTheTypeItClears(TrackingEventType type, ExceptionType expected) =>
+        ExceptionTypes.ClearedBy(type).Should().Be(expected);
+
+    [Theory]
+    [InlineData(TrackingEventType.Departed)]
+    [InlineData(TrackingEventType.Damaged)]
+    [InlineData(TrackingEventType.DeliveryFailed)]
+    public void ClearedBy_AnyOtherTrackingEvent_IsNone(TrackingEventType type) =>
+        ExceptionTypes.ClearedBy(type).Should().BeNull();
+
+    [Fact]
+    public void ClearedBy_ACleanProofOfDelivery_IsReservations_AndOneWithReservationsIsNone()
+    {
+        ExceptionTypes.ClearedBy(DeliveryCondition.Clean).Should().Be(ExceptionType.Reservations);
+        ExceptionTypes.ClearedBy(DeliveryCondition.Reservations).Should().BeNull();
+    }
+
+    [Fact]
     public void ExceptionNumber_IsAnExPrefixAndSevenDigits_AndParses()
     {
         ExceptionNumber.FromSequence(42).Value.Should().Be("EX-0000042");

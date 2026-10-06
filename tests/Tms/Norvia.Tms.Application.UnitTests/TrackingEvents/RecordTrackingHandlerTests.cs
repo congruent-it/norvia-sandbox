@@ -2,6 +2,7 @@ using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Microsoft.Extensions.Time.Testing;
 using Norvia.Tms.Application.Exceptions;
+using Norvia.Tms.Application.UnitTests.Exceptions;
 using Norvia.Tms.Application.TrackingEvents.Record;
 using Norvia.Tms.Application.UnitTests.TransportOrders;
 using Norvia.Tms.Domain.CarrierBookings;
@@ -226,6 +227,34 @@ public sealed class RecordTrackingHandlerTests
         OpenedException().AfterDelivered.Should().BeTrue();
         shipment.Status.Should().Be(ShipmentStatus.Delivered);
         result.Value.ShipmentStatus.Should().Be(ShipmentStatus.Delivered);
+    }
+
+    [Theory]
+    [InlineData(TrackingEventType.Collected, ExceptionType.CollectionFailed)]
+    [InlineData(TrackingEventType.Delivered, ExceptionType.DeliveryFailed)]
+    public async Task Handle_AnEventThatClearsACause_MarksTheOpenExceptionCauseCleared_WithoutPublishingOrResolvingIt(TrackingEventType type, ExceptionType cleared)
+    {
+        var shipment = BookedShipment();
+        var open = OpenExceptions.DeliveryFailed();
+        _exceptions.SingleOrDefaultAsync(Arg.Is<OpenExceptionOfTypeForShipmentSpec>(s => s.ShipmentId == shipment.Id && s.Type == cleared), Arg.Any<CancellationToken>())
+            .Returns(open);
+        open.ClearDomainEvents();
+
+        await _handler.Handle(Collected(type: type), CancellationToken.None);
+
+        open.CauseCleared.Should().BeTrue();
+        open.Status.Should().Be(ExceptionStatus.Open);
+        open.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Handle_CollectedWithNoOpenCollectionFailedException_ChangesNothing()
+    {
+        BookedShipment();
+
+        await _handler.Handle(Collected(), CancellationToken.None);
+
+        await _exceptions.DidNotReceive().AddAsync(Arg.Any<ExceptionCase>(), Arg.Any<CancellationToken>());
     }
 
     private ExceptionCase OpenedException() =>

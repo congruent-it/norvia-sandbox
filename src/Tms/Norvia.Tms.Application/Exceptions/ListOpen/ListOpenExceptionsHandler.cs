@@ -24,6 +24,7 @@ public sealed class ListOpenExceptionsHandler(IReadRepository<ExceptionCase> exc
             exception.Type,
             exception.OpenedAt,
             exception.Causes.Count,
-            exception.AfterDelivered))];
+            exception.AfterDelivered,
+            exception.CauseCleared))];
     }
 }

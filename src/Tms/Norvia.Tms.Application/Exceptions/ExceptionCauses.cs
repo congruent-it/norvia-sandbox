@@ -23,4 +23,17 @@ public sealed class ExceptionCauses(IRepository<ExceptionCase> exceptions, IExce
 
         await exceptions.AddAsync(ExceptionCase.Open(await exceptionNumbers.NextAsync(cancellationToken), shipment, cause), cancellationToken);
     }
+
+    /// <summary>
+    /// Marks the cause of the Shipment's open Exception of the type cleared, if it has one. It publishes nothing and saves
+    /// nothing, like <see cref="OpenOrAddAsync"/>.
+    /// </summary>
+    public async Task ClearAsync(Shipment shipment, ExceptionType type, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(shipment);
+        if (await exceptions.SingleOrDefaultAsync(new OpenExceptionOfTypeForShipmentSpec(shipment.Id, type), cancellationToken) is { } open)
+        {
+            open.MarkCauseCleared();
+        }
+    }
 }

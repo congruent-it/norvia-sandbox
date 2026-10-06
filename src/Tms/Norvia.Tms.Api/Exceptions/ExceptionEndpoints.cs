@@ -25,7 +25,7 @@ public static class ExceptionEndpoints
             .WithSummary("List the Open Exceptions, oldest first.")
             .WithDescription(
                 "Each Exception shows its Exception number, its Shipment, the Shipper, who carried the Shipment (Own fleet or the Carrier), its type, "
-                + "when it opened, how many causes it has and whether the Shipment was Delivered already when it opened. A resolved Exception leaves the list.");
+                + "when it opened, how many causes it has, whether the Shipment was Delivered already when it opened and whether its cause is cleared. A resolved Exception leaves the list.");
 
         // The Planner resolves from the TMS UI, as they assign and release, on a Message trail of its own.
         exceptions.MapPost("/{exceptionNumber}/resolve", ResolveAsync)
