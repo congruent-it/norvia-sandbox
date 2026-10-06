@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/proof-of-delivery.v1.schema.json",
+  "title": "ProofOfDelivery",
+  "description": "A Proof of delivery's metadata, as the Carrier Proof of delivery Logic App sends it in the 'metadata' part of its multipart call to the TMS Proof of delivery API's record operation, with the files in the 'files' parts (Canonical Model command, version 1). The correlation ID, which API Management creates, is in X-Correlation-ID. The Proof of delivery names its source: a Carrier ID, which comes from API Management's token check (ADR 0005) and never from the Carrier's own payload, or Own fleet. 'files' describes the files parts, in order; it carries no content.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "documentId",
+    "source",
+    "carrierBookingReference",
+    "receivedBy",
+    "deliveryTime",
+    "location",
+    "condition",
+    "files"
+  ],
+  "properties": {
+    "documentId": {
+      "description": "The source's own ID for the Proof of delivery, unique per source: sent again, it is recognised as a repeat.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "source": {
+      "description": "Who sent the Proof of delivery.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "carrierId"
+          ],
+          "properties": {
+            "type": {
+              "const": "Carrier"
+            },
+            "carrierId": {
+              "description": "The sending Carrier.",
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ],
+          "properties": {
+            "type": {
+              "const": "OwnFleet"
+            }
+          }
+        }
+      ]
+    },
+    "carrierBookingReference": {
+      "description": "The Carrier's own reference for its booking. With the Carrier, it finds the Shipment.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "carrierBookingNumber": {
+      "description": "The TMS's own Carrier booking number, such as CB-0000042. Used only when the booking reference doesn't match.",
+      "type": "string",
+      "pattern": "^CB-[0-9]{7}$"
+    },
+    "receivedBy": {
+      "description": "The name of the person who signed.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "deliveryTime": {
+      "description": "When the goods were delivered, with the offset of where. Not in the future, beyond a small clock-skew allowance.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "location": {
+      "description": "Where the goods were delivered.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "place",
+        "postcode",
+        "countryCode"
+      ],
+      "properties": {
+        "place": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "postcode": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "countryCode": {
+          "description": "ISO 3166-1 alpha-2.",
+          "type": "string",
+          "pattern": "^[A-Z]{2}$"
+        }
+      }
+    },
+    "condition": {
+      "description": "Whether the Consignee took the goods clean or with reservations.",
+      "enum": [
+        "Clean",
+        "Reservations"
+      ]
+    },
+    "remark": {
+      "description": "The sender's remark. Required with Reservations.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "files": {
+      "description": "The files parts, in order: 1 to 5, each a PDF, JPEG or PNG judged by its content by the TMS.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "contentType"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "contentType": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          }
+        }
+      }
+    }
+  },
+  "if": {
+    "properties": {
+      "condition": {
+        "const": "Reservations"
+      }
+    },
+    "required": [
+      "condition"
+    ]
+  },
+  "then": {
+    "required": [
+      "remark"
+    ]
+  }
+}

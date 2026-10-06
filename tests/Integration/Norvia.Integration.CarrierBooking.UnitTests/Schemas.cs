@@ -14,6 +14,8 @@ internal sealed class Schemas
     private static readonly Lazy<Schemas> CarrierAnswerSchema = new(() => Of("PartnerApi/carrier-answer.v1.schema.json"));
     private static readonly Lazy<Schemas> CarrierAnswerResponseSchema = new(() => Of("PartnerApi/carrier-answer-response.v1.schema.json"));
     private static readonly Lazy<Schemas> CarrierTrackingSchema = new(() => Of("PartnerApi/carrier-tracking.v1.schema.json"));
+    private static readonly Lazy<Schemas> CarrierProofOfDeliverySchema = new(() => Of("PartnerApi/carrier-proof-of-delivery.v1.schema.json"));
+    private static readonly Lazy<Schemas> ProofOfDeliverySchema = new(() => Of("CanonicalModel/proof-of-delivery.v1.schema.json"));
     private static readonly Lazy<Schemas> TrackingEventSchema = new(() => Of("CanonicalModel/tracking-event.v1.schema.json"));
     private static readonly Lazy<Schemas> CarrierBookingAnswerSchema = new(() => Of("CanonicalModel/carrier-booking-answer.v1.schema.json"));
 
@@ -28,6 +30,11 @@ internal sealed class Schemas
     public static Schemas CarrierAnswerResponse => CarrierAnswerResponseSchema.Value;
 
     public static Schemas CarrierTracking => CarrierTrackingSchema.Value;
+
+    public static Schemas CarrierProofOfDelivery => CarrierProofOfDeliverySchema.Value;
+
+    /// <summary>The Canonical Model's Proof of delivery metadata, as the TMS's Proof of delivery API takes it.</summary>
+    public static Schemas ProofOfDelivery => ProofOfDeliverySchema.Value;
 
     /// <summary>The Canonical Model's Tracking event, as the TMS's Tracking event API takes it.</summary>
     public static Schemas TrackingEvent => TrackingEventSchema.Value;

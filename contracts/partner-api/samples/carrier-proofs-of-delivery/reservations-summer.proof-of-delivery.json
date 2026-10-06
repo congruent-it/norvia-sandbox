@@ -1,0 +1,14 @@
+{
+  "documentId": "VDT-POD-2002",
+  "source": { "type": "Carrier", "carrierId": "CAR-0001" },
+  "carrierBookingReference": "VDT-77813",
+  "receivedBy": "J. Jansen",
+  "deliveryTime": "2030-07-15T14:30:00+02:00",
+  "location": { "place": "Rotterdam", "postcode": "3011 AA", "countryCode": "NL" },
+  "condition": "Reservations",
+  "remark": "Two pallets damaged on arrival",
+  "files": [
+    { "name": "cmr.pdf", "contentType": "application/pdf" },
+    { "name": "damage.png", "contentType": "image/png" }
+  ]
+}
