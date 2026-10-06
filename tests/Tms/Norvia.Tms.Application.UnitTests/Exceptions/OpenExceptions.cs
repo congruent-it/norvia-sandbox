@@ -43,6 +43,17 @@ internal static class OpenExceptions
         return ExceptionCase.Open(ExceptionNumber.FromSequence(number), shipment, ExceptionCause.From(cause, at ?? Samples.Now.AddDays(1))!);
     }
 
+    /// <summary>A Late delivery Exception the time-based check opened.</summary>
+    public static ExceptionCase LateDelivery()
+    {
+        var order = Samples.AcceptedOrder(sequence: 7);
+        var shipment = Samples.Planned(order, CarriedBy.Carrier(new CarrierId("CAR-0001")), sequence: 12);
+        var exception = ExceptionCase.Open(
+            ExceptionNumber.FromSequence(5), shipment, ExceptionCause.WindowPassed(shipment, new CorrelationId("corr-check"), Samples.Now.AddDays(2)));
+        exception.ClearDomainEvents();
+        return exception;
+    }
+
     /// <summary>A Reservations Exception a Proof of delivery with reservations opened.</summary>
     public static ExceptionCase Reservations()
     {
