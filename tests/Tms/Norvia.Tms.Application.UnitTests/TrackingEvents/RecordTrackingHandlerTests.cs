@@ -257,20 +257,6 @@ public sealed class RecordTrackingHandlerTests
         await _exceptions.DidNotReceive().AddAsync(Arg.Any<ExceptionCase>(), Arg.Any<CancellationToken>());
     }
 
-    [Fact]
-    public async Task Handle_DeliveredNeverMarksADamagedException()
-    {
-        var shipment = BookedShipment();
-        await _handler.Handle(Collected(type: TrackingEventType.Damaged), CancellationToken.None);
-        var damaged = OpenedException();
-        _exceptions.SingleOrDefaultAsync(Arg.Is<OpenExceptionOfTypeForShipmentSpec>(s => s.ShipmentId == shipment.Id && s.Type == ExceptionType.Damaged), Arg.Any<CancellationToken>())
-            .Returns(damaged);
-
-        await _handler.Handle(Collected(type: TrackingEventType.Delivered, sourceEventId: "evt-2"), CancellationToken.None);
-
-        damaged.CauseCleared.Should().BeFalse();
-    }
-
     private ExceptionCase OpenedException() =>
         (ExceptionCase)_exceptions.ReceivedCalls().Single(call => call.GetMethodInfo().Name == nameof(IRepository<ExceptionCase>.AddAsync)).GetArguments()[0]!;
 

@@ -164,6 +164,9 @@ _Avoid_: POD (the Carrier status code for Delivered), delivery receipt, signed P
 Something that went wrong with a Shipment on its way and needs a decision: a failed collection, a failed delivery, damage, a Proof of delivery with reservations, or a Late delivery. The TMS opens it for one Shipment, and the Planner resolves it, re-planning the Shipment or notifying the Shipper as needed. A Shipment can have several Exceptions over its life. The TMS owns it.
 _Avoid_: incident, issue, problem, alert
 
+**Cause cleared**:
+A marker on an open Exception whose cause no longer holds, for example a Collection failed Exception once the Shipment is Collected. The TMS never closes an Exception: the Planner still resolves it. Damaged is never marked, and a new cause of the same type removes the marker. Nothing is published for it.
+
 **Exception number**:
 The number the TMS gives an Exception when it opens it, such as `EX-0000042`. It stays the Exception's for life and is how the Planner, the Message trail and monitoring refer to it.
 _Avoid_: incident number, ticket number

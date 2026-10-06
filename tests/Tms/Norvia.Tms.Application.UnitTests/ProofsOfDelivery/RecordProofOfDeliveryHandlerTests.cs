@@ -121,6 +121,17 @@ public sealed class RecordProofOfDeliveryHandlerTests
         open.DomainEvents.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task Handle_ACleanProofOfDeliveryWithNoOpenReservationsException_ChangesNoException()
+    {
+        Found(ShipmentStatus.Delivered);
+
+        await _handler.Handle(Command(Report(condition: DeliveryCondition.Clean)), CancellationToken.None);
+
+        await _exceptions.DidNotReceive().AddAsync(Arg.Any<ExceptionCase>(), Arg.Any<CancellationToken>());
+        await _proofsOfDelivery.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
     private ExceptionCase OpenedException() =>
         (ExceptionCase)_exceptions.ReceivedCalls().Single(call => call.GetMethodInfo().Name == nameof(IRepository<ExceptionCase>.AddAsync)).GetArguments()[0]!;
 

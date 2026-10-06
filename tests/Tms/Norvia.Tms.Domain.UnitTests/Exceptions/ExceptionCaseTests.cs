@@ -284,6 +284,18 @@ public sealed class ExceptionCaseTests
     }
 
     [Fact]
+    public void MarkCauseCleared_ForAResolvedException_DoesNotMarkIt()
+    {
+        var shipment = Booked();
+        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, Cause(DeliveryFailed(shipment)));
+        exception.Resolve(ExceptionOutcome.NoActionNeeded, "Checked", new CorrelationId("c"), ReceivedAt);
+
+        exception.MarkCauseCleared();
+
+        exception.CauseCleared.Should().BeFalse();
+    }
+
+    [Fact]
     public void AddCause_RemovesTheCauseClearedMarker()
     {
         var shipment = Booked();
