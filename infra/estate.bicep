@@ -170,6 +170,7 @@ module inboundStorage 'estate/inbound-storage.bicep' = {
     integrationRetentionDays: integrationRetentionDays
     apiManagementPrincipalId: identities.outputs.apiManagementPrincipalId
     proofOfDeliveryPrincipalId: identities.outputs.proofOfDeliveryPrincipalId
+    presenterPrincipalId: presenterPrincipalId
   }
 }
 
@@ -247,6 +248,9 @@ output ESTATE_TRACKING_IDENTITY_NAME string = identities.outputs.trackingIdentit
 output ESTATE_PROOF_OF_DELIVERY_LOGIC_APP string = proofOfDeliveryLogicApp.outputs.logicAppName
 output ESTATE_PROOF_OF_DELIVERY_CLIENT_ID string = identities.outputs.proofOfDeliveryClientId
 output ESTATE_PROOF_OF_DELIVERY_IDENTITY_NAME string = identities.outputs.proofOfDeliveryIdentityName
+output ESTATE_INBOUND_STORAGE_ACCOUNT string = inboundStorage.outputs.storageAccountName
+output ESTATE_INBOUND_CONTAINER string = inboundStorage.outputs.containerName
+output ESTATE_PROOF_OF_DELIVERY_QUEUE string = messaging.outputs.proofOfDeliveryQueueName
 output ESTATE_API_MANAGEMENT string = partnerApi.outputs.apiManagementName
 output ESTATE_PARTNER_API_URL string = partnerApi.outputs.partnerApiUrl
 output ESTATE_PARTNER_API_CLIENT_ID string = identities.outputs.partnerApiClientId

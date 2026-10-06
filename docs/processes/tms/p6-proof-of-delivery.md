@@ -176,6 +176,24 @@ All events go to the topic for Shipment events, through the TMS's transactional 
 
 The event carries no file content and no link. Consumers read the files through the TMS.
 
+## Presenter smoke run
+
+After a deployment, and not in CI, the presenter checks Proof of delivery end to end on the deployed estate, before the headline incident breaks the claim-check path. Do it after the presenter smoke run of Shipment tracking ([docs/processes/tms/p5-shipment-tracking.md](p5-shipment-tracking.md#presenter-smoke-run)), whose steps get a Shipment Booked. Open the TMS UI and the Integration console side by side.
+
+1. **Get another Booked Shipment.** Follow P4's run to step 7 again: Rotterdam to Düsseldorf as Brouwer Dranken, confirmed by Van Dijk Transport. Note the Transport Order number, and set Kessler Spedition back to *Auto-confirm* afterwards. Keep the Van Dijk Transport Persona's tracking mode on *Manual*, as the script delivers the Shipment itself, and an Auto-progress Persona would send a Proof of delivery of its own.
+2. **Run the check.** Run `infra/smoke-test-proof-of-delivery.sh <Transport Order number>`. It posts as Van Dijk Transport, through API Management, from a throwaway Container Apps job running as the Partner portal, and reads the TMS as the intake identity. It reads the inbound container with the presenter's own Storage Blob Data Reader right and Application Insights, which is usually 1 to 5 minutes behind. It checks that:
+   - `PU`, `DEP` and `POD` each return `202 Accepted` and the Shipment is Delivered, in *Delivered without Proof of delivery*;
+   - a Proof of delivery with the sample CMR returns `202 Accepted`, the Shipment leaves that list, and its timeline holds the Proof of delivery as the current one, with its file;
+   - the Proof of delivery's blob is gone from the inbound container;
+   - a Proof of delivery for a reference no Carrier booking has is accepted and lands on the `carrier-proof-of-delivery` queue's dead-letter queue with `ShipmentNotFound`, and its blob is still in the inbound container;
+   - a body over 25 MB is refused with `413`;
+   - each call is in Application Insights by its correlation ID: from API Management, the Carrier Proof of delivery Logic App and the TMS, and for the refused body from API Management.
+3. **Follow it.** The script prints the TMS UI's page for the Shipment, where the timeline shows the Proof of delivery with its file, and the Integration console's links by Shipment number and correlation ID.
+
+The script prints `PASS` or `FAIL` per check, never a body, a token or a key. Dead-lettered messages are read by locking and releasing them, so the unknown reference's message and blob stay for the console and the inbound container. Discard the message in the console afterwards, and leave the blob to the retention rule.
+
+If a check fails, file the gap as its own issue against P6, rather than working around it in the run book.
+
 ## Deferred
 
 These were left out on purpose while designing P6, each with its reason.
