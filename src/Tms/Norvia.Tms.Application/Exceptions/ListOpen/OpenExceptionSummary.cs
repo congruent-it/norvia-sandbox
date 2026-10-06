@@ -1,6 +1,7 @@
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Domain.Exceptions;
+using Norvia.Tms.Domain.ShipperNotifications;
 
 namespace Norvia.Tms.Application.Exceptions.ListOpen;
 
@@ -10,6 +11,7 @@ namespace Norvia.Tms.Application.Exceptions.ListOpen;
 /// <param name="AfterDelivered">Whether the Shipment was Delivered already when the Exception opened.</param>
 /// <param name="CauseCleared">Whether the cause no longer holds. The Exception stays Open until the Planner resolves it.</param>
 /// <param name="Notes">The Planner's notes, in the order they were added.</param>
+/// <param name="LastShipperNotificationStatus">Where the last Shipper notification stands, so a Shipper that wasn't told shows; null when the Planner hasn't notified the Shipper.</param>
 public sealed record OpenExceptionSummary(
     string ExceptionNumber,
     string ShipmentNumber,
@@ -20,4 +22,5 @@ public sealed record OpenExceptionSummary(
     int NumberOfCauses,
     bool AfterDelivered,
     bool CauseCleared,
-    IReadOnlyList<ExceptionNoteSummary> Notes);
+    IReadOnlyList<ExceptionNoteSummary> Notes,
+    ShipperNotificationStatus? LastShipperNotificationStatus = null);

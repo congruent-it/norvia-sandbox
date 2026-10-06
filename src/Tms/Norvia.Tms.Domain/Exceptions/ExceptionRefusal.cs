@@ -7,4 +7,7 @@ public sealed record ExceptionRefusal(ExceptionRefusalCode Code, string Message)
 {
     public static ExceptionRefusal NotFound(string exceptionNumber) =>
         new(ExceptionRefusalCode.ExceptionNotFound, Invariant($"The TMS has no Exception {exceptionNumber}."));
+
+    public static ExceptionRefusal ShipperNotificationNotFound(string notificationId) =>
+        new(ExceptionRefusalCode.ShipperNotificationNotFound, Invariant($"The TMS has no Shipper notification {notificationId}."));
 }

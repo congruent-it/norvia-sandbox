@@ -7,10 +7,13 @@ using Norvia.Tms.Application.Exceptions.AddNote;
 using Norvia.Tms.Application.Exceptions.AgreeDeliveryWindow;
 using Norvia.Tms.Application.Exceptions.CancelCarrierBooking;
 using Norvia.Tms.Application.Exceptions.ListOpen;
+using Norvia.Tms.Application.Exceptions.NotifyShipper;
 using Norvia.Tms.Application.Exceptions.Resolve;
+using Norvia.Tms.Application.Exceptions.ShipperNotificationTemplate;
 using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Exceptions;
+using Norvia.Tms.Domain.ShipperNotifications;
 using Norvia.Tms.Domain.TransportOrders;
 
 namespace Norvia.Tms.Api.Exceptions;
@@ -88,7 +91,75 @@ public static class ExceptionEndpoints
                 + "A cancellation that breaks a rule is refused, changing and publishing nothing, with a problem whose code says which, and whose correlationId names the Message trail the refusal is traced on: "
                 + "ExceptionNotFound (404), ExceptionNotOpen (409), ShipmentAlreadyCollected (409) or NoConfirmedCarrierBooking (409).");
 
+        exceptions.MapGet("/{exceptionNumber}/shipper-notification-template", ShipperNotificationTemplateAsync)
+            .WithName("GetShipperNotificationTemplate")
+            .RequireAuthorization(policy => policy.RequireRole(TransportOrderEndpoints.ManageRole))
+            .WithSummary("Get the message Notify Shipper starts with for the type of an Exception.")
+            .WithDescription("The template for the Exception's type, with the Shipper's reference of the Transport Order filled in. The Planner can edit it before notifying. ExceptionNotFound (404) for an unknown Exception number.");
+
+        // Like a resolution, notifying the Shipper starts in the TMS UI and gets a Message trail of its own.
+        exceptions.MapPost("/{exceptionNumber}/notify-shipper", NotifyShipperAsync)
+            .WithName("NotifyShipper")
+            .RequireAuthorization(policy => policy.RequireRole(TransportOrderEndpoints.ManageRole))
+            .WithMetadata(new TrackedFlow(Flows.ExceptionHandling))
+            .WithSummary("Notify the Shipper from an Open Exception.")
+            .WithDescription(
+                "The Planner can notify the Shipper as often as needed while the Exception is open. The message, which starts from the template for the type, "
+                + $"and the Planner's name are required, and at most {ShipperNotification.MaxMessageLength} and {ShipperNotification.MaxPlannerLength} characters; otherwise the call is a 400. "
+                + "The TMS records a Shipper notification with its notification ID and the status Requested and publishes ShipperNotificationRequested on the Shipment events topic in one transaction, "
+                + "under a new correlation ID, which the answer and the event carry. The Shipper notification Logic App reports it Sent or Not delivered. "
+                + "A notification that breaks a rule is refused, changing and publishing nothing, with a problem whose code says which, and whose correlationId names the Message trail the refusal is traced on: "
+                + "ExceptionNotFound (404) or ExceptionNotOpen (409).");
+
         return app;
+    }
+
+    private static async Task<Results<Ok<ShipperNotificationTemplateResult>, ProblemHttpResult>> ShipperNotificationTemplateAsync(
+        string exceptionNumber,
+        IMediator mediator,
+        CancellationToken cancellationToken)
+    {
+        var result = await mediator.Send(new ShipperNotificationTemplateQuery(exceptionNumber), cancellationToken);
+        return result.IsSuccess
+            ? TypedResults.Ok(result.Value)
+            : RefusalProblem.Of<ExceptionRefusalCode, ShipperNotificationTemplateResult>(result, "The template can't be given.", CorrelationId.New().Value, StatusCodeOf);
+    }
+
+    private static async Task<Results<Ok<NotifyShipperResult>, ProblemHttpResult, ValidationProblem>> NotifyShipperAsync(
+        string exceptionNumber,
+        NotifyShipperRequest request,
+        IMediator mediator,
+        CancellationToken cancellationToken)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (string.IsNullOrWhiteSpace(request.Message))
+        {
+            errors[nameof(NotifyShipperRequest.Message)] = ["A Shipper notification needs its message."];
+        }
+        else if (request.Message.Length > ShipperNotification.MaxMessageLength)
+        {
+            errors[nameof(NotifyShipperRequest.Message)] = [$"A message is at most {ShipperNotification.MaxMessageLength} characters."];
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Planner))
+        {
+            errors[nameof(NotifyShipperRequest.Planner)] = ["A Shipper notification needs the Planner who sends it."];
+        }
+        else if (request.Planner.Length > ShipperNotification.MaxPlannerLength)
+        {
+            errors[nameof(NotifyShipperRequest.Planner)] = [$"A Planner's name is at most {ShipperNotification.MaxPlannerLength} characters."];
+        }
+
+        if (errors.Count > 0 || request is not { Message: { } message, Planner: { } planner })
+        {
+            return TypedResults.ValidationProblem(errors);
+        }
+
+        var command = new NotifyShipperCommand(exceptionNumber, message, planner, CorrelationId.New().Value);
+        var result = await mediator.Send(command, cancellationToken);
+        return result.IsSuccess
+            ? TypedResults.Ok(result.Value)
+            : RefusalProblem.Of<ExceptionRefusalCode, NotifyShipperResult>(result, "The Shipper can't be notified.", command.CorrelationId, StatusCodeOf);
     }
 
     private static async Task<Ok<IReadOnlyList<OpenExceptionSummary>>> ListOpenAsync(
@@ -252,7 +323,7 @@ public static class ExceptionEndpoints
 
     private static int StatusCodeOf(ExceptionRefusalCode code) => code switch
     {
-        ExceptionRefusalCode.ExceptionNotFound => StatusCodes.Status404NotFound,
+        ExceptionRefusalCode.ExceptionNotFound or ExceptionRefusalCode.ShipperNotificationNotFound => StatusCodes.Status404NotFound,
         ExceptionRefusalCode.ExceptionNotOpen
             or ExceptionRefusalCode.ShipmentNotInTransport
             or ExceptionRefusalCode.ShipmentAlreadyCollected
