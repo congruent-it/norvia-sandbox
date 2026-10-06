@@ -1,5 +1,6 @@
 using Ardalis.SharedKernel;
 using Norvia.Tms.Domain.Carriers;
+using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TransportOrders;
 
@@ -8,7 +9,7 @@ namespace Norvia.Tms.Domain.CarrierBookings;
 /// <summary>
 /// A request to one Carrier to carry one Shipment, together with that Carrier's answer. A Shipment can have several
 /// Carrier bookings over its life, one after each that ends without being carried out, but only one open at a time
-/// (P4). The TMS owns it. Sent/not-delivered reporting and withdrawal are later tickets.
+/// (P4). The TMS owns it. Sent/not-delivered reporting and withdrawal are P4's; cancelling a Confirmed one is P7's.
 /// </summary>
 public sealed class CarrierBooking : EntityBase<CarrierBookingId>, IAggregateRoot
 {
@@ -30,6 +31,9 @@ public sealed class CarrierBooking : EntityBase<CarrierBookingId>, IAggregateRoo
         RequestedAt = requestedAt;
         Status = CarrierBookingStatus.Requested;
     }
+
+    /// <summary>The longest cancellation reason the TMS keeps.</summary>
+    public const int MaxCancellationReasonLength = 500;
 
     public CarrierBookingNumber Number { get; private set; }
 
@@ -79,6 +83,20 @@ public sealed class CarrierBooking : EntityBase<CarrierBookingId>, IAggregateRoo
     public CorrelationId? WithdrawalCorrelationId { get; private set; }
 
     public DateTimeOffset? WithdrawnAt { get; private set; }
+
+    /// <summary>Why the Planner cancelled the Confirmed booking (P7); null unless it was cancelled.</summary>
+    public string? CancellationReasonText { get; private set; }
+
+    /// <summary>The Exception the Planner cancelled it from; null unless it was cancelled.</summary>
+    public ExceptionNumber? CancellationExceptionNumber { get; private set; }
+
+    /// <summary>The Planner's idempotency key for the cancellation that ended it; null unless it was cancelled.</summary>
+    public IdempotencyKey? CancellationKey { get; private set; }
+
+    /// <summary>The cancellation's own Message trail; null unless it was cancelled.</summary>
+    public CorrelationId? CancellationCorrelationId { get; private set; }
+
+    public DateTimeOffset? CancelledAt { get; private set; }
 
     /// <summary>
     /// Requests a Carrier booking for a Shipment's release, Requested. Raises no domain event of its own: the release
@@ -215,6 +233,36 @@ public sealed class CarrierBooking : EntityBase<CarrierBookingId>, IAggregateRoo
         RegisterDomainEvent(new CarrierBookingWithdrawnEvent(this));
         return true;
     }
+
+    /// <summary>
+    /// Norvia ends a Confirmed booking before collection, from an Exception, with a reason (P7): it becomes Cancelled and raises
+    /// <c>CarrierBookingCancelled</c>. Returns false, changing nothing, for a booking that isn't Confirmed. The reason is checked
+    /// at the boundary first.
+    /// </summary>
+    public bool Cancel(string reasonText, ExceptionNumber exceptionNumber, IdempotencyKey key, CorrelationId correlationId, DateTimeOffset cancelledAt)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(reasonText);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(reasonText.Length, MaxCancellationReasonLength);
+        ArgumentNullException.ThrowIfNull(exceptionNumber);
+        ArgumentNullException.ThrowIfNull(key);
+        ArgumentNullException.ThrowIfNull(correlationId);
+        if (Status != CarrierBookingStatus.Confirmed)
+        {
+            return false;
+        }
+
+        CancellationReasonText = reasonText;
+        CancellationExceptionNumber = exceptionNumber;
+        CancellationKey = key;
+        CancellationCorrelationId = correlationId;
+        CancelledAt = cancelledAt;
+        Status = CarrierBookingStatus.Cancelled;
+        RegisterDomainEvent(new CarrierBookingCancelledEvent(this));
+        return true;
+    }
+
+    /// <summary>The cancellation's own trail made under the key; null when none was.</summary>
+    public CorrelationId? CancellationUnder(IdempotencyKey key) => CancellationKey == key ? CancellationCorrelationId : null;
 
     /// <summary>The withdrawal's own trail made under the key; null when none was.</summary>
     public CorrelationId? WithdrawalUnder(IdempotencyKey key) => WithdrawalKey == key ? WithdrawalCorrelationId : null;

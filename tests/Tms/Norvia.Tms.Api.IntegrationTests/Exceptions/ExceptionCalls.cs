@@ -79,6 +79,40 @@ internal static class ExceptionCalls
         return await tms.TmsUi.SendAsync(request, cancellationToken);
     }
 
+    /// <summary>Cancels the Carrier booking as the Planner does, through the TMS UI, under the given idempotency key or a new one.</summary>
+    public static async Task<HttpResponseMessage> CancelCarrierBookingAsync(
+        this TmsFixture tms, string exceptionNumber, JsonObject cancellation, CancellationToken cancellationToken, string? idempotencyKey = null)
+    {
+        ArgumentNullException.ThrowIfNull(tms);
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"/v1/exceptions/{exceptionNumber}/cancel-carrier-booking", UriKind.Relative))
+        {
+            Content = JsonContent.Create(cancellation),
+        };
+        request.Headers.Add("Idempotency-Key", idempotencyKey ?? Guid.NewGuid().ToString());
+        return await tms.TmsUi.SendAsync(request, cancellationToken);
+    }
+
+    public static JsonObject Cancellation(string? reason = "Carrier won't make its collection")
+    {
+        var cancellation = new JsonObject();
+        if (reason is not null)
+        {
+            cancellation["reason"] = reason;
+        }
+
+        return cancellation;
+    }
+
+    /// <summary>A Booked Carrier Shipment whose Carrier reported a failed delivery, with the Exception that opened and the booking's numbers.</summary>
+    public static async Task<(string ShipmentNumber, string CarrierBookingNumber, string Reference, string ExceptionNumber)> BookedWithDeliveryFailedAsync(
+        this TmsFixture tms, CancellationToken cancellationToken)
+    {
+        var (shipmentNumber, carrierBookingNumber, reference) = await tms.BookedShipmentWithNumberAsync(cancellationToken);
+        await tms.ReportDeliveryFailedAsync(reference, cancellationToken);
+        var exceptionNumber = (await tms.OpenExceptionsOfAsync(shipmentNumber, cancellationToken)).Single()["exceptionNumber"]!.GetValue<string>();
+        return (shipmentNumber, carrierBookingNumber, reference, exceptionNumber);
+    }
+
     public static JsonObject Window(DateTimeOffset earliest, DateTimeOffset latest) =>
         new() { ["earliest"] = earliest, ["latest"] = latest };
 

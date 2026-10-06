@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Carriers;
+using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TransportOrders;
 
@@ -75,5 +76,18 @@ internal sealed class CarrierBookingConfiguration : IEntityTypeConfiguration<Car
             .HasConversion(id => id!.Value, value => new CorrelationId(value))
             .HasMaxLength(128);
         builder.Property(booking => booking.WithdrawnAt);
+
+        // All null unless the Planner cancelled the Confirmed booking (P7).
+        builder.Property(booking => booking.CancellationReasonText).HasMaxLength(CarrierBooking.MaxCancellationReasonLength);
+        builder.Property(booking => booking.CancellationExceptionNumber)
+            .HasConversion(number => number!.Value, value => ExceptionNumber.Parse(value))
+            .HasMaxLength(10);
+        builder.Property(booking => booking.CancellationKey)
+            .HasConversion(key => key!.Value, value => new IdempotencyKey(value))
+            .HasMaxLength(IdempotencyKey.MaxLength);
+        builder.Property(booking => booking.CancellationCorrelationId)
+            .HasConversion(id => id!.Value, value => new CorrelationId(value))
+            .HasMaxLength(128);
+        builder.Property(booking => booking.CancelledAt);
     }
 }

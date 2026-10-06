@@ -64,6 +64,29 @@ public sealed class ShipmentCarrierBookingAnswerTests
         shipment.Status.Should().Be(ShipmentStatus.Planned);
     }
 
+    [Fact]
+    public void ReturnToPlannedAfterCancellation_ABookedShipment_MakesItPlannedAgain_AndRaisesNoDomainEvent()
+    {
+        var shipment = Released();
+        shipment.Book();
+        shipment.ClearDomainEvents();
+
+        var returned = shipment.ReturnToPlannedAfterCancellation();
+
+        returned.Should().BeTrue();
+        shipment.Status.Should().Be(ShipmentStatus.Planned);
+        shipment.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ReturnToPlannedAfterCancellation_AReleasedShipment_ChangesNothing()
+    {
+        var shipment = Released();
+
+        shipment.ReturnToPlannedAfterCancellation().Should().BeFalse();
+        shipment.Status.Should().Be(ShipmentStatus.Released);
+    }
+
     private static Shipment Released()
     {
         var (order, shipment) = Planned();

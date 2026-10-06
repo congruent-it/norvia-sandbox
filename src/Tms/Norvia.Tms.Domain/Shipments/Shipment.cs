@@ -176,6 +176,22 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
     }
 
     /// <summary>
+    /// Sends a Booked Shipment back to Planned, because the Planner cancelled its Confirmed Carrier booking before collection
+    /// (P7). Raises no domain event of its own: <c>CarrierBookingCancelled</c> already says it. Returns false, changing nothing,
+    /// for a Shipment that isn't Booked.
+    /// </summary>
+    public bool ReturnToPlannedAfterCancellation()
+    {
+        if (Status != ShipmentStatus.Booked)
+        {
+            return false;
+        }
+
+        Status = ShipmentStatus.Planned;
+        return true;
+    }
+
+    /// <summary>
     /// Takes in a Tracking event reported for the Shipment (P5): the event is made, to be kept as a log on the Shipment,
     /// and the status moves forward where the event warrants it. The status only moves forward: an event moves a Booked or
     /// later Shipment to its type's status when that is further along than the current one, and any step can be skipped.

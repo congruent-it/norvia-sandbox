@@ -17,4 +17,7 @@ public enum CarrierBookingStatus
 
     /// <summary>The Planner took it back before the Carrier answered. Final.</summary>
     Withdrawn,
+
+    /// <summary>Norvia ended it after the Carrier confirmed it and before collection, with a reason (P7). Final.</summary>
+    Cancelled,
 }

@@ -43,6 +43,25 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                     b.Property<DateTimeOffset?>("AnsweredAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("CancellationCorrelationId")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("CancellationExceptionNumber")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("CancellationKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("CancellationReasonText")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTimeOffset?>("CancelledAt")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<string>("CarrierBookingReference")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");

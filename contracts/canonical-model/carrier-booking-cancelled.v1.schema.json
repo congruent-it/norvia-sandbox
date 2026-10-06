@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/carrier-booking-cancelled.v1.schema.json",
+  "title": "CarrierBookingCancelled",
+  "description": "The Planner cancelled a Confirmed Carrier booking before collection, from an open Exception (Canonical Model event, version 1; ADR 0010). The Carrier booking became Cancelled and the Shipment went back to Planned; the Shipment's move carries no event of its own, as this event already says it. The Carrier is told from this event. Published on the Shipment events topic, under the correlation ID the TMS starts for the cancellation, because it starts in the TMS UI; the Exception number links it to the Exception.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "carrierBookingNumber", "carrierBookingReference", "shipmentNumber", "carrierId", "exceptionNumber", "reasonText"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "const": "CarrierBookingCancelled" },
+    "eventVersion": { "const": 1 },
+    "occurredAt": { "description": "When the cancellation was recorded.", "type": "string", "format": "date-time" },
+    "correlationId": { "description": "The cancellation's own correlation ID.", "type": "string", "minLength": 1 },
+    "carrierBookingNumber": { "description": "The Carrier booking the Planner cancelled.", "type": "string", "pattern": "^CB-[0-9]{7}$" },
+    "carrierBookingReference": { "description": "The Carrier's own number for the booking, given when it confirmed.", "type": "string", "minLength": 1 },
+    "shipmentNumber": { "description": "The Shipment the Carrier booking covers, now back in Planned.", "type": "string", "pattern": "^SH-[0-9]{7}$" },
+    "carrierId": { "description": "The Carrier the cancelled booking was addressed to.", "type": "string", "minLength": 1 },
+    "exceptionNumber": { "description": "The Exception the Planner cancelled the booking from.", "type": "string", "pattern": "^EX-[0-9]{7}$" },
+    "reasonText": { "description": "Why Norvia cancelled the booking.", "type": "string", "minLength": 1, "maxLength": 500 }
+  }
+}
