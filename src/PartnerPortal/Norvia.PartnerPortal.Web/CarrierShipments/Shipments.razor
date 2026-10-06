@@ -34,13 +34,13 @@ else if (_shipments.Count == 0)
 {
     <div role="status">
         <FluentMessageBar Intent="MessageIntent.Info" AllowDismiss="false">
-            @_persona!.DisplayName has no Booked, Collected or In transit Shipment. Confirm a booking request to get one.
+            @_persona!.DisplayName has no Shipment. Confirm a booking request to get one.
         </FluentMessageBar>
     </div>
 }
 else
 {
-    <p class="mb-6">The Shipments @_persona!.DisplayName has confirmed and not yet delivered. Report what happened to each as a Carrier would.</p>
+    <p class="mb-6">The Shipments @_persona!.DisplayName has confirmed. Report what happened to each as a Carrier would, and send its Proof of delivery.</p>
     @if (_notice is not null)
     {
         <div role="@(_notice.Intent == MessageIntent.Error || _notice.Intent == MessageIntent.Warning ? "alert" : "status")" class="mb-6 max-w-3xl">
@@ -48,7 +48,7 @@ else
                 @_notice.Text
                 @if (_notice.MessageId is not null)
                 {
-                    <span class="block mt-2 text-xs">Norvia's ID for this Tracking event: @_notice.MessageId</span>
+                    <span class="block mt-2 text-xs">Norvia's ID for this @_notice.Subject: @_notice.MessageId</span>
                 }
             </FluentMessageBar>
         </div>
@@ -58,6 +58,14 @@ else
         <div role="alert" class="mb-6 max-w-3xl">
             <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
                 The Tracking event couldn't be sent or recorded. Check the Shipment before you send it again.
+            </FluentMessageBar>
+        </div>
+    }
+    @if (_proofFailed)
+    {
+        <div role="alert" class="mb-6 max-w-3xl">
+            <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+                The Proof of delivery couldn't be sent. Check the Shipment before you send it again.
             </FluentMessageBar>
         </div>
     }
@@ -85,9 +93,15 @@ else
                     <FluentButton Appearance="Appearance.Outline" Disabled="_sending" OnClick="() => SendAsync(context, type)"
                                   aria-label="@($"{TrackingEventText.Button(type)} for {context.CarrierBookingNumber}")">@TrackingEventText.Button(type)</FluentButton>
                 }
+                <FluentButton Appearance="Appearance.Outline" Disabled="_sending" OnClick="() => OpenProof(context)"
+                              aria-label="@($"Send Proof of delivery for {context.CarrierBookingNumber}")">Send Proof of delivery</FluentButton>
             </div>
         </TemplateColumn>
     </FluentDataGrid>
+    @if (_proofFor is { } proofFor)
+    {
+        <ProofOfDeliveryPanel @key="proofFor.CarrierBookingNumber" Shipment="proofFor" Sending="_sending" OnSend="draft => SendProofAsync(proofFor, draft)" OnCancel="CloseProof" />
+    }
 }
 
 @code {
@@ -102,6 +116,8 @@ else
     private bool _sending;
     private bool _failed;
     private TrackingNotice? _notice;
+    private bool _proofFailed;
+    private CarrierShipmentView? _proofFor;
 
     [Parameter]
     public string PersonaId { get; set; } = string.Empty;
@@ -111,15 +127,14 @@ else
         _sending = true;
         _notice = null;
         _failed = false;
+        _proofFailed = false;
         try
         {
             if (await Portal.SendTrackingEventAsync(PersonaId, shipment.CarrierBookingNumber, type, CancellationToken.None) is { } sent)
             {
                 _notice = TrackingNotice.Of(sent);
-                // A Delivered Shipment leaves the list; the others show their new stage and what comes next.
-                _shipments = [.. _shipments!
-                    .Select(current => current.CarrierBookingNumber == shipment.CarrierBookingNumber ? sent.Shipment : current)
-                    .Where(current => current.Stage != ShipmentStage.Delivered)];
+                // A Delivered Shipment stays, for its Proof of delivery; the others show their new stage and what comes next.
+                _shipments = [.. _shipments!.Select(current => current.CarrierBookingNumber == shipment.CarrierBookingNumber ? sent.Shipment : current)];
             }
             else
             {
@@ -131,6 +146,48 @@ else
             // Norvia unreachable is a reply, not this: here the portal itself failed, or the Shipment had moved on.
             PageLog.TrackingFailed(Logger, exception, PersonaId, shipment.CarrierBookingNumber);
             _failed = true;
+        }
+        finally
+        {
+            _sending = false;
+        }
+    }
+
+    private void OpenProof(CarrierShipmentView shipment)
+    {
+        _notice = null;
+        _proofFailed = false;
+        _proofFor = shipment;
+    }
+
+    private void CloseProof() => _proofFor = null;
+
+    private async Task SendProofAsync(CarrierShipmentView shipment, ProofOfDeliveryDraft draft)
+    {
+        _sending = true;
+        _notice = null;
+        _failed = false;
+        _proofFailed = false;
+        try
+        {
+            if (await Portal.SendProofOfDeliveryAsync(PersonaId, shipment.CarrierBookingNumber, draft, CancellationToken.None) is { } sent)
+            {
+                _notice = TrackingNotice.Of(sent);
+                // Norvia having it is the end of it: the form closes, and only a Proof of delivery that didn't arrive stays open to send again.
+                if (sent.Reply.Result != TrackingResult.NotReceived)
+                {
+                    _proofFor = null;
+                }
+            }
+            else
+            {
+                Navigation.NotFound();
+            }
+        }
+        catch (Exception exception)
+        {
+            PageLog.ProofOfDeliveryFailed(Logger, exception, PersonaId, shipment.CarrierBookingNumber);
+            _proofFailed = true;
         }
         finally
         {

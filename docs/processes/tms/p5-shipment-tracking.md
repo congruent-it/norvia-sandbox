@@ -151,7 +151,7 @@ The timeline shows the Shipment's Tracking events in event-time order, with the 
 
 ## Partner portal
 
-Each Carrier Persona gets a list of its Shipments that are Booked, Collected or In transit. Each Shipment offers buttons for the valid next progress Tracking events and for the exception Tracking events. Collection failed (`NPU`) is offered only while the Shipment is Booked.
+Each Carrier Persona gets a list of its Shipments, Booked or later. A Delivered one stays on it, as its [Proof of delivery](p6-proof-of-delivery.md#partner-portal) can still be sent. Each undelivered Shipment offers buttons for the valid next progress Tracking events and for the exception Tracking events. Collection failed (`NPU`) is offered only while the Shipment is Booked.
 
 Next to its answer mode from P4, each Persona has a **tracking mode**, set on its own Carrier page:
 

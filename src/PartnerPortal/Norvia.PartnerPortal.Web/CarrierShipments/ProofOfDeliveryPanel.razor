@@ -1,0 +1,106 @@
+@* The form to send a Proof of delivery for one Shipment, under the list. A Carrier sends one at a time. *@
+@using Norvia.PartnerPortal.Application.CarrierShipments
+@using Norvia.PartnerPortal.Application.CarrierShipments.SendProofOfDelivery
+<section aria-label="@Heading" class="mb-8 max-w-3xl border border-border p-6">
+    <h2 class="mt-0">@Heading</h2>
+    <p class="mt-0 text-sm">
+        Delivered at @Shipment.Details.Delivery.City, @Shipment.Details.Delivery.Postcode, @Shipment.Details.Delivery.Country, now.
+        Each Proof of delivery gets a document ID of its own.
+    </p>
+    <EditForm Model="_form" OnValidSubmit="SendAsync" FormName="proof-of-delivery">
+        <DataAnnotationsValidator />
+        <div class="grid gap-4">
+            <div>
+                <FluentTextField Label="Received by" @bind-Value="_form.ReceivedBy" />
+                <FluentValidationMessage For="() => _form.ReceivedBy" />
+            </div>
+            <FluentSelect TOption="string" Label="Condition" Items="ConditionNames" @bind-Value="_form.ConditionName"
+                          OptionText="@(name => ProofOfDeliveryText.Condition(Enum.Parse<ProofOfDeliveryCondition>(name)))" />
+            <div>
+                <FluentTextArea Label="Remark" @bind-Value="_form.Remark" Rows="3" />
+                <FluentValidationMessage For="() => _form.Remark" />
+            </div>
+            <div>
+                <label for="@SampleId" class="lux-label">
+                    <InputCheckbox id="@SampleId" @bind-Value="_form.UseSampleCmr" /> Attach the sample CMR (@SampleCmr.FileName)
+                </label>
+            </div>
+            <div>
+                <label for="@FilesId" class="lux-label">Files (PDF, JPEG or PNG; 1 to @SendProofOfDeliveryHandler.MaxFiles files of 10 MB or less)</label>
+                <InputFile id="@FilesId" class="lux-input" multiple accept=".pdf,.jpg,.jpeg,.png" OnChange="PickFiles" />
+            </div>
+        </div>
+        @if (_filesProblem is not null)
+        {
+            <div role="alert" class="mt-4">
+                <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">@_filesProblem</FluentMessageBar>
+            </div>
+        }
+        <div class="mt-4 flex flex-wrap items-center gap-4">
+            <FluentButton Type="ButtonType.Submit" Appearance="Appearance.Accent" Disabled="Sending">Send Proof of delivery</FluentButton>
+            <FluentButton Appearance="Appearance.Outline" OnClick="OnCancel" Disabled="Sending">Cancel</FluentButton>
+        </div>
+    </EditForm>
+</section>
+
+@code {
+    private static readonly IReadOnlyList<string> ConditionNames = [.. Enum.GetNames<ProofOfDeliveryCondition>()];
+
+    private readonly ProofOfDeliveryForm _form = new();
+    private IReadOnlyList<IBrowserFile> _picked = [];
+    private string? _filesProblem;
+
+    private string Heading => $"Send Proof of delivery for {Shipment.CarrierBookingNumber}";
+
+    private string SampleId => $"sample-cmr-{Shipment.CarrierBookingNumber}";
+
+    private string FilesId => $"files-{Shipment.CarrierBookingNumber}";
+
+    [Parameter, EditorRequired]
+    public CarrierShipmentView Shipment { get; set; } = null!;
+
+    /// <summary>Whether the Proof of delivery is on its way to Norvia.</summary>
+    [Parameter]
+    public bool Sending { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback<ProofOfDeliveryDraft> OnSend { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback OnCancel { get; set; }
+
+    private void PickFiles(InputFileChangeEventArgs e) => _picked = [.. e.GetMultipleFiles(int.MaxValue)];
+
+    private async Task SendAsync()
+    {
+        _filesProblem = null;
+        var fileCount = _picked.Count + (_form.UseSampleCmr ? 1 : 0);
+        if (fileCount is 0 or > SendProofOfDeliveryHandler.MaxFiles)
+        {
+            _filesProblem = $"Attach 1 to {SendProofOfDeliveryHandler.MaxFiles} files, the sample CMR included, not {fileCount}.";
+            return;
+        }
+
+        if (_picked.FirstOrDefault(file => file.Size > SendProofOfDeliveryHandler.MaxFileBytes) is { } tooLarge)
+        {
+            _filesProblem = $"File {tooLarge.Name} is over 10 MB.";
+            return;
+        }
+
+        var files = new List<ProofOfDeliveryUpload>();
+        if (_form.UseSampleCmr)
+        {
+            files.Add(SampleCmr.Read());
+        }
+
+        foreach (var file in _picked)
+        {
+            await using var stream = file.OpenReadStream(SendProofOfDeliveryHandler.MaxFileBytes);
+            using var content = new MemoryStream();
+            await stream.CopyToAsync(content);
+            files.Add(new ProofOfDeliveryUpload(file.Name, file.ContentType, content.ToArray()));
+        }
+
+        await OnSend.InvokeAsync(new ProofOfDeliveryDraft(_form.ReceivedBy!.Trim(), _form.Condition, _form.Remark, files));
+    }
+}

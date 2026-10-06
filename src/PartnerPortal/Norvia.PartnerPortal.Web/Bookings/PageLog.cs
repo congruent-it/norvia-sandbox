@@ -38,4 +38,7 @@ internal static partial class PageLog
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Sending or recording Persona {PersonaId}'s Tracking event for {CarrierBookingNumber} failed")]
     public static partial void TrackingFailed(ILogger logger, Exception exception, string personaId, string carrierBookingNumber);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Sending Persona {PersonaId}'s Proof of delivery for {CarrierBookingNumber} failed")]
+    public static partial void ProofOfDeliveryFailed(ILogger logger, Exception exception, string personaId, string carrierBookingNumber);
 }

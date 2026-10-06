@@ -71,6 +71,23 @@ internal static class PartnerAnswers
         };
     }
 
+    /// <summary>
+    /// Reads API Management's answer to a Proof of delivery (contracts/partner-api/README.md, Carrier Proof of delivery):
+    /// 202 Accepted and nothing more. A body over the limit is refused, in Norvia's words; anything else that isn't a refusal
+    /// of the Persona's credentials means it wasn't received.
+    /// </summary>
+    public static TrackingReply ReadProofOfDeliveryReply(int statusCode, string body, string? correlationId)
+    {
+        var json = Parse(body);
+        var messageId = Text(json, "messageId") ?? correlationId;
+
+        return statusCode switch
+        {
+            413 => TrackingReply.Refused(Text(json, "text") ?? "A Proof of delivery is at most 25 MB.", messageId),
+            _ => ReadTrackingReply(statusCode, body, correlationId),
+        };
+    }
+
     private static NorviaReply Refusal(CarrierAnswerResult result, JsonObject? json, string? messageId, string fallbackText) =>
         NorviaReply.Refusal(result, Text(json, "text") ?? fallbackText, messageId);
 

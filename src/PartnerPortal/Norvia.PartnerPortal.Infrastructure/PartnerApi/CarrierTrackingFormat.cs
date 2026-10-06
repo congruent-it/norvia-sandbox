@@ -20,7 +20,7 @@ internal static class CarrierTrackingFormat
             ["carrierBookingNumber"] = trackingEvent.CarrierBookingNumber,
             ["eventId"] = trackingEvent.EventId,
             ["statusCode"] = StatusCode(trackingEvent.Type),
-            ["eventTime"] = LocalTime(trackingEvent.EventTime, trackingEvent.Country).ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture),
+            ["eventTime"] = CarrierLocalTime.At(trackingEvent.EventTime, trackingEvent.Country).ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture),
             ["place"] = trackingEvent.Place,
             ["postcode"] = trackingEvent.Postcode,
             ["country"] = trackingEvent.Country,
@@ -38,18 +38,5 @@ internal static class CarrierTrackingFormat
         TrackingEventType.DeliveryFailed => "NDL",
         TrackingEventType.Damaged => "DMG",
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Every Tracking event has a Carrier status code."),
-    };
-
-    // The format has the event time local to the location, without an offset, and the map reads it in the country's time
-    // zone. Europe is covered by three zones for the countries Norvia carries to; any other country reads as Central European.
-    private static DateTime LocalTime(DateTimeOffset moment, string country) =>
-        TimeZoneInfo.ConvertTime(moment, TimeZoneInfo.FindSystemTimeZoneById(ZoneOf(country))).DateTime;
-
-    private static string ZoneOf(string country) => country switch
-    {
-        "GBR" or "IRL" => "Europe/London",
-        "PRT" => "Europe/Lisbon",
-        "FIN" or "EST" or "LVA" or "LTU" or "GRC" or "BGR" or "ROU" => "Europe/Helsinki",
-        _ => "Europe/Amsterdam",
     };
 }

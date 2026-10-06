@@ -636,6 +636,115 @@ public sealed class NorviaPartnerApiClientTests : IDisposable
         _spans.Should().ContainSingle().Which.OperationName.Should().Be("Send Tracking event");
     }
 
+    private static readonly CarrierProofOfDelivery Proof = new(
+        "doc-1", "VDT-77812", "CB-0000042", "J. Jansen", new DateTimeOffset(2030, 7, 2, 10, 15, 30, TimeSpan.Zero), "Utrecht", "3511 AW", "NLD",
+        ProofOfDeliveryCondition.Clean, null, [new CarrierProofOfDeliveryFile("cmr.pdf", "application/pdf", "%PDF-1.4"u8.ToArray())]);
+
+    private Task<TrackingReply> SubmitProofOfDeliveryAsync() =>
+        _client.SubmitProofOfDeliveryAsync(Samples.VanDijkTransport, "SH-0000007", Proof, CancellationToken.None);
+
+    [Fact]
+    public async Task SubmitProofOfDeliveryAsync_PostsItToCarrierProofsOfDelivery_AsThePersona_InTheCarrierFormat_WithItsLength()
+    {
+        _tokens.GetTokenAsync(Samples.VanDijkTransport.Id, Arg.Any<CancellationToken>()).Returns("van-dijk-token");
+        _partnerApi.Answer(HttpStatusCode.Accepted, """{ "messageId": "corr-7" }""", "corr-7");
+
+        await SubmitProofOfDeliveryAsync();
+
+        _partnerApi.Request!.Method.Should().Be(HttpMethod.Post);
+        _partnerApi.Request.RequestUri.Should().Be(new Uri("https://apim.example/partner/v1/carrier-proofs-of-delivery"));
+        _partnerApi.Request.Headers.GetValues("Ocp-Apim-Subscription-Key").Should().Equal("van-dijk-key");
+        _partnerApi.Request.Headers.Authorization!.Parameter.Should().Be("van-dijk-token");
+        _partnerApi.RequestContentLength.Should().BeGreaterThan(0);
+        var sent = JsonNode.Parse(_partnerApi.RequestBody!);
+        Contracts.CarrierProofOfDeliverySchemaErrors(sent).Should().BeEmpty();
+        sent!["documentId"]!.GetValue<string>().Should().Be("doc-1");
+    }
+
+    [Fact]
+    public async Task SubmitProofOfDeliveryAsync_202_IsAccepted_WithNorviasMessageId()
+    {
+        _tokens.GetTokenAsync(Samples.VanDijkTransport.Id, Arg.Any<CancellationToken>()).Returns("van-dijk-token");
+        _partnerApi.Answer(HttpStatusCode.Accepted, """{ "messageId": "corr-7" }""");
+
+        (await SubmitProofOfDeliveryAsync()).Should().Be(TrackingReply.Accepted("corr-7"));
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Forbidden, """{ "messageId": "corr-8", "text": "Not a Carrier." }""", "Not a Carrier.")]
+    [InlineData(HttpStatusCode.Unauthorized, "", PartnerAnswers.UnrecognisedCredentials)]
+    [InlineData(HttpStatusCode.RequestEntityTooLarge, """{ "messageId": "corr-8", "text": "A Proof of delivery is at most 25 MB." }""", "A Proof of delivery is at most 25 MB.")]
+    [InlineData(HttpStatusCode.RequestEntityTooLarge, "", "A Proof of delivery is at most 25 MB.")]
+    public async Task SubmitProofOfDeliveryAsync_RefusedByTheEdge_IsRefused(HttpStatusCode status, string body, string text)
+    {
+        _tokens.GetTokenAsync(Samples.VanDijkTransport.Id, Arg.Any<CancellationToken>()).Returns("van-dijk-token");
+        _partnerApi.Answer(status, body, "corr-8");
+
+        var reply = await SubmitProofOfDeliveryAsync();
+
+        reply.Result.Should().Be(TrackingResult.Refused);
+        reply.Text.Should().Be(text);
+    }
+
+    [Fact]
+    public async Task SubmitProofOfDeliveryAsync_Unavailable_IsNotReceived()
+    {
+        _tokens.GetTokenAsync(Samples.VanDijkTransport.Id, Arg.Any<CancellationToken>()).Returns("van-dijk-token");
+        _partnerApi.Answer(HttpStatusCode.ServiceUnavailable, """{ "messageId": "corr-9" }""");
+
+        (await SubmitProofOfDeliveryAsync()).Should().Be(TrackingReply.NotReceived("corr-9"));
+    }
+
+    [Fact]
+    public async Task SubmitProofOfDeliveryAsync_NorviaUnreachable_IsNotReceived()
+    {
+        _partnerApi.Fail(new HttpRequestException("Connection refused"));
+
+        (await SubmitProofOfDeliveryAsync()).Should().Be(TrackingReply.NotReceived(null));
+    }
+
+    [Fact]
+    public async Task SubmitProofOfDeliveryAsync_LogsTheTrackingContractsKeys_AndTheDocumentsOwnId_NotItsFiles()
+    {
+        _tokens.GetTokenAsync(Samples.VanDijkTransport.Id, Arg.Any<CancellationToken>()).Returns("van-dijk-token");
+        _partnerApi.Answer(HttpStatusCode.Accepted, """{ "messageId": "corr-7" }""");
+
+        await SubmitProofOfDeliveryAsync();
+
+        ScopeOf(_logger.LatestRecord).Should().Contain(new Dictionary<string, object?>
+        {
+            ["flow"] = "carrier-proof-of-delivery",
+            ["partyId"] = "CAR-0001",
+            ["carrierBookingNumber"] = "CB-0000042",
+            ["shipmentNumber"] = "SH-0000007",
+            ["sourceMessageId"] = "doc-1",
+            ["correlationId"] = "corr-7",
+            ["outcome"] = "Succeeded",
+        });
+        _logger.LatestRecord.Message.Should().NotContain("J. Jansen");
+    }
+
+    [Fact]
+    public async Task SubmitProofOfDeliveryAsync_SendsItInASpanOfItsOwn()
+    {
+        _tokens.GetTokenAsync(Samples.VanDijkTransport.Id, Arg.Any<CancellationToken>()).Returns("van-dijk-token");
+        _partnerApi.Answer(HttpStatusCode.Accepted, """{ "messageId": "corr-7" }""");
+
+        await SubmitProofOfDeliveryAsync();
+
+        _spans.Should().ContainSingle().Which.OperationName.Should().Be("Send Proof of delivery");
+    }
+
+    [Fact]
+    public async Task SubmitProofOfDeliveryAsync_WithoutAPersonaOrProof_Throws()
+    {
+        var noPersona = () => _client.SubmitProofOfDeliveryAsync(null!, "SH-1", Proof, CancellationToken.None);
+        var noProof = () => _client.SubmitProofOfDeliveryAsync(Samples.VanDijkTransport, "SH-1", null!, CancellationToken.None);
+
+        await noPersona.Should().ThrowAsync<ArgumentNullException>();
+        await noProof.Should().ThrowAsync<ArgumentNullException>();
+    }
+
     private Task<NorviaAnswer> SubmitAsync(BookingRequest booking) =>
         _client.SubmitAsync(Samples.BrouwerDranken, booking, TestContext.Current.CancellationToken);
 }
