@@ -1,5 +1,6 @@
 using Ardalis.SharedKernel;
 using Norvia.Tms.Domain.CarrierBookings;
+using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Domain.Shippers;
 using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.TransportOrders;
@@ -57,6 +58,9 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
     public CorrelationId CorrelationId { get; private set; }
 
     public DateTimeOffset PlannedAt { get; private set; }
+
+    /// <summary>The delivery windows the Planner agreed after collection (P7), in the order they were set: the last one counts.</summary>
+    public IReadOnlyList<AgreedDeliveryWindow> AgreedDeliveryWindows { get; private set; } = [];
 
     /// <summary>The Planner's release that handed the Shipment over; null while it is Planned and never released.</summary>
     public ShipmentRelease? LastRelease { get; private set; }
@@ -211,6 +215,55 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
         TrackingEventType.Delivered => ShipmentStatus.Delivered,
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, "The TMS doesn't know what status this Tracking event type moves a Shipment to."),
     };
+
+    /// <summary>
+    /// The delivery window that counts for Late delivery, Stale and the fallback ETA (P7): the last agreed one, and otherwise
+    /// the delivery window of the Transport Order's details. Whoever needs the Shipment's delivery window asks here, so none uses
+    /// the Shipper's by mistake.
+    /// </summary>
+    public TimeWindow? DeliveryWindowOf(TransportOrderDetails? orderDetails) =>
+        AgreedDeliveryWindows.Count > 0 ? AgreedDeliveryWindows[^1].Window : orderDetails?.Delivery?.Window;
+
+    /// <summary>
+    /// Sets an agreed delivery window on a Collected or In transit Shipment, from an open Exception, after the Planner agreed a
+    /// redelivery with the Carrier outside the TMS. It joins the earlier ones and raises ShipmentDeliveryWindowAgreed. Returns the
+    /// refusal, changing nothing, for a Shipment that isn't in transport or a window that lacks a time, is reversed or ends in the past.
+    /// </summary>
+    public ExceptionRefusal? AgreeDeliveryWindow(
+        TimeWindow window, ExceptionNumber exceptionNumber, IdempotencyKey key, CorrelationId correlationId, DateTimeOffset agreedAt)
+    {
+        ArgumentNullException.ThrowIfNull(window);
+        ArgumentNullException.ThrowIfNull(exceptionNumber);
+        ArgumentNullException.ThrowIfNull(key);
+        ArgumentNullException.ThrowIfNull(correlationId);
+        if (Status is not (ShipmentStatus.Collected or ShipmentStatus.InTransit))
+        {
+            return new(ExceptionRefusalCode.ShipmentNotInTransport, $"Shipment {Number} is {Status}, not Collected or In transit.");
+        }
+
+        if (window is not { Earliest: { } earliest, Latest: { } latest })
+        {
+            return new(ExceptionRefusalCode.DeliveryWindowInvalid, "The delivery window needs both an earliest and a latest time.");
+        }
+
+        if (earliest > latest)
+        {
+            return new(ExceptionRefusalCode.DeliveryWindowInvalid, "The delivery window's earliest time is after its latest time.");
+        }
+
+        if (latest <= agreedAt)
+        {
+            return new(ExceptionRefusalCode.DeliveryWindowInvalid, "The delivery window ends in the past.");
+        }
+
+        var agreed = new AgreedDeliveryWindow(earliest, latest, exceptionNumber, correlationId, agreedAt, key);
+        AgreedDeliveryWindows = [.. AgreedDeliveryWindows, agreed];
+        RegisterDomainEvent(new ShipmentDeliveryWindowAgreedEvent(this, agreed));
+        return null;
+    }
+
+    /// <summary>The delivery window agreed under the key; null when none was.</summary>
+    public AgreedDeliveryWindow? AgreedDeliveryWindowUnder(IdempotencyKey key) => AgreedDeliveryWindows.FirstOrDefault(agreed => agreed.Key == key);
 
     /// <summary>The release made under the key; null when none was.</summary>
     public ShipmentRelease? ReleaseUnder(IdempotencyKey key) => LastRelease is { } release && release.Key == key ? release : null;

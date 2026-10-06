@@ -322,6 +322,12 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("AgreedDeliveryWindows")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("nvarchar(max)")
+                        .HasDefaultValueSql("N'[]'");
+
                     b.Property<string>("Assignments")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");

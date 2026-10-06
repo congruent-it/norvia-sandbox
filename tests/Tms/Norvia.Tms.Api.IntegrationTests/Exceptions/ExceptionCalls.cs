@@ -66,6 +66,32 @@ internal static class ExceptionCalls
         return await tms.TmsUi.SendAsync(request, cancellationToken);
     }
 
+    /// <summary>Agrees a delivery window as the Planner does, through the TMS UI.</summary>
+    public static async Task<HttpResponseMessage> AgreeDeliveryWindowAsync(
+        this TmsFixture tms, string exceptionNumber, JsonObject window, CancellationToken cancellationToken, string? idempotencyKey = null)
+    {
+        ArgumentNullException.ThrowIfNull(tms);
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"/v1/exceptions/{exceptionNumber}/delivery-window", UriKind.Relative))
+        {
+            Content = JsonContent.Create(window),
+        };
+        request.Headers.Add("Idempotency-Key", idempotencyKey ?? Guid.NewGuid().ToString());
+        return await tms.TmsUi.SendAsync(request, cancellationToken);
+    }
+
+    public static JsonObject Window(DateTimeOffset earliest, DateTimeOffset latest) =>
+        new() { ["earliest"] = earliest, ["latest"] = latest };
+
+    /// <summary>A Collected Carrier Shipment for which the Carrier then reported a failed delivery, and the Exception that opened.</summary>
+    public static async Task<(string ShipmentNumber, string ExceptionNumber)> CollectedWithDeliveryFailedAsync(this TmsFixture tms, CancellationToken cancellationToken)
+    {
+        var (shipmentNumber, reference) = await tms.BookedShipmentAsync(cancellationToken);
+        await tms.RecordedAsync(TrackingEventCalls.Event("Collected", reference, DateTimeOffset.UtcNow.AddMinutes(-2)), cancellationToken);
+        await tms.ReportDeliveryFailedAsync(reference, cancellationToken);
+        var exceptionNumber = (await tms.OpenExceptionsOfAsync(shipmentNumber, cancellationToken)).Single()["exceptionNumber"]!.GetValue<string>();
+        return (shipmentNumber, exceptionNumber);
+    }
+
     public static JsonObject Note(string? text = "Phoned Kessler, redelivery Thursday", string? planner = "Anna de Vries")
     {
         var note = new JsonObject();

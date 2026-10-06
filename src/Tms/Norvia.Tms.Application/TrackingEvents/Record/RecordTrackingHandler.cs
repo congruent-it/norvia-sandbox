@@ -94,7 +94,7 @@ public sealed class RecordTrackingHandler(
         }
 
         var order = await transportOrders.SingleOrDefaultAsync(new TransportOrderByNumberSpec(shipment.TransportOrderNumber), cancellationToken);
-        if (LateDeliveryRules.IsEtaLate(eta, order?.Details.Delivery?.Window))
+        if (LateDeliveryRules.IsEtaLate(eta, shipment.DeliveryWindowOf(order?.Details)))
         {
             await exceptionCauses.OpenOrAddAsync(shipment, ExceptionCause.LateEta(trackingEvent, now), cancellationToken);
         }

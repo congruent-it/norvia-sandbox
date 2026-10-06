@@ -176,6 +176,10 @@ An Exception for a Shipment that won't be, or wasn't, delivered within its deliv
 The **grace** is a TMS setting, 0 by default, added to the delivery window's latest time before the time-based check that also sets Stale opens a Late delivery without a Tracking event.
 _Avoid_: delay, overdue, Stale
 
+**Agreed delivery window**:
+The delivery window the Planner sets on a Collected or In transit Shipment, from an open Exception, after agreeing a redelivery with the Carrier outside the TMS. It replaces the Transport Order's delivery window for Late delivery, Stale and the fallback ETA, while the Transport Order keeps the Shipper's original window. The last one set counts, and earlier ones are kept. It isn't sent to the Carrier.
+_Avoid_: new window, revised window, redelivery slot
+
 **Inventory**:
 A Shipper's stock held by Norvia, per location. The WMS owns it.
 _Avoid_: stock levels

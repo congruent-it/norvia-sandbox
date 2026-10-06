@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/shipment-delivery-window-agreed.v1.schema.json",
+  "title": "ShipmentDeliveryWindowAgreed",
+  "description": "The Planner agreed a delivery window with the Carrier, outside the TMS, for a Collected or In transit Shipment, from an open Exception (Canonical Model event, version 1). The agreed window replaces the Transport Order's for Late delivery, Stale and the fallback ETA; the Transport Order keeps the Shipper's original window, and earlier agreed windows are kept. Published on the Shipment events topic, under the correlation ID of the agreement, which starts a Message trail of its own because it starts in the TMS UI; the Exception number links it to the Exception. It isn't sent to the Carrier.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "shipmentNumber", "transportOrderNumber", "earliest", "latest", "exceptionNumber"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "const": "ShipmentDeliveryWindowAgreed" },
+    "eventVersion": { "const": 1 },
+    "occurredAt": { "description": "When the Planner agreed the window.", "type": "string", "format": "date-time" },
+    "correlationId": { "description": "The agreement's own correlation ID.", "type": "string", "minLength": 1 },
+    "shipmentNumber": { "type": "string", "pattern": "^SH-[0-9]{7}$" },
+    "transportOrderNumber": { "description": "The Transport Order the Shipment carries out; its own window is unchanged.", "type": "string", "pattern": "^TO-[0-9]{7}$" },
+    "earliest": { "description": "The agreed window's earliest time.", "type": "string", "format": "date-time" },
+    "latest": { "description": "The agreed window's latest time: after now, and not before the earliest.", "type": "string", "format": "date-time" },
+    "exceptionNumber": { "description": "The Exception the Planner set the window from.", "type": "string", "pattern": "^EX-[0-9]{7}$" }
+  }
+}

@@ -1,8 +1,10 @@
 using Mediator;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Api.TransportOrders;
 using Norvia.Tms.Application.Exceptions.AddNote;
+using Norvia.Tms.Application.Exceptions.AgreeDeliveryWindow;
 using Norvia.Tms.Application.Exceptions.ListOpen;
 using Norvia.Tms.Application.Exceptions.Resolve;
 using Norvia.Tms.Application.IntegrationEvents;
@@ -53,6 +55,21 @@ public static class ExceptionEndpoints
                 + "and publishes nothing. The Exception stays Open, and the list of Open Exceptions returns its notes. A note that breaks a rule is refused, "
                 + "changing nothing, with a problem whose code says which, and whose correlationId names the Message trail the refusal is traced on: "
                 + "ExceptionNotFound (404) or ExceptionNotOpen (409).");
+
+        // Like a resolution, the agreement starts in the TMS UI and gets a Message trail of its own.
+        exceptions.MapPost("/{exceptionNumber}/delivery-window", AgreeDeliveryWindowAsync)
+            .WithName("AgreeDeliveryWindow")
+            .RequireAuthorization(policy => policy.RequireRole(TransportOrderEndpoints.ManageRole))
+            .WithMetadata(new TrackedFlow(Flows.ExceptionHandling))
+            .WithSummary("Agree a delivery window for the Shipment of an Open Exception.")
+            .WithDescription(
+                "After agreeing a redelivery with the Carrier outside the TMS, the Planner sets the window on a Collected or In transit Shipment. "
+                + "Both its earliest and its latest time are required, and the earliest may not be after the latest; otherwise the call is a 400. "
+                + "The agreed window replaces the Transport Order's for Late delivery, Stale and the fallback ETA, while the Transport Order keeps the Shipper's window. "
+                + "The last one set counts, and earlier ones are kept. An Idempotency-Key is required: the same agreement sent again under it is answered as before, flagged as a repeat, without agreeing or publishing again. An open Late delivery whose ETA is inside the window is marked cause cleared. "
+                + "The TMS publishes ShipmentDeliveryWindowAgreed on the Shipment events topic in one transaction, under a new correlation ID, which the answer and the event carry. "
+                + "An agreement that breaks a rule is refused, changing and publishing nothing, with a problem whose code says which, and whose correlationId names the Message trail the refusal is traced on: "
+                + "ExceptionNotFound (404), ExceptionNotOpen (409), ShipmentNotInTransport (409) or DeliveryWindowInvalid (400, for a window that ends in the past).");
 
         return app;
     }
@@ -119,6 +136,47 @@ public static class ExceptionEndpoints
             : RefusalProblem.Of<ExceptionRefusalCode, AddExceptionNoteResult>(result, "The note can't be added.", command.CorrelationId, StatusCodeOf);
     }
 
+    private static async Task<Results<Ok<AgreeDeliveryWindowResult>, ProblemHttpResult, ValidationProblem>> AgreeDeliveryWindowAsync(
+        string exceptionNumber,
+        AgreeDeliveryWindowRequest request,
+        [FromHeader(Name = TransportOrderEndpoints.IdempotencyKeyHeader)] string? idempotencyKey,
+        IMediator mediator,
+        CancellationToken cancellationToken)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Length > IdempotencyKey.MaxLength)
+        {
+            errors[TransportOrderEndpoints.IdempotencyKeyHeader] =
+                [$"Agreeing a delivery window needs an {TransportOrderEndpoints.IdempotencyKeyHeader} of 1 to {IdempotencyKey.MaxLength} characters, the same for each retry."];
+        }
+
+        if (request.Earliest is null)
+        {
+            errors[nameof(AgreeDeliveryWindowRequest.Earliest)] = ["A delivery window needs its earliest time."];
+        }
+
+        if (request.Latest is null)
+        {
+            errors[nameof(AgreeDeliveryWindowRequest.Latest)] = ["A delivery window needs its latest time."];
+        }
+
+        if (request.Earliest > request.Latest)
+        {
+            errors[nameof(AgreeDeliveryWindowRequest.Earliest)] = ["A delivery window's earliest time can't be after its latest time."];
+        }
+
+        if (errors.Count > 0 || idempotencyKey is null || request is not { Earliest: { } earliest, Latest: { } latest })
+        {
+            return TypedResults.ValidationProblem(errors);
+        }
+
+        var command = new AgreeDeliveryWindowCommand(exceptionNumber, earliest, latest, idempotencyKey, CorrelationId.New().Value);
+        var result = await mediator.Send(command, cancellationToken);
+        return result.IsSuccess
+            ? TypedResults.Ok(result.Value)
+            : RefusalProblem.Of<ExceptionRefusalCode, AgreeDeliveryWindowResult>(result, "The delivery window can't be agreed.", command.CorrelationId, StatusCodeOf);
+    }
+
     private static Dictionary<string, string[]> Check(ResolveExceptionRequest request, out ExceptionOutcome outcome)
     {
         var errors = new Dictionary<string, string[]>();
@@ -143,7 +201,8 @@ public static class ExceptionEndpoints
     private static int StatusCodeOf(ExceptionRefusalCode code) => code switch
     {
         ExceptionRefusalCode.ExceptionNotFound => StatusCodes.Status404NotFound,
-        ExceptionRefusalCode.ExceptionNotOpen => StatusCodes.Status409Conflict,
+        ExceptionRefusalCode.ExceptionNotOpen or ExceptionRefusalCode.ShipmentNotInTransport => StatusCodes.Status409Conflict,
+        ExceptionRefusalCode.DeliveryWindowInvalid => StatusCodes.Status400BadRequest,
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, "The API doesn't know this refusal's status."),
     };
 }

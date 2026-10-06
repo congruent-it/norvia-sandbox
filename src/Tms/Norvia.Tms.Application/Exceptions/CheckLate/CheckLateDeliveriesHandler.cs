@@ -24,11 +24,11 @@ public sealed class CheckLateDeliveriesHandler(
         }
 
         var orderNumbers = inProgress.Select(shipment => shipment.TransportOrderNumber).Distinct().ToList();
-        var windowsByOrder = (await transportOrders.ListAsync(new TransportOrdersByNumbersSpec(orderNumbers), cancellationToken))
-            .ToDictionary(order => order.Number!, order => order.Details.Delivery?.Window);
+        var detailsByOrder = (await transportOrders.ListAsync(new TransportOrdersByNumbersSpec(orderNumbers), cancellationToken))
+            .ToDictionary(order => order.Number!, order => order.Details);
 
         var now = time.GetUtcNow();
-        foreach (var shipment in inProgress.Where(shipment => rules.HasWindowPassed(windowsByOrder.GetValueOrDefault(shipment.TransportOrderNumber), now)))
+        foreach (var shipment in inProgress.Where(shipment => rules.HasWindowPassed(shipment.DeliveryWindowOf(detailsByOrder.GetValueOrDefault(shipment.TransportOrderNumber)), now)))
         {
             // The check has no message to carry a trail, so each Exception it opens gets a new one.
             var cause = ExceptionCause.WindowPassed(shipment, new CorrelationId(Guid.NewGuid().ToString()), now);
