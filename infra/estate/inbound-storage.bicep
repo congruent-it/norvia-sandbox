@@ -14,6 +14,9 @@ param apiManagementPrincipalId string
 @description('The Carrier Proof of delivery Logic App\'s identity, which reads and deletes the Proofs of delivery here and nothing else.')
 param proofOfDeliveryPrincipalId string
 
+@description('The presenter\'s Entra object ID, empty for none. The presenter may see whether a Proof of delivery\'s blob is still here, as the presenter smoke run does.')
+param presenterPrincipalId string = ''
+
 var containerName = 'inbound-proofs-of-delivery'
 
 resource storage 'Microsoft.Storage/storageAccounts@2024-01-01' = {
@@ -100,6 +103,19 @@ resource proofOfDeliveryFetchesAndDeletesItsBlobs 'Microsoft.Authorization/roleA
     principalId: proofOfDeliveryPrincipalId
     roleDefinitionId: storageBlobDataContributor
     principalType: 'ServicePrincipal'
+  }
+}
+
+var storageBlobDataReader = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '2a2b9908-6ea1-4ae2-8e65-a410df84e7d1')
+
+// Reads only: the presenter looks at what is left behind, and never changes it.
+resource presenterSeesProofsOfDelivery 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(presenterPrincipalId)) {
+  name: guid(inbound.id, presenterPrincipalId, storageBlobDataReader)
+  scope: inbound
+  properties: {
+    principalId: presenterPrincipalId
+    roleDefinitionId: storageBlobDataReader
+    principalType: 'User'
   }
 }
 

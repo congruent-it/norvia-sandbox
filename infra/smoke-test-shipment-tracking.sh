@@ -146,12 +146,13 @@ for index, step in enumerate(json.loads(os.environ["STEPS"])):
 
 wanted = int(os.environ["AWAIT_DELIVERED"])
 for _ in range(60 if wanted else 0):
-    timeline = tms("/v1/shipments/%s/tracking-events" % shipment_number)
-    if isinstance(timeline, list) and sum(e["type"] == "Delivered" for e in timeline) >= wanted:
+    events = tms("/v1/shipments/%s/tracking-events" % shipment_number).get("trackingEvents")
+    if isinstance(events, list) and sum(e["type"] == "Delivered" for e in events) >= wanted:
         break
     time.sleep(10)
 timeline = tms("/v1/shipments/%s/tracking-events" % shipment_number)
-result["timeline"] = timeline if isinstance(timeline, dict) else [{"type": e["type"], "moved": e["movedShipment"]} for e in timeline]
+events = timeline.get("trackingEvents")
+result["timeline"] = [{"type": e["type"], "moved": e["movedShipment"]} for e in events] if isinstance(events, list) else timeline
 print("SMOKE-RESULT " + json.dumps(result))
 PYTHON'
 run_steps() {
