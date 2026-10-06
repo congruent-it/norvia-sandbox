@@ -1,4 +1,5 @@
 using Mediator;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Api.TransportOrders;
@@ -65,7 +66,7 @@ public static class ExceptionEndpoints
                 "After agreeing a redelivery with the Carrier outside the TMS, the Planner sets the window on a Collected or In transit Shipment. "
                 + "Both its earliest and its latest time are required, and the earliest may not be after the latest; otherwise the call is a 400. "
                 + "The agreed window replaces the Transport Order's for Late delivery, Stale and the fallback ETA, while the Transport Order keeps the Shipper's window. "
-                + "The last one set counts, and earlier ones are kept. An open Late delivery whose ETA is inside the window is marked cause cleared. "
+                + "The last one set counts, and earlier ones are kept. An Idempotency-Key is required: the same agreement sent again under it is answered as before, flagged as a repeat, without agreeing or publishing again. An open Late delivery whose ETA is inside the window is marked cause cleared. "
                 + "The TMS publishes ShipmentDeliveryWindowAgreed on the Shipment events topic in one transaction, under a new correlation ID, which the answer and the event carry. "
                 + "An agreement that breaks a rule is refused, changing and publishing nothing, with a problem whose code says which, and whose correlationId names the Message trail the refusal is traced on: "
                 + "ExceptionNotFound (404), ExceptionNotOpen (409), ShipmentNotInTransport (409) or DeliveryWindowInvalid (400, for a window that ends in the past).");
@@ -138,10 +139,17 @@ public static class ExceptionEndpoints
     private static async Task<Results<Ok<AgreeDeliveryWindowResult>, ProblemHttpResult, ValidationProblem>> AgreeDeliveryWindowAsync(
         string exceptionNumber,
         AgreeDeliveryWindowRequest request,
+        [FromHeader(Name = TransportOrderEndpoints.IdempotencyKeyHeader)] string? idempotencyKey,
         IMediator mediator,
         CancellationToken cancellationToken)
     {
         var errors = new Dictionary<string, string[]>();
+        if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Length > IdempotencyKey.MaxLength)
+        {
+            errors[TransportOrderEndpoints.IdempotencyKeyHeader] =
+                [$"Agreeing a delivery window needs an {TransportOrderEndpoints.IdempotencyKeyHeader} of 1 to {IdempotencyKey.MaxLength} characters, the same for each retry."];
+        }
+
         if (request.Earliest is null)
         {
             errors[nameof(AgreeDeliveryWindowRequest.Earliest)] = ["A delivery window needs its earliest time."];
@@ -157,12 +165,12 @@ public static class ExceptionEndpoints
             errors[nameof(AgreeDeliveryWindowRequest.Earliest)] = ["A delivery window's earliest time can't be after its latest time."];
         }
 
-        if (errors.Count > 0)
+        if (errors.Count > 0 || idempotencyKey is null || request is not { Earliest: { } earliest, Latest: { } latest })
         {
             return TypedResults.ValidationProblem(errors);
         }
 
-        var command = new AgreeDeliveryWindowCommand(exceptionNumber, request.Earliest!.Value, request.Latest!.Value, CorrelationId.New().Value);
+        var command = new AgreeDeliveryWindowCommand(exceptionNumber, earliest, latest, idempotencyKey, CorrelationId.New().Value);
         var result = await mediator.Send(command, cancellationToken);
         return result.IsSuccess
             ? TypedResults.Ok(result.Value)

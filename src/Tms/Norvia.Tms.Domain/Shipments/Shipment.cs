@@ -227,17 +227,19 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
     /// redelivery with the Carrier outside the TMS. It joins the earlier ones and raises ShipmentDeliveryWindowAgreed. Returns the
     /// refusal, changing nothing, for a Shipment that isn't in transport or a window that lacks a time, is reversed or ends in the past.
     /// </summary>
-    public ExceptionRefusal? AgreeDeliveryWindow(TimeWindow window, ExceptionNumber exceptionNumber, CorrelationId correlationId, DateTimeOffset agreedAt)
+    public ExceptionRefusal? AgreeDeliveryWindow(
+        TimeWindow window, ExceptionNumber exceptionNumber, IdempotencyKey key, CorrelationId correlationId, DateTimeOffset agreedAt)
     {
         ArgumentNullException.ThrowIfNull(window);
         ArgumentNullException.ThrowIfNull(exceptionNumber);
+        ArgumentNullException.ThrowIfNull(key);
         ArgumentNullException.ThrowIfNull(correlationId);
         if (Status is not (ShipmentStatus.Collected or ShipmentStatus.InTransit))
         {
             return new(ExceptionRefusalCode.ShipmentNotInTransport, $"Shipment {Number} is {Status}, not Collected or In transit.");
         }
 
-        if (window.Earliest is not { } earliest || window.Latest is not { } latest)
+        if (window is not { Earliest: { } earliest, Latest: { } latest })
         {
             return new(ExceptionRefusalCode.DeliveryWindowInvalid, "The delivery window needs both an earliest and a latest time.");
         }
@@ -252,11 +254,14 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
             return new(ExceptionRefusalCode.DeliveryWindowInvalid, "The delivery window ends in the past.");
         }
 
-        var agreed = new AgreedDeliveryWindow(window, exceptionNumber.Value, correlationId, agreedAt);
+        var agreed = new AgreedDeliveryWindow(earliest, latest, exceptionNumber.Value, correlationId, agreedAt, key);
         AgreedDeliveryWindows = [.. AgreedDeliveryWindows, agreed];
         RegisterDomainEvent(new ShipmentDeliveryWindowAgreedEvent(this, agreed));
         return null;
     }
+
+    /// <summary>The delivery window agreed under the key; null when none was.</summary>
+    public AgreedDeliveryWindow? AgreedDeliveryWindowUnder(IdempotencyKey key) => AgreedDeliveryWindows.FirstOrDefault(agreed => agreed.Key == key);
 
     /// <summary>The release made under the key; null when none was.</summary>
     public ShipmentRelease? ReleaseUnder(IdempotencyKey key) => LastRelease is { } release && release.Key == key ? release : null;

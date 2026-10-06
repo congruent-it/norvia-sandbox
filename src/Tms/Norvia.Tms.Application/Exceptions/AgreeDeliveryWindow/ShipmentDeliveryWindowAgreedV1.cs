@@ -39,8 +39,8 @@ public sealed record ShipmentDeliveryWindowAgreedV1(
             window.CorrelationId.Value,
             agreed.Shipment.Number.Value,
             agreed.Shipment.TransportOrderNumber.Value,
-            window.Window.Earliest!.Value,
-            window.Window.Latest!.Value,
+            window.Earliest,
+            window.Latest,
             window.ExceptionNumber);
     }
 

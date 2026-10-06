@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json.Nodes;
 using Norvia.Tms.Api.IntegrationTests.Planning;
 using Norvia.Tms.Api.IntegrationTests.ProofsOfDelivery;
@@ -247,6 +248,41 @@ public sealed class ExceptionTracerBulletTests(TmsFixture tms) : IClassFixture<T
         body["exceptionNumber"]!.GetValue<string>().Should().Be(exceptionNumber);
         body["earliest"]!.GetValue<DateTimeOffset>().Should().BeCloseTo(earliest, TimeSpan.FromSeconds(1));
         (await tms.OpenExceptionsOfAsync(shipmentNumber, _cancellationToken)).Should().ContainSingle("agreeing a window doesn't resolve the Exception");
+    }
+
+    [Fact]
+    public async Task AgreeDeliveryWindow_SentAgainUnderItsKey_IsARepeat_AndPublishesNothingMore()
+    {
+        var (shipmentNumber, exceptionNumber) = await tms.CollectedWithDeliveryFailedAsync(_cancellationToken);
+        var earliest = DateTimeOffset.UtcNow.AddDays(2);
+        var window = Window(earliest, earliest.AddHours(4));
+        using var first = await tms.AgreeDeliveryWindowAsync(exceptionNumber, window, _cancellationToken, "key-retry-1");
+        var correlationId = JsonNode.Parse(await first.Content.ReadAsStringAsync(_cancellationToken))!["correlationId"]!.GetValue<string>();
+
+        using var retry = await tms.AgreeDeliveryWindowAsync(exceptionNumber, window, _cancellationToken, "key-retry-1");
+
+        var body = JsonNode.Parse(await retry.Content.ReadAsStringAsync(_cancellationToken))!;
+        retry.StatusCode.Should().Be(HttpStatusCode.OK);
+        body["repeat"]!.GetValue<bool>().Should().BeTrue();
+        body["correlationId"]!.GetValue<string>().Should().Be(correlationId);
+        await TmsFixture.SettleOutboxAsync(_cancellationToken);
+        tms.Published.Count(m => m.Subject == "ShipmentDeliveryWindowAgreed" && JsonNode.Parse(m.Body.ToString())!["shipmentNumber"]!.GetValue<string>() == shipmentNumber)
+            .Should().Be(1);
+    }
+
+    [Fact]
+    public async Task AgreeDeliveryWindow_WithoutAnIdempotencyKey_IsRefused()
+    {
+        var (_, exceptionNumber) = await tms.CollectedWithDeliveryFailedAsync(_cancellationToken);
+        var earliest = DateTimeOffset.UtcNow.AddDays(2);
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"/v1/exceptions/{exceptionNumber}/delivery-window", UriKind.Relative))
+        {
+            Content = JsonContent.Create(Window(earliest, earliest.AddHours(4))),
+        };
+
+        using var response = await tms.TmsUi.SendAsync(request, _cancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
     [Fact]

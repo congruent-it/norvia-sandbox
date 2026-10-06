@@ -43,7 +43,7 @@ public sealed class AgreeDeliveryWindowHandlerTests
 
         result.Value.Should().Be(new AgreeDeliveryWindowResult("EX-0000005", "SH-0000012", Earliest, Latest, "corr-agree"));
         shipment.AgreedDeliveryWindows.Should().ContainSingle().Which.Should().Be(
-            new AgreedDeliveryWindow(new TimeWindow(Earliest, Latest), "EX-0000005", new CorrelationId("corr-agree"), Samples.Now.AddDays(3)));
+            new AgreedDeliveryWindow(Earliest, Latest, "EX-0000005", new CorrelationId("corr-agree"), Samples.Now.AddDays(3), new IdempotencyKey("key-agree")));
         shipment.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<ShipmentDeliveryWindowAgreedEvent>();
         exception.Status.Should().Be(ExceptionStatus.Open);
         await _exceptions.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
@@ -76,6 +76,46 @@ public sealed class AgreeDeliveryWindowHandlerTests
         await _handler.Handle(Agree(), CancellationToken.None);
 
         late.CauseCleared.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Handle_TheSameAgreementSentAgain_IsARepeat_AnsweredAsBefore_WithoutAgreeingPublishingOrSavingAgain()
+    {
+        var (_, shipment) = Found(OpenExceptions.DeliveryFailed());
+        await _handler.Handle(Agree(), CancellationToken.None);
+        shipment.ClearDomainEvents();
+        _exceptions.ClearReceivedCalls();
+
+        var result = await _handler.Handle(Agree() with { CorrelationId = "corr-retry" }, CancellationToken.None);
+
+        result.Value.Should().Be(new AgreeDeliveryWindowResult("EX-0000005", "SH-0000012", Earliest, Latest, "corr-agree", Repeat: true));
+        shipment.AgreedDeliveryWindows.Should().ContainSingle();
+        shipment.DomainEvents.Should().BeEmpty();
+        await _exceptions.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_ARepeatAfterTheExceptionWasResolved_IsStillAnsweredAsBefore()
+    {
+        var exception = OpenExceptions.DeliveryFailed();
+        Found(exception);
+        await _handler.Handle(Agree(), CancellationToken.None);
+        exception.Resolve(ExceptionOutcome.Redelivered, "Done", new CorrelationId("corr-res"), Samples.Now.AddDays(3));
+
+        var result = await _handler.Handle(Agree(), CancellationToken.None);
+
+        result.Value.Repeat.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Handle_AnotherKey_AgreesAgain_AndKeepsTheEarlierWindow()
+    {
+        var (_, shipment) = Found(OpenExceptions.DeliveryFailed());
+        await _handler.Handle(Agree(), CancellationToken.None);
+
+        await _handler.Handle(Agree() with { AgreementKey = "key-later", Latest = Latest.AddDays(1) }, CancellationToken.None);
+
+        shipment.AgreedDeliveryWindows.Should().HaveCount(2);
     }
 
     [Fact]
@@ -155,5 +195,5 @@ public sealed class AgreeDeliveryWindowHandlerTests
             new CorrelationId("corr-eta"),
             Samples.Now.AddDays(2));
 
-    private static AgreeDeliveryWindowCommand Agree(string number = "EX-0000005") => new(number, Earliest, Latest, "corr-agree");
+    private static AgreeDeliveryWindowCommand Agree(string number = "EX-0000005") => new(number, Earliest, Latest, "key-agree", "corr-agree");
 }

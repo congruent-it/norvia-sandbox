@@ -126,10 +126,11 @@ internal sealed record StoredAssignment(string? CarrierId, string CorrelationId,
 }
 
 /// <summary>An <see cref="AgreedDeliveryWindow"/> as the JSON column stores it, in plain values.</summary>
-internal sealed record StoredAgreedDeliveryWindow(DateTimeOffset? Earliest, DateTimeOffset? Latest, string ExceptionNumber, string CorrelationId, DateTimeOffset AgreedAt)
+internal sealed record StoredAgreedDeliveryWindow(
+    DateTimeOffset Earliest, DateTimeOffset Latest, string ExceptionNumber, string CorrelationId, DateTimeOffset AgreedAt, string Key)
 {
     public static StoredAgreedDeliveryWindow Of(AgreedDeliveryWindow agreed) =>
-        new(agreed.Window.Earliest, agreed.Window.Latest, agreed.ExceptionNumber, agreed.CorrelationId.Value, agreed.AgreedAt);
+        new(agreed.Earliest, agreed.Latest, agreed.ExceptionNumber, agreed.CorrelationId.Value, agreed.AgreedAt, agreed.Key.Value);
 
-    public AgreedDeliveryWindow ToWindow() => new(new TimeWindow(Earliest, Latest), ExceptionNumber, new CorrelationId(CorrelationId), AgreedAt);
+    public AgreedDeliveryWindow ToWindow() => new(Earliest, Latest, ExceptionNumber, new CorrelationId(CorrelationId), AgreedAt, new IdempotencyKey(Key));
 }

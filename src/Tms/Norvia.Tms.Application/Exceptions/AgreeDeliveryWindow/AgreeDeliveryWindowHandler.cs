@@ -26,15 +26,25 @@ public sealed class AgreeDeliveryWindowHandler(
             return ExceptionRefused.Because<AgreeDeliveryWindowResult>(ExceptionRefusal.NotFound(command.ExceptionNumber));
         }
 
+        // An Exception always has its Shipment, so a missing one is corrupt data, not something the Planner can fix.
+        var shipment = await shipments.SingleOrDefaultAsync(new ShipmentToChangeSpec(exception.ShipmentNumber), cancellationToken)
+            ?? throw new InvalidOperationException($"Exception {exception.Number} has no Shipment {exception.ShipmentNumber}.");
+
+        var key = new IdempotencyKey(command.AgreementKey);
+        if (shipment.AgreedDeliveryWindowUnder(key) is { } earlier)
+        {
+            return new AgreeDeliveryWindowResult(
+                exception.Number.Value, shipment.Number.Value, earlier.Earliest, earlier.Latest, earlier.CorrelationId.Value, Repeat: true);
+        }
+
         if (exception.Status != ExceptionStatus.Open)
         {
             return ExceptionRefused.Because<AgreeDeliveryWindowResult>(
                 new(ExceptionRefusalCode.ExceptionNotOpen, $"Exception {exception.Number} is {exception.Status}, not Open."));
         }
 
-        var shipment = (await shipments.SingleOrDefaultAsync(new ShipmentToChangeSpec(exception.ShipmentNumber), cancellationToken))!;
         var window = new TimeWindow(command.Earliest, command.Latest);
-        if (shipment.AgreeDeliveryWindow(window, exception.Number, new CorrelationId(command.CorrelationId), time.GetUtcNow()) is { } refusal)
+        if (shipment.AgreeDeliveryWindow(window, exception.Number, key, new CorrelationId(command.CorrelationId), time.GetUtcNow()) is { } refusal)
         {
             return ExceptionRefused.Because<AgreeDeliveryWindowResult>(refusal);
         }

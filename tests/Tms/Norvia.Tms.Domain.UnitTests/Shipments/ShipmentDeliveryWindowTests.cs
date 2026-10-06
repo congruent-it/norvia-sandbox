@@ -26,11 +26,11 @@ public sealed class ShipmentDeliveryWindowTests
     {
         var shipment = OnItsWay(type);
 
-        var refusal = shipment.AgreeDeliveryWindow(Agreed, Number, new CorrelationId("corr-agree"), Now);
+        var refusal = shipment.AgreeDeliveryWindow(Agreed, Number, new IdempotencyKey("key-agree"), new CorrelationId("corr-agree"), Now);
 
         refusal.Should().BeNull();
         var agreed = shipment.AgreedDeliveryWindows.Should().ContainSingle().Subject;
-        agreed.Should().Be(new AgreedDeliveryWindow(Agreed, "EX-0000005", new CorrelationId("corr-agree"), Now));
+        agreed.Should().Be(new AgreedDeliveryWindow(Agreed.Earliest!.Value, Agreed.Latest!.Value, "EX-0000005", new CorrelationId("corr-agree"), Now, new IdempotencyKey("key-agree")));
         var raised = shipment.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<ShipmentDeliveryWindowAgreedEvent>().Subject;
         raised.Shipment.Should().BeSameAs(shipment);
         raised.Agreed.Should().Be(agreed);
@@ -41,7 +41,7 @@ public sealed class ShipmentDeliveryWindowTests
     {
         var shipment = Booked();
 
-        var refusal = shipment.AgreeDeliveryWindow(Agreed, Number, new CorrelationId("corr-agree"), Now);
+        var refusal = shipment.AgreeDeliveryWindow(Agreed, Number, new IdempotencyKey("key-agree"), new CorrelationId("corr-agree"), Now);
 
         refusal.Should().NotBeNull().And.Match<ExceptionRefusal>(r => r.Code == ExceptionRefusalCode.ShipmentNotInTransport);
         shipment.AgreedDeliveryWindows.Should().BeEmpty();
@@ -53,7 +53,7 @@ public sealed class ShipmentDeliveryWindowTests
     {
         var shipment = OnItsWay(TrackingEventType.Delivered);
 
-        shipment.AgreeDeliveryWindow(Agreed, Number, new CorrelationId("corr-agree"), Now)!.Code.Should().Be(ExceptionRefusalCode.ShipmentNotInTransport);
+        shipment.AgreeDeliveryWindow(Agreed, Number, new IdempotencyKey("key-agree"), new CorrelationId("corr-agree"), Now)!.Code.Should().Be(ExceptionRefusalCode.ShipmentNotInTransport);
     }
 
     [Theory]
@@ -67,7 +67,7 @@ public sealed class ShipmentDeliveryWindowTests
         var shipment = OnItsWay(TrackingEventType.Collected);
         var window = new TimeWindow(earliestHours is { } e ? Now.AddHours(e) : null, latestHours is { } l ? Now.AddHours(l) : null);
 
-        var refusal = shipment.AgreeDeliveryWindow(window, Number, new CorrelationId("corr-agree"), Now);
+        var refusal = shipment.AgreeDeliveryWindow(window, Number, new IdempotencyKey("key-agree"), new CorrelationId("corr-agree"), Now);
 
         refusal!.Code.Should().Be(ExceptionRefusalCode.DeliveryWindowInvalid);
         shipment.AgreedDeliveryWindows.Should().BeEmpty();
@@ -79,12 +79,22 @@ public sealed class ShipmentDeliveryWindowTests
     {
         var shipment = OnItsWay(TrackingEventType.Collected);
         var later = new TimeWindow(Now.AddDays(5), Now.AddDays(5).AddHours(2));
-        shipment.AgreeDeliveryWindow(Agreed, Number, new CorrelationId("corr-1"), Now);
+        shipment.AgreeDeliveryWindow(Agreed, Number, new IdempotencyKey("key-1"), new CorrelationId("corr-1"), Now);
 
-        shipment.AgreeDeliveryWindow(later, Number, new CorrelationId("corr-2"), Now.AddHours(1));
+        shipment.AgreeDeliveryWindow(later, Number, new IdempotencyKey("key-2"), new CorrelationId("corr-2"), Now.AddHours(1));
 
         shipment.AgreedDeliveryWindows.Select(a => a.Window).Should().Equal(Agreed, later);
         shipment.DeliveryWindowOf(OrderWindow).Should().Be(later);
+    }
+
+    [Fact]
+    public void AgreedDeliveryWindowUnder_FindsTheWindowAgreedUnderTheKey()
+    {
+        var shipment = OnItsWay(TrackingEventType.Collected);
+        shipment.AgreeDeliveryWindow(Agreed, Number, new IdempotencyKey("key-1"), new CorrelationId("corr-1"), Now);
+
+        shipment.AgreedDeliveryWindowUnder(new IdempotencyKey("key-1"))!.CorrelationId.Should().Be(new CorrelationId("corr-1"));
+        shipment.AgreedDeliveryWindowUnder(new IdempotencyKey("key-other")).Should().BeNull();
     }
 
     [Fact]

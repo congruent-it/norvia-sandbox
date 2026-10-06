@@ -142,7 +142,7 @@ public sealed class TrackingQueriesTests
             new CorrelationId("corr-c"),
             Latest.AddHours(-3));
         var agreedLatest = Latest.AddDays(2);
-        shipment.AgreeDeliveryWindow(new TimeWindow(agreedLatest.AddHours(-4), agreedLatest), ExceptionNumber.FromSequence(5), new CorrelationId("corr-agree"), Latest.AddHours(-2));
+        shipment.AgreeDeliveryWindow(new TimeWindow(agreedLatest.AddHours(-4), agreedLatest), ExceptionNumber.FromSequence(5), new IdempotencyKey("key-agree"), new CorrelationId("corr-agree"), Latest.AddHours(-2));
         _shipments.ListAsync(Arg.Any<ShipmentsInProgressSpec>(), Arg.Any<CancellationToken>()).Returns([shipment]);
         var departed = Report(shipment, TrackingEventType.Departed, "d", Latest.AddHours(5), Latest.AddHours(5), null);
         _events.ListAsync(Arg.Any<TrackingEventsForShipmentsSpec>(), Arg.Any<CancellationToken>()).Returns([departed]);

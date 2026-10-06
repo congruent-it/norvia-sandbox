@@ -11,7 +11,7 @@ namespace Norvia.Tms.Application.UnitTests.Exceptions;
 public sealed class TrackDeliveryWindowAgreementInLoggingScopeTests : IDisposable
 {
     private static readonly DateTimeOffset At = new(2026, 9, 30, 8, 0, 0, TimeSpan.Zero);
-    private static readonly AgreeDeliveryWindowCommand Agree = new("EX-0000005", At, At.AddHours(4), "corr-agree");
+    private static readonly AgreeDeliveryWindowCommand Agree = new("EX-0000005", At, At.AddHours(4), "key-agree", "corr-agree");
 
     private readonly FakeLoggerProvider _logs = new();
     private readonly ILoggerFactory _loggerFactory;

@@ -8,4 +8,9 @@ namespace Norvia.Tms.Domain.Shipments;
 /// </summary>
 /// <param name="ExceptionNumber">The Exception the Planner set it from.</param>
 /// <param name="CorrelationId">The Message trail the TMS started for it, as it starts in the TMS UI.</param>
-public sealed record AgreedDeliveryWindow(TimeWindow Window, string ExceptionNumber, CorrelationId CorrelationId, DateTimeOffset AgreedAt);
+/// <param name="Key">The idempotency key that makes a retry of the agreement a repeat.</param>
+public sealed record AgreedDeliveryWindow(
+    DateTimeOffset Earliest, DateTimeOffset Latest, string ExceptionNumber, CorrelationId CorrelationId, DateTimeOffset AgreedAt, IdempotencyKey Key)
+{
+    public TimeWindow Window => new(Earliest, Latest);
+}

@@ -64,7 +64,7 @@ public sealed class CheckLateDeliveriesHandlerTests
             new TrackingReport(TrackingSource.Carrier(new CarrierId("CAR-0001")), "evt-1", "VDT-1", null, TrackingEventType.Collected, WindowLatest.AddHours(-5), new TrackingLocation("Rotterdam", "3011 AA", "NL"), null, null),
             new CorrelationId("corr-tracking"),
             WindowLatest.AddHours(-5));
-        shipment.AgreeDeliveryWindow(new TimeWindow(WindowLatest, WindowLatest.AddDays(2)), ExceptionNumber.FromSequence(5), new CorrelationId("corr-agree"), WindowLatest.AddHours(-4));
+        shipment.AgreeDeliveryWindow(new TimeWindow(WindowLatest, WindowLatest.AddDays(2)), ExceptionNumber.FromSequence(5), new IdempotencyKey("key-agree"), new CorrelationId("corr-agree"), WindowLatest.AddHours(-4));
         _time.Advance(TimeSpan.FromHours(1));
 
         await Handler(TimeSpan.Zero).Handle(new CheckLateDeliveriesCommand(), CancellationToken.None);

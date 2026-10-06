@@ -46,7 +46,7 @@ public sealed class PublishShipmentDeliveryWindowAgreedTests
     {
         var order = Samples.AcceptedOrder(sequence: 7);
         var shipment = Samples.Planned(order, CarriedBy.Carrier(new CarrierId("CAR-0001")), sequence: 12);
-        var window = new AgreedDeliveryWindow(new TimeWindow(Earliest, Earliest.AddHours(4)), "EX-0000005", new CorrelationId("corr-agree"), Samples.Now.AddDays(3));
+        var window = new AgreedDeliveryWindow(Earliest, Earliest.AddHours(4), "EX-0000005", new CorrelationId("corr-agree"), Samples.Now.AddDays(3), new IdempotencyKey("key-agree"));
         return new ShipmentDeliveryWindowAgreedEvent(shipment, window);
     }
 }

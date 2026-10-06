@@ -68,13 +68,14 @@ internal static class ExceptionCalls
 
     /// <summary>Agrees a delivery window as the Planner does, through the TMS UI.</summary>
     public static async Task<HttpResponseMessage> AgreeDeliveryWindowAsync(
-        this TmsFixture tms, string exceptionNumber, JsonObject window, CancellationToken cancellationToken)
+        this TmsFixture tms, string exceptionNumber, JsonObject window, CancellationToken cancellationToken, string? idempotencyKey = null)
     {
         ArgumentNullException.ThrowIfNull(tms);
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"/v1/exceptions/{exceptionNumber}/delivery-window", UriKind.Relative))
         {
             Content = JsonContent.Create(window),
         };
+        request.Headers.Add("Idempotency-Key", idempotencyKey ?? Guid.NewGuid().ToString());
         return await tms.TmsUi.SendAsync(request, cancellationToken);
     }
 
