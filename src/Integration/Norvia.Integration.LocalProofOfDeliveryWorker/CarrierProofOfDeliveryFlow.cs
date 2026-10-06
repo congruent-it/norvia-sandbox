@@ -1,18 +1,7 @@
-using System.Text.Json;
-using System.Text.Json.Nodes;
 using Norvia.Integration.CarrierBooking;
 using Norvia.Integration.LocalSupport;
 
 namespace Norvia.Integration.LocalProofOfDeliveryWorker;
-
-/// <summary>How the flow's run ended, and so what happens to the queue message: the Logic App's settling steps.</summary>
-/// <param name="DeadLetterReason">The dead-letter reason when <see cref="ProofOfDeliverySettlement.DeadLetter"/>.</param>
-/// <param name="DeadLetterDescription">The dead-letter error description when <see cref="ProofOfDeliverySettlement.DeadLetter"/>.</param>
-internal sealed record ProofOfDeliveryRun(ProofOfDeliverySettlement Settlement, string? DeadLetterReason = null, string? DeadLetterDescription = null)
-{
-    /// <summary>True when the workflow's run would end Failed: the Proof of delivery wasn't recorded.</summary>
-    public bool RunFailed => Settlement != ProofOfDeliverySettlement.Complete;
-}
 
 /// <summary>
 /// The Carrier Proof of delivery Logic App's steps, played locally (ADR 0032): fetch the claim check's blob, map it,
@@ -50,7 +39,7 @@ internal sealed partial class CarrierProofOfDeliveryFlow(IInboundProofsOfDeliver
 
         using var trail = logger.BeginScope(keys);
 
-        var blobName = BlobNameOf(body);
+        var blobName = JsonText.Field(body, "blobName");
         var content = blobName is null ? null : await inbound.ReadAsync(blobName, cancellationToken);
         if (blobName is null || content is null)
         {
@@ -83,7 +72,7 @@ internal sealed partial class CarrierProofOfDeliveryFlow(IInboundProofsOfDeliver
             recorded[TrackingKeys.ShipmentNumber] = outcome.ShipmentNumber;
         }
 
-        if (mapped.Metadata["carrierBookingNumber"] is JsonValue number && number.TryGetValue<string>(out var bookingNumber))
+        if (mapped.CarrierBookingNumber is { } bookingNumber)
         {
             recorded[TrackingKeys.CarrierBookingNumber] = bookingNumber;
         }
@@ -115,21 +104,6 @@ internal sealed partial class CarrierProofOfDeliveryFlow(IInboundProofsOfDeliver
         {
             LogNotDeleted(exception);
             return new(ProofOfDeliverySettlement.Retry);
-        }
-    }
-
-    // The blob a reference names, when the body is a JSON object that has one as text.
-    private static string? BlobNameOf(string body)
-    {
-        try
-        {
-            return JsonNode.Parse(body) is JsonObject reference && reference["blobName"] is JsonValue value && value.TryGetValue<string>(out var name) && !string.IsNullOrWhiteSpace(name)
-                ? name
-                : null;
-        }
-        catch (JsonException)
-        {
-            return null;
         }
     }
 

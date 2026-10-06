@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Extensions.Options;
@@ -72,7 +71,7 @@ internal static partial class SubmitCarrierProofOfDelivery
             [TrackingKeys.PartyId] = carrierId,
             [TrackingKeys.Flow] = TrackingKeys.CarrierProofOfDelivery,
         };
-        if (DocumentIdOf(body) is { } documentId)
+        if (JsonText.Field(body, "documentId") is { } documentId)
         {
             properties[TrackingKeys.SourceMessageId] = documentId;
         }
@@ -132,19 +131,6 @@ internal static partial class SubmitCarrierProofOfDelivery
         }
 
         return buffer.ToArray();
-    }
-
-    // The Carrier's own document ID, when the body is a JSON object that has one as text.
-    private static string? DocumentIdOf(byte[] body)
-    {
-        try
-        {
-            return JsonNode.Parse(body) is JsonObject message && message["documentId"] is JsonValue value && value.TryGetValue<string>(out var documentId) ? documentId : null;
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
     }
 
     private static ContentHttpResult NotAccepted(string correlationId) =>

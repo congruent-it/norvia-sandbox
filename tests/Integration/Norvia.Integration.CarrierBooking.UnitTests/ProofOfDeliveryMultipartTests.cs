@@ -38,3 +38,13 @@ public sealed class ProofOfDeliveryMultipartTests
         header.Should().Be("form-data; name=\"files\"; filename=\"a'b.pdf\"");
     }
 }
+
+public sealed class MappedProofOfDeliveryTests
+{
+    [Fact]
+    public void CarrierBookingNumber_IsTheMetadatasWhenItHasOne_AndNullWhenItHasNone()
+    {
+        new MappedProofOfDelivery(new JsonObject { ["carrierBookingNumber"] = "CB-1" }, []).CarrierBookingNumber.Should().Be("CB-1");
+        new MappedProofOfDelivery(new JsonObject(), []).CarrierBookingNumber.Should().BeNull();
+    }
+}
