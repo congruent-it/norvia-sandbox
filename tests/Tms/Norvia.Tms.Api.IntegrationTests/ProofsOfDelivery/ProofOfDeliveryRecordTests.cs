@@ -20,6 +20,19 @@ public sealed class ProofOfDeliveryRecordTests(TmsFixture tms) : IClassFixture<T
     private readonly CancellationToken _cancellationToken = TestContext.Current.CancellationToken;
 
     [Fact]
+    public async Task Record_MetadataThatDescribesItsFiles_AsTheCanonicalModelDoes_IsAccepted()
+    {
+        var (_, reference) = await tms.DeliveredShipmentAsync(_cancellationToken);
+        var cmr = Cmr();
+        var metadata = Metadata(reference);
+        metadata["files"] = new JsonArray(new JsonObject { ["name"] = cmr.Name, ["contentType"] = cmr.ContentType });
+
+        var recorded = await tms.RecordedProofAsync(metadata, [cmr], _cancellationToken);
+
+        recorded["numberOfFiles"]!.GetValue<int>().Should().Be(1);
+    }
+
+    [Fact]
     public async Task Record_ACleanProofOfDeliveryForADeliveredShipment_StoresItAsCurrent_KeepsItsFile_AndLeavesTheStatusAlone()
     {
         var (shipmentNumber, reference) = await tms.DeliveredShipmentAsync(_cancellationToken);
