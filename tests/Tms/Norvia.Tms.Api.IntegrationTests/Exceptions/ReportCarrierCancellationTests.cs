@@ -81,6 +81,8 @@ public sealed class ReportCarrierCancellationTests(TmsFixture tms) : IClassFixtu
         var (shipmentNumber, carrierBookingNumber, _, exceptionNumber) = await tms.BookedWithDeliveryFailedAsync(_cancellationToken);
         using var cancelled = await tms.CancelCarrierBookingAsync(exceptionNumber, Cancellation(), _cancellationToken);
         cancelled.StatusCode.Should().Be(HttpStatusCode.OK);
+        var cancellationTrail = JsonNode.Parse(await cancelled.Content.ReadAsStringAsync(_cancellationToken))!["correlationId"]!.GetValue<string>();
+        await tms.PublishedAsync(cancellationTrail, "CarrierBookingCancelled", _cancellationToken); // let the cancellation's own event land first
         var before = tms.Published.Count(m => NamesCarrierBooking(m, carrierBookingNumber));
 
         using var response = await tms.ReportCancellationToldAsync(carrierBookingNumber, _cancellationToken);

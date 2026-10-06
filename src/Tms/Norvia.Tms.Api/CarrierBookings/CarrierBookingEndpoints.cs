@@ -161,15 +161,14 @@ public static class CarrierBookingEndpoints
         IMediator mediator,
         CancellationToken cancellationToken)
     {
-        var errors = Check(correlationId, report);
-        if (errors.Count > 0)
+        var errors = CheckNotDelivered(correlationId, report);
+        if (errors.Count > 0 || correlationId is null || report.StatusCode is not { } statusCode || report.Message is not { } message)
         {
             return TypedResults.ValidationProblem(errors);
         }
 
-        var result = await mediator.Send(
-            new ReportCarrierBookingNotDeliveredCommand(carrierBookingNumber, correlationId!, report.StatusCode!.Value, report.Message!), cancellationToken);
-        return result.IsSuccess ? TypedResults.Ok(result.Value) : Refused(result, "The report can't be recorded.", correlationId!);
+        var result = await mediator.Send(new ReportCarrierBookingNotDeliveredCommand(carrierBookingNumber, correlationId, statusCode, message), cancellationToken);
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : Refused(result, "The report can't be recorded.", correlationId);
     }
 
     private static async Task<Results<Ok<CarrierBookingReportResult>, ProblemHttpResult, ValidationProblem>> ReportCancellationToldAsync(
@@ -195,15 +194,15 @@ public static class CarrierBookingEndpoints
         IMediator mediator,
         CancellationToken cancellationToken)
     {
-        var errors = Check(correlationId, report);
-        if (errors.Count > 0)
+        var errors = CheckNotDelivered(correlationId, report);
+        if (errors.Count > 0 || correlationId is null || report.StatusCode is not { } statusCode || report.Message is not { } message)
         {
             return TypedResults.ValidationProblem(errors);
         }
 
         var result = await mediator.Send(
-            new ReportCarrierCancellationNotDeliveredCommand(carrierBookingNumber, correlationId!, report.StatusCode!.Value, report.Message!), cancellationToken);
-        return result.IsSuccess ? TypedResults.Ok(result.Value) : Refused(result, "The report can't be recorded.", correlationId!);
+            new ReportCarrierCancellationNotDeliveredCommand(carrierBookingNumber, correlationId, statusCode, message), cancellationToken);
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : Refused(result, "The report can't be recorded.", correlationId);
     }
 
     private static async Task<Results<Ok<CarrierBookingWithdrawResult>, ProblemHttpResult, ValidationProblem>> WithdrawAsync(
@@ -225,7 +224,7 @@ public static class CarrierBookingEndpoints
     }
 
     /// <summary>The errors of a not-delivered report: an <see cref="TransportOrderEndpoints.CorrelationIdHeader"/> and the technical cause's status code and message.</summary>
-    private static Dictionary<string, string[]> Check(string? correlationId, CarrierBookingNotDeliveredRequest report)
+    private static Dictionary<string, string[]> CheckNotDelivered(string? correlationId, CarrierBookingNotDeliveredRequest report)
     {
         var errors = new Dictionary<string, string[]>();
         if (string.IsNullOrWhiteSpace(correlationId))

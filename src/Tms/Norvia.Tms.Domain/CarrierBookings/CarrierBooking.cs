@@ -281,7 +281,7 @@ public sealed class CarrierBooking : EntityBase<CarrierBookingId>, IAggregateRoo
     /// </summary>
     public bool MarkCarrierTold(DateTimeOffset toldAt)
     {
-        if (!CanBeReportedTold)
+        if (!AwaitsCarrierReport)
         {
             return false;
         }
@@ -299,7 +299,7 @@ public sealed class CarrierBooking : EntityBase<CarrierBookingId>, IAggregateRoo
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
         ArgumentNullException.ThrowIfNull(correlationId);
-        if (!CanBeReportedTold)
+        if (!AwaitsCarrierReport)
         {
             return false;
         }
@@ -311,8 +311,11 @@ public sealed class CarrierBooking : EntityBase<CarrierBookingId>, IAggregateRoo
         return true;
     }
 
-    /// <summary>The message the Carrier cancellation Logic App sends covers a Withdrawn or Cancelled booking, once.</summary>
-    public bool CanBeReportedTold => Status is CarrierBookingStatus.Withdrawn or CarrierBookingStatus.Cancelled && CarrierToldAt is null && CarrierNotToldAt is null;
+    /// <summary>Norvia ended the booking, by withdrawing or cancelling it: the Carrier is told about these, and only these (P7).</summary>
+    public bool IsEndedByNorvia => Status is CarrierBookingStatus.Withdrawn or CarrierBookingStatus.Cancelled;
+
+    /// <summary>The Carrier cancellation Logic App's report is still due: the booking is ended by Norvia and not yet reported told or not told.</summary>
+    public bool AwaitsCarrierReport => IsEndedByNorvia && CarrierToldAt is null && CarrierNotToldAt is null;
 
     /// <summary>The cancellation's own trail made under the key; null when none was.</summary>
     public CorrelationId? CancellationUnder(IdempotencyKey key) => CancellationKey == key ? CancellationCorrelationId : null;

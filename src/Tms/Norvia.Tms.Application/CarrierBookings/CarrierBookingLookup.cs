@@ -26,7 +26,7 @@ internal static class CarrierBookingLookup
         IRepository<CarrierBooking> carrierBookings, string carrierBookingNumber, CancellationToken cancellationToken)
     {
         var (booking, refusal) = await ToBookingAsync(carrierBookings, carrierBookingNumber, cancellationToken);
-        return booking is { Status: not (CarrierBookingStatus.Withdrawn or CarrierBookingStatus.Cancelled) }
+        return booking is { IsEndedByNorvia: false }
             ? (null, CarrierBookingRules.NotCancelled(booking))
             : (booking, refusal);
     }

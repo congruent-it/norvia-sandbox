@@ -14,12 +14,13 @@ public sealed class ReportCarrierCancellationNotDeliveredHandler(IRepository<Car
         ArgumentNullException.ThrowIfNull(command);
 
         var (booking, refusal) = await CarrierBookingLookup.ToCancelledBookingAsync(carrierBookings, command.CarrierBookingNumber, cancellationToken);
-        if (refusal is not null)
+        if (booking is null)
         {
-            return CarrierBookingRefused.Because<CarrierBookingReportResult>(refusal);
+            return CarrierBookingRefused.Because<CarrierBookingReportResult>(
+                refusal ?? throw new InvalidOperationException($"Carrier booking {command.CarrierBookingNumber} was neither found nor refused."));
         }
 
-        if (!booking!.ReportCarrierNotTold(command.StatusCode, command.Message, new CorrelationId(command.CorrelationId), time.GetUtcNow()))
+        if (!booking.ReportCarrierNotTold(command.StatusCode, command.Message, new CorrelationId(command.CorrelationId), time.GetUtcNow()))
         {
             // Already reported told or not told: ignored, changing and publishing nothing.
             return new CarrierBookingReportResult(booking.Number.Value, booking.Status, Ignored: true);
