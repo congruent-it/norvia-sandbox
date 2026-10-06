@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Ardalis.Result;
 using Mediator;
 using Microsoft.Extensions.Logging;
@@ -26,7 +25,7 @@ public sealed partial class TrackCarrierBookingWithdrawalInLoggingScope(ILogger<
         ArgumentNullException.ThrowIfNull(message);
         ArgumentNullException.ThrowIfNull(next);
 
-        using var trail = Track(new()
+        using var trail = logger.Track(new()
         {
             [TrackingKeys.CorrelationId] = message.CorrelationId,
             [TrackingKeys.CarrierBookingNumber] = message.CarrierBookingNumber,
@@ -57,7 +56,7 @@ public sealed partial class TrackCarrierBookingWithdrawalInLoggingScope(ILogger<
             keys[TrackingKeys.CorrelationId] = outcome.CorrelationId;
         }
 
-        using var scope = Track(keys);
+        using var scope = logger.Track(keys);
         if (outcome.Repeat)
         {
             LogRepeat(logger, outcome.CarrierBookingNumber, outcome.Status);
@@ -77,18 +76,8 @@ public sealed partial class TrackCarrierBookingWithdrawalInLoggingScope(ILogger<
             keys[TrackingKeys.FailureCode] = refusal.ErrorCode;
         }
 
-        using var refused = Track(keys);
+        using var refused = logger.Track(keys);
         LogRefused(logger, refusal.ErrorMessage);
-    }
-
-    private IDisposable? Track(Dictionary<string, object?> keys)
-    {
-        foreach (var (key, value) in keys)
-        {
-            Activity.Current?.SetTag(key, value);
-        }
-
-        return logger.BeginScope(keys);
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Carrier booking {CarrierBookingNumber} withdrawn, Shipment {ShipmentNumber} back to Planned")]

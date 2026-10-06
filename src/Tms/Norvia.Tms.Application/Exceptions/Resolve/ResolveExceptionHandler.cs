@@ -16,7 +16,7 @@ public sealed class ResolveExceptionHandler(IRepository<ExceptionCase> exception
         if (!ExceptionNumber.TryParse(command.ExceptionNumber, out var number)
             || await exceptions.SingleOrDefaultAsync(new ExceptionToResolveSpec(number), cancellationToken) is not { } exception)
         {
-            return ExceptionRefused.Because<ResolveExceptionResult>(ExceptionCase.NotFound(command.ExceptionNumber));
+            return ExceptionRefused.Because<ResolveExceptionResult>(ExceptionRefusal.NotFound(command.ExceptionNumber));
         }
 
         if (exception.Resolve(command.Outcome, command.Remark, new CorrelationId(command.CorrelationId), time.GetUtcNow()) is { } refusal)

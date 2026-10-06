@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Ardalis.Result;
 using Mediator;
 using Microsoft.Extensions.Logging;
@@ -29,7 +28,7 @@ public sealed partial class TrackReRateInLoggingScope(ILogger<TrackReRateInLoggi
             return await next(message, cancellationToken);
         }
 
-        using var numbered = Track(new() { [TrackingKeys.TransportOrderNumber] = message.TransportOrderNumber });
+        using var numbered = logger.Track(new() { [TrackingKeys.TransportOrderNumber] = message.TransportOrderNumber });
         var result = await next(message, cancellationToken);
         if (!result.IsSuccess)
         {
@@ -39,7 +38,7 @@ public sealed partial class TrackReRateInLoggingScope(ILogger<TrackReRateInLoggi
                 keys[TrackingKeys.CorrelationId] = result.CorrelationId;
             }
 
-            using var refused = Track(keys);
+            using var refused = logger.Track(keys);
             LogRefused(logger, result.Errors);
         }
         else if (result.IsSuccess)
@@ -63,7 +62,7 @@ public sealed partial class TrackReRateInLoggingScope(ILogger<TrackReRateInLoggi
             trail[TrackingKeys.FailureCode] = failure.Code;
         }
 
-        using var scope = Track(trail);
+        using var scope = logger.Track(trail);
         if (outcome.Repeat)
         {
             LogRepeat(logger, transportOrderNumber, outcome.RatingResult);
@@ -76,16 +75,6 @@ public sealed partial class TrackReRateInLoggingScope(ILogger<TrackReRateInLoggi
         {
             LogReRated(logger, transportOrderNumber);
         }
-    }
-
-    private IDisposable? Track(Dictionary<string, object?> keys)
-    {
-        foreach (var (key, value) in keys)
-        {
-            Activity.Current?.SetTag(key, value);
-        }
-
-        return logger.BeginScope(keys);
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Transport Order {TransportOrderNumber} re-rated: Rated")]

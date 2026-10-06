@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Ardalis.Result;
 using Mediator;
 using Microsoft.Extensions.Logging;
@@ -31,7 +30,7 @@ public sealed partial class TrackTrackingEventInLoggingScope(ILogger<TrackTracki
             call[TrackingKeys.PartyId] = carrierId.Value;
         }
 
-        using var trail = Track(call);
+        using var trail = logger.Track(call);
         var result = await next(message, cancellationToken);
         if (result.IsSuccess)
         {
@@ -58,7 +57,7 @@ public sealed partial class TrackTrackingEventInLoggingScope(ILogger<TrackTracki
             keys[TrackingKeys.CorrelationId] = outcome.CorrelationId;
         }
 
-        using var scope = Track(keys);
+        using var scope = logger.Track(keys);
         if (outcome.Repeat)
         {
             LogRepeat(logger, outcome.EventId, outcome.ShipmentNumber);
@@ -72,22 +71,12 @@ public sealed partial class TrackTrackingEventInLoggingScope(ILogger<TrackTracki
     private void LogRefusal(string sourceEventId, Result<RecordTrackingResult> result)
     {
         var refusal = result.ValidationErrors.First();
-        using var refused = Track(new()
+        using var refused = logger.Track(new()
         {
             [TrackingKeys.Outcome] = TrackingKeys.Refused,
             [TrackingKeys.FailureCode] = refusal.ErrorCode,
         });
         LogRefused(logger, sourceEventId, refusal.ErrorMessage);
-    }
-
-    private IDisposable? Track(Dictionary<string, object?> keys)
-    {
-        foreach (var (key, value) in keys)
-        {
-            Activity.Current?.SetTag(key, value);
-        }
-
-        return logger.BeginScope(keys);
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Tracking event {SourceEventId} recorded for Shipment {ShipmentNumber}, now {ShipmentStatus} (moved it: {MovedShipment})")]

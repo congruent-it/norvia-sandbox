@@ -154,9 +154,6 @@ public sealed class ExceptionCase : EntityBase<ExceptionId>, IAggregateRoot
         return null;
     }
 
-    public static ExceptionRefusal NotFound(string exceptionNumber) =>
-        new(ExceptionRefusalCode.ExceptionNotFound, Invariant($"The TMS has no Exception {exceptionNumber}."));
-
     private static ExceptionCause CauseOf(TrackingEvent trackingEvent, DateTimeOffset addedAt) =>
         new(trackingEvent.Id, trackingEvent.SourceEventId, trackingEvent.CorrelationId, addedAt);
 }

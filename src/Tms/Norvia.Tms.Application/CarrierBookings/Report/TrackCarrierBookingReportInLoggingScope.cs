@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Ardalis.Result;
 using Mediator;
 using Microsoft.Extensions.Logging;
@@ -26,7 +25,7 @@ public sealed partial class TrackCarrierBookingReportInLoggingScope<TCommand>(IL
         ArgumentNullException.ThrowIfNull(message);
         ArgumentNullException.ThrowIfNull(next);
 
-        using var trail = Track(new()
+        using var trail = logger.Track(new()
         {
             [TrackingKeys.CorrelationId] = message.CorrelationId,
             [TrackingKeys.CarrierBookingNumber] = message.CarrierBookingNumber,
@@ -46,7 +45,7 @@ public sealed partial class TrackCarrierBookingReportInLoggingScope<TCommand>(IL
 
     private void LogOutcome(CarrierBookingReportResult outcome)
     {
-        using var scope = Track(new() { [TrackingKeys.Outcome] = TrackingKeys.Succeeded });
+        using var scope = logger.Track(new() { [TrackingKeys.Outcome] = TrackingKeys.Succeeded });
         if (outcome.Ignored)
         {
             LogIgnored(logger, outcome.CarrierBookingNumber, outcome.Status);
@@ -60,18 +59,8 @@ public sealed partial class TrackCarrierBookingReportInLoggingScope<TCommand>(IL
     private void LogRefusal(Result<CarrierBookingReportResult> result)
     {
         var refusal = result.ValidationErrors.First();
-        using var refused = Track(new() { [TrackingKeys.Outcome] = TrackingKeys.Refused, [TrackingKeys.FailureCode] = refusal.ErrorCode });
+        using var refused = logger.Track(new() { [TrackingKeys.Outcome] = TrackingKeys.Refused, [TrackingKeys.FailureCode] = refusal.ErrorCode });
         LogRefused(logger, refusal.ErrorMessage);
-    }
-
-    private IDisposable? Track(Dictionary<string, object?> keys)
-    {
-        foreach (var (key, value) in keys)
-        {
-            Activity.Current?.SetTag(key, value);
-        }
-
-        return logger.BeginScope(keys);
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Carrier booking {CarrierBookingNumber} report recorded: {Status}")]

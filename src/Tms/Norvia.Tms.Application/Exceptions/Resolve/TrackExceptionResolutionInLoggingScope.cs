@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Ardalis.Result;
 using Mediator;
 using Microsoft.Extensions.Logging;
@@ -24,11 +23,11 @@ public sealed partial class TrackExceptionResolutionInLoggingScope(ILogger<Track
         ArgumentNullException.ThrowIfNull(message);
         ArgumentNullException.ThrowIfNull(next);
 
-        using var trail = Track(new() { [TrackingKeys.CorrelationId] = message.CorrelationId });
+        using var trail = logger.Track(new() { [TrackingKeys.CorrelationId] = message.CorrelationId });
         var result = await next(message, cancellationToken);
         if (result.IsSuccess)
         {
-            using var succeeded = Track(new()
+            using var succeeded = logger.Track(new()
             {
                 [TrackingKeys.ShipmentNumber] = result.Value.ShipmentNumber,
                 [TrackingKeys.Outcome] = TrackingKeys.Succeeded,
@@ -38,7 +37,7 @@ public sealed partial class TrackExceptionResolutionInLoggingScope(ILogger<Track
         else
         {
             var refusal = result.ValidationErrors.First();
-            using var refused = Track(new()
+            using var refused = logger.Track(new()
             {
                 [TrackingKeys.Outcome] = TrackingKeys.Refused,
                 [TrackingKeys.FailureCode] = refusal.ErrorCode,
@@ -47,16 +46,6 @@ public sealed partial class TrackExceptionResolutionInLoggingScope(ILogger<Track
         }
 
         return result;
-    }
-
-    private IDisposable? Track(Dictionary<string, object?> keys)
-    {
-        foreach (var (key, value) in keys)
-        {
-            Activity.Current?.SetTag(key, value);
-        }
-
-        return logger.BeginScope(keys);
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Exception {ExceptionNumber} of Shipment {ShipmentNumber} resolved as {Outcome}")]

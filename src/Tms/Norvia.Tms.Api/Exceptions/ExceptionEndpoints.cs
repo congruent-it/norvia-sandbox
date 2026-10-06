@@ -92,6 +92,7 @@ public static class ExceptionEndpoints
     private static int StatusCodeOf(ExceptionRefusalCode code) => code switch
     {
         ExceptionRefusalCode.ExceptionNotFound => StatusCodes.Status404NotFound,
-        _ => StatusCodes.Status409Conflict, // ExceptionNotOpen
+        ExceptionRefusalCode.ExceptionNotOpen => StatusCodes.Status409Conflict,
+        _ => throw new ArgumentOutOfRangeException(nameof(code), code, "The API doesn't know this refusal's status."),
     };
 }
