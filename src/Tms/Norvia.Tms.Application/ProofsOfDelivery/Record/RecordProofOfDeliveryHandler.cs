@@ -1,7 +1,9 @@
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Mediator;
+using Norvia.Tms.Application.Exceptions;
 using Norvia.Tms.Domain.CarrierBookings;
+using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Domain.ProofsOfDelivery;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TransportOrders;
@@ -13,6 +15,7 @@ public sealed class RecordProofOfDeliveryHandler(
     IRepository<CarrierBooking> carrierBookings,
     IRepository<Shipment> shipments,
     IProofOfDeliveryFiles files,
+    ExceptionCauses exceptionCauses,
     ProofOfDeliveryRules rules,
     TimeProvider time)
     : ICommandHandler<RecordProofOfDeliveryCommand, Result<RecordProofOfDeliveryResult>>
@@ -74,10 +77,16 @@ public sealed class RecordProofOfDeliveryHandler(
             await files.StoreAsync(shipment.Number, report.Files[i], command.Files[i], cancellationToken);
         }
 
-        // The record and the event it raises, which goes to the outbox, are saved in one transaction.
+        // The record, the Exception it opens or joins and the events they raise, which go to the outbox, are saved in one transaction.
         // A new document ID for a Shipment that already has a current Proof of delivery replaces it: the earlier one is kept, superseded.
         var replaced = await proofsOfDelivery.SingleOrDefaultAsync(new TrackedCurrentProofOfDeliverySpec(shipment.Id), cancellationToken);
-        var proofOfDelivery = ProofOfDelivery.Record(shipment, report, new CorrelationId(command.CorrelationId), time.GetUtcNow(), replaced);
+        var now = time.GetUtcNow();
+        var proofOfDelivery = ProofOfDelivery.Record(shipment, report, new CorrelationId(command.CorrelationId), now, replaced);
+        if (ExceptionCause.From(proofOfDelivery, now) is { } cause)
+        {
+            await exceptionCauses.OpenOrAddAsync(shipment, cause, cancellationToken);
+        }
+
         await proofsOfDelivery.AddAsync(proofOfDelivery, cancellationToken);
         await proofsOfDelivery.SaveChangesAsync(cancellationToken);
         return RecordProofOfDeliveryResult.From(shipment, proofOfDelivery);

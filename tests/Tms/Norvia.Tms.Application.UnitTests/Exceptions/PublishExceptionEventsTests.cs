@@ -37,6 +37,16 @@ public sealed class PublishExceptionEventsTests
     }
 
     [Fact]
+    public void ExceptionOpened_ForAProofOfDelivery_NamesItsDocumentAsTheCause_AndIsTracedOnTheProofOfDeliveryFlow()
+    {
+        var opened = ExceptionOpenedV1.From(OpenExceptions.Reservations().DomainEvents.OfType<ExceptionOpenedEvent>().Single());
+
+        opened.ExceptionType.Should().Be("Reservations");
+        opened.Cause.Should().Be(new ExceptionCauseV1("ProofOfDelivery", "doc-1"));
+        opened.ApplicationProperties["flow"].Should().Be("carrier-proof-of-delivery");
+    }
+
+    [Fact]
     public void ExceptionOpened_TracksItsKeysOnTheCausesTrail_AndFiltersOnWhoCarries()
     {
         var opened = ExceptionOpenedV1.From(OpenExceptions.DeliveryFailed().DomainEvents.OfType<ExceptionOpenedEvent>().Single());

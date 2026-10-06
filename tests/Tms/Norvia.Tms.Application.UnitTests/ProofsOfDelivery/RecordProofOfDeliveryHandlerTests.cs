@@ -1,11 +1,13 @@
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Microsoft.Extensions.Time.Testing;
+using Norvia.Tms.Application.Exceptions;
 using Norvia.Tms.Application.ProofsOfDelivery;
 using Norvia.Tms.Application.ProofsOfDelivery.Record;
 using Norvia.Tms.Application.UnitTests.TransportOrders;
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Carriers;
+using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Domain.ProofsOfDelivery;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TransportOrders;
@@ -21,13 +23,16 @@ public sealed class RecordProofOfDeliveryHandlerTests
     private readonly IRepository<ProofOfDelivery> _proofsOfDelivery = Substitute.For<IRepository<ProofOfDelivery>>();
     private readonly IRepository<CarrierBooking> _carrierBookings = Substitute.For<IRepository<CarrierBooking>>();
     private readonly IRepository<Shipment> _shipments = Substitute.For<IRepository<Shipment>>();
+    private readonly IRepository<ExceptionCase> _exceptions = Substitute.For<IRepository<ExceptionCase>>();
+    private readonly IExceptionNumbers _exceptionNumbers = Substitute.For<IExceptionNumbers>();
     private readonly IProofOfDeliveryFiles _files = Substitute.For<IProofOfDeliveryFiles>();
     private readonly FakeTimeProvider _time = new(Samples.Now.AddDays(2));
     private readonly RecordProofOfDeliveryHandler _handler;
 
     public RecordProofOfDeliveryHandlerTests()
     {
-        _handler = new RecordProofOfDeliveryHandler(_proofsOfDelivery, _carrierBookings, _shipments, _files, new ProofOfDeliveryRules(TimeSpan.FromMinutes(5)), _time);
+        _exceptionNumbers.NextAsync(Arg.Any<CancellationToken>()).Returns(ExceptionNumber.FromSequence(9));
+        _handler = new RecordProofOfDeliveryHandler(_proofsOfDelivery, _carrierBookings, _shipments, _files, new ExceptionCauses(_exceptions, _exceptionNumbers), new ProofOfDeliveryRules(TimeSpan.FromMinutes(5)), _time);
     }
 
     [Fact]
@@ -52,6 +57,55 @@ public sealed class RecordProofOfDeliveryHandlerTests
         await _files.Received(1).StoreAsync(shipment.Number, Cmr(), Arg.Is<ReadOnlyMemory<byte>>(content => content.ToArray().SequenceEqual(CmrContent)), Arg.Any<CancellationToken>());
         await _proofsOfDelivery.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task Handle_ACleanProofOfDelivery_OpensNoException()
+    {
+        Found(ShipmentStatus.Delivered);
+
+        await _handler.Handle(Command(), CancellationToken.None);
+
+        await _exceptions.DidNotReceive().AddAsync(Arg.Any<ExceptionCase>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_AProofOfDeliveryWithReservations_OpensAReservationsException_WithItsCorrelationId_InTheSameSave()
+    {
+        var shipment = Found(ShipmentStatus.Delivered);
+
+        await _handler.Handle(Command(Report(condition: DeliveryCondition.Reservations)), CancellationToken.None);
+
+        var opened = OpenedException();
+        opened.Type.Should().Be(ExceptionType.Reservations);
+        opened.ShipmentId.Should().Be(shipment.Id);
+        opened.CorrelationId.Should().Be(new CorrelationId("corr-pod"));
+        opened.AfterDelivered.Should().BeFalse();
+        opened.Causes.Should().ContainSingle().Which.SourceEventId.Should().Be("doc-1");
+        opened.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<ExceptionOpenedEvent>();
+        await _exceptions.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+        await _proofsOfDelivery.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_AnotherProofOfDeliveryWithReservationsWhileOneIsOpen_AddsACause_AndOpensNothingNew()
+    {
+        var shipment = Found(ShipmentStatus.Delivered);
+        await _handler.Handle(Command(Report(condition: DeliveryCondition.Reservations)), CancellationToken.None);
+        var open = OpenedException();
+        open.ClearDomainEvents();
+        _exceptions.ClearReceivedCalls();
+        _exceptions.SingleOrDefaultAsync(Arg.Is<OpenExceptionOfTypeForShipmentSpec>(s => s.ShipmentId == shipment.Id && s.Type == ExceptionType.Reservations), Arg.Any<CancellationToken>())
+            .Returns(open);
+
+        await _handler.Handle(Command(Report(documentId: "doc-2", condition: DeliveryCondition.Reservations)), CancellationToken.None);
+
+        open.Causes.Select(cause => cause.SourceEventId).Should().Equal("doc-1", "doc-2");
+        open.DomainEvents.Should().BeEmpty();
+        await _exceptions.DidNotReceive().AddAsync(Arg.Any<ExceptionCase>(), Arg.Any<CancellationToken>());
+    }
+
+    private ExceptionCase OpenedException() =>
+        (ExceptionCase)_exceptions.ReceivedCalls().Single(call => call.GetMethodInfo().Name == nameof(IRepository<ExceptionCase>.AddAsync)).GetArguments()[0]!;
 
     [Theory]
     [InlineData(ShipmentStatus.Booked)]

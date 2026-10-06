@@ -32,7 +32,7 @@ public sealed class RecordTrackingHandlerTests
     public RecordTrackingHandlerTests()
     {
         _exceptionNumbers.NextAsync(Arg.Any<CancellationToken>()).Returns(ExceptionNumber.FromSequence(9));
-        _handler = new RecordTrackingHandler(_trackingEvents, _carrierBookings, _shipments, _exceptions, _exceptionNumbers, new TrackingEventRules(TimeSpan.FromMinutes(5)), _time);
+        _handler = new RecordTrackingHandler(_trackingEvents, _carrierBookings, _shipments, new ExceptionCauses(_exceptions, _exceptionNumbers), new TrackingEventRules(TimeSpan.FromMinutes(5)), _time);
     }
 
     [Fact]
@@ -150,9 +150,10 @@ public sealed class RecordTrackingHandlerTests
 
     [Theory]
     [InlineData(TrackingEventType.Collected)]
-    [InlineData(TrackingEventType.CollectionFailed)]
-    [InlineData(TrackingEventType.Damaged)]
-    public async Task Handle_AnEventThatOpensNoException_OpensNone(TrackingEventType type)
+    [InlineData(TrackingEventType.Departed)]
+    [InlineData(TrackingEventType.Arrived)]
+    [InlineData(TrackingEventType.OutForDelivery)]
+    public async Task Handle_AProgressEvent_OpensNoException(TrackingEventType type)
     {
         BookedShipment();
 
@@ -160,6 +161,75 @@ public sealed class RecordTrackingHandlerTests
 
         await _exceptions.DidNotReceive().AddAsync(Arg.Any<ExceptionCase>(), Arg.Any<CancellationToken>());
     }
+
+    [Theory]
+    [InlineData(TrackingEventType.CollectionFailed, ExceptionType.CollectionFailed)]
+    [InlineData(TrackingEventType.Damaged, ExceptionType.Damaged)]
+    public async Task Handle_CollectionFailedOrDamaged_OpensAnExceptionOfThatType_WithOneExceptionOpened_InTheSameSave(TrackingEventType type, ExceptionType expected)
+    {
+        BookedShipment();
+
+        await _handler.Handle(Collected(type: type, correlationId: "corr-x"), CancellationToken.None);
+
+        var opened = OpenedException();
+        opened.Type.Should().Be(expected);
+        opened.CorrelationId.Should().Be(new CorrelationId("corr-x"));
+        opened.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<ExceptionOpenedEvent>();
+        await _exceptions.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+        await _trackingEvents.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_ADifferentTypeWhileAnotherIsOpen_OpensASecondException()
+    {
+        var shipment = BookedShipment();
+        await _handler.Handle(Collected(type: TrackingEventType.DeliveryFailed, sourceEventId: "evt-1"), CancellationToken.None);
+        var failed = OpenedException();
+        _exceptions.ClearReceivedCalls();
+        _exceptions.SingleOrDefaultAsync(Arg.Is<OpenExceptionOfTypeForShipmentSpec>(s => s.ShipmentId == shipment.Id && s.Type == ExceptionType.DeliveryFailed), Arg.Any<CancellationToken>())
+            .Returns(failed);
+
+        await _handler.Handle(Collected(type: TrackingEventType.Damaged, sourceEventId: "evt-2"), CancellationToken.None);
+
+        OpenedException().Type.Should().Be(ExceptionType.Damaged);
+        failed.Causes.Should().ContainSingle("the Damaged event is no cause of the Delivery failed Exception");
+    }
+
+    [Fact]
+    public async Task Handle_ACauseAfterTheOpenExceptionWasResolved_OpensANewException()
+    {
+        var shipment = BookedShipment();
+        await _handler.Handle(Collected(type: TrackingEventType.Damaged, sourceEventId: "evt-1"), CancellationToken.None);
+        var first = OpenedException();
+        first.Resolve(ExceptionOutcome.NoActionNeeded, "Checked", new CorrelationId("corr-resolve"), Samples.Now.AddDays(3));
+        _exceptions.ClearReceivedCalls();
+        _exceptionNumbers.NextAsync(Arg.Any<CancellationToken>()).Returns(ExceptionNumber.FromSequence(10));
+        // The spec finds open Exceptions only, so a resolved one is not found.
+        _exceptions.SingleOrDefaultAsync(Arg.Any<OpenExceptionOfTypeForShipmentSpec>(), Arg.Any<CancellationToken>()).Returns((ExceptionCase?)null);
+
+        await _handler.Handle(Collected(type: TrackingEventType.Damaged, sourceEventId: "evt-2"), CancellationToken.None);
+
+        var second = OpenedException();
+        second.Number.Value.Should().Be("EX-0000010");
+        second.Status.Should().Be(ExceptionStatus.Open);
+        second.ShipmentId.Should().Be(shipment.Id);
+    }
+
+    [Fact]
+    public async Task Handle_AnExceptionEventAfterDelivered_OpensAnExceptionMarkedAfterDelivered_AndTheShipmentStaysDelivered()
+    {
+        var shipment = BookedShipment();
+        await _handler.Handle(Collected(type: TrackingEventType.Delivered, sourceEventId: "evt-del"), CancellationToken.None);
+
+        var result = await _handler.Handle(Collected(type: TrackingEventType.Damaged, sourceEventId: "evt-dmg"), CancellationToken.None);
+
+        OpenedException().AfterDelivered.Should().BeTrue();
+        shipment.Status.Should().Be(ShipmentStatus.Delivered);
+        result.Value.ShipmentStatus.Should().Be(ShipmentStatus.Delivered);
+    }
+
+    private ExceptionCase OpenedException() =>
+        (ExceptionCase)_exceptions.ReceivedCalls().Single(call => call.GetMethodInfo().Name == nameof(IRepository<ExceptionCase>.AddAsync)).GetArguments()[0]!;
 
     [Fact]
     public async Task Handle_TheSameDeliveryFailedRepeated_OpensNothing()

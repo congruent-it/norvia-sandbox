@@ -7,12 +7,12 @@ namespace Norvia.Tms.Application.Exceptions.Open;
 
 /// <summary>
 /// The Canonical Model event <c>ExceptionOpened</c>, version 1 (contracts/canonical-model/exception-opened.v1.schema.json).
-/// The TMS opened an Exception for a Shipment (P7). It carries the correlation ID of the cause that opened it.
+/// The TMS opened an Exception for a Shipment (P7). It carries the correlation ID of the cause that opened it: a Tracking event or a Proof of delivery.
 /// </summary>
 /// <param name="OccurredAt">When the TMS opened the Exception.</param>
 /// <param name="ShipperId">The Shipper of the Transport Order the Shipment carries out.</param>
 /// <param name="CarrierId">The Carrier that carries the Shipment; null for Own fleet.</param>
-/// <param name="ExceptionType">What went wrong: <c>DeliveryFailed</c>.</param>
+/// <param name="ExceptionType">What went wrong: <c>CollectionFailed</c>, <c>DeliveryFailed</c>, <c>Damaged</c> or <c>Reservations</c>.</param>
 /// <param name="Cause">What opened it.</param>
 /// <param name="AfterDelivered">True when the Shipment was Delivered already when the cause arrived.</param>
 public sealed record ExceptionOpenedV1(
@@ -49,16 +49,16 @@ public sealed record ExceptionOpenedV1(
             exception.ShipperId.Value,
             exception.CarrierId?.Value,
             exception.Type.ToString(),
-            new ExceptionCauseV1(ExceptionCauseV1.TrackingEvent, opened.Cause.SourceEventId),
+            new ExceptionCauseV1(opened.Cause.Kind.ToString(), opened.Cause.SourceEventId),
             exception.AfterDelivered);
     }
 
-    // It is traced on the trail of the Tracking event that caused it, which is the carrier-tracking flow's.
+    // It is traced on the trail of the Tracking event or Proof of delivery that caused it, which is that flow's.
     protected override IEnumerable<KeyValuePair<string, object>> TrackingProperties()
     {
         var properties = new List<KeyValuePair<string, object>>
         {
-            new(TrackingKeys.Flow, Flows.CarrierTracking),
+            new(TrackingKeys.Flow, Cause.Kind == nameof(ExceptionCauseKind.ProofOfDelivery) ? Flows.CarrierProofOfDelivery : Flows.CarrierTracking),
             new(TrackingKeys.TransportOrderNumber, TransportOrderNumber),
             new(TrackingKeys.ShipmentNumber, ShipmentNumber),
         };
