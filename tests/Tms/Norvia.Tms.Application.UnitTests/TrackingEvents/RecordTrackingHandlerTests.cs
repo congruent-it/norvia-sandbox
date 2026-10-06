@@ -287,6 +287,21 @@ public sealed class RecordTrackingHandlerTests
     }
 
     [Fact]
+    public async Task Handle_AnEtaInsideTheAgreedDeliveryWindow_ButAfterTheOrdersOne_OpensNoException()
+    {
+        var shipment = BookedShipment();
+        shipment.Record(
+            new TrackingReport(TrackingSource.Carrier(VanDijk), "evt-0", "VDT-1", null, TrackingEventType.Collected, Samples.Now.AddDays(1), new TrackingLocation("Rotterdam", "3011 AA", "NL"), null, null),
+            new CorrelationId("corr-0"),
+            Samples.Now.AddDays(1));
+        shipment.AgreeDeliveryWindow(new TimeWindow(WindowLatest.AddDays(1), WindowLatest.AddDays(2)), ExceptionNumber.FromSequence(5), new CorrelationId("corr-agree"), Samples.Now.AddDays(1));
+
+        await _handler.Handle(Collected(type: TrackingEventType.Departed, eta: WindowLatest.AddDays(1).AddHours(3), sourceEventId: "evt-2"), CancellationToken.None);
+
+        await _exceptions.DidNotReceive().AddAsync(Arg.Any<ExceptionCase>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Handle_AnotherLateEtaWhileLateDeliveryIsOpen_AddsACause_AndPublishesNothing()
     {
         var shipment = BookedShipment();

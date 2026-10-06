@@ -229,6 +229,57 @@ public sealed class ExceptionTracerBulletTests(TmsFixture tms) : IClassFixture<T
     }
 
     [Fact]
+    public async Task AgreeDeliveryWindow_OnACollectedShipment_PublishesShipmentDeliveryWindowAgreed_OnANewCorrelationId_AndKeepsTheExceptionOpen()
+    {
+        var (shipmentNumber, exceptionNumber) = await tms.CollectedWithDeliveryFailedAsync(_cancellationToken);
+        var earliest = DateTimeOffset.UtcNow.AddDays(2);
+
+        using var response = await tms.AgreeDeliveryWindowAsync(exceptionNumber, Window(earliest, earliest.AddHours(4)), _cancellationToken);
+
+        var answer = await response.Content.ReadAsStringAsync(_cancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, answer);
+        var correlationId = JsonNode.Parse(answer)!["correlationId"]!.GetValue<string>();
+        var message = (await tms.PublishedAsync(correlationId, "ShipmentDeliveryWindowAgreed", _cancellationToken)).Should().ContainSingle().Subject;
+        var body = BodyOf(message);
+        var results = CanonicalModelSchemas.ValidateShipmentDeliveryWindowAgreed(body);
+        results.IsValid.Should().BeTrue(CanonicalModelSchemas.Errors(results));
+        body["shipmentNumber"]!.GetValue<string>().Should().Be(shipmentNumber);
+        body["exceptionNumber"]!.GetValue<string>().Should().Be(exceptionNumber);
+        body["earliest"]!.GetValue<DateTimeOffset>().Should().BeCloseTo(earliest, TimeSpan.FromSeconds(1));
+        (await tms.OpenExceptionsOfAsync(shipmentNumber, _cancellationToken)).Should().ContainSingle("agreeing a window doesn't resolve the Exception");
+    }
+
+    [Fact]
+    public async Task AgreeDeliveryWindow_OnABookedShipment_IsRefused_WithShipmentNotInTransport()
+    {
+        var (shipmentNumber, _, _) = await tms.DeliveryFailedShipmentAsync(_cancellationToken);
+        var exceptionNumber = (await tms.OpenExceptionsOfAsync(shipmentNumber, _cancellationToken)).Single()["exceptionNumber"]!.GetValue<string>();
+        var earliest = DateTimeOffset.UtcNow.AddDays(2);
+
+        using var response = await tms.AgreeDeliveryWindowAsync(exceptionNumber, Window(earliest, earliest.AddHours(4)), _cancellationToken);
+
+        var body = await response.Content.ReadAsStringAsync(_cancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict, body);
+        JsonNode.Parse(body)!["code"]!.GetValue<string>().Should().Be("ShipmentNotInTransport");
+    }
+
+    [Fact]
+    public async Task AgreeDeliveryWindow_ThatIsInconsistentOrEndsInThePast_IsRefused_AsAClientError()
+    {
+        var (_, exceptionNumber) = await tms.CollectedWithDeliveryFailedAsync(_cancellationToken);
+        var now = DateTimeOffset.UtcNow;
+
+        using var reversed = await tms.AgreeDeliveryWindowAsync(exceptionNumber, Window(now.AddDays(3), now.AddDays(2)), _cancellationToken);
+        using var incomplete = await tms.AgreeDeliveryWindowAsync(exceptionNumber, new JsonObject { ["latest"] = now.AddDays(2) }, _cancellationToken);
+        using var past = await tms.AgreeDeliveryWindowAsync(exceptionNumber, Window(now.AddDays(-2), now.AddDays(-1)), _cancellationToken);
+
+        reversed.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        incomplete.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        past.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        JsonNode.Parse(await past.Content.ReadAsStringAsync(_cancellationToken))!["code"]!.GetValue<string>().Should().Be("DeliveryWindowInvalid");
+    }
+
+    [Fact]
     public async Task AddNote_ToAnUnknownException_IsRefused_WithExceptionNotFound()
     {
         using var response = await tms.AddNoteAsync("EX-9999999", Note(), _cancellationToken);

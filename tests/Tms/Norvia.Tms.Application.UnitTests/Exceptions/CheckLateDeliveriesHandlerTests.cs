@@ -3,9 +3,11 @@ using Microsoft.Extensions.Time.Testing;
 using Norvia.Tms.Application.Exceptions;
 using Norvia.Tms.Application.Exceptions.CheckLate;
 using Norvia.Tms.Application.UnitTests.TransportOrders;
+using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Carriers;
 using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Domain.Shipments;
+using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.TransportOrders;
 using NSubstitute;
 
@@ -52,6 +54,22 @@ public sealed class CheckLateDeliveriesHandlerTests
         opened.AfterDelivered.Should().BeFalse();
         opened.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<ExceptionOpenedEvent>();
         await _exceptions.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_AfterTheOrdersWindowButBeforeTheAgreedOne_OpensNothing()
+    {
+        var shipment = OnItsWay(booked: true);
+        shipment.Record(
+            new TrackingReport(TrackingSource.Carrier(new CarrierId("CAR-0001")), "evt-1", "VDT-1", null, TrackingEventType.Collected, WindowLatest.AddHours(-5), new TrackingLocation("Rotterdam", "3011 AA", "NL"), null, null),
+            new CorrelationId("corr-tracking"),
+            WindowLatest.AddHours(-5));
+        shipment.AgreeDeliveryWindow(new TimeWindow(WindowLatest, WindowLatest.AddDays(2)), ExceptionNumber.FromSequence(5), new CorrelationId("corr-agree"), WindowLatest.AddHours(-4));
+        _time.Advance(TimeSpan.FromHours(1));
+
+        await Handler(TimeSpan.Zero).Handle(new CheckLateDeliveriesCommand(), CancellationToken.None);
+
+        await _exceptions.DidNotReceive().AddAsync(Arg.Any<ExceptionCase>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -114,10 +132,16 @@ public sealed class CheckLateDeliveriesHandlerTests
     private CheckLateDeliveriesHandler Handler(TimeSpan grace) =>
         new(_shipments, _transportOrders, _exceptions, new ExceptionCauses(_exceptions, _exceptionNumbers), new LateDeliveryRules(grace), _time);
 
-    private Shipment OnItsWay()
+    private Shipment OnItsWay(bool booked = false)
     {
         var order = Samples.AcceptedOrder(sequence: 7);
         var shipment = Samples.Planned(order, CarriedBy.Carrier(new CarrierId("CAR-0001")), sequence: 12);
+        if (booked)
+        {
+            shipment.Release(order, new IdempotencyKey("key-rel1"), new CorrelationId("corr-release"), WindowLatest.AddHours(-8), CarrierBookingNumber.FromSequence(42));
+            shipment.Book();
+        }
+
         _shipments.ListAsync(Arg.Any<ShipmentsInProgressSpec>(), Arg.Any<CancellationToken>()).Returns([shipment]);
         _transportOrders.ListAsync(Arg.Any<TransportOrdersByNumbersSpec>(), Arg.Any<CancellationToken>()).Returns([order]);
         return shipment;

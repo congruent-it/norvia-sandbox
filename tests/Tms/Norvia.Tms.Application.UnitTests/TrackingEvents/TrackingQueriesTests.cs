@@ -11,6 +11,7 @@ using Norvia.Tms.Domain.Carriers;
 using Norvia.Tms.Domain.ProofsOfDelivery;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.Shippers;
+using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.TransportOrders;
 using NSubstitute;
@@ -130,6 +131,27 @@ public sealed class TrackingQueriesTests
 
         _time.SetUtcNow(Latest.AddHours(2));
         (await InProgressHandler().Handle(new ListShipmentsInProgressQuery(), CancellationToken.None)).Single().IsStale.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ListInProgress_UsesTheAgreedDeliveryWindow_ForStaleAndTheFallbackEta()
+    {
+        var shipment = Booked(sequence: 12);
+        shipment.Record(
+            new TrackingReport(TrackingSource.Carrier(VanDijk), "c", "VDT-1", null, TrackingEventType.Collected, Latest.AddHours(-3), new TrackingLocation("Rotterdam", "3011 AA", "NL"), null, null),
+            new CorrelationId("corr-c"),
+            Latest.AddHours(-3));
+        var agreedLatest = Latest.AddDays(2);
+        shipment.AgreeDeliveryWindow(new TimeWindow(agreedLatest.AddHours(-4), agreedLatest), ExceptionNumber.FromSequence(5), new CorrelationId("corr-agree"), Latest.AddHours(-2));
+        _shipments.ListAsync(Arg.Any<ShipmentsInProgressSpec>(), Arg.Any<CancellationToken>()).Returns([shipment]);
+        var departed = Report(shipment, TrackingEventType.Departed, "d", Latest.AddHours(5), Latest.AddHours(5), null);
+        _events.ListAsync(Arg.Any<TrackingEventsForShipmentsSpec>(), Arg.Any<CancellationToken>()).Returns([departed]);
+
+        _time.SetUtcNow(Latest.AddHours(5));
+        var summary = (await InProgressHandler().Handle(new ListShipmentsInProgressQuery(), CancellationToken.None)).Single();
+
+        summary.IsStale.Should().BeFalse("the Transport Order's window and its grace are past, but the agreed one isn't");
+        summary.Eta.Should().Be(agreedLatest);
     }
 
     [Fact]

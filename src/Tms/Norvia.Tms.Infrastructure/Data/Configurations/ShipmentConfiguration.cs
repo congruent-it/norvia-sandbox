@@ -71,6 +71,19 @@ internal sealed class ShipmentConfiguration : IEntityTypeConfiguration<Shipment>
                     assignments => assignments.ToArray()))
             .IsRequired();
 
+        // The delivery windows the Planner agreed are read and written only with their Shipment, like its assignments, so they are
+        // one JSON column too. It is empty until the Planner agrees one.
+        builder.Property(shipment => shipment.AgreedDeliveryWindows)
+            .HasConversion(
+                windows => JsonSerializer.Serialize(windows.Select(StoredAgreedDeliveryWindow.Of), AssignmentsJson),
+                json => JsonSerializer.Deserialize<StoredAgreedDeliveryWindow[]>(json, AssignmentsJson)!.Select(stored => stored.ToWindow()).ToArray(),
+                new ValueComparer<IReadOnlyList<AgreedDeliveryWindow>>(
+                    (left, right) => left!.SequenceEqual(right!),
+                    windows => windows.Count,
+                    windows => windows.ToArray()))
+            .HasDefaultValueSql("N'[]'")
+            .IsRequired();
+
         builder.Property(shipment => shipment.CorrelationId)
             .HasConversion(id => id.Value, value => new CorrelationId(value))
             .HasMaxLength(128)
@@ -110,4 +123,13 @@ internal sealed record StoredAssignment(string? CarrierId, string CorrelationId,
         new CorrelationId(CorrelationId),
         AssignedAt,
         Key is null ? null : new IdempotencyKey(Key));
+}
+
+/// <summary>An <see cref="AgreedDeliveryWindow"/> as the JSON column stores it, in plain values.</summary>
+internal sealed record StoredAgreedDeliveryWindow(DateTimeOffset? Earliest, DateTimeOffset? Latest, string ExceptionNumber, string CorrelationId, DateTimeOffset AgreedAt)
+{
+    public static StoredAgreedDeliveryWindow Of(AgreedDeliveryWindow agreed) =>
+        new(agreed.Window.Earliest, agreed.Window.Latest, agreed.ExceptionNumber, agreed.CorrelationId.Value, agreed.AgreedAt);
+
+    public AgreedDeliveryWindow ToWindow() => new(new TimeWindow(Earliest, Latest), ExceptionNumber, new CorrelationId(CorrelationId), AgreedAt);
 }
