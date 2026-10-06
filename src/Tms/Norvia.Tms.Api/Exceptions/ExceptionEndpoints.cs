@@ -72,9 +72,10 @@ public static class ExceptionEndpoints
     {
         var errors = new Dictionary<string, string[]>();
         outcome = default;
+        // Matched against the names, as Enum.TryParse would also take a number such as "1".
         if (string.IsNullOrWhiteSpace(request.Outcome)
-            || !Enum.TryParse(request.Outcome, ignoreCase: false, out outcome)
-            || !Enum.IsDefined(outcome))
+            || !Enum.GetNames<ExceptionOutcome>().Contains(request.Outcome, StringComparer.Ordinal)
+            || !Enum.TryParse(request.Outcome, out outcome))
         {
             errors[nameof(ResolveExceptionRequest.Outcome)] =
                 [$"Resolving an Exception needs an outcome: one of {string.Join(", ", Enum.GetNames<ExceptionOutcome>())}."];

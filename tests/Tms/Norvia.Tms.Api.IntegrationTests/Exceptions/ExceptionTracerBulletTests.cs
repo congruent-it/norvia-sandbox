@@ -139,6 +139,7 @@ public sealed class ExceptionTracerBulletTests(TmsFixture tms) : IClassFixture<T
     [Theory]
     [InlineData("Escalated")]
     [InlineData("redelivered")]
+    [InlineData("1")]
     [InlineData(null)]
     public async Task Resolve_WithAnOutcomeOutsideTheList_IsRefused_AndLeavesTheExceptionOpen(string? outcome)
     {
