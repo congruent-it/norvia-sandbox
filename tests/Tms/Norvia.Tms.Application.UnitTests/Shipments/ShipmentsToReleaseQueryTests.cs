@@ -85,6 +85,44 @@ public sealed class ShipmentsToReleaseQueryTests
     }
 
     [Fact]
+    public async Task Handle_AShipmentWhoseWithdrawnBookingTheCarrierWasNotToldOf_FlagsCarrierNotToldWithTheCause()
+    {
+        var order = Samples.AcceptedOrder(sequence: 7);
+        var shipment = Samples.Planned(order, CarriedBy.Carrier(VanDijk), sequence: 12);
+        _repository.ListAsync(Arg.Any<ShipmentsToReleaseSpec>(), Arg.Any<CancellationToken>()).Returns([shipment]);
+        var withdrawn = CarrierBooking.Request(
+            CarrierBookingNumber.FromSequence(1), shipment.Id, shipment.Number, VanDijk, new CorrelationId("corr-release"), Samples.Now.AddHours(1));
+        withdrawn.Withdraw(new IdempotencyKey("key-withdraw"), new CorrelationId("corr-withdraw"), Samples.Now.AddHours(2));
+        withdrawn.ReportCarrierNotTold(503, "Service unavailable.", new CorrelationId("corr-withdraw"), Samples.Now.AddHours(3));
+        _carrierBookings.ListAsync(Arg.Any<CarrierBookingsForShipmentsSpec>(), Arg.Any<CancellationToken>()).Returns([withdrawn]);
+
+        var shipments = await _handler.Handle(new ListShipmentsToReleaseQuery(), CancellationToken.None);
+
+        var outcome = shipments.Should().ContainSingle().Which.LastCarrierBookingOutcome!;
+        outcome.Status.Should().Be(CarrierBookingStatus.Withdrawn);
+        outcome.CarrierNotTold.Should().BeTrue();
+        outcome.CarrierNotToldMessage.Should().Be("Service unavailable.");
+    }
+
+    [Fact]
+    public async Task Handle_AShipmentWhoseCancelledBookingTheCarrierWasToldOf_DoesNotFlagCarrierNotTold()
+    {
+        var order = Samples.AcceptedOrder(sequence: 7);
+        var shipment = Samples.Planned(order, CarriedBy.Carrier(VanDijk), sequence: 12);
+        _repository.ListAsync(Arg.Any<ShipmentsToReleaseSpec>(), Arg.Any<CancellationToken>()).Returns([shipment]);
+        var cancelled = CarrierBooking.Request(
+            CarrierBookingNumber.FromSequence(1), shipment.Id, shipment.Number, VanDijk, new CorrelationId("corr-release"), Samples.Now.AddHours(1));
+        cancelled.Confirm("VDT-1", null, order.Number!, new CorrelationId("corr-answer"), Samples.Now.AddHours(2));
+        cancelled.Cancel("No show", ExceptionNumber.FromSequence(5), new IdempotencyKey("key-cancel"), new CorrelationId("corr-cancel"), Samples.Now.AddHours(3));
+        cancelled.MarkCarrierTold(Samples.Now.AddHours(4));
+        _carrierBookings.ListAsync(Arg.Any<CarrierBookingsForShipmentsSpec>(), Arg.Any<CancellationToken>()).Returns([cancelled]);
+
+        var shipments = await _handler.Handle(new ListShipmentsToReleaseQuery(), CancellationToken.None);
+
+        shipments.Should().ContainSingle().Which.LastCarrierBookingOutcome!.CarrierNotTold.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Handle_AShipmentWhoseConfirmedBookingNorviaCancelled_ShowsItCancelledWithTheReason()
     {
         var order = Samples.AcceptedOrder(sequence: 7);

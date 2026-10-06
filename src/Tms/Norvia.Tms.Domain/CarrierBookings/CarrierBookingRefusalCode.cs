@@ -12,4 +12,7 @@ public enum CarrierBookingRefusalCode
 
     /// <summary>The Carrier booking isn't Requested, and the answer isn't a repeat of what's already recorded.</summary>
     BookingNotOpen,
+
+    /// <summary>The Carrier booking isn't Withdrawn or Cancelled, so there is no cancellation or withdrawal to report on (P7).</summary>
+    BookingNotCancelled,
 }

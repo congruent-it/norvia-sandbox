@@ -27,6 +27,7 @@ Norvia's own message format ([CONTEXT.md](../../CONTEXT.md#integration)): one JS
 | [exception-opened.v1](exception-opened.v1.schema.json) | Event: the TMS opened an Exception for a Shipment, with its Exception number, type, cause and who carries the Shipment |
 | [exception-resolved.v1](exception-resolved.v1.schema.json) | Event: the Planner resolved an Exception, with its outcome and remark |
 | [carrier-booking-cancelled.v1](carrier-booking-cancelled.v1.schema.json) | Event: the Planner cancelled a Confirmed Carrier booking before collection, with a reason, sending the Shipment back to Planned |
+| [carrier-cancellation-not-delivered.v1](carrier-cancellation-not-delivered.v1.schema.json) | Event: the Carrier cancellation Logic App's message for a Cancelled or Withdrawn Carrier booking never reached the Carrier, with the technical cause; the booking is flagged Carrier not told |
 | [shipment-delivery-window-agreed.v1](shipment-delivery-window-agreed.v1.schema.json) | Event: the Planner agreed a delivery window with the Carrier for a Collected or In transit Shipment |
 
 Conventions: property names in camelCase, timestamps as UTC with an offset, weights in kilograms as numbers, money in EUR without VAT as numbers rounded to cents, countries as ISO 3166-1 alpha-2 codes.

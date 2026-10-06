@@ -20,4 +20,14 @@ internal static class CarrierBookingLookup
 
         return (booking, null);
     }
+
+    /// <summary>As <see cref="ToBookingAsync"/>, and refuses a booking that isn't Withdrawn or Cancelled, the only ones the Carrier is told about (P7).</summary>
+    public static async Task<(CarrierBooking? Booking, CarrierBookingRefusal? Refusal)> ToCancelledBookingAsync(
+        IRepository<CarrierBooking> carrierBookings, string carrierBookingNumber, CancellationToken cancellationToken)
+    {
+        var (booking, refusal) = await ToBookingAsync(carrierBookings, carrierBookingNumber, cancellationToken);
+        return booking is { Status: not (CarrierBookingStatus.Withdrawn or CarrierBookingStatus.Cancelled) }
+            ? (null, CarrierBookingRules.NotCancelled(booking))
+            : (booking, refusal);
+    }
 }

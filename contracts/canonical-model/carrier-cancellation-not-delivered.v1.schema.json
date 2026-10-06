@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/carrier-cancellation-not-delivered.v1.schema.json",
+  "title": "CarrierCancellationNotDelivered",
+  "description": "The Carrier cancellation Logic App's message for a Cancelled or Withdrawn Carrier booking never reached the Carrier (Canonical Model event, version 1). The TMS flagged the Carrier booking Carrier not told; the Planner phones the Carrier and nothing is retried. Published on the Shipment events topic, under the correlation ID of the cancellation or withdrawal the report continues.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "carrierBookingNumber", "shipmentNumber", "carrierId", "kind", "statusCode", "message"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "const": "CarrierCancellationNotDelivered" },
+    "eventVersion": { "const": 1 },
+    "occurredAt": { "description": "When the report was recorded.", "type": "string", "format": "date-time" },
+    "correlationId": { "description": "The cancellation's or withdrawal's own correlation ID, which the report continues.", "type": "string", "minLength": 1 },
+    "carrierBookingNumber": { "description": "The Carrier booking whose cancellation or withdrawal the Carrier wasn't told of.", "type": "string", "pattern": "^CB-[0-9]{7}$" },
+    "shipmentNumber": { "description": "The Shipment the Carrier booking covers.", "type": "string", "pattern": "^SH-[0-9]{7}$" },
+    "carrierId": { "description": "The Carrier the message was addressed to.", "type": "string", "minLength": 1 },
+    "kind": { "description": "How Norvia ended the Carrier booking: withdrawn by the Planner before the Carrier answered (P4), or cancelled after it confirmed (P7).", "enum": ["Withdrawn", "Cancelled"] },
+    "statusCode": { "description": "The Carrier endpoint's HTTP status code, or the technical failure's own code.", "type": "integer" },
+    "message": { "description": "The technical cause in plain language.", "type": "string", "minLength": 1 }
+  }
+}

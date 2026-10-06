@@ -7,9 +7,9 @@ using Norvia.Tms.Domain.CarrierBookings;
 namespace Norvia.Tms.Application.CarrierBookings.Report;
 
 /// <summary>
-/// Traces a sent or not-delivered report on the trail it continues, the release's (coding guidelines §7): its
+/// Traces a sent or not-delivered report (P4), or a Carrier told or not-told report (P7), on the trail it continues, the release's (coding guidelines §7): its
 /// <c>correlationId</c> and <c>carrierBookingNumber</c> for the whole call, and <c>outcome</c> for its outcome, in the
-/// logging scope and on the request's trace. A report the TMS ignores, because the booking is no longer Requested, still
+/// logging scope and on the request's trace. A report the TMS ignores, because the booking is no longer in the state it reports on, still
 /// records Succeeded: it isn't a refusal, only a no-op. One the TMS refuses (an unknown booking number) records Refused,
 /// with its <c>failureCode</c>. The API's request scope carries <c>flow</c>.
 /// </summary>
@@ -66,7 +66,7 @@ public sealed partial class TrackCarrierBookingReportInLoggingScope<TCommand>(IL
     [LoggerMessage(Level = LogLevel.Information, Message = "Carrier booking {CarrierBookingNumber} report recorded: {Status}")]
     private static partial void LogRecorded(ILogger logger, string carrierBookingNumber, CarrierBookingStatus status);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Carrier booking {CarrierBookingNumber} report ignored, as it is {Status}, not Requested")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "Carrier booking {CarrierBookingNumber} report ignored, as it is {Status} and the report no longer applies")]
     private static partial void LogIgnored(ILogger logger, string carrierBookingNumber, CarrierBookingStatus status);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "The Carrier booking report refused: {Reason}")]

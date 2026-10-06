@@ -8,12 +8,15 @@ namespace Norvia.Tms.Application.Shipments.ListToRelease;
 /// (P4), or cancelled by Norvia after the Carrier confirmed it (P7).
 /// </summary>
 /// <param name="ReasonCode">The Carrier's reason for rejecting; null unless it rejected.</param>
+/// <param name="CarrierNotTold">Whether the Carrier cancellation Logic App couldn't tell the Carrier about a Withdrawn or Cancelled booking (P7); the Planner phones the Carrier.</param>
+/// <param name="CarrierNotToldMessage">The technical cause when <paramref name="CarrierNotTold"/>; null otherwise.</param>
 /// <param name="ReasonText">The Carrier's reason text for rejecting, or Norvia's reason for cancelling; null when none was given.</param>
-public sealed record LastCarrierBookingOutcome(CarrierBookingStatus Status, CarrierView Carrier, CarrierBookingRejectionReason? ReasonCode, string? ReasonText)
+public sealed record LastCarrierBookingOutcome(CarrierBookingStatus Status, CarrierView Carrier, CarrierBookingRejectionReason? ReasonCode, string? ReasonText, bool CarrierNotTold = false, string? CarrierNotToldMessage = null)
 {
     public static LastCarrierBookingOutcome Of(CarrierBooking booking, ICarrierDirectory carriers)
     {
         ArgumentNullException.ThrowIfNull(booking);
-        return new(booking.Status, CarrierView.Of(booking.CarrierId, carriers), booking.RejectionReason, booking.CancellationReasonText ?? booking.RejectionReasonText);
+        return new(booking.Status, CarrierView.Of(booking.CarrierId, carriers), booking.RejectionReason, booking.CancellationReasonText ?? booking.RejectionReasonText,
+            booking.IsCarrierNotTold, booking.CarrierNotToldMessage);
     }
 }
