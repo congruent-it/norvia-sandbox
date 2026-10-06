@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Ardalis.Result;
 using Mediator;
 using Microsoft.Extensions.Logging;
@@ -34,7 +33,7 @@ public sealed partial class TrackProofOfDeliveryInLoggingScope(ILogger<TrackProo
             call[TrackingKeys.PartyId] = carrierId.Value;
         }
 
-        using var trail = Track(call);
+        using var trail = logger.Track(call);
         var result = await next(message, cancellationToken);
         if (result.IsSuccess)
         {
@@ -50,7 +49,7 @@ public sealed partial class TrackProofOfDeliveryInLoggingScope(ILogger<TrackProo
 
     private void LogOutcome(RecordProofOfDeliveryResult outcome)
     {
-        using var scope = Track(new()
+        using var scope = logger.Track(new()
         {
             [TrackingKeys.ShipmentNumber] = outcome.ShipmentNumber,
             [TrackingKeys.Outcome] = TrackingKeys.Succeeded,
@@ -67,22 +66,12 @@ public sealed partial class TrackProofOfDeliveryInLoggingScope(ILogger<TrackProo
     private void LogRefusal(string documentId, Result<RecordProofOfDeliveryResult> result)
     {
         var refusal = result.ValidationErrors.First();
-        using var refused = Track(new()
+        using var refused = logger.Track(new()
         {
             [TrackingKeys.Outcome] = TrackingKeys.Refused,
             [TrackingKeys.FailureCode] = refusal.ErrorCode,
         });
         LogRefused(logger, documentId, refusal.ErrorMessage);
-    }
-
-    private IDisposable? Track(Dictionary<string, object?> keys)
-    {
-        foreach (var (key, value) in keys)
-        {
-            Activity.Current?.SetTag(key, value);
-        }
-
-        return logger.BeginScope(keys);
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Proof of delivery {DocumentId} recorded for Shipment {ShipmentNumber}, which stays {ShipmentStatus} ({NumberOfFiles} files)")]

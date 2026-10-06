@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Ardalis.Result;
 using Mediator;
 using Microsoft.Extensions.Logging;
@@ -32,7 +31,7 @@ public abstract partial class TrackPlanningInLoggingScope<TCommand, TOutcome>(IL
         ArgumentNullException.ThrowIfNull(next);
 
         var (correlationId, numberKey, number) = TrailOf(message);
-        using var trail = Track(new()
+        using var trail = Logger.Track(new()
         {
             [TrackingKeys.CorrelationId] = correlationId,
             [numberKey] = number,
@@ -82,7 +81,7 @@ public abstract partial class TrackPlanningInLoggingScope<TCommand, TOutcome>(IL
             keys[TrackingKeys.CorrelationId] = outcome.CorrelationId;
         }
 
-        using var scope = Track(keys);
+        using var scope = Logger.Track(keys);
         if (outcome.Repeat)
         {
             LogRepeat(Logger, action, outcome.TransportOrderNumber, outcome.ShipmentNumber);
@@ -96,22 +95,12 @@ public abstract partial class TrackPlanningInLoggingScope<TCommand, TOutcome>(IL
     private void LogRefusal(Result<TOutcome> result)
     {
         var refusal = result.ValidationErrors.First();
-        using var refused = Track(new()
+        using var refused = Logger.Track(new()
         {
             [TrackingKeys.Outcome] = TrackingKeys.Refused,
             [TrackingKeys.FailureCode] = refusal.ErrorCode,
         });
         LogRefused(Logger, action, refusal.ErrorCode, refusal.ErrorMessage);
-    }
-
-    private IDisposable? Track(Dictionary<string, object?> keys)
-    {
-        foreach (var (key, value) in keys)
-        {
-            Activity.Current?.SetTag(key, value);
-        }
-
-        return Logger.BeginScope(keys);
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "{Action} of Transport Order {TransportOrderNumber}, Shipment {ShipmentNumber}, answered as a repeat")]

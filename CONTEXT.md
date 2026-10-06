@@ -164,6 +164,10 @@ _Avoid_: POD (the Carrier status code for Delivered), delivery receipt, signed P
 Something that went wrong with a Shipment on its way and needs a decision: a failed collection, a failed delivery, damage, a Proof of delivery with reservations, or a Late delivery. The TMS opens it for one Shipment, and the Planner resolves it, re-planning the Shipment or notifying the Shipper as needed. A Shipment can have several Exceptions over its life. The TMS owns it.
 _Avoid_: incident, issue, problem, alert
 
+**Exception number**:
+The number the TMS gives an Exception when it opens it, such as `EX-0000042`. It stays the Exception's for life and is how the Planner, the Message trail and monitoring refer to it.
+_Avoid_: incident number, ticket number
+
 **Late delivery**:
 An Exception for a Shipment that won't be, or wasn't, delivered within its delivery window: a Tracking event's ETA falls after the window, or the window passes without Delivered. Unlike Stale, it means Norvia knows the Shipment is late, not that it has gone quiet.
 _Avoid_: delay, overdue, Stale

@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/exception-opened.v1.schema.json",
+  "title": "ExceptionOpened",
+  "description": "The TMS opened an Exception for a Shipment, because something went wrong with it on its way and the Planner has to decide what to do (Canonical Model event, version 1). A Delivery failed Tracking event opens one in the same transaction as the event. A Shipment has at most one open Exception of each type: a later cause of that type joins it and publishes nothing. Published on the Shipment events topic, under the correlation ID of the cause, which API Management creates, through the TMS's transactional outbox. The message's assignedTo property repeats who carries the Shipment, for subscriptions to filter on.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "exceptionNumber", "shipmentNumber", "transportOrderNumber", "shipperId", "carrierId", "exceptionType", "cause", "afterDelivered"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "const": "ExceptionOpened" },
+    "eventVersion": { "const": 1 },
+    "occurredAt": { "description": "When the TMS opened the Exception.", "type": "string", "format": "date-time" },
+    "correlationId": { "description": "The correlation ID of the cause that opened the Exception: for a Tracking event, its own, which API Management creates.", "type": "string", "minLength": 1 },
+    "exceptionNumber": { "description": "The Exception's number, which the TMS gives it and which stays its own for life.", "type": "string", "pattern": "^EX-[0-9]{7}$" },
+    "shipmentNumber": { "type": "string", "pattern": "^SH-[0-9]{7}$" },
+    "transportOrderNumber": { "description": "The Transport Order the Shipment carries out.", "type": "string", "pattern": "^TO-[0-9]{7}$" },
+    "shipperId": { "description": "The Shipper of the Transport Order.", "type": "string", "minLength": 1 },
+    "carrierId": { "description": "The Carrier that carries the Shipment; null for Own fleet.", "type": ["string", "null"], "minLength": 1 },
+    "exceptionType": { "enum": ["DeliveryFailed"] },
+    "cause": {
+      "description": "What opened the Exception.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "sourceEventId"],
+      "properties": {
+        "kind": { "enum": ["TrackingEvent"] },
+        "sourceEventId": { "description": "The Carrier's own ID for the Tracking event.", "type": ["string", "null"], "minLength": 1 }
+      }
+    },
+    "afterDelivered": { "description": "True when the Shipment was Delivered already when the cause arrived. The Shipment stays Delivered.", "type": "boolean" }
+  }
+}

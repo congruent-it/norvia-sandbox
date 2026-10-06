@@ -1,10 +1,12 @@
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Microsoft.Extensions.Time.Testing;
+using Norvia.Tms.Application.Exceptions;
 using Norvia.Tms.Application.TrackingEvents.Record;
 using Norvia.Tms.Application.UnitTests.TransportOrders;
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Carriers;
+using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.TransportOrders;
@@ -22,12 +24,15 @@ public sealed class RecordTrackingHandlerTests
     private readonly IRepository<TrackingEvent> _trackingEvents = Substitute.For<IRepository<TrackingEvent>>();
     private readonly IRepository<CarrierBooking> _carrierBookings = Substitute.For<IRepository<CarrierBooking>>();
     private readonly IRepository<Shipment> _shipments = Substitute.For<IRepository<Shipment>>();
+    private readonly IRepository<ExceptionCase> _exceptions = Substitute.For<IRepository<ExceptionCase>>();
+    private readonly IExceptionNumbers _exceptionNumbers = Substitute.For<IExceptionNumbers>();
     private readonly FakeTimeProvider _time = new(Samples.Now.AddDays(2));
     private readonly RecordTrackingHandler _handler;
 
     public RecordTrackingHandlerTests()
     {
-        _handler = new RecordTrackingHandler(_trackingEvents, _carrierBookings, _shipments, new TrackingEventRules(TimeSpan.FromMinutes(5)), _time);
+        _exceptionNumbers.NextAsync(Arg.Any<CancellationToken>()).Returns(ExceptionNumber.FromSequence(9));
+        _handler = new RecordTrackingHandler(_trackingEvents, _carrierBookings, _shipments, _exceptions, _exceptionNumbers, new TrackingEventRules(TimeSpan.FromMinutes(5)), _time);
     }
 
     [Fact]
@@ -103,6 +108,71 @@ public sealed class RecordTrackingHandlerTests
         result.Value.Should().Be(new RecordTrackingResult("SH-0000012", ShipmentStatus.Booked, "evt-1", MovedShipment: false, "corr-tracking"));
         shipment.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<ShipmentExceptionReportedEvent>();
         await _trackingEvents.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_DeliveryFailed_OpensADeliveryFailedException_WithTheEventsCorrelationId_InTheSameSave()
+    {
+        var shipment = BookedShipment();
+
+        await _handler.Handle(Collected(type: TrackingEventType.DeliveryFailed, correlationId: "corr-ndl"), CancellationToken.None);
+
+        var opened = (ExceptionCase)_exceptions.ReceivedCalls().Single(call => call.GetMethodInfo().Name == nameof(IRepository<ExceptionCase>.AddAsync)).GetArguments()[0]!;
+        opened.Number.Value.Should().Be("EX-0000009");
+        opened.Type.Should().Be(ExceptionType.DeliveryFailed);
+        opened.ShipmentNumber.Should().Be(shipment.Number);
+        opened.CorrelationId.Should().Be(new CorrelationId("corr-ndl"));
+        opened.OpenedAt.Should().Be(Samples.Now.AddDays(2));
+        opened.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<ExceptionOpenedEvent>();
+        await _exceptions.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+        await _trackingEvents.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_DeliveryFailedWhileADeliveryFailedExceptionIsOpen_AddsACause_AndOpensNothingNew()
+    {
+        var shipment = BookedShipment();
+        await _handler.Handle(Collected(type: TrackingEventType.DeliveryFailed, sourceEventId: "evt-1"), CancellationToken.None);
+        var open = (ExceptionCase)_exceptions.ReceivedCalls().Single(call => call.GetMethodInfo().Name == nameof(IRepository<ExceptionCase>.AddAsync)).GetArguments()[0]!;
+        open.ClearDomainEvents();
+        _exceptions.ClearReceivedCalls();
+        _exceptionNumbers.ClearReceivedCalls();
+        _exceptions.SingleOrDefaultAsync(Arg.Is<OpenExceptionOfTypeForShipmentSpec>(s => s.ShipmentId == shipment.Id && s.Type == ExceptionType.DeliveryFailed), Arg.Any<CancellationToken>())
+            .Returns(open);
+
+        await _handler.Handle(Collected(type: TrackingEventType.DeliveryFailed, sourceEventId: "evt-2", correlationId: "corr-2"), CancellationToken.None);
+
+        open.Causes.Select(cause => cause.SourceEventId).Should().Equal("evt-1", "evt-2");
+        open.DomainEvents.Should().BeEmpty();
+        await _exceptions.DidNotReceive().AddAsync(Arg.Any<ExceptionCase>(), Arg.Any<CancellationToken>());
+        await _exceptionNumbers.DidNotReceive().NextAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(TrackingEventType.Collected)]
+    [InlineData(TrackingEventType.CollectionFailed)]
+    [InlineData(TrackingEventType.Damaged)]
+    public async Task Handle_AnEventThatOpensNoException_OpensNone(TrackingEventType type)
+    {
+        BookedShipment();
+
+        await _handler.Handle(Collected(type: type), CancellationToken.None);
+
+        await _exceptions.DidNotReceive().AddAsync(Arg.Any<ExceptionCase>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_TheSameDeliveryFailedRepeated_OpensNothing()
+    {
+        BookedShipment();
+        await _handler.Handle(Collected(type: TrackingEventType.DeliveryFailed), CancellationToken.None);
+        var recorded = (TrackingEvent)_trackingEvents.ReceivedCalls().Single(call => call.GetMethodInfo().Name == nameof(IRepository<TrackingEvent>.AddAsync)).GetArguments()[0]!;
+        _trackingEvents.SingleOrDefaultAsync(Arg.Is<TrackingEventBySourceEventIdSpec>(s => s.SourceEventId == "evt-1"), Arg.Any<CancellationToken>()).Returns(recorded);
+        _exceptions.ClearReceivedCalls();
+
+        await _handler.Handle(Collected(type: TrackingEventType.DeliveryFailed), CancellationToken.None);
+
+        await _exceptions.DidNotReceive().AddAsync(Arg.Any<ExceptionCase>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

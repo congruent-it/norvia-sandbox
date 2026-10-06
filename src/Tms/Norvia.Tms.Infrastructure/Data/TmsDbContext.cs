@@ -10,6 +10,7 @@ internal sealed class TmsDbContext(DbContextOptions<TmsDbContext> options, IDoma
     public const string TransportOrderNumberSequence = "TransportOrderNumbers";
     public const string ShipmentNumberSequence = "ShipmentNumbers";
     public const string CarrierBookingNumberSequence = "CarrierBookingNumbers";
+    public const string ExceptionNumberSequence = "ExceptionNumbers";
 
     // Domain events are handled before the commit, and the integration events their handlers raise are saved as
     // outbox messages in the same transaction as the change that raised them. Everything else works with data
@@ -31,6 +32,7 @@ internal sealed class TmsDbContext(DbContextOptions<TmsDbContext> options, IDoma
         modelBuilder.HasSequence<long>(TransportOrderNumberSequence).StartsAt(1).IncrementsBy(1);
         modelBuilder.HasSequence<long>(ShipmentNumberSequence).StartsAt(1).IncrementsBy(1);
         modelBuilder.HasSequence<long>(CarrierBookingNumberSequence).StartsAt(1).IncrementsBy(1);
+        modelBuilder.HasSequence<long>(ExceptionNumberSequence).StartsAt(1).IncrementsBy(1);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(TmsDbContext).Assembly);
     }
 }

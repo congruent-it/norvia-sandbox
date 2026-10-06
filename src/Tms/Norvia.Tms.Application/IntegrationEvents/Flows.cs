@@ -34,4 +34,10 @@ public static class Flows
     /// on the Proof of delivery, and the event it publishes carries it.
     /// </summary>
     public const string CarrierProofOfDelivery = "carrier-proof-of-delivery";
+
+    /// <summary>
+    /// The Planner's resolution of an Exception (P7), which starts in the TMS UI and so gets a Message trail of its own. An
+    /// Exception a Tracking event opens is traced on that event's trail, in <see cref="CarrierTracking"/>.
+    /// </summary>
+    public const string ExceptionHandling = "exception-handling";
 }
