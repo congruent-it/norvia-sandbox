@@ -257,6 +257,18 @@ public sealed class ExceptionCaseTests
         exception.Notes.Should().BeEmpty();
     }
 
+    [Fact]
+    public void AddNote_WithATextOrPlannerOverTheLimit_Throws()
+    {
+        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), Booked(), Cause(DeliveryFailed(Booked())));
+
+        var tooLongText = () => exception.AddNote(new string('x', ExceptionNote.MaxTextLength + 1), "Anna", new CorrelationId("c"), ReceivedAt);
+        var tooLongPlanner = () => exception.AddNote("Text", new string('x', ExceptionNote.MaxPlannerLength + 1), new CorrelationId("c"), ReceivedAt);
+
+        tooLongText.Should().Throw<ArgumentOutOfRangeException>();
+        tooLongPlanner.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]

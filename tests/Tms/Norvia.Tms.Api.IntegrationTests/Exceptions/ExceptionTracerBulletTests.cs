@@ -209,6 +209,8 @@ public sealed class ExceptionTracerBulletTests(TmsFixture tms) : IClassFixture<T
 
         withoutText.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         withoutPlanner.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        using var tooLong = await tms.AddNoteAsync(exceptionNumber, Note(text: new string('x', 2001)), _cancellationToken);
+        tooLong.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await tms.OpenExceptionsOfAsync(shipmentNumber, _cancellationToken)).Single()["notes"]!.AsArray().Should().BeEmpty();
     }
 

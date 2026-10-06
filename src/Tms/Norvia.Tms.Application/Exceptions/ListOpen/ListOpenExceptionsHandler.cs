@@ -26,6 +26,6 @@ public sealed class ListOpenExceptionsHandler(IReadRepository<ExceptionCase> exc
             exception.Causes.Count,
             exception.AfterDelivered,
             exception.CauseCleared,
-            exception.Notes))];
+            [.. exception.Notes.Select(note => new ExceptionNoteSummary(note.Text, note.Planner, note.AddedAt, note.CorrelationId.Value))]))];
     }
 }

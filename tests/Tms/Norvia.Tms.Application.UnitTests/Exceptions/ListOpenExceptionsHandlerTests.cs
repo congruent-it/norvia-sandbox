@@ -42,7 +42,8 @@ public sealed class ListOpenExceptionsHandlerTests
 
         var open = await _handler.Handle(new ListOpenExceptionsQuery(), CancellationToken.None);
 
-        open.Should().Equal(
+        open.Should().BeEquivalentTo(
+            [
             new OpenExceptionSummary(
                 "EX-0000005",
                 "SH-0000012",
@@ -64,7 +65,8 @@ public sealed class ListOpenExceptionsHandlerTests
                 NumberOfCauses: 1,
                 AfterDelivered: false,
                 CauseCleared: false,
-                Notes: []));
+                Notes: [])],
+            options => options.WithStrictOrdering());
     }
 
     [Fact]
@@ -77,7 +79,7 @@ public sealed class ListOpenExceptionsHandlerTests
 
         var open = await _handler.Handle(new ListOpenExceptionsQuery(), CancellationToken.None);
 
-        open.Single().Notes.Select(note => (note.Text, note.Planner)).Should().Equal(("First", "Anna"), ("Second", "Bram"));
+        open.Single().Notes.Select(note => (note.Text, note.Planner, note.CorrelationId)).Should().Equal(("First", "Anna", "c1"), ("Second", "Bram", "c2"));
     }
 
     [Fact]

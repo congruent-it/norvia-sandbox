@@ -7,4 +7,9 @@ namespace Norvia.Tms.Domain.Exceptions;
 /// record. It starts in the TMS UI and so has a correlation ID of its own.
 /// </summary>
 /// <param name="Planner">Who wrote it, as the TMS UI names them.</param>
-public sealed record ExceptionNote(string Text, string Planner, CorrelationId CorrelationId, DateTimeOffset AddedAt);
+public sealed record ExceptionNote(string Text, string Planner, CorrelationId CorrelationId, DateTimeOffset AddedAt)
+{
+    public const int MaxTextLength = 2000;
+
+    public const int MaxPlannerLength = 200;
+}

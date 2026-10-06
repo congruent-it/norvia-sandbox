@@ -20,4 +20,4 @@ public sealed record OpenExceptionSummary(
     int NumberOfCauses,
     bool AfterDelivered,
     bool CauseCleared,
-    IReadOnlyList<ExceptionNote> Notes);
+    IReadOnlyList<ExceptionNoteSummary> Notes);

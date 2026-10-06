@@ -48,7 +48,7 @@ public static class ExceptionEndpoints
             .WithMetadata(new TrackedFlow(Flows.ExceptionHandling))
             .WithSummary("Add a note to an Open Exception.")
             .WithDescription(
-                "The note is free text, so a phone call or an agreement made outside the TMS is on record, and both it and the Planner's name are required; "
+                "The note is free text, so a phone call or an agreement made outside the TMS is on record, and both it and the Planner's name are required, and at most 2000 and 200 characters; "
                 + "otherwise the call is a 400. The TMS records the note with the Planner and the time, under a new correlation ID which the answer carries, "
                 + "and publishes nothing. The Exception stays Open, and the list of Open Exceptions returns its notes. A note that breaks a rule is refused, "
                 + "changing nothing, with a problem whose code says which, and whose correlationId names the Message trail the refusal is traced on: "
@@ -93,10 +93,18 @@ public static class ExceptionEndpoints
         {
             errors[nameof(AddExceptionNoteRequest.Text)] = ["A note needs its text."];
         }
+        else if (request.Text.Length > ExceptionNote.MaxTextLength)
+        {
+            errors[nameof(AddExceptionNoteRequest.Text)] = [$"A note is at most {ExceptionNote.MaxTextLength} characters."];
+        }
 
         if (string.IsNullOrWhiteSpace(request.Planner))
         {
             errors[nameof(AddExceptionNoteRequest.Planner)] = ["A note needs the Planner who wrote it."];
+        }
+        else if (request.Planner.Length > ExceptionNote.MaxPlannerLength)
+        {
+            errors[nameof(AddExceptionNoteRequest.Planner)] = [$"A Planner's name is at most {ExceptionNote.MaxPlannerLength} characters."];
         }
 
         if (errors.Count > 0)

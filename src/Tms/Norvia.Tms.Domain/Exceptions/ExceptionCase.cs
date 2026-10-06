@@ -156,6 +156,8 @@ public sealed class ExceptionCase : EntityBase<ExceptionId>, IAggregateRoot
         ArgumentException.ThrowIfNullOrWhiteSpace(text);
         ArgumentException.ThrowIfNullOrWhiteSpace(planner);
         ArgumentNullException.ThrowIfNull(correlationId);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(text.Length, ExceptionNote.MaxTextLength);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(planner.Length, ExceptionNote.MaxPlannerLength);
         if (Status != ExceptionStatus.Open)
         {
             return new(ExceptionRefusalCode.ExceptionNotOpen, Invariant($"Exception {Number} is {Status}, not Open."));
