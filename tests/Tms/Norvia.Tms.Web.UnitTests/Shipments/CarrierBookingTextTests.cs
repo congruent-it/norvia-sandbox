@@ -48,6 +48,23 @@ public sealed class CarrierBookingTextTests
     }
 
     [Fact]
+    public void LastOutcome_WithdrawnAndCarrierNotTold_FlagsCarrierNotToldWithTheCause()
+    {
+        var outcome = new LastCarrierBookingOutcome(CarrierBookingStatus.Withdrawn, Samples.Kessler, null, null, CarrierNotTold: true, CarrierNotToldMessage: "Service unavailable.");
+
+        CarrierBookingText.LastOutcome(outcome).Should().Be("Withdrawn from Kessler Spedition. Carrier not told: Service unavailable.");
+    }
+
+    [Fact]
+    public void LastOutcome_CancelledAndCarrierNotTold_FlagsCarrierNotToldWithTheCause()
+    {
+        var outcome = new LastCarrierBookingOutcome(
+            CarrierBookingStatus.Cancelled, Samples.Kessler, null, "Carrier won't make its collection", CarrierNotTold: true, CarrierNotToldMessage: "Service unavailable.");
+
+        CarrierBookingText.LastOutcome(outcome).Should().Be("Cancelled by Norvia: Carrier won't make its collection. Carrier not told: Service unavailable.");
+    }
+
+    [Fact]
     public void LastOutcome_Cancelled_SaysNorviaCancelledItAndGivesTheReason()
     {
         var outcome = new LastCarrierBookingOutcome(CarrierBookingStatus.Cancelled, Samples.Kessler, null, "Carrier won't make its collection");

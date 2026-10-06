@@ -48,6 +48,12 @@ builder.Services
 builder.Services
     .AddScoped<IPipelineBehavior<ReportCarrierBookingNotDeliveredCommand, Result<CarrierBookingReportResult>>,
         TrackCarrierBookingReportInLoggingScope<ReportCarrierBookingNotDeliveredCommand>>();
+builder.Services
+    .AddScoped<IPipelineBehavior<ReportCarrierCancellationToldCommand, Result<CarrierBookingReportResult>>,
+        TrackCarrierBookingReportInLoggingScope<ReportCarrierCancellationToldCommand>>();
+builder.Services
+    .AddScoped<IPipelineBehavior<ReportCarrierCancellationNotDeliveredCommand, Result<CarrierBookingReportResult>>,
+        TrackCarrierBookingReportInLoggingScope<ReportCarrierCancellationNotDeliveredCommand>>();
 builder.Services.AddScoped<IPipelineBehavior<WithdrawCarrierBookingCommand, Result<CarrierBookingWithdrawResult>>, TrackCarrierBookingWithdrawalInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<RecordTrackingCommand, Result<RecordTrackingResult>>, TrackTrackingEventInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<RecordProofOfDeliveryCommand, Result<RecordProofOfDeliveryResult>>, TrackProofOfDeliveryInLoggingScope>();

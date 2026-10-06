@@ -140,6 +140,10 @@ _Avoid_: cancel (that is for a Confirmed Carrier booking), revoke, recall
 Norvia ending a Confirmed Carrier booking before the Carrier has collected the goods, so the Shipment can be re-planned. The Planner does it to resolve an Exception, and the Carrier is told. After collection a Carrier booking can't be cancelled.
 _Avoid_: withdraw (that is for an unanswered Carrier booking), revoke, annul
 
+**Carrier not told**:
+A flag on a Withdrawn or Cancelled Carrier booking whose message never reached the Carrier, with the technical cause. The Planner phones the Carrier; nothing is retried. A booking the Carrier acknowledged has a Carrier told time instead.
+_Avoid_: undelivered cancellation, failed cancellation
+
 **Release**:
 The Planner handing a planned Shipment over to be carried out: booking it with its Carrier, or making it available for a Trip. Until release, the Planner can still change who carries it.
 _Avoid_: tender, dispatch, send

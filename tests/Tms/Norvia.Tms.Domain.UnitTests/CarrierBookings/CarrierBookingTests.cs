@@ -393,6 +393,105 @@ public sealed class CarrierBookingTests
         booking.CancellationUnder(new IdempotencyKey("key-cancel-2")).Should().BeNull();
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MarkCarrierTold_ACancelledOrWithdrawnBooking_RecordsTheToldTime_AndRaisesNoEvent(bool withdrawn)
+    {
+        var booking = withdrawn ? Withdrawn() : Cancelled();
+        var toldAt = AnsweredAt.AddHours(6);
+
+        var told = booking.MarkCarrierTold(toldAt);
+
+        told.Should().BeTrue();
+        booking.CarrierToldAt.Should().Be(toldAt);
+        booking.CarrierNotToldMessage.Should().BeNull();
+        booking.DomainEvents.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ReportCarrierNotTold_ACancelledOrWithdrawnBooking_FlagsItWithTheCause_AndRaisesCarrierCancellationNotDelivered(bool withdrawn)
+    {
+        var booking = withdrawn ? Withdrawn() : Cancelled();
+        var at = AnsweredAt.AddHours(6);
+
+        var reported = booking.ReportCarrierNotTold(503, "Service unavailable.", new CorrelationId("corr-not-told"), at);
+
+        reported.Should().BeTrue();
+        booking.CarrierToldAt.Should().BeNull();
+        booking.CarrierNotToldStatusCode.Should().Be(503);
+        booking.CarrierNotToldMessage.Should().Be("Service unavailable.");
+        booking.CarrierNotToldAt.Should().Be(at);
+        var raised = booking.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<CarrierCancellationNotDeliveredEvent>().Subject;
+        raised.Booking.Should().BeSameAs(booking);
+        raised.CorrelationId.Should().Be(new CorrelationId("corr-not-told"));
+    }
+
+    [Theory]
+    [InlineData(CarrierBookingStatus.Requested)]
+    [InlineData(CarrierBookingStatus.Confirmed)]
+    [InlineData(CarrierBookingStatus.Rejected)]
+    public void ReportingTheCarrierToldOrNotTold_ABookingNorviaDidntEnd_ChangesNothing(CarrierBookingStatus status)
+    {
+        var booking = Requested();
+        if (status == CarrierBookingStatus.Confirmed)
+        {
+            booking.Confirm("VDT-240917-0042", null, TransportOrderNumberOfTwelve, Answer, AnsweredAt);
+        }
+        else if (status == CarrierBookingStatus.Rejected)
+        {
+            booking.Reject(CarrierBookingRejectionReason.NoCapacity, null, Answer, AnsweredAt);
+        }
+
+        booking.ClearDomainEvents();
+
+        booking.MarkCarrierTold(AnsweredAt).Should().BeFalse();
+        booking.ReportCarrierNotTold(503, "Down", new CorrelationId("corr-x"), AnsweredAt).Should().BeFalse();
+        booking.CarrierToldAt.Should().BeNull();
+        booking.CarrierNotToldAt.Should().BeNull();
+        booking.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ReportingTheCarrierToldOrNotTold_ABookingAlreadyReported_ChangesNothing()
+    {
+        var told = Cancelled();
+        told.MarkCarrierTold(AnsweredAt.AddHours(6));
+        var notTold = Cancelled();
+        notTold.ReportCarrierNotTold(503, "Down", new CorrelationId("corr-first"), AnsweredAt.AddHours(6));
+        notTold.ClearDomainEvents();
+
+        told.MarkCarrierTold(AnsweredAt.AddHours(7)).Should().BeFalse();
+        told.ReportCarrierNotTold(500, "Later", new CorrelationId("corr-later"), AnsweredAt.AddHours(7)).Should().BeFalse();
+        notTold.MarkCarrierTold(AnsweredAt.AddHours(7)).Should().BeFalse();
+        notTold.ReportCarrierNotTold(500, "Later", new CorrelationId("corr-later"), AnsweredAt.AddHours(7)).Should().BeFalse();
+
+        told.CarrierToldAt.Should().Be(AnsweredAt.AddHours(6));
+        told.CarrierNotToldAt.Should().BeNull();
+        notTold.CarrierToldAt.Should().BeNull();
+        notTold.CarrierNotToldMessage.Should().Be("Down");
+        told.DomainEvents.Should().BeEmpty();
+        notTold.DomainEvents.Should().BeEmpty();
+    }
+
+    private static CarrierBooking Cancelled()
+    {
+        var booking = Confirmed();
+        booking.Cancel("No show", ExceptionNumber.FromSequence(5), new IdempotencyKey("key-cancel-1"), new CorrelationId("corr-cancel"), AnsweredAt.AddHours(5));
+        booking.ClearDomainEvents();
+        return booking;
+    }
+
+    private static CarrierBooking Withdrawn()
+    {
+        var booking = Requested();
+        booking.Withdraw(new IdempotencyKey("key-withdraw-1"), new CorrelationId("corr-withdraw"), AnsweredAt);
+        booking.ClearDomainEvents();
+        return booking;
+    }
+
     private static CarrierBooking Confirmed()
     {
         var booking = Requested();

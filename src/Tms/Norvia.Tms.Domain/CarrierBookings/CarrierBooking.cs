@@ -98,6 +98,20 @@ public sealed class CarrierBooking : EntityBase<CarrierBookingId>, IAggregateRoo
 
     public DateTimeOffset? CancelledAt { get; private set; }
 
+    /// <summary>When the Carrier acknowledged the cancellation or withdrawal message, reported by the Carrier cancellation Logic App (P7); null until then.</summary>
+    public DateTimeOffset? CarrierToldAt { get; private set; }
+
+    /// <summary>The technical cause's HTTP status code when the cancellation or withdrawal message couldn't be delivered; null unless flagged Carrier not told.</summary>
+    public int? CarrierNotToldStatusCode { get; private set; }
+
+    /// <summary>The technical cause's message; null unless flagged Carrier not told.</summary>
+    public string? CarrierNotToldMessage { get; private set; }
+
+    public DateTimeOffset? CarrierNotToldAt { get; private set; }
+
+    /// <summary>True when the booking is Withdrawn or Cancelled and the Carrier cancellation Logic App reported it as not delivered.</summary>
+    public bool IsCarrierNotTold => CarrierNotToldAt is not null;
+
     /// <summary>
     /// Requests a Carrier booking for a Shipment's release, Requested. Raises no domain event of its own: the release
     /// that creates it announces both in <c>ShipmentReleased</c>.
@@ -260,6 +274,48 @@ public sealed class CarrierBooking : EntityBase<CarrierBookingId>, IAggregateRoo
         RegisterDomainEvent(new CarrierBookingCancelledEvent(this));
         return true;
     }
+
+    /// <summary>
+    /// Records that the Carrier cancellation Logic App's message reached the Carrier, on a Withdrawn or Cancelled booking not yet
+    /// reported (P7). Raises no domain event. Returns false, changing nothing, for any other booking, or one already reported told or not told.
+    /// </summary>
+    public bool MarkCarrierTold(DateTimeOffset toldAt)
+    {
+        if (!AwaitsCarrierReport)
+        {
+            return false;
+        }
+
+        CarrierToldAt = toldAt;
+        return true;
+    }
+
+    /// <summary>
+    /// Records that the Carrier cancellation Logic App's message never reached the Carrier, with its technical cause, on a Withdrawn
+    /// or Cancelled booking not yet reported (P7): the booking is flagged Carrier not told and raises <c>CarrierCancellationNotDelivered</c>.
+    /// Returns false, changing nothing, for any other booking, or one already reported told or not told.
+    /// </summary>
+    public bool ReportCarrierNotTold(int statusCode, string message, CorrelationId correlationId, DateTimeOffset occurredAt)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(message);
+        ArgumentNullException.ThrowIfNull(correlationId);
+        if (!AwaitsCarrierReport)
+        {
+            return false;
+        }
+
+        CarrierNotToldStatusCode = statusCode;
+        CarrierNotToldMessage = message;
+        CarrierNotToldAt = occurredAt;
+        RegisterDomainEvent(new CarrierCancellationNotDeliveredEvent(this, correlationId));
+        return true;
+    }
+
+    /// <summary>Norvia ended the booking, by withdrawing or cancelling it: the Carrier is told about these, and only these (P7).</summary>
+    public bool IsEndedByNorvia => Status is CarrierBookingStatus.Withdrawn or CarrierBookingStatus.Cancelled;
+
+    /// <summary>The Carrier cancellation Logic App's report is still due: the booking is ended by Norvia and not yet reported told or not told.</summary>
+    public bool AwaitsCarrierReport => IsEndedByNorvia && CarrierToldAt is null && CarrierNotToldAt is null;
 
     /// <summary>The cancellation's own trail made under the key; null when none was.</summary>
     public CorrelationId? CancellationUnder(IdempotencyKey key) => CancellationKey == key ? CancellationCorrelationId : null;

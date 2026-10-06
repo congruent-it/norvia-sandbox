@@ -31,4 +31,11 @@ public static class CarrierBookingRules
         ArgumentNullException.ThrowIfNull(booking);
         return new(CarrierBookingRefusalCode.BookingNotOpen, Invariant($"Carrier booking {booking.Number} is {booking.Status}, not Requested."));
     }
+
+    /// <summary>The refusal for a cancellation report on a booking that is neither Withdrawn nor Cancelled (P7).</summary>
+    public static CarrierBookingRefusal NotCancelled(CarrierBooking booking)
+    {
+        ArgumentNullException.ThrowIfNull(booking);
+        return new(CarrierBookingRefusalCode.BookingNotCancelled, Invariant($"Carrier booking {booking.Number} is {booking.Status}, not Withdrawn or Cancelled."));
+    }
 }

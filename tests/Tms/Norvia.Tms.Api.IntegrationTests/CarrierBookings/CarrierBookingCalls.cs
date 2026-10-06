@@ -195,6 +195,39 @@ internal static class CarrierBookingCalls
         return JsonNode.Parse(body)!;
     }
 
+    /// <summary>
+    /// Reports that the cancellation or withdrawal message reached the Carrier, as the Carrier cancellation Logic App does, under the
+    /// given correlation ID or a new one.
+    /// </summary>
+    public static async Task<HttpResponseMessage> ReportCancellationToldAsync(
+        this TmsFixture tms, string carrierBookingNumber, CancellationToken cancellationToken, string? correlationId = null)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"/v1/carrier-bookings/{carrierBookingNumber}/report-cancellation-told", UriKind.Relative));
+        request.Headers.Add("X-Correlation-ID", correlationId ?? Guid.NewGuid().ToString());
+        return await tms.CarrierReport.SendAsync(request, cancellationToken);
+    }
+
+    /// <summary>
+    /// Reports that the cancellation or withdrawal message never reached the Carrier, with a technical cause, as the Carrier
+    /// cancellation Logic App does, under the given correlation ID or a new one.
+    /// </summary>
+    public static async Task<HttpResponseMessage> ReportCancellationNotDeliveredAsync(
+        this TmsFixture tms,
+        string carrierBookingNumber,
+        CancellationToken cancellationToken,
+        int statusCode = 503,
+        string message = "Service unavailable.",
+        string? correlationId = null)
+    {
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post, new Uri($"/v1/carrier-bookings/{carrierBookingNumber}/report-cancellation-not-delivered", UriKind.Relative))
+        {
+            Content = JsonContent.Create(new JsonObject { ["statusCode"] = statusCode, ["message"] = message }),
+        };
+        request.Headers.Add("X-Correlation-ID", correlationId ?? Guid.NewGuid().ToString());
+        return await tms.CarrierReport.SendAsync(request, cancellationToken);
+    }
+
     /// <summary>Withdraws the Carrier booking as the Planner does, through the TMS UI, under the given idempotency key or a new one.</summary>
     public static async Task<HttpResponseMessage> WithdrawAsync(
         this TmsFixture tms, string carrierBookingNumber, CancellationToken cancellationToken, string? idempotencyKey = null)

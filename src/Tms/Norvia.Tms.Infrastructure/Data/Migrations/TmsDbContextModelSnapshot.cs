@@ -71,6 +71,19 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<DateTimeOffset?>("CarrierNotToldAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CarrierNotToldMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int?>("CarrierNotToldStatusCode")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("CarrierToldAt")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<string>("CorrelationId")
                         .IsRequired()
                         .HasMaxLength(128)

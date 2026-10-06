@@ -10,12 +10,15 @@ public static class CarrierBookingText
 {
     public const string NotYetSent = "Not yet sent";
 
+    /// <summary>The flag on a Withdrawn or Cancelled booking whose cancellation message never reached the Carrier (P7).</summary>
+    public const string CarrierNotTold = "Carrier not told";
+
     /// <summary>A Shipment's last Carrier booking outcome at a glance, such as "Rejected by Kessler Spedition: No capacity".</summary>
     public static string LastOutcome(LastCarrierBookingOutcome outcome)
     {
         ArgumentNullException.ThrowIfNull(outcome);
         var carrier = PlanningText.Carrier(outcome.Carrier);
-        return outcome.Status switch
+        var text = outcome.Status switch
         {
             CarrierBookingStatus.Rejected => $"Rejected by {carrier}: {Reason(outcome.ReasonCode, outcome.ReasonText)}",
             CarrierBookingStatus.NotDelivered => $"Not delivered to {carrier}",
@@ -23,6 +26,7 @@ public static class CarrierBookingText
             CarrierBookingStatus.Cancelled => $"Cancelled by Norvia: {outcome.ReasonText}",
             _ => $"{outcome.Status} by {carrier}",
         };
+        return outcome.CarrierNotTold ? $"{text}. {CarrierNotTold}: {outcome.CarrierNotToldMessage}" : text;
     }
 
     /// <summary>What a Carrier booking came to, past its status: the Carrier's rejection reason, its Carrier booking reference, or why it wasn't delivered.</summary>

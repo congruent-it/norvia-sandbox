@@ -89,5 +89,11 @@ internal sealed class CarrierBookingConfiguration : IEntityTypeConfiguration<Car
             .HasConversion(id => id!.Value, value => new CorrelationId(value))
             .HasMaxLength(128);
         builder.Property(booking => booking.CancelledAt);
+
+        // Reported by the Carrier cancellation Logic App for a Withdrawn or Cancelled booking (P7): told, or flagged Carrier not told.
+        builder.Property(booking => booking.CarrierToldAt);
+        builder.Property(booking => booking.CarrierNotToldStatusCode);
+        builder.Property(booking => booking.CarrierNotToldMessage).HasMaxLength(500);
+        builder.Property(booking => booking.CarrierNotToldAt);
     }
 }

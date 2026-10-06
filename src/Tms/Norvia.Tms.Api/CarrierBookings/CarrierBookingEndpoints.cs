@@ -23,7 +23,10 @@ public static class CarrierBookingEndpoints
     /// </summary>
     public const string AnswerRole = "CarrierBookings.Answer";
 
-    /// <summary>The app role only the P4 booking Logic App's managed identity holds, for its sent and not-delivered reports.</summary>
+    /// <summary>
+    /// The app role only the Logic Apps' managed identities hold, for the P4 booking Logic App's sent and not-delivered reports and the P7
+    /// Carrier cancellation Logic App's told and not-delivered reports.
+    /// </summary>
     public const string ReportRole = "CarrierBookings.Report";
 
     public static IEndpointRouteBuilder MapCarrierBookings(this IEndpointRouteBuilder app)
@@ -69,6 +72,27 @@ public static class CarrierBookingEndpoints
                 + "the Shipment's move publishes no event of its own. A report for a booking that is no longer Requested (for example, withdrawn "
                 + "while the report was in flight) is ignored and logged: it changes and publishes nothing. BookingNotFound (404, with that code) for "
                 + "an unknown Carrier booking number.");
+
+        carrierBookings.MapPost("/{carrierBookingNumber}/report-cancellation-told", ReportCancellationToldAsync)
+            .WithName("ReportCarrierCancellationTold")
+            .RequireAuthorization(policy => policy.RequireRole(ReportRole))
+            .WithMetadata(new TrackedFlow(Flows.ExceptionHandling))
+            .WithSummary("Report that the cancellation or withdrawal message for a Cancelled or Withdrawn Carrier booking reached the Carrier.")
+            .WithDescription(
+                "Records the Carrier told time on the booking and publishes nothing. A report for a booking that has already been reported told or "
+                + "not told is ignored and logged: it changes nothing. BookingNotFound (404, with that code) for an unknown Carrier booking number, "
+                + "BookingNotCancelled (409, with that code) for a booking that is neither Withdrawn nor Cancelled.");
+
+        carrierBookings.MapPost("/{carrierBookingNumber}/report-cancellation-not-delivered", ReportCancellationNotDeliveredAsync)
+            .WithName("ReportCarrierCancellationNotDelivered")
+            .RequireAuthorization(policy => policy.RequireRole(ReportRole))
+            .WithMetadata(new TrackedFlow(Flows.ExceptionHandling))
+            .WithSummary("Report that the cancellation or withdrawal message for a Cancelled or Withdrawn Carrier booking never reached the Carrier, with its technical cause.")
+            .WithDescription(
+                "Flags the booking Carrier not told with the technical cause and publishes CarrierCancellationNotDelivered, in one transaction. "
+                + "A report for a booking that has already been reported told or not told is ignored and logged: it changes and publishes nothing. "
+                + "BookingNotFound (404, with that code) for an unknown Carrier booking number, BookingNotCancelled (409, with that code) for a "
+                + "booking that is neither Withdrawn nor Cancelled.");
 
         // The Planner withdraws from the TMS UI, with the same authorization as P3's other planning commands.
         carrierBookings.MapPost("/{carrierBookingNumber}/withdraw", WithdrawAsync)
@@ -137,30 +161,48 @@ public static class CarrierBookingEndpoints
         IMediator mediator,
         CancellationToken cancellationToken)
     {
-        var errors = new Dictionary<string, string[]>();
+        var errors = CheckNotDelivered(correlationId, report);
+        if (errors.Count > 0 || correlationId is null || report.StatusCode is not { } statusCode || report.Message is not { } message)
+        {
+            return TypedResults.ValidationProblem(errors);
+        }
+
+        var result = await mediator.Send(new ReportCarrierBookingNotDeliveredCommand(carrierBookingNumber, correlationId, statusCode, message), cancellationToken);
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : Refused(result, "The report can't be recorded.", correlationId);
+    }
+
+    private static async Task<Results<Ok<CarrierBookingReportResult>, ProblemHttpResult, ValidationProblem>> ReportCancellationToldAsync(
+        string carrierBookingNumber,
+        [FromHeader(Name = TransportOrderEndpoints.CorrelationIdHeader)] string? correlationId,
+        IMediator mediator,
+        CancellationToken cancellationToken)
+    {
         if (string.IsNullOrWhiteSpace(correlationId))
         {
-            errors[TransportOrderEndpoints.CorrelationIdHeader] = [$"Reporting a Carrier booking needs an {TransportOrderEndpoints.CorrelationIdHeader}."];
+            return TypedResults.ValidationProblem(
+                new Dictionary<string, string[]> { [TransportOrderEndpoints.CorrelationIdHeader] = [$"Reporting a Carrier booking needs an {TransportOrderEndpoints.CorrelationIdHeader}."] });
         }
 
-        if (report.StatusCode is null)
-        {
-            errors[nameof(CarrierBookingNotDeliveredRequest.StatusCode)] = ["A not-delivered report needs the technical cause's status code."];
-        }
+        var result = await mediator.Send(new ReportCarrierCancellationToldCommand(carrierBookingNumber, correlationId), cancellationToken);
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : Refused(result, "The report can't be recorded.", correlationId);
+    }
 
-        if (string.IsNullOrWhiteSpace(report.Message))
-        {
-            errors[nameof(CarrierBookingNotDeliveredRequest.Message)] = ["A not-delivered report needs the technical cause's message."];
-        }
-
-        if (errors.Count > 0)
+    private static async Task<Results<Ok<CarrierBookingReportResult>, ProblemHttpResult, ValidationProblem>> ReportCancellationNotDeliveredAsync(
+        string carrierBookingNumber,
+        [FromHeader(Name = TransportOrderEndpoints.CorrelationIdHeader)] string? correlationId,
+        CarrierBookingNotDeliveredRequest report,
+        IMediator mediator,
+        CancellationToken cancellationToken)
+    {
+        var errors = CheckNotDelivered(correlationId, report);
+        if (errors.Count > 0 || correlationId is null || report.StatusCode is not { } statusCode || report.Message is not { } message)
         {
             return TypedResults.ValidationProblem(errors);
         }
 
         var result = await mediator.Send(
-            new ReportCarrierBookingNotDeliveredCommand(carrierBookingNumber, correlationId!, report.StatusCode!.Value, report.Message!), cancellationToken);
-        return result.IsSuccess ? TypedResults.Ok(result.Value) : Refused(result, "The report can't be recorded.", correlationId!);
+            new ReportCarrierCancellationNotDeliveredCommand(carrierBookingNumber, correlationId, statusCode, message), cancellationToken);
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : Refused(result, "The report can't be recorded.", correlationId);
     }
 
     private static async Task<Results<Ok<CarrierBookingWithdrawResult>, ProblemHttpResult, ValidationProblem>> WithdrawAsync(
@@ -179,6 +221,28 @@ public static class CarrierBookingEndpoints
         var correlationId = CorrelationId.New().Value;
         var result = await mediator.Send(new WithdrawCarrierBookingCommand(carrierBookingNumber, idempotencyKey!, correlationId), cancellationToken);
         return result.IsSuccess ? TypedResults.Ok(result.Value) : Refused(result, "The Carrier booking can't be withdrawn.", correlationId);
+    }
+
+    /// <summary>The errors of a not-delivered report: an <see cref="TransportOrderEndpoints.CorrelationIdHeader"/> and the technical cause's status code and message.</summary>
+    private static Dictionary<string, string[]> CheckNotDelivered(string? correlationId, CarrierBookingNotDeliveredRequest report)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (string.IsNullOrWhiteSpace(correlationId))
+        {
+            errors[TransportOrderEndpoints.CorrelationIdHeader] = [$"Reporting a Carrier booking needs an {TransportOrderEndpoints.CorrelationIdHeader}."];
+        }
+
+        if (report.StatusCode is null)
+        {
+            errors[nameof(CarrierBookingNotDeliveredRequest.StatusCode)] = ["A not-delivered report needs the technical cause's status code."];
+        }
+
+        if (string.IsNullOrWhiteSpace(report.Message))
+        {
+            errors[nameof(CarrierBookingNotDeliveredRequest.Message)] = ["A not-delivered report needs the technical cause's message."];
+        }
+
+        return errors;
     }
 
     /// <summary>
@@ -222,6 +286,6 @@ public static class CarrierBookingEndpoints
     private static int StatusCodeOf(CarrierBookingRefusalCode code) => code switch
     {
         CarrierBookingRefusalCode.BookingNotFound => StatusCodes.Status404NotFound,
-        _ => StatusCodes.Status409Conflict, // BookingNotOpen
+        _ => StatusCodes.Status409Conflict, // BookingNotOpen, BookingNotCancelled
     };
 }
