@@ -74,12 +74,30 @@ public sealed class CheckLateDeliveriesHandlerTests
     {
         var shipment = OnItsWay();
         _time.Advance(TimeSpan.FromHours(1));
-        _exceptions.AnyAsync(Arg.Is<OpenExceptionOfTypeForShipmentSpec>(s => s.ShipmentId == shipment.Id && s.Type == ExceptionType.LateDelivery), Arg.Any<CancellationToken>())
-            .Returns(true);
+        _exceptions.SingleOrDefaultAsync(Arg.Is<OpenExceptionOfTypeForShipmentSpec>(s => s.ShipmentId == shipment.Id && s.Type == ExceptionType.LateDelivery), Arg.Any<CancellationToken>())
+            .Returns(open);
 
         await Handler(TimeSpan.Zero).Handle(new CheckLateDeliveriesCommand(), CancellationToken.None);
 
+        open.Causes.Should().ContainSingle();
         await _exceptions.DidNotReceive().AddAsync(Arg.Any<ExceptionCase>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_WhenTheOpenLateDeliveryCauseWasCleared_AddsTheWindowPassedCause_ToRemoveTheMarker()
+    {
+        var shipment = OnItsWay();
+        _time.Advance(TimeSpan.FromHours(1));
+        var open = OpenExceptions.LateDelivery();
+        open.MarkCauseCleared();
+        _exceptions.SingleOrDefaultAsync(Arg.Is<OpenExceptionOfTypeForShipmentSpec>(s => s.ShipmentId == shipment.Id && s.Type == ExceptionType.LateDelivery), Arg.Any<CancellationToken>())
+            .Returns(open);
+
+        await Handler(TimeSpan.Zero).Handle(new CheckLateDeliveriesCommand(), CancellationToken.None);
+
+        open.Causes.Should().HaveCount(2);
+        open.CauseCleared.Should().BeFalse();
+        open.DomainEvents.Should().BeEmpty();
     }
 
     [Fact]

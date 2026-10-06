@@ -173,6 +173,7 @@ _Avoid_: incident number, ticket number
 
 **Late delivery**:
 An Exception for a Shipment that won't be, or wasn't, delivered within its delivery window: a Tracking event's ETA falls after the window, or the window passes without Delivered. Unlike Stale, it means Norvia knows the Shipment is late, not that it has gone quiet.
+The **grace** is a TMS setting, 0 by default, added to the delivery window's latest time before the time-based check that also sets Stale opens a Late delivery without a Tracking event.
 _Avoid_: delay, overdue, Stale
 
 **Inventory**:
