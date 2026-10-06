@@ -74,6 +74,7 @@ public sealed class CheckLateDeliveriesHandlerTests
     {
         var shipment = OnItsWay();
         _time.Advance(TimeSpan.FromHours(1));
+        var open = OpenExceptions.LateDelivery();
         _exceptions.SingleOrDefaultAsync(Arg.Is<OpenExceptionOfTypeForShipmentSpec>(s => s.ShipmentId == shipment.Id && s.Type == ExceptionType.LateDelivery), Arg.Any<CancellationToken>())
             .Returns(open);
 
