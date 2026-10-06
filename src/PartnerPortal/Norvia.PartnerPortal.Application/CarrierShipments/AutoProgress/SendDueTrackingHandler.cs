@@ -64,7 +64,7 @@ public sealed partial class SendDueTrackingHandler(
     private async Task SendProofOfDeliveryAsync(CarrierBookingRequest due, DateTimeOffset now, CancellationToken cancellationToken)
     {
         var sent = await mediator.Send(
-            new SendProofOfDeliveryCommand(due.PersonaId.Value, due.CarrierBookingNumber, ReceivedBy, ProofOfDeliveryCondition.Clean, null, [sampleCmr.Read()]),
+            new SendProofOfDeliveryCommand(due.PersonaId.Value, due.CarrierBookingNumber, ReceivedBy, ProofOfDeliveryCondition.Clean, Remark: null, [sampleCmr.Read()]),
             cancellationToken);
         if (sent.IsSuccess && sent.Value.Reply.IsAccepted)
         {

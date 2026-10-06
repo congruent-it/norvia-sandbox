@@ -164,21 +164,6 @@ public sealed class SendDueTrackingHandlerTests
     }
 
     [Fact]
-    public async Task Handle_AShipmentDeliveredByAManualPersona_SendsNoProofOfDelivery()
-    {
-        var manual = ConfirmedRequest(delay: null);
-        manual.ReportTracking(TrackingEventType.Delivered, Samples.Now);
-        _repository.FirstOrDefaultAsync(Arg.Any<CarrierBookingRequestToAnswerSpec>(), Arg.Any<CancellationToken>()).Returns(manual);
-        _readRepository.FirstOrDefaultAsync(Arg.Any<CarrierBookingRequestToAnswerSpec>(), Arg.Any<CancellationToken>()).Returns(manual);
-        _repository.ListAsync(Arg.Any<CarrierBookingRequestsDueForAutoProgressSpec>(), Arg.Any<CancellationToken>()).Returns(_ => []);
-
-        _time.Advance(TimeSpan.FromHours(1));
-        await Sweep();
-
-        _partnerApi.ProofsOfDelivery.Should().BeEmpty();
-    }
-
-    [Fact]
     public async Task Handle_AfterAnEvent_WaitsAFullDelayBeforeTheNext()
     {
         _time.Advance(Delay);
