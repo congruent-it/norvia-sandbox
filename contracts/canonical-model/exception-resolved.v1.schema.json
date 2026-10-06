@@ -15,7 +15,7 @@
     "exceptionNumber": { "type": "string", "pattern": "^EX-[0-9]{7}$" },
     "shipmentNumber": { "type": "string", "pattern": "^SH-[0-9]{7}$" },
     "transportOrderNumber": { "description": "The Transport Order the Shipment carries out.", "type": "string", "pattern": "^TO-[0-9]{7}$" },
-    "exceptionType": { "enum": ["DeliveryFailed"] },
+    "exceptionType": { "enum": ["CollectionFailed", "DeliveryFailed", "Damaged", "Reservations"] },
     "outcome": { "enum": ["NoActionNeeded", "Redelivered", "Replanned", "ReturnedToShipper", "ClaimHandledOutsideTms"] },
     "remark": { "description": "What the Planner did or concluded; required for every outcome.", "type": "string", "minLength": 1, "pattern": "\\S" }
   }

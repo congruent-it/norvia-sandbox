@@ -53,7 +53,7 @@ internal static class ProofsOfDeliverySamples
 
     public static ProofOfDeliveryFile Cmr() => new(Guid.Parse("0197a1b2-0000-7000-8000-000000000001"), "cmr.pdf", "application/pdf", 4);
 
-    public static ProofOfDeliveryReport Report(ProofOfDeliverySource? source = null, string reference = "VDT-1", IReadOnlyList<ProofOfDeliveryFile>? files = null, string documentId = "doc-1") =>
+    public static ProofOfDeliveryReport Report(ProofOfDeliverySource? source = null, string reference = "VDT-1", IReadOnlyList<ProofOfDeliveryFile>? files = null, string documentId = "doc-1", DeliveryCondition condition = DeliveryCondition.Clean) =>
         new(
             source ?? ProofOfDeliverySource.Carrier(VanDijk),
             documentId,
@@ -61,7 +61,7 @@ internal static class ProofsOfDeliverySamples
             "J. Becker",
             DeliveryTime,
             new TrackingLocation("Düsseldorf", "40213", "DE"),
-            DeliveryCondition.Clean,
+            condition,
             "Signed at the dock",
             files ?? [Cmr()]);
 }

@@ -3,7 +3,6 @@ using Ardalis.SharedKernel;
 using Mediator;
 using Norvia.Tms.Application.Exceptions;
 using Norvia.Tms.Domain.CarrierBookings;
-using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.TransportOrders;
@@ -14,8 +13,7 @@ public sealed class RecordTrackingHandler(
     IRepository<TrackingEvent> trackingEvents,
     IRepository<CarrierBooking> carrierBookings,
     IRepository<Shipment> shipments,
-    IRepository<ExceptionCase> exceptions,
-    IExceptionNumbers exceptionNumbers,
+    ExceptionCauses exceptionCauses,
     TrackingEventRules rules,
     TimeProvider time)
     : ICommandHandler<RecordTrackingCommand, Result<RecordTrackingResult>>
@@ -63,28 +61,12 @@ public sealed class RecordTrackingHandler(
 
         var trackingEvent = shipment.Record(report with { CarrierBookingReference = booking.CarrierBookingReference }, new CorrelationId(command.CorrelationId), now);
 
-        if (ExceptionTypes.OpenedBy(trackingEvent.Type) is { } exceptionType)
-        {
-            await OpenOrJoinExceptionAsync(shipment, exceptionType, trackingEvent, now, cancellationToken);
-        }
+        await exceptionCauses.OpenOrAddAsync(shipment, trackingEvent, now, cancellationToken);
 
         // The tracked Shipment's move and the Exception the event opened save with the event, and the events they raise go
         // to the outbox, in one transaction.
         await trackingEvents.AddAsync(trackingEvent, cancellationToken);
         await trackingEvents.SaveChangesAsync(cancellationToken);
         return RecordTrackingResult.From(shipment, trackingEvent, repeat: false);
-    }
-
-    // A Shipment has at most one open Exception of each type: a later cause joins it, and publishes nothing.
-    private async Task OpenOrJoinExceptionAsync(Shipment shipment, ExceptionType type, TrackingEvent cause, DateTimeOffset now, CancellationToken cancellationToken)
-    {
-        if (await exceptions.SingleOrDefaultAsync(new OpenExceptionOfTypeForShipmentSpec(shipment.Id, type), cancellationToken) is { } open)
-        {
-            open.AddCause(cause, now);
-            return;
-        }
-
-        var number = await exceptionNumbers.NextAsync(cancellationToken);
-        await exceptions.AddAsync(ExceptionCase.Open(number, shipment, cause, now), cancellationToken);
     }
 }

@@ -8,7 +8,7 @@ namespace Norvia.Tms.Application.Exceptions.Resolve;
 /// The Planner resolved an Exception (P7), under the resolution's own correlation ID.
 /// </summary>
 /// <param name="OccurredAt">When the Planner resolved the Exception.</param>
-/// <param name="ExceptionType">What went wrong: <c>DeliveryFailed</c>.</param>
+/// <param name="ExceptionType">What went wrong: <c>CollectionFailed</c>, <c>DeliveryFailed</c>, <c>Damaged</c> or <c>Reservations</c>.</param>
 /// <param name="Outcome">One of <c>NoActionNeeded</c>, <c>Redelivered</c>, <c>Replanned</c>, <c>ReturnedToShipper</c> and <c>ClaimHandledOutsideTms</c>.</param>
 /// <param name="Remark">The Planner's remark.</param>
 public sealed record ExceptionResolvedV1(

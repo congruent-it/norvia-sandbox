@@ -1,6 +1,7 @@
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Carriers;
 using Norvia.Tms.Domain.Exceptions;
+using Norvia.Tms.Domain.ProofsOfDelivery;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.Shippers;
 using Norvia.Tms.Domain.TrackingEvents;
@@ -52,7 +53,8 @@ public sealed class ExceptionCaseTests
 
         var raised = exception.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<ExceptionOpenedEvent>().Subject;
         raised.Exception.Should().BeSameAs(exception);
-        raised.Cause.Should().BeSameAs(cause);
+        raised.Cause.Should().Be(exception.Causes.Single());
+        raised.Cause.TrackingEventId.Should().Be(cause.Id);
     }
 
     [Fact]
@@ -69,17 +71,110 @@ public sealed class ExceptionCaseTests
 
     [Theory]
     [InlineData(TrackingEventType.Collected)]
-    [InlineData(TrackingEventType.CollectionFailed)]
-    [InlineData(TrackingEventType.Damaged)]
-    public void TypeOf_ATrackingEventThatIsNotDeliveryFailed_IsNone_UntilItsExceptionTypeIsBuilt(TrackingEventType type)
+    [InlineData(TrackingEventType.Departed)]
+    [InlineData(TrackingEventType.Arrived)]
+    [InlineData(TrackingEventType.OutForDelivery)]
+    [InlineData(TrackingEventType.Delivered)]
+    public void TypeOf_AProgressTrackingEvent_IsNone(TrackingEventType type)
     {
         ExceptionTypes.OpenedBy(type).Should().BeNull();
     }
 
-    [Fact]
-    public void TypeOf_DeliveryFailed_IsDeliveryFailed()
+    [Theory]
+    [InlineData(TrackingEventType.CollectionFailed, ExceptionType.CollectionFailed)]
+    [InlineData(TrackingEventType.DeliveryFailed, ExceptionType.DeliveryFailed)]
+    [InlineData(TrackingEventType.Damaged, ExceptionType.Damaged)]
+    public void TypeOf_AnExceptionTrackingEvent_IsItsOwnExceptionType(TrackingEventType type, ExceptionType expected)
     {
-        ExceptionTypes.OpenedBy(TrackingEventType.DeliveryFailed).Should().Be(ExceptionType.DeliveryFailed);
+        ExceptionTypes.OpenedBy(type).Should().Be(expected);
+    }
+
+    [Fact]
+    public void TypeOf_AProofOfDelivery_IsReservations_OnlyWithReservations()
+    {
+        ExceptionTypes.OpenedBy(DeliveryCondition.Reservations).Should().Be(ExceptionType.Reservations);
+        ExceptionTypes.OpenedBy(DeliveryCondition.Clean).Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(TrackingEventType.CollectionFailed, ExceptionType.CollectionFailed)]
+    [InlineData(TrackingEventType.Damaged, ExceptionType.Damaged)]
+    public void Open_ForACollectionFailedOrDamagedEvent_OpensAnExceptionOfThatType(TrackingEventType type, ExceptionType expected)
+    {
+        var shipment = Booked();
+        var cause = Report(shipment, type, "evt-x", "corr-x");
+
+        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, cause, ReceivedAt);
+
+        exception.Type.Should().Be(expected);
+        exception.Causes.Should().ContainSingle().Which.TrackingEventId.Should().Be(cause.Id);
+        exception.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<ExceptionOpenedEvent>();
+    }
+
+    [Fact]
+    public void Open_ForAProofOfDeliveryWithReservations_OpensAReservationsException_WithItsCorrelationId()
+    {
+        var shipment = Booked();
+        var cause = ProofWith(shipment, DeliveryCondition.Reservations, "doc-1", "corr-pod");
+
+        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, cause, ReceivedAt);
+
+        exception.Type.Should().Be(ExceptionType.Reservations);
+        exception.CorrelationId.Should().Be(new CorrelationId("corr-pod"));
+        exception.AfterDelivered.Should().BeFalse();
+        var only = exception.Causes.Should().ContainSingle().Which;
+        only.ProofOfDeliveryId.Should().Be(cause.Id);
+        only.TrackingEventId.Should().BeNull();
+        only.SourceEventId.Should().Be("doc-1");
+        only.IsProofOfDelivery.Should().BeTrue();
+        exception.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<ExceptionOpenedEvent>().Which.Cause.Should().Be(only);
+    }
+
+    [Fact]
+    public void Open_ForAProofOfDeliveryOfADeliveredShipment_IsNotMarkedAfterDelivered()
+    {
+        var shipment = Booked();
+        shipment.Record(new TrackingReport(Source, "evt-del", "VDT-1", null, TrackingEventType.Delivered, ReceivedAt, Location, null, null), new CorrelationId("c"), ReceivedAt);
+
+        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, ProofWith(shipment, DeliveryCondition.Reservations), ReceivedAt);
+
+        exception.AfterDelivered.Should().BeFalse("the marker is for Exceptions opened by Tracking events; a Proof of delivery usually comes after Delivered");
+    }
+
+    [Fact]
+    public void Open_ForACleanProofOfDelivery_Throws()
+    {
+        var shipment = Booked();
+
+        var open = () => ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, ProofWith(shipment, DeliveryCondition.Clean), ReceivedAt);
+
+        open.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void AddCause_ForAnotherProofOfDeliveryWithReservations_JoinsTheOpenException_AndRaisesNothing()
+    {
+        var shipment = Booked();
+        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, ProofWith(shipment, DeliveryCondition.Reservations, "doc-1"), ReceivedAt);
+        exception.ClearDomainEvents();
+
+        exception.AddCause(ProofWith(shipment, DeliveryCondition.Reservations, "doc-2"), ReceivedAt.AddHours(1));
+
+        exception.Causes.Select(cause => cause.SourceEventId).Should().Equal("doc-1", "doc-2");
+        exception.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void AddCause_OfAnotherType_Throws()
+    {
+        var shipment = Booked();
+        var exception = ExceptionCase.Open(ExceptionNumber.FromSequence(5), shipment, DeliveryFailed(shipment), ReceivedAt);
+
+        var addTrackingEvent = () => exception.AddCause(Report(shipment, TrackingEventType.Damaged, "evt-dmg", "c"), ReceivedAt);
+        var addProof = () => exception.AddCause(ProofWith(shipment, DeliveryCondition.Reservations), ReceivedAt);
+
+        addTrackingEvent.Should().Throw<ArgumentException>();
+        addProof.Should().Throw<ArgumentException>();
     }
 
     [Fact]
@@ -167,8 +262,27 @@ public sealed class ExceptionCaseTests
     }
 
     private static TrackingEvent DeliveryFailed(Shipment shipment, string sourceEventId = "evt-ndl", string correlationId = "corr-cause") =>
+        Report(shipment, TrackingEventType.DeliveryFailed, sourceEventId, correlationId);
+
+    private static TrackingEvent Report(Shipment shipment, TrackingEventType type, string sourceEventId, string correlationId) =>
         shipment.Record(
-            new TrackingReport(Source, sourceEventId, "VDT-1", null, TrackingEventType.DeliveryFailed, ReceivedAt, Location, null, "Consignee closed"),
+            new TrackingReport(Source, sourceEventId, "VDT-1", null, type, ReceivedAt, Location, null, "Consignee closed"),
+            new CorrelationId(correlationId),
+            ReceivedAt);
+
+    private static ProofOfDelivery ProofWith(Shipment shipment, DeliveryCondition condition, string documentId = "doc-1", string correlationId = "corr-pod") =>
+        ProofOfDelivery.Record(
+            shipment,
+            new ProofOfDeliveryReport(
+                ProofOfDeliverySource.Carrier(new CarrierId("CAR-0001")),
+                documentId,
+                "VDT-1",
+                "J. Becker",
+                ReceivedAt,
+                Location,
+                condition,
+                "Two pallets short",
+                [new ProofOfDeliveryFile(Guid.NewGuid(), "cmr.pdf", "application/pdf", 4)]),
             new CorrelationId(correlationId),
             ReceivedAt);
 

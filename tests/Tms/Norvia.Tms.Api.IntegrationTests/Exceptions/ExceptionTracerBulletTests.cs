@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json.Nodes;
 using Norvia.Tms.Api.IntegrationTests.Planning;
+using Norvia.Tms.Api.IntegrationTests.ProofsOfDelivery;
 using Norvia.Tms.Api.IntegrationTests.TrackingEvents;
 using Norvia.Tms.Api.IntegrationTests.TransportOrders;
 using static Norvia.Tms.Api.IntegrationTests.Exceptions.ExceptionCalls;
@@ -8,7 +9,7 @@ using static Norvia.Tms.Api.IntegrationTests.Exceptions.ExceptionCalls;
 namespace Norvia.Tms.Api.IntegrationTests.Exceptions;
 
 /// <summary>
-/// A Delivery failed Tracking event (<c>NDL</c>) opens an Exception in the same transaction as the event and publishes
+/// A Delivery failed Tracking event (<c>NDL</c>), or any other exception event or Proof of delivery with reservations, opens an Exception in the same transaction as the event and publishes
 /// ExceptionOpened (P7). The Planner sees it in the list of Open Exceptions, oldest first, and resolves it with an outcome
 /// and a required remark, which publishes ExceptionResolved and takes it off the list.
 /// </summary>
@@ -204,12 +205,103 @@ public sealed class ExceptionTracerBulletTests(TmsFixture tms) : IClassFixture<T
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
+    [Theory]
+    [InlineData("CollectionFailed")]
+    [InlineData("Damaged")]
+    public async Task ACollectionFailedOrDamagedEvent_OpensAnExceptionOfThatType_WithOneExceptionOpened(string type)
+    {
+        var (shipmentNumber, reference) = await tms.BookedShipmentAsync(_cancellationToken);
+        var correlationId = TmsCalls.NewCorrelationId();
+
+        await tms.RecordedAsync(TrackingEventCalls.Event(type, reference, DateTimeOffset.UtcNow.AddMinutes(-1), "evt-" + type), _cancellationToken, correlationId);
+
+        var body = BodyOf((await tms.PublishedAsync(correlationId, "ExceptionOpened", _cancellationToken)).Should().ContainSingle().Subject);
+        var results = CanonicalModelSchemas.ValidateExceptionOpened(body);
+        results.IsValid.Should().BeTrue(CanonicalModelSchemas.Errors(results));
+        body["exceptionType"]!.GetValue<string>().Should().Be(type);
+        (await tms.OpenExceptionsOfAsync(shipmentNumber, _cancellationToken)).Should().ContainSingle().Which["type"]!.GetValue<string>().Should().Be(type);
+    }
+
     [Fact]
-    public async Task ACollectedOrDamagedEvent_OpensNoException_UntilItsTypeIsBuilt()
+    public async Task DifferentTypes_CanBeOpenAtOnceOnOneShipment_AndASecondCauseOfAnOpenTypeIsAddedToIt()
     {
         var (shipmentNumber, reference) = await tms.BookedShipmentAsync(_cancellationToken);
 
+        await tms.ReportDeliveryFailedAsync(reference, _cancellationToken);
         await tms.RecordedAsync(TrackingEventCalls.Event("Damaged", reference, DateTimeOffset.UtcNow.AddMinutes(-1)), _cancellationToken);
+        var secondDamagedCorrelationId = TmsCalls.NewCorrelationId();
+        await tms.RecordedAsync(TrackingEventCalls.Event("Damaged", reference, DateTimeOffset.UtcNow.AddMinutes(-1)), _cancellationToken, secondDamagedCorrelationId);
+
+        var open = await tms.OpenExceptionsOfAsync(shipmentNumber, _cancellationToken);
+        open.Select(o => o["type"]!.GetValue<string>()).Should().BeEquivalentTo("DeliveryFailed", "Damaged");
+        open.Single(o => o["type"]!.GetValue<string>() == "Damaged")["numberOfCauses"]!.GetValue<int>().Should().Be(2);
+        await TmsFixture.SettleOutboxAsync(_cancellationToken);
+        tms.Published.Where(m => m.CorrelationId == secondDamagedCorrelationId).Select(m => m.Subject).Should().Equal(["ShipmentExceptionReported"]);
+    }
+
+    [Fact]
+    public async Task AfterResolving_ANewCauseOfTheSameType_OpensANewException()
+    {
+        var (shipmentNumber, reference, _) = await tms.DeliveryFailedShipmentAsync(_cancellationToken);
+        var first = (await tms.OpenExceptionsOfAsync(shipmentNumber, _cancellationToken)).Single()["exceptionNumber"]!.GetValue<string>();
+        await tms.ResolvedAsync(first, Resolution(), _cancellationToken);
+        var correlationId = TmsCalls.NewCorrelationId();
+
+        await tms.ReportDeliveryFailedAsync(reference, _cancellationToken, correlationId);
+
+        await tms.PublishedAsync(correlationId, "ExceptionOpened", _cancellationToken);
+        var open = (await tms.OpenExceptionsOfAsync(shipmentNumber, _cancellationToken)).Should().ContainSingle().Subject;
+        open["exceptionNumber"]!.GetValue<string>().Should().NotBe(first);
+        open["numberOfCauses"]!.GetValue<int>().Should().Be(1);
+    }
+
+    [Fact]
+    public async Task AnExceptionEventAfterDelivered_OpensAnExceptionMarkedAfterDelivered_AndTheShipmentStaysDelivered()
+    {
+        var (shipmentNumber, reference) = await tms.DeliveredShipmentAsync(_cancellationToken);
+        var correlationId = TmsCalls.NewCorrelationId();
+
+        await tms.RecordedAsync(TrackingEventCalls.Event("Damaged", reference, DateTimeOffset.UtcNow.AddMinutes(-1)), _cancellationToken, correlationId);
+
+        BodyOf((await tms.PublishedAsync(correlationId, "ExceptionOpened", _cancellationToken)).Should().ContainSingle().Subject)["afterDelivered"]!.GetValue<bool>().Should().BeTrue();
+        (await tms.OpenExceptionsOfAsync(shipmentNumber, _cancellationToken)).Should().ContainSingle().Which["afterDelivered"]!.GetValue<bool>().Should().BeTrue();
+        (await tms.GetShipmentAsync(shipmentNumber, _cancellationToken))["status"]!.GetValue<string>().Should().Be("Delivered");
+    }
+
+    [Fact]
+    public async Task AProofOfDeliveryWithReservations_OpensOneReservationsException_AndAnotherJoinsIt()
+    {
+        var (shipmentNumber, reference) = await tms.DeliveredShipmentAsync(_cancellationToken);
+        var correlationId = TmsCalls.NewCorrelationId();
+        var metadata = ProofOfDeliveryCalls.Metadata(reference, documentId: "doc-reservations-1");
+        metadata["condition"] = "Reservations";
+
+        await tms.RecordedProofAsync(metadata, [ProofOfDeliveryCalls.Cmr()], _cancellationToken, correlationId);
+
+        var body = BodyOf((await tms.PublishedAsync(correlationId, "ExceptionOpened", _cancellationToken)).Should().ContainSingle().Subject);
+        var results = CanonicalModelSchemas.ValidateExceptionOpened(body);
+        results.IsValid.Should().BeTrue(CanonicalModelSchemas.Errors(results));
+        body["exceptionType"]!.GetValue<string>().Should().Be("Reservations");
+        body["cause"]!["kind"]!.GetValue<string>().Should().Be("ProofOfDelivery");
+        body["cause"]!["sourceEventId"]!.GetValue<string>().Should().Be("doc-reservations-1");
+        body["afterDelivered"]!.GetValue<bool>().Should().BeFalse();
+
+        var second = ProofOfDeliveryCalls.Metadata(reference, documentId: "doc-reservations-2");
+        second["condition"] = "Reservations";
+        var secondCorrelationId = TmsCalls.NewCorrelationId();
+        await tms.RecordedProofAsync(second, [ProofOfDeliveryCalls.Cmr()], _cancellationToken, secondCorrelationId);
+
+        (await tms.OpenExceptionsOfAsync(shipmentNumber, _cancellationToken)).Should().ContainSingle().Which["numberOfCauses"]!.GetValue<int>().Should().Be(2);
+        await TmsFixture.SettleOutboxAsync(_cancellationToken);
+        tms.Published.Where(m => m.CorrelationId == secondCorrelationId).Select(m => m.Subject).Should().NotContain("ExceptionOpened");
+    }
+
+    [Fact]
+    public async Task ACleanProofOfDelivery_OpensNoException()
+    {
+        var (shipmentNumber, reference) = await tms.DeliveredShipmentAsync(_cancellationToken);
+
+        await tms.RecordedProofAsync(ProofOfDeliveryCalls.Metadata(reference), [ProofOfDeliveryCalls.Cmr()], _cancellationToken);
 
         (await tms.OpenExceptionsOfAsync(shipmentNumber, _cancellationToken)).Should().BeEmpty();
     }

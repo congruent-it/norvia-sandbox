@@ -66,6 +66,7 @@ public static class DependencyInjection
         builder.Services.AddSingleton(services => new CarrierBookingOverdueRules(services.GetRequiredService<IOptions<CarrierBookingOptions>>().Value.OverdueAfter));
         builder.Services.AddOptions<TrackingEventOptions>().BindConfiguration(TrackingEventOptions.SectionName)
             .ValidateDataAnnotations().ValidateOnStart();
+        builder.Services.AddScoped<ExceptionCauses>();
         builder.Services.AddSingleton(services => new TrackingEventRules(services.GetRequiredService<IOptions<TrackingEventOptions>>().Value.ClockSkew));
         builder.Services.AddOptions<ProofOfDeliveryOptions>().BindConfiguration(ProofOfDeliveryOptions.SectionName)
             .ValidateDataAnnotations().ValidateOnStart();

@@ -1,5 +1,6 @@
 using Ardalis.SharedKernel;
 using Norvia.Tms.Domain.Carriers;
+using Norvia.Tms.Domain.ProofsOfDelivery;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.Shippers;
 using Norvia.Tms.Domain.TrackingEvents;
@@ -87,15 +88,33 @@ public sealed class ExceptionCase : EntityBase<ExceptionId>, IAggregateRoot
 
     /// <summary>
     /// Opens the Exception a Tracking event of the Shipment causes, with the event as its first cause and its correlation ID,
-    /// and raises ExceptionOpened.
+    /// and raises ExceptionOpened. The Exception is marked after Delivered when the Shipment was Delivered already.
     /// </summary>
     public static ExceptionCase Open(ExceptionNumber number, Shipment shipment, TrackingEvent cause, DateTimeOffset openedAt)
     {
-        ArgumentNullException.ThrowIfNull(number);
-        ArgumentNullException.ThrowIfNull(shipment);
         ArgumentNullException.ThrowIfNull(cause);
         var type = ExceptionTypes.OpenedBy(cause.Type)
             ?? throw new ArgumentException(Invariant($"A {cause.Type} Tracking event opens no Exception."), nameof(cause));
+        return Open(number, shipment, type, ExceptionCause.Of(cause, openedAt), shipment.Status == ShipmentStatus.Delivered);
+    }
+
+    /// <summary>
+    /// Opens the Reservations Exception a Proof of delivery of the Shipment causes, with the Proof of delivery as its first
+    /// cause and its correlation ID, and raises ExceptionOpened. A Proof of delivery usually comes after Delivered, so it
+    /// never marks the Exception after Delivered.
+    /// </summary>
+    public static ExceptionCase Open(ExceptionNumber number, Shipment shipment, ProofOfDelivery cause, DateTimeOffset openedAt)
+    {
+        ArgumentNullException.ThrowIfNull(cause);
+        var type = ExceptionTypes.OpenedBy(cause.Condition)
+            ?? throw new ArgumentException(Invariant($"A {cause.Condition} Proof of delivery opens no Exception."), nameof(cause));
+        return Open(number, shipment, type, ExceptionCause.Of(cause, openedAt), afterDelivered: false);
+    }
+
+    private static ExceptionCase Open(ExceptionNumber number, Shipment shipment, ExceptionType type, ExceptionCause cause, bool afterDelivered)
+    {
+        ArgumentNullException.ThrowIfNull(number);
+        ArgumentNullException.ThrowIfNull(shipment);
         var exception = new ExceptionCase(
             ExceptionId.New(),
             number,
@@ -105,11 +124,11 @@ public sealed class ExceptionCase : EntityBase<ExceptionId>, IAggregateRoot
             shipment.ShipperId,
             shipment.CarriedBy.CarrierId,
             type,
-            shipment.Status == ShipmentStatus.Delivered,
+            afterDelivered,
             cause.CorrelationId,
-            openedAt)
+            cause.AddedAt)
         {
-            Causes = [CauseOf(cause, openedAt)],
+            Causes = [cause],
         };
         exception.RegisterDomainEvent(new ExceptionOpenedEvent(exception, cause));
         return exception;
@@ -124,7 +143,19 @@ public sealed class ExceptionCase : EntityBase<ExceptionId>, IAggregateRoot
             throw new ArgumentException(Invariant($"A {cause.Type} Tracking event is no cause of a {Type} Exception."), nameof(cause));
         }
 
-        Causes = [.. Causes, CauseOf(cause, addedAt)];
+        Causes = [.. Causes, ExceptionCause.Of(cause, addedAt)];
+    }
+
+    /// <summary>Adds a later Proof of delivery of the Exception's type as a cause. It raises nothing.</summary>
+    public void AddCause(ProofOfDelivery cause, DateTimeOffset addedAt)
+    {
+        ArgumentNullException.ThrowIfNull(cause);
+        if (ExceptionTypes.OpenedBy(cause.Condition) != Type)
+        {
+            throw new ArgumentException(Invariant($"A {cause.Condition} Proof of delivery is no cause of a {Type} Exception."), nameof(cause));
+        }
+
+        Causes = [.. Causes, ExceptionCause.Of(cause, addedAt)];
     }
 
     /// <summary>
@@ -153,7 +184,4 @@ public sealed class ExceptionCase : EntityBase<ExceptionId>, IAggregateRoot
         RegisterDomainEvent(new ExceptionResolvedEvent(this));
         return null;
     }
-
-    private static ExceptionCause CauseOf(TrackingEvent trackingEvent, DateTimeOffset addedAt) =>
-        new(trackingEvent.Id, trackingEvent.SourceEventId, trackingEvent.CorrelationId, addedAt);
 }
