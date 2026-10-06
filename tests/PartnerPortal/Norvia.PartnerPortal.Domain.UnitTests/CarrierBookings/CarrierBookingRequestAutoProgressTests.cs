@@ -80,14 +80,59 @@ public sealed class CarrierBookingRequestAutoProgressTests
     }
 
     [Fact]
-    public void ReportTracking_Delivered_EndsTheSchedule()
+    public void ReportTracking_Delivered_PutsTheProofOfDeliveryADelayAfterIt()
     {
         var request = Request();
         request.ScheduleAutoProgress(Delay, Confirmed);
 
         request.ReportTracking(TrackingEventType.Delivered, Confirmed);
 
+        request.AutoProgressDueAt.Should().Be(Confirmed + Delay);
+        request.AutoProgressDue(Confirmed + Delay).Should().BeNull("Delivered is the last Tracking event");
+        request.AutoProofOfDeliveryDue(Confirmed + Delay - TimeSpan.FromMilliseconds(1)).Should().BeFalse();
+        request.AutoProofOfDeliveryDue(Confirmed + Delay).Should().BeTrue();
+    }
+
+    [Fact]
+    public void AutoProofOfDeliveryDue_BeforeTheShipmentIsDelivered_IsFalse()
+    {
+        var request = Request();
+        request.ScheduleAutoProgress(Delay, Confirmed);
+
+        request.AutoProofOfDeliveryDue(Confirmed.AddDays(1)).Should().BeFalse();
+    }
+
+    [Fact]
+    public void AutoProofOfDeliveryDue_ForARequestSentByHand_IsFalse()
+    {
+        var request = Request();
+        request.ReportTracking(TrackingEventType.Delivered, Confirmed);
+
+        request.AutoProofOfDeliveryDue(Confirmed.AddDays(1)).Should().BeFalse();
+    }
+
+    [Fact]
+    public void ReportAutoProofOfDelivery_EndsTheSchedule()
+    {
+        var request = Request();
+        request.ScheduleAutoProgress(Delay, Confirmed);
+        request.ReportTracking(TrackingEventType.Delivered, Confirmed);
+
+        request.ReportAutoProofOfDelivery();
+
         request.AutoProgressDueAt.Should().BeNull();
+        request.AutoProofOfDeliveryDue(Confirmed.AddDays(1)).Should().BeFalse();
+    }
+
+    [Fact]
+    public void ReportAutoProofOfDelivery_BeforeTheShipmentIsDelivered_ChangesNothing()
+    {
+        var request = Request();
+        request.ScheduleAutoProgress(Delay, Confirmed);
+
+        request.ReportAutoProofOfDelivery();
+
+        request.AutoProgressDueAt.Should().Be(Confirmed + Delay);
     }
 
     [Fact]

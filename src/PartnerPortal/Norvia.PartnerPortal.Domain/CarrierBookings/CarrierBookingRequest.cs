@@ -68,7 +68,7 @@ public sealed class CarrierBookingRequest : EntityBase<CarrierBookingRequestId>,
     /// <summary>The delay between the automatic Tracking events, if the Persona's policy was auto-progress when it confirmed. It stays the request's whatever the policy becomes.</summary>
     public TimeSpan? AutoProgressDelay { get; private set; }
 
-    /// <summary>When the next automatic Tracking event is due; null for a request sent by hand, and once the Shipment is Delivered.</summary>
+    /// <summary>When the next automatic Tracking event, or once the Shipment is Delivered its Proof of delivery, is due; null for a request sent by hand, and once the Proof of delivery has gone.</summary>
     public DateTimeOffset? AutoProgressDueAt { get; private set; }
 
     /// <summary>The last progress Tracking event the Persona sent for the Shipment; null until it sends one.</summary>
@@ -146,7 +146,7 @@ public sealed class CarrierBookingRequest : EntityBase<CarrierBookingRequestId>,
             LastProgress = type;
             if (AutoProgressDelay is { } delay && sentAt is { } at)
             {
-                AutoProgressDueAt = TrackingRules.NextAutomatic(type) is null ? null : at + delay;
+                AutoProgressDueAt = at + delay;
             }
         }
 
@@ -171,6 +171,19 @@ public sealed class CarrierBookingRequest : EntityBase<CarrierBookingRequestId>,
     /// <summary>The automatic Tracking event that is due at <paramref name="now"/>; null when none was scheduled or it isn't due yet.</summary>
     public TrackingEventType? AutoProgressDue(DateTimeOffset now) =>
         Status == CarrierBookingRequestStatus.Confirmed && AutoProgressDueAt is { } dueAt && dueAt <= now ? TrackingRules.NextAutomatic(LastProgress) : null;
+
+    /// <summary>Whether the Persona's own Proof of delivery is due at <paramref name="now"/>: the Shipment is Delivered, and a delay has passed since.</summary>
+    public bool AutoProofOfDeliveryDue(DateTimeOffset now) =>
+        Status == CarrierBookingRequestStatus.Confirmed && LastProgress == TrackingEventType.Delivered && AutoProgressDueAt is { } dueAt && dueAt <= now;
+
+    /// <summary>Records that the Persona's automatic Proof of delivery went out, which ends the schedule. Nothing before the Shipment is Delivered.</summary>
+    public void ReportAutoProofOfDelivery()
+    {
+        if (LastProgress == TrackingEventType.Delivered)
+        {
+            AutoProgressDueAt = null;
+        }
+    }
 
     /// <summary>Puts the automatic Tracking event off to <paramref name="until"/>, after an attempt that didn't move the Shipment on.</summary>
     public void DeferAutoProgress(DateTimeOffset until)
