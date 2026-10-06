@@ -79,8 +79,9 @@ public sealed class RecordProofOfDeliveryHandler(
         // The record, the Exception it opens or joins and the events they raise, which go to the outbox, are saved in one transaction.
         // A new document ID for a Shipment that already has a current Proof of delivery replaces it: the earlier one is kept, superseded.
         var replaced = await proofsOfDelivery.SingleOrDefaultAsync(new TrackedCurrentProofOfDeliverySpec(shipment.Id), cancellationToken);
-        var proofOfDelivery = ProofOfDelivery.Record(shipment, report, new CorrelationId(command.CorrelationId), time.GetUtcNow(), replaced);
-        await exceptionCauses.OpenOrAddAsync(shipment, proofOfDelivery, time.GetUtcNow(), cancellationToken);
+        var now = time.GetUtcNow();
+        var proofOfDelivery = ProofOfDelivery.Record(shipment, report, new CorrelationId(command.CorrelationId), now, replaced);
+        await exceptionCauses.OpenOrAddAsync(shipment, proofOfDelivery, now, cancellationToken);
         await proofsOfDelivery.AddAsync(proofOfDelivery, cancellationToken);
         await proofsOfDelivery.SaveChangesAsync(cancellationToken);
         return RecordProofOfDeliveryResult.From(shipment, proofOfDelivery);
