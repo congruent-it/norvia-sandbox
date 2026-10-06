@@ -57,7 +57,8 @@ public sealed class ListOpenExceptionsHandlerTests
                 NumberOfCauses: 2,
                 AfterDelivered: false,
                 CauseCleared: false,
-                Notes: []),
+                Notes: [],
+                LastShipperNotificationStatus: null),
             new OpenExceptionSummary(
                 "EX-0000006",
                 "SH-0000013",
@@ -68,7 +69,8 @@ public sealed class ListOpenExceptionsHandlerTests
                 NumberOfCauses: 1,
                 AfterDelivered: false,
                 CauseCleared: false,
-                Notes: [])],
+                Notes: [],
+                LastShipperNotificationStatus: null)],
             options => options.WithStrictOrdering());
     }
 

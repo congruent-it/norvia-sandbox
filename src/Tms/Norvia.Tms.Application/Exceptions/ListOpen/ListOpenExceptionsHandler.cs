@@ -23,7 +23,7 @@ public sealed class ListOpenExceptionsHandler(
         var open = await exceptions.ListAsync(new OpenExceptionsSpec(), cancellationToken);
         var lastStatusOf = (await notifications.ListAsync(new ShipperNotificationsOfExceptionsSpec([.. open.Select(exception => exception.Id)]), cancellationToken))
             .GroupBy(notification => notification.ExceptionId)
-            .ToDictionary(group => group.Key, group => group.MaxBy(notification => notification.RequestedAt)!.Status);
+            .ToDictionary(group => group.Key, group => ShipperNotification.LastOf(group)?.Status);
         return [.. open.Select(exception => new OpenExceptionSummary(
             exception.Number.Value,
             exception.ShipmentNumber.Value,
@@ -35,6 +35,6 @@ public sealed class ListOpenExceptionsHandler(
             exception.AfterDelivered,
             exception.CauseCleared,
             [.. exception.Notes.Select(note => new ExceptionNoteSummary(note.Text, note.Planner, note.AddedAt, note.CorrelationId.Value))],
-            lastStatusOf.TryGetValue(exception.Id, out var status) ? status : null))];
+            lastStatusOf.GetValueOrDefault(exception.Id)))];
     }
 }

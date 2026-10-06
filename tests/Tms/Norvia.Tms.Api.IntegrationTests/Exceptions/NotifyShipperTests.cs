@@ -99,6 +99,41 @@ public sealed class NotifyShipperTests(TmsFixture tms) : IClassFixture<TmsFixtur
     }
 
     [Fact]
+    public async Task NotDelivered_WithoutAStatusCode_IsRecorded_AsATimeoutHasNone()
+    {
+        var exceptionNumber = await OpenDeliveryFailedExceptionAsync();
+        var (notificationId, correlationId) = await NotifiedAsync(exceptionNumber);
+
+        using var response = await tms.ReportShipperNotificationNotDeliveredAsync(notificationId, _cancellationToken, statusCode: null, message: "Timed out.", correlationId: correlationId);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var message = (await tms.PublishedAsync(correlationId, "ShipperNotificationNotDelivered", _cancellationToken)).Should().ContainSingle().Subject;
+        var body = BodyOf(message);
+        CanonicalModelSchemas.ValidateShipperNotificationNotDelivered(body).IsValid.Should().BeTrue();
+        body["statusCode"].Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ConcurrentReports_OneIsRecorded_TheOtherIgnored_NeitherFails()
+    {
+        var exceptionNumber = await OpenDeliveryFailedExceptionAsync();
+        var (notificationId, correlationId) = await NotifiedAsync(exceptionNumber);
+
+        var responses = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => tms.ReportShipperNotificationSentAsync(notificationId, _cancellationToken, correlationId)));
+
+        responses.Should().OnlyContain(response => response.StatusCode == HttpStatusCode.OK);
+        var ignored = new List<bool>();
+        foreach (var response in responses)
+        {
+            ignored.Add(JsonNode.Parse(await response.Content.ReadAsStringAsync(_cancellationToken))!["ignored"]!.GetValue<bool>());
+            response.Dispose();
+        }
+
+        ignored.Count(i => !i).Should().Be(1);
+        (await LastStatusAsync(exceptionNumber)).Should().Be("Sent");
+    }
+
+    [Fact]
     public async Task ALateOrRepeatReport_IsIgnored_AndPublishesNothing()
     {
         var exceptionNumber = await OpenDeliveryFailedExceptionAsync();

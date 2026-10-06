@@ -17,7 +17,7 @@
     "shipmentNumber": { "type": "string", "pattern": "^SH-[0-9]{7}$" },
     "transportOrderNumber": { "description": "The Transport Order the Shipment carries out.", "type": "string", "pattern": "^TO-[0-9]{7}$" },
     "shipperId": { "description": "The Shipper the message was addressed to.", "type": "string", "minLength": 1 },
-    "statusCode": { "description": "The Shipper endpoint's HTTP status code, or the technical failure's own code.", "type": "integer" },
+    "statusCode": { "description": "The Shipper endpoint's HTTP status code; null when the failure had none, such as a timeout.", "type": ["integer", "null"] },
     "message": { "description": "The technical cause in plain language.", "type": "string", "minLength": 1 }
   }
 }

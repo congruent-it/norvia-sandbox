@@ -23,4 +23,4 @@ public sealed record OpenExceptionSummary(
     bool AfterDelivered,
     bool CauseCleared,
     IReadOnlyList<ExceptionNoteSummary> Notes,
-    ShipperNotificationStatus? LastShipperNotificationStatus = null);
+    ShipperNotificationStatus? LastShipperNotificationStatus);

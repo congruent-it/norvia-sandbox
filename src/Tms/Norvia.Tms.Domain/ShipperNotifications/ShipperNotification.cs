@@ -87,7 +87,7 @@ public sealed class ShipperNotification : EntityBase<ShipperNotificationId>, IAg
 
     public DateTimeOffset? NotDeliveredAt { get; private set; }
 
-    /// <summary>The endpoint's HTTP status code, or the technical failure's own code, of a Not delivered notification.</summary>
+    /// <summary>The endpoint's HTTP status code of a Not delivered notification; null when the failure had none, such as a timeout.</summary>
     public int? NotDeliveredStatusCode { get; private set; }
 
     /// <summary>The technical cause of a Not delivered notification, in plain language.</summary>
@@ -132,6 +132,13 @@ public sealed class ShipperNotification : EntityBase<ShipperNotificationId>, IAg
         return notification;
     }
 
+    /// <summary>The notification the Planner requested last, which is the one the Planner's list shows the status of; null for none.</summary>
+    public static ShipperNotification? LastOf(IEnumerable<ShipperNotification> notifications)
+    {
+        ArgumentNullException.ThrowIfNull(notifications);
+        return notifications.MaxBy(notification => notification.RequestedAt);
+    }
+
     /// <summary>Records the Shipper's endpoint acknowledged the notification. Returns false, changing nothing, for one that is no longer Requested.</summary>
     public bool ReportSent(DateTimeOffset sentAt)
     {
@@ -149,7 +156,7 @@ public sealed class ShipperNotification : EntityBase<ShipperNotificationId>, IAg
     /// Records the notification never reached the Shipper, with the technical cause, and raises ShipperNotificationNotDelivered.
     /// Returns false, changing nothing, for one that is no longer Requested.
     /// </summary>
-    public bool ReportNotDelivered(int statusCode, string message, DateTimeOffset notDeliveredAt)
+    public bool ReportNotDelivered(int? statusCode, string message, DateTimeOffset notDeliveredAt)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
         if (Status != ShipperNotificationStatus.Requested)

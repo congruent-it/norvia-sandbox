@@ -10,7 +10,7 @@ namespace Norvia.Tms.Application.ShipperNotifications.Report;
 /// Published under the correlation ID of the Planner's action the report continues.
 /// </summary>
 /// <param name="CorrelationId">The Planner's action's own correlation ID, which the report continues.</param>
-/// <param name="StatusCode">The Shipper endpoint's HTTP status code, or the technical failure's own code.</param>
+/// <param name="StatusCode">The Shipper endpoint's HTTP status code, or null when the failure had none, such as a timeout.</param>
 /// <param name="Message">The technical cause in plain language.</param>
 public sealed record ShipperNotificationNotDeliveredV1(
     Guid EventId,
@@ -21,7 +21,7 @@ public sealed record ShipperNotificationNotDeliveredV1(
     string ShipmentNumber,
     string TransportOrderNumber,
     string ShipperId,
-    int StatusCode,
+    int? StatusCode,
     string Message)
     : IntegrationEvent(EventId, OccurredAt, CorrelationId)
 {
@@ -44,7 +44,7 @@ public sealed record ShipperNotificationNotDeliveredV1(
             notification.ShipmentNumber.Value,
             notification.TransportOrderNumber.Value,
             notification.ShipperId.Value,
-            notification.NotDeliveredStatusCode ?? throw NotReported(notification),
+            notification.NotDeliveredStatusCode,
             notification.NotDeliveredMessage ?? throw NotReported(notification));
     }
 

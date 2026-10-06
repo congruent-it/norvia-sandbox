@@ -39,14 +39,14 @@ internal static class ShipperNotificationCalls
         this TmsFixture tms,
         string notificationId,
         CancellationToken cancellationToken,
-        int statusCode = 503,
+        int? statusCode = 503,
         string message = "Service unavailable.",
         string? correlationId = null,
         HttpClient? caller = null)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"/v1/shipper-notifications/{notificationId}/report-not-delivered", UriKind.Relative))
         {
-            Content = JsonContent.Create(new JsonObject { ["statusCode"] = statusCode, ["message"] = message }),
+            Content = JsonContent.Create(new JsonObject { ["statusCode"] = statusCode is { } code ? code : null, ["message"] = message }),
         };
         request.Headers.Add("X-Correlation-ID", correlationId ?? Guid.NewGuid().ToString());
         return await (caller ?? tms.ShipperNotificationReport).SendAsync(request, cancellationToken);
