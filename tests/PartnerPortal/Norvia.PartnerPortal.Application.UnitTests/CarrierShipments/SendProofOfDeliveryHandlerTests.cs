@@ -99,6 +99,14 @@ public sealed class SendProofOfDeliveryHandlerTests
     }
 
     [Fact]
+    public async Task Handle_CleanWithARemarkLeftOver_SendsNone()
+    {
+        await Send(remark: "Left over from reservations");
+
+        _partnerApi.ProofsOfDelivery.Should().ContainSingle().Which.Proof.Remark.Should().BeNull();
+    }
+
+    [Fact]
     public async Task Handle_NorviaRefusesIt_StillReturnsTheReply_ForThePortalToTell()
     {
         _partnerApi.Reply = TrackingReply.Refused("Not a Carrier.", "corr-2");

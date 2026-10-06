@@ -56,8 +56,9 @@ public sealed class SendProofOfDeliveryHandler(
         return new SentProofOfDelivery(CarrierShipmentView.From(request), proof, reply);
     }
 
+    // A remark belongs to reservations: a clean Proof of delivery carries none, whatever was typed before the condition changed.
     private static string? Remark(SendProofOfDeliveryCommand command) =>
-        string.IsNullOrWhiteSpace(command.Remark) ? null : command.Remark.Trim();
+        command.Condition == ProofOfDeliveryCondition.Reservations && !string.IsNullOrWhiteSpace(command.Remark) ? command.Remark.Trim() : null;
 
     private static string? Invalidity(SendProofOfDeliveryCommand command)
     {
