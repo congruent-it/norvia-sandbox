@@ -16,3 +16,5 @@ src/Integration/BookingLogicApp/lib/
 src/Integration/AnswerLogicApp/lib/
 # The Carrier-tracking Logic App's local functions, written there by building their project.
 src/Integration/TrackingLogicApp/lib/
+# The Carrier Proof of delivery Logic App's local functions, written there by building their project.
+src/Integration/ProofOfDeliveryLogicApp/lib/

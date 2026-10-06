@@ -1,0 +1,241 @@
+<policies>
+  <inbound>
+    <base />
+    <set-variable name="correlationId" value="@(Guid.NewGuid().ToString())" />
+    <validate-azure-ad-token tenant-id="{{entra-tenant-id}}" output-token-variable-name="partnerToken">
+      <audiences>
+        <audience>{{partner-api-client-id}}</audience>
+      </audiences>
+    </validate-azure-ad-token>
+    <choose>
+      <when condition="@(!((Jwt)context.Variables[&quot;partnerToken&quot;]).Claims.GetValueOrDefault(&quot;roles&quot;, &quot;&quot;).Split(',').Contains(&quot;ProofsOfDelivery.Submit&quot;))">
+        <trace source="norvia-partner-api" severity="information">
+          <message>This client may not submit Proofs of delivery.</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="carrier-proof-of-delivery" />
+          <metadata name="outcome" value="Refused" />
+          <metadata name="failureCode" value="NotAllowedToSubmitProofOfDelivery" />
+        </trace>
+        <return-response>
+          <set-status code="403" reason="Forbidden" />
+          <set-header name="X-Correlation-ID" exists-action="override">
+            <value>@((string)context.Variables["correlationId"])</value>
+          </set-header>
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+          </set-header>
+          <set-body>@(new JObject(
+            new JProperty("messageId", (string)context.Variables["correlationId"]),
+            new JProperty("text", "This client may not submit Proofs of delivery.")).ToString())</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <!-- At most 25 MB: the Content-Length when the Carrier sent one, otherwise the body's own length. Nothing is stored or queued for a body over it. -->
+    <choose>
+      <when condition="@{
+        long declared;
+        if (long.TryParse(context.Request.Headers.GetValueOrDefault(&quot;Content-Length&quot;, &quot;&quot;), out declared))
+        {
+          return declared &gt; 26214400;
+        }
+        return context.Request.Body.As&lt;byte[]&gt;(preserveContent: true).Length &gt; 26214400;
+      }">
+        <trace source="norvia-partner-api" severity="information">
+          <message>The Proof of delivery is over 25 MB.</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="carrier-proof-of-delivery" />
+          <metadata name="outcome" value="Refused" />
+          <metadata name="failureCode" value="ProofOfDeliveryTooLarge" />
+        </trace>
+        <return-response>
+          <set-status code="413" reason="Request Entity Too Large" />
+          <set-header name="X-Correlation-ID" exists-action="override">
+            <value>@((string)context.Variables["correlationId"])</value>
+          </set-header>
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+          </set-header>
+          <set-body>@(new JObject(
+            new JProperty("messageId", (string)context.Variables["correlationId"]),
+            new JProperty("text", "A Proof of delivery is at most 25 MB.")).ToString())</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <set-variable name="carrierId" value="@{
+      var clientId = ((Jwt)context.Variables[&quot;partnerToken&quot;]).Claims.GetValueOrDefault(&quot;azp&quot;, &quot;&quot;);
+      foreach (var entry in &quot;{{carriers-by-client-id}}&quot;.Split(';'))
+      {
+        var pair = entry.Split('=');
+        if (pair.Length == 2 &amp;&amp; pair[0] == clientId) { return pair[1]; }
+      }
+      return &quot;&quot;;
+    }" />
+    <choose>
+      <when condition="@(string.IsNullOrEmpty((string)context.Variables[&quot;carrierId&quot;]))">
+        <trace source="norvia-partner-api" severity="information">
+          <message>No Carrier is registered for this client.</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="carrier-proof-of-delivery" />
+          <metadata name="outcome" value="Refused" />
+          <metadata name="failureCode" value="NoCarrierForClient" />
+        </trace>
+        <return-response>
+          <set-status code="403" reason="Forbidden" />
+          <set-header name="X-Correlation-ID" exists-action="override">
+            <value>@((string)context.Variables["correlationId"])</value>
+          </set-header>
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+          </set-header>
+          <set-body>@(new JObject(
+            new JProperty("messageId", (string)context.Variables["correlationId"]),
+            new JProperty("text", "No Carrier is registered for this client.")).ToString())</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <!-- The Carrier's own document ID, when the body is JSON that has one. A body that isn't is still stored and queued: the map fails the run and the message is dead-lettered. -->
+    <set-variable name="sourceMessageId" value="@{
+      try
+      {
+        var message = context.Request.Body.As&lt;JObject&gt;(preserveContent: true);
+        var documentId = message[&quot;documentId&quot;];
+        return documentId != null &amp;&amp; documentId.Type == JTokenType.String ? (string)documentId : &quot;&quot;;
+      }
+      catch (Exception)
+      {
+        return &quot;&quot;;
+      }
+    }" />
+    <!-- The claim check: the body, unparsed, as a blob named for the correlation ID, written as API Management's own identity. -->
+    <send-request mode="new" response-variable-name="stored" timeout="60" ignore-error="true">
+      <set-url>@("https://{{inbound-storage-account}}.blob.core.windows.net/{{inbound-container-name}}/" + (string)context.Variables["correlationId"])</set-url>
+      <set-method>PUT</set-method>
+      <set-header name="x-ms-blob-type" exists-action="override">
+        <value>BlockBlob</value>
+      </set-header>
+      <set-header name="x-ms-version" exists-action="override">
+        <value>2021-08-06</value>
+      </set-header>
+      <set-header name="Content-Type" exists-action="override">
+        <value>application/json</value>
+      </set-header>
+      <set-body>@(context.Request.Body.As&lt;byte[]&gt;(preserveContent: true))</set-body>
+      <authentication-managed-identity resource="https://storage.azure.com" client-id="{{api-management-identity-client-id}}" />
+    </send-request>
+    <choose>
+      <when condition="@(context.Variables[&quot;stored&quot;] == null || ((IResponse)context.Variables[&quot;stored&quot;]).StatusCode != 201)">
+        <trace source="norvia-partner-api" severity="information">
+          <message>The Proof of delivery could not be stored.</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="carrier-proof-of-delivery" />
+          <metadata name="partyId" value="@((string)context.Variables[&quot;carrierId&quot;])" />
+          <metadata name="outcome" value="Failed" />
+          <metadata name="failureCode" value="ProofOfDeliveryNotStored" />
+        </trace>
+        <return-response>
+          <set-status code="503" reason="Service Unavailable" />
+          <set-header name="X-Correlation-ID" exists-action="override">
+            <value>@((string)context.Variables["correlationId"])</value>
+          </set-header>
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+          </set-header>
+          <set-body>@(new JObject(
+            new JProperty("messageId", (string)context.Variables["correlationId"]),
+            new JProperty("text", "The Proof of delivery was not accepted. Send it again.")).ToString())</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <!-- Only now the reference: Service Bus's REST send, as API Management's own identity. The message is the blob's reference, never the Proof of delivery. -->
+    <send-request mode="new" response-variable-name="enqueued" timeout="20" ignore-error="true">
+      <set-url>https://{{service-bus-namespace}}.servicebus.windows.net/{{proof-of-delivery-queue-name}}/messages</set-url>
+      <set-method>POST</set-method>
+      <set-header name="Content-Type" exists-action="override">
+        <value>application/json</value>
+      </set-header>
+      <set-header name="BrokerProperties" exists-action="override">
+        <value>@(new JObject(new JProperty("MessageId", (string)context.Variables["correlationId"])).ToString(Newtonsoft.Json.Formatting.None))</value>
+      </set-header>
+      <!-- Each of these headers becomes an application property of the message (coding guidelines §7). -->
+      <set-header name="correlationId" exists-action="override">
+        <value>@((string)context.Variables["correlationId"])</value>
+      </set-header>
+      <set-header name="flow" exists-action="override">
+        <value>carrier-proof-of-delivery</value>
+      </set-header>
+      <set-header name="partyId" exists-action="override">
+        <value>@((string)context.Variables["carrierId"])</value>
+      </set-header>
+      <set-header name="sourceMessageId" exists-action="@(string.IsNullOrEmpty((string)context.Variables[&quot;sourceMessageId&quot;]) ? &quot;delete&quot; : &quot;override&quot;)">
+        <value>@((string)context.Variables["sourceMessageId"])</value>
+      </set-header>
+      <set-body>@(new JObject(
+        new JProperty("container", "{{inbound-container-name}}"),
+        new JProperty("blobName", (string)context.Variables["correlationId"])).ToString(Newtonsoft.Json.Formatting.None))</set-body>
+      <authentication-managed-identity resource="https://servicebus.azure.net" client-id="{{api-management-identity-client-id}}" />
+    </send-request>
+    <choose>
+      <when condition="@(context.Variables[&quot;enqueued&quot;] == null || ((IResponse)context.Variables[&quot;enqueued&quot;]).StatusCode != 201)">
+        <trace source="norvia-partner-api" severity="information">
+          <message>The Proof of delivery's reference could not be put on the Proof of delivery queue.</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="carrier-proof-of-delivery" />
+          <metadata name="partyId" value="@((string)context.Variables[&quot;carrierId&quot;])" />
+          <metadata name="outcome" value="Failed" />
+          <metadata name="failureCode" value="ProofOfDeliveryNotQueued" />
+        </trace>
+        <return-response>
+          <set-status code="503" reason="Service Unavailable" />
+          <set-header name="X-Correlation-ID" exists-action="override">
+            <value>@((string)context.Variables["correlationId"])</value>
+          </set-header>
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+          </set-header>
+          <set-body>@(new JObject(
+            new JProperty("messageId", (string)context.Variables["correlationId"]),
+            new JProperty("text", "The Proof of delivery was not accepted. Send it again.")).ToString())</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <trace source="norvia-partner-api" severity="information">
+      <message>Accepted: stored, and its reference put on the Proof of delivery queue</message>
+      <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+      <metadata name="flow" value="carrier-proof-of-delivery" />
+      <metadata name="partyId" value="@((string)context.Variables[&quot;carrierId&quot;])" />
+      <metadata name="sourceMessageId" value="@((string)context.Variables[&quot;sourceMessageId&quot;])" />
+      <metadata name="outcome" value="Succeeded" />
+    </trace>
+    <return-response>
+      <set-status code="202" reason="Accepted" />
+      <set-header name="X-Correlation-ID" exists-action="override">
+        <value>@((string)context.Variables["correlationId"])</value>
+      </set-header>
+      <set-header name="Content-Type" exists-action="override">
+        <value>application/json</value>
+      </set-header>
+      <set-body>@(new JObject(new JProperty("messageId", (string)context.Variables["correlationId"])).ToString())</set-body>
+    </return-response>
+  </inbound>
+  <backend>
+    <base />
+  </backend>
+  <outbound>
+    <base />
+  </outbound>
+  <on-error>
+    <base />
+    <!-- API Management checks the subscription key before the inbound section runs. -->
+    <set-variable name="correlationId" value="@(context.Variables.ContainsKey(&quot;correlationId&quot;) ? (string)context.Variables[&quot;correlationId&quot;] : Guid.NewGuid().ToString())" />
+    <trace source="norvia-partner-api" severity="information">
+      <message>@(context.LastError.Message)</message>
+      <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+      <metadata name="flow" value="carrier-proof-of-delivery" />
+      <metadata name="outcome" value="@(context.Response.StatusCode == 401 || context.Response.StatusCode == 403 ? &quot;Refused&quot; : &quot;Failed&quot;)" />
+      <metadata name="failureCode" value="@(string.IsNullOrEmpty(context.LastError.Reason) ? context.LastError.Source : context.LastError.Reason)" />
+    </trace>
+    <set-header name="X-Correlation-ID" exists-action="override">
+      <value>@((string)context.Variables["correlationId"])</value>
+    </set-header>
+  </on-error>
+</policies>

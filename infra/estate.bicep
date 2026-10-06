@@ -30,7 +30,7 @@ postdeploy hook stores it, so the console's app registration keeps it when the e
 param integrationConsoleRedirectUris string = ''
 
 @description('''The TMS API's address, empty before the apps are first deployed. azd's postdeploy hook stores it, so the intake,
-Carrier-answer and Carrier-tracking Logic Apps keep it when the estate is deployed again.''')
+Carrier-answer, Carrier-tracking and Carrier Proof of delivery Logic Apps keep it when the estate is deployed again.''')
 param tmsBaseUrl string = ''
 
 @secure()
@@ -71,6 +71,7 @@ module messaging 'estate/messaging.bicep' = {
     presenterPrincipalId: presenterPrincipalId
     bookingPrincipalId: identities.outputs.bookingPrincipalId
     trackingPrincipalId: identities.outputs.trackingPrincipalId
+    proofOfDeliveryPrincipalId: identities.outputs.proofOfDeliveryPrincipalId
     apiManagementPrincipalId: identities.outputs.apiManagementPrincipalId
   }
 }
@@ -161,6 +162,36 @@ module trackingLogicApp 'estate/tracking-logic-app.bicep' = {
   }
 }
 
+module inboundStorage 'estate/inbound-storage.bicep' = {
+  scope: resourceGroup
+  params: {
+    location: location
+    tags: tags
+    integrationRetentionDays: integrationRetentionDays
+    apiManagementPrincipalId: identities.outputs.apiManagementPrincipalId
+    proofOfDeliveryPrincipalId: identities.outputs.proofOfDeliveryPrincipalId
+  }
+}
+
+module proofOfDeliveryLogicApp 'estate/proof-of-delivery-logic-app.bicep' = {
+  scope: resourceGroup
+  params: {
+    location: location
+    tags: tags
+    integrationRetentionDays: integrationRetentionDays
+    proofOfDeliveryIdentityName: identities.outputs.proofOfDeliveryIdentityName
+    tmsApiClientId: identities.outputs.tmsApiClientId
+    tmsBaseUrl: tmsBaseUrl
+    applicationInsightsName: monitoring.outputs.applicationInsightsName
+    serviceBusName: messaging.outputs.namespaceName
+    inboundContainerName: inboundStorage.outputs.containerName
+    inboundBlobEndpoint: inboundStorage.outputs.blobEndpoint
+    planName: intakeLogicApp.outputs.planName
+    contentKeyVaultName: intakeLogicApp.outputs.keyVaultName
+    integrationConsolePrincipalId: identities.outputs.integrationConsolePrincipalId
+  }
+}
+
 module partnerApi 'estate/partner-api.bicep' = {
   scope: resourceGroup
   params: {
@@ -177,6 +208,9 @@ module partnerApi 'estate/partner-api.bicep' = {
     answerTriggerAudience: identities.outputs.answerTriggerAudience
     serviceBusName: messaging.outputs.namespaceName
     trackingQueueName: messaging.outputs.queueName
+    proofOfDeliveryQueueName: messaging.outputs.proofOfDeliveryQueueName
+    inboundStorageAccountName: inboundStorage.outputs.storageAccountName
+    inboundContainerName: inboundStorage.outputs.containerName
     applicationInsightsName: monitoring.outputs.applicationInsightsName
     partnerPortalPrincipalId: identities.outputs.partnerPortalPrincipalId
     bookingPrincipalId: identities.outputs.bookingPrincipalId
@@ -210,6 +244,9 @@ output ESTATE_ANSWER_IDENTITY_NAME string = identities.outputs.answerIdentityNam
 output ESTATE_TRACKING_LOGIC_APP string = trackingLogicApp.outputs.logicAppName
 output ESTATE_TRACKING_CLIENT_ID string = identities.outputs.trackingClientId
 output ESTATE_TRACKING_IDENTITY_NAME string = identities.outputs.trackingIdentityName
+output ESTATE_PROOF_OF_DELIVERY_LOGIC_APP string = proofOfDeliveryLogicApp.outputs.logicAppName
+output ESTATE_PROOF_OF_DELIVERY_CLIENT_ID string = identities.outputs.proofOfDeliveryClientId
+output ESTATE_PROOF_OF_DELIVERY_IDENTITY_NAME string = identities.outputs.proofOfDeliveryIdentityName
 output ESTATE_API_MANAGEMENT string = partnerApi.outputs.apiManagementName
 output ESTATE_PARTNER_API_URL string = partnerApi.outputs.partnerApiUrl
 output ESTATE_PARTNER_API_CLIENT_ID string = identities.outputs.partnerApiClientId

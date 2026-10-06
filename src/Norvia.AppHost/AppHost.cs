@@ -185,6 +185,10 @@ else
     // (ADR 0008). A message the TMS refuses is dead-lettered; one it can't be given to is delivered again up to the
     // maximum delivery count, then dead-lettered by Service Bus itself. The estate Bicep sets the same count.
     messaging.AddServiceBusQueue("carrier-tracking").WithProperties(queue => queue.MaxDeliveryCount = 10);
+    // The Proof of delivery queue holds only the reference to a blob in the inbound container, which API Management stores a
+    // Carrier's Proof of delivery in (ADR 0009). Azurite holds the container here; the estate Bicep makes it in Azure.
+    messaging.AddServiceBusQueue("carrier-proof-of-delivery").WithProperties(queue => queue.MaxDeliveryCount = 10);
+    storage.AddBlobContainer("inbound-proofs-of-delivery");
 
     // Locally there is no Easy Auth, so the console signs the developer in as an Integration operator with both app
     // roles, as the estate assigns the presenter. It reads Azure with the developer's own sign-in.
@@ -252,6 +256,7 @@ else
     var partnerApi = builder.AddProject<Projects.Norvia_Integration_LocalPartnerApi>("partner-api")
         .WithReference(tmsApi).WaitFor(tmsApi)
         .WithReference(messaging).WaitFor(messaging)
+        .WithReference(blobs).WaitFor(blobs)
         .WithHttpHealthCheck("/health")
         .WithEnvironment("PartnerApi__Tokens__Issuer", LocalTokens.Issuer)
         .WithEnvironment("PartnerApi__Tokens__Audience", LocalTokens.PartnerApiAudience)
@@ -279,6 +284,17 @@ else
         .WithEnvironment("Tracking__TmsTokens__Issuer", LocalTokens.Issuer)
         .WithEnvironment("Tracking__TmsTokens__Audience", LocalTokens.TmsAudience)
         .WithEnvironment("Tracking__TmsTokens__ClientId", LocalTokens.TrackingLogicAppClientId);
+    // Locally a worker plays the Carrier Proof of delivery Logic App as well (ADR 0032). It reads the Proof of delivery queue
+    // the stand-in fills, fetches the blob the stand-in stored, and records the Proof of delivery with the TMS as the
+    // identity holding the record role.
+    var proofOfDeliveryWorker = builder.AddProject<Projects.Norvia_Integration_LocalProofOfDeliveryWorker>("proof-of-delivery-worker")
+        .WithReference(messaging).WaitFor(messaging)
+        .WithReference(blobs).WaitFor(blobs)
+        .WithReference(tmsApi).WaitFor(tmsApi)
+        .WithEnvironment("ProofOfDelivery__TmsBaseAddress", tmsApi.GetEndpoint("http"))
+        .WithEnvironment("ProofOfDelivery__TmsTokens__Issuer", LocalTokens.Issuer)
+        .WithEnvironment("ProofOfDelivery__TmsTokens__Audience", LocalTokens.TmsAudience)
+        .WithEnvironment("ProofOfDelivery__TmsTokens__ClientId", LocalTokens.ProofOfDeliveryLogicAppClientId);
     foreach (var persona in personas.Where(persona => !persona.IsShipper))
     {
         var carrierApiKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
@@ -310,6 +326,7 @@ else
             partnerApi.WithEnvironment($"PartnerApi__CarriersByClientId__{LocalTokens.PersonaClientId(persona.Id)}", persona.PartyId);
             partnerPortal.WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__0", LocalTokens.RespondRole);
             partnerPortal.WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__1", LocalTokens.TrackingSubmitRole);
+            partnerPortal.WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__2", LocalTokens.ProofsOfDeliverySubmitRole);
         }
     }
 
@@ -322,6 +339,7 @@ else
         (partnerApi.Resource, "Tms__Tokens__SigningKey"),
         (bookingWorker.Resource, "Booking__TmsTokens__SigningKey"),
         (trackingWorker.Resource, "Tracking__TmsTokens__SigningKey"),
+        (proofOfDeliveryWorker.Resource, "ProofOfDelivery__TmsTokens__SigningKey"),
         (partnerPortal.Resource, "PartnerApi__LocalTokens__SigningKey"),
     })
     {

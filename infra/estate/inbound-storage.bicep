@@ -1,0 +1,108 @@
+// The claim check's transit for a Carrier's Proof of delivery (ADR 0009): a storage account with the inbound container, where
+// API Management stores the body unparsed and the Carrier Proof of delivery Logic App fetches it from and deletes it from once
+// the TMS accepted it. The TMS's own container for the files lives with the apps, in the storage account Aspire provisions
+// (ADR 0002), with its tiering rule. This one is only transit: a blob whose message failed stays behind for investigation,
+// as long as the run history and the trail of its message (integrationRetentionDays).
+
+param location string
+param tags object
+param integrationRetentionDays int
+
+@description('API Management\'s identity, which writes the Proofs of delivery here and nothing else.')
+param apiManagementPrincipalId string
+
+@description('The Carrier Proof of delivery Logic App\'s identity, which reads and deletes the Proofs of delivery here and nothing else.')
+param proofOfDeliveryPrincipalId string
+
+var containerName = 'inbound-proofs-of-delivery'
+
+resource storage 'Microsoft.Storage/storageAccounts@2024-01-01' = {
+  name: 'stinbound${uniqueString(resourceGroup().id)}'
+  location: location
+  tags: tags
+  kind: 'StorageV2'
+  sku: {
+    name: 'Standard_LRS'
+  }
+  properties: {
+    minimumTlsVersion: 'TLS1_2'
+    allowBlobPublicAccess: false
+    supportsHttpsTrafficOnly: true
+    // Everyone reaches it with a managed identity; there is no key to use.
+    allowSharedKeyAccess: false
+  }
+}
+
+resource blobServices 'Microsoft.Storage/storageAccounts/blobServices@2024-01-01' = {
+  parent: storage
+  name: 'default'
+}
+
+resource inbound 'Microsoft.Storage/storageAccounts/blobServices/containers@2024-01-01' = {
+  parent: blobServices
+  name: containerName
+}
+
+// Deletes a blob after the estate's retention, the same as the run history and the trail of its message.
+resource retention 'Microsoft.Storage/storageAccounts/managementPolicies@2024-01-01' = {
+  parent: storage
+  name: 'default'
+  properties: {
+    policy: {
+      rules: [
+        {
+          name: 'inbound-proofs-of-delivery-expire'
+          enabled: true
+          type: 'Lifecycle'
+          definition: {
+            filters: {
+              blobTypes: [
+                'blockBlob'
+              ]
+              prefixMatch: [
+                '${containerName}/'
+              ]
+            }
+            actions: {
+              baseBlob: {
+                delete: {
+                  daysAfterModificationGreaterThan: integrationRetentionDays
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+  dependsOn: [
+    inbound
+  ]
+}
+
+var storageBlobDataContributor = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
+
+// Scoped to the container, so API Management writes nothing else and the Logic App reads nothing else.
+resource apiManagementStoresProofsOfDelivery 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(inbound.id, apiManagementPrincipalId, storageBlobDataContributor)
+  scope: inbound
+  properties: {
+    principalId: apiManagementPrincipalId
+    roleDefinitionId: storageBlobDataContributor
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource proofOfDeliveryFetchesAndDeletesItsBlobs 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(inbound.id, proofOfDeliveryPrincipalId, storageBlobDataContributor)
+  scope: inbound
+  properties: {
+    principalId: proofOfDeliveryPrincipalId
+    roleDefinitionId: storageBlobDataContributor
+    principalType: 'ServicePrincipal'
+  }
+}
+
+output storageAccountName string = storage.name
+output containerName string = inbound.name
+output blobEndpoint string = storage.properties.primaryEndpoints.blob

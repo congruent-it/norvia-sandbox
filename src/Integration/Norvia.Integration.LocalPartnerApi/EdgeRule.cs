@@ -38,4 +38,13 @@ internal sealed record EdgeRule(
         options => options.CarriersByClientId,
         "No Carrier is registered for this client.",
         "NoCarrierForClient");
+
+    /// <summary>infra/estate/partner-api/submit-carrier-proof-of-delivery.policy.xml</summary>
+    public static EdgeRule SubmitCarrierProofOfDelivery { get; } = new(
+        "ProofsOfDelivery.Submit",
+        "This client may not submit Proofs of delivery.",
+        "NotAllowedToSubmitProofOfDelivery",
+        options => options.CarriersByClientId,
+        "No Carrier is registered for this client.",
+        "NoCarrierForClient");
 }

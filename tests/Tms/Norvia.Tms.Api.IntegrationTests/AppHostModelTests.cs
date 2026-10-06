@@ -138,7 +138,8 @@ public sealed class AppHostModelTests
     {
         await using var builder = await CreateForAzureAsync();
 
-        builder.Resources.OfType<AzureBlobStorageContainerResource>().Should().ContainSingle(container => container.BlobContainerName == "proofs-of-delivery");
+        builder.Resources.OfType<AzureBlobStorageContainerResource>().Should().ContainSingle(container => container.BlobContainerName == "proofs-of-delivery",
+            "the inbound container is the estate Bicep's, not Aspire's");
         var bicep = builder.Resources.OfType<AzureStorageResource>().Single().GetBicepTemplateString();
         bicep.Should().Contain("Microsoft.Storage/storageAccounts/managementPolicies@")
             .And.Contain("tierToCool")
@@ -158,6 +159,22 @@ public sealed class AppHostModelTests
             .Should().ContainSingle(role => role.Target is AzureStorageResource).Which.Roles.Select(r => r.Name).Should().Equal("StorageBlobDataContributor");
         Resource(builder, "tms-web").Annotations.OfType<Aspire.Hosting.Azure.RoleAssignmentAnnotation>()
             .Should().ContainSingle(role => role.Target is AzureStorageResource).Which.Roles.Select(r => r.Name).Should().Equal("StorageBlobDataReader");
+    }
+
+    [Fact]
+    public async Task Locally_AProofOfDeliveryWorker_PlaysTheCarrierProofOfDeliveryLogicApp_AsTheIdentityHoldingTheRecordRole_AndTheQueueAndTheInboundContainerAreThere()
+    {
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(TestContext.Current.CancellationToken);
+
+        var worker = await EnvironmentOfAsync(builder, "proof-of-delivery-worker");
+        var portal = await EnvironmentOfAsync(builder, "partner-portal-web");
+
+        worker.Should().Contain("ProofOfDelivery__TmsTokens__ClientId", "norvia-local-proof-of-delivery-logic-app")
+            .And.Contain("ProofOfDelivery__TmsTokens__Audience", "api://norvia-tms")
+            .And.ContainKey("ProofOfDelivery__TmsTokens__SigningKey");
+        builder.Resources.OfType<AzureServiceBusQueueResource>().Should().ContainSingle(queue => queue.QueueName == "carrier-proof-of-delivery");
+        builder.Resources.OfType<AzureBlobStorageContainerResource>().Should().Contain(container => container.BlobContainerName == "inbound-proofs-of-delivery");
+        portal.Should().Contain("PartnerApi__LocalTokens__Roles__van-dijk-transport__2", "ProofsOfDelivery.Submit");
     }
 
     [Fact]
@@ -292,7 +309,7 @@ public sealed class AppHostModelTests
     {
         await using var builder = await CreateForAzureAsync();
 
-        builder.Resources.Should().NotContain(resource => resource.Name == "partner-api" || resource.Name == "tracking-worker");
+        builder.Resources.Should().NotContain(resource => new[] { "partner-api", "tracking-worker", "proof-of-delivery-worker" }.Contains(resource.Name));
     }
 
     [Fact]

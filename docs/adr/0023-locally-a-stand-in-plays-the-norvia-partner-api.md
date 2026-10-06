@@ -13,6 +13,8 @@ It plays the Carrier's side too: `POST /partner/v1/carrier-answers` answers as A
 
 It accepts a Carrier's tracking message too: `POST /partner/v1/carrier-tracking` checks the same four things with the role `Tracking.Submit`, puts the message on the tracking queue with the tracking contract's application properties and answers `202 Accepted`. The Carrier-tracking Logic App's side is played by a worker (ADR 0031).
 
+It accepts a Carrier's Proof of delivery by claim check as well: `POST /partner/v1/carrier-proofs-of-delivery` checks the same four things with the role `ProofsOfDelivery.Submit` and a limit of 25 MB (`413`), stores the body unparsed in the inbound container, only then puts the blob's reference on the Proof of delivery queue with the tracking contract's application properties, and answers `202 Accepted`. The Carrier Proof of delivery Logic App's side is played by a worker (ADR 0032).
+
 Tokens are local too: the AppHost's `local-token-signing-key` signs them, as it does for the TMS. Locally the Partner portal issues each Persona's token itself, as Entra would, with the role `TransportOrders.Submit` for Shipper Personas and `CarrierBookings.Respond` for Carrier Personas. The AppHost reads the Personas from the seed file, gives each one a client ID and a subscription key for the run, and passes them to both apps. That is what `identities.bicep` and `partner-api.bicep` do in Azure.
 
 ## Considered Options
