@@ -30,7 +30,7 @@ public sealed class NotYetBillableJourneyTests(TmsUiFixture tms) : BrowserPage(t
         await release.ClickAsync();
         var form = Page.GetByRole(AriaRole.Group, new() { Name = "without Proof of delivery", Exact = false });
         await form.GetByRole(AriaRole.Button, new() { Name = "Release without Proof of delivery" }).ClickAsync();
-        await Expect(form.GetByRole(AriaRole.Alert)).ToContainTextAsync("Give a remark");
+        await Expect(form).ToContainTextAsync("Give a remark");
 
         await form.GetByRole(AriaRole.Textbox, new() { Name = "Remark" }).FillAsync("CMR received by post, scanned in the dossier");
         await form.GetByRole(AriaRole.Button, new() { Name = "Release without Proof of delivery" }).ClickAsync();

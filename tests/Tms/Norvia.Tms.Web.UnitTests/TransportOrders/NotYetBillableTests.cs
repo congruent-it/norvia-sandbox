@@ -90,7 +90,7 @@ public sealed class NotYetBillableTests : TmsWebContext
 
         page.Find("fluent-button[aria-label='Release TO-0000043 without Proof of delivery']").Click();
         page.WaitForElement("section[aria-label='Release TO-0000043 without Proof of delivery'] fluent-text-area").Input("  CMR by post ");
-        Click(Panel(page), "Release without Proof of delivery");
+        Panel(page).QuerySelector("form")!.Submit();
 
         page.WaitForAssertion(() => Commands.Received(1).ReleaseWithoutProofOfDeliveryAsync("TO-0000043", "CMR by post", Arg.Any<CancellationToken>()));
         page.WaitForAssertion(() => page.Find("[role=status]").TextContent.Should().Contain("TO-0000043 is released without a Proof of delivery and is Billable now."));
@@ -106,7 +106,7 @@ public sealed class NotYetBillableTests : TmsWebContext
 
         page.Find("fluent-button[aria-label='Release TO-0000043 without Proof of delivery']").Click();
         page.WaitForElement("section[aria-label='Release TO-0000043 without Proof of delivery'] fluent-text-area").Input("CMR by post");
-        Click(Panel(page), "Release without Proof of delivery");
+        Panel(page).QuerySelector("form")!.Submit();
 
         page.WaitForAssertion(() => page.Find("[role=status]").TextContent.Should().Contain("another reason still keeps it from being Billable"));
     }
@@ -120,9 +120,9 @@ public sealed class NotYetBillableTests : TmsWebContext
 
         page.Find("fluent-button[aria-label='Release TO-0000043 without Proof of delivery']").Click();
         page.WaitForElement("section[aria-label='Release TO-0000043 without Proof of delivery'] fluent-text-area").Input(remark);
-        Click(Panel(page), "Release without Proof of delivery");
+        Panel(page).QuerySelector("form")!.Submit();
 
-        page.WaitForAssertion(() => page.Find("[role=alert]").TextContent.Should().Contain("Give a remark"));
+        page.WaitForAssertion(() => Panel(page).QuerySelector(".validation-message")!.TextContent.Should().Contain("Give a remark"));
         Commands.DidNotReceive().ReleaseWithoutProofOfDeliveryAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
@@ -133,9 +133,9 @@ public sealed class NotYetBillableTests : TmsWebContext
 
         page.Find("fluent-button[aria-label='Release TO-0000043 without Proof of delivery']").Click();
         page.WaitForElement("section[aria-label='Release TO-0000043 without Proof of delivery'] fluent-text-area").Input(new string('x', TransportOrder.MaxReleaseRemarkLength + 1));
-        Click(Panel(page), "Release without Proof of delivery");
+        Panel(page).QuerySelector("form")!.Submit();
 
-        page.WaitForAssertion(() => page.Find("[role=alert]").TextContent.Should().Contain($"at most {TransportOrder.MaxReleaseRemarkLength} characters"));
+        page.WaitForAssertion(() => Panel(page).QuerySelector(".validation-message")!.TextContent.Should().Contain($"at most {TransportOrder.MaxReleaseRemarkLength} characters"));
         Commands.DidNotReceive().ReleaseWithoutProofOfDeliveryAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
@@ -148,7 +148,7 @@ public sealed class NotYetBillableTests : TmsWebContext
 
         page.Find("fluent-button[aria-label='Release TO-0000043 without Proof of delivery']").Click();
         page.WaitForElement("section[aria-label='Release TO-0000043 without Proof of delivery'] fluent-text-area").Input("CMR by post");
-        Click(Panel(page), "Release without Proof of delivery");
+        Panel(page).QuerySelector("form")!.Submit();
 
         page.WaitForAssertion(() => page.Find("[role=alert]").TextContent.Should().Contain("Transport Order TO-0000043 wasn't released: It was released already."));
         Panel(page);
@@ -163,7 +163,7 @@ public sealed class NotYetBillableTests : TmsWebContext
 
         page.Find("fluent-button[aria-label='Release TO-0000043 without Proof of delivery']").Click();
         page.WaitForElement("section[aria-label='Release TO-0000043 without Proof of delivery'] fluent-text-area").Input("CMR by post");
-        Click(Panel(page), "Release without Proof of delivery");
+        Panel(page).QuerySelector("form")!.Submit();
 
         page.WaitForAssertion(() => page.Find("[role=alert]").TextContent.Should().Contain("couldn't be released. Try again."));
         Panel(page);

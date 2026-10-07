@@ -1,3 +1,4 @@
+@using System.ComponentModel.DataAnnotations
 @using Norvia.Tms.Domain.TransportOrders
 @implements IDisposable
 @inject ITransportOrderCommands Commands
@@ -14,20 +15,24 @@
         </div>
     }
 
-    <div class="flex flex-col gap-4">
-        <FluentTextArea @bind-Value="_remark" Immediate="true" Label="Remark" Rows="3" Style="width: 100%;" />
+    <EditForm Model="_form" OnValidSubmit="SubmitAsync" class="flex flex-col gap-4">
+        <DataAnnotationsValidator />
+        <div>
+            <FluentTextArea @bind-Value="_form.Remark" Immediate="true" Label="Remark" Rows="3" Style="width: 100%;" />
+            <FluentValidationMessage For="() => _form.Remark" />
+        </div>
         <p class="!mb-0 text-muted">Why the Transport Order can be billed without a Proof of delivery, such as "CMR received by post, scanned in the dossier". It stays on the Shipment's timeline with your name.</p>
 
         <div class="flex gap-4">
-            <FluentButton Appearance="Appearance.Accent" OnClick="SubmitAsync" Disabled="_working">Release without Proof of delivery</FluentButton>
+            <FluentButton Type="ButtonType.Submit" Appearance="Appearance.Accent" Disabled="_working">Release without Proof of delivery</FluentButton>
             <FluentButton Appearance="Appearance.Outline" OnClick="Close" Disabled="_working">Cancel</FluentButton>
         </div>
-    </div>
+    </EditForm>
 </section>
 
 @code {
     private readonly CancellationTokenSource _closed = new();
-    private string _remark = string.Empty;
+    private readonly ReleaseForm _form = new();
     private string? _failure;
     private bool _working;
 
@@ -42,6 +47,24 @@
     [Parameter, EditorRequired]
     public EventCallback<string> OnDone { get; set; }
 
+    // The remark is required and as long as the TMS accepts; a blank one is as good as none.
+    private sealed class ReleaseForm : IValidatableObject
+    {
+        public string Remark { get; set; } = string.Empty;
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (string.IsNullOrWhiteSpace(Remark))
+            {
+                yield return new("Give a remark: why the order can be billed without a Proof of delivery.", [nameof(Remark)]);
+            }
+            else if (Remark.Trim().Length > TransportOrder.MaxReleaseRemarkLength)
+            {
+                yield return new($"A remark is at most {TransportOrder.MaxReleaseRemarkLength} characters.", [nameof(Remark)]);
+            }
+        }
+    }
+
     private string Title => $"Release {TransportOrderNumber} without Proof of delivery";
 
     private async Task SubmitAsync()
@@ -51,18 +74,7 @@
             return;
         }
 
-        var remark = _remark.Trim();
-        if (remark.Length == 0)
-        {
-            _failure = "Give a remark: why the order can be billed without a Proof of delivery.";
-            return;
-        }
-
-        if (remark.Length > TransportOrder.MaxReleaseRemarkLength)
-        {
-            _failure = $"A remark is at most {TransportOrder.MaxReleaseRemarkLength} characters.";
-            return;
-        }
+        var remark = _form.Remark.Trim();
 
         _working = true;
         _failure = null;

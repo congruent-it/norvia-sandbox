@@ -205,28 +205,24 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
                 return new ReleaseWithoutProofOfDeliveryAnswer.Released(released.BillingState);
             // A refused release: its problem's detail is the refusal's readable message, and its code says which rule.
             case HttpStatusCode.NotFound or HttpStatusCode.Conflict:
-                var problem = await response.Content.ReadFromJsonAsync<Refusal>(Json, cancellationToken);
-                var reason = problem?.Detail ?? $"Transport Order {transportOrderNumber} can't be released without a Proof of delivery.";
-                using (Track(Flows.Billing, TrackingKeys.Refused, new() { TransportOrderNumber = transportOrderNumber, FailureCode = problem?.Code, CorrelationId = problem?.CorrelationId }))
-                {
-                    LogRefused(TmsCommand.ReleaseWithoutProofOfDelivery, transportOrderNumber, reason);
-                }
-
+                var reason = await RefuseAsync(
+                    response, TmsCommand.ReleaseWithoutProofOfDelivery, $"Transport Order {transportOrderNumber}", "released without a Proof of delivery",
+                    flow: Flows.Billing, transportOrderNumber: transportOrderNumber, cancellationToken: cancellationToken);
                 return new ReleaseWithoutProofOfDeliveryAnswer.Refused(reason);
             default:
                 throw Unexpected(response, "a release without a Proof of delivery");
         }
     }
 
-    // What a refused reassignment, release or withdrawal shares: reading the problem, tracing the refusal on the trail it
+    // What a refused reassignment, release, withdrawal or release without a Proof of delivery shares: reading the problem, tracing the refusal on the trail it
     // names, and answering with its readable reason.
     private async Task<string> RefuseAsync(
         HttpResponseMessage response, TmsCommand command, string subject, string action, string? shipmentNumber = null, string? carrierBookingNumber = null,
-        CancellationToken cancellationToken = default)
+        string flow = Flows.TransportPlanning, string? transportOrderNumber = null, CancellationToken cancellationToken = default)
     {
         var problem = await response.Content.ReadFromJsonAsync<Refusal>(Json, cancellationToken);
         var reason = problem?.Detail ?? $"{subject} can't be {action}.";
-        using (Track(Flows.TransportPlanning, TrackingKeys.Refused, new() { FailureCode = problem?.Code, CorrelationId = problem?.CorrelationId, ShipmentNumber = shipmentNumber, CarrierBookingNumber = carrierBookingNumber }))
+        using (Track(flow, TrackingKeys.Refused, new() { TransportOrderNumber = transportOrderNumber, FailureCode = problem?.Code, CorrelationId = problem?.CorrelationId, ShipmentNumber = shipmentNumber, CarrierBookingNumber = carrierBookingNumber }))
         {
             LogRefusedSubject(command, subject, reason);
         }
