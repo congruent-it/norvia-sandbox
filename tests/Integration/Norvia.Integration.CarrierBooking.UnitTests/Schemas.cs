@@ -25,6 +25,11 @@ internal sealed class Schemas
     private static readonly Lazy<Schemas> ShipperNotificationSchema = new(() => Of("PartnerApi/shipper-notification.v1.schema.json"));
     private static readonly Lazy<Schemas> ShipperNotificationRequestedSchema = new(() => Of("CanonicalModel/shipper-notification-requested.v1.schema.json"));
 
+    private static readonly Lazy<Schemas> ShipperTrackingSchema = new(() => Of("PartnerApi/shipper-tracking.v1.schema.json"));
+    private static readonly Lazy<Schemas> ShipperTrackingListItemSchema = new(() => Of("PartnerApi/shipper-tracking-list-item.v1.schema.json"));
+    private static readonly Lazy<Schemas> ShipperTransportOrderDetailSchema = new(() => Of("CanonicalModel/shipper-transport-order-detail.v1.schema.json"));
+    private static readonly Lazy<Schemas> ShipperTransportOrderListItemSchema = new(() => Of("CanonicalModel/shipper-transport-order-list-item.v1.schema.json"));
+
     private readonly JsonSchema _schema;
 
     private Schemas(JsonSchema schema) => _schema = schema;
@@ -60,6 +65,18 @@ internal sealed class Schemas
 
     /// <summary>The Canonical Model's event the Shipper notification map reads.</summary>
     public static Schemas ShipperNotificationRequested => ShipperNotificationRequestedSchema.Value;
+
+    /// <summary>The Shipper tracking format of one Transport Order, as a Shipper gets or finds it.</summary>
+    public static Schemas ShipperTracking => ShipperTrackingSchema.Value;
+
+    /// <summary>The Shipper tracking format of one Transport Order in a list.</summary>
+    public static Schemas ShipperTrackingListItem => ShipperTrackingListItemSchema.Value;
+
+    /// <summary>The Canonical Model's Shipper view of one Transport Order, as the TMS Shipper tracking API returns it.</summary>
+    public static Schemas ShipperTransportOrderDetail => ShipperTransportOrderDetailSchema.Value;
+
+    /// <summary>The Canonical Model's Shipper view of one Transport Order in a list.</summary>
+    public static Schemas ShipperTransportOrderListItem => ShipperTransportOrderListItemSchema.Value;
 
     public EvaluationResults Validate(JsonNode? instance) =>
         _schema.Evaluate(

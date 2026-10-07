@@ -1,0 +1,157 @@
+{%- comment -%}
+  The Canonical Model ShipperTransportOrderDetail -> the Shipper tracking format (contracts/partner-api/shipper-tracking.v1.schema.json),
+  for API Management's set-body policy (template="liquid", parse-date="false"). Filter names are Pascal case: the policy runs Liquid in C# mode.
+  The policy only changes the format. What the Shipper may see is decided in the TMS (ADR 0011), so nothing is left out here that the TMS sent.
+
+  Times: the Canonical Model sends UTC instants. The Shipper format has local date/times, dd-MM-yyyy HH:mm, and Liquid has no time zone support
+  (ADR 0035), so the clock rules are written out below: the countries of Europe, on their mainland's clock, with the European Union's daylight
+  saving time rule. Every instant is converted in the one loop below, from "instant@country" slots:
+    0 pickupFrom, 1 pickupUntil: the collection country    2 deliverFrom, 3 deliverUntil, 4 eta, 5 lastUpdate, 6 deliveredAt: the delivery country
+    7 and on: the progress events, each in the country of its own place (the delivery country when the place has none)
+  A country this map doesn't know is on UTC. The same block is in shipper-tracking-list.liquid.
+
+  Tokens that aren't known (a Tracking status or an event type the Shipper format has no code for) give an empty code, so the Shipper tracking schema
+  refuses the result instead of the map guessing.
+{%- endcomment -%}
+{%- assign colCC = body.collection.countryCode | Default: 'XX' -%}
+{%- assign delCC = body.delivery.countryCode | Default: 'XX' -%}
+{%- capture slotText -%}{{ body.collectionWindow.earliest | Default: '_' }}@{{ colCC }}~{{ body.collectionWindow.latest | Default: '_' }}@{{ colCC }}~{{ body.deliveryWindow.earliest | Default: '_' }}@{{ delCC }}~{{ body.deliveryWindow.latest | Default: '_' }}@{{ delCC }}~{{ body.eta | Default: '_' }}@{{ delCC }}~{{ body.lastUpdate | Default: '_' }}@{{ delCC }}~{{ body.proofOfDelivery.deliveryTime | Default: '_' }}@{{ delCC }}{% for e in body.progress %}~{{ e.eventTime }}@{{ e.place.countryCode | Default: delCC }}{% endfor %}{%- endcapture -%}
+{%- assign slots = slotText | Split: '~' -%}
+{%- assign converted = '' -%}
+{%- for slot in slots -%}
+  {%- assign pair = slot | Split: '@' -%}
+  {%- assign u = pair[0] -%}
+  {%- assign cc = pair[1] -%}
+  {%- if u == '_' -%}
+    {%- assign local = '_' -%}
+  {%- else -%}
+    {%- assign Y = u | Slice: 0, 4 | Abs -%}
+    {%- assign Mo = u | Slice: 5, 2 | Abs -%}
+    {%- assign D = u | Slice: 8, 2 | Abs -%}
+    {%- assign H = u | Slice: 11, 2 | Abs -%}
+    {%- assign Mi = u | Slice: 14, 2 -%}
+    {%- assign std = 0 -%}
+    {%- assign dst = 'none' -%}
+    {%- case cc -%}
+      {%- when 'GB' or 'IE' or 'PT' -%}{%- assign dst = 'eu' -%}
+      {%- when 'AL' or 'AD' or 'AT' or 'BA' or 'BE' or 'HR' or 'CZ' or 'DK' or 'FR' or 'DE' or 'HU' or 'IT' or 'LI' or 'LU' or 'MT' or 'MC' or 'ME' or 'NL' or 'MK' or 'NO' or 'PL' or 'SM' or 'RS' or 'SK' or 'SI' or 'ES' or 'SE' or 'CH' -%}
+        {%- assign std = 1 -%}{%- assign dst = 'eu' -%}
+      {%- when 'BG' or 'CY' or 'EE' or 'FI' or 'GR' or 'LV' or 'LT' or 'MD' or 'RO' or 'UA' -%}
+        {%- assign std = 2 -%}{%- assign dst = 'eu' -%}
+      {%- when 'BY' or 'TR' -%}
+        {%- assign std = 3 -%}
+    {%- endcase -%}
+    {%- assign off = std -%}
+    {%- if dst == 'eu' -%}
+      {%- comment -%} The clocks go forward on the last Sunday of March and back on the last Sunday of October, at the same UTC hour. {%- endcomment -%}
+      {%- assign r = Y | Modulo: 4 -%}{%- assign leaps = Y | Minus: r | DividedBy: 4 -%}
+      {%- assign r = Y | Modulo: 100 -%}{%- assign centuries = Y | Minus: r | DividedBy: 100 -%}
+      {%- assign r = Y | Modulo: 400 -%}{%- assign fourCenturies = Y | Minus: r | DividedBy: 400 -%}
+      {%- assign weekday = Y | Plus: leaps | Minus: centuries | Plus: fourCenturies -%}
+      {%- assign marchDay = weekday | Plus: 33 | Modulo: 7 -%}{%- assign marchDay = 31 | Minus: marchDay -%}
+      {%- assign octoberDay = weekday | Plus: 37 | Modulo: 7 -%}{%- assign octoberDay = 31 | Minus: octoberDay -%}
+      {%- assign clock = Mo | Times: 100 | Plus: D | Times: 100 | Plus: H -%}
+      {%- assign summerStart = 300 | Plus: marchDay | Times: 100 | Plus: 1 -%}
+      {%- assign summerEnd = 1000 | Plus: octoberDay | Times: 100 | Plus: 1 -%}
+      {%- if clock >= summerStart and clock < summerEnd -%}{%- assign off = off | Plus: 1 -%}{%- endif -%}
+    {%- endif -%}
+    {%- assign H = H | Plus: off -%}
+    {%- if H >= 24 -%}
+      {%- assign H = H | Minus: 24 -%}
+      {%- assign D = D | Plus: 1 -%}
+      {%- assign monthLength = 31 -%}
+      {%- if Mo == 4 or Mo == 6 or Mo == 9 or Mo == 11 -%}
+        {%- assign monthLength = 30 -%}
+      {%- elsif Mo == 2 -%}
+        {%- assign monthLength = 28 -%}
+        {%- assign r4 = Y | Modulo: 4 -%}{%- assign r100 = Y | Modulo: 100 -%}{%- assign r400 = Y | Modulo: 400 -%}
+        {%- if r400 == 0 -%}
+          {%- assign monthLength = 29 -%}
+        {%- elsif r4 == 0 and r100 != 0 -%}
+          {%- assign monthLength = 29 -%}
+        {%- endif -%}
+      {%- endif -%}
+      {%- if D > monthLength -%}
+        {%- assign D = 1 -%}{%- assign Mo = Mo | Plus: 1 -%}
+        {%- if Mo > 12 -%}{%- assign Mo = 1 -%}{%- assign Y = Y | Plus: 1 -%}{%- endif -%}
+      {%- endif -%}
+    {%- endif -%}
+    {%- capture local -%}{% if D < 10 %}0{% endif %}{{ D }}-{% if Mo < 10 %}0{% endif %}{{ Mo }}-{{ Y }} {% if H < 10 %}0{% endif %}{{ H }}:{{ Mi }}{%- endcapture -%}
+  {%- endif -%}
+  {%- assign converted = converted | Append: local | Append: '~' -%}
+{%- endfor -%}
+{%- assign locals = converted | Split: '~' -%}
+{
+  "norviaOrderNo": "{{ body.transportOrderNumber }}",
+  "status": "{% case body.trackingStatus %}{% when 'Received' %}RECEIVED{% when 'Scheduled' %}SCHEDULED{% when 'Collected' %}COLLECTED{% when 'InTransit' %}IN_TRANSIT{% when 'Delivered' %}DELIVERED{% endcase %}"
+  {%- if body.shipperReference -%},
+  "bookingRef": "{{ body.shipperReference | Replace: '\\', '\\' | Replace: '"', '\"' | Replace: '\n', '\n' | Replace: '\r', '\r' | Replace: '\t', '\t' }}"
+  {%- endif -%}
+  {%- if body.collection.city -%},
+  "pickupCity": "{{ body.collection.city | Replace: '\\', '\\' | Replace: '"', '\"' | Replace: '\n', '\n' | Replace: '\r', '\r' | Replace: '\t', '\t' }}"
+  {%- endif -%}
+  {%- if body.collection.countryCode -%},
+  "pickupCountry": "{{ body.collection.countryCode }}"
+  {%- endif -%}
+  {%- if locals[0] != '_' -%},
+  "pickupFrom": "{{ locals[0] }}"
+  {%- endif -%}
+  {%- if locals[1] != '_' -%},
+  "pickupUntil": "{{ locals[1] }}"
+  {%- endif -%}
+  {%- if body.delivery.city -%},
+  "receiverCity": "{{ body.delivery.city | Replace: '\\', '\\' | Replace: '"', '\"' | Replace: '\n', '\n' | Replace: '\r', '\r' | Replace: '\t', '\t' }}"
+  {%- endif -%}
+  {%- if body.delivery.countryCode -%},
+  "receiverCountry": "{{ body.delivery.countryCode }}"
+  {%- endif -%}
+  {%- if locals[2] != '_' -%},
+  "deliverFrom": "{{ locals[2] }}"
+  {%- endif -%}
+  {%- if locals[3] != '_' -%},
+  "deliverUntil": "{{ locals[3] }}"
+  {%- endif -%}
+  {%- if locals[4] != '_' -%},
+  "eta": "{{ locals[4] }}"
+  {%- endif -%}
+  {%- if locals[5] != '_' -%},
+  "lastUpdate": "{{ locals[5] }}"
+  {%- endif -%},
+  "events": [
+  {%- assign slot = 7 -%}
+  {%- for e in body.progress -%}
+    {%- if slot > 7 -%},{%- endif -%}
+    {
+      "code": "{% case e.type %}{% when 'Collected' %}COLLECTED{% when 'Departed' %}DEPARTED{% when 'Arrived' %}ARRIVED{% when 'OutForDelivery' %}OUT_FOR_DELIVERY{% when 'Delivered' %}DELIVERED{% endcase %}",
+      "time": "{{ locals[slot] }}"
+      {%- if e.place.city -%},
+      "city": "{{ e.place.city | Replace: '\\', '\\' | Replace: '"', '\"' | Replace: '\n', '\n' | Replace: '\r', '\r' | Replace: '\t', '\t' }}"
+      {%- endif -%}
+      {%- if e.place.countryCode -%},
+      "country": "{{ e.place.countryCode }}"
+      {%- endif -%}
+    }
+    {%- assign slot = slot | Plus: 1 -%}
+  {%- endfor -%}
+  ]
+  {%- if body.proofOfDelivery -%},
+  "proofOfDelivery": {
+    "receivedBy": "{{ body.proofOfDelivery.receivedBy | Replace: '\\', '\\' | Replace: '"', '\"' | Replace: '\n', '\n' | Replace: '\r', '\r' | Replace: '\t', '\t' }}",
+    "deliveredAt": "{{ locals[6] }}",
+    "condition": "{% case body.proofOfDelivery.condition %}{% when 'Clean' %}CLEAN{% when 'Reservations' %}RESERVATIONS{% endcase %}",
+    "files": [
+    {%- assign fileCount = 0 -%}
+    {%- for f in body.proofOfDelivery.files -%}
+      {%- if fileCount > 0 -%},{%- endif -%}
+      {%- assign fileCount = fileCount | Plus: 1 -%}
+      {
+        "fileId": "{{ f.id }}",
+        "name": "{{ f.name | Replace: '\\', '\\' | Replace: '"', '\"' | Replace: '\n', '\n' | Replace: '\r', '\r' | Replace: '\t', '\t' }}",
+        "contentType": "{{ f.contentType | Replace: '\\', '\\' | Replace: '"', '\"' | Replace: '\n', '\n' | Replace: '\r', '\r' | Replace: '\t', '\t' }}",
+        "sizeBytes": {{ f.sizeBytes }}
+      }
+    {%- endfor -%}
+    ]
+  }
+  {%- endif -%}
+}

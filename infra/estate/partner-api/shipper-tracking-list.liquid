@@ -1,0 +1,105 @@
+{%- comment -%}
+  The Canonical Model ShipperTransportOrderListItem array -> the Shipper tracking list item format, an array too
+  (contracts/partner-api/shipper-tracking-list-item.v1.schema.json), for API Management's set-body policy (template="liquid", parse-date="false").
+  Filter names are Pascal case: the policy runs Liquid in C# mode. The policy only changes the format. What the Shipper may see is decided in the TMS (ADR 0011).
+
+  Times: as in shipper-tracking.liquid, which has the same local-time block, explained there (ADR 0035). The ETA and the last update are on the clocks of the
+  delivery country: a list item has no place for the last update, and the detail shows it the same way.
+
+  A Tracking status the Shipper format has no code for gives an empty code, so the schema refuses the result instead of the map guessing.
+{%- endcomment -%}
+[
+{%- assign itemCount = 0 -%}
+{%- for item in body -%}
+  {%- assign cc = item.delivery.countryCode | Default: 'XX' -%}
+  {%- capture slotText -%}{{ item.eta | Default: '_' }}~{{ item.lastUpdate | Default: '_' }}{%- endcapture -%}
+  {%- assign slots = slotText | Split: '~' -%}
+  {%- assign converted = '' -%}
+  {%- for slot in slots -%}
+    {%- assign u = slot -%}
+    {%- if u == '_' -%}
+      {%- assign local = '_' -%}
+    {%- else -%}
+      {%- assign Y = u | Slice: 0, 4 | Abs -%}
+      {%- assign Mo = u | Slice: 5, 2 | Abs -%}
+      {%- assign D = u | Slice: 8, 2 | Abs -%}
+      {%- assign H = u | Slice: 11, 2 | Abs -%}
+      {%- assign Mi = u | Slice: 14, 2 -%}
+      {%- assign std = 0 -%}
+      {%- assign dst = 'none' -%}
+      {%- case cc -%}
+        {%- when 'GB' or 'IE' or 'PT' -%}{%- assign dst = 'eu' -%}
+        {%- when 'AL' or 'AD' or 'AT' or 'BA' or 'BE' or 'HR' or 'CZ' or 'DK' or 'FR' or 'DE' or 'HU' or 'IT' or 'LI' or 'LU' or 'MT' or 'MC' or 'ME' or 'NL' or 'MK' or 'NO' or 'PL' or 'SM' or 'RS' or 'SK' or 'SI' or 'ES' or 'SE' or 'CH' -%}
+          {%- assign std = 1 -%}{%- assign dst = 'eu' -%}
+        {%- when 'BG' or 'CY' or 'EE' or 'FI' or 'GR' or 'LV' or 'LT' or 'MD' or 'RO' or 'UA' -%}
+          {%- assign std = 2 -%}{%- assign dst = 'eu' -%}
+        {%- when 'BY' or 'TR' -%}
+          {%- assign std = 3 -%}
+      {%- endcase -%}
+      {%- assign off = std -%}
+      {%- if dst == 'eu' -%}
+        {%- assign r = Y | Modulo: 4 -%}{%- assign leaps = Y | Minus: r | DividedBy: 4 -%}
+        {%- assign r = Y | Modulo: 100 -%}{%- assign centuries = Y | Minus: r | DividedBy: 100 -%}
+        {%- assign r = Y | Modulo: 400 -%}{%- assign fourCenturies = Y | Minus: r | DividedBy: 400 -%}
+        {%- assign weekday = Y | Plus: leaps | Minus: centuries | Plus: fourCenturies -%}
+        {%- assign marchDay = weekday | Plus: 33 | Modulo: 7 -%}{%- assign marchDay = 31 | Minus: marchDay -%}
+        {%- assign octoberDay = weekday | Plus: 37 | Modulo: 7 -%}{%- assign octoberDay = 31 | Minus: octoberDay -%}
+        {%- assign clock = Mo | Times: 100 | Plus: D | Times: 100 | Plus: H -%}
+        {%- assign summerStart = 300 | Plus: marchDay | Times: 100 | Plus: 1 -%}
+        {%- assign summerEnd = 1000 | Plus: octoberDay | Times: 100 | Plus: 1 -%}
+        {%- if clock >= summerStart and clock < summerEnd -%}{%- assign off = off | Plus: 1 -%}{%- endif -%}
+      {%- endif -%}
+      {%- assign H = H | Plus: off -%}
+      {%- if H >= 24 -%}
+        {%- assign H = H | Minus: 24 -%}
+        {%- assign D = D | Plus: 1 -%}
+        {%- assign monthLength = 31 -%}
+        {%- if Mo == 4 or Mo == 6 or Mo == 9 or Mo == 11 -%}
+          {%- assign monthLength = 30 -%}
+        {%- elsif Mo == 2 -%}
+          {%- assign monthLength = 28 -%}
+          {%- assign r4 = Y | Modulo: 4 -%}{%- assign r100 = Y | Modulo: 100 -%}{%- assign r400 = Y | Modulo: 400 -%}
+          {%- if r400 == 0 -%}
+            {%- assign monthLength = 29 -%}
+          {%- elsif r4 == 0 and r100 != 0 -%}
+            {%- assign monthLength = 29 -%}
+          {%- endif -%}
+        {%- endif -%}
+        {%- if D > monthLength -%}
+          {%- assign D = 1 -%}{%- assign Mo = Mo | Plus: 1 -%}
+          {%- if Mo > 12 -%}{%- assign Mo = 1 -%}{%- assign Y = Y | Plus: 1 -%}{%- endif -%}
+        {%- endif -%}
+      {%- endif -%}
+      {%- capture local -%}{% if D < 10 %}0{% endif %}{{ D }}-{% if Mo < 10 %}0{% endif %}{{ Mo }}-{{ Y }} {% if H < 10 %}0{% endif %}{{ H }}:{{ Mi }}{%- endcapture -%}
+    {%- endif -%}
+    {%- assign converted = converted | Append: local | Append: '~' -%}
+  {%- endfor -%}
+  {%- assign locals = converted | Split: '~' -%}
+  {%- if itemCount > 0 -%},{%- endif -%}{%- assign itemCount = itemCount | Plus: 1 -%}
+  {
+    "norviaOrderNo": "{{ item.transportOrderNumber }}",
+    "status": "{% case item.trackingStatus %}{% when 'Received' %}RECEIVED{% when 'Scheduled' %}SCHEDULED{% when 'Collected' %}COLLECTED{% when 'InTransit' %}IN_TRANSIT{% when 'Delivered' %}DELIVERED{% endcase %}"
+    {%- if item.shipperReference -%},
+    "bookingRef": "{{ item.shipperReference | Replace: '\\', '\\' | Replace: '"', '\"' | Replace: '\n', '\n' | Replace: '\r', '\r' | Replace: '\t', '\t' }}"
+    {%- endif -%}
+    {%- if item.collection.city -%},
+    "pickupCity": "{{ item.collection.city | Replace: '\\', '\\' | Replace: '"', '\"' | Replace: '\n', '\n' | Replace: '\r', '\r' | Replace: '\t', '\t' }}"
+    {%- endif -%}
+    {%- if item.collection.countryCode -%},
+    "pickupCountry": "{{ item.collection.countryCode }}"
+    {%- endif -%}
+    {%- if item.delivery.city -%},
+    "receiverCity": "{{ item.delivery.city | Replace: '\\', '\\' | Replace: '"', '\"' | Replace: '\n', '\n' | Replace: '\r', '\r' | Replace: '\t', '\t' }}"
+    {%- endif -%}
+    {%- if item.delivery.countryCode -%},
+    "receiverCountry": "{{ item.delivery.countryCode }}"
+    {%- endif -%}
+    {%- if locals[0] != '_' -%},
+    "eta": "{{ locals[0] }}"
+    {%- endif -%}
+    {%- if locals[1] != '_' -%},
+    "lastUpdate": "{{ locals[1] }}"
+    {%- endif -%}
+  }
+{%- endfor -%}
+]

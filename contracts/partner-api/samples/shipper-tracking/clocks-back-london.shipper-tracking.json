@@ -1,0 +1,18 @@
+{
+  "norviaOrderNo": "TO-0000010",
+  "bookingRef": "BD-2030-0010",
+  "status": "IN_TRANSIT",
+  "pickupCity": "Rotterdam",
+  "pickupCountry": "NL",
+  "pickupFrom": "26-10-2030 22:00",
+  "pickupUntil": "27-10-2030 05:00",
+  "receiverCity": "London",
+  "receiverCountry": "GB",
+  "deliverFrom": "27-10-2030 01:30",
+  "deliverUntil": "27-10-2030 02:00",
+  "eta": "27-10-2030 01:00",
+  "lastUpdate": "27-10-2030 01:59",
+  "events": [
+    { "code": "ARRIVED", "time": "27-10-2030 01:59", "city": "Dover", "country": "GB" }
+  ]
+}

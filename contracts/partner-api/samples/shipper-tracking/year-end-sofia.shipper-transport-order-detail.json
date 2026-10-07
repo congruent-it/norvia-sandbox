@@ -1,0 +1,13 @@
+{
+  "transportOrderNumber": "TO-0000012",
+  "shipperReference": "BD-2030-0012",
+  "collection": { "city": "Wien", "countryCode": "AT" },
+  "delivery": { "city": "Sofia", "countryCode": "BG" },
+  "collectionWindow": { "earliest": "2030-12-31T21:00:00+00:00", "latest": "2030-12-31T22:00:00+00:00" },
+  "deliveryWindow": { "earliest": "2030-12-31T22:00:00+00:00", "latest": "2031-01-01T10:00:00+00:00" },
+  "trackingStatus": "Scheduled",
+  "eta": "2030-12-31T22:30:00+00:00",
+  "lastUpdate": null,
+  "proofOfDelivery": null,
+  "progress": []
+}

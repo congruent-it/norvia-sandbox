@@ -1,0 +1,15 @@
+{
+  "transportOrderNumber": "TO-0000010",
+  "shipperReference": "BD-2030-0010",
+  "collection": { "city": "Rotterdam", "countryCode": "NL" },
+  "delivery": { "city": "London", "countryCode": "GB" },
+  "collectionWindow": { "earliest": "2030-10-26T20:00:00+00:00", "latest": "2030-10-27T04:00:00+00:00" },
+  "deliveryWindow": { "earliest": "2030-10-27T00:30:00+00:00", "latest": "2030-10-27T02:00:00+00:00" },
+  "trackingStatus": "InTransit",
+  "eta": "2030-10-27T01:00:00+00:00",
+  "lastUpdate": "2030-10-27T00:59:00+00:00",
+  "proofOfDelivery": null,
+  "progress": [
+    { "type": "Arrived", "eventTime": "2030-10-27T00:59:00+00:00", "place": { "city": "Dover", "countryCode": "GB" } }
+  ]
+}

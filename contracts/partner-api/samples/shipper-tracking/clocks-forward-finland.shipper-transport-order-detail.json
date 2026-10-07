@@ -1,0 +1,15 @@
+{
+  "transportOrderNumber": "TO-0000011",
+  "shipperReference": "BD-2030-0011",
+  "collection": { "city": "Tallinn", "countryCode": "EE" },
+  "delivery": { "city": "Helsinki", "countryCode": "FI" },
+  "collectionWindow": { "earliest": "2030-03-30T22:00:00+00:00", "latest": "2030-03-30T23:00:00+00:00" },
+  "deliveryWindow": { "earliest": "2030-03-31T01:00:00+00:00", "latest": "2030-03-31T05:00:00+00:00" },
+  "trackingStatus": "Collected",
+  "eta": "2030-03-31T00:59:00+00:00",
+  "lastUpdate": "2030-03-30T23:30:00+00:00",
+  "proofOfDelivery": null,
+  "progress": [
+    { "type": "Collected", "eventTime": "2030-03-30T23:30:00+00:00", "place": { "city": "Tallinn", "countryCode": "EE" } }
+  ]
+}

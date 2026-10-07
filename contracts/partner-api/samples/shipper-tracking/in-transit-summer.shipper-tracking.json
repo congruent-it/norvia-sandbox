@@ -1,0 +1,20 @@
+{
+  "norviaOrderNo": "TO-0000007",
+  "bookingRef": "BD-2030-0007",
+  "status": "IN_TRANSIT",
+  "pickupCity": "Rotterdam",
+  "pickupCountry": "NL",
+  "pickupFrom": "01-07-2030 07:00",
+  "pickupUntil": "01-07-2030 11:00",
+  "receiverCity": "Düsseldorf",
+  "receiverCountry": "DE",
+  "deliverFrom": "02-07-2030 09:00",
+  "deliverUntil": "02-07-2030 13:00",
+  "eta": "02-07-2030 10:15",
+  "lastUpdate": "01-07-2030 22:40",
+  "events": [
+    { "code": "COLLECTED", "time": "01-07-2030 09:10", "city": "Rotterdam", "country": "NL" },
+    { "code": "DEPARTED", "time": "01-07-2030 10:00", "city": "Rotterdam", "country": "NL" },
+    { "code": "ARRIVED", "time": "01-07-2030 22:40", "city": "Frankfurt am Main", "country": "DE" }
+  ]
+}

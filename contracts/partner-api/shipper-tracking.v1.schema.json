@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/partner-api/shipper-tracking.v1.schema.json",
+  "title": "ShipperTracking",
+  "description": "One Transport Order with its tracking, as a Shipper gets it from the Norvia Partner API when it gets or finds a Transport Order (Shipper tracking format, version 1). It follows the Shipper booking format: its own field names, flat address fields and local date/times, dd-MM-yyyy HH:mm. Event times are local to their place. The pickup window is local to the pickup address; the delivery window, the ETA, the last update and the time of delivery are local to the delivery address. The Shipper deals in Transport Orders, so it never names the Carrier or the Shipment number, and it never shows an Exception, Stale or a remark.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["norviaOrderNo", "status", "events"],
+  "properties": {
+    "norviaOrderNo": { "description": "Norvia's number of the Transport Order.", "type": "string", "pattern": "^TO-[0-9]{7}$" },
+    "bookingRef": { "description": "The Shipper's own reference of the booking. Absent when the Transport Order has none.", "type": "string", "minLength": 1 },
+    "status": { "$ref": "#/$defs/status" },
+    "pickupCity": { "type": "string", "minLength": 1 },
+    "pickupCountry": { "$ref": "#/$defs/country" },
+    "pickupFrom": { "description": "The earliest pickup time, local to the pickup address.", "$ref": "#/$defs/localDateTime" },
+    "pickupUntil": { "description": "The latest pickup time, local to the pickup address.", "$ref": "#/$defs/localDateTime" },
+    "receiverCity": { "type": "string", "minLength": 1 },
+    "receiverCountry": { "$ref": "#/$defs/country" },
+    "deliverFrom": { "description": "The earliest time of the delivery window, local to the delivery address. The window Norvia agreed with the Shipper when there is one.", "$ref": "#/$defs/localDateTime" },
+    "deliverUntil": { "description": "The latest time of the delivery window, local to the delivery address.", "$ref": "#/$defs/localDateTime" },
+    "eta": { "description": "The estimated time of arrival, local to the delivery address. Absent when there is none.", "$ref": "#/$defs/localDateTime" },
+    "lastUpdate": { "description": "The time of the latest progress event, local to the delivery address. Absent before collection.", "$ref": "#/$defs/localDateTime" },
+    "events": {
+      "description": "The progress so far, in the order it happened.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "time"],
+        "properties": {
+          "code": { "enum": ["COLLECTED", "DEPARTED", "ARRIVED", "OUT_FOR_DELIVERY", "DELIVERED"] },
+          "time": { "description": "When it happened, local to its place.", "$ref": "#/$defs/localDateTime" },
+          "city": { "type": "string", "minLength": 1 },
+          "country": { "$ref": "#/$defs/country" }
+        }
+      }
+    },
+    "proofOfDelivery": {
+      "description": "The current Proof of delivery with its files. Absent when there is none.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["receivedBy", "deliveredAt", "condition", "files"],
+      "properties": {
+        "receivedBy": { "type": "string", "minLength": 1 },
+        "deliveredAt": { "description": "When the goods were delivered, local to the delivery address.", "$ref": "#/$defs/localDateTime" },
+        "condition": { "enum": ["CLEAN", "RESERVATIONS"] },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["fileId", "name", "contentType", "sizeBytes"],
+            "properties": {
+              "fileId": { "description": "The ID to download the file with.", "type": "string", "format": "uuid" },
+              "name": { "type": "string", "minLength": 1 },
+              "contentType": { "type": "string", "minLength": 1 },
+              "sizeBytes": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "status": {
+      "description": "Where the Transport Order stands. SCHEDULED covers everything before collection, so the Shipper can't tell Own fleet from a Carrier.",
+      "enum": ["RECEIVED", "SCHEDULED", "COLLECTED", "IN_TRANSIT", "DELIVERED"]
+    },
+    "country": { "description": "ISO 3166-1 alpha-2.", "type": "string", "pattern": "^[A-Z]{2}$" },
+    "localDateTime": {
+      "description": "A local date and time as dd-MM-yyyy HH:mm (24-hour clock), in the time zone of the place it is about.",
+      "type": "string",
+      "pattern": "^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{4} ([01][0-9]|2[0-3]):[0-5][0-9]$",
+      "examples": ["03-10-2030 14:30"]
+    }
+  }
+}

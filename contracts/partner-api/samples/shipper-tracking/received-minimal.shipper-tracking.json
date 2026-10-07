@@ -1,0 +1,9 @@
+{
+  "norviaOrderNo": "TO-0000009",
+  "status": "RECEIVED",
+  "pickupCity": "Rotterdam",
+  "pickupCountry": "NL",
+  "pickupFrom": "03-06-2030 08:00",
+  "receiverCountry": "AT",
+  "events": []
+}
