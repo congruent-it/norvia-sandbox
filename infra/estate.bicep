@@ -240,6 +240,8 @@ module partnerApi 'estate/partner-api.bicep' = {
     tags: tags
     apiManagementIdentityName: identities.outputs.apiManagementIdentityName
     partnerApiClientId: identities.outputs.partnerApiClientId
+    tmsApiClientId: identities.outputs.tmsApiClientId
+    tmsBaseUrl: tmsBaseUrl
     shippersByClientId: join(filter(identities.outputs.shipperByClientId, entry => !empty(entry)), ';')
     carriersByClientId: join(filter(identities.outputs.carrierByClientId, entry => !empty(entry)), ';')
     personaClientIds: identities.outputs.personaClientIds

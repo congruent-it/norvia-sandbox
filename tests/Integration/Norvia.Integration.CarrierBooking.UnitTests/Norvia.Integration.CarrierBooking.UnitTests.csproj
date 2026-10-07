@@ -34,6 +34,9 @@
     <EmbeddedResource Include="..\..\..\infra\estate\partner-api\answer-carrier-booking.policy.xml" LogicalName="PartnerApiPolicies/answer-carrier-booking.policy.xml" />
     <EmbeddedResource Include="..\..\..\infra\estate\partner-api\submit-carrier-tracking.policy.xml" LogicalName="PartnerApiPolicies/submit-carrier-tracking.policy.xml" />
     <EmbeddedResource Include="..\..\..\infra\estate\partner-api\submit-carrier-proof-of-delivery.policy.xml" LogicalName="PartnerApiPolicies/submit-carrier-proof-of-delivery.policy.xml" />
+    <EmbeddedResource Include="..\..\..\infra\estate\partner-api\*-shipper-*.policy.xml" LogicalName="PartnerApiPolicies/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\infra\estate\identities.bicep" LogicalName="Estate/identities.bicep" />
+    <EmbeddedResource Include="..\..\..\infra\estate\partner-api.bicep" LogicalName="Estate/partner-api.bicep" />
     <EmbeddedResource Include="..\..\..\src\Integration\ProofOfDeliveryLogicApp\*.json" LogicalName="ProofOfDeliveryLogicApp/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\src\Integration\ProofOfDeliveryLogicApp\carrier-proof-of-delivery\workflow.json" LogicalName="ProofOfDeliveryLogicApp/carrier-proof-of-delivery/workflow.json" />
     <EmbeddedResource Include="..\..\..\src\Integration\TrackingLogicApp\*.json" LogicalName="TrackingLogicApp/%(Filename)%(Extension)" />

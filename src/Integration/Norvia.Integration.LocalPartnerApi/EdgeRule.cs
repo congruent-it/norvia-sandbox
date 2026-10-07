@@ -47,4 +47,16 @@ internal sealed record EdgeRule(
         options => options.CarriersByClientId,
         "No Carrier is registered for this client.",
         "NoCarrierForClient");
+
+    /// <summary>
+    /// infra/estate/partner-api/ list-, get-, find-shipper-transport-order and get-shipper-proof-of-delivery-file .policy.xml: the
+    /// four operations of the Shipper tracking API (P8) ask the same of their caller.
+    /// </summary>
+    public static EdgeRule ReadShipperTracking { get; } = new(
+        "Tracking.Read",
+        "This client may not read tracking.",
+        "NotAllowedToReadTracking",
+        options => options.ShippersByClientId,
+        "No Shipper is registered for this client.",
+        "NoShipperForClient");
 }

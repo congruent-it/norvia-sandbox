@@ -3,6 +3,7 @@
   <ItemGroup>
     <PackageReference Include="Aspire.Azure.Messaging.ServiceBus" />
     <PackageReference Include="Aspire.Azure.Storage.Blobs" />
+    <PackageReference Include="DotLiquid" />
     <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
   </ItemGroup>
   <ItemGroup>
@@ -10,6 +11,10 @@
     <ProjectReference Include="..\Norvia.Integration.TransportOrderIntake\Norvia.Integration.TransportOrderIntake.csproj" />
     <ProjectReference Include="..\Norvia.Integration.CarrierBooking\Norvia.Integration.CarrierBooking.csproj" />
     <ProjectReference Include="..\Norvia.Integration.LocalSupport\Norvia.Integration.LocalSupport.csproj" />
+  </ItemGroup>
+  <!-- The Shipper tracking maps API Management runs, which the stand-in runs too (ADR 0023, ADR 0035). -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\..\infra\estate\partner-api\*.liquid" LogicalName="%(Filename)%(Extension)" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Norvia.Integration.LocalPartnerApi.UnitTests" />

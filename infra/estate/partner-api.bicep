@@ -31,6 +31,10 @@ param intakeTriggerAudience string
 param answerLogicAppHostName string
 param answerTriggerAudience string
 
+@description('The TMS API app registration, the audience of the tokens API Management gets for the TMS, and the TMS API\'s address, empty until the apps are first deployed (the postdeploy hook sets it).')
+param tmsApiClientId string
+param tmsBaseUrl string
+
 @description('The Service Bus namespace and the tracking queue API Management puts a Carrier\'s tracking message on.')
 param serviceBusName string
 param trackingQueueName string
@@ -60,6 +64,9 @@ once and keeps it in the azd environment, so deploying the estate again keeps th
 param carrierEndpointKeySeed string
 
 var resourceToken = uniqueString(resourceGroup().id)
+
+// The templates hold < and &, which a policy's XML must not. The Bicep puts them in the policies, escaped.
+func xmlEscaped(text string) string => replace(replace(replace(text, '&', '&amp;'), '<', '&lt;'), '>', '&gt;')
 
 resource apiManagementIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
   name: apiManagementIdentityName
@@ -100,6 +107,7 @@ var namedValues = {
   'intake-trigger-audience': intakeTriggerAudience
   'answer-trigger-audience': answerTriggerAudience
   'api-management-identity-client-id': apiManagementIdentity.properties.clientId
+  'tms-api-client-id': tmsApiClientId
   'service-bus-namespace': serviceBusName
   'tracking-queue-name': trackingQueueName
   'proof-of-delivery-queue-name': proofOfDeliveryQueueName
@@ -109,7 +117,7 @@ var namedValues = {
 
 resource policyValues 'Microsoft.ApiManagement/service/namedValues@2024-05-01' = [
   // The loop runs over the names, which are known before the deployment starts; the values aren't.
-  for name in ['entra-tenant-id', 'partner-api-client-id', 'shippers-by-client-id', 'carriers-by-client-id', 'intake-trigger-audience', 'answer-trigger-audience', 'api-management-identity-client-id', 'service-bus-namespace', 'tracking-queue-name', 'proof-of-delivery-queue-name', 'inbound-storage-account', 'inbound-container-name']: {
+  for name in ['entra-tenant-id', 'partner-api-client-id', 'shippers-by-client-id', 'carriers-by-client-id', 'intake-trigger-audience', 'answer-trigger-audience', 'api-management-identity-client-id', 'tms-api-client-id', 'service-bus-namespace', 'tracking-queue-name', 'proof-of-delivery-queue-name', 'inbound-storage-account', 'inbound-container-name']: {
     parent: apiManagement
     name: name
     properties: {
@@ -198,6 +206,18 @@ resource answerLogicApp 'Microsoft.ApiManagement/service/backends@2024-05-01' = 
   properties: {
     description: 'The Carrier-answer Logic App (P4.7). The policy names the trigger.'
     url: 'https://${answerLogicAppHostName}'
+    protocol: 'http'
+  }
+}
+
+// The TMS Shipper tracking API (P8), which the tracking policies query as API Management's identity. Before the apps are first
+// deployed there is no address; the placeholder fails every query with a gateway error, which the policy turns into "temporarily unavailable".
+resource tmsApi 'Microsoft.ApiManagement/service/backends@2024-05-01' = {
+  parent: apiManagement
+  name: 'tms-api'
+  properties: {
+    description: 'The TMS API (P8). The tracking policies name the route.'
+    url: empty(tmsBaseUrl) ? 'https://tms-api.invalid' : tmsBaseUrl
     protocol: 'http'
   }
 }
@@ -316,6 +336,129 @@ resource submitCarrierProofOfDeliveryPolicy 'Microsoft.ApiManagement/service/api
   }
   dependsOn: [
     policyValues
+  ]
+}
+
+// A Shipper reads its tracking here (P8): the TMS answers straight away through API Management, with no Logic App on a read path
+// (ADR 0003). The four operations share one rate limit per subscription, which the policies hold. The maps are Liquid templates in
+// the policies (ADR 0035), put in below.
+var shipperTrackingMap = xmlEscaped(loadTextContent('partner-api/shipper-tracking.liquid'))
+var shipperTrackingListMap = xmlEscaped(loadTextContent('partner-api/shipper-tracking-list.liquid'))
+
+resource listShipperTransportOrders 'Microsoft.ApiManagement/service/apis/operations@2024-05-01' = {
+  parent: partnerApi
+  name: 'list-shipper-transport-orders'
+  properties: {
+    displayName: 'List Transport Orders'
+    description: 'List a Shipper\'s Transport Orders with their Tracking status, newest collection first (contracts/partner-api).'
+    method: 'GET'
+    urlTemplate: '/transport-orders'
+    request: {
+      queryParameters: [
+        { name: 'trackingStatus', type: 'string', description: 'RECEIVED, SCHEDULED, COLLECTED, IN_TRANSIT or DELIVERED' }
+        { name: 'collectionFrom', type: 'string', description: 'The first collection date, yyyy-MM-dd.' }
+        { name: 'collectionTo', type: 'string', description: 'The last collection date, yyyy-MM-dd.' }
+        { name: 'page', type: 'integer', description: 'From 1.' }
+        { name: 'pageSize', type: 'integer', description: '1 to 100, 25 by default.' }
+      ]
+    }
+  }
+}
+
+resource listShipperTransportOrdersPolicy 'Microsoft.ApiManagement/service/apis/operations/policies@2024-05-01' = {
+  parent: listShipperTransportOrders
+  name: 'policy'
+  properties: {
+    format: 'rawxml'
+    value: replace(loadTextContent('partner-api/list-shipper-transport-orders.policy.xml'), '[[shipper-tracking-list.liquid]]', shipperTrackingListMap)
+  }
+  dependsOn: [
+    policyValues
+    tmsApi
+  ]
+}
+
+resource findShipperTransportOrder 'Microsoft.ApiManagement/service/apis/operations@2024-05-01' = {
+  parent: partnerApi
+  name: 'find-shipper-transport-order'
+  properties: {
+    displayName: 'Find Transport Order'
+    description: 'Find one of a Shipper\'s Transport Orders by the Shipper\'s own reference (contracts/partner-api).'
+    method: 'GET'
+    urlTemplate: '/transport-orders/find'
+    request: {
+      queryParameters: [
+        { name: 'shipperReference', type: 'string', required: true }
+      ]
+    }
+  }
+}
+
+resource findShipperTransportOrderPolicy 'Microsoft.ApiManagement/service/apis/operations/policies@2024-05-01' = {
+  parent: findShipperTransportOrder
+  name: 'policy'
+  properties: {
+    format: 'rawxml'
+    value: replace(loadTextContent('partner-api/find-shipper-transport-order.policy.xml'), '[[shipper-tracking.liquid]]', shipperTrackingMap)
+  }
+  dependsOn: [
+    policyValues
+    tmsApi
+  ]
+}
+
+resource getShipperTransportOrder 'Microsoft.ApiManagement/service/apis/operations@2024-05-01' = {
+  parent: partnerApi
+  name: 'get-shipper-transport-order'
+  properties: {
+    displayName: 'Get Transport Order'
+    description: 'Get one of a Shipper\'s Transport Orders by Norvia\'s number, with its progress and current Proof of delivery (contracts/partner-api).'
+    method: 'GET'
+    urlTemplate: '/transport-orders/{transportOrderNumber}'
+    templateParameters: [
+      { name: 'transportOrderNumber', type: 'string', required: true }
+    ]
+  }
+}
+
+resource getShipperTransportOrderPolicy 'Microsoft.ApiManagement/service/apis/operations/policies@2024-05-01' = {
+  parent: getShipperTransportOrder
+  name: 'policy'
+  properties: {
+    format: 'rawxml'
+    value: replace(loadTextContent('partner-api/get-shipper-transport-order.policy.xml'), '[[shipper-tracking.liquid]]', shipperTrackingMap)
+  }
+  dependsOn: [
+    policyValues
+    tmsApi
+  ]
+}
+
+resource getShipperProofOfDeliveryFile 'Microsoft.ApiManagement/service/apis/operations@2024-05-01' = {
+  parent: partnerApi
+  name: 'get-shipper-proof-of-delivery-file'
+  properties: {
+    displayName: 'Download Proof of delivery file'
+    description: 'Download a file of a Transport Order\'s current Proof of delivery, as the TMS streams it (contracts/partner-api).'
+    method: 'GET'
+    urlTemplate: '/transport-orders/{transportOrderNumber}/proof-of-delivery/files/{fileId}'
+    templateParameters: [
+      { name: 'transportOrderNumber', type: 'string', required: true }
+      { name: 'fileId', type: 'string', required: true }
+    ]
+  }
+}
+
+resource getShipperProofOfDeliveryFilePolicy 'Microsoft.ApiManagement/service/apis/operations/policies@2024-05-01' = {
+  parent: getShipperProofOfDeliveryFile
+  name: 'policy'
+  properties: {
+    format: 'rawxml'
+    value: loadTextContent('partner-api/get-shipper-proof-of-delivery-file.policy.xml')
+  }
+  dependsOn: [
+    policyValues
+    tmsApi
   ]
 }
 

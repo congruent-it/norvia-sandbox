@@ -27,6 +27,7 @@ public sealed class LocalPartnerApiFactory : WebApplicationFactory<Program>
     public const string TmsAudience = "api://norvia-tms";
     public const string IntakeClientId = "norvia-local-intake-logic-app";
     public const string AnswerClientId = "norvia-local-answer-logic-app";
+    public const string ApiManagementClientId = "norvia-local-api-management";
 
     public LocalPartnerApiFactory() => ProofOfDeliveryQueue = new(InboundProofsOfDelivery);
 
@@ -39,6 +40,9 @@ public sealed class LocalPartnerApiFactory : WebApplicationFactory<Program>
     internal StubInboundProofsOfDelivery InboundProofsOfDelivery { get; } = new();
 
     internal StubProofOfDeliveryQueue ProofOfDeliveryQueue { get; }
+
+    /// <summary>The stand-in's clock, which a test moves to show the rate limit renew.</summary>
+    internal ManualTimeProvider Time { get; } = new(DateTimeOffset.UtcNow);
 
     /// <summary>What the stand-in logged, with its scopes: the tracking keys its traces carry (coding guidelines §7).</summary>
     public FakeLogCollector Logs => Services.GetRequiredService<FakeLogCollector>();
@@ -61,6 +65,7 @@ public sealed class LocalPartnerApiFactory : WebApplicationFactory<Program>
             ["Tms:Tokens:ClientId"] = IntakeClientId,
             ["Tms:Tokens:SigningKey"] = signingKey,
             ["Tms:AnswerClientId"] = AnswerClientId,
+            ["Tms:ShipperTrackingClientId"] = ApiManagementClientId,
         })
         {
             builder.UseSetting(name, value);
@@ -74,6 +79,8 @@ public sealed class LocalPartnerApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<IProofOfDeliveryQueue>(ProofOfDeliveryQueue);
             services.AddHttpClient<TmsIntake>().ConfigurePrimaryHttpMessageHandler(() => Tms);
             services.AddHttpClient<TmsCarrierAnswers>().ConfigurePrimaryHttpMessageHandler(() => Tms);
+            services.AddHttpClient<TmsShipperTracking>().ConfigurePrimaryHttpMessageHandler(() => Tms);
+            services.AddSingleton<TimeProvider>(Time);
             // Retries straight away, so a test of an unreachable TMS doesn't wait out the backoff.
             services.ConfigureAll<HttpStandardResilienceOptions>(options => options.Retry.Delay = TimeSpan.Zero);
         });
@@ -113,6 +120,10 @@ public sealed class LocalPartnerApiFactory : WebApplicationFactory<Program>
     public static string CarrierProofOfDeliverySample(string name) => Embedded($"PartnerApi/samples/carrier-proofs-of-delivery/{name}");
 
     public static string CarrierAnswerSample(string name) => Embedded($"PartnerApi/samples/carrier-answers/{name}");
+
+    public static string ShipperTrackingSample(string name) => Embedded($"PartnerApi/samples/shipper-tracking/{name}");
+
+    public static string ShipperTrackingListSample(string name) => Embedded($"PartnerApi/samples/shipper-tracking-lists/{name}");
 
     private static string Embedded(string name)
     {

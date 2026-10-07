@@ -235,6 +235,21 @@ It retries a server error, a timeout, `408` and `429` up to three times, waiting
 
 [P8](../../docs/processes/tms/p8-shipper-visibility.md#shipper-tracking-format): a Shipper asks the Norvia Partner API for its Transport Orders, and API Management answers with what the TMS Shipper tracking API returned, mapped from the Canonical Model ([shipper-transport-order-list-item.v1](../canonical-model/shipper-transport-order-list-item.v1.schema.json), [shipper-transport-order-detail.v1](../canonical-model/shipper-transport-order-detail.v1.schema.json)) to the [shipper-tracking-list-item.v1](shipper-tracking-list-item.v1.schema.json) and [shipper-tracking.v1](shipper-tracking.v1.schema.json) formats. The map is an API Management `set-body` policy template, [shipper-tracking-list.liquid](../../infra/estate/partner-api/shipper-tracking-list.liquid) and [shipper-tracking.liquid](../../infra/estate/partner-api/shipper-tracking.liquid) ([ADR 0035](../../docs/adr/0035-the-shipper-tracking-map-is-liquid-with-the-clock-rules-written-out.md)), tested against the sample pairs in `samples/shipper-tracking` and `samples/shipper-tracking-lists`. The policy only changes the format: what the Shipper may see is decided in the TMS.
 
+### Operations
+
+A Shipper calls these `GET` operations of the Norvia Partner API with its subscription key and a token holding the app role `Tracking.Read`, which only Shipper Personas hold. A token without the role, such as a Carrier's, gets `403`. API Management maps the token's `azp` to the Shipper, creates a correlation ID (returned in `X-Correlation-ID`) and queries the TMS Shipper tracking API with its managed identity. It waits five seconds and doesn't retry: a TMS server error or timeout gives `503` and `{ "messageId", "text" }` saying tracking is temporarily unavailable. Each subscription may make 120 calls a minute across the four operations, and over it gets `429`.
+
+| Operation | Route | Answer |
+|---|---|---|
+| List Transport Orders | `/partner/v1/transport-orders?trackingStatus&collectionFrom&collectionTo&page&pageSize` | An array of [shipper-tracking-list-item.v1](shipper-tracking-list-item.v1.schema.json) |
+| Get a Transport Order | `/partner/v1/transport-orders/{transportOrderNumber}` | [shipper-tracking.v1](shipper-tracking.v1.schema.json) |
+| Find a Transport Order | `/partner/v1/transport-orders/find?shipperReference=` | [shipper-tracking.v1](shipper-tracking.v1.schema.json) |
+| Download a Proof of delivery file | `/partner/v1/transport-orders/{transportOrderNumber}/proof-of-delivery/files/{fileId}` | The file, as the TMS streams it |
+
+The TMS's refusals (`TransportOrderNotFound`, `ProofOfDeliveryNotFound`, a bad query) pass through unchanged, with their status.
+
+### Mapping
+
 | Canonical Model | Shipper tracking | What the map does |
 |---|---|---|
 | `transportOrderNumber` | `norviaOrderNo` | Copies it |

@@ -263,7 +263,7 @@ else
         .WithEnvironment("TmsApi__LocalTokens__ClientId", LocalTokens.TmsUiClientId);
 
     // Locally a stand-in plays API Management and the intake and Carrier-answer Logic Apps (ADR 0023), and puts a Carrier's tracking message on the tracking queue. The AppHost gives
-    // each Persona what the estate gives it in Azure: a client ID, a subscription key for the run, and the submit role if it
+    // each Persona what the estate gives it in Azure: a client ID, a subscription key for the run, and the submit and tracking read roles if it
     // is a Shipper or the respond role if it is a Carrier.
     var partnerApi = builder.AddProject<Projects.Norvia_Integration_LocalPartnerApi>("partner-api")
         .WithReference(tmsApi).WaitFor(tmsApi)
@@ -276,7 +276,8 @@ else
         .WithEnvironment("Tms__Tokens__Issuer", LocalTokens.Issuer)
         .WithEnvironment("Tms__Tokens__Audience", LocalTokens.TmsAudience)
         .WithEnvironment("Tms__Tokens__ClientId", LocalTokens.IntakeLogicAppClientId)
-        .WithEnvironment("Tms__AnswerClientId", LocalTokens.AnswerLogicAppClientId);
+        .WithEnvironment("Tms__AnswerClientId", LocalTokens.AnswerLogicAppClientId)
+        .WithEnvironment("Tms__ShipperTrackingClientId", LocalTokens.ApiManagementClientId);
     // Locally a worker plays the P4 booking Logic App (ADR 0030). It reads the booking subscription, sends each Carrier
     // Persona's booking request to the Persona's endpoint in the Partner portal with a credential for the run, and
     // reports the outcome to the TMS as the identity holding the report role.
@@ -365,6 +366,7 @@ else
         {
             partnerApi.WithEnvironment($"PartnerApi__ShippersByClientId__{LocalTokens.PersonaClientId(persona.Id)}", persona.PartyId);
             partnerPortal.WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__0", LocalTokens.SubmitRole);
+            partnerPortal.WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__1", LocalTokens.TrackingReadRole);
         }
         else
         {

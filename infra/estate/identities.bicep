@@ -36,6 +36,8 @@ var proofSubmitRole = 'ProofsOfDelivery.Submit'
 var proofSubmitRoleId = guid('norvia-partner-api', environmentName, proofSubmitRole)
 var respondRole = 'CarrierBookings.Respond'
 var respondRoleId = guid('norvia-partner-api', environmentName, respondRole)
+var trackingReadRole = 'Tracking.Read'
+var trackingReadRoleId = guid('norvia-partner-api', environmentName, trackingReadRole)
 var submitRole = 'TransportOrders.Submit'
 var submitRoleId = guid('norvia-partner-api', environmentName, submitRole)
 var triggerRole = 'TransportOrderIntake.Trigger'
@@ -313,6 +315,16 @@ resource partnerApi 'Microsoft.Graph/applications@v1.0' = {
       isEnabled: true
     }
     {
+      id: trackingReadRoleId
+      value: trackingReadRole
+      displayName: 'Read Shipper tracking'
+      description: 'Read a Shipper\'s Transport Orders with their Tracking status and progress (P8). Only Shipper Personas hold it, so a Carrier Persona gets 403.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
+    {
       id: respondRoleId
       value: respondRole
       displayName: 'Answer Carrier bookings'
@@ -383,6 +395,15 @@ resource submitRoleGrants 'Microsoft.Graph/appRoleAssignedTo@v1.0' = [
   for (persona, i) in personas: if (persona.party.type == 'Shipper') {
     resourceId: partnerApiPrincipal.id
     appRoleId: submitRoleId
+    principalId: personaPrincipals[i].id
+  }
+]
+
+// Shipper Personas may read their tracking too; the Carrier Personas may not, and API Management refuses them with 403 (P8).
+resource trackingReadRoleGrants 'Microsoft.Graph/appRoleAssignedTo@v1.0' = [
+  for (persona, i) in personas: if (persona.party.type == 'Shipper') {
+    resourceId: partnerApiPrincipal.id
+    appRoleId: trackingReadRoleId
     principalId: personaPrincipals[i].id
   }
 ]
