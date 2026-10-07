@@ -39,7 +39,6 @@ eval "$(azd env get-values)"
 resource_group=${AZURE_RESOURCE_GROUP:-rg-$AZURE_ENV_NAME}
 story25=${1:-}
 story26=${2:-}
-brouwer_dranken_id=SHP-0001
 van_dijk_id=CAR-0001
 kessler_id=CAR-0002
 
@@ -273,7 +272,6 @@ step_accepted() {
     || fail "$3's $2 didn't get 202 Accepted: $(jq -c --arg name "$2" '.steps[] | select(.name == $name)' <<<"$1")"
 }
 step_id() { jq -r --arg name "$2" '.steps[] | select(.name == $name) | .correlationId' <<<"$1"; }
-exception_of() { jq -c --arg type "$2" '[.exceptions[]? | select(.type == $type)] | .[0] // empty' <<<"$1"; }
 wait_for_presenter() {
   echo
   echo "$1"
@@ -393,12 +391,13 @@ eta_id=$(step_id "$result" ETA)
 jq -e '.status == "Booked" and ([.exceptions[]? | select(.type == "LateDelivery")] | length == 1)' <<<"$result" >/dev/null \
   || fail "Shipment $shipment26 isn't still Booked with an Open Late delivery Exception after the far ETA: $(jq -c '{status, exceptions}' <<<"$result")"
 exception26=$(jq -r '[.exceptions[] | select(.type == "LateDelivery")][0].exceptionNumber' <<<"$result")
-kessler_booking=$(jq -r --arg kessler "$kessler_id" '[.carrierBookings[] | select(.carrierId == $kessler and .status == "Confirmed")][0].number' <<<"$result")
+kessler_booking=$(jq -r --arg kessler "$kessler_id" '[.carrierBookings[] | select(.carrierId == $kessler and .status == "Confirmed")][0].number // empty' <<<"$result")
+[ -n "$kessler_booking" ] || fail "Shipment $shipment26 has no Confirmed Carrier booking of Kessler Spedition: $(jq -c '.carrierBookings' <<<"$result")"
 pass "a far ETA opened Exception $exception26 (Late delivery) for Booked Shipment $shipment26 (correlation ID $eta_id)"
 
 # 7. The presenter cancels, and releases again to Van Dijk Transport.
-wait_for_presenter "In the TMS UI ($tms_ui/exceptions), on Exception $exception26: choose Cancel Carrier booking with a reason. Then, in
-Shipments to release, reassign Shipment $shipment26 to Van Dijk Transport and release it."
+wait_for_presenter "In the TMS UI ($tms_ui/exceptions), on Exception $exception26: choose Cancel Carrier booking with a reason. Stop there:
+the script reads Shipments to release before the Shipment is released again."
 result=$(look "$story26" kessler-spedition)
 for _ in $(seq 1 12); do
   jq -e --arg booking "$kessler_booking" '[.carrierBookings[] | select(.number == $booking)][0].status == "Cancelled"' <<<"$result" >/dev/null && break
@@ -408,14 +407,12 @@ done
 jq -e --arg booking "$kessler_booking" '[.carrierBookings[] | select(.number == $booking)][0].status == "Cancelled"' <<<"$result" >/dev/null \
   || fail "Kessler Spedition's Carrier booking $kessler_booking isn't Cancelled: $(jq -c '.carrierBookings' <<<"$result")"
 pass "Kessler Spedition's Carrier booking $kessler_booking is Cancelled and Shipment $shipment26 is $(jq -r '.status' <<<"$result")"
-# Kessler's booking leaves the Shipment's last outcome once it is booked again, so the list is read only while it still shows it.
-if jq -e '.toRelease.listed' <<<"$result" >/dev/null; then
-  jq -e '.toRelease.status == "Cancelled" and (.toRelease.reasonText | . != null and . != "") and (.toRelease.carrierNotTold | not)' <<<"$result" >/dev/null \
-    || fail "Shipment $shipment26's Shipments to release row isn't Cancelled by Norvia with its reason, Carrier told: $(jq -c '.toRelease' <<<"$result")"
-  pass "Shipment $shipment26 is in Shipments to release as Cancelled by Norvia, with its reason, and the Carrier isn't flagged not told"
-else
-  echo "NOT CHECKED: Shipment $shipment26 has left Shipments to release already (released again), so its row can't show Cancelled by Norvia."
-fi
+jq -e '.toRelease.listed' <<<"$result" >/dev/null || fail "Shipment $shipment26 isn't in Shipments to release after the cancellation"
+jq -e '.toRelease.status == "Cancelled" and (.toRelease.reasonText | . != null and . != "") and (.toRelease.carrierNotTold | not)' <<<"$result" >/dev/null \
+  || fail "Shipment $shipment26's Shipments to release row isn't Cancelled by Norvia with its reason, Carrier told: $(jq -c '.toRelease' <<<"$result")"
+pass "Shipment $shipment26 is in Shipments to release as Cancelled by Norvia, with its reason, and the Carrier isn't flagged not told"
+wait_for_presenter "Now reassign Shipment $shipment26 to Van Dijk Transport and release it."
+result=$(look "$story26" kessler-spedition)
 jq -e --arg van_dijk "$van_dijk_id" '[.carrierBookings[] | select(.carrierId == $van_dijk)] | length >= 1' <<<"$result" >/dev/null \
   || fail "Shipment $shipment26 wasn't released again to Van Dijk Transport: $(jq -c '.carrierBookings' <<<"$result")"
 pass "Shipment $shipment26 was released again to Van Dijk Transport"
