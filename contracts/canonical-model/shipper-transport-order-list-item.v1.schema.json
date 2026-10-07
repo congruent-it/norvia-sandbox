@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/shipper-transport-order-list-item.v1.schema.json",
+  "title": "ShipperTransportOrderListItem",
+  "description": "The Shipper's view of one of its Transport Orders in a list (Canonical Model, version 1), as the TMS Shipper tracking API's list operation returns it (P8). It holds what the Shipper may see and nothing of what stays inside Norvia (ADR 0011): no Carrier, no Shipment number, no Exception and no Stale. The Tracking status is worked out when the list is asked for and is never stored.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["transportOrderNumber", "shipperReference", "collection", "delivery", "trackingStatus", "eta", "lastUpdate"],
+  "properties": {
+    "transportOrderNumber": { "type": "string", "pattern": "^TO-[0-9]{7}$" },
+    "shipperReference": { "description": "The Shipper's own reference, unique per Shipper; null when the Transport Order has none.", "type": ["string", "null"], "minLength": 1 },
+    "collection": { "$ref": "#/$defs/place" },
+    "delivery": { "$ref": "#/$defs/place" },
+    "trackingStatus": {
+      "description": "Received: Accepted with no Shipment yet. Scheduled: the Shipment is Planned, Released or Booked, including after a rejected or cancelled Carrier booking sent it back to Planned. Then Collected, InTransit and Delivered.",
+      "enum": ["Received", "Scheduled", "Collected", "InTransit", "Delivered"]
+    },
+    "eta": { "description": "The ETA of the last Tracking event that carried one, otherwise the end of the delivery window; null when there is none.", "type": ["string", "null"], "format": "date-time" },
+    "lastUpdate": { "description": "The event time of the latest progress Tracking event; null before collection.", "type": ["string", "null"], "format": "date-time" }
+  },
+  "$defs": {
+    "place": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["city", "countryCode"],
+      "properties": {
+        "city": { "type": ["string", "null"], "minLength": 1 },
+        "countryCode": { "description": "ISO 3166-1 alpha-2.", "type": ["string", "null"], "pattern": "^[A-Z]{2}$" }
+      }
+    }
+  }
+}

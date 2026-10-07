@@ -28,6 +28,8 @@ var recordRole = 'TrackingEvents.Record'
 var recordRoleId = guid('norvia-tms-api', environmentName, recordRole)
 var recordProofRole = 'ProofsOfDelivery.Record'
 var recordProofRoleId = guid('norvia-tms-api', environmentName, recordProofRole)
+var shipperTrackingReadRole = 'ShipperTracking.Read'
+var shipperTrackingReadRoleId = guid('norvia-tms-api', environmentName, shipperTrackingReadRole)
 var trackingSubmitRole = 'Tracking.Submit'
 var trackingSubmitRoleId = guid('norvia-partner-api', environmentName, trackingSubmitRole)
 var proofSubmitRole = 'ProofsOfDelivery.Submit'
@@ -126,6 +128,16 @@ resource tmsApi 'Microsoft.Graph/applications@v1.0' = {
       value: recordRole
       displayName: 'Record Tracking events'
       description: 'Record a Tracking event reported for a Shipment (P5). Only the Carrier-tracking Logic App holds it, and later the Driver reports Logic App (P12).'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
+    {
+      id: shipperTrackingReadRoleId
+      value: shipperTrackingReadRole
+      displayName: 'Read Shipper tracking'
+      description: 'Read a Shipper\'s Transport Orders with their Tracking status (P8). Only API Management holds it, and the TMS trusts the Shipper ID header only from it.'
       allowedMemberTypes: [
         'Application'
       ]
@@ -268,6 +280,14 @@ resource apiManagementIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities
   name: 'id-apim-${uniqueString(resourceGroup().id)}'
   location: location
   tags: tags
+}
+
+// API Management is the one principal holding the Shipper tracking role, so a Shipper-scoped read reaches the TMS only
+// through the Shipper's token check at the edge.
+resource shipperTrackingReadRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: tmsApiPrincipal.id
+  appRoleId: shipperTrackingReadRoleId
+  principalId: apiManagementIdentity.properties.principalId
 }
 
 resource partnerApi 'Microsoft.Graph/applications@v1.0' = {

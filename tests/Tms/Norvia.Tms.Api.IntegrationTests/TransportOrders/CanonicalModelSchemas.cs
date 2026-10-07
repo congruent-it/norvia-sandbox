@@ -57,6 +57,10 @@ internal static class CanonicalModelSchemas
 
     private static readonly Lazy<JsonSchema> CarrierBookingCancelledSchema = new(() => Load("carrier-booking-cancelled.v1.schema.json"));
 
+    private static readonly Lazy<JsonSchema> ShipperTransportOrderListItemSchema = new(() => Load("shipper-transport-order-list-item.v1.schema.json"));
+
+    public static EvaluationResults ValidateShipperTransportOrderListItem(JsonNode body) => Validate(ShipperTransportOrderListItemSchema.Value, body);
+
     public static EvaluationResults ValidateCarrierBookingCancelled(JsonNode body) => Validate(CarrierBookingCancelledSchema.Value, body);
 
     private static readonly Lazy<JsonSchema> CarrierCancellationNotDeliveredSchema = new(() => Load("carrier-cancellation-not-delivered.v1.schema.json"));
