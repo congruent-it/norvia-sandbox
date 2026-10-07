@@ -100,7 +100,7 @@ public sealed class ListShipperTransportOrdersHandlerTests
         _allEvents.Add(Report(shipment, TrackingEventType.Collected, "a", Samples.Now.AddHours(1), eta: Samples.Now.AddDays(2)));
         _allEvents.Add(Report(shipment, TrackingEventType.Arrived, "b", Samples.Now.AddHours(3), eta: eta));
         // A late exception is the Planner's to deal with, not an update for the Shipper.
-        _allEvents.Add(Report(shipment, TrackingEventType.Damaged, "c", Samples.Now.AddHours(5)));
+        _allEvents.Add(Report(shipment, TrackingEventType.Damaged, "c", Samples.Now.AddHours(5), eta: Samples.Now.AddDays(9)));
 
         var listed = await Handler().Handle(new ListShipperTransportOrdersQuery("SHP-0001"), CancellationToken.None);
 

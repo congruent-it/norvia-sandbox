@@ -44,15 +44,16 @@ public sealed class ListShipperTransportOrdersHandler(
     {
         var details = order.Details;
         var deliveryWindow = shipment is null ? details.Delivery?.Window : shipment.DeliveryWindowOf(details);
-        // Only progress counts as an update: an exception stays with the Planner (ADR 0011).
-        var lastUpdate = events.Where(trackingEvent => !trackingEvent.Type.IsException()).MaxBy(trackingEvent => trackingEvent.EventTime)?.EventTime;
+        // Only progress counts, for the update and the ETA alike: an exception stays with the Planner (ADR 0011).
+        var progress = events.Where(trackingEvent => !trackingEvent.Type.IsException()).ToList();
+        var lastUpdate = progress.MaxBy(trackingEvent => trackingEvent.EventTime)?.EventTime;
         var item = new ShipperTransportOrderListItem(
             order.Number!.Value,
             order.ShipperReference,
             PlaceOf(details.Collection?.Address),
             PlaceOf(details.Delivery?.Address),
             TrackingStatuses.Of(shipment?.Status),
-            ShipmentEta.Of(events, deliveryWindow),
+            ShipmentEta.Of(progress, deliveryWindow),
             lastUpdate);
         return (item, details.Collection?.Window?.Earliest);
     }
