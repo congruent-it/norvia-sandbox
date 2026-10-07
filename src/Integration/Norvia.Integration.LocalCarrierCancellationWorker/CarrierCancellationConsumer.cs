@@ -8,13 +8,13 @@ namespace Norvia.Integration.LocalCarrierCancellationWorker;
 /// Carrier cancellation subscription and runs the flow for it. As in the workflow, a message that can't be mapped is dead-lettered with the failure
 /// code, and any other is completed: a run that fails later is on the trail, not redelivered.
 /// </summary>
-internal sealed partial class CarrierBookingEndedConsumer(
+internal sealed partial class CarrierCancellationConsumer(
     ServiceBusClient serviceBus,
     IServiceScopeFactory scopes,
     IOptions<CarrierCancellationWorkerOptions> options,
-    ILogger<CarrierBookingEndedConsumer> logger) : BackgroundService
+    ILogger<CarrierCancellationConsumer> logger) : BackgroundService
 {
-    internal const string UnreadableCode = "CarrierCancellationUnreadable";
+    internal const string UnreadableCode = CarrierCancellationFailureCodes.Unreadable;
     internal const string UnreadableDescription = "The message isn't a cancellation the Carrier can be told of, so nothing was sent to the Carrier.";
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)

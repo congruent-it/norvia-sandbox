@@ -33,13 +33,14 @@ internal sealed partial class CarrierCancellationFlow(
     TimeProvider time,
     ILogger<CarrierCancellationFlow> logger)
 {
-    public async Task<CarrierCancellationFlowOutcome> RunAsync(string carrierBookingEnded, CancellationToken cancellationToken)
+    public async Task<CarrierCancellationFlowOutcome> RunAsync(string carrierCancellationEvent, CancellationToken cancellationToken)
     {
-        var request = RequestOf(carrierBookingEnded);
-        var cancellation = CarrierCancellationMap.ToCarrierCancellation(carrierBookingEnded);
+        var parsed = Parse(carrierCancellationEvent);
+        var request = parsed is null ? null : EventOf(parsed);
+        var cancellation = parsed is null ? null : CarrierCancellationMap.ToCarrierCancellation(parsed);
         if (request is null || cancellation is null)
         {
-            using var unreadable = logger.BeginScope(TrackingKeys.OutcomeOf(TrackingKeys.Failed, "CarrierCancellationUnreadable"));
+            using var unreadable = logger.BeginScope(TrackingKeys.OutcomeOf(TrackingKeys.Failed, CarrierCancellationFailureCodes.Unreadable));
             LogUnreadable();
             return CarrierCancellationFlowOutcome.Unreadable;
         }
@@ -61,7 +62,7 @@ internal sealed partial class CarrierCancellationFlow(
         };
     }
 
-    private async Task<CarrierAnswer> SendAsync(Request request, string cancellation, CancellationToken cancellationToken)
+    private async Task<CarrierAnswer> SendAsync(CancellationEvent request, string cancellation, CancellationToken cancellationToken)
     {
         if (!options.Value.Carriers.TryGetValue(request.CarrierId, out var endpoint))
         {
@@ -78,7 +79,7 @@ internal sealed partial class CarrierCancellationFlow(
             }
 
             var wait = TimeSpan.FromTicks(Math.Min(retry.Interval.Ticks * (1L << attempt), retry.MaximumInterval.Ticks));
-            using var retrying = logger.BeginScope(TrackingKeys.OutcomeOf(TrackingKeys.Retrying, "CarrierUnavailable"));
+            using var retrying = logger.BeginScope(TrackingKeys.OutcomeOf(TrackingKeys.Retrying, CarrierCancellationFailureCodes.CarrierUnavailable));
             LogRetrying(answer.StatusCode, attempt + 1, retry.Count, wait);
             await Task.Delay(wait, time, cancellationToken);
         }
@@ -91,31 +92,30 @@ internal sealed partial class CarrierCancellationFlow(
         {
             return answer.Succeeded
                 ? TrackingKeys.OutcomeOf(TrackingKeys.Succeeded)
-                : TrackingKeys.OutcomeOf(TrackingKeys.Failed, answer.IsRetryable ? "CarrierUnavailable" : "CarrierRefused");
+                : TrackingKeys.OutcomeOf(TrackingKeys.Failed, answer.IsRetryable ? CarrierCancellationFailureCodes.CarrierUnavailable : CarrierCancellationFailureCodes.CarrierRefused);
         }
 
-        return TrackingKeys.OutcomeOf(TrackingKeys.Failed, tmsStatus is 0 or 408 or 429 or >= 500 ? "TmsUnavailable" : "TmsCallRefused");
+        return TrackingKeys.OutcomeOf(TrackingKeys.Failed, tmsStatus is 0 or 408 or 429 or >= 500 ? CarrierCancellationFailureCodes.TmsUnavailable : CarrierCancellationFailureCodes.TmsCallRefused);
     }
 
-    private static Request? RequestOf(string carrierBookingEnded)
+    private static JsonObject? Parse(string carrierCancellationEvent)
     {
         try
         {
-            if (JsonNode.Parse(carrierBookingEnded) is not JsonObject requested
-                || Text(requested, "correlationId") is not { } correlationId
-                || Text(requested, "carrierBookingNumber") is not { } carrierBookingNumber
-                || Text(requested, "carrierId") is not { } carrierId)
-            {
-                return null;
-            }
-
-            return new(correlationId, carrierBookingNumber, carrierId, Text(requested, "shipmentNumber"), Text(requested, "eventId"));
+            return JsonNode.Parse(carrierCancellationEvent) as JsonObject;
         }
         catch (System.Text.Json.JsonException)
         {
             return null;
         }
     }
+
+    private static CancellationEvent? EventOf(JsonObject parsed) =>
+        Text(parsed, "correlationId") is { } correlationId
+        && Text(parsed, "carrierBookingNumber") is { } carrierBookingNumber
+        && Text(parsed, "carrierId") is { } carrierId
+            ? new(correlationId, carrierBookingNumber, carrierId, Text(parsed, "shipmentNumber"), Text(parsed, "eventId"))
+            : null;
 
     private static string? Text(JsonObject node, string name) =>
         node[name] is JsonValue value && value.TryGetValue<string>(out var text) && !string.IsNullOrWhiteSpace(text) ? text : null;
@@ -129,8 +129,8 @@ internal sealed partial class CarrierCancellationFlow(
     [LoggerMessage(Level = LogLevel.Information, Message = "Reported the cancellation {Report} to the TMS, which answered {StatusCode}")]
     private partial void LogReported(string report, int statusCode);
 
-    /// <summary>What a request names, and the tracking contract's keys it gives the trail.</summary>
-    private sealed record Request(string CorrelationId, string CarrierBookingNumber, string CarrierId, string? ShipmentNumber, string? EventId)
+    /// <summary>What the event names, and the tracking contract's keys it gives the trail.</summary>
+    private sealed record CancellationEvent(string CorrelationId, string CarrierBookingNumber, string CarrierId, string? ShipmentNumber, string? EventId)
     {
         public Dictionary<string, object?> Keys
         {

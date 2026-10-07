@@ -14,10 +14,15 @@ public static class CarrierCancellationMap
 {
     /// <param name="carrierBookingEnded">The <c>CarrierBookingCancelled</c> or <c>CarrierBookingWithdrawn</c> event as JSON text, as the Service Bus message carries it.</param>
     /// <returns>The cancellation, or null when the text isn't such an event the Carrier can be told of, so the cancellation always has what its schema requires.</returns>
-    public static JsonObject? ToCarrierCancellation(string carrierBookingEnded)
+    public static JsonObject? ToCarrierCancellation(string carrierBookingEnded) =>
+        JsonFields.Parse(carrierBookingEnded) is { } ended ? ToCarrierCancellation(ended) : null;
+
+    /// <param name="ended">The event, already parsed, for a caller that reads other fields of it too.</param>
+    /// <returns>The cancellation, or null when the event isn't one the Carrier can be told of.</returns>
+    public static JsonObject? ToCarrierCancellation(JsonObject ended)
     {
-        if (JsonFields.Parse(carrierBookingEnded) is not { } ended
-            || JsonFields.Text(ended, "carrierBookingNumber") is not { } bookingNumber
+        ArgumentNullException.ThrowIfNull(ended);
+        if (JsonFields.Text(ended, "carrierBookingNumber") is not { } bookingNumber
             || JsonFields.Text(ended, "shipmentNumber") is not { } shipmentNumber)
         {
             return null;

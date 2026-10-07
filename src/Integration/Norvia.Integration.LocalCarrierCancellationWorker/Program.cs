@@ -20,6 +20,6 @@ builder.Services.AddHttpClient<CarrierEndpoint>(http => http.Timeout = TimeSpan.
 builder.Services.AddHttpClient<TmsReports>((services, http) =>
     http.BaseAddress = services.GetRequiredService<IOptions<CarrierCancellationWorkerOptions>>().Value.TmsBaseAddress);
 builder.Services.AddTransient<CarrierCancellationFlow>();
-builder.Services.AddHostedService<CarrierBookingEndedConsumer>();
+builder.Services.AddHostedService<CarrierCancellationConsumer>();
 
 await builder.Build().RunAsync();

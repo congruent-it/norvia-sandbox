@@ -88,7 +88,7 @@ public sealed class CarrierCancellationWorkflowTests
 
         map["type"]!.GetValue<string>().Should().Be("InvokeFunction");
         map["inputs"]!["functionName"]!.GetValue<string>().Should().Be("MapCarrierCancellation");
-        map["inputs"]!["parameters"]!["carrierBookingEnded"]!.GetValue<string>().Should().Be("@{triggerBody()?['contentData']}");
+        map["inputs"]!["parameters"]!["carrierCancellationEvent"]!.GetValue<string>().Should().Be("@{triggerBody()?['contentData']}");
         map["trackedProperties"]!["failureCode"]!.GetValue<string>().Should().Contain("CarrierCancellationUnreadable");
     }
 

@@ -5,7 +5,7 @@ using NSubstitute;
 
 namespace Norvia.Integration.LocalCarrierCancellationWorker.UnitTests;
 
-public class CarrierBookingEndedConsumerTests
+public class CarrierCancellationConsumerTests
 {
     private readonly CarrierCancellationWorld _world = new();
     private readonly ServiceBusReceiver _receiver = Substitute.For<ServiceBusReceiver>();
@@ -13,8 +13,8 @@ public class CarrierBookingEndedConsumerTests
     private async Task HandleAsync(string body)
     {
         var services = new ServiceCollection().AddSingleton(_world.Flow).BuildServiceProvider();
-        var consumer = new CarrierBookingEndedConsumer(
-            Substitute.For<ServiceBusClient>(), services.GetRequiredService<IServiceScopeFactory>(), _world.Options, NullLogger<CarrierBookingEndedConsumer>.Instance);
+        var consumer = new CarrierCancellationConsumer(
+            Substitute.For<ServiceBusClient>(), services.GetRequiredService<IServiceScopeFactory>(), _world.Options, NullLogger<CarrierCancellationConsumer>.Instance);
         var message = ServiceBusModelFactory.ServiceBusReceivedMessage(BinaryData.FromString(body));
 
         await consumer.HandleAsync(new ProcessMessageEventArgs(message, _receiver, CancellationToken.None));
