@@ -53,7 +53,7 @@ public sealed class ProofOfDeliveryJourneyTests(TmsUiFixture tms) : BrowserPage(
     public async Task ADeliveredShipmentWithoutAProofOfDelivery_WaitsInTheFifthList_UntilItsProofOfDeliveryArrives()
     {
         var (shipmentNumber, reference) = await InTransitShipmentAsync();
-        await RecordTrackingAsync("Delivered", reference, DateTimeOffset.UtcNow.AddMinutes(-10));
+        await RecordRotterdamTrackingAsync("Delivered", reference, DateTimeOffset.UtcNow.AddMinutes(-10));
 
         await Page.GetByRole(AriaRole.Link, new() { Name = "Delivered without Proof of delivery" }).ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Delivered without Proof of delivery", Level = 1 })).ToBeVisibleAsync();
@@ -85,36 +85,6 @@ public sealed class ProofOfDeliveryJourneyTests(TmsUiFixture tms) : BrowserPage(
 
         var saved = await Page.APIRequest.GetAsync($"{viewPath}?download=true");
         saved.Headers["content-disposition"].Should().Contain("cmr-served.pdf");
-    }
-
-    private async Task<(string ShipmentNumber, string Reference)> InTransitShipmentAsync()
-    {
-        var (shipmentNumber, bookingNumber) = await ReleaseToCarrierAsync("Van Dijk Transport");
-        var reference = $"VDT-{Guid.NewGuid():N}"[..12];
-        using (var confirmed = await _tms.ConfirmAsync(VanDijkId, bookingNumber, reference, TestContext.Current.CancellationToken))
-        {
-            confirmed.StatusCode.Should().Be(HttpStatusCode.OK, await confirmed.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
-        }
-
-        var now = DateTimeOffset.UtcNow;
-        await RecordTrackingAsync("Collected", reference, now.AddMinutes(-40));
-        await RecordTrackingAsync("Departed", reference, now.AddMinutes(-30));
-        return (shipmentNumber, reference);
-    }
-
-    private async Task RecordTrackingAsync(string type, string reference, DateTimeOffset eventTime)
-    {
-        var trackingEvent = new JsonObject
-        {
-            ["eventId"] = Guid.NewGuid().ToString(),
-            ["source"] = new JsonObject { ["type"] = "Carrier", ["carrierId"] = VanDijkId },
-            ["carrierBookingReference"] = reference,
-            ["type"] = type,
-            ["eventTime"] = JsonValue.Create(eventTime),
-            ["location"] = new JsonObject { ["place"] = "Rotterdam", ["postcode"] = "3011 AA", ["countryCode"] = "NL" },
-        };
-        using var response = await _tms.RecordTrackingAsync(trackingEvent, TestContext.Current.CancellationToken);
-        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
     }
 
     private async Task RecordProofAsync(string reference, string receivedBy, string fileName)

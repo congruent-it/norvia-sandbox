@@ -50,4 +50,10 @@ public interface ITransportOrderCommands
 
     /// <summary>Resolves an open Exception with an outcome and the remark every outcome needs (P7).</summary>
     Task<ExceptionAnswer> ResolveAsync(string exceptionNumber, ExceptionOutcome outcome, string remark, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Releases a Delivered, Not yet billable Transport Order without a Proof of delivery, with the remark every release
+    /// needs (P9). The order becomes Billable only when nothing else blocks it.
+    /// </summary>
+    Task<ReleaseWithoutProofOfDeliveryAnswer> ReleaseWithoutProofOfDeliveryAsync(string transportOrderNumber, string remark, CancellationToken cancellationToken);
 }

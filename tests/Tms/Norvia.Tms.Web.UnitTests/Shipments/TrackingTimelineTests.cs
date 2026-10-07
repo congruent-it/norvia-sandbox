@@ -2,6 +2,8 @@ using AngleSharp.Dom;
 using Norvia.Tms.Application.ProofsOfDelivery.Read;
 using Norvia.Tms.Application.Exceptions.Timeline;
 using Norvia.Tms.Application.TrackingEvents.Timeline;
+using Norvia.Tms.Application.TransportOrders;
+using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Domain.ShipperNotifications;
 using Norvia.Tms.Domain.ProofsOfDelivery;
@@ -179,6 +181,71 @@ public sealed class TrackingTimelineTests : TmsWebContext
     // Reported at 08:00 and 09:00 in Rotterdam (UTC+2), received five minutes later.
     private static TrackingTimelineEntry Entry(TrackingEventType type, DateTimeOffset eventTime, bool moved) =>
         new(type, eventTime, "Rotterdam", "3011 AA", "NL", null, null, eventTime.AddMinutes(5), moved);
+
+    [Fact]
+    public void Render_ABillableOrder_ShowsTheBillingStateAndWhenItBecameBillable()
+    {
+        var billable = new ShipmentBillingView(BillingState.Billable, new DateTimeOffset(2026, 9, 25, 8, 15, 0, TimeSpan.Zero), null);
+        Queries.FindTrackingTimelineAsync("SH-0000012", Arg.Any<CancellationToken>()).Returns(new ShipmentTimeline([], [], [], [], billable));
+
+        var page = RenderTimeline("SH-0000012");
+
+        var billing = page.WaitForElement("section[aria-labelledby='section-billing']");
+        DescriptionsOf(billing).Should().Equal(("Billing state", "Billable"), ("Became Billable", "Fri 25 Sep 2026, 10:15"));
+    }
+
+    [Fact]
+    public void Render_ANotYetBillableOrder_SaysItIsNotBillableYet_WithoutAReleaseOrABillableTime()
+    {
+        var notYet = new ShipmentBillingView(BillingState.NotYetBillable, null, null);
+        Queries.FindTrackingTimelineAsync("SH-0000012", Arg.Any<CancellationToken>()).Returns(new ShipmentTimeline([], [], [], [], notYet));
+
+        var page = RenderTimeline("SH-0000012");
+
+        DescriptionsOf(page.WaitForElement("section[aria-labelledby='section-billing']")).Should().Equal(("Billing state", "Not yet billable"));
+    }
+
+    [Fact]
+    public void Render_AFulfilmentOrder_SaysItIsBilledThroughTheFulfilmentContract()
+    {
+        var fulfilment = new ShipmentBillingView(BillingState.NotBilledSeparately, null, null);
+        Queries.FindTrackingTimelineAsync("SH-0000012", Arg.Any<CancellationToken>()).Returns(new ShipmentTimeline([], [], [], [], fulfilment));
+
+        var page = RenderTimeline("SH-0000012");
+
+        DescriptionsOf(page.WaitForElement("section[aria-labelledby='section-billing']")).Should().Equal(("Billing state", "Not billed separately (Fulfilment Contract)"));
+    }
+
+    [Fact]
+    public void Render_AReleaseWithoutProofOfDelivery_ShowsWhoReleasedItWhenAndWhy()
+    {
+        var released = new ShipmentBillingView(
+            BillingState.Billable, new DateTimeOffset(2026, 9, 25, 8, 15, 0, TimeSpan.Zero),
+            new ProofOfDeliveryReleaseView("Sanne Bakker", new DateTimeOffset(2026, 9, 25, 8, 15, 0, TimeSpan.Zero), "CMR received by post"));
+        Queries.FindTrackingTimelineAsync("SH-0000012", Arg.Any<CancellationToken>()).Returns(new ShipmentTimeline([], [], [], [], released));
+
+        var page = RenderTimeline("SH-0000012");
+
+        DescriptionsOf(page.WaitForElement("section[aria-labelledby='section-billing']")).Should().Equal(
+            ("Billing state", "Billable"),
+            ("Became Billable", "Fri 25 Sep 2026, 10:15"),
+            ("Released without Proof of delivery", "Fri 25 Sep 2026, 10:15 by Sanne Bakker"),
+            ("Remark", "CMR received by post"));
+    }
+
+    [Fact]
+    public void Render_AShipmentWithoutABillingView_ShowsNoBillingSection()
+    {
+        Queries.FindTrackingTimelineAsync("SH-0000012", Arg.Any<CancellationToken>()).Returns(new ShipmentTimeline([], [], [], []));
+
+        var page = RenderTimeline("SH-0000012");
+
+        page.WaitForAssertion(() => page.Find("section[aria-labelledby='section-tracking-timeline']"));
+        page.FindAll("section[aria-labelledby='section-billing']").Should().BeEmpty();
+    }
+
+    private static List<(string Term, string Description)> DescriptionsOf(IElement section) =>
+        [.. section.QuerySelectorAll("dt").Zip(section.QuerySelectorAll("dd"), (term, description) => (term.TextContent.Trim(), description.TextContent.Trim()))];
 
     private IRenderedComponent<TrackingTimeline> RenderTimeline(string number) =>
         Render<TrackingTimeline>(parameters => parameters.Add(page => page.ShipmentNumber, number));

@@ -6,6 +6,7 @@ using Norvia.Tms.Application.Exceptions.Timeline;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shipments.ListInProgress;
 using Norvia.Tms.Application.TrackingEvents.Timeline;
+using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.UnitTests.TransportOrders;
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Carriers;
@@ -47,6 +48,7 @@ public sealed class TrackingQueriesTests
         _proofsOfDelivery.ListAsync(Arg.Any<ProofsOfDeliveryForShipmentSpec>(), Arg.Any<CancellationToken>()).Returns([]);
         _carriers.Find(VanDijk).Returns(new Carrier(VanDijk, "Van Dijk Transport", true));
         _events.ListAsync(Arg.Any<TrackingEventsForShipmentsSpec>(), Arg.Any<CancellationToken>()).Returns([]);
+        _orders.FirstOrDefaultAsync(Arg.Any<TransportOrderByIdSpec>(), Arg.Any<CancellationToken>()).Returns(call => _allOrders.FirstOrDefault(order => order.Id == call.Arg<TransportOrderByIdSpec>().Id));
         _orders.ListAsync(Arg.Any<TransportOrdersByNumbersSpec>(), Arg.Any<CancellationToken>()).Returns(_ => _allOrders);
     }
 
@@ -330,6 +332,31 @@ public sealed class TrackingQueriesTests
             new AgreedDeliveryWindowView(Samples.Now.AddDays(6), Samples.Now.AddDays(7), "EX-0000006", Samples.Now.AddDays(5)));
     }
 
+    [Fact]
+    public async Task Timeline_ShowsTheBillingStateOfTheShipmentsTransportOrder_NotYetBillableBeforeAnythingHappened()
+    {
+        _shipments.FirstOrDefaultAsync(Arg.Any<ShipmentByNumberSpec>(), Arg.Any<CancellationToken>()).Returns(Booked(sequence: 12));
+        _events.ListAsync(Arg.Any<TrackingTimelineSpec>(), Arg.Any<CancellationToken>()).Returns([]);
+
+        var result = await TimelineHandler().Handle(new GetTrackingTimelineQuery("SH-0000012"), CancellationToken.None);
+
+        result.Value.Billing.Should().Be(new ShipmentBillingView(BillingState.NotYetBillable, null, null));
+    }
+
+    [Fact]
+    public async Task Timeline_AReleasedOrder_ShowsWhoReleasedItWhenAndWhy()
+    {
+        var shipment = Booked(sequence: 12);
+        _shipments.FirstOrDefaultAsync(Arg.Any<ShipmentByNumberSpec>(), Arg.Any<CancellationToken>()).Returns(shipment);
+        _events.ListAsync(Arg.Any<TrackingTimelineSpec>(), Arg.Any<CancellationToken>()).Returns([]);
+        _allOrders.Single().ReleaseWithoutProofOfDelivery(Samples.Now.AddDays(1), "CMR by post", "Jan", Samples.Now.AddDays(2)).Should().BeNull();
+
+        var result = await TimelineHandler().Handle(new GetTrackingTimelineQuery("SH-0000012"), CancellationToken.None);
+
+        result.Value.Billing.Should().Be(new ShipmentBillingView(
+            BillingState.NotYetBillable, null, new ProofOfDeliveryReleaseView("Jan", Samples.Now.AddDays(2), "CMR by post")));
+    }
+
     [Theory]
     [InlineData("SH-0000099")]
     [InlineData("nonsense")]
@@ -344,7 +371,7 @@ public sealed class TrackingQueriesTests
 
     private ListShipmentsInProgressHandler InProgressHandler() => new(_shipments, _events, _orders, _proofsOfDelivery, _exceptions, _carriers, new ShipmentStaleRules(TimeSpan.FromHours(2), TimeSpan.FromHours(24), TimeSpan.FromHours(2)), _time);
 
-    private GetTrackingTimelineHandler TimelineHandler() => new(_shipments, _events, _proofsOfDelivery, _exceptions, _notifications, _carrierBookings);
+    private GetTrackingTimelineHandler TimelineHandler() => new(_shipments, _events, _proofsOfDelivery, _exceptions, _notifications, _carrierBookings, _orders);
 
     private static TrackingEvent Report(
         Shipment shipment, TrackingEventType type, string id, DateTimeOffset eventTime, DateTimeOffset receivedAt, DateTimeOffset? eta) =>
