@@ -13,6 +13,8 @@ namespace Norvia.Integration.CarrierBooking;
 /// </remarks>
 public static class ShipperNotificationMap
 {
+    private static readonly string[] RequiredFields = ["notificationId", "bookingRef", "transportOrderNumber", "message", "contact"];
+
     private static readonly Dictionary<string, string> ExceptionCodes = new(StringComparer.Ordinal)
     {
         ["CollectionFailed"] = "COLLECTION_FAILED",
@@ -23,7 +25,7 @@ public static class ShipperNotificationMap
     };
 
     /// <param name="shipperNotificationRequested">The <c>ShipperNotificationRequested</c> event as JSON text, as the Service Bus message carries it.</param>
-    /// <returns>The notification, or null when the text isn't a <c>ShipperNotificationRequested</c> the Shipper can be told of.</returns>
+    /// <returns>The notification, or null when the text isn't a <c>ShipperNotificationRequested</c> the Shipper can be told of, so the notification always has what its schema requires.</returns>
     public static JsonObject? ToShipperNotification(string shipperNotificationRequested)
     {
         if (JsonFields.Parse(shipperNotificationRequested) is not { } requested
@@ -51,6 +53,8 @@ public static class ShipperNotificationMap
             ["contact"] = JsonFields.Text(requested, "planner"),
         };
 
-        return JsonFields.WithoutNulls(notification);
+        return RequiredFields.Any(name => notification[name] is null)
+            ? null
+            : JsonFields.WithoutNulls(notification);
     }
 }

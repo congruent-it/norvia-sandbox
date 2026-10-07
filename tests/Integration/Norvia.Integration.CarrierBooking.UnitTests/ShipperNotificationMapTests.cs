@@ -56,4 +56,13 @@ public class ShipperNotificationMapTests
         notification["deliverFrom"]!.GetValue<string>().Should().Be("04-10-2030 08:00");
         notification["deliverUntil"]!.GetValue<string>().Should().Be("04-10-2030 14:00");
     }
+
+    [Theory]
+    [InlineData("notificationId")]
+    [InlineData("shipperReference")]
+    [InlineData("transportOrderNumber")]
+    [InlineData("message")]
+    [InlineData("planner")]
+    public void ToShipperNotification_AnEventWithoutARequiredValue_GivesNothing(string name) =>
+        ShipperNotificationMap.ToShipperNotification(Requested(r => r[name] = null).ToJsonString()).Should().BeNull();
 }

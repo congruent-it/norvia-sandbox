@@ -72,14 +72,20 @@ public sealed class ShipperNotificationSampleTests
     }
 
     [Fact]
-    public void Validate_ANotificationWithAnEtaAndAWindow_OrAnOffset_BreaksTheShipperNotificationSchema()
+    public void Validate_ANotificationWithAnEtaAndAWindow_BreaksTheShipperNotificationSchema()
     {
-        var both = JsonNode.Parse(Contracts.Read($"{Folder}/late-window-winter.shipper-notification.json"))!.AsObject();
-        both["eta"] = "16-01-2030 10:00";
-        var offset = JsonNode.Parse(Contracts.Read($"{Folder}/delivery-failed-summer.shipper-notification.json"))!.AsObject();
-        offset["eta"] = "2030-10-04T09:15:00+02:00";
+        var notification = JsonNode.Parse(Contracts.Read($"{Folder}/late-window-winter.shipper-notification.json"))!.AsObject();
+        notification["eta"] = "16-01-2030 10:00";
 
-        Schemas.ShipperNotification.Validate(both).IsValid.Should().BeFalse();
-        Schemas.ShipperNotification.Validate(offset).IsValid.Should().BeFalse();
+        Schemas.ShipperNotification.Validate(notification).IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Validate_ANotificationWithAnOffset_BreaksTheShipperNotificationSchema()
+    {
+        var notification = JsonNode.Parse(Contracts.Read($"{Folder}/delivery-failed-summer.shipper-notification.json"))!.AsObject();
+        notification["eta"] = "2030-10-04T09:15:00+02:00";
+
+        Schemas.ShipperNotification.Validate(notification).IsValid.Should().BeFalse();
     }
 }

@@ -11,7 +11,6 @@ internal static class LocalTimes
     private const string PartnerFormat = "dd-MM-yyyy HH:mm";
     private const string CanonicalFormat = "yyyy-MM-dd'T'HH:mm:ss'+00:00'";
     private const string OffsetFormat = "yyyy-MM-dd'T'HH:mm:sszzz";
-    private const string ShipperFormat = "dd-MM-yyyy HH:mm";
     private const string CarrierFormat = "yyyy-MM-dd'T'HH:mm:ss";
 
     public static string? ToUtc(string? localTime, Country? country)
@@ -29,23 +28,13 @@ internal static class LocalTimes
     /// <summary>The local date/time of a Canonical Model timestamp in the country's time zone, or null when it isn't one.</summary>
     public static string? FromUtc(string? timestamp, Country? country)
     {
-        if (country is null || !DateTimeOffset.TryParse(timestamp, CultureInfo.InvariantCulture, DateTimeStyles.None, out var instant))
-        {
-            return null;
-        }
-
-        return TimeZoneInfo.ConvertTime(instant, TimeZoneOf(country)).DateTime.ToString(CarrierFormat, CultureInfo.InvariantCulture);
+        return FromUtc(timestamp, country, CarrierFormat);
     }
 
     /// <summary>The local date/time of a Canonical Model timestamp in the country's time zone, as the Shipper formats have it (<c>dd-MM-yyyy HH:mm</c>), or null when it isn't one.</summary>
     public static string? FromUtcForShipper(string? timestamp, Country? country)
     {
-        if (country is null || !DateTimeOffset.TryParse(timestamp, CultureInfo.InvariantCulture, DateTimeStyles.None, out var instant))
-        {
-            return null;
-        }
-
-        return TimeZoneInfo.ConvertTime(instant, TimeZoneOf(country)).DateTime.ToString(ShipperFormat, CultureInfo.InvariantCulture);
+        return FromUtc(timestamp, country, PartnerFormat);
     }
 
     /// <summary>
@@ -64,6 +53,16 @@ internal static class LocalTimes
         var zone = TimeZoneOf(country);
         var offset = zone.IsAmbiguousTime(local) ? zone.BaseUtcOffset : zone.GetUtcOffset(local);
         return new DateTimeOffset(local, offset).ToString(OffsetFormat, CultureInfo.InvariantCulture);
+    }
+
+    private static string? FromUtc(string? timestamp, Country? country, string format)
+    {
+        if (country is null || !DateTimeOffset.TryParse(timestamp, CultureInfo.InvariantCulture, DateTimeStyles.None, out var instant))
+        {
+            return null;
+        }
+
+        return TimeZoneInfo.ConvertTime(instant, TimeZoneOf(country)).DateTime.ToString(format, CultureInfo.InvariantCulture);
     }
 
     private static TimeZoneInfo TimeZoneOf(Country country) =>
