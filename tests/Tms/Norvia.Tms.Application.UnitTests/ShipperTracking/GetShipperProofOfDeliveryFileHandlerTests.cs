@@ -29,7 +29,7 @@ public sealed class GetShipperProofOfDeliveryFileHandlerTests
     }
 
     [Fact]
-    public async Task ACurrentFile_IsStreamed()
+    public async Task Handle_ACurrentFile_IsStreamed()
     {
         var current = ProofOfDelivery.Record(_shipment, Report(files: [Cmr()]), new CorrelationId("corr-pod"), Samples.Now);
         _proofs.FirstOrDefaultAsync(Arg.Is<CurrentProofOfDeliverySpec>(s => s.ShipmentId == _shipment.Id), Arg.Any<CancellationToken>()).Returns(current);
@@ -42,7 +42,7 @@ public sealed class GetShipperProofOfDeliveryFileHandlerTests
     }
 
     [Fact]
-    public async Task AFileOfASupersededProofOfDelivery_IsProofOfDeliveryNotFound()
+    public async Task Handle_AFileOfASupersededProofOfDelivery_IsProofOfDeliveryNotFound()
     {
         // The current Proof of delivery holds another file; the superseded one's file is never looked up.
         var current = ProofOfDelivery.Record(_shipment, Report(files: [Cmr() with { Id = Guid.NewGuid() }]), new CorrelationId("corr-pod"), Samples.Now);
@@ -55,7 +55,7 @@ public sealed class GetShipperProofOfDeliveryFileHandlerTests
     }
 
     [Fact]
-    public async Task ATransportOrderWithNoProofOfDelivery_IsProofOfDeliveryNotFound()
+    public async Task Handle_ATransportOrderWithNoProofOfDelivery_IsProofOfDeliveryNotFound()
     {
         var result = await Handler().Handle(new GetShipperProofOfDeliveryFileQuery("SHP-0001", "TO-0000007", Cmr().Id), CancellationToken.None);
 
@@ -63,7 +63,7 @@ public sealed class GetShipperProofOfDeliveryFileHandlerTests
     }
 
     [Fact]
-    public async Task AFileTheStorageHasLost_IsProofOfDeliveryNotFound()
+    public async Task Handle_AFileTheStorageHasLost_IsProofOfDeliveryNotFound()
     {
         var current = ProofOfDelivery.Record(_shipment, Report(files: [Cmr()]), new CorrelationId("corr-pod"), Samples.Now);
         _proofs.FirstOrDefaultAsync(Arg.Any<CurrentProofOfDeliverySpec>(), Arg.Any<CancellationToken>()).Returns(current);
@@ -77,7 +77,7 @@ public sealed class GetShipperProofOfDeliveryFileHandlerTests
     [Theory]
     [InlineData("TO-0000099")]
     [InlineData("not-a-number")]
-    public async Task AnUnknownTransportOrderOrAnotherShippers_IsTransportOrderNotFound(string number)
+    public async Task Handle_AnUnknownTransportOrderOrAnotherShippers_IsTransportOrderNotFound(string number)
     {
         _orders.FirstOrDefaultAsync(Arg.Any<ShipperTransportOrderByNumberSpec>(), Arg.Any<CancellationToken>()).Returns((TransportOrder?)null);
 

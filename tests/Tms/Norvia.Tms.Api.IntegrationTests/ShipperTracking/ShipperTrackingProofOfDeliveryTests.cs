@@ -15,19 +15,9 @@ public sealed class ShipperTrackingProofOfDeliveryTests(TmsFixture tms) : IClass
     private readonly CancellationToken _cancellationToken = TestContext.Current.CancellationToken;
 
     [Fact]
-    public async Task Detail_ShowsTheCurrentProofOfDeliveryWithItsFiles_AndNoSupersededOne_AndReadsTheFile()
+    public async Task Detail_ShowsTheCurrentProofOfDeliveryWithItsFiles_AndNoSupersededOne_AndMatchesTheSchema()
     {
-        var (shipmentNumber, reference) = await tms.DeliveredShipmentAsync(_cancellationToken);
-        var number = await tms.TransportOrderOfAsync(shipmentNumber, _cancellationToken);
-        (await tms.GotAsync(Shipper, number, _cancellationToken))["proofOfDelivery"].Should().BeNull();
-        var blurry = Cmr("blurry.pdf");
-        var clear = Cmr("clear.pdf");
-        await tms.RecordedProofAsync(Metadata(reference, deliveryTime: DateTimeOffset.UtcNow.AddHours(-3)), [blurry], _cancellationToken);
-        var superseded = await FileIdAsync(shipmentNumber);
-        var clearer = Metadata(reference, deliveryTime: DateTimeOffset.UtcNow.AddHours(-2));
-        clearer["receivedBy"] = "A. Schmidt";
-        clearer["condition"] = "Reservations";
-        await tms.RecordedProofAsync(clearer, [clear], _cancellationToken);
+        var (number, superseded, clear) = await SupersededThenCurrentAsync();
 
         var body = await tms.GotBodyAsync(Shipper, number, _cancellationToken);
 
@@ -36,22 +26,42 @@ public sealed class ShipperTrackingProofOfDeliveryTests(TmsFixture tms) : IClass
         proof["receivedBy"]!.GetValue<string>().Should().Be("A. Schmidt");
         proof["condition"]!.GetValue<string>().Should().Be("Reservations");
         proof["deliveryTime"].Should().NotBeNull();
-        var file = proof["files"]!.AsArray().Should().ContainSingle().Subject!;
-        file["name"]!.GetValue<string>().Should().Be("clear.pdf");
+        proof["files"]!.AsArray().Should().ContainSingle().Subject!["name"]!.GetValue<string>().Should().Be(clear.Name);
         body.Should().NotContain("blurry").And.NotContain(superseded);
         var results = CanonicalModelSchemas.ValidateShipperTransportOrderDetail(detail);
         results.IsValid.Should().BeTrue(CanonicalModelSchemas.Errors(results));
+    }
 
-        using var read = await tms.GetProofFileAsync(tms.ShipperTracking, Shipper, number, file["id"]!.GetValue<string>(), _cancellationToken);
+    [Fact]
+    public async Task Detail_WithNoProofOfDelivery_ShowsNone()
+    {
+        var (shipmentNumber, _) = await tms.BookedShipmentAsync(_cancellationToken);
+        var number = await tms.TransportOrderOfAsync(shipmentNumber, _cancellationToken);
+
+        (await tms.GotAsync(Shipper, number, _cancellationToken))["proofOfDelivery"].Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ReadingAFile_OfTheCurrentProofOfDelivery_StreamsIt()
+    {
+        var (number, _, clear) = await SupersededThenCurrentAsync();
+        var fileId = (await tms.GotAsync(Shipper, number, _cancellationToken))["proofOfDelivery"]!["files"]![0]!["id"]!.GetValue<string>();
+
+        using var read = await tms.GetProofFileAsync(tms.ShipperTracking, Shipper, number, fileId, _cancellationToken);
+
         read.StatusCode.Should().Be(HttpStatusCode.OK);
         read.Content.Headers.ContentType!.MediaType.Should().Be("application/pdf");
         (await read.Content.ReadAsByteArrayAsync(_cancellationToken)).Should().Equal(clear.Content);
+    }
 
-        using var readSuperseded = await tms.GetProofFileAsync(tms.ShipperTracking, Shipper, number, superseded, _cancellationToken);
-        await AssertNotFoundAsync(readSuperseded, "ProofOfDeliveryNotFound");
+    [Fact]
+    public async Task ReadingAFile_OfASupersededProofOfDelivery_IsProofOfDeliveryNotFound()
+    {
+        var (number, superseded, _) = await SupersededThenCurrentAsync();
 
-        async Task<string> FileIdAsync(string shipment) =>
-            (await tms.GetProofsOnTimelineAsync(shipment, _cancellationToken)).Single()!["files"]![0]!["id"]!.GetValue<string>();
+        using var response = await tms.GetProofFileAsync(tms.ShipperTracking, Shipper, number, superseded, _cancellationToken);
+
+        await AssertNotFoundAsync(response, "ProofOfDeliveryNotFound");
     }
 
     [Fact]
@@ -88,6 +98,21 @@ public sealed class ShipperTrackingProofOfDeliveryTests(TmsFixture tms) : IClass
 
         noShipper.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         forbidden.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    /// <summary>A delivered Shipment whose first Proof of delivery (blurry.pdf) a clearer one (clear.pdf) superseded.</summary>
+    private async Task<(string Number, string SupersededFileId, SentFile Current)> SupersededThenCurrentAsync()
+    {
+        var (shipmentNumber, reference) = await tms.DeliveredShipmentAsync(_cancellationToken);
+        var number = await tms.TransportOrderOfAsync(shipmentNumber, _cancellationToken);
+        var clear = Cmr("clear.pdf");
+        await tms.RecordedProofAsync(Metadata(reference, deliveryTime: DateTimeOffset.UtcNow.AddHours(-3)), [Cmr("blurry.pdf")], _cancellationToken);
+        var superseded = (await tms.GetProofsOnTimelineAsync(shipmentNumber, _cancellationToken)).Single()!["files"]![0]!["id"]!.GetValue<string>();
+        var clearer = Metadata(reference, deliveryTime: DateTimeOffset.UtcNow.AddHours(-2));
+        clearer["receivedBy"] = "A. Schmidt";
+        clearer["condition"] = "Reservations";
+        await tms.RecordedProofAsync(clearer, [clear], _cancellationToken);
+        return (number, superseded, clear);
     }
 
     private async Task AssertNotFoundAsync(HttpResponseMessage response, string code)

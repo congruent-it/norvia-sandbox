@@ -31,7 +31,7 @@ public sealed class GetShipperProofOfDeliveryFileHandler(
         // Only the current Proof of delivery's files are the Shipper's: a superseded one's are found nowhere.
         if ((await shipments.ListAsync(new ShipmentsOfTransportOrdersSpec([order.Id]), cancellationToken)).FirstOrDefault() is not { } shipment
             || await proofsOfDelivery.FirstOrDefaultAsync(new CurrentProofOfDeliverySpec(shipment.Id), cancellationToken) is not { } proofOfDelivery
-            || proofOfDelivery.Files.FirstOrDefault(file => file.Id == query.FileId) is not { } file
+            || proofOfDelivery.FileById(query.FileId) is not { } file
             || await files.OpenReadAsync(shipment.Number, file, cancellationToken) is not { } content)
         {
             return ShipperTrackingRefused.Because<ProofOfDeliveryFileContent>(ShipperTrackingRefusal.ProofOfDeliveryNotFound());
