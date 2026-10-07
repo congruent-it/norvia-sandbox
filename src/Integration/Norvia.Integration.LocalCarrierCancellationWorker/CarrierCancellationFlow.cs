@@ -23,7 +23,7 @@ internal enum CarrierCancellationFlowOutcome
 }
 
 /// <summary>
-/// The P7 Carrier cancellation Logic App's steps, played locally (ADR 0033): map the cancellation, send it to the Carrier's
+/// The P7 Carrier cancellation Logic App's steps, played locally (ADR 0034): map the cancellation, send it to the Carrier's
 /// endpoint under the bounded exponential retry policy, and report the outcome to the TMS under the action's correlation ID.
 /// </summary>
 internal sealed partial class CarrierCancellationFlow(
@@ -56,7 +56,7 @@ internal sealed partial class CarrierCancellationFlow(
         return status switch
         {
             >= 200 and < 300 => CarrierCancellationFlowOutcome.Done,
-            0 or >= 500 => CarrierCancellationFlowOutcome.TmsUnavailable,
+            0 or 408 or 429 or >= 500 => CarrierCancellationFlowOutcome.TmsUnavailable,
             _ => CarrierCancellationFlowOutcome.TmsRefused,
         };
     }
@@ -94,7 +94,7 @@ internal sealed partial class CarrierCancellationFlow(
                 : TrackingKeys.OutcomeOf(TrackingKeys.Failed, answer.IsRetryable ? "CarrierUnavailable" : "CarrierRefused");
         }
 
-        return TrackingKeys.OutcomeOf(TrackingKeys.Failed, tmsStatus is 0 or >= 500 ? "TmsUnavailable" : "TmsCallRefused");
+        return TrackingKeys.OutcomeOf(TrackingKeys.Failed, tmsStatus is 0 or 408 or 429 or >= 500 ? "TmsUnavailable" : "TmsCallRefused");
     }
 
     private static Request? RequestOf(string carrierBookingEnded)

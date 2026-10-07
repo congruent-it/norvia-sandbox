@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Options;
 using Norvia.Integration.LocalCarrierCancellationWorker;
 
-// Locally there is no Logic Apps runtime, so this plays the P7 Carrier cancellation Logic App (ADR 0033).
+// Locally there is no Logic Apps runtime, so this plays the P7 Carrier cancellation Logic App (ADR 0034).
 var builder = Host.CreateApplicationBuilder(args);
 
 builder.AddServiceDefaults();

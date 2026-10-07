@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk.Worker">
-  <!-- Locally, plays the P7 Carrier cancellation Logic App (ADR 0033). azd never deploys it. -->
+  <!-- Locally, plays the P7 Carrier cancellation Logic App (ADR 0034). azd never deploys it. -->
   <ItemGroup>
     <PackageReference Include="Aspire.Azure.Messaging.ServiceBus" />
     <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />

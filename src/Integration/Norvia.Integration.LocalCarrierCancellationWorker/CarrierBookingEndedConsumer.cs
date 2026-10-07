@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 namespace Norvia.Integration.LocalCarrierCancellationWorker;
 
 /// <summary>
-/// The Carrier cancellation Logic App's trigger, played locally (ADR 0033): picks up <c>CarrierBookingCancelled</c> or <c>CarrierBookingWithdrawn</c> from the
+/// The Carrier cancellation Logic App's trigger, played locally (ADR 0034): picks up <c>CarrierBookingCancelled</c> or <c>CarrierBookingWithdrawn</c> from the
 /// Carrier cancellation subscription and runs the flow for it. As in the workflow, a message that can't be mapped is dead-lettered with the failure
 /// code, and any other is completed: a run that fails later is on the trail, not redelivered.
 /// </summary>

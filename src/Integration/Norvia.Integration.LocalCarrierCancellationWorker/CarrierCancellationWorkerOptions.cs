@@ -13,7 +13,7 @@ public sealed class CarrierCancellationWorkerOptions
     [Required]
     public string Topic { get; set; } = "shipment-events";
 
-    /// <summary>The Carrier Carrier cancellation Logic App's own subscription, filtered to <c>CarrierBookingCancelled</c> or <c>CarrierBookingWithdrawn</c>.</summary>
+    /// <summary>The Carrier cancellation Logic App's own subscription, filtered to <c>CarrierBookingCancelled</c> or <c>CarrierBookingWithdrawn</c>.</summary>
     [Required]
     public string Subscription { get; set; } = "carrier-cancellation";
 
@@ -29,25 +29,4 @@ public sealed class CarrierCancellationWorkerOptions
 
     /// <summary>The bounded exponential retry policy, with the numbers of the workflow's <c>retryPolicy</c>.</summary>
     public RetryOptions Retry { get; set; } = new();
-}
-
-/// <summary>A Carrier Persona's cancellation endpoint in the Partner portal, and the credential Key Vault holds in Azure.</summary>
-public sealed class CarrierEndpointOptions
-{
-    [Required]
-    public Uri? Address { get; set; }
-
-    [Required]
-    public string ApiKey { get; set; } = string.Empty;
-}
-
-public sealed class RetryOptions
-{
-    /// <summary>How many times a send is retried after the first attempt.</summary>
-    [Range(0, 10)]
-    public int Count { get; set; } = 3;
-
-    public TimeSpan Interval { get; set; } = TimeSpan.FromSeconds(5);
-
-    public TimeSpan MaximumInterval { get; set; } = TimeSpan.FromSeconds(20);
 }
