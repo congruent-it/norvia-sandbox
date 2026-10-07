@@ -1,0 +1,27 @@
+{
+  "transportOrderNumber": "TO-0000008",
+  "shipperReference": "BD-2030-0008",
+  "collection": { "city": "Hamburg", "countryCode": "DE" },
+  "delivery": { "city": "London", "countryCode": "GB" },
+  "collectionWindow": { "earliest": "2030-12-09T07:00:00+00:00", "latest": "2030-12-09T11:00:00+00:00" },
+  "deliveryWindow": { "earliest": "2030-12-11T09:00:00+00:00", "latest": "2030-12-11T13:00:00+00:00" },
+  "trackingStatus": "Delivered",
+  "eta": "2030-12-11T10:30:00+00:00",
+  "lastUpdate": "2030-12-11T10:05:00+00:00",
+  "proofOfDelivery": {
+    "receivedBy": "M. \"Max\" Müller",
+    "deliveryTime": "2030-12-11T10:05:00+00:00",
+    "condition": "Reservations",
+    "files": [
+      { "id": "6f1d3b52-8a4e-4c9d-b7e1-2a5c9e0f4d11", "name": "CMR \\ signed.pdf", "contentType": "application/pdf", "sizeBytes": 48213 },
+      { "id": "a2c4e6f8-1b3d-4f5a-9c7e-0d2b4f6a8c22", "name": "damage-photo.jpg", "contentType": "image/jpeg", "sizeBytes": 1523004 }
+    ]
+  },
+  "progress": [
+    { "type": "Collected", "eventTime": "2030-12-09T08:30:00+00:00", "place": { "city": "Hamburg", "countryCode": "DE" } },
+    { "type": "Departed", "eventTime": "2030-12-09T09:15:00+00:00", "place": { "city": "Hamburg", "countryCode": "DE" } },
+    { "type": "Arrived", "eventTime": "2030-12-10T14:20:00+00:00", "place": { "city": "Dover", "countryCode": "GB" } },
+    { "type": "OutForDelivery", "eventTime": "2030-12-11T08:00:00+00:00", "place": { "city": "London", "countryCode": "GB" } },
+    { "type": "Delivered", "eventTime": "2030-12-11T10:05:00+00:00", "place": { "city": "London", "countryCode": "GB" } }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "transportOrderNumber": "TO-0000007",
+  "shipperReference": "BD-2030-0007",
+  "collection": { "city": "Rotterdam", "countryCode": "NL" },
+  "delivery": { "city": "Düsseldorf", "countryCode": "DE" },
+  "collectionWindow": { "earliest": "2030-07-01T05:00:00+00:00", "latest": "2030-07-01T09:00:00+00:00" },
+  "deliveryWindow": { "earliest": "2030-07-02T07:00:00+00:00", "latest": "2030-07-02T11:00:00+00:00" },
+  "trackingStatus": "InTransit",
+  "eta": "2030-07-02T08:15:00+00:00",
+  "lastUpdate": "2030-07-01T20:40:00+00:00",
+  "proofOfDelivery": null,
+  "progress": [
+    { "type": "Collected", "eventTime": "2030-07-01T07:10:00+00:00", "place": { "city": "Rotterdam", "countryCode": "NL" } },
+    { "type": "Departed", "eventTime": "2030-07-01T08:00:00+00:00", "place": { "city": "Rotterdam", "countryCode": "NL" } },
+    { "type": "Arrived", "eventTime": "2030-07-01T20:40:00+00:00", "place": { "city": "Frankfurt am Main", "countryCode": "DE" } }
+  ]
+}

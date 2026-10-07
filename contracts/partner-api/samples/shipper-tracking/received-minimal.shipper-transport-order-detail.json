@@ -1,0 +1,13 @@
+{
+  "transportOrderNumber": "TO-0000009",
+  "shipperReference": null,
+  "collection": { "city": "Rotterdam", "countryCode": "NL" },
+  "delivery": { "city": null, "countryCode": "AT" },
+  "collectionWindow": { "earliest": "2030-06-03T06:00:00+00:00", "latest": null },
+  "deliveryWindow": null,
+  "trackingStatus": "Received",
+  "eta": null,
+  "lastUpdate": null,
+  "proofOfDelivery": null,
+  "progress": []
+}

@@ -1,0 +1,7 @@
+[
+  { "transportOrderNumber": "TO-0000001", "shipperReference": "BD-2030-0001", "collection": { "city": "Rotterdam", "countryCode": "NL" }, "delivery": { "city": "Düsseldorf", "countryCode": "DE" }, "trackingStatus": "Received", "eta": "2030-07-02T11:00:00+00:00", "lastUpdate": null },
+  { "transportOrderNumber": "TO-0000002", "shipperReference": null, "collection": { "city": "Rotterdam", "countryCode": "NL" }, "delivery": { "city": "Düsseldorf", "countryCode": "DE" }, "trackingStatus": "Scheduled", "eta": null, "lastUpdate": null },
+  { "transportOrderNumber": "TO-0000003", "shipperReference": "BD-2030-0003", "collection": { "city": "Hamburg", "countryCode": "DE" }, "delivery": { "city": "Düsseldorf", "countryCode": "DE" }, "trackingStatus": "Collected", "eta": "2030-07-02T08:15:00+00:00", "lastUpdate": "2030-07-01T07:10:00+00:00" },
+  { "transportOrderNumber": "TO-0000004", "shipperReference": "BD-2030-0004", "collection": { "city": "Rotterdam", "countryCode": "NL" }, "delivery": { "city": "London", "countryCode": "GB" }, "trackingStatus": "InTransit", "eta": "2030-10-27T01:00:00+00:00", "lastUpdate": "2030-10-27T00:59:00+00:00" },
+  { "transportOrderNumber": "TO-0000005", "shipperReference": "BD-2030-0005", "collection": { "city": "Tallinn", "countryCode": "EE" }, "delivery": { "city": "Helsinki", "countryCode": "FI" }, "trackingStatus": "Delivered", "eta": "2030-03-31T01:00:00+00:00", "lastUpdate": "2030-03-30T23:30:00+00:00" }
+]

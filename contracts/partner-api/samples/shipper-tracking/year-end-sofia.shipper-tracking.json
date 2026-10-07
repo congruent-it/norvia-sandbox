@@ -1,0 +1,15 @@
+{
+  "norviaOrderNo": "TO-0000012",
+  "bookingRef": "BD-2030-0012",
+  "status": "SCHEDULED",
+  "pickupCity": "Wien",
+  "pickupCountry": "AT",
+  "pickupFrom": "31-12-2030 22:00",
+  "pickupUntil": "31-12-2030 23:00",
+  "receiverCity": "Sofia",
+  "receiverCountry": "BG",
+  "deliverFrom": "01-01-2031 00:00",
+  "deliverUntil": "01-01-2031 12:00",
+  "eta": "01-01-2031 00:30",
+  "events": []
+}

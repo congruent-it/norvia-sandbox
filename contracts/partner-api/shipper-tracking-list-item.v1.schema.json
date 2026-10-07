@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/partner-api/shipper-tracking-list-item.v1.schema.json",
+  "title": "ShipperTrackingListItem",
+  "description": "One Transport Order in the list a Shipper gets from the Norvia Partner API's tracking operation (Shipper tracking format, version 1); the answer is an array of these, newest collection first. It follows the Shipper booking format: its own field names, flat address fields and local date/times, dd-MM-yyyy HH:mm. The ETA and the last update are local to the delivery address. The Shipper deals in Transport Orders, so it never names the Carrier or the Shipment number.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["norviaOrderNo", "status"],
+  "properties": {
+    "norviaOrderNo": { "description": "Norvia's number of the Transport Order.", "type": "string", "pattern": "^TO-[0-9]{7}$" },
+    "bookingRef": { "description": "The Shipper's own reference of the booking. Absent when the Transport Order has none.", "type": "string", "minLength": 1 },
+    "status": { "$ref": "#/$defs/status" },
+    "pickupCity": { "type": "string", "minLength": 1 },
+    "pickupCountry": { "$ref": "#/$defs/country" },
+    "receiverCity": { "type": "string", "minLength": 1 },
+    "receiverCountry": { "$ref": "#/$defs/country" },
+    "eta": { "description": "The estimated time of arrival, local to the delivery address. Absent when there is none.", "$ref": "#/$defs/localDateTime" },
+    "lastUpdate": { "description": "The time of the latest progress event, local to the delivery address. Absent before collection.", "$ref": "#/$defs/localDateTime" }
+  },
+  "$defs": {
+    "status": {
+      "description": "Where the Transport Order stands. SCHEDULED covers everything before collection, so the Shipper can't tell Own fleet from a Carrier.",
+      "enum": ["RECEIVED", "SCHEDULED", "COLLECTED", "IN_TRANSIT", "DELIVERED"]
+    },
+    "country": { "description": "ISO 3166-1 alpha-2.", "type": "string", "pattern": "^[A-Z]{2}$" },
+    "localDateTime": {
+      "description": "A local date and time as dd-MM-yyyy HH:mm (24-hour clock), in the time zone of the place it is about.",
+      "type": "string",
+      "pattern": "^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{4} ([01][0-9]|2[0-3]):[0-5][0-9]$",
+      "examples": ["03-10-2030 14:30"]
+    }
+  }
+}

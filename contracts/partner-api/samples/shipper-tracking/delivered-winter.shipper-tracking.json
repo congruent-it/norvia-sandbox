@@ -1,0 +1,31 @@
+{
+  "norviaOrderNo": "TO-0000008",
+  "bookingRef": "BD-2030-0008",
+  "status": "DELIVERED",
+  "pickupCity": "Hamburg",
+  "pickupCountry": "DE",
+  "pickupFrom": "09-12-2030 08:00",
+  "pickupUntil": "09-12-2030 12:00",
+  "receiverCity": "London",
+  "receiverCountry": "GB",
+  "deliverFrom": "11-12-2030 09:00",
+  "deliverUntil": "11-12-2030 13:00",
+  "eta": "11-12-2030 10:30",
+  "lastUpdate": "11-12-2030 10:05",
+  "events": [
+    { "code": "COLLECTED", "time": "09-12-2030 09:30", "city": "Hamburg", "country": "DE" },
+    { "code": "DEPARTED", "time": "09-12-2030 10:15", "city": "Hamburg", "country": "DE" },
+    { "code": "ARRIVED", "time": "10-12-2030 14:20", "city": "Dover", "country": "GB" },
+    { "code": "OUT_FOR_DELIVERY", "time": "11-12-2030 08:00", "city": "London", "country": "GB" },
+    { "code": "DELIVERED", "time": "11-12-2030 10:05", "city": "London", "country": "GB" }
+  ],
+  "proofOfDelivery": {
+    "receivedBy": "M. \"Max\" Müller",
+    "deliveredAt": "11-12-2030 10:05",
+    "condition": "RESERVATIONS",
+    "files": [
+      { "fileId": "6f1d3b52-8a4e-4c9d-b7e1-2a5c9e0f4d11", "name": "CMR \\ signed.pdf", "contentType": "application/pdf", "sizeBytes": 48213 },
+      { "fileId": "a2c4e6f8-1b3d-4f5a-9c7e-0d2b4f6a8c22", "name": "damage-photo.jpg", "contentType": "image/jpeg", "sizeBytes": 1523004 }
+    ]
+  }
+}
