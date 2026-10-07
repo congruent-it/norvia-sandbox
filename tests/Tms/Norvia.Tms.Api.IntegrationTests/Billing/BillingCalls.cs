@@ -91,4 +91,38 @@ internal static class BillingCalls
         entry.Should().NotBeNull($"Transport Order {transportOrderNumber} should be listed");
         return [.. entry!["blockingReasons"]!.AsArray().Select(reason => reason!.GetValue<string>())];
     }
+
+    /// <summary>Customer service releases the Transport Order without a Proof of delivery, through the TMS UI.</summary>
+    public static async Task<HttpResponseMessage> ReleaseWithoutProofOfDeliveryAsync(
+        this TmsFixture tms, string transportOrderNumber, JsonObject release, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"/v1/transport-orders/{transportOrderNumber}/release-without-proof-of-delivery", UriKind.Relative))
+        {
+            Content = System.Net.Http.Json.JsonContent.Create(release),
+        };
+        return await tms.TmsUi.SendAsync(request, cancellationToken);
+    }
+
+    /// <summary>The body of a release without a Proof of delivery.</summary>
+    public static JsonObject Release(string? remark = "CMR received by post, scanned in the dossier", string? releasedBy = "Jan Jansen") =>
+        new() { ["remark"] = remark, ["releasedBy"] = releasedBy };
+
+    /// <summary>Releases the Transport Order without a Proof of delivery, which the TMS must accept, and returns what it answered.</summary>
+    public static async Task<JsonNode> ReleasedWithoutProofAsync(this TmsFixture tms, string transportOrderNumber, CancellationToken cancellationToken)
+    {
+        using var response = await tms.ReleaseWithoutProofOfDeliveryAsync(transportOrderNumber, Release(), cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, body);
+        return JsonNode.Parse(body)!;
+    }
+
+    /// <summary>Releases the Transport Order without a Proof of delivery, which the TMS must refuse with the status, and returns its problem.</summary>
+    public static async Task<JsonNode> ReleaseRefusedAsync(
+        this TmsFixture tms, string transportOrderNumber, JsonObject release, System.Net.HttpStatusCode status, CancellationToken cancellationToken)
+    {
+        using var response = await tms.ReleaseWithoutProofOfDeliveryAsync(transportOrderNumber, release, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        response.StatusCode.Should().Be(status, body);
+        return JsonNode.Parse(body)!;
+    }
 }

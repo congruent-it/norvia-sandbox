@@ -129,6 +129,8 @@ internal sealed class TransportOrderConfiguration : IEntityTypeConfiguration<Tra
             .HasConversion(id => id!.Value, value => new CorrelationId(value))
             .HasMaxLength(128);
         builder.Property(order => order.ReleasedWithoutProofOfDelivery);
+        builder.Property(order => order.ReleasedBy).HasMaxLength(TransportOrder.MaxReleasedByLength);
+        builder.Property(order => order.ReleaseRemark).HasMaxLength(TransportOrder.MaxReleaseRemarkLength);
 
         // Why Rating failed, kept like the rejection reasons: its stable code by name and its message.
         builder.Property(order => order.RatingFailure)

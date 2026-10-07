@@ -170,6 +170,105 @@ public sealed class TransportOrderBillingTests
         order.BillingState.Should().Be(BillingState.NotYetBillable);
     }
 
+    [Fact]
+    public void ReleaseWithoutProofOfDelivery_DeliveredOrder_RecordsWhoWhenAndWhyAndPublishesNothing()
+    {
+        var order = PlannedRated();
+
+        var refusal = order.ReleaseWithoutProofOfDelivery(DeliveredAt, "CMR received by post", "Jan", BillableAt);
+
+        refusal.Should().BeNull();
+        order.ReleasedWithoutProofOfDelivery.Should().BeTrue();
+        order.ReleasedBy.Should().Be("Jan");
+        order.ReleasedAt.Should().Be(BillableAt);
+        order.ReleaseRemark.Should().Be("CMR received by post");
+        order.BillingState.Should().Be(BillingState.NotYetBillable);
+        order.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TryBecomeBillable_ReleasedWithoutProofOfDelivery_BecomesBillable()
+    {
+        var order = PlannedRated();
+        order.ReleaseWithoutProofOfDelivery(DeliveredAt, "CMR by post", "Jan", BillableAt);
+
+        var billable = order.TryBecomeBillable(new BillingFacts(DeliveredAt, HasCurrentProofOfDelivery: false, HasOpenException: false), BillingCorrelationId, BillableAt);
+
+        billable.Should().BeTrue();
+        order.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<TransportOrderBillableEvent>();
+    }
+
+    [Fact]
+    public void TryBecomeBillable_ReleasedWithoutProofOfDeliveryButOpenException_StaysNotYetBillable()
+    {
+        var order = PlannedRated();
+        order.ReleaseWithoutProofOfDelivery(DeliveredAt, "CMR by post", "Jan", BillableAt);
+
+        order.TryBecomeBillable(new BillingFacts(DeliveredAt, false, HasOpenException: true), BillingCorrelationId, BillableAt).Should().BeFalse();
+    }
+
+    [Fact]
+    public void ReleaseWithoutProofOfDelivery_UnratedOrder_IsAllowedAndKeepsItNotYetBillable()
+    {
+        var order = Planned();
+
+        order.ReleaseWithoutProofOfDelivery(DeliveredAt, "CMR by post", "Jan", BillableAt).Should().BeNull();
+
+        order.TryBecomeBillable(new BillingFacts(DeliveredAt, false, false), BillingCorrelationId, BillableAt).Should().BeFalse();
+        order.BillingState.Should().Be(BillingState.NotYetBillable);
+    }
+
+    [Fact]
+    public void ReleaseWithoutProofOfDelivery_ShipmentNotDelivered_IsRefused()
+    {
+        var order = PlannedRated();
+
+        order.ReleaseWithoutProofOfDelivery(null, "CMR by post", "Jan", BillableAt)!.Code.Should().Be(BillingRefusalCode.ShipmentNotDelivered);
+
+        order.ReleasedWithoutProofOfDelivery.Should().BeFalse();
+    }
+
+    [Fact]
+    public void ReleaseWithoutProofOfDelivery_BillableOrder_IsRefused()
+    {
+        var order = PlannedRated();
+        order.TryBecomeBillable(new BillingFacts(DeliveredAt, true, false), BillingCorrelationId, BillableAt);
+
+        order.ReleaseWithoutProofOfDelivery(DeliveredAt, "CMR by post", "Jan", BillableAt)!.Code.Should().Be(BillingRefusalCode.AlreadyBillable);
+
+        order.ReleasedWithoutProofOfDelivery.Should().BeFalse();
+    }
+
+    [Fact]
+    public void ReleaseWithoutProofOfDelivery_FulfilmentOrder_IsRefused()
+    {
+        var order = Accepted(IntakeChannel.Wms);
+
+        order.ReleaseWithoutProofOfDelivery(DeliveredAt, "CMR by post", "Jan", BillableAt)!.Code.Should().Be(BillingRefusalCode.NotBilledSeparately);
+    }
+
+    [Fact]
+    public void ReleaseWithoutProofOfDelivery_ReleasedAlready_IsRefusedAndKeepsTheFirstRelease()
+    {
+        var order = Planned();
+        order.ReleaseWithoutProofOfDelivery(DeliveredAt, "first", "Jan", BillableAt);
+
+        order.ReleaseWithoutProofOfDelivery(DeliveredAt, "second", "Piet", BillableAt.AddHours(1))!.Code.Should().Be(BillingRefusalCode.AlreadyReleased);
+
+        order.ReleaseRemark.Should().Be("first");
+        order.ReleasedBy.Should().Be("Jan");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("  ")]
+    public void ReleaseWithoutProofOfDelivery_BlankRemark_Throws(string remark)
+    {
+        var release = () => PlannedRated().ReleaseWithoutProofOfDelivery(DeliveredAt, remark, "Jan", BillableAt);
+
+        release.Should().Throw<ArgumentException>();
+    }
+
     private static RateCard RateCard() => new(
         new RateCardId("RC-0001"),
         new ShipperId("SHP-0001"),
