@@ -72,7 +72,29 @@ public sealed class ShipperTrackingMapLocalTimeTests
 
         // 07:10 UTC in the Netherlands is 09:10; the delivery address is in Germany, which is on the same clocks in July.
         ((string?)tracking["events"]!.AsArray()[0]!["time"]).Should().Be("01-07-2030 09:10");
-        tracking["events"]!.AsArray()[0]!.AsObject().ContainsKey("city").Should().BeFalse();
+    }
+
+    [Fact]
+    public void Detail_AnEventWithoutAPlace_LeavesOutItsCityAndCountry()
+    {
+        var canonical = JsonNode.Parse(Contracts.Read("PartnerApi/samples/shipper-tracking/in-transit-summer.shipper-transport-order-detail.json"))!.AsObject();
+        canonical["progress"]!.AsArray()[0]!["place"] = new JsonObject { ["city"] = null, ["countryCode"] = null };
+
+        var tracking = ShipperTrackingMaps.Detail(canonical.ToJsonString());
+
+        tracking["events"]!.AsArray()[0]!.AsObject().Select(property => property.Key).Should().BeEquivalentTo("code", "time");
+    }
+
+    [Fact]
+    public void Detail_TextWithQuotesBackslashesAndControlCharacters_IsEscapedIntoValidJson()
+    {
+        const string Text = "a \"quoted\" \\ back\nline\ttab";
+        var canonical = JsonNode.Parse(Contracts.Read("PartnerApi/samples/shipper-tracking/delivered-winter.shipper-transport-order-detail.json"))!.AsObject();
+        canonical["proofOfDelivery"]!["receivedBy"] = Text;
+
+        var tracking = ShipperTrackingMaps.Detail(canonical.ToJsonString());
+
+        ((string?)tracking["proofOfDelivery"]!["receivedBy"]).Should().Be(Text);
     }
 
     [Fact]
