@@ -12,6 +12,8 @@ coverage.cobertura.xml
 src/Integration/IntakeLogicApp/lib/
 # The booking Logic App's local functions, written there by building their project.
 src/Integration/BookingLogicApp/lib/
+# The Shipper notification Logic App's local functions, written there by building their project.
+src/Integration/ShipperNotificationLogicApp/lib/
 # The Carrier-answer Logic App's local functions, written there by building their project.
 src/Integration/AnswerLogicApp/lib/
 # The Carrier-tracking Logic App's local functions, written there by building their project.

@@ -27,6 +27,7 @@ hooks:
       ./infra/migrate.sh partner-portal-migrations "the Partner portal's database" &&
       ./infra/deploy-intake-logic-app.sh &&
       ./infra/deploy-booking-logic-app.sh &&
+      ./infra/deploy-shipper-notification-logic-app.sh &&
       ./infra/deploy-answer-logic-app.sh &&
       ./infra/deploy-tracking-logic-app.sh &&
       ./infra/deploy-proof-of-delivery-logic-app.sh &&

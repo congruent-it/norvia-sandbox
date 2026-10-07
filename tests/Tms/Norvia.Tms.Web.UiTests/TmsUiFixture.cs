@@ -24,6 +24,7 @@ public sealed class TmsUiFixture : IAsyncLifetime
 {
     private const string IntakeRole = "TransportOrders.Intake";
     private const string AnswerRole = "CarrierBookings.Answer";
+    private const string ManageRole = "TransportOrders.Manage";
     private const string TrackingRecordRole = "TrackingEvents.Record";
     private const string ProofOfDeliveryRecordRole = "ProofsOfDelivery.Record";
     private const string ProofOfDeliveryLogicAppClientId = "norvia-local-proof-of-delivery-logic-app";
@@ -44,6 +45,9 @@ public sealed class TmsUiFixture : IAsyncLifetime
 
     /// <summary>A client for the TMS API holding the Proof of delivery record role, as the Carrier Proof of delivery Logic App's managed identity does.</summary>
     public HttpClient ProofOfDeliveryRecord { get; private set; } = null!;
+
+    /// <summary>A client for the TMS API holding the manage role, as the TMS UI's managed identity does for the Planner's actions.</summary>
+    public HttpClient Manage { get; private set; } = null!;
 
     public Uri TmsUi { get; private set; } = null!;
 
@@ -72,6 +76,8 @@ public sealed class TmsUiFixture : IAsyncLifetime
         // A released Shipment's booking goes through the worker that plays the P4 booking Logic App (ADR 0030) to the portal.
         await _app.ResourceNotifications.WaitForResourceHealthyAsync("partner-portal-web", startup.Token);
         await _app.ResourceNotifications.WaitForResourceAsync("booking-worker", KnownResourceStates.Running, startup.Token);
+        // A Shipper notification goes through the worker that plays the P7 Shipper notification Logic App (ADR 0033) to the portal.
+        await _app.ResourceNotifications.WaitForResourceAsync("shipper-notification-worker", KnownResourceStates.Running, startup.Token);
         // A Carrier's answer goes through the stand-in that plays API Management and the Carrier-answer Logic App (ADR 0023).
         await _app.ResourceNotifications.WaitForResourceHealthyAsync("partner-api", startup.Token);
 
@@ -79,6 +85,8 @@ public sealed class TmsUiFixture : IAsyncLifetime
         Intake.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", IssueToken(IntakeRole, LocalTokens.IntakeLogicAppClientId));
         Answer = _app.CreateHttpClient("tms-api");
         Answer.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", IssueToken(AnswerRole, LocalTokens.AnswerLogicAppClientId));
+        Manage = _app.CreateHttpClient("tms-api");
+        Manage.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", IssueToken(ManageRole, LocalTokens.TmsUiClientId));
         TrackingRecord = _app.CreateHttpClient("tms-api");
         TrackingRecord.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", IssueToken(TrackingRecordRole, LocalTokens.TrackingLogicAppClientId));
         ProofOfDeliveryRecord = _app.CreateHttpClient("tms-api");
@@ -106,6 +114,19 @@ public sealed class TmsUiFixture : IAsyncLifetime
     {
         var answer = new JsonObject { ["carrierId"] = carrierId, ["outcome"] = "Confirmed", ["carrierBookingReference"] = carrierBookingReference };
         return await PostAsync(Answer, $"/v1/carrier-bookings/{carrierBookingNumber}/answer", answer, cancellationToken);
+    }
+
+    /// <summary>Notifies the Shipper of an open Exception, as the Planner does through the TMS UI, on a trail of its own.</summary>
+    public async Task<HttpResponseMessage> NotifyShipperAsync(string exceptionNumber, string message, CancellationToken cancellationToken) =>
+        await PostAsync(Manage, $"/v1/exceptions/{exceptionNumber}/notify-shipper", new JsonObject { ["message"] = message, ["planner"] = "Anna de Vries" }, cancellationToken);
+
+    /// <summary>The number of the Open Exception of a Shipment, once the TMS has opened it.</summary>
+    public async Task<string?> OpenExceptionOfAsync(string shipmentNumber, CancellationToken cancellationToken)
+    {
+        using var response = await Manage.GetAsync(new Uri("/v1/exceptions/open", UriKind.Relative), cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var open = await response.Content.ReadFromJsonAsync<JsonArray>(cancellationToken);
+        return open?.FirstOrDefault(exception => exception?["shipmentNumber"]?.GetValue<string>() == shipmentNumber)?["exceptionNumber"]?.GetValue<string>();
     }
 
     /// <summary>Records a Canonical Model Tracking event, as the Carrier-tracking Logic App does, each on a trail of its own.</summary>
@@ -154,6 +175,7 @@ public sealed class TmsUiFixture : IAsyncLifetime
         _playwright?.Dispose();
         Intake?.Dispose();
         Answer?.Dispose();
+        Manage?.Dispose();
         TrackingRecord?.Dispose();
         ProofOfDeliveryRecord?.Dispose();
 

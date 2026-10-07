@@ -15,6 +15,7 @@ internal static class ResubmitAwareFilters
     private static readonly Dictionary<string, string> Conditions = new()
     {
         ["carrier-booking"] = "assignedTo = 'Carrier'",
+        ["shipper-notification"] = "eventType = 'ShipperNotificationRequested'",
     };
 
     public static void Apply(JsonNode configuration)

@@ -1,0 +1,31 @@
+{
+  "serviceProviderConnections": {
+    "serviceBus": {
+      "displayName": "Shipment events",
+      "parameterValues": {
+        "fullyQualifiedNamespace": "@appsetting('SERVICE_BUS_NAMESPACE')",
+        "authProvider": {
+          "Type": "ManagedServiceIdentity",
+          "Identity": "@appsetting('SHIPPER_NOTIFICATION_IDENTITY_ID')"
+        }
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/serviceBus"
+      }
+    },
+    "keyVault": {
+      "displayName": "Shipper endpoint credentials",
+      "parameterValues": {
+        "VaultUri": "@appsetting('KEY_VAULT_URI')",
+        "authProvider": {
+          "Type": "ManagedServiceIdentity",
+          "Identity": "@appsetting('SHIPPER_NOTIFICATION_IDENTITY_ID')"
+        }
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/keyVault"
+      }
+    }
+  },
+  "managedApiConnections": {}
+}
