@@ -70,7 +70,7 @@ public sealed class PublishTransportOrderBillableTests
         var order = Samples.AcceptedOrder(sequence: 3, correlationId: "corr-intake");
         order.Rate(Samples.RateCard(), Samples.Now.AddSeconds(2));
         order.Plan(ShipmentNumber.FromSequence(12), CarriedBy.OwnFleet, new IdempotencyKey("plan"), new CorrelationId("corr-plan"), Samples.Now.AddHours(1));
-        order.TryBecomeBillable(new BillingFacts(DeliveredAt, HasCurrentProofOfDelivery: true), new CorrelationId("corr-billing"), BillableAt);
+        order.TryBecomeBillable(new BillingFacts(DeliveredAt, HasCurrentProofOfDelivery: true, HasOpenException: false), new CorrelationId("corr-billing"), BillableAt);
         order.ClearDomainEvents();
         return order;
     }
