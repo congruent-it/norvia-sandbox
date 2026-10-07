@@ -6,4 +6,5 @@ namespace Norvia.Tms.Domain.TransportOrders;
 /// </summary>
 /// <param name="DeliveredAt">When the Shipment was Delivered; null while it isn't.</param>
 /// <param name="HasCurrentProofOfDelivery">Whether the Shipment has a current Proof of delivery (P6).</param>
-public sealed record BillingFacts(DateTimeOffset? DeliveredAt, bool HasCurrentProofOfDelivery);
+/// <param name="HasOpenException">Whether the Shipment has an open Exception (P7), whatever its type.</param>
+public sealed record BillingFacts(DateTimeOffset? DeliveredAt, bool HasCurrentProofOfDelivery, bool HasOpenException);

@@ -1,4 +1,5 @@
 using Ardalis.SharedKernel;
+using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Domain.ProofsOfDelivery;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TrackingEvents;
@@ -16,7 +17,8 @@ public sealed class BillingCheck(
     IReadRepository<TransportOrder> transportOrders,
     IReadRepository<Shipment> shipments,
     IReadRepository<TrackingEvent> trackingEvents,
-    IReadRepository<ProofOfDelivery> proofsOfDelivery)
+    IReadRepository<ProofOfDelivery> proofsOfDelivery,
+    IReadRepository<ExceptionCase> exceptions)
 {
     /// <summary>
     /// Checks the Transport Order the Shipment carries out, as the transaction that changed the Shipment would. Reads the
@@ -61,7 +63,9 @@ public sealed class BillingCheck(
 
         var hasProofOfDelivery = change.ProofOfDeliveryRecorded
             || await proofsOfDelivery.AnyAsync(new CurrentProofOfDeliverySpec(shipment.Id), cancellationToken);
-        order.TryBecomeBillable(new BillingFacts(deliveredAt, hasProofOfDelivery), change.CorrelationId, change.At);
+        var hasOpenException = change.ExceptionOpened
+            || await exceptions.AnyAsync(new OpenExceptionOfShipmentSpec(shipment.Id, change.ExceptionResolved), cancellationToken);
+        order.TryBecomeBillable(new BillingFacts(deliveredAt, hasProofOfDelivery, hasOpenException), change.CorrelationId, change.At);
     }
 
     private async Task<DateTimeOffset?> DeliveredAtAsync(Shipment shipment, CancellationToken cancellationToken)

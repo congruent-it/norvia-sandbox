@@ -43,7 +43,7 @@ public sealed class TransportOrderBillingTests
     {
         var order = PlannedRated();
 
-        var billable = order.TryBecomeBillable(new BillingFacts(DeliveredAt, HasCurrentProofOfDelivery: true), BillingCorrelationId, BillableAt);
+        var billable = order.TryBecomeBillable(new BillingFacts(DeliveredAt, HasCurrentProofOfDelivery: true, HasOpenException: false), BillingCorrelationId, BillableAt);
 
         billable.Should().BeTrue();
         order.BillingState.Should().Be(BillingState.Billable);
@@ -57,11 +57,23 @@ public sealed class TransportOrderBillingTests
     }
 
     [Fact]
+    public void TryBecomeBillable_ShipmentWithAnOpenException_StaysNotYetBillable()
+    {
+        var order = PlannedRated();
+
+        var billable = order.TryBecomeBillable(new BillingFacts(DeliveredAt, HasCurrentProofOfDelivery: true, HasOpenException: true), BillingCorrelationId, BillableAt);
+
+        billable.Should().BeFalse();
+        order.BillingState.Should().Be(BillingState.NotYetBillable);
+        order.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
     public void TryBecomeBillable_ShipmentNotDelivered_StaysNotYetBillable()
     {
         var order = PlannedRated();
 
-        var billable = order.TryBecomeBillable(new BillingFacts(null, HasCurrentProofOfDelivery: true), BillingCorrelationId, BillableAt);
+        var billable = order.TryBecomeBillable(new BillingFacts(null, HasCurrentProofOfDelivery: true, HasOpenException: false), BillingCorrelationId, BillableAt);
 
         billable.Should().BeFalse();
         order.BillingState.Should().Be(BillingState.NotYetBillable);
@@ -73,7 +85,7 @@ public sealed class TransportOrderBillingTests
     {
         var order = PlannedRated();
 
-        var billable = order.TryBecomeBillable(new BillingFacts(DeliveredAt, HasCurrentProofOfDelivery: false), BillingCorrelationId, BillableAt);
+        var billable = order.TryBecomeBillable(new BillingFacts(DeliveredAt, HasCurrentProofOfDelivery: false, HasOpenException: false), BillingCorrelationId, BillableAt);
 
         billable.Should().BeFalse();
         order.BillingState.Should().Be(BillingState.NotYetBillable);
@@ -93,7 +105,7 @@ public sealed class TransportOrderBillingTests
 
         order.ClearDomainEvents();
 
-        var billable = order.TryBecomeBillable(new BillingFacts(DeliveredAt, true), BillingCorrelationId, BillableAt);
+        var billable = order.TryBecomeBillable(new BillingFacts(DeliveredAt, true, HasOpenException: false), BillingCorrelationId, BillableAt);
 
         billable.Should().BeFalse();
         order.BillingState.Should().Be(BillingState.NotYetBillable);
@@ -105,10 +117,10 @@ public sealed class TransportOrderBillingTests
     {
         var order = Planned();
         order.Rate(null, ReceivedAt.AddSeconds(2));
-        order.TryBecomeBillable(new BillingFacts(DeliveredAt, true), BillingCorrelationId, BillableAt).Should().BeFalse();
+        order.TryBecomeBillable(new BillingFacts(DeliveredAt, true, HasOpenException: false), BillingCorrelationId, BillableAt).Should().BeFalse();
 
         order.ReRate(RateCard(), BillableAt, new IdempotencyKey("key-1"));
-        var billable = order.TryBecomeBillable(new BillingFacts(DeliveredAt, true), new CorrelationId("re-rate-corr"), BillableAt);
+        var billable = order.TryBecomeBillable(new BillingFacts(DeliveredAt, true, HasOpenException: false), new CorrelationId("re-rate-corr"), BillableAt);
 
         billable.Should().BeTrue();
         order.BillingCorrelationId.Should().Be(new CorrelationId("re-rate-corr"));
@@ -121,7 +133,7 @@ public sealed class TransportOrderBillingTests
         order.Plan(ShipmentNumber.FromSequence(3), CarriedBy.OwnFleet, new IdempotencyKey("plan"), new CorrelationId("plan-corr"), ReceivedAt.AddHours(1));
         order.ClearDomainEvents();
 
-        var billable = order.TryBecomeBillable(new BillingFacts(DeliveredAt, true), BillingCorrelationId, BillableAt);
+        var billable = order.TryBecomeBillable(new BillingFacts(DeliveredAt, true, HasOpenException: false), BillingCorrelationId, BillableAt);
 
         billable.Should().BeFalse();
         order.BillingState.Should().Be(BillingState.NotBilledSeparately);
@@ -132,10 +144,10 @@ public sealed class TransportOrderBillingTests
     public void TryBecomeBillable_AlreadyBillable_ChangesNothingAndRaisesNothing()
     {
         var order = PlannedRated();
-        order.TryBecomeBillable(new BillingFacts(DeliveredAt, true), BillingCorrelationId, BillableAt);
+        order.TryBecomeBillable(new BillingFacts(DeliveredAt, true, HasOpenException: false), BillingCorrelationId, BillableAt);
         order.ClearDomainEvents();
 
-        var again = order.TryBecomeBillable(new BillingFacts(DeliveredAt.AddDays(1), true), new CorrelationId("later"), BillableAt.AddDays(1));
+        var again = order.TryBecomeBillable(new BillingFacts(DeliveredAt.AddDays(1), true, HasOpenException: false), new CorrelationId("later"), BillableAt.AddDays(1));
 
         again.Should().BeFalse("Billable is final: nothing publishes the event again");
         order.BillingState.Should().Be(BillingState.Billable);
@@ -152,7 +164,7 @@ public sealed class TransportOrderBillingTests
         order.Rate(RateCard(), ReceivedAt.AddSeconds(2));
         order.ClearDomainEvents();
 
-        var billable = order.TryBecomeBillable(new BillingFacts(DeliveredAt, true), BillingCorrelationId, BillableAt);
+        var billable = order.TryBecomeBillable(new BillingFacts(DeliveredAt, true, HasOpenException: false), BillingCorrelationId, BillableAt);
 
         billable.Should().BeFalse("an order with no Shipment can't have been delivered");
         order.BillingState.Should().Be(BillingState.NotYetBillable);

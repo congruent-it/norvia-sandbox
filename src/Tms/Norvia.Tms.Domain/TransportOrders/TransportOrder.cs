@@ -174,7 +174,7 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
 
     /// <summary>
     /// Makes a Transport-only order Billable when all its conditions hold (P9, "no POD, no invoice"): its Shipment is
-    /// Delivered, it is Rated, and its Shipment has a current Proof of delivery. It then raises TransportOrderBillable once.
+    /// Delivered, it is Rated, its Shipment has a current Proof of delivery and no open Exception. It then raises TransportOrderBillable once.
     /// Returns false, changing nothing, when a condition doesn't hold yet, when the order is billed through the Fulfilment
     /// Contract, and when it is Billable already: Billable is final.
     /// </summary>
@@ -185,7 +185,7 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
         ArgumentNullException.ThrowIfNull(facts);
         ArgumentNullException.ThrowIfNull(correlationId);
         if (!AwaitsBillingFacts
-            || facts is not { DeliveredAt: { } deliveredAt, HasCurrentProofOfDelivery: true })
+            || facts is not { DeliveredAt: { } deliveredAt, HasCurrentProofOfDelivery: true, HasOpenException: false })
         {
             return false;
         }

@@ -20,7 +20,8 @@ internal static class ProofOfDeliveryCalls
         string carrierBookingReference,
         string? documentId = null,
         JsonObject? source = null,
-        DateTimeOffset? deliveryTime = null) =>
+        DateTimeOffset? deliveryTime = null,
+        string condition = "Clean") =>
         new()
         {
             ["documentId"] = documentId ?? Guid.NewGuid().ToString(),
@@ -29,7 +30,7 @@ internal static class ProofOfDeliveryCalls
             ["receivedBy"] = "J. Becker",
             ["deliveryTime"] = JsonValue.Create(deliveryTime ?? new DateTimeOffset(2026, 9, 25, 14, 30, 0, TimeSpan.FromHours(2))),
             ["location"] = new JsonObject { ["place"] = "Düsseldorf", ["postcode"] = "40213", ["countryCode"] = "DE" },
-            ["condition"] = "Clean",
+            ["condition"] = condition,
             ["remark"] = "Signed at the dock",
         };
 

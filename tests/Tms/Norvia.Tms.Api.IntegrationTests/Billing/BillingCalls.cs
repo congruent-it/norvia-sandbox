@@ -42,6 +42,11 @@ internal static class BillingCalls
         await tms.RecordedProofAsync(
             ProofOfDeliveryCalls.Metadata(order.CarrierBookingReference, documentId: documentId), [ProofOfDeliveryCalls.Cmr()], cancellationToken, correlationId);
 
+    /// <summary>The Carrier sends a Proof of delivery signed with reservations for the Shipment, which opens a Reservations Exception, on the correlation ID.</summary>
+    public static async Task ProofWithReservationsRecordedAsync(this TmsFixture tms, BookedOrder order, string correlationId, CancellationToken cancellationToken, string? documentId = null) =>
+        await tms.RecordedProofAsync(
+            ProofOfDeliveryCalls.Metadata(order.CarrierBookingReference, documentId: documentId, condition: "Reservations"), [ProofOfDeliveryCalls.Cmr()], cancellationToken, correlationId);
+
     /// <summary>A Transport Order's billing state, from the query API.</summary>
     public static async Task<string> BillingStateAsync(this TmsFixture tms, string transportOrderNumber, CancellationToken cancellationToken) =>
         (await tms.GetTransportOrderAsync(transportOrderNumber, cancellationToken))["billingState"]!.GetValue<string>();

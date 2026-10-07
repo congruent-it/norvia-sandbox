@@ -1,6 +1,7 @@
 using Ardalis.SharedKernel;
 using Norvia.Tms.Application.Billing;
 using Norvia.Tms.Application.UnitTests.TransportOrders;
+using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Domain.ProofsOfDelivery;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TrackingEvents;
@@ -19,12 +20,13 @@ public sealed class BillingCheckTests
     private readonly IReadRepository<Shipment> _shipments = Substitute.For<IReadRepository<Shipment>>();
     private readonly IReadRepository<TrackingEvent> _trackingEvents = Substitute.For<IReadRepository<TrackingEvent>>();
     private readonly IReadRepository<ProofOfDelivery> _proofs = Substitute.For<IReadRepository<ProofOfDelivery>>();
+    private readonly IReadRepository<ExceptionCase> _exceptions = Substitute.For<IReadRepository<ExceptionCase>>();
     private readonly BillingCheck _check;
 
     public BillingCheckTests()
     {
         _trackingEvents.ListAsync(Arg.Any<DeliveredTrackingEventsForShipmentsSpec>(), Arg.Any<CancellationToken>()).Returns([]);
-        _check = new BillingCheck(_orders, _shipments, _trackingEvents, _proofs);
+        _check = new BillingCheck(_orders, _shipments, _trackingEvents, _proofs, _exceptions);
     }
 
     [Fact]
@@ -171,6 +173,45 @@ public sealed class BillingCheckTests
 
         order.DomainEvents.Should().BeEmpty();
         order.DeliveredAt.Should().Be(DeliveredAt);
+    }
+
+    [Fact]
+    public async Task Check_ShipmentWithAnOpenException_LeavesTheOrderNotYetBillable()
+    {
+        var (order, shipment) = RatedOrderAndDeliveredShipment();
+        _exceptions.AnyAsync(Arg.Is<OpenExceptionOfShipmentSpec>(s => s != null), Arg.Any<CancellationToken>()).Returns(true);
+
+        await _check.CheckAsync(order, shipment, Change with { DeliveredAt = DeliveredAt, ProofOfDeliveryRecorded = true }, CancellationToken.None);
+
+        order.BillingState.Should().Be(BillingState.NotYetBillable);
+        order.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Check_TheTransactionOpenedAnException_LeavesTheOrderNotYetBillable_BeforeTheStoreCanKnow()
+    {
+        var (order, shipment) = RatedOrderAndDeliveredShipment();
+
+        await _check.CheckAsync(order, shipment, Change with { DeliveredAt = DeliveredAt, ProofOfDeliveryRecorded = true, ExceptionOpened = true }, CancellationToken.None);
+
+        order.BillingState.Should().Be(BillingState.NotYetBillable);
+    }
+
+    [Fact]
+    public async Task Check_TheTransactionResolvedTheLastOpenException_MakesTheOrderBillable_ForAnyOutcome()
+    {
+        var (order, shipment) = RatedOrderAndDeliveredShipment();
+        var resolving = ExceptionId.New();
+        // The store still has the resolved Exception as open; only the other Exceptions count.
+        _exceptions.AnyAsync(Arg.Is<OpenExceptionOfShipmentSpec>(s => s != null), Arg.Any<CancellationToken>()).Returns(false);
+        _trackingEvents.ListAsync(Arg.Any<DeliveredTrackingEventsForShipmentsSpec>(), Arg.Any<CancellationToken>())
+            .Returns([new DeliveredEventRow(shipment.Id, DeliveredAt)]);
+        _proofs.AnyAsync(Arg.Any<CurrentProofOfDeliverySpec>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await _check.CheckAsync(order, shipment, Change with { ExceptionResolved = resolving }, CancellationToken.None);
+
+        order.BillingState.Should().Be(BillingState.Billable);
+        order.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<TransportOrderBillableEvent>();
     }
 
     private static (TransportOrder Order, Shipment Shipment) RatedOrderAndDeliveredShipment()
