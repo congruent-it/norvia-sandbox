@@ -37,6 +37,9 @@ public static class TrackingKeys
     /// <summary>The <see cref="Flow"/> of a Carrier's Proof of delivery, from the edge to the TMS.</summary>
     public const string CarrierProofOfDelivery = "carrier-proof-of-delivery";
 
+    /// <summary>The <see cref="Flow"/> of a Shipper's tracking query, from the edge to the TMS's answer.</summary>
+    public const string ShipperTracking = "shipper-tracking";
+
     /// <summary>The <see cref="Outcome"/>s the stand-ins record.</summary>
     public const string Succeeded = "Succeeded";
     public const string Refused = "Refused";

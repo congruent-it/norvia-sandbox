@@ -19,4 +19,8 @@ public sealed class TmsOptions
     /// <summary>The Carrier-answer Logic App's client ID, the one holding the TMS answer role.</summary>
     [Required]
     public string? AnswerClientId { get; set; }
+
+    /// <summary>API Management's client ID, the one holding the TMS Shipper tracking role.</summary>
+    [Required]
+    public string? ShipperTrackingClientId { get; set; }
 }

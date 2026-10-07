@@ -1,0 +1,204 @@
+<policies>
+  <inbound>
+    <base />
+    <set-variable name="correlationId" value="@(Guid.NewGuid().ToString())" />
+    <validate-azure-ad-token tenant-id="{{entra-tenant-id}}" output-token-variable-name="partnerToken">
+      <audiences>
+        <audience>{{partner-api-client-id}}</audience>
+      </audiences>
+    </validate-azure-ad-token>
+    <choose>
+      <when condition="@(!((Jwt)context.Variables[&quot;partnerToken&quot;]).Claims.GetValueOrDefault(&quot;roles&quot;, &quot;&quot;).Split(',').Contains(&quot;Tracking.Read&quot;))">
+        <trace source="norvia-partner-api" severity="information">
+          <message>This client may not read tracking.</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="shipper-tracking" />
+          <metadata name="outcome" value="Refused" />
+          <metadata name="failureCode" value="NotAllowedToReadTracking" />
+        </trace>
+        <return-response>
+          <set-status code="403" reason="Forbidden" />
+          <set-header name="X-Correlation-ID" exists-action="override">
+            <value>@((string)context.Variables["correlationId"])</value>
+          </set-header>
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+          </set-header>
+          <set-body>@(new JObject(
+            new JProperty("messageId", (string)context.Variables["correlationId"]),
+            new JProperty("text", "This client may not read tracking.")).ToString())</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <set-variable name="shipperId" value="@{
+      var clientId = ((Jwt)context.Variables[&quot;partnerToken&quot;]).Claims.GetValueOrDefault(&quot;azp&quot;, &quot;&quot;);
+      foreach (var entry in &quot;{{shippers-by-client-id}}&quot;.Split(';'))
+      {
+        var pair = entry.Split('=');
+        if (pair.Length == 2 &amp;&amp; pair[0] == clientId) { return pair[1]; }
+      }
+      return &quot;&quot;;
+    }" />
+    <choose>
+      <when condition="@(string.IsNullOrEmpty((string)context.Variables[&quot;shipperId&quot;]))">
+        <trace source="norvia-partner-api" severity="information">
+          <message>No Shipper is registered for this client.</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="shipper-tracking" />
+          <metadata name="outcome" value="Refused" />
+          <metadata name="failureCode" value="NoShipperForClient" />
+        </trace>
+        <return-response>
+          <set-status code="403" reason="Forbidden" />
+          <set-header name="X-Correlation-ID" exists-action="override">
+            <value>@((string)context.Variables["correlationId"])</value>
+          </set-header>
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+          </set-header>
+          <set-body>@(new JObject(
+            new JProperty("messageId", (string)context.Variables["correlationId"]),
+            new JProperty("text", "No Shipper is registered for this client.")).ToString())</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <!-- One counter per subscription, shared by the four tracking operations, so a polling Persona stays well inside it. Over the limit API Management answers 429 itself. -->
+    <rate-limit-by-key calls="120" renewal-period="60" counter-key="@(context.Subscription.Id + &quot;:shipper-tracking&quot;)" />
+    <!-- List: the TMS list, narrowed by the query string as it came. The TMS knows the Shipper only from this header, which only API Management's identity may send (ADR 0005). -->
+    <set-backend-service backend-id="tms-api" />
+    <rewrite-uri template="/v1/shipper-tracking/transport-orders" />
+    <authentication-managed-identity resource="{{tms-api-client-id}}" client-id="{{api-management-identity-client-id}}" />
+    <set-header name="X-Shipper-ID" exists-action="override">
+      <value>@((string)context.Variables[&quot;shipperId&quot;])</value>
+    </set-header>
+    <set-header name="X-Correlation-ID" exists-action="override">
+      <value>@((string)context.Variables[&quot;correlationId&quot;])</value>
+    </set-header>
+    <set-header name="Ocp-Apim-Subscription-Key" exists-action="delete" />
+  </inbound>
+  <backend>
+    <!-- A short wait and no retry: a failure reaches the Shipper at once (P8). -->
+    <forward-request timeout="5" follow-redirects="false" />
+  </backend>
+  <outbound>
+    <base />
+    <set-header name="X-Correlation-ID" exists-action="override">
+      <value>@((string)context.Variables[&quot;correlationId&quot;])</value>
+    </set-header>
+    <choose>
+      <when condition="@(context.Response.StatusCode &gt;= 500)">
+        <trace source="norvia-partner-api" severity="information">
+          <message>The TMS answered with a server error.</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="shipper-tracking" />
+          <metadata name="partyId" value="@((string)context.Variables[&quot;shipperId&quot;])" />
+          <metadata name="outcome" value="Failed" />
+          <metadata name="failureCode" value="TmsUnavailable" />
+        </trace>
+        <return-response>
+          <set-status code="503" reason="Service Unavailable" />
+          <set-header name="X-Correlation-ID" exists-action="override">
+            <value>@((string)context.Variables["correlationId"])</value>
+          </set-header>
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+          </set-header>
+          <set-body>@(new JObject(
+            new JProperty("messageId", (string)context.Variables["correlationId"]),
+            new JProperty("text", "Tracking is temporarily unavailable. Try again shortly.")).ToString())</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <choose>
+      <when condition="@(context.Response.StatusCode == 200)">
+        <set-body template="liquid" parse-date="false">[[shipper-tracking-list.liquid]]</set-body>
+      </when>
+    </choose>
+    <!-- The map gives an empty code for a Tracking status or event type the Shipper format has no code for (ADR 0035). The Shipper gets no wrong answer. -->
+    <choose>
+      <when condition="@(context.Response.StatusCode == 200 &amp;&amp; System.Text.RegularExpressions.Regex.IsMatch(context.Response.Body.As&lt;string&gt;(preserveContent: true), &quot;\&quot;(status|code)\&quot;\\s*:\\s*\&quot;\&quot;&quot;))">
+        <trace source="norvia-partner-api" severity="information">
+          <message>The TMS answered with a Tracking status or event the Shipper format has no code for.</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="shipper-tracking" />
+          <metadata name="partyId" value="@((string)context.Variables[&quot;shipperId&quot;])" />
+          <metadata name="outcome" value="Failed" />
+          <metadata name="failureCode" value="TrackingNotMapped" />
+        </trace>
+        <return-response>
+          <set-status code="503" reason="Service Unavailable" />
+          <set-header name="X-Correlation-ID" exists-action="override">
+            <value>@((string)context.Variables["correlationId"])</value>
+          </set-header>
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+          </set-header>
+          <set-body>@(new JObject(
+            new JProperty("messageId", (string)context.Variables["correlationId"]),
+            new JProperty("text", "Tracking is temporarily unavailable. Try again shortly.")).ToString())</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <choose>
+      <when condition="@(context.Response.StatusCode == 200)">
+        <trace source="norvia-partner-api" severity="information">
+          <message>Answered the Shipper</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="shipper-tracking" />
+          <metadata name="partyId" value="@((string)context.Variables[&quot;shipperId&quot;])" />
+          <metadata name="outcome" value="Succeeded" />
+        </trace>
+      </when>
+      <when condition="@(context.Response.StatusCode &gt;= 400)">
+        <trace source="norvia-partner-api" severity="information">
+          <message>The TMS refused the query.</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="shipper-tracking" />
+          <metadata name="partyId" value="@((string)context.Variables[&quot;shipperId&quot;])" />
+          <metadata name="outcome" value="Refused" />
+          <metadata name="failureCode" value="TmsRefused" />
+        </trace>
+      </when>
+    </choose>
+  </outbound>
+  <on-error>
+    <base />
+    <!-- API Management checks the subscription key before the inbound section runs. -->
+    <set-variable name="correlationId" value="@(context.Variables.ContainsKey(&quot;correlationId&quot;) ? (string)context.Variables[&quot;correlationId&quot;] : Guid.NewGuid().ToString())" />
+    <!-- The TMS didn't answer in time, or couldn't be reached. -->
+    <choose>
+      <when condition="@(context.LastError.Source == &quot;forward-request&quot;)">
+        <trace source="norvia-partner-api" severity="information">
+          <message>The TMS did not answer in time.</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="shipper-tracking" />
+          <metadata name="partyId" value="@((string)context.Variables[&quot;shipperId&quot;])" />
+          <metadata name="outcome" value="Failed" />
+          <metadata name="failureCode" value="TmsUnavailable" />
+        </trace>
+        <return-response>
+          <set-status code="503" reason="Service Unavailable" />
+          <set-header name="X-Correlation-ID" exists-action="override">
+            <value>@((string)context.Variables["correlationId"])</value>
+          </set-header>
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+          </set-header>
+          <set-body>@(new JObject(
+            new JProperty("messageId", (string)context.Variables["correlationId"]),
+            new JProperty("text", "Tracking is temporarily unavailable. Try again shortly.")).ToString())</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <trace source="norvia-partner-api" severity="information">
+      <message>@(context.LastError.Message)</message>
+      <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+      <metadata name="flow" value="shipper-tracking" />
+      <metadata name="outcome" value="@(context.Response.StatusCode == 401 || context.Response.StatusCode == 403 || context.Response.StatusCode == 429 ? &quot;Refused&quot; : &quot;Failed&quot;)" />
+      <metadata name="failureCode" value="@(string.IsNullOrEmpty(context.LastError.Reason) ? context.LastError.Source : context.LastError.Reason)" />
+    </trace>
+    <set-header name="X-Correlation-ID" exists-action="override">
+      <value>@((string)context.Variables[&quot;correlationId&quot;])</value>
+    </set-header>
+  </on-error>
+</policies>

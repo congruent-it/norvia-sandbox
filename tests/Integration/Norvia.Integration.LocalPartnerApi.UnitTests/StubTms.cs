@@ -13,6 +13,15 @@ public sealed class StubTms : HttpMessageHandler
     public void Answer(HttpStatusCode status, string body, string contentType = "application/json") =>
         _answer = () => new HttpResponseMessage(status) { Content = new StringContent(body, Encoding.UTF8, contentType) };
 
+    public void AnswerFile(HttpStatusCode status, byte[] content, string contentType, string fileName) =>
+        _answer = () =>
+        {
+            var response = new HttpResponseMessage(status) { Content = new ByteArrayContent(content) };
+            response.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+            response.Content.Headers.ContentDisposition = new System.Net.Http.Headers.ContentDispositionHeaderValue("attachment") { FileName = fileName };
+            return response;
+        };
+
     public void Fail(Exception exception) => _answer = () => throw exception;
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
