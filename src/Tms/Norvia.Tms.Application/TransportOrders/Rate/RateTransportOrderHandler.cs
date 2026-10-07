@@ -1,12 +1,13 @@
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Mediator;
+using Norvia.Tms.Application.Billing;
 using Norvia.Tms.Application.RateCards;
 using Norvia.Tms.Domain.TransportOrders;
 
 namespace Norvia.Tms.Application.TransportOrders.Rate;
 
-public sealed class RateTransportOrderHandler(IRepository<TransportOrder> repository, IRateCardDirectory rateCards, TimeProvider time)
+public sealed class RateTransportOrderHandler(IRepository<TransportOrder> repository, IRateCardDirectory rateCards, BillingCheck billing, TimeProvider time)
     : ICommandHandler<RateTransportOrderCommand, Result<RateTransportOrderResult>>
 {
     public async ValueTask<Result<RateTransportOrderResult>> Handle(RateTransportOrderCommand command, CancellationToken cancellationToken)
@@ -21,14 +22,19 @@ public sealed class RateTransportOrderHandler(IRepository<TransportOrder> reposi
         }
 
         var rateCard = rateCards.FindFor(order.ShipperId);
+        var now = time.GetUtcNow();
         var outcome = command.ReRateKey is { } key
-            ? order.ReRate(rateCard, time.GetUtcNow(), new IdempotencyKey(key))
-            : order.Rate(rateCard, time.GetUtcNow()) ? ReRateOutcome.ReRated : (ReRateOutcome?)null;
+            ? order.ReRate(rateCard, now, new IdempotencyKey(key))
+            : order.Rate(rateCard, now) ? ReRateOutcome.ReRated : (ReRateOutcome?)null;
         switch (outcome)
         {
             case ReRateOutcome.ReRated:
-                // The rating result, with its Freight Charge or failure, and the outcome event's outbox message are
+                // Rating can complete the order's conditions to be Billable (P9), on the intake's Message trail as the rating
+                // is. A Customer service re-rate starts in the TMS UI, so it gets a Message trail of its own. The rating result,
+                // with its Freight Charge or failure, the order becoming Billable and the outcome events' outbox messages are
                 // saved in one transaction.
+                var billingTrail = command.ReRateKey is null ? order.CorrelationId : CorrelationId.New();
+                await billing.CheckAsync(order, shipment: null, new BillingChange(billingTrail, now), cancellationToken);
                 await repository.SaveChangesAsync(cancellationToken);
                 break;
             case ReRateOutcome.Refused:

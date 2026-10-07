@@ -1,6 +1,7 @@
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Microsoft.Extensions.Time.Testing;
+using Norvia.Tms.Application.Billing;
 using Norvia.Tms.Application.Exceptions;
 using Norvia.Tms.Application.ProofsOfDelivery;
 using Norvia.Tms.Application.ProofsOfDelivery.Record;
@@ -10,6 +11,7 @@ using Norvia.Tms.Domain.Carriers;
 using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Domain.ProofsOfDelivery;
 using Norvia.Tms.Domain.Shipments;
+using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.TransportOrders;
 using NSubstitute;
 using static Norvia.Tms.Application.UnitTests.ProofsOfDelivery.ProofsOfDeliverySamples;
@@ -25,6 +27,9 @@ public sealed class RecordProofOfDeliveryHandlerTests
     private readonly IRepository<Shipment> _shipments = Substitute.For<IRepository<Shipment>>();
     private readonly IRepository<ExceptionCase> _exceptions = Substitute.For<IRepository<ExceptionCase>>();
     private readonly IExceptionNumbers _exceptionNumbers = Substitute.For<IExceptionNumbers>();
+    private readonly IReadRepository<TransportOrder> _orders = Substitute.For<IReadRepository<TransportOrder>>();
+    private readonly IReadRepository<ProofOfDelivery> _currentProofs = Substitute.For<IReadRepository<ProofOfDelivery>>();
+    private readonly IReadRepository<TrackingEvent> _trackingEvents = Substitute.For<IReadRepository<TrackingEvent>>();
     private readonly IProofOfDeliveryFiles _files = Substitute.For<IProofOfDeliveryFiles>();
     private readonly FakeTimeProvider _time = new(Samples.Now.AddDays(2));
     private readonly RecordProofOfDeliveryHandler _handler;
@@ -32,7 +37,8 @@ public sealed class RecordProofOfDeliveryHandlerTests
     public RecordProofOfDeliveryHandlerTests()
     {
         _exceptionNumbers.NextAsync(Arg.Any<CancellationToken>()).Returns(ExceptionNumber.FromSequence(9));
-        _handler = new RecordProofOfDeliveryHandler(_proofsOfDelivery, _carrierBookings, _shipments, _files, new ExceptionCauses(_exceptions, _exceptionNumbers), new ProofOfDeliveryRules(TimeSpan.FromMinutes(5)), _time);
+        _trackingEvents.ListAsync(Arg.Any<DeliveredTrackingEventsForShipmentsSpec>(), Arg.Any<CancellationToken>()).Returns([]);
+        _handler = new RecordProofOfDeliveryHandler(_proofsOfDelivery, _carrierBookings, _shipments, _files, new ExceptionCauses(_exceptions, _exceptionNumbers), new BillingCheck(_orders, Substitute.For<IReadRepository<Shipment>>(), _trackingEvents, _currentProofs), new ProofOfDeliveryRules(TimeSpan.FromMinutes(5)), _time);
     }
 
     [Fact]
@@ -56,6 +62,48 @@ public sealed class RecordProofOfDeliveryHandlerTests
         recorded.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<ProofOfDeliveryReceivedEvent>();
         await _files.Received(1).StoreAsync(shipment.Number, Cmr(), Arg.Is<ReadOnlyMemory<byte>>(content => content.ToArray().SequenceEqual(CmrContent)), Arg.Any<CancellationToken>());
         await _proofsOfDelivery.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_TheProofOfDeliveryThatCompletesTheConditions_MakesTheTransportOrderBillable_OnItsTrail_InTheSameSave()
+    {
+        var shipment = Found(ShipmentStatus.Delivered);
+        var order = RatedOrderOf(shipment);
+        _trackingEvents.ListAsync(Arg.Any<DeliveredTrackingEventsForShipmentsSpec>(), Arg.Any<CancellationToken>())
+            .Returns([new DeliveredEventRow(shipment.Id, Samples.Now.AddHours(3))]);
+
+        await _handler.Handle(Command(), CancellationToken.None);
+
+        order.BillingState.Should().Be(BillingState.Billable);
+        order.DeliveredAt.Should().Be(Samples.Now.AddHours(3));
+        order.BillingCorrelationId.Should().Be(new CorrelationId("corr-pod"));
+        order.BecameBillableAt.Should().Be(Samples.Now.AddDays(2));
+        order.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<TransportOrderBillableEvent>();
+        await _proofsOfDelivery.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_AProofOfDeliveryForAnOrderNotRatedYet_LeavesItNotYetBillable()
+    {
+        var shipment = Found(ShipmentStatus.Delivered);
+        var order = RatedOrderOf(shipment, rated: false);
+
+        await _handler.Handle(Command(), CancellationToken.None);
+
+        order.BillingState.Should().Be(BillingState.NotYetBillable);
+        order.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Handle_AProofOfDeliveryForAShipmentNotDeliveredYet_DoesNotCheckBilling()
+    {
+        var shipment = Found(ShipmentStatus.Booked);
+        var order = RatedOrderOf(shipment);
+
+        await _handler.Handle(Command(), CancellationToken.None);
+
+        order.BillingState.Should().Be(BillingState.NotYetBillable);
+        await _orders.DidNotReceive().SingleOrDefaultAsync(Arg.Any<TransportOrderToBillSpec>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -334,6 +382,16 @@ public sealed class RecordProofOfDeliveryHandlerTests
             .Returns(ConfirmedBooking(shipment));
         _shipments.SingleOrDefaultAsync(Arg.Is<ShipmentByNumberSpec>(s => s.Number == shipment.Number), Arg.Any<CancellationToken>()).Returns(shipment);
         return shipment;
+    }
+
+    /// <summary>The Transport Order the Shipment carries out, as the Billing check reads it.</summary>
+    private TransportOrder RatedOrderOf(Shipment shipment, bool rated = true)
+    {
+        var order = rated ? Samples.RatedOrder(sequence: 7) : Samples.AcceptedOrder(sequence: 7);
+        order.Plan(shipment.Number, CarriedBy.Carrier(VanDijk), new IdempotencyKey("plan"), new CorrelationId("corr-plan"), Samples.Now.AddHours(1));
+        order.ClearDomainEvents();
+        _orders.SingleOrDefaultAsync(Arg.Is<TransportOrderToBillSpec>(s => s.Number == order.Number), Arg.Any<CancellationToken>()).Returns(order);
+        return order;
     }
 
     private static RecordProofOfDeliveryCommand Command(ProofOfDeliveryReport? report = null) =>

@@ -1,6 +1,7 @@
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Microsoft.Extensions.Time.Testing;
+using Norvia.Tms.Application.Billing;
 using Norvia.Tms.Application.Exceptions;
 using Norvia.Tms.Application.TrackingEvents.Record;
 using Norvia.Tms.Application.UnitTests.Exceptions;
@@ -8,6 +9,7 @@ using Norvia.Tms.Application.UnitTests.TransportOrders;
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Carriers;
 using Norvia.Tms.Domain.Exceptions;
+using Norvia.Tms.Domain.ProofsOfDelivery;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.TransportOrders;
@@ -28,13 +30,15 @@ public sealed class RecordTrackingHandlerTests
     private readonly IReadRepository<TransportOrder> _transportOrders = Substitute.For<IReadRepository<TransportOrder>>();
     private readonly IRepository<ExceptionCase> _exceptions = Substitute.For<IRepository<ExceptionCase>>();
     private readonly IExceptionNumbers _exceptionNumbers = Substitute.For<IExceptionNumbers>();
+    private readonly IReadRepository<TrackingEvent> _deliveredEvents = Substitute.For<IReadRepository<TrackingEvent>>();
+    private readonly IReadRepository<ProofOfDelivery> _proofsOfDelivery = Substitute.For<IReadRepository<ProofOfDelivery>>();
     private readonly FakeTimeProvider _time = new(Samples.Now.AddDays(2));
     private readonly RecordTrackingHandler _handler;
 
     public RecordTrackingHandlerTests()
     {
         _exceptionNumbers.NextAsync(Arg.Any<CancellationToken>()).Returns(ExceptionNumber.FromSequence(9));
-        _handler = new RecordTrackingHandler(_trackingEvents, _carrierBookings, _shipments, _transportOrders, new ExceptionCauses(_exceptions, _exceptionNumbers), new TrackingEventRules(TimeSpan.FromMinutes(5)), _time);
+        _handler = new RecordTrackingHandler(_trackingEvents, _carrierBookings, _shipments, _transportOrders, new ExceptionCauses(_exceptions, _exceptionNumbers), new BillingCheck(_transportOrders, Substitute.For<IReadRepository<Shipment>>(), _deliveredEvents, _proofsOfDelivery), new TrackingEventRules(TimeSpan.FromMinutes(5)), _time);
     }
 
     [Fact]
@@ -331,6 +335,63 @@ public sealed class RecordTrackingHandlerTests
     }
 
     [Fact]
+    public async Task Handle_TheDeliveredEventThatCompletesTheConditions_MakesTheTransportOrderBillable_OnTheEventsTrail_InTheSameSave()
+    {
+        var shipment = BookedShipment();
+        var order = RatedOrderOf(shipment);
+        _proofsOfDelivery.AnyAsync(Arg.Is<CurrentProofOfDeliverySpec>(s => s.ShipmentId == shipment.Id), Arg.Any<CancellationToken>()).Returns(true);
+        var eventTime = Samples.Now.AddDays(1);
+
+        await _handler.Handle(Collected(type: TrackingEventType.Delivered, eventTime: eventTime, correlationId: "corr-delivered"), CancellationToken.None);
+
+        order.BillingState.Should().Be(BillingState.Billable);
+        order.DeliveredAt.Should().Be(eventTime, "it is the time the Delivered event says, not when the TMS recorded it");
+        order.BillingCorrelationId.Should().Be(new CorrelationId("corr-delivered"));
+        order.BecameBillableAt.Should().Be(Samples.Now.AddDays(2));
+        order.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<TransportOrderBillableEvent>();
+        await _trackingEvents.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_TheDeliveredEventForAnOrderWithoutAProofOfDelivery_LeavesItNotYetBillable()
+    {
+        var shipment = BookedShipment();
+        var order = RatedOrderOf(shipment);
+
+        await _handler.Handle(Collected(type: TrackingEventType.Delivered), CancellationToken.None);
+
+        order.BillingState.Should().Be(BillingState.NotYetBillable);
+        order.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Handle_AnEventThatDoesNotDeliverTheShipment_DoesNotCheckBilling()
+    {
+        var shipment = BookedShipment();
+        var order = RatedOrderOf(shipment);
+        _proofsOfDelivery.AnyAsync(Arg.Any<CurrentProofOfDeliverySpec>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await _handler.Handle(Collected(type: TrackingEventType.Collected), CancellationToken.None);
+
+        order.BillingState.Should().Be(BillingState.NotYetBillable);
+        await _transportOrders.DidNotReceive().SingleOrDefaultAsync(Arg.Any<TransportOrderToBillSpec>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_ADeliveredEventSentAgain_DoesNotCheckBillingAgain()
+    {
+        var shipment = BookedShipment();
+        var order = RatedOrderOf(shipment);
+        await _handler.Handle(Collected(type: TrackingEventType.Delivered, sourceEventId: "evt-del"), CancellationToken.None);
+        _transportOrders.ClearReceivedCalls();
+
+        await _handler.Handle(Collected(type: TrackingEventType.Delivered, sourceEventId: "evt-del-2"), CancellationToken.None);
+
+        await _transportOrders.DidNotReceive().SingleOrDefaultAsync(Arg.Any<TransportOrderToBillSpec>(), Arg.Any<CancellationToken>());
+        order.BillingState.Should().Be(BillingState.NotYetBillable);
+    }
+
+    [Fact]
     public async Task Handle_ADeliveredEventWithALateEta_IsNotCheckedForLateDelivery_AndClearsAnOpenOne()
     {
         var shipment = BookedShipment();
@@ -542,6 +603,16 @@ public sealed class RecordTrackingHandlerTests
         _transportOrders.SingleOrDefaultAsync(Arg.Is<TransportOrderByNumberSpec>(s => s.Number == order.Number), Arg.Any<CancellationToken>())
             .Returns(order);
         return shipment;
+    }
+
+    /// <summary>The Rated Transport Order the Shipment carries out, as the Billing check reads it.</summary>
+    private TransportOrder RatedOrderOf(Shipment shipment)
+    {
+        var order = Samples.RatedOrder(sequence: 7);
+        order.Plan(shipment.Number, CarriedBy.Carrier(VanDijk), new IdempotencyKey("plan"), new CorrelationId("corr-plan"), Samples.Now.AddHours(1));
+        order.ClearDomainEvents();
+        _transportOrders.SingleOrDefaultAsync(Arg.Is<TransportOrderToBillSpec>(s => s.Number == order.Number), Arg.Any<CancellationToken>()).Returns(order);
+        return order;
     }
 
     private static CarrierBooking ConfirmedBooking(Shipment shipment)

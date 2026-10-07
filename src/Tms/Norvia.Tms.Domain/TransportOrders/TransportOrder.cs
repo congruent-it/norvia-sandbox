@@ -72,6 +72,21 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
     /// <summary>The key of the last re-rate, so that re-rate sent again is known as a repeat; null until one runs.</summary>
     public IdempotencyKey? LastReRateKey { get; private set; }
 
+    /// <summary>Where the Transport Order stands for billing (P9); null for a Rejected booking, which is never billed.</summary>
+    public BillingState? BillingState { get; private set; }
+
+    /// <summary>When the Shipment was Delivered, frozen when the Transport Order became Billable; null until then.</summary>
+    public DateTimeOffset? DeliveredAt { get; private set; }
+
+    /// <summary>When the Transport Order became Billable; null until then.</summary>
+    public DateTimeOffset? BecameBillableAt { get; private set; }
+
+    /// <summary>The Message trail of the transaction that made the Transport Order Billable; null until then.</summary>
+    public CorrelationId? BillingCorrelationId { get; private set; }
+
+    /// <summary>Whether Customer service released the Transport Order without a Proof of delivery (P9); false until it is.</summary>
+    public bool ReleasedWithoutProofOfDelivery { get; private set; }
+
     /// <summary>The number of the Transport Order's one Shipment, once it is Planned; null until then.</summary>
     public ShipmentNumber? ShipmentNumber { get; private set; }
 
@@ -148,6 +163,41 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
         return ReRateOutcome.ReRated;
     }
 
+    /// <summary>
+    /// Whether the order's own conditions to be Billable hold (P9): it is a Transport-only order that isn't Billable yet, it is
+    /// Rated and it has its Shipment. Only then do the Shipment's facts decide.
+    /// </summary>
+    public bool AwaitsBillingFacts =>
+        BillingState == TransportOrders.BillingState.NotYetBillable
+        && RatingResult == TransportOrders.RatingResult.Rated
+        && ShipmentNumber is not null;
+
+    /// <summary>
+    /// Makes a Transport-only order Billable when all its conditions hold (P9, "no POD, no invoice"): its Shipment is
+    /// Delivered, it is Rated, and its Shipment has a current Proof of delivery. It then raises TransportOrderBillable once.
+    /// Returns false, changing nothing, when a condition doesn't hold yet, when the order is billed through the Fulfilment
+    /// Contract, and when it is Billable already: Billable is final.
+    /// </summary>
+    /// <param name="facts">What is known about the Shipment.</param>
+    /// <param name="correlationId">The Message trail of the transaction that may make the order Billable.</param>
+    public bool TryBecomeBillable(BillingFacts facts, CorrelationId correlationId, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(facts);
+        ArgumentNullException.ThrowIfNull(correlationId);
+        if (!AwaitsBillingFacts
+            || facts is not { DeliveredAt: { } deliveredAt, HasCurrentProofOfDelivery: true })
+        {
+            return false;
+        }
+
+        BillingState = TransportOrders.BillingState.Billable;
+        DeliveredAt = deliveredAt;
+        BecameBillableAt = now;
+        BillingCorrelationId = correlationId;
+        RegisterDomainEvent(new TransportOrderBillableEvent(this));
+        return true;
+    }
+
     private void ApplyRating(RateCard? rateCard, DateTimeOffset ratedAt)
     {
         var outcome = rateCard?.Rate(Details)
@@ -183,6 +233,7 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
             Number = number,
             Status = TransportOrderStatus.Accepted,
             ShipperReference = details.ShipperReference,
+            BillingState = channel == IntakeChannel.Wms ? TransportOrders.BillingState.NotBilledSeparately : TransportOrders.BillingState.NotYetBillable,
             RatingResult = channel == IntakeChannel.Wms ? TransportOrders.RatingResult.NotRatedSeparately : TransportOrders.RatingResult.NotYetRated,
         };
         order.RegisterDomainEvent(new TransportOrderAcceptedEvent(order));

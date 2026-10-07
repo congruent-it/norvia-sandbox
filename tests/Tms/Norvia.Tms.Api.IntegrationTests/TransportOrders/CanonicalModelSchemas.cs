@@ -19,6 +19,8 @@ internal static class CanonicalModelSchemas
 
     private static readonly Lazy<JsonSchema> TransportOrderRatedSchema = new(() => Load("transport-order-rated.v1.schema.json"));
 
+    private static readonly Lazy<JsonSchema> TransportOrderBillableSchema = new(() => Load("transport-order-billable.v1.schema.json"));
+
     private static readonly Lazy<JsonSchema> TransportOrderRatingFailedSchema = new(() => Load("transport-order-rating-failed.v1.schema.json"));
 
     private static readonly Lazy<JsonSchema> ShipmentPlannedSchema = new(() => Load("shipment-planned.v1.schema.json"));
@@ -118,6 +120,8 @@ internal static class CanonicalModelSchemas
     public static EvaluationResults ValidateTransportOrderRejected(JsonNode body) => Validate(TransportOrderRejectedSchema.Value, body);
 
     public static EvaluationResults ValidateTransportOrderRated(JsonNode body) => Validate(TransportOrderRatedSchema.Value, body);
+
+    public static EvaluationResults ValidateTransportOrderBillable(JsonNode body) => Validate(TransportOrderBillableSchema.Value, body);
 
     public static EvaluationResults ValidateTransportOrderRatingFailed(JsonNode body) => Validate(TransportOrderRatingFailedSchema.Value, body);
 

@@ -1,12 +1,17 @@
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Microsoft.Extensions.Time.Testing;
+using Norvia.Tms.Application.Billing;
 using Norvia.Tms.Application.RateCards;
 using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.Rate;
+using Norvia.Tms.Domain.ProofsOfDelivery;
+using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.Shippers;
+using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.TransportOrders;
 using NSubstitute;
+using static Norvia.Tms.Application.UnitTests.ProofsOfDelivery.ProofsOfDeliverySamples;
 
 namespace Norvia.Tms.Application.UnitTests.TransportOrders;
 
@@ -15,13 +20,39 @@ public sealed class ReRateTests
 {
     private readonly IRepository<TransportOrder> _repository = Substitute.For<IRepository<TransportOrder>>();
     private readonly IRateCardDirectory _rateCards = Substitute.For<IRateCardDirectory>();
+    private readonly IReadRepository<TransportOrder> _orders = Substitute.For<IReadRepository<TransportOrder>>();
+    private readonly IReadRepository<Shipment> _shipments = Substitute.For<IReadRepository<Shipment>>();
+    private readonly IReadRepository<TrackingEvent> _trackingEvents = Substitute.For<IReadRepository<TrackingEvent>>();
+    private readonly IReadRepository<ProofOfDelivery> _proofs = Substitute.For<IReadRepository<ProofOfDelivery>>();
     private readonly FakeTimeProvider _time = new(Samples.Now.AddHours(3));
     private readonly RateTransportOrderHandler _handler;
 
     public ReRateTests()
     {
         _rateCards.FindFor(new ShipperId("SHP-0001")).Returns(Samples.RateCard());
-        _handler = new RateTransportOrderHandler(_repository, _rateCards, _time);
+        _handler = new RateTransportOrderHandler(_repository, _rateCards, new BillingCheck(_orders, _shipments, _trackingEvents, _proofs), _time);
+    }
+
+    [Fact]
+    public async Task Handle_ReRateOfADeliveredOrderWithAProofOfDelivery_MakesItBillable_AndSavesItWithTheRating()
+    {
+        var order = Samples.RatingFailedOrder(sequence: 7);
+        var shipment = ShipmentCarriedTo(ShipmentStatus.Delivered);
+        order.Plan(shipment.Number, CarriedBy.Carrier(VanDijk), new IdempotencyKey("plan"), new CorrelationId("corr-plan"), Samples.Now.AddHours(1));
+        order.ClearDomainEvents();
+        _repository.SingleOrDefaultAsync(Arg.Any<TransportOrderToRateSpec>(), Arg.Any<CancellationToken>()).Returns(order);
+        _shipments.SingleOrDefaultAsync(Arg.Any<ShipmentByNumberSpec>(), Arg.Any<CancellationToken>()).Returns(shipment);
+        _trackingEvents.ListAsync(Arg.Any<DeliveredTrackingEventsForShipmentsSpec>(), Arg.Any<CancellationToken>())
+            .Returns([new DeliveredEventRow(shipment.Id, Samples.Now.AddHours(30))]);
+        _proofs.AnyAsync(Arg.Any<CurrentProofOfDeliverySpec>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await _handler.Handle(new RateTransportOrderCommand("TO-0000007", ReRateKey: "key-1"), CancellationToken.None);
+
+        order.RatingResult.Should().Be(RatingResult.Rated);
+        order.BillingState.Should().Be(BillingState.Billable);
+        order.BillingCorrelationId.Should().NotBe(order.CorrelationId, "a re-rate starts in the TMS UI, so it has a Message trail of its own");
+        order.DomainEvents.Select(e => e.GetType()).Should().Equal(typeof(TransportOrderRatedEvent), typeof(TransportOrderBillableEvent));
+        await _repository.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]

@@ -631,6 +631,17 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTimeOffset?>("BecameBillableAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("BillingCorrelationId")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("BillingState")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
                     b.Property<string>("Channel")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -640,6 +651,9 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTimeOffset?>("DeliveredAt")
+                        .HasColumnType("datetimeoffset");
 
                     b.Property<string>("Details")
                         .IsRequired()
@@ -681,6 +695,9 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool>("ReleasedWithoutProofOfDelivery")
+                        .HasColumnType("bit");
+
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -710,6 +727,8 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                     b.HasIndex("Number")
                         .IsUnique()
                         .HasFilter("[Number] IS NOT NULL");
+
+                    b.HasIndex("BillingState", "ReceivedAt");
 
                     b.HasIndex("RatingResult", "ReceivedAt");
 

@@ -1,6 +1,7 @@
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Mediator;
+using Norvia.Tms.Application.Billing;
 using Norvia.Tms.Application.Exceptions;
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Exceptions;
@@ -16,6 +17,7 @@ public sealed class RecordProofOfDeliveryHandler(
     IRepository<Shipment> shipments,
     IProofOfDeliveryFiles files,
     ExceptionCauses exceptionCauses,
+    BillingCheck billing,
     ProofOfDeliveryRules rules,
     TimeProvider time)
     : ICommandHandler<RecordProofOfDeliveryCommand, Result<RecordProofOfDeliveryResult>>
@@ -77,11 +79,13 @@ public sealed class RecordProofOfDeliveryHandler(
             await files.StoreAsync(shipment.Number, report.Files[i], command.Files[i], cancellationToken);
         }
 
-        // The record, the Exception it opens or joins and the events they raise, which go to the outbox, are saved in one transaction.
+        // The record, the Exception it opens or joins, the Transport Order becoming Billable and the events they raise, which go to the
+        // outbox, are saved in one transaction.
         // A new document ID for a Shipment that already has a current Proof of delivery replaces it: the earlier one is kept, superseded.
         var replaced = await proofsOfDelivery.SingleOrDefaultAsync(new TrackedCurrentProofOfDeliverySpec(shipment.Id), cancellationToken);
         var now = time.GetUtcNow();
-        var proofOfDelivery = ProofOfDelivery.Record(shipment, report, new CorrelationId(command.CorrelationId), now, replaced);
+        var correlationId = new CorrelationId(command.CorrelationId);
+        var proofOfDelivery = ProofOfDelivery.Record(shipment, report, correlationId, now, replaced);
         if (ExceptionCause.From(proofOfDelivery, now) is { } cause)
         {
             await exceptionCauses.OpenOrAddAsync(shipment, cause, cancellationToken);
@@ -89,6 +93,12 @@ public sealed class RecordProofOfDeliveryHandler(
         else if (ExceptionTypes.ClearedBy(proofOfDelivery.Condition) is { } cleared)
         {
             await exceptionCauses.ClearAsync(shipment, cleared, cancellationToken);
+        }
+
+        // A Proof of delivery can complete the conditions of the Transport Order of a Delivered Shipment to be Billable (P9).
+        if (shipment.Status == ShipmentStatus.Delivered)
+        {
+            await billing.CheckAsync(shipment, new BillingChange(correlationId, now, ProofOfDeliveryRecorded: true), cancellationToken);
         }
 
         await proofsOfDelivery.AddAsync(proofOfDelivery, cancellationToken);
