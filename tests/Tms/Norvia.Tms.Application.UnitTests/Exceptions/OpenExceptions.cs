@@ -13,7 +13,11 @@ namespace Norvia.Tms.Application.UnitTests.Exceptions;
 internal static class OpenExceptions
 {
     public static ExceptionCase DeliveryFailed(
-        CarriedBy? carriedBy = null, long orderSequence = 7, long shipmentSequence = 12, long number = 5, DateTimeOffset? at = null)
+        CarriedBy? carriedBy = null, long orderSequence = 7, long shipmentSequence = 12, long number = 5, DateTimeOffset? at = null) =>
+        DeliveryFailedOn(BookedShipment(carriedBy, orderSequence, shipmentSequence), number, at);
+
+    /// <summary>A Shipment that was released and, for a Carrier, Booked: the one a Delivery failed Exception is opened on.</summary>
+    public static Shipment BookedShipment(CarriedBy? carriedBy = null, long orderSequence = 7, long shipmentSequence = 12)
     {
         var order = Samples.AcceptedOrder(sequence: orderSequence);
         var shipment = Samples.Planned(order, carriedBy ?? CarriedBy.Carrier(new CarrierId("CAR-0001")), sequence: shipmentSequence);
@@ -27,6 +31,12 @@ internal static class OpenExceptions
         }
 
         shipment.Book();
+        return shipment;
+    }
+
+    /// <summary>An Exception a Delivery failed Tracking event of the Shipment opened.</summary>
+    public static ExceptionCase DeliveryFailedOn(Shipment shipment, long number = 5, DateTimeOffset? at = null)
+    {
         var cause = shipment.Record(
             new TrackingReport(
                 shipment.CarriedBy.CarrierId is { } carrierId ? TrackingSource.Carrier(carrierId) : TrackingSource.OwnFleet,

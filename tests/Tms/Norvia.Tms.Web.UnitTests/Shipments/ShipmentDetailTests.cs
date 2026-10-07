@@ -138,7 +138,7 @@ public sealed class ShipmentDetailTests : TmsWebContext
     public void Render_AShipment_ShowsItsTrackingTimeline()
     {
         Queries.FindShipmentAsync("SH-0000012", Arg.Any<CancellationToken>()).Returns(Samples.Shipment("SH-0000012"));
-        Queries.FindTrackingTimelineAsync("SH-0000012", Arg.Any<CancellationToken>()).Returns(new ShipmentTimeline([], []));
+        Queries.FindTrackingTimelineAsync("SH-0000012", Arg.Any<CancellationToken>()).Returns(new ShipmentTimeline([], [], [], []));
 
         var page = RenderDetail("SH-0000012");
 

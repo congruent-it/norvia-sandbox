@@ -1,0 +1,229 @@
+@using Norvia.Tms.Application.Exceptions.ListOpen
+@using Norvia.Tms.Domain.Exceptions
+@using Norvia.Tms.Web.TransportOrders
+@implements IDisposable
+@inject ITransportOrderQueries Queries
+@inject ITransportOrderCommands Commands
+@inject ILogger<ExceptionActionPanel> Logger
+
+@* One Planner action on one open Exception, as a form under the list. It asks the TMS API to do it and says what came of it. *@
+<section role="group" aria-label="@Title" class="mb-6 rounded-flatly border border-border p-4">
+    <h2 class="!mb-3 !text-xl">@Title</h2>
+
+    @if (_failure is { } failure)
+    {
+        <div role="alert" class="mb-4">
+            <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">@failure</FluentMessageBar>
+        </div>
+    }
+
+    @if (!_ready)
+    {
+        <FluentStack VerticalAlignment="VerticalAlignment.Center" role="status">
+            <FluentProgressRing />
+            <span>Loading the message…</span>
+        </FluentStack>
+    }
+    else
+    {
+        <div class="flex flex-col gap-4">
+            @switch (Kind)
+            {
+                case ExceptionActionKind.NotifyShipper:
+                    <FluentTextArea @bind-Value="_text" Immediate="true" Label="Message to the Shipper" Rows="5" Style="width: 100%;" />
+                    break;
+                case ExceptionActionKind.CancelCarrierBooking:
+                    <FluentTextArea @bind-Value="_text" Immediate="true" Label="Reason" Rows="3" Style="width: 100%;" />
+                    break;
+                case ExceptionActionKind.AddNote:
+                    <FluentTextArea @bind-Value="_text" Immediate="true" Label="Note" Rows="3" Style="width: 100%;" />
+                    break;
+                case ExceptionActionKind.AgreeDeliveryWindow:
+                    <FluentTextField @bind-Value="_earliest" Immediate="true" Label="Earliest" Placeholder="@NorviaTime.InputFormat" />
+                    <FluentTextField @bind-Value="_latest" Immediate="true" Label="Latest" Placeholder="@NorviaTime.InputFormat" />
+                    <p class="!mb-0 text-muted">Times as Rotterdam reads them, such as 2026-10-08 14:30. The Carrier isn't sent the window: you agreed it with them already.</p>
+                    break;
+                case ExceptionActionKind.Resolve:
+                    <FluentSelect TOption="string" @bind-Value="_outcome" Label="Outcome" Width="100%">
+                        <FluentOption TOption="string" Value="">Choose an outcome</FluentOption>
+                        @foreach (var outcome in Enum.GetValues<ExceptionOutcome>())
+                        {
+                            <FluentOption TOption="string" Value="@outcome.ToString()">@ExceptionText.Outcome(outcome)</FluentOption>
+                        }
+                    </FluentSelect>
+                    <FluentTextArea @bind-Value="_text" Immediate="true" Label="Remark" Rows="3" Style="width: 100%;" />
+                    break;
+            }
+
+            <div class="flex gap-4">
+                <FluentButton Appearance="Appearance.Accent" OnClick="SubmitAsync" Disabled="_working">@SubmitText</FluentButton>
+                <FluentButton Appearance="Appearance.Outline" OnClick="Close" Disabled="_working">Cancel</FluentButton>
+            </div>
+        </div>
+    }
+</section>
+
+@code {
+    private readonly CancellationTokenSource _closed = new();
+    private string _text = string.Empty;
+    private string _earliest = string.Empty;
+    private string _latest = string.Empty;
+    private string _outcome = string.Empty;
+    private string? _failure;
+    private bool _ready;
+    private bool _working;
+
+    [Parameter, EditorRequired]
+    public OpenExceptionSummary OpenException { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public ExceptionActionKind Kind { get; set; }
+
+    /// <summary>Raised when the Planner closes the form without acting.</summary>
+    [Parameter, EditorRequired]
+    public EventCallback OnClosed { get; set; }
+
+    /// <summary>Raised once the TMS did what the Planner asked, with what to tell them.</summary>
+    [Parameter, EditorRequired]
+    public EventCallback<string> OnDone { get; set; }
+
+    private string Title => Kind switch
+    {
+        ExceptionActionKind.NotifyShipper => $"Notify Shipper of {OpenException.ExceptionNumber}",
+        ExceptionActionKind.CancelCarrierBooking => $"Cancel Carrier booking of {OpenException.ExceptionNumber}",
+        ExceptionActionKind.AgreeDeliveryWindow => $"Agree delivery window for {OpenException.ExceptionNumber}",
+        ExceptionActionKind.AddNote => $"Add note to {OpenException.ExceptionNumber}",
+        ExceptionActionKind.Resolve => $"Resolve {OpenException.ExceptionNumber}",
+        _ => throw new InvalidOperationException($"Unknown action {Kind}."),
+    };
+
+    private string SubmitText => Kind switch
+    {
+        ExceptionActionKind.NotifyShipper => "Send notification",
+        ExceptionActionKind.CancelCarrierBooking => "Cancel Carrier booking",
+        ExceptionActionKind.AgreeDeliveryWindow => "Agree window",
+        ExceptionActionKind.AddNote => "Add note",
+        ExceptionActionKind.Resolve => "Resolve Exception",
+        _ => throw new InvalidOperationException($"Unknown action {Kind}."),
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Kind != ExceptionActionKind.NotifyShipper)
+        {
+            _ready = true;
+            return;
+        }
+
+        // The message starts from the template for the Exception's type, which the Planner can edit.
+        try
+        {
+            _text = await Queries.FindShipperNotificationTemplateAsync(OpenException.ExceptionNumber, _closed.Token) ?? string.Empty;
+        }
+        catch (OperationCanceledException) when (_closed.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning(exception, "Reading the Shipper notification template of Exception {ExceptionNumber} failed", OpenException.ExceptionNumber);
+            _failure = "The message couldn't be prefilled, so write it yourself.";
+        }
+
+        _ready = true;
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (_working)
+        {
+            return;
+        }
+
+        if (Invalid() is { } problem)
+        {
+            _failure = problem;
+            return;
+        }
+
+        _working = true;
+        _failure = null;
+        try
+        {
+            var number = OpenException.ExceptionNumber;
+            var answer = await ActAsync(number);
+            switch (answer)
+            {
+                case ExceptionAnswer.Done:
+                    await OnDone.InvokeAsync(DoneText);
+                    break;
+                case ExceptionAnswer.Refused refused:
+                    _failure = $"Exception {number} wasn't changed: {refused.Reason}";
+                    break;
+            }
+        }
+        catch (OperationCanceledException) when (_closed.IsCancellationRequested)
+        {
+            // The page closed while the TMS was answering.
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning(exception, "{Action} on Exception {ExceptionNumber} failed", Kind, OpenException.ExceptionNumber);
+            _failure = $"Exception {OpenException.ExceptionNumber} couldn't be changed. Try again.";
+        }
+        finally
+        {
+            _working = false;
+        }
+    }
+
+    private Task<ExceptionAnswer> ActAsync(string number) => Kind switch
+    {
+        ExceptionActionKind.NotifyShipper => Commands.NotifyShipperAsync(number, _text.Trim(), _closed.Token),
+        ExceptionActionKind.CancelCarrierBooking => Commands.CancelCarrierBookingAsync(number, _text.Trim(), _closed.Token),
+        ExceptionActionKind.AgreeDeliveryWindow => AgreeAsync(number),
+        ExceptionActionKind.AddNote => Commands.AddNoteAsync(number, _text.Trim(), _closed.Token),
+        ExceptionActionKind.Resolve => Commands.ResolveAsync(number, Enum.Parse<ExceptionOutcome>(_outcome), _text.Trim(), _closed.Token),
+        _ => throw new InvalidOperationException($"Unknown action {Kind}."),
+    };
+
+    private Task<ExceptionAnswer> AgreeAsync(string number)
+    {
+        NorviaTime.TryParse(_earliest, out var earliest);
+        NorviaTime.TryParse(_latest, out var latest);
+        return Commands.AgreeDeliveryWindowAsync(number, earliest, latest, _closed.Token);
+    }
+
+    // What the TMS would refuse anyway, said before asking.
+    private string? Invalid() => Kind switch
+    {
+        ExceptionActionKind.NotifyShipper when string.IsNullOrWhiteSpace(_text) => "Write the message to the Shipper.",
+        ExceptionActionKind.CancelCarrierBooking when string.IsNullOrWhiteSpace(_text) => "Give the reason for cancelling the Carrier booking.",
+        ExceptionActionKind.AddNote when string.IsNullOrWhiteSpace(_text) => "Write the note.",
+        ExceptionActionKind.Resolve when !Enum.TryParse<ExceptionOutcome>(_outcome, out _) => "Choose the outcome.",
+        ExceptionActionKind.Resolve when string.IsNullOrWhiteSpace(_text) => "Give a remark: what you did or concluded.",
+        ExceptionActionKind.AgreeDeliveryWindow when !NorviaTime.TryParse(_earliest, out _) || !NorviaTime.TryParse(_latest, out _) =>
+            $"Give the earliest and the latest time as {NorviaTime.InputFormat}.",
+        ExceptionActionKind.AgreeDeliveryWindow when NorviaTime.TryParse(_earliest, out var earliest) && NorviaTime.TryParse(_latest, out var latest) && earliest > latest =>
+            "The earliest time can't be after the latest.",
+        _ => null,
+    };
+
+    private string DoneText => Kind switch
+    {
+        ExceptionActionKind.NotifyShipper => $"The Shipper is being notified of {OpenException.ExceptionNumber}.",
+        ExceptionActionKind.CancelCarrierBooking => $"The Carrier booking of {OpenException.ExceptionNumber} is cancelled, and Shipment {OpenException.ShipmentNumber} is back in the Shipments to release.",
+        ExceptionActionKind.AgreeDeliveryWindow => $"The delivery window for {OpenException.ExceptionNumber} is agreed.",
+        ExceptionActionKind.AddNote => $"The note is added to {OpenException.ExceptionNumber}.",
+        ExceptionActionKind.Resolve => $"{OpenException.ExceptionNumber} is resolved.",
+        _ => throw new InvalidOperationException($"Unknown action {Kind}."),
+    };
+
+    private Task Close() => OnClosed.InvokeAsync();
+
+    public void Dispose()
+    {
+        _closed.Cancel();
+        _closed.Dispose();
+    }
+}
