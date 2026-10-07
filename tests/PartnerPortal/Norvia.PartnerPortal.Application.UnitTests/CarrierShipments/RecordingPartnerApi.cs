@@ -1,4 +1,5 @@
 using Norvia.PartnerPortal.Application.Bookings;
+using Norvia.PartnerPortal.Application.ShipperTracking;
 using Norvia.PartnerPortal.Domain.Bookings;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
 using Norvia.PartnerPortal.Domain.Personas;
@@ -29,5 +30,17 @@ internal sealed class RecordingPartnerApi : INorviaPartnerApi
     public Task<NorviaAnswer> SubmitAsync(Persona persona, BookingRequest booking, CancellationToken cancellationToken) => throw new NotSupportedException();
 
     public Task<NorviaReply> AnswerAsync(Persona persona, string carrierBookingNumber, string shipmentNumber, CarrierAnswer answer, CancellationToken cancellationToken) =>
+        throw new NotSupportedException();
+
+    public Task<TrackingAnswer<IReadOnlyList<ShipperTrackingSummary>>> ListTransportOrdersAsync(Persona persona, ShipperTrackingFilter filter, CancellationToken cancellationToken) =>
+        throw new NotSupportedException();
+
+    public Task<TrackingAnswer<ShipperTrackingDetail>> GetTransportOrderAsync(Persona persona, string transportOrderNumber, CancellationToken cancellationToken) =>
+        throw new NotSupportedException();
+
+    public Task<TrackingAnswer<ShipperTrackingDetail>> FindTransportOrderAsync(Persona persona, string shipperReference, CancellationToken cancellationToken) =>
+        throw new NotSupportedException();
+
+    public Task<TrackingAnswer<ShipperProofFileContent>> DownloadProofOfDeliveryFileAsync(Persona persona, string transportOrderNumber, Guid fileId, CancellationToken cancellationToken) =>
         throw new NotSupportedException();
 }

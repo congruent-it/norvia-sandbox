@@ -1,0 +1,9 @@
+<FluentStack VerticalAlignment="VerticalAlignment.Center" role="status">
+    <FluentProgressRing />
+    <span>@Text</span>
+</FluentStack>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Text { get; set; } = string.Empty;
+}

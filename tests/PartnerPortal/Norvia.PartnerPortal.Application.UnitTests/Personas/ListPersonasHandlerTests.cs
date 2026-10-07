@@ -15,7 +15,7 @@ public sealed class ListPersonasHandlerTests
         var listed = await new ListPersonasHandler(personas).Handle(new ListPersonasQuery(), CancellationToken.None);
 
         listed.Should().Equal(
-            new PersonaView("brouwer-dranken", "Brouwer Dranken", PartyType.Shipper),
+            new PersonaView("brouwer-dranken", "Brouwer Dranken", PartyType.Shipper, TimeSpan.FromSeconds(5)),
             new PersonaView("van-dijk-transport", "Van Dijk Transport", PartyType.Carrier));
     }
 }

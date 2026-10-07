@@ -7,6 +7,7 @@ using Norvia.PartnerPortal.Application.Bookings;
 using Norvia.PartnerPortal.Application.CarrierBookings.Answer;
 using Norvia.PartnerPortal.Application.CarrierShipments;
 using Norvia.PartnerPortal.Application.CarrierShipments.SendProofOfDelivery;
+using Norvia.PartnerPortal.Application.ShipperTracking;
 using Norvia.PartnerPortal.Domain.Bookings;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
 using Norvia.PartnerPortal.Domain.Personas;
@@ -185,6 +186,111 @@ internal sealed partial class NorviaPartnerApiClient(
         return reply;
     }
 
+    public Task<TrackingAnswer<IReadOnlyList<ShipperTrackingSummary>>> ListTransportOrdersAsync(
+        Persona persona, ShipperTrackingFilter filter, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+        return QueryTrackingAsync(
+            persona, "List Transport Orders", transportOrderNumber: null, $"transport-orders?{ShipperTrackingFormat.QueryOf(filter)}",
+            async (response, token) => ShipperTrackingFormat.ReadList(await response.Content.ReadAsStringAsync(token)), cancellationToken);
+    }
+
+    public Task<TrackingAnswer<ShipperTrackingDetail>> GetTransportOrderAsync(Persona persona, string transportOrderNumber, CancellationToken cancellationToken) =>
+        QueryTrackingAsync(
+            persona, "Get Transport Order", transportOrderNumber, $"transport-orders/{Uri.EscapeDataString(transportOrderNumber)}",
+            ReadDetailAsync, cancellationToken);
+
+    public Task<TrackingAnswer<ShipperTrackingDetail>> FindTransportOrderAsync(Persona persona, string shipperReference, CancellationToken cancellationToken) =>
+        QueryTrackingAsync(
+            persona, "Find Transport Order", transportOrderNumber: null, $"transport-orders/find?shipperReference={Uri.EscapeDataString(shipperReference)}",
+            ReadDetailAsync, cancellationToken);
+
+    public Task<TrackingAnswer<ShipperProofFileContent>> DownloadProofOfDeliveryFileAsync(
+        Persona persona, string transportOrderNumber, Guid fileId, CancellationToken cancellationToken) =>
+        QueryTrackingAsync(
+            persona, "Download Proof of delivery file", transportOrderNumber,
+            $"transport-orders/{Uri.EscapeDataString(transportOrderNumber)}/proof-of-delivery/files/{fileId}",
+            async (response, token) => new ShipperProofFileContent(
+                response.Content.Headers.ContentDisposition?.FileNameStar ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"') ?? fileId.ToString(),
+                response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream",
+                await response.Content.ReadAsByteArrayAsync(token)),
+            cancellationToken);
+
+    private static async Task<ShipperTrackingDetail> ReadDetailAsync(HttpResponseMessage response, CancellationToken cancellationToken) =>
+        ShipperTrackingFormat.ReadDetail(await response.Content.ReadAsStringAsync(cancellationToken));
+
+    /// <summary>
+    /// One tracking query as the Persona, in a span of its own. A failure, an answer it can't read and Norvia unreachable
+    /// are all answers, not errors: the screen keeps what it last had and shows the failure beside it.
+    /// </summary>
+    private async Task<TrackingAnswer<T>> QueryTrackingAsync<T>(
+        Persona persona,
+        string spanName,
+        string? transportOrderNumber,
+        string relativeUri,
+        Func<HttpResponseMessage, CancellationToken, Task<T>> read,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(persona);
+
+        using var span = activities.Source.StartActivity(spanName, ActivityKind.Internal);
+        TrackingAnswer<T> answer;
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(relativeUri, UriKind.Relative));
+            request.Headers.Add("Ocp-Apim-Subscription-Key", options.Value.SubscriptionKeyOf(persona.Id));
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await tokens.GetTokenAsync(persona.Id, cancellationToken));
+
+            using var response = await http.SendAsync(request, cancellationToken);
+            var correlationId = CorrelationIdOf(response);
+            if (response.IsSuccessStatusCode)
+            {
+                answer = TrackingAnswer.Found<T>(await read(response, cancellationToken), correlationId);
+            }
+            else
+            {
+                answer = ShipperTrackingFailures.Read<T>((int)response.StatusCode, await response.Content.ReadAsStringAsync(cancellationToken), correlationId);
+            }
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Unreachable, too slow, no token to call with, or an answer in no format we know: the Shipper sees none.
+            LogTrackingQueryFailed(exception, persona.Id.Value, spanName);
+            answer = TrackingAnswer.Unavailable<T>(ShipperTrackingFailures.UnavailableText);
+        }
+
+        var keys = new Dictionary<string, object?> { ["flow"] = "shipper-tracking", ["partyId"] = persona.PartyId };
+        foreach (var (key, value) in OutcomeOf(answer.Outcome))
+        {
+            keys[key] = value;
+        }
+
+        if (answer.MessageId is { } messageId)
+        {
+            keys["correlationId"] = messageId;
+        }
+
+        if (transportOrderNumber is not null)
+        {
+            keys["transportOrderNumber"] = transportOrderNumber;
+        }
+
+        using (logger.BeginScope(keys))
+        {
+            LogTrackingQueried(persona.Id.Value, spanName, answer.Outcome);
+        }
+
+        return answer;
+    }
+
+    private static Dictionary<string, object?> OutcomeOf(TrackingOutcome outcome) => outcome switch
+    {
+        TrackingOutcome.Found => new() { ["outcome"] = "Succeeded" },
+        TrackingOutcome.NotFound or TrackingOutcome.Refused => new() { ["outcome"] = "Refused" },
+        TrackingOutcome.Unavailable => new() { ["outcome"] = "Failed", ["failureCode"] = "TrackingUnavailable" },
+        _ => throw new ArgumentOutOfRangeException(nameof(outcome), outcome, "Every answer records its outcome."),
+    };
+
     private static Dictionary<string, object?> TrackingKeysOf(Persona persona, string carrierBookingNumber, string shipmentNumber, NorviaReply reply)
     {
         var keys = CarrierAnswerTracking.KeysOf(persona, carrierBookingNumber, shipmentNumber, reply.MessageId);
@@ -257,4 +363,10 @@ internal sealed partial class NorviaPartnerApiClient(
 
     [LoggerMessage(Level = LogLevel.Information, Message = "The Norvia Partner API replied to a Proof of delivery by Persona {PersonaId} for {CarrierBookingNumber}: {Result}")]
     private partial void LogProofOfDeliveryReplied(string personaId, string carrierBookingNumber, TrackingResult result);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "A tracking query ({Query}) by Persona {PersonaId} got no answer it could read")]
+    private partial void LogTrackingQueryFailed(Exception exception, string personaId, string query);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Norvia answered the tracking query ({Query}) by Persona {PersonaId}: {Outcome}")]
+    private partial void LogTrackingQueried(string personaId, string query, TrackingOutcome outcome);
 }

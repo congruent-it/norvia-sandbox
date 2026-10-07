@@ -1,3 +1,4 @@
+using Norvia.PartnerPortal.Domain.Personas;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Norvia.PartnerPortal.Application.CarrierBookings;
@@ -22,7 +23,7 @@ public sealed class BookingRequestsTests : PortalWebContext
     [Fact]
     public void Render_ListsEveryRequestWithWhatItAsks()
     {
-        Portal.ListCarrierBookingRequestsAsync("van-dijk-transport", Arg.Any<CancellationToken>()).Returns([Request()]);
+        Portal.ListCarrierBookingRequestsAsync(new PersonaId("van-dijk-transport"), Arg.Any<CancellationToken>()).Returns([Request()]);
 
         var row = RenderPage().FindAll("tbody tr").Should().ContainSingle().Subject;
 
@@ -35,7 +36,7 @@ public sealed class BookingRequestsTests : PortalWebContext
     [Fact]
     public void Render_ARequestWithAnAutomaticAnswerComingUp_SaysWhen()
     {
-        Portal.ListCarrierBookingRequestsAsync("van-dijk-transport", Arg.Any<CancellationToken>()).Returns(
+        Portal.ListCarrierBookingRequestsAsync(new PersonaId("van-dijk-transport"), Arg.Any<CancellationToken>()).Returns(
             [Request() with { AutoAnswerMode = CarrierAnswerMode.AutoConfirm, AutoAnswerDueAt = new DateTimeOffset(2026, 10, 2, 9, 0, 5, TimeSpan.Zero) }]);
 
         RenderPage().Find("tbody tr").TextContent.Should().Contain("Auto-confirms at 11:00:05");
@@ -44,7 +45,7 @@ public sealed class BookingRequestsTests : PortalWebContext
     [Fact]
     public void Render_ShowsTheCarriersAnswerMode_EvenWithNoRequests()
     {
-        Portal.ListCarrierBookingRequestsAsync("van-dijk-transport", Arg.Any<CancellationToken>()).Returns([]);
+        Portal.ListCarrierBookingRequestsAsync(new PersonaId("van-dijk-transport"), Arg.Any<CancellationToken>()).Returns([]);
 
         RenderPage().Find("[aria-label='Answer mode']").TextContent.Should().Contain("Save answer mode");
     }
@@ -52,7 +53,7 @@ public sealed class BookingRequestsTests : PortalWebContext
     [Fact]
     public void Render_ForACarrier_ShowsTheTrackingModeNextToTheAnswerMode()
     {
-        Portal.ListCarrierBookingRequestsAsync("van-dijk-transport", Arg.Any<CancellationToken>()).Returns([]);
+        Portal.ListCarrierBookingRequestsAsync(new PersonaId("van-dijk-transport"), Arg.Any<CancellationToken>()).Returns([]);
 
         RenderPage().Find("[aria-label='Tracking mode']").TextContent.Should().Contain("Save tracking mode");
     }
@@ -60,7 +61,7 @@ public sealed class BookingRequestsTests : PortalWebContext
     [Fact]
     public void Render_AsRequestsArrive_ShowsThemWithoutAReload()
     {
-        Portal.ListCarrierBookingRequestsAsync("van-dijk-transport", Arg.Any<CancellationToken>()).Returns([], [Request("CB-0000001")]);
+        Portal.ListCarrierBookingRequestsAsync(new PersonaId("van-dijk-transport"), Arg.Any<CancellationToken>()).Returns([], [Request("CB-0000001")]);
         var page = RenderPage();
         page.Find("[role=status]").TextContent.Should().Contain("hasn't asked");
 
@@ -72,7 +73,7 @@ public sealed class BookingRequestsTests : PortalWebContext
     [Fact]
     public void Render_WhenARefreshFails_KeepsWhatItShowed_AndTriesAgain()
     {
-        Portal.ListCarrierBookingRequestsAsync("van-dijk-transport", Arg.Any<CancellationToken>()).Returns(
+        Portal.ListCarrierBookingRequestsAsync(new PersonaId("van-dijk-transport"), Arg.Any<CancellationToken>()).Returns(
             _ => [Request("CB-0000001")],
             _ => throw new InvalidOperationException("The database is down."),
             _ => [Request("CB-0000001"), Request("CB-0000002")]);
@@ -90,19 +91,19 @@ public sealed class BookingRequestsTests : PortalWebContext
     [Fact]
     public async Task Dispose_StopsTheRefreshing()
     {
-        Portal.ListCarrierBookingRequestsAsync("van-dijk-transport", Arg.Any<CancellationToken>()).Returns([]);
+        Portal.ListCarrierBookingRequestsAsync(new PersonaId("van-dijk-transport"), Arg.Any<CancellationToken>()).Returns([]);
         var page = RenderPage();
 
         await page.Instance.DisposeAsync();
         Time.Advance(BookingRequests.RefreshInterval);
 
-        await Portal.Received(1).ListCarrierBookingRequestsAsync("van-dijk-transport", Arg.Any<CancellationToken>());
+        await Portal.Received(1).ListCarrierBookingRequestsAsync(new PersonaId("van-dijk-transport"), Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public void Render_WithNoRequests_SaysSo()
     {
-        Portal.ListCarrierBookingRequestsAsync("van-dijk-transport", Arg.Any<CancellationToken>()).Returns([]);
+        Portal.ListCarrierBookingRequestsAsync(new PersonaId("van-dijk-transport"), Arg.Any<CancellationToken>()).Returns([]);
 
         RenderPage().Find("[role=status]").TextContent.Should().Contain("Norvia hasn't asked Van Dijk Transport to carry anything yet.");
     }
@@ -110,7 +111,7 @@ public sealed class BookingRequestsTests : PortalWebContext
     [Fact]
     public void Render_WhileLoading_SaysSo()
     {
-        Portal.ListCarrierBookingRequestsAsync("van-dijk-transport", Arg.Any<CancellationToken>())
+        Portal.ListCarrierBookingRequestsAsync(new PersonaId("van-dijk-transport"), Arg.Any<CancellationToken>())
             .Returns(new TaskCompletionSource<IReadOnlyList<CarrierBookingRequestView>>().Task);
 
         RenderPage().Find("[role=status]").TextContent.Should().Contain("Loading the booking requests");
@@ -119,7 +120,7 @@ public sealed class BookingRequestsTests : PortalWebContext
     [Fact]
     public void Render_WhenTheRequestsCantBeLoaded_SaysSo()
     {
-        Portal.ListCarrierBookingRequestsAsync("van-dijk-transport", Arg.Any<CancellationToken>())
+        Portal.ListCarrierBookingRequestsAsync(new PersonaId("van-dijk-transport"), Arg.Any<CancellationToken>())
             .Returns<IReadOnlyList<CarrierBookingRequestView>>(_ => throw new InvalidOperationException("The database is down."));
 
         RenderPage().Find("[role=alert]").TextContent.Should().Contain("The booking requests couldn't be loaded.");

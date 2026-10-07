@@ -97,7 +97,7 @@
         _saved = false;
         try
         {
-            _form = await Portal.GetCarrierAnswerSettingsAsync(PersonaId, CancellationToken.None) is { } settings ? AnswerModeForm.From(settings) : null;
+            _form = await Portal.GetCarrierAnswerSettingsAsync(new PersonaId(PersonaId), CancellationToken.None) is { } settings ? AnswerModeForm.From(settings) : null;
             _loadFailed = _form is null;
         }
         catch (Exception exception)
@@ -114,7 +114,7 @@
         _saveFailed = false;
         try
         {
-            if (await Portal.ChangeCarrierAnswerSettingsAsync(PersonaId, _form!.ToSettings(), CancellationToken.None) is { } settings)
+            if (await Portal.ChangeCarrierAnswerSettingsAsync(new PersonaId(PersonaId), _form!.ToSettings(), CancellationToken.None) is { } settings)
             {
                 _form = AnswerModeForm.From(settings);
                 _saved = true;

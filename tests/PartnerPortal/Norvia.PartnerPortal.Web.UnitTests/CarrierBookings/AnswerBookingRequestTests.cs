@@ -1,3 +1,4 @@
+using Norvia.PartnerPortal.Domain.Personas;
 using Microsoft.Extensions.DependencyInjection;
 using Norvia.PartnerPortal.Application.CarrierBookings;
 using Norvia.PartnerPortal.Application.CarrierBookings.Answer;
@@ -31,12 +32,12 @@ public sealed class AnswerBookingRequestTests : PortalWebContext
 
     private IRenderedComponent<BookingRequests> RenderInbox(params CarrierBookingRequestView[] requests)
     {
-        Portal.ListCarrierBookingRequestsAsync("van-dijk-transport", Arg.Any<CancellationToken>()).Returns(requests);
+        Portal.ListCarrierBookingRequestsAsync(new PersonaId("van-dijk-transport"), Arg.Any<CancellationToken>()).Returns(requests);
         return Render<BookingRequests>(parameters => parameters.Add(page => page.PersonaId, "van-dijk-transport"));
     }
 
     private void NorviaReplies(CarrierBookingRequestView after, NorviaReply? reply, bool recorded = true) =>
-        Portal.AnswerCarrierBookingAsync("van-dijk-transport", "CB-0000001", Arg.Any<CarrierAnswer>(), Arg.Any<CancellationToken>())
+        Portal.AnswerCarrierBookingAsync(new PersonaId("van-dijk-transport"), "CB-0000001", Arg.Any<CarrierAnswer>(), Arg.Any<CancellationToken>())
             .Returns(new AnsweredCarrierBooking(after, reply, recorded));
 
     private static AngleSharp.Dom.IElement Panel(IRenderedComponent<BookingRequests> page, string heading) =>
@@ -88,7 +89,7 @@ public sealed class AnswerBookingRequestTests : PortalWebContext
         Panel(page, "Confirm CB-0000001").QuerySelector("form")!.Submit();
 
         page.WaitForAssertion(() => Panel(page, "Confirm CB-0000001").TextContent.Should().Contain(ConfirmForm.ReferenceRequired));
-        Portal.DidNotReceive().AnswerCarrierBookingAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CarrierAnswer>(), Arg.Any<CancellationToken>());
+        Portal.DidNotReceive().AnswerCarrierBookingAsync(Arg.Any<PersonaId>(), Arg.Any<string>(), Arg.Any<CarrierAnswer>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -105,7 +106,7 @@ public sealed class AnswerBookingRequestTests : PortalWebContext
         panel.QuerySelector("form")!.Submit();
 
         Portal.Received(1).AnswerCarrierBookingAsync(
-            "van-dijk-transport",
+            new PersonaId("van-dijk-transport"),
             "CB-0000001",
             Arg.Is<CarrierAnswer>(answer => answer is CarrierAnswer.Confirmation
                 && ((CarrierAnswer.Confirmation)answer).BookingReference == "VDT-77812"
@@ -143,7 +144,7 @@ public sealed class AnswerBookingRequestTests : PortalWebContext
         Panel(page, "Reject CB-0000001").QuerySelector("form")!.Submit();
 
         page.WaitForAssertion(() => Panel(page, "Reject CB-0000001").TextContent.Should().Contain(RejectForm.TextRequired));
-        Portal.DidNotReceive().AnswerCarrierBookingAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CarrierAnswer>(), Arg.Any<CancellationToken>());
+        Portal.DidNotReceive().AnswerCarrierBookingAsync(Arg.Any<PersonaId>(), Arg.Any<string>(), Arg.Any<CarrierAnswer>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -159,7 +160,7 @@ public sealed class AnswerBookingRequestTests : PortalWebContext
         panel.QuerySelector("form")!.Submit();
 
         Portal.Received(1).AnswerCarrierBookingAsync(
-            "van-dijk-transport",
+            new PersonaId("van-dijk-transport"),
             "CB-0000001",
             Arg.Is<CarrierAnswer>(answer => answer is CarrierAnswer.Rejection
                 && ((CarrierAnswer.Rejection)answer).Reason == CarrierRejectionReason.NoCapacity
@@ -218,7 +219,7 @@ public sealed class AnswerBookingRequestTests : PortalWebContext
     [Fact]
     public void Answer_WhenThePortalItselfFails_SaysSo_AndKeepsTheForm()
     {
-        Portal.AnswerCarrierBookingAsync("van-dijk-transport", "CB-0000001", Arg.Any<CarrierAnswer>(), Arg.Any<CancellationToken>())
+        Portal.AnswerCarrierBookingAsync(new PersonaId("van-dijk-transport"), "CB-0000001", Arg.Any<CarrierAnswer>(), Arg.Any<CancellationToken>())
             .Returns<AnsweredCarrierBooking?>(_ => throw new InvalidOperationException("The database is down."));
         var page = RenderInbox(Open());
         page.Find("[aria-label=\"Reject CB-0000001\"]").Click();
@@ -234,7 +235,7 @@ public sealed class AnswerBookingRequestTests : PortalWebContext
     {
         var notFound = false;
         Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().OnNotFound += (_, _) => notFound = true;
-        Portal.AnswerCarrierBookingAsync("van-dijk-transport", "CB-0000001", Arg.Any<CarrierAnswer>(), Arg.Any<CancellationToken>())
+        Portal.AnswerCarrierBookingAsync(new PersonaId("van-dijk-transport"), "CB-0000001", Arg.Any<CarrierAnswer>(), Arg.Any<CancellationToken>())
             .Returns((AnsweredCarrierBooking?)null);
         var page = RenderInbox(Open());
         page.Find("[aria-label=\"Reject CB-0000001\"]").Click();
@@ -253,7 +254,7 @@ public sealed class AnswerBookingRequestTests : PortalWebContext
         page.FindAll("fluent-button").Single(button => button.TextContent.Trim() == "Cancel").Click();
 
         page.FindAll("section").Should().BeEmpty();
-        Portal.DidNotReceive().AnswerCarrierBookingAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CarrierAnswer>(), Arg.Any<CancellationToken>());
+        Portal.DidNotReceive().AnswerCarrierBookingAsync(Arg.Any<PersonaId>(), Arg.Any<string>(), Arg.Any<CarrierAnswer>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -276,7 +277,7 @@ public sealed class AnswerBookingRequestTests : PortalWebContext
     public void Refresh_ARequestTheCarrierWasAnsweringThatNorviaClosed_TakesItsFormAway()
     {
         var open = Open();
-        Portal.ListCarrierBookingRequestsAsync("van-dijk-transport", Arg.Any<CancellationToken>())
+        Portal.ListCarrierBookingRequestsAsync(new PersonaId("van-dijk-transport"), Arg.Any<CancellationToken>())
             .Returns([open], [Closed(open, CarrierBookingRequestStatus.WithdrawnByNorvia)]);
         var page = Render<BookingRequests>(parameters => parameters.Add(p => p.PersonaId, "van-dijk-transport"));
         page.Find("[aria-label=\"Confirm CB-0000001\"]").Click();

@@ -1,3 +1,4 @@
+using Norvia.PartnerPortal.Domain.Personas;
 using Ardalis.SharedKernel;
 using Norvia.PartnerPortal.Application.CarrierShipments.List;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
@@ -16,7 +17,7 @@ public sealed class ListCarrierShipmentsHandlerTests
         var repository = Substitute.For<IReadRepository<CarrierBookingRequest>>();
         repository.ListAsync(Arg.Is<CarrierShipmentsOfPersonaSpec>(spec => spec != null), Arg.Any<CancellationToken>()).Returns([request]);
 
-        var shipments = await new ListCarrierShipmentsHandler(repository).Handle(new ListCarrierShipmentsQuery("van-dijk-transport"), CancellationToken.None);
+        var shipments = await new ListCarrierShipmentsHandler(repository).Handle(new ListCarrierShipmentsQuery(new PersonaId("van-dijk-transport")), CancellationToken.None);
 
         var shipment = shipments.Should().ContainSingle().Subject;
         shipment.CarrierBookingNumber.Should().Be("CB-0000001");

@@ -1,0 +1,186 @@
+@page "/personas/{PersonaId}/tracking"
+@* Interactive, and not prerendered, like the other pages: it polls, and Fluent UI's components don't survive static streaming rendering. *@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inherits ShipperTrackingPage<IReadOnlyList<ShipperTrackingSummary>>
+@inject NavigationManager Navigation
+@inject ILogger<TrackedOrders> Logger
+@using Norvia.PartnerPortal.Application.ShipperTracking
+
+<PageTitle>Tracking · @(Persona?.DisplayName ?? PersonaId) · Partner portal</PageTitle>
+
+<h1>Tracking</h1>
+
+@if (LoadFailed)
+{
+    <div role="alert">
+        <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+            The tracking couldn't be loaded. Reload the page to try again.
+        </FluentMessageBar>
+    </div>
+}
+else if (Persona is null)
+{
+    <Loading Text="Loading the tracking…" />
+}
+else
+{
+    <p class="mb-6">Where @Persona.DisplayName's Transport Orders stand, newest collection first. The screen asks Norvia again every @PollSeconds seconds. Times are local to the place they are about.</p>
+
+    <form role="search" class="mb-6 flex max-w-3xl flex-wrap items-end gap-4" @onsubmit="SearchAsync" @onsubmit:preventDefault>
+        <div class="grow">
+            <label for="tracking-search" class="lux-label">Transport Order number or Shipper reference</label>
+            <input id="tracking-search" type="search" class="lux-input" @bind="_search" @bind:event="oninput" />
+        </div>
+        <FluentButton Type="ButtonType.Submit" Appearance="Appearance.Accent">Search</FluentButton>
+    </form>
+    @if (_searchText is not null)
+    {
+        <div role="status" class="mb-4">
+            <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">@_searchText</FluentMessageBar>
+        </div>
+    }
+
+    <div role="group" aria-label="Filters" class="mb-6 grid max-w-3xl gap-4 sm:grid-cols-3">
+        <div>
+            <label for="tracking-status" class="lux-label">Tracking status</label>
+            <select id="tracking-status" class="lux-input" @bind="_status" @bind:after="FilterChangedAsync">
+                <option value="">All</option>
+                @foreach (var status in Enum.GetValues<ShipperTrackingStatus>())
+                {
+                    <option value="@status">@TrackingText.Status(status)</option>
+                }
+            </select>
+        </div>
+        <div>
+            <label for="tracking-from" class="lux-label">Collection from</label>
+            <input id="tracking-from" type="date" class="lux-input" @bind="_from" @bind:after="FilterChangedAsync" />
+        </div>
+        <div>
+            <label for="tracking-to" class="lux-label">Collection to</label>
+            <input id="tracking-to" type="date" class="lux-input" @bind="_to" @bind:after="FilterChangedAsync" />
+        </div>
+    </div>
+
+    <FetchStatus FetchedAt="Answer.FetchedAt" Error="@Answer.Error" ErrorMessageId="@Answer.ErrorMessageId" />
+
+    @if (!Answer.HasAnswered)
+    {
+        @if (Answer.Error is null)
+        {
+            <Loading Text="Loading the Transport Orders…" />
+        }
+    }
+    else if (Answer.Value is not { Count: > 0 } orders)
+    {
+        <div role="status">
+            <FluentMessageBar Intent="MessageIntent.Info" AllowDismiss="false">
+                @(_page > 1 ? "There are no more Transport Orders." : "There are no Transport Orders to show.")
+            </FluentMessageBar>
+        </div>
+    }
+    else
+    {
+        <FluentDataGrid Items="orders.AsQueryable()" TGridItem="ShipperTrackingSummary" Class="lux-table" aria-label="Transport Orders" MultiLine="true">
+            <TemplateColumn Title="Transport Order">
+                <a href="@PersonaChoice.TrackingPath(PersonaId, context.TransportOrderNumber)">@context.TransportOrderNumber</a>
+            </TemplateColumn>
+            <PropertyColumn Title="Shipper reference" Property="@(order => order.ShipperReference ?? "")" />
+            <PropertyColumn Title="From" Property="@(order => order.Pickup.ToString())" />
+            <PropertyColumn Title="To" Property="@(order => order.Receiver.ToString())" />
+            <PropertyColumn Title="Tracking status" Property="@(order => TrackingText.Status(order.Status))" />
+            <PropertyColumn Title="ETA" Property="@(order => TrackingText.Time(order.Eta))" />
+            <PropertyColumn Title="Last update" Property="@(order => TrackingText.Time(order.LastUpdate))" />
+        </FluentDataGrid>
+    }
+
+    @if (_page > 1 || Answer.Value is { Count: ShipperTrackingFilter.PageSize })
+    {
+        <nav aria-label="Pages" class="mt-4 flex items-center gap-4">
+            <FluentButton Appearance="Appearance.Outline" Disabled="_page <= 1" OnClick="PreviousPageAsync">Previous</FluentButton>
+            <span>Page @_page</span>
+            <FluentButton Appearance="Appearance.Outline" Disabled="Answer.Value is not { Count: ShipperTrackingFilter.PageSize }" OnClick="NextPageAsync">Next</FluentButton>
+        </nav>
+    }
+}
+
+@code {
+    private string _status = string.Empty;
+    private DateTime? _from;
+    private DateTime? _to;
+    private int _page = 1;
+    private string _search = string.Empty;
+    private string? _searchText;
+
+    private int PollSeconds => (int)Math.Round(PollInterval.TotalSeconds);
+
+    private ShipperTrackingFilter Filter => new(
+        Enum.TryParse<ShipperTrackingStatus>(_status, out var status) ? status : null,
+        _from is { } from ? DateOnly.FromDateTime(from) : null,
+        _to is { } to ? DateOnly.FromDateTime(to) : null,
+        _page);
+
+    protected override Task<TrackingAnswer<IReadOnlyList<ShipperTrackingSummary>>> AskAsync(CancellationToken cancellationToken) =>
+        Portal.ListTrackedTransportOrdersAsync(PersonaKey, Filter, cancellationToken);
+
+    private Task FilterChangedAsync()
+    {
+        _page = 1;
+        return FetchAsync(CancellationToken.None);
+    }
+
+    private Task PreviousPageAsync()
+    {
+        _page--;
+        return FetchAsync(CancellationToken.None);
+    }
+
+    private Task NextPageAsync()
+    {
+        _page++;
+        return FetchAsync(CancellationToken.None);
+    }
+
+    private async Task SearchAsync()
+    {
+        _searchText = null;
+        var term = _search.Trim();
+        if (term.Length == 0)
+        {
+            return;
+        }
+
+        if (TransportOrderNumber.IsMatch(term))
+        {
+            Navigation.NavigateTo(PersonaChoice.TrackingPath(PersonaId, term.ToUpperInvariant()));
+            return;
+        }
+
+        var found = await FindAsync(term);
+        if (found.IsFound)
+        {
+            Navigation.NavigateTo(PersonaChoice.TrackingPath(PersonaId, found.Value!.TransportOrderNumber));
+        }
+        else
+        {
+            _searchText = found.Outcome == TrackingOutcome.NotFound
+                ? $"No Transport Order has the number or Shipper reference '{term}'."
+                : found.Text;
+        }
+    }
+
+    private async Task<TrackingAnswer<ShipperTrackingDetail>> FindAsync(string reference)
+    {
+        try
+        {
+            return await Portal.FindTrackedTransportOrderAsync(PersonaKey, reference, CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            PageLog.TrackingLoadFailed(Logger, exception, PersonaId);
+            return TrackingAnswer.Unavailable<ShipperTrackingDetail>("The search couldn't be made.");
+        }
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex TransportOrderNumber = new(
+        "^TO-[0-9]{7}$", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+}

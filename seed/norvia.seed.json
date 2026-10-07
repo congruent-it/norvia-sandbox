@@ -168,10 +168,12 @@
   ],
   "personas": [
     {
+      "$comment": "A Shipper Persona's tracking screen asks Norvia again every few seconds while it is open (P8). 'shipper.trackingPollSeconds' sets that per Persona; one without it polls every 5 seconds.",
       "id": "brouwer-dranken",
       "displayName": "Brouwer Dranken",
       "party": { "type": "Shipper", "id": "SHP-0001" },
-      "clientAppRegistration": "norvia-persona-brouwer-dranken"
+      "clientAppRegistration": "norvia-persona-brouwer-dranken",
+      "shipper": { "trackingPollSeconds": 3 }
     },
     {
       "$comment": "Every active Shipper has a Persona, so the Shipper notification Logic App has an endpoint to call for each (P7). This one has no address book yet.",

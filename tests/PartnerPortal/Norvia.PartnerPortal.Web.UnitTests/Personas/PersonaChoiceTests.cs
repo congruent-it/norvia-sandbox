@@ -1,3 +1,4 @@
+using Norvia.PartnerPortal.Domain.Personas;
 using Microsoft.AspNetCore.Http;
 using Norvia.PartnerPortal.Web.Personas;
 
@@ -46,5 +47,12 @@ public sealed class PersonaChoiceTests
         PersonaChoice.BookingsPath("brouwer-dranken").Should().Be("/personas/brouwer-dranken/bookings");
         PersonaChoice.NotificationsPath("brouwer-dranken").Should().Be("/personas/brouwer-dranken/notifications");
         PersonaChoice.ShipmentsPath("van-dijk-transport").Should().Be("/personas/van-dijk-transport/shipments");
+    }
+
+    [Fact]
+    public void TrackingPath_IsThePersonasTrackingScreen_AndATransportOrdersDetailUnderIt()
+    {
+        PersonaChoice.TrackingPath("brouwer-dranken").Should().Be("/personas/brouwer-dranken/tracking");
+        PersonaChoice.TrackingPath("brouwer-dranken", "TO-0000042").Should().Be("/personas/brouwer-dranken/tracking/TO-0000042");
     }
 }

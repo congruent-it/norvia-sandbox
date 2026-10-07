@@ -39,7 +39,7 @@ public sealed class AnswerCarrierBookingHandlerTests
     }
 
     private ValueTask<Result<AnsweredCarrierBooking>> Answer(CarrierAnswer answer, string persona = "van-dijk-transport") =>
-        _handler.Handle(new AnswerCarrierBookingCommand(persona, "CB-0000001", answer), CancellationToken.None);
+        _handler.Handle(new AnswerCarrierBookingCommand(new PersonaId(persona), "CB-0000001", answer), CancellationToken.None);
 
     private void NorviaReplies(NorviaReply reply) =>
         _partnerApi.AnswerAsync(Samples.VanDijkTransport, "CB-0000001", "SH-0000042", Arg.Any<CarrierAnswer>(), Arg.Any<CancellationToken>()).Returns(reply);
@@ -198,7 +198,7 @@ public sealed class AnswerCarrierBookingHandlerTests
         _repository.FirstOrDefaultAsync(Arg.Is<CarrierBookingRequestToAnswerSpec>(spec => spec != null), Arg.Any<CancellationToken>()).Returns(request);
         _partnerApi.AnswerAsync(Samples.KesslerSpedition, "CB-0000002", "SH-0000043", Arg.Any<CarrierAnswer>(), Arg.Any<CancellationToken>()).Returns(NorviaReply.Recorded("answer-1"));
 
-        await _handler.Handle(new AnswerCarrierBookingCommand("kessler-spedition", "CB-0000002", Confirmation), CancellationToken.None);
+        await _handler.Handle(new AnswerCarrierBookingCommand(new PersonaId("kessler-spedition"), "CB-0000002", Confirmation), CancellationToken.None);
 
         request.AutoProgressDueAt.Should().Be(Samples.Now.AddSeconds(5));
         _autoProgress.Received(1).ShipmentConfirmed();

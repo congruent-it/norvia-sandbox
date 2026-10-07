@@ -32,6 +32,10 @@
                          class="text-muted no-underline hover:text-primary" ActiveClass="!text-primary">
                     My bookings
                 </NavLink>
+                <NavLink href="@PersonaChoice.TrackingPath(_current.Id)" Match="NavLinkMatch.Prefix"
+                         class="text-muted no-underline hover:text-primary" ActiveClass="!text-primary">
+                    Tracking
+                </NavLink>
                 <NavLink href="@PersonaChoice.NotificationsPath(_current.Id)" Match="NavLinkMatch.All"
                          class="text-muted no-underline hover:text-primary" ActiveClass="!text-primary">
                     Notifications

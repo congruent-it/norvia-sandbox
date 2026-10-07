@@ -75,7 +75,7 @@ else
                 return;
             }
 
-            _notifications = await Portal.ListShipperNotificationsAsync(PersonaId, CancellationToken.None);
+            _notifications = await Portal.ListShipperNotificationsAsync(new PersonaId(PersonaId), CancellationToken.None);
         }
         catch (Exception exception)
         {
@@ -107,7 +107,7 @@ else
 
                 try
                 {
-                    _notifications = await Portal.ListShipperNotificationsAsync(PersonaId, cancellationToken);
+                    _notifications = await Portal.ListShipperNotificationsAsync(new PersonaId(PersonaId), cancellationToken);
                     await InvokeAsync(StateHasChanged);
                 }
                 catch (Exception exception) when (!cancellationToken.IsCancellationRequested)

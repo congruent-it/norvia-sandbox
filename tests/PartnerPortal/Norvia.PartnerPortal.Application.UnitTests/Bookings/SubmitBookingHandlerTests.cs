@@ -32,7 +32,7 @@ public sealed class SubmitBookingHandlerTests
         _partnerApi.SubmitAsync(Samples.BrouwerDranken, Arg.Any<BookingRequest>(), Arg.Any<CancellationToken>())
             .Returns(NorviaAnswer.Accepted("TO-0000042", "corr-1"));
 
-        var result = await _handler.Handle(new SubmitBookingCommand("brouwer-dranken", Samples.Booking()), CancellationToken.None);
+        var result = await _handler.Handle(new SubmitBookingCommand(new PersonaId("brouwer-dranken"), Samples.Booking()), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Result.Should().Be(BookingResult.Accepted);
@@ -47,7 +47,7 @@ public sealed class SubmitBookingHandlerTests
         var booking = Samples.Booking();
         _partnerApi.SubmitAsync(Arg.Any<Persona>(), Arg.Any<BookingRequest>(), Arg.Any<CancellationToken>()).Returns(NorviaAnswer.NotReceived(null));
 
-        await _handler.Handle(new SubmitBookingCommand("brouwer-dranken", booking), CancellationToken.None);
+        await _handler.Handle(new SubmitBookingCommand(new PersonaId("brouwer-dranken"), booking), CancellationToken.None);
 
         await _partnerApi.Received(1).SubmitAsync(Samples.BrouwerDranken, booking, Arg.Any<CancellationToken>());
     }
@@ -58,7 +58,7 @@ public sealed class SubmitBookingHandlerTests
         RejectionReason[] reasons = [new("QuantityInvalid", "Goods line 1 needs a quantity of at least 1."), new("WeightInvalid", "Goods line 1 needs a weight greater than 0 kg.")];
         _partnerApi.SubmitAsync(Arg.Any<Persona>(), Arg.Any<BookingRequest>(), Arg.Any<CancellationToken>()).Returns(NorviaAnswer.Rejected(reasons, "corr-2"));
 
-        var result = await _handler.Handle(new SubmitBookingCommand("brouwer-dranken", Samples.Booking()), CancellationToken.None);
+        var result = await _handler.Handle(new SubmitBookingCommand(new PersonaId("brouwer-dranken"), Samples.Booking()), CancellationToken.None);
 
         result.Value.Result.Should().Be(BookingResult.Rejected);
         result.Value.Reasons.Should().Equal(reasons);
@@ -71,7 +71,7 @@ public sealed class SubmitBookingHandlerTests
     {
         _partnerApi.SubmitAsync(Arg.Any<Persona>(), Arg.Any<BookingRequest>(), Arg.Any<CancellationToken>()).Returns(answer);
 
-        await _handler.Handle(new SubmitBookingCommand("brouwer-dranken", Samples.Booking("BD-7")), CancellationToken.None);
+        await _handler.Handle(new SubmitBookingCommand(new PersonaId("brouwer-dranken"), Samples.Booking("BD-7")), CancellationToken.None);
 
         await _repository.Received(1).AddAsync(
             Arg.Is<Booking>(booking =>
@@ -88,7 +88,7 @@ public sealed class SubmitBookingHandlerTests
     {
         _partnerApi.SubmitAsync(Arg.Any<Persona>(), Arg.Any<BookingRequest>(), Arg.Any<CancellationToken>()).Returns(answer);
 
-        var result = await _handler.Handle(new SubmitBookingCommand("brouwer-dranken", Samples.Booking()), CancellationToken.None);
+        var result = await _handler.Handle(new SubmitBookingCommand(new PersonaId("brouwer-dranken"), Samples.Booking()), CancellationToken.None);
 
         result.Value.Recorded.Should().BeTrue();
     }
@@ -101,7 +101,7 @@ public sealed class SubmitBookingHandlerTests
             .Returns(NorviaAnswer.Accepted("TO-0000042", "corr-1"));
         _repository.AddAsync(Arg.Any<Booking>(), Arg.Any<CancellationToken>()).Returns<Booking>(_ => throw new InvalidOperationException("Connection Timeout Expired."));
 
-        var result = await _handler.Handle(new SubmitBookingCommand("brouwer-dranken", Samples.Booking()), CancellationToken.None);
+        var result = await _handler.Handle(new SubmitBookingCommand(new PersonaId("brouwer-dranken"), Samples.Booking()), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Result.Should().Be(BookingResult.Accepted);
@@ -125,7 +125,7 @@ public sealed class SubmitBookingHandlerTests
             throw new OperationCanceledException(cancellation.Token);
         });
 
-        var handling = async () => await _handler.Handle(new SubmitBookingCommand("brouwer-dranken", Samples.Booking()), cancellation.Token);
+        var handling = async () => await _handler.Handle(new SubmitBookingCommand(new PersonaId("brouwer-dranken"), Samples.Booking()), cancellation.Token);
 
         await handling.Should().ThrowAsync<OperationCanceledException>();
     }
@@ -142,7 +142,7 @@ public sealed class SubmitBookingHandlerTests
     [Fact]
     public async Task Handle_UnknownPersona_IsNotFound_AndSendsNothing()
     {
-        var result = await _handler.Handle(new SubmitBookingCommand("nobody", Samples.Booking()), CancellationToken.None);
+        var result = await _handler.Handle(new SubmitBookingCommand(new PersonaId("nobody"), Samples.Booking()), CancellationToken.None);
 
         result.Status.Should().Be(ResultStatus.NotFound);
         await _partnerApi.DidNotReceive().SubmitAsync(Arg.Any<Persona>(), Arg.Any<BookingRequest>(), Arg.Any<CancellationToken>());

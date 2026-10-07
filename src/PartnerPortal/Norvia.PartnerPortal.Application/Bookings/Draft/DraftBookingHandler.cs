@@ -12,7 +12,7 @@ public sealed class DraftBookingHandler(IPersonaDirectory personas, TimeProvider
     {
         ArgumentNullException.ThrowIfNull(query);
 
-        if (personas.Find(new PersonaId(query.PersonaId)) is not { } persona)
+        if (personas.Find(query.PersonaId) is not { } persona)
         {
             return ValueTask.FromResult<Result<BookingRequest>>(Result.NotFound($"There is no Persona '{query.PersonaId}'."));
         }

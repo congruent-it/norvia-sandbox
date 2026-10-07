@@ -1,3 +1,4 @@
+using Norvia.PartnerPortal.Domain.Personas;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Norvia.PartnerPortal.Application.Bookings;
@@ -11,7 +12,7 @@ public sealed class MyBookingsTests : PortalWebContext
     [Fact]
     public void Render_ListsEveryBookingWithNorviasAnswer()
     {
-        Portal.ListBookingsAsync("brouwer-dranken", Arg.Any<CancellationToken>()).Returns(
+        Portal.ListBookingsAsync(new PersonaId("brouwer-dranken"), Arg.Any<CancellationToken>()).Returns(
         [
             Samples.Answered(NorviaAnswer.Accepted("TO-0000042", "corr-1"), "BD-1"),
             Samples.Answered(NorviaAnswer.Rejected([new RejectionReason("QuantityInvalid", "Goods line 1 needs a quantity of at least 1.")], "corr-2"), "BD-2"),
@@ -29,7 +30,7 @@ public sealed class MyBookingsTests : PortalWebContext
     [Fact]
     public void Render_WithNoBookings_SaysSo_AndLinksToTheForm()
     {
-        Portal.ListBookingsAsync("brouwer-dranken", Arg.Any<CancellationToken>()).Returns([]);
+        Portal.ListBookingsAsync(new PersonaId("brouwer-dranken"), Arg.Any<CancellationToken>()).Returns([]);
 
         var page = RenderPage();
 
@@ -40,7 +41,7 @@ public sealed class MyBookingsTests : PortalWebContext
     [Fact]
     public void Render_WhileLoading_SaysSo()
     {
-        Portal.ListBookingsAsync("brouwer-dranken", Arg.Any<CancellationToken>()).Returns(new TaskCompletionSource<IReadOnlyList<BookingView>>().Task);
+        Portal.ListBookingsAsync(new PersonaId("brouwer-dranken"), Arg.Any<CancellationToken>()).Returns(new TaskCompletionSource<IReadOnlyList<BookingView>>().Task);
 
         RenderPage().Find("[role=status]").TextContent.Should().Contain("Loading the bookings");
     }
@@ -48,7 +49,7 @@ public sealed class MyBookingsTests : PortalWebContext
     [Fact]
     public void Render_WhenTheBookingsCantBeLoaded_SaysSo()
     {
-        Portal.ListBookingsAsync("brouwer-dranken", Arg.Any<CancellationToken>()).Returns<IReadOnlyList<BookingView>>(_ => throw new InvalidOperationException("The database is down."));
+        Portal.ListBookingsAsync(new PersonaId("brouwer-dranken"), Arg.Any<CancellationToken>()).Returns<IReadOnlyList<BookingView>>(_ => throw new InvalidOperationException("The database is down."));
 
         RenderPage().Find("[role=alert]").TextContent.Should().Contain("The bookings couldn't be loaded.");
     }

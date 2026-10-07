@@ -109,6 +109,11 @@ Each Shipper Persona gets a **tracking screen**:
 
 While the screen is open, it polls the API every few seconds. The interval is a Partner portal setting per Persona. Each poll is a real API Management call, so a Carrier in auto-progress (P5) visibly moves the Shipper's screen along, until something stops it.
 
+- **The interval** is `shipper.trackingPollSeconds` of the Persona in the seed file, at least 1 second, and 5 seconds for a Persona that sets none. A poll starts its wait when the last one finished, so a slow answer never piles polls up.
+- **Times** are shown as the API returns them: local to the place they are about, with no conversion in the portal.
+- **A Proof of delivery file** downloads through the portal (`/personas/{id}/tracking/{Transport Order number}/proof-of-delivery/files/{file ID}`), which fetches it from API Management as the Persona, so the Persona's token and subscription key never reach the browser.
+- **On an error** (the portal can't reach API Management, or it answers with a gateway error, a refusal or an answer in no known format) the screen keeps the last answer, shows when it was fetched and shows the error with Norvia's reference when there is one. A Transport Order the API says isn't there is an answer, not an error.
+
 The notification inbox from P7 stays where it is. The tracking screen doesn't show notifications.
 
 ## TMS API

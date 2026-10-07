@@ -11,7 +11,7 @@ public sealed class ListBookingsHandler(IReadRepository<Booking> repository) : I
     {
         ArgumentNullException.ThrowIfNull(query);
 
-        var bookings = await repository.ListAsync(new BookingsOfPersonaSpec(new PersonaId(query.PersonaId)), cancellationToken);
+        var bookings = await repository.ListAsync(new BookingsOfPersonaSpec(query.PersonaId), cancellationToken);
 
         return [.. bookings.Select(BookingView.From)];
     }

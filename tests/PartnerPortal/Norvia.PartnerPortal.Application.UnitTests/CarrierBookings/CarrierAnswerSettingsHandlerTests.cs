@@ -20,10 +20,10 @@ public sealed class CarrierAnswerSettingsHandlerTests
     }
 
     private ValueTask<Result<CarrierAnswerSettingsView>> Get(string persona) =>
-        new GetCarrierAnswerSettingsHandler(_readRepository, _personas).Handle(new GetCarrierAnswerSettingsQuery(persona), CancellationToken.None);
+        new GetCarrierAnswerSettingsHandler(_readRepository, _personas).Handle(new GetCarrierAnswerSettingsQuery(new PersonaId(persona)), CancellationToken.None);
 
     private ValueTask<Result<CarrierAnswerSettingsView>> Change(string persona, CarrierAnswerMode mode, int delaySeconds, CarrierRejectionReason reason = CarrierRejectionReason.NoCapacity) =>
-        new ChangeCarrierAnswerSettingsHandler(_repository, _personas).Handle(new ChangeCarrierAnswerSettingsCommand(persona, mode, reason, delaySeconds), CancellationToken.None);
+        new ChangeCarrierAnswerSettingsHandler(_repository, _personas).Handle(new ChangeCarrierAnswerSettingsCommand(new PersonaId(persona), mode, reason, delaySeconds), CancellationToken.None);
 
     [Fact]
     public async Task Get_ForAPersonaNeverChanged_IsTheSeedFilesDefault()

@@ -85,7 +85,7 @@
         _saved = false;
         try
         {
-            _form = await Portal.GetCarrierTrackingSettingsAsync(PersonaId, CancellationToken.None) is { } settings ? TrackingModeForm.From(settings) : null;
+            _form = await Portal.GetCarrierTrackingSettingsAsync(new PersonaId(PersonaId), CancellationToken.None) is { } settings ? TrackingModeForm.From(settings) : null;
             _loadFailed = _form is null;
         }
         catch (Exception exception)
@@ -102,7 +102,7 @@
         _saveFailed = false;
         try
         {
-            if (await Portal.ChangeCarrierTrackingSettingsAsync(PersonaId, _form!.ToSettings(), CancellationToken.None) is { } settings)
+            if (await Portal.ChangeCarrierTrackingSettingsAsync(new PersonaId(PersonaId), _form!.ToSettings(), CancellationToken.None) is { } settings)
             {
                 _form = TrackingModeForm.From(settings);
                 _saved = true;

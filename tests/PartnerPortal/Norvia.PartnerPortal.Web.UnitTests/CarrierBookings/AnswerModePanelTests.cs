@@ -1,3 +1,4 @@
+using Norvia.PartnerPortal.Domain.Personas;
 using Norvia.PartnerPortal.Application.CarrierBookings.AnswerSettings;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
 using Norvia.PartnerPortal.Web.CarrierBookings;
@@ -10,7 +11,7 @@ public sealed class AnswerModePanelTests : PortalWebContext
         Render<AnswerModePanel>(parameters => parameters.Add(panel => panel.PersonaId, personaId));
 
     private void Current(CarrierAnswerMode mode, CarrierRejectionReason reason = CarrierRejectionReason.NoCapacity, int seconds = 5) =>
-        Portal.GetCarrierAnswerSettingsAsync("kessler-spedition", Arg.Any<CancellationToken>()).Returns(new CarrierAnswerSettingsView(mode, reason, seconds));
+        Portal.GetCarrierAnswerSettingsAsync(new PersonaId("kessler-spedition"), Arg.Any<CancellationToken>()).Returns(new CarrierAnswerSettingsView(mode, reason, seconds));
 
     [Fact]
     public void Render_ShowsTheModeTheCarrierHasNow()
@@ -57,7 +58,7 @@ public sealed class AnswerModePanelTests : PortalWebContext
     public void Save_SendsTheChosenModeReasonAndDelay()
     {
         Current(CarrierAnswerMode.Manual);
-        Portal.ChangeCarrierAnswerSettingsAsync("kessler-spedition", Arg.Any<CarrierAnswerSettingsView>(), Arg.Any<CancellationToken>())
+        Portal.ChangeCarrierAnswerSettingsAsync(new PersonaId("kessler-spedition"), Arg.Any<CarrierAnswerSettingsView>(), Arg.Any<CancellationToken>())
             .Returns(new CarrierAnswerSettingsView(CarrierAnswerMode.AutoReject, CarrierRejectionReason.GoodsNotAccepted, 9));
         var panel = RenderPanel();
         Field(panel.Find("[role=group]"), "Mode").Change("AutoReject");
@@ -67,7 +68,7 @@ public sealed class AnswerModePanelTests : PortalWebContext
         panel.Find("form").Submit();
 
         Portal.Received(1).ChangeCarrierAnswerSettingsAsync(
-            "kessler-spedition", new CarrierAnswerSettingsView(CarrierAnswerMode.AutoReject, CarrierRejectionReason.GoodsNotAccepted, 9), Arg.Any<CancellationToken>());
+            new PersonaId("kessler-spedition"), new CarrierAnswerSettingsView(CarrierAnswerMode.AutoReject, CarrierRejectionReason.GoodsNotAccepted, 9), Arg.Any<CancellationToken>());
         panel.Find("[role=status]").TextContent.Should().Contain("Saved");
     }
 
@@ -82,7 +83,7 @@ public sealed class AnswerModePanelTests : PortalWebContext
 
         panel.Find("form").Submit();
 
-        Portal.DidNotReceive().ChangeCarrierAnswerSettingsAsync(Arg.Any<string>(), Arg.Any<CarrierAnswerSettingsView>(), Arg.Any<CancellationToken>());
+        Portal.DidNotReceive().ChangeCarrierAnswerSettingsAsync(Arg.Any<PersonaId>(), Arg.Any<CarrierAnswerSettingsView>(), Arg.Any<CancellationToken>());
         panel.Markup.Should().Contain(AnswerModeForm.DelayOutOfRange);
     }
 
@@ -90,7 +91,7 @@ public sealed class AnswerModePanelTests : PortalWebContext
     public void Save_WhenItFails_SaysSo()
     {
         Current(CarrierAnswerMode.AutoConfirm);
-        Portal.ChangeCarrierAnswerSettingsAsync(Arg.Any<string>(), Arg.Any<CarrierAnswerSettingsView>(), Arg.Any<CancellationToken>())
+        Portal.ChangeCarrierAnswerSettingsAsync(Arg.Any<PersonaId>(), Arg.Any<CarrierAnswerSettingsView>(), Arg.Any<CancellationToken>())
             .Returns<CarrierAnswerSettingsView?>(_ => throw new InvalidOperationException("The database is down."));
         var panel = RenderPanel();
 
@@ -103,7 +104,7 @@ public sealed class AnswerModePanelTests : PortalWebContext
     public void Save_ForANonexistentPersona_SaysSo()
     {
         Current(CarrierAnswerMode.AutoConfirm);
-        Portal.ChangeCarrierAnswerSettingsAsync(Arg.Any<string>(), Arg.Any<CarrierAnswerSettingsView>(), Arg.Any<CancellationToken>()).Returns((CarrierAnswerSettingsView?)null);
+        Portal.ChangeCarrierAnswerSettingsAsync(Arg.Any<PersonaId>(), Arg.Any<CarrierAnswerSettingsView>(), Arg.Any<CancellationToken>()).Returns((CarrierAnswerSettingsView?)null);
         var panel = RenderPanel();
 
         panel.Find("form").Submit();
@@ -114,7 +115,7 @@ public sealed class AnswerModePanelTests : PortalWebContext
     [Fact]
     public void Render_WhenTheModeCantBeLoaded_SaysSo()
     {
-        Portal.GetCarrierAnswerSettingsAsync("kessler-spedition", Arg.Any<CancellationToken>())
+        Portal.GetCarrierAnswerSettingsAsync(new PersonaId("kessler-spedition"), Arg.Any<CancellationToken>())
             .Returns<CarrierAnswerSettingsView?>(_ => throw new InvalidOperationException("The database is down."));
 
         RenderPanel().Find("[role=alert]").TextContent.Should().Contain("couldn't be loaded");
@@ -123,7 +124,7 @@ public sealed class AnswerModePanelTests : PortalWebContext
     [Fact]
     public void Render_ForNoSuchCarrier_SaysTheModeCantBeLoaded()
     {
-        Portal.GetCarrierAnswerSettingsAsync("kessler-spedition", Arg.Any<CancellationToken>()).Returns((CarrierAnswerSettingsView?)null);
+        Portal.GetCarrierAnswerSettingsAsync(new PersonaId("kessler-spedition"), Arg.Any<CancellationToken>()).Returns((CarrierAnswerSettingsView?)null);
 
         RenderPanel().Find("[role=alert]").TextContent.Should().Contain("couldn't be loaded");
     }
@@ -131,7 +132,7 @@ public sealed class AnswerModePanelTests : PortalWebContext
     [Fact]
     public void Render_WhileLoading_SaysSo()
     {
-        Portal.GetCarrierAnswerSettingsAsync("kessler-spedition", Arg.Any<CancellationToken>()).Returns(new TaskCompletionSource<CarrierAnswerSettingsView?>().Task);
+        Portal.GetCarrierAnswerSettingsAsync(new PersonaId("kessler-spedition"), Arg.Any<CancellationToken>()).Returns(new TaskCompletionSource<CarrierAnswerSettingsView?>().Task);
 
         RenderPanel().Find("[role=status]").TextContent.Should().Contain("Loading");
     }

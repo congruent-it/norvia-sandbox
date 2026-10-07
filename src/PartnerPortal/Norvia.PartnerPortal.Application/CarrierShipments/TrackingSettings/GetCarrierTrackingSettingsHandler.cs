@@ -14,7 +14,7 @@ public sealed class GetCarrierTrackingSettingsHandler(IReadRepository<CarrierTra
     {
         ArgumentNullException.ThrowIfNull(query);
 
-        if (personas.Find(new PersonaId(query.PersonaId)) is not { Carrier: not null } carrier)
+        if (personas.Find(query.PersonaId) is not { Carrier: not null } carrier)
         {
             return Result.NotFound($"There is no Carrier Persona '{query.PersonaId}'.");
         }

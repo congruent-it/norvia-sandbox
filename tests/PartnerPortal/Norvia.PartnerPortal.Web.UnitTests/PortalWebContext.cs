@@ -1,3 +1,4 @@
+using Norvia.PartnerPortal.Domain.Personas;
 using AngleSharp.Dom;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
@@ -19,9 +20,9 @@ public abstract class PortalWebContext : BunitContext
         Services.AddSingleton(Portal);
         Services.AddSingleton<TimeProvider>(Time);
         Portal.ListPersonasAsync(Arg.Any<CancellationToken>()).Returns(Samples.Personas);
-        Portal.GetCarrierAnswerSettingsAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+        Portal.GetCarrierAnswerSettingsAsync(Arg.Any<PersonaId>(), Arg.Any<CancellationToken>())
             .Returns(new CarrierAnswerSettingsView(CarrierAnswerMode.Manual, CarrierRejectionReason.NoCapacity, 5));
-        Portal.GetCarrierTrackingSettingsAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+        Portal.GetCarrierTrackingSettingsAsync(Arg.Any<PersonaId>(), Arg.Any<CancellationToken>())
             .Returns(new CarrierTrackingSettingsView(TrackingMode.Manual, 5));
     }
 

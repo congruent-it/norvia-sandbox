@@ -79,7 +79,7 @@ else
                 return;
             }
 
-            _bookings = await Portal.ListBookingsAsync(PersonaId, CancellationToken.None);
+            _bookings = await Portal.ListBookingsAsync(new PersonaId(PersonaId), CancellationToken.None);
         }
         catch (Exception exception)
         {

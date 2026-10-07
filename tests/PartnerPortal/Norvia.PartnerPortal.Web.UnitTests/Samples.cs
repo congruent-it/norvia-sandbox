@@ -9,7 +9,7 @@ internal static class Samples
 {
     public static readonly DateTimeOffset SentAt = new(2026, 9, 25, 10, 0, 0, TimeSpan.Zero);
 
-    public static readonly PersonaView BrouwerDranken = new("brouwer-dranken", "Brouwer Dranken", PartyType.Shipper);
+    public static readonly PersonaView BrouwerDranken = new("brouwer-dranken", "Brouwer Dranken", PartyType.Shipper, TimeSpan.FromSeconds(3));
 
     public static readonly PersonaView VanDijkTransport = new("van-dijk-transport", "Van Dijk Transport", PartyType.Carrier);
 

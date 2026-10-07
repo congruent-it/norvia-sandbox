@@ -1,3 +1,4 @@
+using Norvia.PartnerPortal.Domain.Personas;
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Mediator;
@@ -60,7 +61,7 @@ public sealed class AnswerDueCarrierBookingsHandlerTests
 
         await _mediator.Received(1).Send(
             Arg.Is<AnswerCarrierBookingCommand>(command =>
-                command.PersonaId == "kessler-spedition"
+                command.PersonaId == new PersonaId("kessler-spedition")
                 && command.CarrierBookingNumber == "CB-0000042"
                 && command.Answer.Equals(new CarrierAnswer.Confirmation("KES-260924-0042"))),
             Arg.Any<CancellationToken>());

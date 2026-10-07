@@ -28,6 +28,8 @@
     <EmbeddedResource Include="..\..\..\contracts\partner-api\*.json" LogicalName="PartnerApi/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\responses\*.json" LogicalName="PartnerApi/samples/responses/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\carrier-answer-responses\*.json" LogicalName="PartnerApi/samples/carrier-answer-responses/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\shipper-tracking\*.shipper-tracking.json" LogicalName="PartnerApi/samples/shipper-tracking/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\shipper-tracking-lists\*.shipper-tracking-list.json" LogicalName="PartnerApi/samples/shipper-tracking-lists/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\seed\norvia.seed.json" LogicalName="seed/norvia.seed.json" />
   </ItemGroup>
 </Project>
