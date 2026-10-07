@@ -95,6 +95,8 @@ public sealed class CarrierCancellationEndpointTests
         { null, Cancelled() },
         { "cancel-1", Cancelled() with { CarrierBookingNumber = null } },
         { "cancel-1", Cancelled() with { ShipmentNumber = " " } },
+        { "cancel-1", Cancelled() with { CarrierBookingNumber = "CB-1" } },
+        { "cancel-1", Cancelled() with { ShipmentNumber = "SH-42" } },
         { "cancel-1", Cancelled() with { Kind = null } },
         { "cancel-1", Cancelled() with { Kind = "REVOKED" } },
         { "cancel-1", Cancelled(reason: null) },
@@ -112,6 +114,17 @@ public sealed class CarrierCancellationEndpointTests
 
         result.Result.Should().BeOfType<ProblemHttpResult>().Which.StatusCode.Should().Be(StatusCodes.Status400BadRequest);
         await _mediator.DidNotReceiveWithAnyArgs().Send(Arg.Any<ReceiveCarrierCancellationCommand>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Receive_WhenTheApplicationFindsItInvalid_IsABadRequest_NotAnUnknownCarrier()
+    {
+        _mediator.Send(Arg.Any<ReceiveCarrierCancellationCommand>(), Arg.Any<CancellationToken>())
+            .Returns(Result<ReceiveCarrierCancellationResult>.Invalid(new ValidationError("ReasonText", "A cancellation needs a reason.")));
+
+        var result = await Receive();
+
+        result.Result.Should().BeOfType<ProblemHttpResult>().Which.StatusCode.Should().Be(StatusCodes.Status400BadRequest);
     }
 
     [Fact]

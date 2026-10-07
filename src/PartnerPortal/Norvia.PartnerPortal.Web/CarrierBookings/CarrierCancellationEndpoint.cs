@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Mediator;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
@@ -71,6 +72,14 @@ public static partial class CarrierCancellationEndpoint
         var kind = body.Kind == CancelledKind ? CarrierCancellationKind.Cancelled : CarrierCancellationKind.Withdrawn;
         var result = await mediator.Send(
             new ReceiveCarrierCancellationCommand(carrierId, body.CarrierBookingNumber!, kind, body.ReasonText, correlationId!), cancellationToken);
+        if (result.Status == Ardalis.Result.ResultStatus.Invalid)
+        {
+            using var invalid = logger.BeginScope(EndpointTracking.Outcome("Failed", "CarrierCancellationInvalid"));
+            LogInvalid(logger, carrierId);
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status400BadRequest, title: "The cancellation is invalid.", detail: string.Join(' ', result.ValidationErrors.Select(error => error.ErrorMessage)));
+        }
+
         if (!result.IsSuccess)
         {
             using var unknown = logger.BeginScope(EndpointTracking.Outcome("Failed", "CarrierUnknown"));
@@ -92,8 +101,16 @@ public static partial class CarrierCancellationEndpoint
             problems.Add($"The request needs an {CorrelationIdHeader}.");
         }
 
-        Require(problems, body.CarrierBookingNumber, "carrierBookingNumber");
-        Require(problems, body.ShipmentNumber, "shipmentNumber");
+        if (body.CarrierBookingNumber is null || !CarrierBookingNumber().IsMatch(body.CarrierBookingNumber))
+        {
+            problems.Add("The cancellation needs a carrierBookingNumber such as CB-0000001.");
+        }
+
+        if (body.ShipmentNumber is null || !ShipmentNumber().IsMatch(body.ShipmentNumber))
+        {
+            problems.Add("The cancellation needs a shipmentNumber such as SH-0000042.");
+        }
+
         switch (body.Kind)
         {
             case CancelledKind:
@@ -127,6 +144,12 @@ public static partial class CarrierCancellationEndpoint
             problems.Add($"The cancellation needs a {name}.");
         }
     }
+
+    [GeneratedRegex("^CB-[0-9]{7}$")]
+    private static partial Regex CarrierBookingNumber();
+
+    [GeneratedRegex("^SH-[0-9]{7}$")]
+    private static partial Regex ShipmentNumber();
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Refused a cancellation for Carrier {CarrierId}: the credential is missing or wrong")]
     private static partial void LogRefused(ILogger logger, string carrierId);
