@@ -271,6 +271,19 @@ All events go to the topic for Shipment events, through the TMS's transactional 
 
 The Shipment going back to Planned publishes no event of its own, because `CarrierBookingCancelled` already says it, as in P4.
 
+## Presenter smoke run
+
+After a deployment, and not in CI, the presenter checks Exception handling end to end on the deployed estate, before the headline incident relies on it. Do it after the presenter smoke runs of Carrier booking ([P4](p4-carrier-booking.md#presenter-smoke-run)), Shipment tracking ([P5](p5-shipment-tracking.md#presenter-smoke-run)) and Proof of delivery ([P6](p6-proof-of-delivery.md#presenter-smoke-run)). The script makes the Carriers' calls. The Planner's actions are the presenter's, in the TMS UI, and the script stops and says what to do. Run it in a terminal, with the TMS UI, the Partner portal and the Integration console side by side.
+
+1. **Get two Booked Shipments.** Follow P4's run twice: Rotterdam to Düsseldorf as Brouwer Dranken. The first is confirmed by Van Dijk Transport (story 25), the second by Kessler Spedition, set to *Auto-confirm* for it (story 26). Note both Transport Order numbers. Keep both Personas' tracking mode on *Manual*, as the script sends the Tracking events itself.
+2. **Run the check.** Run `infra/smoke-test-exception-handling.sh <story 25 Transport Order number> <story 26 Transport Order number>`. It posts as the Carriers, through API Management, from a throwaway Container Apps job running as the Partner portal, and reads the TMS as the intake identity, and Application Insights, which is usually 1 to 5 minutes behind.
+3. **Story 25.** The script sends `PU`, `DEP` and `NDL` as Van Dijk Transport and checks that a Delivery failed Exception opens. In the TMS UI, notify Brouwer Dranken and agree a new delivery window. The script checks that the notification ended Sent and that `ShipmentDeliveryWindowAgreed` was published, sends `POD` and checks that the Exception is marked cause cleared. Resolve it as `Redelivered`. The script checks that it left the list and that `ExceptionResolved` was published. Open Brouwer Dranken's notification inbox in the Partner portal and see the notification.
+4. **Story 26.** The script sends an `NPU` with an ETA two weeks away as Kessler Spedition, so that the Shipment stays Booked, and checks that a Late delivery Exception opens. In the TMS UI, cancel the Carrier booking with a reason and wait. The script checks that the Carrier booking is Cancelled, that Shipments to release shows it as cancelled by Norvia with the reason and that the Carrier isn't flagged as not told. Then reassign the Shipment to Van Dijk Transport and release it. Open Kessler Spedition's booking inbox and see the request as "cancelled by Norvia".
+5. **Stop the endpoint.** The script points the Shipper notification Logic App away from the Partner portal. Notify the Shipper again from the story 26 Exception. The script checks that the notification ends Not delivered after the retries, and puts the Logic App back, even when the run fails.
+6. **Follow it.** The script checks that the Tracking events, the notification and the cancellation are in Application Insights by correlation ID, in API Management, the Logic Apps and the TMS, and prints the TMS UI's and the Integration console's links.
+
+The script prints `PASS` or `FAIL` per check, never a body, a token or a key. If a check fails, file the gap as its own issue against P7, rather than working around it in the run book.
+
 ## Deferred
 
 These were left out on purpose while designing P7, each with its reason.
