@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Norvia.Tms.Application;
 using Norvia.Tms.Application.CarrierBookings;
 using Norvia.Tms.Application.Carriers;
 using Norvia.Tms.Application.Exceptions;
@@ -85,6 +86,7 @@ public static class DependencyInjection
         builder.Services.AddSingleton(services => new LateDeliveryRules(services.GetRequiredService<IOptions<LateDeliveryOptions>>().Value.Grace));
         builder.Services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
         builder.Services.AddScoped(typeof(IReadRepository<>), typeof(EfRepository<>));
+        builder.Services.AddScoped<IConflictRetrier, EfConflictRetrier>();
         builder.Services.AddScoped<IDomainEventDispatcher, MediatorDomainEventDispatcher>();
         builder.Services.AddScoped<IOutbox>(services => services.GetRequiredService<OutboxBuffer>());
         builder.Services.AddScoped<ITransportOrderNumbers, SqlTransportOrderNumbers>();

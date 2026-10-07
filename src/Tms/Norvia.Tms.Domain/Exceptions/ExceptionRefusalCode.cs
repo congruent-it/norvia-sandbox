@@ -23,4 +23,7 @@ public enum ExceptionRefusalCode
 
     /// <summary>The Shipment is Collected or later: after collection a Carrier booking can't be cancelled (ADR 0010).</summary>
     ShipmentAlreadyCollected,
+
+    /// <summary>The TMS has no Shipper notification with that ID.</summary>
+    ShipperNotificationNotFound,
 }

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/shipper-notification-requested.v1.schema.json",
+  "title": "ShipperNotificationRequested",
+  "description": "The Planner notified the Shipper from an open Exception (Canonical Model event, version 1). The TMS recorded a Shipper notification with the status Requested in the same transaction. The Planner can notify as often as needed, so an Exception has any number of these. The Shipper notification Logic App sends the message from this event and reports the notification Sent or Not delivered. Published on the Shipment events topic, under the correlation ID of the Planner's action, which the TMS creates, through the TMS's transactional outbox.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "notificationId", "exceptionNumber", "shipmentNumber", "transportOrderNumber", "shipperId", "shipperReference", "exceptionType", "message", "eta", "agreedDeliveryWindowEarliest", "agreedDeliveryWindowLatest", "planner"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "const": "ShipperNotificationRequested" },
+    "eventVersion": { "const": 1 },
+    "occurredAt": { "description": "When the TMS recorded the Shipper notification.", "type": "string", "format": "date-time" },
+    "correlationId": { "description": "The Planner's action's own correlation ID, which the Logic App's report continues.", "type": "string", "minLength": 1 },
+    "notificationId": { "description": "The notification ID, which the Partner portal treats as the key, so a repeated call is ignored, and which the Logic App reports back on.", "type": "string", "format": "uuid" },
+    "exceptionNumber": { "description": "The Exception the Planner notified the Shipper from.", "type": "string", "pattern": "^EX-[0-9]{7}$" },
+    "shipmentNumber": { "type": "string", "pattern": "^SH-[0-9]{7}$" },
+    "transportOrderNumber": { "description": "The Transport Order the Shipment carries out.", "type": "string", "pattern": "^TO-[0-9]{7}$" },
+    "shipperId": { "description": "The Shipper to notify.", "type": "string", "minLength": 1 },
+    "shipperReference": { "description": "The Shipper's own reference of the Transport Order, so the Shipper recognises the Shipment; null when the Transport Order has none.", "type": ["string", "null"], "minLength": 1 },
+    "exceptionType": { "enum": ["CollectionFailed", "DeliveryFailed", "Damaged", "Reservations", "LateDelivery"] },
+    "message": { "description": "What the Planner wrote, starting from the template for the Exception's type.", "type": "string", "minLength": 1 },
+    "eta": { "description": "The Shipment's ETA when the Planner notified; null when it has none.", "type": ["string", "null"], "format": "date-time" },
+    "agreedDeliveryWindowEarliest": { "description": "The earliest time of the delivery window the Planner agreed for the Shipment; null when none was agreed.", "type": ["string", "null"], "format": "date-time" },
+    "agreedDeliveryWindowLatest": { "description": "The latest time of the delivery window the Planner agreed for the Shipment; null when none was agreed.", "type": ["string", "null"], "format": "date-time" },
+    "planner": { "description": "The Planner who notified the Shipper, as the TMS UI names them.", "type": "string", "minLength": 1 }
+  }
+}

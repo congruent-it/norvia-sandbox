@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/shipper-notification-not-delivered.v1.schema.json",
+  "title": "ShipperNotificationNotDelivered",
+  "description": "The Shipper notification Logic App's message never reached the Shipper (Canonical Model event, version 1). The Logic App used up its retries on a server error or timeout, or met a client error. The TMS moved the Shipper notification to Not delivered with the technical cause, and the Exception shows the Shipper wasn't told. The Planner can notify again, or phone the Shipper and add a note. Published on the Shipment events topic, under the correlation ID of the Planner's action the report continues.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "notificationId", "exceptionNumber", "shipmentNumber", "transportOrderNumber", "shipperId", "statusCode", "message"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "const": "ShipperNotificationNotDelivered" },
+    "eventVersion": { "const": 1 },
+    "occurredAt": { "description": "When the report was recorded.", "type": "string", "format": "date-time" },
+    "correlationId": { "description": "The Planner's action's own correlation ID, which the report continues.", "type": "string", "minLength": 1 },
+    "notificationId": { "description": "The Shipper notification that never reached the Shipper.", "type": "string", "format": "uuid" },
+    "exceptionNumber": { "type": "string", "pattern": "^EX-[0-9]{7}$" },
+    "shipmentNumber": { "type": "string", "pattern": "^SH-[0-9]{7}$" },
+    "transportOrderNumber": { "description": "The Transport Order the Shipment carries out.", "type": "string", "pattern": "^TO-[0-9]{7}$" },
+    "shipperId": { "description": "The Shipper the message was addressed to.", "type": "string", "minLength": 1 },
+    "statusCode": { "description": "The Shipper endpoint's HTTP status code; null when the failure had none, such as a timeout.", "type": ["integer", "null"] },
+    "message": { "description": "The technical cause in plain language.", "type": "string", "minLength": 1 }
+  }
+}

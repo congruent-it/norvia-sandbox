@@ -9,6 +9,7 @@ using Norvia.Tms.Api.CarrierBookings;
 using Norvia.Tms.Api.Exceptions;
 using Norvia.Tms.Api.ProofsOfDelivery;
 using Norvia.Tms.Api.Shipments;
+using Norvia.Tms.Api.ShipperNotifications;
 using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Api.TrackingEvents;
 using Norvia.Tms.Api.TransportOrders;
@@ -18,10 +19,12 @@ using Norvia.Tms.Application.CarrierBookings.Withdraw;
 using Norvia.Tms.Application.Exceptions.AddNote;
 using Norvia.Tms.Application.Exceptions.AgreeDeliveryWindow;
 using Norvia.Tms.Application.Exceptions.CancelCarrierBooking;
+using Norvia.Tms.Application.Exceptions.NotifyShipper;
 using Norvia.Tms.Application.Exceptions.Resolve;
 using Norvia.Tms.Application.ProofsOfDelivery.Record;
 using Norvia.Tms.Application.Shipments.Reassign;
 using Norvia.Tms.Application.Shipments.Release;
+using Norvia.Tms.Application.ShipperNotifications.Report;
 using Norvia.Tms.Application.TrackingEvents.Record;
 using Norvia.Tms.Application.TransportOrders.Assign;
 using Norvia.Tms.Application.TransportOrders.Rate;
@@ -61,6 +64,13 @@ builder.Services.AddScoped<IPipelineBehavior<ResolveExceptionCommand, Result<Res
 builder.Services.AddScoped<IPipelineBehavior<AddExceptionNoteCommand, Result<AddExceptionNoteResult>>, TrackExceptionNoteInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<AgreeDeliveryWindowCommand, Result<AgreeDeliveryWindowResult>>, TrackDeliveryWindowAgreementInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<CancelCarrierBookingCommand, Result<CancelCarrierBookingResult>>, TrackCarrierBookingCancellationInLoggingScope>();
+builder.Services.AddScoped<IPipelineBehavior<NotifyShipperCommand, Result<NotifyShipperResult>>, TrackShipperNotificationInLoggingScope>();
+builder.Services
+    .AddScoped<IPipelineBehavior<ReportShipperNotificationSentCommand, Result<ShipperNotificationReportResult>>,
+        TrackShipperNotificationReportInLoggingScope<ReportShipperNotificationSentCommand>>();
+builder.Services
+    .AddScoped<IPipelineBehavior<ReportShipperNotificationNotDeliveredCommand, Result<ShipperNotificationReportResult>>,
+        TrackShipperNotificationReportInLoggingScope<ReportShipperNotificationNotDeliveredCommand>>();
 builder.AddTmsInfrastructure();
 builder.AddTmsProofOfDeliveryStorage();
 builder.AddTmsOutboxPublisher();
@@ -157,6 +167,7 @@ app.MapCarrierBookings();
 app.MapTrackingEvents();
 app.MapProofsOfDelivery();
 app.MapExceptions();
+app.MapShipperNotifications();
 
 await app.RunAsync();
 

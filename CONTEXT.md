@@ -140,6 +140,10 @@ _Avoid_: cancel (that is for a Confirmed Carrier booking), revoke, recall
 Norvia ending a Confirmed Carrier booking before the Carrier has collected the goods, so the Shipment can be re-planned. The Planner does it to resolve an Exception, and the Carrier is told. After collection a Carrier booking can't be cancelled.
 _Avoid_: withdraw (that is for an unanswered Carrier booking), revoke, annul
 
+**Shipper notification**:
+A message the Planner sends the Shipper about an open Exception, as often as needed, starting from a template for the Exception's type. It has a notification ID and is Requested until the Shipper notification Logic App reports it Sent or Not delivered, with the technical cause. It is one-way: the Shipper can't reply through the TMS.
+_Avoid_: alert, email, update
+
 **Carrier not told**:
 A flag on a Withdrawn or Cancelled Carrier booking whose message never reached the Carrier, with the technical cause. The Planner phones the Carrier; nothing is retried. A booking the Carrier acknowledged has a Carrier told time instead.
 _Avoid_: undelivered cancellation, failed cancellation

@@ -9,6 +9,7 @@ using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Carriers;
 using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Domain.Shipments;
+using Norvia.Tms.Domain.ShipperNotifications;
 using Norvia.Tms.Domain.Shippers;
 using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.TransportOrders;
@@ -21,6 +22,7 @@ public sealed class ListOpenExceptionsHandlerTests
     private static readonly CarrierId VanDijk = new("CAR-0001");
 
     private readonly IReadRepository<ExceptionCase> _exceptions = Substitute.For<IReadRepository<ExceptionCase>>();
+    private readonly IReadRepository<ShipperNotification> _notifications = Substitute.For<IReadRepository<ShipperNotification>>();
     private readonly IShipperDirectory _shippers = Substitute.For<IShipperDirectory>();
     private readonly ICarrierDirectory _carriers = Substitute.For<ICarrierDirectory>();
     private readonly ListOpenExceptionsHandler _handler;
@@ -29,7 +31,8 @@ public sealed class ListOpenExceptionsHandlerTests
     {
         _shippers.Find(new ShipperId("SHP-0001")).Returns(new Shipper(new ShipperId("SHP-0001"), "Brouwer Dranken", true));
         _carriers.Find(VanDijk).Returns(new Carrier(VanDijk, "Van Dijk Transport", true));
-        _handler = new ListOpenExceptionsHandler(_exceptions, _shippers, _carriers);
+        _notifications.ListAsync(Arg.Any<ShipperNotificationsOfExceptionsSpec>(), Arg.Any<CancellationToken>()).Returns([]);
+        _handler = new ListOpenExceptionsHandler(_exceptions, _notifications, _shippers, _carriers);
     }
 
     [Fact]
@@ -54,7 +57,8 @@ public sealed class ListOpenExceptionsHandlerTests
                 NumberOfCauses: 2,
                 AfterDelivered: false,
                 CauseCleared: false,
-                Notes: []),
+                Notes: [],
+                LastShipperNotificationStatus: null),
             new OpenExceptionSummary(
                 "EX-0000006",
                 "SH-0000013",
@@ -65,7 +69,8 @@ public sealed class ListOpenExceptionsHandlerTests
                 NumberOfCauses: 1,
                 AfterDelivered: false,
                 CauseCleared: false,
-                Notes: [])],
+                Notes: [],
+                LastShipperNotificationStatus: null)],
             options => options.WithStrictOrdering());
     }
 
@@ -92,6 +97,23 @@ public sealed class ListOpenExceptionsHandlerTests
         var open = await _handler.Handle(new ListOpenExceptionsQuery(), CancellationToken.None);
 
         open.Should().ContainSingle().Which.CauseCleared.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Handle_ShowsTheStatusOfTheLastShipperNotification_AndNoneForAnExceptionNeverNotified()
+    {
+        var notified = OpenExceptions.DeliveryFailed();
+        var never = OpenExceptions.DeliveryFailed(orderSequence: 8, shipmentSequence: 13, number: 6);
+        var first = ShipperNotificationSamples.Requested(notified, Samples.Now.AddDays(2));
+        first.ReportNotDelivered(503, "Down", Samples.Now.AddDays(2));
+        var last = ShipperNotificationSamples.Requested(notified, Samples.Now.AddDays(3));
+        last.ReportSent(Samples.Now.AddDays(3));
+        _exceptions.ListAsync(Arg.Any<OpenExceptionsSpec>(), Arg.Any<CancellationToken>()).Returns([notified, never]);
+        _notifications.ListAsync(Arg.Any<ShipperNotificationsOfExceptionsSpec>(), Arg.Any<CancellationToken>()).Returns([last, first]);
+
+        var open = await _handler.Handle(new ListOpenExceptionsQuery(), CancellationToken.None);
+
+        open.Select(summary => summary.LastShipperNotificationStatus).Should().Equal(ShipperNotificationStatus.Sent, null);
     }
 
     [Fact]

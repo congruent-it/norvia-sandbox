@@ -43,6 +43,9 @@ public class TmsFixture : IAsyncLifetime
     /// <summary>The app role only the P4 booking Logic App's managed identity holds, for its sent and not-delivered reports.</summary>
     public const string ReportRole = "CarrierBookings.Report";
 
+    /// <summary>The app role only the P7 Shipper notification Logic App's managed identity holds.</summary>
+    public const string ShipperNotificationReportRole = "ShipperNotifications.Report";
+
     /// <summary>The app role of the Carrier-tracking Logic App's managed identity, which records Tracking events (P5).</summary>
     public const string TrackingRecordRole = "TrackingEvents.Record";
 
@@ -84,6 +87,9 @@ public class TmsFixture : IAsyncLifetime
 
     /// <summary>A client holding the report role, as the P4 booking Logic App's managed identity will (P4, later ticket).</summary>
     public HttpClient CarrierReport { get; private set; } = null!;
+
+    /// <summary>A client holding the Shipper notification report role, as the P7 Shipper notification Logic App's managed identity will.</summary>
+    public HttpClient ShipperNotificationReport { get; private set; } = null!;
 
     /// <summary>A client holding the record role, as the Carrier-tracking Logic App's managed identity will (P5, later ticket).</summary>
     public HttpClient TrackingRecord { get; private set; } = null!;
@@ -140,6 +146,7 @@ public class TmsFixture : IAsyncLifetime
         TmsUi = CreateTmsClient(IssueToken([ManageRole], clientId: LocalTokens.TmsUiClientId));
         CarrierAnswer = CreateTmsClient(IssueToken([AnswerRole], clientId: "norvia-test-carrier-answer-logic-app"));
         CarrierReport = CreateTmsClient(IssueToken([ReportRole], clientId: "norvia-test-p4-booking-logic-app"));
+        ShipperNotificationReport = CreateTmsClient(IssueToken([ShipperNotificationReportRole], clientId: "norvia-test-p7-shipper-notification-logic-app"));
         TrackingRecord = CreateTmsClient(IssueToken([TrackingRecordRole], clientId: "norvia-test-carrier-tracking-logic-app"));
 
         ProofOfDeliveryRecord = CreateTmsClient(IssueToken([ProofOfDeliveryRecordRole], clientId: "norvia-test-carrier-proof-of-delivery-logic-app"));
@@ -445,6 +452,7 @@ public class TmsFixture : IAsyncLifetime
         TmsUi?.Dispose();
         CarrierAnswer?.Dispose();
         CarrierReport?.Dispose();
+        ShipperNotificationReport?.Dispose();
         TrackingRecord?.Dispose();
         ProofOfDeliveryRecord?.Dispose();
 
