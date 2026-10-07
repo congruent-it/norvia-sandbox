@@ -7,6 +7,7 @@ using Norvia.Tms.Api.Shipments;
 using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Application.CanonicalModel;
 using Norvia.Tms.Application.Billing.ListNotYetBillable;
+using Norvia.Tms.Application.Billing.Release;
 using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.TransportOrders;
@@ -108,6 +109,20 @@ public static class TransportOrderEndpoints
                 + "is answered as before, flagged as a repeat, without planning again. An assignment that breaks an assignment rule is refused, "
                 + "changing and publishing nothing, with a problem whose code says which, and whose correlationId names the Message trail the refusal is traced on: TransportOrderNotFound (404), TransportOrderNotAccepted "
                 + "or TransportOrderAlreadyPlanned (409), UnknownCarrier or InactiveCarrier (422). The rating result never blocks an assignment.");
+
+        // Customer service releases from the TMS UI, which starts the action, so the TMS starts a Message trail of its own.
+        transportOrders.MapPost("/{transportOrderNumber}/release-without-proof-of-delivery", ReleaseWithoutProofOfDeliveryAsync)
+            .WithName("ReleaseTransportOrderWithoutProofOfDelivery")
+            .RequireAuthorization(policy => policy.RequireRole(ManageRole))
+            .WithMetadata(new TrackedFlow(Flows.Billing))
+            .WithSummary("Release a Delivered, Not yet billable Transport Order without a Proof of delivery.")
+            .WithDescription(
+                "Lets a Carrier that never sends a Proof of delivery not hold up billing for good. The remark and who releases it are required; otherwise the call is a 400. "
+                + "The TMS records who released it, when and the remark, and lifts only the NoProofOfDelivery blocking reason: an order that isn't Rated or has an open Exception stays Not yet billable. "
+                + "When the release completes the order, it becomes Billable and the TMS publishes one TransportOrderBillable with releasedWithoutProofOfDelivery set, in the same transaction, "
+                + "under a new correlation ID, which the answer and the event carry. The release publishes nothing of its own. A release that breaks a rule is refused, "
+                + "changing and publishing nothing, with a problem whose code says which, and whose correlationId names the Message trail the refusal is traced on: "
+                + "TransportOrderNotFound (404), or AlreadyBillable, NotBilledSeparately, ShipmentNotDelivered or AlreadyReleased (409).");
 
         return app;
     }
@@ -243,4 +258,51 @@ public static class TransportOrderEndpoints
                 extensions: new Dictionary<string, object?> { ["correlationId"] = result.CorrelationId }),
         };
     }
+
+    private static async Task<Results<Ok<ReleaseWithoutProofOfDeliveryResult>, ProblemHttpResult, ValidationProblem>> ReleaseWithoutProofOfDeliveryAsync(
+        string transportOrderNumber,
+        ReleaseWithoutProofOfDeliveryRequest request,
+        IMediator mediator,
+        CancellationToken cancellationToken)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (string.IsNullOrWhiteSpace(request.Remark))
+        {
+            errors[nameof(ReleaseWithoutProofOfDeliveryRequest.Remark)] = ["A release without a Proof of delivery needs its remark."];
+        }
+        else if (request.Remark.Length > TransportOrder.MaxReleaseRemarkLength)
+        {
+            errors[nameof(ReleaseWithoutProofOfDeliveryRequest.Remark)] = [$"A remark is at most {TransportOrder.MaxReleaseRemarkLength} characters."];
+        }
+
+        if (string.IsNullOrWhiteSpace(request.ReleasedBy))
+        {
+            errors[nameof(ReleaseWithoutProofOfDeliveryRequest.ReleasedBy)] = ["A release needs who released it."];
+        }
+        else if (request.ReleasedBy.Length > TransportOrder.MaxReleasedByLength)
+        {
+            errors[nameof(ReleaseWithoutProofOfDeliveryRequest.ReleasedBy)] = [$"A name is at most {TransportOrder.MaxReleasedByLength} characters."];
+        }
+
+        if (errors.Count > 0)
+        {
+            return TypedResults.ValidationProblem(errors);
+        }
+
+        var command = new ReleaseWithoutProofOfDeliveryCommand(transportOrderNumber, request.Remark!, request.ReleasedBy!, CorrelationId.New().Value);
+        var result = await mediator.Send(command, cancellationToken);
+        return result.IsSuccess
+            ? TypedResults.Ok(result.Value)
+            : RefusalProblem.Of<BillingRefusalCode, ReleaseWithoutProofOfDeliveryResult>(result, "The Transport Order can't be released without a Proof of delivery.", command.CorrelationId, StatusCodeOf);
+    }
+
+    private static int StatusCodeOf(BillingRefusalCode code) => code switch
+    {
+        BillingRefusalCode.TransportOrderNotFound => StatusCodes.Status404NotFound,
+        BillingRefusalCode.AlreadyBillable
+            or BillingRefusalCode.NotBilledSeparately
+            or BillingRefusalCode.ShipmentNotDelivered
+            or BillingRefusalCode.AlreadyReleased => StatusCodes.Status409Conflict,
+        _ => throw new ArgumentOutOfRangeException(nameof(code), code, "The API doesn't know this refusal's status."),
+    };
 }

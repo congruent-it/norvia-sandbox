@@ -87,6 +87,21 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
     /// <summary>Whether Customer service released the Transport Order without a Proof of delivery (P9); false until it is.</summary>
     public bool ReleasedWithoutProofOfDelivery { get; private set; }
 
+    /// <summary>Who in Customer service released the Transport Order without a Proof of delivery; null until they do.</summary>
+    public string? ReleasedBy { get; private set; }
+
+    /// <summary>When Customer service released the Transport Order without a Proof of delivery; null until then.</summary>
+    public DateTimeOffset? ReleasedAt { get; private set; }
+
+    /// <summary>The remark Customer service gave when releasing the Transport Order without a Proof of delivery; null until then.</summary>
+    public string? ReleaseRemark { get; private set; }
+
+    /// <summary>The longest remark of a release without a Proof of delivery.</summary>
+    public const int MaxReleaseRemarkLength = 2000;
+
+    /// <summary>The longest name of who released.</summary>
+    public const int MaxReleasedByLength = 200;
+
     /// <summary>The number of the Transport Order's one Shipment, once it is Planned; null until then.</summary>
     public ShipmentNumber? ShipmentNumber { get; private set; }
 
@@ -185,7 +200,8 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
         ArgumentNullException.ThrowIfNull(facts);
         ArgumentNullException.ThrowIfNull(correlationId);
         if (!AwaitsBillingFacts
-            || facts is not { DeliveredAt: { } deliveredAt, HasCurrentProofOfDelivery: true, HasOpenException: false })
+            || facts is not { DeliveredAt: { } deliveredAt, HasOpenException: false }
+            || !(facts.HasCurrentProofOfDelivery || ReleasedWithoutProofOfDelivery))
         {
             return false;
         }
@@ -196,6 +212,44 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
         BillingCorrelationId = correlationId;
         RegisterDomainEvent(new TransportOrderBillableEvent(this));
         return true;
+    }
+
+    /// <summary>
+    /// Customer service releases a Delivered, Not yet billable order without a Proof of delivery (P9), so a Carrier that never
+    /// sends one can't hold up billing for good. It lifts only <c>NoProofOfDelivery</c>: the order becomes Billable only through
+    /// <see cref="TryBecomeBillable"/>, and publishes nothing of its own. Returns the refusal, changing nothing, when the order is
+    /// Billable, billed through the Fulfilment Contract, released already or not Delivered.
+    /// </summary>
+    /// <param name="deliveredAt">When the order's Shipment was Delivered; null while it isn't.</param>
+    public BillingRefusal? ReleaseWithoutProofOfDelivery(DateTimeOffset? deliveredAt, string remark, string releasedBy, DateTimeOffset now)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(remark);
+        ArgumentException.ThrowIfNullOrWhiteSpace(releasedBy);
+        switch (BillingState)
+        {
+            case TransportOrders.BillingState.Billable:
+                return new(BillingRefusalCode.AlreadyBillable, Invariant($"Transport Order {Number} is Billable already."));
+            case TransportOrders.BillingState.NotBilledSeparately:
+                return new(BillingRefusalCode.NotBilledSeparately, Invariant($"Transport Order {Number} is billed through the Fulfilment Contract."));
+            case null:
+                throw new InvalidOperationException("A Rejected booking has no billing state to release.");
+        }
+
+        if (deliveredAt is null)
+        {
+            return new(BillingRefusalCode.ShipmentNotDelivered, Invariant($"The Shipment of Transport Order {Number} isn't Delivered."));
+        }
+
+        if (ReleasedWithoutProofOfDelivery)
+        {
+            return new(BillingRefusalCode.AlreadyReleased, Invariant($"Transport Order {Number} was released without a Proof of delivery already."));
+        }
+
+        ReleasedWithoutProofOfDelivery = true;
+        ReleasedBy = releasedBy;
+        ReleasedAt = now;
+        ReleaseRemark = remark;
+        return null;
     }
 
     private void ApplyRating(RateCard? rateCard, DateTimeOffset ratedAt)

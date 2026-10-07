@@ -14,6 +14,7 @@ using Norvia.Tms.Api.ShipperNotifications;
 using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Api.TrackingEvents;
 using Norvia.Tms.Api.TransportOrders;
+using Norvia.Tms.Application.Billing.Release;
 using Norvia.Tms.Application.CarrierBookings.Answer;
 using Norvia.Tms.Application.CarrierBookings.Report;
 using Norvia.Tms.Application.CarrierBookings.Withdraw;
@@ -61,6 +62,7 @@ builder.Services
 builder.Services.AddScoped<IPipelineBehavior<WithdrawCarrierBookingCommand, Result<CarrierBookingWithdrawResult>>, TrackCarrierBookingWithdrawalInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<RecordTrackingCommand, Result<RecordTrackingResult>>, TrackTrackingEventInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<RecordProofOfDeliveryCommand, Result<RecordProofOfDeliveryResult>>, TrackProofOfDeliveryInLoggingScope>();
+builder.Services.AddScoped<IPipelineBehavior<ReleaseWithoutProofOfDeliveryCommand, Result<ReleaseWithoutProofOfDeliveryResult>>, TrackReleaseWithoutProofOfDeliveryInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<ResolveExceptionCommand, Result<ResolveExceptionResult>>, TrackExceptionResolutionInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<AddExceptionNoteCommand, Result<AddExceptionNoteResult>>, TrackExceptionNoteInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<AgreeDeliveryWindowCommand, Result<AgreeDeliveryWindowResult>>, TrackDeliveryWindowAgreementInLoggingScope>();

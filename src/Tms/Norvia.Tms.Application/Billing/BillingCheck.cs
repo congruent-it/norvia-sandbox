@@ -49,7 +49,7 @@ public sealed class BillingCheck(
             return;
         }
 
-        shipment ??= await shipments.SingleOrDefaultAsync(new ShipmentByNumberSpec(order.ShipmentNumber!), cancellationToken);
+        shipment ??= await FindShipmentAsync(order, cancellationToken);
         if (shipment is null)
         {
             return;
@@ -68,7 +68,17 @@ public sealed class BillingCheck(
         order.TryBecomeBillable(new BillingFacts(deliveredAt, hasProofOfDelivery, hasOpenException), change.CorrelationId, change.At);
     }
 
-    private async Task<DateTimeOffset?> DeliveredAtAsync(Shipment shipment, CancellationToken cancellationToken)
+    /// <summary>The Transport Order's Shipment; null while it isn't Planned.</summary>
+    public async Task<Shipment?> FindShipmentAsync(TransportOrder order, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(order);
+        return order.ShipmentNumber is { } number
+            ? await shipments.SingleOrDefaultAsync(new ShipmentByNumberSpec(number), cancellationToken)
+            : null;
+    }
+
+    /// <summary>When the Shipment was Delivered; null while it isn't.</summary>
+    public async Task<DateTimeOffset?> DeliveredAtAsync(Shipment shipment, CancellationToken cancellationToken)
     {
         if (shipment.Status != ShipmentStatus.Delivered)
         {
