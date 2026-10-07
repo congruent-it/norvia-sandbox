@@ -19,10 +19,15 @@ public static partial class ShipperNotificationEndpoint
     public const string ApiKeyHeader = EndpointCredential.ApiKeyHeader;
     private const string Flow = "shipper-notification";
 
+    public const string Route = "/shipper/v1/{shipperId}/notifications";
+
+    /// <summary>Where a Shipper Persona's notifications are sent.</summary>
+    public static string PathOf(string shipperId) => Route.Replace("{shipperId}", shipperId, StringComparison.Ordinal);
+
     public static IEndpointRouteBuilder MapShipperNotificationEndpoint(this IEndpointRouteBuilder endpoints)
     {
         // Anonymous like the rest of the portal; what it asks of the caller is the Shipper's credential, checked below.
-        endpoints.MapPost("/shipper/v1/{shipperId}/notifications", ReceiveAsync).AllowAnonymous();
+        endpoints.MapPost(Route, ReceiveAsync).AllowAnonymous();
         return endpoints;
     }
 
@@ -42,19 +47,19 @@ public static partial class ShipperNotificationEndpoint
         ArgumentNullException.ThrowIfNull(loggers);
 
         var logger = loggers.CreateLogger(typeof(ShipperNotificationEndpoint));
-        using var trail = logger.BeginScope(TrackingKeys(shipperId, correlationId, body));
+        using var trail = logger.BeginScope(EndpointTracking.Keys(Flow, shipperId, correlationId, ("transportOrderNumber", body.TransportOrderNumber)));
 
         // Who the caller is comes first, so an unknown Shipper and a wrong credential look the same from outside.
         if (!EndpointCredential.IsOf(shipperId, apiKey, options.Value.ApiKeys))
         {
-            using var refused = logger.BeginScope(Outcome("Refused", "CredentialInvalid"));
+            using var refused = logger.BeginScope(EndpointTracking.Outcome("Refused", "CredentialInvalid"));
             LogRefused(logger, shipperId);
             return TypedResults.Unauthorized();
         }
 
         if (Problems(correlationId, body) is { Count: > 0 } problems)
         {
-            using var invalid = logger.BeginScope(Outcome("Failed", "ShipperNotificationInvalid"));
+            using var invalid = logger.BeginScope(EndpointTracking.Outcome("Failed", "ShipperNotificationInvalid"));
             LogInvalid(logger, shipperId);
             return TypedResults.Problem(
                 statusCode: StatusCodes.Status400BadRequest, title: "The notification is invalid.", detail: string.Join(' ', problems));
@@ -69,12 +74,12 @@ public static partial class ShipperNotificationEndpoint
             cancellationToken);
         if (!result.IsSuccess)
         {
-            using var unknown = logger.BeginScope(Outcome("Failed", "ShipperUnknown"));
+            using var unknown = logger.BeginScope(EndpointTracking.Outcome("Failed", "ShipperUnknown"));
             LogUnknownShipper(logger, shipperId);
             return TypedResults.Problem(statusCode: StatusCodes.Status404NotFound, title: "There is no such Shipper.");
         }
 
-        using var received = logger.BeginScope(Outcome("Succeeded", failureCode: null));
+        using var received = logger.BeginScope(EndpointTracking.Outcome("Succeeded", failureCode: null));
         LogReceived(logger, result.Value.Repeated);
         return TypedResults.Ok(result.Value);
     }
@@ -101,7 +106,7 @@ public static partial class ShipperNotificationEndpoint
 
         if (!ShipperExceptionCodes.TryParse(body.ExceptionCode, out _))
         {
-            problems.Add("The notification needs an exceptionCode: COLLECTION_FAILED, DELIVERY_FAILED, DAMAGED, RESERVATIONS or LATE.");
+            problems.Add($"The notification needs an exceptionCode, one of {string.Join(", ", ShipperExceptionCodes.WireNames)}.");
         }
 
         Require(problems, body.Message, "message");
@@ -145,26 +150,6 @@ public static partial class ShipperNotificationEndpoint
             problems.Add($"The notification needs a {name}.");
         }
     }
-
-    // The tracking contract's keys the request carries (coding guidelines §7); a key that doesn't apply is left out.
-    private static Dictionary<string, object?> TrackingKeys(string shipperId, string? correlationId, ShipperNotificationBody body)
-    {
-        var keys = new Dictionary<string, object?> { ["flow"] = Flow, ["partyId"] = shipperId };
-        if (!string.IsNullOrWhiteSpace(correlationId))
-        {
-            keys["correlationId"] = correlationId;
-        }
-
-        if (!string.IsNullOrWhiteSpace(body.TransportOrderNumber))
-        {
-            keys["transportOrderNumber"] = body.TransportOrderNumber;
-        }
-
-        return keys;
-    }
-
-    private static Dictionary<string, object?> Outcome(string outcome, string? failureCode) =>
-        failureCode is null ? new() { ["outcome"] = outcome } : new() { ["outcome"] = outcome, ["failureCode"] = failureCode };
 
     [GeneratedRegex("^TO-[0-9]{7}$")]
     private static partial Regex TransportOrderNumber();

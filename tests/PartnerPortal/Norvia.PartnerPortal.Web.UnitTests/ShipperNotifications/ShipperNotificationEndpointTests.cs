@@ -33,6 +33,11 @@ public sealed class ShipperNotificationEndpointTests
         _mediator.Send(Arg.Any<ReceiveShipperNotificationCommand>(), Arg.Any<CancellationToken>())
             .Returns(Result.Success(new ReceiveShipperNotificationResult(Guid.Parse(Id), repeated)));
 
+    // The AppHost and the Logic App address the endpoint by this shape, which the AppHost model tests pin from their side.
+    [Fact]
+    public void PathOf_IsWhereTheLogicAppSendsAShippersNotifications() =>
+        ShipperNotificationEndpoint.PathOf("SHP-0001").Should().Be("/shipper/v1/SHP-0001/notifications");
+
     [Fact]
     public async Task Receive_AValidNotification_IsPutInTheInboxAndAcknowledged()
     {

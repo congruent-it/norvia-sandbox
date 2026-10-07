@@ -135,6 +135,20 @@ public sealed class ShipperNotificationTests
         code.Should().Be(expected);
     }
 
+    [Fact]
+    public void WireNames_AreEveryCodeAsTheFormatSpellsIt() =>
+        ShipperExceptionCodes.WireNames.Should().Equal("COLLECTION_FAILED", "DELIVERY_FAILED", "DAMAGED", "RESERVATIONS", "LATE");
+
+    [Fact]
+    public void WireNameOf_IsWhatTryParseReadsBack()
+    {
+        foreach (var code in Enum.GetValues<ShipperExceptionCode>())
+        {
+            ShipperExceptionCodes.TryParse(ShipperExceptionCodes.WireNameOf(code), out var read).Should().BeTrue();
+            read.Should().Be(code);
+        }
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]

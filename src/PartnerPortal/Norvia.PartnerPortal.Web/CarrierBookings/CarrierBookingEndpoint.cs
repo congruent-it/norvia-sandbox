@@ -40,19 +40,20 @@ public static partial class CarrierBookingEndpoint
         ArgumentNullException.ThrowIfNull(loggers);
 
         var logger = loggers.CreateLogger(typeof(CarrierBookingEndpoint));
-        using var trail = logger.BeginScope(TrackingKeys(carrierId, correlationId, body));
+        using var trail = logger.BeginScope(EndpointTracking.Keys(
+            Flow, carrierId, correlationId, ("shipmentNumber", body.ShipmentNumber), ("carrierBookingNumber", body.CarrierBookingNumber)));
 
         // Who the caller is comes first, so an unknown Carrier and a wrong credential look the same from outside.
         if (!EndpointCredential.IsOf(carrierId, apiKey, options.Value.ApiKeys))
         {
-            using var refused = logger.BeginScope(Outcome("Refused", "CredentialInvalid"));
+            using var refused = logger.BeginScope(EndpointTracking.Outcome("Refused", "CredentialInvalid"));
             LogRefused(logger, carrierId);
             return TypedResults.Unauthorized();
         }
 
         if (Problems(correlationId, body) is { Count: > 0 } problems)
         {
-            using var invalid = logger.BeginScope(Outcome("Failed", "BookingRequestInvalid"));
+            using var invalid = logger.BeginScope(EndpointTracking.Outcome("Failed", "BookingRequestInvalid"));
             LogInvalid(logger, carrierId);
             return TypedResults.Problem(
                 statusCode: StatusCodes.Status400BadRequest, title: "The booking request is incomplete.", detail: string.Join(' ', problems));
@@ -62,12 +63,12 @@ public static partial class CarrierBookingEndpoint
             new ReceiveCarrierBookingCommand(carrierId, body.CarrierBookingNumber!, body.ShipmentNumber!, correlationId!, DetailsOf(body)), cancellationToken);
         if (!result.IsSuccess)
         {
-            using var unknown = logger.BeginScope(Outcome("Failed", "CarrierUnknown"));
+            using var unknown = logger.BeginScope(EndpointTracking.Outcome("Failed", "CarrierUnknown"));
             LogUnknownCarrier(logger, carrierId);
             return TypedResults.Problem(statusCode: StatusCodes.Status404NotFound, title: "There is no such Carrier.");
         }
 
-        using var received = logger.BeginScope(Outcome("Succeeded", failureCode: null));
+        using var received = logger.BeginScope(EndpointTracking.Outcome("Succeeded", failureCode: null));
         LogReceived(logger, result.Value.Repeated);
         return TypedResults.Ok(result.Value);
     }
@@ -99,31 +100,6 @@ public static partial class CarrierBookingEndpoint
         body.ConsigneeName,
         [.. (body.Goods ?? []).Select(line => new CarrierBookingGoodsLine(
             line.PackageType, line.Quantity, line.WeightKg, line.LengthCm, line.WidthCm, line.HeightCm))]);
-
-    // The tracking contract's keys the request carries (coding guidelines §7); a key that doesn't apply is left out.
-    private static Dictionary<string, object?> TrackingKeys(string carrierId, string? correlationId, CarrierBookingRequestBody body)
-    {
-        var keys = new Dictionary<string, object?> { ["flow"] = Flow, ["partyId"] = carrierId };
-        if (!string.IsNullOrWhiteSpace(correlationId))
-        {
-            keys["correlationId"] = correlationId;
-        }
-
-        if (!string.IsNullOrWhiteSpace(body.ShipmentNumber))
-        {
-            keys["shipmentNumber"] = body.ShipmentNumber;
-        }
-
-        if (!string.IsNullOrWhiteSpace(body.CarrierBookingNumber))
-        {
-            keys["carrierBookingNumber"] = body.CarrierBookingNumber;
-        }
-
-        return keys;
-    }
-
-    private static Dictionary<string, object?> Outcome(string outcome, string? failureCode) =>
-        failureCode is null ? new() { ["outcome"] = outcome } : new() { ["outcome"] = outcome, ["failureCode"] = failureCode };
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Refused a booking request for Carrier {CarrierId}: the credential is missing or wrong")]
     private static partial void LogRefused(ILogger logger, string carrierId);

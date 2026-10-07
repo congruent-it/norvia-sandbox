@@ -113,6 +113,14 @@ public sealed class NotificationInboxTests : PortalWebContext
     public void Arrival_ANotificationWithNeither_SaysNothing() =>
         ExceptionText.Arrival(Notification()).Should().BeEmpty();
 
+    [Fact]
+    public void ExceptionText_HasWordsForEveryCode() =>
+        Enum.GetValues<ShipperExceptionCode>().Select(ExceptionText.Of).Should().OnlyHaveUniqueItems().And.OnlyContain(text => text.Length > 0);
+
+    [Fact]
+    public void ExceptionText_ForACodeItDoesNotKnow_Throws() =>
+        ((Func<string>)(() => ExceptionText.Of((ShipperExceptionCode)99))).Should().Throw<ArgumentOutOfRangeException>();
+
     [Theory]
     [InlineData(ShipperExceptionCode.CollectionFailed, "Collection failed")]
     [InlineData(ShipperExceptionCode.DeliveryFailed, "Delivery failed")]

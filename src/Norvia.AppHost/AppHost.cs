@@ -124,9 +124,7 @@ if (builder.ExecutionContext.IsPublishMode)
     // behind an Entra sign-in that only the presenter passes (ADR 0024). The apps don't know it is there.
     // The exceptions are each Carrier Persona's booking endpoint and each Shipper Persona's notification endpoint: the
     // Logic Apps that call them are no browsers, and the endpoints ask them for the party's own credential.
-    var personaEndpoints = personas
-        .Select(persona => persona.IsShipper ? $"/shipper/v1/{persona.PartyId}/notifications" : $"/carrier/v1/{persona.PartyId}/bookings")
-        .ToList();
+    var personaEndpoints = personas.Select(persona => persona.EndpointPath).ToList();
     foreach (var (demoUi, pathsOutsideTheGate) in new[] { (tmsWeb, []), (partnerPortal, personaEndpoints) })
     {
         demoUi.WithExternalHttpEndpoints()
@@ -307,7 +305,7 @@ else
     {
         var carrierApiKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
         bookingWorker
-            .WithEnvironment($"Booking__Carriers__{persona.PartyId}__Address", ReferenceExpression.Create($"{partnerPortal.GetEndpoint("http")}/carrier/v1/{persona.PartyId}/bookings"))
+            .WithEnvironment($"Booking__Carriers__{persona.PartyId}__Address", ReferenceExpression.Create($"{partnerPortal.GetEndpoint("http")}{persona.EndpointPath}"))
             .WithEnvironment($"Booking__Carriers__{persona.PartyId}__ApiKey", carrierApiKey);
         // The Persona's endpoint asks its caller for the same credential, as Key Vault holds it in Azure.
         partnerPortal.WithEnvironment($"CarrierEndpoint__ApiKeys__{persona.PartyId}", carrierApiKey);

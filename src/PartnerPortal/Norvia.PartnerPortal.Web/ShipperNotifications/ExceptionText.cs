@@ -13,7 +13,7 @@ public static class ExceptionText
         ShipperExceptionCode.Damaged => "Goods damaged",
         ShipperExceptionCode.Reservations => "Delivered with reservations",
         ShipperExceptionCode.Late => "Delivery late",
-        _ => code.ToString(),
+        _ => throw new ArgumentOutOfRangeException(nameof(code), code, "The inbox has no words for this code."),
     };
 
     /// <summary>When the goods are now due, as the notification says: the agreed delivery window if there is one, else the ETA.</summary>

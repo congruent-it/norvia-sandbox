@@ -56,7 +56,7 @@ public sealed class AppHostModelTests
         var portal = await EnvironmentOfAsync(builder, "partner-portal-web");
 
         portal.Should().Contain("PartnerApi__BaseAddress", "{partner-api.bindings.http.url}/partner/v1")
-            .And.Contain("PartnerApi__PersonaClientIds", "brouwer-dranken=norvia-local-persona-brouwer-dranken;van-dijk-transport=norvia-local-persona-van-dijk-transport;kessler-spedition=norvia-local-persona-kessler-spedition;pakketpunt-express=norvia-local-persona-pakketpunt-express")
+            .And.Contain("PartnerApi__PersonaClientIds", "brouwer-dranken=norvia-local-persona-brouwer-dranken;tuincentrum-groenrijk=norvia-local-persona-tuincentrum-groenrijk;van-dijk-transport=norvia-local-persona-van-dijk-transport;kessler-spedition=norvia-local-persona-kessler-spedition;pakketpunt-express=norvia-local-persona-pakketpunt-express")
             .And.Contain("PartnerApi__LocalTokens__Roles__brouwer-dranken__0", "TransportOrders.Submit")
             .And.ContainKey("PartnerApi__LocalTokens__SigningKey");
         foreach (var carrier in new[] { "van-dijk-transport", "kessler-spedition", "pakketpunt-express" })
@@ -66,6 +66,20 @@ public sealed class AppHostModelTests
 
         portal.Keys.Should().NotContain(key => key.StartsWith("PartnerApi__LocalTokens__Roles__brouwer-dranken__1", StringComparison.Ordinal), "a Shipper Persona holds no respond role");
         portal.Keys.Should().NotContain(key => key.StartsWith("PartnerApi__Entra", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Locally_ThePartnerPortal_AsksEachPersonasEndpointCallerForACredential()
+    {
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(TestContext.Current.CancellationToken);
+
+        var portal = await EnvironmentOfAsync(builder, "partner-portal-web");
+
+        portal.Keys.Where(key => key.StartsWith("ShipperEndpoint__ApiKeys__", StringComparison.Ordinal))
+            .Should().BeEquivalentTo("ShipperEndpoint__ApiKeys__SHP-0001", "ShipperEndpoint__ApiKeys__SHP-0003");
+        portal.Keys.Where(key => key.StartsWith("CarrierEndpoint__ApiKeys__", StringComparison.Ordinal))
+            .Should().BeEquivalentTo("CarrierEndpoint__ApiKeys__CAR-0001", "CarrierEndpoint__ApiKeys__CAR-0002", "CarrierEndpoint__ApiKeys__CAR-0003");
+        portal.Values.Where(value => value.Length == 32).Should().OnlyHaveUniqueItems();
     }
 
     [Fact]
@@ -375,7 +389,7 @@ public sealed class AppHostModelTests
 
         var bicep = ContainerAppBicepOf(builder, demoUi);
 
-        bicep.Should().MatchRegex(@"excludedPaths: \[\s*'/health'\s*'/alive'(\s*'/carrier/v1/[^']+/bookings')*\s*\]");
+        bicep.Should().MatchRegex(@"excludedPaths: \[\s*'/health'\s*'/alive'(\s*'/(carrier|shipper)/v1/[^']+/(bookings|notifications)')*\s*\]");
     }
 
     [Fact]
@@ -387,13 +401,13 @@ public sealed class AppHostModelTests
     }
 
     [Fact]
-    public async Task InAzure_ThePartnerPortal_AlsoLeavesEachCarriersBookingEndpointOutsideTheGate()
+    public async Task InAzure_ThePartnerPortal_AlsoLeavesEachPersonasEndpointOutsideTheGate()
     {
-        // The P4 booking Logic App is no browser, and the endpoint asks it for the Carrier's own credential (ADR 0024).
+        // The P4 booking and P7 Shipper notification Logic Apps are no browsers, and each endpoint asks its caller for the party's own credential (ADR 0024).
         await using var builder = await CreateForAzureAsync();
 
         ContainerAppBicepOf(builder, "partner-portal-web").Should()
-            .MatchRegex(@"excludedPaths: \[\s*'/health'\s*'/alive'\s*'/carrier/v1/CAR-0001/bookings'\s*'/carrier/v1/CAR-0002/bookings'\s*'/carrier/v1/CAR-0003/bookings'\s*\]");
+            .MatchRegex(@"excludedPaths: \[\s*'/health'\s*'/alive'\s*'/shipper/v1/SHP-0001/notifications'\s*'/shipper/v1/SHP-0003/notifications'\s*'/carrier/v1/CAR-0001/bookings'\s*'/carrier/v1/CAR-0002/bookings'\s*'/carrier/v1/CAR-0003/bookings'\s*\]");
     }
 
     [Theory]
