@@ -38,4 +38,11 @@ public static class CarrierBookingRules
         ArgumentNullException.ThrowIfNull(booking);
         return new(CarrierBookingRefusalCode.BookingNotCancelled, Invariant($"Carrier booking {booking.Number} is {booking.Status}, not Withdrawn or Cancelled."));
     }
+
+    /// <summary>The refusal for a confirmation whose reference the Carrier already holds on another Confirmed Carrier booking.</summary>
+    public static CarrierBookingRefusal ReferenceInUse(CarrierBooking booking, string carrierBookingReference)
+    {
+        ArgumentNullException.ThrowIfNull(booking);
+        return new(CarrierBookingRefusalCode.ReferenceInUse, Invariant($"Carrier {booking.CarrierId} already holds reference {carrierBookingReference} on another Confirmed Carrier booking, so Carrier booking {booking.Number} can't be confirmed with it."));
+    }
 }

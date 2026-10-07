@@ -140,6 +140,7 @@ An `INVALID` answer never reaches the TMS.
 |---|---|---|---|
 | `RECORDED` | 200 | The TMS recorded the answer: the booking is Confirmed or Rejected. `repeated` is true when the same answer was recorded before, and nothing was recorded again | `carrierBookingNumber`, `decision`, `repeated` |
 | `BOOKING_NOT_OPEN` | 409 | The booking isn't Requested any more: Norvia withdrew it while the Carrier was answering, or it already has a different answer (`BookingNotOpen` at the TMS) | `carrierBookingNumber`, `text` |
+| `REFERENCE_IN_USE` | 422 | A confirmation's booking reference is one the Carrier already holds on another Confirmed booking (`ReferenceInUse` at the TMS). Nothing was recorded, and the Carrier confirms again with another reference | `carrierBookingNumber`, `text` |
 | `BOOKING_NOT_FOUND` | 404 | Norvia has no such booking | `carrierBookingNumber`, `text` |
 | `NOT_ALLOWED` | 403 | The booking is another Carrier's | `carrierBookingNumber`, `text` |
 | `INVALID` | 400 | The answer breaks the rules above. Nothing was sent to the TMS | `carrierBookingNumber` when it named one, `text` saying why |

@@ -46,6 +46,7 @@ public sealed class CarrierAnswerResponsesTests
     [InlineData(403, "NOT_ALLOWED")]
     [InlineData(404, "BOOKING_NOT_FOUND")]
     [InlineData(409, "BOOKING_NOT_OPEN")]
+    [InlineData(422, "REFERENCE_IN_USE")]
     public void Relay_ARefusalOfTheTms_IsRelayedWithItsOwnStatus_AndTheRunNeedNotFail(int status, string result)
     {
         var response = Relay(status, "{}");
@@ -71,7 +72,7 @@ public sealed class CarrierAnswerResponsesTests
     [InlineData(429, "TmsUnavailable")]
     [InlineData(400, "TmsCallRefused")]
     [InlineData(401, "TmsCallRefused")]
-    [InlineData(422, "TmsCallRefused")]
+    [InlineData(405, "TmsCallRefused")]
     public void Relay_ATmsThatCouldntTakeTheAnswerIn_IsNotReceived_WithTheReasonForTheRun(int status, string failureCode)
     {
         var response = Relay(status, "");

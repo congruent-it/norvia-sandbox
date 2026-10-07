@@ -16,6 +16,7 @@ public sealed class CarrierBookingAnswerFromAnInactiveCarrierTests(CorrectableSe
     [Fact]
     public async Task Confirm_FromACarrierMadeInactiveSinceTheBookingWasSent_IsAccepted()
     {
+        var reference = CarrierBookingCalls.NewReference();
         var number = await tms.SubmitAcceptedAsync(_cancellationToken);
         var assigned = await tms.AssignPlannedAsync(number, PlanningCalls.ToCarrier(), _cancellationToken);
         await tms.PublishedAsync(assigned["correlationId"]!.GetValue<string>(), "ShipmentPlanned", _cancellationToken);
@@ -24,7 +25,7 @@ public sealed class CarrierBookingAnswerFromAnInactiveCarrierTests(CorrectableSe
 
         await tms.CorrectSeedAsync(Deactivate(PlanningCalls.CarrierId), _cancellationToken);
 
-        var confirmed = await tms.ConfirmedAsync(carrierBookingNumber, PlanningCalls.CarrierId, "VDT-240917-0042", _cancellationToken);
+        var confirmed = await tms.ConfirmedAsync(carrierBookingNumber, PlanningCalls.CarrierId, reference, _cancellationToken);
 
         confirmed["status"]!.GetValue<string>().Should().Be("Confirmed");
     }

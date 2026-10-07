@@ -13,11 +13,11 @@ namespace Norvia.Tms.Api.IntegrationTests.CarrierBookings;
 /// </summary>
 public sealed class CarrierBookingAnswerAuthorizationTests(TmsFixture tms)
 {
-    private static readonly JsonObject Confirmation = new()
+    private static JsonObject Confirmation => new()
     {
         ["carrierId"] = PlanningCalls.CarrierId,
         ["outcome"] = "Confirmed",
-        ["carrierBookingReference"] = "VDT-240917-0042",
+        ["carrierBookingReference"] = CarrierBookingCalls.NewReference(),
     };
 
     private static readonly JsonObject Rejection = new() { ["carrierId"] = PlanningCalls.CarrierId, ["outcome"] = "Rejected", ["reasonCode"] = "NoCapacity" };

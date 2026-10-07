@@ -9,6 +9,9 @@ public enum CarrierAnswerResult
     /// <summary>Norvia no longer has the request open: it withdrew it while the Carrier was answering, or the request already has a different answer.</summary>
     BookingNotOpen,
 
+    /// <summary>The confirmation's reference is one the Carrier already holds on another confirmed booking. Nothing was recorded, and the Carrier confirms again with another reference.</summary>
+    ReferenceInUse,
+
     /// <summary>Norvia has no such booking.</summary>
     BookingNotFound,
 

@@ -82,8 +82,9 @@ public sealed class CarrierBookingQueriesTests(TmsFixture tms)
     [Fact]
     public async Task BookingsAwaitingAnswer_ListsOnlyRequestedBookings_NotConfirmedRejectedNotDeliveredOrWithdrawnOnes()
     {
+        var reference = CarrierBookingCalls.NewReference();
         var (confirmedBooking, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
-        await tms.ConfirmedAsync(confirmedBooking, PlanningCalls.CarrierId, "VDT-240917-0042", _cancellationToken);
+        await tms.ConfirmedAsync(confirmedBooking, PlanningCalls.CarrierId, reference, _cancellationToken);
         var (rejectedBooking, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
         await tms.RejectedAsync(rejectedBooking, PlanningCalls.CarrierId, "NoCapacity", _cancellationToken);
         var (withdrawnBooking, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);

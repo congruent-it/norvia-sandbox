@@ -32,6 +32,12 @@ public sealed class ConfirmCarrierBookingHandler(IRepository<CarrierBooking> car
                 : CarrierBookingRefused.Because<CarrierBookingAnswerResult>(CarrierBookingRules.NotOpen(booking));
         }
 
+        // Tracking events and Proofs of delivery find their Shipment by the Carrier's reference, so one Carrier may not hold it twice.
+        if (await carrierBookings.AnyAsync(new ConfirmedCarrierBookingByReferenceSpec(booking.CarrierId, command.CarrierBookingReference), cancellationToken))
+        {
+            return CarrierBookingRefused.Because<CarrierBookingAnswerResult>(CarrierBookingRules.ReferenceInUse(booking, command.CarrierBookingReference));
+        }
+
         if (!booking.Confirm(
                 command.CarrierBookingReference, command.PlannedCollectionTime, shipment.TransportOrderNumber, new CorrelationId(command.CorrelationId), time.GetUtcNow())
             || !shipment.Book())

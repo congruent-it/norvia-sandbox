@@ -17,6 +17,7 @@ public sealed class CarrierAnswerTrackingTests
     [Theory]
     [InlineData(CarrierAnswerResult.Recorded, "Succeeded", null)]
     [InlineData(CarrierAnswerResult.BookingNotOpen, "Refused", "BookingNotOpen")]
+    [InlineData(CarrierAnswerResult.ReferenceInUse, "Refused", "ReferenceInUse")]
     [InlineData(CarrierAnswerResult.BookingNotFound, "Refused", "BookingNotFound")]
     [InlineData(CarrierAnswerResult.NotAllowed, "Refused", "CarrierNotAllowed")]
     [InlineData(CarrierAnswerResult.Invalid, "Refused", "CarrierAnswerUnreadable")]

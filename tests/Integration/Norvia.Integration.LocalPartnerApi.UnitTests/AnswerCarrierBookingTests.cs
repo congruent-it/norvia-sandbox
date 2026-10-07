@@ -150,6 +150,17 @@ public sealed class AnswerCarrierBookingTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Answer_TheTmsRefusesBecauseTheReferenceIsInUse_RelaysReferenceInUse()
+    {
+        _factory.Tms.Answer(HttpStatusCode.UnprocessableEntity, """{ "title": "The Carrier's answer can't be recorded.", "code": "ReferenceInUse" }""", "application/problem+json");
+
+        using var response = await AnswerAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        (await BodyAsync(response))["result"]!.GetValue<string>().Should().Be("REFERENCE_IN_USE");
+    }
+
+    [Fact]
     public async Task Answer_TheTmsCantBeReached_AnswersNotReceived()
     {
         _factory.Tms.Fail(new HttpRequestException("Connection refused"));

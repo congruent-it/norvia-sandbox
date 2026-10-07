@@ -74,8 +74,9 @@ public sealed class CarrierBookingWithdrawTests(TmsFixture tms)
     [Fact]
     public async Task Withdraw_ABookingAlreadyConfirmed_IsRefused_WithBookingNotOpen()
     {
+        var reference = CarrierBookingCalls.NewReference();
         var (carrierBookingNumber, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
-        await tms.ConfirmedAsync(carrierBookingNumber, PlanningCalls.CarrierId, "VDT-240917-0042", _cancellationToken);
+        await tms.ConfirmedAsync(carrierBookingNumber, PlanningCalls.CarrierId, reference, _cancellationToken);
 
         var problem = await tms.WithdrawRefusedAsync(carrierBookingNumber, HttpStatusCode.Conflict, _cancellationToken);
 
@@ -85,10 +86,11 @@ public sealed class CarrierBookingWithdrawTests(TmsFixture tms)
     [Fact]
     public async Task Confirm_AWithdrawnBooking_IsRefused_WithBookingNotOpen()
     {
+        var reference = CarrierBookingCalls.NewReference();
         var (carrierBookingNumber, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
         await tms.WithdrawnAsync(carrierBookingNumber, _cancellationToken);
 
-        var problem = await tms.ConfirmRefusedAsync(carrierBookingNumber, PlanningCalls.CarrierId, "VDT-240917-0042", HttpStatusCode.Conflict, _cancellationToken);
+        var problem = await tms.ConfirmRefusedAsync(carrierBookingNumber, PlanningCalls.CarrierId, reference, HttpStatusCode.Conflict, _cancellationToken);
 
         problem["code"]!.GetValue<string>().Should().Be("BookingNotOpen");
     }

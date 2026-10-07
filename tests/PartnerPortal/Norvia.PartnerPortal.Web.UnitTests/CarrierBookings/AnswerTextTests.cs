@@ -93,6 +93,15 @@ public sealed class AnswerTextTests
     }
 
     [Fact]
+    public void Notice_ReferenceInUse_AsksForAnotherReference_AndLetsTheCarrierAnswerAgain()
+    {
+        var notice = AnswerNotice.Of("CB-0000001", Confirmation, new AnsweredCarrierBooking(Request, NorviaReply.Refusal(CarrierAnswerResult.ReferenceInUse, "x", "m-1")));
+
+        notice.Text.Should().Contain("already hold that reference").And.Contain("reference of its own");
+        notice.AnswerAgain.Should().BeTrue();
+    }
+
+    [Fact]
     public void Notice_AnyOtherRefusal_IsInNorviasWords()
     {
         var notice = AnswerNotice.Of("CB-0000001", Confirmation, new AnsweredCarrierBooking(Request, NorviaReply.Refusal(CarrierAnswerResult.NotAllowed, "Not yours.", "m-1")));

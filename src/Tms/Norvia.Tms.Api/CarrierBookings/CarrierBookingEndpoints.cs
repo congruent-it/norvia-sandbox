@@ -49,7 +49,8 @@ public static class CarrierBookingEndpoints
                 + "answered as before, flagged as a repeat, without recording anything again or publishing a new event. An answer is refused, "
                 + "changing and publishing nothing, with a problem whose correlationId names the Message trail the refusal is traced on: "
                 + "BookingNotFound (404, with that code) or BookingNotOpen (409, with that code) for a conflicting answer to a booking that "
-                + "already has one, or the wrong Carrier answering (403, no code). A Carrier made inactive since the booking was sent can still "
+                + "already has one, ReferenceInUse (422, with that code) for a confirmation whose reference the Carrier already holds on another Confirmed "
+                + "Carrier booking, or the wrong Carrier answering (403, no code). A Carrier made inactive since the booking was sent can still "
                 + "answer it.");
 
         carrierBookings.MapPost("/{carrierBookingNumber}/report-sent", ReportSentAsync)
@@ -286,6 +287,7 @@ public static class CarrierBookingEndpoints
     private static int StatusCodeOf(CarrierBookingRefusalCode code) => code switch
     {
         CarrierBookingRefusalCode.BookingNotFound => StatusCodes.Status404NotFound,
+        CarrierBookingRefusalCode.ReferenceInUse => StatusCodes.Status422UnprocessableEntity,
         _ => StatusCodes.Status409Conflict, // BookingNotOpen, BookingNotCancelled
     };
 }
