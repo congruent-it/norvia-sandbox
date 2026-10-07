@@ -16,6 +16,7 @@ internal static class ResubmitAwareFilters
     {
         ["carrier-booking"] = "assignedTo = 'Carrier'",
         ["shipper-notification"] = "eventType = 'ShipperNotificationRequested'",
+        ["carrier-cancellation"] = "eventType = 'CarrierBookingCancelled' OR eventType = 'CarrierBookingWithdrawn'",
     };
 
     public static void Apply(JsonNode configuration)

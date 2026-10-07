@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The Carrier cancellation map as a local function of the P7 Carrier cancellation Logic App (ADR 0019). Building this project writes it into the
+    Logic App project's lib/custom folder, which is what gets deployed. The Logic Apps SDK's build targets read the
+    target framework as a folder name, so it must be net8, not net8.0.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8</TargetFramework>
+    <AzureFunctionsVersion>v4</AzureFunctionsVersion>
+    <OutputType>Library</OutputType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <SelfContained>false</SelfContained>
+    <IsPackable>false</IsPackable>
+    <LogicAppFolderToPublish>$(MSBuildProjectDirectory)/../CarrierCancellationLogicApp</LogicAppFolderToPublish>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Abstractions" />
+    <PackageReference Include="Microsoft.Azure.Functions.Worker.Sdk" />
+    <PackageReference Include="Microsoft.Azure.Workflows.WebJobs.Sdk" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Norvia.Integration.CarrierBooking\Norvia.Integration.CarrierBooking.csproj" />
+  </ItemGroup>
+  <!-- The SDK copies the functions into lib/custom when the project is published, so every build publishes. -->
+  <Target Name="PublishToTheLogicAppOnBuild" AfterTargets="Build">
+    <CallTarget Targets="Publish" />
+  </Target>
+</Project>

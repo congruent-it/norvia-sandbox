@@ -11,6 +11,9 @@ param bookingPrincipalId string
 @description('The P7 Shipper notification Logic App\'s identity, which receives from its own subscription and from nothing else.')
 param shipperNotificationPrincipalId string
 
+@description('The P7 Carrier cancellation Logic App\'s identity, which receives from its own subscription and from nothing else.')
+param carrierCancellationPrincipalId string
+
 @description('The Carrier-tracking Logic App\'s identity, which receives from the tracking queue and from nothing else.')
 param trackingPrincipalId string
 
@@ -119,6 +122,25 @@ resource shipperNotificationFilter 'Microsoft.ServiceBus/namespaces/topics/subsc
   }
 }
 
+// The P7 Carrier cancellation Logic App's subscription: CarrierBookingCancelled and CarrierBookingWithdrawn only, as the message's
+// eventType property says. Its filter also routes resubmits from the console, like every subscription's (coding guidelines §7). The
+// AppHost's emulator gives the same subscription the same condition (ResubmitAwareFilters).
+resource carrierCancellation 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01' = {
+  parent: shipmentEvents
+  name: 'carrier-cancellation'
+}
+
+resource carrierCancellationFilter 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
+  parent: carrierCancellation
+  name: '$Default'
+  properties: {
+    filterType: 'SqlFilter'
+    sqlFilter: {
+      sqlExpression: '((eventType = \'CarrierBookingCancelled\' OR eventType = \'CarrierBookingWithdrawn\') AND resubmitTo IS NULL) OR resubmitTo = \'carrier-cancellation\''
+    }
+  }
+}
+
 var serviceBusDataReceiver = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0')
 
 resource presenterReadsMessages 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(presenterPrincipalId)) {
@@ -148,6 +170,17 @@ resource shipperNotificationReceivesItsMessages 'Microsoft.Authorization/roleAss
   scope: shipperNotification
   properties: {
     principalId: shipperNotificationPrincipalId
+    roleDefinitionId: serviceBusDataReceiver
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Scoped to the subscription, so the Carrier cancellation Logic App reads cancellations and withdrawals and no other message.
+resource carrierCancellationReceivesItsMessages 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(carrierCancellation.id, carrierCancellationPrincipalId, serviceBusDataReceiver)
+  scope: carrierCancellation
+  properties: {
+    principalId: carrierCancellationPrincipalId
     roleDefinitionId: serviceBusDataReceiver
     principalType: 'ServicePrincipal'
   }

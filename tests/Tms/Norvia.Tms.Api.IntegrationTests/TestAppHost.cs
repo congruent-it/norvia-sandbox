@@ -12,7 +12,7 @@ internal static class TestAppHost
     private static readonly string[] Unneeded =
     [
         "dbgate", "partner-portal", "partner-portal-migrations", "partner-portal-web", "integration-console-web",
-        "partner-api", "booking-worker", "shipper-notification-worker", "tracking-worker", "proof-of-delivery-worker",
+        "partner-api", "booking-worker", "shipper-notification-worker", "carrier-cancellation-worker", "tracking-worker", "proof-of-delivery-worker",
     ];
 
     /// <summary>Takes the resources the TMS API's tests don't use out of the AppHost, so it starts the TMS (with its UI, which the demo seed test needs), its database and the Service Bus emulator.</summary>

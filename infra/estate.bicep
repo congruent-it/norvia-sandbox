@@ -30,7 +30,7 @@ postdeploy hook stores it, so the console's app registration keeps it when the e
 param integrationConsoleRedirectUris string = ''
 
 @description('''The TMS API's address, empty before the apps are first deployed. azd's postdeploy hook stores it, so the intake,
-Carrier-answer, Shipper notification, Carrier-tracking and Carrier Proof of delivery Logic Apps keep it when the estate is deployed again.''')
+Carrier-answer, Shipper notification, Carrier cancellation, Carrier-tracking and Carrier Proof of delivery Logic Apps keep it when the estate is deployed again.''')
 param tmsBaseUrl string = ''
 
 @secure()
@@ -39,7 +39,7 @@ once and keeps it in the azd environment.''')
 param carrierEndpointKeySeed string
 
 @description('''The Partner portal's address, empty before the apps are first deployed. azd's postdeploy hook stores it, so the P4
-booking and Shipper notification Logic Apps keep it when the estate is deployed again.''')
+booking, Shipper notification and Carrier cancellation Logic Apps keep it when the estate is deployed again.''')
 param partnerPortalBaseUrl string = ''
 
 var tags = {
@@ -71,6 +71,7 @@ module messaging 'estate/messaging.bicep' = {
     presenterPrincipalId: presenterPrincipalId
     bookingPrincipalId: identities.outputs.bookingPrincipalId
     shipperNotificationPrincipalId: identities.outputs.shipperNotificationPrincipalId
+    carrierCancellationPrincipalId: identities.outputs.carrierCancellationPrincipalId
     trackingPrincipalId: identities.outputs.trackingPrincipalId
     proofOfDeliveryPrincipalId: identities.outputs.proofOfDeliveryPrincipalId
     apiManagementPrincipalId: identities.outputs.apiManagementPrincipalId
@@ -165,6 +166,25 @@ module shipperNotificationLogicApp 'estate/shipper-notification-logic-app.bicep'
   }
 }
 
+module carrierCancellationLogicApp 'estate/carrier-cancellation-logic-app.bicep' = {
+  scope: resourceGroup
+  params: {
+    location: location
+    tags: tags
+    integrationRetentionDays: integrationRetentionDays
+    carrierCancellationIdentityName: identities.outputs.carrierCancellationIdentityName
+    tmsApiClientId: identities.outputs.tmsApiClientId
+    tmsBaseUrl: tmsBaseUrl
+    partnerPortalBaseUrl: partnerPortalBaseUrl
+    applicationInsightsName: monitoring.outputs.applicationInsightsName
+    serviceBusName: messaging.outputs.namespaceName
+    planName: intakeLogicApp.outputs.planName
+    contentKeyVaultName: intakeLogicApp.outputs.keyVaultName
+    carrierKeyVaultName: partnerApi.outputs.partnerPortalKeyVaultName
+    integrationConsolePrincipalId: identities.outputs.integrationConsolePrincipalId
+  }
+}
+
 module trackingLogicApp 'estate/tracking-logic-app.bicep' = {
   scope: resourceGroup
   params: {
@@ -236,6 +256,7 @@ module partnerApi 'estate/partner-api.bicep' = {
     partnerPortalPrincipalId: identities.outputs.partnerPortalPrincipalId
     bookingPrincipalId: identities.outputs.bookingPrincipalId
     shipperNotificationPrincipalId: identities.outputs.shipperNotificationPrincipalId
+    carrierCancellationPrincipalId: identities.outputs.carrierCancellationPrincipalId
     carrierEndpointKeySeed: carrierEndpointKeySeed
   }
 }
@@ -258,11 +279,14 @@ output ESTATE_BOOKING_IDENTITY_NAME string = identities.outputs.bookingIdentityN
 output ESTATE_BOOKING_CLIENT_ID string = identities.outputs.bookingClientId
 output ESTATE_SHIPPER_NOTIFICATION_IDENTITY_NAME string = identities.outputs.shipperNotificationIdentityName
 output ESTATE_SHIPPER_NOTIFICATION_CLIENT_ID string = identities.outputs.shipperNotificationClientId
+output ESTATE_CARRIER_CANCELLATION_IDENTITY_NAME string = identities.outputs.carrierCancellationIdentityName
+output ESTATE_CARRIER_CANCELLATION_CLIENT_ID string = identities.outputs.carrierCancellationClientId
 output ESTATE_TMS_UI_IDENTITY_NAME string = identities.outputs.tmsUiIdentityName
 output ESTATE_TMS_UI_CLIENT_ID string = identities.outputs.tmsUiClientId
 output ESTATE_INTAKE_LOGIC_APP string = intakeLogicApp.outputs.logicAppName
 output ESTATE_BOOKING_LOGIC_APP string = bookingLogicApp.outputs.logicAppName
 output ESTATE_SHIPPER_NOTIFICATION_LOGIC_APP string = shipperNotificationLogicApp.outputs.logicAppName
+output ESTATE_CARRIER_CANCELLATION_LOGIC_APP string = carrierCancellationLogicApp.outputs.logicAppName
 output ESTATE_ANSWER_LOGIC_APP string = answerLogicApp.outputs.logicAppName
 output ESTATE_ANSWER_CLIENT_ID string = identities.outputs.answerClientId
 output ESTATE_ANSWER_IDENTITY_NAME string = identities.outputs.answerIdentityName

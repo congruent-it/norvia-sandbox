@@ -191,6 +191,8 @@ else
     shipmentEvents.AddServiceBusSubscription("carrier-booking");
     // The P7 Shipper notification Logic App's subscription: ShipperNotificationRequested only (see ResubmitAwareFilters).
     shipmentEvents.AddServiceBusSubscription("shipper-notification");
+    // The P7 Carrier cancellation Logic App's subscription: CarrierBookingCancelled and CarrierBookingWithdrawn only (see ResubmitAwareFilters).
+    shipmentEvents.AddServiceBusSubscription("carrier-cancellation");
     // The tracking queue API Management puts a Carrier's tracking message on and the Carrier-tracking Logic App reads
     // (ADR 0008). A message the TMS refuses is dead-lettered; one it can't be given to is delivered again up to the
     // maximum delivery count, then dead-lettered by Service Bus itself. The estate Bicep sets the same count.
@@ -295,6 +297,16 @@ else
         .WithEnvironment("ShipperNotification__TmsTokens__Issuer", LocalTokens.Issuer)
         .WithEnvironment("ShipperNotification__TmsTokens__Audience", LocalTokens.TmsAudience)
         .WithEnvironment("ShipperNotification__TmsTokens__ClientId", LocalTokens.ShipperNotificationLogicAppClientId);
+    // Locally a worker plays the P7 Carrier cancellation Logic App too (ADR 0034). It reads its subscription, sends each Carrier
+    // Persona's cancellation or withdrawal to the Persona's cancellation endpoint in the Partner portal with the credential for the
+    // run, and reports it told or not delivered to the TMS as the identity holding the Carrier booking report role.
+    var carrierCancellationWorker = builder.AddProject<Projects.Norvia_Integration_LocalCarrierCancellationWorker>("carrier-cancellation-worker")
+        .WithReference(messaging).WaitFor(messaging)
+        .WithReference(tmsApi).WaitFor(tmsApi)
+        .WithEnvironment("CarrierCancellation__TmsBaseAddress", tmsApi.GetEndpoint("http"))
+        .WithEnvironment("CarrierCancellation__TmsTokens__Issuer", LocalTokens.Issuer)
+        .WithEnvironment("CarrierCancellation__TmsTokens__Audience", LocalTokens.TmsAudience)
+        .WithEnvironment("CarrierCancellation__TmsTokens__ClientId", LocalTokens.CarrierCancellationLogicAppClientId);
     // Locally a worker plays the Carrier-tracking Logic App too (ADR 0031). It reads the tracking queue API Management's
     // stand-in fills and records each Tracking event with the TMS as the identity holding the record role.
     var trackingWorker = builder.AddProject<Projects.Norvia_Integration_LocalTrackingWorker>("tracking-worker")
@@ -321,7 +333,10 @@ else
         bookingWorker
             .WithEnvironment($"Booking__Carriers__{persona.PartyId}__Address", ReferenceExpression.Create($"{partnerPortal.GetEndpoint("http")}{persona.EndpointPath}"))
             .WithEnvironment($"Booking__Carriers__{persona.PartyId}__ApiKey", carrierApiKey);
-        // The Persona's endpoint asks its caller for the same credential, as Key Vault holds it in Azure.
+        carrierCancellationWorker
+            .WithEnvironment($"CarrierCancellation__Carriers__{persona.PartyId}__Address", ReferenceExpression.Create($"{partnerPortal.GetEndpoint("http")}{persona.CancellationPath}"))
+            .WithEnvironment($"CarrierCancellation__Carriers__{persona.PartyId}__ApiKey", carrierApiKey);
+        // The Persona's booking and cancellation endpoints ask their callers for the same credential, as Key Vault holds it in Azure.
         partnerPortal.WithEnvironment($"CarrierEndpoint__ApiKeys__{persona.PartyId}", carrierApiKey);
     }
 
@@ -370,6 +385,7 @@ else
         (partnerApi.Resource, "Tms__Tokens__SigningKey"),
         (bookingWorker.Resource, "Booking__TmsTokens__SigningKey"),
         (shipperNotificationWorker.Resource, "ShipperNotification__TmsTokens__SigningKey"),
+        (carrierCancellationWorker.Resource, "CarrierCancellation__TmsTokens__SigningKey"),
         (trackingWorker.Resource, "Tracking__TmsTokens__SigningKey"),
         (proofOfDeliveryWorker.Resource, "ProofOfDelivery__TmsTokens__SigningKey"),
         (partnerPortal.Resource, "PartnerApi__LocalTokens__SigningKey"),
