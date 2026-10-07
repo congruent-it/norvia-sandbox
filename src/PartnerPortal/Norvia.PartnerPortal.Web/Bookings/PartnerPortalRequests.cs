@@ -15,6 +15,8 @@ using Norvia.PartnerPortal.Application.CarrierShipments.SendProofOfDelivery;
 using Norvia.PartnerPortal.Application.CarrierShipments.TrackingSettings;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Application.Personas.List;
+using Norvia.PartnerPortal.Application.ShipperNotifications;
+using Norvia.PartnerPortal.Application.ShipperNotifications.List;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
 using Norvia.PartnerPortal.Web.CarrierShipments;
 
@@ -43,6 +45,9 @@ internal sealed class PartnerPortalRequests(IServiceScopeFactory scopes) : IPart
 
     public Task<IReadOnlyList<CarrierBookingRequestView>> ListCarrierBookingRequestsAsync(string personaId, CancellationToken cancellationToken) =>
         SendAsync(new ListCarrierBookingRequestsQuery(personaId), cancellationToken);
+
+    public Task<IReadOnlyList<ShipperNotificationView>> ListShipperNotificationsAsync(string personaId, CancellationToken cancellationToken) =>
+        SendAsync(new ListShipperNotificationsQuery(personaId), cancellationToken);
 
     public async Task<AnsweredCarrierBooking?> AnswerCarrierBookingAsync(
         string personaId, string carrierBookingNumber, CarrierAnswer answer, CancellationToken cancellationToken)

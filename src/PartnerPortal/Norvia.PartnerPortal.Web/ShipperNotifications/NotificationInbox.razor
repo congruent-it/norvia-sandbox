@@ -1,0 +1,135 @@
+@page "/personas/{PersonaId}/notifications"
+@* Interactive like the other pages: Fluent UI's components don't survive static streaming rendering. *@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject IPartnerPortal Portal
+@inject NavigationManager Navigation
+@inject ILogger<NotificationInbox> Logger
+@inject TimeProvider Time
+@implements IAsyncDisposable
+@using Norvia.PartnerPortal.Application.ShipperNotifications
+
+<PageTitle>Notifications · @(_persona?.DisplayName ?? PersonaId) · Partner portal</PageTitle>
+
+<h1>Notifications</h1>
+
+@if (_loadFailed)
+{
+    <div role="alert">
+        <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+            The notifications couldn't be loaded. Reload the page to try again.
+        </FluentMessageBar>
+    </div>
+}
+else if (_notifications is null)
+{
+    <FluentStack VerticalAlignment="VerticalAlignment.Center" role="status">
+        <FluentProgressRing />
+        <span>Loading the notifications…</span>
+    </FluentStack>
+}
+else if (_notifications.Count == 0)
+{
+    <div role="status">
+        <FluentMessageBar Intent="MessageIntent.Info" AllowDismiss="false">
+            Norvia hasn't sent @_persona!.DisplayName a notification yet.
+        </FluentMessageBar>
+    </div>
+}
+else
+{
+    <p class="mb-6">Every notification Norvia sent @_persona!.DisplayName, the latest first. You can't reply to them here.</p>
+    <FluentDataGrid Items="_notifications.AsQueryable()" TGridItem="ShipperNotificationView" Class="lux-table" aria-label="Notifications"
+                    GridTemplateColumns="1.2fr 1.2fr 1.4fr 1.6fr 3fr 1.6fr 1.2fr" MultiLine="true">
+        <PropertyColumn Title="Received" Property="@(notification => PortalTime.Format(notification.ReceivedAt))" />
+        <PropertyColumn Title="Transport Order" Property="@(notification => notification.TransportOrderNumber)" />
+        <PropertyColumn Title="Shipper reference" Property="@(notification => notification.ShipperReference)" />
+        <PropertyColumn Title="About" Property="@(notification => ExceptionText.Of(notification.ExceptionCode))" />
+        <PropertyColumn Title="Message" Property="@(notification => notification.Message)" />
+        <PropertyColumn Title="Arrival" Property="@(notification => ExceptionText.Arrival(notification))" />
+        <PropertyColumn Title="Norvia contact" Property="@(notification => notification.Contact)" />
+    </FluentDataGrid>
+}
+
+@code {
+    /// <summary>How often the inbox reads itself again, so a notification shows as it arrives without a page refresh.</summary>
+    public static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(2);
+
+    private readonly CancellationTokenSource _stopped = new();
+    private Task? _refreshing;
+    private PersonaView? _persona;
+    private IReadOnlyList<ShipperNotificationView>? _notifications;
+    private bool _loadFailed;
+
+    [Parameter]
+    public string PersonaId { get; set; } = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _notifications = null;
+        try
+        {
+            _persona = PersonaChoice.Find(PersonaId, await Portal.ListPersonasAsync(CancellationToken.None));
+            if (_persona is null || _persona.PartyType != PartyType.Shipper)
+            {
+                Navigation.NotFound();
+                return;
+            }
+
+            _notifications = await Portal.ListShipperNotificationsAsync(PersonaId, CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            PageLog.NotificationsLoadFailed(Logger, exception, PersonaId);
+            _loadFailed = true;
+        }
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _refreshing = RefreshUntilStoppedAsync(_stopped.Token);
+        }
+    }
+
+    // A refresh that fails keeps what the inbox showed and tries again on the next tick.
+    private async Task RefreshUntilStoppedAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(RefreshInterval, Time);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                if (_persona is null || _notifications is null)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    _notifications = await Portal.ListShipperNotificationsAsync(PersonaId, cancellationToken);
+                    await InvokeAsync(StateHasChanged);
+                }
+                catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+                {
+                    PageLog.NotificationsLoadFailed(Logger, exception, PersonaId);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The page is gone.
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _stopped.CancelAsync();
+        if (_refreshing is not null)
+        {
+            await _refreshing;
+        }
+
+        _stopped.Dispose();
+    }
+}

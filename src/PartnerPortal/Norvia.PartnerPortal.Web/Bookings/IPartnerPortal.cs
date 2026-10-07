@@ -7,6 +7,7 @@ using Norvia.PartnerPortal.Application.CarrierShipments.Send;
 using Norvia.PartnerPortal.Application.CarrierShipments.SendProofOfDelivery;
 using Norvia.PartnerPortal.Application.CarrierShipments.TrackingSettings;
 using Norvia.PartnerPortal.Application.Personas;
+using Norvia.PartnerPortal.Application.ShipperNotifications;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
 using Norvia.PartnerPortal.Web.CarrierShipments;
 
@@ -68,4 +69,7 @@ public interface IPartnerPortal
     /// settings; null when there is no such Carrier Persona. A delay out of range throws, as the page limits it.
     /// </summary>
     Task<CarrierTrackingSettingsView?> ChangeCarrierTrackingSettingsAsync(string personaId, CarrierTrackingSettingsView settings, CancellationToken cancellationToken);
+
+    /// <summary>The notifications in the Shipper Persona's inbox, the latest first.</summary>
+    Task<IReadOnlyList<ShipperNotificationView>> ListShipperNotificationsAsync(string personaId, CancellationToken cancellationToken);
 }

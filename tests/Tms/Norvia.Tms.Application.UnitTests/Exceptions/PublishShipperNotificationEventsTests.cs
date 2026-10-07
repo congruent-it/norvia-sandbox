@@ -1,9 +1,9 @@
+using Ardalis.SharedKernel;
 using Norvia.Tms.Application.Exceptions.NotifyShipper;
 using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.ShipperNotifications.Report;
 using Norvia.Tms.Application.UnitTests.TransportOrders;
 using Norvia.Tms.Domain.ShipperNotifications;
-using Ardalis.SharedKernel;
 using Norvia.Tms.Domain.TransportOrders;
 using NSubstitute;
 

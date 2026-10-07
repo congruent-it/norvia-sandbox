@@ -49,7 +49,7 @@ param partnerPortalPrincipalId string
 param bookingPrincipalId string
 
 @secure()
-@description('''A random value the Carrier endpoints' credentials are derived from, one per Carrier Persona. The deployment hook makes it
+@description('''A random value the Carrier and Shipper endpoints' credentials are derived from, one per Persona. The deployment hook makes it
 once and keeps it in the azd environment, so deploying the estate again keeps the credentials the apps already hold.''')
 param carrierEndpointKeySeed string
 
@@ -386,6 +386,24 @@ resource carrierEndpointKeys 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = [
     name: 'carrier-endpoint-key-${carrierId}'
     properties: {
       value: replace('${guid(carrierEndpointKeySeed, carrierId, 'carrier-endpoint-key')}${guid(carrierId, carrierEndpointKeySeed, 'carrier-endpoint-key')}', '-', '')
+    }
+  }
+]
+
+// Every Shipper Persona has a notification endpoint in the Partner portal (P7), with a credential of its own named after the
+// Shipper's ID, derived like the Carriers'. The portal reads them; the Shipper notification Logic App gets the role to read
+// its own when it is built.
+var shipperIds = map(
+  filter(loadJsonContent('../../seed/norvia.seed.json').personas, persona => persona.party.type == 'Shipper'),
+  persona => persona.party.id
+)
+
+resource shipperEndpointKeys 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = [
+  for shipperId in shipperIds: {
+    parent: partnerPortalSecrets
+    name: 'shipper-endpoint-key-${shipperId}'
+    properties: {
+      value: replace('${guid(carrierEndpointKeySeed, shipperId, 'shipper-endpoint-key')}${guid(shipperId, carrierEndpointKeySeed, 'shipper-endpoint-key')}', '-', '')
     }
   }
 ]

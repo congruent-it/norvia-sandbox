@@ -1,9 +1,7 @@
-using System.Security.Cryptography;
-using System.Text;
-using Mediator;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using Norvia.PartnerPortal.Application;
 using Norvia.PartnerPortal.Application.CarrierBookings.Receive;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
 
@@ -16,7 +14,7 @@ namespace Norvia.PartnerPortal.Web.CarrierBookings;
 public static partial class CarrierBookingEndpoint
 {
     public const string CorrelationIdHeader = "X-Correlation-ID";
-    public const string ApiKeyHeader = "X-Api-Key";
+    public const string ApiKeyHeader = EndpointCredential.ApiKeyHeader;
     private const string Flow = "carrier-booking";
 
     public static IEndpointRouteBuilder MapCarrierBookingEndpoint(this IEndpointRouteBuilder endpoints)
@@ -31,54 +29,50 @@ public static partial class CarrierBookingEndpoint
         [FromHeader(Name = ApiKeyHeader)] string? apiKey,
         [FromHeader(Name = CorrelationIdHeader)] string? correlationId,
         CarrierBookingRequestBody body,
-        IMediator mediator,
+        IConflictRetrier retrier,
         IOptions<CarrierEndpointOptions> options,
         ILoggerFactory loggers,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(body);
-        ArgumentNullException.ThrowIfNull(mediator);
+        ArgumentNullException.ThrowIfNull(retrier);
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(loggers);
 
         var logger = loggers.CreateLogger(typeof(CarrierBookingEndpoint));
-        using var trail = logger.BeginScope(TrackingKeys(carrierId, correlationId, body));
+        using var trail = logger.BeginScope(EndpointTracking.Keys(
+            Flow, carrierId, correlationId, ("shipmentNumber", body.ShipmentNumber), ("carrierBookingNumber", body.CarrierBookingNumber)));
 
         // Who the caller is comes first, so an unknown Carrier and a wrong credential look the same from outside.
-        if (!IsCredentialOf(carrierId, apiKey, options.Value))
+        if (!EndpointCredential.IsOf(carrierId, apiKey, options.Value.ApiKeys))
         {
-            using var refused = logger.BeginScope(Outcome("Refused", "CredentialInvalid"));
+            using var refused = logger.BeginScope(EndpointTracking.Outcome("Refused", "CredentialInvalid"));
             LogRefused(logger, carrierId);
             return TypedResults.Unauthorized();
         }
 
         if (Problems(correlationId, body) is { Count: > 0 } problems)
         {
-            using var invalid = logger.BeginScope(Outcome("Failed", "BookingRequestInvalid"));
+            using var invalid = logger.BeginScope(EndpointTracking.Outcome("Failed", "BookingRequestInvalid"));
             LogInvalid(logger, carrierId);
             return TypedResults.Problem(
                 statusCode: StatusCodes.Status400BadRequest, title: "The booking request is incomplete.", detail: string.Join(' ', problems));
         }
 
-        var result = await mediator.Send(
-            new ReceiveCarrierBookingCommand(carrierId, body.CarrierBookingNumber!, body.ShipmentNumber!, correlationId!, DetailsOf(body)), cancellationToken);
+        var command = new ReceiveCarrierBookingCommand(carrierId, body.CarrierBookingNumber!, body.ShipmentNumber!, correlationId!, DetailsOf(body));
+        // Two copies of one request can arrive at once; the one that loses the race is told it is a repeat.
+        var result = await retrier.RunAsync(mediator => mediator.Send(command, cancellationToken).AsTask());
         if (!result.IsSuccess)
         {
-            using var unknown = logger.BeginScope(Outcome("Failed", "CarrierUnknown"));
+            using var unknown = logger.BeginScope(EndpointTracking.Outcome("Failed", "CarrierUnknown"));
             LogUnknownCarrier(logger, carrierId);
             return TypedResults.Problem(statusCode: StatusCodes.Status404NotFound, title: "There is no such Carrier.");
         }
 
-        using var received = logger.BeginScope(Outcome("Succeeded", failureCode: null));
+        using var received = logger.BeginScope(EndpointTracking.Outcome("Succeeded", failureCode: null));
         LogReceived(logger, result.Value.Repeated);
         return TypedResults.Ok(result.Value);
     }
-
-    private static bool IsCredentialOf(string carrierId, string? apiKey, CarrierEndpointOptions options) =>
-        !string.IsNullOrEmpty(apiKey)
-        && options.ApiKeys.TryGetValue(carrierId, out var expected)
-        && !string.IsNullOrEmpty(expected)
-        && CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(apiKey), Encoding.UTF8.GetBytes(expected));
 
     private static List<string> Problems(string? correlationId, CarrierBookingRequestBody body)
     {
@@ -107,31 +101,6 @@ public static partial class CarrierBookingEndpoint
         body.ConsigneeName,
         [.. (body.Goods ?? []).Select(line => new CarrierBookingGoodsLine(
             line.PackageType, line.Quantity, line.WeightKg, line.LengthCm, line.WidthCm, line.HeightCm))]);
-
-    // The tracking contract's keys the request carries (coding guidelines §7); a key that doesn't apply is left out.
-    private static Dictionary<string, object?> TrackingKeys(string carrierId, string? correlationId, CarrierBookingRequestBody body)
-    {
-        var keys = new Dictionary<string, object?> { ["flow"] = Flow, ["partyId"] = carrierId };
-        if (!string.IsNullOrWhiteSpace(correlationId))
-        {
-            keys["correlationId"] = correlationId;
-        }
-
-        if (!string.IsNullOrWhiteSpace(body.ShipmentNumber))
-        {
-            keys["shipmentNumber"] = body.ShipmentNumber;
-        }
-
-        if (!string.IsNullOrWhiteSpace(body.CarrierBookingNumber))
-        {
-            keys["carrierBookingNumber"] = body.CarrierBookingNumber;
-        }
-
-        return keys;
-    }
-
-    private static Dictionary<string, object?> Outcome(string outcome, string? failureCode) =>
-        failureCode is null ? new() { ["outcome"] = outcome } : new() { ["outcome"] = outcome, ["failureCode"] = failureCode };
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Refused a booking request for Carrier {CarrierId}: the credential is missing or wrong")]
     private static partial void LogRefused(ILogger logger, string carrierId);

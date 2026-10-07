@@ -11,6 +11,13 @@ public sealed record SeedPersona(string Id, string PartyType, string PartyId)
 {
     public bool IsShipper => PartyType == "Shipper";
 
+    /// <summary>
+    /// Where the Partner portal takes what Norvia's Logic Apps send this Persona: a Shipper's notifications, a Carrier's
+    /// booking requests. The portal's own endpoints (ShipperNotificationEndpoint, CarrierBookingEndpoint) have the same
+    /// shapes, which the AppHost model tests pin from this side.
+    /// </summary>
+    public string EndpointPath => IsShipper ? $"/shipper/v1/{PartyId}/notifications" : $"/carrier/v1/{PartyId}/bookings";
+
     public static IReadOnlyList<SeedPersona> ReadAll(string seedFile)
     {
         using var seed = JsonDocument.Parse(File.ReadAllText(seedFile));

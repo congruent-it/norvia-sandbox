@@ -217,6 +217,84 @@ namespace Norvia.PartnerPortal.Infrastructure.Data.Migrations
 
                     b.ToTable("CarrierTrackingSettings", (string)null);
                 });
+
+            modelBuilder.Entity("Norvia.PartnerPortal.Domain.ShipperNotifications.ShipperNotification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("NotificationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("PersonaId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "Content", "Norvia.PartnerPortal.Domain.ShipperNotifications.ShipperNotification.Content#ShipperNotificationContent", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<string>("BookingRef")
+                                .IsRequired()
+                                .HasMaxLength(200)
+                                .HasColumnType("nvarchar(200)");
+
+                            b1.Property<string>("Contact")
+                                .IsRequired()
+                                .HasMaxLength(200)
+                                .HasColumnType("nvarchar(200)");
+
+                            b1.Property<string>("ExceptionCode")
+                                .IsRequired()
+                                .HasMaxLength(30)
+                                .HasColumnType("nvarchar(30)");
+
+                            b1.Property<string>("Message")
+                                .IsRequired()
+                                .HasMaxLength(4000)
+                                .HasColumnType("nvarchar(4000)");
+
+                            b1.Property<string>("TransportOrderNumber")
+                                .IsRequired()
+                                .HasMaxLength(50)
+                                .HasColumnType("nvarchar(50)");
+
+                            b1.ComplexProperty(typeof(Dictionary<string, object>), "Timing", "Norvia.PartnerPortal.Domain.ShipperNotifications.ShipperNotification.Content#ShipperNotificationContent.Timing#DeliveryTiming", b2 =>
+                                {
+                                    b2.IsRequired();
+
+                                    b2.Property<DateTime?>("DeliverFrom")
+                                        .HasColumnType("datetime2")
+                                        .HasColumnName("DeliverFrom");
+
+                                    b2.Property<DateTime?>("DeliverUntil")
+                                        .HasColumnType("datetime2")
+                                        .HasColumnName("DeliverUntil");
+
+                                    b2.Property<DateTime?>("Eta")
+                                        .HasColumnType("datetime2")
+                                        .HasColumnName("Eta");
+                                });
+                        });
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PersonaId", "NotificationId")
+                        .IsUnique();
+
+                    b.HasIndex("PersonaId", "ReceivedAt");
+
+                    b.ToTable("ShipperNotifications", (string)null);
+                });
 #pragma warning restore 612, 618
         }
     }

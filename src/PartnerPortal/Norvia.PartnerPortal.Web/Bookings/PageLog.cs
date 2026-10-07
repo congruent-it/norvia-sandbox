@@ -41,4 +41,7 @@ internal static partial class PageLog
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Sending Persona {PersonaId}'s Proof of delivery for {CarrierBookingNumber} failed")]
     public static partial void ProofOfDeliveryFailed(ILogger logger, Exception exception, string personaId, string carrierBookingNumber);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Loading the notifications of Persona {PersonaId} failed")]
+    public static partial void NotificationsLoadFailed(ILogger logger, Exception exception, string personaId);
 }
