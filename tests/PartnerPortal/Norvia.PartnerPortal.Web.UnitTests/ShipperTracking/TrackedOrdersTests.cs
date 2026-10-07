@@ -2,6 +2,7 @@ using AngleSharp.Dom;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Norvia.PartnerPortal.Application.ShipperTracking;
+using Norvia.PartnerPortal.Domain.Personas;
 using Norvia.PartnerPortal.Web.Bookings;
 using Norvia.PartnerPortal.Web.ShipperTracking;
 
@@ -12,7 +13,7 @@ public sealed class TrackedOrdersTests : PortalWebContext
     private static TrackingAnswer<IReadOnlyList<ShipperTrackingSummary>> Listed(params ShipperTrackingSummary[] orders) => TrackingAnswer.Found<IReadOnlyList<ShipperTrackingSummary>>(orders);
 
     private void ListReturns(params ShipperTrackingSummary[] orders) =>
-        Portal.ListTrackedTransportOrdersAsync("brouwer-dranken", Arg.Any<ShipperTrackingFilter>(), Arg.Any<CancellationToken>()).Returns(Listed(orders));
+        Portal.ListTrackedTransportOrdersAsync(new PersonaId("brouwer-dranken"), Arg.Any<ShipperTrackingFilter>(), Arg.Any<CancellationToken>()).Returns(Listed(orders));
 
     private IRenderedComponent<TrackedOrders> RenderPage() =>
         Render<TrackedOrders>(parameters => parameters.Add(page => page.PersonaId, "brouwer-dranken"));
@@ -64,7 +65,7 @@ public sealed class TrackedOrdersTests : PortalWebContext
 
         RenderPage();
 
-        Portal.Received(1).ListTrackedTransportOrdersAsync("brouwer-dranken", new ShipperTrackingFilter(), Arg.Any<CancellationToken>());
+        Portal.Received(1).ListTrackedTransportOrdersAsync(new PersonaId("brouwer-dranken"), new ShipperTrackingFilter(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -83,7 +84,7 @@ public sealed class TrackedOrdersTests : PortalWebContext
 
         page.Find("#tracking-status").Change("InTransit");
 
-        Portal.Received().ListTrackedTransportOrdersAsync("brouwer-dranken", new ShipperTrackingFilter(ShipperTrackingStatus.InTransit), Arg.Any<CancellationToken>());
+        Portal.Received().ListTrackedTransportOrdersAsync(new PersonaId("brouwer-dranken"), new ShipperTrackingFilter(ShipperTrackingStatus.InTransit), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -96,7 +97,7 @@ public sealed class TrackedOrdersTests : PortalWebContext
         page.Find("#tracking-to").Change("2030-10-31");
 
         Portal.Received().ListTrackedTransportOrdersAsync(
-            "brouwer-dranken", new ShipperTrackingFilter(null, new DateOnly(2030, 10, 1), new DateOnly(2030, 10, 31)), Arg.Any<CancellationToken>());
+            new PersonaId("brouwer-dranken"), new ShipperTrackingFilter(null, new DateOnly(2030, 10, 1), new DateOnly(2030, 10, 31)), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -108,36 +109,36 @@ public sealed class TrackedOrdersTests : PortalWebContext
 
         page.Find("#tracking-status").Change(string.Empty);
 
-        Portal.Received().ListTrackedTransportOrdersAsync("brouwer-dranken", Arg.Is<ShipperTrackingFilter>(filter => filter.Status == null), Arg.Any<CancellationToken>());
+        Portal.Received().ListTrackedTransportOrdersAsync(new PersonaId("brouwer-dranken"), Arg.Is<ShipperTrackingFilter>(filter => filter.Status == null), Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public void Filter_Changed_GoesBackToTheFirstPage()
     {
-        Portal.ListTrackedTransportOrdersAsync("brouwer-dranken", Arg.Any<ShipperTrackingFilter>(), Arg.Any<CancellationToken>())
+        Portal.ListTrackedTransportOrdersAsync(new PersonaId("brouwer-dranken"), Arg.Any<ShipperTrackingFilter>(), Arg.Any<CancellationToken>())
             .Returns(Listed([.. Enumerable.Range(1, ShipperTrackingFilter.PageSize).Select(index => TrackingSamples.Summary($"TO-{index:0000000}"))]));
         var page = RenderPage();
         page.FindAll("fluent-button").Single(button => button.TextContent == "Next").Click();
 
         page.Find("#tracking-status").Change("Collected");
 
-        Portal.Received().ListTrackedTransportOrdersAsync("brouwer-dranken", new ShipperTrackingFilter(ShipperTrackingStatus.Collected, null, null, Page: 1), Arg.Any<CancellationToken>());
+        Portal.Received().ListTrackedTransportOrdersAsync(new PersonaId("brouwer-dranken"), new ShipperTrackingFilter(ShipperTrackingStatus.Collected, null, null, Page: 1), Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public void Paging_AFullPage_OffersTheNextOne_AndThePreviousOnceThere()
     {
-        Portal.ListTrackedTransportOrdersAsync("brouwer-dranken", Arg.Any<ShipperTrackingFilter>(), Arg.Any<CancellationToken>())
+        Portal.ListTrackedTransportOrdersAsync(new PersonaId("brouwer-dranken"), Arg.Any<ShipperTrackingFilter>(), Arg.Any<CancellationToken>())
             .Returns(Listed([.. Enumerable.Range(1, ShipperTrackingFilter.PageSize).Select(index => TrackingSamples.Summary($"TO-{index:0000000}"))]));
         var page = RenderPage();
 
         page.FindAll("fluent-button").Single(button => button.TextContent == "Next").Click();
 
-        Portal.Received().ListTrackedTransportOrdersAsync("brouwer-dranken", new ShipperTrackingFilter(Page: 2), Arg.Any<CancellationToken>());
+        Portal.Received().ListTrackedTransportOrdersAsync(new PersonaId("brouwer-dranken"), new ShipperTrackingFilter(Page: 2), Arg.Any<CancellationToken>());
         page.Find("nav[aria-label=Pages]").TextContent.Should().Contain("Page 2");
 
         page.FindAll("fluent-button").Single(button => button.TextContent == "Previous").Click();
-        Portal.Received().ListTrackedTransportOrdersAsync("brouwer-dranken", new ShipperTrackingFilter(Page: 1), Arg.Any<CancellationToken>());
+        Portal.Received().ListTrackedTransportOrdersAsync(new PersonaId("brouwer-dranken"), new ShipperTrackingFilter(Page: 1), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -152,8 +153,8 @@ public sealed class TrackedOrdersTests : PortalWebContext
     public void Paging_PastTheLastPage_SaysThereAreNoMore()
     {
         var full = Listed([.. Enumerable.Range(1, ShipperTrackingFilter.PageSize).Select(index => TrackingSamples.Summary($"TO-{index:0000000}"))]);
-        Portal.ListTrackedTransportOrdersAsync("brouwer-dranken", new ShipperTrackingFilter(), Arg.Any<CancellationToken>()).Returns(full);
-        Portal.ListTrackedTransportOrdersAsync("brouwer-dranken", new ShipperTrackingFilter(Page: 2), Arg.Any<CancellationToken>()).Returns(Listed());
+        Portal.ListTrackedTransportOrdersAsync(new PersonaId("brouwer-dranken"), new ShipperTrackingFilter(), Arg.Any<CancellationToken>()).Returns(full);
+        Portal.ListTrackedTransportOrdersAsync(new PersonaId("brouwer-dranken"), new ShipperTrackingFilter(Page: 2), Arg.Any<CancellationToken>()).Returns(Listed());
         var page = RenderPage();
 
         page.FindAll("fluent-button").Single(button => button.TextContent == "Next").Click();
@@ -177,7 +178,7 @@ public sealed class TrackedOrdersTests : PortalWebContext
     public void Search_ByShipperReference_FindsItAndOpensItsDetail()
     {
         ListReturns();
-        Portal.FindTrackedTransportOrderAsync("brouwer-dranken", "BD-2030-0001", Arg.Any<CancellationToken>()).Returns(TrackingAnswer.Found(TrackingSamples.Detail("TO-0000077")));
+        Portal.FindTrackedTransportOrderAsync(new PersonaId("brouwer-dranken"), "BD-2030-0001", Arg.Any<CancellationToken>()).Returns(TrackingAnswer.Found(TrackingSamples.Detail("TO-0000077")));
         var page = RenderPage();
 
         Search(page, " BD-2030-0001 ");
@@ -189,7 +190,7 @@ public sealed class TrackedOrdersTests : PortalWebContext
     public void Search_ForAReferenceNoTransportOrderHas_SaysSo()
     {
         ListReturns();
-        Portal.FindTrackedTransportOrderAsync("brouwer-dranken", "nope", Arg.Any<CancellationToken>()).Returns(TrackingAnswer.NotFound<ShipperTrackingDetail>("Not found."));
+        Portal.FindTrackedTransportOrderAsync(new PersonaId("brouwer-dranken"), "nope", Arg.Any<CancellationToken>()).Returns(TrackingAnswer.NotFound<ShipperTrackingDetail>("Not found."));
         var page = RenderPage();
 
         Search(page, "nope");
@@ -201,7 +202,7 @@ public sealed class TrackedOrdersTests : PortalWebContext
     public void Search_WhenTrackingIsUnavailable_ShowsTheError()
     {
         ListReturns();
-        Portal.FindTrackedTransportOrderAsync("brouwer-dranken", "BD-1", Arg.Any<CancellationToken>())
+        Portal.FindTrackedTransportOrderAsync(new PersonaId("brouwer-dranken"), "BD-1", Arg.Any<CancellationToken>())
             .Returns(TrackingAnswer.Unavailable<ShipperTrackingDetail>("Tracking is temporarily unavailable."));
         var page = RenderPage();
 
@@ -214,7 +215,7 @@ public sealed class TrackedOrdersTests : PortalWebContext
     public void Search_WhenTheSearchThrows_SaysItCouldntBeMade()
     {
         ListReturns();
-        Portal.FindTrackedTransportOrderAsync("brouwer-dranken", "BD-1", Arg.Any<CancellationToken>()).Returns<TrackingAnswer<ShipperTrackingDetail>>(_ => throw new InvalidOperationException("Down."));
+        Portal.FindTrackedTransportOrderAsync(new PersonaId("brouwer-dranken"), "BD-1", Arg.Any<CancellationToken>()).Returns<TrackingAnswer<ShipperTrackingDetail>>(_ => throw new InvalidOperationException("Down."));
         var page = RenderPage();
 
         Search(page, "BD-1");
@@ -237,7 +238,7 @@ public sealed class TrackedOrdersTests : PortalWebContext
     [Fact]
     public void Poll_AsksAgainAtThePersonasInterval_AndShowsWhatChanged()
     {
-        Portal.ListTrackedTransportOrdersAsync("brouwer-dranken", Arg.Any<ShipperTrackingFilter>(), Arg.Any<CancellationToken>())
+        Portal.ListTrackedTransportOrdersAsync(new PersonaId("brouwer-dranken"), Arg.Any<ShipperTrackingFilter>(), Arg.Any<CancellationToken>())
             .Returns(Listed(TrackingSamples.Summary(status: ShipperTrackingStatus.Collected)), Listed(TrackingSamples.Summary(status: ShipperTrackingStatus.InTransit)));
         var page = RenderPage();
         page.Find("tbody tr").TextContent.Should().Contain("Collected");
@@ -278,7 +279,7 @@ public sealed class TrackedOrdersTests : PortalWebContext
     public void Poll_WhenItFails_KeepsTheLastAnswer_WithItsFetchedAtTime_AndShowsTheError()
     {
         Time.SetUtcNow(new DateTimeOffset(2026, 10, 7, 9, 15, 30, TimeSpan.Zero));
-        Portal.ListTrackedTransportOrdersAsync("brouwer-dranken", Arg.Any<ShipperTrackingFilter>(), Arg.Any<CancellationToken>())
+        Portal.ListTrackedTransportOrdersAsync(new PersonaId("brouwer-dranken"), Arg.Any<ShipperTrackingFilter>(), Arg.Any<CancellationToken>())
             .Returns(Listed(TrackingSamples.Summary()), TrackingAnswer.Unavailable<IReadOnlyList<ShipperTrackingSummary>>("Tracking is temporarily unavailable. Try again shortly.", "corr-7"));
         var page = RenderPage();
 
@@ -292,7 +293,7 @@ public sealed class TrackedOrdersTests : PortalWebContext
     [Fact]
     public void Poll_WhenItThrows_KeepsTheLastAnswer_AndShowsAnError()
     {
-        Portal.ListTrackedTransportOrdersAsync("brouwer-dranken", Arg.Any<ShipperTrackingFilter>(), Arg.Any<CancellationToken>())
+        Portal.ListTrackedTransportOrdersAsync(new PersonaId("brouwer-dranken"), Arg.Any<ShipperTrackingFilter>(), Arg.Any<CancellationToken>())
             .Returns(_ => Listed(TrackingSamples.Summary()), _ => throw new InvalidOperationException("Down."));
         var page = RenderPage();
 
@@ -305,7 +306,7 @@ public sealed class TrackedOrdersTests : PortalWebContext
     [Fact]
     public void Poll_WhenItWorksAgain_TakesTheErrorAway()
     {
-        Portal.ListTrackedTransportOrdersAsync("brouwer-dranken", Arg.Any<ShipperTrackingFilter>(), Arg.Any<CancellationToken>())
+        Portal.ListTrackedTransportOrdersAsync(new PersonaId("brouwer-dranken"), Arg.Any<ShipperTrackingFilter>(), Arg.Any<CancellationToken>())
             .Returns(Listed(TrackingSamples.Summary()), TrackingAnswer.Unavailable<IReadOnlyList<ShipperTrackingSummary>>("Down."), Listed(TrackingSamples.Summary()));
         var page = RenderPage();
         Time.Advance(TimeSpan.FromSeconds(3));
@@ -326,13 +327,13 @@ public sealed class TrackedOrdersTests : PortalWebContext
         Time.Advance(TimeSpan.FromSeconds(3));
 
         page.WaitForAssertion(() => Portal.Received(2).ListTrackedTransportOrdersAsync(
-            "brouwer-dranken", new ShipperTrackingFilter(ShipperTrackingStatus.Delivered), Arg.Any<CancellationToken>()));
+            new PersonaId("brouwer-dranken"), new ShipperTrackingFilter(ShipperTrackingStatus.Delivered), Arg.Any<CancellationToken>()));
     }
 
     [Fact]
     public void Render_WhenTheFirstAnswerIsAnError_ShowsItWithoutAnAnswer()
     {
-        Portal.ListTrackedTransportOrdersAsync("brouwer-dranken", Arg.Any<ShipperTrackingFilter>(), Arg.Any<CancellationToken>())
+        Portal.ListTrackedTransportOrdersAsync(new PersonaId("brouwer-dranken"), Arg.Any<ShipperTrackingFilter>(), Arg.Any<CancellationToken>())
             .Returns(TrackingAnswer.Unavailable<IReadOnlyList<ShipperTrackingSummary>>("Tracking is temporarily unavailable."));
 
         var page = RenderPage();

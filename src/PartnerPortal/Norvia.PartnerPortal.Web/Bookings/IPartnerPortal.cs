@@ -10,6 +10,7 @@ using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Application.ShipperNotifications;
 using Norvia.PartnerPortal.Application.ShipperTracking;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
+using Norvia.PartnerPortal.Domain.Personas;
 using Norvia.PartnerPortal.Web.CarrierShipments;
 
 namespace Norvia.PartnerPortal.Web.Bookings;
@@ -79,15 +80,15 @@ public interface IPartnerPortal
     /// A failure is an answer, so a screen can keep what it last showed.
     /// </summary>
     Task<TrackingAnswer<IReadOnlyList<ShipperTrackingSummary>>> ListTrackedTransportOrdersAsync(
-        string personaId, ShipperTrackingFilter filter, CancellationToken cancellationToken);
+        PersonaId personaId, ShipperTrackingFilter filter, CancellationToken cancellationToken);
 
     /// <summary>One of the Shipper Persona's Transport Orders by Norvia's number, with its progress and Proof of delivery.</summary>
-    Task<TrackingAnswer<ShipperTrackingDetail>> GetTrackedTransportOrderAsync(string personaId, string transportOrderNumber, CancellationToken cancellationToken);
+    Task<TrackingAnswer<ShipperTrackingDetail>> GetTrackedTransportOrderAsync(PersonaId personaId, string transportOrderNumber, CancellationToken cancellationToken);
 
     /// <summary>One of the Shipper Persona's Transport Orders by the Shipper's own reference.</summary>
-    Task<TrackingAnswer<ShipperTrackingDetail>> FindTrackedTransportOrderAsync(string personaId, string shipperReference, CancellationToken cancellationToken);
+    Task<TrackingAnswer<ShipperTrackingDetail>> FindTrackedTransportOrderAsync(PersonaId personaId, string shipperReference, CancellationToken cancellationToken);
 
     /// <summary>A file of the Transport Order's current Proof of delivery, as Norvia streams it.</summary>
     Task<TrackingAnswer<ShipperProofFileContent>> DownloadProofOfDeliveryFileAsync(
-        string personaId, string transportOrderNumber, Guid fileId, CancellationToken cancellationToken);
+        PersonaId personaId, string transportOrderNumber, Guid fileId, CancellationToken cancellationToken);
 }

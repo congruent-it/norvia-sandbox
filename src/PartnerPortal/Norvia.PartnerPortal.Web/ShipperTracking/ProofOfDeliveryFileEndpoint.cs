@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http.HttpResults;
 using Norvia.PartnerPortal.Application.ShipperTracking;
+using Norvia.PartnerPortal.Domain.Personas;
 using Norvia.PartnerPortal.Web.Bookings;
 
 namespace Norvia.PartnerPortal.Web.ShipperTracking;
@@ -24,7 +25,7 @@ public static class ProofOfDeliveryFileEndpoint
     {
         ArgumentNullException.ThrowIfNull(portal);
 
-        var answer = await portal.DownloadProofOfDeliveryFileAsync(personaId, transportOrderNumber, fileId, cancellationToken);
+        var answer = await portal.DownloadProofOfDeliveryFileAsync(new PersonaId(personaId), transportOrderNumber, fileId, cancellationToken);
         return answer.Outcome switch
         {
             // With a body, so the status code pages don't turn it into the Not Found page.

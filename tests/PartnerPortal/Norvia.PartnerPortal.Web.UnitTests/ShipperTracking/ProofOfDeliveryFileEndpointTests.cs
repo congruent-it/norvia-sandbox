@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Norvia.PartnerPortal.Application.ShipperTracking;
+using Norvia.PartnerPortal.Domain.Personas;
 using Norvia.PartnerPortal.Web.Bookings;
 using Norvia.PartnerPortal.Web.ShipperTracking;
 
@@ -13,7 +14,7 @@ public sealed class ProofOfDeliveryFileEndpointTests
     [Fact]
     public async Task Download_AFileNorviaStreams_IsSentWithItsNameAndType()
     {
-        _portal.DownloadProofOfDeliveryFileAsync("brouwer-dranken", "TO-0000042", FileId, Arg.Any<CancellationToken>())
+        _portal.DownloadProofOfDeliveryFileAsync(new PersonaId("brouwer-dranken"), "TO-0000042", FileId, Arg.Any<CancellationToken>())
             .Returns(TrackingAnswer.Found(new ShipperProofFileContent("CMR signed.pdf", "application/pdf", [1, 2, 3])));
 
         var result = await ProofOfDeliveryFileEndpoint.DownloadAsync("brouwer-dranken", "TO-0000042", FileId, _portal, Xunit.TestContext.Current.CancellationToken);
@@ -28,7 +29,7 @@ public sealed class ProofOfDeliveryFileEndpointTests
     [InlineData(TrackingOutcome.Unavailable, StatusCodes.Status503ServiceUnavailable)]
     public async Task Download_AFailure_IsAProblemWithTheMatchingStatus(TrackingOutcome outcome, int status)
     {
-        _portal.DownloadProofOfDeliveryFileAsync("brouwer-dranken", "TO-0000042", FileId, Arg.Any<CancellationToken>())
+        _portal.DownloadProofOfDeliveryFileAsync(new PersonaId("brouwer-dranken"), "TO-0000042", FileId, Arg.Any<CancellationToken>())
             .Returns(TrackingAnswer.Failed<ShipperProofFileContent>(outcome, "Why not."));
 
         var result = await ProofOfDeliveryFileEndpoint.DownloadAsync("brouwer-dranken", "TO-0000042", FileId, _portal, Xunit.TestContext.Current.CancellationToken);

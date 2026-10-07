@@ -30,6 +30,9 @@ public abstract class ShipperTrackingPage<T> : PollingPage
     [Parameter]
     public string PersonaId { get; set; } = string.Empty;
 
+    /// <summary>The route's Persona, as the application knows it.</summary>
+    protected PersonaId PersonaKey => new(PersonaId);
+
     protected LastAnswer<T> Answer { get; } = new();
 
     protected PersonaView? Persona { get; private set; }

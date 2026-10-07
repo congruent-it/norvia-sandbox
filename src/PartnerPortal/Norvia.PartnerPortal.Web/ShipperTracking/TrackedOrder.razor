@@ -113,7 +113,7 @@ else
     public string TransportOrderNumber { get; set; } = string.Empty;
 
     protected override Task<TrackingAnswer<ShipperTrackingDetail>> AskAsync(CancellationToken cancellationToken) =>
-        Portal.GetTrackedTransportOrderAsync(PersonaId, TransportOrderNumber, cancellationToken);
+        Portal.GetTrackedTransportOrderAsync(PersonaKey, TransportOrderNumber, cancellationToken);
 
     private static string PlaceText(ShipperPlace place) => place.ToString() is { Length: > 0 } text ? text : "–";
 

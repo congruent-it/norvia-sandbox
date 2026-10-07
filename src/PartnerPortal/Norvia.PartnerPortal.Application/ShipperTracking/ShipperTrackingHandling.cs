@@ -10,8 +10,8 @@ internal static class ShipperTrackingHandling
     /// Norvia is not asked.
     /// </summary>
     public static async ValueTask<TrackingAnswer<T>> AskAsShipperAsync<T>(
-        IPersonaDirectory personas, string personaId, Func<Persona, Task<TrackingAnswer<T>>> ask) =>
-        personas.Find(new PersonaId(personaId)) is { PartyType: PartyType.Shipper } shipper
+        IPersonaDirectory personas, PersonaId personaId, Func<Persona, Task<TrackingAnswer<T>>> ask) =>
+        personas.Find(personaId) is { PartyType: PartyType.Shipper } shipper
             ? await ask(shipper)
             : TrackingAnswer.NotFound<T>($"There is no Shipper Persona '{personaId}'.");
 }

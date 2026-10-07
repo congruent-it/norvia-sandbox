@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Norvia.PartnerPortal.Application.ShipperTracking;
+using Norvia.PartnerPortal.Domain.Personas;
 using Norvia.PartnerPortal.Web.Bookings;
 using Norvia.PartnerPortal.Web.ShipperTracking;
 
@@ -12,7 +13,7 @@ public sealed class TrackedOrderTests : PortalWebContext
         Render<TrackedOrder>(parameters => parameters.Add(page => page.PersonaId, "brouwer-dranken").Add(page => page.TransportOrderNumber, number));
 
     private void GetReturns(TrackingAnswer<ShipperTrackingDetail> answer) =>
-        Portal.GetTrackedTransportOrderAsync("brouwer-dranken", "TO-0000042", Arg.Any<CancellationToken>()).Returns(answer);
+        Portal.GetTrackedTransportOrderAsync(new PersonaId("brouwer-dranken"), "TO-0000042", Arg.Any<CancellationToken>()).Returns(answer);
 
     private int GetCalls => Portal.ReceivedCalls().Count(call => call.GetMethodInfo().Name == nameof(IPartnerPortal.GetTrackedTransportOrderAsync));
 
@@ -130,7 +131,7 @@ public sealed class TrackedOrderTests : PortalWebContext
     public void Poll_AsksAgainAtThePersonasInterval_AndShowsTheProgressThatCameIn()
     {
         GetReturns(TrackingAnswer.Found(TrackingSamples.Detail() with { Progress = [] }));
-        Portal.GetTrackedTransportOrderAsync("brouwer-dranken", "TO-0000042", Arg.Any<CancellationToken>())
+        Portal.GetTrackedTransportOrderAsync(new PersonaId("brouwer-dranken"), "TO-0000042", Arg.Any<CancellationToken>())
             .Returns(TrackingAnswer.Found(TrackingSamples.Detail() with { Progress = [] }), TrackingAnswer.Found(TrackingSamples.Detail()));
         var page = RenderPage();
         page.Markup.Should().Contain("Nothing has happened");
@@ -147,7 +148,7 @@ public sealed class TrackedOrderTests : PortalWebContext
     public void Poll_WhenItFails_KeepsTheLastAnswer_WithItsFetchedAtTime_AndShowsTheError()
     {
         Time.SetUtcNow(new DateTimeOffset(2026, 10, 7, 9, 15, 30, TimeSpan.Zero));
-        Portal.GetTrackedTransportOrderAsync("brouwer-dranken", "TO-0000042", Arg.Any<CancellationToken>())
+        Portal.GetTrackedTransportOrderAsync(new PersonaId("brouwer-dranken"), "TO-0000042", Arg.Any<CancellationToken>())
             .Returns(TrackingAnswer.Found(TrackingSamples.Detail()), TrackingAnswer.Unavailable<ShipperTrackingDetail>("Tracking is temporarily unavailable. Try again shortly.", "corr-8"));
         var page = RenderPage();
 
@@ -162,7 +163,7 @@ public sealed class TrackedOrderTests : PortalWebContext
     [Fact]
     public void Poll_WhenItThrows_KeepsTheLastAnswer_AndShowsAnError()
     {
-        Portal.GetTrackedTransportOrderAsync("brouwer-dranken", "TO-0000042", Arg.Any<CancellationToken>())
+        Portal.GetTrackedTransportOrderAsync(new PersonaId("brouwer-dranken"), "TO-0000042", Arg.Any<CancellationToken>())
             .Returns(_ => TrackingAnswer.Found(TrackingSamples.Detail()), _ => throw new InvalidOperationException("Down."));
         var page = RenderPage();
 
@@ -175,7 +176,7 @@ public sealed class TrackedOrderTests : PortalWebContext
     [Fact]
     public void Poll_WhenTheTransportOrderGoesMissing_SaysSoInsteadOfKeepingIt()
     {
-        Portal.GetTrackedTransportOrderAsync("brouwer-dranken", "TO-0000042", Arg.Any<CancellationToken>())
+        Portal.GetTrackedTransportOrderAsync(new PersonaId("brouwer-dranken"), "TO-0000042", Arg.Any<CancellationToken>())
             .Returns(TrackingAnswer.Found(TrackingSamples.Detail()), TrackingAnswer.NotFound<ShipperTrackingDetail>("Not found."));
         var page = RenderPage();
 
