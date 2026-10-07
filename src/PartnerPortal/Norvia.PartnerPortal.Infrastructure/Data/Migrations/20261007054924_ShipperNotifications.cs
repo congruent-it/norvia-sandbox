@@ -22,12 +22,12 @@ namespace Norvia.PartnerPortal.Infrastructure.Data.Migrations
                     ReceivedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     Content_BookingRef = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
                     Content_Contact = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
-                    Content_DeliverFrom = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
-                    Content_DeliverUntil = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
-                    Content_Eta = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
                     Content_ExceptionCode = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: false),
                     Content_Message = table.Column<string>(type: "nvarchar(4000)", maxLength: 4000, nullable: false),
-                    Content_TransportOrderNumber = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false)
+                    Content_TransportOrderNumber = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
+                    DeliverFrom = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    DeliverUntil = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    Eta = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
                 constraints: table =>
                 {

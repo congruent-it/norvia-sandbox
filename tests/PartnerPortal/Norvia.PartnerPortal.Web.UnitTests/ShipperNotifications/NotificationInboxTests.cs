@@ -9,14 +9,19 @@ namespace Norvia.PartnerPortal.Web.UnitTests.ShipperNotifications;
 public sealed class NotificationInboxTests : PortalWebContext
 {
     private static ShipperNotificationView Notification(
-        string order = "TO-0000042", string reference = "BD-2030-0001", DateTimeOffset? at = null, string? eta = "03-10-2030 14:30", string? from = null, string? until = null) => new(
+        string order = "TO-0000042", string reference = "BD-2030-0001", DateTimeOffset? at = null, DateTime? eta = null, DateTime? from = null, DateTime? until = null) => new(
         Guid.CreateVersion7(), at ?? new DateTimeOffset(2026, 10, 7, 9, 0, 0, TimeSpan.Zero), order, reference, ShipperExceptionCode.Late,
-        "The truck is stuck in traffic.", eta, from, until, "Eva Planner", "corr-1");
+        "The truck is stuck in traffic.", Timing(eta, from, until), "Eva Planner", "corr-1");
+
+    private static DeliveryTiming Timing(DateTime? eta, DateTime? from, DateTime? until) =>
+        from is { } start && until is { } end ? DeliveryTiming.WithWindow(start, end)
+        : eta is { } expected ? DeliveryTiming.WithEta(expected)
+        : DeliveryTiming.None;
 
     [Fact]
     public void Render_ListsEveryNotification_WithItsTransportOrderNumberAndShipperReference()
     {
-        Portal.ListShipperNotificationsAsync("brouwer-dranken", Arg.Any<CancellationToken>()).Returns([Notification()]);
+        Portal.ListShipperNotificationsAsync("brouwer-dranken", Arg.Any<CancellationToken>()).Returns([Notification(eta: new DateTime(2030, 10, 3, 14, 30, 0))]);
 
         var row = RenderPage().FindAll("tbody tr").Should().ContainSingle().Subject;
 
@@ -41,7 +46,7 @@ public sealed class NotificationInboxTests : PortalWebContext
     public void Render_ANotificationWithAnAgreedWindow_ShowsTheWindowInsteadOfTheEta()
     {
         Portal.ListShipperNotificationsAsync("brouwer-dranken", Arg.Any<CancellationToken>())
-            .Returns([Notification(eta: null, from: "04-10-2030 09:00", until: "04-10-2030 12:00")]);
+            .Returns([Notification(from: new DateTime(2030, 10, 4, 9, 0, 0), until: new DateTime(2030, 10, 4, 12, 0, 0))]);
 
         RenderPage().Find("tbody tr").TextContent.Should().Contain("Agreed window 04-10-2030 09:00 to 04-10-2030 12:00").And.NotContain("ETA");
     }
@@ -106,7 +111,7 @@ public sealed class NotificationInboxTests : PortalWebContext
 
     [Fact]
     public void Arrival_ANotificationWithNeither_SaysNothing() =>
-        ExceptionText.Arrival(Notification(eta: null)).Should().BeEmpty();
+        ExceptionText.Arrival(Notification()).Should().BeEmpty();
 
     [Theory]
     [InlineData(ShipperExceptionCode.CollectionFailed, "Collection failed")]

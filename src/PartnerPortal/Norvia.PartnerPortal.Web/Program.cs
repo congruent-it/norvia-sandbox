@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Options;
 using Microsoft.FluentUI.AspNetCore.Components;
 using Norvia.PartnerPortal.Application.Bookings.Submit;
 using Norvia.PartnerPortal.Application.CarrierBookings.AutoAnswer;
@@ -34,8 +35,11 @@ builder.Services.AddSingleton<ISampleCmr, BundledSampleCmr>();
 builder.Services.AddSingleton<AutoProgressWorker>();
 builder.Services.AddSingleton<IAutoProgressSignal>(services => services.GetRequiredService<AutoProgressWorker>());
 builder.Services.AddHostedService(services => services.GetRequiredService<AutoProgressWorker>());
-builder.Services.AddOptions<CarrierEndpointOptions>().BindConfiguration(CarrierEndpointOptions.SectionName);
-builder.Services.AddOptions<ShipperEndpointOptions>().BindConfiguration(ShipperEndpointOptions.SectionName);
+// A Persona's endpoint without its credential would refuse every caller, so a missing one stops the portal at startup.
+builder.Services.AddOptions<CarrierEndpointOptions>().BindConfiguration(CarrierEndpointOptions.SectionName).ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<CarrierEndpointOptions>, EveryCarrierHasACredential>();
+builder.Services.AddOptions<ShipperEndpointOptions>().BindConfiguration(ShipperEndpointOptions.SectionName).ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<ShipperEndpointOptions>, EveryShipperHasACredential>();
 
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddFluentUIComponents();

@@ -50,7 +50,7 @@ public sealed class ShipperNotificationEndpointTests
                 && command.Content.TransportOrderNumber == "TO-0000042"
                 && command.Content.ExceptionCode == ShipperExceptionCode.Late
                 && command.Content.Message == "The truck is stuck in traffic."
-                && command.Content.Eta == "03-10-2030 14:30"
+                && command.Content.Timing == DeliveryTiming.WithEta(new DateTime(2030, 10, 3, 14, 30, 0))
                 && command.Content.Contact == "Eva Planner"),
             Arg.Any<CancellationToken>());
     }
@@ -75,7 +75,7 @@ public sealed class ShipperNotificationEndpointTests
         result.Result.Should().BeOfType<Ok<ReceiveShipperNotificationResult>>();
         await _mediator.Received(1).Send(
             Arg.Is<ReceiveShipperNotificationCommand>(command =>
-                command.Content.Eta == null && command.Content.DeliverFrom == "04-10-2030 09:00" && command.Content.DeliverUntil == "04-10-2030 12:00"),
+                command.Content.Timing == DeliveryTiming.WithWindow(new DateTime(2030, 10, 4, 9, 0, 0), new DateTime(2030, 10, 4, 12, 0, 0))),
             Arg.Any<CancellationToken>());
     }
 
@@ -87,6 +87,8 @@ public sealed class ShipperNotificationEndpointTests
         var result = await Receive(body: Body() with { Eta = null });
 
         result.Result.Should().BeOfType<Ok<ReceiveShipperNotificationResult>>();
+        await _mediator.Received(1).Send(
+            Arg.Is<ReceiveShipperNotificationCommand>(command => command.Content.Timing == DeliveryTiming.None), Arg.Any<CancellationToken>());
     }
 
     [Theory]
@@ -125,6 +127,8 @@ public sealed class ShipperNotificationEndpointTests
             { "corr-1", valid with { Message = "" } },
             { "corr-1", valid with { Contact = null } },
             { "corr-1", valid with { Eta = "2030-10-03T14:30:00" } },
+            { "corr-1", valid with { Eta = "31-02-2030 10:00" } },
+            { "corr-1", valid with { Eta = null, DeliverFrom = "04-10-2030 09:00", DeliverUntil = "later" } },
             { "corr-1", valid with { Eta = null, DeliverFrom = "04-10-2030 09:00" } },
             { "corr-1", valid with { DeliverFrom = "04-10-2030 09:00", DeliverUntil = "04-10-2030 12:00" } },
         };

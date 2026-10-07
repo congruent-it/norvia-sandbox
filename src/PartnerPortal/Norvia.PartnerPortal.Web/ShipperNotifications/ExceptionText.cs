@@ -20,10 +20,10 @@ public static class ExceptionText
     public static string Arrival(ShipperNotificationView notification)
     {
         ArgumentNullException.ThrowIfNull(notification);
-        return notification switch
+        return notification.Timing switch
         {
-            { DeliverFrom: { } from, DeliverUntil: { } until } => $"Agreed window {from} to {until}",
-            { Eta: { } eta } => $"ETA {eta}",
+            { DeliverFrom: { } from, DeliverUntil: { } until } => $"Agreed window {LocalDateTimeText.Of(from)} to {LocalDateTimeText.Of(until)}",
+            { Eta: { } eta } => $"ETA {LocalDateTimeText.Of(eta)}",
             _ => string.Empty,
         };
     }

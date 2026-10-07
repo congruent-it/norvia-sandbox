@@ -253,18 +253,6 @@ namespace Norvia.PartnerPortal.Infrastructure.Data.Migrations
                                 .HasMaxLength(200)
                                 .HasColumnType("nvarchar(200)");
 
-                            b1.Property<string>("DeliverFrom")
-                                .HasMaxLength(20)
-                                .HasColumnType("nvarchar(20)");
-
-                            b1.Property<string>("DeliverUntil")
-                                .HasMaxLength(20)
-                                .HasColumnType("nvarchar(20)");
-
-                            b1.Property<string>("Eta")
-                                .HasMaxLength(20)
-                                .HasColumnType("nvarchar(20)");
-
                             b1.Property<string>("ExceptionCode")
                                 .IsRequired()
                                 .HasMaxLength(30)
@@ -279,6 +267,23 @@ namespace Norvia.PartnerPortal.Infrastructure.Data.Migrations
                                 .IsRequired()
                                 .HasMaxLength(50)
                                 .HasColumnType("nvarchar(50)");
+
+                            b1.ComplexProperty(typeof(Dictionary<string, object>), "Timing", "Norvia.PartnerPortal.Domain.ShipperNotifications.ShipperNotification.Content#ShipperNotificationContent.Timing#DeliveryTiming", b2 =>
+                                {
+                                    b2.IsRequired();
+
+                                    b2.Property<DateTime?>("DeliverFrom")
+                                        .HasColumnType("datetime2")
+                                        .HasColumnName("DeliverFrom");
+
+                                    b2.Property<DateTime?>("DeliverUntil")
+                                        .HasColumnType("datetime2")
+                                        .HasColumnName("DeliverUntil");
+
+                                    b2.Property<DateTime?>("Eta")
+                                        .HasColumnType("datetime2")
+                                        .HasColumnName("Eta");
+                                });
                         });
 
                     b.HasKey("Id");

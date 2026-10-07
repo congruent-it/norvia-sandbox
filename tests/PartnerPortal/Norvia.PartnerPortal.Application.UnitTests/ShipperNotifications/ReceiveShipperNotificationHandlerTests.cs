@@ -12,7 +12,8 @@ public sealed class ReceiveShipperNotificationHandlerTests
     private static readonly Guid NotificationId = Guid.Parse("0f1c0d9e-3b0a-4f43-a6f6-7f1f0d6a9b01");
 
     private static readonly ShipperNotificationContent Content = new(
-        "BD-2030-0001", "TO-0000042", ShipperExceptionCode.DeliveryFailed, "Nobody was home.", null, "04-10-2030 09:00", "04-10-2030 12:00", "Eva Planner");
+        "BD-2030-0001", "TO-0000042", ShipperExceptionCode.DeliveryFailed, "Nobody was home.",
+        DeliveryTiming.WithWindow(new DateTime(2030, 10, 4, 9, 0, 0), new DateTime(2030, 10, 4, 12, 0, 0)), "Eva Planner");
 
     private readonly IRepository<ShipperNotification> _repository = Substitute.For<IRepository<ShipperNotification>>();
     private readonly IPersonaDirectory _personas = Substitute.For<IPersonaDirectory>();

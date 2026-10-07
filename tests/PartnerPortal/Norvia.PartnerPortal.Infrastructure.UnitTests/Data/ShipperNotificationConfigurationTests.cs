@@ -31,4 +31,20 @@ public sealed class ShipperNotificationConfigurationTests
 
         property.GetProviderClrType().Should().Be<string>();
     }
+
+    [Theory]
+    [InlineData(nameof(DeliveryTiming.Eta))]
+    [InlineData(nameof(DeliveryTiming.DeliverFrom))]
+    [InlineData(nameof(DeliveryTiming.DeliverUntil))]
+    public void Timing_IsStoredAsOptionalDateTimes(string name)
+    {
+        using var context = NewContext();
+
+        var property = context.Model.FindEntityType(typeof(ShipperNotification))!
+            .FindComplexProperty(nameof(ShipperNotification.Content))!.ComplexType
+            .FindComplexProperty(nameof(ShipperNotificationContent.Timing))!.ComplexType.FindProperty(name)!;
+
+        property.ClrType.Should().Be<DateTime?>();
+        property.IsNullable.Should().BeTrue();
+    }
 }

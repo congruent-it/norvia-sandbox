@@ -33,9 +33,12 @@ internal sealed class ShipperNotificationConfiguration : IEntityTypeConfiguratio
             content.Property(value => value.TransportOrderNumber).HasMaxLength(50).IsRequired();
             content.Property(value => value.ExceptionCode).HasConversion<string>().HasMaxLength(30).IsRequired();
             content.Property(value => value.Message).HasMaxLength(4000).IsRequired();
-            content.Property(value => value.Eta).HasMaxLength(20);
-            content.Property(value => value.DeliverFrom).HasMaxLength(20);
-            content.Property(value => value.DeliverUntil).HasMaxLength(20);
+            content.ComplexProperty(value => value.Timing, timing =>
+            {
+                timing.Property(value => value.Eta).HasColumnName("Eta");
+                timing.Property(value => value.DeliverFrom).HasColumnName("DeliverFrom");
+                timing.Property(value => value.DeliverUntil).HasColumnName("DeliverUntil");
+            });
             content.Property(value => value.Contact).HasMaxLength(200).IsRequired();
         });
     }

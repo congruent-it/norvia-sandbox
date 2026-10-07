@@ -11,7 +11,7 @@ public sealed class ShipperNotificationTests
     private static readonly Guid SecondId = Guid.Parse("0f1c0d9e-3b0a-4f43-a6f6-7f1f0d6a9b02");
 
     private static readonly ShipperNotificationContent Content = new(
-        "BD-2030-0001", "TO-0000042", ShipperExceptionCode.Late, "The truck is stuck in traffic.", "03-10-2030 14:30", null, null, "Eva Planner");
+        "BD-2030-0001", "TO-0000042", ShipperExceptionCode.Late, "The truck is stuck in traffic.", DeliveryTiming.WithEta(new DateTime(2030, 10, 3, 14, 30, 0)), "Eva Planner");
 
     private static ShipperNotification Receive(PersonaId? persona = null, Guid? id = null, DateTimeOffset? at = null) =>
         ShipperNotification.Receive(persona ?? Brouwer, id ?? FirstId, "corr-1", at ?? ReceivedAt, Content);
@@ -75,6 +75,53 @@ public sealed class ShipperNotificationTests
 
         found.Should().Equal(wanted);
     }
+
+    [Fact]
+    public void DeliveryTiming_WithAnEta_HasNoWindow()
+    {
+        var timing = DeliveryTiming.WithEta(new DateTime(2030, 10, 3, 14, 30, 0));
+
+        timing.Eta.Should().Be(new DateTime(2030, 10, 3, 14, 30, 0));
+        timing.DeliverFrom.Should().BeNull();
+        timing.DeliverUntil.Should().BeNull();
+        timing.HasWindow.Should().BeFalse();
+    }
+
+    [Fact]
+    public void DeliveryTiming_WithAWindow_HasNoEta()
+    {
+        var timing = DeliveryTiming.WithWindow(new DateTime(2030, 10, 4, 9, 0, 0), new DateTime(2030, 10, 4, 12, 0, 0));
+
+        timing.Eta.Should().BeNull();
+        timing.DeliverFrom.Should().Be(new DateTime(2030, 10, 4, 9, 0, 0));
+        timing.DeliverUntil.Should().Be(new DateTime(2030, 10, 4, 12, 0, 0));
+        timing.HasWindow.Should().BeTrue();
+    }
+
+    [Fact]
+    public void DeliveryTiming_None_SaysNeither()
+    {
+        DeliveryTiming.None.Eta.Should().BeNull();
+        DeliveryTiming.None.HasWindow.Should().BeFalse();
+    }
+
+    [Fact]
+    public void LocalDateTimeText_ReadsAndWritesTheFormatsForm()
+    {
+        LocalDateTimeText.TryParse("03-10-2030 14:30", out var value).Should().BeTrue();
+        value.Should().Be(new DateTime(2030, 10, 3, 14, 30, 0));
+        LocalDateTimeText.Of(value).Should().Be("03-10-2030 14:30");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("2030-10-03T14:30:00")]
+    [InlineData("3-10-2030 14:30")]
+    [InlineData("31-02-2030 10:00")]
+    [InlineData("03-10-2030 24:00")]
+    public void LocalDateTimeText_AnythingElse_IsNotADateTime(string? text) =>
+        LocalDateTimeText.TryParse(text, out _).Should().BeFalse();
 
     [Theory]
     [InlineData("COLLECTION_FAILED", ShipperExceptionCode.CollectionFailed)]

@@ -10,7 +10,7 @@ public sealed class ListShipperNotificationsHandlerTests
     public async Task Handle_ReadsThePersonasInbox_WithTheTransportOrderAndTheShipperReference()
     {
         var content = new ShipperNotificationContent(
-            "BD-2030-0001", "TO-0000042", ShipperExceptionCode.Damaged, "A pallet was damaged.", "03-10-2030 14:30", null, null, "Eva Planner");
+            "BD-2030-0001", "TO-0000042", ShipperExceptionCode.Damaged, "A pallet was damaged.", DeliveryTiming.WithEta(new DateTime(2030, 10, 3, 14, 30, 0)), "Eva Planner");
         var notification = ShipperNotification.Receive(Samples.BrouwerDranken.Id, Guid.NewGuid(), "corr-1", Samples.Now, content);
         var repository = Substitute.For<IReadRepository<ShipperNotification>>();
         repository.ListAsync(Arg.Any<ShipperNotificationsOfPersonaSpec>(), Arg.Any<CancellationToken>()).Returns([notification]);
@@ -24,7 +24,7 @@ public sealed class ListShipperNotificationsHandlerTests
         view.ShipperReference.Should().Be("BD-2030-0001");
         view.ExceptionCode.Should().Be(ShipperExceptionCode.Damaged);
         view.Message.Should().Be("A pallet was damaged.");
-        view.Eta.Should().Be("03-10-2030 14:30");
+        view.Timing.Eta.Should().Be(new DateTime(2030, 10, 3, 14, 30, 0));
         view.Contact.Should().Be("Eva Planner");
         view.CorrelationId.Should().Be("corr-1");
     }

@@ -65,7 +65,7 @@ public static partial class ShipperNotificationEndpoint
             new ReceiveShipperNotificationCommand(
                 shipperId, Guid.Parse(body.NotificationId!), correlationId!,
                 new ShipperNotificationContent(
-                    body.BookingRef!, body.TransportOrderNumber!, code, body.Message!, body.Eta, body.DeliverFrom, body.DeliverUntil, body.Contact!)),
+                    body.BookingRef!, body.TransportOrderNumber!, code, body.Message!, TimingOf(body), body.Contact!)),
             cancellationToken);
         if (!result.IsSuccess)
         {
@@ -108,7 +108,7 @@ public static partial class ShipperNotificationEndpoint
         Require(problems, body.Contact, "contact");
         foreach (var (name, value) in new[] { ("eta", body.Eta), ("deliverFrom", body.DeliverFrom), ("deliverUntil", body.DeliverUntil) })
         {
-            if (value is not null && !LocalDateTime().IsMatch(value))
+            if (value is not null && !LocalDateTimeText.TryParse(value, out _))
             {
                 problems.Add($"The {name} must be a local date and time as dd-MM-yyyy HH:mm.");
             }
@@ -125,6 +125,17 @@ public static partial class ShipperNotificationEndpoint
         }
 
         return problems;
+    }
+
+    // Only called for a body that passed Problems, so what it holds parses.
+    private static DeliveryTiming TimingOf(ShipperNotificationBody body)
+    {
+        if (LocalDateTimeText.TryParse(body.DeliverFrom, out var from) && LocalDateTimeText.TryParse(body.DeliverUntil, out var until))
+        {
+            return DeliveryTiming.WithWindow(from, until);
+        }
+
+        return LocalDateTimeText.TryParse(body.Eta, out var eta) ? DeliveryTiming.WithEta(eta) : DeliveryTiming.None;
     }
 
     private static void Require(List<string> problems, string? value, string name)
@@ -157,9 +168,6 @@ public static partial class ShipperNotificationEndpoint
 
     [GeneratedRegex("^TO-[0-9]{7}$")]
     private static partial Regex TransportOrderNumber();
-
-    [GeneratedRegex("^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{4} ([01][0-9]|2[0-3]):[0-5][0-9]$")]
-    private static partial Regex LocalDateTime();
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Refused a notification for Shipper {ShipperId}: the credential is missing or wrong")]
     private static partial void LogRefused(ILogger logger, string shipperId);

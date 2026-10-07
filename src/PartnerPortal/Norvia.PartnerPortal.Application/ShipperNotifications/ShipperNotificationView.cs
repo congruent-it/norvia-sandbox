@@ -10,9 +10,7 @@ public sealed record ShipperNotificationView(
     string ShipperReference,
     ShipperExceptionCode ExceptionCode,
     string Message,
-    string? Eta,
-    string? DeliverFrom,
-    string? DeliverUntil,
+    DeliveryTiming Timing,
     string Contact,
     string CorrelationId)
 {
@@ -22,6 +20,6 @@ public sealed record ShipperNotificationView(
         var content = notification.Content;
         return new(
             notification.NotificationId, notification.ReceivedAt, content.TransportOrderNumber, content.BookingRef, content.ExceptionCode,
-            content.Message, content.Eta, content.DeliverFrom, content.DeliverUntil, content.Contact, notification.CorrelationId);
+            content.Message, content.Timing, content.Contact, notification.CorrelationId);
     }
 }
