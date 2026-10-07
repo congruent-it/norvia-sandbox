@@ -39,6 +39,33 @@ public sealed class ShipperTransportOrdersSpecTests
         found.Should().ContainSingle().Which.TransportOrderId.Should().Be(one.Id);
     }
 
+    [Fact]
+    public void ByNumber_Evaluated_FindsTheShippersOrderAndNotAnotherShippersWithTheSameNumber()
+    {
+        var own = Accepted("SHP-0001", 1);
+        var anothers = Accepted("SHP-0003", 1);
+
+        new ShipperTransportOrderByNumberSpec(new ShipperId("SHP-0001"), TransportOrderNumber.FromSequence(1)).Evaluate([anothers, own])
+            .Should().ContainSingle().Which.Should().BeSameAs(own);
+        new ShipperTransportOrderByNumberSpec(new ShipperId("SHP-0001"), TransportOrderNumber.FromSequence(2)).Evaluate([own, anothers])
+            .Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ByReference_Evaluated_FindsTheShippersOrderByItsReference_NotARejectedOneOrAnotherShippers()
+    {
+        var own = Accepted("SHP-0001", 1);
+        var anothers = Accepted("SHP-0003", 2);
+        var rejected = TransportOrder.Reject(
+            new ShipperId("SHP-0001"), TransportOrderTests.SampleDetails(), [new RejectionReason(RejectionCode.GoodsLinesMissing, "None.")],
+            IntakeChannel.ShipperApi, new CorrelationId("corr-rejected"), Morning);
+        var reference = own.ShipperReference!;
+
+        new ShipperTransportOrderByReferenceSpec(new ShipperId("SHP-0001"), reference).Evaluate([anothers, rejected, own])
+            .Should().ContainSingle().Which.Should().BeSameAs(own);
+        new ShipperTransportOrderByReferenceSpec(new ShipperId("SHP-0001"), "other").Evaluate([own]).Should().BeEmpty();
+    }
+
     private static TransportOrder Accepted(string shipperId, long sequence) => TransportOrder.Accept(
         new ShipperId(shipperId),
         TransportOrderTests.SampleDetails(),

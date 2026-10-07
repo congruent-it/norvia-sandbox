@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/shipper-transport-order-detail.v1.schema.json",
+  "title": "ShipperTransportOrderDetail",
+  "description": "The Shipper's view of one of its Transport Orders (Canonical Model, version 1), as the TMS Shipper tracking API's get and find operations return it (P8). It holds what the Shipper may see and nothing of what stays inside Norvia (ADR 0011): no Carrier, no Shipment number, no Exception, no Stale and no remarks on Tracking events. The Tracking status is worked out when it is asked for and is never stored.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["transportOrderNumber", "shipperReference", "collection", "delivery", "collectionWindow", "deliveryWindow", "trackingStatus", "eta", "lastUpdate", "progress"],
+  "properties": {
+    "transportOrderNumber": { "type": "string", "pattern": "^TO-[0-9]{7}$" },
+    "shipperReference": { "description": "The Shipper's own reference, unique per Shipper; null when the Transport Order has none.", "type": ["string", "null"], "minLength": 1 },
+    "collection": { "$ref": "#/$defs/place" },
+    "delivery": { "$ref": "#/$defs/place" },
+    "collectionWindow": { "$ref": "#/$defs/window" },
+    "deliveryWindow": { "description": "The delivery window the Planner agreed (P7) when there is one, otherwise the Transport Order's.", "$ref": "#/$defs/window" },
+    "trackingStatus": {
+      "description": "Received: Accepted with no Shipment yet. Scheduled: the Shipment is Planned, Released or Booked, including after a rejected or cancelled Carrier booking sent it back to Planned. Then Collected, InTransit and Delivered.",
+      "enum": ["Received", "Scheduled", "Collected", "InTransit", "Delivered"]
+    },
+    "eta": { "description": "The ETA of the last Tracking event that carried one, otherwise the end of the delivery window; null when there is none.", "type": ["string", "null"], "format": "date-time" },
+    "lastUpdate": { "description": "The event time of the latest progress Tracking event; null before collection.", "type": ["string", "null"], "format": "date-time" },
+    "progress": {
+      "description": "The progress Tracking events in event-time order. Exception events never appear.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "eventTime", "place"],
+        "properties": {
+          "type": { "enum": ["Collected", "Departed", "Arrived", "OutForDelivery", "Delivered"] },
+          "eventTime": { "type": "string", "format": "date-time" },
+          "place": { "type": "object", "additionalProperties": false, "required": ["city", "countryCode"], "properties": { "city": { "type": ["string", "null"], "minLength": 1 }, "countryCode": { "type": ["string", "null"], "pattern": "^[A-Z]{2}$" } } }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "place": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["city", "countryCode"],
+      "properties": {
+        "city": { "type": ["string", "null"], "minLength": 1 },
+        "countryCode": { "description": "ISO 3166-1 alpha-2.", "type": ["string", "null"], "pattern": "^[A-Z]{2}$" }
+      }
+    },
+    "window": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["earliest", "latest"],
+      "properties": {
+        "earliest": { "type": ["string", "null"], "format": "date-time" },
+        "latest": { "type": ["string", "null"], "format": "date-time" }
+      }
+    }
+  }
+}
