@@ -28,6 +28,7 @@ hooks:
       ./infra/deploy-intake-logic-app.sh &&
       ./infra/deploy-booking-logic-app.sh &&
       ./infra/deploy-shipper-notification-logic-app.sh &&
+      ./infra/deploy-carrier-cancellation-logic-app.sh &&
       ./infra/deploy-answer-logic-app.sh &&
       ./infra/deploy-tracking-logic-app.sh &&
       ./infra/deploy-proof-of-delivery-logic-app.sh &&

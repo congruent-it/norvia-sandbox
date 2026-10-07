@@ -105,7 +105,7 @@ resource tmsApi 'Microsoft.Graph/applications@v1.0' = {
       id: reportRoleId
       value: reportRole
       displayName: 'Report Carrier bookings'
-      description: 'Report that a Carrier booking\'s request was sent to the Carrier, or never reached it (P4). Only the P4 booking Logic App holds it.'
+      description: 'Report that a Carrier booking\'s request, or its cancellation or withdrawal, was sent to the Carrier or never reached it (P4, P7). Only the P4 booking Logic App and the P7 Carrier cancellation Logic App hold it.'
       allowedMemberTypes: [
         'Application'
       ]
@@ -176,6 +176,20 @@ resource shipperNotificationIdentity 'Microsoft.ManagedIdentity/userAssignedIden
   name: 'id-shipper-notification-${uniqueString(resourceGroup().id)}'
   location: location
   tags: tags
+}
+
+// The P7 Carrier cancellation Logic App's identity, which it runs as. It holds the Carrier booking report role, like the booking
+// identity, because it reports a cancellation told or not delivered on the same Carrier booking operations. It holds no other role.
+resource carrierCancellationIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
+  name: 'id-carrier-cancellation-${uniqueString(resourceGroup().id)}'
+  location: location
+  tags: tags
+}
+
+resource carrierCancellationReportRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: tmsApiPrincipal.id
+  appRoleId: reportRoleId
+  principalId: carrierCancellationIdentity.properties.principalId
 }
 
 resource shipperNotificationReportRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
@@ -578,6 +592,10 @@ output shipperNotificationIdentityId string = shipperNotificationIdentity.id
 output shipperNotificationIdentityName string = shipperNotificationIdentity.name
 output shipperNotificationPrincipalId string = shipperNotificationIdentity.properties.principalId
 output shipperNotificationClientId string = shipperNotificationIdentity.properties.clientId
+output carrierCancellationIdentityId string = carrierCancellationIdentity.id
+output carrierCancellationIdentityName string = carrierCancellationIdentity.name
+output carrierCancellationPrincipalId string = carrierCancellationIdentity.properties.principalId
+output carrierCancellationClientId string = carrierCancellationIdentity.properties.clientId
 output tmsUiIdentityName string = tmsUiIdentity.name
 output tmsUiClientId string = tmsUiIdentity.properties.clientId
 output partnerApiClientId string = partnerApi.appId

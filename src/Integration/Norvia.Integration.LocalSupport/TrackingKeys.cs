@@ -28,6 +28,9 @@ public static class TrackingKeys
     /// <summary>The <see cref="Flow"/> of a Shipper notification, from the request to the report to the TMS.</summary>
     public const string ShipperNotification = "shipper-notification";
 
+    /// <summary>The <see cref="Flow"/> of a Carrier cancellation or withdrawal, from the event to the report to the TMS.</summary>
+    public const string CarrierCancellation = "carrier-cancellation";
+
     /// <summary>The <see cref="Flow"/> of a Carrier's tracking message, from the edge to the TMS.</summary>
     public const string CarrierTracking = "carrier-tracking";
 

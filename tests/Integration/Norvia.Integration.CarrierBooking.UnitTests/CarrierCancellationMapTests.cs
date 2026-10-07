@@ -26,6 +26,10 @@ public class CarrierCancellationMapTests
     }
 
     [Fact]
+    public void ToCarrierCancellation_AnEventAlreadyParsed_GivesTheSameCancellationAsItsText() =>
+        CarrierCancellationMap.ToCarrierCancellation(Cancelled())!.ToJsonString().Should().Be(CarrierCancellationMap.ToCarrierCancellation(Cancelled().ToJsonString())!.ToJsonString());
+
+    [Fact]
     public void ToCarrierCancellation_AWithdrawnBooking_GivesKindWithdrawnWithoutReferenceOrReason()
     {
         var cancellation = CarrierCancellationMap.ToCarrierCancellation(Event("withdrawn.carrier-booking-withdrawn.json").ToJsonString());
