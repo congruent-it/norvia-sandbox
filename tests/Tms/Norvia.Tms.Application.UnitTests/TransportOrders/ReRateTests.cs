@@ -30,7 +30,7 @@ public sealed class ReRateTests
     public ReRateTests()
     {
         _rateCards.FindFor(new ShipperId("SHP-0001")).Returns(Samples.RateCard());
-        _handler = new RateTransportOrderHandler(_repository, _rateCards, new BillingCheck(_orders, _shipments, _trackingEvents, _proofs), _time);
+        _handler = new RateTransportOrderHandler(_repository, _rateCards, new BillingCheck(_orders, _shipments, _trackingEvents, _proofs, Substitute.For<IReadRepository<Norvia.Tms.Domain.Exceptions.ExceptionCase>>()), _time);
     }
 
     [Fact]

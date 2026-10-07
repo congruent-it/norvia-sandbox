@@ -27,6 +27,7 @@ public sealed class RecordProofOfDeliveryHandlerTests
     private readonly IRepository<Shipment> _shipments = Substitute.For<IRepository<Shipment>>();
     private readonly IRepository<ExceptionCase> _exceptions = Substitute.For<IRepository<ExceptionCase>>();
     private readonly IExceptionNumbers _exceptionNumbers = Substitute.For<IExceptionNumbers>();
+    private readonly IReadRepository<ExceptionCase> _openExceptions = Substitute.For<IReadRepository<ExceptionCase>>();
     private readonly IReadRepository<TransportOrder> _orders = Substitute.For<IReadRepository<TransportOrder>>();
     private readonly IReadRepository<ProofOfDelivery> _currentProofs = Substitute.For<IReadRepository<ProofOfDelivery>>();
     private readonly IReadRepository<TrackingEvent> _trackingEvents = Substitute.For<IReadRepository<TrackingEvent>>();
@@ -38,7 +39,7 @@ public sealed class RecordProofOfDeliveryHandlerTests
     {
         _exceptionNumbers.NextAsync(Arg.Any<CancellationToken>()).Returns(ExceptionNumber.FromSequence(9));
         _trackingEvents.ListAsync(Arg.Any<DeliveredTrackingEventsForShipmentsSpec>(), Arg.Any<CancellationToken>()).Returns([]);
-        _handler = new RecordProofOfDeliveryHandler(_proofsOfDelivery, _carrierBookings, _shipments, _files, new ExceptionCauses(_exceptions, _exceptionNumbers), new BillingCheck(_orders, Substitute.For<IReadRepository<Shipment>>(), _trackingEvents, _currentProofs), new ProofOfDeliveryRules(TimeSpan.FromMinutes(5)), _time);
+        _handler = new RecordProofOfDeliveryHandler(_proofsOfDelivery, _carrierBookings, _shipments, _files, new ExceptionCauses(_exceptions, _exceptionNumbers), new BillingCheck(_orders, Substitute.For<IReadRepository<Shipment>>(), _trackingEvents, _currentProofs, _openExceptions), new ProofOfDeliveryRules(TimeSpan.FromMinutes(5)), _time);
     }
 
     [Fact]
@@ -80,6 +81,50 @@ public sealed class RecordProofOfDeliveryHandlerTests
         order.BecameBillableAt.Should().Be(Samples.Now.AddDays(2));
         order.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<TransportOrderBillableEvent>();
         await _proofsOfDelivery.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_AProofOfDeliveryWithReservations_LeavesTheOrderNotYetBillable_WhileItsExceptionIsOpen()
+    {
+        var shipment = Found(ShipmentStatus.Delivered);
+        var order = RatedOrderOf(shipment);
+        _trackingEvents.ListAsync(Arg.Any<DeliveredTrackingEventsForShipmentsSpec>(), Arg.Any<CancellationToken>())
+            .Returns([new DeliveredEventRow(shipment.Id, Samples.Now.AddHours(3))]);
+
+        await _handler.Handle(Command(Report(condition: DeliveryCondition.Reservations)), CancellationToken.None);
+
+        order.BillingState.Should().Be(BillingState.NotYetBillable);
+        order.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Handle_ACleanProofOfDelivery_LeavesTheOrderNotYetBillable_WhileAnotherExceptionIsOpen()
+    {
+        var shipment = Found(ShipmentStatus.Delivered);
+        var order = RatedOrderOf(shipment);
+        _trackingEvents.ListAsync(Arg.Any<DeliveredTrackingEventsForShipmentsSpec>(), Arg.Any<CancellationToken>())
+            .Returns([new DeliveredEventRow(shipment.Id, Samples.Now.AddHours(3))]);
+        _openExceptions.AnyAsync(Arg.Any<OpenExceptionOfShipmentSpec>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await _handler.Handle(Command(), CancellationToken.None);
+
+        order.BillingState.Should().Be(BillingState.NotYetBillable);
+    }
+
+    [Fact]
+    public async Task Handle_ANewProofOfDeliveryAfterTheOrderIsBillable_PublishesNothing()
+    {
+        var shipment = Found(ShipmentStatus.Delivered);
+        var order = RatedOrderOf(shipment);
+        _trackingEvents.ListAsync(Arg.Any<DeliveredTrackingEventsForShipmentsSpec>(), Arg.Any<CancellationToken>())
+            .Returns([new DeliveredEventRow(shipment.Id, Samples.Now.AddHours(3))]);
+        await _handler.Handle(Command(), CancellationToken.None);
+        order.ClearDomainEvents();
+
+        await _handler.Handle(Command(Report(documentId: "doc-2", condition: DeliveryCondition.Reservations)), CancellationToken.None);
+
+        order.BillingState.Should().Be(BillingState.Billable);
+        order.DomainEvents.Should().BeEmpty();
     }
 
     [Fact]

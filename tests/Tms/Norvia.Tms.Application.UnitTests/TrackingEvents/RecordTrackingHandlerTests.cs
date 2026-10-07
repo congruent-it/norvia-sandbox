@@ -29,6 +29,7 @@ public sealed class RecordTrackingHandlerTests
     private readonly IRepository<Shipment> _shipments = Substitute.For<IRepository<Shipment>>();
     private readonly IReadRepository<TransportOrder> _transportOrders = Substitute.For<IReadRepository<TransportOrder>>();
     private readonly IRepository<ExceptionCase> _exceptions = Substitute.For<IRepository<ExceptionCase>>();
+    private readonly IReadRepository<ExceptionCase> _openExceptions = Substitute.For<IReadRepository<ExceptionCase>>();
     private readonly IExceptionNumbers _exceptionNumbers = Substitute.For<IExceptionNumbers>();
     private readonly IReadRepository<TrackingEvent> _deliveredEvents = Substitute.For<IReadRepository<TrackingEvent>>();
     private readonly IReadRepository<ProofOfDelivery> _proofsOfDelivery = Substitute.For<IReadRepository<ProofOfDelivery>>();
@@ -38,7 +39,7 @@ public sealed class RecordTrackingHandlerTests
     public RecordTrackingHandlerTests()
     {
         _exceptionNumbers.NextAsync(Arg.Any<CancellationToken>()).Returns(ExceptionNumber.FromSequence(9));
-        _handler = new RecordTrackingHandler(_trackingEvents, _carrierBookings, _shipments, _transportOrders, new ExceptionCauses(_exceptions, _exceptionNumbers), new BillingCheck(_transportOrders, Substitute.For<IReadRepository<Shipment>>(), _deliveredEvents, _proofsOfDelivery), new TrackingEventRules(TimeSpan.FromMinutes(5)), _time);
+        _handler = new RecordTrackingHandler(_trackingEvents, _carrierBookings, _shipments, _transportOrders, new ExceptionCauses(_exceptions, _exceptionNumbers), new BillingCheck(_transportOrders, Substitute.For<IReadRepository<Shipment>>(), _deliveredEvents, _proofsOfDelivery, _openExceptions), new TrackingEventRules(TimeSpan.FromMinutes(5)), _time);
     }
 
     [Fact]
@@ -350,6 +351,20 @@ public sealed class RecordTrackingHandlerTests
         order.BecameBillableAt.Should().Be(Samples.Now.AddDays(2));
         order.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<TransportOrderBillableEvent>();
         await _trackingEvents.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_TheDeliveredEventForAShipmentWithAnOpenException_LeavesTheOrderNotYetBillable()
+    {
+        var shipment = BookedShipment();
+        var order = RatedOrderOf(shipment);
+        _proofsOfDelivery.AnyAsync(Arg.Is<CurrentProofOfDeliverySpec>(s => s.ShipmentId == shipment.Id), Arg.Any<CancellationToken>()).Returns(true);
+        _openExceptions.AnyAsync(Arg.Any<OpenExceptionOfShipmentSpec>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await _handler.Handle(Collected(type: TrackingEventType.Delivered, eventTime: Samples.Now.AddDays(1)), CancellationToken.None);
+
+        order.BillingState.Should().Be(BillingState.NotYetBillable);
+        order.DomainEvents.Should().BeEmpty();
     }
 
     [Fact]

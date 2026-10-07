@@ -86,7 +86,8 @@ public sealed class RecordProofOfDeliveryHandler(
         var now = time.GetUtcNow();
         var correlationId = new CorrelationId(command.CorrelationId);
         var proofOfDelivery = ProofOfDelivery.Record(shipment, report, correlationId, now, replaced);
-        if (ExceptionCause.From(proofOfDelivery, now) is { } cause)
+        var cause = ExceptionCause.From(proofOfDelivery, now);
+        if (cause is not null)
         {
             await exceptionCauses.OpenOrAddAsync(shipment, cause, cancellationToken);
         }
@@ -98,7 +99,7 @@ public sealed class RecordProofOfDeliveryHandler(
         // A Proof of delivery can complete the conditions of the Transport Order of a Delivered Shipment to be Billable (P9).
         if (shipment.Status == ShipmentStatus.Delivered)
         {
-            await billing.CheckAsync(shipment, new BillingChange(correlationId, now, ProofOfDeliveryRecorded: true), cancellationToken);
+            await billing.CheckAsync(shipment, new BillingChange(correlationId, now, ProofOfDeliveryRecorded: true, ExceptionOpened: cause is not null), cancellationToken);
         }
 
         await proofsOfDelivery.AddAsync(proofOfDelivery, cancellationToken);

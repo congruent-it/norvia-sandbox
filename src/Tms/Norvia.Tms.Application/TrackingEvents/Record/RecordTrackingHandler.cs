@@ -66,7 +66,8 @@ public sealed class RecordTrackingHandler(
         var correlationId = new CorrelationId(command.CorrelationId);
         var trackingEvent = shipment.Record(report with { CarrierBookingReference = booking.CarrierBookingReference }, correlationId, now);
 
-        if (ExceptionCause.From(trackingEvent, now) is { } cause)
+        var cause = ExceptionCause.From(trackingEvent, now);
+        if (cause is not null)
         {
             await exceptionCauses.OpenOrAddAsync(shipment, cause, cancellationToken);
         }
@@ -83,7 +84,7 @@ public sealed class RecordTrackingHandler(
         // The Shipment moving to Delivered can complete its Transport Order's conditions to be Billable (P9).
         if (trackingEvent is { Type: TrackingEventType.Delivered, MovedShipment: true })
         {
-            await billing.CheckAsync(shipment, new BillingChange(correlationId, now, DeliveredAt: trackingEvent.EventTime), cancellationToken);
+            await billing.CheckAsync(shipment, new BillingChange(correlationId, now, DeliveredAt: trackingEvent.EventTime, ExceptionOpened: cause is not null), cancellationToken);
         }
 
         // The tracked Shipment's move, the Exception the event opened and the Transport Order becoming Billable save with the

@@ -57,6 +57,18 @@ public sealed class TransportOrderBillingTests
     }
 
     [Fact]
+    public void TryBecomeBillable_ShipmentWithAnOpenException_StaysNotYetBillable()
+    {
+        var order = PlannedRated();
+
+        var billable = order.TryBecomeBillable(new BillingFacts(DeliveredAt, HasCurrentProofOfDelivery: true, HasOpenException: true), BillingCorrelationId, BillableAt);
+
+        billable.Should().BeFalse();
+        order.BillingState.Should().Be(BillingState.NotYetBillable);
+        order.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
     public void TryBecomeBillable_ShipmentNotDelivered_StaysNotYetBillable()
     {
         var order = PlannedRated();
