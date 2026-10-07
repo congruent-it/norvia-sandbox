@@ -1,3 +1,4 @@
+using Norvia.PartnerPortal.Domain.Personas;
 using Ardalis.SharedKernel;
 using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Time.Testing;
@@ -39,7 +40,7 @@ public sealed class SendTrackingHandlerTests
     }
 
     private ValueTask<Ardalis.Result.Result<SentTrackingEvent>> Send(TrackingEventType type, string persona = "van-dijk-transport") =>
-        _handler.Handle(new SendTrackingCommand(persona, "CB-0000001", type), CancellationToken.None);
+        _handler.Handle(new SendTrackingCommand(new PersonaId(persona), "CB-0000001", type), CancellationToken.None);
 
     [Fact]
     public async Task Handle_SendsTheEventToNorviaAsTheCarrierPersona_WithItsBookingReferenceAndNumber()

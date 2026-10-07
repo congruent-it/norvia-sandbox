@@ -54,11 +54,11 @@ public sealed class PartnerPortalRequestsTests : IDisposable
     public async Task DraftBookingAsync_ForAPersona_IsItsDraft_AndNullForNone()
     {
         var draft = Samples.Draft();
-        _mediator.Send(new DraftBookingQuery("brouwer-dranken"), Arg.Any<CancellationToken>()).Returns(Result.Success(draft));
-        _mediator.Send(new DraftBookingQuery("nobody"), Arg.Any<CancellationToken>()).Returns(Result<BookingRequest>.NotFound());
+        _mediator.Send(new DraftBookingQuery(new PersonaId("brouwer-dranken")), Arg.Any<CancellationToken>()).Returns(Result.Success(draft));
+        _mediator.Send(new DraftBookingQuery(new PersonaId("nobody")), Arg.Any<CancellationToken>()).Returns(Result<BookingRequest>.NotFound());
 
-        (await _portal.DraftBookingAsync("brouwer-dranken", Xunit.TestContext.Current.CancellationToken)).Should().BeSameAs(draft);
-        (await _portal.DraftBookingAsync("nobody", Xunit.TestContext.Current.CancellationToken)).Should().BeNull();
+        (await _portal.DraftBookingAsync(new PersonaId("brouwer-dranken"), Xunit.TestContext.Current.CancellationToken)).Should().BeSameAs(draft);
+        (await _portal.DraftBookingAsync(new PersonaId("nobody"), Xunit.TestContext.Current.CancellationToken)).Should().BeNull();
     }
 
     [Fact]
@@ -66,9 +66,9 @@ public sealed class PartnerPortalRequestsTests : IDisposable
     {
         var booking = Samples.Draft();
         var answered = Samples.Answered(NorviaAnswer.Accepted("TO-0000042", "corr-1"));
-        _mediator.Send(new SubmitBookingCommand("brouwer-dranken", booking), Arg.Any<CancellationToken>()).Returns(Result.Success(answered));
+        _mediator.Send(new SubmitBookingCommand(new PersonaId("brouwer-dranken"), booking), Arg.Any<CancellationToken>()).Returns(Result.Success(answered));
 
-        (await _portal.SubmitBookingAsync("brouwer-dranken", booking, Xunit.TestContext.Current.CancellationToken)).Should().BeSameAs(answered);
+        (await _portal.SubmitBookingAsync(new PersonaId("brouwer-dranken"), booking, Xunit.TestContext.Current.CancellationToken)).Should().BeSameAs(answered);
     }
 
     [Fact]
@@ -115,20 +115,20 @@ public sealed class PartnerPortalRequestsTests : IDisposable
         var answer = new CarrierAnswer.Confirmation("VDT-1");
         var details = new CarrierBookingDetails(new CarrierBookingStop(null, null, null, null, null, null), new CarrierBookingStop(null, null, null, null, null, null), null, []);
         var answered = new AnsweredCarrierBooking(new CarrierBookingRequestView(Guid.CreateVersion7(), "CB-0000001", "SH-0000001", Samples.SentAt, details), NorviaReply.Recorded("m-1"));
-        _mediator.Send(new AnswerCarrierBookingCommand("van-dijk-transport", "CB-0000001", answer), Arg.Any<CancellationToken>()).Returns(Result.Success(answered));
-        _mediator.Send(new AnswerCarrierBookingCommand("van-dijk-transport", "CB-0000009", answer), Arg.Any<CancellationToken>()).Returns(Result<AnsweredCarrierBooking>.NotFound());
+        _mediator.Send(new AnswerCarrierBookingCommand(new PersonaId("van-dijk-transport"), "CB-0000001", answer), Arg.Any<CancellationToken>()).Returns(Result.Success(answered));
+        _mediator.Send(new AnswerCarrierBookingCommand(new PersonaId("van-dijk-transport"), "CB-0000009", answer), Arg.Any<CancellationToken>()).Returns(Result<AnsweredCarrierBooking>.NotFound());
 
-        (await _portal.AnswerCarrierBookingAsync("van-dijk-transport", "CB-0000001", answer, Xunit.TestContext.Current.CancellationToken)).Should().BeSameAs(answered);
-        (await _portal.AnswerCarrierBookingAsync("van-dijk-transport", "CB-0000009", answer, Xunit.TestContext.Current.CancellationToken)).Should().BeNull();
+        (await _portal.AnswerCarrierBookingAsync(new PersonaId("van-dijk-transport"), "CB-0000001", answer, Xunit.TestContext.Current.CancellationToken)).Should().BeSameAs(answered);
+        (await _portal.AnswerCarrierBookingAsync(new PersonaId("van-dijk-transport"), "CB-0000009", answer, Xunit.TestContext.Current.CancellationToken)).Should().BeNull();
     }
 
     [Fact]
     public async Task ListCarrierShipmentsAsync_ListsThePersonasShipments()
     {
         IReadOnlyList<CarrierShipmentView> shipments = [];
-        _mediator.Send(new ListCarrierShipmentsQuery("van-dijk-transport"), Arg.Any<CancellationToken>()).Returns(shipments);
+        _mediator.Send(new ListCarrierShipmentsQuery(new PersonaId("van-dijk-transport")), Arg.Any<CancellationToken>()).Returns(shipments);
 
-        (await _portal.ListCarrierShipmentsAsync("van-dijk-transport", Xunit.TestContext.Current.CancellationToken)).Should().BeSameAs(shipments);
+        (await _portal.ListCarrierShipmentsAsync(new PersonaId("van-dijk-transport"), Xunit.TestContext.Current.CancellationToken)).Should().BeSameAs(shipments);
     }
 
     [Fact]
@@ -138,11 +138,11 @@ public sealed class PartnerPortalRequestsTests : IDisposable
         var shipment = new CarrierShipmentView("CB-0000001", "SH-0000001", "VDT-1", details, ShipmentStage.Collected, [], []);
         var sent = new SentTrackingEvent(
             shipment, new CarrierTrackingEvent("evt-1", "VDT-1", "CB-0000001", TrackingEventType.Collected, Samples.SentAt, "Rotterdam", "3087 BM", "NLD"), TrackingReply.Accepted("m-1"));
-        _mediator.Send(new SendTrackingCommand("van-dijk-transport", "CB-0000001", TrackingEventType.Collected), Arg.Any<CancellationToken>()).Returns(Result.Success(sent));
-        _mediator.Send(new SendTrackingCommand("van-dijk-transport", "CB-0000009", TrackingEventType.Collected), Arg.Any<CancellationToken>()).Returns(Result<SentTrackingEvent>.NotFound());
+        _mediator.Send(new SendTrackingCommand(new PersonaId("van-dijk-transport"), "CB-0000001", TrackingEventType.Collected), Arg.Any<CancellationToken>()).Returns(Result.Success(sent));
+        _mediator.Send(new SendTrackingCommand(new PersonaId("van-dijk-transport"), "CB-0000009", TrackingEventType.Collected), Arg.Any<CancellationToken>()).Returns(Result<SentTrackingEvent>.NotFound());
 
-        (await _portal.SendTrackingEventAsync("van-dijk-transport", "CB-0000001", TrackingEventType.Collected, Xunit.TestContext.Current.CancellationToken)).Should().BeSameAs(sent);
-        (await _portal.SendTrackingEventAsync("van-dijk-transport", "CB-0000009", TrackingEventType.Collected, Xunit.TestContext.Current.CancellationToken)).Should().BeNull();
+        (await _portal.SendTrackingEventAsync(new PersonaId("van-dijk-transport"), "CB-0000001", TrackingEventType.Collected, Xunit.TestContext.Current.CancellationToken)).Should().BeSameAs(sent);
+        (await _portal.SendTrackingEventAsync(new PersonaId("van-dijk-transport"), "CB-0000009", TrackingEventType.Collected, Xunit.TestContext.Current.CancellationToken)).Should().BeNull();
     }
 
     [Fact]
@@ -155,30 +155,30 @@ public sealed class PartnerPortalRequestsTests : IDisposable
             shipment, new CarrierProofOfDelivery("doc-1", "VDT-1", "CB-0000001", "J. Jansen", Samples.SentAt, "Utrecht", "3511 AW", "NLD", ProofOfDeliveryCondition.Clean, null, []),
             TrackingReply.Accepted("m-1"));
         var draft = new ProofOfDeliveryDraft("J. Jansen", ProofOfDeliveryCondition.Clean, null, files);
-        _mediator.Send(new SendProofOfDeliveryCommand("van-dijk-transport", "CB-0000001", "J. Jansen", ProofOfDeliveryCondition.Clean, null, files), Arg.Any<CancellationToken>())
+        _mediator.Send(new SendProofOfDeliveryCommand(new PersonaId("van-dijk-transport"), "CB-0000001", "J. Jansen", ProofOfDeliveryCondition.Clean, null, files), Arg.Any<CancellationToken>())
             .Returns(Result.Success(sent));
-        _mediator.Send(new SendProofOfDeliveryCommand("van-dijk-transport", "CB-0000009", "J. Jansen", ProofOfDeliveryCondition.Clean, null, files), Arg.Any<CancellationToken>())
+        _mediator.Send(new SendProofOfDeliveryCommand(new PersonaId("van-dijk-transport"), "CB-0000009", "J. Jansen", ProofOfDeliveryCondition.Clean, null, files), Arg.Any<CancellationToken>())
             .Returns(Result<SentProofOfDelivery>.NotFound());
 
-        (await _portal.SendProofOfDeliveryAsync("van-dijk-transport", "CB-0000001", draft, Xunit.TestContext.Current.CancellationToken)).Should().BeSameAs(sent);
-        (await _portal.SendProofOfDeliveryAsync("van-dijk-transport", "CB-0000009", draft, Xunit.TestContext.Current.CancellationToken)).Should().BeNull();
+        (await _portal.SendProofOfDeliveryAsync(new PersonaId("van-dijk-transport"), "CB-0000001", draft, Xunit.TestContext.Current.CancellationToken)).Should().BeSameAs(sent);
+        (await _portal.SendProofOfDeliveryAsync(new PersonaId("van-dijk-transport"), "CB-0000009", draft, Xunit.TestContext.Current.CancellationToken)).Should().BeNull();
     }
 
     [Fact]
     public async Task ListBookingsAsync_ListsThePersonasBookings()
     {
         IReadOnlyList<BookingView> bookings = [Samples.Answered(NorviaAnswer.NotReceived(null))];
-        _mediator.Send(new ListBookingsQuery("brouwer-dranken"), Arg.Any<CancellationToken>()).Returns(bookings);
+        _mediator.Send(new ListBookingsQuery(new PersonaId("brouwer-dranken")), Arg.Any<CancellationToken>()).Returns(bookings);
 
-        (await _portal.ListBookingsAsync("brouwer-dranken", Xunit.TestContext.Current.CancellationToken)).Should().BeSameAs(bookings);
+        (await _portal.ListBookingsAsync(new PersonaId("brouwer-dranken"), Xunit.TestContext.Current.CancellationToken)).Should().BeSameAs(bookings);
     }
 
     [Fact]
     public async Task ARequestThatFails_Throws_RatherThanSayingThereIsNone()
     {
-        _mediator.Send(new DraftBookingQuery("brouwer-dranken"), Arg.Any<CancellationToken>()).Returns(Result<BookingRequest>.Error("The seed file is gone."));
+        _mediator.Send(new DraftBookingQuery(new PersonaId("brouwer-dranken")), Arg.Any<CancellationToken>()).Returns(Result<BookingRequest>.Error("The seed file is gone."));
 
-        var draft = () => _portal.DraftBookingAsync("brouwer-dranken", Xunit.TestContext.Current.CancellationToken);
+        var draft = () => _portal.DraftBookingAsync(new PersonaId("brouwer-dranken"), Xunit.TestContext.Current.CancellationToken);
 
         await draft.Should().ThrowAsync<InvalidOperationException>();
     }
@@ -187,46 +187,46 @@ public sealed class PartnerPortalRequestsTests : IDisposable
     public async Task GetCarrierAnswerSettingsAsync_ReadsTheSettings_OrIsNullWithoutThePersona()
     {
         var settings = new CarrierAnswerSettingsView(CarrierAnswerMode.AutoConfirm, CarrierRejectionReason.NoCapacity, 5);
-        _mediator.Send(new GetCarrierAnswerSettingsQuery("kessler-spedition"), Arg.Any<CancellationToken>()).Returns(Result.Success(settings));
-        _mediator.Send(new GetCarrierAnswerSettingsQuery("nobody"), Arg.Any<CancellationToken>()).Returns(Result<CarrierAnswerSettingsView>.NotFound());
+        _mediator.Send(new GetCarrierAnswerSettingsQuery(new PersonaId("kessler-spedition")), Arg.Any<CancellationToken>()).Returns(Result.Success(settings));
+        _mediator.Send(new GetCarrierAnswerSettingsQuery(new PersonaId("nobody")), Arg.Any<CancellationToken>()).Returns(Result<CarrierAnswerSettingsView>.NotFound());
 
-        (await _portal.GetCarrierAnswerSettingsAsync("kessler-spedition", Xunit.TestContext.Current.CancellationToken)).Should().Be(settings);
-        (await _portal.GetCarrierAnswerSettingsAsync("nobody", Xunit.TestContext.Current.CancellationToken)).Should().BeNull();
+        (await _portal.GetCarrierAnswerSettingsAsync(new PersonaId("kessler-spedition"), Xunit.TestContext.Current.CancellationToken)).Should().Be(settings);
+        (await _portal.GetCarrierAnswerSettingsAsync(new PersonaId("nobody"), Xunit.TestContext.Current.CancellationToken)).Should().BeNull();
     }
 
     [Fact]
     public async Task ChangeCarrierAnswerSettingsAsync_ChangesTheSettings_OrIsNullWithoutThePersona()
     {
         var settings = new CarrierAnswerSettingsView(CarrierAnswerMode.AutoReject, CarrierRejectionReason.LaneNotServed, 3);
-        _mediator.Send(new ChangeCarrierAnswerSettingsCommand("kessler-spedition", CarrierAnswerMode.AutoReject, CarrierRejectionReason.LaneNotServed, 3), Arg.Any<CancellationToken>())
+        _mediator.Send(new ChangeCarrierAnswerSettingsCommand(new PersonaId("kessler-spedition"), CarrierAnswerMode.AutoReject, CarrierRejectionReason.LaneNotServed, 3), Arg.Any<CancellationToken>())
             .Returns(Result.Success(settings));
-        _mediator.Send(new ChangeCarrierAnswerSettingsCommand("nobody", CarrierAnswerMode.AutoReject, CarrierRejectionReason.LaneNotServed, 3), Arg.Any<CancellationToken>())
+        _mediator.Send(new ChangeCarrierAnswerSettingsCommand(new PersonaId("nobody"), CarrierAnswerMode.AutoReject, CarrierRejectionReason.LaneNotServed, 3), Arg.Any<CancellationToken>())
             .Returns(Result<CarrierAnswerSettingsView>.NotFound());
 
-        (await _portal.ChangeCarrierAnswerSettingsAsync("kessler-spedition", settings, Xunit.TestContext.Current.CancellationToken)).Should().Be(settings);
-        (await _portal.ChangeCarrierAnswerSettingsAsync("nobody", settings, Xunit.TestContext.Current.CancellationToken)).Should().BeNull();
+        (await _portal.ChangeCarrierAnswerSettingsAsync(new PersonaId("kessler-spedition"), settings, Xunit.TestContext.Current.CancellationToken)).Should().Be(settings);
+        (await _portal.ChangeCarrierAnswerSettingsAsync(new PersonaId("nobody"), settings, Xunit.TestContext.Current.CancellationToken)).Should().BeNull();
     }
 
     [Fact]
     public async Task GetCarrierTrackingSettingsAsync_ReadsTheSettings_OrIsNullWithoutThePersona()
     {
         var settings = new CarrierTrackingSettingsView(TrackingMode.AutoProgress, 5);
-        _mediator.Send(new GetCarrierTrackingSettingsQuery("kessler-spedition"), Arg.Any<CancellationToken>()).Returns(Result.Success(settings));
-        _mediator.Send(new GetCarrierTrackingSettingsQuery("nobody"), Arg.Any<CancellationToken>()).Returns(Result<CarrierTrackingSettingsView>.NotFound());
+        _mediator.Send(new GetCarrierTrackingSettingsQuery(new PersonaId("kessler-spedition")), Arg.Any<CancellationToken>()).Returns(Result.Success(settings));
+        _mediator.Send(new GetCarrierTrackingSettingsQuery(new PersonaId("nobody")), Arg.Any<CancellationToken>()).Returns(Result<CarrierTrackingSettingsView>.NotFound());
 
-        (await _portal.GetCarrierTrackingSettingsAsync("kessler-spedition", Xunit.TestContext.Current.CancellationToken)).Should().Be(settings);
-        (await _portal.GetCarrierTrackingSettingsAsync("nobody", Xunit.TestContext.Current.CancellationToken)).Should().BeNull();
+        (await _portal.GetCarrierTrackingSettingsAsync(new PersonaId("kessler-spedition"), Xunit.TestContext.Current.CancellationToken)).Should().Be(settings);
+        (await _portal.GetCarrierTrackingSettingsAsync(new PersonaId("nobody"), Xunit.TestContext.Current.CancellationToken)).Should().BeNull();
     }
 
     [Fact]
     public async Task ChangeCarrierTrackingSettingsAsync_ChangesTheSettings_OrIsNullWithoutThePersona()
     {
         var settings = new CarrierTrackingSettingsView(TrackingMode.AutoProgress, 3);
-        _mediator.Send(new ChangeCarrierTrackingSettingsCommand("kessler-spedition", TrackingMode.AutoProgress, 3), Arg.Any<CancellationToken>()).Returns(Result.Success(settings));
-        _mediator.Send(new ChangeCarrierTrackingSettingsCommand("nobody", TrackingMode.AutoProgress, 3), Arg.Any<CancellationToken>())
+        _mediator.Send(new ChangeCarrierTrackingSettingsCommand(new PersonaId("kessler-spedition"), TrackingMode.AutoProgress, 3), Arg.Any<CancellationToken>()).Returns(Result.Success(settings));
+        _mediator.Send(new ChangeCarrierTrackingSettingsCommand(new PersonaId("nobody"), TrackingMode.AutoProgress, 3), Arg.Any<CancellationToken>())
             .Returns(Result<CarrierTrackingSettingsView>.NotFound());
 
-        (await _portal.ChangeCarrierTrackingSettingsAsync("kessler-spedition", settings, Xunit.TestContext.Current.CancellationToken)).Should().Be(settings);
-        (await _portal.ChangeCarrierTrackingSettingsAsync("nobody", settings, Xunit.TestContext.Current.CancellationToken)).Should().BeNull();
+        (await _portal.ChangeCarrierTrackingSettingsAsync(new PersonaId("kessler-spedition"), settings, Xunit.TestContext.Current.CancellationToken)).Should().Be(settings);
+        (await _portal.ChangeCarrierTrackingSettingsAsync(new PersonaId("nobody"), settings, Xunit.TestContext.Current.CancellationToken)).Should().BeNull();
     }
 }

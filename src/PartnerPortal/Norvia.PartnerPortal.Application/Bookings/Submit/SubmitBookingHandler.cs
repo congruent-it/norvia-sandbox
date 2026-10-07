@@ -20,7 +20,7 @@ public sealed partial class SubmitBookingHandler(
     {
         ArgumentNullException.ThrowIfNull(command);
 
-        if (personas.Find(new PersonaId(command.PersonaId)) is not { } persona)
+        if (personas.Find(command.PersonaId) is not { } persona)
         {
             return Result.NotFound($"There is no Persona '{command.PersonaId}'.");
         }

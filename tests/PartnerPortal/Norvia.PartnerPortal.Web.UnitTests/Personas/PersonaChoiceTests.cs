@@ -1,3 +1,4 @@
+using Norvia.PartnerPortal.Domain.Personas;
 using Microsoft.AspNetCore.Http;
 using Norvia.PartnerPortal.Web.Personas;
 

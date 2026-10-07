@@ -1,3 +1,4 @@
+using Norvia.PartnerPortal.Domain.Personas;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Norvia.PartnerPortal.Application.CarrierShipments;
@@ -24,7 +25,7 @@ public sealed class ShipmentsTests : PortalWebContext
 
     private IRenderedComponent<Shipments> RenderShipments(params CarrierShipmentView[] shipments)
     {
-        Portal.ListCarrierShipmentsAsync("van-dijk-transport", Arg.Any<CancellationToken>()).Returns(shipments);
+        Portal.ListCarrierShipmentsAsync(new PersonaId("van-dijk-transport"), Arg.Any<CancellationToken>()).Returns(shipments);
         return Render<Shipments>(parameters => parameters.Add(page => page.PersonaId, "van-dijk-transport"));
     }
 
@@ -78,7 +79,7 @@ public sealed class ShipmentsTests : PortalWebContext
     public void Click_SendsThatEventAsThePersona_ForThatShipment_AndShowsTheNextStep()
     {
         var after = Shipment(lastProgress: TrackingEventType.Collected);
-        Portal.SendTrackingEventAsync("van-dijk-transport", "CB-0000001", TrackingEventType.Collected, Arg.Any<CancellationToken>())
+        Portal.SendTrackingEventAsync(new PersonaId("van-dijk-transport"), "CB-0000001", TrackingEventType.Collected, Arg.Any<CancellationToken>())
             .Returns(new SentTrackingEvent(after, Sent(TrackingEventType.Collected), TrackingReply.Accepted("corr-1")));
         var page = RenderShipments(Shipment());
 
@@ -96,7 +97,7 @@ public sealed class ShipmentsTests : PortalWebContext
     public void Click_AnException_IsSent_AndTheShipmentStaysWhereItWas()
     {
         var shipment = Shipment();
-        Portal.SendTrackingEventAsync("van-dijk-transport", "CB-0000001", TrackingEventType.CollectionFailed, Arg.Any<CancellationToken>())
+        Portal.SendTrackingEventAsync(new PersonaId("van-dijk-transport"), "CB-0000001", TrackingEventType.CollectionFailed, Arg.Any<CancellationToken>())
             .Returns(new SentTrackingEvent(shipment, Sent(TrackingEventType.CollectionFailed), TrackingReply.Accepted("corr-1")));
         var page = RenderShipments(shipment);
 
@@ -113,7 +114,7 @@ public sealed class ShipmentsTests : PortalWebContext
     public void Click_Delivered_KeepsTheShipmentOnTheList_ForItsProofOfDelivery()
     {
         var delivered = Shipment(lastProgress: TrackingEventType.Delivered);
-        Portal.SendTrackingEventAsync("van-dijk-transport", "CB-0000001", TrackingEventType.Delivered, Arg.Any<CancellationToken>())
+        Portal.SendTrackingEventAsync(new PersonaId("van-dijk-transport"), "CB-0000001", TrackingEventType.Delivered, Arg.Any<CancellationToken>())
             .Returns(new SentTrackingEvent(delivered, Sent(TrackingEventType.Delivered), TrackingReply.Accepted("corr-1")));
         var page = RenderShipments(Shipment("CB-0000001"), Shipment("CB-0000002"));
 
@@ -131,7 +132,7 @@ public sealed class ShipmentsTests : PortalWebContext
     [Fact]
     public void Click_NorviaDidNotReceiveIt_WarnsAndKeepsTheButtons()
     {
-        Portal.SendTrackingEventAsync("van-dijk-transport", "CB-0000001", TrackingEventType.Collected, Arg.Any<CancellationToken>())
+        Portal.SendTrackingEventAsync(new PersonaId("van-dijk-transport"), "CB-0000001", TrackingEventType.Collected, Arg.Any<CancellationToken>())
             .Returns(new SentTrackingEvent(Shipment(), Sent(TrackingEventType.Collected), TrackingReply.NotReceived(null)));
         var page = RenderShipments(Shipment());
 
@@ -147,7 +148,7 @@ public sealed class ShipmentsTests : PortalWebContext
     [Fact]
     public void Click_WhenThePortalFails_SaysSo()
     {
-        Portal.SendTrackingEventAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<TrackingEventType>(), Arg.Any<CancellationToken>())
+        Portal.SendTrackingEventAsync(Arg.Any<PersonaId>(), Arg.Any<string>(), Arg.Any<TrackingEventType>(), Arg.Any<CancellationToken>())
             .Returns<SentTrackingEvent?>(_ => throw new InvalidOperationException("The database is down."));
         var page = RenderShipments(Shipment());
 
@@ -159,7 +160,7 @@ public sealed class ShipmentsTests : PortalWebContext
     [Fact]
     public void Render_AsShipmentsAreConfirmed_ShowsThemWithoutAReload()
     {
-        Portal.ListCarrierShipmentsAsync("van-dijk-transport", Arg.Any<CancellationToken>()).Returns([], [Shipment("CB-0000001")]);
+        Portal.ListCarrierShipmentsAsync(new PersonaId("van-dijk-transport"), Arg.Any<CancellationToken>()).Returns([], [Shipment("CB-0000001")]);
         var page = Render<Shipments>(parameters => parameters.Add(component => component.PersonaId, "van-dijk-transport"));
         page.Find("[role=status]").TextContent.Should().Contain("has no Shipment");
 
@@ -171,7 +172,7 @@ public sealed class ShipmentsTests : PortalWebContext
     [Fact]
     public void Render_WhenTheListCantBeLoaded_SaysSo()
     {
-        Portal.ListCarrierShipmentsAsync("van-dijk-transport", Arg.Any<CancellationToken>()).Returns<IReadOnlyList<CarrierShipmentView>>(_ => throw new InvalidOperationException("down"));
+        Portal.ListCarrierShipmentsAsync(new PersonaId("van-dijk-transport"), Arg.Any<CancellationToken>()).Returns<IReadOnlyList<CarrierShipmentView>>(_ => throw new InvalidOperationException("down"));
 
         Render<Shipments>(parameters => parameters.Add(page => page.PersonaId, "van-dijk-transport"))
             .Find("[role=alert]").TextContent.Should().Contain("couldn't be loaded");
@@ -193,12 +194,12 @@ public sealed class ShipmentsTests : PortalWebContext
     [Fact]
     public async Task Dispose_StopsTheRefreshing()
     {
-        Portal.ListCarrierShipmentsAsync("van-dijk-transport", Arg.Any<CancellationToken>()).Returns([]);
+        Portal.ListCarrierShipmentsAsync(new PersonaId("van-dijk-transport"), Arg.Any<CancellationToken>()).Returns([]);
         var page = Render<Shipments>(parameters => parameters.Add(component => component.PersonaId, "van-dijk-transport"));
 
         await page.Instance.DisposeAsync();
         Time.Advance(Shipments.RefreshInterval);
 
-        await Portal.Received(1).ListCarrierShipmentsAsync("van-dijk-transport", Arg.Any<CancellationToken>());
+        await Portal.Received(1).ListCarrierShipmentsAsync(new PersonaId("van-dijk-transport"), Arg.Any<CancellationToken>());
     }
 }

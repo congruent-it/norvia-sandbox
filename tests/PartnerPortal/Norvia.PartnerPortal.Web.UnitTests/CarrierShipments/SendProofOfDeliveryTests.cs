@@ -1,3 +1,4 @@
+using Norvia.PartnerPortal.Domain.Personas;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.Extensions.DependencyInjection;
 using Norvia.PartnerPortal.Application.CarrierShipments;
@@ -23,7 +24,7 @@ public sealed class SendProofOfDeliveryTests : PortalWebContext
 
     private IRenderedComponent<Shipments> RenderShipments(params CarrierShipmentView[] shipments)
     {
-        Portal.ListCarrierShipmentsAsync("van-dijk-transport", Arg.Any<CancellationToken>()).Returns(shipments);
+        Portal.ListCarrierShipmentsAsync(new PersonaId("van-dijk-transport"), Arg.Any<CancellationToken>()).Returns(shipments);
         return Render<Shipments>(parameters => parameters.Add(page => page.PersonaId, "van-dijk-transport"));
     }
 
@@ -31,7 +32,7 @@ public sealed class SendProofOfDeliveryTests : PortalWebContext
         page.Find($"section[aria-label=\"Send Proof of delivery for {number}\"]");
 
     private void NorviaReplies(TrackingReply reply, string number = "CB-0000001") =>
-        Portal.SendProofOfDeliveryAsync("van-dijk-transport", number, Arg.Any<ProofOfDeliveryDraft>(), Arg.Any<CancellationToken>())
+        Portal.SendProofOfDeliveryAsync(new PersonaId("van-dijk-transport"), number, Arg.Any<ProofOfDeliveryDraft>(), Arg.Any<CancellationToken>())
             .Returns(new SentProofOfDelivery(
                 Shipment(number),
                 new CarrierProofOfDelivery("doc-1", "VDT-77812", number, "J. Jansen", DateTimeOffset.UnixEpoch, "Utrecht", "3511 AW", "NLD", ProofOfDeliveryCondition.Clean, null, []),
@@ -48,7 +49,7 @@ public sealed class SendProofOfDeliveryTests : PortalWebContext
         Field(Panel(page), "Received by").Change(receivedBy);
 
     private void NothingWasSent() =>
-        Portal.DidNotReceive().SendProofOfDeliveryAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<ProofOfDeliveryDraft>(), Arg.Any<CancellationToken>());
+        Portal.DidNotReceive().SendProofOfDeliveryAsync(Arg.Any<PersonaId>(), Arg.Any<string>(), Arg.Any<ProofOfDeliveryDraft>(), Arg.Any<CancellationToken>());
 
     private static ProofOfDeliveryDraft Draft(IEnumerable<NSubstitute.Core.ICall> calls) =>
         (ProofOfDeliveryDraft)calls.Single(call => call.GetMethodInfo().Name == nameof(IPartnerPortal.SendProofOfDeliveryAsync)).GetArguments()[2]!;
@@ -137,7 +138,7 @@ public sealed class SendProofOfDeliveryTests : PortalWebContext
         var file = draft.Files.Should().ContainSingle().Subject;
         (file.Name, file.ContentType).Should().Be(("sample-cmr.pdf", "application/pdf"));
         file.Content.Take(5).Should().Equal("%PDF-"u8.ToArray());
-        Portal.Received(1).SendProofOfDeliveryAsync("van-dijk-transport", "CB-0000001", Arg.Any<ProofOfDeliveryDraft>(), Arg.Any<CancellationToken>());
+        Portal.Received(1).SendProofOfDeliveryAsync(new PersonaId("van-dijk-transport"), "CB-0000001", Arg.Any<ProofOfDeliveryDraft>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -258,7 +259,7 @@ public sealed class SendProofOfDeliveryTests : PortalWebContext
     [Fact]
     public void Send_WhenThePortalFails_SaysSo_AndKeepsTheForm()
     {
-        Portal.SendProofOfDeliveryAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<ProofOfDeliveryDraft>(), Arg.Any<CancellationToken>())
+        Portal.SendProofOfDeliveryAsync(Arg.Any<PersonaId>(), Arg.Any<string>(), Arg.Any<ProofOfDeliveryDraft>(), Arg.Any<CancellationToken>())
             .Returns<SentProofOfDelivery?>(_ => throw new InvalidOperationException("The database is down."));
         var page = OpenForm();
         FillIn(page);
@@ -275,7 +276,7 @@ public sealed class SendProofOfDeliveryTests : PortalWebContext
     [Fact]
     public void Send_WhenTheShipmentIsGone_IsNotFound()
     {
-        Portal.SendProofOfDeliveryAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<ProofOfDeliveryDraft>(), Arg.Any<CancellationToken>())
+        Portal.SendProofOfDeliveryAsync(Arg.Any<PersonaId>(), Arg.Any<string>(), Arg.Any<ProofOfDeliveryDraft>(), Arg.Any<CancellationToken>())
             .Returns((SentProofOfDelivery?)null);
         var notFound = false;
         Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().OnNotFound += (_, _) => notFound = true;

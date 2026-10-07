@@ -1,3 +1,4 @@
+using Norvia.PartnerPortal.Domain.Personas;
 using System.Diagnostics;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,7 +12,7 @@ public sealed class NewBookingTests : PortalWebContext
 {
     public NewBookingTests()
     {
-        Portal.DraftBookingAsync("brouwer-dranken", Arg.Any<CancellationToken>()).Returns(Samples.Draft());
+        Portal.DraftBookingAsync(new PersonaId("brouwer-dranken"), Arg.Any<CancellationToken>()).Returns(Samples.Draft());
     }
 
     [Fact]
@@ -43,7 +44,7 @@ public sealed class NewBookingTests : PortalWebContext
         page.Find("form").Submit();
 
         Portal.Received(1).SubmitBookingAsync(
-            "brouwer-dranken",
+            new PersonaId("brouwer-dranken"),
             Arg.Is<BookingRequest>(booking => booking.ShipperReference == "BK-20260925-100000" && booking.CollectionAddress.City == "Schiedam"),
             Arg.Any<CancellationToken>());
     }
@@ -87,7 +88,7 @@ public sealed class NewBookingTests : PortalWebContext
     [Fact]
     public void Submit_WhenThePortalCantKeepTheBooking_SaysSo_AndKeepsTheForm()
     {
-        Portal.SubmitBookingAsync("brouwer-dranken", Arg.Any<BookingRequest>(), Arg.Any<CancellationToken>())
+        Portal.SubmitBookingAsync(new PersonaId("brouwer-dranken"), Arg.Any<BookingRequest>(), Arg.Any<CancellationToken>())
             .Returns<BookingView?>(_ => throw new InvalidOperationException("The database is down."));
         var page = RenderPage();
 
@@ -100,7 +101,7 @@ public sealed class NewBookingTests : PortalWebContext
     [Fact]
     public void Submit_WhenThePortalFails_ShowsItsTraceId_SoTheAttemptCanBeFound()
     {
-        Portal.SubmitBookingAsync("brouwer-dranken", Arg.Any<BookingRequest>(), Arg.Any<CancellationToken>())
+        Portal.SubmitBookingAsync(new PersonaId("brouwer-dranken"), Arg.Any<BookingRequest>(), Arg.Any<CancellationToken>())
             .Returns<BookingView?>(_ => throw new InvalidOperationException("The database is down."));
         var page = RenderPage();
         using var submitting = new Activity("Event onsubmit").Start();
@@ -130,7 +131,7 @@ public sealed class NewBookingTests : PortalWebContext
 
         page.Find("form").Submit();
 
-        Portal.DidNotReceive().SubmitBookingAsync(Arg.Any<string>(), Arg.Any<BookingRequest>(), Arg.Any<CancellationToken>());
+        Portal.DidNotReceive().SubmitBookingAsync(Arg.Any<PersonaId>(), Arg.Any<BookingRequest>(), Arg.Any<CancellationToken>());
         Group(page, "Delivery").TextContent.Should().Contain("Enter an email address, such as name@example.com.");
     }
 
@@ -172,7 +173,7 @@ public sealed class NewBookingTests : PortalWebContext
         var page = RenderPage();
         page.Find("form").Submit();
         page.WaitForAssertion(() => page.FindAll("[aria-label=\"Norvia's answer\"]").Should().NotBeEmpty());
-        Portal.DraftBookingAsync("brouwer-dranken", Arg.Any<CancellationToken>()).Returns(Samples.Draft() with { ShipperReference = "BK-20260925-100500" });
+        Portal.DraftBookingAsync(new PersonaId("brouwer-dranken"), Arg.Any<CancellationToken>()).Returns(Samples.Draft() with { ShipperReference = "BK-20260925-100500" });
 
         page.FindAll("fluent-button").Single(button => button.TextContent.Trim() == "Start a new booking").Click();
 
@@ -194,7 +195,7 @@ public sealed class NewBookingTests : PortalWebContext
     [Fact]
     public void Render_WhenTheFormCantBeLoaded_SaysSo()
     {
-        Portal.DraftBookingAsync("brouwer-dranken", Arg.Any<CancellationToken>()).Returns<BookingRequest?>(_ => throw new InvalidOperationException("The seed file is gone."));
+        Portal.DraftBookingAsync(new PersonaId("brouwer-dranken"), Arg.Any<CancellationToken>()).Returns<BookingRequest?>(_ => throw new InvalidOperationException("The seed file is gone."));
 
         var page = RenderPage();
 
@@ -202,7 +203,7 @@ public sealed class NewBookingTests : PortalWebContext
     }
 
     private void AnswerWith(NorviaAnswer answer) =>
-        Portal.SubmitBookingAsync("brouwer-dranken", Arg.Any<BookingRequest>(), Arg.Any<CancellationToken>()).Returns(Samples.Answered(answer));
+        Portal.SubmitBookingAsync(new PersonaId("brouwer-dranken"), Arg.Any<BookingRequest>(), Arg.Any<CancellationToken>()).Returns(Samples.Answered(answer));
 
     private IRenderedComponent<NewBooking> RenderPage() =>
         Render<NewBooking>(parameters => parameters.Add(page => page.PersonaId, "brouwer-dranken"));

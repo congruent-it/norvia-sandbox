@@ -1,3 +1,4 @@
+using Norvia.PartnerPortal.Domain.Personas;
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Microsoft.Extensions.Time.Testing;
@@ -50,7 +51,7 @@ public sealed class SendProofOfDeliveryHandlerTests
         string? remark = null,
         IReadOnlyList<ProofOfDeliveryUpload>? files = null,
         string persona = "van-dijk-transport") =>
-        _handler.Handle(new SendProofOfDeliveryCommand(persona, "CB-0000001", receivedBy, condition, remark, files ?? [Cmr]), CancellationToken.None);
+        _handler.Handle(new SendProofOfDeliveryCommand(new PersonaId(persona), "CB-0000001", receivedBy, condition, remark, files ?? [Cmr]), CancellationToken.None);
 
     [Fact]
     public async Task Handle_SendsTheProofToNorviaAsTheCarrierPersona_WithItsBookingReferenceNumberAndFiles()

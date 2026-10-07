@@ -12,7 +12,7 @@ public sealed class ListCarrierShipmentsHandler(IReadRepository<CarrierBookingRe
     {
         ArgumentNullException.ThrowIfNull(query);
 
-        var requests = await repository.ListAsync(new CarrierShipmentsOfPersonaSpec(new PersonaId(query.PersonaId)), cancellationToken);
+        var requests = await repository.ListAsync(new CarrierShipmentsOfPersonaSpec(query.PersonaId), cancellationToken);
         return [.. requests.Select(CarrierShipmentView.From)];
     }
 }

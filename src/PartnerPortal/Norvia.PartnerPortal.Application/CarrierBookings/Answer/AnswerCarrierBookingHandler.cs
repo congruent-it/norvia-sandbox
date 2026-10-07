@@ -25,7 +25,7 @@ public sealed partial class AnswerCarrierBookingHandler(
     {
         ArgumentNullException.ThrowIfNull(command);
 
-        if (personas.Find(new PersonaId(command.PersonaId)) is not { PartyType: PartyType.Carrier } carrier)
+        if (personas.Find(command.PersonaId) is not { PartyType: PartyType.Carrier } carrier)
         {
             return Result.NotFound($"There is no Carrier Persona '{command.PersonaId}'.");
         }

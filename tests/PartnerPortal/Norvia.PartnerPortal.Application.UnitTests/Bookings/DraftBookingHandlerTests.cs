@@ -23,7 +23,7 @@ public sealed class DraftBookingHandlerTests
     [Fact]
     public async Task Handle_ShipperWithSavedAddresses_CollectsFromItsOwnAddressAndDeliversToItsConsignee()
     {
-        var draft = (await _handler.Handle(new DraftBookingQuery("brouwer-dranken"), CancellationToken.None)).Value;
+        var draft = (await _handler.Handle(new DraftBookingQuery(new PersonaId("brouwer-dranken")), CancellationToken.None)).Value;
 
         draft.CollectionAddress.Should().Be(new BookingAddress("Waalhaven Oostzijde 88", "3087 BM", "Rotterdam", "NL"));
         draft.DeliveryAddress.Should().Be(new BookingAddress("Oudegracht 112", "3511 AW", "Utrecht", "NL"));
@@ -33,7 +33,7 @@ public sealed class DraftBookingHandlerTests
     [Fact]
     public async Task Handle_Always_CollectsTomorrowMorning_WithNoDeliveryWindow()
     {
-        var draft = (await _handler.Handle(new DraftBookingQuery("brouwer-dranken"), CancellationToken.None)).Value;
+        var draft = (await _handler.Handle(new DraftBookingQuery(new PersonaId("brouwer-dranken")), CancellationToken.None)).Value;
 
         draft.CollectionWindow.Should().Be(new LocalWindow(new DateTime(2026, 9, 25, 8, 0, 0), new DateTime(2026, 9, 25, 12, 0, 0)));
         draft.DeliveryWindow.Should().Be(new LocalWindow());
@@ -42,7 +42,7 @@ public sealed class DraftBookingHandlerTests
     [Fact]
     public async Task Handle_Always_HasOneLineOfPallets()
     {
-        var draft = (await _handler.Handle(new DraftBookingQuery("brouwer-dranken"), CancellationToken.None)).Value;
+        var draft = (await _handler.Handle(new DraftBookingQuery(new PersonaId("brouwer-dranken")), CancellationToken.None)).Value;
 
         draft.GoodsLines.Should().Equal(new BookingGoodsLine(PackageType.Pallet, 2, 850m, new PackageDimensions(120, 80, 150)));
     }
@@ -50,9 +50,9 @@ public sealed class DraftBookingHandlerTests
     [Fact]
     public async Task Handle_Always_GivesAReferenceNotUsedBefore()
     {
-        var first = (await _handler.Handle(new DraftBookingQuery("brouwer-dranken"), CancellationToken.None)).Value;
+        var first = (await _handler.Handle(new DraftBookingQuery(new PersonaId("brouwer-dranken")), CancellationToken.None)).Value;
         _time.Advance(TimeSpan.FromSeconds(1));
-        var second = (await _handler.Handle(new DraftBookingQuery("brouwer-dranken"), CancellationToken.None)).Value;
+        var second = (await _handler.Handle(new DraftBookingQuery(new PersonaId("brouwer-dranken")), CancellationToken.None)).Value;
 
         first.ShipperReference.Should().Be("BK-20260924-081500");
         second.ShipperReference.Should().NotBe(first.ShipperReference);
@@ -61,7 +61,7 @@ public sealed class DraftBookingHandlerTests
     [Fact]
     public async Task Handle_PartyWithoutSavedAddresses_LeavesTheAddressesEmpty()
     {
-        var draft = (await _handler.Handle(new DraftBookingQuery("van-dijk-transport"), CancellationToken.None)).Value;
+        var draft = (await _handler.Handle(new DraftBookingQuery(new PersonaId("van-dijk-transport")), CancellationToken.None)).Value;
 
         draft.CollectionAddress.Should().Be(new BookingAddress());
         draft.DeliveryAddress.Should().Be(new BookingAddress());
@@ -71,7 +71,7 @@ public sealed class DraftBookingHandlerTests
     [Fact]
     public async Task Handle_UnknownPersona_IsNotFound()
     {
-        var result = await _handler.Handle(new DraftBookingQuery("nobody"), CancellationToken.None);
+        var result = await _handler.Handle(new DraftBookingQuery(new PersonaId("nobody")), CancellationToken.None);
 
         result.Status.Should().Be(ResultStatus.NotFound);
     }

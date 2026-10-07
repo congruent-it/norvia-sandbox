@@ -1,3 +1,4 @@
+using Norvia.PartnerPortal.Domain.Personas;
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Norvia.PartnerPortal.Application.CarrierShipments.TrackingSettings;
@@ -20,10 +21,10 @@ public sealed class CarrierTrackingSettingsHandlerTests
     }
 
     private ValueTask<Result<CarrierTrackingSettingsView>> Get(string persona) =>
-        new GetCarrierTrackingSettingsHandler(_readRepository, _personas).Handle(new GetCarrierTrackingSettingsQuery(persona), CancellationToken.None);
+        new GetCarrierTrackingSettingsHandler(_readRepository, _personas).Handle(new GetCarrierTrackingSettingsQuery(new PersonaId(persona)), CancellationToken.None);
 
     private ValueTask<Result<CarrierTrackingSettingsView>> Change(string persona, TrackingMode mode, int delaySeconds) =>
-        new ChangeCarrierTrackingSettingsHandler(_repository, _personas).Handle(new ChangeCarrierTrackingSettingsCommand(persona, mode, delaySeconds), CancellationToken.None);
+        new ChangeCarrierTrackingSettingsHandler(_repository, _personas).Handle(new ChangeCarrierTrackingSettingsCommand(new PersonaId(persona), mode, delaySeconds), CancellationToken.None);
 
     [Fact]
     public async Task Get_ForAPersonaNeverChanged_IsTheSeedFilesDefault()

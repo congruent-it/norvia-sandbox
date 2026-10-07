@@ -1,3 +1,4 @@
+using Norvia.PartnerPortal.Domain.Personas;
 using Ardalis.SharedKernel;
 using Norvia.PartnerPortal.Application.ShipperNotifications.List;
 using Norvia.PartnerPortal.Domain.ShipperNotifications;
@@ -15,7 +16,7 @@ public sealed class ListShipperNotificationsHandlerTests
         var repository = Substitute.For<IReadRepository<ShipperNotification>>();
         repository.ListAsync(Arg.Any<ShipperNotificationsOfPersonaSpec>(), Arg.Any<CancellationToken>()).Returns([notification]);
 
-        var inbox = await new ListShipperNotificationsHandler(repository).Handle(new ListShipperNotificationsQuery("brouwer-dranken"), CancellationToken.None);
+        var inbox = await new ListShipperNotificationsHandler(repository).Handle(new ListShipperNotificationsQuery(new PersonaId("brouwer-dranken")), CancellationToken.None);
 
         var view = inbox.Should().ContainSingle().Subject;
         view.NotificationId.Should().Be(notification.NotificationId);

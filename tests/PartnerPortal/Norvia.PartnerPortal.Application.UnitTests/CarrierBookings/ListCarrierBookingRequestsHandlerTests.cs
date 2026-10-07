@@ -1,3 +1,4 @@
+using Norvia.PartnerPortal.Domain.Personas;
 using Ardalis.SharedKernel;
 using Norvia.PartnerPortal.Application.CarrierBookings.List;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
@@ -15,7 +16,7 @@ public sealed class ListCarrierBookingRequestsHandlerTests
         repository.ListAsync(Arg.Is<CarrierBookingRequestsOfPersonaSpec>(spec => spec.PersonaId == Samples.VanDijkTransport.Id), Arg.Any<CancellationToken>())
             .Returns([request]);
 
-        var inbox = await new ListCarrierBookingRequestsHandler(repository).Handle(new ListCarrierBookingRequestsQuery("van-dijk-transport"), CancellationToken.None);
+        var inbox = await new ListCarrierBookingRequestsHandler(repository).Handle(new ListCarrierBookingRequestsQuery(new PersonaId("van-dijk-transport")), CancellationToken.None);
 
         var view = inbox.Should().ContainSingle().Subject;
         view.Id.Should().Be(request.Id.Value);
@@ -34,7 +35,7 @@ public sealed class ListCarrierBookingRequestsHandlerTests
         var repository = Substitute.For<IReadRepository<CarrierBookingRequest>>();
         repository.ListAsync(Arg.Any<CarrierBookingRequestsOfPersonaSpec>(), Arg.Any<CancellationToken>()).Returns([request]);
 
-        var inbox = await new ListCarrierBookingRequestsHandler(repository).Handle(new ListCarrierBookingRequestsQuery("van-dijk-transport"), CancellationToken.None);
+        var inbox = await new ListCarrierBookingRequestsHandler(repository).Handle(new ListCarrierBookingRequestsQuery(new PersonaId("van-dijk-transport")), CancellationToken.None);
 
         var view = inbox.Single();
         view.IsOpen.Should().BeFalse();

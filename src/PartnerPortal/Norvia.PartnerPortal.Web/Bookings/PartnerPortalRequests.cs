@@ -37,37 +37,37 @@ internal sealed class PartnerPortalRequests(IServiceScopeFactory scopes) : IPart
     public Task<IReadOnlyList<PersonaView>> ListPersonasAsync(CancellationToken cancellationToken) =>
         SendAsync(new ListPersonasQuery(), cancellationToken);
 
-    public async Task<BookingRequest?> DraftBookingAsync(string personaId, CancellationToken cancellationToken) =>
+    public async Task<BookingRequest?> DraftBookingAsync(PersonaId personaId, CancellationToken cancellationToken) =>
         FoundOrNull(await SendAsync(new DraftBookingQuery(personaId), cancellationToken));
 
-    public async Task<BookingView?> SubmitBookingAsync(string personaId, BookingRequest booking, CancellationToken cancellationToken)
+    public async Task<BookingView?> SubmitBookingAsync(PersonaId personaId, BookingRequest booking, CancellationToken cancellationToken)
     {
         await using var scope = scopes.CreateAsyncScope();
         return FoundOrNull(await scope.ServiceProvider.GetRequiredService<IMediator>().Send(new SubmitBookingCommand(personaId, booking), cancellationToken));
     }
 
-    public Task<IReadOnlyList<BookingView>> ListBookingsAsync(string personaId, CancellationToken cancellationToken) =>
+    public Task<IReadOnlyList<BookingView>> ListBookingsAsync(PersonaId personaId, CancellationToken cancellationToken) =>
         SendAsync(new ListBookingsQuery(personaId), cancellationToken);
 
-    public Task<IReadOnlyList<CarrierBookingRequestView>> ListCarrierBookingRequestsAsync(string personaId, CancellationToken cancellationToken) =>
+    public Task<IReadOnlyList<CarrierBookingRequestView>> ListCarrierBookingRequestsAsync(PersonaId personaId, CancellationToken cancellationToken) =>
         SendAsync(new ListCarrierBookingRequestsQuery(personaId), cancellationToken);
 
-    public Task<IReadOnlyList<ShipperNotificationView>> ListShipperNotificationsAsync(string personaId, CancellationToken cancellationToken) =>
+    public Task<IReadOnlyList<ShipperNotificationView>> ListShipperNotificationsAsync(PersonaId personaId, CancellationToken cancellationToken) =>
         SendAsync(new ListShipperNotificationsQuery(personaId), cancellationToken);
 
     public async Task<AnsweredCarrierBooking?> AnswerCarrierBookingAsync(
-        string personaId, string carrierBookingNumber, CarrierAnswer answer, CancellationToken cancellationToken)
+        PersonaId personaId, string carrierBookingNumber, CarrierAnswer answer, CancellationToken cancellationToken)
     {
         await using var scope = scopes.CreateAsyncScope();
         return FoundOrNull(await scope.ServiceProvider.GetRequiredService<IMediator>()
             .Send(new AnswerCarrierBookingCommand(personaId, carrierBookingNumber, answer), cancellationToken));
     }
 
-    public async Task<CarrierAnswerSettingsView?> GetCarrierAnswerSettingsAsync(string personaId, CancellationToken cancellationToken) =>
+    public async Task<CarrierAnswerSettingsView?> GetCarrierAnswerSettingsAsync(PersonaId personaId, CancellationToken cancellationToken) =>
         FoundOrNull(await SendAsync(new GetCarrierAnswerSettingsQuery(personaId), cancellationToken));
 
     public async Task<CarrierAnswerSettingsView?> ChangeCarrierAnswerSettingsAsync(
-        string personaId, CarrierAnswerSettingsView settings, CancellationToken cancellationToken)
+        PersonaId personaId, CarrierAnswerSettingsView settings, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(settings);
         await using var scope = scopes.CreateAsyncScope();
@@ -75,11 +75,11 @@ internal sealed class PartnerPortalRequests(IServiceScopeFactory scopes) : IPart
             .Send(new ChangeCarrierAnswerSettingsCommand(personaId, settings.Mode, settings.RejectionReason, settings.DelaySeconds), cancellationToken));
     }
 
-    public Task<IReadOnlyList<CarrierShipmentView>> ListCarrierShipmentsAsync(string personaId, CancellationToken cancellationToken) =>
+    public Task<IReadOnlyList<CarrierShipmentView>> ListCarrierShipmentsAsync(PersonaId personaId, CancellationToken cancellationToken) =>
         SendAsync(new ListCarrierShipmentsQuery(personaId), cancellationToken);
 
     public async Task<SentTrackingEvent?> SendTrackingEventAsync(
-        string personaId, string carrierBookingNumber, TrackingEventType type, CancellationToken cancellationToken)
+        PersonaId personaId, string carrierBookingNumber, TrackingEventType type, CancellationToken cancellationToken)
     {
         await using var scope = scopes.CreateAsyncScope();
         return FoundOrNull(await scope.ServiceProvider.GetRequiredService<IMediator>()
@@ -87,7 +87,7 @@ internal sealed class PartnerPortalRequests(IServiceScopeFactory scopes) : IPart
     }
 
     public async Task<SentProofOfDelivery?> SendProofOfDeliveryAsync(
-        string personaId, string carrierBookingNumber, ProofOfDeliveryDraft draft, CancellationToken cancellationToken)
+        PersonaId personaId, string carrierBookingNumber, ProofOfDeliveryDraft draft, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(draft);
         await using var scope = scopes.CreateAsyncScope();
@@ -95,11 +95,11 @@ internal sealed class PartnerPortalRequests(IServiceScopeFactory scopes) : IPart
             .Send(new SendProofOfDeliveryCommand(personaId, carrierBookingNumber, draft.ReceivedBy, draft.Condition, draft.Remark, draft.Files), cancellationToken));
     }
 
-    public async Task<CarrierTrackingSettingsView?> GetCarrierTrackingSettingsAsync(string personaId, CancellationToken cancellationToken) =>
+    public async Task<CarrierTrackingSettingsView?> GetCarrierTrackingSettingsAsync(PersonaId personaId, CancellationToken cancellationToken) =>
         FoundOrNull(await SendAsync(new GetCarrierTrackingSettingsQuery(personaId), cancellationToken));
 
     public async Task<CarrierTrackingSettingsView?> ChangeCarrierTrackingSettingsAsync(
-        string personaId, CarrierTrackingSettingsView settings, CancellationToken cancellationToken)
+        PersonaId personaId, CarrierTrackingSettingsView settings, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(settings);
         await using var scope = scopes.CreateAsyncScope();

@@ -1,3 +1,4 @@
+using Norvia.PartnerPortal.Domain.Personas;
 using Norvia.PartnerPortal.Application.CarrierShipments.TrackingSettings;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
 using Norvia.PartnerPortal.Web.CarrierShipments;
@@ -10,7 +11,7 @@ public sealed class TrackingModePanelTests : PortalWebContext
         Render<TrackingModePanel>(parameters => parameters.Add(panel => panel.PersonaId, personaId));
 
     private void Current(TrackingMode mode, int seconds = 5) =>
-        Portal.GetCarrierTrackingSettingsAsync("kessler-spedition", Arg.Any<CancellationToken>()).Returns(new CarrierTrackingSettingsView(mode, seconds));
+        Portal.GetCarrierTrackingSettingsAsync(new PersonaId("kessler-spedition"), Arg.Any<CancellationToken>()).Returns(new CarrierTrackingSettingsView(mode, seconds));
 
     [Fact]
     public void Render_ShowsTheModeTheCarrierHasNow()
@@ -38,7 +39,7 @@ public sealed class TrackingModePanelTests : PortalWebContext
     public void Save_SendsTheChosenModeAndDelay()
     {
         Current(TrackingMode.Manual);
-        Portal.ChangeCarrierTrackingSettingsAsync("kessler-spedition", Arg.Any<CarrierTrackingSettingsView>(), Arg.Any<CancellationToken>())
+        Portal.ChangeCarrierTrackingSettingsAsync(new PersonaId("kessler-spedition"), Arg.Any<CarrierTrackingSettingsView>(), Arg.Any<CancellationToken>())
             .Returns(new CarrierTrackingSettingsView(TrackingMode.AutoProgress, 9));
         var panel = RenderPanel();
         Field(panel.Find("[role=group]"), "Mode").Change("AutoProgress");
@@ -47,7 +48,7 @@ public sealed class TrackingModePanelTests : PortalWebContext
         panel.Find("form").Submit();
 
         Portal.Received(1).ChangeCarrierTrackingSettingsAsync(
-            "kessler-spedition", new CarrierTrackingSettingsView(TrackingMode.AutoProgress, 9), Arg.Any<CancellationToken>());
+            new PersonaId("kessler-spedition"), new CarrierTrackingSettingsView(TrackingMode.AutoProgress, 9), Arg.Any<CancellationToken>());
         panel.Find("[role=status]").TextContent.Should().Contain("Saved");
     }
 
@@ -62,7 +63,7 @@ public sealed class TrackingModePanelTests : PortalWebContext
 
         panel.Find("form").Submit();
 
-        Portal.DidNotReceive().ChangeCarrierTrackingSettingsAsync(Arg.Any<string>(), Arg.Any<CarrierTrackingSettingsView>(), Arg.Any<CancellationToken>());
+        Portal.DidNotReceive().ChangeCarrierTrackingSettingsAsync(Arg.Any<PersonaId>(), Arg.Any<CarrierTrackingSettingsView>(), Arg.Any<CancellationToken>());
         panel.Markup.Should().Contain(TrackingModeForm.DelayOutOfRange);
     }
 
@@ -70,7 +71,7 @@ public sealed class TrackingModePanelTests : PortalWebContext
     public void Save_WhenItFails_SaysSo()
     {
         Current(TrackingMode.AutoProgress);
-        Portal.ChangeCarrierTrackingSettingsAsync(Arg.Any<string>(), Arg.Any<CarrierTrackingSettingsView>(), Arg.Any<CancellationToken>())
+        Portal.ChangeCarrierTrackingSettingsAsync(Arg.Any<PersonaId>(), Arg.Any<CarrierTrackingSettingsView>(), Arg.Any<CancellationToken>())
             .Returns<CarrierTrackingSettingsView?>(_ => throw new InvalidOperationException("The database is down."));
         var panel = RenderPanel();
 
@@ -83,7 +84,7 @@ public sealed class TrackingModePanelTests : PortalWebContext
     public void Save_ForANonexistentPersona_SaysSo()
     {
         Current(TrackingMode.AutoProgress);
-        Portal.ChangeCarrierTrackingSettingsAsync(Arg.Any<string>(), Arg.Any<CarrierTrackingSettingsView>(), Arg.Any<CancellationToken>()).Returns((CarrierTrackingSettingsView?)null);
+        Portal.ChangeCarrierTrackingSettingsAsync(Arg.Any<PersonaId>(), Arg.Any<CarrierTrackingSettingsView>(), Arg.Any<CancellationToken>()).Returns((CarrierTrackingSettingsView?)null);
         var panel = RenderPanel();
 
         panel.Find("form").Submit();
@@ -94,7 +95,7 @@ public sealed class TrackingModePanelTests : PortalWebContext
     [Fact]
     public void Render_WhenTheModeCantBeLoaded_SaysSo()
     {
-        Portal.GetCarrierTrackingSettingsAsync("kessler-spedition", Arg.Any<CancellationToken>())
+        Portal.GetCarrierTrackingSettingsAsync(new PersonaId("kessler-spedition"), Arg.Any<CancellationToken>())
             .Returns<CarrierTrackingSettingsView?>(_ => throw new InvalidOperationException("The database is down."));
 
         RenderPanel().Find("[role=alert]").TextContent.Should().Contain("couldn't be loaded");
@@ -103,7 +104,7 @@ public sealed class TrackingModePanelTests : PortalWebContext
     [Fact]
     public void Render_ForNoSuchCarrier_SaysTheModeCantBeLoaded()
     {
-        Portal.GetCarrierTrackingSettingsAsync("kessler-spedition", Arg.Any<CancellationToken>()).Returns((CarrierTrackingSettingsView?)null);
+        Portal.GetCarrierTrackingSettingsAsync(new PersonaId("kessler-spedition"), Arg.Any<CancellationToken>()).Returns((CarrierTrackingSettingsView?)null);
 
         RenderPanel().Find("[role=alert]").TextContent.Should().Contain("couldn't be loaded");
     }
@@ -111,7 +112,7 @@ public sealed class TrackingModePanelTests : PortalWebContext
     [Fact]
     public void Render_WhileLoading_SaysSo()
     {
-        Portal.GetCarrierTrackingSettingsAsync("kessler-spedition", Arg.Any<CancellationToken>()).Returns(new TaskCompletionSource<CarrierTrackingSettingsView?>().Task);
+        Portal.GetCarrierTrackingSettingsAsync(new PersonaId("kessler-spedition"), Arg.Any<CancellationToken>()).Returns(new TaskCompletionSource<CarrierTrackingSettingsView?>().Task);
 
         RenderPanel().Find("[role=status]").TextContent.Should().Contain("Loading");
     }

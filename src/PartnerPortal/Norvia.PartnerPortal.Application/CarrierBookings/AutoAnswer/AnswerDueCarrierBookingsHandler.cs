@@ -41,7 +41,7 @@ public sealed partial class AnswerDueCarrierBookingsHandler(
             return;
         }
 
-        var answered = await mediator.Send(new AnswerCarrierBookingCommand(carrier.Id.Value, due.CarrierBookingNumber, answer), cancellationToken);
+        var answered = await mediator.Send(new AnswerCarrierBookingCommand(carrier.Id, due.CarrierBookingNumber, answer), cancellationToken);
         if (answered.IsSuccess && !answered.Value.Request.IsOpen)
         {
             return;

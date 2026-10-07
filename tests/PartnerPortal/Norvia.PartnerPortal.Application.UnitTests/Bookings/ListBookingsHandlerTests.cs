@@ -17,7 +17,7 @@ public sealed class ListBookingsHandlerTests
         _repository.ListAsync(Arg.Is<BookingsOfPersonaSpec>(spec => spec.PersonaId == Samples.BrouwerDranken.Id), Arg.Any<CancellationToken>())
             .Returns([accepted, refused]);
 
-        var bookings = await new ListBookingsHandler(_repository).Handle(new ListBookingsQuery("brouwer-dranken"), CancellationToken.None);
+        var bookings = await new ListBookingsHandler(_repository).Handle(new ListBookingsQuery(new PersonaId("brouwer-dranken")), CancellationToken.None);
 
         bookings.Should().SatisfyRespectively(
             first =>

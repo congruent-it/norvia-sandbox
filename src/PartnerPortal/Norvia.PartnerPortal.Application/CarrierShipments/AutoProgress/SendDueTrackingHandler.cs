@@ -49,7 +49,7 @@ public sealed partial class SendDueTrackingHandler(
             return;
         }
 
-        var sent = await mediator.Send(new SendTrackingCommand(due.PersonaId.Value, due.CarrierBookingNumber, type), cancellationToken);
+        var sent = await mediator.Send(new SendTrackingCommand(due.PersonaId, due.CarrierBookingNumber, type), cancellationToken);
         if (sent.IsSuccess && sent.Value.Reply.IsAccepted && sent.Value.Recorded)
         {
             return;
@@ -64,7 +64,7 @@ public sealed partial class SendDueTrackingHandler(
     private async Task SendProofOfDeliveryAsync(CarrierBookingRequest due, DateTimeOffset now, CancellationToken cancellationToken)
     {
         var sent = await mediator.Send(
-            new SendProofOfDeliveryCommand(due.PersonaId.Value, due.CarrierBookingNumber, ReceivedBy, ProofOfDeliveryCondition.Clean, Remark: null, [sampleCmr.Read()]),
+            new SendProofOfDeliveryCommand(due.PersonaId, due.CarrierBookingNumber, ReceivedBy, ProofOfDeliveryCondition.Clean, Remark: null, [sampleCmr.Read()]),
             cancellationToken);
         if (sent.IsSuccess && sent.Value.Reply.IsAccepted)
         {

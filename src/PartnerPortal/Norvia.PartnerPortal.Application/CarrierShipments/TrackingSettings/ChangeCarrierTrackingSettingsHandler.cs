@@ -14,7 +14,7 @@ public sealed class ChangeCarrierTrackingSettingsHandler(IRepository<CarrierTrac
     {
         ArgumentNullException.ThrowIfNull(command);
 
-        if (personas.Find(new PersonaId(command.PersonaId)) is not { Carrier: not null } carrier)
+        if (personas.Find(command.PersonaId) is not { Carrier: not null } carrier)
         {
             return Result.NotFound($"There is no Carrier Persona '{command.PersonaId}'.");
         }

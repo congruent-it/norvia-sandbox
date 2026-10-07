@@ -157,7 +157,7 @@ else
         _failed = false;
         try
         {
-            if (await Portal.AnswerCarrierBookingAsync(PersonaId, number, answer, CancellationToken.None) is { } answered)
+            if (await Portal.AnswerCarrierBookingAsync(new PersonaId(PersonaId), number, answer, CancellationToken.None) is { } answered)
             {
                 _notice = AnswerNotice.Of(number, answer, answered);
                 _requests = [.. _requests!.Select(request => request.CarrierBookingNumber == number ? answered.Request : request)];
@@ -214,7 +214,7 @@ else
                 return;
             }
 
-            _requests = await Portal.ListCarrierBookingRequestsAsync(PersonaId, CancellationToken.None);
+            _requests = await Portal.ListCarrierBookingRequestsAsync(new PersonaId(PersonaId), CancellationToken.None);
         }
         catch (Exception exception)
         {
@@ -238,7 +238,7 @@ else
 
                 try
                 {
-                    _requests = await Portal.ListCarrierBookingRequestsAsync(PersonaId, cancellationToken);
+                    _requests = await Portal.ListCarrierBookingRequestsAsync(new PersonaId(PersonaId), cancellationToken);
                     await InvokeAsync(StateHasChanged);
                 }
                 catch (Exception exception) when (!cancellationToken.IsCancellationRequested)

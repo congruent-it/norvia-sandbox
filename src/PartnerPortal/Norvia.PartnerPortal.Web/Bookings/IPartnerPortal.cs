@@ -21,59 +21,59 @@ public interface IPartnerPortal
     Task<IReadOnlyList<PersonaView>> ListPersonasAsync(CancellationToken cancellationToken);
 
     /// <summary>A new booking for the Persona, filled in from its address book; null when there is no such Persona.</summary>
-    Task<BookingRequest?> DraftBookingAsync(string personaId, CancellationToken cancellationToken);
+    Task<BookingRequest?> DraftBookingAsync(PersonaId personaId, CancellationToken cancellationToken);
 
     /// <summary>Sends the booking to Norvia as the Persona and returns Norvia's answer; null when there is no such Persona.</summary>
-    Task<BookingView?> SubmitBookingAsync(string personaId, BookingRequest booking, CancellationToken cancellationToken);
+    Task<BookingView?> SubmitBookingAsync(PersonaId personaId, BookingRequest booking, CancellationToken cancellationToken);
 
     /// <summary>The bookings the Persona sent, the latest first.</summary>
-    Task<IReadOnlyList<BookingView>> ListBookingsAsync(string personaId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<BookingView>> ListBookingsAsync(PersonaId personaId, CancellationToken cancellationToken);
 
     /// <summary>The booking requests in the Carrier Persona's inbox, the latest first.</summary>
-    Task<IReadOnlyList<CarrierBookingRequestView>> ListCarrierBookingRequestsAsync(string personaId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<CarrierBookingRequestView>> ListCarrierBookingRequestsAsync(PersonaId personaId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Sends the Carrier Persona's answer to one of the requests in its inbox to Norvia, and returns what Norvia replied and
     /// how the inbox now has the request; null when there is no such Carrier Persona or request.
     /// </summary>
-    Task<AnsweredCarrierBooking?> AnswerCarrierBookingAsync(string personaId, string carrierBookingNumber, CarrierAnswer answer, CancellationToken cancellationToken);
+    Task<AnsweredCarrierBooking?> AnswerCarrierBookingAsync(PersonaId personaId, string carrierBookingNumber, CarrierAnswer answer, CancellationToken cancellationToken);
 
     /// <summary>How the Carrier Persona answers its booking requests now; null when there is no such Carrier Persona.</summary>
-    Task<CarrierAnswerSettingsView?> GetCarrierAnswerSettingsAsync(string personaId, CancellationToken cancellationToken);
+    Task<CarrierAnswerSettingsView?> GetCarrierAnswerSettingsAsync(PersonaId personaId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Changes how the Carrier Persona answers the requests that reach it from now on, and returns the new settings;
     /// null when there is no such Carrier Persona. A delay out of range throws, as the page limits it.
     /// </summary>
-    Task<CarrierAnswerSettingsView?> ChangeCarrierAnswerSettingsAsync(string personaId, CarrierAnswerSettingsView settings, CancellationToken cancellationToken);
+    Task<CarrierAnswerSettingsView?> ChangeCarrierAnswerSettingsAsync(PersonaId personaId, CarrierAnswerSettingsView settings, CancellationToken cancellationToken);
 
     /// <summary>The Carrier Persona's Shipments, Booked or later and Delivered ones too, the latest first.</summary>
-    Task<IReadOnlyList<CarrierShipmentView>> ListCarrierShipmentsAsync(string personaId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<CarrierShipmentView>> ListCarrierShipmentsAsync(PersonaId personaId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Sends a Tracking event for one of the Carrier Persona's Shipments to Norvia, and returns what the Partner API replied
     /// and how the Shipment now stands; null when there is no such Carrier Persona or Shipment.
     /// </summary>
-    Task<SentTrackingEvent?> SendTrackingEventAsync(string personaId, string carrierBookingNumber, TrackingEventType type, CancellationToken cancellationToken);
+    Task<SentTrackingEvent?> SendTrackingEventAsync(PersonaId personaId, string carrierBookingNumber, TrackingEventType type, CancellationToken cancellationToken);
 
     /// <summary>
     /// Sends a Proof of delivery for one of the Carrier Persona's Shipments to Norvia, and returns what the Partner API
     /// replied; null when there is no such Carrier Persona or Shipment.
     /// </summary>
     Task<SentProofOfDelivery?> SendProofOfDeliveryAsync(
-        string personaId, string carrierBookingNumber, ProofOfDeliveryDraft draft, CancellationToken cancellationToken);
+        PersonaId personaId, string carrierBookingNumber, ProofOfDeliveryDraft draft, CancellationToken cancellationToken);
 
     /// <summary>How the Carrier Persona sends Tracking events now; null when there is no such Carrier Persona.</summary>
-    Task<CarrierTrackingSettingsView?> GetCarrierTrackingSettingsAsync(string personaId, CancellationToken cancellationToken);
+    Task<CarrierTrackingSettingsView?> GetCarrierTrackingSettingsAsync(PersonaId personaId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Changes how the Carrier Persona sends Tracking events for the Shipments it confirms from now on, and returns the new
     /// settings; null when there is no such Carrier Persona. A delay out of range throws, as the page limits it.
     /// </summary>
-    Task<CarrierTrackingSettingsView?> ChangeCarrierTrackingSettingsAsync(string personaId, CarrierTrackingSettingsView settings, CancellationToken cancellationToken);
+    Task<CarrierTrackingSettingsView?> ChangeCarrierTrackingSettingsAsync(PersonaId personaId, CarrierTrackingSettingsView settings, CancellationToken cancellationToken);
 
     /// <summary>The notifications in the Shipper Persona's inbox, the latest first.</summary>
-    Task<IReadOnlyList<ShipperNotificationView>> ListShipperNotificationsAsync(string personaId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<ShipperNotificationView>> ListShipperNotificationsAsync(PersonaId personaId, CancellationToken cancellationToken);
 
     /// <summary>
     /// The Shipper Persona's Transport Orders as Norvia answers them through the Partner API, newest collection first.

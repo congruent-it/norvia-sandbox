@@ -12,7 +12,7 @@ public sealed class ListCarrierBookingRequestsHandler(IReadRepository<CarrierBoo
     {
         ArgumentNullException.ThrowIfNull(query);
 
-        var requests = await repository.ListAsync(new CarrierBookingRequestsOfPersonaSpec(new PersonaId(query.PersonaId)), cancellationToken);
+        var requests = await repository.ListAsync(new CarrierBookingRequestsOfPersonaSpec(query.PersonaId), cancellationToken);
         return [.. requests.Select(CarrierBookingRequestView.From)];
     }
 }

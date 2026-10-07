@@ -158,7 +158,7 @@ else
 
     private async Task StartNewAsync()
     {
-        var draft = await Portal.DraftBookingAsync(PersonaId, CancellationToken.None);
+        var draft = await Portal.DraftBookingAsync(new PersonaId(PersonaId), CancellationToken.None);
         _form = draft is null ? null : BookingForm.From(draft);
         _answer = null;
         _submitFailed = false;
@@ -175,7 +175,7 @@ else
         _traceId = Activity.Current?.TraceId.ToString();
         try
         {
-            _answer = await Portal.SubmitBookingAsync(PersonaId, _form!.ToRequest(), CancellationToken.None);
+            _answer = await Portal.SubmitBookingAsync(new PersonaId(PersonaId), _form!.ToRequest(), CancellationToken.None);
         }
         catch (Exception exception)
         {

@@ -1,6 +1,7 @@
 using Ardalis.Result;
 using Mediator;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
+using Norvia.PartnerPortal.Domain.Personas;
 
 namespace Norvia.PartnerPortal.Application.CarrierShipments.SendProofOfDelivery;
 
@@ -11,7 +12,7 @@ namespace Norvia.PartnerPortal.Application.CarrierShipments.SendProofOfDelivery;
 /// of at most 10 MB, or the delivery address can't give a location.
 /// </summary>
 public sealed record SendProofOfDeliveryCommand(
-    string PersonaId,
+    PersonaId PersonaId,
     string CarrierBookingNumber,
     string ReceivedBy,
     ProofOfDeliveryCondition Condition,

@@ -130,7 +130,7 @@ else
         _proofFailed = false;
         try
         {
-            if (await Portal.SendTrackingEventAsync(PersonaId, shipment.CarrierBookingNumber, type, CancellationToken.None) is { } sent)
+            if (await Portal.SendTrackingEventAsync(new PersonaId(PersonaId), shipment.CarrierBookingNumber, type, CancellationToken.None) is { } sent)
             {
                 _notice = TrackingNotice.Of(sent);
                 // A Delivered Shipment stays, for its Proof of delivery; the others show their new stage and what comes next.
@@ -170,7 +170,7 @@ else
         _proofFailed = false;
         try
         {
-            if (await Portal.SendProofOfDeliveryAsync(PersonaId, shipment.CarrierBookingNumber, draft, CancellationToken.None) is { } sent)
+            if (await Portal.SendProofOfDeliveryAsync(new PersonaId(PersonaId), shipment.CarrierBookingNumber, draft, CancellationToken.None) is { } sent)
             {
                 _notice = TrackingNotice.Of(sent);
                 // Norvia having it is the end of it: the form closes, and only a Proof of delivery that didn't arrive stays open to send again.
@@ -226,7 +226,7 @@ else
                 return;
             }
 
-            _shipments = await Portal.ListCarrierShipmentsAsync(PersonaId, CancellationToken.None);
+            _shipments = await Portal.ListCarrierShipmentsAsync(new PersonaId(PersonaId), CancellationToken.None);
         }
         catch (Exception exception)
         {
@@ -250,7 +250,7 @@ else
 
                 try
                 {
-                    _shipments = await Portal.ListCarrierShipmentsAsync(PersonaId, cancellationToken);
+                    _shipments = await Portal.ListCarrierShipmentsAsync(new PersonaId(PersonaId), cancellationToken);
                     await InvokeAsync(StateHasChanged);
                 }
                 catch (Exception exception) when (!cancellationToken.IsCancellationRequested)

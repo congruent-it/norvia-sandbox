@@ -1,3 +1,4 @@
+using Norvia.PartnerPortal.Domain.Personas;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Norvia.PartnerPortal.Application.ShipperNotifications;
@@ -21,7 +22,7 @@ public sealed class NotificationInboxTests : PortalWebContext
     [Fact]
     public void Render_ListsEveryNotification_WithItsTransportOrderNumberAndShipperReference()
     {
-        Portal.ListShipperNotificationsAsync("brouwer-dranken", Arg.Any<CancellationToken>()).Returns([Notification(eta: new DateTime(2030, 10, 3, 14, 30, 0))]);
+        Portal.ListShipperNotificationsAsync(new PersonaId("brouwer-dranken"), Arg.Any<CancellationToken>()).Returns([Notification(eta: new DateTime(2030, 10, 3, 14, 30, 0))]);
 
         var row = RenderPage().FindAll("tbody tr").Should().ContainSingle().Subject;
 
@@ -32,7 +33,7 @@ public sealed class NotificationInboxTests : PortalWebContext
     [Fact]
     public void Render_KeepsTheOrderTheApplicationGives_NewestFirst()
     {
-        Portal.ListShipperNotificationsAsync("brouwer-dranken", Arg.Any<CancellationToken>()).Returns(
+        Portal.ListShipperNotificationsAsync(new PersonaId("brouwer-dranken"), Arg.Any<CancellationToken>()).Returns(
             [Notification("TO-0000002", at: new DateTimeOffset(2026, 10, 7, 10, 0, 0, TimeSpan.Zero)), Notification("TO-0000001", at: new DateTimeOffset(2026, 10, 7, 9, 0, 0, TimeSpan.Zero))]);
 
         var rows = RenderPage().FindAll("tbody tr");
@@ -45,7 +46,7 @@ public sealed class NotificationInboxTests : PortalWebContext
     [Fact]
     public void Render_ANotificationWithAnAgreedWindow_ShowsTheWindowInsteadOfTheEta()
     {
-        Portal.ListShipperNotificationsAsync("brouwer-dranken", Arg.Any<CancellationToken>())
+        Portal.ListShipperNotificationsAsync(new PersonaId("brouwer-dranken"), Arg.Any<CancellationToken>())
             .Returns([Notification(from: new DateTime(2030, 10, 4, 9, 0, 0), until: new DateTime(2030, 10, 4, 12, 0, 0))]);
 
         RenderPage().Find("tbody tr").TextContent.Should().Contain("Agreed window 04-10-2030 09:00 to 04-10-2030 12:00").And.NotContain("ETA");
@@ -54,7 +55,7 @@ public sealed class NotificationInboxTests : PortalWebContext
     [Fact]
     public void Render_WithNoNotifications_SaysSo()
     {
-        Portal.ListShipperNotificationsAsync("brouwer-dranken", Arg.Any<CancellationToken>()).Returns([]);
+        Portal.ListShipperNotificationsAsync(new PersonaId("brouwer-dranken"), Arg.Any<CancellationToken>()).Returns([]);
 
         RenderPage().Find("[role=status]").TextContent.Should().Contain("hasn't sent Brouwer Dranken a notification yet");
     }
@@ -62,7 +63,7 @@ public sealed class NotificationInboxTests : PortalWebContext
     [Fact]
     public void Render_AsNotificationsArrive_ShowsThemWithoutAReload()
     {
-        Portal.ListShipperNotificationsAsync("brouwer-dranken", Arg.Any<CancellationToken>()).Returns([], [Notification("TO-0000007")]);
+        Portal.ListShipperNotificationsAsync(new PersonaId("brouwer-dranken"), Arg.Any<CancellationToken>()).Returns([], [Notification("TO-0000007")]);
         var page = RenderPage();
         page.Find("[role=status]").TextContent.Should().Contain("hasn't sent");
 
@@ -74,7 +75,7 @@ public sealed class NotificationInboxTests : PortalWebContext
     [Fact]
     public void Render_WhenARefreshFails_KeepsWhatItShowed_AndTriesAgain()
     {
-        Portal.ListShipperNotificationsAsync("brouwer-dranken", Arg.Any<CancellationToken>()).Returns(
+        Portal.ListShipperNotificationsAsync(new PersonaId("brouwer-dranken"), Arg.Any<CancellationToken>()).Returns(
             _ => [Notification("TO-0000001")],
             _ => throw new InvalidOperationException("The database is down."),
             _ => [Notification("TO-0000001"), Notification("TO-0000002")]);
@@ -90,7 +91,7 @@ public sealed class NotificationInboxTests : PortalWebContext
     [Fact]
     public void Render_WhenTheInboxCantBeLoaded_SaysSo()
     {
-        Portal.ListShipperNotificationsAsync("brouwer-dranken", Arg.Any<CancellationToken>())
+        Portal.ListShipperNotificationsAsync(new PersonaId("brouwer-dranken"), Arg.Any<CancellationToken>())
             .Returns<IReadOnlyList<ShipperNotificationView>>(_ => throw new InvalidOperationException("The database is down."));
 
         RenderPage().Find("[role=alert]").TextContent.Should().Contain("couldn't be loaded");

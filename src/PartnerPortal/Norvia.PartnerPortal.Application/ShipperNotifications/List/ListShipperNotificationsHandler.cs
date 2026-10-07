@@ -12,7 +12,7 @@ public sealed class ListShipperNotificationsHandler(IReadRepository<ShipperNotif
     {
         ArgumentNullException.ThrowIfNull(query);
 
-        var notifications = await repository.ListAsync(new ShipperNotificationsOfPersonaSpec(new PersonaId(query.PersonaId)), cancellationToken);
+        var notifications = await repository.ListAsync(new ShipperNotificationsOfPersonaSpec(query.PersonaId), cancellationToken);
         return [.. notifications.Select(ShipperNotificationView.From)];
     }
 }
