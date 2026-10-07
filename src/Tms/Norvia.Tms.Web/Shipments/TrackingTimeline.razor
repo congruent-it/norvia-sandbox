@@ -7,6 +7,29 @@
 @inject ITransportOrderQueries Queries
 @inject ILogger<TrackingTimeline> Logger
 
+@* Where the Shipment's Transport Order stands for billing (P9): its state, when it became Billable, and a release without a Proof of delivery with who, when and why. *@
+@if (_timeline?.Billing is { } billing)
+{
+    <TransportOrderSection Heading="Billing">
+        <dl class="detail-list">
+            <dt>Billing state</dt>
+            <dd>@BillingText.State(billing.BillingState)</dd>
+            @if (billing.BecameBillableAt is { } billableAt)
+            {
+                <dt>Became Billable</dt>
+                <dd>@NorviaTime.Format(billableAt)</dd>
+            }
+            @if (billing.ProofOfDeliveryRelease is { } release)
+            {
+                <dt>Released without Proof of delivery</dt>
+                <dd>@NorviaTime.Format(release.ReleasedAt) by @release.ReleasedBy</dd>
+                <dt>Remark</dt>
+                <dd>@release.Remark</dd>
+            }
+        </dl>
+    </TransportOrderSection>
+}
+
 @* A Shipment's Tracking events in event-time order, each with when it arrived and whether it moved the status, and its Proofs of delivery with their files. *@
 <TransportOrderSection Heading="Tracking timeline">
     @if (_failed)

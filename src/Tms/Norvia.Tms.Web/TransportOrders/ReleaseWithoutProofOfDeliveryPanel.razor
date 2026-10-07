@@ -1,0 +1,106 @@
+@using Norvia.Tms.Domain.TransportOrders
+@implements IDisposable
+@inject ITransportOrderCommands Commands
+@inject ILogger<ReleaseWithoutProofOfDeliveryPanel> Logger
+
+@* Customer service releases one Delivered, Not yet billable Transport Order without a Proof of delivery, as a form under the list. The remark is required. *@
+<section role="group" aria-label="@Title" class="mb-6 rounded-flatly border border-border p-4">
+    <h2 class="!mb-3 !text-xl">@Title</h2>
+
+    @if (_failure is { } failure)
+    {
+        <div role="alert" class="mb-4">
+            <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">@failure</FluentMessageBar>
+        </div>
+    }
+
+    <div class="flex flex-col gap-4">
+        <FluentTextArea @bind-Value="_remark" Immediate="true" Label="Remark" Rows="3" Style="width: 100%;" />
+        <p class="!mb-0 text-muted">Why the Transport Order can be billed without a Proof of delivery, such as "CMR received by post, scanned in the dossier". It stays on the Shipment's timeline with your name.</p>
+
+        <div class="flex gap-4">
+            <FluentButton Appearance="Appearance.Accent" OnClick="SubmitAsync" Disabled="_working">Release without Proof of delivery</FluentButton>
+            <FluentButton Appearance="Appearance.Outline" OnClick="Close" Disabled="_working">Cancel</FluentButton>
+        </div>
+    </div>
+</section>
+
+@code {
+    private readonly CancellationTokenSource _closed = new();
+    private string _remark = string.Empty;
+    private string? _failure;
+    private bool _working;
+
+    [Parameter, EditorRequired]
+    public string TransportOrderNumber { get; set; } = string.Empty;
+
+    /// <summary>Raised when Customer service closes the form without releasing.</summary>
+    [Parameter, EditorRequired]
+    public EventCallback OnClosed { get; set; }
+
+    /// <summary>Raised once the TMS recorded the release, with what to tell Customer service.</summary>
+    [Parameter, EditorRequired]
+    public EventCallback<string> OnDone { get; set; }
+
+    private string Title => $"Release {TransportOrderNumber} without Proof of delivery";
+
+    private async Task SubmitAsync()
+    {
+        if (_working)
+        {
+            return;
+        }
+
+        var remark = _remark.Trim();
+        if (remark.Length == 0)
+        {
+            _failure = "Give a remark: why the order can be billed without a Proof of delivery.";
+            return;
+        }
+
+        if (remark.Length > TransportOrder.MaxReleaseRemarkLength)
+        {
+            _failure = $"A remark is at most {TransportOrder.MaxReleaseRemarkLength} characters.";
+            return;
+        }
+
+        _working = true;
+        _failure = null;
+        try
+        {
+            switch (await Commands.ReleaseWithoutProofOfDeliveryAsync(TransportOrderNumber, remark, _closed.Token))
+            {
+                case ReleaseWithoutProofOfDeliveryAnswer.Released { BillingState: BillingState.Billable }:
+                    await OnDone.InvokeAsync($"Transport Order {TransportOrderNumber} is released without a Proof of delivery and is Billable now.");
+                    break;
+                case ReleaseWithoutProofOfDeliveryAnswer.Released:
+                    await OnDone.InvokeAsync($"Transport Order {TransportOrderNumber} is released without a Proof of delivery, but another reason still keeps it from being Billable.");
+                    break;
+                case ReleaseWithoutProofOfDeliveryAnswer.Refused refused:
+                    _failure = $"Transport Order {TransportOrderNumber} wasn't released: {refused.Reason}";
+                    break;
+            }
+        }
+        catch (OperationCanceledException) when (_closed.IsCancellationRequested)
+        {
+            // The page closed while the TMS was answering.
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning(exception, "Releasing Transport Order {TransportOrderNumber} without a Proof of delivery failed", TransportOrderNumber);
+            _failure = $"Transport Order {TransportOrderNumber} couldn't be released. Try again.";
+        }
+        finally
+        {
+            _working = false;
+        }
+    }
+
+    private Task Close() => OnClosed.InvokeAsync();
+
+    public void Dispose()
+    {
+        _closed.Cancel();
+        _closed.Dispose();
+    }
+}

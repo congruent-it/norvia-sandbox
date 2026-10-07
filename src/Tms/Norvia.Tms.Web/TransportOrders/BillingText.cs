@@ -1,4 +1,5 @@
 using Norvia.Tms.Application.Billing.ListNotYetBillable;
+using Norvia.Tms.Domain.TransportOrders;
 
 namespace Norvia.Tms.Web.TransportOrders;
 
@@ -11,5 +12,13 @@ public static class BillingText
         BillingBlockingReason.NoProofOfDelivery => "No Proof of delivery",
         BillingBlockingReason.OpenException => "Open Exception",
         _ => reason.ToString(),
+    };
+
+    public static string State(BillingState state) => state switch
+    {
+        BillingState.NotYetBillable => "Not yet billable",
+        BillingState.Billable => "Billable",
+        BillingState.NotBilledSeparately => "Not billed separately (Fulfilment Contract)",
+        _ => state.ToString(),
     };
 }

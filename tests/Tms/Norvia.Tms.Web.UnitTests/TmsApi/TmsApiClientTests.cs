@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging.Testing;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.TransportOrders;
+using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Web.Shipments;
 using Norvia.Tms.Web.TmsApi;
 using Norvia.Tms.Web.TransportOrders;
@@ -464,6 +465,93 @@ public sealed class TmsApiClientTests : IDisposable
 
         _spans.Should().ContainSingle().Which.DisplayName.Should().Be("Release Shipment");
     }
+
+    [Fact]
+    public async Task ReleaseWithoutProofOfDeliveryAsync_PostsTheRemarkAndWhoReleases_AsTheTmsUi_UnderAnIdempotencyKey()
+    {
+        _tmsApi.Answer(HttpStatusCode.OK, ReleasedWithoutProof("Billable"));
+
+        await ReleaseWithoutProofOfDeliveryAsync("TO-0000043", "CMR by post");
+
+        _tmsApi.Request!.Method.Should().Be(HttpMethod.Post);
+        _tmsApi.Request.RequestUri.Should().Be(new Uri("http://tms-api.example/v1/transport-orders/TO-0000043/release-without-proof-of-delivery"));
+        _tmsApi.Request.Headers.Authorization!.Parameter.Should().Be("tms-ui-token");
+        _tmsApi.Request.Headers.GetValues("Idempotency-Key").Should().ContainSingle().Which.Should().NotBeNullOrWhiteSpace();
+        JsonNode.DeepEquals(JsonNode.Parse(_tmsApi.RequestBody!), JsonNode.Parse("""{ "remark": "CMR by post", "releasedBy": "Sanne Bakker" }""")).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("Billable", BillingState.Billable)]
+    [InlineData("NotYetBillable", BillingState.NotYetBillable)]
+    public async Task ReleaseWithoutProofOfDeliveryAsync_Released_SaysWhereTheOrderStandsForBilling(string state, BillingState expected)
+    {
+        _tmsApi.Answer(HttpStatusCode.OK, ReleasedWithoutProof(state));
+
+        var answer = await ReleaseWithoutProofOfDeliveryAsync("TO-0000043", "CMR by post");
+
+        answer.Should().Be(new ReleaseWithoutProofOfDeliveryAnswer.Released(expected));
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.NotFound, "TransportOrderNotFound", "There is no Transport Order TO-0000043.")]
+    [InlineData(HttpStatusCode.Conflict, "AlreadyReleased", "Transport Order TO-0000043 was released without a Proof of delivery already.")]
+    public async Task ReleaseWithoutProofOfDeliveryAsync_Refused_IsRefusedWithTheTmsReason_OnTheTrailTheRefusalNames(HttpStatusCode status, string code, string reason)
+    {
+        _tmsApi.Answer(
+            status,
+            $$"""{ "status": {{(int)status}}, "detail": "{{reason}}", "code": "{{code}}", "correlationId": "corr-refused" }""",
+            "application/problem+json");
+
+        var answer = await ReleaseWithoutProofOfDeliveryAsync("TO-0000043", "CMR by post");
+
+        answer.Should().Be(new ReleaseWithoutProofOfDeliveryAnswer.Refused(reason));
+        ScopeOf(_logger.LatestRecord).Should().Contain(new Dictionary<string, object?>
+        {
+            ["correlationId"] = "corr-refused",
+            ["flow"] = "billing",
+            ["transportOrderNumber"] = "TO-0000043",
+            ["failureCode"] = code,
+            ["outcome"] = "Refused",
+        });
+    }
+
+    [Fact]
+    public async Task ReleaseWithoutProofOfDeliveryAsync_Released_RecordsItsOutcomeOnTheBillingTrail_InASpanOfItsOwn()
+    {
+        _tmsApi.Answer(HttpStatusCode.OK, ReleasedWithoutProof("Billable"));
+
+        await ReleaseWithoutProofOfDeliveryAsync("TO-0000043", "CMR by post");
+
+        ScopeOf(_logger.LatestRecord).Should().Contain(new Dictionary<string, object?>
+        {
+            ["correlationId"] = "corr-release",
+            ["flow"] = "billing",
+            ["transportOrderNumber"] = "TO-0000043",
+            ["shipmentNumber"] = "SH-0000012",
+            ["outcome"] = "Succeeded",
+        }).And.NotContainKey("failureCode");
+        _spans.Should().ContainSingle().Which.DisplayName.Should().Be("Release without Proof of delivery");
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.BadRequest)]
+    [InlineData(HttpStatusCode.Forbidden)]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    public async Task ReleaseWithoutProofOfDeliveryAsync_AnyOtherAnswer_Fails(HttpStatusCode status)
+    {
+        _tmsApi.Answer(status, "{}", "application/problem+json");
+
+        var release = () => ReleaseWithoutProofOfDeliveryAsync("TO-0000043", "CMR by post");
+
+        await release.Should().ThrowAsync<HttpRequestException>();
+    }
+
+    private Task<ReleaseWithoutProofOfDeliveryAnswer> ReleaseWithoutProofOfDeliveryAsync(string number, string remark) =>
+        _client.ReleaseWithoutProofOfDeliveryAsync(number, remark, Xunit.TestContext.Current.CancellationToken);
+
+    // As the TMS API answers a release without a Proof of delivery: ReleaseWithoutProofOfDeliveryResult, with its enums as strings.
+    private static string ReleasedWithoutProof(string billingState) =>
+        $$"""{ "transportOrderNumber": "TO-0000043", "shipmentNumber": "SH-0000012", "billingState": "{{billingState}}", "correlationId": "corr-release" }""";
 
     [Fact]
     public async Task WithdrawAsync_PostsToTheCarrierBookingsWithdraw_AsTheTmsUi_UnderAnIdempotencyKey()

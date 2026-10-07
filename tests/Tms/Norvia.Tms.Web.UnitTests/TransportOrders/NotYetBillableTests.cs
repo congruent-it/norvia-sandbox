@@ -1,4 +1,6 @@
+using AngleSharp.Dom;
 using Norvia.Tms.Application.Billing.ListNotYetBillable;
+using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Web.TransportOrders;
 
 namespace Norvia.Tms.Web.UnitTests.TransportOrders;
@@ -61,4 +63,138 @@ public sealed class NotYetBillableTests : TmsWebContext
         page.WaitForAssertion(() => page.FindAll("a[href='/transport-orders/TO-0000043']").Should().BeEmpty());
         page.Find("a[href='/transport-orders/TO-0000044']");
     }
+
+    [Fact]
+    public void Render_OffersOnlyTheActionsThatCanLiftABlockingReason()
+    {
+        Queries.ListNotYetBillableAsync(Arg.Any<CancellationToken>()).Returns([
+            Order("TO-0000043", "SH-0000012", BillingBlockingReason.NotRated, BillingBlockingReason.NoProofOfDelivery),
+            Order("TO-0000044", "SH-0000013", BillingBlockingReason.OpenException),
+            Order("TO-0000045", "SH-0000014", BillingBlockingReason.NotRated)]);
+
+        var page = Render<NotYetBillable>();
+
+        page.WaitForElement("tbody tr");
+        ActionsOf(page).Should().Equal(
+            "Open the rating exception of TO-0000043", "Release TO-0000043 without Proof of delivery",
+            "Open the rating exception of TO-0000045");
+        page.Find("a[aria-label='Open the rating exception of TO-0000043']").GetAttribute("href").Should().Be("/transport-orders/TO-0000043");
+    }
+
+    [Fact]
+    public void Release_AsksForARemark_AndSendsItAsTheCustomerServiceRemark()
+    {
+        var page = RenderWithOneToRelease();
+        Commands.ReleaseWithoutProofOfDeliveryAsync("TO-0000043", "CMR by post", Arg.Any<CancellationToken>())
+            .Returns(new ReleaseWithoutProofOfDeliveryAnswer.Released(BillingState.Billable));
+
+        page.Find("fluent-button[aria-label='Release TO-0000043 without Proof of delivery']").Click();
+        page.WaitForElement("section[aria-label='Release TO-0000043 without Proof of delivery'] fluent-text-area").Input("  CMR by post ");
+        Click(Panel(page), "Release without Proof of delivery");
+
+        page.WaitForAssertion(() => Commands.Received(1).ReleaseWithoutProofOfDeliveryAsync("TO-0000043", "CMR by post", Arg.Any<CancellationToken>()));
+        page.WaitForAssertion(() => page.Find("[role=status]").TextContent.Should().Contain("TO-0000043 is released without a Proof of delivery and is Billable now."));
+        page.FindAll("section[aria-label^='Release']").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Release_ThatLeavesAnotherReason_SaysTheOrderIsNotBillableYet()
+    {
+        var page = RenderWithOneToRelease();
+        Commands.ReleaseWithoutProofOfDeliveryAsync("TO-0000043", "CMR by post", Arg.Any<CancellationToken>())
+            .Returns(new ReleaseWithoutProofOfDeliveryAnswer.Released(BillingState.NotYetBillable));
+
+        page.Find("fluent-button[aria-label='Release TO-0000043 without Proof of delivery']").Click();
+        page.WaitForElement("section[aria-label='Release TO-0000043 without Proof of delivery'] fluent-text-area").Input("CMR by post");
+        Click(Panel(page), "Release without Proof of delivery");
+
+        page.WaitForAssertion(() => page.Find("[role=status]").TextContent.Should().Contain("another reason still keeps it from being Billable"));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Release_WithoutARemark_IsNotSent(string remark)
+    {
+        var page = RenderWithOneToRelease();
+
+        page.Find("fluent-button[aria-label='Release TO-0000043 without Proof of delivery']").Click();
+        page.WaitForElement("section[aria-label='Release TO-0000043 without Proof of delivery'] fluent-text-area").Input(remark);
+        Click(Panel(page), "Release without Proof of delivery");
+
+        page.WaitForAssertion(() => page.Find("[role=alert]").TextContent.Should().Contain("Give a remark"));
+        Commands.DidNotReceive().ReleaseWithoutProofOfDeliveryAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void Release_WithATooLongRemark_IsNotSent()
+    {
+        var page = RenderWithOneToRelease();
+
+        page.Find("fluent-button[aria-label='Release TO-0000043 without Proof of delivery']").Click();
+        page.WaitForElement("section[aria-label='Release TO-0000043 without Proof of delivery'] fluent-text-area").Input(new string('x', TransportOrder.MaxReleaseRemarkLength + 1));
+        Click(Panel(page), "Release without Proof of delivery");
+
+        page.WaitForAssertion(() => page.Find("[role=alert]").TextContent.Should().Contain($"at most {TransportOrder.MaxReleaseRemarkLength} characters"));
+        Commands.DidNotReceive().ReleaseWithoutProofOfDeliveryAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void Release_TheTmsRefuses_KeepsTheFormOpen_WithTheReason()
+    {
+        var page = RenderWithOneToRelease();
+        Commands.ReleaseWithoutProofOfDeliveryAsync("TO-0000043", "CMR by post", Arg.Any<CancellationToken>())
+            .Returns(new ReleaseWithoutProofOfDeliveryAnswer.Refused("It was released already."));
+
+        page.Find("fluent-button[aria-label='Release TO-0000043 without Proof of delivery']").Click();
+        page.WaitForElement("section[aria-label='Release TO-0000043 without Proof of delivery'] fluent-text-area").Input("CMR by post");
+        Click(Panel(page), "Release without Proof of delivery");
+
+        page.WaitForAssertion(() => page.Find("[role=alert]").TextContent.Should().Contain("Transport Order TO-0000043 wasn't released: It was released already."));
+        Panel(page);
+    }
+
+    [Fact]
+    public void Release_WhenTheTmsCantBeReached_KeepsTheFormOpen_AndSaysToTryAgain()
+    {
+        var page = RenderWithOneToRelease();
+        Commands.ReleaseWithoutProofOfDeliveryAsync("TO-0000043", "CMR by post", Arg.Any<CancellationToken>())
+            .Returns<ReleaseWithoutProofOfDeliveryAnswer>(_ => throw new HttpRequestException("The TMS API didn't answer."));
+
+        page.Find("fluent-button[aria-label='Release TO-0000043 without Proof of delivery']").Click();
+        page.WaitForElement("section[aria-label='Release TO-0000043 without Proof of delivery'] fluent-text-area").Input("CMR by post");
+        Click(Panel(page), "Release without Proof of delivery");
+
+        page.WaitForAssertion(() => page.Find("[role=alert]").TextContent.Should().Contain("couldn't be released. Try again."));
+        Panel(page);
+    }
+
+    [Fact]
+    public void Release_CanBeClosedWithoutReleasing()
+    {
+        var page = RenderWithOneToRelease();
+
+        page.Find("fluent-button[aria-label='Release TO-0000043 without Proof of delivery']").Click();
+        Click(Panel(page), "Cancel");
+
+        page.WaitForAssertion(() => page.FindAll("section[aria-label^='Release']").Should().BeEmpty());
+        Commands.DidNotReceive().ReleaseWithoutProofOfDeliveryAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    private IRenderedComponent<NotYetBillable> RenderWithOneToRelease()
+    {
+        Queries.ListNotYetBillableAsync(Arg.Any<CancellationToken>()).Returns([Order("TO-0000043", "SH-0000012", BillingBlockingReason.NoProofOfDelivery)]);
+        var page = Render<NotYetBillable>();
+        page.WaitForElement("tbody tr");
+        return page;
+    }
+
+    private static IElement Panel(IRenderedComponent<NotYetBillable> page) =>
+        page.WaitForElement("section[aria-label='Release TO-0000043 without Proof of delivery']");
+
+    private static void Click(IElement panel, string text) =>
+        panel.QuerySelectorAll("fluent-button").Single(button => button.TextContent.Trim() == text).Click();
+
+    private static List<string> ActionsOf(IRenderedComponent<NotYetBillable> page) =>
+        [.. page.FindAll("tbody fluent-button, tbody a[aria-label]").Select(action => action.GetAttribute("aria-label")!)];
 }

@@ -184,6 +184,40 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
         }
     }
 
+    public async Task<ReleaseWithoutProofOfDeliveryAnswer> ReleaseWithoutProofOfDeliveryAsync(string transportOrderNumber, string remark, CancellationToken cancellationToken)
+    {
+        using var span = activities.Source.StartActivity("Release without Proof of delivery", ActivityKind.Internal);
+        using var request = await CommandAsync($"/v1/transport-orders/{Uri.EscapeDataString(transportOrderNumber)}/release-without-proof-of-delivery", cancellationToken);
+        request.Content = JsonContent.Create(new ProofOfDeliveryRelease(remark, CustomerServiceName.Demo), options: Json);
+
+        using var response = await http.SendAsync(request, cancellationToken);
+        switch (response.StatusCode)
+        {
+            case HttpStatusCode.OK:
+                var released = await response.Content.ReadFromJsonAsync<ProofOfDeliveryReleased>(Json, cancellationToken)
+                    ?? throw new HttpRequestException("The TMS API answered a release without a Proof of delivery without a body.");
+                // The release starts a Message trail of its own, which TransportOrderBillable continues when the release completes the order.
+                using (Track(Flows.Billing, TrackingKeys.Succeeded, new() { TransportOrderNumber = transportOrderNumber, CorrelationId = released.CorrelationId, ShipmentNumber = released.ShipmentNumber }))
+                {
+                    LogReleasedWithoutProofOfDelivery(transportOrderNumber, released.BillingState);
+                }
+
+                return new ReleaseWithoutProofOfDeliveryAnswer.Released(released.BillingState);
+            // A refused release: its problem's detail is the refusal's readable message, and its code says which rule.
+            case HttpStatusCode.NotFound or HttpStatusCode.Conflict:
+                var problem = await response.Content.ReadFromJsonAsync<Refusal>(Json, cancellationToken);
+                var reason = problem?.Detail ?? $"Transport Order {transportOrderNumber} can't be released without a Proof of delivery.";
+                using (Track(Flows.Billing, TrackingKeys.Refused, new() { TransportOrderNumber = transportOrderNumber, FailureCode = problem?.Code, CorrelationId = problem?.CorrelationId }))
+                {
+                    LogRefused(TmsCommand.ReleaseWithoutProofOfDelivery, transportOrderNumber, reason);
+                }
+
+                return new ReleaseWithoutProofOfDeliveryAnswer.Refused(reason);
+            default:
+                throw Unexpected(response, "a release without a Proof of delivery");
+        }
+    }
+
     // What a refused reassignment, release or withdrawal shares: reading the problem, tracing the refusal on the trail it
     // names, and answering with its readable reason.
     private async Task<string> RefuseAsync(
@@ -261,6 +295,9 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
     [LoggerMessage(Level = LogLevel.Information, Message = "Shipment {ShipmentNumber} released")]
     private partial void LogReleased(string shipmentNumber);
 
+    [LoggerMessage(Level = LogLevel.Information, Message = "Transport Order {TransportOrderNumber} released without a Proof of delivery: {BillingState}")]
+    private partial void LogReleasedWithoutProofOfDelivery(string transportOrderNumber, BillingState billingState);
+
     [LoggerMessage(Level = LogLevel.Information, Message = "Carrier booking {CarrierBookingNumber} withdrawn")]
     private partial void LogWithdrawn(string carrierBookingNumber);
 
@@ -290,6 +327,7 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
         Reassignment,
         Release,
         Withdrawal,
+        ReleaseWithoutProofOfDelivery,
     }
 
     // What the TMS API answers a re-rate, as far as the TMS UI reads it.
@@ -316,4 +354,10 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
 
     // What the TMS API answers a withdrawal, as far as the TMS UI reads it.
     private sealed record Withdrawn(string? ShipmentNumber, string? CorrelationId);
+
+    // What the TMS UI asks the TMS API to release a Transport Order without a Proof of delivery with.
+    private sealed record ProofOfDeliveryRelease(string Remark, string ReleasedBy);
+
+    // What the TMS API answers a release without a Proof of delivery, as far as the TMS UI reads it.
+    private sealed record ProofOfDeliveryReleased(BillingState BillingState, string? ShipmentNumber, string? CorrelationId);
 }

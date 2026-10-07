@@ -14,6 +14,8 @@ namespace Norvia.Tms.Web.UiTests;
 /// </summary>
 public abstract class BrowserPage(TmsUiFixture tms) : IAsyncLifetime
 {
+    private const string VanDijkId = "CAR-0001";
+
     private static readonly string ArtifactsDirectory = Path.Combine(
         Environment.GetEnvironmentVariable("NORVIA_UI_TEST_ARTIFACTS") ?? Path.Combine(AppContext.BaseDirectory, "TestResults"),
         "playwright");
@@ -78,6 +80,38 @@ public abstract class BrowserPage(TmsUiFixture tms) : IAsyncLifetime
         var bookingNumber = Regex.Match(await withdraw.GetAttributeAsync("aria-label") ?? await withdraw.InnerTextAsync(), @"CB-\d{7}").Value;
         bookingNumber.Should().NotBeEmpty();
         return (shipmentNumber, bookingNumber);
+    }
+
+        /// <summary>Releases a new Transport Order to Van Dijk Transport, has it confirm the booking and report the Shipment In transit.</summary>
+    protected async Task<(string ShipmentNumber, string Reference)> InTransitShipmentAsync()
+    {
+        var (shipmentNumber, bookingNumber) = await ReleaseToCarrierAsync("Van Dijk Transport");
+        var reference = $"VDT-{Guid.NewGuid():N}"[..12];
+        using (var confirmed = await tms.ConfirmAsync(VanDijkId, bookingNumber, reference, TestContext.Current.CancellationToken))
+        {
+            confirmed.StatusCode.Should().Be(HttpStatusCode.OK, await confirmed.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        await RecordRotterdamTrackingAsync("Collected", reference, now.AddMinutes(-40));
+        await RecordRotterdamTrackingAsync("Departed", reference, now.AddMinutes(-30));
+        return (shipmentNumber, reference);
+    }
+
+    /// <summary>Records a Tracking event from Van Dijk Transport, reported from Rotterdam, for the booking reference.</summary>
+    protected async Task RecordRotterdamTrackingAsync(string type, string reference, DateTimeOffset eventTime)
+    {
+        var trackingEvent = new JsonObject
+        {
+            ["eventId"] = Guid.NewGuid().ToString(),
+            ["source"] = new JsonObject { ["type"] = "Carrier", ["carrierId"] = VanDijkId },
+            ["carrierBookingReference"] = reference,
+            ["type"] = type,
+            ["eventTime"] = JsonValue.Create(eventTime),
+            ["location"] = new JsonObject { ["place"] = "Rotterdam", ["postcode"] = "3011 AA", ["countryCode"] = "NL" },
+        };
+        using var response = await tms.RecordTrackingAsync(trackingEvent, TestContext.Current.CancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
     }
 
     public async ValueTask DisposeAsync()

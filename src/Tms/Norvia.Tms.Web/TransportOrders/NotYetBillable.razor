@@ -12,11 +12,24 @@
 
 <h1>Not yet billable</h1>
 
+@if (_done is { } done)
+{
+    <div role="status" class="mb-4">
+        <FluentMessageBar Intent="MessageIntent.Success" AllowDismiss="false">@done</FluentMessageBar>
+    </div>
+}
+
+@if (_releasing is { } releasing)
+{
+    @* Keyed by the order, so a new choice starts a new form. *@
+    <ReleaseWithoutProofOfDeliveryPanel @key="releasing" TransportOrderNumber="@releasing" OnClosed="CloseRelease" OnDone="Done" />
+}
+
 <LiveListStates Items="_list.Items" LastReadFailed="_list.LastReadFailed" Name="Transport Orders not yet billable"
                 Empty="@("No delivered Transport Order is waiting to become billable. An order appears here once its Shipment is Delivered and something still blocks billing.")" Context="orders">
     @* Oldest delivery first, as the query gives them: what has waited longest is followed up first. *@
     <FluentDataGrid Items="orders.AsQueryable()" TGridItem="TransportOrderNotYetBillableSummary" Class="flatly-table" aria-label="Transport Orders not yet billable"
-                    GridTemplateColumns="1.4fr 1.2fr 1.3fr 1.4fr 2.4fr 1.3fr" MultiLine="true">
+                    GridTemplateColumns="1.4fr 1.2fr 1.3fr 1.4fr 2.2fr 1.3fr 2fr" MultiLine="true">
         <TemplateColumn Title="Transport Order">
             <a href="/transport-orders/@context.TransportOrderNumber">@context.TransportOrderNumber</a>
         </TemplateColumn>
@@ -27,11 +40,29 @@
         <TemplateColumn Title="Shipment">
             <a href="/shipments/@context.ShipmentNumber">@context.ShipmentNumber</a>
         </TemplateColumn>
+        @* Only what can lift a blocking reason is offered: the rating exception when the order isn't rated, and the release when the Proof of delivery is missing. *@
+        <TemplateColumn Title="Actions">
+            <div class="flex flex-col items-start gap-2">
+                @if (context.BlockingReasons.Contains(BillingBlockingReason.NotRated))
+                {
+                    <a href="/transport-orders/@context.TransportOrderNumber" aria-label="@($"Open the rating exception of {context.TransportOrderNumber}")">Rating exception</a>
+                }
+                @if (context.BlockingReasons.Contains(BillingBlockingReason.NoProofOfDelivery))
+                {
+                    <FluentButton Appearance="Appearance.Outline" OnClick="() => _releasing = context.TransportOrderNumber"
+                                  aria-label="@($"Release {context.TransportOrderNumber} without Proof of delivery")">
+                        Release without Proof of delivery
+                    </FluentButton>
+                }
+            </div>
+        </TemplateColumn>
     </FluentDataGrid>
 </LiveListStates>
 
 @code {
     private LiveTransportOrderList<TransportOrderNotYetBillableSummary> _list = null!;
+    private string? _releasing;
+    private string? _done;
 
     protected override void OnInitialized()
     {
@@ -39,6 +70,15 @@
             Queries.ListNotYetBillableAsync, "the Transport Orders not yet billable", Time, Options.Value.RefreshInterval, Logger);
         _list.Changed += () => InvokeAsync(StateHasChanged);
         _list.Start();
+    }
+
+    private void CloseRelease() => _releasing = null;
+
+    // The list isn't changed here: it reads again shortly, and then drops the order if it became Billable.
+    private void Done(string text)
+    {
+        _releasing = null;
+        _done = text;
     }
 
     public async ValueTask DisposeAsync() => await _list.DisposeAsync();
