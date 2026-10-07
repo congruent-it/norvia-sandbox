@@ -29,17 +29,26 @@ public class ShipperNotificationRequestedConsumerTests
     }
 
     [Theory]
-    [InlineData("not json", System.Net.HttpStatusCode.OK)]
-    [InlineData("request", System.Net.HttpStatusCode.ServiceUnavailable)]
-    [InlineData("request", System.Net.HttpStatusCode.NotFound)]
-    public async Task HandleAsync_ARunThatFails_StillCompletesTheMessage_AsTheTriggerDoes(string message, System.Net.HttpStatusCode tmsStatus)
+    [InlineData(System.Net.HttpStatusCode.ServiceUnavailable)]
+    [InlineData(System.Net.HttpStatusCode.NotFound)]
+    public async Task HandleAsync_ARunThatFailsToReport_StillCompletesTheMessage_AsTheWorkflowDoes(System.Net.HttpStatusCode tmsStatus)
     {
         _world.Tms.Otherwise(tmsStatus);
 
-        await HandleAsync(message == "request" ? ShipperNotificationWorld.Request() : message);
+        await HandleAsync(ShipperNotificationWorld.Request());
 
         await _receiver.Received(1).CompleteMessageAsync(Arg.Any<ServiceBusReceivedMessage>(), Arg.Any<CancellationToken>());
         await _receiver.DidNotReceiveWithAnyArgs().AbandonMessageAsync(default!, default, TestContext.Current.CancellationToken);
         await _receiver.DidNotReceiveWithAnyArgs().DeadLetterMessageAsync(default!, default(string), default, TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task HandleAsync_AnUnreadableMessage_IsDeadLetteredWithTheFailureCode_AndNotCompleted()
+    {
+        await HandleAsync("not json");
+
+        await _receiver.Received(1).DeadLetterMessageAsync(
+            Arg.Any<ServiceBusReceivedMessage>(), "ShipperNotificationRequestedUnreadable", Arg.Is<string>(text => text.Contains("nothing was sent")), Arg.Any<CancellationToken>());
+        await _receiver.DidNotReceiveWithAnyArgs().CompleteMessageAsync(default!, TestContext.Current.CancellationToken);
     }
 }

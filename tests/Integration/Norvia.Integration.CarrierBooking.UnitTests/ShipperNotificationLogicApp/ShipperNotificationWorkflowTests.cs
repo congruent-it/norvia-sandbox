@@ -30,7 +30,7 @@ public sealed class ShipperNotificationWorkflowTests
 
     [Fact]
     public void Trigger_ClientTrackingId_IsTheNotificationsCorrelationId() =>
-        ShipperNotificationWorkflow.Trigger["correlation"]!["clientTrackingId"]!.GetValue<string>().Should().Be("@{triggerOutputs()?['body']?['correlationId']}");
+        ShipperNotificationWorkflow.Trigger["correlation"]!["clientTrackingId"]!.GetValue<string>().Should().Be("@{triggerOutputs()?['body']?['userProperties']?['correlationId']}");
 
     [Fact]
     public void Trigger_TracksNothing_BecauseTheFirstStepTracksTheKeysTheMessageCarries() =>
@@ -90,6 +90,34 @@ public sealed class ShipperNotificationWorkflowTests
         map["inputs"]!["functionName"]!.GetValue<string>().Should().Be("MapShipperNotificationRequested");
         map["inputs"]!["parameters"]!["shipperNotificationRequested"]!.GetValue<string>().Should().Be("@{triggerBody()?['contentData']}");
         map["trackedProperties"]!["failureCode"]!.GetValue<string>().Should().Contain("ShipperNotificationRequestedUnreadable");
+    }
+
+    [Fact]
+    public void Trigger_LocksTheMessage_SoTheWorkflowSettlesIt() =>
+        ShipperNotificationWorkflow.Trigger["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("peekLockTopicMessages");
+
+    [Fact]
+    public void UnreadableNotification_IsDeadLetteredWithTheFailureCodeAndAReadableMessage_AndFailsTheRun()
+    {
+        var deadLetter = ShipperNotificationWorkflow.Action("Dead_letter_the_unreadable_notification");
+        var parameters = deadLetter["inputs"]!["parameters"]!;
+
+        Statuses(deadLetter, ShipperNotificationWorkflow.MapAction).Should().BeEquivalentTo("Failed");
+        deadLetter["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("deadLetterTopicMessage");
+        parameters["subscriptionName"]!.GetValue<string>().Should().Be("shipper-notification");
+        parameters["lockToken"]!.GetValue<string>().Should().Be("@triggerBody()?['lockToken']");
+        parameters["deadLetterReason"]!.GetValue<string>().Should().Be("ShipperNotificationRequestedUnreadable");
+        parameters["deadLetterErrorDescription"]!.GetValue<string>().Should().Contain("nothing was sent");
+        deadLetter["trackedProperties"]!["outcome"]!.GetValue<string>().Should().Be("DeadLettered");
+        deadLetter["trackedProperties"]!["failureCode"]!.GetValue<string>().Should().Be("ShipperNotificationRequestedUnreadable");
+        ShipperNotificationWorkflow.Action("Fail_the_run_on_the_unreadable_notification")["inputs"]!["runStatus"]!.GetValue<string>().Should().Be("Failed");
+    }
+
+    [Fact]
+    public void MappedNotification_IsCompletedBeforeAnythingIsSent_SoAFailedRunIsNotRedelivered()
+    {
+        Statuses(ShipperNotificationWorkflow.Action("Complete_the_message"), ShipperNotificationWorkflow.MapAction).Should().BeEquivalentTo("Succeeded");
+        Statuses(ShipperNotificationWorkflow.Action(ShipperNotificationWorkflow.Credential), "Complete_the_message").Should().BeEquivalentTo("Succeeded");
     }
 
     [Fact]

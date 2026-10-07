@@ -5,8 +5,8 @@ namespace Norvia.Integration.LocalShipperNotificationWorker;
 
 /// <summary>
 /// The Shipper notification Logic App's trigger, played locally (ADR 0033): picks up <c>ShipperNotificationRequested</c> from the
-/// Shipper notification subscription and runs the flow for it. As with the Logic App's trigger, the message is completed once the run has
-/// started: a run that fails is on the trail, not redelivered.
+/// Shipper notification subscription and runs the flow for it. As in the workflow, a message that can't be mapped is dead-lettered with the failure
+/// code, and any other is completed: a run that fails later is on the trail, not redelivered.
 /// </summary>
 internal sealed partial class ShipperNotificationRequestedConsumer(
     ServiceBusClient serviceBus,
@@ -14,6 +14,9 @@ internal sealed partial class ShipperNotificationRequestedConsumer(
     IOptions<ShipperNotificationWorkerOptions> options,
     ILogger<ShipperNotificationRequestedConsumer> logger) : BackgroundService
 {
+    internal const string UnreadableCode = "ShipperNotificationRequestedUnreadable";
+    internal const string UnreadableDescription = "The message isn't a notification the Shipper can be told of, so nothing was sent to the Shipper.";
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var settings = options.Value;
@@ -52,7 +55,14 @@ internal sealed partial class ShipperNotificationRequestedConsumer(
             LogRunFailed(outcome);
         }
 
-        // The Logic App's Service Bus trigger completes a message once its run has started, so a failed run isn't redelivered.
+        if (outcome == ShipperNotificationFlowOutcome.Unreadable)
+        {
+            // As the workflow does: the failure code and a readable message, for the Integration operator to find (coding guidelines §7).
+            await args.DeadLetterMessageAsync(args.Message, UnreadableCode, UnreadableDescription, args.CancellationToken);
+            return;
+        }
+
+        // The workflow completes a message once it has mapped it, so a run that fails later isn't redelivered.
         await args.CompleteMessageAsync(args.Message, args.CancellationToken);
     }
 

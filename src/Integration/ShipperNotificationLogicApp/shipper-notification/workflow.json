@@ -13,12 +13,12 @@
           },
           "serviceProviderConfiguration": {
             "connectionName": "serviceBus",
-            "operationId": "receiveTopicMessages",
+            "operationId": "peekLockTopicMessages",
             "serviceProviderId": "/serviceProviders/serviceBus"
           }
         },
         "correlation": {
-          "clientTrackingId": "@{triggerOutputs()?['body']?['correlationId']}"
+          "clientTrackingId": "@{triggerOutputs()?['body']?['userProperties']?['correlationId']}"
         }
       }
     },
@@ -63,6 +63,74 @@
           "failureCode": "@if(equals(action()?['status'], 'Failed'), 'ShipperNotificationRequestedUnreadable', null)"
         }
       },
+      "Dead_letter_the_unreadable_notification": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "topicName": "shipment-events",
+            "subscriptionName": "shipper-notification",
+            "lockToken": "@triggerBody()?['lockToken']",
+            "deadLetterReason": "ShipperNotificationRequestedUnreadable",
+            "deadLetterErrorDescription": "The message isn't a notification the Shipper can be told of, so nothing was sent to the Shipper."
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBus",
+            "operationId": "deadLetterTopicMessage",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "runAfter": {
+          "Map_the_notification": [
+            "Failed"
+          ]
+        },
+        "trackedProperties": {
+          "correlationId": "@outputs('Track_the_notification')?['correlationId']",
+          "flow": "shipper-notification",
+          "partyId": "@outputs('Track_the_notification')?['partyId']",
+          "transportOrderNumber": "@outputs('Track_the_notification')?['transportOrderNumber']",
+          "shipmentNumber": "@outputs('Track_the_notification')?['shipmentNumber']",
+          "sourceMessageId": "@outputs('Track_the_notification')?['sourceMessageId']",
+          "outcome": "DeadLettered",
+          "failureCode": "ShipperNotificationRequestedUnreadable"
+        }
+      },
+      "Fail_the_run_on_the_unreadable_notification": {
+        "type": "Terminate",
+        "inputs": {
+          "runStatus": "Failed",
+          "runError": {
+            "code": "ShipperNotificationRequestedUnreadable",
+            "message": "The message isn't a notification the Shipper can be told of, so it was dead-lettered."
+          }
+        },
+        "runAfter": {
+          "Dead_letter_the_unreadable_notification": [
+            "Succeeded",
+            "Failed"
+          ]
+        }
+      },
+      "Complete_the_message": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "topicName": "shipment-events",
+            "subscriptionName": "shipper-notification",
+            "lockToken": "@triggerBody()?['lockToken']"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBus",
+            "operationId": "completeTopicMessage",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "runAfter": {
+          "Map_the_notification": [
+            "Succeeded"
+          ]
+        }
+      },
       "Get_the_Shipper_endpoint_credential": {
         "type": "ServiceProvider",
         "inputs": {
@@ -76,7 +144,7 @@
           }
         },
         "runAfter": {
-          "Map_the_notification": [
+          "Complete_the_message": [
             "Succeeded"
           ]
         },
