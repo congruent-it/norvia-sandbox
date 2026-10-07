@@ -46,4 +46,9 @@ public static class Flows
     /// the correlation ID is only in the logs.
     /// </summary>
     public const string ShipperTracking = "shipper-tracking";
+
+    /// <summary>
+    /// Deciding that a Transport Order is Billable (P9), on the Message trail of the transaction that completed its last condition.
+    /// </summary>
+    public const string Billing = "billing";
 }

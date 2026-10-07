@@ -119,6 +119,17 @@ internal sealed class TransportOrderConfiguration : IEntityTypeConfiguration<Tra
             .HasConversion(key => key!.Value, value => new IdempotencyKey(value))
             .HasMaxLength(IdempotencyKey.MaxLength);
 
+        // Where the Transport Order stands for billing (P9), and, once it is Billable, when it was delivered and became Billable
+        // and on which Message trail. A Rejected booking has none.
+        builder.Property(order => order.BillingState)
+            .HasConversion<string>()
+            .HasMaxLength(30);
+        builder.HasIndex(order => new { order.BillingState, order.ReceivedAt });
+        builder.Property(order => order.BillingCorrelationId)
+            .HasConversion(id => id!.Value, value => new CorrelationId(value))
+            .HasMaxLength(128);
+        builder.Property(order => order.ReleasedWithoutProofOfDelivery);
+
         // Why Rating failed, kept like the rejection reasons: its stable code by name and its message.
         builder.Property(order => order.RatingFailure)
             .HasConversion(

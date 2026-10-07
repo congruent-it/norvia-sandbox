@@ -47,7 +47,8 @@ public sealed class TransportOrderQueryTests
             RatingResult.NotYetRated,
             null,
             null,
-            CanonicalTransportOrder.From(order)));
+            CanonicalTransportOrder.From(order),
+            BillingState.NotYetBillable));
     }
 
     [Fact]

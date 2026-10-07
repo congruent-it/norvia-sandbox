@@ -10,6 +10,7 @@ namespace Norvia.Tms.Application.TransportOrders;
 /// <param name="RatingResult">Null for a Rejected booking, which is never rated.</param>
 /// <param name="FreightCharge">The frozen Freight Charge once the Transport Order is Rated; null until then.</param>
 /// <param name="RatingFailure">Why the Rate Card couldn't price the Transport Order, once Rating failed; null otherwise.</param>
+/// <param name="BillingState">Where the Transport Order stands for billing (P9); null for a Rejected booking.</param>
 public sealed record TransportOrderView(
     Guid Id,
     string? TransportOrderNumber,
@@ -23,7 +24,8 @@ public sealed record TransportOrderView(
     RatingResult? RatingResult,
     FreightChargeView? FreightCharge,
     RatingFailureView? RatingFailure,
-    CanonicalTransportOrder TransportOrder)
+    CanonicalTransportOrder TransportOrder,
+    BillingState? BillingState = null)
 {
     public static TransportOrderView Of(TransportOrder order, IShipperDirectory shippers)
     {
@@ -41,6 +43,7 @@ public sealed record TransportOrderView(
             order.RatingResult,
             FreightChargeView.From(order.FreightCharge),
             RatingFailureView.From(order.RatingFailure),
-            CanonicalTransportOrder.From(order));
+            CanonicalTransportOrder.From(order),
+            order.BillingState);
     }
 }

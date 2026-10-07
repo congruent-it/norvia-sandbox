@@ -1,6 +1,7 @@
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Mediator;
+using Norvia.Tms.Application.Billing;
 using Norvia.Tms.Application.Exceptions;
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Exceptions;
@@ -16,6 +17,7 @@ public sealed class RecordTrackingHandler(
     IRepository<Shipment> shipments,
     IReadRepository<TransportOrder> transportOrders,
     ExceptionCauses exceptionCauses,
+    BillingCheck billing,
     TrackingEventRules rules,
     TimeProvider time)
     : ICommandHandler<RecordTrackingCommand, Result<RecordTrackingResult>>
@@ -61,7 +63,8 @@ public sealed class RecordTrackingHandler(
             return TrackingEventRefused.Because<RecordTrackingResult>(refusal);
         }
 
-        var trackingEvent = shipment.Record(report with { CarrierBookingReference = booking.CarrierBookingReference }, new CorrelationId(command.CorrelationId), now);
+        var correlationId = new CorrelationId(command.CorrelationId);
+        var trackingEvent = shipment.Record(report with { CarrierBookingReference = booking.CarrierBookingReference }, correlationId, now);
 
         if (ExceptionCause.From(trackingEvent, now) is { } cause)
         {
@@ -77,8 +80,14 @@ public sealed class RecordTrackingHandler(
 
         await CheckLateDeliveryAsync(shipment, trackingEvent, now, cancellationToken);
 
-        // The tracked Shipment's move and the Exception the event opened save with the event, and the events they raise go
-        // to the outbox, in one transaction.
+        // The Shipment moving to Delivered can complete its Transport Order's conditions to be Billable (P9).
+        if (trackingEvent is { Type: TrackingEventType.Delivered, MovedShipment: true })
+        {
+            await billing.CheckAsync(shipment, new BillingChange(correlationId, now, DeliveredAt: trackingEvent.EventTime), cancellationToken);
+        }
+
+        // The tracked Shipment's move, the Exception the event opened and the Transport Order becoming Billable save with the
+        // event, and the events they raise go to the outbox, in one transaction.
         await trackingEvents.AddAsync(trackingEvent, cancellationToken);
         await trackingEvents.SaveChangesAsync(cancellationToken);
         return RecordTrackingResult.From(shipment, trackingEvent, repeat: false);
