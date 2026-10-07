@@ -240,6 +240,15 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
     public TimeWindow? DeliveryWindowOf(TransportOrderDetails? orderDetails) =>
         AgreedDeliveryWindows.Count > 0 ? AgreedDeliveryWindows[^1].Window : orderDetails?.Delivery?.Window;
 
+    /// <summary>Whether a Planner can agree a delivery window for the Shipment (P7): it is Collected or In transit.</summary>
+    public bool AllowsDeliveryWindowAgreement => Status is ShipmentStatus.Collected or ShipmentStatus.InTransit;
+
+    /// <summary>
+    /// Whether a Planner can cancel the Shipment's Carrier booking (P7): a Carrier carries it and it is Booked, so not collected yet.
+    /// A Booked Carrier Shipment always has its Confirmed Carrier booking.
+    /// </summary>
+    public bool AllowsCarrierBookingCancellation => !CarriedBy.IsOwnFleet && Status == ShipmentStatus.Booked;
+
     /// <summary>
     /// Sets an agreed delivery window on a Collected or In transit Shipment, from an open Exception, after the Planner agreed a
     /// redelivery with the Carrier outside the TMS. It joins the earlier ones and raises ShipmentDeliveryWindowAgreed. Returns the
@@ -252,7 +261,7 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
         ArgumentNullException.ThrowIfNull(exceptionNumber);
         ArgumentNullException.ThrowIfNull(key);
         ArgumentNullException.ThrowIfNull(correlationId);
-        if (Status is not (ShipmentStatus.Collected or ShipmentStatus.InTransit))
+        if (!AllowsDeliveryWindowAgreement)
         {
             return new(ExceptionRefusalCode.ShipmentNotInTransport, $"Shipment {Number} is {Status}, not Collected or In transit.");
         }

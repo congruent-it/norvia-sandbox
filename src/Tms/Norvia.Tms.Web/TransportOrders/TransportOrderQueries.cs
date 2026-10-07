@@ -1,6 +1,8 @@
 using Ardalis.Result;
 using Mediator;
 using Norvia.Tms.Application.Carriers.ListActive;
+using Norvia.Tms.Application.Exceptions.ListOpen;
+using Norvia.Tms.Application.Exceptions.ShipperNotificationTemplate;
 using Norvia.Tms.Application.ProofsOfDelivery.ListMissing;
 using Norvia.Tms.Application.ProofsOfDelivery.Read;
 using Norvia.Tms.Application.Shipments;
@@ -60,6 +62,17 @@ internal sealed class TransportOrderQueries(IServiceScopeFactory scopes) : ITran
 
     public async Task<ShipmentTimeline?> FindTrackingTimelineAsync(string shipmentNumber, CancellationToken cancellationToken) =>
         FoundOrNull(await SendAsync(new GetTrackingTimelineQuery(shipmentNumber), cancellationToken), $"the timeline of Shipment {shipmentNumber}");
+
+    public Task<IReadOnlyList<OpenExceptionSummary>> ListOpenExceptionsAsync(CancellationToken cancellationToken) =>
+        SendAsync(new ListOpenExceptionsQuery(), cancellationToken);
+
+    public async Task<string?> FindShipperNotificationTemplateAsync(string exceptionNumber, CancellationToken cancellationToken) =>
+        (await SendAsync(new ShipperNotificationTemplateQuery(exceptionNumber), cancellationToken)) switch
+        {
+            { IsSuccess: true } result => result.Value.Message,
+            { Status: ResultStatus.NotFound or ResultStatus.Invalid } => null,
+            var result => throw new InvalidOperationException($"Reading the template of Exception {exceptionNumber} failed with {result.Status}."),
+        };
 
     private async Task<TResponse> SendAsync<TResponse>(IQuery<TResponse> query, CancellationToken cancellationToken)
     {

@@ -22,6 +22,28 @@ public sealed class NorviaTimeTests
         NorviaTime.Format(null).Should().Be("Not given");
     }
 
+    [Theory]
+    [InlineData("2026-10-08 14:30", "2026-10-08T12:30:00Z")]
+    [InlineData(" 2026-12-01 08:00 ", "2026-12-01T07:00:00Z")]
+    public void TryParse_ATimeAsAPlannerTypesIt_IsRotterdamLocalTime(string text, string expected)
+    {
+        NorviaTime.TryParse(text, out var moment).Should().BeTrue();
+
+        moment.Should().Be(DateTimeOffset.Parse(expected, System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("tomorrow")]
+    [InlineData("08/10/2026 14:30")]
+    [InlineData("2026-10-08")]
+    [InlineData("2026-03-29 02:30")] // doesn't exist in Rotterdam: the clocks went forward
+    public void TryParse_AnythingElse_IsNotATime(string? text)
+    {
+        NorviaTime.TryParse(text, out _).Should().BeFalse();
+    }
+
     private static DateTimeOffset? Parse(string? value) =>
         value is null ? null : DateTimeOffset.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
 }

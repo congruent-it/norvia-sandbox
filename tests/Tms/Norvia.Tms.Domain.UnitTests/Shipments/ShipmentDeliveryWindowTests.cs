@@ -106,6 +106,28 @@ public sealed class ShipmentDeliveryWindowTests
         shipment.DeliveryWindowOf(null).Should().BeNull();
     }
 
+    [Theory]
+    [InlineData(TrackingEventType.Collected, true)]
+    [InlineData(TrackingEventType.Departed, true)]
+    [InlineData(TrackingEventType.Delivered, false)]
+    public void AllowsDeliveryWindowAgreement_OnlyForACollectedOrInTransitShipment(TrackingEventType type, bool allowed) =>
+        OnItsWay(type).AllowsDeliveryWindowAgreement.Should().Be(allowed);
+
+    [Fact]
+    public void AllowsDeliveryWindowAgreement_ABookedShipmentDoesNot_AndItMayStillBeCancelled()
+    {
+        var booked = Booked();
+
+        booked.AllowsDeliveryWindowAgreement.Should().BeFalse();
+        booked.AllowsCarrierBookingCancellation.Should().BeTrue();
+    }
+
+    [Fact]
+    public void AllowsCarrierBookingCancellation_NotOnceCollected()
+    {
+        OnItsWay(TrackingEventType.Collected).AllowsCarrierBookingCancellation.Should().BeFalse();
+    }
+
     private static Shipment OnItsWay(TrackingEventType type)
     {
         var shipment = Booked();

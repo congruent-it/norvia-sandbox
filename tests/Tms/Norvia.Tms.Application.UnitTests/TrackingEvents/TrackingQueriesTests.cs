@@ -2,6 +2,7 @@ using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Microsoft.Extensions.Time.Testing;
 using Norvia.Tms.Application.Carriers;
+using Norvia.Tms.Application.Exceptions.Timeline;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shipments.ListInProgress;
 using Norvia.Tms.Application.TrackingEvents.Timeline;
@@ -12,6 +13,7 @@ using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Domain.ProofsOfDelivery;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.Shippers;
+using Norvia.Tms.Domain.ShipperNotifications;
 using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.TransportOrders;
 using NSubstitute;
@@ -28,12 +30,19 @@ public sealed class TrackingQueriesTests
     private readonly IReadRepository<TrackingEvent> _events = Substitute.For<IReadRepository<TrackingEvent>>();
     private readonly IReadRepository<TransportOrder> _orders = Substitute.For<IReadRepository<TransportOrder>>();
     private readonly IReadRepository<ProofOfDelivery> _proofsOfDelivery = Substitute.For<IReadRepository<ProofOfDelivery>>();
+    private readonly IReadRepository<ExceptionCase> _exceptions = Substitute.For<IReadRepository<ExceptionCase>>();
+    private readonly IReadRepository<ShipperNotification> _notifications = Substitute.For<IReadRepository<ShipperNotification>>();
+    private readonly IReadRepository<CarrierBooking> _carrierBookings = Substitute.For<IReadRepository<CarrierBooking>>();
     private readonly ICarrierDirectory _carriers = Substitute.For<ICarrierDirectory>();
     private readonly FakeTimeProvider _time = new(Samples.Now);
     private readonly List<TransportOrder> _allOrders = [];
 
     public TrackingQueriesTests()
     {
+        _exceptions.ListAsync(Arg.Any<OpenExceptionsForShipmentsSpec>(), Arg.Any<CancellationToken>()).Returns([]);
+        _exceptions.ListAsync(Arg.Any<ExceptionsOfShipmentSpec>(), Arg.Any<CancellationToken>()).Returns([]);
+        _notifications.ListAsync(Arg.Any<ShipperNotificationsOfExceptionsSpec>(), Arg.Any<CancellationToken>()).Returns([]);
+        _carrierBookings.ListAsync(Arg.Any<CarrierBookingsByShipmentSpec>(), Arg.Any<CancellationToken>()).Returns([]);
         _proofsOfDelivery.ListAsync(Arg.Any<CurrentProofsOfDeliveryForShipmentsSpec>(), Arg.Any<CancellationToken>()).Returns([]);
         _proofsOfDelivery.ListAsync(Arg.Any<ProofsOfDeliveryForShipmentSpec>(), Arg.Any<CancellationToken>()).Returns([]);
         _carriers.Find(VanDijk).Returns(new Carrier(VanDijk, "Van Dijk Transport", true));
@@ -60,7 +69,7 @@ public sealed class TrackingQueriesTests
         var listed = await InProgressHandler().Handle(new ListShipmentsInProgressQuery(), CancellationToken.None);
 
         listed.Should().ContainSingle().Which.Should().Be(new ShipmentInProgressSummary(
-            "SH-0000012", new CarriedByView(AssignedTo.Carrier, new CarrierView("CAR-0001", "Van Dijk Transport")), ShipmentStatus.Booked, null, Latest, false, false));
+            "SH-0000012", new CarriedByView(AssignedTo.Carrier, new CarrierView("CAR-0001", "Van Dijk Transport")), ShipmentStatus.Booked, null, Latest, false, false, false));
     }
 
     [Fact]
@@ -247,6 +256,78 @@ public sealed class TrackingQueriesTests
 
         result.Value.TrackingEvents.Should().BeEmpty();
         result.Value.ProofsOfDelivery.Should().BeEmpty();
+        result.Value.Exceptions.Should().BeEmpty();
+        result.Value.AgreedDeliveryWindows.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ListInProgress_MarksTheShipmentsThatHaveAnOpenException()
+    {
+        var withException = Booked(sequence: 12);
+        var without = Booked(sequence: 13, orderSequence: 8);
+        _shipments.ListAsync(Arg.Any<ShipmentsInProgressSpec>(), Arg.Any<CancellationToken>()).Returns([withException, without]);
+        _exceptions.ListAsync(Arg.Any<OpenExceptionsForShipmentsSpec>(), Arg.Any<CancellationToken>()).Returns([withException.Id]);
+
+        var listed = await InProgressHandler().Handle(new ListShipmentsInProgressQuery(), CancellationToken.None);
+
+        listed.ToDictionary(summary => summary.ShipmentNumber, summary => summary.HasOpenException)
+            .Should().BeEquivalentTo(new Dictionary<string, bool> { ["SH-0000012"] = true, ["SH-0000013"] = false });
+    }
+
+    [Fact]
+    public async Task Timeline_ShowsEachExceptionWithItsCausesNotesNotificationsAndOutcome()
+    {
+        var shipment = Booked(sequence: 12);
+        _shipments.FirstOrDefaultAsync(Arg.Any<ShipmentByNumberSpec>(), Arg.Any<CancellationToken>()).Returns(shipment);
+        _events.ListAsync(Arg.Any<TrackingTimelineSpec>(), Arg.Any<CancellationToken>()).Returns([]);
+        var failed = ExceptionCase.Open(
+            ExceptionNumber.FromSequence(5), shipment,
+            ExceptionCause.From(Report(shipment, TrackingEventType.DeliveryFailed, "evt-ndl", Samples.Now.AddDays(1), Samples.Now.AddDays(1), null), Samples.Now.AddDays(1))!);
+        failed.AddNote("Phoned Kessler", "Anna de Vries", new CorrelationId("corr-note"), Samples.Now.AddDays(2));
+        var notification = ShipperNotification.Request(failed, "REF-1", "Your delivery failed.", "Anna de Vries", null, null, new CorrelationId("corr-notify"), Samples.Now.AddDays(2));
+        notification.ReportSent(Samples.Now.AddDays(2).AddMinutes(1));
+        failed.Resolve(ExceptionOutcome.Redelivered, "Delivered Thursday", new CorrelationId("corr-resolve"), Samples.Now.AddDays(4));
+        var late = ExceptionCase.Open(ExceptionNumber.FromSequence(6), shipment, ExceptionCause.WindowPassed(shipment, new CorrelationId("corr-check"), Samples.Now.AddDays(5)));
+        _exceptions.ListAsync(Arg.Is<ExceptionsOfShipmentSpec>(spec => spec.ShipmentId == shipment.Id), Arg.Any<CancellationToken>()).Returns([failed, late]);
+        _notifications.ListAsync(Arg.Any<ShipperNotificationsOfExceptionsSpec>(), Arg.Any<CancellationToken>()).Returns([notification]);
+
+        var result = await TimelineHandler().Handle(new GetTrackingTimelineQuery("SH-0000012"), CancellationToken.None);
+
+        var exceptions = result.Value.Exceptions;
+        exceptions.Select(exception => (exception.ExceptionNumber, exception.Status, exception.Outcome)).Should().Equal(
+            ("EX-0000005", ExceptionStatus.Resolved, ExceptionOutcome.Redelivered), ("EX-0000006", ExceptionStatus.Open, (ExceptionOutcome?)null));
+        exceptions[0].Causes.Should().ContainSingle().Which.Should().Be(new ExceptionCauseView(ExceptionCauseKind.TrackingEvent, "evt-ndl", Samples.Now.AddDays(1)));
+        exceptions[0].Notes.Should().ContainSingle().Which.Should().Be(new ExceptionNoteView("Phoned Kessler", "Anna de Vries", Samples.Now.AddDays(2)));
+        exceptions[0].Notifications.Should().ContainSingle().Which.Should().Be(
+            new ShipperNotificationView("Your delivery failed.", "Anna de Vries", ShipperNotificationStatus.Sent, Samples.Now.AddDays(2), Samples.Now.AddDays(2).AddMinutes(1), null));
+        exceptions[0].Remark.Should().Be("Delivered Thursday");
+        exceptions[0].ResolvedAt.Should().Be(Samples.Now.AddDays(4));
+        exceptions[1].Notifications.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Timeline_ShowsTheCarrierBookingCancellationOnTheExceptionItWasMadeFrom_AndEachAgreedDeliveryWindow()
+    {
+        var shipment = Booked(sequence: 12);
+        _shipments.FirstOrDefaultAsync(Arg.Any<ShipmentByNumberSpec>(), Arg.Any<CancellationToken>()).Returns(shipment);
+        _events.ListAsync(Arg.Any<TrackingTimelineSpec>(), Arg.Any<CancellationToken>()).Returns([]);
+        var late = ExceptionCase.Open(ExceptionNumber.FromSequence(6), shipment, ExceptionCause.WindowPassed(shipment, new CorrelationId("corr-check"), Samples.Now.AddDays(5)));
+        _exceptions.ListAsync(Arg.Any<ExceptionsOfShipmentSpec>(), Arg.Any<CancellationToken>()).Returns([late]);
+        var booking = CarrierBooking.Request(CarrierBookingNumber.FromSequence(12), shipment.Id, shipment.Number, VanDijk, new CorrelationId("corr-booking"), Samples.Now);
+        booking.Confirm("VDT-1", null, shipment.TransportOrderNumber, new CorrelationId("corr-confirm"), Samples.Now.AddHours(1));
+        booking.Cancel("Won't make its collection", late.Number, new IdempotencyKey("key-cancel"), new CorrelationId("corr-cancel"), Samples.Now.AddDays(5));
+        _carrierBookings.ListAsync(Arg.Any<CarrierBookingsByShipmentSpec>(), Arg.Any<CancellationToken>()).Returns([booking]);
+        shipment.Record(
+            new TrackingReport(TrackingSource.Carrier(VanDijk), "evt-col", "VDT-1", null, TrackingEventType.Collected, Samples.Now, new TrackingLocation("Rotterdam", "3011 AA", "NL"), null, null),
+            new CorrelationId("corr-col"), Samples.Now);
+        shipment.AgreeDeliveryWindow(new TimeWindow(Samples.Now.AddDays(6), Samples.Now.AddDays(7)), late.Number, new IdempotencyKey("key-window"), new CorrelationId("corr-window"), Samples.Now.AddDays(5));
+
+        var result = await TimelineHandler().Handle(new GetTrackingTimelineQuery("SH-0000012"), CancellationToken.None);
+
+        result.Value.Exceptions.Single().CarrierBookingCancellations.Should().ContainSingle().Which.Should().Be(
+            new CarrierBookingCancellationView(booking.Number.Value, "Won't make its collection", Samples.Now.AddDays(5), false, null));
+        result.Value.AgreedDeliveryWindows.Should().ContainSingle().Which.Should().Be(
+            new AgreedDeliveryWindowView(Samples.Now.AddDays(6), Samples.Now.AddDays(7), "EX-0000006", Samples.Now.AddDays(5)));
     }
 
     [Theory]
@@ -261,9 +342,9 @@ public sealed class TrackingQueriesTests
         result.Status.Should().Be(ResultStatus.NotFound);
     }
 
-    private ListShipmentsInProgressHandler InProgressHandler() => new(_shipments, _events, _orders, _proofsOfDelivery, _carriers, new ShipmentStaleRules(TimeSpan.FromHours(2), TimeSpan.FromHours(24), TimeSpan.FromHours(2)), _time);
+    private ListShipmentsInProgressHandler InProgressHandler() => new(_shipments, _events, _orders, _proofsOfDelivery, _exceptions, _carriers, new ShipmentStaleRules(TimeSpan.FromHours(2), TimeSpan.FromHours(24), TimeSpan.FromHours(2)), _time);
 
-    private GetTrackingTimelineHandler TimelineHandler() => new(_shipments, _events, _proofsOfDelivery);
+    private GetTrackingTimelineHandler TimelineHandler() => new(_shipments, _events, _proofsOfDelivery, _exceptions, _notifications, _carrierBookings);
 
     private static TrackingEvent Report(
         Shipment shipment, TrackingEventType type, string id, DateTimeOffset eventTime, DateTimeOffset receivedAt, DateTimeOffset? eta) =>

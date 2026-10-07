@@ -2,6 +2,8 @@ using Ardalis.Result;
 using Mediator;
 using Microsoft.Extensions.DependencyInjection;
 using Norvia.Tms.Application.Carriers.ListActive;
+using Norvia.Tms.Application.Exceptions.ListOpen;
+using Norvia.Tms.Application.Exceptions.ShipperNotificationTemplate;
 using Norvia.Tms.Application.ProofsOfDelivery.ListMissing;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shipments.GetByNumber;
@@ -74,9 +76,52 @@ public sealed class TransportOrderQueriesTests : IDisposable
     }
 
     [Fact]
+    public async Task ListOpenExceptionsAsync_ReturnsWhatTheQueryGives()
+    {
+        IReadOnlyList<OpenExceptionSummary> open = [];
+        _mediator.Send(new ListOpenExceptionsQuery(), Arg.Any<CancellationToken>()).Returns(open);
+
+        var exceptions = await _queries.ListOpenExceptionsAsync(Xunit.TestContext.Current.CancellationToken);
+
+        exceptions.Should().BeSameAs(open);
+    }
+
+    [Fact]
+    public async Task FindShipperNotificationTemplateAsync_AKnownException_ReturnsItsMessage()
+    {
+        _mediator.Send(new ShipperNotificationTemplateQuery("EX-0000005"), Arg.Any<CancellationToken>())
+            .Returns(Result.Success(new ShipperNotificationTemplateResult("EX-0000005", "Your delivery failed.")));
+
+        var message = await _queries.FindShipperNotificationTemplateAsync("EX-0000005", Xunit.TestContext.Current.CancellationToken);
+
+        message.Should().Be("Your delivery failed.");
+    }
+
+    [Fact]
+    public async Task FindShipperNotificationTemplateAsync_AnUnknownException_ReturnsNull()
+    {
+        _mediator.Send(new ShipperNotificationTemplateQuery("EX-0000999"), Arg.Any<CancellationToken>())
+            .Returns(Result<ShipperNotificationTemplateResult>.Invalid(new ValidationError("Exception", "There is no Exception EX-0000999.", "ExceptionNotFound", ValidationSeverity.Error)));
+
+        var message = await _queries.FindShipperNotificationTemplateAsync("EX-0000999", Xunit.TestContext.Current.CancellationToken);
+
+        message.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task FindShipperNotificationTemplateAsync_AnyOtherFailure_Throws()
+    {
+        _mediator.Send(new ShipperNotificationTemplateQuery("EX-0000005"), Arg.Any<CancellationToken>()).Returns(Result<ShipperNotificationTemplateResult>.Error("boom"));
+
+        var find = () => _queries.FindShipperNotificationTemplateAsync("EX-0000005", Xunit.TestContext.Current.CancellationToken);
+
+        await find.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
     public async Task FindTrackingTimelineAsync_AKnownShipment_ReturnsItsTimeline()
     {
-        var timeline = new ShipmentTimeline([], []);
+        var timeline = new ShipmentTimeline([], [], [], []);
         _mediator.Send(new GetTrackingTimelineQuery("SH-0000012"), Arg.Any<CancellationToken>()).Returns(Result.Success(timeline));
 
         var found = await _queries.FindTrackingTimelineAsync("SH-0000012", Xunit.TestContext.Current.CancellationToken);

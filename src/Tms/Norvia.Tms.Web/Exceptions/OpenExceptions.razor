@@ -1,0 +1,115 @@
+@page "/exceptions"
+@rendermode InteractiveServer
+@using Microsoft.Extensions.Options
+@using Norvia.Tms.Application.Exceptions.ListOpen
+@using Norvia.Tms.Web.TransportOrders
+@implements IAsyncDisposable
+@inject ITransportOrderQueries Queries
+@inject TimeProvider Time
+@inject IOptions<LiveListOptions> Options
+@inject ILogger<LiveTransportOrderList<OpenExceptionSummary>> Logger
+
+<PageTitle>Open Exceptions · Norvia TMS</PageTitle>
+
+<h1>Open Exceptions</h1>
+
+@if (_done is { } done)
+{
+    <div role="status" class="mb-4">
+        <FluentMessageBar Intent="MessageIntent.Success" AllowDismiss="false">@done</FluentMessageBar>
+    </div>
+}
+
+@if (_action is var (number, kind) && _list.Items?.FirstOrDefault(exception => exception.ExceptionNumber == number) is { } acting)
+{
+    @* Keyed by the Exception and the action, so a new choice starts a new form. *@
+    <ExceptionActionPanel @key="(number, kind)" OpenException="acting" Kind="kind" OnClosed="CloseAction" OnDone="Done" />
+}
+
+<LiveListStates Items="_list.Items" LastReadFailed="_list.LastReadFailed" Name="Open Exceptions"
+                Empty="No Exceptions are open. One opens when a Carrier reports a failed collection, a failed delivery or damage, when a Proof of delivery comes with reservations, or when a Shipment will be late." Context="exceptions">
+    @* Oldest first, as the query gives them: what has waited longest needs the Planner first. Only the actions that are allowed are offered. *@
+    <FluentDataGrid Items="exceptions.AsQueryable()" TGridItem="OpenExceptionSummary" Class="flatly-table" aria-label="Open Exceptions"
+                    GridTemplateColumns="1fr 1fr 1.2fr 1.2fr 1.1fr 1.4fr auto 1.2fr 1.1fr 1.8fr 1.6fr" MultiLine="true">
+        <PropertyColumn Title="Exception" Property="@(exception => exception.ExceptionNumber)" />
+        <TemplateColumn Title="Shipment">
+            <a href="/shipments/@context.ShipmentNumber">@context.ShipmentNumber</a>
+        </TemplateColumn>
+        <PropertyColumn Title="Shipper" Property="@(exception => exception.Shipper.Name ?? exception.Shipper.Id)" />
+        <PropertyColumn Title="Carried by" Property="@(exception => PlanningText.CarriedBy(exception.CarriedBy))" />
+        <PropertyColumn Title="Type" Property="@(exception => ExceptionText.Type(exception.Type))" />
+        <PropertyColumn Title="Opened" Property="@(exception => NorviaTime.Format(exception.OpenedAt))" />
+        <PropertyColumn Title="Causes" Property="@(exception => exception.NumberOfCauses)" />
+        <TemplateColumn Title="Markers">
+            @if (context.CauseCleared)
+            {
+                <strong class="block">@ExceptionText.CauseCleared</strong>
+            }
+            @if (context.AfterDelivered)
+            {
+                <strong class="block">@ExceptionText.AfterDelivered</strong>
+            }
+        </TemplateColumn>
+        <PropertyColumn Title="Shipper notification" Property="@(exception => ExceptionText.LastNotification(exception))" />
+        <TemplateColumn Title="Notes">
+            <ul class="m-0 list-none space-y-1 p-0">
+                @foreach (var note in context.Notes)
+                {
+                    <li>@note.Text <span class="text-muted">(@note.Planner)</span></li>
+                }
+            </ul>
+        </TemplateColumn>
+        <TemplateColumn Title="Actions">
+            <div class="flex flex-col items-start gap-2">
+                <FluentButton Appearance="Appearance.Outline" OnClick="() => Choose(context, ExceptionActionKind.NotifyShipper)"
+                              aria-label="@($"Notify Shipper of {context.ExceptionNumber}")">Notify Shipper</FluentButton>
+                @if (context.CanCancelCarrierBooking)
+                {
+                    <FluentButton Appearance="Appearance.Outline" OnClick="() => Choose(context, ExceptionActionKind.CancelCarrierBooking)"
+                                  aria-label="@($"Cancel Carrier booking of {context.ExceptionNumber}")">Cancel Carrier booking</FluentButton>
+                }
+                @if (context.CanAgreeDeliveryWindow)
+                {
+                    <FluentButton Appearance="Appearance.Outline" OnClick="() => Choose(context, ExceptionActionKind.AgreeDeliveryWindow)"
+                                  aria-label="@($"Agree delivery window for {context.ExceptionNumber}")">Agree delivery window</FluentButton>
+                }
+                <FluentButton Appearance="Appearance.Outline" OnClick="() => Choose(context, ExceptionActionKind.AddNote)"
+                              aria-label="@($"Add note to {context.ExceptionNumber}")">Add note</FluentButton>
+                <FluentButton Appearance="Appearance.Outline" OnClick="() => Choose(context, ExceptionActionKind.Resolve)"
+                              aria-label="@($"Resolve {context.ExceptionNumber}")">Resolve</FluentButton>
+                <a href="/shipments/@context.ShipmentNumber" aria-label="@($"Open timeline of {context.ExceptionNumber}")">Open timeline</a>
+            </div>
+        </TemplateColumn>
+    </FluentDataGrid>
+</LiveListStates>
+
+@code {
+    private LiveTransportOrderList<OpenExceptionSummary> _list = null!;
+    private (string Number, ExceptionActionKind Kind)? _action;
+    private string? _done;
+
+    protected override void OnInitialized()
+    {
+        _list = new LiveTransportOrderList<OpenExceptionSummary>(
+            Queries.ListOpenExceptionsAsync, "the Open Exceptions", Time, Options.Value.RefreshInterval, Logger);
+        _list.Changed += () => InvokeAsync(StateHasChanged);
+        _list.Start();
+    }
+
+    private void Choose(OpenExceptionSummary exception, ExceptionActionKind kind)
+    {
+        _done = null;
+        _action = (exception.ExceptionNumber, kind);
+    }
+
+    private void CloseAction() => _action = null;
+
+    // The list isn't changed here: it reads again shortly, and then shows what the action did, such as a resolved Exception gone.
+    private void Done(string text)
+    {
+        _action = null;
+        _done = text;
+    }
+
+    public async ValueTask DisposeAsync() => await _list.DisposeAsync();
+}

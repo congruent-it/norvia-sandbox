@@ -1,4 +1,6 @@
+@using Norvia.Tms.Application.Exceptions.Timeline
 @using Norvia.Tms.Application.ProofsOfDelivery.Read
+@using Norvia.Tms.Web.Exceptions
 @using Norvia.Tms.Application.TrackingEvents.Timeline
 @using Norvia.Tms.Web.TransportOrders
 @implements IDisposable
@@ -67,6 +69,80 @@
                         </li>
                     }
                 </ul>
+            </TemplateColumn>
+        </FluentDataGrid>
+    }
+</TransportOrderSection>
+
+<TransportOrderSection Heading="Exceptions">
+    @if (_failed)
+    {
+        <p class="!mb-0" role="status">The Exceptions couldn't be loaded either.</p>
+    }
+    else if (_timeline is null)
+    {
+        <p class="!mb-0" role="status">Loading the Exceptions…</p>
+    }
+    else if (_timeline.Exceptions.Count == 0)
+    {
+        <p class="!mb-0" role="status">No Exception has been opened for this Shipment.</p>
+    }
+    else
+    {
+        @* Each Exception with its causes, what the Planner did about it, its Shipper notifications and its outcome, in the order they happened. *@
+        <div class="flex flex-col gap-6">
+            @foreach (var exception in _timeline.Exceptions)
+            {
+                <article aria-label="@($"Exception {exception.ExceptionNumber}")">
+                    <h3 class="!mb-2 !text-base">
+                        @exception.ExceptionNumber · @ExceptionText.Type(exception.Type) · @exception.Status
+                        @if (exception.CauseCleared)
+                        {
+                            <strong> · @ExceptionText.CauseCleared</strong>
+                        }
+                        @if (exception.AfterDelivered)
+                        {
+                            <strong> · @ExceptionText.AfterDelivered</strong>
+                        }
+                    </h3>
+                    <FluentDataGrid Items="ExceptionStory.Of(exception).AsQueryable()" TGridItem="ExceptionHappening" Class="flatly-table" aria-label="@($"Story of {exception.ExceptionNumber}")"
+                                    GridTemplateColumns="1.4fr 2fr 4fr" MultiLine="true">
+                        <PropertyColumn Title="When" Property="@(happening => NorviaTime.Format(happening.When))" />
+                        <PropertyColumn Title="What" Property="@(happening => happening.What)" />
+                        <PropertyColumn Title="Detail" Property="@(happening => happening.Detail)" />
+                    </FluentDataGrid>
+                </article>
+            }
+        </div>
+    }
+</TransportOrderSection>
+
+<TransportOrderSection Heading="Agreed delivery windows">
+    @if (_failed)
+    {
+        <p class="!mb-0" role="status">The agreed delivery windows couldn't be loaded either.</p>
+    }
+    else if (_timeline is null)
+    {
+        <p class="!mb-0" role="status">Loading the agreed delivery windows…</p>
+    }
+    else if (_timeline.AgreedDeliveryWindows.Count == 0)
+    {
+        <p class="!mb-0" role="status">No delivery window has been agreed for this Shipment: the Transport Order's counts.</p>
+    }
+    else
+    {
+        @* The last one counts, and the earlier ones are kept. *@
+        <FluentDataGrid Items="_timeline.AgreedDeliveryWindows.AsQueryable()" TGridItem="AgreedDeliveryWindowView" Class="flatly-table" aria-label="Agreed delivery windows"
+                        GridTemplateColumns="2fr 1.4fr 1.4fr 1fr" MultiLine="true">
+            <PropertyColumn Title="Window" Property="@(agreed => NorviaTime.FormatWindow(agreed.Earliest, agreed.Latest))" />
+            <PropertyColumn Title="Agreed" Property="@(agreed => NorviaTime.Format(agreed.AgreedAt))" />
+            <PropertyColumn Title="From Exception" Property="@(agreed => agreed.ExceptionNumber)" />
+            <TemplateColumn Title="Counts">
+                @if (context == _timeline.AgreedDeliveryWindows[^1])
+                {
+                    <strong>Current</strong>
+                }
             </TemplateColumn>
         </FluentDataGrid>
     }

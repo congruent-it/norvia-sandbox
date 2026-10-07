@@ -29,7 +29,7 @@ public sealed class ShipmentsInProgressTests : TmsWebContext
         var page = Render<ShipmentsInProgress>();
 
         page.WaitForAssertion(() => CellsOf(page, "SH-0000012").Should().Equal(
-            "SH-0000012", "Kessler Spedition", "Collected", "Collected, Sat 26 Sep 2026, 06:00, Rotterdam, 3011 AA, NL", "Sun 27 Sep 2026, 12:00", "", ""));
+            "SH-0000012", "Kessler Spedition", "Collected", "Collected, Sat 26 Sep 2026, 06:00, Rotterdam, 3011 AA, NL", "Sun 27 Sep 2026, 12:00", "", "", ""));
         page.Find("a[href='/shipments/SH-0000012']");
     }
 
@@ -41,7 +41,7 @@ public sealed class ShipmentsInProgressTests : TmsWebContext
 
         var page = Render<ShipmentsInProgress>();
 
-        page.WaitForAssertion(() => CellsOf(page, "SH-0000012").Skip(2).Should().Equal("Booked", "None yet", "Not given", "", ""));
+        page.WaitForAssertion(() => CellsOf(page, "SH-0000012").Skip(2).Should().Equal("Booked", "None yet", "Not given", "", "", ""));
     }
 
     [Fact]
@@ -162,6 +162,21 @@ public sealed class ShipmentsInProgressTests : TmsWebContext
         page.FindAll("[role=alert]").Should().BeEmpty();
     }
 
+    [Fact]
+    public void Render_AShipmentWithAnOpenException_MarksIt_AndOneWithoutDoesNot()
+    {
+        Queries.ListShipmentsInProgressAsync(Arg.Any<CancellationToken>())
+            .Returns([Collected("SH-0000012") with { HasOpenException = true }, Collected("SH-0000013")]);
+
+        var page = Render<ShipmentsInProgress>();
+
+        page.WaitForAssertion(() =>
+        {
+            CellsOf(page, "SH-0000012")[^1].Should().Be("Open Exception");
+            CellsOf(page, "SH-0000013")[^1].Should().BeEmpty();
+        });
+    }
+
     // Collected at 06:00 on 26 September 2026 in Rotterdam (UTC+2), carried by Kessler Spedition, expected the next day at 12:00.
     private static ShipmentInProgressSummary Collected(string number) => new(
         number,
@@ -169,6 +184,7 @@ public sealed class ShipmentsInProgressTests : TmsWebContext
         ShipmentStatus.Collected,
         new LastTrackingEventView(TrackingEventType.Collected, new DateTimeOffset(2026, 9, 26, 4, 0, 0, TimeSpan.Zero), "Rotterdam", "3011 AA", "NL"),
         new DateTimeOffset(2026, 9, 27, 10, 0, 0, TimeSpan.Zero),
+        false,
         false,
         false);
 

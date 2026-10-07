@@ -1,6 +1,9 @@
 using AngleSharp.Dom;
 using Norvia.Tms.Application.ProofsOfDelivery.Read;
+using Norvia.Tms.Application.Exceptions.Timeline;
 using Norvia.Tms.Application.TrackingEvents.Timeline;
+using Norvia.Tms.Domain.Exceptions;
+using Norvia.Tms.Domain.ShipperNotifications;
 using Norvia.Tms.Domain.ProofsOfDelivery;
 using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Web.Shipments;
@@ -17,7 +20,7 @@ public sealed class TrackingTimelineTests : TmsWebContext
         [
             Entry(TrackingEventType.Collected, new DateTimeOffset(2026, 9, 26, 6, 0, 0, TimeSpan.Zero), moved: true),
             Entry(TrackingEventType.Damaged, new DateTimeOffset(2026, 9, 26, 7, 0, 0, TimeSpan.Zero), moved: false) with { Remark = "Pallet dented" },
-        ], []));
+        ], [], [], []));
 
         var page = RenderTimeline("SH-0000012");
 
@@ -29,7 +32,7 @@ public sealed class TrackingTimelineTests : TmsWebContext
     [Fact]
     public void Render_AShipmentNoCarrierHasReportedOn_SaysSoInsteadOfAnEmptyTable()
     {
-        Queries.FindTrackingTimelineAsync("SH-0000012", Arg.Any<CancellationToken>()).Returns(new ShipmentTimeline([], []));
+        Queries.FindTrackingTimelineAsync("SH-0000012", Arg.Any<CancellationToken>()).Returns(new ShipmentTimeline([], [], [], []));
 
         var page = RenderTimeline("SH-0000012");
 
@@ -58,7 +61,7 @@ public sealed class TrackingTimelineTests : TmsWebContext
                 Remark = "Two cartons crushed",
                 Files = [new ProofOfDeliveryFileView(FileId, "cmr.pdf", "application/pdf", 48 * 1024)],
             },
-        ]));
+        ], [], []));
 
         var page = RenderTimeline("SH-0000012");
 
@@ -78,7 +81,7 @@ public sealed class TrackingTimelineTests : TmsWebContext
         [
             Proof(current: false) with { ReceivedBy = "A. Jansen" },
             Proof(current: true),
-        ]));
+        ], [], []));
 
         var page = RenderTimeline("SH-0000012");
 
@@ -91,11 +94,75 @@ public sealed class TrackingTimelineTests : TmsWebContext
     [Fact]
     public void Render_AShipmentWithNoProofOfDelivery_SaysSoInsteadOfAnEmptyTable()
     {
-        Queries.FindTrackingTimelineAsync("SH-0000012", Arg.Any<CancellationToken>()).Returns(new ShipmentTimeline([Entry(TrackingEventType.Collected, new DateTimeOffset(2026, 9, 26, 6, 0, 0, TimeSpan.Zero), moved: true)], []));
+        Queries.FindTrackingTimelineAsync("SH-0000012", Arg.Any<CancellationToken>()).Returns(new ShipmentTimeline([Entry(TrackingEventType.Collected, new DateTimeOffset(2026, 9, 26, 6, 0, 0, TimeSpan.Zero), moved: true)], [], [], []));
 
         var page = RenderTimeline("SH-0000012");
 
         page.WaitForAssertion(() => page.Find("section[aria-labelledby='section-proofs-of-delivery']").TextContent.Should().Contain("No Proof of delivery has been received for this Shipment."));
+    }
+
+    [Fact]
+    public void Render_AShipmentWithNoExceptionOrAgreedWindow_SaysSoInEachSection()
+    {
+        Queries.FindTrackingTimelineAsync("SH-0000012", Arg.Any<CancellationToken>()).Returns(new ShipmentTimeline([], [], [], []));
+
+        var page = RenderTimeline("SH-0000012");
+
+        page.WaitForAssertion(() =>
+        {
+            page.Find("section[aria-labelledby='section-exceptions']").TextContent.Should().Contain("No Exception has been opened for this Shipment.");
+            page.Find("section[aria-labelledby='section-agreed-delivery-windows']").TextContent.Should().Contain("No delivery window has been agreed for this Shipment");
+        });
+    }
+
+    [Fact]
+    public void Render_AnExceptionOnTheTimeline_ShowsItsMarkersCausesNotesNotificationsAndOutcome()
+    {
+        var opened = new DateTimeOffset(2026, 9, 24, 9, 45, 0, TimeSpan.Zero);
+        Queries.FindTrackingTimelineAsync("SH-0000012", Arg.Any<CancellationToken>()).Returns(new ShipmentTimeline([], [],
+        [
+            new ExceptionTimelineEntry(
+                "EX-0000005", ExceptionType.DeliveryFailed, ExceptionStatus.Resolved, opened, true, true,
+                [new ExceptionCauseView(ExceptionCauseKind.TrackingEvent, "evt-ndl", opened)],
+                [new ExceptionNoteView("Phoned Kessler", "Anna de Vries", opened.AddHours(1))],
+                [new ShipperNotificationView("Your delivery failed.", "Anna de Vries", ShipperNotificationStatus.Sent, opened.AddHours(2), opened.AddHours(2), null)],
+                [],
+                ExceptionOutcome.Redelivered, "Delivered Thursday", opened.AddHours(3)),
+            new ExceptionTimelineEntry("EX-0000006", ExceptionType.LateDelivery, ExceptionStatus.Open, opened, false, false, [], [], [], [], null, null, null),
+        ], []));
+
+        var page = RenderTimeline("SH-0000012");
+
+        page.WaitForAssertion(() =>
+        {
+            var resolved = page.Find("article[aria-label='Exception EX-0000005']");
+            resolved.QuerySelector("h3")!.TextContent.Should().Contain("EX-0000005").And.Contain("Delivery failed").And.Contain("Resolved")
+                .And.Contain("Cause cleared").And.Contain("After Delivered");
+            resolved.QuerySelectorAll("tbody tr").Select(row => string.Join(" | ", row.QuerySelectorAll("td").Select(cell => cell.TextContent.Trim()))).Should().Equal(
+                "Thu 24 Sep 2026, 11:45 | Cause: Tracking event | Reported as evt-ndl",
+                "Thu 24 Sep 2026, 12:45 | Note by Anna de Vries | Phoned Kessler",
+                "Thu 24 Sep 2026, 13:45 | Shipper notification sent (by Anna de Vries) | Your delivery failed.",
+                "Thu 24 Sep 2026, 14:45 | Resolved: Redelivered | Delivered Thursday");
+            page.Find("article[aria-label='Exception EX-0000006'] h3").TextContent.Should().Contain("Open").And.NotContain("Cause cleared");
+        });
+    }
+
+    [Fact]
+    public void Render_TheAgreedDeliveryWindows_ShowEachWithTheLastCounting()
+    {
+        var agreed = new DateTimeOffset(2026, 9, 24, 9, 45, 0, TimeSpan.Zero);
+        Queries.FindTrackingTimelineAsync("SH-0000012", Arg.Any<CancellationToken>()).Returns(new ShipmentTimeline([], [], [],
+        [
+            new AgreedDeliveryWindowView(agreed.AddDays(1), agreed.AddDays(1).AddHours(4), "EX-0000005", agreed),
+            new AgreedDeliveryWindowView(agreed.AddDays(2), agreed.AddDays(2).AddHours(4), "EX-0000005", agreed.AddHours(1)),
+        ]));
+
+        var page = RenderTimeline("SH-0000012");
+
+        page.WaitForAssertion(() => page.Find("section[aria-labelledby='section-agreed-delivery-windows']").QuerySelectorAll("tbody tr")
+            .Select(row => string.Join(" | ", row.QuerySelectorAll("td").Select(cell => cell.TextContent.Trim()))).Should().Equal(
+                "Fri 25 Sep 2026, 11:45–15:45 | Thu 24 Sep 2026, 11:45 | EX-0000005 | ",
+                "Sat 26 Sep 2026, 11:45–15:45 | Thu 24 Sep 2026, 12:45 | EX-0000005 | Current"));
     }
 
     private static readonly Guid FileId = Guid.Parse("6f1c2f55-4a3f-4a38-9a54-2b7a1f0f7a11");

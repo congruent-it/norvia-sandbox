@@ -1,3 +1,4 @@
+using Norvia.Tms.Application.Exceptions.ListOpen;
 using Norvia.Tms.Application.ProofsOfDelivery.ListMissing;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shipments.ListAwaitingAnswer;
@@ -52,4 +53,10 @@ public interface ITransportOrderQueries
 
     /// <summary>The Shipment's Tracking events in event-time order and its Proofs of delivery, or null when there is no such Shipment.</summary>
     Task<ShipmentTimeline?> FindTrackingTimelineAsync(string shipmentNumber, CancellationToken cancellationToken);
+
+    /// <summary>The Planner's Open Exceptions (P7), oldest first.</summary>
+    Task<IReadOnlyList<OpenExceptionSummary>> ListOpenExceptionsAsync(CancellationToken cancellationToken);
+
+    /// <summary>The message Notify Shipper starts with for the type of this Exception, or null when there is no such Exception.</summary>
+    Task<string?> FindShipperNotificationTemplateAsync(string exceptionNumber, CancellationToken cancellationToken);
 }

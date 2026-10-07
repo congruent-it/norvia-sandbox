@@ -1,14 +1,24 @@
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Mediator;
+using Norvia.Tms.Application.Exceptions.Timeline;
 using Norvia.Tms.Application.ProofsOfDelivery.Read;
+using Norvia.Tms.Domain.CarrierBookings;
+using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Domain.ProofsOfDelivery;
 using Norvia.Tms.Domain.Shipments;
+using Norvia.Tms.Domain.ShipperNotifications;
 using Norvia.Tms.Domain.TrackingEvents;
 
 namespace Norvia.Tms.Application.TrackingEvents.Timeline;
 
-public sealed class GetTrackingTimelineHandler(IReadRepository<Shipment> shipments, IReadRepository<TrackingEvent> trackingEvents, IReadRepository<ProofOfDelivery> proofsOfDelivery)
+public sealed class GetTrackingTimelineHandler(
+    IReadRepository<Shipment> shipments,
+    IReadRepository<TrackingEvent> trackingEvents,
+    IReadRepository<ProofOfDelivery> proofsOfDelivery,
+    IReadRepository<ExceptionCase> exceptions,
+    IReadRepository<ShipperNotification> notifications,
+    IReadRepository<CarrierBooking> carrierBookings)
     : IQueryHandler<GetTrackingTimelineQuery, Result<ShipmentTimeline>>
 {
     public async ValueTask<Result<ShipmentTimeline>> Handle(GetTrackingTimelineQuery query, CancellationToken cancellationToken)
@@ -28,6 +38,17 @@ public sealed class GetTrackingTimelineHandler(IReadRepository<Shipment> shipmen
 
         var events = await trackingEvents.ListAsync(new TrackingTimelineSpec(shipment.Id), cancellationToken);
         var proofs = await proofsOfDelivery.ListAsync(new ProofsOfDeliveryForShipmentSpec(shipment.Id), cancellationToken);
-        return new ShipmentTimeline([.. events.Select(TrackingTimelineEntry.Of)], [.. proofs.Select(ProofOfDeliveryView.Of)]);
+        var shipmentExceptions = await exceptions.ListAsync(new ExceptionsOfShipmentSpec(shipment.Id), cancellationToken);
+        var shipperNotifications = shipmentExceptions.Count == 0
+            ? []
+            : await notifications.ListAsync(new ShipperNotificationsOfExceptionsSpec([.. shipmentExceptions.Select(exception => exception.Id)]), cancellationToken);
+        var cancelledBookings = shipmentExceptions.Count == 0
+            ? []
+            : (await carrierBookings.ListAsync(new CarrierBookingsByShipmentSpec(shipment.Id), cancellationToken)).Where(booking => booking.CancelledAt is not null).ToList();
+        return new ShipmentTimeline(
+            [.. events.Select(TrackingTimelineEntry.Of)],
+            [.. proofs.Select(ProofOfDeliveryView.Of)],
+            [.. shipmentExceptions.Select(exception => ExceptionTimelineEntry.Of(exception, shipperNotifications, cancelledBookings))],
+            [.. shipment.AgreedDeliveryWindows.Select(AgreedDeliveryWindowView.Of)]);
     }
 }
