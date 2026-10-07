@@ -77,7 +77,7 @@ public sealed class ListTransportOrdersNotYetBillableHandler(
             reasons.Add(BillingBlockingReason.NotRated);
         }
 
-        if (!withProof.Contains(shipmentId))
+        if (!order.ReleasedWithoutProofOfDelivery && !withProof.Contains(shipmentId))
         {
             reasons.Add(BillingBlockingReason.NoProofOfDelivery);
         }

@@ -107,6 +107,16 @@ public sealed class ListTransportOrdersNotYetBillableHandlerTests
     }
 
     [Fact]
+    public async Task Handle_AnOrderReleasedWithoutAProofOfDelivery_NoLongerShowsNoProofOfDelivery()
+    {
+        var order = Samples.RatingFailedOrder(sequence: 7);
+        typeof(TransportOrder).GetProperty(nameof(TransportOrder.ReleasedWithoutProofOfDelivery))!.SetValue(order, true);
+        Delivered(order, shipmentSequence: 12, DeliveredAt);
+
+        (await Handle()).Single().BlockingReasons.Should().Equal(BillingBlockingReason.NotRated);
+    }
+
+    [Fact]
     public async Task Handle_PutsTheOldestDeliveryFirst_AndAnOrderWhoseShipmentIsNotDeliveredIsLeftOut()
     {
         Delivered(Samples.RatedOrder(sequence: 7), shipmentSequence: 12, DeliveredAt.AddHours(5));

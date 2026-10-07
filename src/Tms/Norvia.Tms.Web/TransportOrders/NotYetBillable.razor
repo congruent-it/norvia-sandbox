@@ -24,7 +24,7 @@
         <PropertyColumn Title="Shipper reference" Property="@(order => SubmittedTransportOrder.Given(order.ShipperReference))" />
         <PropertyColumn Title="Delivered" Property="@(order => NorviaTime.Format(order.DeliveredAt))" />
         <PropertyColumn Title="Blocking reasons" Property="@(order => string.Join(", ", order.BlockingReasons.Select(BillingText.Reason)))" />
-        <TemplateColumn Title="Timeline">
+        <TemplateColumn Title="Shipment">
             <a href="/shipments/@context.ShipmentNumber">@context.ShipmentNumber</a>
         </TemplateColumn>
     </FluentDataGrid>
