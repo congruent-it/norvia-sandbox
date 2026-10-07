@@ -61,23 +61,24 @@ public sealed class CarrierCancellationSampleTests
         results.IsValid.Should().BeTrue(Schemas.Errors(results));
     }
 
-    [Fact]
-    public void Validate_ACancelledWithoutAReferenceOrReason_BreaksTheCarrierCancellationSchema()
+    [Theory]
+    [InlineData("carrierBookingReference")]
+    [InlineData("reasonText")]
+    public void Validate_ACancelledWithoutAReferenceOrReason_BreaksTheCarrierCancellationSchema(string name)
     {
-        foreach (var name in new[] { "carrierBookingReference", "reasonText" })
-        {
-            var cancellation = JsonNode.Parse(Contracts.Read($"{Folder}/cancelled{Suffix}"))!.AsObject();
-            cancellation.Remove(name);
+        var cancellation = JsonNode.Parse(Contracts.Read($"{Folder}/cancelled{Suffix}"))!.AsObject();
+        cancellation.Remove(name);
 
-            Schemas.CarrierCancellation.Validate(cancellation).IsValid.Should().BeFalse(name);
-        }
+        Schemas.CarrierCancellation.Validate(cancellation).IsValid.Should().BeFalse();
     }
 
-    [Fact]
-    public void Validate_AWithdrawnWithAReference_BreaksTheCarrierCancellationSchema()
+    [Theory]
+    [InlineData("carrierBookingReference", "KESSLER-88213")]
+    [InlineData("reasonText", "Taken back.")]
+    public void Validate_AWithdrawnWithAReferenceOrReason_BreaksTheCarrierCancellationSchema(string name, string value)
     {
         var cancellation = JsonNode.Parse(Contracts.Read($"{Folder}/withdrawn{Suffix}"))!.AsObject();
-        cancellation["carrierBookingReference"] = "KESSLER-88213";
+        cancellation[name] = value;
 
         Schemas.CarrierCancellation.Validate(cancellation).IsValid.Should().BeFalse();
     }

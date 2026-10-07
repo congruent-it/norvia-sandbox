@@ -11,9 +11,9 @@
     "carrierBookingReference": { "description": "The Carrier's own number for the booking, given when it confirmed. Only for CANCELLED.", "type": "string", "minLength": 1 },
     "shipmentNumber": { "description": "The Shipment the Carrier booking covered.", "type": "string", "pattern": "^SH-[0-9]{7}$" },
     "kind": { "description": "WITHDRAWN: Norvia took back a request the Carrier hadn't answered. CANCELLED: Norvia ended a booking the Carrier had confirmed.", "enum": ["WITHDRAWN", "CANCELLED"] },
-    "reasonText": { "description": "Why Norvia cancelled. Required for CANCELLED.", "type": "string", "minLength": 1, "maxLength": 500 }
+    "reasonText": { "description": "Why Norvia cancelled. Required for CANCELLED, absent for WITHDRAWN.", "type": "string", "minLength": 1, "maxLength": 500 }
   },
   "if": { "properties": { "kind": { "const": "CANCELLED" } } },
   "then": { "required": ["carrierBookingReference", "reasonText"] },
-  "else": { "not": { "required": ["carrierBookingReference"] } }
+  "else": { "not": { "anyOf": [{ "required": ["carrierBookingReference"] }, { "required": ["reasonText"] }] } }
 }
