@@ -1,6 +1,7 @@
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Mediator;
+using Norvia.Tms.Domain.ProofsOfDelivery;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.Shippers;
 using Norvia.Tms.Domain.ShipperTracking;
@@ -12,7 +13,8 @@ namespace Norvia.Tms.Application.ShipperTracking.GetTransportOrder;
 public sealed class GetShipperTransportOrderHandler(
     IReadRepository<TransportOrder> transportOrders,
     IReadRepository<Shipment> shipments,
-    IReadRepository<TrackingEvent> trackingEvents)
+    IReadRepository<TrackingEvent> trackingEvents,
+    IReadRepository<ProofOfDelivery> proofsOfDelivery)
     : IQueryHandler<GetShipperTransportOrderQuery, Result<ShipperTransportOrderDetail>>
 {
     public async ValueTask<Result<ShipperTransportOrderDetail>> Handle(GetShipperTransportOrderQuery query, CancellationToken cancellationToken)
@@ -28,6 +30,6 @@ public sealed class GetShipperTransportOrderHandler(
         var order = await transportOrders.FirstOrDefaultAsync(new ShipperTransportOrderByNumberSpec(new ShipperId(query.ShipperId), number), cancellationToken);
         return order is null
             ? notFound
-            : await ShipperTransportOrderDetailProjection.ProjectAsync(order, shipments, trackingEvents, cancellationToken);
+            : await ShipperTransportOrderDetailProjection.ProjectAsync(order, shipments, trackingEvents, proofsOfDelivery, cancellationToken);
     }
 }

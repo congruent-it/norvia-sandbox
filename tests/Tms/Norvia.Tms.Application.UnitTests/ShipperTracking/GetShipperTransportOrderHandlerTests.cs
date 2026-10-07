@@ -5,6 +5,7 @@ using Norvia.Tms.Application.UnitTests.TransportOrders;
 using Norvia.Tms.Domain.Carriers;
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Exceptions;
+using Norvia.Tms.Domain.ProofsOfDelivery;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.ShipperTracking;
 using Norvia.Tms.Domain.TrackingEvents;
@@ -21,6 +22,7 @@ public sealed class GetShipperTransportOrderHandlerTests
     private readonly IReadRepository<TransportOrder> _orders = Substitute.For<IReadRepository<TransportOrder>>();
     private readonly IReadRepository<Shipment> _shipments = Substitute.For<IReadRepository<Shipment>>();
     private readonly IReadRepository<TrackingEvent> _events = Substitute.For<IReadRepository<TrackingEvent>>();
+    private readonly IReadRepository<ProofOfDelivery> _proofs = Substitute.For<IReadRepository<ProofOfDelivery>>();
     private readonly List<Shipment> _allShipments = [];
     private readonly List<TrackingEvent> _allEvents = [];
 
@@ -89,6 +91,29 @@ public sealed class GetShipperTransportOrderHandlerTests
         detail.Eta.Should().Be(agreed.Latest);
     }
 
+    [Fact]
+    public async Task Get_ShowsTheCurrentProofOfDeliveryWithItsFiles_AndNoneWhenThereIsNone()
+    {
+        var order = Samples.AcceptedOrder(sequence: 7);
+        var shipment = Booked(order);
+        GivenOrder(order);
+        var before = (await GetHandler().Handle(new GetShipperTransportOrderQuery("SHP-0001", "TO-0000007"), CancellationToken.None)).Value;
+        var proof = ProofOfDelivery.Record(
+            shipment,
+            new ProofOfDeliveryReport(
+                ProofOfDeliverySource.Carrier(new CarrierId("CAR-0001")), "doc-1", "VDT-1", "J. Becker", Samples.Now, new TrackingLocation("Utrecht", "3511 AA", "NL"),
+                DeliveryCondition.Reservations, "One pallet damaged", [new ProofOfDeliveryFile(Guid.Parse("0197a1b2-0000-7000-8000-000000000001"), "cmr.pdf", "application/pdf", 4)]),
+            new CorrelationId("corr-pod"),
+            Samples.Now);
+        _proofs.FirstOrDefaultAsync(Arg.Any<CurrentProofOfDeliverySpec>(), Arg.Any<CancellationToken>()).Returns(proof);
+
+        var after = (await GetHandler().Handle(new GetShipperTransportOrderQuery("SHP-0001", "TO-0000007"), CancellationToken.None)).Value;
+
+        before.ProofOfDelivery.Should().BeNull();
+        after.ProofOfDelivery.Should().BeEquivalentTo(new ShipperProofOfDelivery(
+            "J. Becker", Samples.Now, DeliveryCondition.Reservations, [new ShipperProofOfDeliveryFile(Guid.Parse("0197a1b2-0000-7000-8000-000000000001"), "cmr.pdf", "application/pdf", 4)]));
+    }
+
     [Theory]
     [InlineData("TO-0000099")]
     [InlineData("not-a-number")]
@@ -130,9 +155,9 @@ public sealed class GetShipperTransportOrderHandlerTests
     private void GivenOrder(TransportOrder order) =>
         _orders.FirstOrDefaultAsync(Arg.Any<ShipperTransportOrderByNumberSpec>(), Arg.Any<CancellationToken>()).Returns(order);
 
-    private GetShipperTransportOrderHandler GetHandler() => new(_orders, _shipments, _events);
+    private GetShipperTransportOrderHandler GetHandler() => new(_orders, _shipments, _events, _proofs);
 
-    private FindShipperTransportOrderHandler FindHandler() => new(_orders, _shipments, _events);
+    private FindShipperTransportOrderHandler FindHandler() => new(_orders, _shipments, _events, _proofs);
 
     private Shipment Booked(TransportOrder order)
     {
