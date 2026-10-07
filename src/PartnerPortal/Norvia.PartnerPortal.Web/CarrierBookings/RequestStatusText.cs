@@ -26,6 +26,9 @@ public static class RequestStatusText
             CarrierBookingRequestStatus.Confirmed => Confirmed(request),
             CarrierBookingRequestStatus.Rejected => Rejected(request),
             CarrierBookingRequestStatus.WithdrawnByNorvia => "Withdrawn by Norvia",
+            CarrierBookingRequestStatus.CancelledByNorvia => string.IsNullOrWhiteSpace(request.CancellationText)
+                ? "Cancelled by Norvia"
+                : $"Cancelled by Norvia: {request.CancellationText}",
             _ => throw new ArgumentOutOfRangeException(nameof(request), request.Status, "Every status has words."),
         };
     }

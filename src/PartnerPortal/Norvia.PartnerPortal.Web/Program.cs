@@ -58,6 +58,7 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 app.MapPersonaSwitcher();
 app.MapCarrierBookingEndpoint();
+app.MapCarrierCancellationEndpoint();
 app.MapShipperNotificationEndpoint();
 app.MapDefaultEndpoints();
 

@@ -90,10 +90,19 @@ public sealed class CarrierBookingRequestConfigurationTests
         var entity = context.Model.FindEntityType(typeof(CarrierBookingRequest))!;
 
         entity.FindProperty(nameof(CarrierBookingRequest.Status))!.IsNullable.Should().BeFalse();
-        foreach (var name in new[] { "ClosedAt", "AnswerCorrelationId", "CarrierBookingReference", "PlannedCollection", "RejectionReason", "RejectionText" })
+        foreach (var name in new[] { "ClosedAt", "AnswerCorrelationId", "CarrierBookingReference", "PlannedCollection", "RejectionReason", "RejectionText", "CancellationText", "CancelledAt" })
         {
             entity.FindProperty(name)!.IsNullable.Should().BeTrue(name);
         }
+    }
+
+    [Fact]
+    public void TheCancellationReason_IsKeptUpToTheFormatsLimit()
+    {
+        using var context = NewContext();
+
+        context.Model.FindEntityType(typeof(CarrierBookingRequest))!.FindProperty(nameof(CarrierBookingRequest.CancellationText))!
+            .GetMaxLength().Should().Be(500);
     }
 
     [Fact]

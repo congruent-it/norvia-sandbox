@@ -117,6 +117,13 @@ namespace Norvia.PartnerPortal.Infrastructure.Data.Migrations
                     b.Property<DateTimeOffset?>("AutoProgressDueAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("CancellationText")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTimeOffset?>("CancelledAt")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<string>("CarrierBookingNumber")
                         .IsRequired()
                         .HasMaxLength(50)
