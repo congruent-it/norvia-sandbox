@@ -1,0 +1,45 @@
+@page "/not-yet-billable"
+@rendermode InteractiveServer
+@using Microsoft.Extensions.Options
+@using Norvia.Tms.Application.Billing.ListNotYetBillable
+@implements IAsyncDisposable
+@inject ITransportOrderQueries Queries
+@inject TimeProvider Time
+@inject IOptions<LiveListOptions> Options
+@inject ILogger<LiveTransportOrderList<TransportOrderNotYetBillableSummary>> Logger
+
+<PageTitle>Not yet billable · Norvia TMS</PageTitle>
+
+<h1>Not yet billable</h1>
+
+<LiveListStates Items="_list.Items" LastReadFailed="_list.LastReadFailed" Name="Transport Orders not yet billable"
+                Empty="@("No delivered Transport Order is waiting to become billable. An order appears here once its Shipment is Delivered and something still blocks billing.")" Context="orders">
+    @* Oldest delivery first, as the query gives them: what has waited longest is followed up first. *@
+    <FluentDataGrid Items="orders.AsQueryable()" TGridItem="TransportOrderNotYetBillableSummary" Class="flatly-table" aria-label="Transport Orders not yet billable"
+                    GridTemplateColumns="1.4fr 1.2fr 1.3fr 1.4fr 2.4fr 1.3fr" MultiLine="true">
+        <TemplateColumn Title="Transport Order">
+            <a href="/transport-orders/@context.TransportOrderNumber">@context.TransportOrderNumber</a>
+        </TemplateColumn>
+        <PropertyColumn Title="Shipper" Property="@(order => order.Shipper.Name ?? order.Shipper.Id)" />
+        <PropertyColumn Title="Shipper reference" Property="@(order => SubmittedTransportOrder.Given(order.ShipperReference))" />
+        <PropertyColumn Title="Delivered" Property="@(order => NorviaTime.Format(order.DeliveredAt))" />
+        <PropertyColumn Title="Blocking reasons" Property="@(order => string.Join(", ", order.BlockingReasons.Select(BillingText.Reason)))" />
+        <TemplateColumn Title="Shipment">
+            <a href="/shipments/@context.ShipmentNumber">@context.ShipmentNumber</a>
+        </TemplateColumn>
+    </FluentDataGrid>
+</LiveListStates>
+
+@code {
+    private LiveTransportOrderList<TransportOrderNotYetBillableSummary> _list = null!;
+
+    protected override void OnInitialized()
+    {
+        _list = new LiveTransportOrderList<TransportOrderNotYetBillableSummary>(
+            Queries.ListNotYetBillableAsync, "the Transport Orders not yet billable", Time, Options.Value.RefreshInterval, Logger);
+        _list.Changed += () => InvokeAsync(StateHasChanged);
+        _list.Start();
+    }
+
+    public async ValueTask DisposeAsync() => await _list.DisposeAsync();
+}

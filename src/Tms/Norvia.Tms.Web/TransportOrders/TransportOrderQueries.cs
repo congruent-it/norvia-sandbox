@@ -1,5 +1,6 @@
 using Ardalis.Result;
 using Mediator;
+using Norvia.Tms.Application.Billing.ListNotYetBillable;
 using Norvia.Tms.Application.Carriers.ListActive;
 using Norvia.Tms.Application.Exceptions.ListOpen;
 using Norvia.Tms.Application.Exceptions.ShipperNotificationTemplate;
@@ -35,6 +36,9 @@ internal sealed class TransportOrderQueries(IServiceScopeFactory scopes) : ITran
 
     public Task<IReadOnlyList<RatingExceptionSummary>> ListRatingExceptionsAsync(CancellationToken cancellationToken) =>
         SendAsync(new ListRatingExceptionsQuery(), cancellationToken);
+
+    public Task<IReadOnlyList<TransportOrderNotYetBillableSummary>> ListNotYetBillableAsync(CancellationToken cancellationToken) =>
+        SendAsync(new ListTransportOrdersNotYetBillableQuery(), cancellationToken);
 
     public Task<IReadOnlyList<CarrierView>> ListActiveCarriersAsync(CancellationToken cancellationToken) =>
         SendAsync(new ListActiveCarriersQuery(), cancellationToken);

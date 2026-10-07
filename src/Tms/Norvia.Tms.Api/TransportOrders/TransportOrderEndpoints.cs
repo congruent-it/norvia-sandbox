@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Norvia.Tms.Api.Shipments;
 using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Application.CanonicalModel;
+using Norvia.Tms.Application.Billing.ListNotYetBillable;
 using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.TransportOrders;
@@ -71,6 +72,14 @@ public static class TransportOrderEndpoints
         queries.MapGet("/rating-exceptions", ListRatingExceptionsAsync)
             .WithName("ListRatingExceptions")
             .WithSummary("List the rating exceptions: every Transport Order whose Rating failed, with its failure code and message.");
+
+        queries.MapGet("/not-yet-billable", ListNotYetBillableAsync)
+            .WithName("ListTransportOrdersNotYetBillable")
+            .WithSummary("List the Delivered Transport-only orders that aren't Billable yet, oldest delivery first, each with its blocking reasons.")
+            .WithDescription(
+                "Each order shows its number, Shipper, Shipper reference, when its Shipment was delivered and its blocking reasons: NotRated, "
+                + "NoProofOfDelivery and OpenException. A reason disappears when its condition is met, and an order that becomes Billable leaves the list. "
+                + "Orders whose Shipment isn't Delivered, Billable orders and Fulfilment orders aren't listed.");
 
         // Customer service re-rates from the TMS UI, which calls as its own identity with the manage role.
         transportOrders.MapPost("/{transportOrderNumber}/re-rate", ReRateAsync)
@@ -174,6 +183,11 @@ public static class TransportOrderEndpoints
         IMediator mediator,
         CancellationToken cancellationToken) =>
         TypedResults.Ok(await mediator.Send(new ListRatingExceptionsQuery(), cancellationToken));
+
+    private static async Task<Ok<IReadOnlyList<TransportOrderNotYetBillableSummary>>> ListNotYetBillableAsync(
+        IMediator mediator,
+        CancellationToken cancellationToken) =>
+        TypedResults.Ok(await mediator.Send(new ListTransportOrdersNotYetBillableQuery(), cancellationToken));
 
     private static async Task<Results<Created<AssignTransportOrderResult>, Ok<AssignTransportOrderResult>, ProblemHttpResult, ValidationProblem>> AssignAsync(
         string transportOrderNumber,
