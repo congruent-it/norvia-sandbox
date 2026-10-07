@@ -50,6 +50,7 @@ public sealed class ReRateTests
 
         order.RatingResult.Should().Be(RatingResult.Rated);
         order.BillingState.Should().Be(BillingState.Billable);
+        order.BillingCorrelationId.Should().NotBe(order.CorrelationId, "a re-rate starts in the TMS UI, so it has a Message trail of its own");
         order.DomainEvents.Select(e => e.GetType()).Should().Equal(typeof(TransportOrderRatedEvent), typeof(TransportOrderBillableEvent));
         await _repository.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }

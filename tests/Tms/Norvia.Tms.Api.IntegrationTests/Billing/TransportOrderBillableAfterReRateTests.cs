@@ -31,11 +31,13 @@ public sealed class TransportOrderBillableAfterReRateTests(CorrectableSeedTmsFix
         using var response = await tms.ReRateAsync(order, _cancellationToken);
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
 
-        var message = (await tms.PublishedAsync(intake, "TransportOrderBillable", _cancellationToken)).Should().ContainSingle().Subject;
+        await tms.WaitForBillableAsync(order, _cancellationToken);
+        var message = tms.BillablePublished(order).Should().ContainSingle().Subject;
         var body = JsonNode.Parse(message.Body.ToString())!;
         CanonicalModelSchemas.ValidateTransportOrderBillable(body).IsValid.Should().BeTrue();
         body["transportOrderNumber"]!.GetValue<string>().Should().Be(order);
-        body["correlationId"]!.GetValue<string>().Should().Be(intake, "a re-rate is on its Transport Order's intake trail");
+        body["correlationId"]!.GetValue<string>().Should().NotBe(intake, "a re-rate starts in the TMS UI, so it has a Message trail of its own");
+        message.CorrelationId.Should().Be(body["correlationId"]!.GetValue<string>());
         body["intakeCorrelationId"]!.GetValue<string>().Should().Be(intake);
         var stored = await tms.GetTransportOrderAsync(order, _cancellationToken);
         JsonNode.DeepEquals(body["freightCharge"], stored["freightCharge"]).Should().BeTrue();

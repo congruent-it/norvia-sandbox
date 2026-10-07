@@ -29,10 +29,12 @@ public sealed class RateTransportOrderHandler(IRepository<TransportOrder> reposi
         switch (outcome)
         {
             case ReRateOutcome.ReRated:
-                // Rating, or a re-rate after Rating failed, can complete the order's conditions to be Billable (P9), on the
-                // intake's Message trail as the rating is. The rating result, with its Freight Charge or failure, the order
-                // becoming Billable and the outcome events' outbox messages are saved in one transaction.
-                await billing.CheckAsync(order, shipment: null, new BillingChange(order.CorrelationId, now), cancellationToken);
+                // Rating can complete the order's conditions to be Billable (P9), on the intake's Message trail as the rating
+                // is. A Customer service re-rate starts in the TMS UI, so it gets a Message trail of its own. The rating result,
+                // with its Freight Charge or failure, the order becoming Billable and the outcome events' outbox messages are
+                // saved in one transaction.
+                var billingTrail = command.ReRateKey is null ? order.CorrelationId : CorrelationId.New();
+                await billing.CheckAsync(order, shipment: null, new BillingChange(billingTrail, now), cancellationToken);
                 await repository.SaveChangesAsync(cancellationToken);
                 break;
             case ReRateOutcome.Refused:

@@ -41,13 +41,13 @@ public sealed class BillingCheck(
         ArgumentNullException.ThrowIfNull(order);
         ArgumentNullException.ThrowIfNull(change);
 
-        // Billable is final, a Fulfilment order is never billed separately, and an unrated order has to wait for Rating.
-        if (order is not { BillingState: BillingState.NotYetBillable, RatingResult: RatingResult.Rated, ShipmentNumber: { } shipmentNumber })
+        // Saves reading the Shipment's facts for an order they can't decide for.
+        if (!order.AwaitsBillingFacts)
         {
             return;
         }
 
-        shipment ??= await shipments.SingleOrDefaultAsync(new ShipmentByNumberSpec(shipmentNumber), cancellationToken);
+        shipment ??= await shipments.SingleOrDefaultAsync(new ShipmentByNumberSpec(order.ShipmentNumber!), cancellationToken);
         if (shipment is null)
         {
             return;

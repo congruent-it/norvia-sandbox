@@ -164,6 +164,15 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
     }
 
     /// <summary>
+    /// Whether the order's own conditions to be Billable hold (P9): it is a Transport-only order that isn't Billable yet, it is
+    /// Rated and it has its Shipment. Only then do the Shipment's facts decide.
+    /// </summary>
+    public bool AwaitsBillingFacts =>
+        BillingState == TransportOrders.BillingState.NotYetBillable
+        && RatingResult == TransportOrders.RatingResult.Rated
+        && ShipmentNumber is not null;
+
+    /// <summary>
     /// Makes a Transport-only order Billable when all its conditions hold (P9, "no POD, no invoice"): its Shipment is
     /// Delivered, it is Rated, and its Shipment has a current Proof of delivery. It then raises TransportOrderBillable once.
     /// Returns false, changing nothing, when a condition doesn't hold yet, when the order is billed through the Fulfilment
@@ -175,9 +184,7 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
     {
         ArgumentNullException.ThrowIfNull(facts);
         ArgumentNullException.ThrowIfNull(correlationId);
-        if (BillingState != TransportOrders.BillingState.NotYetBillable
-            || RatingResult != TransportOrders.RatingResult.Rated
-            || ShipmentNumber is null
+        if (!AwaitsBillingFacts
             || facts is not { DeliveredAt: { } deliveredAt, HasCurrentProofOfDelivery: true })
         {
             return false;

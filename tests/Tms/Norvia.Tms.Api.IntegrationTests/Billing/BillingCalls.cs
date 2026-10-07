@@ -46,6 +46,19 @@ internal static class BillingCalls
     public static async Task<string> BillingStateAsync(this TmsFixture tms, string transportOrderNumber, CancellationToken cancellationToken) =>
         (await tms.GetTransportOrderAsync(transportOrderNumber, cancellationToken))["billingState"]!.GetValue<string>();
 
+    /// <summary>Waits for the Transport Order's TransportOrderBillable, then lets the outbox run a few more cycles so a duplicate would show up too.</summary>
+    public static async Task WaitForBillableAsync(this TmsFixture tms, string transportOrderNumber, CancellationToken cancellationToken)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(30));
+        while (tms.BillablePublished(transportOrderNumber).Count == 0)
+        {
+            await Task.Delay(TmsFixture.PollInterval, timeout.Token);
+        }
+
+        await TmsFixture.SettleOutboxAsync(cancellationToken);
+    }
+
     /// <summary>The TransportOrderBillable messages published for the Transport Order so far.</summary>
     public static IReadOnlyList<ServiceBusReceivedMessage> BillablePublished(this TmsFixture tms, string transportOrderNumber) =>
         [.. tms.Published.Where(m =>
