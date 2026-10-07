@@ -87,8 +87,8 @@ public sealed class ListShipperTransportOrdersHandler(
             PlaceOf(details.Collection?.Address),
             PlaceOf(details.Delivery?.Address),
             TrackingStatuses.Of(shipment?.Status),
-            ShipmentEta.Of(progress, deliveryWindow),
-            lastUpdate);
+            ShipmentEta.Of(progress, deliveryWindow)?.ToUniversalTime(),
+            lastUpdate?.ToUniversalTime());
     }
 
     private static ShipperPlaceView? PlaceOf(Address? address) => address is null ? null : new(address.City, address.Country);
