@@ -96,7 +96,7 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
     /// <summary>The remark Customer service gave when releasing the Transport Order without a Proof of delivery; null until then.</summary>
     public string? ReleaseRemark { get; private set; }
 
-    /// <summary>The longest remark or name of a release.</summary>
+    /// <summary>The longest remark of a release without a Proof of delivery.</summary>
     public const int MaxReleaseRemarkLength = 2000;
 
     /// <summary>The longest name of who released.</summary>
