@@ -139,6 +139,20 @@ API Management creates a correlation ID for each query and passes it to the TMS 
 
 P8 publishes no events and consumes none.
 
+## Presenter smoke run
+
+After a deployment, and not in CI, the presenter checks Shipper visibility end to end on the deployed estate, before the headline incident is re-enacted from the Shipper's side. Do it after the presenter smoke runs of Carrier booking ([P4](p4-carrier-booking.md#presenter-smoke-run)), Shipment tracking ([P5](p5-shipment-tracking.md#presenter-smoke-run)) and Proof of delivery ([P6](p6-proof-of-delivery.md#presenter-smoke-run)). The presenter's steps are in the Partner portal and the TMS UI, and the script stops and says what to do. Run it in a terminal, with the Partner portal, the TMS UI and the Integration console side by side.
+
+1. **Get two Transport Orders.** Book two as Brouwer Dranken, Rotterdam to Düsseldorf. For story 14, plan the Shipment and assign it to Kessler Spedition, but don't release it. Leave Kessler Spedition on *Auto-confirm* and *Auto-progress*. For story 15, follow P4's run to a Booked Shipment carried by Van Dijk Transport, with its tracking on *Manual*. Don't track either first. Note both Transport Order numbers.
+2. **Run the check.** Run `infra/smoke-test-shipper-visibility.sh <story 14 Transport Order number> <story 15 Transport Order number>`. It queries as Brouwer Dranken, through API Management, from a throwaway Container Apps job running as the Partner portal. It reads the TMS as the intake identity and Application Insights, which is usually 1 to 5 minutes behind.
+3. **Story 14.** The script checks that the Transport Order is Scheduled. Open Brouwer Dranken's tracking screen for it, then release the Shipment in the TMS UI. Kessler Spedition confirms and progresses it by itself. The script checks that the Shipper's view only moves forward to Delivered, with a Proof of delivery whose sample CMR downloads through API Management. Say whether you saw the screen do the same by itself.
+4. **A Carrier is refused.** The script queries with Van Dijk Transport's token and checks for `403`.
+5. **Story 15.** The script sends `PU` and `DEP` as Van Dijk Transport and checks that the Shipper sees In transit. Open the screen. The script then sends a status code outside P5's mapping table (`DLV`), which gets `202 Accepted` and fails in the Carrier-tracking Logic App, as P5's presenter-panel fault will. It checks that the Shipper's view stays In transit with the same last update for 90 seconds. Say whether the screen shows its last update getting older. The fault is not built yet, so the script plays what it does. The message stays on the `carrier-tracking` dead-letter queue. Discard it in the Integration console afterwards.
+6. **Stop the TMS.** The script points API Management's `tms-api` backend at an address that answers nothing, and checks for `503` with a correlation ID. The screen keeps its last answer and shows the error with the time it was fetched. Say whether it does. The script puts the backend back, even when the run fails, and checks that the query works again.
+7. **Follow it.** The script checks that the queries are in Application Insights by correlation ID, in API Management and, where the TMS answered, the TMS, and prints the Partner portal's and the Integration console's links.
+
+The script prints `PASS` or `FAIL` per check, never a body, a token or a key. If a check fails, file the gap as its own issue against P8, rather than working around it in the run book.
+
 ## Deferred
 
 These were left out on purpose while designing P8, each with its reason.
