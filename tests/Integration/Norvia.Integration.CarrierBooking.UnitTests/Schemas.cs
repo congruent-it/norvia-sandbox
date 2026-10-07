@@ -19,6 +19,9 @@ internal sealed class Schemas
     private static readonly Lazy<Schemas> TrackingEventSchema = new(() => Of("CanonicalModel/tracking-event.v1.schema.json"));
     private static readonly Lazy<Schemas> CarrierBookingAnswerSchema = new(() => Of("CanonicalModel/carrier-booking-answer.v1.schema.json"));
 
+    private static readonly Lazy<Schemas> ShipperNotificationSchema = new(() => Of("PartnerApi/shipper-notification.v1.schema.json"));
+    private static readonly Lazy<Schemas> ShipperNotificationRequestedSchema = new(() => Of("CanonicalModel/shipper-notification-requested.v1.schema.json"));
+
     private readonly JsonSchema _schema;
 
     private Schemas(JsonSchema schema) => _schema = schema;
@@ -41,6 +44,11 @@ internal sealed class Schemas
 
     /// <summary>The Canonical Model's answer, as the TMS's Carrier booking API takes it.</summary>
     public static Schemas CarrierBookingAnswer => CarrierBookingAnswerSchema.Value;
+
+    public static Schemas ShipperNotification => ShipperNotificationSchema.Value;
+
+    /// <summary>The Canonical Model's event the Shipper notification map reads.</summary>
+    public static Schemas ShipperNotificationRequested => ShipperNotificationRequestedSchema.Value;
 
     public EvaluationResults Validate(JsonNode? instance) =>
         _schema.Evaluate(

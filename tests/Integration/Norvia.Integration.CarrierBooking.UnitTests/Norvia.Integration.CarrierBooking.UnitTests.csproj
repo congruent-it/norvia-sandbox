@@ -25,6 +25,7 @@
     <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\carrier-answer-responses\*.json" LogicalName="PartnerApi/samples/carrier-answer-responses/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\carrier-tracking\*.json" LogicalName="PartnerApi/samples/carrier-tracking/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\carrier-proofs-of-delivery\*.json" LogicalName="PartnerApi/samples/carrier-proofs-of-delivery/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\shipper-notifications\*.json" LogicalName="PartnerApi/samples/shipper-notifications/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\infra\estate\partner-api\answer-carrier-booking.policy.xml" LogicalName="PartnerApiPolicies/answer-carrier-booking.policy.xml" />
     <EmbeddedResource Include="..\..\..\infra\estate\partner-api\submit-carrier-tracking.policy.xml" LogicalName="PartnerApiPolicies/submit-carrier-tracking.policy.xml" />
     <EmbeddedResource Include="..\..\..\infra\estate\partner-api\submit-carrier-proof-of-delivery.policy.xml" LogicalName="PartnerApiPolicies/submit-carrier-proof-of-delivery.policy.xml" />

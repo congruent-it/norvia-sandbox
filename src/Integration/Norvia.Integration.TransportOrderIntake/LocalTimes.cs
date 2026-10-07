@@ -4,13 +4,14 @@ namespace Norvia.Integration.TransportOrderIntake;
 
 /// <summary>
 /// Turns a partner's local date/time into a Canonical Model timestamp (UTC, with its offset), and a Canonical Model
-/// timestamp into a local date/time without an offset, as the Carrier booking format has them.
+/// timestamp into a local date/time without an offset, as the Carrier booking and Shipper formats have them.
 /// </summary>
 internal static class LocalTimes
 {
     private const string PartnerFormat = "dd-MM-yyyy HH:mm";
     private const string CanonicalFormat = "yyyy-MM-dd'T'HH:mm:ss'+00:00'";
     private const string OffsetFormat = "yyyy-MM-dd'T'HH:mm:sszzz";
+    private const string ShipperFormat = "dd-MM-yyyy HH:mm";
     private const string CarrierFormat = "yyyy-MM-dd'T'HH:mm:ss";
 
     public static string? ToUtc(string? localTime, Country? country)
@@ -34,6 +35,17 @@ internal static class LocalTimes
         }
 
         return TimeZoneInfo.ConvertTime(instant, TimeZoneOf(country)).DateTime.ToString(CarrierFormat, CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>The local date/time of a Canonical Model timestamp in the country's time zone, as the Shipper formats have it (<c>dd-MM-yyyy HH:mm</c>), or null when it isn't one.</summary>
+    public static string? FromUtcForShipper(string? timestamp, Country? country)
+    {
+        if (country is null || !DateTimeOffset.TryParse(timestamp, CultureInfo.InvariantCulture, DateTimeStyles.None, out var instant))
+        {
+            return null;
+        }
+
+        return TimeZoneInfo.ConvertTime(instant, TimeZoneOf(country)).DateTime.ToString(ShipperFormat, CultureInfo.InvariantCulture);
     }
 
     /// <summary>

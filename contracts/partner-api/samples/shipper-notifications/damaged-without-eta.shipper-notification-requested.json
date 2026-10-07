@@ -1,0 +1,21 @@
+{
+  "eventId": "7d1e0c4a-5b2f-4e8a-9c3d-0a1b2c3d4e03",
+  "eventType": "ShipperNotificationRequested",
+  "eventVersion": 1,
+  "occurredAt": "2030-10-03T08:00:00+00:00",
+  "correlationId": "notify-3",
+  "notificationId": "3f8a2b6c-9d41-4c7e-8a15-6b0e2d9f7c03",
+  "exceptionNumber": "EX-0000003",
+  "shipmentNumber": "SH-0000043",
+  "transportOrderNumber": "TO-0000003",
+  "shipperId": "SHP-0001",
+  "shipperReference": "BD-2030-0003",
+  "deliveryCountry": "NL",
+  "deliveryPostcode": "3511 AW",
+  "exceptionType": "Damaged",
+  "message": "One pallet was damaged in transit. We will contact you about the claim.",
+  "eta": null,
+  "agreedDeliveryWindowEarliest": null,
+  "agreedDeliveryWindowLatest": null,
+  "planner": "Anna de Vries"
+}

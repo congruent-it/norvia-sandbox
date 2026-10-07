@@ -1,0 +1,10 @@
+{
+  "notificationId": "3f8a2b6c-9d41-4c7e-8a15-6b0e2d9f7c02",
+  "bookingRef": "BD-2030-0002",
+  "transportOrderNumber": "TO-0000002",
+  "exceptionCode": "LATE",
+  "message": "Your goods are delayed. We agreed a new delivery window with the receiver.",
+  "deliverFrom": "16-01-2030 09:00",
+  "deliverUntil": "16-01-2030 15:30",
+  "contact": "Anna de Vries"
+}

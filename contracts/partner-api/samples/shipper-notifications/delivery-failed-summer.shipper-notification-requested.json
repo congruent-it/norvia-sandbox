@@ -1,0 +1,21 @@
+{
+  "eventId": "7d1e0c4a-5b2f-4e8a-9c3d-0a1b2c3d4e01",
+  "eventType": "ShipperNotificationRequested",
+  "eventVersion": 1,
+  "occurredAt": "2030-10-03T08:00:00+00:00",
+  "correlationId": "notify-1",
+  "notificationId": "3f8a2b6c-9d41-4c7e-8a15-6b0e2d9f7c01",
+  "exceptionNumber": "EX-0000001",
+  "shipmentNumber": "SH-0000041",
+  "transportOrderNumber": "TO-0000001",
+  "shipperId": "SHP-0001",
+  "shipperReference": "BD-2030-0001",
+  "deliveryCountry": "DE",
+  "deliveryPostcode": "40591",
+  "exceptionType": "DeliveryFailed",
+  "message": "Delivery was attempted but the receiver was closed. We will redeliver tomorrow.",
+  "eta": "2030-10-04T07:15:00+00:00",
+  "agreedDeliveryWindowEarliest": null,
+  "agreedDeliveryWindowLatest": null,
+  "planner": "Anna de Vries"
+}

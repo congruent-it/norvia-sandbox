@@ -1,0 +1,8 @@
+{
+  "notificationId": "3f8a2b6c-9d41-4c7e-8a15-6b0e2d9f7c03",
+  "bookingRef": "BD-2030-0003",
+  "transportOrderNumber": "TO-0000003",
+  "exceptionCode": "DAMAGED",
+  "message": "One pallet was damaged in transit. We will contact you about the claim.",
+  "contact": "Anna de Vries"
+}
