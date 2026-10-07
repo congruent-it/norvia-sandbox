@@ -129,6 +129,58 @@ public sealed class ShipperTrackingListTests(TmsFixture tms) : IClassFixture<Tms
     }
 
     [Fact]
+    public async Task List_FilteredByCollectionDatesAndStatus_AndPaged_OnlyCoversTheShippersOwnTransportOrders()
+    {
+        var day = DateTimeOffset.UtcNow.Date.AddDays(500);
+        string[] mine = [await SubmitCollectingAsync(Shipper, day), await SubmitCollectingAsync(Shipper, day.AddDays(1))];
+        var anothers = await SubmitCollectingAsync(AnotherShipper, day);
+        var range = $"collectionFrom={day:yyyy-MM-dd}&collectionTo={day.AddDays(1):yyyy-MM-dd}";
+
+        var both = await ListedAsync(Shipper, range);
+        var onlyFirstDay = await ListedAsync(Shipper, $"collectionFrom={day:yyyy-MM-dd}&collectionTo={day:yyyy-MM-dd}");
+        var secondPage = await ListedAsync(Shipper, $"{range}&pageSize=1&page=2");
+        var scheduled = await ListedAsync(Shipper, $"{range}&trackingStatus=Scheduled");
+        var received = await ListedAsync(Shipper, $"{range}&trackingStatus=Received");
+
+        Numbers(both).Should().Equal(mine.Reverse());
+        Numbers(onlyFirstDay).Should().Equal(mine[0]);
+        Numbers(secondPage).Should().Equal(mine[0]);
+        scheduled.Should().BeEmpty();
+        Numbers(received).Should().Equal(mine.Reverse());
+        Numbers(both).Should().NotContain(anothers);
+    }
+
+    [Theory]
+    [InlineData("page=0")]
+    [InlineData("pageSize=0")]
+    [InlineData("pageSize=101")]
+    [InlineData("collectionFrom=2030-02-01&collectionTo=2030-01-01")]
+    [InlineData("trackingStatus=Exception")]
+    public async Task List_WithAnInvalidFilterOrPage_IsABadRequest(string query)
+    {
+        using var response = await tms.ListAsync(tms.ShipperTracking, Shipper, _cancellationToken, query: query);
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+    }
+
+    private async Task<JsonArray> ListedAsync(string shipperId, string query)
+    {
+        using var response = await tms.ListAsync(tms.ShipperTracking, shipperId, _cancellationToken, query: query);
+        var body = await response.Content.ReadAsStringAsync(_cancellationToken);
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, body);
+        return JsonNode.Parse(body)!.AsArray();
+    }
+
+    private async Task<string> SubmitCollectingAsync(string shipperId, DateTimeOffset day)
+    {
+        var booking = Bookings.Valid(TmsCalls.NewReference());
+        booking["shipperId"] = shipperId;
+        booking["collection"]!["window"] = ExceptionCalls.Window(day.AddHours(6), day.AddHours(10));
+        booking["delivery"]!["window"] = ExceptionCalls.Window(day.AddDays(1).AddHours(12), day.AddDays(1).AddHours(16));
+        return await tms.SubmitAcceptedAsync(booking, TmsCalls.NewCorrelationId(), _cancellationToken);
+    }
+
+    [Fact]
     public async Task List_ForAShipmentWithACarrierAndAnException_ShowsNoCarrierShipmentNumberExceptionOrStale()
     {
         var (shipmentNumber, _, _, _) = await tms.BookedWithDeliveryFailedAsync(_cancellationToken);

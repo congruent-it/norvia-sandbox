@@ -133,6 +133,53 @@ public sealed class ListShipperTransportOrdersHandlerTests
         listed.Select(item => item.TransportOrderNumber).Should().Equal("TO-0000002", "TO-0000001");
     }
 
+    [Fact]
+    public async Task Handle_FilteredByTrackingStatus_ListsOnlyThoseTransportOrders()
+    {
+        var received = Samples.AcceptedOrder(sequence: 1);
+        var scheduled = Samples.AcceptedOrder(sequence: 2);
+        Plan(scheduled);
+        _orders.ListAsync(Arg.Any<ShipperTransportOrdersSpec>(), Arg.Any<CancellationToken>()).Returns([received, scheduled]);
+
+        var listed = await Handler().Handle(new ListShipperTransportOrdersQuery("SHP-0001", TrackingStatus: TrackingStatus.Scheduled), CancellationToken.None);
+
+        listed.Select(item => item.TransportOrderNumber).Should().Equal("TO-0000002");
+    }
+
+    [Fact]
+    public async Task Handle_FilteredByCollectionDateRange_ListsOnlyThoseCollectedWithinItEndsIncluded()
+    {
+        var orders = Enumerable.Range(0, 4).Select(day => day * 2).Select((days, index) => OrderCollectingIn(days, sequence: index + 1)).ToList();
+        _orders.ListAsync(Arg.Any<ShipperTransportOrdersSpec>(), Arg.Any<CancellationToken>()).Returns(orders);
+        var from = DateOnly.FromDateTime(Samples.Now.AddDays(2).DateTime);
+        var to = DateOnly.FromDateTime(Samples.Now.AddDays(4).DateTime);
+
+        var listed = await Handler().Handle(new ListShipperTransportOrdersQuery("SHP-0001", CollectionFrom: from, CollectionTo: to), CancellationToken.None);
+
+        listed.Select(item => item.TransportOrderNumber).Should().Equal("TO-0000003", "TO-0000002");
+    }
+
+    [Fact]
+    public async Task Handle_Paged_ReturnsThePageOfTheNewestFirstOrder()
+    {
+        var orders = Enumerable.Range(1, 5).Select(sequence => OrderCollectingIn(sequence, sequence)).ToList();
+        _orders.ListAsync(Arg.Any<ShipperTransportOrdersSpec>(), Arg.Any<CancellationToken>()).Returns(orders);
+
+        var second = await Handler().Handle(new ListShipperTransportOrdersQuery("SHP-0001", Page: 2, PageSize: 2), CancellationToken.None);
+        var beyond = await Handler().Handle(new ListShipperTransportOrdersQuery("SHP-0001", Page: 4, PageSize: 2), CancellationToken.None);
+
+        second.Select(item => item.TransportOrderNumber).Should().Equal("TO-0000003", "TO-0000002");
+        beyond.Should().BeEmpty();
+    }
+
+    private static TransportOrder OrderCollectingIn(int days, int sequence)
+    {
+        var booking = Samples.CanonicalTransportOrder();
+        var moved = booking with { Collection = booking.Collection! with { Window = new(Samples.Now.AddDays(days), Samples.Now.AddDays(days).AddHours(4)) } };
+        return TransportOrder.Accept(
+            new ShipperId("SHP-0001"), moved.ToDetails(), TransportOrderNumber.FromSequence(sequence), IntakeChannel.ShipperApi, new CorrelationId($"corr-{sequence}"), Samples.Now);
+    }
+
     private ListShipperTransportOrdersHandler Handler() => new(_orders, _shipments, _events);
 
     private Shipment Plan(TransportOrder order)
