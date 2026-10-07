@@ -8,7 +8,10 @@ using Norvia.Tms.Domain.TransportOrders;
 
 namespace Norvia.Tms.Application.ShipperTracking.GetTransportOrder;
 
-/// <summary>What the Shipper sees of one Transport Order, the same whether it was got by number or found by reference.</summary>
+/// <summary>
+/// What the Shipper sees of one Transport Order, the same whether it was got by number or found by reference. Every time is a UTC
+/// instant, as the Canonical Model and the Shipper tracking map expect (ADR 0035), whatever offset the Carrier's event carried.
+/// </summary>
 internal static class ShipperTransportOrderDetailProjection
 {
     public static async Task<ShipperTransportOrderDetail> ProjectAsync(
@@ -35,22 +38,22 @@ internal static class ShipperTransportOrderDetailProjection
             WindowOf(details.Collection?.Window),
             WindowOf(deliveryWindow),
             TrackingStatuses.Of(shipment?.Status),
-            ShipmentEta.Of(progress, deliveryWindow),
-            progress.MaxBy(trackingEvent => trackingEvent.EventTime)?.EventTime,
+            ShipmentEta.Of(progress, deliveryWindow)?.ToUniversalTime(),
+            progress.MaxBy(trackingEvent => trackingEvent.EventTime)?.EventTime.ToUniversalTime(),
             [.. progress.Select(trackingEvent => new ShipperProgressEntry(
                 trackingEvent.Type.ToString(),
-                trackingEvent.EventTime,
+                trackingEvent.EventTime.ToUniversalTime(),
                 new ShipperPlaceView(trackingEvent.Location.Place, trackingEvent.Location.CountryCode)))],
             proofOfDelivery is null
                 ? null
                 : new ShipperProofOfDelivery(
                     proofOfDelivery.ReceivedBy,
-                    proofOfDelivery.DeliveryTime,
+                    proofOfDelivery.DeliveryTime.ToUniversalTime(),
                     proofOfDelivery.Condition,
                     [.. proofOfDelivery.Files.Select(file => new ShipperProofOfDeliveryFile(file.Id, file.Name, file.ContentType, file.SizeBytes))]));
     }
 
     private static ShipperPlaceView? PlaceOf(Address? address) => address is null ? null : new(address.City, address.Country);
 
-    private static ShipperWindowView? WindowOf(TimeWindow? window) => window is null ? null : new(window.Earliest, window.Latest);
+    private static ShipperWindowView? WindowOf(TimeWindow? window) => window is null ? null : new(window.Earliest?.ToUniversalTime(), window.Latest?.ToUniversalTime());
 }

@@ -70,7 +70,7 @@ else
     }
     @* Wide columns for what wraps (addresses, goods), narrow ones for what doesn't; multi-line, so a row grows to fit its text. *@
     <FluentDataGrid Items="_requests.AsQueryable()" TGridItem="CarrierBookingRequestView" Class="lux-table" aria-label="Booking requests"
-                    GridTemplateColumns="1.1fr 1.5fr 1fr 1.8fr 1.8fr 1.3fr 1.8fr 1.8fr" MultiLine="true">
+                    GridTemplateColumns="1.1fr minmax(13rem, 1.5fr) minmax(9rem, 1fr) 1.8fr 1.8fr 1.3fr 1.8fr 1.8fr" MultiLine="true">
         <PropertyColumn Title="Received" Property="@(request => PortalTime.Format(request.ReceivedAt))" />
         <PropertyColumn Title="Booking number" Property="@(request => request.CarrierBookingNumber)" />
         <PropertyColumn Title="Shipment" Property="@(request => request.ShipmentNumber)" />

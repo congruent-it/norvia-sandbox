@@ -111,6 +111,22 @@ public sealed class ListShipperTransportOrdersHandlerTests
     }
 
     [Fact]
+    public async Task Handle_AnEventTimeWithALocalOffset_IsListedAsAUtcInstant()
+    {
+        var order = Samples.AcceptedOrder(sequence: 7);
+        var shipment = Booked(order);
+        _orders.ListAsync(Arg.Any<ShipperTransportOrdersSpec>(), Arg.Any<CancellationToken>()).Returns([order]);
+        var local = new DateTimeOffset(2026, 10, 7, 16, 47, 0, TimeSpan.FromHours(2));
+        _allEvents.Add(Report(shipment, TrackingEventType.Collected, "a", local, eta: local.AddDays(1)));
+
+        var listed = await Handler().Handle(new ListShipperTransportOrdersQuery("SHP-0001"), CancellationToken.None);
+
+        var item = listed.Should().ContainSingle().Subject;
+        item.LastUpdate!.Value.Offset.Should().Be(TimeSpan.Zero);
+        item.Eta!.Value.Offset.Should().Be(TimeSpan.Zero);
+    }
+
+    [Fact]
     public async Task Handle_SeveralTransportOrders_ListsTheNewestCollectionFirst()
     {
         var earlier = Samples.AcceptedOrder(sequence: 1);

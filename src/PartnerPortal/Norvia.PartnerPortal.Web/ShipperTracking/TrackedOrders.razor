@@ -80,7 +80,8 @@ else
     }
     else
     {
-        <FluentDataGrid Items="orders.AsQueryable()" TGridItem="ShipperTrackingSummary" Class="lux-table" aria-label="Transport Orders" MultiLine="true">
+        <FluentDataGrid Items="orders.AsQueryable()" TGridItem="ShipperTrackingSummary" Class="lux-table" aria-label="Transport Orders"
+                        GridTemplateColumns="minmax(13rem, 1.2fr) minmax(13rem, 1.2fr) 1.2fr 1.2fr minmax(11rem, 1fr) 1fr 1.2fr" MultiLine="true">
             <TemplateColumn Title="Transport Order">
                 <a href="@PersonaChoice.TrackingPath(PersonaId, context.TransportOrderNumber)">@context.TransportOrderNumber</a>
             </TemplateColumn>
