@@ -52,6 +52,9 @@ public class TmsFixture : IAsyncLifetime
     /// <summary>The app role of the Carrier Proof of delivery Logic App's managed identity, which records Proofs of delivery (P6).</summary>
     public const string ProofOfDeliveryRecordRole = "ProofsOfDelivery.Record";
 
+    /// <summary>The app role only API Management's managed identity holds: a Shipper's tracking queries go through it (P8).</summary>
+    public const string ShipperTrackingReadRole = "ShipperTracking.Read";
+
     /// <summary>The client ID the TMS takes as the WMS handoff's caller. No WMS exists yet, so only the tests call as it.</summary>
     public const string WmsClientId = "norvia-test-wms";
 
@@ -93,6 +96,9 @@ public class TmsFixture : IAsyncLifetime
 
     /// <summary>A client holding the record role, as the Carrier-tracking Logic App's managed identity will (P5, later ticket).</summary>
     public HttpClient TrackingRecord { get; private set; } = null!;
+
+    /// <summary>Calls as API Management does for a Shipper's tracking queries.</summary>
+    public HttpClient ShipperTracking { get; private set; } = null!;
 
     /// <summary>A client holding the Proof of delivery record role, as the Carrier Proof of delivery Logic App's managed identity will (P6, later ticket).</summary>
     public HttpClient ProofOfDeliveryRecord { get; private set; } = null!;
@@ -149,6 +155,7 @@ public class TmsFixture : IAsyncLifetime
         ShipperNotificationReport = CreateTmsClient(IssueToken([ShipperNotificationReportRole], clientId: "norvia-test-p7-shipper-notification-logic-app"));
         TrackingRecord = CreateTmsClient(IssueToken([TrackingRecordRole], clientId: "norvia-test-carrier-tracking-logic-app"));
 
+        ShipperTracking = CreateTmsClient(IssueToken([ShipperTrackingReadRole], clientId: "norvia-test-apim"));
         ProofOfDeliveryRecord = CreateTmsClient(IssueToken([ProofOfDeliveryRecordRole], clientId: "norvia-test-carrier-proof-of-delivery-logic-app"));
 
         _serviceBus = new ServiceBusClient(await _app!.GetConnectionStringAsync("messaging", startup.Token));
@@ -454,6 +461,7 @@ public class TmsFixture : IAsyncLifetime
         CarrierReport?.Dispose();
         ShipperNotificationReport?.Dispose();
         TrackingRecord?.Dispose();
+        ShipperTracking?.Dispose();
         ProofOfDeliveryRecord?.Dispose();
 
         if (_app is not null)

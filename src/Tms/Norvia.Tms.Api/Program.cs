@@ -9,6 +9,7 @@ using Norvia.Tms.Api.CarrierBookings;
 using Norvia.Tms.Api.Exceptions;
 using Norvia.Tms.Api.ProofsOfDelivery;
 using Norvia.Tms.Api.Shipments;
+using Norvia.Tms.Api.ShipperTracking;
 using Norvia.Tms.Api.ShipperNotifications;
 using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Api.TrackingEvents;
@@ -168,6 +169,7 @@ app.MapTrackingEvents();
 app.MapProofsOfDelivery();
 app.MapExceptions();
 app.MapShipperNotifications();
+app.MapShipperTracking();
 
 await app.RunAsync();
 

@@ -40,4 +40,10 @@ public static class Flows
     /// Exception a Tracking event opens is traced on that event's trail, in <see cref="CarrierTracking"/>.
     /// </summary>
     public const string ExceptionHandling = "exception-handling";
+
+    /// <summary>
+    /// A Shipper's query of its Transport Orders (P8), on the correlation ID API Management creates for it. It changes nothing, so
+    /// the correlation ID is only in the logs.
+    /// </summary>
+    public const string ShipperTracking = "shipper-tracking";
 }

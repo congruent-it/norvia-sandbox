@@ -31,5 +31,6 @@ Norvia's own message format ([CONTEXT.md](../../CONTEXT.md#integration)): one JS
 | [shipper-notification-requested.v1](shipper-notification-requested.v1.schema.json) | Event: the Planner notified the Shipper from an open Exception, with the message, the Shipment's ETA or agreed delivery window and the notification ID |
 | [shipper-notification-not-delivered.v1](shipper-notification-not-delivered.v1.schema.json) | Event: the Shipper notification Logic App's message never reached the Shipper, with the technical cause |
 | [shipment-delivery-window-agreed.v1](shipment-delivery-window-agreed.v1.schema.json) | Event: the Planner agreed a delivery window with the Carrier for a Collected or In transit Shipment |
+| [shipper-transport-order-list-item.v1](shipper-transport-order-list-item.v1.schema.json) | Response: the Shipper's view of one of its Transport Orders in a list, with its Tracking status, ETA and last update, as the TMS Shipper tracking API's list operation returns it; never a Carrier, a Shipment number, an Exception or Stale |
 
 Conventions: property names in camelCase, timestamps as UTC with an offset, weights in kilograms as numbers, money in EUR without VAT as numbers rounded to cents, countries as ISO 3166-1 alpha-2 codes.
