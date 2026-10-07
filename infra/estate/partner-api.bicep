@@ -48,6 +48,9 @@ param partnerPortalPrincipalId string
 @description('The P4 booking Logic App\'s identity, which may read the Carrier endpoints\' credentials and nothing else in the vault.')
 param bookingPrincipalId string
 
+@description('The P7 Shipper notification Logic App\'s identity, which may read the Shipper endpoints\' credentials and nothing else in the vault.')
+param shipperNotificationPrincipalId string
+
 @secure()
 @description('''A random value the Carrier and Shipper endpoints' credentials are derived from, one per Persona. The deployment hook makes it
 once and keeps it in the azd environment, so deploying the estate again keeps the credentials the apps already hold.''')
@@ -392,7 +395,7 @@ resource carrierEndpointKeys 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = [
 
 // Every Shipper Persona has a notification endpoint in the Partner portal (P7), with a credential of its own named after the
 // Shipper's ID, derived like the Carriers'. The portal reads them; the Shipper notification Logic App gets the role to read
-// its own when it is built.
+// them below.
 var shipperIds = map(
   filter(loadJsonContent('../../seed/norvia.seed.json').personas, persona => persona.party.type == 'Shipper'),
   persona => persona.party.id
@@ -427,6 +430,19 @@ resource bookingReadsTheCarrierEndpointKeys 'Microsoft.Authorization/roleAssignm
     scope: carrierEndpointKeys[i]
     properties: {
       principalId: bookingPrincipalId
+      roleDefinitionId: keyVaultSecretsUser
+      principalType: 'ServicePrincipal'
+    }
+  }
+]
+
+// Scoped to each secret, so the Shipper notification Logic App can't read a Persona's subscription key or a Carrier's credential.
+resource shipperNotificationReadsTheShipperEndpointKeys 'Microsoft.Authorization/roleAssignments@2022-04-01' = [
+  for (shipperId, i) in shipperIds: {
+    name: guid(shipperEndpointKeys[i].id, shipperNotificationPrincipalId, keyVaultSecretsUser)
+    scope: shipperEndpointKeys[i]
+    properties: {
+      principalId: shipperNotificationPrincipalId
       roleDefinitionId: keyVaultSecretsUser
       principalType: 'ServicePrincipal'
     }

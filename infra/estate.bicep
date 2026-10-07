@@ -30,7 +30,7 @@ postdeploy hook stores it, so the console's app registration keeps it when the e
 param integrationConsoleRedirectUris string = ''
 
 @description('''The TMS API's address, empty before the apps are first deployed. azd's postdeploy hook stores it, so the intake,
-Carrier-answer, Carrier-tracking and Carrier Proof of delivery Logic Apps keep it when the estate is deployed again.''')
+Carrier-answer, Shipper notification, Carrier-tracking and Carrier Proof of delivery Logic Apps keep it when the estate is deployed again.''')
 param tmsBaseUrl string = ''
 
 @secure()
@@ -39,7 +39,7 @@ once and keeps it in the azd environment.''')
 param carrierEndpointKeySeed string
 
 @description('''The Partner portal's address, empty before the apps are first deployed. azd's postdeploy hook stores it, so the P4
-booking Logic App keeps it when the estate is deployed again.''')
+booking and Shipper notification Logic Apps keep it when the estate is deployed again.''')
 param partnerPortalBaseUrl string = ''
 
 var tags = {
@@ -70,6 +70,7 @@ module messaging 'estate/messaging.bicep' = {
     tags: tags
     presenterPrincipalId: presenterPrincipalId
     bookingPrincipalId: identities.outputs.bookingPrincipalId
+    shipperNotificationPrincipalId: identities.outputs.shipperNotificationPrincipalId
     trackingPrincipalId: identities.outputs.trackingPrincipalId
     proofOfDeliveryPrincipalId: identities.outputs.proofOfDeliveryPrincipalId
     apiManagementPrincipalId: identities.outputs.apiManagementPrincipalId
@@ -145,6 +146,25 @@ module bookingLogicApp 'estate/booking-logic-app.bicep' = {
   }
 }
 
+module shipperNotificationLogicApp 'estate/shipper-notification-logic-app.bicep' = {
+  scope: resourceGroup
+  params: {
+    location: location
+    tags: tags
+    integrationRetentionDays: integrationRetentionDays
+    shipperNotificationIdentityName: identities.outputs.shipperNotificationIdentityName
+    tmsApiClientId: identities.outputs.tmsApiClientId
+    tmsBaseUrl: tmsBaseUrl
+    partnerPortalBaseUrl: partnerPortalBaseUrl
+    applicationInsightsName: monitoring.outputs.applicationInsightsName
+    serviceBusName: messaging.outputs.namespaceName
+    planName: intakeLogicApp.outputs.planName
+    contentKeyVaultName: intakeLogicApp.outputs.keyVaultName
+    shipperKeyVaultName: partnerApi.outputs.partnerPortalKeyVaultName
+    integrationConsolePrincipalId: identities.outputs.integrationConsolePrincipalId
+  }
+}
+
 module trackingLogicApp 'estate/tracking-logic-app.bicep' = {
   scope: resourceGroup
   params: {
@@ -215,6 +235,7 @@ module partnerApi 'estate/partner-api.bicep' = {
     applicationInsightsName: monitoring.outputs.applicationInsightsName
     partnerPortalPrincipalId: identities.outputs.partnerPortalPrincipalId
     bookingPrincipalId: identities.outputs.bookingPrincipalId
+    shipperNotificationPrincipalId: identities.outputs.shipperNotificationPrincipalId
     carrierEndpointKeySeed: carrierEndpointKeySeed
   }
 }
@@ -235,10 +256,13 @@ output ESTATE_INTAKE_CLIENT_ID string = identities.outputs.intakeClientId
 output ESTATE_INTAKE_IDENTITY_ID string = identities.outputs.intakeIdentityId
 output ESTATE_BOOKING_IDENTITY_NAME string = identities.outputs.bookingIdentityName
 output ESTATE_BOOKING_CLIENT_ID string = identities.outputs.bookingClientId
+output ESTATE_SHIPPER_NOTIFICATION_IDENTITY_NAME string = identities.outputs.shipperNotificationIdentityName
+output ESTATE_SHIPPER_NOTIFICATION_CLIENT_ID string = identities.outputs.shipperNotificationClientId
 output ESTATE_TMS_UI_IDENTITY_NAME string = identities.outputs.tmsUiIdentityName
 output ESTATE_TMS_UI_CLIENT_ID string = identities.outputs.tmsUiClientId
 output ESTATE_INTAKE_LOGIC_APP string = intakeLogicApp.outputs.logicAppName
 output ESTATE_BOOKING_LOGIC_APP string = bookingLogicApp.outputs.logicAppName
+output ESTATE_SHIPPER_NOTIFICATION_LOGIC_APP string = shipperNotificationLogicApp.outputs.logicAppName
 output ESTATE_ANSWER_LOGIC_APP string = answerLogicApp.outputs.logicAppName
 output ESTATE_ANSWER_CLIENT_ID string = identities.outputs.answerClientId
 output ESTATE_ANSWER_IDENTITY_NAME string = identities.outputs.answerIdentityName

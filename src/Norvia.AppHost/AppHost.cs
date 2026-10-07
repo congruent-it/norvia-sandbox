@@ -187,6 +187,8 @@ else
     shipmentEvents.AddServiceBusSubscription("shipment-events-monitoring", subscriptionName: "monitoring");
     // The P4 booking Logic App's subscription: Carrier Shipments only (see ResubmitAwareFilters).
     shipmentEvents.AddServiceBusSubscription("carrier-booking");
+    // The P7 Shipper notification Logic App's subscription: ShipperNotificationRequested only (see ResubmitAwareFilters).
+    shipmentEvents.AddServiceBusSubscription("shipper-notification");
     // The tracking queue API Management puts a Carrier's tracking message on and the Carrier-tracking Logic App reads
     // (ADR 0008). A message the TMS refuses is dead-lettered; one it can't be given to is delivered again up to the
     // maximum delivery count, then dead-lettered by Service Bus itself. The estate Bicep sets the same count.
@@ -281,6 +283,16 @@ else
         .WithEnvironment("Booking__TmsTokens__Issuer", LocalTokens.Issuer)
         .WithEnvironment("Booking__TmsTokens__Audience", LocalTokens.TmsAudience)
         .WithEnvironment("Booking__TmsTokens__ClientId", LocalTokens.BookingLogicAppClientId);
+    // Locally a worker plays the P7 Shipper notification Logic App as well (ADR 0033). It reads its subscription, sends each
+    // Shipper Persona's notification to the Persona's endpoint in the Partner portal with a credential for the run, and
+    // reports the outcome to the TMS as the identity holding the report role.
+    var shipperNotificationWorker = builder.AddProject<Projects.Norvia_Integration_LocalShipperNotificationWorker>("shipper-notification-worker")
+        .WithReference(messaging).WaitFor(messaging)
+        .WithReference(tmsApi).WaitFor(tmsApi)
+        .WithEnvironment("ShipperNotification__TmsBaseAddress", tmsApi.GetEndpoint("http"))
+        .WithEnvironment("ShipperNotification__TmsTokens__Issuer", LocalTokens.Issuer)
+        .WithEnvironment("ShipperNotification__TmsTokens__Audience", LocalTokens.TmsAudience)
+        .WithEnvironment("ShipperNotification__TmsTokens__ClientId", LocalTokens.ShipperNotificationLogicAppClientId);
     // Locally a worker plays the Carrier-tracking Logic App too (ADR 0031). It reads the tracking queue API Management's
     // stand-in fills and records each Tracking event with the TMS as the identity holding the record role.
     var trackingWorker = builder.AddProject<Projects.Norvia_Integration_LocalTrackingWorker>("tracking-worker")
@@ -311,11 +323,15 @@ else
         partnerPortal.WithEnvironment($"CarrierEndpoint__ApiKeys__{persona.PartyId}", carrierApiKey);
     }
 
-    // Each Shipper Persona's notification endpoint asks for a credential too. Locally nothing calls it yet: the Shipper
-    // notification Logic App has no stand-in here, so the key is only what the endpoint holds for a caller of its own.
+    // Each Shipper Persona's notification endpoint asks its caller, the P7 Shipper notification Logic App, for a credential
+    // too, which the worker has for the run as Key Vault holds it in Azure.
     foreach (var persona in personas.Where(persona => persona.IsShipper))
     {
-        partnerPortal.WithEnvironment($"ShipperEndpoint__ApiKeys__{persona.PartyId}", Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant());
+        var shipperApiKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
+        shipperNotificationWorker
+            .WithEnvironment($"ShipperNotification__Shippers__{persona.PartyId}__Address", ReferenceExpression.Create($"{partnerPortal.GetEndpoint("http")}{persona.EndpointPath}"))
+            .WithEnvironment($"ShipperNotification__Shippers__{persona.PartyId}__ApiKey", shipperApiKey);
+        partnerPortal.WithEnvironment($"ShipperEndpoint__ApiKeys__{persona.PartyId}", shipperApiKey);
     }
 
     partnerPortal.WaitFor(partnerApi)
@@ -351,6 +367,7 @@ else
         (partnerApi.Resource, "PartnerApi__Tokens__SigningKey"),
         (partnerApi.Resource, "Tms__Tokens__SigningKey"),
         (bookingWorker.Resource, "Booking__TmsTokens__SigningKey"),
+        (shipperNotificationWorker.Resource, "ShipperNotification__TmsTokens__SigningKey"),
         (trackingWorker.Resource, "Tracking__TmsTokens__SigningKey"),
         (proofOfDeliveryWorker.Resource, "ProofOfDelivery__TmsTokens__SigningKey"),
         (partnerPortal.Resource, "PartnerApi__LocalTokens__SigningKey"),

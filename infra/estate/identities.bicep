@@ -22,6 +22,8 @@ var answerRole = 'CarrierBookings.Answer'
 var answerRoleId = guid('norvia-tms-api', environmentName, answerRole)
 var reportRole = 'CarrierBookings.Report'
 var reportRoleId = guid('norvia-tms-api', environmentName, reportRole)
+var shipperNotificationReportRole = 'ShipperNotifications.Report'
+var shipperNotificationReportRoleId = guid('norvia-tms-api', environmentName, shipperNotificationReportRole)
 var recordRole = 'TrackingEvents.Record'
 var recordRoleId = guid('norvia-tms-api', environmentName, recordRole)
 var recordProofRole = 'ProofsOfDelivery.Record'
@@ -110,6 +112,16 @@ resource tmsApi 'Microsoft.Graph/applications@v1.0' = {
       isEnabled: true
     }
     {
+      id: shipperNotificationReportRoleId
+      value: shipperNotificationReportRole
+      displayName: 'Report Shipper notifications'
+      description: 'Report that a Shipper notification was acknowledged by the Shipper\'s endpoint, or never reached it (P7). Only the P7 Shipper notification Logic App holds it.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
+    {
       id: recordRoleId
       value: recordRole
       displayName: 'Record Tracking events'
@@ -156,6 +168,20 @@ resource reportRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
   resourceId: tmsApiPrincipal.id
   appRoleId: reportRoleId
   principalId: bookingIdentity.properties.principalId
+}
+
+// The P7 Shipper notification Logic App's identity, which it runs as. It is the one principal holding the Shipper notification
+// report role, so nothing reports a Shipper notification's delivery to the TMS without passing the integration layer.
+resource shipperNotificationIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
+  name: 'id-shipper-notification-${uniqueString(resourceGroup().id)}'
+  location: location
+  tags: tags
+}
+
+resource shipperNotificationReportRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: tmsApiPrincipal.id
+  appRoleId: shipperNotificationReportRoleId
+  principalId: shipperNotificationIdentity.properties.principalId
 }
 
 // The Carrier-answer Logic App's identity, which it runs as. It is the one principal holding the answer role, so nothing
@@ -548,6 +574,10 @@ output bookingIdentityId string = bookingIdentity.id
 output bookingIdentityName string = bookingIdentity.name
 output bookingPrincipalId string = bookingIdentity.properties.principalId
 output bookingClientId string = bookingIdentity.properties.clientId
+output shipperNotificationIdentityId string = shipperNotificationIdentity.id
+output shipperNotificationIdentityName string = shipperNotificationIdentity.name
+output shipperNotificationPrincipalId string = shipperNotificationIdentity.properties.principalId
+output shipperNotificationClientId string = shipperNotificationIdentity.properties.clientId
 output tmsUiIdentityName string = tmsUiIdentity.name
 output tmsUiClientId string = tmsUiIdentity.properties.clientId
 output partnerApiClientId string = partnerApi.appId
