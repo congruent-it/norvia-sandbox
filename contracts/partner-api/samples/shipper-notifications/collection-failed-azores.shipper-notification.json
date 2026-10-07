@@ -1,0 +1,9 @@
+{
+  "notificationId": "3f8a2b6c-9d41-4c7e-8a15-6b0e2d9f7c05",
+  "bookingRef": "BD-2030-0005",
+  "transportOrderNumber": "TO-0000005",
+  "exceptionCode": "COLLECTION_FAILED",
+  "message": "The driver could not collect the goods: the dock was closed.",
+  "eta": "10-01-2030 09:00",
+  "contact": "Anna de Vries"
+}

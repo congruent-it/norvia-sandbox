@@ -1,5 +1,6 @@
 using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Domain.ShipperNotifications;
+using Norvia.Tms.Domain.TransportOrders;
 
 namespace Norvia.Tms.Application.Exceptions.NotifyShipper;
 
@@ -8,6 +9,8 @@ namespace Norvia.Tms.Application.Exceptions.NotifyShipper;
 /// The Planner notified the Shipper from an open Exception (P7), under the action's own correlation ID. The Shipper notification
 /// Logic App sends the message from this event.
 /// </summary>
+/// <param name="DeliveryCountry">ISO 3166-1 alpha-2 country of the delivery address, so the Logic App can show times in the address's time zone.</param>
+/// <param name="DeliveryPostcode">Postcode of the delivery address, for the countries that span time zones.</param>
 /// <param name="NotificationId">The key the Partner portal treats a notification by, so a repeated call is ignored.</param>
 /// <param name="ExceptionType">What went wrong: <c>CollectionFailed</c>, <c>DeliveryFailed</c>, <c>Damaged</c>, <c>Reservations</c> or <c>LateDelivery</c>.</param>
 /// <param name="Message">What the Planner wrote, starting from the template for the type.</param>
@@ -24,6 +27,8 @@ public sealed record ShipperNotificationRequestedV1(
     string TransportOrderNumber,
     string ShipperId,
     string? ShipperReference,
+    string? DeliveryCountry,
+    string? DeliveryPostcode,
     string ExceptionType,
     string Message,
     DateTimeOffset? Eta,
@@ -38,7 +43,7 @@ public sealed record ShipperNotificationRequestedV1(
 
     protected override string TopicName => Topics.ShipmentEvents;
 
-    public static ShipperNotificationRequestedV1 From(ShipperNotificationRequestedEvent requested)
+    public static ShipperNotificationRequestedV1 From(ShipperNotificationRequestedEvent requested, Address? deliveryAddress)
     {
         ArgumentNullException.ThrowIfNull(requested);
         var notification = requested.Notification;
@@ -52,6 +57,8 @@ public sealed record ShipperNotificationRequestedV1(
             notification.TransportOrderNumber.Value,
             notification.ShipperId.Value,
             notification.ShipperReference,
+            deliveryAddress?.Country,
+            deliveryAddress?.Postcode,
             notification.Type.ToString(),
             notification.Message,
             notification.Eta,

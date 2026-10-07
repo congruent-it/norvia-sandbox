@@ -4,7 +4,7 @@ namespace Norvia.Integration.TransportOrderIntake;
 
 /// <summary>
 /// Turns a partner's local date/time into a Canonical Model timestamp (UTC, with its offset), and a Canonical Model
-/// timestamp into a local date/time without an offset, as the Carrier booking format has them.
+/// timestamp into a local date/time without an offset, as the Carrier booking and Shipper formats have them.
 /// </summary>
 internal static class LocalTimes
 {
@@ -28,12 +28,13 @@ internal static class LocalTimes
     /// <summary>The local date/time of a Canonical Model timestamp in the country's time zone, or null when it isn't one.</summary>
     public static string? FromUtc(string? timestamp, Country? country)
     {
-        if (country is null || !DateTimeOffset.TryParse(timestamp, CultureInfo.InvariantCulture, DateTimeStyles.None, out var instant))
-        {
-            return null;
-        }
+        return FromUtc(timestamp, country, CarrierFormat);
+    }
 
-        return TimeZoneInfo.ConvertTime(instant, TimeZoneOf(country)).DateTime.ToString(CarrierFormat, CultureInfo.InvariantCulture);
+    /// <summary>The local date/time of a Canonical Model timestamp in the country's time zone, as the Shipper formats have it (<c>dd-MM-yyyy HH:mm</c>), or null when it isn't one.</summary>
+    public static string? FromUtcForShipper(string? timestamp, Country? country)
+    {
+        return FromUtc(timestamp, country, PartnerFormat);
     }
 
     /// <summary>
@@ -52,6 +53,16 @@ internal static class LocalTimes
         var zone = TimeZoneOf(country);
         var offset = zone.IsAmbiguousTime(local) ? zone.BaseUtcOffset : zone.GetUtcOffset(local);
         return new DateTimeOffset(local, offset).ToString(OffsetFormat, CultureInfo.InvariantCulture);
+    }
+
+    private static string? FromUtc(string? timestamp, Country? country, string format)
+    {
+        if (country is null || !DateTimeOffset.TryParse(timestamp, CultureInfo.InvariantCulture, DateTimeStyles.None, out var instant))
+        {
+            return null;
+        }
+
+        return TimeZoneInfo.ConvertTime(instant, TimeZoneOf(country)).DateTime.ToString(format, CultureInfo.InvariantCulture);
     }
 
     private static TimeZoneInfo TimeZoneOf(Country country) =>

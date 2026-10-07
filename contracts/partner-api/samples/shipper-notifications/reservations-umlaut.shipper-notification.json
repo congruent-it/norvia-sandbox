@@ -1,0 +1,8 @@
+{
+  "notificationId": "3f8a2b6c-9d41-4c7e-8a15-6b0e2d9f7c04",
+  "bookingRef": "BD-2030-0004",
+  "transportOrderNumber": "TO-0000004",
+  "exceptionCode": "RESERVATIONS",
+  "message": "The receiver signed with reservations: two cartons were wet.",
+  "contact": "Jörg Müller"
+}

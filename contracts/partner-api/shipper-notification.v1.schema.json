@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/partner-api/shipper-notification.v1.schema.json",
+  "title": "ShipperNotification",
+  "description": "A notification about an Exception, as Norvia's Shipper notification Logic App sends it to the Shipper's notification endpoint in the Partner portal (Shipper notification format, version 1). It follows the Shipper booking format: its own field names and local date/times in the time zone of the delivery address, formatted dd-MM-yyyy HH:mm. The Shipper deals in Transport Orders, so it never names the Carrier or the Shipment number. The notification ID is its key: a notification sent again is ignored.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["notificationId", "bookingRef", "transportOrderNumber", "exceptionCode", "message", "contact"],
+  "properties": {
+    "notificationId": { "description": "The key of the notification, which Norvia reports back on.", "type": "string", "format": "uuid" },
+    "bookingRef": { "description": "The Shipper's own reference of the booking, so the Shipper recognises the Transport Order.", "type": "string", "minLength": 1 },
+    "transportOrderNumber": { "description": "Norvia's number of the Transport Order the notification is about.", "type": "string", "pattern": "^TO-[0-9]{7}$" },
+    "exceptionCode": { "description": "What went wrong.", "enum": ["COLLECTION_FAILED", "DELIVERY_FAILED", "DAMAGED", "RESERVATIONS", "LATE"] },
+    "message": { "description": "What the Planner wrote.", "type": "string", "minLength": 1 },
+    "eta": { "description": "The current estimated time of arrival, local to the delivery address. Absent when a delivery window was agreed or there is no ETA.", "$ref": "#/$defs/localDateTime" },
+    "deliverFrom": { "description": "The earliest time of the agreed delivery window, local to the delivery address. Comes with deliverUntil, and replaces the ETA.", "$ref": "#/$defs/localDateTime" },
+    "deliverUntil": { "description": "The latest time of the agreed delivery window, local to the delivery address.", "$ref": "#/$defs/localDateTime" },
+    "contact": { "description": "The Norvia contact: the Planner's name.", "type": "string", "minLength": 1 }
+  },
+  "dependentRequired": {
+    "deliverFrom": ["deliverUntil"],
+    "deliverUntil": ["deliverFrom"]
+  },
+  "not": { "required": ["eta", "deliverFrom"] },
+  "$defs": {
+    "localDateTime": {
+      "description": "A local date and time as dd-MM-yyyy HH:mm (24-hour clock), in the time zone of the delivery address.",
+      "type": "string",
+      "pattern": "^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{4} ([01][0-9]|2[0-3]):[0-5][0-9]$",
+      "examples": ["03-10-2030 14:30"]
+    }
+  }
+}

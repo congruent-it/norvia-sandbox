@@ -174,6 +174,8 @@ The Shipper notification format follows the conventions of the Shipper booking f
 
 The notification doesn't name the Carrier or the Shipment number. Towards the Shipper, Norvia carries the goods, just as towards the Carrier, Norvia is the customer (P4). The Shipper deals in Transport Orders (ADR 0011).
 
+The schema is [shipper-notification.v1.schema.json](../../../contracts/partner-api/shipper-notification.v1.schema.json), with sample messages in `contracts/partner-api/samples/shipper-notifications`. The map reads the delivery address's country and postcode from the event, so it needs no lookup to show times in that time zone. An agreed delivery window replaces the ETA.
+
 The Exception types map to the Shipper codes `COLLECTION_FAILED`, `DELIVERY_FAILED`, `DAMAGED`, `RESERVATIONS` and `LATE`.
 
 ## Carrier cancellation format
@@ -258,7 +260,7 @@ All events go to the topic for Shipment events, through the TMS's transactional 
 |---|---|---|---|
 | `ExceptionOpened` | An Exception opens | Exception number, Shipment number, Transport Order number, Shipper, Carrier ID or Own fleet, type, the cause (Tracking event, Proof of delivery or window passed), the after Delivered marker, correlation ID | Monitoring |
 | `ExceptionResolved` | The Planner resolves an Exception | Exception number, Shipment number, type, outcome, remark, correlation ID | Monitoring. [P9](p9-freight-settlement.md) checks whether the order is Billable inside the TMS, not from this event (ADR 0003) |
-| `ShipperNotificationRequested` | The Planner notifies the Shipper | Notification ID, Exception number, Shipment number, Transport Order number, Shipper, Shipper reference, type, message, ETA or agreed delivery window, Planner's name, correlation ID | Shipper notification Logic App |
+| `ShipperNotificationRequested` | The Planner notifies the Shipper | Notification ID, Exception number, Shipment number, Transport Order number, Shipper, Shipper reference, delivery country and postcode, type, message, ETA or agreed delivery window, Planner's name, correlation ID | Shipper notification Logic App |
 | `ShipperNotificationNotDelivered` | A notification is reported not delivered | Notification ID, Exception number, Shipment number, Shipper, technical cause, correlation ID | Monitoring. An alert later |
 | `CarrierBookingCancelled` | The Planner cancels a Carrier booking | Carrier booking number, Carrier booking reference, Shipment number, Carrier ID, Exception number, reason text, correlation ID | Carrier cancellation Logic App. Monitoring |
 | `CarrierCancellationNotDelivered` | A cancellation or withdrawal is reported not delivered | Carrier booking number, Shipment number, Carrier ID, kind, technical cause, correlation ID | Monitoring. An alert later |

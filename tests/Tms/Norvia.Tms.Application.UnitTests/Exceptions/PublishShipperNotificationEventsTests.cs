@@ -3,6 +3,8 @@ using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.ShipperNotifications.Report;
 using Norvia.Tms.Application.UnitTests.TransportOrders;
 using Norvia.Tms.Domain.ShipperNotifications;
+using Ardalis.SharedKernel;
+using Norvia.Tms.Domain.TransportOrders;
 using NSubstitute;
 
 namespace Norvia.Tms.Application.UnitTests.Exceptions;
@@ -10,12 +12,15 @@ namespace Norvia.Tms.Application.UnitTests.Exceptions;
 public sealed class PublishShipperNotificationEventsTests
 {
     private readonly IOutbox _outbox = Substitute.For<IOutbox>();
+    private readonly IReadRepository<TransportOrder> _transportOrders = Substitute.For<IReadRepository<TransportOrder>>();
     private readonly ShipperNotification _notification = ShipperNotificationSamples.Requested(OpenExceptions.DeliveryFailed(), Samples.Now.AddDays(3));
 
     [Fact]
     public async Task Requested_PublishesShipperNotificationRequested_OnThePlannersTrail()
     {
-        await new PublishShipperNotificationRequested(_outbox).Handle(new ShipperNotificationRequestedEvent(_notification), CancellationToken.None);
+        _transportOrders.SingleOrDefaultAsync(Arg.Any<TransportOrderByNumberSpec>(), Arg.Any<CancellationToken>())
+            .Returns(Samples.AcceptedOrder(sequence: 7));
+        await new PublishShipperNotificationRequested(_outbox, _transportOrders).Handle(new ShipperNotificationRequestedEvent(_notification), CancellationToken.None);
 
         _outbox.Received(1).Add(Arg.Is<ShipperNotificationRequestedV1>(e =>
             e.EventType == "ShipperNotificationRequested"
@@ -24,6 +29,8 @@ public sealed class PublishShipperNotificationEventsTests
             && e.ShipmentNumber == "SH-0000012"
             && e.ShipperId == "SHP-0001"
             && e.ShipperReference == "SHIP-REF-1"
+            && e.DeliveryCountry == "NL"
+            && e.DeliveryPostcode == "3511 AW"
             && e.ExceptionType == "DeliveryFailed"
             && e.Message == "Your shipment is delayed."
             && e.Planner == "Anna de Vries"
@@ -34,7 +41,7 @@ public sealed class PublishShipperNotificationEventsTests
     [Fact]
     public void Requested_IsOnTheShipmentEventsTopic_TracedOnTheExceptionHandlingFlow()
     {
-        var requested = ShipperNotificationRequestedV1.From(new ShipperNotificationRequestedEvent(_notification));
+        var requested = ShipperNotificationRequestedV1.From(new ShipperNotificationRequestedEvent(_notification), null);
 
         requested.Topic.Should().Be("shipment-events");
         requested.EventVersion.Should().Be(1);

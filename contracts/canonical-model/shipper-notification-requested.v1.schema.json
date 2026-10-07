@@ -5,7 +5,7 @@
   "description": "The Planner notified the Shipper from an open Exception (Canonical Model event, version 1). The TMS recorded a Shipper notification with the status Requested in the same transaction. The Planner can notify as often as needed, so an Exception has any number of these. The Shipper notification Logic App sends the message from this event and reports the notification Sent or Not delivered. Published on the Shipment events topic, under the correlation ID of the Planner's action, which the TMS creates, through the TMS's transactional outbox.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "notificationId", "exceptionNumber", "shipmentNumber", "transportOrderNumber", "shipperId", "shipperReference", "exceptionType", "message", "eta", "agreedDeliveryWindowEarliest", "agreedDeliveryWindowLatest", "planner"],
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "notificationId", "exceptionNumber", "shipmentNumber", "transportOrderNumber", "shipperId", "shipperReference", "deliveryCountry", "deliveryPostcode", "exceptionType", "message", "eta", "agreedDeliveryWindowEarliest", "agreedDeliveryWindowLatest", "planner"],
   "properties": {
     "eventId": { "type": "string", "format": "uuid" },
     "eventType": { "const": "ShipperNotificationRequested" },
@@ -18,6 +18,8 @@
     "transportOrderNumber": { "description": "The Transport Order the Shipment carries out.", "type": "string", "pattern": "^TO-[0-9]{7}$" },
     "shipperId": { "description": "The Shipper to notify.", "type": "string", "minLength": 1 },
     "shipperReference": { "description": "The Shipper's own reference of the Transport Order, so the Shipper recognises the Shipment; null when the Transport Order has none.", "type": ["string", "null"], "minLength": 1 },
+    "deliveryCountry": { "description": "The ISO 3166-1 alpha-2 country of the Transport Order's delivery address, so the Shipper notification Logic App can show times in the address's time zone; null when the Transport Order has none.", "type": ["string", "null"], "pattern": "^[A-Z]{2}$" },
+    "deliveryPostcode": { "description": "The postcode of the delivery address, for the countries that span time zones; null when it has none.", "type": ["string", "null"], "minLength": 1 },
     "exceptionType": { "enum": ["CollectionFailed", "DeliveryFailed", "Damaged", "Reservations", "LateDelivery"] },
     "message": { "description": "What the Planner wrote, starting from the template for the Exception's type.", "type": "string", "minLength": 1 },
     "eta": { "description": "The Shipment's ETA when the Planner notified; null when it has none.", "type": ["string", "null"], "format": "date-time" },

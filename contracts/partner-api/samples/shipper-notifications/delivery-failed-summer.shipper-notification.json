@@ -1,0 +1,9 @@
+{
+  "notificationId": "3f8a2b6c-9d41-4c7e-8a15-6b0e2d9f7c01",
+  "bookingRef": "BD-2030-0001",
+  "transportOrderNumber": "TO-0000001",
+  "exceptionCode": "DELIVERY_FAILED",
+  "message": "Delivery was attempted but the receiver was closed. We will redeliver tomorrow.",
+  "eta": "04-10-2030 09:15",
+  "contact": "Anna de Vries"
+}
