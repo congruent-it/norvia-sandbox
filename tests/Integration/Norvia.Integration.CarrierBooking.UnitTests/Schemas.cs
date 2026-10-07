@@ -19,6 +19,9 @@ internal sealed class Schemas
     private static readonly Lazy<Schemas> TrackingEventSchema = new(() => Of("CanonicalModel/tracking-event.v1.schema.json"));
     private static readonly Lazy<Schemas> CarrierBookingAnswerSchema = new(() => Of("CanonicalModel/carrier-booking-answer.v1.schema.json"));
 
+    private static readonly Lazy<Schemas> CarrierCancellationSchema = new(() => Of("PartnerApi/carrier-cancellation.v1.schema.json"));
+    private static readonly Lazy<Schemas> CarrierBookingCancelledSchema = new(() => Of("CanonicalModel/carrier-booking-cancelled.v1.schema.json"));
+    private static readonly Lazy<Schemas> CarrierBookingWithdrawnSchema = new(() => Of("CanonicalModel/carrier-booking-withdrawn.v1.schema.json"));
     private static readonly Lazy<Schemas> ShipperNotificationSchema = new(() => Of("PartnerApi/shipper-notification.v1.schema.json"));
     private static readonly Lazy<Schemas> ShipperNotificationRequestedSchema = new(() => Of("CanonicalModel/shipper-notification-requested.v1.schema.json"));
 
@@ -44,6 +47,14 @@ internal sealed class Schemas
 
     /// <summary>The Canonical Model's answer, as the TMS's Carrier booking API takes it.</summary>
     public static Schemas CarrierBookingAnswer => CarrierBookingAnswerSchema.Value;
+
+    public static Schemas CarrierCancellation => CarrierCancellationSchema.Value;
+
+    /// <summary>The Canonical Model's event the Carrier cancellation map reads for a Cancelled Carrier booking.</summary>
+    public static Schemas CarrierBookingCancelled => CarrierBookingCancelledSchema.Value;
+
+    /// <summary>The Canonical Model's event the Carrier cancellation map reads for a Withdrawn Carrier booking.</summary>
+    public static Schemas CarrierBookingWithdrawn => CarrierBookingWithdrawnSchema.Value;
 
     public static Schemas ShipperNotification => ShipperNotificationSchema.Value;
 

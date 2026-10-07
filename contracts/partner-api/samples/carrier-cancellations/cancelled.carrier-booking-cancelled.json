@@ -1,0 +1,13 @@
+{
+  "eventId": "9b2c1d3e-4f5a-4b6c-8d7e-1a2b3c4d5e01",
+  "eventType": "CarrierBookingCancelled",
+  "eventVersion": 1,
+  "occurredAt": "2030-10-02T09:00:00+00:00",
+  "correlationId": "cancel-1",
+  "carrierBookingNumber": "CB-0000041",
+  "carrierBookingReference": "KESSLER-88213",
+  "shipmentNumber": "SH-0000041",
+  "carrierId": "CAR-0001",
+  "exceptionNumber": "EX-0000001",
+  "reasonText": "The ETA is far beyond the delivery window and the Carrier won't make its collection."
+}

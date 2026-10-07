@@ -1,0 +1,10 @@
+{
+  "eventId": "9b2c1d3e-4f5a-4b6c-8d7e-1a2b3c4d5e02",
+  "eventType": "CarrierBookingWithdrawn",
+  "eventVersion": 1,
+  "occurredAt": "2030-10-02T09:30:00+00:00",
+  "correlationId": "withdraw-1",
+  "carrierBookingNumber": "CB-0000042",
+  "shipmentNumber": "SH-0000042",
+  "carrierId": "CAR-0001"
+}

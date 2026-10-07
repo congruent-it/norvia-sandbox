@@ -190,6 +190,8 @@ The Carrier cancellation format follows the conventions of the [Carrier booking 
 | Kind: `WITHDRAWN` or `CANCELLED` | Yes |
 | Reason text | Yes for `CANCELLED`, no for `WITHDRAWN` |
 
+The schema is [carrier-cancellation.v1.schema.json](../../../contracts/partner-api/carrier-cancellation.v1.schema.json), with sample messages in `contracts/partner-api/samples/carrier-cancellations`. The map reads the `CarrierBookingCancelled` or `CarrierBookingWithdrawn` event, so it needs no lookup. A `WITHDRAWN` message never carries a reference or a reason, and the Exception number stays inside Norvia.
+
 ## Action rules
 
 | Rule | Failure code |
