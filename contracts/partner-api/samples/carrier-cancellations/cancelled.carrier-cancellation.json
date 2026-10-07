@@ -1,0 +1,7 @@
+{
+  "carrierBookingNumber": "CB-0000041",
+  "carrierBookingReference": "KESSLER-88213",
+  "shipmentNumber": "SH-0000041",
+  "kind": "CANCELLED",
+  "reasonText": "The ETA is far beyond the delivery window and the Carrier won't make its collection."
+}

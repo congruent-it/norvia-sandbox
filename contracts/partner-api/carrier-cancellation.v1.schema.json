@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/partner-api/carrier-cancellation.v1.schema.json",
+  "title": "CarrierCancellation",
+  "description": "A cancellation, as Norvia's P7 Carrier cancellation Logic App sends it to a Carrier's cancellation endpoint (Carrier cancellation format, version 1). It follows the Carrier booking format: its own field names and the same keys. It tells the Carrier about a Withdrawn booking (never answered, so no Carrier booking reference) or a Cancelled one (Confirmed, so with the Carrier's own reference and a reason). The Carrier can't refuse it. The Carrier booking number is its key: a cancellation sent again is ignored.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["carrierBookingNumber", "shipmentNumber", "kind"],
+  "properties": {
+    "carrierBookingNumber": { "description": "The Carrier booking that ended, the key of the cancellation.", "type": "string", "pattern": "^CB-[0-9]{7}$" },
+    "carrierBookingReference": { "description": "The Carrier's own number for the booking, given when it confirmed. Only for CANCELLED.", "type": "string", "minLength": 1 },
+    "shipmentNumber": { "description": "The Shipment the Carrier booking covered.", "type": "string", "pattern": "^SH-[0-9]{7}$" },
+    "kind": { "description": "WITHDRAWN: Norvia took back a request the Carrier hadn't answered. CANCELLED: Norvia ended a booking the Carrier had confirmed.", "enum": ["WITHDRAWN", "CANCELLED"] },
+    "reasonText": { "description": "Why Norvia cancelled. Required for CANCELLED.", "type": "string", "minLength": 1, "maxLength": 500 }
+  },
+  "if": { "properties": { "kind": { "const": "CANCELLED" } } },
+  "then": { "required": ["carrierBookingReference", "reasonText"] },
+  "else": { "not": { "required": ["carrierBookingReference"] } }
+}
