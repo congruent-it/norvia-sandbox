@@ -25,7 +25,7 @@ public sealed class CarrierBookingEndpointTests
     private Task<Results<Ok<ReceiveCarrierBookingResult>, ProblemHttpResult, UnauthorizedHttpResult>> Receive(
         string carrierId = "CAR-0001", string? apiKey = "carrier-secret", string? correlationId = "release-1", CarrierBookingRequestBody? body = null) =>
         CarrierBookingEndpoint.ReceiveAsync(
-            carrierId, apiKey, correlationId, body ?? Body(), _mediator, _options, NullLoggerFactory.Instance, CancellationToken.None);
+            carrierId, apiKey, correlationId, body ?? Body(), new PassThroughRetrier(_mediator), _options, NullLoggerFactory.Instance, CancellationToken.None);
 
     [Fact]
     public async Task Receive_ARequestWithTheCredential_IsPutInTheInboxAndAnswered()

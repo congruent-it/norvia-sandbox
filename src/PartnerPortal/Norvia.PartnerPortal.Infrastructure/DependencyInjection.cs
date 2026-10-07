@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Norvia.PartnerPortal.Application;
 using Norvia.PartnerPortal.Application.Bookings;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Infrastructure.Data;
@@ -26,6 +27,7 @@ public static class DependencyInjection
         builder.AddPartnerPortalDbContext();
         builder.Services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
         builder.Services.AddScoped(typeof(IReadRepository<>), typeof(EfRepository<>));
+        builder.Services.AddScoped<IConflictRetrier, EfConflictRetrier>();
 
         builder.Services.AddOptions<SeedOptions>().BindConfiguration(SeedOptions.SectionName)
             .ValidateDataAnnotations()

@@ -1,8 +1,8 @@
 using System.Text.RegularExpressions;
-using Mediator;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using Norvia.PartnerPortal.Application;
 using Norvia.PartnerPortal.Application.ShipperNotifications.Receive;
 using Norvia.PartnerPortal.Domain.ShipperNotifications;
 
@@ -36,13 +36,13 @@ public static partial class ShipperNotificationEndpoint
         [FromHeader(Name = ApiKeyHeader)] string? apiKey,
         [FromHeader(Name = CorrelationIdHeader)] string? correlationId,
         ShipperNotificationBody body,
-        IMediator mediator,
+        IConflictRetrier retrier,
         IOptions<ShipperEndpointOptions> options,
         ILoggerFactory loggers,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(body);
-        ArgumentNullException.ThrowIfNull(mediator);
+        ArgumentNullException.ThrowIfNull(retrier);
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(loggers);
 
@@ -66,12 +66,11 @@ public static partial class ShipperNotificationEndpoint
         }
 
         _ = ShipperExceptionCodes.TryParse(body.ExceptionCode, out var code);
-        var result = await mediator.Send(
-            new ReceiveShipperNotificationCommand(
-                shipperId, Guid.Parse(body.NotificationId!), correlationId!,
-                new ShipperNotificationContent(
-                    body.BookingRef!, body.TransportOrderNumber!, code, body.Message!, TimingOf(body), body.Contact!)),
-            cancellationToken);
+        var command = new ReceiveShipperNotificationCommand(
+            shipperId, Guid.Parse(body.NotificationId!), correlationId!,
+            new ShipperNotificationContent(body.BookingRef!, body.TransportOrderNumber!, code, body.Message!, TimingOf(body), body.Contact!));
+        // Two copies of one notification can arrive at once; the one that loses the race is told it is a repeat.
+        var result = await retrier.RunAsync(mediator => mediator.Send(command, cancellationToken).AsTask());
         if (!result.IsSuccess)
         {
             using var unknown = logger.BeginScope(EndpointTracking.Outcome("Failed", "ShipperUnknown"));

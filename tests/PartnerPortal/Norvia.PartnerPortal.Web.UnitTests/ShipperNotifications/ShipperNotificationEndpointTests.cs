@@ -27,7 +27,7 @@ public sealed class ShipperNotificationEndpointTests
     private Task<Results<Ok<ReceiveShipperNotificationResult>, ProblemHttpResult, UnauthorizedHttpResult>> Receive(
         string shipperId = "SHP-0001", string? apiKey = "shipper-secret", string? correlationId = "corr-1", ShipperNotificationBody? body = null) =>
         ShipperNotificationEndpoint.ReceiveAsync(
-            shipperId, apiKey, correlationId, body ?? Body(), _mediator, _options, NullLoggerFactory.Instance, CancellationToken.None);
+            shipperId, apiKey, correlationId, body ?? Body(), new PassThroughRetrier(_mediator), _options, NullLoggerFactory.Instance, CancellationToken.None);
 
     private void Answers(bool repeated) =>
         _mediator.Send(Arg.Any<ReceiveShipperNotificationCommand>(), Arg.Any<CancellationToken>())

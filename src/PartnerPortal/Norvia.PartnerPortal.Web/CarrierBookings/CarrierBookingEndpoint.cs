@@ -1,7 +1,7 @@
-using Mediator;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using Norvia.PartnerPortal.Application;
 using Norvia.PartnerPortal.Application.CarrierBookings.Receive;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
 
@@ -29,13 +29,13 @@ public static partial class CarrierBookingEndpoint
         [FromHeader(Name = ApiKeyHeader)] string? apiKey,
         [FromHeader(Name = CorrelationIdHeader)] string? correlationId,
         CarrierBookingRequestBody body,
-        IMediator mediator,
+        IConflictRetrier retrier,
         IOptions<CarrierEndpointOptions> options,
         ILoggerFactory loggers,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(body);
-        ArgumentNullException.ThrowIfNull(mediator);
+        ArgumentNullException.ThrowIfNull(retrier);
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(loggers);
 
@@ -59,8 +59,9 @@ public static partial class CarrierBookingEndpoint
                 statusCode: StatusCodes.Status400BadRequest, title: "The booking request is incomplete.", detail: string.Join(' ', problems));
         }
 
-        var result = await mediator.Send(
-            new ReceiveCarrierBookingCommand(carrierId, body.CarrierBookingNumber!, body.ShipmentNumber!, correlationId!, DetailsOf(body)), cancellationToken);
+        var command = new ReceiveCarrierBookingCommand(carrierId, body.CarrierBookingNumber!, body.ShipmentNumber!, correlationId!, DetailsOf(body));
+        // Two copies of one request can arrive at once; the one that loses the race is told it is a repeat.
+        var result = await retrier.RunAsync(mediator => mediator.Send(command, cancellationToken).AsTask());
         if (!result.IsSuccess)
         {
             using var unknown = logger.BeginScope(EndpointTracking.Outcome("Failed", "CarrierUnknown"));
