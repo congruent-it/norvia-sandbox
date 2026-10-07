@@ -14,4 +14,7 @@ public enum CarrierBookingRequestStatus
 
     /// <summary>Norvia answered a late answer with BookingNotOpen: Norvia withdrew the request, or closed it some other way, while the Carrier was answering.</summary>
     WithdrawnByNorvia,
+
+    /// <summary>Norvia told the Carrier it ended a booking the Carrier had confirmed, with a reason.</summary>
+    CancelledByNorvia,
 }

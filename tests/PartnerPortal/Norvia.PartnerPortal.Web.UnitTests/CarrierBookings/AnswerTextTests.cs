@@ -30,6 +30,8 @@ public sealed class AnswerTextTests
     {
         RequestStatusText.Of(Request).Should().Be("Open");
         RequestStatusText.Of(Request with { Status = CarrierBookingRequestStatus.WithdrawnByNorvia }).Should().Be("Withdrawn by Norvia");
+        RequestStatusText.Of(Request with { Status = CarrierBookingRequestStatus.CancelledByNorvia, CancellationText = "Truck broke down" }).Should().Be("Cancelled by Norvia: Truck broke down");
+        RequestStatusText.Of(Request with { Status = CarrierBookingRequestStatus.CancelledByNorvia }).Should().Be("Cancelled by Norvia");
         RequestStatusText.Of(Request with { Status = CarrierBookingRequestStatus.Confirmed, CarrierBookingReference = "R-1" }).Should().Be("Confirmed, your reference R-1");
         RequestStatusText.Of(Request with { Status = CarrierBookingRequestStatus.Rejected, RejectionReason = CarrierRejectionReason.NoCapacity }).Should().Be("Rejected: No capacity");
         RequestStatusText.Of(Request with { Status = CarrierBookingRequestStatus.Rejected }).Should().Be("Rejected: No reason");

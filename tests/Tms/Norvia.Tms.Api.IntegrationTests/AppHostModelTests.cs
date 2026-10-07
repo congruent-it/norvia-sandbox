@@ -389,7 +389,7 @@ public sealed class AppHostModelTests
 
         var bicep = ContainerAppBicepOf(builder, demoUi);
 
-        bicep.Should().MatchRegex(@"excludedPaths: \[\s*'/health'\s*'/alive'(\s*'/(carrier|shipper)/v1/[^']+/(bookings|notifications)')*\s*\]");
+        bicep.Should().MatchRegex(@"excludedPaths: \[\s*'/health'\s*'/alive'(\s*'/(carrier|shipper)/v1/[^']+/(bookings|notifications|cancellations)')*\s*\]");
     }
 
     [Fact]
@@ -403,11 +403,11 @@ public sealed class AppHostModelTests
     [Fact]
     public async Task InAzure_ThePartnerPortal_AlsoLeavesEachPersonasEndpointOutsideTheGate()
     {
-        // The P4 booking and P7 Shipper notification Logic Apps are no browsers, and each endpoint asks its caller for the party's own credential (ADR 0024).
+        // The P4 booking, P7 Shipper notification and P7 Carrier cancellation Logic Apps are no browsers, and each endpoint asks its caller for the party's own credential (ADR 0024).
         await using var builder = await CreateForAzureAsync();
 
         ContainerAppBicepOf(builder, "partner-portal-web").Should()
-            .MatchRegex(@"excludedPaths: \[\s*'/health'\s*'/alive'\s*'/shipper/v1/SHP-0001/notifications'\s*'/shipper/v1/SHP-0003/notifications'\s*'/carrier/v1/CAR-0001/bookings'\s*'/carrier/v1/CAR-0002/bookings'\s*'/carrier/v1/CAR-0003/bookings'\s*\]");
+            .MatchRegex(@"excludedPaths: \[\s*'/health'\s*'/alive'\s*'/shipper/v1/SHP-0001/notifications'\s*'/shipper/v1/SHP-0003/notifications'\s*'/carrier/v1/CAR-0001/bookings'\s*'/carrier/v1/CAR-0002/bookings'\s*'/carrier/v1/CAR-0003/bookings'\s*'/carrier/v1/CAR-0001/cancellations'\s*'/carrier/v1/CAR-0002/cancellations'\s*'/carrier/v1/CAR-0003/cancellations'\s*\]");
     }
 
     [Theory]

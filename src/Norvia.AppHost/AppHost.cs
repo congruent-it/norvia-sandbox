@@ -122,9 +122,11 @@ if (builder.ExecutionContext.IsPublishMode)
 
     // The TMS UI and the Partner portal have no login of their own, so in Azure they open to the presenter's browser
     // behind an Entra sign-in that only the presenter passes (ADR 0024). The apps don't know it is there.
-    // The exceptions are each Carrier Persona's booking endpoint and each Shipper Persona's notification endpoint: the
-    // Logic Apps that call them are no browsers, and the endpoints ask them for the party's own credential.
-    var personaEndpoints = personas.Select(persona => persona.EndpointPath).ToList();
+    // The exceptions are each Carrier Persona's booking and cancellation endpoints and each Shipper Persona's notification
+    // endpoint: the Logic Apps that call them are no browsers, and the endpoints ask them for the party's own credential.
+    var personaEndpoints = personas.Select(persona => persona.EndpointPath)
+        .Concat(personas.Select(persona => persona.CancellationPath).OfType<string>())
+        .ToList();
     foreach (var (demoUi, pathsOutsideTheGate) in new[] { (tmsWeb, []), (partnerPortal, personaEndpoints) })
     {
         demoUi.WithExternalHttpEndpoints()

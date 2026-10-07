@@ -228,7 +228,7 @@ The timeline shows each Exception with its causes, actions, Shipper notification
 - **Shipper Personas** get a notification endpoint and a **notification inbox** that lists the notifications received, newest first, with their Transport Order number and Shipper reference. Every active Shipper has a Persona, as every active Carrier does.
 - **Carrier Personas** get a cancellation endpoint. Their booking inbox from P4 shows a request as "withdrawn by Norvia" or "cancelled by Norvia", with the reason. A cancelled Shipment leaves the Persona's list of Shipments to track.
 
-The endpoints have no answer modes. They acknowledge every valid message. A Shipper Persona's notification endpoint is `/shipper/v1/<Shipper ID>/notifications`. It asks its caller for the Shipper's own credential, which Key Vault holds as `shipper-endpoint-key-<Shipper ID>`, and stores a notification once per notification ID.
+The endpoints have no answer modes. They acknowledge every valid message. A Shipper Persona's notification endpoint is `/shipper/v1/<Shipper ID>/notifications`. It asks its caller for the Shipper's own credential, which Key Vault holds as `shipper-endpoint-key-<Shipper ID>`, and stores a notification once per notification ID. A Carrier Persona's cancellation endpoint is `/carrier/v1/<Carrier ID>/cancellations`. It asks for the Carrier's own credential, the one Key Vault already holds as `carrier-endpoint-key-<Carrier ID>` for the booking endpoint, and applies a cancellation or withdrawal once per Carrier booking number. It acknowledges a message it can't apply, such as a cancellation for a booking its inbox never had, or a withdrawal of a request the Carrier already confirmed, and leaves the inbox as it was.
 
 ## TMS API
 
