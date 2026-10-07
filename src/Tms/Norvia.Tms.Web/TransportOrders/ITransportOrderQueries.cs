@@ -1,3 +1,4 @@
+using Norvia.Tms.Application.Billing.ListNotYetBillable;
 using Norvia.Tms.Application.Exceptions.ListOpen;
 using Norvia.Tms.Application.ProofsOfDelivery.ListMissing;
 using Norvia.Tms.Application.Shipments;
@@ -32,6 +33,9 @@ public interface ITransportOrderQueries
 
     /// <summary>The rating exceptions: the Transport Orders whose Rating failed, which Customer service follows up.</summary>
     Task<IReadOnlyList<RatingExceptionSummary>> ListRatingExceptionsAsync(CancellationToken cancellationToken);
+
+    /// <summary>The Delivered Transport-only orders that aren't Billable yet (P9), oldest delivery first, each with its blocking reasons.</summary>
+    Task<IReadOnlyList<TransportOrderNotYetBillableSummary>> ListNotYetBillableAsync(CancellationToken cancellationToken);
 
     /// <summary>The Carriers a Planner may assign to: only the active ones, by name.</summary>
     Task<IReadOnlyList<CarrierView>> ListActiveCarriersAsync(CancellationToken cancellationToken);

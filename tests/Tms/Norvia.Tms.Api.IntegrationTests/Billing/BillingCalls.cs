@@ -70,4 +70,25 @@ internal static class BillingCalls
             m.Subject == "TransportOrderBillable"
             && m.ApplicationProperties.TryGetValue("transportOrderNumber", out var number)
             && Equals(number, transportOrderNumber))];
+
+    /// <summary>Customer service's list of Delivered orders that aren't Billable yet, oldest delivery first.</summary>
+    public static async Task<JsonArray> ListNotYetBillableAsync(this TmsFixture tms, CancellationToken cancellationToken)
+    {
+        using var response = await tms.Tms.GetAsync(new Uri("/v1/transport-orders/not-yet-billable", UriKind.Relative), cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, body);
+        return JsonNode.Parse(body)!.AsArray();
+    }
+
+    /// <summary>The list's entry for the Transport Order, or null when it isn't listed.</summary>
+    public static async Task<JsonNode?> NotYetBillableEntryAsync(this TmsFixture tms, string transportOrderNumber, CancellationToken cancellationToken) =>
+        (await tms.ListNotYetBillableAsync(cancellationToken)).SingleOrDefault(entry => entry!["transportOrderNumber"]!.GetValue<string>() == transportOrderNumber);
+
+    /// <summary>The reasons the list gives for the Transport Order.</summary>
+    public static async Task<string[]> BlockingReasonsAsync(this TmsFixture tms, string transportOrderNumber, CancellationToken cancellationToken)
+    {
+        var entry = await tms.NotYetBillableEntryAsync(transportOrderNumber, cancellationToken);
+        entry.Should().NotBeNull($"Transport Order {transportOrderNumber} should be listed");
+        return [.. entry!["blockingReasons"]!.AsArray().Select(reason => reason!.GetValue<string>())];
+    }
 }

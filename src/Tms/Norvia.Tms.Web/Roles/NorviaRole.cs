@@ -23,7 +23,7 @@ public sealed record NorviaRole(string Key, string Name, IReadOnlyList<RoleView>
         ]);
 
     public static readonly NorviaRole CustomerService = new("customer-service", "Customer service",
-        [new("/rejected-bookings", "Rejected bookings"), new("/rating-exceptions", "Rating exceptions")]);
+        [new("/rejected-bookings", "Rejected bookings"), new("/rating-exceptions", "Rating exceptions"), new("/not-yet-billable", "Not yet billable")]);
 
     /// <summary>Where the role opens: its first view.</summary>
     public string Home => Views[0].Path;

@@ -17,6 +17,7 @@ public sealed class TransportOrderQueryAuthorizationTests(TmsFixture tms)
     [InlineData("/v1/transport-orders/TO-0000001")]
     [InlineData("/v1/transport-orders/00000000-0000-0000-0000-000000000001")]
     [InlineData("/v1/transport-orders/rating-exceptions")]
+    [InlineData("/v1/transport-orders/not-yet-billable")]
     [InlineData("/v1/shipments/SH-0000001")]
     public async Task Query_WithoutAToken_IsUnauthorized(string query)
     {

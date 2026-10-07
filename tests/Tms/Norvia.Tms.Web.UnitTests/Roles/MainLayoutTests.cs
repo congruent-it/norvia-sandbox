@@ -16,11 +16,11 @@ public sealed class MainLayoutTests : BunitContext
     }
 
     [Fact]
-    public void Render_AsCustomerService_LinksToTheRejectedBookingsAndTheRatingExceptions()
+    public void Render_AsCustomerService_LinksToTheRejectedBookingsTheRatingExceptionsAndNotYetBillable()
     {
         var layout = RenderAs("customer-service");
 
-        MainNavigation(layout).Should().Equal(("/rejected-bookings", "Rejected bookings"), ("/rating-exceptions", "Rating exceptions"));
+        MainNavigation(layout).Should().Equal(("/rejected-bookings", "Rejected bookings"), ("/rating-exceptions", "Rating exceptions"), ("/not-yet-billable", "Not yet billable"));
     }
 
     [Fact]

@@ -29,11 +29,12 @@ public sealed class NorviaRoleTests
     }
 
     [Fact]
-    public void Views_OfCustomerService_AreTheRejectedBookingsThenTheRatingExceptions()
+    public void Views_OfCustomerService_AreTheRejectedBookingsThenTheRatingExceptionsThenNotYetBillable()
     {
         NorviaRole.CustomerService.Views.Select(view => (view.Path, view.Title)).Should().Equal(
             ("/rejected-bookings", "Rejected bookings"),
-            ("/rating-exceptions", "Rating exceptions"));
+            ("/rating-exceptions", "Rating exceptions"),
+            ("/not-yet-billable", "Not yet billable"));
     }
 
     [Fact]
