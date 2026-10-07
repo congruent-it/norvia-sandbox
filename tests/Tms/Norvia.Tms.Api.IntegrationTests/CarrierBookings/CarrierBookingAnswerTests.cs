@@ -22,10 +22,11 @@ public sealed class CarrierBookingAnswerTests(TmsFixture tms)
     [Fact]
     public async Task Confirm_ARequestedBooking_MovesItToConfirmed_AndTheShipmentToBooked_AndPublishesOneCarrierBookingConfirmed()
     {
+        var reference = CarrierBookingCalls.NewReference();
         var (carrierBookingNumber, shipmentNumber) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
         var plannedCollectionTime = DateTimeOffset.UtcNow.AddDays(1);
 
-        var confirmed = await tms.ConfirmedAsync(carrierBookingNumber, PlanningCalls.CarrierId, "VDT-240917-0042", _cancellationToken, plannedCollectionTime);
+        var confirmed = await tms.ConfirmedAsync(carrierBookingNumber, PlanningCalls.CarrierId, reference, _cancellationToken, plannedCollectionTime);
 
         confirmed["carrierBookingNumber"]!.GetValue<string>().Should().Be(carrierBookingNumber);
         confirmed["status"]!.GetValue<string>().Should().Be("Confirmed");
@@ -36,7 +37,7 @@ public sealed class CarrierBookingAnswerTests(TmsFixture tms)
         shipment["status"]!.GetValue<string>().Should().Be("Booked");
         var booking = BookingOf(shipment, carrierBookingNumber);
         booking["status"]!.GetValue<string>().Should().Be("Confirmed");
-        booking["carrierBookingReference"]!.GetValue<string>().Should().Be("VDT-240917-0042");
+        booking["carrierBookingReference"]!.GetValue<string>().Should().Be(reference);
         DateTimeOffset.Parse(booking["plannedCollectionTime"]!.GetValue<string>(), CultureInfo.InvariantCulture).Should().BeCloseTo(plannedCollectionTime, TimeSpan.FromSeconds(1));
         booking["answeredAt"].Should().NotBeNull();
 
@@ -45,16 +46,17 @@ public sealed class CarrierBookingAnswerTests(TmsFixture tms)
         body["carrierBookingNumber"]!.GetValue<string>().Should().Be(carrierBookingNumber);
         body["shipmentNumber"]!.GetValue<string>().Should().Be(shipmentNumber);
         body["carrierId"]!.GetValue<string>().Should().Be(PlanningCalls.CarrierId);
-        body["carrierBookingReference"]!.GetValue<string>().Should().Be("VDT-240917-0042");
+        body["carrierBookingReference"]!.GetValue<string>().Should().Be(reference);
         message.ApplicationProperties.Should().Contain("carrierBookingNumber", carrierBookingNumber);
     }
 
     [Fact]
     public async Task Confirm_WithNoPlannedCollectionTime_StoresNone_AndTheEventCarriesNone()
     {
+        var reference = CarrierBookingCalls.NewReference();
         var (carrierBookingNumber, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
 
-        var confirmed = await tms.ConfirmedAsync(carrierBookingNumber, PlanningCalls.CarrierId, "VDT-240917-0043", _cancellationToken);
+        var confirmed = await tms.ConfirmedAsync(carrierBookingNumber, PlanningCalls.CarrierId, reference, _cancellationToken);
 
         var message = await SingleConfirmedAsync(confirmed);
         var body = Valid(message, CanonicalModelSchemas.ValidateCarrierBookingConfirmed);
@@ -64,11 +66,12 @@ public sealed class CarrierBookingAnswerTests(TmsFixture tms)
     [Fact]
     public async Task Confirm_TheAnswersOwnCorrelationId_IsWhatTheEventCarries()
     {
+        var reference = CarrierBookingCalls.NewReference();
         var (carrierBookingNumber, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
         var answerCorrelationId = Guid.NewGuid().ToString();
 
         var confirmed = await tms.ConfirmedAsync(
-            carrierBookingNumber, PlanningCalls.CarrierId, "VDT-240917-0042", _cancellationToken, correlationId: answerCorrelationId);
+            carrierBookingNumber, PlanningCalls.CarrierId, reference, _cancellationToken, correlationId: answerCorrelationId);
 
         confirmed["correlationId"]!.GetValue<string>().Should().Be(answerCorrelationId);
         var message = await SingleConfirmedAsync(confirmed);

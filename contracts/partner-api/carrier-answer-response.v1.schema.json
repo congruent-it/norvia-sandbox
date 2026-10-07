@@ -6,7 +6,7 @@
   "type": "object",
   "required": ["result", "messageId"],
   "properties": {
-    "result": { "enum": ["RECORDED", "BOOKING_NOT_OPEN", "BOOKING_NOT_FOUND", "NOT_ALLOWED", "INVALID", "NOT_RECEIVED"] },
+    "result": { "enum": ["RECORDED", "BOOKING_NOT_OPEN", "REFERENCE_IN_USE", "BOOKING_NOT_FOUND", "NOT_ALLOWED", "INVALID", "NOT_RECEIVED"] },
     "messageId": {
       "description": "Norvia's ID for this answer (the correlation ID). Quote it when asking Norvia about the answer.",
       "type": "string",
@@ -32,12 +32,12 @@
       }
     },
     "refusal": {
-      "description": "Norvia did not record the answer. BOOKING_NOT_OPEN (HTTP 409): Norvia no longer has the booking open, for example because it withdrew it while the Carrier was answering, or the booking already has a different answer. BOOKING_NOT_FOUND (HTTP 404): Norvia has no such booking. NOT_ALLOWED (HTTP 403): the booking isn't this Carrier's. INVALID (HTTP 400): the answer can't be used; text says why. NOT_RECEIVED (HTTP 502): Norvia could not take the answer in, so nothing was recorded; send it again.",
+      "description": "Norvia did not record the answer. BOOKING_NOT_OPEN (HTTP 409): Norvia no longer has the booking open, for example because it withdrew it while the Carrier was answering, or the booking already has a different answer. REFERENCE_IN_USE (HTTP 422): the Carrier already holds the reference of a confirmation on another Confirmed booking; confirm with a reference of its own. BOOKING_NOT_FOUND (HTTP 404): Norvia has no such booking. NOT_ALLOWED (HTTP 403): the booking isn't this Carrier's. INVALID (HTTP 400): the answer can't be used; text says why. NOT_RECEIVED (HTTP 502): Norvia could not take the answer in, so nothing was recorded; send it again.",
       "type": "object",
       "additionalProperties": false,
       "required": ["result", "messageId", "text"],
       "properties": {
-        "result": { "enum": ["BOOKING_NOT_OPEN", "BOOKING_NOT_FOUND", "NOT_ALLOWED", "INVALID", "NOT_RECEIVED"] },
+        "result": { "enum": ["BOOKING_NOT_OPEN", "REFERENCE_IN_USE", "BOOKING_NOT_FOUND", "NOT_ALLOWED", "INVALID", "NOT_RECEIVED"] },
         "messageId": true,
         "carrierBookingNumber": { "type": "string", "pattern": "^CB-[0-9]{7}$" },
         "text": { "type": "string", "minLength": 1 }

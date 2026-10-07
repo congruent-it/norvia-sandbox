@@ -18,7 +18,8 @@ public sealed class CarrierBookingAnswerRefusalTests(TmsFixture tms)
     [Fact]
     public async Task Confirm_AnUnknownBookingNumber_IsRefused_WithBookingNotFound()
     {
-        var problem = await tms.ConfirmRefusedAsync("CB-9999999", PlanningCalls.CarrierId, "VDT-240917-0042", HttpStatusCode.NotFound, _cancellationToken);
+        var reference = CarrierBookingCalls.NewReference();
+        var problem = await tms.ConfirmRefusedAsync("CB-9999999", PlanningCalls.CarrierId, reference, HttpStatusCode.NotFound, _cancellationToken);
 
         problem["code"]!.GetValue<string>().Should().Be("BookingNotFound");
     }
@@ -34,10 +35,11 @@ public sealed class CarrierBookingAnswerRefusalTests(TmsFixture tms)
     [Fact]
     public async Task Confirm_FromAnotherCarrier_IsRefused_WithNoStableCode_AndChangesNothing()
     {
+        var reference = CarrierBookingCalls.NewReference();
         var (carrierBookingNumber, shipmentNumber) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
 
         var problem = await tms.ConfirmRefusedAsync(
-            carrierBookingNumber, PlanningCalls.OtherCarrierId, "VDT-240917-0042", HttpStatusCode.Forbidden, _cancellationToken);
+            carrierBookingNumber, PlanningCalls.OtherCarrierId, reference, HttpStatusCode.Forbidden, _cancellationToken);
 
         problem["code"].Should().BeNull("the design's answer rules give the wrong-Carrier rule no code, only \"Refused\"");
         var shipment = await tms.GetShipmentAsync(shipmentNumber, _cancellationToken);
@@ -60,13 +62,30 @@ public sealed class CarrierBookingAnswerRefusalTests(TmsFixture tms)
     [Fact]
     public async Task Confirm_ABookingAlreadyConfirmedDifferently_IsRefused_WithBookingNotOpen()
     {
+        var reference41 = CarrierBookingCalls.NewReference();
+        var reference42 = CarrierBookingCalls.NewReference();
         var (carrierBookingNumber, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
-        await tms.ConfirmedAsync(carrierBookingNumber, PlanningCalls.CarrierId, "VDT-240917-0041", _cancellationToken);
+        await tms.ConfirmedAsync(carrierBookingNumber, PlanningCalls.CarrierId, reference41, _cancellationToken);
 
         var problem = await tms.ConfirmRefusedAsync(
-            carrierBookingNumber, PlanningCalls.CarrierId, "VDT-240917-0042", HttpStatusCode.Conflict, _cancellationToken);
+            carrierBookingNumber, PlanningCalls.CarrierId, reference42, HttpStatusCode.Conflict, _cancellationToken);
 
         problem["code"]!.GetValue<string>().Should().Be("BookingNotOpen");
+    }
+
+    [Fact]
+    public async Task Confirm_AReferenceTheCarrierAlreadyHoldsOnAnotherConfirmedBooking_IsRefused_WithReferenceInUse_AndLeavesTheBookingRequested()
+    {
+        var reference = CarrierBookingCalls.NewReference();
+        var (first, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
+        var (second, shipmentNumber) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
+        await tms.ConfirmedAsync(first, PlanningCalls.CarrierId, reference, _cancellationToken);
+
+        var problem = await tms.ConfirmRefusedAsync(second, PlanningCalls.CarrierId, reference, HttpStatusCode.UnprocessableEntity, _cancellationToken);
+
+        problem["code"]!.GetValue<string>().Should().Be("ReferenceInUse");
+        var shipment = await tms.GetShipmentAsync(shipmentNumber, _cancellationToken);
+        BookingOf(shipment, second)["status"]!.GetValue<string>().Should().Be("Requested");
     }
 
     [Fact]
@@ -83,13 +102,14 @@ public sealed class CarrierBookingAnswerRefusalTests(TmsFixture tms)
     [Fact]
     public async Task Confirm_TheExactSameConfirmationRepeated_ReturnsTheOriginalResult_FlaggedAsARepeat_AndPublishesNoNewEvent()
     {
+        var reference = CarrierBookingCalls.NewReference();
         var (carrierBookingNumber, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
-        var first = await tms.ConfirmedAsync(carrierBookingNumber, PlanningCalls.CarrierId, "VDT-240917-0042", _cancellationToken);
+        var first = await tms.ConfirmedAsync(carrierBookingNumber, PlanningCalls.CarrierId, reference, _cancellationToken);
         var firstCorrelationId = first["correlationId"]!.GetValue<string>();
         await tms.PublishedAsync(firstCorrelationId, "CarrierBookingConfirmed", _cancellationToken);
 
         var repeated = await tms.ConfirmedAsync(
-            carrierBookingNumber, PlanningCalls.CarrierId, "VDT-240917-0042", _cancellationToken, correlationId: Guid.NewGuid().ToString());
+            carrierBookingNumber, PlanningCalls.CarrierId, reference, _cancellationToken, correlationId: Guid.NewGuid().ToString());
 
         repeated["repeat"]!.GetValue<bool>().Should().BeTrue();
         repeated["correlationId"]!.GetValue<string>().Should().Be(firstCorrelationId, "a repeat answers on the trail of the answer it repeats");
@@ -154,10 +174,11 @@ public sealed class CarrierBookingAnswerRefusalTests(TmsFixture tms)
     [Fact]
     public async Task Confirm_Refused_IsTracedAsRefused_WithItsFailureCode()
     {
+        var reference = CarrierBookingCalls.NewReference();
         var correlationId = Guid.NewGuid().ToString();
 
         using var response = await tms.ConfirmAsync(
-            "CB-9999999", PlanningCalls.CarrierId, "VDT-240917-0042", _cancellationToken, correlationId: correlationId);
+            "CB-9999999", PlanningCalls.CarrierId, reference, _cancellationToken, correlationId: correlationId);
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
         var refusal = await tms.TmsLogAsync(log => log["correlationId"] == correlationId && log["outcome"] == "Refused", _cancellationToken);
@@ -168,11 +189,12 @@ public sealed class CarrierBookingAnswerRefusalTests(TmsFixture tms)
     [Fact]
     public async Task Confirm_RefusedForTheWrongCarrier_IsTracedAsRefused_WithNoFailureCode()
     {
+        var reference = CarrierBookingCalls.NewReference();
         var (carrierBookingNumber, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
         var correlationId = Guid.NewGuid().ToString();
 
         using var response = await tms.ConfirmAsync(
-            carrierBookingNumber, PlanningCalls.OtherCarrierId, "VDT-240917-0042", _cancellationToken, correlationId: correlationId);
+            carrierBookingNumber, PlanningCalls.OtherCarrierId, reference, _cancellationToken, correlationId: correlationId);
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         var refusal = await tms.TmsLogAsync(log => log["correlationId"] == correlationId && log["outcome"] == "Refused", _cancellationToken);

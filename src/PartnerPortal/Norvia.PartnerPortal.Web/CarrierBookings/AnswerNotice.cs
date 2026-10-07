@@ -32,6 +32,8 @@ public sealed record AnswerNotice(string Text, MessageIntent Intent, string? Mes
                 new($"Norvia recorded your {what} of {carrierBookingNumber}.", MessageIntent.Success, reply.MessageId, AnswerAgain: false),
             CarrierAnswerResult.BookingNotOpen =>
                 new($"Norvia no longer has {carrierBookingNumber} open: it was withdrawn while you were answering, or has been closed. Nothing was recorded, and the inbox shows the request as withdrawn by Norvia.", MessageIntent.Warning, reply.MessageId, AnswerAgain: false),
+            CarrierAnswerResult.ReferenceInUse =>
+                new($"Norvia did not record your {what} of {carrierBookingNumber}: you already hold that reference on another confirmed booking. Confirm again with a reference of its own.", MessageIntent.Warning, reply.MessageId, AnswerAgain: true),
             CarrierAnswerResult.NotReceived =>
                 new($"Norvia did not receive your {what} of {carrierBookingNumber}, so nothing was recorded. Send it again in a moment.", MessageIntent.Warning, reply.MessageId, AnswerAgain: true),
             _ => new(reply.Text ?? "Norvia refused the answer.", MessageIntent.Error, reply.MessageId, AnswerAgain: false),

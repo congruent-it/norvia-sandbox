@@ -19,6 +19,7 @@ public static class TmsAnswerOutcome
         403 => (Refused, "CarrierNotAllowed"),
         404 => (Refused, "BookingNotFound"),
         409 => (Refused, "BookingNotOpen"),
+        422 => (Refused, "ReferenceInUse"),
         _ => (Failed, WhyNotReceived(tmsStatusCode)),
     };
 

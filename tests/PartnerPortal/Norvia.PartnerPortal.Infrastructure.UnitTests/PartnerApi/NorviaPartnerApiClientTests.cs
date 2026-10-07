@@ -403,6 +403,7 @@ public sealed class NorviaPartnerApiClientTests : IDisposable
 
     [Theory]
     [InlineData(HttpStatusCode.Conflict, "booking-not-open.json", CarrierAnswerResult.BookingNotOpen)]
+    [InlineData(HttpStatusCode.UnprocessableEntity, "reference-in-use.json", CarrierAnswerResult.ReferenceInUse)]
     [InlineData(HttpStatusCode.NotFound, "booking-not-found.json", CarrierAnswerResult.BookingNotFound)]
     [InlineData(HttpStatusCode.Forbidden, "not-allowed.json", CarrierAnswerResult.NotAllowed)]
     [InlineData(HttpStatusCode.BadRequest, "invalid.json", CarrierAnswerResult.Invalid)]
@@ -490,6 +491,7 @@ public sealed class NorviaPartnerApiClientTests : IDisposable
 
     [Theory]
     [InlineData(HttpStatusCode.Conflict, "booking-not-open.json", "Refused", "BookingNotOpen")]
+    [InlineData(HttpStatusCode.UnprocessableEntity, "reference-in-use.json", "Refused", "ReferenceInUse")]
     [InlineData(HttpStatusCode.NotFound, "booking-not-found.json", "Refused", "BookingNotFound")]
     [InlineData(HttpStatusCode.Forbidden, "not-allowed.json", "Refused", "CarrierNotAllowed")]
     [InlineData(HttpStatusCode.BadRequest, "invalid.json", "Refused", "CarrierAnswerUnreadable")]

@@ -36,6 +36,7 @@ public static class CarrierAnswerTracking
     {
         CarrierAnswerResult.Recorded => new() { ["outcome"] = "Succeeded" },
         CarrierAnswerResult.BookingNotOpen => new() { ["outcome"] = "Refused", ["failureCode"] = "BookingNotOpen" },
+        CarrierAnswerResult.ReferenceInUse => new() { ["outcome"] = "Refused", ["failureCode"] = "ReferenceInUse" },
         CarrierAnswerResult.BookingNotFound => new() { ["outcome"] = "Refused", ["failureCode"] = "BookingNotFound" },
         CarrierAnswerResult.NotAllowed => new() { ["outcome"] = "Refused", ["failureCode"] = "CarrierNotAllowed" },
         CarrierAnswerResult.Invalid => new() { ["outcome"] = "Refused", ["failureCode"] = "CarrierAnswerUnreadable" },

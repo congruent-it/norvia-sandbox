@@ -15,4 +15,7 @@ public enum CarrierBookingRefusalCode
 
     /// <summary>The Carrier booking isn't Withdrawn or Cancelled, so there is no cancellation or withdrawal to report on (P7).</summary>
     BookingNotCancelled,
+
+    /// <summary>The Carrier already holds the reference on another Confirmed Carrier booking, so a Tracking event or Proof of delivery naming it couldn't tell the two apart.</summary>
+    ReferenceInUse,
 }

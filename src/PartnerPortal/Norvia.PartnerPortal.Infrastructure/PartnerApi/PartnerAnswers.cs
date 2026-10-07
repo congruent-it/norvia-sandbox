@@ -44,6 +44,7 @@ internal static class PartnerAnswers
         {
             (200, "RECORDED") => NorviaReply.Recorded(messageId, json?["repeated"] is JsonValue repeated && repeated.TryGetValue<bool>(out var value) && value),
             (409, "BOOKING_NOT_OPEN") => Refusal(CarrierAnswerResult.BookingNotOpen, json, messageId, "Norvia no longer has this booking open."),
+            (422, "REFERENCE_IN_USE") => Refusal(CarrierAnswerResult.ReferenceInUse, json, messageId, "Norvia has this reference on another confirmed booking of yours."),
             (404, "BOOKING_NOT_FOUND") => Refusal(CarrierAnswerResult.BookingNotFound, json, messageId, "Norvia has no such booking."),
             (403, "NOT_ALLOWED") => Refusal(CarrierAnswerResult.NotAllowed, json, messageId, "This booking is not yours to answer."),
             (400, "INVALID") => Refusal(CarrierAnswerResult.Invalid, json, messageId, "Norvia can't use this answer."),

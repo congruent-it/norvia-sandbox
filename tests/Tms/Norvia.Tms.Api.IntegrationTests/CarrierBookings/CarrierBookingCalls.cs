@@ -10,6 +10,9 @@ namespace Norvia.Tms.Api.IntegrationTests.CarrierBookings;
 /// <summary>What the Carrier booking answer tests do at the TMS's boundary: confirm or reject as the Carrier-answer Logic App does.</summary>
 internal static class CarrierBookingCalls
 {
+    /// <summary>A Carrier booking reference no other test used: the TMS refuses a reference the Carrier already holds on another Confirmed booking, and the tests share one database.</summary>
+    public static string NewReference() => $"VDT-{Guid.NewGuid():N}"[..20];
+
     /// <summary>Posts an answer body of the caller's own shape, for a call the request-level validation must refuse.</summary>
     public static async Task<HttpResponseMessage> AnswerAsync(
         this TmsFixture tms, string carrierBookingNumber, JsonObject answer, CancellationToken cancellationToken, string? correlationId = null)

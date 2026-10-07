@@ -144,8 +144,8 @@
               "partyId": "@action()?['inputs']?['body']?['carrierId']",
               "carrierBookingNumber": "@action()?['outputs']?['body']?['carrierBookingNumber']",
               "shipmentNumber": "@action()?['outputs']?['body']?['shipmentNumber']",
-              "outcome": "@if(equals(action()?['outputs']?['statusCode'], 200), 'Succeeded', if(contains(createArray(403, 404, 409), action()?['outputs']?['statusCode']), 'Refused', 'Failed'))",
-              "failureCode": "@if(equals(action()?['outputs']?['statusCode'], 200), null, if(equals(action()?['outputs']?['statusCode'], 403), 'CarrierNotAllowed', if(equals(action()?['outputs']?['statusCode'], 404), 'BookingNotFound', if(equals(action()?['outputs']?['statusCode'], 409), 'BookingNotOpen', if(and(greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 400), less(coalesce(action()?['outputs']?['statusCode'], 0), 500), not(contains(createArray(408, 429), action()?['outputs']?['statusCode']))), 'TmsCallRefused', 'TmsUnavailable')))))"
+              "outcome": "@if(equals(action()?['outputs']?['statusCode'], 200), 'Succeeded', if(contains(createArray(403, 404, 409, 422), action()?['outputs']?['statusCode']), 'Refused', 'Failed'))",
+              "failureCode": "@if(equals(action()?['outputs']?['statusCode'], 200), null, if(equals(action()?['outputs']?['statusCode'], 403), 'CarrierNotAllowed', if(equals(action()?['outputs']?['statusCode'], 404), 'BookingNotFound', if(equals(action()?['outputs']?['statusCode'], 409), 'BookingNotOpen', if(equals(action()?['outputs']?['statusCode'], 422), 'ReferenceInUse', if(and(greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 400), less(coalesce(action()?['outputs']?['statusCode'], 0), 500), not(contains(createArray(408, 429), action()?['outputs']?['statusCode']))), 'TmsCallRefused', 'TmsUnavailable'))))))"
             }
           }
         },

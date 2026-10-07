@@ -11,6 +11,7 @@ namespace Norvia.Integration.CarrierBooking;
 public static class CarrierAnswerResponses
 {
     private const string NotReceivedText = "Norvia could not take your answer in, so nothing was recorded. Please send it again later.";
+    private const string ReferenceInUseText = "Norvia has this reference on another confirmed booking of yours, so nothing was recorded. Confirm with a reference of its own.";
     private const string NotOpenText = "Norvia no longer has this booking open: it was withdrawn, or already has a different answer.";
 
     /// <param name="mapped">What the map made of the Carrier's answer.</param>
@@ -32,6 +33,7 @@ public static class CarrierAnswerResponses
             403 => Refusal(403, "NOT_ALLOWED", number, "This booking is not yours to answer.", correlationId, null),
             404 => Refusal(404, "BOOKING_NOT_FOUND", number, $"Norvia has no booking {number}.", correlationId, null),
             409 => Refusal(409, "BOOKING_NOT_OPEN", number, NotOpenText, correlationId, null),
+            422 => Refusal(422, "REFERENCE_IN_USE", number, ReferenceInUseText, correlationId, null),
             _ => Refusal(502, "NOT_RECEIVED", number, NotReceivedText, correlationId, TmsAnswerOutcome.WhyNotReceived(tmsStatusCode)),
         };
     }

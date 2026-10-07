@@ -82,6 +82,22 @@ public sealed class ConfirmCarrierBookingHandlerTests
     }
 
     [Fact]
+    public async Task Handle_AReferenceTheCarrierAlreadyHoldsOnAConfirmedBooking_IsRefused_WithReferenceInUse_AndChangesNothing()
+    {
+        var (booking, shipment) = ReleasedBooking();
+        _carrierBookings.AnyAsync(Arg.Is<ConfirmedCarrierBookingByReferenceSpec>(spec => spec.CarrierId == VanDijk && spec.CarrierBookingReference == "123"), Arg.Any<CancellationToken>())
+            .Returns(true);
+
+        var result = await _handler.Handle(new ConfirmCarrierBookingCommand("CB-0000001", "CAR-0001", "corr-answer", "123", null), CancellationToken.None);
+
+        result.Status.Should().Be(ResultStatus.Invalid);
+        result.ValidationErrors.Should().ContainSingle().Which.ErrorCode.Should().Be(nameof(CarrierBookingRefusalCode.ReferenceInUse));
+        booking.Status.Should().Be(CarrierBookingStatus.Requested);
+        shipment.Status.Should().NotBe(ShipmentStatus.Booked);
+        await _carrierBookings.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Handle_ADifferentConfirmationOfABookingAlreadyConfirmed_IsRefused_WithBookingNotOpen_AndChangesNothing()
     {
         var (booking, shipment) = ReleasedBooking();
