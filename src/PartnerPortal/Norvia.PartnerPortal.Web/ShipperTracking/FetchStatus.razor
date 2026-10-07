@@ -1,0 +1,33 @@
+@* When the screen last got an answer and, beside it, why the latest poll didn't: the last answer stays on screen (P8). *@
+@if (FetchedAt is { } fetchedAt)
+{
+    <p class="mb-2 text-sm text-muted" data-testid="fetched-at">Fetched at <time datetime="@fetchedAt.ToString("O")">@PortalTime.FormatTimeOfDay(fetchedAt)</time></p>
+}
+
+@if (Error is not null)
+{
+    <div role="alert" class="mb-4">
+        <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+            @Error
+            @if (ErrorMessageId is not null)
+            {
+                <span class="text-xs">(Norvia's reference @ErrorMessageId)</span>
+            }
+            @if (FetchedAt is not null)
+            {
+                <span>The answer below is from @PortalTime.FormatTimeOfDay(FetchedAt.Value).</span>
+            }
+        </FluentMessageBar>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public DateTimeOffset? FetchedAt { get; set; }
+
+    [Parameter]
+    public string? Error { get; set; }
+
+    [Parameter]
+    public string? ErrorMessageId { get; set; }
+}

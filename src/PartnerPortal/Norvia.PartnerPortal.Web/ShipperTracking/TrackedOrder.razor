@@ -1,0 +1,174 @@
+@page "/personas/{PersonaId}/tracking/{TransportOrderNumber}"
+@* Interactive, and not prerendered, like the list: it polls, and Fluent UI's components don't survive static streaming rendering. *@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inherits PollingPage
+@inject IPartnerPortal Portal
+@inject NavigationManager Navigation
+@inject ILogger<TrackedOrder> Logger
+@using Norvia.PartnerPortal.Application.ShipperTracking
+
+<PageTitle>@TransportOrderNumber · Tracking · @(_persona?.DisplayName ?? PersonaId) · Partner portal</PageTitle>
+
+<p class="mb-2 text-sm"><a href="@PersonaChoice.TrackingPath(PersonaId)">← All Transport Orders</a></p>
+<h1>@TransportOrderNumber</h1>
+
+@if (_loadFailed)
+{
+    <div role="alert">
+        <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+            The Transport Order couldn't be loaded. Reload the page to try again.
+        </FluentMessageBar>
+    </div>
+}
+else if (_persona is null)
+{
+    <FluentStack VerticalAlignment="VerticalAlignment.Center" role="status">
+        <FluentProgressRing />
+        <span>Loading the Transport Order…</span>
+    </FluentStack>
+}
+else
+{
+    <FetchStatus FetchedAt="_answer.FetchedAt" Error="@_answer.Error" ErrorMessageId="@_answer.ErrorMessageId" />
+
+    @if (_answer.NotFoundText is not null)
+    {
+        <div role="status">
+            <FluentMessageBar Intent="MessageIntent.Info" AllowDismiss="false">
+                @_persona.DisplayName has no Transport Order @TransportOrderNumber.
+            </FluentMessageBar>
+        </div>
+    }
+    else if (_answer.Value is { } order)
+    {
+        <dl class="mb-8 grid max-w-3xl grid-cols-[max-content_1fr] gap-x-8 gap-y-2" aria-label="Transport Order">
+            <dt class="font-semibold">Tracking status</dt>
+            <dd class="m-0">@TrackingText.Status(order.Status)</dd>
+            <dt class="font-semibold">Shipper reference</dt>
+            <dd class="m-0">@(order.ShipperReference ?? "–")</dd>
+            <dt class="font-semibold">Collection</dt>
+            <dd class="m-0">@PlaceText(order.Pickup)</dd>
+            <dt class="font-semibold">Collection window</dt>
+            <dd class="m-0">@WindowText(order.PickupFrom, order.PickupUntil)</dd>
+            <dt class="font-semibold">Delivery</dt>
+            <dd class="m-0">@PlaceText(order.Receiver)</dd>
+            <dt class="font-semibold">Delivery window</dt>
+            <dd class="m-0">@WindowText(order.DeliverFrom, order.DeliverUntil)</dd>
+            <dt class="font-semibold">ETA</dt>
+            <dd class="m-0">@TrackingText.Time(order.Eta)</dd>
+            <dt class="font-semibold">Last update</dt>
+            <dd class="m-0">@TrackingText.Time(order.LastUpdate)</dd>
+        </dl>
+
+        <h2>Progress</h2>
+        @if (order.Progress.Count == 0)
+        {
+            <p>Nothing has happened to the goods yet.</p>
+        }
+        else
+        {
+            <ol class="mb-8 max-w-3xl list-none p-0" aria-label="Progress">
+                @foreach (var step in order.Progress)
+                {
+                    <li class="flex gap-4 border-b border-border py-2">
+                        <span class="w-40 shrink-0">@step.Time</span>
+                        <span class="font-semibold">@TrackingText.Progress(step.Type)</span>
+                        <span>@step.Place</span>
+                    </li>
+                }
+            </ol>
+        }
+
+        <h2>Proof of delivery</h2>
+        @if (order.ProofOfDelivery is not { } proof)
+        {
+            <p>There is no Proof of delivery yet.</p>
+        }
+        else
+        {
+            <dl class="mb-4 grid max-w-3xl grid-cols-[max-content_1fr] gap-x-8 gap-y-2" aria-label="Proof of delivery">
+                <dt class="font-semibold">Received by</dt>
+                <dd class="m-0">@proof.ReceivedBy</dd>
+                <dt class="font-semibold">Delivered</dt>
+                <dd class="m-0">@proof.DeliveredAt</dd>
+                <dt class="font-semibold">Condition</dt>
+                <dd class="m-0">@TrackingText.Condition(proof.Condition)</dd>
+            </dl>
+            @if (proof.Files.Count > 0)
+            {
+                <ul class="m-0 list-none p-0" aria-label="Proof of delivery files">
+                    @foreach (var file in proof.Files)
+                    {
+                        <li class="py-1">
+                            <a href="@PersonaChoice.ProofOfDeliveryFilePath(PersonaId, TransportOrderNumber, file.FileId)" download="@file.Name">@file.Name</a>
+                            <span class="text-sm text-muted">(@TrackingText.FileSize(file.SizeBytes))</span>
+                        </li>
+                    }
+                </ul>
+            }
+        }
+    }
+    else if (_answer.Error is null)
+    {
+        <FluentStack VerticalAlignment="VerticalAlignment.Center" role="status">
+            <FluentProgressRing />
+            <span>Loading the Transport Order…</span>
+        </FluentStack>
+    }
+}
+
+@code {
+    private readonly LastAnswer<ShipperTrackingDetail> _answer = new();
+    private PersonaView? _persona;
+    private bool _loadFailed;
+
+    [Parameter]
+    public string PersonaId { get; set; } = string.Empty;
+
+    [Parameter]
+    public string TransportOrderNumber { get; set; } = string.Empty;
+
+    protected override TimeSpan PollInterval => _persona?.TrackingPollInterval ?? ShipperProfile.DefaultTrackingPollInterval;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            _persona = PersonaChoice.Find(PersonaId, await Portal.ListPersonasAsync(CancellationToken.None));
+            if (_persona is null || _persona.PartyType != PartyType.Shipper)
+            {
+                _persona = null;
+                Navigation.NotFound();
+                return;
+            }
+
+            await FetchAsync(CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            PageLog.TrackingLoadFailed(Logger, exception, PersonaId);
+            _loadFailed = true;
+        }
+    }
+
+    protected override Task PollAsync(CancellationToken cancellationToken) => _persona is null ? Task.CompletedTask : FetchAsync(cancellationToken);
+
+    // A poll that fails keeps the last answer on screen and says why; the next poll tries again.
+    private async Task FetchAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            _answer.Apply(await Portal.GetTrackedTransportOrderAsync(PersonaId, TransportOrderNumber, cancellationToken), Time.GetUtcNow());
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            PageLog.TrackingLoadFailed(Logger, exception, PersonaId);
+            _answer.Fail("Tracking couldn't be fetched.");
+        }
+    }
+
+    private static string PlaceText(ShipperPlace place) => place.ToString() is { Length: > 0 } text ? text : "–";
+
+    private static string WindowText(string? from, string? until) =>
+        from is null || until is null ? "–" : $"{from} to {until}";
+}

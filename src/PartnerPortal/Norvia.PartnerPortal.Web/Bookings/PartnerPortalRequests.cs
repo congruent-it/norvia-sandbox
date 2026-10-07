@@ -17,6 +17,11 @@ using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Application.Personas.List;
 using Norvia.PartnerPortal.Application.ShipperNotifications;
 using Norvia.PartnerPortal.Application.ShipperNotifications.List;
+using Norvia.PartnerPortal.Application.ShipperTracking;
+using Norvia.PartnerPortal.Application.ShipperTracking.DownloadFile;
+using Norvia.PartnerPortal.Application.ShipperTracking.FindTransportOrder;
+using Norvia.PartnerPortal.Application.ShipperTracking.GetTransportOrder;
+using Norvia.PartnerPortal.Application.ShipperTracking.List;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
 using Norvia.PartnerPortal.Web.CarrierShipments;
 
@@ -100,6 +105,23 @@ internal sealed class PartnerPortalRequests(IServiceScopeFactory scopes) : IPart
         return FoundOrNull(await scope.ServiceProvider.GetRequiredService<IMediator>()
             .Send(new ChangeCarrierTrackingSettingsCommand(personaId, settings.Mode, settings.DelaySeconds), cancellationToken));
     }
+
+    public Task<TrackingAnswer<IReadOnlyList<ShipperTrackingSummary>>> ListTrackedTransportOrdersAsync(
+        string personaId, ShipperTrackingFilter filter, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+        return SendAsync(new ListShipperTrackingQuery(personaId, filter), cancellationToken);
+    }
+
+    public Task<TrackingAnswer<ShipperTrackingDetail>> GetTrackedTransportOrderAsync(string personaId, string transportOrderNumber, CancellationToken cancellationToken) =>
+        SendAsync(new GetShipperTrackingQuery(personaId, transportOrderNumber), cancellationToken);
+
+    public Task<TrackingAnswer<ShipperTrackingDetail>> FindTrackedTransportOrderAsync(string personaId, string shipperReference, CancellationToken cancellationToken) =>
+        SendAsync(new FindShipperTrackingQuery(personaId, shipperReference), cancellationToken);
+
+    public Task<TrackingAnswer<ShipperProofFileContent>> DownloadProofOfDeliveryFileAsync(
+        string personaId, string transportOrderNumber, Guid fileId, CancellationToken cancellationToken) =>
+        SendAsync(new DownloadProofOfDeliveryFileQuery(personaId, transportOrderNumber, fileId), cancellationToken);
 
     private async Task<TResponse> SendAsync<TResponse>(IQuery<TResponse> query, CancellationToken cancellationToken)
     {

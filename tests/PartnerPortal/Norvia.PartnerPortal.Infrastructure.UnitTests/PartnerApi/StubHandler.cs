@@ -29,6 +29,15 @@ internal sealed class StubHandler : HttpMessageHandler
         return response;
     };
 
+    public void AnswerFile(string contentType, byte[] content, string fileName, string correlationId) => _answer = () =>
+    {
+        var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(content) };
+        response.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+        response.Content.Headers.ContentDisposition = new System.Net.Http.Headers.ContentDispositionHeaderValue("attachment") { FileName = fileName };
+        response.Headers.Add("X-Correlation-ID", correlationId);
+        return response;
+    };
+
     public void Fail(Exception exception) => _answer = () => throw exception;
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)

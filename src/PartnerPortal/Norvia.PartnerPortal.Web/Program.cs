@@ -12,6 +12,7 @@ using Norvia.PartnerPortal.Web.CarrierShipments;
 using Norvia.PartnerPortal.Web.Components;
 using Norvia.PartnerPortal.Web.Personas;
 using Norvia.PartnerPortal.Web.ShipperNotifications;
+using Norvia.PartnerPortal.Web.ShipperTracking;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -60,6 +61,7 @@ app.MapPersonaSwitcher();
 app.MapCarrierBookingEndpoint();
 app.MapCarrierCancellationEndpoint();
 app.MapShipperNotificationEndpoint();
+app.MapProofOfDeliveryFileEndpoint();
 app.MapDefaultEndpoints();
 
 await app.RunAsync();

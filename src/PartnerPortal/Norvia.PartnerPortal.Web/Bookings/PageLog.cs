@@ -44,4 +44,7 @@ internal static partial class PageLog
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Loading the notifications of Persona {PersonaId} failed")]
     public static partial void NotificationsLoadFailed(ILogger logger, Exception exception, string personaId);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Loading the tracking of Persona {PersonaId} failed")]
+    public static partial void TrackingLoadFailed(ILogger logger, Exception exception, string personaId);
 }

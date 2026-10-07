@@ -145,4 +145,32 @@ public sealed class SeedFilePersonaDirectoryTests
 
         read.Should().Throw<InvalidDataException>();
     }
+
+    [Fact]
+    public void Find_AShipperPersonaWithAPollInterval_HasIt() =>
+        TheSeedFile().Find(new PersonaId("brouwer-dranken"))!.TrackingPollInterval.Should().Be(TimeSpan.FromSeconds(3));
+
+    [Fact]
+    public void Find_AShipperPersonaWithoutOne_PollsEveryFiveSeconds() =>
+        TheSeedFile().Find(new PersonaId("tuincentrum-groenrijk"))!.TrackingPollInterval.Should().Be(TimeSpan.FromSeconds(5));
+
+    [Fact]
+    public void Find_ACarrierPersona_HasNoShipperProfile() =>
+        TheSeedFile().Find(new PersonaId("van-dijk-transport"))!.Shipper.Should().BeNull();
+
+    [Fact]
+    public void Constructor_AShipperPersonaPollingTooOften_IsRefused()
+    {
+        var seed = ShipperSeed("""{ "trackingPollSeconds": 0.2 }""");
+
+        ((Action)(() => Read(seed))).Should().Throw<InvalidDataException>().WithMessage("*brouwer*polls every 0.2 seconds*");
+    }
+
+    private static string ShipperSeed(string shipperSection) => $$"""
+        {
+          "shippers": [ { "id": "SHP-0001" } ],
+          "carriers": [],
+          "personas": [ { "id": "brouwer", "displayName": "Brouwer", "party": { "type": "Shipper", "id": "SHP-0001" }, "shipper": {{shipperSection}} } ]
+        }
+        """;
 }

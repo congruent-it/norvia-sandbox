@@ -52,7 +52,8 @@ internal sealed class SeedFilePersonaDirectory : IPersonaDirectory
             persona.Party.Id,
             addresses?.Select(ToSavedAddress).ToArray()
                 ?? throw new InvalidDataException($"Persona '{persona.Id}' plays {persona.Party.Type} {persona.Party.Id}, which the seed file doesn't have."),
-            ToCarrierProfile(persona));
+            ToCarrierProfile(persona),
+            ToShipperProfile(persona));
     }
 
     // A Carrier Persona must say how it answers and what its references start with, and a Shipper Persona has no use for either.
@@ -81,6 +82,20 @@ internal sealed class SeedFilePersonaDirectory : IPersonaDirectory
                 : new CarrierTrackingPolicy(TrackingMode.Manual, DefaultTrackingDelay));
     }
 
+    // A Shipper Persona may say how often its tracking screen asks Norvia again; one that doesn't polls every few seconds.
+    private static ShipperProfile? ToShipperProfile(SeedPersona persona)
+    {
+        if (persona.Party.Type != PartyType.Shipper || persona.Shipper?.TrackingPollSeconds is not { } seconds)
+        {
+            return null;
+        }
+
+        var interval = TimeSpan.FromSeconds(seconds);
+        return interval >= ShipperProfile.MinimumTrackingPollInterval
+            ? new ShipperProfile(interval)
+            : throw new InvalidDataException($"Shipper Persona '{persona.Id}' polls every {seconds} seconds; the least is {ShipperProfile.MinimumTrackingPollInterval.TotalSeconds}.");
+    }
+
     private static SavedAddress ToSavedAddress(SeedAddress address) =>
         new(address.Label, address.Street, address.Postcode, address.City, address.Country,
             address.Consignee is { } consignee ? new SavedConsignee(consignee.Name, consignee.ContactName, consignee.Phone) : null);
@@ -91,7 +106,9 @@ internal sealed class SeedFilePersonaDirectory : IPersonaDirectory
 
     private sealed record SeedCarrier(string Id);
 
-    private sealed record SeedPersona(string Id, string DisplayName, SeedParty Party, SeedCarrierPersona? Carrier);
+    private sealed record SeedPersona(string Id, string DisplayName, SeedParty Party, SeedCarrierPersona? Carrier, SeedShipperPersona? Shipper);
+
+    private sealed record SeedShipperPersona(double? TrackingPollSeconds);
 
     private sealed record SeedCarrierPersona(string BookingReferencePrefix, SeedAnswer Answer, SeedTracking? Tracking);
 

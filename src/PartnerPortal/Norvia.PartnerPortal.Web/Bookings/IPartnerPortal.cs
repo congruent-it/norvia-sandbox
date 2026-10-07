@@ -8,6 +8,7 @@ using Norvia.PartnerPortal.Application.CarrierShipments.SendProofOfDelivery;
 using Norvia.PartnerPortal.Application.CarrierShipments.TrackingSettings;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Application.ShipperNotifications;
+using Norvia.PartnerPortal.Application.ShipperTracking;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
 using Norvia.PartnerPortal.Web.CarrierShipments;
 
@@ -72,4 +73,21 @@ public interface IPartnerPortal
 
     /// <summary>The notifications in the Shipper Persona's inbox, the latest first.</summary>
     Task<IReadOnlyList<ShipperNotificationView>> ListShipperNotificationsAsync(string personaId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The Shipper Persona's Transport Orders as Norvia answers them through the Partner API, newest collection first.
+    /// A failure is an answer, so a screen can keep what it last showed.
+    /// </summary>
+    Task<TrackingAnswer<IReadOnlyList<ShipperTrackingSummary>>> ListTrackedTransportOrdersAsync(
+        string personaId, ShipperTrackingFilter filter, CancellationToken cancellationToken);
+
+    /// <summary>One of the Shipper Persona's Transport Orders by Norvia's number, with its progress and Proof of delivery.</summary>
+    Task<TrackingAnswer<ShipperTrackingDetail>> GetTrackedTransportOrderAsync(string personaId, string transportOrderNumber, CancellationToken cancellationToken);
+
+    /// <summary>One of the Shipper Persona's Transport Orders by the Shipper's own reference.</summary>
+    Task<TrackingAnswer<ShipperTrackingDetail>> FindTrackedTransportOrderAsync(string personaId, string shipperReference, CancellationToken cancellationToken);
+
+    /// <summary>A file of the Transport Order's current Proof of delivery, as Norvia streams it.</summary>
+    Task<TrackingAnswer<ShipperProofFileContent>> DownloadProofOfDeliveryFileAsync(
+        string personaId, string transportOrderNumber, Guid fileId, CancellationToken cancellationToken);
 }

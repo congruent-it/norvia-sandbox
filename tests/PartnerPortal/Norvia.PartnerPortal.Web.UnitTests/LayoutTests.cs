@@ -17,7 +17,7 @@ public sealed class LayoutTests : PortalWebContext
             .AddCascadingValue(context)
             .Add(component => component.Body, (RenderFragment)(builder => builder.AddContent(0, "the page"))));
 
-        layout.FindAll("nav a").Select(link => link.GetAttribute("href")).Should().Contain(["/personas/brouwer-dranken/bookings/new", "/personas/brouwer-dranken/bookings", "/personas/brouwer-dranken/notifications"]);
+        layout.FindAll("nav a").Select(link => link.GetAttribute("href")).Should().Contain(["/personas/brouwer-dranken/bookings/new", "/personas/brouwer-dranken/bookings", "/personas/brouwer-dranken/tracking", "/personas/brouwer-dranken/notifications"]);
         layout.Find("button[aria-pressed=true]").TextContent.Trim().Should().Be("Brouwer Dranken");
         layout.Find("main").TextContent.Should().Contain("the page");
     }
@@ -35,7 +35,8 @@ public sealed class LayoutTests : PortalWebContext
         layout.FindAll("nav a").Select(link => link.GetAttribute("href")).Should().Contain("/personas/van-dijk-transport/booking-requests")
             .And.Contain("/personas/van-dijk-transport/shipments")
             .And.NotContain("/personas/van-dijk-transport/bookings/new")
-            .And.NotContain("/personas/van-dijk-transport/notifications");
+            .And.NotContain("/personas/van-dijk-transport/notifications")
+            .And.NotContain("/personas/van-dijk-transport/tracking");
         layout.Find("button[aria-pressed=true]").TextContent.Trim().Should().Be("Van Dijk Transport");
     }
 

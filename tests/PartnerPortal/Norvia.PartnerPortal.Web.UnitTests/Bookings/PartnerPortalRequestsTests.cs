@@ -15,6 +15,11 @@ using Norvia.PartnerPortal.Application.CarrierShipments.SendProofOfDelivery;
 using Norvia.PartnerPortal.Application.CarrierShipments.TrackingSettings;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Application.Personas.List;
+using Norvia.PartnerPortal.Application.ShipperTracking;
+using Norvia.PartnerPortal.Application.ShipperTracking.DownloadFile;
+using Norvia.PartnerPortal.Application.ShipperTracking.FindTransportOrder;
+using Norvia.PartnerPortal.Application.ShipperTracking.GetTransportOrder;
+using Norvia.PartnerPortal.Application.ShipperTracking.List;
 using Norvia.PartnerPortal.Domain.Bookings;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
 using Norvia.PartnerPortal.Web.Bookings;
@@ -63,6 +68,44 @@ public sealed class PartnerPortalRequestsTests : IDisposable
         _mediator.Send(new SubmitBookingCommand("brouwer-dranken", booking), Arg.Any<CancellationToken>()).Returns(Result.Success(answered));
 
         (await _portal.SubmitBookingAsync("brouwer-dranken", booking, Xunit.TestContext.Current.CancellationToken)).Should().BeSameAs(answered);
+    }
+
+    [Fact]
+    public async Task ListTrackedTransportOrdersAsync_AsksForTheFilteredList_AsThePersona()
+    {
+        var filter = new ShipperTrackingFilter(ShipperTrackingStatus.Collected, Page: 2);
+        var answer = TrackingAnswer.Found<IReadOnlyList<ShipperTrackingSummary>>([]);
+        _mediator.Send(new ListShipperTrackingQuery("brouwer-dranken", filter), Arg.Any<CancellationToken>()).Returns(answer);
+
+        (await _portal.ListTrackedTransportOrdersAsync("brouwer-dranken", filter, Xunit.TestContext.Current.CancellationToken)).Should().BeSameAs(answer);
+    }
+
+    [Fact]
+    public async Task GetTrackedTransportOrderAsync_AsksForItByNumber_AsThePersona()
+    {
+        var answer = TrackingAnswer.NotFound<ShipperTrackingDetail>("No.");
+        _mediator.Send(new GetShipperTrackingQuery("brouwer-dranken", "TO-0000042"), Arg.Any<CancellationToken>()).Returns(answer);
+
+        (await _portal.GetTrackedTransportOrderAsync("brouwer-dranken", "TO-0000042", Xunit.TestContext.Current.CancellationToken)).Should().BeSameAs(answer);
+    }
+
+    [Fact]
+    public async Task FindTrackedTransportOrderAsync_AsksForItByTheShipperReference_AsThePersona()
+    {
+        var answer = TrackingAnswer.NotFound<ShipperTrackingDetail>("No.");
+        _mediator.Send(new FindShipperTrackingQuery("brouwer-dranken", "BD-1"), Arg.Any<CancellationToken>()).Returns(answer);
+
+        (await _portal.FindTrackedTransportOrderAsync("brouwer-dranken", "BD-1", Xunit.TestContext.Current.CancellationToken)).Should().BeSameAs(answer);
+    }
+
+    [Fact]
+    public async Task DownloadProofOfDeliveryFileAsync_AsksForTheFile_AsThePersona()
+    {
+        var fileId = Guid.CreateVersion7();
+        var answer = TrackingAnswer.Found(new ShipperProofFileContent("cmr.pdf", "application/pdf", [1]));
+        _mediator.Send(new DownloadProofOfDeliveryFileQuery("brouwer-dranken", "TO-0000042", fileId), Arg.Any<CancellationToken>()).Returns(answer);
+
+        (await _portal.DownloadProofOfDeliveryFileAsync("brouwer-dranken", "TO-0000042", fileId, Xunit.TestContext.Current.CancellationToken)).Should().BeSameAs(answer);
     }
 
     [Fact]

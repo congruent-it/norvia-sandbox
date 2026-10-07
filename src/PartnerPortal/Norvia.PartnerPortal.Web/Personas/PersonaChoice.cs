@@ -25,6 +25,15 @@ public static class PersonaChoice
 
     public static string NotificationsPath(string personaId) => $"/personas/{Uri.EscapeDataString(personaId)}/notifications";
 
+    public static string TrackingPath(string personaId) => $"/personas/{Uri.EscapeDataString(personaId)}/tracking";
+
+    public static string TrackingPath(string personaId, string transportOrderNumber) =>
+        $"{TrackingPath(personaId)}/{Uri.EscapeDataString(transportOrderNumber)}";
+
+    /// <summary>Where a Transport Order's Proof of delivery file is downloaded through the portal.</summary>
+    public static string ProofOfDeliveryFilePath(string personaId, string transportOrderNumber, Guid fileId) =>
+        $"{TrackingPath(personaId, transportOrderNumber)}/proof-of-delivery/files/{fileId}";
+
     /// <summary>Where a Persona's work starts: a Shipper books a transport, a Carrier opens its inbox.</summary>
     public static string HomePath(PersonaView persona)
     {
