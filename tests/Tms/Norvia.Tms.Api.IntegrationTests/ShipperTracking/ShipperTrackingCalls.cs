@@ -14,11 +14,11 @@ internal static class ShipperTrackingCalls
 
     /// <summary>Asks for the Shipper's Transport Orders as API Management does, with the Shipper ID and a correlation ID, and returns the raw answer.</summary>
     public static async Task<HttpResponseMessage> ListAsync(
-        this TmsFixture tms, HttpClient caller, string? shipperId, CancellationToken cancellationToken, string? correlationId = null)
+        this TmsFixture tms, HttpClient caller, string? shipperId, CancellationToken cancellationToken, string? correlationId = null, string? query = null)
     {
         ArgumentNullException.ThrowIfNull(tms);
         ArgumentNullException.ThrowIfNull(caller);
-        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("/v1/shipper-tracking/transport-orders", UriKind.Relative));
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("/v1/shipper-tracking/transport-orders" + (query is null ? "" : "?" + query), UriKind.Relative));
         if (shipperId is not null)
         {
             request.Headers.Add("X-Shipper-ID", shipperId);
@@ -71,7 +71,7 @@ internal static class ShipperTrackingCalls
     /// <summary>The raw body of the Shipper's Transport Orders, for what no part of it may contain.</summary>
     public static async Task<string> ListedBodyForAsync(this TmsFixture tms, string shipperId, CancellationToken cancellationToken)
     {
-        using var response = await tms.ListAsync(tms.ShipperTracking, shipperId, cancellationToken);
+        using var response = await tms.ListAsync(tms.ShipperTracking, shipperId, cancellationToken, query: "pageSize=100");
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         response.StatusCode.Should().Be(HttpStatusCode.OK, body);
         return body;

@@ -35,6 +35,8 @@ public static class ShipperTrackingEndpoints
                 $"Scoped to the Shipper in {ShipperIdHeader}, which is required, as is {TrackingScopeMiddleware.CorrelationIdHeader}; otherwise the call is a 400. "
                 + "Each item has the Transport Order number, the Shipper reference, the collection and delivery places, the Tracking status "
                 + "(Received, Scheduled, Collected, InTransit or Delivered), the ETA and the last update. The Tracking status is worked out when the call is made. "
+                + "It can be narrowed with trackingStatus and a collectionFrom to collectionTo date range (both ends included, by the date the collection window opens), "
+                + "and is paged with page (from 1) and pageSize (1 to 100, 25 by default), always newest collection first. "
                 + "Rejected bookings are not returned. Nothing in the answer names a Carrier, a Shipment number, an Exception or Stale.");
 
         shipperTracking.MapGet("/transport-orders/find", FindTransportOrderAsync)
@@ -124,14 +126,35 @@ public static class ShipperTrackingEndpoints
         [FromHeader(Name = ShipperIdHeader)] string? shipperId,
         [FromHeader(Name = TrackingScopeMiddleware.CorrelationIdHeader)] string? correlationId,
         IMediator mediator,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        [FromQuery] TrackingStatus? trackingStatus = null,
+        [FromQuery] DateOnly? collectionFrom = null,
+        [FromQuery] DateOnly? collectionTo = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = ListShipperTransportOrdersQuery.DefaultPageSize)
     {
         var errors = Check(shipperId, correlationId);
+        if (page < 1)
+        {
+            errors["page"] = ["The page is counted from 1."];
+        }
+
+        if (pageSize is < 1 or > ListShipperTransportOrdersQuery.MaxPageSize)
+        {
+            errors["pageSize"] = [$"The page size is between 1 and {ListShipperTransportOrdersQuery.MaxPageSize}."];
+        }
+
+        if (collectionFrom > collectionTo)
+        {
+            errors["collectionTo"] = ["The collection date range ends before it starts."];
+        }
+
         if (errors.Count > 0)
         {
             return TypedResults.ValidationProblem(errors);
         }
 
-        return TypedResults.Ok(await mediator.Send(new ListShipperTransportOrdersQuery(shipperId!), cancellationToken));
+        return TypedResults.Ok(await mediator.Send(
+            new ListShipperTransportOrdersQuery(shipperId!, trackingStatus, collectionFrom, collectionTo, page, pageSize), cancellationToken));
     }
 }
