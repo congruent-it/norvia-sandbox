@@ -50,7 +50,7 @@ public sealed class ReceiveCarrierCancellationHandlerTests
 
         var result = await _handler.Handle(Cancel(), CancellationToken.None);
 
-        result.Value.Should().Be(new ReceiveCarrierCancellationResult("CB-0000001", Applied: true, Repeated: false));
+        result.Value.Should().Be(new ReceiveCarrierCancellationResult("CB-0000001", CarrierCancellationOutcome.Applied));
         request.Status.Should().Be(CarrierBookingRequestStatus.CancelledByNorvia);
         request.CancellationText.Should().Be("Truck broke down");
         request.CancelledAt.Should().Be(Samples.Now);
@@ -66,7 +66,7 @@ public sealed class ReceiveCarrierCancellationHandlerTests
 
         var result = await _handler.Handle(Cancel(reason: "Truck broke down"), CancellationToken.None);
 
-        result.Value.Should().Be(new ReceiveCarrierCancellationResult("CB-0000001", Applied: false, Repeated: true));
+        result.Value.Should().Be(new ReceiveCarrierCancellationResult("CB-0000001", CarrierCancellationOutcome.Repeated));
         request.CancelledAt.Should().Be(Samples.Now.AddMinutes(-5));
         await _repository.DidNotReceiveWithAnyArgs().UpdateAsync(default!, CancellationToken.None);
     }
@@ -79,7 +79,7 @@ public sealed class ReceiveCarrierCancellationHandlerTests
 
         var result = await _handler.Handle(Withdraw(), CancellationToken.None);
 
-        result.Value.Applied.Should().BeTrue();
+        result.Value.Outcome.Should().Be(CarrierCancellationOutcome.Applied);
         request.Status.Should().Be(CarrierBookingRequestStatus.WithdrawnByNorvia);
         request.ClosedAt.Should().Be(Samples.Now);
         await _repository.Received(1).UpdateAsync(request, Arg.Any<CancellationToken>());
@@ -94,7 +94,7 @@ public sealed class ReceiveCarrierCancellationHandlerTests
 
         var result = await _handler.Handle(Withdraw(), CancellationToken.None);
 
-        result.Value.Should().Be(new ReceiveCarrierCancellationResult("CB-0000001", Applied: false, Repeated: true));
+        result.Value.Should().Be(new ReceiveCarrierCancellationResult("CB-0000001", CarrierCancellationOutcome.Repeated));
         await _repository.DidNotReceiveWithAnyArgs().UpdateAsync(default!, CancellationToken.None);
     }
 
@@ -106,7 +106,7 @@ public sealed class ReceiveCarrierCancellationHandlerTests
 
         var result = await _handler.Handle(Withdraw(), CancellationToken.None);
 
-        result.Value.Should().Be(new ReceiveCarrierCancellationResult("CB-0000001", Applied: false, Repeated: false));
+        result.Value.Should().Be(new ReceiveCarrierCancellationResult("CB-0000001", CarrierCancellationOutcome.NotApplicable));
         request.Status.Should().Be(CarrierBookingRequestStatus.Confirmed);
         await _repository.DidNotReceiveWithAnyArgs().UpdateAsync(default!, CancellationToken.None);
     }
@@ -119,7 +119,7 @@ public sealed class ReceiveCarrierCancellationHandlerTests
         var result = await _handler.Handle(Cancel(), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
-        result.Value.Should().Be(new ReceiveCarrierCancellationResult("CB-0000001", Applied: false, Repeated: false));
+        result.Value.Should().Be(new ReceiveCarrierCancellationResult("CB-0000001", CarrierCancellationOutcome.NotApplicable));
         await _repository.DidNotReceiveWithAnyArgs().UpdateAsync(default!, CancellationToken.None);
     }
 

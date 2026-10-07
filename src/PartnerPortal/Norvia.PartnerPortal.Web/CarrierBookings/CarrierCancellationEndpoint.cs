@@ -88,7 +88,7 @@ public static partial class CarrierCancellationEndpoint
         }
 
         using var received = logger.BeginScope(EndpointTracking.Outcome("Succeeded", failureCode: null));
-        LogReceived(logger, result.Value.Applied, result.Value.Repeated);
+        LogReceived(logger, result.Value.Outcome);
         return TypedResults.Ok(result.Value);
     }
 
@@ -160,6 +160,6 @@ public static partial class CarrierCancellationEndpoint
     [LoggerMessage(Level = LogLevel.Warning, Message = "No Carrier Persona has the ID {CarrierId}")]
     private static partial void LogUnknownCarrier(ILogger logger, string carrierId);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Acknowledged the cancellation (applied: {Applied}, repeated: {Repeated})")]
-    private static partial void LogReceived(ILogger logger, bool applied, bool repeated);
+    [LoggerMessage(Level = LogLevel.Information, Message = "Acknowledged the cancellation (outcome: {Outcome})")]
+    private static partial void LogReceived(ILogger logger, CarrierCancellationOutcome outcome);
 }

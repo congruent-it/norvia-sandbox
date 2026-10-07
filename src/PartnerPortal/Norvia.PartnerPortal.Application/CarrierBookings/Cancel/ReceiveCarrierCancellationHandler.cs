@@ -32,21 +32,16 @@ public sealed class ReceiveCarrierCancellationHandler(
         var request = await repository.FirstOrDefaultAsync(new CarrierBookingRequestToAnswerSpec(carrier.Id, command.CarrierBookingNumber), cancellationToken);
         if (request is null)
         {
-            return new ReceiveCarrierCancellationResult(command.CarrierBookingNumber, Applied: false, Repeated: false);
+            return new ReceiveCarrierCancellationResult(command.CarrierBookingNumber, CarrierCancellationOutcome.NotApplicable);
         }
 
-        // The Carrier booking number is the key: a repeat finds the booking already ended and is not an error.
-        var repeated = request.Status == (command.Kind == CarrierCancellationKind.Cancelled
-            ? CarrierBookingRequestStatus.CancelledByNorvia
-            : CarrierBookingRequestStatus.WithdrawnByNorvia);
-        var applied = !repeated && (command.Kind == CarrierCancellationKind.Cancelled
-            ? request.CancelledByNorvia(command.ReasonText!, time.GetUtcNow())
-            : request.WithdrawnByNorvia(command.CorrelationId, time.GetUtcNow()));
-        if (applied)
+        // The Carrier booking number is the key: the booking decides whether this message is a repeat.
+        var outcome = request.EndedByNorvia(command.Kind, command.ReasonText, command.CorrelationId, time.GetUtcNow());
+        if (outcome == CarrierCancellationOutcome.Applied)
         {
             await repository.UpdateAsync(request, cancellationToken);
         }
 
-        return new ReceiveCarrierCancellationResult(command.CarrierBookingNumber, applied, repeated);
+        return new ReceiveCarrierCancellationResult(command.CarrierBookingNumber, outcome);
     }
 }

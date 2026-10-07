@@ -26,9 +26,9 @@ public sealed class CarrierCancellationEndpointTests
         CarrierCancellationEndpoint.ReceiveAsync(
             carrierId, apiKey, correlationId, body ?? Cancelled(), _mediator, _options, NullLoggerFactory.Instance, CancellationToken.None);
 
-    private void MediatorAnswers(bool applied, bool repeated) =>
+    private void MediatorAnswers(CarrierCancellationOutcome outcome) =>
         _mediator.Send(Arg.Any<ReceiveCarrierCancellationCommand>(), Arg.Any<CancellationToken>())
-            .Returns(Result.Success(new ReceiveCarrierCancellationResult("CB-0000001", applied, repeated)));
+            .Returns(Result.Success(new ReceiveCarrierCancellationResult("CB-0000001", outcome)));
 
     [Fact]
     public void PathOf_NamesTheCarriersCancellationEndpoint() =>
@@ -37,11 +37,11 @@ public sealed class CarrierCancellationEndpointTests
     [Fact]
     public async Task Receive_ACancellationWithTheCredential_IsAppliedAndAcknowledged()
     {
-        MediatorAnswers(applied: true, repeated: false);
+        MediatorAnswers(CarrierCancellationOutcome.Applied);
 
         var result = await Receive();
 
-        result.Result.Should().BeOfType<Ok<ReceiveCarrierCancellationResult>>().Which.Value!.Repeated.Should().BeFalse();
+        result.Result.Should().BeOfType<Ok<ReceiveCarrierCancellationResult>>().Which.Value!.Outcome.Should().Be(CarrierCancellationOutcome.Applied);
         await _mediator.Received(1).Send(
             new ReceiveCarrierCancellationCommand("CAR-0001", "CB-0000001", CarrierCancellationKind.Cancelled, "Truck broke down", "cancel-1"),
             Arg.Any<CancellationToken>());
@@ -50,7 +50,7 @@ public sealed class CarrierCancellationEndpointTests
     [Fact]
     public async Task Receive_AWithdrawal_IsAppliedAsAWithdrawal_WithoutAReason()
     {
-        MediatorAnswers(applied: true, repeated: false);
+        MediatorAnswers(CarrierCancellationOutcome.Applied);
 
         var result = await Receive(Withdrawn());
 
@@ -63,11 +63,11 @@ public sealed class CarrierCancellationEndpointTests
     [Fact]
     public async Task Receive_ARepeat_IsAcknowledgedAsSuccess_FlaggedAsRepeated()
     {
-        MediatorAnswers(applied: false, repeated: true);
+        MediatorAnswers(CarrierCancellationOutcome.Repeated);
 
         var result = await Receive();
 
-        result.Result.Should().BeOfType<Ok<ReceiveCarrierCancellationResult>>().Which.Value!.Repeated.Should().BeTrue();
+        result.Result.Should().BeOfType<Ok<ReceiveCarrierCancellationResult>>().Which.Value!.Outcome.Should().Be(CarrierCancellationOutcome.Repeated);
     }
 
     [Theory]

@@ -86,4 +86,37 @@ public sealed class CarrierBookingRequestCancellationTests
 
         spec.Evaluate([kept, cancelled]).Should().ContainSingle().Which.Should().BeSameAs(kept);
     }
+
+    [Fact]
+    public void EndedByNorvia_ACancellation_IsAppliedOnce_ThenRepeated()
+    {
+        var request = Confirmed();
+
+        request.EndedByNorvia(CarrierCancellationKind.Cancelled, "Truck broke down", "c-1", At).Should().Be(CarrierCancellationOutcome.Applied);
+        request.EndedByNorvia(CarrierCancellationKind.Cancelled, "Truck broke down", "c-1", At.AddHours(1)).Should().Be(CarrierCancellationOutcome.Repeated);
+        request.CancelledAt.Should().Be(At);
+    }
+
+    [Fact]
+    public void EndedByNorvia_AWithdrawal_IsAppliedOnce_ThenRepeated()
+    {
+        var request = Received();
+
+        request.EndedByNorvia(CarrierCancellationKind.Withdrawn, null, "w-1", At).Should().Be(CarrierCancellationOutcome.Applied);
+        request.EndedByNorvia(CarrierCancellationKind.Withdrawn, null, "w-1", At.AddHours(1)).Should().Be(CarrierCancellationOutcome.Repeated);
+        request.ClosedAt.Should().Be(At);
+    }
+
+    [Fact]
+    public void EndedByNorvia_AMessageThatDoesNotFitTheState_ChangesNothing()
+    {
+        var confirmed = Confirmed();
+        var open = Received();
+
+        confirmed.EndedByNorvia(CarrierCancellationKind.Withdrawn, null, "w-1", At).Should().Be(CarrierCancellationOutcome.NotApplicable);
+        open.EndedByNorvia(CarrierCancellationKind.Cancelled, "Why", "c-1", At).Should().Be(CarrierCancellationOutcome.NotApplicable);
+
+        confirmed.Status.Should().Be(CarrierBookingRequestStatus.Confirmed);
+        open.Status.Should().Be(CarrierBookingRequestStatus.Open);
+    }
 }

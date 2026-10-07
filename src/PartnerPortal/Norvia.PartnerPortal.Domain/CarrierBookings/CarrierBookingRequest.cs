@@ -213,6 +213,19 @@ public sealed class CarrierBookingRequest : EntityBase<CarrierBookingRequestId>,
     }
 
     /// <summary>
+    /// Applies what Norvia told the Carrier about ending the booking, once: a withdrawal ends an Open request, a cancellation
+    /// a Confirmed one. The same message again is <see cref="CarrierCancellationOutcome.Repeated"/>; any other state is left as it was.
+    /// </summary>
+    public CarrierCancellationOutcome EndedByNorvia(CarrierCancellationKind kind, string? reasonText, string? correlationId, DateTimeOffset at) => kind switch
+    {
+        CarrierCancellationKind.Withdrawn when Status == CarrierBookingRequestStatus.WithdrawnByNorvia => CarrierCancellationOutcome.Repeated,
+        CarrierCancellationKind.Withdrawn => WithdrawnByNorvia(correlationId, at) ? CarrierCancellationOutcome.Applied : CarrierCancellationOutcome.NotApplicable,
+        CarrierCancellationKind.Cancelled when Status == CarrierBookingRequestStatus.CancelledByNorvia => CarrierCancellationOutcome.Repeated,
+        CarrierCancellationKind.Cancelled => CancelledByNorvia(reasonText!, at) ? CarrierCancellationOutcome.Applied : CarrierCancellationOutcome.NotApplicable,
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Every kind ends a booking in one way."),
+    };
+
+    /// <summary>
     /// Records that Norvia cancelled the booking the Carrier had confirmed, and stops the Shipment's automatic Tracking
     /// events. Only a Confirmed request is cancelled: it returns false, changing nothing, for any other, a cancelled one included.
     /// </summary>
