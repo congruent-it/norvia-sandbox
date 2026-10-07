@@ -75,7 +75,7 @@ else
             <div class="md:col-span-3">
                 <TransportOrderSection Heading="Carrier bookings">
                     <FluentDataGrid Items="_shipment.CarrierBookings.AsQueryable()" TGridItem="CarrierBookingView" Class="flatly-table" aria-label="Carrier bookings"
-                                    GridTemplateColumns="1fr 1.2fr 1fr 1.2fr 1.2fr 2fr" MultiLine="true">
+                                    GridTemplateColumns="minmax(13rem, 1fr) 1.2fr 1fr 1.2fr 1.2fr 2fr" MultiLine="true">
                         <PropertyColumn Title="Carrier booking number" Property="@(booking => booking.CarrierBookingNumber)" />
                         <PropertyColumn Title="Carrier" Property="@(booking => PlanningText.Carrier(booking.Carrier))" />
                         <PropertyColumn Title="Status" Property="@(booking => booking.Status)" />
