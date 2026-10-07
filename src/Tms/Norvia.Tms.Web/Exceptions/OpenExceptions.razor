@@ -30,7 +30,7 @@
                 Empty="No Exceptions are open. One opens when a Carrier reports a failed collection, a failed delivery or damage, when a Proof of delivery comes with reservations, or when a Shipment will be late." Context="exceptions">
     @* Oldest first, as the query gives them: what has waited longest needs the Planner first. Only the actions that are allowed are offered. *@
     <FluentDataGrid Items="exceptions.AsQueryable()" TGridItem="OpenExceptionSummary" Class="flatly-table" aria-label="Open Exceptions"
-                    GridTemplateColumns="1fr 1fr 1.2fr 1.2fr 1.1fr 1.4fr auto 1.2fr 1.1fr 1.8fr 1.6fr" MultiLine="true">
+                    GridTemplateColumns="minmax(7rem, 1fr) minmax(7rem, 1fr) minmax(6rem, 1.2fr) minmax(6rem, 1.2fr) minmax(6rem, 1.1fr) minmax(7.5rem, 1.4fr) minmax(5.5rem, auto) minmax(6.5rem, 1.2fr) minmax(7.5rem, 1.1fr) minmax(5.5rem, 1.8fr) minmax(13rem, 1.6fr)" MultiLine="true">
         <PropertyColumn Title="Exception" Property="@(exception => exception.ExceptionNumber)" />
         <TemplateColumn Title="Shipment">
             <a href="/shipments/@context.ShipmentNumber">@context.ShipmentNumber</a>
@@ -50,7 +50,7 @@
                 <strong class="block">@ExceptionText.AfterDelivered</strong>
             }
         </TemplateColumn>
-        <PropertyColumn Title="Shipper notification" Property="@(exception => ExceptionText.LastNotification(exception))" />
+        <PropertyColumn Title="Notification" Property="@(exception => ExceptionText.LastNotification(exception))" />
         <TemplateColumn Title="Notes">
             <ul class="m-0 list-none space-y-1 p-0">
                 @foreach (var note in context.Notes)

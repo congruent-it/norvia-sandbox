@@ -24,7 +24,7 @@
     else
     {
         <FluentDataGrid Items="_timeline.TrackingEvents.AsQueryable()" TGridItem="TrackingTimelineEntry" Class="flatly-table" aria-label="Tracking timeline"
-                        GridTemplateColumns="1fr 1.2fr 1.4fr 1.2fr auto 1.2fr 1.6fr" MultiLine="true">
+                        GridTemplateColumns="1fr 1.2fr 1.4fr 1.2fr minmax(9.5rem, auto) 1.2fr 1.6fr" MultiLine="true">
             <PropertyColumn Title="Event" Property="@(entry => TrackingText.Type(entry.Type))" />
             <PropertyColumn Title="Happened" Property="@(entry => NorviaTime.Format(entry.EventTime))" />
             <PropertyColumn Title="Place" Property="@(entry => TrackingText.Place(entry.Place, entry.Postcode, entry.CountryCode))" />
