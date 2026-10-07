@@ -122,10 +122,12 @@ if (builder.ExecutionContext.IsPublishMode)
 
     // The TMS UI and the Partner portal have no login of their own, so in Azure they open to the presenter's browser
     // behind an Entra sign-in that only the presenter passes (ADR 0024). The apps don't know it is there.
-    // The one exception is each Carrier Persona's booking endpoint: the P4 booking Logic App is no browser, and the
-    // endpoint asks it for the Carrier's own credential.
-    var carrierEndpoints = personas.Where(persona => !persona.IsShipper).Select(persona => $"/carrier/v1/{persona.PartyId}/bookings").ToList();
-    foreach (var (demoUi, pathsOutsideTheGate) in new[] { (tmsWeb, []), (partnerPortal, carrierEndpoints) })
+    // The exceptions are each Carrier Persona's booking endpoint and each Shipper Persona's notification endpoint: the
+    // Logic Apps that call them are no browsers, and the endpoints ask them for the party's own credential.
+    var personaEndpoints = personas
+        .Select(persona => persona.IsShipper ? $"/shipper/v1/{persona.PartyId}/notifications" : $"/carrier/v1/{persona.PartyId}/bookings")
+        .ToList();
+    foreach (var (demoUi, pathsOutsideTheGate) in new[] { (tmsWeb, []), (partnerPortal, personaEndpoints) })
     {
         demoUi.WithExternalHttpEndpoints()
             .PublishAsAzureContainerApp((infrastructure, app) =>
@@ -168,6 +170,12 @@ if (builder.ExecutionContext.IsPublishMode)
     foreach (var carrier in personas.Where(persona => !persona.IsShipper))
     {
         partnerPortal.WithEnvironment($"CarrierEndpoint__ApiKeys__{carrier.PartyId}", partnerPortalSecrets.Resource.GetSecret($"carrier-endpoint-key-{carrier.PartyId}"));
+    }
+
+    // Likewise each Shipper Persona's notification endpoint, for the Shipper notification Logic App (P7).
+    foreach (var shipper in personas.Where(persona => persona.IsShipper))
+    {
+        partnerPortal.WithEnvironment($"ShipperEndpoint__ApiKeys__{shipper.PartyId}", partnerPortalSecrets.Resource.GetSecret($"shipper-endpoint-key-{shipper.PartyId}"));
     }
 }
 else
@@ -303,6 +311,13 @@ else
             .WithEnvironment($"Booking__Carriers__{persona.PartyId}__ApiKey", carrierApiKey);
         // The Persona's endpoint asks its caller for the same credential, as Key Vault holds it in Azure.
         partnerPortal.WithEnvironment($"CarrierEndpoint__ApiKeys__{persona.PartyId}", carrierApiKey);
+    }
+
+    // Each Shipper Persona's notification endpoint asks for a credential too. Locally nothing calls it yet: the Shipper
+    // notification Logic App has no stand-in here, so the key is only what the endpoint holds for a caller of its own.
+    foreach (var persona in personas.Where(persona => persona.IsShipper))
+    {
+        partnerPortal.WithEnvironment($"ShipperEndpoint__ApiKeys__{persona.PartyId}", Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant());
     }
 
     partnerPortal.WaitFor(partnerApi)

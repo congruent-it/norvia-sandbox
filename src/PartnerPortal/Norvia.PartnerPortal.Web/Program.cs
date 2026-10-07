@@ -10,6 +10,7 @@ using Norvia.PartnerPortal.Web.CarrierBookings;
 using Norvia.PartnerPortal.Web.CarrierShipments;
 using Norvia.PartnerPortal.Web.Components;
 using Norvia.PartnerPortal.Web.Personas;
+using Norvia.PartnerPortal.Web.ShipperNotifications;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -34,6 +35,7 @@ builder.Services.AddSingleton<AutoProgressWorker>();
 builder.Services.AddSingleton<IAutoProgressSignal>(services => services.GetRequiredService<AutoProgressWorker>());
 builder.Services.AddHostedService(services => services.GetRequiredService<AutoProgressWorker>());
 builder.Services.AddOptions<CarrierEndpointOptions>().BindConfiguration(CarrierEndpointOptions.SectionName);
+builder.Services.AddOptions<ShipperEndpointOptions>().BindConfiguration(ShipperEndpointOptions.SectionName);
 
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddFluentUIComponents();
@@ -52,6 +54,7 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 app.MapPersonaSwitcher();
 app.MapCarrierBookingEndpoint();
+app.MapShipperNotificationEndpoint();
 app.MapDefaultEndpoints();
 
 await app.RunAsync();

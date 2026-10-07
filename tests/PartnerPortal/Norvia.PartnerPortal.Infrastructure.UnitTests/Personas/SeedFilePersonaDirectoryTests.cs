@@ -17,10 +17,26 @@ public sealed class SeedFilePersonaDirectoryTests
         TheSeedFile().All.Select(persona => (persona.Id.Value, persona.DisplayName, persona.PartyType, persona.PartyId))
             .Should().Equal(
                 ("brouwer-dranken", "Brouwer Dranken", PartyType.Shipper, "SHP-0001"),
+                ("tuincentrum-groenrijk", "Tuincentrum Groenrijk", PartyType.Shipper, "SHP-0003"),
                 ("van-dijk-transport", "Van Dijk Transport", PartyType.Carrier, "CAR-0001"),
                 ("kessler-spedition", "Kessler Spedition", PartyType.Carrier, "CAR-0002"),
                 ("pakketpunt-express", "PakketPunt Express", PartyType.Carrier, "CAR-0003"));
     }
+
+    [Fact]
+    public void All_HasAShipperPersonaForEveryActiveShipperInTheSeedFile()
+    {
+        var activeShippers = System.Text.Json.JsonDocument.Parse(Contracts.Read("seed/norvia.seed.json")).RootElement.GetProperty("shippers").EnumerateArray()
+            .Where(shipper => shipper.GetProperty("active").GetBoolean())
+            .Select(shipper => shipper.GetProperty("id").GetString());
+
+        TheSeedFile().All.Where(persona => persona.PartyType == PartyType.Shipper).Select(persona => persona.PartyId)
+            .Should().BeEquivalentTo(activeShippers);
+    }
+
+    [Fact]
+    public void Find_AShipperWithoutAddresses_IsAPersonaWithAnEmptyAddressBook() =>
+        TheSeedFile().Find(new PersonaId("tuincentrum-groenrijk"))!.SavedAddresses.Should().BeEmpty();
 
     [Theory]
     [InlineData("van-dijk-transport", "VDT", CarrierAnswerMode.Manual)]

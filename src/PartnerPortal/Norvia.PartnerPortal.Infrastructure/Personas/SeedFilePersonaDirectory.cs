@@ -40,7 +40,7 @@ internal sealed class SeedFilePersonaDirectory : IPersonaDirectory
     {
         IReadOnlyList<SeedAddress>? addresses = persona.Party.Type switch
         {
-            PartyType.Shipper => seed.Shippers.FirstOrDefault(shipper => shipper.Id == persona.Party.Id)?.Addresses,
+            PartyType.Shipper => seed.Shippers.FirstOrDefault(shipper => shipper.Id == persona.Party.Id) is { } shipper ? shipper.Addresses ?? [] : null,
             PartyType.Carrier => seed.Carriers.Any(carrier => carrier.Id == persona.Party.Id) ? [] : null,
             _ => null,
         };

@@ -1,0 +1,30 @@
+using Norvia.PartnerPortal.Application.ShipperNotifications;
+using Norvia.PartnerPortal.Domain.ShipperNotifications;
+
+namespace Norvia.PartnerPortal.Web.ShipperNotifications;
+
+/// <summary>The words the inbox uses for what a notification is about.</summary>
+public static class ExceptionText
+{
+    public static string Of(ShipperExceptionCode code) => code switch
+    {
+        ShipperExceptionCode.CollectionFailed => "Collection failed",
+        ShipperExceptionCode.DeliveryFailed => "Delivery failed",
+        ShipperExceptionCode.Damaged => "Goods damaged",
+        ShipperExceptionCode.Reservations => "Delivered with reservations",
+        ShipperExceptionCode.Late => "Delivery late",
+        _ => code.ToString(),
+    };
+
+    /// <summary>When the goods are now due, as the notification says: the agreed delivery window if there is one, else the ETA.</summary>
+    public static string Arrival(ShipperNotificationView notification)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        return notification switch
+        {
+            { DeliverFrom: { } from, DeliverUntil: { } until } => $"Agreed window {from} to {until}",
+            { Eta: { } eta } => $"ETA {eta}",
+            _ => string.Empty,
+        };
+    }
+}
