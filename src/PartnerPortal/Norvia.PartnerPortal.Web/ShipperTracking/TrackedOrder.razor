@@ -1,18 +1,15 @@
 @page "/personas/{PersonaId}/tracking/{TransportOrderNumber}"
 @* Interactive, and not prerendered, like the list: it polls, and Fluent UI's components don't survive static streaming rendering. *@
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
-@inherits PollingPage
-@inject IPartnerPortal Portal
-@inject NavigationManager Navigation
-@inject ILogger<TrackedOrder> Logger
+@inherits ShipperTrackingPage<ShipperTrackingDetail>
 @using Norvia.PartnerPortal.Application.ShipperTracking
 
-<PageTitle>@TransportOrderNumber · Tracking · @(_persona?.DisplayName ?? PersonaId) · Partner portal</PageTitle>
+<PageTitle>@TransportOrderNumber · Tracking · @(Persona?.DisplayName ?? PersonaId) · Partner portal</PageTitle>
 
 <p class="mb-2 text-sm"><a href="@PersonaChoice.TrackingPath(PersonaId)">← All Transport Orders</a></p>
 <h1>@TransportOrderNumber</h1>
 
-@if (_loadFailed)
+@if (LoadFailed)
 {
     <div role="alert">
         <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
@@ -20,26 +17,23 @@
         </FluentMessageBar>
     </div>
 }
-else if (_persona is null)
+else if (Persona is null)
 {
-    <FluentStack VerticalAlignment="VerticalAlignment.Center" role="status">
-        <FluentProgressRing />
-        <span>Loading the Transport Order…</span>
-    </FluentStack>
+    <Loading Text="Loading the Transport Order…" />
 }
 else
 {
-    <FetchStatus FetchedAt="_answer.FetchedAt" Error="@_answer.Error" ErrorMessageId="@_answer.ErrorMessageId" />
+    <FetchStatus FetchedAt="Answer.FetchedAt" Error="@Answer.Error" ErrorMessageId="@Answer.ErrorMessageId" />
 
-    @if (_answer.NotFoundText is not null)
+    @if (Answer.NotFoundText is not null)
     {
         <div role="status">
             <FluentMessageBar Intent="MessageIntent.Info" AllowDismiss="false">
-                @_persona.DisplayName has no Transport Order @TransportOrderNumber.
+                @Persona.DisplayName has no Transport Order @TransportOrderNumber.
             </FluentMessageBar>
         </div>
     }
-    else if (_answer.Value is { } order)
+    else if (Answer.Value is { } order)
     {
         <dl class="mb-8 grid max-w-3xl grid-cols-[max-content_1fr] gap-x-8 gap-y-2" aria-label="Transport Order">
             <dt class="font-semibold">Tracking status</dt>
@@ -108,64 +102,18 @@ else
             }
         }
     }
-    else if (_answer.Error is null)
+    else if (Answer.Error is null)
     {
-        <FluentStack VerticalAlignment="VerticalAlignment.Center" role="status">
-            <FluentProgressRing />
-            <span>Loading the Transport Order…</span>
-        </FluentStack>
+        <Loading Text="Loading the Transport Order…" />
     }
 }
 
 @code {
-    private readonly LastAnswer<ShipperTrackingDetail> _answer = new();
-    private PersonaView? _persona;
-    private bool _loadFailed;
-
-    [Parameter]
-    public string PersonaId { get; set; } = string.Empty;
-
     [Parameter]
     public string TransportOrderNumber { get; set; } = string.Empty;
 
-    protected override TimeSpan PollInterval => _persona?.TrackingPollInterval ?? ShipperProfile.DefaultTrackingPollInterval;
-
-    protected override async Task OnParametersSetAsync()
-    {
-        try
-        {
-            _persona = PersonaChoice.Find(PersonaId, await Portal.ListPersonasAsync(CancellationToken.None));
-            if (_persona is null || _persona.PartyType != PartyType.Shipper)
-            {
-                _persona = null;
-                Navigation.NotFound();
-                return;
-            }
-
-            await FetchAsync(CancellationToken.None);
-        }
-        catch (Exception exception)
-        {
-            PageLog.TrackingLoadFailed(Logger, exception, PersonaId);
-            _loadFailed = true;
-        }
-    }
-
-    protected override Task PollAsync(CancellationToken cancellationToken) => _persona is null ? Task.CompletedTask : FetchAsync(cancellationToken);
-
-    // A poll that fails keeps the last answer on screen and says why; the next poll tries again.
-    private async Task FetchAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            _answer.Apply(await Portal.GetTrackedTransportOrderAsync(PersonaId, TransportOrderNumber, cancellationToken), Time.GetUtcNow());
-        }
-        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
-        {
-            PageLog.TrackingLoadFailed(Logger, exception, PersonaId);
-            _answer.Fail("Tracking couldn't be fetched.");
-        }
-    }
+    protected override Task<TrackingAnswer<ShipperTrackingDetail>> AskAsync(CancellationToken cancellationToken) =>
+        Portal.GetTrackedTransportOrderAsync(PersonaId, TransportOrderNumber, cancellationToken);
 
     private static string PlaceText(ShipperPlace place) => place.ToString() is { Length: > 0 } text ? text : "–";
 

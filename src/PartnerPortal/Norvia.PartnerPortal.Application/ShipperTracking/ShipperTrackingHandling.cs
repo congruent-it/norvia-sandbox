@@ -5,9 +5,13 @@ namespace Norvia.PartnerPortal.Application.ShipperTracking;
 
 internal static class ShipperTrackingHandling
 {
-    /// <summary>The Shipper Persona; null for a Persona that is none, as a Carrier has no tracking screen.</summary>
-    public static Persona? ShipperOf(IPersonaDirectory personas, string personaId) =>
-        personas.Find(new PersonaId(personaId)) is { PartyType: PartyType.Shipper } persona ? persona : null;
-
-    public static TrackingAnswer<T> NoShipper<T>(string personaId) => TrackingAnswer.NotFound<T>($"There is no Shipper Persona '{personaId}'.");
+    /// <summary>
+    /// Asks Norvia as the Shipper Persona. A Persona that is none, as a Carrier has no tracking screen, is not found, and
+    /// Norvia is not asked.
+    /// </summary>
+    public static async ValueTask<TrackingAnswer<T>> AskAsShipperAsync<T>(
+        IPersonaDirectory personas, string personaId, Func<Persona, Task<TrackingAnswer<T>>> ask) =>
+        personas.Find(new PersonaId(personaId)) is { PartyType: PartyType.Shipper } shipper
+            ? await ask(shipper)
+            : TrackingAnswer.NotFound<T>($"There is no Shipper Persona '{personaId}'.");
 }

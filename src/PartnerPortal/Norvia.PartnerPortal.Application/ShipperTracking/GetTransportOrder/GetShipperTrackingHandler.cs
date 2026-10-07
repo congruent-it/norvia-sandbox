@@ -11,8 +11,6 @@ public sealed class GetShipperTrackingHandler(IPersonaDirectory personas, INorvi
     {
         ArgumentNullException.ThrowIfNull(query);
 
-        return ShipperTrackingHandling.ShipperOf(personas, query.PersonaId) is { } shipper
-            ? await partnerApi.GetTransportOrderAsync(shipper, query.TransportOrderNumber, cancellationToken)
-            : ShipperTrackingHandling.NoShipper<ShipperTrackingDetail>(query.PersonaId);
+        return await ShipperTrackingHandling.AskAsShipperAsync(personas, query.PersonaId, shipper => partnerApi.GetTransportOrderAsync(shipper, query.TransportOrderNumber, cancellationToken));
     }
 }

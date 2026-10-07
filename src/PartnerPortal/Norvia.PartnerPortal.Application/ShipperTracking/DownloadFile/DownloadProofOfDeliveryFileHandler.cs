@@ -11,8 +11,6 @@ public sealed class DownloadProofOfDeliveryFileHandler(IPersonaDirectory persona
     {
         ArgumentNullException.ThrowIfNull(query);
 
-        return ShipperTrackingHandling.ShipperOf(personas, query.PersonaId) is { } shipper
-            ? await partnerApi.DownloadProofOfDeliveryFileAsync(shipper, query.TransportOrderNumber, query.FileId, cancellationToken)
-            : ShipperTrackingHandling.NoShipper<ShipperProofFileContent>(query.PersonaId);
+        return await ShipperTrackingHandling.AskAsShipperAsync(personas, query.PersonaId, shipper => partnerApi.DownloadProofOfDeliveryFileAsync(shipper, query.TransportOrderNumber, query.FileId, cancellationToken));
     }
 }

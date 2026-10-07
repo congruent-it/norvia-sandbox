@@ -1,17 +1,16 @@
 @page "/personas/{PersonaId}/tracking"
 @* Interactive, and not prerendered, like the other pages: it polls, and Fluent UI's components don't survive static streaming rendering. *@
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
-@inherits PollingPage
-@inject IPartnerPortal Portal
+@inherits ShipperTrackingPage<IReadOnlyList<ShipperTrackingSummary>>
 @inject NavigationManager Navigation
 @inject ILogger<TrackedOrders> Logger
 @using Norvia.PartnerPortal.Application.ShipperTracking
 
-<PageTitle>Tracking · @(_persona?.DisplayName ?? PersonaId) · Partner portal</PageTitle>
+<PageTitle>Tracking · @(Persona?.DisplayName ?? PersonaId) · Partner portal</PageTitle>
 
 <h1>Tracking</h1>
 
-@if (_loadFailed)
+@if (LoadFailed)
 {
     <div role="alert">
         <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
@@ -19,16 +18,13 @@
         </FluentMessageBar>
     </div>
 }
-else if (_persona is null)
+else if (Persona is null)
 {
-    <FluentStack VerticalAlignment="VerticalAlignment.Center" role="status">
-        <FluentProgressRing />
-        <span>Loading the tracking…</span>
-    </FluentStack>
+    <Loading Text="Loading the tracking…" />
 }
 else
 {
-    <p class="mb-6">Where @_persona.DisplayName's Transport Orders stand, newest collection first. The screen asks Norvia again every @PollSeconds seconds. Times are local to the place they are about.</p>
+    <p class="mb-6">Where @Persona.DisplayName's Transport Orders stand, newest collection first. The screen asks Norvia again every @PollSeconds seconds. Times are local to the place they are about.</p>
 
     <form role="search" class="mb-6 flex max-w-3xl flex-wrap items-end gap-4" @onsubmit="SearchAsync" @onsubmit:preventDefault>
         <div class="grow">
@@ -65,19 +61,16 @@ else
         </div>
     </div>
 
-    <FetchStatus FetchedAt="_answer.FetchedAt" Error="@_answer.Error" ErrorMessageId="@_answer.ErrorMessageId" />
+    <FetchStatus FetchedAt="Answer.FetchedAt" Error="@Answer.Error" ErrorMessageId="@Answer.ErrorMessageId" />
 
-    @if (!_answer.HasAnswered)
+    @if (!Answer.HasAnswered)
     {
-        @if (_answer.Error is null)
+        @if (Answer.Error is null)
         {
-            <FluentStack VerticalAlignment="VerticalAlignment.Center" role="status">
-                <FluentProgressRing />
-                <span>Loading the Transport Orders…</span>
-            </FluentStack>
+            <Loading Text="Loading the Transport Orders…" />
         }
     }
-    else if (_answer.Value is not { Count: > 0 } orders)
+    else if (Answer.Value is not { Count: > 0 } orders)
     {
         <div role="status">
             <FluentMessageBar Intent="MessageIntent.Info" AllowDismiss="false">
@@ -100,33 +93,23 @@ else
         </FluentDataGrid>
     }
 
-    @if (_page > 1 || _answer.Value is { Count: ShipperTrackingFilter.PageSize })
+    @if (_page > 1 || Answer.Value is { Count: ShipperTrackingFilter.PageSize })
     {
         <nav aria-label="Pages" class="mt-4 flex items-center gap-4">
             <FluentButton Appearance="Appearance.Outline" Disabled="_page <= 1" OnClick="PreviousPageAsync">Previous</FluentButton>
             <span>Page @_page</span>
-            <FluentButton Appearance="Appearance.Outline" Disabled="_answer.Value is not { Count: ShipperTrackingFilter.PageSize }" OnClick="NextPageAsync">Next</FluentButton>
+            <FluentButton Appearance="Appearance.Outline" Disabled="Answer.Value is not { Count: ShipperTrackingFilter.PageSize }" OnClick="NextPageAsync">Next</FluentButton>
         </nav>
     }
 }
 
 @code {
-    private readonly LastAnswer<IReadOnlyList<ShipperTrackingSummary>> _answer = new();
-    // One fetch at a time, each with the filter as it is when it starts, so a slow poll never overwrites the answer to a newer filter.
-    private readonly SemaphoreSlim _fetching = new(1, 1);
-    private PersonaView? _persona;
-    private bool _loadFailed;
     private string _status = string.Empty;
     private DateTime? _from;
     private DateTime? _to;
     private int _page = 1;
     private string _search = string.Empty;
     private string? _searchText;
-
-    [Parameter]
-    public string PersonaId { get; set; } = string.Empty;
-
-    protected override TimeSpan PollInterval => _persona?.TrackingPollInterval ?? ShipperProfile.DefaultTrackingPollInterval;
 
     private int PollSeconds => (int)Math.Round(PollInterval.TotalSeconds);
 
@@ -136,47 +119,8 @@ else
         _to is { } to ? DateOnly.FromDateTime(to) : null,
         _page);
 
-    protected override async Task OnParametersSetAsync()
-    {
-        try
-        {
-            _persona = PersonaChoice.Find(PersonaId, await Portal.ListPersonasAsync(CancellationToken.None));
-            if (_persona is null || _persona.PartyType != PartyType.Shipper)
-            {
-                _persona = null;
-                Navigation.NotFound();
-                return;
-            }
-
-            await FetchAsync(CancellationToken.None);
-        }
-        catch (Exception exception)
-        {
-            PageLog.TrackingLoadFailed(Logger, exception, PersonaId);
-            _loadFailed = true;
-        }
-    }
-
-    protected override Task PollAsync(CancellationToken cancellationToken) => _persona is null ? Task.CompletedTask : FetchAsync(cancellationToken);
-
-    // A poll that fails keeps the last answer on screen and says why; the next poll tries again.
-    private async Task FetchAsync(CancellationToken cancellationToken)
-    {
-        await _fetching.WaitAsync(cancellationToken);
-        try
-        {
-            _answer.Apply(await Portal.ListTrackedTransportOrdersAsync(PersonaId, Filter, cancellationToken), Time.GetUtcNow());
-        }
-        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
-        {
-            PageLog.TrackingLoadFailed(Logger, exception, PersonaId);
-            _answer.Fail("Tracking couldn't be fetched.");
-        }
-        finally
-        {
-            _fetching.Release();
-        }
-    }
+    protected override Task<TrackingAnswer<IReadOnlyList<ShipperTrackingSummary>>> AskAsync(CancellationToken cancellationToken) =>
+        Portal.ListTrackedTransportOrdersAsync(PersonaId, Filter, cancellationToken);
 
     private Task FilterChangedAsync()
     {
