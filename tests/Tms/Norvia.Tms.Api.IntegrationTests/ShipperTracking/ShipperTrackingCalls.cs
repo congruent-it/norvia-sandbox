@@ -28,6 +28,42 @@ internal static class ShipperTrackingCalls
         return await caller.SendAsync(request, cancellationToken);
     }
 
+    /// <summary>Gets one Transport Order's tracking as API Management does, by its number, and returns the raw answer.</summary>
+    public static Task<HttpResponseMessage> GetAsync(
+        this TmsFixture tms, HttpClient caller, string? shipperId, string transportOrderNumber, CancellationToken cancellationToken) =>
+        SendAsync(caller, shipperId, $"/v1/shipper-tracking/transport-orders/{Uri.EscapeDataString(transportOrderNumber)}", cancellationToken);
+
+    /// <summary>Finds one Transport Order's tracking as API Management does, by the Shipper's reference, and returns the raw answer.</summary>
+    public static Task<HttpResponseMessage> FindAsync(
+        this TmsFixture tms, HttpClient caller, string? shipperId, string shipperReference, CancellationToken cancellationToken) =>
+        SendAsync(caller, shipperId, $"/v1/shipper-tracking/transport-orders/find?shipperReference={Uri.EscapeDataString(shipperReference)}", cancellationToken);
+
+    /// <summary>The Shipper's Transport Order by number, which the TMS must answer.</summary>
+    public static async Task<JsonNode> GotAsync(this TmsFixture tms, string shipperId, string transportOrderNumber, CancellationToken cancellationToken) =>
+        JsonNode.Parse(await tms.GotBodyAsync(shipperId, transportOrderNumber, cancellationToken))!;
+
+    /// <summary>The raw body of the Shipper's Transport Order by number, for what no part of it may contain.</summary>
+    public static async Task<string> GotBodyAsync(this TmsFixture tms, string shipperId, string transportOrderNumber, CancellationToken cancellationToken)
+    {
+        using var response = await tms.GetAsync(tms.ShipperTracking, shipperId, transportOrderNumber, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, body);
+        return body;
+    }
+
+    private static async Task<HttpResponseMessage> SendAsync(HttpClient caller, string? shipperId, string path, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(caller);
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(path, UriKind.Relative));
+        if (shipperId is not null)
+        {
+            request.Headers.Add("X-Shipper-ID", shipperId);
+        }
+
+        request.Headers.Add("X-Correlation-ID", TmsCalls.NewCorrelationId());
+        return await caller.SendAsync(request, cancellationToken);
+    }
+
     /// <summary>The Shipper's Transport Orders, as API Management gets them, which the TMS must answer.</summary>
     public static async Task<JsonArray> ListedForAsync(this TmsFixture tms, string shipperId, CancellationToken cancellationToken) =>
         JsonNode.Parse(await tms.ListedBodyForAsync(shipperId, cancellationToken))!.AsArray();

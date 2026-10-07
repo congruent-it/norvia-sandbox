@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Application.IntegrationEvents;
+using Norvia.Tms.Application.ShipperTracking.GetTransportOrder;
 using Norvia.Tms.Application.ShipperTracking.ListTransportOrders;
+using Norvia.Tms.Domain.ShipperTracking;
 
 namespace Norvia.Tms.Api.ShipperTracking;
 
@@ -35,14 +37,74 @@ public static class ShipperTrackingEndpoints
                 + "(Received, Scheduled, Collected, InTransit or Delivered), the ETA and the last update. The Tracking status is worked out when the call is made. "
                 + "Rejected bookings are not returned. Nothing in the answer names a Carrier, a Shipment number, an Exception or Stale.");
 
+        shipperTracking.MapGet("/transport-orders/find", FindTransportOrderAsync)
+            .WithName("FindShipperTransportOrder")
+            .RequireAuthorization(policy => policy.RequireRole(ReadRole))
+            .WithMetadata(new TrackedFlow(Flows.ShipperTracking))
+            .WithSummary("Find one of a Shipper's Transport Orders by the Shipper's own reference, with its tracking (Canonical Model).")
+            .WithDescription(
+                $"As the get operation, which it answers the same as. Scoped to the Shipper in {ShipperIdHeader}; the reference is unique per Shipper. "
+                + "A reference that is unknown or another Shipper's is a 404 with the code TransportOrderNotFound, the same for both.");
+
+        shipperTracking.MapGet("/transport-orders/{transportOrderNumber}", GetTransportOrderAsync)
+            .WithName("GetShipperTransportOrder")
+            .RequireAuthorization(policy => policy.RequireRole(ReadRole))
+            .WithMetadata(new TrackedFlow(Flows.ShipperTracking))
+            .WithSummary("Get one of a Shipper's Transport Orders by Norvia's number, with its tracking (Canonical Model).")
+            .WithDescription(
+                $"Scoped to the Shipper in {ShipperIdHeader}, which is required, as is {TrackingScopeMiddleware.CorrelationIdHeader}; otherwise the call is a 400. "
+                + "Returns the collection and delivery places, the collection window, the delivery window (the agreed one when there is one), the Tracking status, "
+                + "the ETA, the last update and the progress: only progress Tracking events, in event-time order, without remarks. "
+                + "A Transport Order that is unknown or another Shipper's is a 404 with the code TransportOrderNotFound, the same for both. "
+                + "Nothing in the answer names a Carrier, a Shipment number, an Exception or Stale.");
+
         return app;
     }
 
-    private static async Task<Results<Ok<IReadOnlyList<ShipperTransportOrderListItem>>, ValidationProblem>> ListTransportOrdersAsync(
+    private static async Task<Results<Ok<ShipperTransportOrderDetail>, ValidationProblem, ProblemHttpResult>> GetTransportOrderAsync(
+        string transportOrderNumber,
         [FromHeader(Name = ShipperIdHeader)] string? shipperId,
         [FromHeader(Name = TrackingScopeMiddleware.CorrelationIdHeader)] string? correlationId,
         IMediator mediator,
         CancellationToken cancellationToken)
+    {
+        var errors = Check(shipperId, correlationId);
+        if (errors.Count > 0)
+        {
+            return TypedResults.ValidationProblem(errors);
+        }
+
+        var result = await mediator.Send(new GetShipperTransportOrderQuery(shipperId!, transportOrderNumber), cancellationToken);
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : Refused(result, correlationId!);
+    }
+
+    private static async Task<Results<Ok<ShipperTransportOrderDetail>, ValidationProblem, ProblemHttpResult>> FindTransportOrderAsync(
+        [FromQuery] string? shipperReference,
+        [FromHeader(Name = ShipperIdHeader)] string? shipperId,
+        [FromHeader(Name = TrackingScopeMiddleware.CorrelationIdHeader)] string? correlationId,
+        IMediator mediator,
+        CancellationToken cancellationToken)
+    {
+        var errors = Check(shipperId, correlationId);
+        if (string.IsNullOrWhiteSpace(shipperReference))
+        {
+            errors["shipperReference"] = ["Finding a Transport Order needs the Shipper's reference."];
+        }
+
+        if (errors.Count > 0)
+        {
+            return TypedResults.ValidationProblem(errors);
+        }
+
+        var result = await mediator.Send(new FindShipperTransportOrderQuery(shipperId!, shipperReference!), cancellationToken);
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : Refused(result, correlationId!);
+    }
+
+    private static ProblemHttpResult Refused(Ardalis.Result.Result<ShipperTransportOrderDetail> result, string correlationId) =>
+        RefusalProblem.Of<ShipperTrackingRefusalCode, ShipperTransportOrderDetail>(
+            result, "The Transport Order can't be tracked.", correlationId, _ => StatusCodes.Status404NotFound);
+
+    private static Dictionary<string, string[]> Check(string? shipperId, string? correlationId)
     {
         var errors = new Dictionary<string, string[]>();
         if (string.IsNullOrWhiteSpace(shipperId))
@@ -55,6 +117,16 @@ public static class ShipperTrackingEndpoints
             errors[TrackingScopeMiddleware.CorrelationIdHeader] = [$"A Shipper's query needs a {TrackingScopeMiddleware.CorrelationIdHeader}."];
         }
 
+        return errors;
+    }
+
+    private static async Task<Results<Ok<IReadOnlyList<ShipperTransportOrderListItem>>, ValidationProblem>> ListTransportOrdersAsync(
+        [FromHeader(Name = ShipperIdHeader)] string? shipperId,
+        [FromHeader(Name = TrackingScopeMiddleware.CorrelationIdHeader)] string? correlationId,
+        IMediator mediator,
+        CancellationToken cancellationToken)
+    {
+        var errors = Check(shipperId, correlationId);
         if (errors.Count > 0)
         {
             return TypedResults.ValidationProblem(errors);
