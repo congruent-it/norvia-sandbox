@@ -5,4 +5,7 @@ public sealed record ShipperTrackingRefusal(ShipperTrackingRefusalCode Code, str
 {
     public static ShipperTrackingRefusal TransportOrderNotFound() =>
         new(ShipperTrackingRefusalCode.TransportOrderNotFound, "The Transport Order is not known to the TMS.");
+
+    public static ShipperTrackingRefusal ProofOfDeliveryNotFound() =>
+        new(ShipperTrackingRefusalCode.ProofOfDeliveryNotFound, "The Transport Order has no current Proof of delivery with such a file.");
 }

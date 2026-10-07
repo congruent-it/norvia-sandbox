@@ -1,5 +1,6 @@
 using Ardalis.SharedKernel;
 using Norvia.Tms.Application.ShipperTracking.ListTransportOrders;
+using Norvia.Tms.Domain.ProofsOfDelivery;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.ShipperTracking;
 using Norvia.Tms.Domain.TrackingEvents;
@@ -14,10 +15,13 @@ internal static class ShipperTransportOrderDetailProjection
         TransportOrder order,
         IReadRepository<Shipment> shipments,
         IReadRepository<TrackingEvent> trackingEvents,
+        IReadRepository<ProofOfDelivery> proofsOfDelivery,
         CancellationToken cancellationToken)
     {
         var shipment = (await shipments.ListAsync(new ShipmentsOfTransportOrdersSpec([order.Id]), cancellationToken)).FirstOrDefault();
         var events = shipment is null ? [] : await trackingEvents.ListAsync(new TrackingTimelineSpec(shipment.Id), cancellationToken);
+
+        var proofOfDelivery = shipment is null ? null : await proofsOfDelivery.FirstOrDefaultAsync(new CurrentProofOfDeliverySpec(shipment.Id), cancellationToken);
 
         var details = order.Details;
         var deliveryWindow = shipment is null ? details.Delivery?.Window : shipment.DeliveryWindowOf(details);
@@ -36,7 +40,14 @@ internal static class ShipperTransportOrderDetailProjection
             [.. progress.Select(trackingEvent => new ShipperProgressEntry(
                 trackingEvent.Type.ToString(),
                 trackingEvent.EventTime,
-                new ShipperPlaceView(trackingEvent.Location.Place, trackingEvent.Location.CountryCode)))]);
+                new ShipperPlaceView(trackingEvent.Location.Place, trackingEvent.Location.CountryCode)))],
+            proofOfDelivery is null
+                ? null
+                : new ShipperProofOfDelivery(
+                    proofOfDelivery.ReceivedBy,
+                    proofOfDelivery.DeliveryTime,
+                    proofOfDelivery.Condition,
+                    [.. proofOfDelivery.Files.Select(file => new ShipperProofOfDeliveryFile(file.Id, file.Name, file.ContentType, file.SizeBytes))]));
     }
 
     private static ShipperPlaceView? PlaceOf(Address? address) => address is null ? null : new(address.City, address.Country);

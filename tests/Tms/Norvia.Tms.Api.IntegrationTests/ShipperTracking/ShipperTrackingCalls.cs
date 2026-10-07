@@ -38,6 +38,11 @@ internal static class ShipperTrackingCalls
         this TmsFixture tms, HttpClient caller, string? shipperId, string shipperReference, CancellationToken cancellationToken) =>
         SendAsync(caller, shipperId, $"/v1/shipper-tracking/transport-orders/find?shipperReference={Uri.EscapeDataString(shipperReference)}", cancellationToken);
 
+    /// <summary>Reads a Proof of delivery file of the Shipper's Transport Order as API Management does, and returns the raw answer.</summary>
+    public static Task<HttpResponseMessage> GetProofFileAsync(
+        this TmsFixture tms, HttpClient caller, string? shipperId, string transportOrderNumber, string fileId, CancellationToken cancellationToken) =>
+        SendAsync(caller, shipperId, $"/v1/shipper-tracking/transport-orders/{Uri.EscapeDataString(transportOrderNumber)}/proof-of-delivery/files/{fileId}", cancellationToken);
+
     /// <summary>The Shipper's Transport Order by number, which the TMS must answer.</summary>
     public static async Task<JsonNode> GotAsync(this TmsFixture tms, string shipperId, string transportOrderNumber, CancellationToken cancellationToken) =>
         JsonNode.Parse(await tms.GotBodyAsync(shipperId, transportOrderNumber, cancellationToken))!;

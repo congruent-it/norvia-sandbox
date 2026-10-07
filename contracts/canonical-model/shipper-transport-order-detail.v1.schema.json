@@ -5,7 +5,7 @@
   "description": "The Shipper's view of one of its Transport Orders (Canonical Model, version 1), as the TMS Shipper tracking API's get and find operations return it (P8). It holds what the Shipper may see and nothing of what stays inside Norvia (ADR 0011): no Carrier, no Shipment number, no Exception, no Stale and no remarks on Tracking events. The Tracking status is worked out when it is asked for and is never stored.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["transportOrderNumber", "shipperReference", "collection", "delivery", "collectionWindow", "deliveryWindow", "trackingStatus", "eta", "lastUpdate", "progress"],
+  "required": ["transportOrderNumber", "shipperReference", "collection", "delivery", "collectionWindow", "deliveryWindow", "trackingStatus", "eta", "lastUpdate", "progress", "proofOfDelivery"],
   "properties": {
     "transportOrderNumber": { "type": "string", "pattern": "^TO-[0-9]{7}$" },
     "shipperReference": { "description": "The Shipper's own reference, unique per Shipper; null when the Transport Order has none.", "type": ["string", "null"], "minLength": 1 },
@@ -19,6 +19,31 @@
     },
     "eta": { "description": "The ETA of the last Tracking event that carried one, otherwise the end of the delivery window; null when there is none.", "type": ["string", "null"], "format": "date-time" },
     "lastUpdate": { "description": "The event time of the latest progress Tracking event; null before collection.", "type": ["string", "null"], "format": "date-time" },
+    "proofOfDelivery": {
+      "description": "The current Proof of delivery with its files, read through the Shipper tracking API's file operation; null when there is none. A superseded one never appears.",
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["receivedBy", "deliveryTime", "condition", "files"],
+      "properties": {
+        "receivedBy": { "type": "string", "minLength": 1 },
+        "deliveryTime": { "type": "string", "format": "date-time" },
+        "condition": { "enum": ["Clean", "Reservations"] },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "name", "contentType", "sizeBytes"],
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "name": { "type": "string", "minLength": 1 },
+              "contentType": { "type": "string", "minLength": 1 },
+              "sizeBytes": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
+    },
     "progress": {
       "description": "The progress Tracking events in event-time order. Exception events never appear.",
       "type": "array",

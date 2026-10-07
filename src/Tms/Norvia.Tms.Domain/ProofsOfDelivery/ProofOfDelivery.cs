@@ -124,6 +124,9 @@ public sealed class ProofOfDelivery : EntityBase<ProofOfDeliveryId>, IAggregateR
         return proofOfDelivery;
     }
 
+    /// <summary>One of its files by the file's ID, or null when it holds no such file.</summary>
+    public ProofOfDeliveryFile? FileById(Guid fileId) => Files.FirstOrDefault(file => file.Id == fileId);
+
     /// <summary>Whether a report is this Proof of delivery sent again: the same source under the same document ID.</summary>
     public bool IsRepeatOf(ProofOfDeliveryReport report)
     {

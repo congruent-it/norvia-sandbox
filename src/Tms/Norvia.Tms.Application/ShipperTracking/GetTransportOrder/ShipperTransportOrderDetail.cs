@@ -1,4 +1,5 @@
 using Norvia.Tms.Application.ShipperTracking.ListTransportOrders;
+using Norvia.Tms.Domain.ProofsOfDelivery;
 using Norvia.Tms.Domain.ShipperTracking;
 
 namespace Norvia.Tms.Application.ShipperTracking.GetTransportOrder;
@@ -11,6 +12,7 @@ namespace Norvia.Tms.Application.ShipperTracking.GetTransportOrder;
 /// <param name="Eta">The ETA of the last Tracking event that carried one, otherwise the end of the delivery window; null when there is none.</param>
 /// <param name="LastUpdate">The event time of the latest progress Tracking event; null before collection.</param>
 /// <param name="Progress">The progress Tracking events in event-time order.</param>
+/// <param name="ProofOfDelivery">The current Proof of delivery, with its files; null when there is none. A superseded one never appears.</param>
 public sealed record ShipperTransportOrderDetail(
     string TransportOrderNumber,
     string? ShipperReference,
@@ -21,9 +23,16 @@ public sealed record ShipperTransportOrderDetail(
     TrackingStatus TrackingStatus,
     DateTimeOffset? Eta,
     DateTimeOffset? LastUpdate,
-    IReadOnlyList<ShipperProgressEntry> Progress);
+    IReadOnlyList<ShipperProgressEntry> Progress,
+    ShipperProofOfDelivery? ProofOfDelivery);
 
 public sealed record ShipperWindowView(DateTimeOffset? Earliest, DateTimeOffset? Latest);
 
 /// <param name="Type">Collected, Departed, Arrived, OutForDelivery or Delivered.</param>
 public sealed record ShipperProgressEntry(string Type, DateTimeOffset EventTime, ShipperPlaceView Place);
+
+/// <param name="Condition">Clean or Reservations.</param>
+/// <param name="Files">The files to download, each through its ID.</param>
+public sealed record ShipperProofOfDelivery(string ReceivedBy, DateTimeOffset DeliveryTime, DeliveryCondition Condition, IReadOnlyList<ShipperProofOfDeliveryFile> Files);
+
+public sealed record ShipperProofOfDeliveryFile(Guid Id, string Name, string ContentType, long SizeBytes);

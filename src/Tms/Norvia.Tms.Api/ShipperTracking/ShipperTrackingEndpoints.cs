@@ -4,7 +4,9 @@ using Microsoft.AspNetCore.Mvc;
 using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.ShipperTracking.GetTransportOrder;
+using Norvia.Tms.Application.ProofsOfDelivery.Read;
 using Norvia.Tms.Application.ShipperTracking.ListTransportOrders;
+using Norvia.Tms.Application.ShipperTracking.ReadProofOfDeliveryFile;
 using Norvia.Tms.Domain.ShipperTracking;
 
 namespace Norvia.Tms.Api.ShipperTracking;
@@ -60,7 +62,39 @@ public static class ShipperTrackingEndpoints
                 + "A Transport Order that is unknown or another Shipper's is a 404 with the code TransportOrderNotFound, the same for both. "
                 + "Nothing in the answer names a Carrier, a Shipment number, an Exception or Stale.");
 
+        shipperTracking.MapGet("/transport-orders/{transportOrderNumber}/proof-of-delivery/files/{fileId:guid}", GetProofOfDeliveryFileAsync)
+            .WithName("GetShipperProofOfDeliveryFile")
+            .RequireAuthorization(policy => policy.RequireRole(ReadRole))
+            .WithMetadata(new TrackedFlow(Flows.ShipperTracking))
+            .WithSummary("Read one file of a Shipper's Transport Order's current Proof of delivery, streamed with the content type it was sent with.")
+            .WithDescription(
+                $"Scoped to the Shipper in {ShipperIdHeader}, which is required, as is {TrackingScopeMiddleware.CorrelationIdHeader}; otherwise the call is a 400. "
+                + "A Transport Order that is unknown or another Shipper's is a 404 with the code TransportOrderNotFound. A file of a superseded Proof of delivery, "
+                + "a Transport Order with no Proof of delivery or a file it doesn't hold is a 404 with the code ProofOfDeliveryNotFound. "
+                + "P6's Planner operation to read a Proof of delivery file is unchanged.");
+
         return app;
+    }
+
+    private static async Task<Results<FileStreamHttpResult, ValidationProblem, ProblemHttpResult>> GetProofOfDeliveryFileAsync(
+        string transportOrderNumber,
+        Guid fileId,
+        [FromHeader(Name = ShipperIdHeader)] string? shipperId,
+        [FromHeader(Name = TrackingScopeMiddleware.CorrelationIdHeader)] string? correlationId,
+        IMediator mediator,
+        CancellationToken cancellationToken)
+    {
+        var errors = Check(shipperId, correlationId);
+        if (errors.Count > 0)
+        {
+            return TypedResults.ValidationProblem(errors);
+        }
+
+        var result = await mediator.Send(new GetShipperProofOfDeliveryFileQuery(shipperId!, transportOrderNumber, fileId), cancellationToken);
+        return result.IsSuccess
+            ? TypedResults.File(result.Value.Content, result.Value.ContentType, result.Value.Name)
+            : RefusalProblem.Of<ShipperTrackingRefusalCode, ProofOfDeliveryFileContent>(
+                result, "The Proof of delivery file can't be read.", correlationId!, _ => StatusCodes.Status404NotFound);
     }
 
     private static async Task<Results<Ok<ShipperTransportOrderDetail>, ValidationProblem, ProblemHttpResult>> GetTransportOrderAsync(
