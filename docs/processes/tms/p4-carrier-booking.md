@@ -206,7 +206,7 @@ P4 is two trails with a wait between them, not one. The release starts the booki
 
 ### Message trail
 
-The Hops of both trails, named as the [Integration console](../../operations/integration-console.md#message-trail) shows them, in time order. The release and the booking belong to the Flows `transport-planning` and `carrier-booking`, with the sent report in `carrier-booking-report`. The answer belongs to `carrier-booking-answer`, on a correlation ID API Management creates.
+The Hops of both trails, named as the [Integration console](../../operations/integration-console.md#message-trail) shows them, in time order. The release and the booking belong to the Flows `transport-planning` and `carrier-booking`, with the sent report in `carrier-booking-report`. The answer's Hops belong to two Flows on one correlation ID that API Management creates: `carrier-answer` for API Management and the Carrier-answer Logic App, and `carrier-booking-answer` for the TMS's calls.
 
 ```mermaid
 sequenceDiagram
@@ -238,10 +238,12 @@ The answer arrives later, as a trail of its own:
 
 ```mermaid
 sequenceDiagram
-    box transparent Flow carrier-booking-answer
+    box transparent Flow carrier-answer
         participant portal as partner-portal-web: Send Carrier answer
         participant apim as apim-norvia: Answer Carrier booking
         participant logic as logic-answer: carrier-answer
+    end
+    box transparent Flow carrier-booking-answer
         participant tms as tms-api: POST /v1/carrier-bookings/CB-0000042/answer
         participant pub as tms-api: publish CarrierBookingConfirmed
     end
