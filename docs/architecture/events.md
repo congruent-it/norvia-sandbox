@@ -35,6 +35,7 @@ Subscriptions and subscribers marked *planned* are designed in a process doc but
 | [`CarrierCancellationNotDelivered`](../../contracts/canonical-model/carrier-cancellation-not-delivered.v1.schema.json) | `shipment-events` | TMS | `monitoring` (every message) | Monitoring | [P7](../processes/tms/p7-exception-handling.md) |
 | [`ShipmentDeliveryWindowAgreed`](../../contracts/canonical-model/shipment-delivery-window-agreed.v1.schema.json) | `shipment-events` | TMS | `monitoring` (every message) | Monitoring | [P7](../processes/tms/p7-exception-handling.md) |
 | `CarrierCostIncurred` *planned* | `shipment-events` | TMS | `carrier-cost` *planned* (`CarrierCostIncurred` only) | Carrier cost Logic App (P9) *planned* | [P9](../processes/tms/p9-freight-settlement.md) |
+
 ## Reading the table
 
 - The P4 booking Logic App's `carrier-booking` subscription receives every event that carries the Shipment's `assignedTo` property when it is `Carrier`. The Logic App acts on `ShipmentReleased` and ignores the rest.

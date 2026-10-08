@@ -12,7 +12,7 @@ public sealed partial class EventCatalogueTests
     private static readonly string Root = FindRepositoryRoot();
 
     [Fact]
-    public void EveryEventSchema_HasARow()
+    public void Catalogue_EventSchemaInCanonicalModel_HasARow()
     {
         var catalogued = Catalogue().Select(row => row.Event).ToHashSet();
 
@@ -22,7 +22,7 @@ public sealed partial class EventCatalogueTests
     }
 
     [Fact]
-    public void EverySubscriptionInBicep_HasARow()
+    public void Catalogue_SubscriptionInBicep_HasARow()
     {
         var missing = Missing(BicepSubscriptions());
 
@@ -30,7 +30,7 @@ public sealed partial class EventCatalogueTests
     }
 
     [Fact]
-    public void EverySubscriptionInTheAppHost_HasARow()
+    public void Catalogue_SubscriptionInAppHost_HasARow()
     {
         var missing = Missing(AppHostSubscriptions());
 
@@ -38,9 +38,9 @@ public sealed partial class EventCatalogueTests
     }
 
     [Fact]
-    public void NoBuiltRow_NamesASubscriptionThatDoesNotExist()
+    public void Catalogue_BuiltRowNamingUnknownSubscription_Fails()
     {
-        var existing = BicepSubscriptions().Union(AppHostSubscriptions()).ToHashSet();
+        var existing = BicepSubscriptions().Intersect(AppHostSubscriptions()).ToHashSet();
 
         var unknown = Catalogue()
             .SelectMany(row => row.Subscriptions.Where(s => !s.Planned).Select(s => s.Key))
@@ -48,17 +48,21 @@ public sealed partial class EventCatalogueTests
             .Distinct()
             .ToList();
 
-        unknown.Should().BeEmpty("a row may name only subscriptions that exist, unless it marks them planned");
+        unknown.Should().BeEmpty("a row may name only subscriptions that exist in both Bicep and the AppHost, unless it marks them planned");
     }
 
+    // The checks above pass vacuously when a parser finds nothing, so each source must yield something.
     [Fact]
-    public void TheCatalogue_IsNotEmpty()
-    {
-        Catalogue().Should().NotBeEmpty();
-        BicepSubscriptions().Should().NotBeEmpty();
-        AppHostSubscriptions().Should().NotBeEmpty();
-        EventSchemaTitles().Should().NotBeEmpty();
-    }
+    public void Catalogue_Parsed_IsNotEmpty() => Catalogue().Should().NotBeEmpty();
+
+    [Fact]
+    public void BicepSubscriptions_Parsed_IsNotEmpty() => BicepSubscriptions().Should().NotBeEmpty();
+
+    [Fact]
+    public void AppHostSubscriptions_Parsed_IsNotEmpty() => AppHostSubscriptions().Should().NotBeEmpty();
+
+    [Fact]
+    public void EventSchemaTitles_Read_IsNotEmpty() => EventSchemaTitles().Should().NotBeEmpty();
 
     private static List<string> Missing(IEnumerable<string> subscriptions)
     {
@@ -107,7 +111,7 @@ public sealed partial class EventCatalogueTests
             // An event's body names its type; commands, responses and documents do not.
             if (schema.RootElement.TryGetProperty("properties", out var properties) && properties.TryGetProperty("eventType", out _))
             {
-                titles.Add(schema.RootElement.GetProperty("title").GetString()!);
+                titles.Add(schema.RootElement.GetProperty("title").GetString() ?? throw new InvalidOperationException($"{path} has no title."));
             }
         }
 
