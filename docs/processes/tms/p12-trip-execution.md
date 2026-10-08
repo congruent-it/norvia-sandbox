@@ -232,6 +232,8 @@ The Shipment's timeline shows the Driver's Tracking events and Proofs of deliver
 
 The TMS APIs accept only the Canonical Model (ADR 0003). The Driver reports Logic App's managed identity holds these roles:
 
+Who holds each role, and what else each identity may reach, is in [Identity and access](../../architecture/identity-and-access.md).
+
 | Operation | API | Role |
 |---|---|---|
 | Start a Trip | Trip API | `Trips.Start` |

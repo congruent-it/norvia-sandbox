@@ -172,6 +172,8 @@ The views update without a page refresh, as P3's lists do. P10's capacity view l
 
 The Trip API accepts only the Canonical Model (ADR 0003). The Planner's actions are in the TMS UI.
 
+Who holds each role, and what else each identity may reach, is in [Identity and access](../../architecture/identity-and-access.md).
+
 | Operation | Caller | Role |
 |---|---|---|
 | Report a Trip version as delivered or not delivered | Trip dispatch Logic App | `Trips.ReportDelivery` |

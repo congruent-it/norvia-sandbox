@@ -234,6 +234,8 @@ The endpoints have no answer modes. They acknowledge every valid message. A Ship
 
 The Exception API accepts only the Canonical Model (ADR 0003). Each Logic App's managed identity holds only the role it needs.
 
+Who holds each role, and what else each identity may reach, is in [Identity and access](../../architecture/identity-and-access.md).
+
 | Operation | Caller | Role |
 |---|---|---|
 | Report a Shipper notification as sent or not delivered | Shipper notification Logic App | `ShipperNotifications.Report` |

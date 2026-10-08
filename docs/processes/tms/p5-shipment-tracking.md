@@ -166,6 +166,8 @@ The delay is a Partner portal setting per Persona, a few seconds by default. Aut
 
 The Tracking event API accepts only the Canonical Model (ADR 0003).
 
+Who holds each role, and what else each identity may reach, is in [Identity and access](../../architecture/identity-and-access.md).
+
 | Operation | Caller | Role |
 |---|---|---|
 | Record a Tracking event | Carrier-tracking Logic App. Driver reports Logic App ([P12](p12-trip-execution.md)) | `TrackingEvents.Record` |
