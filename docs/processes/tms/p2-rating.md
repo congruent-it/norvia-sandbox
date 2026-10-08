@@ -121,7 +121,7 @@ sequenceDiagram
     tms-)pub: outbox, within a second
 ```
 
-- A Transport Order the Rate Card can't price publishes `TransportOrderRatingFailed` instead, and the first Hop carries the `failureCode`. Its `outcome` is still `Succeeded`: Rating failed is Rating's answer, not a failed flow.
+- A Transport Order the Rate Card can't price publishes `TransportOrderRatingFailed` instead, and the `Rate Transport Order` Hop carries the `failureCode`. Its `outcome` is still `Succeeded`: Rating failed is Rating's answer, not a failed flow.
 - A Transport Order from the WMS channel is *Not rated separately* and has no rating Hop and no event.
 - A rating that threw has a `Rate Transport Order` Hop with the outcome `Retrying` and no publish Hop. The next sweep rates the order, and its Hop follows.
 - A re-rate starts in the TMS UI, so it continues the intake's trail from the other side. The UI's Hop is `tms-web: Re-rate Transport Order`, which calls `tms-api: POST /v1/transport-orders/TO-0000042/re-rate` and then the publish Hop. A refused re-rate (409) stops at the call.

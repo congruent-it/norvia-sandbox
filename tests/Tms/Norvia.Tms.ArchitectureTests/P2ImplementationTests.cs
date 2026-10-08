@@ -5,7 +5,7 @@ namespace Norvia.Tms.ArchitectureTests;
 /// <summary>
 /// The Implementation section of the P2 process doc (docs/processes/tms/p2-rating.md) links to the files
 /// that carry each step. A link to a file that has moved or gone is a lie in the code map. Only the links are checked:
-/// the Hop names in the diagram, the workflow action names and what each row says are not.
+/// the Hop names in the diagram and what each row says are not.
 /// </summary>
 public sealed partial class P2ImplementationTests
 {
