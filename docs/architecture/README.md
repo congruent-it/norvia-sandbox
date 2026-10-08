@@ -4,7 +4,8 @@ How Norvia's estate is put together, for engineers and coding agents working on 
 
 | Page | Covers |
 |---|---|
-| [c4.md](c4.md) | L1 system context: Norvia's systems, the parties outside Norvia and the people who use them. L2 containers: the applications, API Management, the Logic Apps, Service Bus, SQL, storage, Key Vault, Application Insights and Entra, and how they talk |
+| [c4.md](c4.md) | L1 system context: Norvia's systems, the parties outside Norvia and the people who use them. L2 containers: the applications, API Management, the Logic Apps, Service Bus, SQL, storage, Key Vault, Application Insights and Entra, and how they talk. L3 components of the integration layer: API Management's policies, the Logic Apps and their local functions, the subscriptions and queues, and the TMS APIs they call |
+| [local-vs-azure.md](local-vs-azure.md) | What plays each Azure piece under Aspire, the ADR that decided it, and where the two can differ |
 
 ## Conventions
 
