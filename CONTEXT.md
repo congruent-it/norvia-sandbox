@@ -365,6 +365,10 @@ _Avoid_: common data model, standard format
 Everything the integration layer did under one correlation ID: the call or event it started from, and every queue, subscription, Logic App run and application call that followed from it, fan-out included. An action by a Norvia employee in an application starts a new trail, except a re-rate: it continues the trail of its Transport Order's intake, so the order's whole rating is found by one correlation ID.
 _Avoid_: integration message, message flow, transaction
 
+**Flow**:
+One named path through the integration layer, from what starts it to the application call or published event it ends in, such as transport-order-intake or carrier-answer. A business process uses one or more flows. Whatever reacts to a published event starts a new flow on the same Message trail. Every Hop belongs to exactly one flow.
+_Avoid_: integration, interface, pipeline, workflow (that is one Logic App's definition)
+
 **Hop**:
 One thing the integration layer did on a Message trail: an API Management call, a Logic App run, an application call or a published event, with its flow, time, duration and outcome. A hop that started others caused them; where it started more than one, the trail fans out.
 _Avoid_: step (that is an action inside a Logic App run), span, event

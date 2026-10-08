@@ -271,6 +271,10 @@ The demo:
 5. The Driver delivers the third with reservations. P7 opens a Reservations Exception.
 6. The Driver ends the Trip. The second Shipment appears in *Shipments to put on Trips* as a Re-delivery.
 
+## Implementation
+
+Not built yet.
+
 ## Deferred
 
 These were left out on purpose while designing P12, each with its reason.
