@@ -99,6 +99,73 @@ After a deployment, and not in CI, the presenter checks Rating on the deployed e
 
 If a check fails, file the gap as its own issue against P2, rather than working around it in the run book.
 
+## Implementation
+
+For engineers and coding agents. It shows what the estate does when a Transport Order is rated, where each step lives in the repository, what plays each Azure piece on a developer's machine, and what is designed but not built. It follows the template set by [P1's Implementation section](p1-transport-order-intake.md#implementation). Azure is the estate [c4.md](../../architecture/c4.md) draws.
+
+Rating runs entirely inside the TMS: there is no API Management operation, Logic App or Function in it. The rating worker is a hosted service of the TMS API, and the only things it sends out are its outcome events.
+
+### Message trail
+
+The Hops that Rating adds to the Message trail of the Transport Order's intake, named as the [Integration console](../../operations/integration-console.md#message-trail) shows them, in time order. They belong to the Flow `transport-order-rating` and carry the intake's correlation ID, so they follow the intake's Hops ([P1](p1-transport-order-intake.md#implementation)) on the same trail. The Shipper does not wait for them: the booking is answered before Rating starts.
+
+```mermaid
+sequenceDiagram
+    box transparent Flow transport-order-rating
+        participant tms as tms-api: Rate Transport Order
+        participant pub as tms-api: publish TransportOrderRated
+    end
+    participant intake as tms-api: POST /v1/transport-orders (Flow transport-order-intake)
+    intake-)tms: trigger after the acceptance commit (or the next sweep)
+    tms->>tms: Rate Card version, Lane, Weight Break, Freight Charge
+    tms-)pub: outbox, within a second
+```
+
+- A Transport Order the Rate Card can't price publishes `TransportOrderRatingFailed` instead, and the first Hop carries the `failureCode`. Its `outcome` is still `Succeeded`: Rating failed is Rating's answer, not a failed flow.
+- A Transport Order from the WMS channel is *Not rated separately* and has no rating Hop and no event.
+- A rating that threw has a `Rate Transport Order` Hop with the outcome `Retrying` and no publish Hop. The next sweep rates the order, and its Hop follows.
+- A re-rate starts in the TMS UI, so it continues the intake's trail from the other side. The UI's Hop is `tms-web: Re-rate Transport Order`, which calls `tms-api: POST /v1/transport-orders/TO-0000042/re-rate` and then the publish Hop. A refused re-rate (409) stops at the call.
+- The publish Hop appears only once the outbox has sent the message ([failure behaviour](../../architecture/failure-behaviour.md#the-tms-outbox)).
+
+### Code map
+
+Links go to files, not lines, so they stay true as the code moves.
+
+| Step | Where |
+|---|---|
+| 1. Acceptance | `Accept` in [TransportOrder.cs](../../../src/Tms/Norvia.Tms.Domain/TransportOrders/TransportOrder.cs) sets the rating result from the channel ([IntakeChannel.cs](../../../src/Tms/Norvia.Tms.Domain/TransportOrders/IntakeChannel.cs), [RatingResult.cs](../../../src/Tms/Norvia.Tms.Domain/TransportOrders/RatingResult.cs)) |
+| 2. Pick-up | [TriggerRatingAfterAcceptance.cs](../../../src/Tms/Norvia.Tms.Application/TransportOrders/Rate/TriggerRatingAfterAcceptance.cs) signals the worker ([RatingSignal.cs](../../../src/Tms/Norvia.Tms.Infrastructure/Rating/RatingSignal.cs)). The worker is [RatingWorker.cs](../../../src/Tms/Norvia.Tms.Infrastructure/Rating/RatingWorker.cs), with its sweep interval in [RatingOptions.cs](../../../src/Tms/Norvia.Tms.Infrastructure/Rating/RatingOptions.cs). It finds the orders through [ListTransportOrdersNotYetRatedHandler.cs](../../../src/Tms/Norvia.Tms.Application/TransportOrders/Rate/ListTransportOrdersNotYetRatedHandler.cs) and [TransportOrdersNotYetRatedSpec.cs](../../../src/Tms/Norvia.Tms.Domain/TransportOrders/TransportOrdersNotYetRatedSpec.cs). It is registered by `AddTmsRatingWorker` in [DependencyInjection.cs](../../../src/Tms/Norvia.Tms.Infrastructure/DependencyInjection.cs) and called from the TMS API's [Program.cs](../../../src/Tms/Norvia.Tms.Api/Program.cs) |
+| 3. Choose the Rate Card version | [RateCard.cs](../../../src/Tms/Norvia.Tms.Domain/RateCards/RateCard.cs), [RateCardVersion.cs](../../../src/Tms/Norvia.Tms.Domain/RateCards/RateCardVersion.cs) and the collection date rule in [CollectionDate.cs](../../../src/Tms/Norvia.Tms.Domain/RateCards/CollectionDate.cs). The copy comes from [SeedFileRateCardDirectory.cs](../../../src/Tms/Norvia.Tms.Infrastructure/RateCards/SeedFileRateCardDirectory.cs) through [IRateCardDirectory.cs](../../../src/Tms/Norvia.Tms.Application/RateCards/IRateCardDirectory.cs), loaded at startup by [LoadSeedOnStart.cs](../../../src/Tms/Norvia.Tms.Infrastructure/Seed/LoadSeedOnStart.cs) |
+| 4. Match the Lane | [Zone.cs](../../../src/Tms/Norvia.Tms.Domain/RateCards/Zone.cs) (the most specific prefix), [Lane.cs](../../../src/Tms/Norvia.Tms.Domain/RateCards/Lane.cs) |
+| 5. Choose the Weight Break | [WeightBreak.cs](../../../src/Tms/Norvia.Tms.Domain/RateCards/WeightBreak.cs), `WeightBreakFor` in [Lane.cs](../../../src/Tms/Norvia.Tms.Domain/RateCards/Lane.cs) |
+| 6. Calculate | `ChargeLinesFor` in [Lane.cs](../../../src/Tms/Norvia.Tms.Domain/RateCards/Lane.cs), with [ChargeLine.cs](../../../src/Tms/Norvia.Tms.Domain/TransportOrders/ChargeLine.cs), [FreightCharge.cs](../../../src/Tms/Norvia.Tms.Domain/TransportOrders/FreightCharge.cs) and [Money.cs](../../../src/Tms/Norvia.Tms.Domain/TransportOrders/Money.cs) |
+| 7. Record | [RateTransportOrderHandler.cs](../../../src/Tms/Norvia.Tms.Application/TransportOrders/Rate/RateTransportOrderHandler.cs), with [RateTransportOrderCommand.cs](../../../src/Tms/Norvia.Tms.Application/TransportOrders/Rate/RateTransportOrderCommand.cs). Aggregate methods `Rate` and `ReRate` in [TransportOrder.cs](../../../src/Tms/Norvia.Tms.Domain/TransportOrders/TransportOrder.cs), outcome and reasons in [RatingOutcome.cs](../../../src/Tms/Norvia.Tms.Domain/TransportOrders/RatingOutcome.cs), [RatingFailure.cs](../../../src/Tms/Norvia.Tms.Domain/TransportOrders/RatingFailure.cs) and [RatingFailureCode.cs](../../../src/Tms/Norvia.Tms.Domain/TransportOrders/RatingFailureCode.cs). Stored by [TransportOrderConfiguration.cs](../../../src/Tms/Norvia.Tms.Infrastructure/Data/Configurations/TransportOrderConfiguration.cs) (the concurrency token that stops two instances rating one order) |
+| 7. Publish | Event types [TransportOrderRatedEvent.cs](../../../src/Tms/Norvia.Tms.Domain/TransportOrders/TransportOrderRatedEvent.cs) and [TransportOrderRatingFailedEvent.cs](../../../src/Tms/Norvia.Tms.Domain/TransportOrders/TransportOrderRatingFailedEvent.cs). Publishers [PublishTransportOrderRated.cs](../../../src/Tms/Norvia.Tms.Application/TransportOrders/Rate/PublishTransportOrderRated.cs) and [PublishTransportOrderRatingFailed.cs](../../../src/Tms/Norvia.Tms.Application/TransportOrders/Rate/PublishTransportOrderRatingFailed.cs), messages [TransportOrderRatedV1.cs](../../../src/Tms/Norvia.Tms.Application/TransportOrders/Rate/TransportOrderRatedV1.cs) and [TransportOrderRatingFailedV1.cs](../../../src/Tms/Norvia.Tms.Application/TransportOrders/Rate/TransportOrderRatingFailedV1.cs), sent by [OutboxPublisher.cs](../../../src/Tms/Norvia.Tms.Infrastructure/Outbox/OutboxPublisher.cs). Contracts: [transport-order-rated.v1.schema.json](../../../contracts/canonical-model/transport-order-rated.v1.schema.json) and [transport-order-rating-failed.v1.schema.json](../../../contracts/canonical-model/transport-order-rating-failed.v1.schema.json). Topic and subscription: [messaging.bicep](../../../infra/estate/messaging.bicep) |
+| Tracking | The flow name is in [Flows.cs](../../../src/Tms/Norvia.Tms.Application/IntegrationEvents/Flows.cs). The worker puts the keys on the `Rate Transport Order` span and in the log scope ([RatingWorker.cs](../../../src/Tms/Norvia.Tms.Infrastructure/Rating/RatingWorker.cs)). A re-rate does it in [TrackReRateInLoggingScope.cs](../../../src/Tms/Norvia.Tms.Application/TransportOrders/Rate/TrackReRateInLoggingScope.cs) |
+| Re-rate: list and command | Endpoints `GET /v1/transport-orders/rating-exceptions` and `POST /v1/transport-orders/{number}/re-rate` in [TransportOrderEndpoints.cs](../../../src/Tms/Norvia.Tms.Api/TransportOrders/TransportOrderEndpoints.cs). The list is [ListRatingExceptionsHandler.cs](../../../src/Tms/Norvia.Tms.Application/TransportOrders/RatingExceptions/ListRatingExceptionsHandler.cs) with [TransportOrdersRatingFailedSpec.cs](../../../src/Tms/Norvia.Tms.Domain/TransportOrders/TransportOrdersRatingFailedSpec.cs). The outcomes are [ReRateOutcome.cs](../../../src/Tms/Norvia.Tms.Domain/TransportOrders/ReRateOutcome.cs) and [IdempotencyKey.cs](../../../src/Tms/Norvia.Tms.Domain/TransportOrders/IdempotencyKey.cs) |
+| Re-rate: TMS UI | [RatingExceptions.razor](../../../src/Tms/Norvia.Tms.Web/TransportOrders/RatingExceptions.razor) (the list and the button), [TmsApiClient.cs](../../../src/Tms/Norvia.Tms.Web/TmsApi/TmsApiClient.cs) (the `Re-rate Transport Order` Hop), [ReRateAnswer.cs](../../../src/Tms/Norvia.Tms.Web/TransportOrders/ReRateAnswer.cs). The Rating section of an order is [TransportOrderRating.razor](../../../src/Tms/Norvia.Tms.Web/TransportOrders/TransportOrderRating.razor), worded by [RatingText.cs](../../../src/Tms/Norvia.Tms.Web/TransportOrders/RatingText.cs) |
+| The seed Rate Cards | [norvia.seed.json](../../../seed/norvia.seed.json). The overlap rule is checked as the seed loads |
+| The applications | The TMS API, which hosts the worker, and the TMS UI are declared in the [AppHost](../../../src/Norvia.AppHost/AppHost.cs) |
+| The presenter smoke run | [smoke-test-rating.sh](../../../infra/smoke-test-rating.sh), run after the [Norvia Partner API](../../../infra/smoke-test-partner-api.sh) smoke run |
+
+### Locally
+
+Nothing plays an Azure piece for Rating itself: the rating worker is part of the TMS API, which is the same application in both, and the Rate Cards come from the seed file in both. What differs is around it. The Service Bus emulator plays Service Bus for the outcome events, and the Aspire dashboard plays Application Insights, so the rating Hops are searched through the dashboard's telemetry. The full map, and the places where the two can differ, are in [local-vs-azure.md](../../architecture/local-vs-azure.md).
+
+To see a rating locally, book from the Partner portal and watch the order's Rating section in the TMS UI. The Antwerp and Düsseldorf bookings of the [presenter smoke run](#presenter-smoke-run) work the same way, apart from the script, which needs a deployed estate.
+
+### Gaps
+
+Designed in this document and not built yet:
+
+| Gap | Where it stands |
+|---|---|
+| The ERP to TMS Rate Card sync, and with it the live "fix the Rate Card, then re-rate" demo | Rate Cards come from the seed file ([Rate Cards in the TMS](#rate-cards-in-the-tms)). Tests cover the fix-and-re-rate path |
+| A fuller Rate Card, automatic re-rating, Quotes, Carrier cost, a pricing desk role | Left out on purpose ([Deferred](#deferred)) |
+| As-found toggles and presenter-panel faults for P2 | None added. No Bicep parameter switches anything broken in Rating. [Failure behaviour](../../architecture/failure-behaviour.md#p2-rating) lists the row each would worsen |
+| Alerts on P2 | None built: there is no alert on `TransportOrderRatingFailed` ([monitoring.bicep](../../../infra/estate/monitoring.bicep) declares no alert rule) |
+| Rating in the Integration console's failed runs and dead-letter panels | Nothing to show: Rating has no Logic App run and no dead letter. Finding its Hops and their `failureCode` is built |
+
 ## Deferred
 
 These were left out on purpose while designing P2, each with its reason.
