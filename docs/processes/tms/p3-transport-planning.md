@@ -95,9 +95,9 @@ All three events go to a new topic for Shipment events, `shipment-events`, throu
 
 | Event | Carries | Consumers |
 |---|---|---|
-| `ShipmentPlanned` | Shipment number, Transport Order number, Shipper, Own fleet or the Carrier's ID, correlation ID | Monitoring |
-| `ShipmentReassigned` | As `ShipmentPlanned`, plus who carried it before | Monitoring |
-| `ShipmentReleased` | The full Shipment with its Transport Order's details (addresses, windows, goods lines), Own fleet or the Carrier's ID, the Carrier booking number for a Carrier Shipment (P4), correlation ID | P4 Logic App, for Carrier Shipments only (subscription filter). None for Own fleet, since P11 runs inside the TMS |
+| `ShipmentPlanned` | Shipment number, Transport Order number, Shipper, Own fleet or the Carrier's ID, correlation ID | [Subscribers](../../architecture/events.md#catalogue) |
+| `ShipmentReassigned` | As `ShipmentPlanned`, plus who carried it before | [Subscribers](../../architecture/events.md#catalogue) |
+| `ShipmentReleased` | The full Shipment with its Transport Order's details (addresses, windows, goods lines), Own fleet or the Carrier's ID, the Carrier booking number for a Carrier Shipment (P4), correlation ID | [Subscribers](../../architecture/events.md#catalogue) |
 
 ## Presenter smoke run
 

@@ -260,14 +260,14 @@ All events go to the topic for Shipment events, through the TMS's transactional 
 
 | Event | Published when | Carries | Consumers |
 |---|---|---|---|
-| `ExceptionOpened` | An Exception opens | Exception number, Shipment number, Transport Order number, Shipper, Carrier ID or Own fleet, type, the cause (Tracking event, Proof of delivery or window passed), the after Delivered marker, correlation ID | Monitoring |
-| `ExceptionResolved` | The Planner resolves an Exception | Exception number, Shipment number, type, outcome, remark, correlation ID | Monitoring. [P9](p9-freight-settlement.md) checks whether the order is Billable inside the TMS, not from this event (ADR 0003) |
-| `ShipperNotificationRequested` | The Planner notifies the Shipper | Notification ID, Exception number, Shipment number, Transport Order number, Shipper, Shipper reference, delivery country and postcode, type, message, ETA or agreed delivery window, Planner's name, correlation ID | Shipper notification Logic App |
-| `ShipperNotificationNotDelivered` | A notification is reported not delivered | Notification ID, Exception number, Shipment number, Shipper, technical cause, correlation ID | Monitoring. An alert later |
-| `CarrierBookingCancelled` | The Planner cancels a Carrier booking | Carrier booking number, Carrier booking reference, Shipment number, Carrier ID, Exception number, reason text, correlation ID | Carrier cancellation Logic App. Monitoring |
-| `CarrierCancellationNotDelivered` | A cancellation or withdrawal is reported not delivered | Carrier booking number, Shipment number, Carrier ID, kind, technical cause, correlation ID | Monitoring. An alert later |
-| `ShipmentDeliveryWindowAgreed` | The Planner agrees a delivery window | Shipment number, Transport Order number, the window, Exception number, correlation ID | Monitoring |
-| `CarrierBookingWithdrawn` (P4, new consumer) | As in P4 | As in P4 | Carrier cancellation Logic App. Monitoring |
+| `ExceptionOpened` | An Exception opens | Exception number, Shipment number, Transport Order number, Shipper, Carrier ID or Own fleet, type, the cause (Tracking event, Proof of delivery or window passed), the after Delivered marker, correlation ID | [Subscribers](../../architecture/events.md#catalogue) |
+| `ExceptionResolved` | The Planner resolves an Exception | Exception number, Shipment number, type, outcome, remark, correlation ID | [Subscribers](../../architecture/events.md#catalogue). [P9](p9-freight-settlement.md) checks whether the order is Billable inside the TMS, not from this event (ADR 0003). |
+| `ShipperNotificationRequested` | The Planner notifies the Shipper | Notification ID, Exception number, Shipment number, Transport Order number, Shipper, Shipper reference, delivery country and postcode, type, message, ETA or agreed delivery window, Planner's name, correlation ID | [Subscribers](../../architecture/events.md#catalogue) |
+| `ShipperNotificationNotDelivered` | A notification is reported not delivered | Notification ID, Exception number, Shipment number, Shipper, technical cause, correlation ID | [Subscribers](../../architecture/events.md#catalogue) |
+| `CarrierBookingCancelled` | The Planner cancels a Carrier booking | Carrier booking number, Carrier booking reference, Shipment number, Carrier ID, Exception number, reason text, correlation ID | [Subscribers](../../architecture/events.md#catalogue) |
+| `CarrierCancellationNotDelivered` | A cancellation or withdrawal is reported not delivered | Carrier booking number, Shipment number, Carrier ID, kind, technical cause, correlation ID | [Subscribers](../../architecture/events.md#catalogue) |
+| `ShipmentDeliveryWindowAgreed` | The Planner agrees a delivery window | Shipment number, Transport Order number, the window, Exception number, correlation ID | [Subscribers](../../architecture/events.md#catalogue) |
+| `CarrierBookingWithdrawn` (P4, new consumer) | As in P4 | As in P4 | [Subscribers](../../architecture/events.md#catalogue) |
 
 The Shipment going back to Planned publishes no event of its own, because `CarrierBookingCancelled` already says it, as in P4.
 

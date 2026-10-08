@@ -169,11 +169,11 @@ All events go to the topic for Shipment events, through the TMS's transactional 
 
 | Event | Carries | Consumers |
 |---|---|---|
-| `ShipmentReleased` (P3, extended) | As in P3, plus the Carrier booking number and its Carrier cost (P9) | P4 booking Logic App |
-| `CarrierBookingConfirmed` | Carrier booking number, Shipment number, Transport Order number, Carrier ID, Carrier booking reference, planned collection time, Carrier cost total, correlation ID | Monitoring. P9 hands the Carrier cost to the ERP on Delivered, not on this event |
-| `CarrierBookingRejected` | Carrier booking number, Shipment number, Carrier ID, reason code and text, correlation ID | Monitoring |
-| `CarrierBookingNotDelivered` | Carrier booking number, Shipment number, Carrier ID, technical cause, correlation ID | Monitoring. An alert later |
-| `CarrierBookingWithdrawn` | Carrier booking number, Shipment number, Carrier ID, correlation ID | Carrier cancellation Logic App (P7). Monitoring |
+| `ShipmentReleased` (P3, extended) | As in P3, plus the Carrier booking number and its Carrier cost (P9) | [Subscribers](../../architecture/events.md#catalogue) |
+| `CarrierBookingConfirmed` | Carrier booking number, Shipment number, Transport Order number, Carrier ID, Carrier booking reference, planned collection time, Carrier cost total, correlation ID | [Subscribers](../../architecture/events.md#catalogue). P9 hands the Carrier cost to the ERP on Delivered, not on this event. |
+| `CarrierBookingRejected` | Carrier booking number, Shipment number, Carrier ID, reason code and text, correlation ID | [Subscribers](../../architecture/events.md#catalogue) |
+| `CarrierBookingNotDelivered` | Carrier booking number, Shipment number, Carrier ID, technical cause, correlation ID | [Subscribers](../../architecture/events.md#catalogue) |
+| `CarrierBookingWithdrawn` | Carrier booking number, Shipment number, Carrier ID, correlation ID | [Subscribers](../../architecture/events.md#catalogue) |
 
 A sent report and a repeated answer publish no event.
 

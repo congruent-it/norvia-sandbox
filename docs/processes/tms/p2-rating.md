@@ -70,8 +70,8 @@ Both events are published to the topic for Transport Order events, through the T
 
 | Event | Carries | Consumers |
 |---|---|---|
-| `TransportOrderRated` | Transport Order number, Shipper, Freight Charge with charge lines, Rate Card version, correlation ID | Monitoring. [P9](p9-freight-settlement.md) checks whether the order is Billable inside the TMS, not from this event (ADR 0003) |
-| `TransportOrderRatingFailed` | Transport Order number, Shipper, failure code and message, correlation ID | Monitoring |
+| `TransportOrderRated` | Transport Order number, Shipper, Freight Charge with charge lines, Rate Card version, correlation ID | [Subscribers](../../architecture/events.md#catalogue). [P9](p9-freight-settlement.md) checks whether the order is Billable inside the TMS, not from this event (ADR 0003). |
+| `TransportOrderRatingFailed` | Transport Order number, Shipper, failure code and message, correlation ID | [Subscribers](../../architecture/events.md#catalogue) |
 
 *Not rated separately* publishes no event. Each successful rating or re-rating publishes exactly one event.
 

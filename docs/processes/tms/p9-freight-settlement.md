@@ -159,8 +159,8 @@ Both events go through the TMS's transactional outbox (ADR 0003).
 
 | Event | Topic | Published when | Carries | Consumers |
 |---|---|---|---|---|
-| `TransportOrderBillable` | Transport Order events | A Transport Order becomes Billable | Transport Order number, Shipper, Shipper reference, Shipment number, delivery time, Freight Charge with charge lines and Rate Card version, whether it was released without a Proof of delivery, intake and billing correlation IDs | Billing Logic App |
-| `CarrierCostIncurred` | Shipment events, Carrier only | A Carrier Shipment moves to Delivered | Carrier booking number, Carrier booking reference, Shipment number, Transport Order number, Carrier ID, Carrier cost with charge lines, source (Carrier Rate Card version, or Spot with its remark), delivery time, correlation ID | Carrier cost Logic App |
+| `TransportOrderBillable` | Transport Order events | A Transport Order becomes Billable | Transport Order number, Shipper, Shipper reference, Shipment number, delivery time, Freight Charge with charge lines and Rate Card version, whether it was released without a Proof of delivery, intake and billing correlation IDs | [Subscribers](../../architecture/events.md#catalogue) |
+| `CarrierCostIncurred` | Shipment events, Carrier only | A Carrier Shipment moves to Delivered | Carrier booking number, Carrier booking reference, Shipment number, Transport Order number, Carrier ID, Carrier cost with charge lines, source (Carrier Rate Card version, or Spot with its remark), delivery time, correlation ID | [Subscribers](../../architecture/events.md#catalogue) |
 
 The release without a Proof of delivery publishes nothing of its own. If it makes the order Billable, `TransportOrderBillable` says so.
 
