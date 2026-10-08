@@ -15,6 +15,7 @@ public sealed partial class ImplementationSectionTests
     {
         "docs/processes/tms/p1-transport-order-intake.md",
         "docs/processes/tms/p2-rating.md",
+        "docs/processes/tms/p3-transport-planning.md",
     };
 
     [Theory]
