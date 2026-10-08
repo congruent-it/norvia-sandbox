@@ -145,6 +145,8 @@ A Booked Shipment leaves the Planner's lists. All lists update without a page re
 
 The Carrier booking API accepts only the Canonical Model (ADR 0003). Each Logic App's managed identity holds only the role it needs.
 
+Who holds each role, and what else each identity may reach, is in [Identity and access](../../architecture/identity-and-access.md).
+
 | Operation | Caller | Role |
 |---|---|---|
 | Record the Carrier's answer (confirm or reject) | Carrier-answer Logic App | `CarrierBookings.Answer` |

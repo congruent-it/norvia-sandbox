@@ -137,6 +137,8 @@ Automatic Proofs of delivery go through exactly the same path as manual ones. Th
 
 The Proof of delivery API accepts only the Canonical Model (ADR 0003). It takes the files in the same call, as multipart. The TMS never reads from the integration layer's storage.
 
+Who holds each role, and what else each identity may reach, is in [Identity and access](../../architecture/identity-and-access.md).
+
 | Operation | Caller | Role |
 |---|---|---|
 | Record a Proof of delivery (canonical metadata plus files) | Carrier Proof of delivery Logic App. Driver reports Logic App ([P12](p12-trip-execution.md)) | `ProofsOfDelivery.Record` |

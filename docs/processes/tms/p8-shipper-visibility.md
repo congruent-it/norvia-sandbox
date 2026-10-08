@@ -120,6 +120,8 @@ The notification inbox from P7 stays where it is. The tracking screen doesn't sh
 
 The Shipper tracking API returns only the Canonical Model (ADR 0003).
 
+Who holds each role, and what else each identity may reach, is in [Identity and access](../../architecture/identity-and-access.md).
+
 | Operation | Caller | Role |
 |---|---|---|
 | List, get and find Transport Orders for a Shipper | API Management's managed identity | `ShipperTracking.Read` |

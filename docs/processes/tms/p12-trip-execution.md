@@ -239,6 +239,8 @@ The TMS APIs accept only the Canonical Model (ADR 0003). The Driver reports Logi
 | Record a Tracking event | Tracking event API (P5) | `TrackingEvents.Record` |
 | Record a Proof of delivery | Proof of delivery API (P6) | `ProofsOfDelivery.Record` |
 
+Who holds each role, and what else each identity may reach, is in [Identity and access](../../architecture/identity-and-access.md).
+
 For an Own fleet source the canonical Tracking event and Proof of delivery carry the Trip number and the Driver ID in place of a Carrier booking reference. P5's and P6's events carry the Trip number where they carry a Carrier booking reference.
 
 ## Correlation ID
