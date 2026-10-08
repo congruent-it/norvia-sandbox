@@ -135,7 +135,7 @@ P4 adds a third list to the Planner's two from P3.
 |---|---|---|
 | Transport Orders to plan (P3) | Unchanged | Assign |
 | Shipments to release (P3) | Planned Shipments. A Shipment that came back from a booking shows its last Carrier booking's outcome, for example "Rejected by Kessler Spedition: NoCapacity, no trucks on Friday", or "Not delivered", or "Withdrawn", or "Cancelled by Norvia" (P7) | Reassign, release |
-| Bookings awaiting an answer (P4) | Requested Carrier bookings, sorted by the earliest collection time: Shipment, Carrier, Carrier booking number, requested time, sent time or "not yet sent", and an overdue flag | Withdraw |
+| Bookings awaiting an answer (P4) | Requested Carrier bookings, sorted by the earliest collection time: Shipment, Carrier, Carrier booking number, requested time, sent time or "not yet sent", and an overdue flag | Withdraw: call and handler |
 
 A Carrier booking is **overdue** once it has been Requested for longer than a TMS setting (2 hours by default), or once its collection window's earliest time has passed, whichever comes first. Overdue is only a flag. Nothing happens automatically.
 
@@ -197,6 +197,126 @@ After a deployment, and not in CI, the presenter checks Carrier booking end to e
 10. **Restore Kessler Spedition.** In the Partner portal, set its *Mode* back to *Auto-confirm*, so the next run and the other demos find it as seeded.
 
 If a check fails, file the gap as its own issue against P4, rather than working around it in the run book.
+
+## Implementation
+
+For engineers and coding agents. It shows what the estate does when a Planner releases a Shipment to a Carrier and the Carrier answers, where each step lives in the repository, what plays each Azure piece on a developer's machine, and what is designed but not built. It follows the template set by [P1's Implementation section](p1-transport-order-intake.md#implementation). Azure is the estate [c4.md](../../architecture/c4.md) draws.
+
+P4 is two trails with a wait between them, not one. The release starts the booking: the P4 booking Logic App sends the request and reports it sent. The Carrier's answer is a call of its own, later, through API Management and the Carrier-answer Logic App. The two are tied together by the Carrier booking number ([Correlation ID](#correlation-id)).
+
+### Message trail
+
+The Hops of both trails, named as the [Integration console](../../operations/integration-console.md#message-trail) shows them, in time order. The release and the booking belong to the Flows `transport-planning` and `carrier-booking`, with the sent report in `carrier-booking-report`. The answer's Hops belong to two Flows on one correlation ID that API Management creates: `carrier-answer` for API Management and the Carrier-answer Logic App, and `carrier-booking-answer` for the TMS's calls.
+
+```mermaid
+sequenceDiagram
+    box transparent Flow transport-planning
+        participant ui as tms-web: Release Shipment
+        participant rel as tms-api: POST /v1/shipments/SH-0000042/release
+        participant pub as tms-api: publish ShipmentReleased
+    end
+    box transparent Flow carrier-booking
+        participant booking as logic-booking: carrier-booking
+        participant recv as partner-portal-web: POST /carrier/v1/carrier-id/bookings
+    end
+    box transparent Flow carrier-booking-report
+        participant sent as tms-api: POST /v1/carrier-bookings/CB-0000042/report-sent
+    end
+    ui->>rel: release command
+    rel->>rel: Shipment Released and Carrier booking Requested, with the outbox message, in one transaction
+    rel-->>ui: 201 or 200
+    rel-)pub: outbox, within a second
+    pub-)booking: shipment-events, subscription carrier-booking
+    booking->>booking: Map_the_release, Get_the_Carrier_endpoint_credential
+    booking->>recv: Send_to_the_Carrier (Carrier booking format)
+    recv-->>booking: 200 received
+    booking->>sent: Report_the_booking_sent
+    sent-->>booking: 200
+```
+
+The answer arrives later, as a trail of its own:
+
+```mermaid
+sequenceDiagram
+    box transparent Flow carrier-answer
+        participant portal as partner-portal-web: Send Carrier answer
+        participant apim as apim-norvia: Answer Carrier booking
+        participant logic as logic-answer: carrier-answer
+    end
+    box transparent Flow carrier-booking-answer
+        participant tms as tms-api: POST /v1/carrier-bookings/CB-0000042/answer
+        participant pub as tms-api: publish CarrierBookingConfirmed
+    end
+    portal->>apim: POST /partner/v1/carrier-answers (Persona token and subscription key)
+    apim->>logic: Canonical call, Carrier ID from azp, correlation ID
+    logic->>logic: Map_the_answer (CarrierAnswerMap)
+    logic->>tms: Answer_to_the_TMS (Canonical Model answer)
+    tms-->>logic: 200 (also a repeat), 404, 403, 409, 422 or 400
+    logic->>logic: Relay_the_TMS_outcome (CarrierAnswerResponses)
+    logic-->>apim: RECORDED or a refusal code
+    apim-->>portal: the same answer
+    tms-)pub: outbox, within a second
+```
+
+- A rejection publishes `CarrierBookingRejected` instead. A repeated answer and a refused one publish nothing, so the trail ends at the TMS call.
+- A refused call stops at `apim-norvia`. The Logic App refuses anything but API Management's call, and its run fails with `CallerNotApiManagement`.
+- When the Carrier can't be reached, `Send_to_the_Carrier` is `Failed` (`CarrierUnavailable` or `CarrierRefused`) and the Logic App calls `report-not-delivered` instead of `report-sent`. The TMS publishes `CarrierBookingNotDelivered`.
+- A report for a booking that is no longer Requested is ignored: its Hop ends at the call, with no publish.
+- A withdrawal is a third trail, in the Flow `transport-planning`: `tms-web: Withdraw Carrier booking`, then `tms-api: POST /v1/carrier-bookings/<number>/withdraw`, then `tms-api: publish CarrierBookingWithdrawn`. The Carrier cancellation Logic App takes it from there ([P7](p7-exception-handling.md#cancelling-a-carrier-booking)).
+- An automatic answer from a Persona ([answer mode](#carriers-and-their-personas)) leaves the same Hops as a manual one, started by the Partner portal's background worker instead of a click.
+- The publish Hops appear only once the outbox has sent the message ([failure behaviour](../../architecture/failure-behaviour.md#the-tms-outbox)).
+
+### Code map
+
+Links go to files, not lines, so they stay true as the code moves.
+
+| Step | Where |
+|---|---|
+| 1. Create the booking | The release's handler [ReleaseShipmentHandler.cs](../../../src/Tms/Norvia.Tms.Application/Shipments/Release/ReleaseShipmentHandler.cs) (see [P3's code map](p3-transport-planning.md#code-map)) requests the booking. Aggregate [CarrierBooking.cs](../../../src/Tms/Norvia.Tms.Domain/CarrierBookings/CarrierBooking.cs) (`Request`), its [CarrierBookingStatus.cs](../../../src/Tms/Norvia.Tms.Domain/CarrierBookings/CarrierBookingStatus.cs) and [CarrierBookingNumber.cs](../../../src/Tms/Norvia.Tms.Domain/CarrierBookings/CarrierBookingNumber.cs), numbered by [ICarrierBookingNumbers.cs](../../../src/Tms/Norvia.Tms.Application/CarrierBookings/ICarrierBookingNumbers.cs) from [SqlCarrierBookingNumbers.cs](../../../src/Tms/Norvia.Tms.Infrastructure/CarrierBookings/SqlCarrierBookingNumbers.cs). Stored by [CarrierBookingConfiguration.cs](../../../src/Tms/Norvia.Tms.Infrastructure/Data/Configurations/CarrierBookingConfiguration.cs). Event [ShipmentReleasedEvent.cs](../../../src/Tms/Norvia.Tms.Domain/Shipments/ShipmentReleasedEvent.cs), message [ShipmentReleasedV1.cs](../../../src/Tms/Norvia.Tms.Application/Shipments/Release/ShipmentReleasedV1.cs), contract [shipment-released.v1.schema.json](../../../contracts/canonical-model/shipment-released.v1.schema.json) |
+| 2. Map | Logic App: [workflow.json](../../../src/Integration/BookingLogicApp/carrier-booking/workflow.json) (`When_a_Shipment_is_released`, `Track_the_booking`, `Map_the_release`). Function: [MapShipmentReleased.cs](../../../src/Integration/Norvia.Integration.CarrierBooking.Functions/MapShipmentReleased.cs). Map: [CarrierBookingMap.cs](../../../src/Integration/Norvia.Integration.CarrierBooking/CarrierBookingMap.cs), with [Alpha3Codes.cs](../../../src/Integration/Norvia.Integration.CarrierBooking/Alpha3Codes.cs) and [MessageContent.cs](../../../src/Integration/Norvia.Integration.CarrierBooking/MessageContent.cs). Contract and samples: [carrier-booking.v1.schema.json](../../../contracts/partner-api/carrier-booking.v1.schema.json) |
+| 3. Send | Logic App: `Get_the_Carrier_endpoint_credential` and `Send_to_the_Carrier` in the same [workflow.json](../../../src/Integration/BookingLogicApp/carrier-booking/workflow.json). The Carrier's side in the Partner portal: endpoint [CarrierBookingEndpoint.cs](../../../src/PartnerPortal/Norvia.PartnerPortal.Web/CarrierBookings/CarrierBookingEndpoint.cs) (`POST /carrier/v1/{carrierId}/bookings`), [CarrierBookingRequestBody.cs](../../../src/PartnerPortal/Norvia.PartnerPortal.Web/CarrierBookings/CarrierBookingRequestBody.cs), startup check that every Carrier Persona has an endpoint credential, [EveryCarrierHasACredential.cs](../../../src/PartnerPortal/Norvia.PartnerPortal.Web/CarrierBookings/EveryCarrierHasACredential.cs), handler [ReceiveCarrierBookingHandler.cs](../../../src/PartnerPortal/Norvia.PartnerPortal.Application/CarrierBookings/Receive/ReceiveCarrierBookingHandler.cs) (keyed on the Carrier booking number, so a repeat is ignored), and the Persona's record [CarrierBookingRequest.cs](../../../src/PartnerPortal/Norvia.PartnerPortal.Domain/CarrierBookings/CarrierBookingRequest.cs) |
+| 4. Report sent | Logic App: `Report_the_booking_sent`. Endpoint `POST /v1/carrier-bookings/{number}/report-sent` in [CarrierBookingEndpoints.cs](../../../src/Tms/Norvia.Tms.Api/CarrierBookings/CarrierBookingEndpoints.cs). Handler [ReportCarrierBookingSentHandler.cs](../../../src/Tms/Norvia.Tms.Application/CarrierBookings/Report/ReportCarrierBookingSentHandler.cs) with [ReportCarrierBookingSentCommand.cs](../../../src/Tms/Norvia.Tms.Application/CarrierBookings/Report/ReportCarrierBookingSentCommand.cs) and [CarrierBookingReportResult.cs](../../../src/Tms/Norvia.Tms.Application/CarrierBookings/Report/CarrierBookingReportResult.cs). Aggregate method `MarkSent` in [CarrierBooking.cs](../../../src/Tms/Norvia.Tms.Domain/CarrierBookings/CarrierBooking.cs) |
+| Not delivered | Logic App: `Report_the_booking_not_delivered`. Endpoint `POST /v1/carrier-bookings/{number}/report-not-delivered` in [CarrierBookingEndpoints.cs](../../../src/Tms/Norvia.Tms.Api/CarrierBookings/CarrierBookingEndpoints.cs) with [CarrierBookingNotDeliveredRequest.cs](../../../src/Tms/Norvia.Tms.Api/CarrierBookings/CarrierBookingNotDeliveredRequest.cs). Handler [ReportCarrierBookingNotDeliveredHandler.cs](../../../src/Tms/Norvia.Tms.Application/CarrierBookings/Report/ReportCarrierBookingNotDeliveredHandler.cs). Event [CarrierBookingNotDeliveredEvent.cs](../../../src/Tms/Norvia.Tms.Domain/CarrierBookings/CarrierBookingNotDeliveredEvent.cs), publisher [PublishCarrierBookingNotDelivered.cs](../../../src/Tms/Norvia.Tms.Application/CarrierBookings/Report/PublishCarrierBookingNotDelivered.cs), message [CarrierBookingNotDeliveredV1.cs](../../../src/Tms/Norvia.Tms.Application/CarrierBookings/Report/CarrierBookingNotDeliveredV1.cs), contract [carrier-booking-not-delivered.v1.schema.json](../../../contracts/canonical-model/carrier-booking-not-delivered.v1.schema.json) |
+| 5a. Answer: the Persona's inbox | The inbox [BookingRequests.razor](../../../src/PartnerPortal/Norvia.PartnerPortal.Web/CarrierBookings/BookingRequests.razor) with [AnswerPanel.razor](../../../src/PartnerPortal/Norvia.PartnerPortal.Web/CarrierBookings/AnswerPanel.razor). Handler [AnswerCarrierBookingHandler.cs](../../../src/PartnerPortal/Norvia.PartnerPortal.Application/CarrierBookings/Answer/AnswerCarrierBookingHandler.cs), the call `Send Carrier answer` in [NorviaPartnerApiClient.cs](../../../src/PartnerPortal/Norvia.PartnerPortal.Infrastructure/PartnerApi/NorviaPartnerApiClient.cs) with [CarrierAnswerFormat.cs](../../../src/PartnerPortal/Norvia.PartnerPortal.Infrastructure/PartnerApi/CarrierAnswerFormat.cs), and the reply read by [PartnerAnswers.cs](../../../src/PartnerPortal/Norvia.PartnerPortal.Infrastructure/PartnerApi/PartnerAnswers.cs). |
+| Answer modes and automatic answers | [CarrierAnswerSettings.cs](../../../src/PartnerPortal/Norvia.PartnerPortal.Domain/CarrierBookings/CarrierAnswerSettings.cs), [CarrierAnswerMode.cs](../../../src/PartnerPortal/Norvia.PartnerPortal.Domain/CarrierBookings/CarrierAnswerMode.cs), [AnswerModePanel.razor](../../../src/PartnerPortal/Norvia.PartnerPortal.Web/CarrierBookings/AnswerModePanel.razor) and [ChangeCarrierAnswerSettingsHandler.cs](../../../src/PartnerPortal/Norvia.PartnerPortal.Application/CarrierBookings/AnswerSettings/ChangeCarrierAnswerSettingsHandler.cs). Automatic answers: [AutoAnswerWorker.cs](../../../src/PartnerPortal/Norvia.PartnerPortal.Web/CarrierBookings/AutoAnswerWorker.cs) and [AnswerDueCarrierBookingsHandler.cs](../../../src/PartnerPortal/Norvia.PartnerPortal.Application/CarrierBookings/AutoAnswer/AnswerDueCarrierBookingsHandler.cs). The generated reference: [BookingReferencePattern.cs](../../../src/PartnerPortal/Norvia.PartnerPortal.Domain/CarrierBookings/BookingReferencePattern.cs) |
+| 5b. Answer: the edge | API Management: [answer-carrier-booking.policy.xml](../../../infra/estate/partner-api/answer-carrier-booking.policy.xml), the operation `answer-carrier-booking` declared in [partner-api.bicep](../../../infra/estate/partner-api.bicep). Contract and samples: [carrier-answer.v1.schema.json](../../../contracts/partner-api/carrier-answer.v1.schema.json), [carrier-answer-response.v1.schema.json](../../../contracts/partner-api/carrier-answer-response.v1.schema.json) and [the Partner API contract](../../../contracts/partner-api/README.md#carrier-answer) |
+| 5c. Answer: map | Logic App: [workflow.json](../../../src/Integration/AnswerLogicApp/carrier-answer/workflow.json) (`Track_the_answer`, `Map_the_answer`). Function: [MapCarrierAnswer.cs](../../../src/Integration/Norvia.Integration.CarrierAnswer.Functions/MapCarrierAnswer.cs). Map: [CarrierAnswerMap.cs](../../../src/Integration/Norvia.Integration.CarrierBooking/CarrierAnswerMap.cs) producing [MappedCarrierAnswer.cs](../../../src/Integration/Norvia.Integration.CarrierBooking/MappedCarrierAnswer.cs). Canonical contract: [carrier-booking-answer.v1.schema.json](../../../contracts/canonical-model/carrier-booking-answer.v1.schema.json) |
+| 6a. Record the answer: call and handlers | Logic App: `Answer_to_the_TMS`. Endpoint `POST /v1/carrier-bookings/{number}/answer` in [CarrierBookingEndpoints.cs](../../../src/Tms/Norvia.Tms.Api/CarrierBookings/CarrierBookingEndpoints.cs) with [CarrierBookingAnswerRequest.cs](../../../src/Tms/Norvia.Tms.Api/CarrierBookings/CarrierBookingAnswerRequest.cs) and [CarrierBookingAnswerOutcome.cs](../../../src/Tms/Norvia.Tms.Api/CarrierBookings/CarrierBookingAnswerOutcome.cs). Handlers [ConfirmCarrierBookingHandler.cs](../../../src/Tms/Norvia.Tms.Application/CarrierBookings/Answer/ConfirmCarrierBookingHandler.cs) and [RejectCarrierBookingHandler.cs](../../../src/Tms/Norvia.Tms.Application/CarrierBookings/Answer/RejectCarrierBookingHandler.cs). |
+| 6a. Record the answer: rules and aggregate | The answer rules and their failure codes: [CarrierBookingRules.cs](../../../src/Tms/Norvia.Tms.Domain/CarrierBookings/CarrierBookingRules.cs), [CarrierBookingRefusal.cs](../../../src/Tms/Norvia.Tms.Domain/CarrierBookings/CarrierBookingRefusal.cs), [CarrierBookingRefusalCode.cs](../../../src/Tms/Norvia.Tms.Domain/CarrierBookings/CarrierBookingRefusalCode.cs) and [CarrierBookingRejectionReason.cs](../../../src/Tms/Norvia.Tms.Domain/CarrierBookings/CarrierBookingRejectionReason.cs). The reference check (finds a Confirmed booking of the Carrier that already holds the reference): [ConfirmedCarrierBookingByReferenceSpec.cs](../../../src/Tms/Norvia.Tms.Domain/CarrierBookings/ConfirmedCarrierBookingByReferenceSpec.cs). Aggregate methods `Confirm` and `Reject` in [CarrierBooking.cs](../../../src/Tms/Norvia.Tms.Domain/CarrierBookings/CarrierBooking.cs); the Shipment's moves to Booked and back to Planned are in [Shipment.cs](../../../src/Tms/Norvia.Tms.Domain/Shipments/Shipment.cs) |
+| 6b. Publish | Event types [CarrierBookingConfirmedEvent.cs](../../../src/Tms/Norvia.Tms.Domain/CarrierBookings/CarrierBookingConfirmedEvent.cs) and [CarrierBookingRejectedEvent.cs](../../../src/Tms/Norvia.Tms.Domain/CarrierBookings/CarrierBookingRejectedEvent.cs). Publishers [PublishCarrierBookingConfirmed.cs](../../../src/Tms/Norvia.Tms.Application/CarrierBookings/Answer/PublishCarrierBookingConfirmed.cs) and [PublishCarrierBookingRejected.cs](../../../src/Tms/Norvia.Tms.Application/CarrierBookings/Answer/PublishCarrierBookingRejected.cs), messages [CarrierBookingConfirmedV1.cs](../../../src/Tms/Norvia.Tms.Application/CarrierBookings/Answer/CarrierBookingConfirmedV1.cs) and [CarrierBookingRejectedV1.cs](../../../src/Tms/Norvia.Tms.Application/CarrierBookings/Answer/CarrierBookingRejectedV1.cs), sent by [OutboxPublisher.cs](../../../src/Tms/Norvia.Tms.Infrastructure/Outbox/OutboxPublisher.cs). Contracts [carrier-booking-confirmed.v1.schema.json](../../../contracts/canonical-model/carrier-booking-confirmed.v1.schema.json) and [carrier-booking-rejected.v1.schema.json](../../../contracts/canonical-model/carrier-booking-rejected.v1.schema.json). Topic and subscriptions: [messaging.bicep](../../../infra/estate/messaging.bicep) |
+| 6c. Relay to the Carrier | Logic App: `Relay_the_TMS_outcome` and `Answer_the_Carrier`. Function: [RelayTmsAnswer.cs](../../../src/Integration/Norvia.Integration.CarrierAnswer.Functions/RelayTmsAnswer.cs). Responses: [CarrierAnswerResponses.cs](../../../src/Integration/Norvia.Integration.CarrierBooking/CarrierAnswerResponses.cs) and [TmsAnswerOutcome.cs](../../../src/Integration/Norvia.Integration.CarrierBooking/TmsAnswerOutcome.cs) |
+| 7. Follow up: lists | The bookings awaiting an answer: [ListCarrierBookingsAwaitingAnswerHandler.cs](../../../src/Tms/Norvia.Tms.Application/Shipments/ListAwaitingAnswer/ListCarrierBookingsAwaitingAnswerHandler.cs) with [RequestedCarrierBookingsSpec.cs](../../../src/Tms/Norvia.Tms.Domain/CarrierBookings/RequestedCarrierBookingsSpec.cs), [CarrierBookingAwaitingAnswerSummary.cs](../../../src/Tms/Norvia.Tms.Application/Shipments/ListAwaitingAnswer/CarrierBookingAwaitingAnswerSummary.cs) and the overdue rule [CarrierBookingOverdueRules.cs](../../../src/Tms/Norvia.Tms.Domain/CarrierBookings/CarrierBookingOverdueRules.cs), whose limit is `OverdueAfter` in [CarrierBookingOptions.cs](../../../src/Tms/Norvia.Tms.Infrastructure/CarrierBookings/CarrierBookingOptions.cs). Endpoint `GET /v1/shipments/bookings-awaiting-answer` in [ShipmentEndpoints.cs](../../../src/Tms/Norvia.Tms.Api/Shipments/ShipmentEndpoints.cs). The last outcome on the Shipments to release: [LastCarrierBookingOutcome.cs](../../../src/Tms/Norvia.Tms.Application/Shipments/ListToRelease/LastCarrierBookingOutcome.cs) |
+| Withdraw: call and handler | Endpoint `POST /v1/carrier-bookings/{number}/withdraw` in [CarrierBookingEndpoints.cs](../../../src/Tms/Norvia.Tms.Api/CarrierBookings/CarrierBookingEndpoints.cs) (tracked as `Flows.TransportPlanning`). Handler [WithdrawCarrierBookingHandler.cs](../../../src/Tms/Norvia.Tms.Application/CarrierBookings/Withdraw/WithdrawCarrierBookingHandler.cs). Aggregate method `Withdraw` in [CarrierBooking.cs](../../../src/Tms/Norvia.Tms.Domain/CarrierBookings/CarrierBooking.cs). |
+| Withdraw: publish | Event [CarrierBookingWithdrawnEvent.cs](../../../src/Tms/Norvia.Tms.Domain/CarrierBookings/CarrierBookingWithdrawnEvent.cs), publisher [PublishCarrierBookingWithdrawn.cs](../../../src/Tms/Norvia.Tms.Application/CarrierBookings/Withdraw/PublishCarrierBookingWithdrawn.cs), message [CarrierBookingWithdrawnV1.cs](../../../src/Tms/Norvia.Tms.Application/CarrierBookings/Withdraw/CarrierBookingWithdrawnV1.cs), contract [carrier-booking-withdrawn.v1.schema.json](../../../contracts/canonical-model/carrier-booking-withdrawn.v1.schema.json). The Carrier is told by the P7 Logic App [workflow.json](../../../src/Integration/CarrierCancellationLogicApp/carrier-cancellation/workflow.json) |
+| Tracking | The flow names are in [Flows.cs](../../../src/Tms/Norvia.Tms.Application/IntegrationEvents/Flows.cs). Each call puts the keys in the log scope: [TrackCarrierBookingAnswerInLoggingScope.cs](../../../src/Tms/Norvia.Tms.Application/CarrierBookings/Answer/TrackCarrierBookingAnswerInLoggingScope.cs), [TrackCarrierBookingReportInLoggingScope.cs](../../../src/Tms/Norvia.Tms.Application/CarrierBookings/Report/TrackCarrierBookingReportInLoggingScope.cs) and [TrackCarrierBookingWithdrawalInLoggingScope.cs](../../../src/Tms/Norvia.Tms.Application/CarrierBookings/Withdraw/TrackCarrierBookingWithdrawalInLoggingScope.cs) |
+| TMS UI | [BookingsAwaitingAnswer.razor](../../../src/Tms/Norvia.Tms.Web/Shipments/BookingsAwaitingAnswer.razor) (the list and *Withdraw*), [ShipmentsToRelease.razor](../../../src/Tms/Norvia.Tms.Web/Shipments/ShipmentsToRelease.razor), [ShipmentDetail.razor](../../../src/Tms/Norvia.Tms.Web/Shipments/ShipmentDetail.razor), [TmsApiClient.cs](../../../src/Tms/Norvia.Tms.Web/TmsApi/TmsApiClient.cs) (the `Withdraw Carrier booking` Hop), [CarrierBookingWithdrawals.cs](../../../src/Tms/Norvia.Tms.Web/Shipments/CarrierBookingWithdrawals.cs), [WithdrawAnswer.cs](../../../src/Tms/Norvia.Tms.Web/Shipments/WithdrawAnswer.cs), wording [CarrierBookingText.cs](../../../src/Tms/Norvia.Tms.Web/Shipments/CarrierBookingText.cs) |
+| The applications | The TMS API, TMS UI and Partner portal are declared in the [AppHost](../../../src/Norvia.AppHost/AppHost.cs). The Function hosts are the [booking Functions project](../../../src/Integration/Norvia.Integration.CarrierBooking.Functions/Norvia.Integration.CarrierBooking.Functions.csproj) and the [answer Functions project](../../../src/Integration/Norvia.Integration.CarrierAnswer.Functions/Norvia.Integration.CarrierAnswer.Functions.csproj), each deployed with its Logic App |
+| The Logic App resources | [booking-logic-app.bicep](../../../infra/estate/booking-logic-app.bicep) deployed by [deploy-booking-logic-app.sh](../../../infra/deploy-booking-logic-app.sh), and [answer-logic-app.bicep](../../../infra/estate/answer-logic-app.bicep) deployed by [deploy-answer-logic-app.sh](../../../infra/deploy-answer-logic-app.sh) |
+| The presenter smoke run | [smoke-test-carrier-booking.sh](../../../infra/smoke-test-carrier-booking.sh), run after the [Transport planning](../../../infra/smoke-test-transport-planning.sh) smoke run |
+
+### Locally
+
+Under Aspire there are two stand-ins, because there are two Azure pieces to play. `Norvia.Integration.LocalBookingWorker` plays the P4 booking Logic App: [ShipmentReleasedConsumer.cs](../../../src/Integration/Norvia.Integration.LocalBookingWorker/ShipmentReleasedConsumer.cs) takes the `ShipmentReleased` from the `carrier-booking` subscription, and [CarrierBookingFlow.cs](../../../src/Integration/Norvia.Integration.LocalBookingWorker/CarrierBookingFlow.cs) runs the map ([CarrierBookingMap.cs](../../../src/Integration/Norvia.Integration.CarrierBooking/CarrierBookingMap.cs)), the send ([CarrierEndpoint.cs](../../../src/Integration/Norvia.Integration.LocalBookingWorker/CarrierEndpoint.cs)) and the reports ([TmsReports.cs](../../../src/Integration/Norvia.Integration.LocalBookingWorker/TmsReports.cs)). `Norvia.Integration.LocalPartnerApi` plays API Management and the Carrier-answer Logic App in one request: [AnswerCarrierBooking.cs](../../../src/Integration/Norvia.Integration.LocalPartnerApi/AnswerCarrierBooking.cs) makes the edge's checks, then calls `CarrierAnswerMap`, the TMS (through [TmsCarrierAnswers.cs](../../../src/Integration/Norvia.Integration.LocalPartnerApi/TmsCarrierAnswers.cs)) and the relay, the same classes the Logic App's local functions wrap. The Partner portal, the TMS API and the TMS UI are the same applications in both, the Service Bus emulator plays Service Bus with the `carrier-booking` subscription declared in the [AppHost](../../../src/Norvia.AppHost/AppHost.cs), the AppHost generates the Carrier endpoint credentials that Key Vault holds in Azure, and the Aspire dashboard plays Application Insights. The full map is in [local-vs-azure.md](../../architecture/local-vs-azure.md).
+
+Three differences matter for P4:
+
+- The `carrier-booking` subscription's filter is written twice, in [messaging.bicep](../../../infra/estate/messaging.bicep) and in [ResubmitAwareFilters.cs](../../../src/Norvia.AppHost/ResubmitAwareFilters.cs). Change one and the worker sees different messages from the Logic App.
+- The retry of the Carrier and TMS calls is the Logic App's policy in Azure and the worker's bounded exponential policy locally, so the numbers are chosen separately.
+- The edge's checks on an answer and the policy's are two implementations kept close by tests. Entra enforces the `CarrierBookings.Respond` role in Azure. Locally the Partner portal signs each Persona's token itself with that role.
+
+To see P4 locally, book from the Partner portal as a Shipper, assign and release in the TMS UI, then answer from a Carrier Persona's inbox, or leave the Persona on Auto-confirm. The steps of the [presenter smoke run](#presenter-smoke-run) work the same way, apart from the script, which needs a deployed estate.
+
+### Gaps
+
+Designed in this document and not built yet:
+
+| Gap | Where it stands |
+|---|---|
+| The Carrier cost in the booking request, on `ShipmentReleased`, and the reason code `PriceNotAccepted` | Designed in [P9](p9-freight-settlement.md#carrier-cost). Nothing is priced at release yet: the booking carries no cost, and the reason code is not in the list the TMS accepts |
+| Consolidating Shipments, changes after confirmation by the Carrier, automatic withdrawal or rebooking of an overdue booking, EDI and AS2, driver and vehicle details, notifying the Shipper | See [Deferred](#deferred) |
+| As-found toggles and presenter-panel faults for P4 | None added. No Bicep parameter switches anything broken in booking, and nothing in the Partner portal injects a fault. [Failure behaviour](../../architecture/failure-behaviour.md#p4-carrier-booking) lists the row each would worsen: the Carrier endpoint's secret inlined, no alert on the `ShipmentReleased` dead-letter queue, a Carrier's endpoint down, an unmappable reason code |
+| Alerts on P4 | None built: failed runs of the booking and Carrier-answer Logic Apps and the `carrier-booking` dead-letter queue are planned only ([monitoring.bicep](../../../infra/estate/monitoring.bicep) declares no alert rule) |
+| The Integration console's failed runs and dead-letter panels for P4 | Planned. Finding the Hops and opening the run are built. A failed Carrier answer run is view-only, because the Carrier already has its answer |
 
 ## Deferred
 
