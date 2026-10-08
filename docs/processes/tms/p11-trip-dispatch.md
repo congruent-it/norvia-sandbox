@@ -200,6 +200,10 @@ The demo: the Planner builds a Trip, dispatches it, and it appears in the Driver
 
 As-found: a presenter-panel fault, **Driver app unavailable**, makes the Driver app refuse Trips. The Planner sees Not delivered, and the failed Logic App run shows where it broke. The fault is switched off and the Planner sends it again.
 
+## Implementation
+
+Not built yet.
+
 ## Deferred
 
 These were left out on purpose while designing P11, each with its reason.

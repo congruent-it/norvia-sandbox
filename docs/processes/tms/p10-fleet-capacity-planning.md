@@ -155,6 +155,10 @@ Seven Drivers: two with CE, three with C and two with B. All have a Monday to Fr
 
 Within the first week of the Planning horizon, one rigid truck is Off the road for maintenance and one CE Driver is on leave. Together with the seeded Own fleet Transport Orders, this makes one day Over capacity. The demo shows the warning in P3 and the Planner moving a Shipment to a Carrier. The seed gives these dates relative to the day the demo starts.
 
+## Implementation
+
+Not built yet.
+
 ## Deferred
 
 These were left out on purpose while designing P10, each with its reason.

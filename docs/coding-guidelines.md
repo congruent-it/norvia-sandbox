@@ -237,4 +237,5 @@ A key that doesn't apply is left out, never sent empty.
 - A PR is mergeable only when the build has no warnings, `dotnet format --verify-no-changes` passes, all tests pass and the coverage gate is met.
 - Tests are part of the change, not a follow-up. Bug fixes start with a failing test that reproduces the bug.
 - A decision that is hard to reverse, surprising, or the result of a real trade-off gets an ADR in [docs/adr/](adr/).
+- A PR that adds or changes an event, a subscription, a Flow, a Logic App, an app role or a local stand-in updates the matching page in [docs/architecture/](architecture/README.md) and the process's Implementation section in the same PR.
 - Keep PRs small and focused on one issue.

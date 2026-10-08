@@ -128,6 +128,10 @@ All events go to a new topic for Invoicing events, through the ERP's transaction
 
 Recording a billable line publishes nothing. The Invoice run is what the Shipper sees.
 
+## Implementation
+
+Not built yet.
+
 ## Deferred
 
 These were left out on purpose while designing E1, each with its reason.

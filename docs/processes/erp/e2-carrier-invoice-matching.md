@@ -138,6 +138,10 @@ All events go to the topic for Invoicing events, through the ERP's transactional
 
 Recording a Carrier cost, receiving a Carrier invoice that still has lines To decide, and deciding a line that isn't the last publish nothing.
 
+## Implementation
+
+Not built yet.
+
 ## Deferred
 
 These were left out on purpose while designing E2, each with its reason.
