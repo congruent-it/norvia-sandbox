@@ -232,14 +232,14 @@ The Shipment's timeline shows the Driver's Tracking events and Proofs of deliver
 
 The TMS APIs accept only the Canonical Model (ADR 0003). The Driver reports Logic App's managed identity holds these roles:
 
-Who holds each role, and what else each identity may reach, is in [Identity and access](../../architecture/identity-and-access.md).
-
 | Operation | API | Role |
 |---|---|---|
 | Start a Trip | Trip API | `Trips.Start` |
 | End a Trip | Trip API | `Trips.End` |
 | Record a Tracking event | Tracking event API (P5) | `TrackingEvents.Record` |
 | Record a Proof of delivery | Proof of delivery API (P6) | `ProofsOfDelivery.Record` |
+
+Who holds each role, and what else each identity may reach, is in [Identity and access](../../architecture/identity-and-access.md).
 
 For an Own fleet source the canonical Tracking event and Proof of delivery carry the Trip number and the Driver ID in place of a Carrier booking reference. P5's and P6's events carry the Trip number where they carry a Carrier booking reference.
 
