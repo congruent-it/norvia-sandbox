@@ -8,7 +8,7 @@ namespace Norvia.Tms.ArchitectureTests;
 /// </summary>
 public sealed partial class FailureBehaviourTests
 {
-    private static readonly string Root = FindRepositoryRoot();
+    private static readonly string Root = RepositoryRoot.Path;
 
     [Fact]
     public void Page_FailureCodeInPolicyOrWorkflow_IsNamed()
@@ -79,19 +79,6 @@ public sealed partial class FailureBehaviourTests
     private static IEnumerable<string> EstateFiles() =>
         Directory.GetFiles(Path.Combine(Root, "infra", "estate", "partner-api"), "*.policy.xml")
             .Concat(Directory.GetFiles(Path.Combine(Root, "src", "Integration"), "workflow.json", SearchOption.AllDirectories));
-
-    private static string FindRepositoryRoot()
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "Norvia.slnx")))
-            {
-                return directory.FullName;
-            }
-        }
-
-        throw new InvalidOperationException("Found no Norvia.slnx above the test assembly.");
-    }
 
     [GeneratedRegex("`([^`]+)`")]
     private static partial Regex BacktickedRegex();

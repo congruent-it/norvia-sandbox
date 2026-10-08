@@ -4,12 +4,13 @@ namespace Norvia.Tms.ArchitectureTests;
 
 /// <summary>
 /// The Implementation section of the P1 process doc (docs/processes/tms/p1-transport-order-intake.md) links to the files
-/// that carry each step. A link to a file that has moved or gone is a lie in the code map.
+/// that carry each step. A link to a file that has moved or gone is a lie in the code map. Only the links are checked:
+/// the Hop names in the diagram, the workflow action names and what each row says are not.
 /// </summary>
-public sealed partial class ProcessImplementationTests
+public sealed partial class P1ImplementationTests
 {
-    private static readonly string Root = FindRepositoryRoot();
     private const string Document = "docs/processes/tms/p1-transport-order-intake.md";
+    private static readonly string Root = RepositoryRoot.Path;
 
     [Fact]
     public void Section_LinkedFile_Exists()
@@ -34,25 +35,17 @@ public sealed partial class ProcessImplementationTests
     private static List<string> Links()
     {
         var text = File.ReadAllText(Path.Combine(Root, Document));
-        var start = text.IndexOf("## Implementation", StringComparison.Ordinal);
+        var start = text.IndexOf("\n## Implementation\n", StringComparison.Ordinal);
+        if (start < 0)
+        {
+            return [];
+        }
+
         var end = text.IndexOf("\n## ", start + 1, StringComparison.Ordinal);
-        var section = start < 0 ? string.Empty : text[start..(end < 0 ? text.Length : end)];
+        var section = text[start..(end < 0 ? text.Length : end)];
 
         return [.. LinkRegex().Matches(section).Select(match => match.Groups[1].Value)
             .Where(target => !target.StartsWith("http", StringComparison.Ordinal) && !target.StartsWith('#'))];
-    }
-
-    private static string FindRepositoryRoot()
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "Norvia.slnx")))
-            {
-                return directory.FullName;
-            }
-        }
-
-        throw new InvalidOperationException("Found no Norvia.slnx above the test assembly.");
     }
 
     [GeneratedRegex(@"\]\(([^)\s]+)\)")]
