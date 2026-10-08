@@ -112,19 +112,25 @@ The Hops that Rating adds to the Message trail of the Transport Order's intake, 
 ```mermaid
 sequenceDiagram
     box transparent Flow transport-order-rating
+        participant ui as tms-web: Re-rate Transport Order
         participant tms as tms-api: Rate Transport Order
+        participant call as tms-api: POST /v1/transport-orders/TO-0000042/re-rate
         participant pub as tms-api: publish TransportOrderRated
     end
-    participant intake as tms-api: POST /v1/transport-orders (Flow transport-order-intake)
-    intake-)tms: trigger after the acceptance commit (or the next sweep)
+    Note over tms: First rating, after the acceptance commit or the next sweep
     tms->>tms: Rate Card version, Lane, Weight Break, Freight Charge
     tms-)pub: outbox, within a second
+    Note over ui: Re-rate, only for an order whose Rating failed
+    ui->>call: re-rate command with an Idempotency-Key
+    call->>call: the same calculation
+    call-->>ui: 200 with the rating result, or 409 and nothing changes
+    call-)pub: outbox, within a second
 ```
 
 - A Transport Order the Rate Card can't price publishes `TransportOrderRatingFailed` instead, and the `Rate Transport Order` Hop carries the `failureCode`. Its `outcome` is still `Succeeded`: Rating failed is Rating's answer, not a failed flow.
 - A Transport Order from the WMS channel is *Not rated separately* and has no rating Hop and no event.
 - A rating that threw has a `Rate Transport Order` Hop with the outcome `Retrying` and no publish Hop. The next sweep rates the order, and its Hop follows.
-- A re-rate starts in the TMS UI, so it continues the intake's trail from the other side. The UI's Hop is `tms-web: Re-rate Transport Order`, which calls `tms-api: POST /v1/transport-orders/TO-0000042/re-rate` and then the publish Hop. A refused re-rate (409) stops at the call.
+- A re-rate starts in the TMS UI, not in the worker, so the first rating and a re-rate are two separate runs through the diagram. A re-rate continues the intake's trail from the other side. It has no `Rate Transport Order` Hop: the call does the rating. A refused re-rate (409) stops at the call.
 - The publish Hop appears only once the outbox has sent the message ([failure behaviour](../../architecture/failure-behaviour.md#the-tms-outbox)).
 
 ### Code map
@@ -146,11 +152,12 @@ Links go to files, not lines, so they stay true as the code moves.
 | Re-rate: TMS UI | [RatingExceptions.razor](../../../src/Tms/Norvia.Tms.Web/TransportOrders/RatingExceptions.razor) (the list and the button), [TmsApiClient.cs](../../../src/Tms/Norvia.Tms.Web/TmsApi/TmsApiClient.cs) (the `Re-rate Transport Order` Hop), [ReRateAnswer.cs](../../../src/Tms/Norvia.Tms.Web/TransportOrders/ReRateAnswer.cs). The Rating section of an order is [TransportOrderRating.razor](../../../src/Tms/Norvia.Tms.Web/TransportOrders/TransportOrderRating.razor), worded by [RatingText.cs](../../../src/Tms/Norvia.Tms.Web/TransportOrders/RatingText.cs) |
 | The seed Rate Cards | [norvia.seed.json](../../../seed/norvia.seed.json). The overlap rule is checked as the seed loads |
 | The applications | The TMS API, which hosts the worker, and the TMS UI are declared in the [AppHost](../../../src/Norvia.AppHost/AppHost.cs) |
+| Bicep | Rating has no Bicep resource of its own. It publishes to the topic [messaging.bicep](../../../infra/estate/messaging.bicep) declares, and the TMS API's Container App is part of the estate like any other |
 | The presenter smoke run | [smoke-test-rating.sh](../../../infra/smoke-test-rating.sh), run after the [Norvia Partner API](../../../infra/smoke-test-partner-api.sh) smoke run |
 
 ### Locally
 
-Nothing plays an Azure piece for Rating itself: the rating worker is part of the TMS API, which is the same application in both, and the Rate Cards come from the seed file in both. What differs is around it. The Service Bus emulator plays Service Bus for the outcome events, and the Aspire dashboard plays Application Insights, so the rating Hops are searched through the dashboard's telemetry. The full map, and the places where the two can differ, are in [local-vs-azure.md](../../architecture/local-vs-azure.md).
+Nothing plays an Azure piece for Rating itself: the rating worker is part of the TMS API, which is the same application in both, and the Rate Cards come from the seed file in both. What differs is around it. The Service Bus emulator plays Service Bus for the outcome events, and the Aspire dashboard plays Application Insights, so the rating Hops are searched through the dashboard's telemetry ([local-vs-azure.md](../../architecture/local-vs-azure.md) has no row for Rating, as nothing plays a piece of it). The full map, and the places where the two can differ, are in [local-vs-azure.md](../../architecture/local-vs-azure.md).
 
 To see a rating locally, book from the Partner portal and watch the order's Rating section in the TMS UI. The Antwerp and Düsseldorf bookings of the [presenter smoke run](#presenter-smoke-run) work the same way, apart from the script, which needs a deployed estate.
 
