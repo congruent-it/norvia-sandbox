@@ -137,8 +137,8 @@ sequenceDiagram
     call->>call: assignment rules, then the change and the outbox message in one transaction
     call-->>ui: 201 or 200, or 404, 409 or 422 and nothing changes
     call-)pub: outbox, within a second
-    Note over booking: Only a release of a Carrier Shipment is acted on
     pub-)booking: shipment-events, subscription carrier-booking
+    Note over booking: Takes all three events of a Carrier Shipment, acts on ShipmentReleased only
 ```
 
 - The three actions differ in the path of the call and the event: assign is `POST /v1/transport-orders/<number>/assign` and publishes `ShipmentPlanned`, reassign is `POST /v1/shipments/<number>/reassign` and publishes `ShipmentReassigned`, release is `POST /v1/shipments/<number>/release` and publishes `ShipmentReleased`.
@@ -172,7 +172,7 @@ Links go to files, not lines, so they stay true as the code moves.
 
 ### Locally
 
-Nothing plays an Azure piece for planning itself: the TMS API and the TMS UI are the same applications in both, and the Carriers come from the seed file in both. What differs is around it. The Service Bus emulator plays Service Bus, with the topic `shipment-events` and its subscriptions declared in the [AppHost](../../../src/Norvia.AppHost/AppHost.cs), and the Aspire dashboard plays Application Insights, so the planning Hops are searched through the dashboard's telemetry. The one Azure piece P3 hands to is the P4 booking Logic App, which `LocalBookingWorker` plays: [ShipmentReleasedConsumer.cs](../../../src/Integration/Norvia.Integration.LocalBookingWorker/ShipmentReleasedConsumer.cs) takes the `ShipmentReleased` from the `carrier-booking` subscription ([local-vs-azure.md](../../architecture/local-vs-azure.md) has the row). The full map, and the places where the two can differ, are in [local-vs-azure.md](../../architecture/local-vs-azure.md).
+Planning itself needs no stand-in: the TMS API and the TMS UI are the same applications in both, and the Carriers come from the seed file in both. Around it: The Service Bus emulator plays Service Bus, with the topic `shipment-events` and its subscriptions declared in the [AppHost](../../../src/Norvia.AppHost/AppHost.cs), and the Aspire dashboard plays Application Insights, so the planning Hops are searched through the dashboard's telemetry. The one Azure piece P3 hands to is the P4 booking Logic App, which `LocalBookingWorker` plays: [ShipmentReleasedConsumer.cs](../../../src/Integration/Norvia.Integration.LocalBookingWorker/ShipmentReleasedConsumer.cs) takes the `ShipmentReleased` from the `carrier-booking` subscription (see its row). The full map, and the places where the two can differ, are in [local-vs-azure.md](../../architecture/local-vs-azure.md).
 
 To see planning locally, book from the Partner portal, then assign, reassign and release in the TMS UI. The steps of the [presenter smoke run](#presenter-smoke-run) work the same way, apart from the script, which needs a deployed estate.
 
