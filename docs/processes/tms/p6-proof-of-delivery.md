@@ -172,7 +172,7 @@ All events go to the topic for Shipment events, through the TMS's transactional 
 
 | Event | Published when | Carries | Consumers |
 |---|---|---|---|
-| `ProofOfDeliveryReceived` | A Proof of delivery is recorded, including one that replaces an earlier one | Shipment number, Transport Order number, Carrier ID or Own fleet, Carrier booking reference, received by, delivery time, condition, remark, number of files, whether it replaces an earlier one, correlation ID | Monitoring. P7 opens its Exception, and P9 checks whether the order is Billable, inside the TMS, not from this event (ADR 0003) |
+| `ProofOfDeliveryReceived` | A Proof of delivery is recorded, including one that replaces an earlier one | Shipment number, Transport Order number, Carrier ID or Own fleet, Carrier booking reference, received by, delivery time, condition, remark, number of files, whether it replaces an earlier one, correlation ID | [Subscribers](../../architecture/events.md#catalogue). P7 opens its Exception, and P9 checks whether the order is Billable, inside the TMS, not from this event (ADR 0003). |
 
 The event carries no file content and no link. Consumers read the files through the TMS.
 

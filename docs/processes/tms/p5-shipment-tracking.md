@@ -190,10 +190,10 @@ All events go to the topic for Shipment events, through the TMS's transactional 
 
 | Event | Published when | Carries | Consumers |
 |---|---|---|---|
-| `ShipmentCollected` | The Shipment moves to Collected | Shipment number, Transport Order number, Carrier ID or Own fleet, Carrier booking reference, event time, location, ETA, correlation ID | Monitoring |
-| `ShipmentInTransit` | The Shipment moves to In transit | As `ShipmentCollected` | Monitoring |
-| `ShipmentDelivered` | The Shipment moves to Delivered | As `ShipmentCollected` | Monitoring. [P9](p9-freight-settlement.md) acts inside the TMS in the same transaction, not on this event (ADR 0003) |
-| `ShipmentExceptionReported` | An exception Tracking event is recorded | As `ShipmentCollected`, plus the exception type and remark | Monitoring. P7 opens its Exception inside the TMS, not from this event (ADR 0003) |
+| `ShipmentCollected` | The Shipment moves to Collected | Shipment number, Transport Order number, Carrier ID or Own fleet, Carrier booking reference, event time, location, ETA, correlation ID | [Subscribers](../../architecture/events.md#catalogue) |
+| `ShipmentInTransit` | The Shipment moves to In transit | As `ShipmentCollected` | [Subscribers](../../architecture/events.md#catalogue) |
+| `ShipmentDelivered` | The Shipment moves to Delivered | As `ShipmentCollected` | [Subscribers](../../architecture/events.md#catalogue). [P9](p9-freight-settlement.md) acts inside the TMS in the same transaction, not on this event (ADR 0003). |
+| `ShipmentExceptionReported` | An exception Tracking event is recorded | As `ShipmentCollected`, plus the exception type and remark | [Subscribers](../../architecture/events.md#catalogue). P7 opens its Exception inside the TMS, not from this event (ADR 0003). |
 
 A Tracking event that skips steps publishes only the event for the status it lands on. For example, Delivered straight after Booked publishes only `ShipmentDelivered`.
 

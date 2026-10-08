@@ -105,8 +105,8 @@ Both events are published to the topic for Transport Order events, through the T
 
 | Event | Carries | Consumers |
 |---|---|---|
-| `TransportOrderAccepted` | The full Canonical Model Transport Order, correlation ID | Consumers outside the TMS, later. P3 works from the TMS's own data, not from this event (ADR 0003) |
-| `TransportOrderRejected` | The reasons and the Shipper reference, correlation ID | Monitoring and reporting |
+| `TransportOrderAccepted` | The full Canonical Model Transport Order, correlation ID | [Subscribers](../../architecture/events.md#catalogue). P3 works from the TMS's own data, not from this event (ADR 0003). |
+| `TransportOrderRejected` | The reasons and the Shipper reference, correlation ID | [Subscribers](../../architecture/events.md#catalogue) |
 
 A repeat submission publishes no event.
 
