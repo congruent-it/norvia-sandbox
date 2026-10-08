@@ -110,6 +110,74 @@ Both events are published to the topic for Transport Order events, through the T
 
 A repeat submission publishes no event.
 
+## Implementation
+
+For engineers and coding agents. It shows what the estate does when a Shipper books, where each step lives in the repository, what plays each Azure piece on a developer's machine, and what is designed but not built. Azure is the estate [c4.md](../../architecture/c4.md) draws. This section is the template the Implementation sections of the other processes follow.
+
+### Message trail
+
+The Hops an accepted booking leaves on its Message trail, named as the [Integration console](../../operations/integration-console.md#message-trail) shows them, in time order. All of them belong to the one Flow `transport-order-intake`. The Shipper waits on the whole path, so every call returns before the one that started it does.
+
+```mermaid
+sequenceDiagram
+    box transparent Flow transport-order-intake
+        participant portal as partner-portal-web: Send booking
+        participant apim as apim-norvia: Submit transport order
+        participant logic as logic-intake: transport-order-intake
+        participant tms as tms-api: POST /v1/transport-orders
+        participant pub as tms-api: publish TransportOrderAccepted
+    end
+    portal->>apim: POST /partner/v1/transport-orders (partner booking)
+    apim->>logic: Canonical call, Shipper ID, correlation ID
+    logic->>logic: Map_the_booking (IntakeMap)
+    logic->>tms: Submit_to_the_TMS (Canonical Model Transport Order)
+    tms-->>logic: 201 or 200 (repeat) or 422
+    logic-->>apim: ACCEPTED, ALREADY_BOOKED or REJECTED
+    apim-->>portal: the same answer
+    tms-)pub: outbox, within a second
+```
+
+- A rejected booking publishes `TransportOrderRejected` instead of `TransportOrderAccepted`. A repeat publishes nothing, so its trail ends at the TMS call.
+- A refused call stops at `apim-norvia`. A booking with a value the map can't read still reaches the TMS, which rejects it. One the map can't parse at all fails the run before the TMS call.
+- The publish Hop appears only once the outbox has sent the message ([failure behaviour](../../architecture/failure-behaviour.md#the-tms-outbox)).
+
+### Code map
+
+Links go to files, not lines, so they stay true as the code moves.
+
+| Step | Where |
+|---|---|
+| 1. Book | [NewBooking.razor](../../../src/PartnerPortal/Norvia.PartnerPortal.Web/Bookings/NewBooking.razor) (the form), [SubmitBookingHandler.cs](../../../src/PartnerPortal/Norvia.PartnerPortal.Application/Bookings/Submit/SubmitBookingHandler.cs), [NorviaPartnerApiClient.cs](../../../src/PartnerPortal/Norvia.PartnerPortal.Infrastructure/PartnerApi/NorviaPartnerApiClient.cs) (the `Send booking` Hop), [Booking.cs](../../../src/PartnerPortal/Norvia.PartnerPortal.Domain/Bookings/Booking.cs) (the Persona's own record) |
+| 2. Check at the edge | API Management: [submit-transport-order.policy.xml](../../../infra/estate/partner-api/submit-transport-order.policy.xml), the operation declared in [partner-api.bicep](../../../infra/estate/partner-api.bicep) |
+| 3. Map | Logic App: [workflow.json](../../../src/Integration/IntakeLogicApp/transport-order-intake/workflow.json) (`Map_the_booking`). Function: [MapPartnerBooking.cs](../../../src/Integration/Norvia.Integration.TransportOrderIntake.Functions/MapPartnerBooking.cs). Map: [IntakeMap.cs](../../../src/Integration/Norvia.Integration.TransportOrderIntake/IntakeMap.cs). Contract and samples: [contracts/partner-api](../../../contracts/partner-api/README.md) |
+| 4. Submit to the TMS | Logic App: `Submit_to_the_TMS` in the same [workflow.json](../../../src/Integration/IntakeLogicApp/transport-order-intake/workflow.json). Endpoint: [TransportOrderEndpoints.cs](../../../src/Tms/Norvia.Tms.Api/TransportOrders/TransportOrderEndpoints.cs). Channel check: [IntakeCallers.cs](../../../src/Tms/Norvia.Tms.Api/TransportOrders/IntakeCallers.cs). Command: [SubmitTransportOrderCommand.cs](../../../src/Tms/Norvia.Tms.Application/TransportOrders/Submit/SubmitTransportOrderCommand.cs) |
+| 5. Check for a repeat | [SubmitTransportOrderHandler.cs](../../../src/Tms/Norvia.Tms.Application/TransportOrders/Submit/SubmitTransportOrderHandler.cs), with [TransportOrderByShipperReferenceSpec.cs](../../../src/Tms/Norvia.Tms.Domain/TransportOrders/TransportOrderByShipperReferenceSpec.cs). The unique index is in [TransportOrderConfiguration.cs](../../../src/Tms/Norvia.Tms.Infrastructure/Data/Configurations/TransportOrderConfiguration.cs) |
+| 6. Validate | [TransportOrderRules.cs](../../../src/Tms/Norvia.Tms.Domain/TransportOrders/TransportOrderRules.cs), codes in [RejectionCode.cs](../../../src/Tms/Norvia.Tms.Domain/TransportOrders/RejectionCode.cs). Shipper data: [SeedFileShipperDirectory.cs](../../../src/Tms/Norvia.Tms.Infrastructure/Shippers/SeedFileShipperDirectory.cs) |
+| 7. Record | Aggregate methods `Accept` and `Reject` in [TransportOrder.cs](../../../src/Tms/Norvia.Tms.Domain/TransportOrders/TransportOrder.cs) |
+| 7. Publish | Event types [TransportOrderAcceptedEvent.cs](../../../src/Tms/Norvia.Tms.Domain/TransportOrders/TransportOrderAcceptedEvent.cs) and [TransportOrderRejectedEvent.cs](../../../src/Tms/Norvia.Tms.Domain/TransportOrders/TransportOrderRejectedEvent.cs). Publishers [PublishTransportOrderAccepted.cs](../../../src/Tms/Norvia.Tms.Application/TransportOrders/Submit/PublishTransportOrderAccepted.cs) and [PublishTransportOrderRejected.cs](../../../src/Tms/Norvia.Tms.Application/TransportOrders/Submit/PublishTransportOrderRejected.cs), sent by [OutboxPublisher.cs](../../../src/Tms/Norvia.Tms.Infrastructure/Outbox/OutboxPublisher.cs). Topic and subscription: [messaging.bicep](../../../infra/estate/messaging.bicep) |
+| 8. Respond | Logic App: `Relay_the_TMS_outcome` and `Answer_the_Shipper`. Function: [RelayTmsOutcome.cs](../../../src/Integration/Norvia.Integration.TransportOrderIntake.Functions/RelayTmsOutcome.cs). Responses: [BookingResponses.cs](../../../src/Integration/Norvia.Integration.TransportOrderIntake/BookingResponses.cs) |
+| 8. Show in the TMS UI | [WaitingForPlanning.razor](../../../src/Tms/Norvia.Tms.Web/TransportOrders/WaitingForPlanning.razor), which re-reads every second by default ([LiveTransportOrderList.cs](../../../src/Tms/Norvia.Tms.Web/TransportOrders/LiveTransportOrderList.cs)) |
+| The applications | The TMS API, TMS UI and Partner portal are declared in the [AppHost](../../../src/Norvia.AppHost/AppHost.cs). The Function host is the [Functions project](../../../src/Integration/Norvia.Integration.TransportOrderIntake.Functions/Norvia.Integration.TransportOrderIntake.Functions.csproj), deployed with the Logic App |
+| The Logic App resource | [intake-logic-app.bicep](../../../infra/estate/intake-logic-app.bicep), deployed by [deploy-intake-logic-app.sh](../../../infra/deploy-intake-logic-app.sh) and checked after a deploy by [smoke-test-intake.sh](../../../infra/smoke-test-intake.sh) |
+
+### Locally
+
+Under Aspire there is no API Management and no Logic Apps runtime. `Norvia.Integration.LocalPartnerApi` plays both, in one request: [SubmitTransportOrder.cs](../../../src/Integration/Norvia.Integration.LocalPartnerApi/SubmitTransportOrder.cs) makes the edge's checks, then calls `IntakeMap`, the TMS (through [TmsIntake.cs](../../../src/Integration/Norvia.Integration.LocalPartnerApi/TmsIntake.cs)) and the relay, the same classes the Logic App's local functions wrap. The Partner portal, the TMS API and the TMS UI are the same applications in both, the Service Bus emulator plays Service Bus, and the Aspire dashboard plays Application Insights. The full map, and the places where the two can differ, are in [local-vs-azure.md](../../architecture/local-vs-azure.md).
+
+Two differences matter for P1. The retry of the TMS call is the Logic App's policy in Azure and the service defaults' standard resilience handler locally, so the numbers are chosen separately. The policy's checks and the stand-in's are two implementations kept close by tests.
+
+### Gaps
+
+Designed in this document and not built yet:
+
+| Gap | Where it stands |
+|---|---|
+| The WMS handoff channel (`Wms`) | The TMS accepts the channel and maps it from its own client ID, but no WMS exists to call it ([Channels](#channels)) |
+| Entry by Norvia staff in the TMS UI, amend and cancel after acceptance, notifying the Shipper, asynchronous intake, the ERP and master-data sync | Left out on purpose ([Deferred](#deferred)) |
+| As-found toggles and presenter-panel faults for P1 | None added. No Bicep parameter switches anything broken in intake, and nothing in the Partner portal injects an intake fault. [Failure behaviour](../../architecture/failure-behaviour.md#p1-transport-order-intake) lists the row each would worsen |
+| Alerts on P1 | None built: failed requests on the Partner API and failed runs of the intake Logic App are planned only ([monitoring.bicep](../../../infra/estate/monitoring.bicep) declares no alert rule) |
+| The Integration console's failed runs and dead-letter panels for P1 | Planned, slice 2. Finding the Hops and opening the run are built |
+
 ## Deferred
 
 These were left out on purpose while designing P1, each with its reason.

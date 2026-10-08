@@ -9,7 +9,7 @@ namespace Norvia.Tms.ArchitectureTests;
 /// </summary>
 public sealed partial class EventCatalogueTests
 {
-    private static readonly string Root = FindRepositoryRoot();
+    private static readonly string Root = RepositoryRoot.Path;
 
     [Fact]
     public void Catalogue_EventSchemaInCanonicalModel_HasARow()
@@ -149,19 +149,6 @@ public sealed partial class EventCatalogueTests
         }
 
         return subscriptions;
-    }
-
-    private static string FindRepositoryRoot()
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "Norvia.slnx")))
-            {
-                return directory.FullName;
-            }
-        }
-
-        throw new InvalidOperationException("Found no Norvia.slnx above the test assembly.");
     }
 
     [GeneratedRegex("`([^`]+)`")]
