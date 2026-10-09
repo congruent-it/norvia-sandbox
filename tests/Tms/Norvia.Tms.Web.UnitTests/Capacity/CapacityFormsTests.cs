@@ -1,3 +1,4 @@
+using Microsoft.FluentUI.AspNetCore.Components;
 using Norvia.Tms.Application.Fleet;
 using Norvia.Tms.Application.Fleet.Planning;
 using Norvia.Tms.Domain.Fleet;
@@ -18,11 +19,10 @@ public sealed class CapacityFormsTests : TmsWebContext
         var page = RenderDrivers();
         var form = page.WaitForElement("section[aria-label='Record an Absence']");
         form.QuerySelectorAll("fluent-select")[0].Change("DRV-0001");
-        var fields = form.QuerySelectorAll("fluent-text-field");
-        fields[0].Input("2026-10-14");
-        fields[1].Input("2026-10-16");
+        PickDate(page, 0, new DateTime(2026, 10, 14));
+        PickDate(page, 1, new DateTime(2026, 10, 16));
         form.QuerySelectorAll("fluent-select")[1].Change("Training");
-        fields[2].Input("ADR course");
+        form.QuerySelectorAll("fluent-text-field")[^1].Input("ADR course");
         Commands.RecordAbsenceAsync(Arg.Any<PeriodEntry>(), Arg.Any<CancellationToken>()).Returns(new CapacityAnswer.Done());
 
         Click(form, "Record Absence");
@@ -54,8 +54,8 @@ public sealed class CapacityFormsTests : TmsWebContext
         var page = RenderDrivers();
         var form = page.WaitForElement("section[aria-label='Record an Absence']");
         form.QuerySelectorAll("fluent-select")[0].Change("DRV-0001");
-        form.QuerySelectorAll("fluent-text-field")[0].Input("2026-10-10");
-        form.QuerySelectorAll("fluent-text-field")[1].Input("2026-10-10");
+        PickDate(page, 0, new DateTime(2026, 10, 10));
+        PickDate(page, 1, new DateTime(2026, 10, 10));
 
         Click(form, "Record Absence");
 
@@ -69,8 +69,8 @@ public sealed class CapacityFormsTests : TmsWebContext
         var page = RenderDrivers();
         var form = page.WaitForElement("section[aria-label='Record an Absence']");
         form.QuerySelectorAll("fluent-select")[0].Change("DRV-0001");
-        form.QuerySelectorAll("fluent-text-field")[0].Input("2026-10-14");
-        form.QuerySelectorAll("fluent-text-field")[1].Input("2026-10-14");
+        PickDate(page, 0, new DateTime(2026, 10, 14));
+        PickDate(page, 1, new DateTime(2026, 10, 14));
 
         Click(form, "Record Absence");
 
@@ -84,10 +84,9 @@ public sealed class CapacityFormsTests : TmsWebContext
         var page = RenderDrivers();
         var form = page.WaitForElement("section[aria-label='Edit a Shift']");
         form.QuerySelector("fluent-select")!.Change("DRV-0001");
-        var fields = form.QuerySelectorAll("fluent-text-field");
-        fields[0].Input("2026-10-14");
-        fields[1].Input("05:00");
-        fields[2].Input("13:00");
+        PickDate(page, 2, new DateTime(2026, 10, 14));
+        PickTime(page, 0, new DateTime(2026, 10, 14, 5, 0, 0));
+        PickTime(page, 1, new DateTime(2026, 10, 14, 13, 0, 0));
 
         Click(form, "Edit Shift");
 
@@ -102,10 +101,9 @@ public sealed class CapacityFormsTests : TmsWebContext
         var page = RenderDrivers();
         var form = page.WaitForElement("section[aria-label='Edit a Shift']");
         form.QuerySelector("fluent-select")!.Change("DRV-0001");
-        var fields = form.QuerySelectorAll("fluent-text-field");
-        fields[0].Input("2026-10-14");
-        fields[1].Input("14:00");
-        fields[2].Input("06:00");
+        PickDate(page, 2, new DateTime(2026, 10, 14));
+        PickTime(page, 0, new DateTime(2026, 10, 14, 14, 0, 0));
+        PickTime(page, 1, new DateTime(2026, 10, 14, 6, 0, 0));
 
         Click(form, "Edit Shift");
 
@@ -121,7 +119,7 @@ public sealed class CapacityFormsTests : TmsWebContext
         var page = RenderDrivers();
         var form = page.WaitForElement("section[aria-label='Edit a Shift']");
         form.QuerySelector("fluent-select")!.Change("DRV-0001");
-        form.QuerySelectorAll("fluent-text-field")[0].Input("2026-10-14");
+        PickDate(page, 2, new DateTime(2026, 10, 14));
 
         Click(form, "Edit Shift");
 
@@ -138,13 +136,15 @@ public sealed class CapacityFormsTests : TmsWebContext
 
         var rows = page.WaitForElements("section[aria-label='Change a Roster'] ul[aria-label=Weekdays] li");
         rows.Should().HaveCount(7);
-        rows[0].QuerySelectorAll("fluent-text-field")[0].GetAttribute("value").Should().Be("06:00");
-        rows[0].QuerySelectorAll("fluent-text-field")[1].GetAttribute("value").Should().Be("14:00");
-        rows[2].QuerySelectorAll("fluent-text-field")[0].HasAttribute("disabled").Should().BeTrue("Wednesday is a day off");
+        var pickers = page.FindComponent<RosterForm>().FindComponents<FluentTimePicker>();
+        pickers.Should().HaveCount(14);
+        pickers[0].Instance.Value.Should().Be(DateTime.Today.AddHours(6));
+        pickers[1].Instance.Value.Should().Be(DateTime.Today.AddHours(14));
+        pickers[4].Instance.Disabled.Should().BeTrue("Wednesday is a day off");
 
         rows[2].QuerySelector("fluent-checkbox")!.TriggerEvent("oncheckedchange", new Microsoft.FluentUI.AspNetCore.Components.CheckboxChangeEventArgs { Checked = true });
-        rows[2].QuerySelectorAll("fluent-text-field")[0].Input("09:00");
-        rows[2].QuerySelectorAll("fluent-text-field")[1].Input("17:00");
+        PickTime(page, 4, DateTime.Today.AddHours(9));
+        PickTime(page, 5, DateTime.Today.AddHours(17));
         Click(form, "Change Roster");
 
         page.WaitForAssertion(() => Commands.Received(1).ChangeRosterAsync(
@@ -162,7 +162,7 @@ public sealed class CapacityFormsTests : TmsWebContext
         var form = page.WaitForElement("section[aria-label='Change a Roster']");
         form.QuerySelector("fluent-select")!.Change("DRV-0001");
         var rows = page.WaitForElements("section[aria-label='Change a Roster'] ul[aria-label=Weekdays] li");
-        rows[0].QuerySelectorAll("fluent-text-field")[1].Input("05:00");
+        PickTime(page, 1, DateTime.Today.AddHours(5));
 
         Click(form, "Change Roster");
 
@@ -226,8 +226,8 @@ public sealed class CapacityFormsTests : TmsWebContext
         var form = page.WaitForElement("section[aria-label='Take a Vehicle off the road']");
         page.WaitForAssertion(() => form.QuerySelectorAll("fluent-option").Should().Contain(option => option.TextContent.Contains("RT-201-C", StringComparison.Ordinal)));
         form.QuerySelectorAll("fluent-select")[0].Change("VEH-0003");
-        form.QuerySelectorAll("fluent-text-field")[0].Input("2026-10-14");
-        form.QuerySelectorAll("fluent-text-field")[1].Input("2026-10-14");
+        PickDate(page, 0, new DateTime(2026, 10, 14));
+        PickDate(page, 1, new DateTime(2026, 10, 14));
         form.QuerySelectorAll("fluent-select")[1].Change("Repair");
 
         Click(form, "Take off the road");
@@ -269,6 +269,20 @@ public sealed class CapacityFormsTests : TmsWebContext
         var page = Render<DriversTab>();
         page.WaitForAssertion(() => page.Markup.Should().Contain("Anouk de Vries"));
         return page;
+    }
+
+    /// <summary>Chooses a date in the nth date picker on the page, as the Planner does in the browser.</summary>
+    private static void PickDate(IRenderedComponent<Microsoft.AspNetCore.Components.IComponent> page, int index, DateTime value)
+    {
+        var picker = page.FindComponents<FluentDatePicker>()[index];
+        page.InvokeAsync(() => picker.Instance.ValueChanged.InvokeAsync(value)).GetAwaiter().GetResult();
+    }
+
+    /// <summary>Chooses a time in the nth time picker on the page.</summary>
+    private static void PickTime(IRenderedComponent<Microsoft.AspNetCore.Components.IComponent> page, int index, DateTime value)
+    {
+        var picker = page.FindComponents<FluentTimePicker>()[index];
+        page.InvokeAsync(() => picker.Instance.ValueChanged.InvokeAsync(value)).GetAwaiter().GetResult();
     }
 
     private static void Click(AngleSharp.Dom.IElement scope, string label) =>

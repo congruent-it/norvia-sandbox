@@ -27,8 +27,8 @@
                 <FluentOption TOption="string" Value="@subject.Id">@subject.Name</FluentOption>
             }
         </FluentSelect>
-        <FluentTextField Placeholder="yyyy-MM-dd" Label="From" aria-label="From" @bind-Value="_from" Immediate="true" />
-        <FluentTextField Placeholder="yyyy-MM-dd" Label="To" aria-label="To" @bind-Value="_to" Immediate="true" />
+        <FluentDatePicker Label="From" aria-label="From" @bind-Value="_from" />
+        <FluentDatePicker Label="To" aria-label="To" @bind-Value="_to" />
         <FluentSelect TOption="string" Label="Reason" aria-label="Reason" @bind-Value="_reason" Width="12rem">
             @foreach (var reason in Reasons)
             {
@@ -43,8 +43,8 @@
 @code {
     private readonly CancellationTokenSource _closed = new();
     private string _subjectId = string.Empty;
-    private string _from = string.Empty;
-    private string _to = string.Empty;
+    private DateTime? _from;
+    private DateTime? _to;
     private string _reason = string.Empty;
     private string _remark = string.Empty;
     private string? _failure;
@@ -88,11 +88,14 @@
             return;
         }
 
-        if (!TryDate(_from, out var from) || !TryDate(_to, out var to))
+        if (_from is not { } first || _to is not { } last)
         {
             _failure = "Enter the first and the last day.";
             return;
         }
+
+        var from = DateOnly.FromDateTime(first);
+        var to = DateOnly.FromDateTime(last);
 
         _working = true;
         try
@@ -122,9 +125,6 @@
             _working = false;
         }
     }
-
-    private static bool TryDate(string text, out DateOnly date) =>
-        DateOnly.TryParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out date);
 
     public void Dispose()
     {

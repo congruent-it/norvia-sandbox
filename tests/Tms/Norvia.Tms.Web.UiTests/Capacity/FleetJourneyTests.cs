@@ -42,7 +42,9 @@ public sealed class FleetJourneyTests(TmsUiFixture tms) : BrowserPage(tms)
     [Fact]
     public async Task ThePlanner_RecordsAnAbsenceAndAnOffTheRoadDay_SeesThemInTheTabs_AndRemovesThem()
     {
-        var day = DateOnly.FromDateTime(DateTime.Today).AddDays(5).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        var chosen = DateOnly.FromDateTime(DateTime.Today).AddDays(5);
+        var day = chosen.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        var dayText = chosen.ToString("ddd d MMM", System.Globalization.CultureInfo.InvariantCulture);
         var consoleLines = new List<string>();
         Page.PageError += (_, error) => consoleLines.Add("PAGEERROR " + error);
         await Page.GotoAsync("/capacity/drivers");
@@ -60,6 +62,7 @@ public sealed class FleetJourneyTests(TmsUiFixture tms) : BrowserPage(tms)
         await Expect(absence.GetByRole(AriaRole.Status)).ToContainTextAsync("recorded");
         var absences = Page.GetByRole(AriaRole.Table, new() { Name = "Absences" });
         await Expect(absences.GetByRole(AriaRole.Row).Filter(new() { HasText = "Sanne Jansen" })).ToContainTextAsync("Leave: Dentist");
+        await Expect(absences.GetByRole(AriaRole.Row).Filter(new() { HasText = "Sanne Jansen" })).ToContainTextAsync(dayText);
         await absences.GetByRole(AriaRole.Button, new() { Name = "Remove Absence of Sanne Jansen" }).ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Status).Filter(new() { HasText = "removed" })).ToBeVisibleAsync();
         await Expect(absences.GetByRole(AriaRole.Row).Filter(new() { HasText = "Sanne Jansen" })).ToHaveCountAsync(0);
@@ -75,6 +78,7 @@ public sealed class FleetJourneyTests(TmsUiFixture tms) : BrowserPage(tms)
 
         var days = Page.GetByRole(AriaRole.Table, new() { Name = "Off the road days" });
         await Expect(days.GetByRole(AriaRole.Row).Filter(new() { HasText = "TT-301-F" })).ToContainTextAsync("Maintenance");
+        await Expect(days.GetByRole(AriaRole.Row).Filter(new() { HasText = "TT-301-F" })).ToContainTextAsync(dayText);
         await days.GetByRole(AriaRole.Button, new() { Name = "Remove Off the road day of TT-301-F" }).ClickAsync();
         await Expect(days.GetByRole(AriaRole.Row).Filter(new() { HasText = "TT-301-F" })).ToHaveCountAsync(0);
     }

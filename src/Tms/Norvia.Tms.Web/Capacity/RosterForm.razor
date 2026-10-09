@@ -35,8 +35,8 @@
             {
                 <li class="mb-2 flex flex-wrap items-end gap-4">
                     <FluentCheckbox Label="@row.Name" @bind-Value="row.Works" />
-                    <FluentTextField Placeholder="HH:mm" Label="@($"{row.Name} start")" aria-label="@($"{row.Name} start")" @bind-Value="row.Start" Immediate="true" Disabled="!row.Works" />
-                    <FluentTextField Placeholder="HH:mm" Label="@($"{row.Name} end")" aria-label="@($"{row.Name} end")" @bind-Value="row.End" Immediate="true" Disabled="!row.Works" />
+                    <FluentTimePicker Label="@($"{row.Name} start")" aria-label="@($"{row.Name} start")" @bind-Value="row.Start" Disabled="!row.Works" />
+                    <FluentTimePicker Label="@($"{row.Name} end")" aria-label="@($"{row.Name} end")" @bind-Value="row.End" Disabled="!row.Works" />
                 </li>
             }
         </ul>
@@ -71,9 +71,9 @@
 
         public bool Works { get; set; }
 
-        public string Start { get; set; } = "08:00";
+        public DateTime? Start { get; set; } = DateTime.Today.AddHours(8);
 
-        public string End { get; set; } = "16:30";
+        public DateTime? End { get; set; } = DateTime.Today.AddHours(16.5);
     }
 
     private void Choose(string driverId)
@@ -88,8 +88,8 @@
             if (current.FirstOrDefault(entry => entry.Weekday == weekday) is { } shift)
             {
                 row.Works = true;
-                row.Start = shift.Start.ToString("HH:mm", CultureInfo.InvariantCulture);
-                row.End = shift.End.ToString("HH:mm", CultureInfo.InvariantCulture);
+                row.Start = DateTime.Today.Add(shift.Start.ToTimeSpan());
+                row.End = DateTime.Today.Add(shift.End.ToTimeSpan());
             }
 
             return row;
@@ -108,14 +108,15 @@
         var weekdays = new List<RosterWeekdayView>();
         foreach (var row in _rows.Where(row => row.Works))
         {
-            if (!TimeOnly.TryParseExact(row.Start, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var start)
-                || !TimeOnly.TryParseExact(row.End, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var end)
-                || start >= end)
+            if (row.Start is not { } chosenStart || row.End is not { } chosenEnd
+                || TimeOnly.FromDateTime(chosenStart) >= TimeOnly.FromDateTime(chosenEnd))
             {
                 _failure = $"{row.Name}: enter a start and an end, with the end after the start.";
                 return;
             }
 
+            var start = TimeOnly.FromDateTime(chosenStart);
+            var end = TimeOnly.FromDateTime(chosenEnd);
             weekdays.Add(new RosterWeekdayView(row.Weekday, start, end));
         }
 

@@ -27,9 +27,9 @@
                 <FluentOption TOption="string" Value="@driver.Id">@driver.Name</FluentOption>
             }
         </FluentSelect>
-        <FluentTextField Placeholder="yyyy-MM-dd" Label="Day" aria-label="Day" @bind-Value="_day" Immediate="true" />
-        <FluentTextField Placeholder="HH:mm" Label="Shift start" aria-label="Shift start" @bind-Value="_start" Immediate="true" />
-        <FluentTextField Placeholder="HH:mm" Label="Shift end" aria-label="Shift end" @bind-Value="_end" Immediate="true" />
+        <FluentDatePicker Label="Day" aria-label="Day" @bind-Value="_day" />
+        <FluentTimePicker Label="Shift start" aria-label="Shift start" @bind-Value="_start" />
+        <FluentTimePicker Label="Shift end" aria-label="Shift end" @bind-Value="_end" />
         <FluentButton Appearance="Appearance.Accent" OnClick="SubmitAsync" Disabled="_working">Edit Shift</FluentButton>
     </div>
 </section>
@@ -37,9 +37,9 @@
 @code {
     private readonly CancellationTokenSource _closed = new();
     private string _driverId = string.Empty;
-    private string _day = string.Empty;
-    private string _start = "06:00";
-    private string _end = "14:30";
+    private DateTime? _day;
+    private DateTime? _start = DateTime.Today.AddHours(6);
+    private DateTime? _end = DateTime.Today.AddHours(14.5);
     private string? _failure;
     private string? _done;
     private bool _working;
@@ -66,19 +66,21 @@
             return;
         }
 
-        if (!DateOnly.TryParseExact(_day, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day))
+        if (_day is not { } chosenDay)
         {
             _failure = "Enter the day.";
             return;
         }
 
-        if (!TimeOnly.TryParseExact(_start, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var start)
-            || !TimeOnly.TryParseExact(_end, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var end)
-            || start >= end)
+        if (_start is not { } chosenStart || _end is not { } chosenEnd || TimeOnly.FromDateTime(chosenStart) >= TimeOnly.FromDateTime(chosenEnd))
         {
             _failure = "Enter a start and an end, with the end after the start.";
             return;
         }
+
+        var day = DateOnly.FromDateTime(chosenDay);
+        var start = TimeOnly.FromDateTime(chosenStart);
+        var end = TimeOnly.FromDateTime(chosenEnd);
 
         _working = true;
         try
