@@ -456,6 +456,102 @@
       "active": false
     }
   ],
+  "vehicles": [
+    {
+      "$comment": "The Own fleet's Vehicles, as the ERP will own them (ADR 0014); the TMS keeps a read copy and owns their availability (P10).",
+      "id": "VEH-0001",
+      "registration": "VN-101-A",
+      "type": "Van",
+      "payloadKg": 1200,
+      "palletPlaces": 4,
+      "active": true
+    },
+    {
+      "id": "VEH-0002",
+      "registration": "VN-102-B",
+      "type": "Van",
+      "payloadKg": 1200,
+      "palletPlaces": 4,
+      "active": true
+    },
+    {
+      "id": "VEH-0003",
+      "registration": "RT-201-C",
+      "type": "RigidTruck",
+      "payloadKg": 10000,
+      "palletPlaces": 18,
+      "active": true
+    },
+    {
+      "id": "VEH-0004",
+      "registration": "RT-202-D",
+      "type": "RigidTruck",
+      "payloadKg": 10000,
+      "palletPlaces": 18,
+      "active": true
+    },
+    {
+      "id": "VEH-0005",
+      "registration": "RT-203-E",
+      "type": "RigidTruck",
+      "payloadKg": 10000,
+      "palletPlaces": 18,
+      "active": true
+    },
+    {
+      "id": "VEH-0006",
+      "registration": "TT-301-F",
+      "type": "TractorWithTrailer",
+      "payloadKg": 24000,
+      "palletPlaces": 33,
+      "active": true
+    }
+  ],
+  "drivers": [
+    {
+      "$comment": "The Own fleet's Drivers: two with CE, three with C and two with B. Their licence categories are what the TMS checks a Vehicle against (P10).",
+      "id": "DRV-0001",
+      "name": "Anouk de Vries",
+      "licences": ["B", "C", "CE"],
+      "active": true
+    },
+    {
+      "id": "DRV-0002",
+      "name": "Joost Bakker",
+      "licences": ["B", "C", "CE"],
+      "active": true
+    },
+    {
+      "id": "DRV-0003",
+      "name": "Bram Visser",
+      "licences": ["B", "C"],
+      "active": true
+    },
+    {
+      "id": "DRV-0004",
+      "name": "Fatima El Amrani",
+      "licences": ["B", "C"],
+      "active": true
+    },
+    {
+      "id": "DRV-0005",
+      "name": "Henk Mulder",
+      "licences": ["B", "C"],
+      "active": true
+    },
+    {
+      "id": "DRV-0006",
+      "name": "Sanne Jansen",
+      "licences": ["B"],
+      "active": true
+    },
+    {
+      "id": "DRV-0007",
+      "name": "Tim Peeters",
+      "licences": ["B"],
+      "active": true
+    }
+  ],
   "personas": [
     {
       "$comment": "A Shipper Persona's tracking screen asks Norvia again every few seconds while it is open (P8). 'shipper.trackingPollSeconds' sets that per Persona; one without it polls every 5 seconds.",

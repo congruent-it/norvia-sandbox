@@ -18,6 +18,16 @@ public sealed class ApiReferenceTests(TmsFixture tms)
     }
 
     [Fact]
+    public async Task OpenApiDocument_V1_HasNoRouteForVehiclesOrDrivers_BecauseTheErpOwnsTheirMasterData()
+    {
+        using var response = await tms.Tms.GetAsync(new Uri("/openapi/v1.json", UriKind.Relative), _cancellationToken);
+
+        var paths = JsonNode.Parse(await response.Content.ReadAsStringAsync(_cancellationToken))!["paths"]!.AsObject();
+        paths.Select(path => path.Key).Should().NotContain(path => path.Contains("vehicle", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("driver", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task Scalar_ServesTheApiReference()
     {
         using var response = await tms.Tms.GetAsync(new Uri("/scalar", UriKind.Relative), _cancellationToken);

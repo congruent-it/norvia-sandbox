@@ -4,6 +4,9 @@ using Norvia.Tms.Application.Billing.ListNotYetBillable;
 using Norvia.Tms.Application.Carriers.ListActive;
 using Norvia.Tms.Application.Exceptions.ListOpen;
 using Norvia.Tms.Application.Exceptions.ShipperNotificationTemplate;
+using Norvia.Tms.Application.Fleet;
+using Norvia.Tms.Application.Fleet.ListDrivers;
+using Norvia.Tms.Application.Fleet.ListVehicles;
 using Norvia.Tms.Application.ProofsOfDelivery.ListMissing;
 using Norvia.Tms.Application.ProofsOfDelivery.Read;
 using Norvia.Tms.Application.Shipments;
@@ -42,6 +45,12 @@ internal sealed class TransportOrderQueries(IServiceScopeFactory scopes) : ITran
 
     public Task<IReadOnlyList<CarrierView>> ListActiveCarriersAsync(CancellationToken cancellationToken) =>
         SendAsync(new ListActiveCarriersQuery(), cancellationToken);
+
+    public Task<IReadOnlyList<VehicleView>> ListVehiclesAsync(CancellationToken cancellationToken) =>
+        SendAsync(new ListVehiclesQuery(), cancellationToken);
+
+    public Task<IReadOnlyList<DriverView>> ListDriversAsync(CancellationToken cancellationToken) =>
+        SendAsync(new ListDriversQuery(), cancellationToken);
 
     public async Task<TransportOrderView?> FindAsync(string transportOrderNumber, CancellationToken cancellationToken) =>
         FoundOrNull(await SendAsync(new GetTransportOrderQuery(transportOrderNumber), cancellationToken), $"Transport Order {transportOrderNumber}");

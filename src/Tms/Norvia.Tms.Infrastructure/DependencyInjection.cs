@@ -11,6 +11,7 @@ using Norvia.Tms.Application.Billing;
 using Norvia.Tms.Application.CarrierBookings;
 using Norvia.Tms.Application.Carriers;
 using Norvia.Tms.Application.Exceptions;
+using Norvia.Tms.Application.Fleet;
 using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.ProofsOfDelivery;
 using Norvia.Tms.Application.RateCards;
@@ -30,6 +31,7 @@ using Norvia.Tms.Infrastructure.Carriers;
 using Norvia.Tms.Infrastructure.Clock;
 using Norvia.Tms.Infrastructure.Data;
 using Norvia.Tms.Infrastructure.Exceptions;
+using Norvia.Tms.Infrastructure.Fleet;
 using Norvia.Tms.Infrastructure.Outbox;
 using Norvia.Tms.Infrastructure.ProofsOfDelivery;
 using Norvia.Tms.Infrastructure.RateCards;
@@ -100,6 +102,8 @@ public static class DependencyInjection
         builder.Services.AddSingleton<IRateCardDirectory, SeedFileRateCardDirectory>();
         builder.Services.AddSingleton<ICarrierRateCardDirectory, SeedFileCarrierRateCardDirectory>();
         builder.Services.AddSingleton<ICarrierDirectory, SeedFileCarrierDirectory>();
+        builder.Services.AddSingleton<IVehicleDirectory, SeedFileVehicleDirectory>();
+        builder.Services.AddSingleton<IDriverDirectory, SeedFileDriverDirectory>();
         builder.Services.AddHostedService<LoadSeedOnStart>();
 
         return builder;

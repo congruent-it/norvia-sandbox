@@ -4,6 +4,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Norvia.Tms.Application.Carriers.ListActive;
 using Norvia.Tms.Application.Exceptions.ListOpen;
 using Norvia.Tms.Application.Exceptions.ShipperNotificationTemplate;
+using Norvia.Tms.Application.Fleet;
+using Norvia.Tms.Application.Fleet.ListDrivers;
+using Norvia.Tms.Application.Fleet.ListVehicles;
 using Norvia.Tms.Application.ProofsOfDelivery.ListMissing;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shipments.GetByNumber;
@@ -51,6 +54,28 @@ public sealed class TransportOrderQueriesTests : IDisposable
         var carriers = await _queries.ListActiveCarriersAsync(Xunit.TestContext.Current.CancellationToken);
 
         carriers.Should().BeSameAs(active);
+    }
+
+    [Fact]
+    public async Task ListVehiclesAsync_ListsTheOwnFleetsVehicles()
+    {
+        IReadOnlyList<VehicleView> vehicles = [];
+        _mediator.Send(new ListVehiclesQuery(), Arg.Any<CancellationToken>()).Returns(vehicles);
+
+        var listed = await _queries.ListVehiclesAsync(Xunit.TestContext.Current.CancellationToken);
+
+        listed.Should().BeSameAs(vehicles);
+    }
+
+    [Fact]
+    public async Task ListDriversAsync_ListsTheOwnFleetsDrivers()
+    {
+        IReadOnlyList<DriverView> drivers = [];
+        _mediator.Send(new ListDriversQuery(), Arg.Any<CancellationToken>()).Returns(drivers);
+
+        var listed = await _queries.ListDriversAsync(Xunit.TestContext.Current.CancellationToken);
+
+        listed.Should().BeSameAs(drivers);
     }
 
     [Fact]
