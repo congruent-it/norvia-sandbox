@@ -27,9 +27,12 @@ internal static class CanonicalModelSchemas
 
     private static readonly Lazy<JsonSchema> ShipmentReassignedSchema = new(() => Load("shipment-reassigned.v1.schema.json"));
 
+    private static readonly Lazy<JsonSchema> CarrierCostSchema = new(() => Load("carrier-cost.v1.schema.json"));
+
     private static readonly Lazy<JsonSchema> ShipmentReleasedSchema = new(() =>
     {
         _ = TransportOrderSchema.Value;
+        _ = CarrierCostSchema.Value;
         return Load("shipment-released.v1.schema.json");
     });
 

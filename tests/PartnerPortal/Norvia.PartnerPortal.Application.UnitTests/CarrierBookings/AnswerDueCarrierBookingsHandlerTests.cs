@@ -1,4 +1,3 @@
-using Norvia.PartnerPortal.Domain.Personas;
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Mediator;
@@ -9,6 +8,7 @@ using Norvia.PartnerPortal.Application.CarrierBookings.Answer;
 using Norvia.PartnerPortal.Application.CarrierBookings.AutoAnswer;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
+using Norvia.PartnerPortal.Domain.Personas;
 
 namespace Norvia.PartnerPortal.Application.UnitTests.CarrierBookings;
 

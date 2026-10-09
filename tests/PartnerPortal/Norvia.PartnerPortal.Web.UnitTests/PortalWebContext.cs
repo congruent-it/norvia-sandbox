@@ -1,4 +1,3 @@
-using Norvia.PartnerPortal.Domain.Personas;
 using AngleSharp.Dom;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
@@ -6,6 +5,7 @@ using Microsoft.FluentUI.AspNetCore.Components;
 using Norvia.PartnerPortal.Application.CarrierBookings.AnswerSettings;
 using Norvia.PartnerPortal.Application.CarrierShipments.TrackingSettings;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
+using Norvia.PartnerPortal.Domain.Personas;
 using Norvia.PartnerPortal.Web.Bookings;
 
 namespace Norvia.PartnerPortal.Web.UnitTests;

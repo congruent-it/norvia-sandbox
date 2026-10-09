@@ -1,10 +1,14 @@
 using Norvia.Tms.Application.CanonicalModel;
+using Norvia.Tms.Application.CarrierBookings;
 using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.Shipments.Release;
+using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.UnitTests.TransportOrders;
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Carriers;
+using Norvia.Tms.Domain.RateCards;
 using Norvia.Tms.Domain.Shipments;
+using Norvia.Tms.Domain.TransportOrders;
 using NSubstitute;
 
 namespace Norvia.Tms.Application.UnitTests.Shipments;
@@ -44,6 +48,30 @@ public sealed class PublishShipmentReleasedTests
     }
 
     [Fact]
+    public void From_CarrierShipmentWithACarrierCost_CarriesItWithItsLinesTotalAndSource()
+    {
+        var cost = new CarrierCost(
+            [new ChargeLine(ChargeLineType.Freight, new Money(11.00m)), new ChargeLine(ChargeLineType.MinimumChargeAdjustment, new Money(24.00m))],
+            CarrierCostSource.CarrierRateCard(new RateCardVersionReference(new RateCardId("CRC-0001"), 2)),
+            Samples.Now.AddHours(3));
+
+        var released = ShipmentReleasedV1.From(Release(CarriedBy.Carrier(new CarrierId("CAR-0001")), CarrierBookingNumber.FromSequence(1), cost));
+
+        released.CarrierCost.Should().Be(new CarrierCostView(
+            "EUR",
+            35.00m,
+            [new ChargeLineView("Freight", 11.00m), new ChargeLineView("MinimumChargeAdjustment", 24.00m)],
+            new CarrierCostSourceView("CarrierRateCard", new RateCardVersionView("CRC-0001", 2)),
+            Samples.Now.AddHours(3)));
+    }
+
+    [Fact]
+    public void From_OwnFleetShipment_CarriesNoCarrierCost()
+    {
+        ShipmentReleasedV1.From(Release(CarriedBy.OwnFleet, carrierBookingNumber: null)).CarrierCost.Should().BeNull();
+    }
+
+    [Fact]
     public void ShipmentReleased_ForACarrierShipment_TracksTheCarrierBookingNumberToo()
     {
         var released = ShipmentReleasedV1.From(Release(CarriedBy.Carrier(new CarrierId("CAR-0001")), CarrierBookingNumber.FromSequence(1)));
@@ -73,11 +101,11 @@ public sealed class PublishShipmentReleasedTests
         released.ApplicationProperties.Should().NotContainKey("carrierBookingNumber");
     }
 
-    private static ShipmentReleasedEvent Release(CarriedBy carriedBy, CarrierBookingNumber? carrierBookingNumber)
+    private static ShipmentReleasedEvent Release(CarriedBy carriedBy, CarrierBookingNumber? carrierBookingNumber, CarrierCost? carrierCost = null)
     {
         var order = Samples.AcceptedOrder(sequence: 3);
         var shipment = Samples.Planned(order, carriedBy, sequence: 12);
-        shipment.Release(order, new("key-rel1"), new("corr-release"), Samples.Now.AddHours(3), carrierBookingNumber);
+        shipment.Release(order, new("key-rel1"), new("corr-release"), Samples.Now.AddHours(3), carrierBookingNumber, carrierCost);
         return (ShipmentReleasedEvent)shipment.DomainEvents.Single();
     }
 }

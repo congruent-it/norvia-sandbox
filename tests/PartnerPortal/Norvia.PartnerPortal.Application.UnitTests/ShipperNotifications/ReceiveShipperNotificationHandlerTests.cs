@@ -1,9 +1,9 @@
-using Norvia.PartnerPortal.Domain.Personas;
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Microsoft.Extensions.Time.Testing;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Application.ShipperNotifications.Receive;
+using Norvia.PartnerPortal.Domain.Personas;
 using Norvia.PartnerPortal.Domain.ShipperNotifications;
 
 namespace Norvia.PartnerPortal.Application.UnitTests.ShipperNotifications;

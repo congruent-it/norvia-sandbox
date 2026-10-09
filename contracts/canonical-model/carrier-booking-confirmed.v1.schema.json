@@ -16,7 +16,8 @@
     "transportOrderNumber",
     "carrierId",
     "carrierBookingReference",
-    "plannedCollectionTime"
+    "plannedCollectionTime",
+    "carrierCostTotal"
   ],
   "properties": {
     "eventId": { "type": "string", "format": "uuid" },
@@ -33,6 +34,12 @@
       "description": "When the Carrier plans to collect, if it gave one.",
       "type": ["string", "null"],
       "format": "date-time"
+    },
+    "carrierCostTotal": {
+      "description": "The total of the Carrier cost frozen on the Carrier booking, which the Carrier accepted by confirming, in EUR without VAT (P9). Null only for a Carrier booking requested before release priced it.",
+      "type": ["number", "null"],
+      "minimum": 0,
+      "multipleOf": 0.01
     }
   }
 }

@@ -32,4 +32,16 @@ public enum AssignmentRefusalCode
 
     /// <summary>The reassignment names who carries the Shipment already, so there is nothing to change.</summary>
     AssignmentUnchanged,
+
+    /// <summary>The release can't price the Carrier booking, because the Carrier has no Carrier Rate Card (P9).</summary>
+    NoRateCard,
+
+    /// <summary>The release can't price the Carrier booking, because no version of the Carrier Rate Card is valid on the collection date (P9).</summary>
+    NoValidRateCardVersion,
+
+    /// <summary>The release can't price the Carrier booking, because no Lane of the Carrier Rate Card covers the origin and destination Zones (P9).</summary>
+    NoMatchingLane,
+
+    /// <summary>The release can't price the Carrier booking, because the total weight is above the Lane's highest Weight Break (P9).</summary>
+    WeightAboveHighestBreak,
 }

@@ -66,6 +66,9 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<string>("CarrierCost")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("CarrierId")
                         .IsRequired()
                         .HasMaxLength(50)

@@ -1,6 +1,6 @@
-using Norvia.PartnerPortal.Domain.Personas;
 using Norvia.PartnerPortal.Application.CarrierBookings.AnswerSettings;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
+using Norvia.PartnerPortal.Domain.Personas;
 using Norvia.PartnerPortal.Web.CarrierBookings;
 
 namespace Norvia.PartnerPortal.Web.UnitTests.CarrierBookings;

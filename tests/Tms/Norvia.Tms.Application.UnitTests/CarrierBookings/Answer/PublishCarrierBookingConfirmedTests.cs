@@ -3,6 +3,7 @@ using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.UnitTests.TransportOrders;
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Carriers;
+using Norvia.Tms.Domain.RateCards;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TransportOrders;
 using NSubstitute;
@@ -32,6 +33,17 @@ public sealed class PublishCarrierBookingConfirmedTests
     }
 
     [Fact]
+    public void From_ABookingWithACarrierCost_CarriesItsTotal()
+    {
+        var cost = new CarrierCost(
+            [new ChargeLine(ChargeLineType.Freight, new Money(11.00m)), new ChargeLine(ChargeLineType.MinimumChargeAdjustment, new Money(24.00m))],
+            CarrierCostSource.CarrierRateCard(new RateCardVersionReference(new RateCardId("CRC-0001"), 2)),
+            Samples.Now);
+
+        CarrierBookingConfirmedV1.From(Confirmed(cost)).CarrierCostTotal.Should().Be(35.00m);
+    }
+
+    [Fact]
     public void CarrierBookingConfirmed_TracksItsKeys()
     {
         var confirmedEvent = CarrierBookingConfirmedV1.From(Confirmed());
@@ -52,12 +64,12 @@ public sealed class PublishCarrierBookingConfirmedTests
         });
     }
 
-    private static CarrierBookingConfirmedEvent Confirmed()
+    private static CarrierBookingConfirmedEvent Confirmed(CarrierCost? carrierCost = null)
     {
         var order = Samples.AcceptedOrder(sequence: 7);
         var shipment = Samples.Planned(order, CarriedBy.Carrier(new CarrierId("CAR-0001")), sequence: 12);
         var booking = CarrierBooking.Request(
-            CarrierBookingNumber.FromSequence(1), shipment.Id, shipment.Number, new CarrierId("CAR-0001"), new CorrelationId("corr-release"), Samples.Now.AddHours(1));
+            CarrierBookingNumber.FromSequence(1), shipment.Id, shipment.Number, new CarrierId("CAR-0001"), new CorrelationId("corr-release"), Samples.Now.AddHours(1), carrierCost);
 
         booking.Confirm("VDT-240917-0042", plannedCollectionTime: null, order.Number!, new CorrelationId("corr-answer"), Samples.Now.AddHours(2));
         return (CarrierBookingConfirmedEvent)booking.DomainEvents.Single();

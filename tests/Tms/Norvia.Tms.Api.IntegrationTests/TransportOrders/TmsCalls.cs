@@ -74,6 +74,17 @@ internal static class TmsCalls
         return [.. tms.Published.Where(m => m.CorrelationId == correlationId && m.Subject == eventType)];
     }
 
+    /// <summary>Waits until the Transport Order is rated, or its rating failed, whichever it is.</summary>
+    public static async Task WaitForRatingToSettleAsync(this TmsFixture tms, string number, CancellationToken cancellationToken)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(Timeout);
+        while ((await tms.GetTransportOrderAsync(number, cancellationToken))["ratingResult"]?.GetValue<string>() is not ("Rated" or "RatingFailed"))
+        {
+            await Task.Delay(TmsFixture.PollInterval, timeout.Token);
+        }
+    }
+
     /// <summary>Reads the Transport Order until it has the rating result, as Rating runs a moment after acceptance.</summary>
     public static async Task<JsonNode> WaitForRatingResultAsync(this TmsFixture tms, string number, string ratingResult, CancellationToken cancellationToken)
     {

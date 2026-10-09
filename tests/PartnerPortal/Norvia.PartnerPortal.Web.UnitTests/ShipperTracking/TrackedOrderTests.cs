@@ -79,7 +79,13 @@ public sealed class TrackedOrderTests : PortalWebContext
     {
         GetReturns(TrackingAnswer.Found(TrackingSamples.Detail() with
         {
-            Status = ShipperTrackingStatus.Scheduled, Eta = null, LastUpdate = null, DeliverFrom = null, DeliverUntil = null, Progress = [], ProofOfDelivery = null,
+            Status = ShipperTrackingStatus.Scheduled,
+            Eta = null,
+            LastUpdate = null,
+            DeliverFrom = null,
+            DeliverUntil = null,
+            Progress = [],
+            ProofOfDelivery = null,
         }));
 
         var page = RenderPage();
