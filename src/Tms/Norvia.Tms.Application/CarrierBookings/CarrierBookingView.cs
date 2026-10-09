@@ -48,4 +48,3 @@ public sealed record CarrierBookingView(
             CarrierCostView.From(booking.CarrierCost));
     }
 }
-

@@ -1,3 +1,4 @@
+using Norvia.Tms.Application.CarrierBookings;
 using Norvia.Tms.Application.Exceptions.Timeline;
 using Norvia.Tms.Application.ProofsOfDelivery.Read;
 using Norvia.Tms.Application.TransportOrders;
@@ -13,9 +14,11 @@ namespace Norvia.Tms.Application.TrackingEvents.Timeline;
 /// <param name="Exceptions">Open and resolved (P7), in the order they opened.</param>
 /// <param name="AgreedDeliveryWindows">The delivery windows the Planner agreed (P7), in the order they were set; the last one counts.</param>
 /// <param name="Billing">Where the Shipment's Transport Order stands for billing (P9); null when the Shipment has no Transport Order to read.</param>
+/// <param name="CarrierBookings">Every Carrier booking of the Shipment in the order they were requested, rejected ones included with their reason code and text.</param>
 public sealed record ShipmentTimeline(
     IReadOnlyList<TrackingTimelineEntry> TrackingEvents,
     IReadOnlyList<ProofOfDeliveryView> ProofsOfDelivery,
     IReadOnlyList<ExceptionTimelineEntry> Exceptions,
     IReadOnlyList<AgreedDeliveryWindowView> AgreedDeliveryWindows,
-    ShipmentBillingView? Billing = null);
+    ShipmentBillingView? Billing = null,
+    IReadOnlyList<CarrierBookingView>? CarrierBookings = null);

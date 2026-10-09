@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using Norvia.Tms.Api.IntegrationTests.CarrierBookings;
 using Norvia.Tms.Api.IntegrationTests.TransportOrders;
+using Norvia.Tms.Api.IntegrationTests.TrackingEvents;
 
 namespace Norvia.Tms.Api.IntegrationTests.Planning;
 
@@ -51,5 +52,21 @@ public sealed class PriceNotAcceptedTests(TmsFixture tms)
         newBooking["carrierCost"]!["total"]!.GetValue<decimal>().Should().Be(86.50m);
         newBooking["carrierCost"]!["calculatedAt"]!.GetValue<DateTimeOffset>()
             .Should().BeAfter(CarrierBookingCalls.BookingOf(shipment, first)["carrierCost"]!["calculatedAt"]!.GetValue<DateTimeOffset>());
+    }
+
+    [Fact]
+    public async Task Timeline_ShowsTheRejectedBookingWithItsReasonCode_AndTheNewBookingBesideIt()
+    {
+        var (first, shipmentNumber) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
+        await tms.RejectedAsync(first, PlanningCalls.CarrierId, "PriceNotAccepted", _cancellationToken);
+        var second = (await tms.ReleasedAsync(shipmentNumber, _cancellationToken))["carrierBookingNumber"]!.GetValue<string>();
+
+        var timeline = await tms.GetTimelineAsync(shipmentNumber, _cancellationToken);
+
+        var bookings = timeline["carrierBookings"]!.AsArray();
+        bookings.Select(booking => booking!["carrierBookingNumber"]!.GetValue<string>()).Should().Equal(first, second);
+        bookings[0]!["status"]!.GetValue<string>().Should().Be("Rejected");
+        bookings[0]!["reasonCode"]!.GetValue<string>().Should().Be("PriceNotAccepted");
+        bookings[1]!["status"]!.GetValue<string>().Should().Be("Requested");
     }
 }

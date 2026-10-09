@@ -147,7 +147,7 @@ P5 adds a fourth list to the Planner's three from P3 and P4.
 |---|---|---|
 | Shipments in progress (P5) | Booked (or Dispatched, for Own fleet), Collected and In transit Shipments: Shipment, Carrier (or Own fleet and the Trip number), status, last Tracking event (type, time, place), ETA and the Stale flag. Stale Shipments first, then by ETA | Open the timeline |
 
-The timeline shows the Shipment's Tracking events in event-time order, with the time each one arrived and whether it moved the status. [P6](p6-proof-of-delivery.md#planners-lists) adds Proofs of delivery to the timeline and a list of Delivered Shipments without one. The list is read-only. A Delivered Shipment leaves it. It updates without a page refresh, as the other lists do.
+The timeline shows the Shipment's Tracking events in event-time order, with the time each one arrived and whether it moved the status. The timeline data also lists every Carrier booking of the Shipment, a rejected one with its reason code and text. [P6](p6-proof-of-delivery.md#planners-lists) adds Proofs of delivery to the timeline and a list of Delivered Shipments without one. The list is read-only. A Delivered Shipment leaves it. It updates without a page refresh, as the other lists do.
 
 ## Partner portal
 
