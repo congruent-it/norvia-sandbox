@@ -26,7 +26,7 @@
       "properties": {
         "carrierId": true,
         "outcome": { "const": "Rejected" },
-        "reasonCode": { "enum": ["NoCapacity", "LaneNotServed", "WindowNotFeasible", "GoodsNotAccepted", "Other"] },
+        "reasonCode": { "enum": ["NoCapacity", "LaneNotServed", "WindowNotFeasible", "GoodsNotAccepted", "PriceNotAccepted", "Other"] },
         "reasonText": { "description": "The reason in plain language. Required when the reason code is Other.", "type": "string", "minLength": 1, "pattern": "\\S" }
       },
       "if": { "properties": { "reasonCode": { "const": "Other" } } },
