@@ -157,7 +157,7 @@ Within the first week of the Planning horizon, one rigid truck is Off the road f
 
 ## Implementation
 
-Not built yet.
+The Driving-hour budget is built: `DrivingHourBudget` in the TMS domain works out the hours left today, this week and this fortnight, and the extensions left this week, from the day it is and the Trip durations it is given. The limits are the `DrivingHours` TMS settings. Until P11 supplies Trip durations, every budget is full, and the Drivers tab shows it. The rest of P10 is not built yet.
 
 ## Deferred
 

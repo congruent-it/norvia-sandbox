@@ -26,6 +26,10 @@ public sealed class FleetJourneyTests(TmsUiFixture tms) : BrowserPage(tms)
         var drivers = Page.GetByRole(AriaRole.Table, new() { Name = "Drivers" });
         await Expect(drivers.GetByRole(AriaRole.Row).Filter(new() { HasText = "Anouk de Vries" })).ToContainTextAsync("B, C, CE");
         await Expect(drivers.GetByRole(AriaRole.Row).Filter(new() { HasText = "Sanne Jansen" })).ToContainTextAsync("Van");
+        // No Trips exist before P11, so every Driving-hour budget is full.
+        await Expect(drivers.GetByRole(AriaRole.Row).Filter(new() { HasText = "Anouk de Vries" })).ToContainTextAsync("9 h");
+        await Expect(drivers.GetByRole(AriaRole.Row).Filter(new() { HasText = "Anouk de Vries" })).ToContainTextAsync("56 h");
+        await Expect(drivers.GetByRole(AriaRole.Row).Filter(new() { HasText = "Anouk de Vries" })).ToContainTextAsync("90 h");
     }
 
     [Fact]

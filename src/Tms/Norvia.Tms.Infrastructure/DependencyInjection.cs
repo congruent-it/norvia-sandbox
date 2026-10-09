@@ -119,6 +119,12 @@ public static class DependencyInjection
             var options = services.GetRequiredService<IOptions<PlanningHorizonOptions>>().Value;
             return new PlanningHorizonRules(options.Days, TimeZoneInfo.FindSystemTimeZoneById(options.TimeZone));
         });
+        builder.Services.AddOptions<DrivingHourOptions>().BindConfiguration(DrivingHourOptions.SectionName)
+            .ValidateDataAnnotations()
+            .Validate(options => options.IsConsistent, "DrivingHours: the extended daily limit can't be below the daily one, nor the fortnightly below the weekly.")
+            .ValidateOnStart();
+        builder.Services.AddSingleton(services => services.GetRequiredService<IOptions<DrivingHourOptions>>().Value.ToLimits());
+        builder.Services.AddSingleton<IPlannedDrivingHours, NoTripsPlannedDrivingHours>();
         builder.Services.AddHostedService<LoadSeedOnStart>();
 
         return builder;
