@@ -132,10 +132,23 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
         }
     }
 
-    public async Task<ReleaseAnswer> ReleaseAsync(string shipmentNumber, CancellationToken cancellationToken)
+    public Task<ReleaseAnswer> ReleaseAsync(string shipmentNumber, CancellationToken cancellationToken) =>
+        SendReleaseAsync("Release Shipment", $"/v1/shipments/{Uri.EscapeDataString(shipmentNumber)}/release", shipmentNumber, spotPrice: null, cancellationToken);
+
+    public Task<ReleaseAnswer> ReleaseWithSpotPriceAsync(string shipmentNumber, decimal amount, string remark, CancellationToken cancellationToken) =>
+        SendReleaseAsync(
+            "Release Shipment with Spot price", $"/v1/shipments/{Uri.EscapeDataString(shipmentNumber)}/release-with-spot-price", shipmentNumber,
+            new SpotPriceRelease(amount, remark), cancellationToken);
+
+    // A release, with or without a Spot price: both answer and trace the same way.
+    private async Task<ReleaseAnswer> SendReleaseAsync(string spanName, string path, string shipmentNumber, SpotPriceRelease? spotPrice, CancellationToken cancellationToken)
     {
-        using var span = activities.Source.StartActivity("Release Shipment", ActivityKind.Internal);
-        using var request = await CommandAsync($"/v1/shipments/{Uri.EscapeDataString(shipmentNumber)}/release", cancellationToken);
+        using var span = activities.Source.StartActivity(spanName, ActivityKind.Internal);
+        using var request = await CommandAsync(path, cancellationToken);
+        if (spotPrice is not null)
+        {
+            request.Content = JsonContent.Create(spotPrice, options: Json);
+        }
 
         using var response = await http.SendAsync(request, cancellationToken);
         switch (response.StatusCode)
@@ -149,10 +162,10 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
                 }
 
                 return new ReleaseAnswer.Released();
-            // A refused release: its problem's detail is the refusal's readable message, and its code says which rule.
-            case HttpStatusCode.NotFound or HttpStatusCode.Conflict:
-                return new ReleaseAnswer.Refused(
-                    await RefuseAsync(response, TmsCommand.Release, $"Shipment {shipmentNumber}", "released", shipmentNumber, cancellationToken: cancellationToken));
+            // A refused release: its problem's detail is the refusal's readable message, and its code says which rule, such as a pricing failure.
+            case HttpStatusCode.NotFound or HttpStatusCode.Conflict or HttpStatusCode.UnprocessableEntity:
+                var (reason, code) = await RefuseWithCodeAsync(response, TmsCommand.Release, $"Shipment {shipmentNumber}", "released", shipmentNumber, cancellationToken: cancellationToken);
+                return new ReleaseAnswer.Refused(reason, code);
             default:
                 throw Unexpected(response, "a release");
         }
@@ -218,6 +231,11 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
     // names, and answering with its readable reason.
     private async Task<string> RefuseAsync(
         HttpResponseMessage response, TmsCommand command, string subject, string action, string? shipmentNumber = null, string? carrierBookingNumber = null,
+        string flow = Flows.TransportPlanning, string? transportOrderNumber = null, CancellationToken cancellationToken = default) =>
+        (await RefuseWithCodeAsync(response, command, subject, action, shipmentNumber, carrierBookingNumber, flow, transportOrderNumber, cancellationToken)).Reason;
+
+    private async Task<(string Reason, string? Code)> RefuseWithCodeAsync(
+        HttpResponseMessage response, TmsCommand command, string subject, string action, string? shipmentNumber = null, string? carrierBookingNumber = null,
         string flow = Flows.TransportPlanning, string? transportOrderNumber = null, CancellationToken cancellationToken = default)
     {
         var problem = await response.Content.ReadFromJsonAsync<Refusal>(Json, cancellationToken);
@@ -227,7 +245,7 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
             LogRefusedSubject(command, subject, reason);
         }
 
-        return reason;
+        return (reason, problem?.Code);
     }
 
     // A command as the TMS UI's own identity, under a new idempotency key that every retry of it repeats.
@@ -347,6 +365,9 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
 
     // What the TMS API answers a release, as far as the TMS UI reads it.
     private sealed record Released(string? TransportOrderNumber, string? CorrelationId, string? ShipperId);
+
+    // What the TMS UI asks the TMS API to release a Shipment at.
+    private sealed record SpotPriceRelease(decimal Amount, string Remark);
 
     // What the TMS API answers a withdrawal, as far as the TMS UI reads it.
     private sealed record Withdrawn(string? ShipmentNumber, string? CorrelationId);

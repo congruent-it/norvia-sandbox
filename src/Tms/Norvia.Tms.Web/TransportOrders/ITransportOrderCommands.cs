@@ -31,6 +31,13 @@ public interface ITransportOrderCommands
     Task<ReleaseAnswer> ReleaseAsync(string shipmentNumber, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Releases one Planned Carrier Shipment at a Spot price, after its release failed on the Carrier Rate Card (P9).
+    /// </summary>
+    /// <param name="amount">In EUR, without VAT.</param>
+    /// <param name="remark">Where the price comes from, such as "agreed with Van Dijk by phone, €480".</param>
+    Task<ReleaseAnswer> ReleaseWithSpotPriceAsync(string shipmentNumber, decimal amount, string remark, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Withdraws one Requested Carrier booking before the Carrier answers, which puts its Shipment back to Planned. Each
     /// withdrawal is a call of its own, so one is refused on its own.
     /// </summary>

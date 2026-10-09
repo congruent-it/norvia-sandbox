@@ -48,7 +48,7 @@
                 Empty="No Carrier bookings are waiting for an answer. A booking appears here as soon as a Shipment is released to a Carrier." Context="bookings">
     @* The earliest collection first, as the query gives them: that booking needs its answer first. *@
     <FluentDataGrid Items="bookings.AsQueryable()" TGridItem="CarrierBookingAwaitingAnswerSummary" Class="flatly-table" aria-label="Bookings awaiting an answer"
-                    GridTemplateColumns="1fr 1fr 1fr 1.2fr 1.2fr 1.2fr auto auto" MultiLine="true">
+                    GridTemplateColumns="1fr 1fr 1fr 1.2fr 1.2fr 1.2fr 1.6fr auto auto" MultiLine="true">
         <TemplateColumn Title="Shipment">
             <a href="/shipments/@context.ShipmentNumber">@context.ShipmentNumber</a>
         </TemplateColumn>
@@ -57,6 +57,7 @@
         <PropertyColumn Title="Collection" Property="@(booking => NorviaTime.Format(booking.EarliestCollectionTime))" />
         <PropertyColumn Title="Requested" Property="@(booking => NorviaTime.Format(booking.RequestedAt))" />
         <PropertyColumn Title="Sent" Property="@(booking => CarrierBookingText.Sent(booking.SentAt))" />
+        <PropertyColumn Title="Carrier cost" Property="@(booking => CarrierBookingText.CarrierCost(booking.CarrierCost))" />
         <TemplateColumn Title="Overdue">
             @if (context.Overdue)
             {
