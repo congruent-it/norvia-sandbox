@@ -41,7 +41,7 @@ public static class CapacityEndpoints
             .WithDescription(
                 "start and end are required, otherwise the call is a 400. The Shift replaces the one from the Driver's Roster, "
                 + "or adds one on a day off, and is marked as edited by hand. A change that breaks a rule is refused, changing nothing, with a problem whose code says which: "
-                + "PlanningDayNotFound (404), DriverNotFound (404), DayClosed (409): days before today are closed and read-only, or ShiftInvalid (400): a Shift ends after it starts.");
+                + "PlanningDayNotFound (404), DriverNotFound (404), DayClosed (409): days before today are closed and read-only, DriverAbsent (409): the Driver has an Absence that day, or ShiftInvalid (400): a Shift ends after it starts.");
 
         capacity.MapGet("/absences", ListAbsencesAsync)
             .RequireAuthorization()
@@ -263,7 +263,7 @@ public static class CapacityEndpoints
     {
         PlanningRefusalCode.PlanningDayNotFound or PlanningRefusalCode.DriverNotFound or PlanningRefusalCode.VehicleNotFound
             or PlanningRefusalCode.AbsenceNotFound or PlanningRefusalCode.OffTheRoadDayNotFound => StatusCodes.Status404NotFound,
-        PlanningRefusalCode.DayClosed => StatusCodes.Status409Conflict,
+        PlanningRefusalCode.DayClosed or PlanningRefusalCode.DriverAbsent => StatusCodes.Status409Conflict,
         PlanningRefusalCode.ShiftInvalid or PlanningRefusalCode.PeriodInvalid or PlanningRefusalCode.RemarkTooLong => StatusCodes.Status400BadRequest,
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, "The API doesn't know this refusal's status."),
     };

@@ -26,9 +26,9 @@ public sealed class RecordAbsenceHandler(
             return PlanningRefused.Because<RecordAbsenceResult>(PlanningRefusal.PeriodInvalid(AvailabilityPeriod.MaxDays));
         }
 
-        if (command.Remark?.Trim().Length > Absence.MaxRemarkLength)
+        if (command.Remark?.Trim().Length > AvailabilityPeriod.MaxRemarkLength)
         {
-            return PlanningRefused.Because<RecordAbsenceResult>(PlanningRefusal.RemarkTooLong(Absence.MaxRemarkLength));
+            return PlanningRefused.Because<RecordAbsenceResult>(PlanningRefusal.RemarkTooLong(AvailabilityPeriod.MaxRemarkLength));
         }
 
         if (command.From < horizon.Today(time.GetUtcNow()))

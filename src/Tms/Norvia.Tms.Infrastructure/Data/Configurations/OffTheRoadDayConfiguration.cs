@@ -16,7 +16,7 @@ internal sealed class OffTheRoadDayConfiguration : IEntityTypeConfiguration<OffT
 
         builder.Property(day => day.VehicleId).HasConversion(id => id.Value, value => new VehicleId(value)).HasMaxLength(20).IsRequired();
         builder.Property(day => day.Reason).HasConversion<string>().HasMaxLength(12);
-        builder.Property(day => day.Remark).HasMaxLength(Absence.MaxRemarkLength).IsRequired();
+        builder.Property(day => day.Remark).HasMaxLength(AvailabilityPeriod.MaxRemarkLength).IsRequired();
 
         builder.HasIndex(day => new { day.VehicleId, day.Date }).IsUnique();
         builder.HasIndex(day => day.Date);

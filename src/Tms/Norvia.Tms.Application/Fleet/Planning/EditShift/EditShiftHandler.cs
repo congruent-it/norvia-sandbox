@@ -5,7 +5,7 @@ using Norvia.Tms.Domain.Fleet;
 
 namespace Norvia.Tms.Application.Fleet.Planning.EditShift;
 
-public sealed class EditShiftHandler(IRepository<PlanningDay> days, IDriverDirectory drivers, PlanningHorizonRules horizon, TimeProvider time)
+public sealed class EditShiftHandler(IRepository<PlanningDay> days, IReadRepository<Absence> absences, IDriverDirectory drivers, PlanningHorizonRules horizon, TimeProvider time)
     : ICommandHandler<EditShiftCommand, Result<EditShiftResult>>
 {
     public async ValueTask<Result<EditShiftResult>> Handle(EditShiftCommand command, CancellationToken cancellationToken)
@@ -20,6 +20,11 @@ public sealed class EditShiftHandler(IRepository<PlanningDay> days, IDriverDirec
         if (drivers.ListActive().All(driver => driver.Id != command.DriverId))
         {
             return PlanningRefused.Because<EditShiftResult>(PlanningRefusal.DriverNotFound(command.DriverId.Value));
+        }
+
+        if ((await absences.ListAsync(new AbsencesOfDriverBetweenSpec(command.DriverId, command.Date, command.Date), cancellationToken)).Count > 0)
+        {
+            return PlanningRefused.Because<EditShiftResult>(PlanningRefusal.DriverAbsent(command.DriverId.Value, command.Date));
         }
 
         day.CloseIfBefore(horizon.Today(time.GetUtcNow()));

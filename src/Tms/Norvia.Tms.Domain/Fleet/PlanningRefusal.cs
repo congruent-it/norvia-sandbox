@@ -20,6 +20,9 @@ public sealed record PlanningRefusal(PlanningRefusalCode Code, string Message)
     public static PlanningRefusal VehicleNotFound(string vehicleId) =>
         new(PlanningRefusalCode.VehicleNotFound, Invariant($"The Own fleet has no active Vehicle {vehicleId}."));
 
+    public static PlanningRefusal DriverAbsent(string driverId, DateOnly date) =>
+        new(PlanningRefusalCode.DriverAbsent, Invariant($"Driver {driverId} has an Absence on {date:yyyy-MM-dd}: remove it before editing their Shift."));
+
     public static PlanningRefusal AbsenceNotFound() =>
         new(PlanningRefusalCode.AbsenceNotFound, "The Driver has no such Absence.");
 

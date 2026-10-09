@@ -8,8 +8,6 @@ namespace Norvia.Tms.Domain.Fleet;
 /// </summary>
 public sealed class Absence : EntityBase<AbsenceId>, IAggregateRoot
 {
-    public const int MaxRemarkLength = 500;
-
     private Absence(DriverId driverId, DateOnly date, AbsenceReason reason, string remark)
     {
         Id = AbsenceId.New();

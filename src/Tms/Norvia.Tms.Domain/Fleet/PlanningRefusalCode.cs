@@ -30,6 +30,9 @@ public enum PlanningRefusalCode
     /// <summary>A period of days ends before it starts, or is longer than the TMS records at once.</summary>
     PeriodInvalid,
 
+    /// <summary>The Driver has an Absence that day, so they have no Shift to edit.</summary>
+    DriverAbsent,
+
     /// <summary>A remark is longer than the TMS keeps.</summary>
     RemarkTooLong,
 }

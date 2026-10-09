@@ -103,7 +103,7 @@ public sealed class RecordAbsenceTests
     [Fact]
     public async Task Handle_ATooLongRemark_IsRefused()
     {
-        var result = await Run(new RecordAbsenceCommand(Anouk, Monday, Monday, AbsenceReason.Leave, new string('x', Absence.MaxRemarkLength + 1)));
+        var result = await Run(new RecordAbsenceCommand(Anouk, Monday, Monday, AbsenceReason.Leave, new string('x', AvailabilityPeriod.MaxRemarkLength + 1)));
 
         Code(result).Should().Be(nameof(PlanningRefusalCode.RemarkTooLong));
     }

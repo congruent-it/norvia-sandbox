@@ -6,6 +6,9 @@ public static class AvailabilityPeriod
     /// <summary>The most days one action records, so a typing mistake doesn't fill years with Absences.</summary>
     public const int MaxDays = 92;
 
+    /// <summary>The longest remark an Absence or an Off the road day keeps.</summary>
+    public const int MaxRemarkLength = 500;
+
     public static bool IsValid(DateOnly from, DateOnly to) => to >= from && to.DayNumber - from.DayNumber < MaxDays;
 
     public static IEnumerable<DateOnly> Days(DateOnly from, DateOnly to) =>
