@@ -143,10 +143,10 @@
 
 /*
  * A FluentSelect inside a grid cell isn't a floating overlay: its open list grows in normal flow, so the cell's own
- * clip (or scroll, under MultiLine) cuts it off. Only the cell holding an open select loses its clip; every other one
- * keeps it.
+ * clip (or scroll, under MultiLine) cuts it off. Only the row holding an open select loses its clip, so the list isn't cut
+ * off and the cells it spills over, which scroll under MultiLine, don't show a scrollbar; every other row keeps it.
  */
-.flatly-table.fluent-data-grid td:has(fluent-select[open]) {
+.flatly-table.fluent-data-grid tr:has(fluent-select[open]) td {
     overflow: visible;
 }
 
