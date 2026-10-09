@@ -15,6 +15,7 @@ using Norvia.Tms.Application.Shipments.ListToRelease;
 using Norvia.Tms.Application.Shipments.Reassign;
 using Norvia.Tms.Application.Shipments.Release;
 using Norvia.Tms.Application.TrackingEvents.Timeline;
+using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TransportOrders;
 
@@ -109,6 +110,17 @@ public static class ShipmentEndpoints
                 + "NoValidRateCardVersion, NoMatchingLane or WeightAboveHighestBreak (422), naming the Carrier, and creating no Carrier booking. A Carrier Shipment "
                 + "is priced at release, and its Carrier cost is frozen on the Carrier booking and carried by ShipmentReleased (P9).");
 
+        shipments.MapPost("/{shipmentNumber}/release-with-spot-price", ReleaseWithSpotPriceAsync)
+            .WithName("ReleaseShipmentWithSpotPrice")
+            .RequireAuthorization(policy => policy.RequireRole(TransportOrderEndpoints.ManageRole))
+            .WithMetadata(new TrackedFlow(Flows.TransportPlanning))
+            .WithSummary("Release a Carrier Shipment its Carrier's Carrier Rate Card can't price, at a Spot price the Planner enters (P9).")
+            .WithDescription(
+                "The request carries the amount in EUR without VAT, in whole cents, and a required remark. The Carrier cost frozen on the new Carrier "
+                + "booking has one Freight line, the source Spot and the remark. It is otherwise a release (see ReleaseShipment), including its "
+                + "Idempotency-Key. A Spot price is allowed only when the Carrier Rate Card can't price the Shipment: it is refused with "
+                + "CarrierRateCardPricesShipment (409) when it can, and with SpotPriceNotAllowed (409) for Own fleet, creating and publishing nothing.");
+
         return app;
     }
 
@@ -163,6 +175,41 @@ public static class ShipmentEndpoints
         return result.IsSuccess
             ? TypedResults.Ok(result.Value)
             : AssignmentCalls.Refused(result, "The Shipment can't be released.", command.CorrelationId);
+    }
+
+    private static async Task<Results<Ok<ReleaseShipmentResult>, ProblemHttpResult, ValidationProblem>> ReleaseWithSpotPriceAsync(
+        string shipmentNumber,
+        [FromHeader(Name = TransportOrderEndpoints.IdempotencyKeyHeader)] string? idempotencyKey,
+        ReleaseWithSpotPriceRequest request,
+        IMediator mediator,
+        CancellationToken cancellationToken)
+    {
+        var errors = AssignmentCalls.Check(PlanningAction.Release, idempotencyKey);
+        if (request.Amount is not > 0m || request.Amount.Value != Math.Round(request.Amount.Value, 2))
+        {
+            errors[nameof(ReleaseWithSpotPriceRequest.Amount)] = ["A Spot price needs an amount above zero, in whole cents."];
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Remark))
+        {
+            errors[nameof(ReleaseWithSpotPriceRequest.Remark)] = ["A Spot price needs its remark."];
+        }
+        else if (request.Remark.Length > CarrierCostSource.MaxRemarkLength)
+        {
+            errors[nameof(ReleaseWithSpotPriceRequest.Remark)] = [$"A remark is at most {CarrierCostSource.MaxRemarkLength} characters."];
+        }
+
+        if (errors.Count > 0)
+        {
+            return TypedResults.ValidationProblem(errors);
+        }
+
+        var command = new ReleaseShipmentCommand(
+            shipmentNumber, idempotencyKey!, CorrelationId.New().Value, new SpotPrice(request.Amount!.Value, request.Remark!));
+        var result = await mediator.Send(command, cancellationToken);
+        return result.IsSuccess
+            ? TypedResults.Ok(result.Value)
+            : AssignmentCalls.Refused(result, "The Shipment can't be released with a Spot price.", command.CorrelationId);
     }
 
     private static async Task<Ok<IReadOnlyList<ShipmentToReleaseSummary>>> ListToReleaseAsync(

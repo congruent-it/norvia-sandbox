@@ -18,6 +18,21 @@ public sealed record CarrierCost(IReadOnlyList<ChargeLine> ChargeLines, CarrierC
         return new(priced.ChargeLines, CarrierCostSource.CarrierRateCard(priced.RateCardVersion), calculatedAt);
     }
 
+    /// <summary>
+    /// The Carrier cost a Planner enters as a Spot price: one Freight line of a positive amount in cents, with the remark
+    /// that says where it comes from.
+    /// </summary>
+    public static CarrierCost Spot(Money amount, string remark, DateTimeOffset calculatedAt)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(amount.Amount, 0m);
+        if (amount.RoundedToCents() != amount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(amount), amount, "A Spot price is an amount in whole cents.");
+        }
+
+        return new([new ChargeLine(ChargeLineType.Freight, amount)], CarrierCostSource.Spot(remark), calculatedAt);
+    }
+
     public bool Equals(CarrierCost? other) =>
         other is not null && Source == other.Source && CalculatedAt == other.CalculatedAt && ChargeLines.SequenceEqual(other.ChargeLines);
 

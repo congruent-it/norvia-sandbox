@@ -78,6 +78,29 @@ public static class AssignmentRules
             Invariant($"{Describe(carrier.Id, carrier)} can't price the Carrier booking. {failure.Message}")));
     }
 
+    /// <summary>
+    /// Prices the Carrier booking from a Spot price the Planner entered (P9), which is allowed only after the Carrier Rate
+    /// Card failed to price the Shipment: the Planner can't override a Carrier Rate Card that prices it.
+    /// </summary>
+    /// <param name="carrierRateCardRefusal">Why the Carrier Rate Card can't price the Shipment, or null when it can.</param>
+    public static (CarrierCost? Cost, AssignmentRefusal? Refusal) PriceCarrierBookingAtSpot(
+        Carrier carrier, AssignmentRefusal? carrierRateCardRefusal, Money amount, string remark, DateTimeOffset calculatedAt)
+    {
+        ArgumentNullException.ThrowIfNull(carrier);
+        return carrierRateCardRefusal is null
+            ? (null, new(
+                AssignmentRefusalCode.CarrierRateCardPricesShipment,
+                Invariant($"{Describe(carrier.Id, carrier)}'s Carrier Rate Card prices this Shipment, so it can't be released with a Spot price.")))
+            : (CarrierCost.Spot(amount, remark, calculatedAt), null);
+    }
+
+    /// <summary>The refusal for a Spot price on a Shipment of Own fleet, which has no Carrier cost.</summary>
+    public static AssignmentRefusal SpotPriceForOwnFleet(Shipment shipment)
+    {
+        ArgumentNullException.ThrowIfNull(shipment);
+        return new(AssignmentRefusalCode.SpotPriceNotAllowed, Invariant($"Shipment {shipment.Number} is carried by Own fleet, which has no Carrier cost, so it can't be released with a Spot price."));
+    }
+
     private static AssignmentRefusal? CheckShipment(Shipment shipment, PlanningAction action) => shipment.Status == ShipmentStatus.Planned
         ? null
         : new(

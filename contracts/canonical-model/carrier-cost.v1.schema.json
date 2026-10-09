@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://norvia.example/canonical-model/carrier-cost.v1.schema.json",
   "title": "CarrierCost",
-  "description": "What Norvia pays a Carrier for one Carrier booking, as the TMS calculates it at release from the Carrier's Carrier Rate Card and freezes on the Carrier booking (Canonical Model document, version 1). It is never recalculated: a new release after a rejection makes a new Carrier booking with a newly calculated Carrier cost. It is never the Shipper's Freight Charge. Carried by ShipmentReleased for a Carrier Shipment.",
+  "description": "What Norvia pays a Carrier for one Carrier booking, as the TMS calculates it at release from the Carrier's Carrier Rate Card, or takes from the Spot price the Planner enters when the Carrier Rate Card can't price the Shipment, and freezes on the Carrier booking (Canonical Model document, version 1). It is never recalculated: a new release after a rejection makes a new Carrier booking with a newly calculated Carrier cost. It is never the Shipper's Freight Charge. Carried by ShipmentReleased for a Carrier Shipment.",
   "type": "object",
   "additionalProperties": false,
   "required": ["currency", "total", "chargeLines", "source", "calculatedAt"],
@@ -29,11 +29,14 @@
       "description": "Where the Carrier cost came from.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["kind", "rateCardVersion"],
+      "required": ["kind"],
       "properties": {
-        "kind": { "description": "CarrierRateCard: priced from the Carrier's Carrier Rate Card.", "enum": ["CarrierRateCard"] },
+        "kind": {
+          "description": "CarrierRateCard: priced from the Carrier's Carrier Rate Card. Spot: the Planner's Spot price, entered after the Carrier Rate Card failed to price the Shipment.",
+          "enum": ["CarrierRateCard", "Spot"]
+        },
         "rateCardVersion": {
-          "description": "The version of the Carrier's Carrier Rate Card the Carrier cost was calculated from: the one valid on the collection date.",
+          "description": "The version of the Carrier's Carrier Rate Card the Carrier cost was calculated from: the one valid on the collection date. Present for CarrierRateCard only.",
           "type": "object",
           "additionalProperties": false,
           "required": ["rateCardId", "version"],
@@ -41,8 +44,13 @@
             "rateCardId": { "type": "string", "minLength": 1 },
             "version": { "type": "integer", "minimum": 1 }
           }
-        }
-      }
+        },
+        "remark": { "description": "The Planner's remark with the Spot price. Present for Spot only.", "type": "string", "minLength": 1, "maxLength": 500 }
+      },
+      "oneOf": [
+        { "properties": { "kind": { "const": "CarrierRateCard" } }, "required": ["rateCardVersion"], "not": { "required": ["remark"] } },
+        { "properties": { "kind": { "const": "Spot" } }, "required": ["remark"], "not": { "required": ["rateCardVersion"] } }
+      ]
     },
     "calculatedAt": { "description": "When the Carrier cost was calculated: when the Shipment was released.", "type": "string", "format": "date-time" }
   }

@@ -46,4 +46,31 @@ public sealed class CarrierCostTests
         Cost().Should().Be(Cost());
         Cost().GetHashCode().Should().Be(Cost().GetHashCode());
     }
+
+    [Fact]
+    public void Spot_AnAmountAndARemark_IsOneFreightLine_WithTheSpotSourceAndItsRemark()
+    {
+        var cost = CarrierCost.Spot(new Money(480m), "Agreed with Van Dijk by phone", CalculatedAt);
+
+        cost.ChargeLines.Should().Equal(new ChargeLine(ChargeLineType.Freight, new Money(480m)));
+        cost.Total.Should().Be(new Money(480m));
+        cost.Source.Should().Be(CarrierCostSource.Spot("Agreed with Van Dijk by phone"));
+        cost.Source.Kind.Should().Be(CarrierCostSourceKind.Spot);
+        cost.Source.RateCardVersion.Should().BeNull();
+        cost.CalculatedAt.Should().Be(CalculatedAt);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-5)]
+    [InlineData(10.005)]
+    public void Spot_AnAmountThatIsNotAPositiveAmountInCents_Throws(double amount) =>
+        FluentActions.Invoking(() => CarrierCost.Spot(new Money((decimal)amount), "remark", CalculatedAt))
+            .Should().Throw<ArgumentOutOfRangeException>();
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Spot_WithoutARemark_Throws(string remark) =>
+        FluentActions.Invoking(() => CarrierCost.Spot(new Money(10m), remark, CalculatedAt)).Should().Throw<ArgumentException>();
 }

@@ -13,5 +13,9 @@ namespace Norvia.Tms.Application.Shipments.Release;
 /// The new Message trail the TMS starts for this release, as it starts in the TMS UI. A repeat answers with the trail of
 /// the release it repeats.
 /// </param>
-public sealed record ReleaseShipmentCommand(string ShipmentNumber, string ReleaseKey, string CorrelationId)
+/// <param name="SpotPrice">
+/// Releases a Carrier Shipment at the Planner's Spot price, which is allowed only after its Carrier Rate Card failed to
+/// price it (P9); null prices the release from the Carrier Rate Card.
+/// </param>
+public sealed record ReleaseShipmentCommand(string ShipmentNumber, string ReleaseKey, string CorrelationId, SpotPrice? SpotPrice = null)
     : ICommand<Result<ReleaseShipmentResult>>;

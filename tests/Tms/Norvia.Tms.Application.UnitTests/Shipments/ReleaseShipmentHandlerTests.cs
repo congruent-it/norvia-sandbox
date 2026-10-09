@@ -255,6 +255,65 @@ public sealed class ReleaseShipmentHandlerTests
         NothingReleased(shipment);
     }
 
+    [Fact]
+    public async Task Handle_TheSameReleaseSentAgainWithAnotherSpotPrice_AnswersAsBefore_AndKeepsTheFirstCarrierCost()
+    {
+        _carrierRateCards.FindFor(VanDijk).Returns(VanDijkRateCard(laneDestination: "Groningen"));
+        var (_, shipment) = PlannedShipment(CarriedBy.Carrier(VanDijk));
+        _carrierBookingNumbers.NextAsync(Arg.Any<CancellationToken>()).Returns(BookingNumber);
+        var first = await _handler.Handle(new ReleaseShipmentCommand("SH-0000012", "key-rel1", "corr-release", new SpotPrice(480m, "first")), CancellationToken.None);
+        shipment.ClearDomainEvents();
+        _carrierBookings.ClearReceivedCalls();
+
+        var repeat = await _handler.Handle(new ReleaseShipmentCommand("SH-0000012", "key-rel1", "corr-retry", new SpotPrice(520m, "second")), CancellationToken.None);
+
+        repeat.Value.Should().Be(first.Value with { Repeat = true });
+        shipment.DomainEvents.Should().BeEmpty();
+        await _carrierBookings.DidNotReceive().AddAsync(Arg.Any<CarrierBooking>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_SpotPriceAfterTheCarrierRateCardFailed_ReleasesWithASpotCarrierCostOnTheBooking()
+    {
+        _carrierRateCards.FindFor(VanDijk).Returns(VanDijkRateCard(laneDestination: "Groningen"));
+        var (_, shipment) = PlannedShipment(CarriedBy.Carrier(VanDijk));
+        _carrierBookingNumbers.NextAsync(Arg.Any<CancellationToken>()).Returns(BookingNumber);
+
+        var result = await _handler.Handle(
+            new ReleaseShipmentCommand("SH-0000012", "key-rel1", "corr-release", new SpotPrice(480m, "Agreed with Van Dijk by phone")), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        var expected = CarrierCost.Spot(new Money(480m), "Agreed with Van Dijk by phone", _time.GetUtcNow());
+        shipment.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<ShipmentReleasedEvent>().Which.CarrierCost.Should().Be(expected);
+        await _carrierBookings.Received(1).AddAsync(Arg.Is<CarrierBooking>(booking => booking.CarrierCost == expected), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_SpotPriceWhenTheCarrierRateCardCanPriceTheShipment_IsRefused_AndReleasesNothing()
+    {
+        _carrierRateCards.FindFor(VanDijk).Returns(VanDijkRateCard());
+        var (_, shipment) = PlannedShipment(CarriedBy.Carrier(VanDijk));
+
+        var result = await _handler.Handle(
+            new ReleaseShipmentCommand("SH-0000012", "key-rel1", "corr-release", new SpotPrice(480m, "remark")), CancellationToken.None);
+
+        RefusalOf(result).ErrorCode.Should().Be(nameof(AssignmentRefusalCode.CarrierRateCardPricesShipment));
+        NothingReleased(shipment);
+        await _carrierBookings.DidNotReceive().AddAsync(Arg.Any<CarrierBooking>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_SpotPriceForOwnFleet_IsRefused()
+    {
+        var (_, shipment) = PlannedShipment(CarriedBy.OwnFleet);
+
+        var result = await _handler.Handle(
+            new ReleaseShipmentCommand("SH-0000012", "key-rel1", "corr-release", new SpotPrice(480m, "remark")), CancellationToken.None);
+
+        RefusalOf(result).ErrorCode.Should().Be(nameof(AssignmentRefusalCode.SpotPriceNotAllowed));
+        NothingReleased(shipment);
+    }
+
     private static ValidationError RefusalOf(Result<ReleaseShipmentResult> result)
     {
         result.Status.Should().Be(ResultStatus.Invalid);
