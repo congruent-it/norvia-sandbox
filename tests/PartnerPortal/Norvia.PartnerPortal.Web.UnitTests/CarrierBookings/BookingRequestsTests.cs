@@ -63,6 +63,16 @@ public sealed class BookingRequestsTests : PortalWebContext
     }
 
     [Fact]
+    public void Render_AChargeLineWithoutAType_ShowsJustItsAmount()
+    {
+        var request = Request();
+        request = request with { Details = request.Details with { CarrierCost = new CarrierCost("EUR", 5m, [new CarrierChargeLine("", 5m)], IsSpot: false) } };
+        Portal.ListCarrierBookingRequestsAsync(new PersonaId("van-dijk-transport"), Arg.Any<CancellationToken>()).Returns([request]);
+
+        RenderPage().Find("tbody tr").TextContent.Should().Contain("5.00 EUR");
+    }
+
+    [Fact]
     public void Render_ARequestWithoutACarrierCost_ShowsNoPrice()
     {
         Portal.ListCarrierBookingRequestsAsync(new PersonaId("van-dijk-transport"), Arg.Any<CancellationToken>()).Returns([Request()]);

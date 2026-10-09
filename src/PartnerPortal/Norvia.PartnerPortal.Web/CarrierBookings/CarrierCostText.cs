@@ -17,7 +17,9 @@ public static partial class CarrierCostText
     {
         ArgumentNullException.ThrowIfNull(line);
         var words = CamelHumps().Replace(line.Type, " $1").Trim().ToLowerInvariant();
-        return $"{char.ToUpperInvariant(words[0])}{words[1..]} {Amount(line.Amount)}";
+        return words.Length == 0
+            ? Amount(line.Amount)
+            : $"{char.ToUpperInvariant(words[0])}{words[1..]} {Amount(line.Amount)}";
     }
 
     private static string Amount(decimal amount) => amount.ToString("0.00", CultureInfo.InvariantCulture);
