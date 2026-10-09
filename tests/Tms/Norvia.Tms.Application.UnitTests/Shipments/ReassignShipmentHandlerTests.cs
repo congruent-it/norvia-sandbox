@@ -2,6 +2,7 @@ using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Microsoft.Extensions.Time.Testing;
 using Norvia.Tms.Application.Carriers;
+using Norvia.Tms.Application.UnitTests.Fleet.Planning;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shipments.Reassign;
 using Norvia.Tms.Application.UnitTests.TransportOrders;
@@ -25,7 +26,7 @@ public sealed class ReassignShipmentHandlerTests
     {
         _carriers.Find(VanDijk).Returns(new Carrier(VanDijk, "Van Dijk Transport", true));
         _carriers.Find(Kessler).Returns(new Carrier(Kessler, "Kessler Spedition", true));
-        _handler = new ReassignShipmentHandler(_shipments, _carriers, _time);
+        _handler = new ReassignShipmentHandler(_shipments, _carriers, LoadChecks.NoWarnings(_time), _time);
     }
 
     [Fact]
@@ -57,6 +58,34 @@ public sealed class ReassignShipmentHandlerTests
 
         result.Value.CarriedBy.Should().Be(new CarriedByView(AssignedTo.OwnFleet, null));
         shipment.CarriedBy.Should().Be(CarriedBy.OwnFleet);
+    }
+
+    [Fact]
+    public async Task Handle_ShipmentToOwnFleetCollectingBeyondThePlanningHorizon_ReassignsItWithAnOutsideTheHorizonWarning()
+    {
+        var order = Samples.AcceptedOrder(sequence: 7);
+        var shipment = PlannedShipment(CarriedBy.Carrier(VanDijk), order);
+        var later = new FakeTimeProvider(Samples.Now.AddDays(30));
+        var handler = new ReassignShipmentHandler(_shipments, _carriers, LoadChecks.Warnings([], [order], [], [], [], later), later);
+
+        var result = await handler.Handle(new ReassignShipmentCommand("SH-0000012", CarrierId: null, "key-r1", "corr-reassign"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.LoadWarning!.OutsideHorizon.Should().BeTrue();
+        shipment.CarriedBy.Should().Be(CarriedBy.OwnFleet);
+    }
+
+    [Fact]
+    public async Task Handle_ShipmentToACarrier_HasNoLoadWarning()
+    {
+        var order = Samples.AcceptedOrder(sequence: 7);
+        PlannedShipment(CarriedBy.OwnFleet, order);
+        var later = new FakeTimeProvider(Samples.Now.AddDays(30));
+        var handler = new ReassignShipmentHandler(_shipments, _carriers, LoadChecks.Warnings([], [order], [], [], [], later), later);
+
+        var result = await handler.Handle(new ReassignShipmentCommand("SH-0000012", "CAR-0001", "key-r1", "corr-reassign"), CancellationToken.None);
+
+        result.Value.LoadWarning.Should().BeNull();
     }
 
     [Fact]
@@ -125,9 +154,9 @@ public sealed class ReassignShipmentHandlerTests
         await _shipments.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
-    private Shipment PlannedShipment(CarriedBy carriedBy)
+    private Shipment PlannedShipment(CarriedBy carriedBy, Norvia.Tms.Domain.TransportOrders.TransportOrder? order = null)
     {
-        var shipment = Samples.Planned(Samples.AcceptedOrder(sequence: 7), carriedBy, sequence: 12);
+        var shipment = Samples.Planned(order ?? Samples.AcceptedOrder(sequence: 7), carriedBy, sequence: 12);
         _shipments.SingleOrDefaultAsync(Arg.Is<ShipmentToChangeSpec>(s => s.Number == shipment.Number), Arg.Any<CancellationToken>())
             .Returns(shipment);
         return shipment;

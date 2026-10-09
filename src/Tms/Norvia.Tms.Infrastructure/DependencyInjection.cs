@@ -12,6 +12,7 @@ using Norvia.Tms.Application.CarrierBookings;
 using Norvia.Tms.Application.Carriers;
 using Norvia.Tms.Application.Exceptions;
 using Norvia.Tms.Application.Fleet;
+using Norvia.Tms.Application.Fleet.Planning;
 using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.ProofsOfDelivery;
 using Norvia.Tms.Application.RateCards;
@@ -107,6 +108,8 @@ public static class DependencyInjection
         builder.Services.AddSingleton<IDriverDirectory, SeedFileDriverDirectory>();
         builder.Services.AddSingleton<IRosterDirectory, SeedFileRosterDirectory>();
         builder.Services.AddScoped<EffectiveRosters>();
+        builder.Services.AddScoped<DayLoads>();
+        builder.Services.AddScoped<LoadCheckWarnings>();
         builder.Services.AddOptions<PlanningHorizonOptions>().BindConfiguration(PlanningHorizonOptions.SectionName)
             .ValidateDataAnnotations()
             .Validate(options => TimeZoneInfo.TryFindSystemTimeZoneById(options.TimeZone, out _), "PlanningHorizon:TimeZone isn't a time zone this host knows.")

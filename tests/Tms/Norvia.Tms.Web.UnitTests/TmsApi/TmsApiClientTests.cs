@@ -180,6 +180,20 @@ public sealed class TmsApiClientTests : IDisposable
         answer.Should().Be(new AssignAnswer.Planned("SH-0000012"));
     }
 
+    [Fact]
+    public async Task AssignAsync_OwnFleetOverCapacity_CarriesTheLoadWarningText()
+    {
+        _tmsApi.Answer(HttpStatusCode.Created, @"{
+              ""shipmentNumber"": ""SH-0000012"", ""transportOrderNumber"": ""TO-0000042"", ""status"": ""Planned"",
+              ""carriedBy"": { ""assignedTo"": ""OwnFleet"", ""carrier"": null }, ""shipperId"": ""SHP-0001"", ""correlationId"": ""corr-planning"", ""repeat"": false,
+              ""loadWarning"": { ""date"": ""2026-10-01"", ""outsideHorizon"": false, ""load"": null, ""text"": ""Thu 1 Oct: Over capacity, 34 of 30 pallet places after this assignment"" }
+            }");
+
+        var answer = await AssignAsync("TO-0000042", carrierId: null);
+
+        answer.Should().Be(new AssignAnswer.Planned("SH-0000012", "Thu 1 Oct: Over capacity, 34 of 30 pallet places after this assignment"));
+    }
+
     [Theory]
     [InlineData(HttpStatusCode.NotFound, "TransportOrderNotFound", "There is no Transport Order TO-0000042.")]
     [InlineData(HttpStatusCode.Conflict, "TransportOrderAlreadyPlanned", "Transport Order TO-0000042 is Planned already.")]

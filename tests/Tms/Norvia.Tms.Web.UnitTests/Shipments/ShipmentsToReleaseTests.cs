@@ -315,6 +315,20 @@ public sealed class ShipmentsToReleaseTests : TmsWebContext
     }
 
     [Fact]
+    public void Reassign_ToOwnFleetOnADayOverCapacity_ShowsTheLoadWarning()
+    {
+        var page = RenderWith(Samples.ToRelease("SH-0000012"));
+        Commands.ReassignAsync("SH-0000012", null, Arg.Any<CancellationToken>())
+            .Returns(new ReassignAnswer.Reassigned(new CarriedByView(AssignedTo.OwnFleet, null), "Thu 1 Oct: Over capacity, 34 of 30 pallet places after this assignment"));
+        Choose(page, "SH-0000012", "own-fleet");
+
+        ReassignButton(page, "SH-0000012").Click();
+
+        page.WaitForAssertion(() => page.Markup.Should()
+            .Contain("Shipment SH-0000012 is now carried by Own fleet. Thu 1 Oct: Over capacity, 34 of 30 pallet places after this assignment"));
+    }
+
+    [Fact]
     public void Reassign_WhenTheTmsRefuses_SaysWhy()
     {
         var page = RenderWith(Samples.ToRelease("SH-0000012"));

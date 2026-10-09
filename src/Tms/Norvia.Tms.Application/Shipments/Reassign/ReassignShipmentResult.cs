@@ -1,3 +1,4 @@
+using Norvia.Tms.Application.Fleet.Planning;
 using Norvia.Tms.Domain.Shipments;
 
 namespace Norvia.Tms.Application.Shipments.Reassign;
@@ -7,6 +8,7 @@ namespace Norvia.Tms.Application.Shipments.Reassign;
 /// reassignment's own correlation ID for its trail.
 /// </summary>
 /// <param name="Repeat">True when the reassignment was sent again under its key, and answered as before without reassigning.</param>
+/// <param name="LoadWarning">For a reassignment to Own fleet, the load check warning for the collection day including this Shipment; null when there is none. Never blocks.</param>
 public sealed record ReassignShipmentResult(
     string ShipmentNumber,
     string TransportOrderNumber,
@@ -15,4 +17,5 @@ public sealed record ReassignShipmentResult(
     CarriedByView PreviouslyCarriedBy,
     string ShipperId,
     string CorrelationId,
-    bool Repeat = false) : IPlanningOutcome;
+    bool Repeat = false,
+    LoadCheckWarning? LoadWarning = null) : IPlanningOutcome;

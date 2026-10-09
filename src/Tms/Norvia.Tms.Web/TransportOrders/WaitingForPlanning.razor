@@ -28,6 +28,10 @@
                             Transport Order @outcome.TransportOrderNumber is planned as Shipment
                             <a href="/shipments/@planned.ShipmentNumber">@planned.ShipmentNumber</a>, carried by @(outcome.Assignee).
                         </FluentMessageBar>
+                        @if (planned.LoadWarning is { } loadWarning)
+                        {
+                            <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">@loadWarning</FluentMessageBar>
+                        }
                         break;
                     case AssignAnswer.Refused refused:
                         <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
