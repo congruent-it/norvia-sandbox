@@ -1,0 +1,39 @@
+@page "/capacity/drivers"
+@rendermode InteractiveServer
+@using Microsoft.Extensions.Options
+@using Norvia.Tms.Application.Fleet
+@using Norvia.Tms.Web.TransportOrders
+@implements IAsyncDisposable
+@inject ITransportOrderQueries Queries
+@inject TimeProvider Time
+@inject IOptions<LiveListOptions> Options
+@inject ILogger<LiveTransportOrderList<DriverView>> Logger
+
+<PageTitle>Capacity · Drivers · Norvia TMS</PageTitle>
+
+<h1>Capacity</h1>
+
+<CapacityTabs />
+
+<LiveListStates Items="_list.Items" LastReadFailed="_list.LastReadFailed" Name="Drivers"
+                Empty="There are no Drivers in the Own fleet." Context="drivers">
+    <FluentDataGrid Items="drivers.AsQueryable()" TGridItem="DriverView" Class="flatly-table" aria-label="Drivers"
+                    GridTemplateColumns="1.6fr 1fr 2.4fr" MultiLine="true">
+        <PropertyColumn Title="Name" Property="@(driver => driver.Name)" />
+        <PropertyColumn Title="Licences" Property="@(driver => FleetText.Licences(driver.Licences))" />
+        <PropertyColumn Title="Can drive" Property="@(driver => FleetText.VehicleTypes(driver.CanDrive))" />
+    </FluentDataGrid>
+</LiveListStates>
+
+@code {
+    private LiveTransportOrderList<DriverView> _list = null!;
+
+    protected override void OnInitialized()
+    {
+        _list = new LiveTransportOrderList<DriverView>(Queries.ListDriversAsync, "the Drivers", Time, Options.Value.RefreshInterval, Logger);
+        _list.Changed += () => InvokeAsync(StateHasChanged);
+        _list.Start();
+    }
+
+    public ValueTask DisposeAsync() => _list.DisposeAsync();
+}

@@ -1,5 +1,6 @@
 using Norvia.Tms.Application.Billing.ListNotYetBillable;
 using Norvia.Tms.Application.Exceptions.ListOpen;
+using Norvia.Tms.Application.Fleet;
 using Norvia.Tms.Application.ProofsOfDelivery.ListMissing;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shipments.ListAwaitingAnswer;
@@ -39,6 +40,12 @@ public interface ITransportOrderQueries
 
     /// <summary>The Carriers a Planner may assign to: only the active ones, by name.</summary>
     Task<IReadOnlyList<CarrierView>> ListActiveCarriersAsync(CancellationToken cancellationToken);
+
+    /// <summary>The Own fleet's active Vehicles (P10), by registration.</summary>
+    Task<IReadOnlyList<VehicleView>> ListVehiclesAsync(CancellationToken cancellationToken);
+
+    /// <summary>The Own fleet's active Drivers (P10), by name, each with the licences they hold.</summary>
+    Task<IReadOnlyList<DriverView>> ListDriversAsync(CancellationToken cancellationToken);
 
     /// <summary>The Shipment with this number, or null when there is none.</summary>
     Task<ShipmentView?> FindShipmentAsync(string shipmentNumber, CancellationToken cancellationToken);

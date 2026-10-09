@@ -1,0 +1,41 @@
+@page "/capacity"
+@rendermode InteractiveServer
+@using Microsoft.Extensions.Options
+@using Norvia.Tms.Application.Fleet
+@using Norvia.Tms.Web.TransportOrders
+@implements IAsyncDisposable
+@inject ITransportOrderQueries Queries
+@inject TimeProvider Time
+@inject IOptions<LiveListOptions> Options
+@inject ILogger<LiveTransportOrderList<VehicleView>> Logger
+
+<PageTitle>Capacity · Vehicles · Norvia TMS</PageTitle>
+
+<h1>Capacity</h1>
+
+<CapacityTabs />
+
+<LiveListStates Items="_list.Items" LastReadFailed="_list.LastReadFailed" Name="Vehicles"
+                Empty="There are no Vehicles in the Own fleet." Context="vehicles">
+    <FluentDataGrid Items="vehicles.AsQueryable()" TGridItem="VehicleView" Class="flatly-table" aria-label="Vehicles"
+                    GridTemplateColumns="1.4fr 1.6fr 1fr 1.2fr 1fr" MultiLine="true">
+        <PropertyColumn Title="Registration" Property="@(vehicle => vehicle.Registration)" />
+        <PropertyColumn Title="Vehicle type" Property="@(vehicle => FleetText.VehicleType(vehicle.Type))" />
+        <PropertyColumn Title="Payload" Property="@(vehicle => $"{vehicle.PayloadKg:N0} kg")" />
+        <PropertyColumn Title="Pallet places" Property="@(vehicle => vehicle.PalletPlaces)" />
+        <PropertyColumn Title="Licence needed" Property="@(vehicle => vehicle.LicenceNeeded.ToString())" />
+    </FluentDataGrid>
+</LiveListStates>
+
+@code {
+    private LiveTransportOrderList<VehicleView> _list = null!;
+
+    protected override void OnInitialized()
+    {
+        _list = new LiveTransportOrderList<VehicleView>(Queries.ListVehiclesAsync, "the Vehicles", Time, Options.Value.RefreshInterval, Logger);
+        _list.Changed += () => InvokeAsync(StateHasChanged);
+        _list.Start();
+    }
+
+    public ValueTask DisposeAsync() => _list.DisposeAsync();
+}
