@@ -21,19 +21,9 @@ public sealed class RecordAbsenceHandler(
             return PlanningRefused.Because<RecordAbsenceResult>(PlanningRefusal.DriverNotFound(command.DriverId.Value));
         }
 
-        if (!AvailabilityPeriod.IsValid(command.From, command.To))
+        if (AvailabilityPeriod.Refusal(command.From, command.To, command.Remark, horizon.Today(time.GetUtcNow())) is { } refusal)
         {
-            return PlanningRefused.Because<RecordAbsenceResult>(PlanningRefusal.PeriodInvalid(AvailabilityPeriod.MaxDays));
-        }
-
-        if (command.Remark?.Trim().Length > AvailabilityPeriod.MaxRemarkLength)
-        {
-            return PlanningRefused.Because<RecordAbsenceResult>(PlanningRefusal.RemarkTooLong(AvailabilityPeriod.MaxRemarkLength));
-        }
-
-        if (command.From < horizon.Today(time.GetUtcNow()))
-        {
-            return PlanningRefused.Because<RecordAbsenceResult>(PlanningRefusal.DayClosed(command.From));
+            return PlanningRefused.Because<RecordAbsenceResult>(refusal);
         }
 
         var recorded = (await absences.ListAsync(new AbsencesOfDriverBetweenSpec(command.DriverId, command.From, command.To), cancellationToken))

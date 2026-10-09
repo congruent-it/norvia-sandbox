@@ -21,19 +21,9 @@ public sealed class RecordOffTheRoadHandler(
             return PlanningRefused.Because<RecordOffTheRoadResult>(PlanningRefusal.VehicleNotFound(command.VehicleId.Value));
         }
 
-        if (!AvailabilityPeriod.IsValid(command.From, command.To))
+        if (AvailabilityPeriod.Refusal(command.From, command.To, command.Remark, horizon.Today(time.GetUtcNow())) is { } refusal)
         {
-            return PlanningRefused.Because<RecordOffTheRoadResult>(PlanningRefusal.PeriodInvalid(AvailabilityPeriod.MaxDays));
-        }
-
-        if (command.Remark?.Trim().Length > AvailabilityPeriod.MaxRemarkLength)
-        {
-            return PlanningRefused.Because<RecordOffTheRoadResult>(PlanningRefusal.RemarkTooLong(AvailabilityPeriod.MaxRemarkLength));
-        }
-
-        if (command.From < horizon.Today(time.GetUtcNow()))
-        {
-            return PlanningRefused.Because<RecordOffTheRoadResult>(PlanningRefusal.DayClosed(command.From));
+            return PlanningRefused.Because<RecordOffTheRoadResult>(refusal);
         }
 
         var recorded = (await offTheRoadDays.ListAsync(new OffTheRoadDaysOfVehicleBetweenSpec(command.VehicleId, command.From, command.To), cancellationToken))

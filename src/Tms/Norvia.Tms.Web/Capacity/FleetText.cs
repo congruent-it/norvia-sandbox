@@ -41,6 +41,7 @@ internal static class FleetText
     public static string Weekday(DayOfWeek weekday) => CultureInfo.InvariantCulture.DateTimeFormat.GetAbbreviatedDayName(weekday);
 
     /// <summary>A reason as the Planner reads it, such as "Leave" or "Maintenance"; the remark follows when there is one.</summary>
-    public static string Reason(Enum reason, string remark) =>
+    public static string Reason<TReason>(TReason reason, string remark)
+        where TReason : struct, Enum =>
         remark.Length == 0 ? reason.ToString() : $"{reason}: {remark}";
 }

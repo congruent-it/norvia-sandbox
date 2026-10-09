@@ -184,13 +184,7 @@ public static class CapacityEndpoints
         IMediator mediator,
         CancellationToken cancellationToken)
     {
-        var errors = PeriodErrors(request, "A Driver is needed.");
-        if (!Enum.TryParse<AbsenceReason>(request.Reason, ignoreCase: true, out var reason) || !Enum.IsDefined(reason))
-        {
-            errors[nameof(RecordPeriodRequest.Reason)] = ["A reason is Leave, Sickness or Training."];
-        }
-
-        if (errors.Count > 0)
+        if (!TryReadPeriod(request, "A Driver is needed.", "A reason is Leave, Sickness or Training.", out AbsenceReason reason, out var errors))
         {
             return TypedResults.ValidationProblem(errors);
         }
@@ -210,13 +204,7 @@ public static class CapacityEndpoints
         IMediator mediator,
         CancellationToken cancellationToken)
     {
-        var errors = PeriodErrors(request, "A Vehicle is needed.");
-        if (!Enum.TryParse<OffTheRoadReason>(request.Reason, ignoreCase: true, out var reason) || !Enum.IsDefined(reason))
-        {
-            errors[nameof(RecordPeriodRequest.Reason)] = ["A reason is Maintenance or Repair."];
-        }
-
-        if (errors.Count > 0)
+        if (!TryReadPeriod(request, "A Vehicle is needed.", "A reason is Maintenance or Repair.", out OffTheRoadReason reason, out var errors))
         {
             return TypedResults.ValidationProblem(errors);
         }
@@ -231,9 +219,11 @@ public static class CapacityEndpoints
         return result.IsSuccess ? TypedResults.NoContent() : Refused(result.ValidationErrors.First(), "The Off the road day can't be removed.");
     }
 
-    private static Dictionary<string, string[]> PeriodErrors(RecordPeriodRequest request, string missingId)
+    /// <summary>Reads a period request: its Driver or Vehicle, first and last day, and reason, collecting what is missing or unknown.</summary>
+    private static bool TryReadPeriod<TReason>(RecordPeriodRequest request, string missingId, string unknownReason, out TReason reason, out Dictionary<string, string[]> errors)
+        where TReason : struct, Enum
     {
-        Dictionary<string, string[]> errors = [];
+        errors = [];
         if (string.IsNullOrWhiteSpace(request.Id))
         {
             errors[nameof(RecordPeriodRequest.Id)] = [missingId];
@@ -249,7 +239,12 @@ public static class CapacityEndpoints
             errors[nameof(RecordPeriodRequest.To)] = ["A period needs its last day."];
         }
 
-        return errors;
+        if (!Enum.TryParse(request.Reason, ignoreCase: true, out reason) || !Enum.IsDefined(reason))
+        {
+            errors[nameof(RecordPeriodRequest.Reason)] = [unknownReason];
+        }
+
+        return errors.Count == 0;
     }
 
     private static ProblemHttpResult Refused(Ardalis.Result.ValidationError refusal, string title) =>

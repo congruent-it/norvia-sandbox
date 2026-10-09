@@ -18,6 +18,8 @@ internal sealed class AbsenceConfiguration : IEntityTypeConfiguration<Absence>
         builder.Property(absence => absence.Reason).HasConversion<string>().HasMaxLength(10);
         builder.Property(absence => absence.Remark).HasMaxLength(AvailabilityPeriod.MaxRemarkLength).IsRequired();
 
+        builder.Property<byte[]>("RowVersion").IsRowVersion();
+
         // A Driver is absent a day or isn't: recording it twice is one record.
         builder.HasIndex(absence => new { absence.DriverId, absence.Date }).IsUnique();
         builder.HasIndex(absence => absence.Date);
