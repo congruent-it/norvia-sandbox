@@ -176,6 +176,19 @@ The seed file gets Carrier Rate Cards, in the same shape as the Rate Cards from 
 
 Each Carrier cost sits about 15–25% below the Freight Charge for the same Lane and weight, so the margin in the ERP looks believable.
 
+## Presenter smoke run
+
+After a deployment, and not in CI, the presenter checks the TMS side of Freight settlement end to end on the deployed estate, before the headline relies on it. Do it after the presenter smoke runs of Carrier booking ([P4](p4-carrier-booking.md#presenter-smoke-run)), Proof of delivery ([P6](p6-proof-of-delivery.md#presenter-smoke-run)) and Exception handling ([P7](p7-exception-handling.md#presenter-smoke-run)). The script makes the Carriers' calls. The Planner's and Customer service's actions, and Van Dijk Transport's answers in the Partner portal, are the presenter's, and the script stops and says what to do. Run it in a terminal, with the TMS UI, the Partner portal and the Integration console side by side.
+
+1. **Get three Transport Orders.** Book three as Brouwer Dranken, Rotterdam to Düsseldorf. Assign the first two to Van Dijk Transport and stop there: don't release them. Follow P4's run for the third to a Booked Shipment carried by Kessler Spedition, with its tracking on *Manual*. Don't track any of them first. Note the three Transport Order numbers.
+2. **Run the check.** Run `infra/smoke-test-freight-settlement.sh <Spot price order> <PriceNotAccepted order> <no Proof of delivery order>`. It posts as the Carriers, through API Management, from a throwaway Container Apps job running as the Partner portal, and reads the TMS as the intake identity, and Application Insights, which is usually 1 to 5 minutes behind.
+3. **Story 14.** The script checks that the first Shipment is in the list of Shipments to release with `NoMatchingLane`. In the TMS UI, try to release it and see it fail, then release it with a Spot price and a remark. The script checks that the Carrier booking is Requested with a Carrier cost of one *Freight* line, from the source *Spot*, with the remark. In the Partner portal, open Van Dijk's booking inbox, see the price and confirm. The script then sends `PU`, `DEP` and `POD` as Van Dijk Transport and checks that the Shipment is Delivered, that `CarrierCostIncurred` was published and that the order is Not yet billable for `NoProofOfDelivery`. It sends a clean Proof of delivery and checks that the order is Billable and that `TransportOrderBillable` was published.
+4. **`PriceNotAccepted`.** The script checks that the second Shipment is in the list with `NoMatchingLane`. Release it with a Spot price, then reject the booking in Van Dijk's inbox with `PriceNotAccepted`. The script checks that the Shipment is Planned again and that the Carrier booking is Rejected with that reason.
+5. **No Proof of delivery.** The script sends `PU`, `DEP` and `POD` as Kessler Spedition and checks that the third order shows in Customer service's list with `NoProofOfDelivery`. In the TMS UI, release it without a Proof of delivery, with a remark. The script checks that the order is Billable, with who released it and the remark, that it left the list and that `TransportOrderBillable` was published.
+6. **Follow it.** The script checks that the Tracking events, the Proof of delivery, the Spot price release and the release without a Proof of delivery are in Application Insights by correlation ID, in API Management, the Logic Apps and the TMS, and prints the TMS UI's and the Integration console's links.
+
+The script prints `PASS` or `FAIL` per check, never a body, a token or a key. The Billing and Carrier cost Logic Apps and the ERP billing API aren't built yet, so it checks that both events were published, not that the ERP received them. If a check fails, file the gap as its own issue against P9, rather than working around it in the run book.
+
 ## Deferred
 
 These were left out on purpose while designing P9, each with its reason.
