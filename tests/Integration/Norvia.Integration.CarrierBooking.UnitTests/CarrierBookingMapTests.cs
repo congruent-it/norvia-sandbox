@@ -6,7 +6,25 @@ namespace Norvia.Integration.CarrierBooking.UnitTests;
 public class CarrierBookingMapTests
 {
     // 2030-10-02 is summer time in the Netherlands and Germany (UTC+2); 2030-01-15 is winter time (UTC+1).
-    private static string Release(string collectionEarliest = "2030-10-02T05:30:00+00:00", string collectionLatest = "2030-10-02T09:00:00+00:00") => $$"""
+    private const string RateCardCost = """
+        {
+          "currency": "EUR", "total": 310.00,
+          "chargeLines": [ { "type": "Freight", "amount": 290.00 }, { "type": "MinimumChargeAdjustment", "amount": 20.00 } ],
+          "source": { "kind": "CarrierRateCard", "rateCardVersion": { "rateCardId": "RC-1", "version": 3 } },
+          "calculatedAt": "2030-10-01T08:00:00+00:00"
+        }
+        """;
+
+    private const string SpotCost = """
+        {
+          "currency": "EUR", "total": 480.00,
+          "chargeLines": [ { "type": "Freight", "amount": 480.00 } ],
+          "source": { "kind": "Spot", "remark": "agreed with Van Dijk by phone, 480" },
+          "calculatedAt": "2030-10-01T08:00:00+00:00"
+        }
+        """;
+
+    private static string Release(string collectionEarliest = "2030-10-02T05:30:00+00:00", string collectionLatest = "2030-10-02T09:00:00+00:00", string carrierCost = RateCardCost) => $$"""
         {
           "eventId": "5c2c7f0e-3a4c-4d0a-9f3e-5a7a1c0c9b11",
           "eventType": "ShipmentReleased",
@@ -19,6 +37,7 @@ public class CarrierBookingMapTests
           "assignedTo": "Carrier",
           "carrierId": "CARRIER-VAN-DIJK",
           "carrierBookingNumber": "CB-0000001",
+          "carrierCost": {{carrierCost}},
           "transportOrder": {
             "transportOrderNumber": "TO-0000007",
             "shipperId": "SHIPPER-ACME",
@@ -152,4 +171,34 @@ public class CarrierBookingMapTests
     [Fact]
     public void Alpha3Codes_EachCode_IsThreeCapitals() =>
         Alpha3Codes.Alpha2.Select(code => Alpha3Codes.Of(code)).Should().OnlyContain(code => code!.Length == 3 && code.All(char.IsAsciiLetterUpper));
+
+    [Fact]
+    public void ToCarrierBooking_ARateCardCost_CarriesTheTotalAndItsChargeLinesAsNoSpotPrice()
+    {
+        var cost = Map(Release())["carrierCost"]!.AsObject();
+
+        cost["currency"]!.GetValue<string>().Should().Be("EUR");
+        cost["total"]!.GetValue<decimal>().Should().Be(310.00m);
+        cost["isSpot"]!.GetValue<bool>().Should().BeFalse();
+        cost["chargeLines"]!.AsArray().Select(line => (line!["type"]!.GetValue<string>(), line["amount"]!.GetValue<decimal>()))
+            .Should().Equal(("Freight", 290.00m), ("MinimumChargeAdjustment", 20.00m));
+    }
+
+    [Fact]
+    public void ToCarrierBooking_ASpotPrice_IsFlaggedAsSpotWithoutTheRemarkOrTheRateCard()
+    {
+        var cost = Map(Release(carrierCost: SpotCost))["carrierCost"]!.AsObject();
+
+        cost["isSpot"]!.GetValue<bool>().Should().BeTrue();
+        cost["total"]!.GetValue<decimal>().Should().Be(480.00m);
+        cost.ToJsonString().Should().NotContain("remark").And.NotContain("rateCard").And.NotContain("calculatedAt");
+    }
+
+    [Fact]
+    public void ToCarrierBooking_AReleaseWithAFreightCharge_NeverCarriesItToTheCarrier()
+    {
+        var booking = Map(Release());
+
+        booking.ToJsonString().Should().NotContain("freightCharge").And.NotContain("412.5");
+    }
 }

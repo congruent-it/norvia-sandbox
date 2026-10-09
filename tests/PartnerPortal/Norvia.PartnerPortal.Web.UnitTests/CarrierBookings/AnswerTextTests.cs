@@ -21,6 +21,7 @@ public sealed class AnswerTextTests
     [InlineData(CarrierRejectionReason.LaneNotServed, "Lane not served")]
     [InlineData(CarrierRejectionReason.WindowNotFeasible, "Window not feasible")]
     [InlineData(CarrierRejectionReason.GoodsNotAccepted, "Goods not accepted")]
+    [InlineData(CarrierRejectionReason.PriceNotAccepted, "Price not accepted")]
     [InlineData(CarrierRejectionReason.Other, "Other")]
     public void Reason_HasItsWords(CarrierRejectionReason reason, string words) =>
         RequestStatusText.Reason(reason).Should().Be(words);

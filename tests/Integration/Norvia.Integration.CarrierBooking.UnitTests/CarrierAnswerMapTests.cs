@@ -22,6 +22,7 @@ public sealed class CarrierAnswerMapTests
     [InlineData("LANE_NOT_SERVED", "LaneNotServed")]
     [InlineData("WINDOW_NOT_FEASIBLE", "WindowNotFeasible")]
     [InlineData("GOODS_NOT_ACCEPTED", "GoodsNotAccepted")]
+    [InlineData("PRICE_NOT_ACCEPTED", "PriceNotAccepted")]
     public void ToCarrierBookingAnswer_EveryReasonCode_MapsToTheCanonicalOne(string carrierReason, string canonicalReason)
     {
         var mapped = Map($$"""{ "carrierBookingNumber": "CB-0000042", "decision": "DECLINED", "declineReason": "{{carrierReason}}" }""");

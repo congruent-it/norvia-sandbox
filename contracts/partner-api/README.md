@@ -110,6 +110,7 @@ The other way round, [P4](../../docs/processes/tms/p4-carrier-booking.md#carrier
 | `window.earliest`, `latest`: UTC with offset | `collectFrom`, `collectUntil`, `deliverFrom`, `deliverUntil`: local date/time without an offset | Converts to the time zone of the address's country, daylight saving time included |
 | `transportOrder.delivery.consignee.name` | `consigneeName` | Copies the name only: no contact, phone or email |
 | `transportOrder.goodsLines[]` | `goods[]` | Flattens `dimensionsCm` into `lengthCm`, `widthCm` and `heightCm` |
+| `carrierCost`: `total`, `chargeLines[]`, `source.kind` | `carrierCost`: `currency`, `total`, `chargeLines[]`, `isSpot` | Copies the total and its charge lines; `isSpot` is true when the source is a Spot price. The Planner's remark and the Carrier Rate Card version stay with Norvia. By confirming, the Carrier accepts it ([P9](../../docs/processes/tms/p9-freight-settlement.md#what-the-carrier-sees)) |
 | `shipperId`, `transportOrder.shipperReference`, `transportOrder.instructions`, anything of the Freight Charge | Left out | Towards the Carrier, Norvia is the customer |
 
 A value the Carrier format can't hold is left out, as in the intake map. The Carrier answers a request it can't use.
@@ -128,7 +129,7 @@ The answer never names the Carrier. API Management takes it from the token's `az
 | `decision`: `CONFIRMED` or `DECLINED` | `outcome`: `Confirmed` or `Rejected` | Translates it. Any other decision is `INVALID`: left out, it would reach the TMS as the default outcome |
 | `bookingRef` | `carrierBookingReference` | Copies it. A confirmation without one is `INVALID` |
 | `plannedCollection`: a date and time with its UTC offset | `plannedCollectionTime`: UTC with an offset | Converts it. Without an offset it is `INVALID`: it names no instant |
-| `declineReason`: `NO_CAPACITY`, `LANE_NOT_SERVED`, `WINDOW_NOT_FEASIBLE`, `GOODS_NOT_ACCEPTED`, `OTHER` | `reasonCode`: `NoCapacity`, `LaneNotServed`, `WindowNotFeasible`, `GoodsNotAccepted`, `Other` | Translates it. An unknown code is `INVALID` |
+| `declineReason`: `NO_CAPACITY`, `LANE_NOT_SERVED`, `WINDOW_NOT_FEASIBLE`, `GOODS_NOT_ACCEPTED`, `PRICE_NOT_ACCEPTED`, `OTHER` | `reasonCode`: `NoCapacity`, `LaneNotServed`, `WindowNotFeasible`, `GoodsNotAccepted`, `PriceNotAccepted`, `Other` | Translates it. An unknown code is `INVALID` |
 | `declineText` | `reasonText` | Copies it. A rejection for `OTHER` without one is `INVALID` |
 | Anything else, a `carrierId` included | Left out | The Carrier comes from the token alone |
 

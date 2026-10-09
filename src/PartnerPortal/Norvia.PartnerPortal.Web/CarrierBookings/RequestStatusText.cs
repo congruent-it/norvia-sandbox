@@ -12,6 +12,7 @@ public static class RequestStatusText
         CarrierRejectionReason.LaneNotServed => "Lane not served",
         CarrierRejectionReason.WindowNotFeasible => "Window not feasible",
         CarrierRejectionReason.GoodsNotAccepted => "Goods not accepted",
+        CarrierRejectionReason.PriceNotAccepted => "Price not accepted",
         CarrierRejectionReason.Other => "Other",
         _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, "Every reason has words."),
     };

@@ -1,0 +1,5 @@
+{
+  "carrierId": "CAR-0001",
+  "outcome": "Rejected",
+  "reasonCode": "PriceNotAccepted"
+}
