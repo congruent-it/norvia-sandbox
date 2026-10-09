@@ -13,6 +13,8 @@ internal static class FleetText
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unknown Vehicle type."),
     };
 
+    public static string Payload(int kg) => $"{kg:N0} kg";
+
     public static string Licences(IEnumerable<LicenceCategory> licences) => string.Join(", ", licences);
 
     public static string VehicleTypes(IEnumerable<VehicleType> types) => string.Join(", ", types.Select(VehicleType));

@@ -21,7 +21,7 @@
                     GridTemplateColumns="1.4fr 1.6fr 1fr 1.2fr 1fr" MultiLine="true">
         <PropertyColumn Title="Registration" Property="@(vehicle => vehicle.Registration)" />
         <PropertyColumn Title="Vehicle type" Property="@(vehicle => FleetText.VehicleType(vehicle.Type))" />
-        <PropertyColumn Title="Payload" Property="@(vehicle => $"{vehicle.PayloadKg:N0} kg")" />
+        <PropertyColumn Title="Payload" Property="@(vehicle => FleetText.Payload(vehicle.PayloadKg))" />
         <PropertyColumn Title="Pallet places" Property="@(vehicle => vehicle.PalletPlaces)" />
         <PropertyColumn Title="Licence needed" Property="@(vehicle => vehicle.LicenceNeeded.ToString())" />
     </FluentDataGrid>
