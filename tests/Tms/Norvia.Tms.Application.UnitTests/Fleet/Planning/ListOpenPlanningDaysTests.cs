@@ -135,7 +135,7 @@ public sealed class ListOpenPlanningDaysTests
 
     private static ListOpenPlanningDaysHandler Handler(
         IReadRepository<PlanningDay> days, IDriverDirectory drivers, IVehicleDirectory vehicles, List<TransportOrder> orders, List<Shipment> shipments) =>
-        new(days, Repository(shipments), Repository(orders), drivers, vehicles);
+        new(days, LoadChecks.LoadsOver(shipments, orders, drivers, vehicles), drivers, vehicles);
 
     private static IReadRepository<T> Repository<T>(List<T> stored)
         where T : class, IAggregateRoot

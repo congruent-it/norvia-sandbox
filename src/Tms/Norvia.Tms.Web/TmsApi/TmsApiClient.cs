@@ -89,7 +89,7 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
                     LogAssigned(transportOrderNumber, assigned.ShipmentNumber);
                 }
 
-                return new AssignAnswer.Planned(assigned.ShipmentNumber);
+                return new AssignAnswer.Planned(assigned.ShipmentNumber, assigned.LoadWarning?.Text);
             // A refused assignment: its problem's detail is the refusal's readable message, and its code says which rule.
             case HttpStatusCode.NotFound or HttpStatusCode.Conflict or HttpStatusCode.UnprocessableEntity:
                 var problem = await response.Content.ReadFromJsonAsync<Refusal>(Json, cancellationToken);
@@ -122,7 +122,7 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
                     LogReassigned(shipmentNumber);
                 }
 
-                return new ReassignAnswer.Reassigned(reassigned.CarriedBy);
+                return new ReassignAnswer.Reassigned(reassigned.CarriedBy, reassigned.LoadWarning?.Text);
             // A refused reassignment: its problem's detail is the refusal's readable message, and its code says which rule.
             case HttpStatusCode.NotFound or HttpStatusCode.Conflict or HttpStatusCode.UnprocessableEntity:
                 return new ReassignAnswer.Refused(
@@ -355,13 +355,16 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
     private sealed record Assignment(AssignedTo AssignedTo, string? CarrierId);
 
     // What the TMS API answers an assignment, as far as the TMS UI reads it.
-    private sealed record Assigned(string ShipmentNumber, string? CorrelationId, string? ShipperId);
+    private sealed record Assigned(string ShipmentNumber, string? CorrelationId, string? ShipperId, LoadWarning? LoadWarning = null);
+
+    // The load check warning the TMS API adds to an Own fleet assignment, as far as the TMS UI reads it: the sentence.
+    private sealed record LoadWarning(string Text);
 
     // What the TMS UI asks the TMS API to reassign a Shipment to.
     private sealed record Reassignment(AssignedTo AssignedTo, string? CarrierId);
 
     // What the TMS API answers a reassignment, as far as the TMS UI reads it.
-    private sealed record Reassigned(CarriedByView CarriedBy, string? TransportOrderNumber, string? CorrelationId, string? ShipperId);
+    private sealed record Reassigned(CarriedByView CarriedBy, string? TransportOrderNumber, string? CorrelationId, string? ShipperId, LoadWarning? LoadWarning = null);
 
     // What the TMS API answers a release, as far as the TMS UI reads it.
     private sealed record Released(string? TransportOrderNumber, string? CorrelationId, string? ShipperId);

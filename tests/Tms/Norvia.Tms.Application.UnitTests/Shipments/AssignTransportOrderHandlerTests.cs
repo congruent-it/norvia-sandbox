@@ -2,6 +2,7 @@ using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Microsoft.Extensions.Time.Testing;
 using Norvia.Tms.Application.Carriers;
+using Norvia.Tms.Application.UnitTests.Fleet.Planning;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.TransportOrders.Assign;
 using Norvia.Tms.Application.UnitTests.TransportOrders;
@@ -25,7 +26,7 @@ public sealed class AssignTransportOrderHandlerTests
     {
         _shipmentNumbers.NextAsync(Arg.Any<CancellationToken>()).Returns(ShipmentNumber.FromSequence(12));
         _carriers.Find(new CarrierId("CAR-0001")).Returns(new Carrier(new CarrierId("CAR-0001"), "Van Dijk Transport", true));
-        _handler = new AssignTransportOrderHandler(_transportOrders, _shipments, _shipmentNumbers, _carriers, _time);
+        _handler = new AssignTransportOrderHandler(_transportOrders, _shipments, _shipmentNumbers, _carriers, LoadChecks.NoWarnings(_time), _time);
     }
 
     [Fact]
@@ -46,6 +47,35 @@ public sealed class AssignTransportOrderHandlerTests
         result.Value.Repeat.Should().BeFalse();
         order.Status.Should().Be(TransportOrderStatus.Planned);
         order.ShipmentNumber.Should().Be(ShipmentNumber.FromSequence(12));
+    }
+
+    [Fact]
+    public async Task Handle_OwnFleetOrderCollectingBeyondThePlanningHorizon_PlansItWithAnOutsideTheHorizonWarning()
+    {
+        var order = Samples.AcceptedOrder();
+        _transportOrders.SingleOrDefaultAsync(Arg.Any<TransportOrderToPlanSpec>(), Arg.Any<CancellationToken>()).Returns(order);
+        var later = new FakeTimeProvider(Samples.Now.AddDays(30));
+        var handler = new AssignTransportOrderHandler(_transportOrders, _shipments, _shipmentNumbers, _carriers, LoadChecks.Warnings([], [order], [], [], [], later), later);
+
+        var result = await handler.Handle(new AssignTransportOrderCommand("TO-0000007", CarrierId: null, "key-1", "corr-planning"), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.LoadWarning!.OutsideHorizon.Should().BeTrue();
+        result.Value.LoadWarning.Text.Should().EndWith("Outside the Planning horizon");
+        order.Status.Should().Be(TransportOrderStatus.Planned);
+    }
+
+    [Fact]
+    public async Task Handle_AcceptedOrderToACarrier_HasNoLoadWarning()
+    {
+        var order = Samples.AcceptedOrder();
+        _transportOrders.SingleOrDefaultAsync(Arg.Any<TransportOrderToPlanSpec>(), Arg.Any<CancellationToken>()).Returns(order);
+        var later = new FakeTimeProvider(Samples.Now.AddDays(30));
+        var handler = new AssignTransportOrderHandler(_transportOrders, _shipments, _shipmentNumbers, _carriers, LoadChecks.Warnings([], [order], [], [], [], later), later);
+
+        var result = await handler.Handle(new AssignTransportOrderCommand("TO-0000007", "CAR-0001", "key-1", "corr-planning"), CancellationToken.None);
+
+        result.Value.LoadWarning.Should().BeNull();
     }
 
     [Fact]

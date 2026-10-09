@@ -245,6 +245,22 @@ public sealed class WaitingForPlanningTests : TmsWebContext
     }
 
     [Fact]
+    public void Assign_ToOwnFleetOnADayOverCapacity_ShowsTheLoadWarningBesideThePlannedMessage()
+    {
+        var page = RenderWith(Samples.ToPlan("TO-0000042"));
+        Commands.AssignAsync("TO-0000042", null, Arg.Any<CancellationToken>())
+            .Returns(new AssignAnswer.Planned("SH-0000012", "Thu 1 Oct: Over capacity, 34 of 30 pallet places after this assignment"));
+        Select(page, "TO-0000042");
+        Choose(page, "own-fleet");
+
+        AssignButton(page).Click();
+
+        page.WaitForAssertion(() => Outcomes(page).Should().Equal(
+            "Transport Order TO-0000042 is planned as Shipment SH-0000012, carried by Own fleet.",
+            "Thu 1 Oct: Over capacity, 34 of 30 pallet places after this assignment"));
+    }
+
+    [Fact]
     public void Assign_AnOrderWhoseRatingFailed_AssignsIt()
     {
         var page = RenderWith(Samples.ToPlan("TO-0000042", ratingResult: RatingResult.RatingFailed));

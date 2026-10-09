@@ -2,13 +2,14 @@ using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Mediator;
 using Norvia.Tms.Application.Carriers;
+using Norvia.Tms.Application.Fleet.Planning;
 using Norvia.Tms.Domain.Carriers;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TransportOrders;
 
 namespace Norvia.Tms.Application.Shipments.Reassign;
 
-public sealed class ReassignShipmentHandler(IRepository<Shipment> shipments, ICarrierDirectory carriers, TimeProvider time)
+public sealed class ReassignShipmentHandler(IRepository<Shipment> shipments, ICarrierDirectory carriers, LoadCheckWarnings loadWarnings, TimeProvider time)
     : ICommandHandler<ReassignShipmentCommand, Result<ReassignShipmentResult>>
 {
     public async ValueTask<Result<ReassignShipmentResult>> Handle(ReassignShipmentCommand command, CancellationToken cancellationToken)
@@ -24,7 +25,7 @@ public sealed class ReassignShipmentHandler(IRepository<Shipment> shipments, ICa
         var key = new IdempotencyKey(command.ReassignmentKey);
         if (shipment.ReassignmentUnder(key) is var (earlierPrevious, earlier))
         {
-            return ResultOf(shipment, earlierPrevious, earlier, repeat: true);
+            return await ResultOfAsync(shipment, earlierPrevious, earlier, repeat: true, cancellationToken);
         }
 
         var carrierId = command.CarrierId is { } id ? new CarrierId(id) : null;
@@ -42,10 +43,10 @@ public sealed class ReassignShipmentHandler(IRepository<Shipment> shipments, ICa
 
         // Saving the tracked Shipment stores ShipmentReassigned's outbox message with it, in one transaction.
         await shipments.SaveChangesAsync(cancellationToken);
-        return ResultOf(shipment, previous, shipment.Assignments[^1], repeat: false);
+        return await ResultOfAsync(shipment, previous, shipment.Assignments[^1], repeat: false, cancellationToken);
     }
 
-    private ReassignShipmentResult ResultOf(Shipment shipment, ShipmentAssignment previous, ShipmentAssignment reassignment, bool repeat) => new(
+    private async Task<ReassignShipmentResult> ResultOfAsync(Shipment shipment, ShipmentAssignment previous, ShipmentAssignment reassignment, bool repeat, CancellationToken cancellationToken) => new(
         shipment.Number.Value,
         shipment.TransportOrderNumber.Value,
         shipment.Status,
@@ -53,5 +54,6 @@ public sealed class ReassignShipmentHandler(IRepository<Shipment> shipments, ICa
         CarriedByView.Of(previous.CarriedBy, carriers),
         shipment.ShipperId.Value,
         reassignment.CorrelationId.Value,
-        repeat);
+        repeat,
+        await loadWarnings.ForAsync(shipment, cancellationToken));
 }

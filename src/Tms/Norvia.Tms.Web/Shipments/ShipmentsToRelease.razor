@@ -267,6 +267,7 @@
         {
             _reassignOutcome = await Commands.ReassignAsync(shipmentNumber, carrierId, _closed.Token) switch
             {
+                ReassignAnswer.Reassigned { LoadWarning: { } loadWarning } => (MessageIntent.Warning, $"Shipment {shipmentNumber} is now carried by {assignee}. {loadWarning}"),
                 ReassignAnswer.Reassigned => (MessageIntent.Success, $"Shipment {shipmentNumber} is now carried by {assignee}."),
                 ReassignAnswer.Refused refused => (MessageIntent.Warning, $"Shipment {shipmentNumber} wasn't reassigned: {refused.Reason}"),
                 var answer => throw new InvalidOperationException($"Unknown reassign answer {answer}."),
