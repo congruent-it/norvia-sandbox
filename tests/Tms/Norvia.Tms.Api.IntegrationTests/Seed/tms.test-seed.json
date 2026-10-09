@@ -143,5 +143,48 @@
         }
       ]
     }
+  ],
+  "vehicles": [
+    { "id": "VEH-0001", "registration": "VN-101-A", "type": "Van", "payloadKg": 1200, "palletPlaces": 4, "active": true },
+    { "id": "VEH-0002", "registration": "RT-201-C", "type": "RigidTruck", "payloadKg": 10000, "palletPlaces": 18, "active": true },
+    { "id": "VEH-0009", "registration": "ZZ-999-Z", "type": "Van", "payloadKg": 1200, "palletPlaces": 4, "active": false }
+  ],
+  "drivers": [
+    {
+      "$comment": "Works Monday to Saturday, so a Saturday opens with a Shift for her and none for the others.",
+      "id": "DRV-0001",
+      "name": "Anouk de Vries",
+      "licences": ["B", "C", "CE"],
+      "roster": {
+        "Monday": { "start": "06:00", "end": "14:30" },
+        "Tuesday": { "start": "06:00", "end": "14:30" },
+        "Wednesday": { "start": "06:00", "end": "14:30" },
+        "Thursday": { "start": "06:00", "end": "14:30" },
+        "Friday": { "start": "06:00", "end": "14:30" },
+        "Saturday": { "start": "08:00", "end": "12:00" }
+      },
+      "active": true
+    },
+    {
+      "id": "DRV-0002",
+      "name": "Joost Bakker",
+      "licences": ["B", "C"],
+      "roster": {
+        "Monday": { "start": "08:00", "end": "16:30" },
+        "Tuesday": { "start": "08:00", "end": "16:30" },
+        "Wednesday": { "start": "08:00", "end": "16:30" },
+        "Thursday": { "start": "08:00", "end": "16:30" },
+        "Friday": { "start": "08:00", "end": "16:30" }
+      },
+      "active": true
+    },
+    {
+      "$comment": "Inactive, so the horizon job gives her no Shifts although her Roster works.",
+      "id": "DRV-0009",
+      "name": "Former Driver",
+      "licences": ["B"],
+      "roster": { "Monday": { "start": "07:00", "end": "15:00" } },
+      "active": false
+    }
   ]
 }

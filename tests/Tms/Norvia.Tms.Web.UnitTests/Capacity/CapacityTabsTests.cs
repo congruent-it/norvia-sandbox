@@ -1,4 +1,5 @@
 using Norvia.Tms.Application.Fleet;
+using Norvia.Tms.Application.Fleet.Planning;
 using Norvia.Tms.Domain.Fleet;
 using Norvia.Tms.Web.Capacity;
 using Norvia.Tms.Web.UnitTests.TransportOrders;
@@ -103,6 +104,52 @@ public sealed class CapacityTabsTests : TmsWebContext
         var page = Render<VehiclesTab>();
 
         page.FindAll("nav[aria-label=Capacity] a").Select(link => (link.GetAttribute("href"), link.TextContent.Trim()))
-            .Should().Equal(("/capacity", "Vehicles"), ("/capacity/drivers", "Drivers"));
+            .Should().Equal(("/capacity", "Vehicles"), ("/capacity/drivers", "Drivers"), ("/capacity/days", "Days"));
+    }
+
+    [Fact]
+    public void Render_DaysTab_ListsOneRowPerOpenDay_WithVehiclesAvailableAndTheDriversOnShift()
+    {
+        Queries.ListPlanningDaysAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new PlanningDayView(new DateOnly(2026, 10, 12), 6, [new ShiftView("DRV-0001", "Anouk de Vries", new TimeOnly(6, 0), new TimeOnly(14, 30), false)]),
+            new PlanningDayView(new DateOnly(2026, 10, 17), 5, []),
+            new PlanningDayView(new DateOnly(2026, 10, 13), 6,
+            [
+                new ShiftView("DRV-0001", "Anouk de Vries", new TimeOnly(5, 0), new TimeOnly(13, 0), true),
+                new ShiftView("DRV-0002", "Joost Bakker", new TimeOnly(7, 0), new TimeOnly(15, 30), false),
+            ]),
+        ]);
+
+        var page = Render<DaysTab>();
+
+        page.WaitForAssertion(() => page.FindAll("tbody tr").Select(row => row.QuerySelectorAll("td").Select(cell => cell.TextContent.Trim()).ToList())
+            .Should().SatisfyRespectively(
+                first => first.Should().Equal("Mon 12 Oct", "6", "Anouk de Vries 06:00-14:30"),
+                second => second.Should().Equal("Sat 17 Oct", "5", string.Empty),
+                third => third.Should().Equal("Tue 13 Oct", "6", "Anouk de Vries 05:00-13:00 (edited); Joost Bakker 07:00-15:30")));
+    }
+
+    [Fact]
+    public void Render_DaysTab_WithNoOpenDays_SaysSo()
+    {
+        Queries.ListPlanningDaysAsync(Arg.Any<CancellationToken>()).Returns([]);
+
+        var page = Render<DaysTab>();
+
+        page.WaitForAssertion(() => page.Find("[role=status]").TextContent.Should().Contain("There are no open days in the Planning horizon yet."));
+    }
+
+    [Fact]
+    public void Render_DaysTab_WhenADayOpensWhileTheTabIsOpen_ShowsItWithoutARefresh()
+    {
+        var monday = new PlanningDayView(new DateOnly(2026, 10, 12), 6, []);
+        Queries.ListPlanningDaysAsync(Arg.Any<CancellationToken>()).Returns([monday], [monday, new PlanningDayView(new DateOnly(2026, 10, 13), 6, [])]);
+        var page = Render<DaysTab>();
+        page.WaitForAssertion(() => page.Markup.Should().Contain("Mon 12 Oct"));
+
+        Time.Advance(RefreshInterval);
+
+        page.WaitForAssertion(() => page.Markup.Should().Contain("Tue 13 Oct"));
     }
 }

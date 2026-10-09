@@ -5,6 +5,7 @@ using Mediator;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Norvia.Tms.Api.Capacity;
 using Norvia.Tms.Api.CarrierBookings;
 using Norvia.Tms.Api.Exceptions;
 using Norvia.Tms.Api.ProofsOfDelivery;
@@ -78,6 +79,7 @@ builder.AddTmsInfrastructure();
 builder.AddTmsProofOfDeliveryStorage();
 builder.AddTmsOutboxPublisher();
 builder.AddTmsRatingWorker();
+builder.AddTmsPlanningHorizonJob();
 
 // Issuer, audience and keys come from Authentication:Schemes:Bearer: Entra in Azure, the AppHost's local key otherwise.
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -170,6 +172,7 @@ app.MapCarrierBookings();
 app.MapTrackingEvents();
 app.MapProofsOfDelivery();
 app.MapExceptions();
+app.MapCapacity();
 app.MapShipperNotifications();
 app.MapShipperTracking();
 

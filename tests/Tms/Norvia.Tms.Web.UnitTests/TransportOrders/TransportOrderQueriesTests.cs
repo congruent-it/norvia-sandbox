@@ -7,6 +7,8 @@ using Norvia.Tms.Application.Exceptions.ShipperNotificationTemplate;
 using Norvia.Tms.Application.Fleet;
 using Norvia.Tms.Application.Fleet.ListDrivers;
 using Norvia.Tms.Application.Fleet.ListVehicles;
+using Norvia.Tms.Application.Fleet.Planning;
+using Norvia.Tms.Application.Fleet.Planning.ListOpenDays;
 using Norvia.Tms.Application.ProofsOfDelivery.ListMissing;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shipments.GetByNumber;
@@ -76,6 +78,17 @@ public sealed class TransportOrderQueriesTests : IDisposable
         var listed = await _queries.ListDriversAsync(Xunit.TestContext.Current.CancellationToken);
 
         listed.Should().BeSameAs(drivers);
+    }
+
+    [Fact]
+    public async Task ListPlanningDaysAsync_ListsTheOpenDaysOfThePlanningHorizon()
+    {
+        IReadOnlyList<PlanningDayView> days = [];
+        _mediator.Send(new ListOpenPlanningDaysQuery(), Arg.Any<CancellationToken>()).Returns(days);
+
+        var listed = await _queries.ListPlanningDaysAsync(Xunit.TestContext.Current.CancellationToken);
+
+        listed.Should().BeSameAs(days);
     }
 
     [Fact]

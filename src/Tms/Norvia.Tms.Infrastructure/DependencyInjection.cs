@@ -22,6 +22,7 @@ using Norvia.Tms.Application.TransportOrders.Rate;
 using Norvia.Tms.Application.TransportOrders.Submit;
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Exceptions;
+using Norvia.Tms.Domain.Fleet;
 using Norvia.Tms.Domain.ProofsOfDelivery;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TrackingEvents;
@@ -104,6 +105,16 @@ public static class DependencyInjection
         builder.Services.AddSingleton<ICarrierDirectory, SeedFileCarrierDirectory>();
         builder.Services.AddSingleton<IVehicleDirectory, SeedFileVehicleDirectory>();
         builder.Services.AddSingleton<IDriverDirectory, SeedFileDriverDirectory>();
+        builder.Services.AddSingleton<IRosterDirectory, SeedFileRosterDirectory>();
+        builder.Services.AddOptions<PlanningHorizonOptions>().BindConfiguration(PlanningHorizonOptions.SectionName)
+            .ValidateDataAnnotations()
+            .Validate(options => TimeZoneInfo.TryFindSystemTimeZoneById(options.TimeZone, out _), "PlanningHorizon:TimeZone isn't a time zone this host knows.")
+            .ValidateOnStart();
+        builder.Services.AddSingleton(services =>
+        {
+            var options = services.GetRequiredService<IOptions<PlanningHorizonOptions>>().Value;
+            return new PlanningHorizonRules(options.Days, TimeZoneInfo.FindSystemTimeZoneById(options.TimeZone));
+        });
         builder.Services.AddHostedService<LoadSeedOnStart>();
 
         return builder;
@@ -122,6 +133,19 @@ public static class DependencyInjection
         builder.Services.AddSingleton<RatingSignal>();
         builder.Services.AddSingleton<IRatingTrigger>(services => services.GetRequiredService<RatingSignal>());
         builder.Services.AddHostedService<RatingWorker>();
+
+        return builder;
+    }
+
+    /// <summary>
+    /// Opens the days of the Planning horizon every midnight (P10). Only the process that takes in Transport Orders runs it,
+    /// as it runs the rating worker; the TMS UI shares the database and only reads the days.
+    /// </summary>
+    public static IHostApplicationBuilder AddTmsPlanningHorizonJob(this IHostApplicationBuilder builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.Services.AddHostedService<PlanningHorizonWorker>();
 
         return builder;
     }
