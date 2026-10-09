@@ -20,22 +20,32 @@
     }
 
     <div class="flex flex-wrap items-end gap-4">
-        <FluentSelect TOption="string" Label="@SubjectLabel" aria-label="@SubjectLabel" @bind-Value="_subjectId" Width="14rem">
-            <FluentOption TOption="string" Value="">Choose a @SubjectLabel.ToLowerInvariant()</FluentOption>
-            @foreach (var subject in Subjects)
-            {
-                <FluentOption TOption="string" Value="@subject.Id">@subject.Name</FluentOption>
-            }
-        </FluentSelect>
-        <FluentDatePicker Label="From" aria-label="From" @bind-Value="_from" />
-        <FluentDatePicker Label="To" aria-label="To" @bind-Value="_to" />
-        <FluentSelect TOption="string" Label="Reason" aria-label="Reason" @bind-Value="_reason" Width="12rem">
-            @foreach (var reason in Reasons)
-            {
-                <FluentOption TOption="string" Value="@reason">@reason</FluentOption>
-            }
-        </FluentSelect>
-        <FluentTextField Label="Remark" aria-label="Remark" @bind-Value="_remark" Immediate="true" MaxLength="500" />
+        <div class="flex items-center gap-2">
+            <FluentSelect TOption="string" Label="@SubjectLabel" aria-label="@SubjectLabel" @bind-Value="_subjectId" Width="14rem">
+                <FluentOption TOption="string" Value="">Choose a @SubjectLabel.ToLowerInvariant()</FluentOption>
+                @foreach (var subject in Subjects)
+                {
+                    <FluentOption TOption="string" Value="@subject.Id">@subject.Name</FluentOption>
+                }
+            </FluentSelect>
+        </div>
+        <div class="flex items-center gap-2">
+            <FluentDatePicker Label="From" aria-label="From" @bind-Value="_from" />
+        </div>
+        <div class="flex items-center gap-2">
+            <FluentDatePicker Label="To" aria-label="To" @bind-Value="_to" />
+        </div>
+        <div class="flex items-center gap-2">
+            <FluentSelect TOption="string" Label="Reason" aria-label="Reason" @bind-Value="_reason" Width="12rem">
+                @foreach (var reason in Reasons)
+                {
+                    <FluentOption TOption="string" Value="@reason">@reason</FluentOption>
+                }
+            </FluentSelect>
+        </div>
+        <div class="flex items-center gap-2">
+            <FluentTextField Label="Remark" aria-label="Remark" @bind-Value="_remark" Immediate="true" MaxLength="500" />
+        </div>
         <FluentButton Appearance="Appearance.Accent" OnClick="SubmitAsync" Disabled="_working">@SubmitText</FluentButton>
     </div>
 </section>

@@ -20,13 +20,15 @@
         </div>
     }
 
-    <FluentSelect TOption="string" Label="Driver" aria-label="Driver" Value="@_driverId" ValueChanged="Choose" Width="14rem">
-        <FluentOption TOption="string" Value="">Choose a driver</FluentOption>
-        @foreach (var roster in Rosters)
-        {
-            <FluentOption TOption="string" Value="@roster.DriverId">@roster.DriverName</FluentOption>
-        }
-    </FluentSelect>
+    <div class="flex items-center gap-2">
+        <FluentSelect TOption="string" Label="Driver" aria-label="Driver" Value="@_driverId" ValueChanged="Choose" Width="14rem">
+            <FluentOption TOption="string" Value="">Choose a driver</FluentOption>
+            @foreach (var roster in Rosters)
+            {
+                <FluentOption TOption="string" Value="@roster.DriverId">@roster.DriverName</FluentOption>
+            }
+        </FluentSelect>
+    </div>
 
     @if (_driverId.Length > 0)
     {
@@ -35,8 +37,12 @@
             {
                 <li class="mb-2 flex flex-wrap items-end gap-4">
                     <FluentCheckbox Label="@row.Name" @bind-Value="row.Works" />
-                    <FluentTimePicker Label="@($"{row.Name} start")" aria-label="@($"{row.Name} start")" @bind-Value="row.Start" Disabled="!row.Works" />
-                    <FluentTimePicker Label="@($"{row.Name} end")" aria-label="@($"{row.Name} end")" @bind-Value="row.End" Disabled="!row.Works" />
+                    <div class="flex items-center gap-2">
+                        <FluentTimePicker Label="@($"{row.Name} start")" aria-label="@($"{row.Name} start")" @bind-Value="row.Start" Disabled="!row.Works" />
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <FluentTimePicker Label="@($"{row.Name} end")" aria-label="@($"{row.Name} end")" @bind-Value="row.End" Disabled="!row.Works" />
+                    </div>
                 </li>
             }
         </ul>

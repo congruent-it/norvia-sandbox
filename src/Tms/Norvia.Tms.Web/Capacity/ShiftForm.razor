@@ -20,16 +20,24 @@
     }
 
     <div class="flex flex-wrap items-end gap-4">
-        <FluentSelect TOption="string" Label="Driver" aria-label="Driver" @bind-Value="_driverId" Width="14rem">
-            <FluentOption TOption="string" Value="">Choose a driver</FluentOption>
-            @foreach (var driver in Drivers)
-            {
-                <FluentOption TOption="string" Value="@driver.Id">@driver.Name</FluentOption>
-            }
-        </FluentSelect>
-        <FluentDatePicker Label="Day" aria-label="Day" @bind-Value="_day" />
-        <FluentTimePicker Label="Shift start" aria-label="Shift start" @bind-Value="_start" />
-        <FluentTimePicker Label="Shift end" aria-label="Shift end" @bind-Value="_end" />
+        <div class="flex items-center gap-2">
+            <FluentSelect TOption="string" Label="Driver" aria-label="Driver" @bind-Value="_driverId" Width="14rem">
+                <FluentOption TOption="string" Value="">Choose a driver</FluentOption>
+                @foreach (var driver in Drivers)
+                {
+                    <FluentOption TOption="string" Value="@driver.Id">@driver.Name</FluentOption>
+                }
+            </FluentSelect>
+        </div>
+        <div class="flex items-center gap-2">
+            <FluentDatePicker Label="Day" aria-label="Day" @bind-Value="_day" />
+        </div>
+        <div class="flex items-center gap-2">
+            <FluentTimePicker Label="Shift start" aria-label="Shift start" @bind-Value="_start" />
+        </div>
+        <div class="flex items-center gap-2">
+            <FluentTimePicker Label="Shift end" aria-label="Shift end" @bind-Value="_end" />
+        </div>
         <FluentButton Appearance="Appearance.Accent" OnClick="SubmitAsync" Disabled="_working">Edit Shift</FluentButton>
     </div>
 </section>
