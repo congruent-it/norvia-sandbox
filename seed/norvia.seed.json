@@ -509,46 +509,95 @@
   ],
   "drivers": [
     {
-      "$comment": "The Own fleet's Drivers: two with CE, three with C and two with B. Their licence categories are what the TMS checks a Vehicle against (P10).",
+      "$comment": "The Own fleet's Drivers: two with CE, three with C and two with B. Their licence categories are what the TMS checks a Vehicle against (P10). Each has a Monday to Friday Roster with its own Shift times, which the horizon job copies onto every day it opens.",
       "id": "DRV-0001",
       "name": "Anouk de Vries",
       "licences": ["B", "C", "CE"],
+      "roster": {
+        "Monday": { "start": "06:00", "end": "14:30" },
+        "Tuesday": { "start": "06:00", "end": "14:30" },
+        "Wednesday": { "start": "06:00", "end": "14:30" },
+        "Thursday": { "start": "06:00", "end": "14:30" },
+        "Friday": { "start": "06:00", "end": "14:30" }
+      },
       "active": true
     },
     {
       "id": "DRV-0002",
       "name": "Joost Bakker",
       "licences": ["B", "C", "CE"],
+      "roster": {
+        "Monday": { "start": "07:00", "end": "15:30" },
+        "Tuesday": { "start": "07:00", "end": "15:30" },
+        "Wednesday": { "start": "07:00", "end": "15:30" },
+        "Thursday": { "start": "07:00", "end": "15:30" },
+        "Friday": { "start": "07:00", "end": "15:30" }
+      },
       "active": true
     },
     {
       "id": "DRV-0003",
       "name": "Bram Visser",
       "licences": ["B", "C"],
+      "roster": {
+        "Monday": { "start": "08:00", "end": "16:30" },
+        "Tuesday": { "start": "08:00", "end": "16:30" },
+        "Wednesday": { "start": "08:00", "end": "16:30" },
+        "Thursday": { "start": "08:00", "end": "16:30" },
+        "Friday": { "start": "08:00", "end": "16:30" }
+      },
       "active": true
     },
     {
       "id": "DRV-0004",
       "name": "Fatima El Amrani",
       "licences": ["B", "C"],
+      "roster": {
+        "Monday": { "start": "06:30", "end": "15:00" },
+        "Tuesday": { "start": "06:30", "end": "15:00" },
+        "Wednesday": { "start": "06:30", "end": "15:00" },
+        "Thursday": { "start": "06:30", "end": "15:00" },
+        "Friday": { "start": "06:30", "end": "15:00" }
+      },
       "active": true
     },
     {
       "id": "DRV-0005",
       "name": "Henk Mulder",
       "licences": ["B", "C"],
+      "roster": {
+        "Monday": { "start": "09:00", "end": "17:30" },
+        "Tuesday": { "start": "09:00", "end": "17:30" },
+        "Wednesday": { "start": "09:00", "end": "17:30" },
+        "Thursday": { "start": "09:00", "end": "17:30" },
+        "Friday": { "start": "09:00", "end": "17:30" }
+      },
       "active": true
     },
     {
       "id": "DRV-0006",
       "name": "Sanne Jansen",
       "licences": ["B"],
+      "roster": {
+        "Monday": { "start": "07:30", "end": "16:00" },
+        "Tuesday": { "start": "07:30", "end": "16:00" },
+        "Wednesday": { "start": "07:30", "end": "16:00" },
+        "Thursday": { "start": "07:30", "end": "16:00" },
+        "Friday": { "start": "07:30", "end": "16:00" }
+      },
       "active": true
     },
     {
       "id": "DRV-0007",
       "name": "Tim Peeters",
       "licences": ["B"],
+      "roster": {
+        "Monday": { "start": "08:30", "end": "17:00" },
+        "Tuesday": { "start": "08:30", "end": "17:00" },
+        "Wednesday": { "start": "08:30", "end": "17:00" },
+        "Thursday": { "start": "08:30", "end": "17:00" },
+        "Friday": { "start": "08:30", "end": "17:00" }
+      },
       "active": true
     }
   ],

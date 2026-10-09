@@ -23,10 +23,16 @@ public sealed class ControlledClockTmsFixture : TmsFixture
     /// <summary>Gives the TMS the system's time again.</summary>
     public void ResetClock() => File.Delete(_clockFile);
 
+    /// <summary>Restarts the TMS API, as a deployment does, keeping its database and clock. Every test on this fixture sees the restart.</summary>
+    public Task RestartAsync(CancellationToken cancellationToken) => RestartTmsAsync(cancellationToken);
+
     protected override Dictionary<string, string> TmsApiSettings()
     {
         var settings = base.TmsApiSettings();
         settings["Clock__ControlFile"] = _clockFile;
+
+        // The horizon job looks for a new day every second, so a test that moves the clock past midnight doesn't wait for it.
+        settings["PlanningHorizon__CheckInterval"] = "00:00:01";
         return settings;
     }
 

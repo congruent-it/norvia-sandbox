@@ -1,0 +1,39 @@
+@page "/capacity/days"
+@rendermode InteractiveServer
+@using Microsoft.Extensions.Options
+@using Norvia.Tms.Application.Fleet.Planning
+@using Norvia.Tms.Web.TransportOrders
+@implements IAsyncDisposable
+@inject ITransportOrderQueries Queries
+@inject TimeProvider Time
+@inject IOptions<LiveListOptions> Options
+@inject ILogger<LiveTransportOrderList<PlanningDayView>> Logger
+
+<PageTitle>Capacity · Days · Norvia TMS</PageTitle>
+
+<h1>Capacity</h1>
+
+<CapacityTabs />
+
+<LiveListStates Items="_list.Items" LastReadFailed="_list.LastReadFailed" Name="Days"
+                Empty="There are no open days in the Planning horizon yet." Context="days">
+    <FluentDataGrid Items="days.AsQueryable()" TGridItem="PlanningDayView" Class="flatly-table" aria-label="Open days"
+                    GridTemplateColumns="1fr 1fr 3fr" MultiLine="true">
+        <PropertyColumn Title="Day" Property="@(day => FleetText.Day(day.Date))" />
+        <PropertyColumn Title="Vehicles available" Property="@(day => day.AvailableVehicles)" />
+        <PropertyColumn Title="Drivers on shift" Property="@(day => FleetText.DriversOnShift(day.Shifts))" />
+    </FluentDataGrid>
+</LiveListStates>
+
+@code {
+    private LiveTransportOrderList<PlanningDayView> _list = null!;
+
+    protected override void OnInitialized()
+    {
+        _list = new LiveTransportOrderList<PlanningDayView>(Queries.ListPlanningDaysAsync, "the open days", Time, Options.Value.RefreshInterval, Logger);
+        _list.Changed += () => InvokeAsync(StateHasChanged);
+        _list.Start();
+    }
+
+    public ValueTask DisposeAsync() => _list.DisposeAsync();
+}

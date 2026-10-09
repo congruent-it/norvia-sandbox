@@ -45,12 +45,44 @@ public sealed class SeedFileFleetDirectoryTests : IDisposable
     }
 
     [Fact]
+    public void List_Rosters_AreTheWeekdaysEachDriverWorks()
+    {
+        var rosters = new SeedFileRosterDirectory(Seed("""
+            { "drivers": [
+              { "id": "DRV-0001", "name": "Anouk", "licences": ["B"], "active": true,
+                "roster": { "Monday": { "start": "06:00", "end": "14:30" }, "Saturday": { "start": "08:00", "end": "12:00" } } },
+              { "id": "DRV-0002", "name": "Joost", "licences": ["B"], "active": true }
+            ] }
+            """)).List();
+
+        var roster = rosters.Should().ContainSingle("a Driver without a Roster has none").Subject;
+        roster.DriverId.Should().Be(new DriverId("DRV-0001"));
+        roster.ShiftOn(new DateOnly(2026, 10, 12)).Should().Be(new ShiftTimes(new TimeOnly(6, 0), new TimeOnly(14, 30)));
+        roster.ShiftOn(new DateOnly(2026, 10, 17)).Should().Be(new ShiftTimes(new TimeOnly(8, 0), new TimeOnly(12, 0)));
+        roster.ShiftOn(new DateOnly(2026, 10, 13)).Should().BeNull("Tuesday is a day off");
+    }
+
+    [Fact]
+    public void List_TheDemoSeed_GivesEveryDriverAMondayToFridayRoster()
+    {
+        var options = Options.Create(new SeedOptions { Path = Path.Combine(RepositoryRoot(), "seed", "norvia.seed.json") });
+
+        var rosters = new SeedFileRosterDirectory(options).List();
+
+        rosters.Should().HaveCount(7);
+        rosters.Should().OnlyContain(roster => roster.Weekdays.Keys.Order().SequenceEqual(new[]
+            { DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday }));
+        rosters.Select(roster => roster.ShiftOn(new DateOnly(2026, 10, 12))).Distinct().Should().HaveCountGreaterThan(1, "the Shift times differ");
+    }
+
+    [Fact]
     public void ListActive_SeedWithoutFleet_IsEmpty()
     {
         var options = Seed("""{ "carriers": [] }""");
 
         new SeedFileVehicleDirectory(options).ListActive().Should().BeEmpty();
         new SeedFileDriverDirectory(options).ListActive().Should().BeEmpty();
+        new SeedFileRosterDirectory(options).List().Should().BeEmpty();
     }
 
     [Fact]

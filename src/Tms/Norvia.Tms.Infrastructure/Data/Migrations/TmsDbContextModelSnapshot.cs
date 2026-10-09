@@ -258,6 +258,34 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                     b.ToTable("Exceptions", (string)null);
                 });
 
+            modelBuilder.Entity("Norvia.Tms.Domain.Fleet.PlanningDay", b =>
+                {
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<string>("AvailableVehicles")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Shifts")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.HasKey("Date");
+
+                    b.ToTable("PlanningDays", (string)null);
+                });
+
             modelBuilder.Entity("Norvia.Tms.Domain.ProofsOfDelivery.ProofOfDelivery", b =>
                 {
                     b.Property<Guid>("Id")

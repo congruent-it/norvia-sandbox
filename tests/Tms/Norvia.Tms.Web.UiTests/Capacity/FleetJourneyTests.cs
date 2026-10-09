@@ -5,7 +5,8 @@ namespace Norvia.Tms.Web.UiTests.Capacity;
 
 /// <summary>
 /// The Planner opens the Capacity view (P10) and sees the Own fleet the demo seed names: the Vehicles tab, then the
-/// Drivers tab with the licences each Driver holds and the Vehicle types those cover.
+/// Drivers tab with the licences each Driver holds and the Vehicle types those cover. The Days tab has a row for each open day
+/// of the Planning horizon, which the TMS's horizon job opened.
 /// </summary>
 public sealed class FleetJourneyTests(TmsUiFixture tms) : BrowserPage(tms)
 {
@@ -25,5 +26,16 @@ public sealed class FleetJourneyTests(TmsUiFixture tms) : BrowserPage(tms)
         var drivers = Page.GetByRole(AriaRole.Table, new() { Name = "Drivers" });
         await Expect(drivers.GetByRole(AriaRole.Row).Filter(new() { HasText = "Anouk de Vries" })).ToContainTextAsync("B, C, CE");
         await Expect(drivers.GetByRole(AriaRole.Row).Filter(new() { HasText = "Sanne Jansen" })).ToContainTextAsync("Van");
+    }
+
+    [Fact]
+    public async Task ThePlanner_OpensTheDaysTab_AndSeesOneRowForEachOpenDayOfThePlanningHorizon()
+    {
+        await Page.GotoAsync("/capacity/days");
+
+        var days = Page.GetByRole(AriaRole.Table, new() { Name = "Open days" });
+        // The header row, and today with the next 14 days.
+        await Expect(days.GetByRole(AriaRole.Row)).ToHaveCountAsync(16);
+        await Expect(days.GetByRole(AriaRole.Row).Nth(1)).ToContainTextAsync("6");
     }
 }
