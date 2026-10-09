@@ -1,5 +1,7 @@
 using AngleSharp.Dom;
+using Norvia.Tms.Application.CarrierBookings;
 using Norvia.Tms.Application.Shipments;
+using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.Shipments.ListAwaitingAnswer;
 using Norvia.Tms.Web.Shipments;
 using Norvia.Tms.Web.UnitTests.TransportOrders;
@@ -35,6 +37,29 @@ public sealed class BookingsAwaitingAnswerTests : TmsWebContext
         cells[4].Should().Be("Thu 24 Sep 2026, 11:45");
         cells[5].Should().Be("Not yet sent");
         cells[6].Should().BeEmpty();
+        cells[7].Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Render_ABookingPricedOnACarrierRateCard_ShowsItsCarrierCostAndSource()
+    {
+        Queries.ListCarrierBookingsAwaitingAnswerAsync(Arg.Any<CancellationToken>()).Returns(
+            [Booking("CB-0000007", "SH-0000012") with { CarrierCost = Cost(412.5m, new CarrierCostSourceView("CarrierRateCard", new RateCardVersionView("RC-KESSLER", 2))) }]);
+
+        var page = Render<BookingsAwaitingAnswer>();
+
+        page.WaitForAssertion(() => CellsOf(page, "SH-0000012")[6].Should().Be("412.50 EUR · Carrier Rate Card version 2"));
+    }
+
+    [Fact]
+    public void Render_ABookingAtASpotPrice_ShowsItsCarrierCostAndSpotSource()
+    {
+        Queries.ListCarrierBookingsAwaitingAnswerAsync(Arg.Any<CancellationToken>()).Returns(
+            [Booking("CB-0000007", "SH-0000012") with { CarrierCost = Cost(480m, new CarrierCostSourceView("Spot", null, "agreed by phone")) }]);
+
+        var page = Render<BookingsAwaitingAnswer>();
+
+        page.WaitForAssertion(() => CellsOf(page, "SH-0000012")[6].Should().Be("480.00 EUR · Spot price: agreed by phone"));
     }
 
     [Fact]
@@ -58,8 +83,8 @@ public sealed class BookingsAwaitingAnswerTests : TmsWebContext
 
         page.WaitForAssertion(() =>
         {
-            CellsOf(page, "SH-0000012")[6].Should().Be("Overdue");
-            CellsOf(page, "SH-0000013")[6].Should().BeEmpty();
+            CellsOf(page, "SH-0000012")[7].Should().Be("Overdue");
+            CellsOf(page, "SH-0000013")[7].Should().BeEmpty();
         });
     }
 
@@ -204,6 +229,9 @@ public sealed class BookingsAwaitingAnswerTests : TmsWebContext
         null,
         new DateTimeOffset(2026, 9, 26, 4, 0, 0, TimeSpan.Zero),
         false);
+
+    private static CarrierCostView Cost(decimal total, CarrierCostSourceView source) =>
+        new("EUR", total, [new ChargeLineView("Freight", total)], source, new DateTimeOffset(2026, 9, 24, 9, 45, 0, TimeSpan.Zero));
 
     private static List<string> CellsOf(IRenderedComponent<BookingsAwaitingAnswer> page, string shipmentNumber) =>
         [.. page.Find($"tr:has(a[href='/shipments/{shipmentNumber}'])").QuerySelectorAll("td").Select(cell => cell.TextContent.Trim())];

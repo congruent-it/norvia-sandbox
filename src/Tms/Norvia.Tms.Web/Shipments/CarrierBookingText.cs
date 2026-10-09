@@ -1,3 +1,4 @@
+using System.Globalization;
 using Norvia.Tms.Application.CarrierBookings;
 using Norvia.Tms.Application.Shipments.ListToRelease;
 using Norvia.Tms.Domain.CarrierBookings;
@@ -41,6 +42,26 @@ public static class CarrierBookingText
             CarrierBookingStatus.Withdrawn when booking.WithdrawnAt is { } at => $"Withdrawn {NorviaTime.Format(at)}",
             _ => string.Empty,
         };
+    }
+
+    /// <summary>
+    /// A Carrier cost and its source at a glance, such as "412.50 EUR · Carrier Rate Card version 3" or "480.00 EUR · Spot price: agreed by phone"
+    /// (P9); empty for a booking without one.
+    /// </summary>
+    public static string CarrierCost(CarrierCostView? cost)
+    {
+        if (cost is null)
+        {
+            return string.Empty;
+        }
+
+        var source = cost.Source switch
+        {
+            { Kind: nameof(CarrierCostSourceKind.Spot) } spot => string.IsNullOrWhiteSpace(spot.Remark) ? "Spot price" : $"Spot price: {spot.Remark}",
+            { RateCardVersion: { } version } => $"Carrier Rate Card version {version.Version}",
+            _ => "Carrier Rate Card",
+        };
+        return $"{cost.Total.ToString("0.00", CultureInfo.InvariantCulture)} {cost.Currency} · {source}";
     }
 
     /// <summary>When the Carrier acknowledged receipt of the request, or that it hasn't yet.</summary>

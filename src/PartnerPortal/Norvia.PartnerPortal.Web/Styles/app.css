@@ -245,6 +245,13 @@ fluent-button::part(control) {
     padding: 0;
 }
 
+/* A header that doesn't fit wraps at its words instead of being cut off with an ellipsis. */
+.lux-table.fluent-data-grid .col-title-text {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+}
+
 /*
  * Alerts as Lux draws them: solid colour, white text, square, in light mode. Fluent scopes its own with an attribute
  * (.fluent-messagebar.intent-error[b-…], three classes' worth), so these add body and :not(.dark) to outrank it.

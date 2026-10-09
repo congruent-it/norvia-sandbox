@@ -412,7 +412,8 @@ public sealed class TmsApiClientTests : IDisposable
     [Theory]
     [InlineData(HttpStatusCode.NotFound, "ShipmentNotFound", "There is no Shipment SH-0000012.")]
     [InlineData(HttpStatusCode.Conflict, "ShipmentNotPlanned", "Shipment SH-0000012 isn't Planned.")]
-    public async Task ReleaseAsync_Refused_IsRefusedWithTheTmsReason(HttpStatusCode status, string code, string reason)
+    [InlineData(HttpStatusCode.UnprocessableEntity, "NoMatchingLane", "Van Dijk Transport's Carrier Rate Card has no Lane for it.")]
+    public async Task ReleaseAsync_Refused_IsRefusedWithTheTmsReasonAndCode(HttpStatusCode status, string code, string reason)
     {
         _tmsApi.Answer(
             status,
@@ -421,11 +422,10 @@ public sealed class TmsApiClientTests : IDisposable
 
         var answer = await ReleaseAsync("SH-0000012");
 
-        answer.Should().Be(new ReleaseAnswer.Refused(reason));
+        answer.Should().Be(new ReleaseAnswer.Refused(reason, code));
     }
 
     [Theory]
-    [InlineData(HttpStatusCode.UnprocessableEntity)]
     [InlineData(HttpStatusCode.Unauthorized)]
     [InlineData(HttpStatusCode.Forbidden)]
     [InlineData(HttpStatusCode.InternalServerError)]
@@ -464,6 +464,66 @@ public sealed class TmsApiClientTests : IDisposable
         await ReleaseAsync("SH-0000012");
 
         _spans.Should().ContainSingle().Which.DisplayName.Should().Be("Release Shipment");
+    }
+
+    [Fact]
+    public async Task ReleaseWithSpotPriceAsync_PostsTheAmountAndRemark_AsTheTmsUi_UnderAnIdempotencyKey()
+    {
+        _tmsApi.Answer(HttpStatusCode.OK, Released());
+
+        var answer = await ReleaseWithSpotPriceAsync("SH-0000012", 480m, "agreed with Van Dijk by phone, €480");
+
+        answer.Should().Be(new ReleaseAnswer.Released());
+        _tmsApi.Request!.Method.Should().Be(HttpMethod.Post);
+        _tmsApi.Request.RequestUri.Should().Be(new Uri("http://tms-api.example/v1/shipments/SH-0000012/release-with-spot-price"));
+        _tmsApi.Request.Headers.Authorization!.Parameter.Should().Be("tms-ui-token");
+        _tmsApi.Request.Headers.GetValues("Idempotency-Key").Should().ContainSingle().Which.Should().NotBeNullOrWhiteSpace();
+        JsonNode.DeepEquals(JsonNode.Parse(_tmsApi.RequestBody!), JsonNode.Parse("""{ "amount": 480, "remark": "agreed with Van Dijk by phone, €480" }""")).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.NotFound, "ShipmentNotFound", "There is no Shipment SH-0000012.")]
+    [InlineData(HttpStatusCode.Conflict, "CarrierRateCardPricesShipment", "Van Dijk Transport's Carrier Rate Card prices Shipment SH-0000012.")]
+    public async Task ReleaseWithSpotPriceAsync_Refused_IsRefusedWithTheTmsReasonAndCode(HttpStatusCode status, string code, string reason)
+    {
+        _tmsApi.Answer(
+            status,
+            $$"""{ "status": {{(int)status}}, "title": "The Shipment can't be released with a Spot price.", "detail": "{{reason}}", "code": "{{code}}" }""",
+            "application/problem+json");
+
+        var answer = await ReleaseWithSpotPriceAsync("SH-0000012", 480m, "by phone");
+
+        answer.Should().Be(new ReleaseAnswer.Refused(reason, code));
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.BadRequest)]
+    [InlineData(HttpStatusCode.Forbidden)]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    public async Task ReleaseWithSpotPriceAsync_AnyOtherAnswer_Fails(HttpStatusCode status)
+    {
+        _tmsApi.Answer(status, "{}", "application/problem+json");
+
+        var release = () => ReleaseWithSpotPriceAsync("SH-0000012", 480m, "by phone");
+
+        await release.Should().ThrowAsync<HttpRequestException>();
+    }
+
+    [Fact]
+    public async Task ReleaseWithSpotPriceAsync_Released_RecordsItsOutcomeOnTheAssignmentsTrailInASpanOfItsOwn()
+    {
+        _tmsApi.Answer(HttpStatusCode.OK, Released());
+
+        await ReleaseWithSpotPriceAsync("SH-0000012", 480m, "by phone");
+
+        ScopeOf(_logger.LatestRecord).Should().Contain(new Dictionary<string, object?>
+        {
+            ["correlationId"] = "corr-release",
+            ["flow"] = "transport-planning",
+            ["shipmentNumber"] = "SH-0000012",
+            ["outcome"] = "Succeeded",
+        });
+        _spans.Should().ContainSingle().Which.DisplayName.Should().Be("Release Shipment with Spot price");
     }
 
     [Fact]
@@ -739,6 +799,9 @@ public sealed class TmsApiClientTests : IDisposable
 
     private Task<ReassignAnswer> ReassignAsync(string shipmentNumber, string? carrierId) =>
         _client.ReassignAsync(shipmentNumber, carrierId, Xunit.TestContext.Current.CancellationToken);
+
+    private Task<ReleaseAnswer> ReleaseWithSpotPriceAsync(string shipmentNumber, decimal amount, string remark) =>
+        _client.ReleaseWithSpotPriceAsync(shipmentNumber, amount, remark, Xunit.TestContext.Current.CancellationToken);
 
     private Task<ReleaseAnswer> ReleaseAsync(string shipmentNumber) => _client.ReleaseAsync(shipmentNumber, Xunit.TestContext.Current.CancellationToken);
 

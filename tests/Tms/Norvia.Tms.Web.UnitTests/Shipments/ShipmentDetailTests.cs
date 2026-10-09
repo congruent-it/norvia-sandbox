@@ -1,6 +1,7 @@
 using AngleSharp.Dom;
 using Norvia.Tms.Application.CarrierBookings;
 using Norvia.Tms.Application.Shipments;
+using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.TrackingEvents.Timeline;
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Shipments;
@@ -66,7 +67,7 @@ public sealed class ShipmentDetailTests : TmsWebContext
 
         var page = RenderDetail("SH-0000012");
 
-        page.WaitForAssertion(() => Rows(page, "Carrier bookings").Should().Equal("CB-0000001 | Kessler Spedition | Requested | Thu 24 Sep 2026, 11:45 | Not yet sent | "));
+        page.WaitForAssertion(() => Rows(page, "Carrier bookings").Should().Equal("CB-0000001 | Kessler Spedition | Requested | Thu 24 Sep 2026, 11:45 | Not yet sent |  | "));
     }
 
     [Fact]
@@ -79,7 +80,7 @@ public sealed class ShipmentDetailTests : TmsWebContext
                 {
                     SentAt = new DateTimeOffset(2026, 9, 24, 9, 46, 0, TimeSpan.Zero),
                     ReasonCode = CarrierBookingRejectionReason.NoCapacity,
-                    ReasonText = "Fully booked until Friday.",
+                    ReasonText = "Fully booked until Friday. | ",
                 },
                 Booking("CB-0000002", CarrierBookingStatus.Confirmed) with { CarrierBookingReference = "KS-7781" },
             ]));
@@ -87,8 +88,8 @@ public sealed class ShipmentDetailTests : TmsWebContext
         var page = RenderDetail("SH-0000012");
 
         page.WaitForAssertion(() => Rows(page, "Carrier bookings").Should().Equal(
-            "CB-0000001 | Kessler Spedition | Rejected | Thu 24 Sep 2026, 11:45 | Thu 24 Sep 2026, 11:46 | Fully booked until Friday.",
-            "CB-0000002 | Kessler Spedition | Confirmed | Thu 24 Sep 2026, 11:45 | Not yet sent | Carrier booking reference KS-7781"));
+            "CB-0000001 | Kessler Spedition | Rejected | Thu 24 Sep 2026, 11:45 | Thu 24 Sep 2026, 11:46 | Fully booked until Friday. | | ",
+            "CB-0000002 | Kessler Spedition | Confirmed | Thu 24 Sep 2026, 11:45 | Not yet sent | Carrier booking reference KS-7781 | "));
     }
 
     [Fact]
@@ -143,6 +144,20 @@ public sealed class ShipmentDetailTests : TmsWebContext
         var page = RenderDetail("SH-0000012");
 
         page.WaitForAssertion(() => Section(page, "Tracking timeline").TextContent.Should().Contain("No Tracking events have been reported"));
+    }
+
+    [Fact]
+    public void Render_ACarrierBooking_ShowsItsCarrierCostAndSource()
+    {
+        var booking = Booking("CB-0000007", CarrierBookingStatus.Requested) with
+        {
+            CarrierCost = new CarrierCostView("EUR", 480m, [new ChargeLineView("Freight", 480m)], new CarrierCostSourceView("Spot", null, "agreed by phone"), new DateTimeOffset(2026, 9, 24, 9, 45, 0, TimeSpan.Zero)),
+        };
+        Queries.FindShipmentAsync("SH-0000012", Arg.Any<CancellationToken>()).Returns(Samples.Shipment("SH-0000012", ShipmentStatus.Released, [booking]));
+
+        var page = RenderDetail("SH-0000012");
+
+        page.WaitForAssertion(() => Rows(page, "Carrier bookings").Should().ContainSingle().Which.Should().Contain("480.00 EUR · Spot price: agreed by phone"));
     }
 
     private static CarrierBookingView Booking(string number, CarrierBookingStatus status) =>

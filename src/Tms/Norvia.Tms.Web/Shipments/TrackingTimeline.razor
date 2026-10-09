@@ -1,3 +1,4 @@
+@using Norvia.Tms.Application.CarrierBookings
 @using Norvia.Tms.Application.Exceptions.Timeline
 @using Norvia.Tms.Application.ProofsOfDelivery.Read
 @using Norvia.Tms.Web.Exceptions
@@ -27,6 +28,21 @@
                 <dd>@release.Remark</dd>
             }
         </dl>
+    </TransportOrderSection>
+}
+
+@* What each Carrier booking of the Shipment costs and where that cost came from (P9), in the order the bookings were requested. *@
+@if (_timeline?.CarrierBookings is { Count: > 0 } carrierBookings)
+{
+    <TransportOrderSection Heading="Carrier cost">
+        <FluentDataGrid Items="carrierBookings.AsQueryable()" TGridItem="CarrierBookingView" Class="flatly-table" aria-label="Carrier cost by Carrier booking"
+                        GridTemplateColumns="1.2fr 1.4fr 1fr 1.4fr 2.4fr" MultiLine="true">
+            <PropertyColumn Title="Carrier booking" Property="@(booking => booking.CarrierBookingNumber)" />
+            <PropertyColumn Title="Carrier" Property="@(booking => PlanningText.Carrier(booking.Carrier))" />
+            <PropertyColumn Title="Status" Property="@(booking => booking.Status)" />
+            <PropertyColumn Title="Requested" Property="@(booking => NorviaTime.Format(booking.RequestedAt))" />
+            <PropertyColumn Title="Carrier cost" Property="@(booking => CarrierBookingText.CarrierCost(booking.CarrierCost))" />
+        </FluentDataGrid>
     </TransportOrderSection>
 }
 

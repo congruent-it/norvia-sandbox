@@ -1,5 +1,7 @@
 using Ardalis.SharedKernel;
+using Microsoft.Extensions.Time.Testing;
 using Norvia.Tms.Application.Carriers;
+using Norvia.Tms.Application.RateCards;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shipments.ListToRelease;
 using Norvia.Tms.Application.Shippers;
@@ -8,6 +10,7 @@ using Norvia.Tms.Application.UnitTests.TransportOrders;
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Carriers;
 using Norvia.Tms.Domain.Exceptions;
+using Norvia.Tms.Domain.RateCards;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.Shippers;
 using Norvia.Tms.Domain.TransportOrders;
@@ -23,6 +26,9 @@ public sealed class ShipmentsToReleaseQueryTests
     private readonly IReadRepository<CarrierBooking> _carrierBookings = Substitute.For<IReadRepository<CarrierBooking>>();
     private readonly IShipperDirectory _shippers = Substitute.For<IShipperDirectory>();
     private readonly ICarrierDirectory _carriers = Substitute.For<ICarrierDirectory>();
+    private readonly IReadRepository<TransportOrder> _transportOrders = Substitute.For<IReadRepository<TransportOrder>>();
+    private readonly ICarrierRateCardDirectory _carrierRateCards = Substitute.For<ICarrierRateCardDirectory>();
+    private readonly FakeTimeProvider _time = new(Samples.Now.AddHours(3));
     private readonly ListShipmentsToReleaseHandler _handler;
 
     public ShipmentsToReleaseQueryTests()
@@ -30,8 +36,78 @@ public sealed class ShipmentsToReleaseQueryTests
         _shippers.Find(new ShipperId("SHP-0001")).Returns(new Shipper(new ShipperId("SHP-0001"), "Brouwer Dranken", true));
         _carriers.Find(VanDijk).Returns(new Carrier(VanDijk, "Van Dijk Transport", true));
         _carrierBookings.ListAsync(Arg.Any<CarrierBookingsForShipmentsSpec>(), Arg.Any<CancellationToken>()).Returns([]);
-        _handler = new ListShipmentsToReleaseHandler(_repository, _carrierBookings, _shippers, _carriers);
+        _transportOrders.ListAsync(Arg.Any<TransportOrdersByNumbersSpec>(), Arg.Any<CancellationToken>()).Returns([]);
+        _carrierRateCards.FindFor(VanDijk).Returns(VanDijkRateCard());
+        _handler = new ListShipmentsToReleaseHandler(_repository, _carrierBookings, _transportOrders, _shippers, _carriers, _carrierRateCards, _time);
     }
+
+    [Fact]
+    public async Task Handle_ACarrierShipmentItsCarrierRateCardCantPrice_ShowsThePricingFailureNamingTheCarrier()
+    {
+        _carrierRateCards.FindFor(VanDijk).Returns(VanDijkRateCard(laneDestination: "Groningen"));
+        var (_, shipment) = PlannedWithOrder(CarriedBy.Carrier(VanDijk));
+
+        var shipments = await _handler.Handle(new ListShipmentsToReleaseQuery(), CancellationToken.None);
+
+        var failure = shipments.Should().ContainSingle().Which.PricingFailure;
+        failure!.Code.Should().Be("NoMatchingLane");
+        failure.Message.Should().Contain("Van Dijk Transport");
+        shipments[0].ShipmentNumber.Should().Be(shipment.Number.Value);
+    }
+
+    [Fact]
+    public async Task Handle_ACarrierWithoutACarrierRateCard_ShowsNoRateCard()
+    {
+        _carrierRateCards.FindFor(VanDijk).Returns((CarrierRateCard?)null);
+        PlannedWithOrder(CarriedBy.Carrier(VanDijk));
+
+        var shipments = await _handler.Handle(new ListShipmentsToReleaseQuery(), CancellationToken.None);
+
+        shipments.Should().ContainSingle().Which.PricingFailure!.Code.Should().Be("NoRateCard");
+    }
+
+    [Fact]
+    public async Task Handle_ACarrierShipmentItsCarrierRateCardPrices_ShowsNoPricingFailure()
+    {
+        PlannedWithOrder(CarriedBy.Carrier(VanDijk));
+
+        var shipments = await _handler.Handle(new ListShipmentsToReleaseQuery(), CancellationToken.None);
+
+        shipments.Should().ContainSingle().Which.PricingFailure.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Handle_AnOwnFleetShipment_ShowsNoPricingFailure_AndReadsNoCarrierRateCard()
+    {
+        PlannedWithOrder(CarriedBy.OwnFleet);
+
+        var shipments = await _handler.Handle(new ListShipmentsToReleaseQuery(), CancellationToken.None);
+
+        shipments.Should().ContainSingle().Which.PricingFailure.Should().BeNull();
+        _carrierRateCards.DidNotReceive().FindFor(Arg.Any<CarrierId>());
+    }
+
+    private (TransportOrder Order, Shipment Shipment) PlannedWithOrder(CarriedBy carriedBy)
+    {
+        var order = Samples.AcceptedOrder(sequence: 7);
+        var shipment = Samples.Planned(order, carriedBy, sequence: 12);
+        _repository.ListAsync(Arg.Any<ShipmentsToReleaseSpec>(), Arg.Any<CancellationToken>()).Returns([shipment]);
+        _transportOrders.ListAsync(Arg.Any<TransportOrdersByNumbersSpec>(), Arg.Any<CancellationToken>()).Returns([order]);
+        return (order, shipment);
+    }
+
+    // Van Dijk's Carrier Rate Card, which prices the sample from Rotterdam to Utrecht: up to 2,000 kg at 9.50 per 100 kg.
+    private static CarrierRateCard VanDijkRateCard(string laneDestination = "Utrecht") => new(
+        new RateCardId("CRC-0001"),
+        VanDijk,
+        [
+            new RateCardVersion(
+                2,
+                new DateOnly(2026, 1, 1),
+                null,
+                [new Zone(new ZoneName("Rotterdam"), "NL", ["30"]), new Zone(new ZoneName("Utrecht"), "NL", ["35"]), new Zone(new ZoneName("Groningen"), "NL", ["97"])],
+                [new Lane(new ZoneName("Rotterdam"), new ZoneName(laneDestination), [new WeightBreak(2_000m, new Money(9.50m))], new Money(35.00m))]),
+        ]);
 
     [Fact]
     public async Task Handle_PlannedShipments_ListsEachWithWhoCarriesIt()

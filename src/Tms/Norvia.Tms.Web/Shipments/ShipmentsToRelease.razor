@@ -31,7 +31,7 @@
                         break;
                     case ReleaseAnswer.Refused refused:
                         <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
-                            Shipment @outcome.ShipmentNumber wasn't released: @refused.Reason
+                            Shipment @outcome.ShipmentNumber wasn't released@(refused.Code is { } code ? $" ({code})" : string.Empty): @refused.Reason
                         </FluentMessageBar>
                         break;
                     default:
@@ -77,7 +77,7 @@
 
     @* Planned first, as the query gives them: the Shipment planned first is released first. *@
     <FluentDataGrid Items="shipments.AsQueryable()" TGridItem="ShipmentToReleaseSummary" Class="flatly-table" aria-label="Shipments to release"
-                    GridTemplateColumns="auto 1fr 1fr 1.1fr 1.1fr 1fr 1.6fr 1.4fr auto" MultiLine="true">
+                    GridTemplateColumns="auto minmax(8.5rem, 1fr) minmax(8.5rem, 1fr) 1.1fr 1.1fr 1fr 1.6fr minmax(8.5rem, 1.2fr) 1.4fr auto minmax(8.5rem, auto)" MultiLine="true">
         <TemplateColumn Title="Select">
             <FluentCheckbox Value="_selected.Contains(context.ShipmentNumber)"
                             ValueChanged="@((bool selected) => Select(context.ShipmentNumber, selected))"
@@ -96,6 +96,12 @@
             @if (context.LastCarrierBookingOutcome is { } outcome)
             {
                 @CarrierBookingText.LastOutcome(outcome)
+            }
+        </TemplateColumn>
+        <TemplateColumn Title="Pricing failure">
+            @if (context.PricingFailure is { } pricingFailure)
+            {
+                <strong title="@pricingFailure.Message">@pricingFailure.Code</strong>
             }
         </TemplateColumn>
         <TemplateColumn Title="Reassign to">
@@ -117,7 +123,22 @@
                 Reassign
             </FluentButton>
         </TemplateColumn>
+        <TemplateColumn Title="Spot price">
+            @* Only a Shipment its Carrier's Carrier Rate Card can't price, as the TMS says: a Spot price can't override a Carrier Rate Card that prices it (P9). *@
+            @if (context.PricingFailure is not null)
+            {
+                <FluentButton Appearance="Appearance.Outline" OnClick="() => OpenSpotPrice(context.ShipmentNumber)"
+                              aria-label="@($"Release {context.ShipmentNumber} with Spot price")">
+                    Release with Spot price
+                </FluentButton>
+            }
+        </TemplateColumn>
     </FluentDataGrid>
+
+    @if (_spotPriceFor is { } spotPriceShipment && shipments.Any(shipment => shipment.ShipmentNumber == spotPriceShipment && shipment.PricingFailure is not null))
+    {
+        <ReleaseWithSpotPricePanel @key="spotPriceShipment" ShipmentNumber="@spotPriceShipment" OnClosed="CloseSpotPrice" OnReleased="() => SpotPriceReleasedAsync(spotPriceShipment)" />
+    }
 </LiveListStates>
 
 @code {
@@ -129,6 +150,7 @@
     private readonly HashSet<string> _reassigning = [];
     private readonly Dictionary<string, string> _reassignTo = [];
     private readonly List<ReleaseOutcome> _releaseOutcomes = [];
+    private string? _spotPriceFor;
     private LiveTransportOrderList<ShipmentToReleaseSummary> _list = null!;
     private IReadOnlyList<CarrierView>? _carriers;
     private bool _carriersFailed;
@@ -212,6 +234,19 @@
         {
             _releasing = false;
         }
+    }
+
+    private void OpenSpotPrice(string number) => _spotPriceFor = number;
+
+    private void CloseSpotPrice() => _spotPriceFor = null;
+
+    private Task SpotPriceReleasedAsync(string number)
+    {
+        _spotPriceFor = null;
+        _selected.Remove(number);
+        _releaseOutcomes.RemoveAll(outcome => outcome.ShipmentNumber == number);
+        _releaseOutcomes.Add(new ReleaseOutcome(number, new ReleaseAnswer.Released()));
+        return Task.CompletedTask;
     }
 
     // The row isn't changed here: the list reads again shortly, and then shows who carries the Shipment now.

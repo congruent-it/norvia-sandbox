@@ -38,6 +38,33 @@ public sealed class CarrierCostAtReleaseTests(TmsFixture tms)
         cost["calculatedAt"]!.GetValue<DateTimeOffset>().Should().Be(body["occurredAt"]!.GetValue<DateTimeOffset>(), "it is calculated at release");
     }
 
+    [Theory]
+    [InlineData("NoRateCard")]
+    [InlineData("NoValidRateCardVersion")]
+    [InlineData("NoMatchingLane")]
+    [InlineData("WeightAboveHighestBreak")]
+    public async Task ShipmentsToRelease_ACarrierShipmentTheCarrierRateCardCantPrice_ShowsThePricingFailure_ThatTheReleaseWouldRefuseWith(string code)
+    {
+        var (booking, assignment, carrierName) = ShipmentThatFailsWith(code);
+        var shipmentNumber = await PlannedAsync(booking, assignment);
+
+        var listed = (await tms.ListShipmentsToReleaseAsync(_cancellationToken)).Single(shipment => shipment!["shipmentNumber"]!.GetValue<string>() == shipmentNumber)!;
+        var problem = await tms.ReleaseRefusedAsync(shipmentNumber, HttpStatusCode.UnprocessableEntity, _cancellationToken);
+
+        listed["pricingFailure"]!["code"]!.GetValue<string>().Should().Be(code).And.Be(problem["code"]!.GetValue<string>());
+        listed["pricingFailure"]!["message"]!.GetValue<string>().Should().Contain(carrierName);
+    }
+
+    [Fact]
+    public async Task ShipmentsToRelease_ACarrierShipmentTheCarrierRateCardPrices_ShowsNoPricingFailure()
+    {
+        var shipmentNumber = await PlannedAsync(Bookings.Valid(TmsCalls.NewReference()), PlanningCalls.ToCarrier());
+
+        var listed = (await tms.ListShipmentsToReleaseAsync(_cancellationToken)).Single(shipment => shipment!["shipmentNumber"]!.GetValue<string>() == shipmentNumber)!;
+
+        listed["pricingFailure"].Should().BeNull();
+    }
+
     [Fact]
     public async Task Release_FreightBelowTheLanesMinimum_PricesTheMinimumChargeAsAnAdjustmentLine()
     {
