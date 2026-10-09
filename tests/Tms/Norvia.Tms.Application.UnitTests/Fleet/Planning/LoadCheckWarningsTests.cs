@@ -2,14 +2,14 @@ using Ardalis.SharedKernel;
 using Ardalis.Specification;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
-using NSubstitute;
-using NSubstitute.ExceptionExtensions;
 using Norvia.Tms.Application.Fleet;
 using Norvia.Tms.Application.Fleet.Planning;
 using Norvia.Tms.Application.UnitTests.TransportOrders;
 using Norvia.Tms.Domain.Fleet;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TransportOrders;
+using NSubstitute;
+using NSubstitute.ExceptionExtensions;
 
 namespace Norvia.Tms.Application.UnitTests.Fleet.Planning;
 

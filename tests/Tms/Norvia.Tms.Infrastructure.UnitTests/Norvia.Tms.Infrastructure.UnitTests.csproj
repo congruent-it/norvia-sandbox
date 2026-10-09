@@ -18,6 +18,9 @@
     <PackageReference Include="xunit.v3.mtp-off" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\..\..\seed\norvia.seed.json" Link="DemoSeed\norvia.seed.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
     <Using Include="Xunit" />
     <Using Include="AwesomeAssertions" />
     <Using Include="NSubstitute" />
