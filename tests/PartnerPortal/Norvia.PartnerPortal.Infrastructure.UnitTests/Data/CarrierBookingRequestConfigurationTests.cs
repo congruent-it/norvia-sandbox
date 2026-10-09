@@ -22,7 +22,8 @@ public sealed class CarrierBookingRequestConfigurationTests
             new CarrierBookingStop("Waalhaven Oostzijde 88", "3087 BM", "Rotterdam", "NLD", new DateTime(2030, 10, 2, 7, 30, 0), new DateTime(2030, 10, 2, 11, 0, 0)),
             new CarrierBookingStop(null, null, "Düsseldorf", "DEU", null, null),
             "Getränke Schmitz GmbH",
-            [new CarrierBookingGoodsLine("pallet", 4, 2400m, 120m, 80m, 160m), new CarrierBookingGoodsLine("parcel", 3, 12m, null, null, null)]);
+            [new CarrierBookingGoodsLine("pallet", 4, 2400m, 120m, 80m, 160m), new CarrierBookingGoodsLine("parcel", 3, 12m, null, null, null)],
+            new CarrierCost("EUR", 412.50m, [new CarrierChargeLine("Freight", 400m), new CarrierChargeLine("MinimumChargeAdjustment", 12.50m)], IsSpot: true));
         using var context = NewContext();
         var property = context.Model.FindEntityType(typeof(CarrierBookingRequest))!.FindProperty(nameof(CarrierBookingRequest.Details))!;
         var converter = property.GetValueConverter()!;
@@ -33,6 +34,7 @@ public sealed class CarrierBookingRequestConfigurationTests
         read.Delivery.Should().Be(details.Delivery);
         read.ConsigneeName.Should().Be(details.ConsigneeName);
         read.Goods.Should().Equal(details.Goods);
+        read.CarrierCost.Should().BeEquivalentTo(details.CarrierCost);
     }
 
     [Fact]

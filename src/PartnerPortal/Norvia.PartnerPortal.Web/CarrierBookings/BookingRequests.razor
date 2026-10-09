@@ -70,7 +70,7 @@ else
     }
     @* Wide columns for what wraps (addresses, goods), narrow ones for what doesn't; multi-line, so a row grows to fit its text. *@
     <FluentDataGrid Items="_requests.AsQueryable()" TGridItem="CarrierBookingRequestView" Class="lux-table" aria-label="Booking requests"
-                    GridTemplateColumns="1.1fr minmax(13rem, 1.5fr) minmax(9rem, 1fr) 1.8fr 1.8fr 1.3fr 1.8fr 1.8fr" MultiLine="true">
+                    GridTemplateColumns="1.1fr minmax(13rem, 1.5fr) minmax(9rem, 1fr) 1.8fr 1.8fr 1.3fr 1.8fr 1.4fr 1.8fr" MultiLine="true">
         <PropertyColumn Title="Received" Property="@(request => PortalTime.Format(request.ReceivedAt))" />
         <PropertyColumn Title="Booking number" Property="@(request => request.CarrierBookingNumber)" />
         <PropertyColumn Title="Shipment" Property="@(request => request.ShipmentNumber)" />
@@ -89,9 +89,29 @@ else
                 }
             </ul>
         </TemplateColumn>
+        <TemplateColumn Title="Carrier cost">
+            @if (context.Details.CarrierCost is { } cost)
+            {
+                <div>@CarrierCostText.Total(cost)</div>
+                @if (cost.IsSpot)
+                {
+                    <div class="text-xs">Spot price</div>
+                }
+                <ul class="m-0 list-none p-0 text-xs">
+                    @foreach (var line in cost.ChargeLines)
+                    {
+                        <li>@CarrierCostText.Line(line)</li>
+                    }
+                </ul>
+            }
+        </TemplateColumn>
         <TemplateColumn Title="Answer">
             @if (context.IsOpen)
             {
+                @if (context.Details.CarrierCost is { } offered)
+                {
+                    <div class="mb-2 text-xs">Confirming accepts @CarrierCostText.Total(offered)@(offered.IsSpot ? " (Spot price)" : "").</div>
+                }
                 <div class="flex flex-wrap gap-2">
                     <FluentButton Appearance="Appearance.Accent" OnClick="() => Choose(context, AnswerKind.Confirm)" aria-label="@($"Confirm {context.CarrierBookingNumber}")">Confirm</FluentButton>
                     <FluentButton Appearance="Appearance.Outline" OnClick="() => Choose(context, AnswerKind.Reject)" aria-label="@($"Reject {context.CarrierBookingNumber}")">Reject</FluentButton>

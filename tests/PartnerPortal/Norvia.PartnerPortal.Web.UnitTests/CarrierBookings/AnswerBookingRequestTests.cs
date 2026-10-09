@@ -170,6 +170,26 @@ public sealed class AnswerBookingRequestTests : PortalWebContext
     }
 
     [Fact]
+    public void Reject_OffersPriceNotAccepted_AndSendsIt()
+    {
+        var request = Open();
+        NorviaReplies(Closed(request, CarrierBookingRequestStatus.Rejected), NorviaReply.Recorded("answer-1"));
+        var page = RenderInbox(request);
+        page.Find("[aria-label=\"Reject CB-0000001\"]").Click();
+        var panel = Panel(page, "Reject CB-0000001");
+        panel.QuerySelectorAll("fluent-option").Select(option => option.TextContent.Trim()).Should().Contain("Price not accepted");
+
+        panel.QuerySelector("fluent-select")!.Change("PriceNotAccepted");
+        panel.QuerySelector("form")!.Submit();
+
+        Portal.Received(1).AnswerCarrierBookingAsync(
+            new PersonaId("van-dijk-transport"),
+            "CB-0000001",
+            Arg.Is<CarrierAnswer>(answer => answer is CarrierAnswer.Rejection && ((CarrierAnswer.Rejection)answer).Reason == CarrierRejectionReason.PriceNotAccepted),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public void Answer_NorviaSaysTheBookingIsNotOpen_ShowsTheRequestWithdrawnByNorvia()
     {
         var request = Open();
