@@ -144,6 +144,296 @@
       ]
     }
   ],
+  "carrierRateCards": [
+    {
+      "$comment": "Van Dijk Transport's Carrier Rate Card: the Benelux Lanes out of Rotterdam, about 20% below Brouwer Dranken's Rate Card. It deliberately has no Zone in Germany, so releasing Rotterdam to Düsseldorf to Van Dijk finds no Lane and the Planner enters a Spot price (P9).",
+      "id": "CRC-0001",
+      "carrierId": "CAR-0001",
+      "versions": [
+        {
+          "version": 1,
+          "validFrom": "2026-01-01",
+          "validTo": null,
+          "zones": [
+            { "name": "Rotterdam", "country": "NL", "postcodePrefixes": ["30", "31", "32"] },
+            { "name": "Utrecht", "country": "NL", "postcodePrefixes": ["34", "35", "36", "37", "38", "39"] },
+            { "name": "Amsterdam", "country": "NL", "postcodePrefixes": ["10", "11", "12", "13", "14", "15"] },
+            { "name": "Antwerpen", "country": "BE", "postcodePrefixes": ["20", "21", "22", "23", "24", "25", "26", "27", "28", "29"] },
+            { "name": "Brussel", "country": "BE", "postcodePrefixes": ["10", "11", "12"] },
+            { "name": "Luxembourg", "country": "LU", "postcodePrefixes": ["1", "2", "3", "4", "5", "6", "7", "8", "9"] }
+          ],
+          "lanes": [
+            {
+              "origin": "Rotterdam",
+              "destination": "Rotterdam",
+              "minimumCharge": 44.00,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 7.60 },
+                { "upToKg": 1000, "pricePer100Kg": 6.56 },
+                { "upToKg": 2500, "pricePer100Kg": 5.52 },
+                { "upToKg": 24000, "pricePer100Kg": 3.84 }
+              ]
+            },
+            {
+              "origin": "Rotterdam",
+              "destination": "Utrecht",
+              "minimumCharge": 52.00,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 9.44 },
+                { "upToKg": 1000, "pricePer100Kg": 8.16 },
+                { "upToKg": 2500, "pricePer100Kg": 6.88 },
+                { "upToKg": 24000, "pricePer100Kg": 4.72 }
+              ]
+            },
+            {
+              "origin": "Rotterdam",
+              "destination": "Amsterdam",
+              "minimumCharge": 56.00,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 10.32 },
+                { "upToKg": 1000, "pricePer100Kg": 8.88 },
+                { "upToKg": 2500, "pricePer100Kg": 7.44 },
+                { "upToKg": 24000, "pricePer100Kg": 5.12 }
+              ]
+            },
+            {
+              "origin": "Rotterdam",
+              "destination": "Antwerpen",
+              "minimumCharge": 68.00,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 11.68 },
+                { "upToKg": 1000, "pricePer100Kg": 9.92 },
+                { "upToKg": 2500, "pricePer100Kg": 8.24 },
+                { "upToKg": 24000, "pricePer100Kg": 5.68 }
+              ]
+            },
+            {
+              "origin": "Rotterdam",
+              "destination": "Brussel",
+              "minimumCharge": 76.00,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 12.96 },
+                { "upToKg": 1000, "pricePer100Kg": 11.12 },
+                { "upToKg": 2500, "pricePer100Kg": 9.20 },
+                { "upToKg": 24000, "pricePer100Kg": 6.32 }
+              ]
+            },
+            {
+              "origin": "Rotterdam",
+              "destination": "Luxembourg",
+              "minimumCharge": 116.00,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 19.60 },
+                { "upToKg": 1000, "pricePer100Kg": 16.64 },
+                { "upToKg": 2500, "pricePer100Kg": 13.76 },
+                { "upToKg": 24000, "pricePer100Kg": 9.28 }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "$comment": "Kessler Spedition's Carrier Rate Card: the Benelux Lanes and Rotterdam to Düsseldorf, about 16% below Brouwer Dranken's Rate Card where it has the same Lane (P9).",
+      "id": "CRC-0002",
+      "carrierId": "CAR-0002",
+      "versions": [
+        {
+          "version": 1,
+          "validFrom": "2026-01-01",
+          "validTo": null,
+          "zones": [
+            { "name": "Rotterdam", "country": "NL", "postcodePrefixes": ["30", "31", "32"] },
+            { "name": "Utrecht", "country": "NL", "postcodePrefixes": ["34", "35", "36", "37", "38", "39"] },
+            { "name": "Amsterdam", "country": "NL", "postcodePrefixes": ["10", "11", "12", "13", "14", "15"] },
+            { "name": "Antwerpen", "country": "BE", "postcodePrefixes": ["20", "21", "22", "23", "24", "25", "26", "27", "28", "29"] },
+            { "name": "Brussel", "country": "BE", "postcodePrefixes": ["10", "11", "12"] },
+            { "name": "Luxembourg", "country": "LU", "postcodePrefixes": ["1", "2", "3", "4", "5", "6", "7", "8", "9"] },
+            { "name": "Düsseldorf", "country": "DE", "postcodePrefixes": ["40", "41", "42"] }
+          ],
+          "lanes": [
+            {
+              "origin": "Rotterdam",
+              "destination": "Rotterdam",
+              "minimumCharge": 46.20,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 7.98 },
+                { "upToKg": 1000, "pricePer100Kg": 6.89 },
+                { "upToKg": 2500, "pricePer100Kg": 5.80 },
+                { "upToKg": 24000, "pricePer100Kg": 4.03 }
+              ]
+            },
+            {
+              "origin": "Rotterdam",
+              "destination": "Utrecht",
+              "minimumCharge": 54.60,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 9.91 },
+                { "upToKg": 1000, "pricePer100Kg": 8.57 },
+                { "upToKg": 2500, "pricePer100Kg": 7.22 },
+                { "upToKg": 24000, "pricePer100Kg": 4.96 }
+              ]
+            },
+            {
+              "origin": "Rotterdam",
+              "destination": "Amsterdam",
+              "minimumCharge": 58.80,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 10.84 },
+                { "upToKg": 1000, "pricePer100Kg": 9.32 },
+                { "upToKg": 2500, "pricePer100Kg": 7.81 },
+                { "upToKg": 24000, "pricePer100Kg": 5.38 }
+              ]
+            },
+            {
+              "origin": "Rotterdam",
+              "destination": "Antwerpen",
+              "minimumCharge": 71.40,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 12.26 },
+                { "upToKg": 1000, "pricePer100Kg": 10.42 },
+                { "upToKg": 2500, "pricePer100Kg": 8.65 },
+                { "upToKg": 24000, "pricePer100Kg": 5.96 }
+              ]
+            },
+            {
+              "origin": "Rotterdam",
+              "destination": "Brussel",
+              "minimumCharge": 79.80,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 13.61 },
+                { "upToKg": 1000, "pricePer100Kg": 11.68 },
+                { "upToKg": 2500, "pricePer100Kg": 9.66 },
+                { "upToKg": 24000, "pricePer100Kg": 6.64 }
+              ]
+            },
+            {
+              "origin": "Rotterdam",
+              "destination": "Luxembourg",
+              "minimumCharge": 121.80,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 20.58 },
+                { "upToKg": 1000, "pricePer100Kg": 17.47 },
+                { "upToKg": 2500, "pricePer100Kg": 14.45 },
+                { "upToKg": 24000, "pricePer100Kg": 9.74 }
+              ]
+            },
+            {
+              "origin": "Rotterdam",
+              "destination": "Düsseldorf",
+              "minimumCharge": 100.80,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 15.88 },
+                { "upToKg": 1000, "pricePer100Kg": 13.52 },
+                { "upToKg": 2500, "pricePer100Kg": 11.26 },
+                { "upToKg": 24000, "pricePer100Kg": 7.73 }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "$comment": "PakketPunt Express's Carrier Rate Card: every Lane in the seed's Zones, about 23% below Brouwer Dranken's Rate Card where it has the same Lane, so it always prices (P9).",
+      "id": "CRC-0003",
+      "carrierId": "CAR-0003",
+      "versions": [
+        {
+          "version": 1,
+          "validFrom": "2026-01-01",
+          "validTo": null,
+          "zones": [
+            { "name": "Rotterdam", "country": "NL", "postcodePrefixes": ["30", "31", "32"] },
+            { "name": "Utrecht", "country": "NL", "postcodePrefixes": ["34", "35", "36", "37", "38", "39"] },
+            { "name": "Amsterdam", "country": "NL", "postcodePrefixes": ["10", "11", "12", "13", "14", "15"] },
+            { "name": "Antwerpen", "country": "BE", "postcodePrefixes": ["20", "21", "22", "23", "24", "25", "26", "27", "28", "29"] },
+            { "name": "Brussel", "country": "BE", "postcodePrefixes": ["10", "11", "12"] },
+            { "name": "Luxembourg", "country": "LU", "postcodePrefixes": ["1", "2", "3", "4", "5", "6", "7", "8", "9"] },
+            { "name": "Düsseldorf", "country": "DE", "postcodePrefixes": ["40", "41", "42"] }
+          ],
+          "lanes": [
+            {
+              "origin": "Rotterdam",
+              "destination": "Rotterdam",
+              "minimumCharge": 42.35,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 7.32 },
+                { "upToKg": 1000, "pricePer100Kg": 6.31 },
+                { "upToKg": 2500, "pricePer100Kg": 5.31 },
+                { "upToKg": 24000, "pricePer100Kg": 3.70 }
+              ]
+            },
+            {
+              "origin": "Rotterdam",
+              "destination": "Utrecht",
+              "minimumCharge": 50.05,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 9.09 },
+                { "upToKg": 1000, "pricePer100Kg": 7.85 },
+                { "upToKg": 2500, "pricePer100Kg": 6.62 },
+                { "upToKg": 24000, "pricePer100Kg": 4.54 }
+              ]
+            },
+            {
+              "origin": "Rotterdam",
+              "destination": "Amsterdam",
+              "minimumCharge": 53.90,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 9.93 },
+                { "upToKg": 1000, "pricePer100Kg": 8.55 },
+                { "upToKg": 2500, "pricePer100Kg": 7.16 },
+                { "upToKg": 24000, "pricePer100Kg": 4.93 }
+              ]
+            },
+            {
+              "origin": "Rotterdam",
+              "destination": "Antwerpen",
+              "minimumCharge": 65.45,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 11.24 },
+                { "upToKg": 1000, "pricePer100Kg": 9.55 },
+                { "upToKg": 2500, "pricePer100Kg": 7.93 },
+                { "upToKg": 24000, "pricePer100Kg": 5.47 }
+              ]
+            },
+            {
+              "origin": "Rotterdam",
+              "destination": "Brussel",
+              "minimumCharge": 73.15,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 12.47 },
+                { "upToKg": 1000, "pricePer100Kg": 10.70 },
+                { "upToKg": 2500, "pricePer100Kg": 8.86 },
+                { "upToKg": 24000, "pricePer100Kg": 6.08 }
+              ]
+            },
+            {
+              "origin": "Rotterdam",
+              "destination": "Luxembourg",
+              "minimumCharge": 111.65,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 18.87 },
+                { "upToKg": 1000, "pricePer100Kg": 16.02 },
+                { "upToKg": 2500, "pricePer100Kg": 13.24 },
+                { "upToKg": 24000, "pricePer100Kg": 8.93 }
+              ]
+            },
+            {
+              "origin": "Rotterdam",
+              "destination": "Düsseldorf",
+              "minimumCharge": 92.40,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 14.55 },
+                { "upToKg": 1000, "pricePer100Kg": 12.40 },
+                { "upToKg": 2500, "pricePer100Kg": 10.32 },
+                { "upToKg": 24000, "pricePer100Kg": 7.08 }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
   "carriers": [
     {
       "id": "CAR-0001",

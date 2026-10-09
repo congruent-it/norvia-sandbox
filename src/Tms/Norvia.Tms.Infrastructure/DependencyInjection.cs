@@ -98,6 +98,7 @@ public static class DependencyInjection
         builder.Services.AddScoped<IPipelineBehavior<SubmitTransportOrderCommand, Result<SubmitTransportOrderResult>>, RetrySubmissionThatLostARace>();
         builder.Services.AddSingleton<IShipperDirectory, SeedFileShipperDirectory>();
         builder.Services.AddSingleton<IRateCardDirectory, SeedFileRateCardDirectory>();
+        builder.Services.AddSingleton<ICarrierRateCardDirectory, SeedFileCarrierRateCardDirectory>();
         builder.Services.AddSingleton<ICarrierDirectory, SeedFileCarrierDirectory>();
         builder.Services.AddHostedService<LoadSeedOnStart>();
 
