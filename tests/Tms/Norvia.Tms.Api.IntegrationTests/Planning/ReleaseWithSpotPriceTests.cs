@@ -110,6 +110,27 @@ public sealed class ReleaseWithSpotPriceTests(TmsFixture tms)
     }
 
     [Fact]
+    public async Task ReleaseWithSpotPrice_SentAgainUnderTheSameKeyWithAnotherPrice_AnswersAsBefore_AndKeepsTheFirstSpotPrice()
+    {
+        var shipmentNumber = await UnpricedAsync();
+        var key = Guid.NewGuid().ToString();
+        using var first = await tms.ReleaseWithSpotPriceAsync(shipmentNumber, PlanningCalls.Spot(480m, Remark), _cancellationToken, idempotencyKey: key);
+        var released = JsonNode.Parse(await first.Content.ReadAsStringAsync(_cancellationToken))!;
+
+        using var again = await tms.ReleaseWithSpotPriceAsync(shipmentNumber, PlanningCalls.Spot(520m, "Changed my mind"), _cancellationToken, idempotencyKey: key);
+
+        var body = await again.Content.ReadAsStringAsync(_cancellationToken);
+        again.StatusCode.Should().Be(HttpStatusCode.OK, body);
+        var repeat = JsonNode.Parse(body)!;
+        repeat["repeat"]!.GetValue<bool>().Should().BeTrue();
+        repeat["carrierBookingNumber"]!.GetValue<string>().Should().Be(released["carrierBookingNumber"]!.GetValue<string>());
+        var shipment = await tms.GetShipmentAsync(shipmentNumber, _cancellationToken);
+        shipment["carrierBookings"]!.AsArray().Should().ContainSingle();
+        CarrierBookingCalls.BookingOf(shipment, released["carrierBookingNumber"]!.GetValue<string>())["carrierCost"]!["total"]!
+            .GetValue<decimal>().Should().Be(480m);
+    }
+
+    [Fact]
     public async Task ReleaseWithSpotPrice_WithARemarkOverTheLimit_IsRefused()
     {
         var shipmentNumber = await UnpricedAsync();

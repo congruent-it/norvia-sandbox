@@ -256,6 +256,23 @@ public sealed class ReleaseShipmentHandlerTests
     }
 
     [Fact]
+    public async Task Handle_TheSameReleaseSentAgainWithAnotherSpotPrice_AnswersAsBefore_AndKeepsTheFirstCarrierCost()
+    {
+        _carrierRateCards.FindFor(VanDijk).Returns(VanDijkRateCard(laneDestination: "Groningen"));
+        var (_, shipment) = PlannedShipment(CarriedBy.Carrier(VanDijk));
+        _carrierBookingNumbers.NextAsync(Arg.Any<CancellationToken>()).Returns(BookingNumber);
+        var first = await _handler.Handle(new ReleaseShipmentCommand("SH-0000012", "key-rel1", "corr-release", new SpotPrice(480m, "first")), CancellationToken.None);
+        shipment.ClearDomainEvents();
+        _carrierBookings.ClearReceivedCalls();
+
+        var repeat = await _handler.Handle(new ReleaseShipmentCommand("SH-0000012", "key-rel1", "corr-retry", new SpotPrice(520m, "second")), CancellationToken.None);
+
+        repeat.Value.Should().Be(first.Value with { Repeat = true });
+        shipment.DomainEvents.Should().BeEmpty();
+        await _carrierBookings.DidNotReceive().AddAsync(Arg.Any<CarrierBooking>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Handle_SpotPriceAfterTheCarrierRateCardFailed_ReleasesWithASpotCarrierCostOnTheBooking()
     {
         _carrierRateCards.FindFor(VanDijk).Returns(VanDijkRateCard(laneDestination: "Groningen"));
