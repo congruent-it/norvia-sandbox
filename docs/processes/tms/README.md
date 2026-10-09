@@ -1,6 +1,6 @@
 # TMS business processes
 
-The catalogue of business processes the TMS supports. It is documented in full so we can plan and build each one later; the first build is a single thin end-to-end slice. Terms are defined in [CONTEXT.md](../../../CONTEXT.md).
+The catalogue of business processes the TMS supports. It is documented in full so we can plan and build each one later; the first build is a single thin end-to-end slice. Terms are defined in [GLOSSARY.md](../../../GLOSSARY.md).
 
 Norvia runs a **mixed** operation: its own fleet handles regional and Benelux transport, and subcontracted Carriers handle long-haul, parcel and peak volume. Some processes apply to only one side of that split. The "Applies to" column says which.
 

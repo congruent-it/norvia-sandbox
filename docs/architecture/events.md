@@ -1,6 +1,6 @@
 # Events: publishers and subscribers
 
-The event catalogue. Every event the estate publishes, with the topic it goes to, who publishes it, the subscriptions that receive it, who reads each subscription, and the process that owns it. This page alone owns publishers and subscribers: a process doc's Events table says what the event carries and links here for who reads it. Terms are defined in [CONTEXT.md](../../CONTEXT.md).
+The event catalogue. Every event the estate publishes, with the topic it goes to, who publishes it, the subscriptions that receive it, who reads each subscription, and the process that owns it. This page alone owns publishers and subscribers: a process doc's Events table says what the event carries and links here for who reads it. Terms are defined in [GLOSSARY.md](../../GLOSSARY.md).
 
 An event's body is its [Canonical Model](../../contracts/canonical-model/README.md) schema, linked from the first column. Events go out as Service Bus messages ([ADR 0003](../adr/0003-http-in-events-out.md)); the topics and subscriptions are declared in [messaging.bicep](../../infra/estate/messaging.bicep) for Azure and in the [AppHost](../../src/Norvia.AppHost/AppHost.cs) for the local emulator. Every subscription's filter also passes a message resubmitted from the Integration console to the subscription it was dead-lettered from alone ([coding guidelines §7](../coding-guidelines.md)); the sentences below leave that out.
 
@@ -34,7 +34,7 @@ Subscriptions and subscribers marked *planned* are designed in a process doc but
 | [`CarrierBookingCancelled`](../../contracts/canonical-model/carrier-booking-cancelled.v1.schema.json) | `shipment-events` | TMS | `monitoring` (every message)<br/>`carrier-cancellation` (`CarrierBookingCancelled` and `CarrierBookingWithdrawn` only) | Monitoring<br/>Carrier cancellation Logic App (P7) | [P7](../processes/tms/p7-exception-handling.md) |
 | [`CarrierCancellationNotDelivered`](../../contracts/canonical-model/carrier-cancellation-not-delivered.v1.schema.json) | `shipment-events` | TMS | `monitoring` (every message) | Monitoring | [P7](../processes/tms/p7-exception-handling.md) |
 | [`ShipmentDeliveryWindowAgreed`](../../contracts/canonical-model/shipment-delivery-window-agreed.v1.schema.json) | `shipment-events` | TMS | `monitoring` (every message) | Monitoring | [P7](../processes/tms/p7-exception-handling.md) |
-| `CarrierCostIncurred` *planned* | `shipment-events` | TMS | `carrier-cost` *planned* (`CarrierCostIncurred` only) | Carrier cost Logic App (P9) *planned* | [P9](../processes/tms/p9-freight-settlement.md) |
+| [`CarrierCostIncurred`](../../contracts/canonical-model/carrier-cost-incurred.v1.schema.json) | `shipment-events` | TMS | `carrier-cost` *planned* (`CarrierCostIncurred` only) | Carrier cost Logic App (P9) *planned* | [P9](../processes/tms/p9-freight-settlement.md) |
 
 ## Reading the table
 

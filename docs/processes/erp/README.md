@@ -1,6 +1,6 @@
 # ERP business processes
 
-The catalogue of business processes the ERP supports. The ERP is Norvia's system of record for Shipper and Carrier master data, Contracts, Rate Cards, Carrier Rate Cards and invoicing (ADR 0002). It is built as a realistic application with its own domain model, persistence and UI (ADR 0001), and it talks to the TMS only through Azure Integration Services. Terms are defined in [CONTEXT.md](../../../CONTEXT.md).
+The catalogue of business processes the ERP supports. The ERP is Norvia's system of record for Shipper and Carrier master data, Contracts, Rate Cards, Carrier Rate Cards and invoicing (ADR 0002). It is built as a realistic application with its own domain model, persistence and UI (ADR 0001), and it talks to the TMS only through Azure Integration Services. Terms are defined in [GLOSSARY.md](../../../GLOSSARY.md).
 
 The ERP's first slice is invoicing, which the TMS's [P9 Freight settlement](../tms/p9-freight-settlement.md) needs. In this slice the ERP loads Shippers, Carriers, Rate Cards and Carrier Rate Cards from the seed file, with the same IDs as the TMS, and shows them read-only. Editing them, and syncing them to the TMS, come later.
 

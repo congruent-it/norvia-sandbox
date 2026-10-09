@@ -68,7 +68,7 @@ Formatting and naming are enforced by the root `.editorconfig` and `dotnet forma
 - Async all the way: every I/O method is `async`, ends in `Async` and accepts a `CancellationToken` as its last parameter, which it passes on. Never call `.Result`, `.Wait()` or `GetAwaiter().GetResult()`.
 - Do not use exceptions for expected outcomes (not found, validation failed, invalid state transition). Return a result type and let the endpoint map it to a status code. Exceptions are for bugs and infrastructure failures.
 - Prefer small, intention-revealing methods over comments. Comment *why*, not *what*.
-- Use the domain terms from [CONTEXT.md](../CONTEXT.md) in type, method and variable names. If a term is missing, add it there before coding it.
+- Use the domain terms from [GLOSSARY.md](../GLOSSARY.md) in type, method and variable names. If a term is missing, add it there before coding it.
 
 ## 4. Domain model
 

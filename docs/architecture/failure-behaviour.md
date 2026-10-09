@@ -1,6 +1,6 @@
 # Failure behaviour per Flow
 
-What happens when each hop of each Flow fails: how often it is retried, where a message that can't be delivered ends up and with which `failureCode`, who is told, what the Integration console can do about it, and which as-found toggle breaks it. For engineers and coding agents working on the estate and for the technical audience of a demo. Azure is the estate [c4.md](c4.md) draws; what plays each piece locally is in [local-vs-azure.md](local-vs-azure.md). Terms are defined in [CONTEXT.md](../../CONTEXT.md), **Flow** included.
+What happens when each hop of each Flow fails: how often it is retried, where a message that can't be delivered ends up and with which `failureCode`, who is told, what the Integration console can do about it, and which as-found toggle breaks it. For engineers and coding agents working on the estate and for the technical audience of a demo. Azure is the estate [c4.md](c4.md) draws; what plays each piece locally is in [local-vs-azure.md](local-vs-azure.md). Terms are defined in [GLOSSARY.md](../../GLOSSARY.md), **Flow** included.
 
 The page is also the as-found backlog. Everything marked *planned* is designed in a process doc or an ADR and not built yet, and that includes **every alert and every toggle**: today [monitoring.bicep](../../infra/estate/monitoring.bicep) declares the workspace and Application Insights and no alert rule, and no Bicep parameter switches anything broken. So the estate is, for now, as found in the worst way: a failure is recorded and can be found, and nobody is told.
 

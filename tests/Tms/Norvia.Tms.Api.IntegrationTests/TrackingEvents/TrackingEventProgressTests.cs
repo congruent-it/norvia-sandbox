@@ -77,7 +77,8 @@ public sealed class TrackingEventProgressTests(ControlledClockTmsFixture tms) : 
         await tms.PublishedAsync(correlationIds[4], "ShipmentDelivered", _cancellationToken);
         await TmsFixture.SettleOutboxAsync(_cancellationToken);
         var published = correlationIds.Select(id => tms.Published.Where(m => m.CorrelationId == id).Select(m => m.Subject).ToArray()).ToArray();
-        published.Select(subjects => string.Join(',', subjects)).Should().Equal("ShipmentCollected", "ShipmentInTransit", string.Empty, string.Empty, "ShipmentDelivered");
+        published.Select(subjects => string.Join(',', subjects.Order())).Should().Equal(
+            "ShipmentCollected", "ShipmentInTransit", string.Empty, string.Empty, "CarrierCostIncurred,ShipmentDelivered");
     }
 
     [Fact]

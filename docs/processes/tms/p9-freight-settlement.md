@@ -1,6 +1,6 @@
 # P9 Freight settlement
 
-Freight settlement makes sure Norvia is paid for each Transport Order it delivers, and pays each Carrier the price it agreed. The TMS decides when a Transport Order is Billable and hands it to the ERP with its frozen Freight Charge. It prices each Carrier booking at release and hands its Carrier cost to the ERP once the Shipment is Delivered. The ERP does the rest: Invoice runs, Credit notes and Matching Carrier invoices. This document covers the TMS side. The ERP side is [E1 Invoicing](../erp/e1-invoicing.md) and [E2 Carrier invoice matching](../erp/e2-carrier-invoice-matching.md). Terms are defined in [CONTEXT.md](../../../CONTEXT.md).
+Freight settlement makes sure Norvia is paid for each Transport Order it delivers, and pays each Carrier the price it agreed. The TMS decides when a Transport Order is Billable and hands it to the ERP with its frozen Freight Charge. It prices each Carrier booking at release and hands its Carrier cost to the ERP once the Shipment is Delivered. The ERP does the rest: Invoice runs, Credit notes and Matching Carrier invoices. This document covers the TMS side. The ERP side is [E1 Invoicing](../erp/e1-invoicing.md) and [E2 Carrier invoice matching](../erp/e2-carrier-invoice-matching.md). Terms are defined in [GLOSSARY.md](../../../GLOSSARY.md).
 
 | | |
 |---|---|

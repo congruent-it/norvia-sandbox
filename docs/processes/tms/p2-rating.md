@@ -1,6 +1,6 @@
 # P2 Rating
 
-Rating calculates the Freight Charge for an accepted Transport Order from the Shipper's Rate Card. It covers only what Norvia charges the Shipper. What a Carrier costs Norvia is not part of it. Terms are defined in [CONTEXT.md](../../../CONTEXT.md).
+Rating calculates the Freight Charge for an accepted Transport Order from the Shipper's Rate Card. It covers only what Norvia charges the Shipper. What a Carrier costs Norvia is not part of it. Terms are defined in [GLOSSARY.md](../../../GLOSSARY.md).
 
 | | |
 |---|---|

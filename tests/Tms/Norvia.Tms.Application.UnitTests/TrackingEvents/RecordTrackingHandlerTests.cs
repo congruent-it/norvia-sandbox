@@ -554,6 +554,42 @@ public sealed class RecordTrackingHandlerTests
     }
 
     [Fact]
+    public async Task Handle_TheDeliveredEventForAShipmentWhoseBookingHasACarrierCost_RaisesCarrierCostIncurred_OnTheEventsTrail_InTheSameSave()
+    {
+        var shipment = BookedShipment(CarrierCost.Spot(new Money(480m), "Agreed by phone", Samples.Now));
+
+        await _handler.Handle(Collected(type: TrackingEventType.Delivered, correlationId: "corr-delivered"), CancellationToken.None);
+
+        var incurred = shipment.DomainEvents.OfType<CarrierCostIncurredEvent>().Should().ContainSingle().Subject;
+        incurred.DeliveredEvent.CorrelationId.Should().Be(new CorrelationId("corr-delivered"));
+        await _trackingEvents.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(TrackingEventType.Collected)]
+    [InlineData(TrackingEventType.Arrived)]
+    public async Task Handle_AnEventThatIsNotTheDeliveredOne_RaisesNoCarrierCostIncurred(TrackingEventType type)
+    {
+        var shipment = BookedShipment(CarrierCost.Spot(new Money(480m), "Agreed by phone", Samples.Now));
+
+        await _handler.Handle(Collected(type: type), CancellationToken.None);
+
+        shipment.DomainEvents.OfType<CarrierCostIncurredEvent>().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Handle_ADeliveredEventSentAgain_RaisesNoSecondCarrierCostIncurred()
+    {
+        var shipment = BookedShipment(CarrierCost.Spot(new Money(480m), "Agreed by phone", Samples.Now));
+        await _handler.Handle(Collected(type: TrackingEventType.Delivered, sourceEventId: "evt-del"), CancellationToken.None);
+        shipment.ClearDomainEvents();
+
+        await _handler.Handle(Collected(type: TrackingEventType.Delivered, sourceEventId: "evt-del-2"), CancellationToken.None);
+
+        shipment.DomainEvents.OfType<CarrierCostIncurredEvent>().Should().BeEmpty("the Shipment was Delivered already");
+    }
+
+    [Fact]
     public async Task Handle_DeliveredForABookedShipment_StoresTheEvent_MovesTheShipment_AndRaisesTheEvent_InOneSave()
     {
         var shipment = BookedShipment();
@@ -602,14 +638,14 @@ public sealed class RecordTrackingHandlerTests
                 "Dock 4"),
             correlationId);
 
-    private Shipment BookedShipment()
+    private Shipment BookedShipment(CarrierCost? carrierCost = null)
     {
         var order = Samples.AcceptedOrder(sequence: 7);
         var shipment = Samples.Planned(order, CarriedBy.Carrier(VanDijk), sequence: 12);
         shipment.Release(order, new IdempotencyKey("key-rel1"), new CorrelationId("corr-release"), Samples.Now.AddHours(1), BookingNumber);
         shipment.Book();
         shipment.ClearDomainEvents();
-        var booking = ConfirmedBooking(shipment);
+        var booking = ConfirmedBooking(shipment, carrierCost);
 
         _carrierBookings.SingleOrDefaultAsync(Arg.Is<ConfirmedCarrierBookingByReferenceSpec>(s => s.CarrierBookingReference == "VDT-1" && s.CarrierId == VanDijk), Arg.Any<CancellationToken>())
             .Returns(booking);
@@ -630,9 +666,9 @@ public sealed class RecordTrackingHandlerTests
         return order;
     }
 
-    private static CarrierBooking ConfirmedBooking(Shipment shipment)
+    private static CarrierBooking ConfirmedBooking(Shipment shipment, CarrierCost? carrierCost = null)
     {
-        var booking = CarrierBooking.Request(BookingNumber, shipment.Id, shipment.Number, VanDijk, new CorrelationId("corr-release"), Samples.Now.AddHours(1));
+        var booking = CarrierBooking.Request(BookingNumber, shipment.Id, shipment.Number, VanDijk, new CorrelationId("corr-release"), Samples.Now.AddHours(1), carrierCost);
         booking.Confirm("VDT-1", plannedCollectionTime: null, shipment.TransportOrderNumber, new CorrelationId("corr-answer"), Samples.Now.AddHours(2));
         return booking;
     }

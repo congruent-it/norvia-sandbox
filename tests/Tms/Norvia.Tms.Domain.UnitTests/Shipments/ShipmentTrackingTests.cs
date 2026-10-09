@@ -205,6 +205,59 @@ public sealed class ShipmentTrackingTests
         shipment.DomainEvents.Should().BeEmpty();
     }
 
+    [Fact]
+    public void IncurCarrierCost_ForAConfirmedBookingWithACarrierCost_RaisesCarrierCostIncurred()
+    {
+        var shipment = Booked();
+        var delivered = Report(shipment, TrackingEventType.Delivered);
+        shipment.ClearDomainEvents();
+        var cost = CarrierCost.Spot(new Money(480m), "Agreed by phone", ReceivedAt);
+        var booking = ConfirmedBooking(shipment, cost);
+
+        shipment.IncurCarrierCost(booking, delivered);
+
+        var raised = shipment.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<CarrierCostIncurredEvent>().Subject;
+        raised.Shipment.Should().BeSameAs(shipment);
+        raised.Booking.Should().BeSameAs(booking);
+        raised.CarrierCost.Should().Be(cost);
+        raised.DeliveredEvent.Should().BeSameAs(delivered);
+    }
+
+    [Fact]
+    public void IncurCarrierCost_ForABookingWithoutACarrierCost_RaisesNothing()
+    {
+        var shipment = Booked();
+        var delivered = Report(shipment, TrackingEventType.Delivered);
+        shipment.ClearDomainEvents();
+
+        shipment.IncurCarrierCost(ConfirmedBooking(shipment, carrierCost: null), delivered);
+
+        shipment.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void IncurCarrierCost_ForABookingThatIsNotConfirmed_RaisesNothing()
+    {
+        var shipment = Booked();
+        var delivered = Report(shipment, TrackingEventType.Delivered);
+        shipment.ClearDomainEvents();
+        var requested = CarrierBooking.Request(
+            CarrierBookingNumber.FromSequence(42), shipment.Id, shipment.Number, new CarrierId("CAR-0001"), new CorrelationId("corr-release"), ReceivedAt,
+            CarrierCost.Spot(new Money(480m), "Agreed by phone", ReceivedAt));
+
+        shipment.IncurCarrierCost(requested, delivered);
+
+        shipment.DomainEvents.Should().BeEmpty();
+    }
+
+    private static CarrierBooking ConfirmedBooking(Shipment shipment, CarrierCost? carrierCost)
+    {
+        var booking = CarrierBooking.Request(
+            CarrierBookingNumber.FromSequence(42), shipment.Id, shipment.Number, new CarrierId("CAR-0001"), new CorrelationId("corr-release"), ReceivedAt, carrierCost);
+        booking.Confirm("VDT-1", plannedCollectionTime: null, shipment.TransportOrderNumber, new CorrelationId("corr-answer"), ReceivedAt.AddHours(1));
+        return booking;
+    }
+
     private static TrackingEvent Collected(Shipment shipment, DateTimeOffset? eta, string sourceEventId = "evt-1") =>
         shipment.Record(
             new TrackingReport(Source, sourceEventId, "VDT-1", null, TrackingEventType.Collected, EventTime, Location, eta, "Dock 4"),

@@ -1,6 +1,6 @@
 # Local vs Azure
 
-What plays each Azure piece when the estate runs under Aspire on a developer's machine (`dotnet run` on the AppHost), and where the two can differ. Azure is the estate [c4.md](c4.md) draws. The estate Bicep in [infra/](../../infra/) owns it there, and the AppHost owns the applications in both ([ADR 0004](../adr/0004-bicep-owns-the-estate-aspire-owns-the-apps.md)). Terms are defined in [CONTEXT.md](../../CONTEXT.md).
+What plays each Azure piece when the estate runs under Aspire on a developer's machine (`dotnet run` on the AppHost), and where the two can differ. Azure is the estate [c4.md](c4.md) draws. The estate Bicep in [infra/](../../infra/) owns it there, and the AppHost owns the applications in both ([ADR 0004](../adr/0004-bicep-owns-the-estate-aspire-owns-the-apps.md)). Terms are defined in [GLOSSARY.md](../../GLOSSARY.md).
 
 Locally there is no Azure subscription, no API Management, no Logic Apps runtime and no Entra. The stand-ins run the same code the Azure pieces run (the maps in `Norvia.Integration.CarrierBooking`, `IntakeMap` and the rest), so a booking, an answer, a Tracking event or a Proof of delivery travels the same path through the applications and reaches the TMS the same way. The Partner portal, the TMS API, the TMS UI and the Integration console are the same applications in both. Neither stand-in runs in Azure: `azd` never deploys them.
 

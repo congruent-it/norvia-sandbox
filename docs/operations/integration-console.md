@@ -1,6 +1,6 @@
 # Integration console
 
-The Integration console is where the Integration operator finds out what the integration layer did with a message, and resolves the messages that failed in it. It shows Message trails, failed Logic App runs and dead-lettered messages, and it can resubmit or discard a dead-lettered message. It reads what the estate already records and keeps nothing of its own ([ADR 0017](../adr/0017-the-integration-console-reads-the-estates-telemetry-and-stores-nothing.md)). Terms are defined in [CONTEXT.md](../../CONTEXT.md).
+The Integration console is where the Integration operator finds out what the integration layer did with a message, and resolves the messages that failed in it. It shows Message trails, failed Logic App runs and dead-lettered messages, and it can resubmit or discard a dead-lettered message. It reads what the estate already records and keeps nothing of its own ([ADR 0017](../adr/0017-the-integration-console-reads-the-estates-telemetry-and-stores-nothing.md)). Terms are defined in [GLOSSARY.md](../../GLOSSARY.md).
 
 | | |
 |---|---|

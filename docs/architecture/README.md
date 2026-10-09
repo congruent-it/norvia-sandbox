@@ -1,6 +1,6 @@
 # Architecture
 
-How Norvia's estate is put together, for engineers and coding agents working on it and for the technical audience of a demo. Each page covers one topic. What a process does, step by step, is in its [process doc](../processes/tms/README.md); how it is built goes in that doc's Implementation section, which the processes are getting one by one. Terms are defined in [CONTEXT.md](../../CONTEXT.md), **Flow** included.
+How Norvia's estate is put together, for engineers and coding agents working on it and for the technical audience of a demo. Each page covers one topic. What a process does, step by step, is in its [process doc](../processes/tms/README.md); how it is built goes in that doc's Implementation section, which the processes are getting one by one. Terms are defined in [GLOSSARY.md](../../GLOSSARY.md), **Flow** included.
 
 | Page | Covers |
 |---|---|

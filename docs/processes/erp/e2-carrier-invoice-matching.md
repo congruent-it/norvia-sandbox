@@ -1,6 +1,6 @@
 # E2 Carrier invoice matching
 
-Carrier invoice matching checks what a Carrier asks to be paid against the Carrier cost Norvia agreed for each Carrier booking. The TMS hands the ERP each Carrier cost once the Shipment is Delivered. The Carrier sends a Carrier invoice from its Persona through API Management. The ERP matches each line, approves an invoice that matches in full, puts the rest in front of Finance, and tells the Carrier the outcome. This is the ERP half of [P9 Freight settlement](../tms/p9-freight-settlement.md). Terms are defined in [CONTEXT.md](../../../CONTEXT.md).
+Carrier invoice matching checks what a Carrier asks to be paid against the Carrier cost Norvia agreed for each Carrier booking. The TMS hands the ERP each Carrier cost once the Shipment is Delivered. The Carrier sends a Carrier invoice from its Persona through API Management. The ERP matches each line, approves an invoice that matches in full, puts the rest in front of Finance, and tells the Carrier the outcome. This is the ERP half of [P9 Freight settlement](../tms/p9-freight-settlement.md). Terms are defined in [GLOSSARY.md](../../../GLOSSARY.md).
 
 | | |
 |---|---|

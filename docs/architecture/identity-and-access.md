@@ -1,6 +1,6 @@
 # Identity and access
 
-Who each identity is in Entra, which app roles it holds, which APIs it may call, and which Service Bus subscriptions, containers and secrets it may read. For engineers and coding agents working on the estate and for the technical audience of a demo. Azure is the estate [c4.md](c4.md) draws; what plays Entra locally is in [local-vs-azure.md](local-vs-azure.md#the-map). Terms are defined in [CONTEXT.md](../../CONTEXT.md).
+Who each identity is in Entra, which app roles it holds, which APIs it may call, and which Service Bus subscriptions, containers and secrets it may read. For engineers and coding agents working on the estate and for the technical audience of a demo. Azure is the estate [c4.md](c4.md) draws; what plays Entra locally is in [local-vs-azure.md](local-vs-azure.md#the-map). Terms are defined in [GLOSSARY.md](../../GLOSSARY.md).
 
 Everything is declared in [identities.bicep](../../infra/estate/identities.bicep) and the role assignments beside each resource in [infra/estate/](../../infra/estate/). No application holds a client secret: every caller is a managed identity, and the Persona client apps trust the Partner portal's managed identity through federated credentials ([ADR 0005](../adr/0005-partner-identity-comes-from-the-token.md)). There is no drift test for this page; the [coding guidelines §11](../coding-guidelines.md#11-workflow) rule that a PR changing an app role updates the matching architecture page keeps it current.
 

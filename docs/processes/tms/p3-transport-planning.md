@@ -1,6 +1,6 @@
 # P3 Transport planning
 
-Transport planning turns an accepted Transport Order into a Shipment and decides who carries it: Norvia's Own fleet or a Carrier. The Planner does this by hand in the TMS UI and then releases the Shipment, which hands it over to Carrier booking (P4) or Trip dispatch (P11). Terms are defined in [CONTEXT.md](../../../CONTEXT.md).
+Transport planning turns an accepted Transport Order into a Shipment and decides who carries it: Norvia's Own fleet or a Carrier. The Planner does this by hand in the TMS UI and then releases the Shipment, which hands it over to Carrier booking (P4) or Trip dispatch (P11). Terms are defined in [GLOSSARY.md](../../../GLOSSARY.md).
 
 | | |
 |---|---|

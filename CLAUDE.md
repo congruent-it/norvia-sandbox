@@ -12,7 +12,7 @@ The five default triage labels (`needs-triage`, `needs-info`, `ready-for-agent`,
 
 ### Domain docs
 
-Single-context: a root `CONTEXT.md` and `docs/adr/`. See `docs/agents/domain.md`.
+Single-context: a root `GLOSSARY.md` and `docs/adr/`. See `docs/agents/domain.md`.
 
 ## Coding guidelines
 
