@@ -34,12 +34,20 @@ public sealed class DayLoads(
     }
 
     /// <summary>The day's capacity from its active Drivers' Shifts and active available Vehicles, against the demand.</summary>
-    public DayLoadView Of(PlanningDay day, IReadOnlyDictionary<DateOnly, FleetLoad> demandByDay)
+    public DayLoadView Of(PlanningDay day, IReadOnlyDictionary<DateOnly, FleetLoad> demandByDay) =>
+        LoadOf(day, demandByDay, drivers.ListActive().ToDictionary(driver => driver.Id), vehicles.ListActive().ToDictionary(vehicle => vehicle.Id));
+
+    /// <summary>As above, for many days at once, with the active Drivers and Vehicles looked up once.</summary>
+    public static DayLoadView LoadOf(
+        PlanningDay day,
+        IReadOnlyDictionary<DateOnly, FleetLoad> demandByDay,
+        IReadOnlyDictionary<DriverId, Driver> activeDrivers,
+        IReadOnlyDictionary<VehicleId, Vehicle> activeVehicles)
     {
         ArgumentNullException.ThrowIfNull(day);
         ArgumentNullException.ThrowIfNull(demandByDay);
-        var activeDrivers = drivers.ListActive().ToDictionary(driver => driver.Id);
-        var activeVehicles = vehicles.ListActive().ToDictionary(vehicle => vehicle.Id);
+        ArgumentNullException.ThrowIfNull(activeDrivers);
+        ArgumentNullException.ThrowIfNull(activeVehicles);
         var capacity = LoadCheck.CapacityOf(
             day.AvailableVehicles.Where(activeVehicles.ContainsKey).Select(id => activeVehicles[id]),
             day.Shifts.Where(shift => activeDrivers.ContainsKey(shift.DriverId)).Select(shift => activeDrivers[shift.DriverId]));

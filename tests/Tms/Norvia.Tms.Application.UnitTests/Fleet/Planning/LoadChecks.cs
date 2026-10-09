@@ -1,5 +1,6 @@
 using Ardalis.SharedKernel;
 using Ardalis.Specification;
+using Microsoft.Extensions.Logging.Abstractions;
 using Norvia.Tms.Application.Fleet;
 using Norvia.Tms.Application.Fleet.Planning;
 using Norvia.Tms.Domain.Fleet;
@@ -28,7 +29,7 @@ internal static class LoadChecks
         driverDirectory.ListActive().Returns(drivers);
         var vehicleDirectory = Substitute.For<IVehicleDirectory>();
         vehicleDirectory.ListActive().Returns(vehicles);
-        return new LoadCheckWarnings(Repository(days), Repository(orders), LoadsOver(shipments, orders, driverDirectory, vehicleDirectory), new PlanningHorizonRules(14, Amsterdam), time);
+        return new LoadCheckWarnings(Repository(days), Repository(orders), LoadsOver(shipments, orders, driverDirectory, vehicleDirectory), new PlanningHorizonRules(14, Amsterdam), time, NullLogger<LoadCheckWarnings>.Instance);
     }
 
     public static IReadRepository<T> Repository<T>(List<T> stored)

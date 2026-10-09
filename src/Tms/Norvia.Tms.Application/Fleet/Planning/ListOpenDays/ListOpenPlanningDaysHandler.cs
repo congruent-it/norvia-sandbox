@@ -32,7 +32,7 @@ public sealed class ListOpenPlanningDaysHandler(
                             .Select(shift => new ShiftView(shift.DriverId.Value, activeDrivers[shift.DriverId].Name, shift.Start, shift.End, shift.EditedByHand))
                             .OrderBy(shift => shift.Start).ThenBy(shift => shift.DriverName, StringComparer.Ordinal),
                     ],
-                    loads.Of(day, demand));
+                    DayLoads.LoadOf(day, demand, activeDrivers, activeVehicles));
             }),
         ];
     }

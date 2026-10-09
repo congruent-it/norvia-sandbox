@@ -1,4 +1,10 @@
+using Ardalis.SharedKernel;
+using Ardalis.Specification;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
+using NSubstitute;
+using NSubstitute.ExceptionExtensions;
+using Norvia.Tms.Application.Fleet;
 using Norvia.Tms.Application.Fleet.Planning;
 using Norvia.Tms.Application.UnitTests.TransportOrders;
 using Norvia.Tms.Domain.Fleet;
@@ -74,6 +80,24 @@ public sealed class LoadCheckWarningsTests
         var shipment = Samples.Planned(order, CarriedBy.OwnFleet, sequence: 1);
 
         var warnings = LoadChecks.Warnings([], [order], [shipment], [], [], _time);
+
+        (await warnings.ForAsync(shipment, CancellationToken.None)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task For_AFailureWorkingItOut_GivesNoWarning_SoTheSavedAssignmentIsntLost()
+    {
+        var order = Order(1, Thursday, new GoodsLine("pallet", 99, 99000m, null));
+        var shipment = Samples.Planned(order, CarriedBy.OwnFleet, sequence: 1);
+        var days = Substitute.For<IReadRepository<PlanningDay>>();
+        days.FirstOrDefaultAsync(Arg.Any<ISpecification<PlanningDay>>(), Arg.Any<CancellationToken>()).ThrowsAsync(new InvalidOperationException("database down"));
+        var warnings = new LoadCheckWarnings(
+            days,
+            LoadChecks.Repository([order]),
+            LoadChecks.LoadsOver([shipment], [order], Substitute.For<IDriverDirectory>(), Substitute.For<IVehicleDirectory>()),
+            new PlanningHorizonRules(14, LoadChecks.Amsterdam),
+            _time,
+            NullLogger<LoadCheckWarnings>.Instance);
 
         (await warnings.ForAsync(shipment, CancellationToken.None)).Should().BeNull();
     }
