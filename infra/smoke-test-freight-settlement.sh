@@ -286,11 +286,11 @@ wait_for_presenter() {
   echo "$1"
   read -r -p "Press Enter once it is done... "
 }
-# Asks again, for up to two minutes, until the jq test $3 holds for the state of Transport Order $1 carried by Persona $2.
+# Asks again, for up to three minutes, until the jq test $3 holds for the state of Transport Order $1 carried by Persona $2.
 look_until() {
   local result
   result=$(look "$1" "$2")
-  for _ in $(seq 1 12); do
+  for _ in $(seq 1 18); do
     jq -e "$3" <<<"$result" >/dev/null && break
     sleep 10
     result=$(look "$1" "$2")
@@ -354,7 +354,10 @@ published_by_action() {
     || fail "no Message trail of $1's $3 action published $4 in Application Insights after 10 minutes"
 }
 
-
+deliver_steps=$(jq -nc '[
+  {name: "PU", kind: "track", statusCode: "PU", wait: "Collected"},
+  {name: "DEP", kind: "track", statusCode: "DEP", wait: "In transit"},
+  {name: "POD", kind: "track", statusCode: "POD", wait: "Delivered"}]')
 spot_booking_ok='[.carrierBookings[] | select(.carrierId == "'$van_dijk_id'" and .status == "Requested")] | length == 1'
 spot_cost_ok='[.carrierBookings[] | select(.status == "Requested")][0].carrierCost
   | .currency == "EUR" and .source.kind == "Spot" and (.source.remark | . != null and . != "") and .total > 0
@@ -364,38 +367,37 @@ spot_cost_ok='[.carrierBookings[] | select(.status == "Requested")][0].carrierCo
 echo
 echo "Story 14"
 result=$(look "$spot_order" van-dijk-transport)
-shipment14=$(jq -r '.shipmentNumber // empty' <<<"$result")
-[ -n "$shipment14" ] || fail "Transport Order $spot_order has no Shipment, or the TMS doesn't answer for it"
+shipment_spot=$(jq -r '.shipmentNumber // empty' <<<"$result")
+[ -n "$shipment_spot" ] || fail "Transport Order $spot_order has no Shipment, or the TMS doesn't answer for it"
 jq -e --arg van_dijk "$van_dijk_id" '.status == "Planned" and .carrierId == $van_dijk' <<<"$result" >/dev/null \
-  || fail "Shipment $shipment14 isn't Planned and assigned to Van Dijk Transport: $(jq -c '{status, carrierId}' <<<"$result")"
+  || fail "Shipment $shipment_spot isn't Planned and assigned to Van Dijk Transport: $(jq -c '{status, carrierId}' <<<"$result")"
 jq -e '.toReleaseListed and .pricingFailure == "NoMatchingLane"' <<<"$result" >/dev/null \
-  || fail "Shipment $shipment14 isn't in Shipments to release with the pricing failure NoMatchingLane: $(jq -c '{toReleaseListed, pricingFailure}' <<<"$result")"
-pass "Shipment $shipment14 is in Shipments to release with the pricing failure NoMatchingLane: Van Dijk's Carrier Rate Card has no Lane into Germany"
-wait_for_presenter "In the TMS UI ($tms_ui), try to release Shipment $shipment14 and see it fail with NoMatchingLane. Then choose Release with Spot price,
+  || fail "Shipment $shipment_spot isn't in Shipments to release with the pricing failure NoMatchingLane: $(jq -c '{toReleaseListed, pricingFailure}' <<<"$result")"
+pass "Shipment $shipment_spot is in Shipments to release with the pricing failure NoMatchingLane"
+wait_for_presenter "In the TMS UI ($tms_ui), try to release Shipment $shipment_spot and see it fail with NoMatchingLane. Then choose Release with Spot price,
 enter an amount (such as 480) and the remark \"agreed with Van Dijk by phone\"."
 result=$(look_until "$spot_order" van-dijk-transport "$spot_booking_ok")
 jq -e "$spot_booking_ok" <<<"$result" >/dev/null \
-  || fail "Shipment $shipment14 has no Requested Carrier booking of Van Dijk Transport after the release with a Spot price: $(jq -c '.carrierBookings' <<<"$result")"
+  || fail "Shipment $shipment_spot has no Requested Carrier booking of Van Dijk Transport after the release with a Spot price: $(jq -c '.carrierBookings' <<<"$result")"
 jq -e "$spot_cost_ok" <<<"$result" >/dev/null \
   || fail "the Carrier booking's Carrier cost isn't one Freight line from a Spot price with its remark: $(jq -c '.carrierBookings' <<<"$result")"
 pass "the release with a Spot price left a Requested Carrier booking whose Carrier cost is one Freight line, source Spot, with its remark"
 
 # 2. The presenter confirms in Van Dijk's inbox, and the Shipment is delivered.
 wait_for_presenter "In the Partner portal, as Van Dijk Transport, open the booking inbox: see the price and that it is a Spot price,
-and Confirm the booking for Shipment $shipment14."
+and Confirm the booking for Shipment $shipment_spot."
 result=$(look_until "$spot_order" van-dijk-transport '.reference != null')
-jq -e '.reference != null' <<<"$result" >/dev/null || fail "Shipment $shipment14's Carrier booking isn't Confirmed after the presenter's Confirm"
+jq -e '.reference != null' <<<"$result" >/dev/null || fail "Shipment $shipment_spot's Carrier booking isn't Confirmed after the presenter's Confirm"
 pass "Van Dijk Transport confirmed the Spot price: the Carrier booking is Confirmed"
-result=$(run_steps "$(jq -nc '[
-  {name: "PU", kind: "track", statusCode: "PU", wait: "Collected"},
-  {name: "DEP", kind: "track", statusCode: "DEP", wait: "In transit"},
-  {name: "POD", kind: "track", statusCode: "POD", wait: "Delivered"}]')" "$spot_order" van-dijk-transport 0)
+result=$(run_steps "$deliver_steps" "$spot_order" van-dijk-transport 0)
 for code in PU DEP POD; do step_accepted "$result" "$code" "Van Dijk Transport"; done
-pod14_id=$(step_id "$result" POD)
-jq -e '.status == "Delivered"' <<<"$result" >/dev/null || fail "Shipment $shipment14 isn't Delivered after POD: $(jq -c '.status' <<<"$result")"
-pass "PU, DEP and POD returned 202 Accepted and Shipment $shipment14 is Delivered (POD's correlation ID $pod14_id)"
-published_by_call "Shipment $shipment14's POD" "$pod14_id" CarrierCostIncurred
-pass "Delivering Shipment $shipment14 published CarrierCostIncurred"
+pu_spot_id=$(step_id "$result" PU)
+dep_spot_id=$(step_id "$result" DEP)
+pod_spot_id=$(step_id "$result" POD)
+jq -e '.status == "Delivered"' <<<"$result" >/dev/null || fail "Shipment $shipment_spot isn't Delivered after POD: $(jq -c '.status' <<<"$result")"
+pass "PU, DEP and POD returned 202 Accepted and Shipment $shipment_spot is Delivered (POD's correlation ID $pod_spot_id)"
+published_by_call "Shipment $shipment_spot's POD" "$pod_spot_id" CarrierCostIncurred
+pass "Delivering Shipment $shipment_spot published CarrierCostIncurred"
 result=$(look_until "$spot_order" van-dijk-transport '.notYetBillable.listed')
 jq -e '.billingState == "NotYetBillable" and .notYetBillable.listed and (.notYetBillable.blockingReasons == ["NoProofOfDelivery"])' <<<"$result" >/dev/null \
   || fail "Transport Order $spot_order isn't Not yet billable for NoProofOfDelivery only: $(jq -c '{billingState, notYetBillable}' <<<"$result")"
@@ -404,11 +406,11 @@ pass "Transport Order $spot_order is Delivered and Not yet billable, for NoProof
 # 3. A clean Proof of delivery makes the order Billable.
 result=$(run_steps "$(jq -nc '[{name: "cmr", kind: "proof"}]')" "$spot_order" van-dijk-transport 60)
 step_accepted "$result" cmr "Van Dijk Transport"
-cmr14_id=$(step_id "$result" cmr)
+cmr_spot_id=$(step_id "$result" cmr)
 jq -e '.billingState == "Billable" and (.notYetBillable.listed | not)' <<<"$result" >/dev/null \
   || fail "after a clean Proof of delivery Transport Order $spot_order isn't Billable and out of Customer service's list: $(jq -c '{billingState, notYetBillable}' <<<"$result")"
-published_by_call "Transport Order $spot_order's Proof of delivery" "$cmr14_id" TransportOrderBillable
-pass "a clean Proof of delivery returned 202 Accepted: Transport Order $spot_order is Billable and TransportOrderBillable was published (correlation ID $cmr14_id)"
+published_by_call "Transport Order $spot_order's Proof of delivery" "$cmr_spot_id" TransportOrderBillable
+pass "a clean Proof of delivery returned 202 Accepted: Transport Order $spot_order is Billable and TransportOrderBillable was published (correlation ID $cmr_spot_id)"
 
 # Story 14 variant. 4. PriceNotAccepted sends the Shipment back to Planned.
 echo
@@ -418,8 +420,11 @@ shipment_rejected=$(jq -r '.shipmentNumber // empty' <<<"$result")
 [ -n "$shipment_rejected" ] || fail "Transport Order $rejected_order has no Shipment, or the TMS doesn't answer for it"
 jq -e --arg van_dijk "$van_dijk_id" '.status == "Planned" and .carrierId == $van_dijk and .pricingFailure == "NoMatchingLane"' <<<"$result" >/dev/null \
   || fail "Shipment $shipment_rejected isn't Planned, assigned to Van Dijk Transport, with the pricing failure NoMatchingLane: $(jq -c '{status, carrierId, pricingFailure}' <<<"$result")"
-wait_for_presenter "In the TMS UI, on Shipment $shipment_rejected: Release with Spot price, any amount and remark. Then, in the Partner portal as Van Dijk Transport,
-reject that booking with the reason PriceNotAccepted."
+wait_for_presenter "In the TMS UI, on Shipment $shipment_rejected: Release with Spot price, any amount and remark."
+result=$(look_until "$rejected_order" van-dijk-transport "$spot_booking_ok")
+jq -e "$spot_booking_ok" <<<"$result" >/dev/null \
+  || fail "Shipment $shipment_rejected has no Requested Carrier booking of Van Dijk Transport after the release with a Spot price: $(jq -c '.carrierBookings' <<<"$result")"
+wait_for_presenter "In the Partner portal, as Van Dijk Transport, reject that booking with the reason PriceNotAccepted."
 result=$(look_until "$rejected_order" van-dijk-transport '.status == "Planned" and ([.carrierBookings[] | select(.status == "Rejected")] | length >= 1)')
 jq -e '.status == "Planned" and ([.carrierBookings[] | select(.status == "Rejected" and .reasonCode == "PriceNotAccepted")] | length == 1)' <<<"$result" >/dev/null \
   || fail "Shipment $shipment_rejected isn't Planned again with a Carrier booking Rejected as PriceNotAccepted: $(jq -c '{status, carrierBookings}' <<<"$result")"
@@ -431,10 +436,7 @@ echo "Delivered without a Proof of delivery"
 result=$(look "$no_pod_order" kessler-spedition)
 jq -e --arg kessler "$kessler_id" '.status == "Booked" and .carrierId == $kessler and .reference != null' <<<"$result" >/dev/null \
   || fail "Transport Order $no_pod_order isn't Booked and carried by Kessler Spedition with a Confirmed Carrier booking: $(jq -c '{status, carrierId, reference}' <<<"$result")"
-result=$(run_steps "$(jq -nc '[
-  {name: "PU", kind: "track", statusCode: "PU", wait: "Collected"},
-  {name: "DEP", kind: "track", statusCode: "DEP", wait: "In transit"},
-  {name: "POD", kind: "track", statusCode: "POD", wait: "Delivered"}]')" "$no_pod_order" kessler-spedition 0)
+result=$(run_steps "$deliver_steps" "$no_pod_order" kessler-spedition 0)
 shipment_no_pod=$(jq -r '.shipmentNumber // empty' <<<"$result")
 [ -n "$shipment_no_pod" ] || fail "Transport Order $no_pod_order has no Shipment, or the TMS doesn't answer for it"
 for code in PU DEP POD; do step_accepted "$result" "$code" "Kessler Spedition"; done
@@ -455,11 +457,13 @@ pass "Delivering Shipment $shipment_no_pod published CarrierCostIncurred"
 
 # 6. The whole path, by correlation ID.
 echo
-found "story 14's POD, by correlation ID $pod14_id," "$pod14_id" "$AZURE_ESTATE_API_MANAGEMENT" "$tracking_logic_app" tms-api
-found "story 14's Proof of delivery, by correlation ID $cmr14_id," "$cmr14_id" "$AZURE_ESTATE_API_MANAGEMENT" "$proof_logic_app" tms-api
+found "story 14's PU, by correlation ID $pu_spot_id," "$pu_spot_id" "$AZURE_ESTATE_API_MANAGEMENT" "$tracking_logic_app" tms-api
+found "story 14's DEP, by correlation ID $dep_spot_id," "$dep_spot_id" "$AZURE_ESTATE_API_MANAGEMENT" "$tracking_logic_app" tms-api
+found "story 14's POD, by correlation ID $pod_spot_id," "$pod_spot_id" "$AZURE_ESTATE_API_MANAGEMENT" "$tracking_logic_app" tms-api
+found "story 14's Proof of delivery, by correlation ID $cmr_spot_id," "$cmr_spot_id" "$AZURE_ESTATE_API_MANAGEMENT" "$proof_logic_app" tms-api
 found "the third order's POD, by correlation ID $pod_no_pod_id," "$pod_no_pod_id" "$AZURE_ESTATE_API_MANAGEMENT" "$tracking_logic_app" tms-api
-release_ids=$(until_found action_ids_reaching "$shipment14" transport-planning "$booking_logic_app")
-[ -n "$release_ids" ] || fail "no Planner action on Shipment $shipment14 reached the Carrier booking Logic App in Application Insights after 10 minutes"
+release_ids=$(until_found action_ids_reaching "$shipment_spot" transport-planning "$booking_logic_app")
+[ -n "$release_ids" ] || fail "no Planner action on Shipment $shipment_spot reached the Carrier booking Logic App in Application Insights after 10 minutes"
 found "the release with a Spot price, by correlation ID $(head -1 <<<"$release_ids")," "$(head -1 <<<"$release_ids")" "$booking_logic_app" tms-api
 billing_ids=$(until_found action_ids_reaching "$shipment_no_pod" billing tms-api)
 [ -n "$billing_ids" ] || fail "no release without a Proof of delivery on Shipment $shipment_no_pod in the TMS in Application Insights after 10 minutes"
@@ -467,13 +471,13 @@ found "the release without a Proof of delivery, by correlation ID $(head -1 <<<"
 
 echo
 echo "Open in the Partner portal, as Van Dijk Transport (the script can't sign in as the Persona):"
-echo "  The booking inbox: the answered request for Shipment $shipment14 with its Spot price, and the one for Shipment $shipment_rejected as rejected"
+echo "  The booking inbox: the answered request for Shipment $shipment_spot with its Spot price, and the one for Shipment $shipment_rejected as rejected"
 echo "Open in the TMS UI:"
-echo "  Shipment 14:                  $tms_ui/shipments/$shipment14 (the Carrier cost, and the billing state, Billable)"
+echo "  Spot Shipment:                $tms_ui/shipments/$shipment_spot (the Carrier cost, and the billing state, Billable)"
 echo "  PriceNotAccepted Shipment:    $tms_ui/shipments/$shipment_rejected"
 echo "  Released without a Proof of delivery: $tms_ui/shipments/$shipment_no_pod (the remark and who released it)"
 echo "Open in the Integration console, by the Shipment number and by each correlation ID:"
-echo "  Shipment 14:  $console/?key=$shipment14"
-echo "  POD:          $console/?key=$pod14_id"
-echo "  Proof:        $console/?key=$cmr14_id"
+echo "  Spot Shipment: $console/?key=$shipment_spot"
+echo "  POD:          $console/?key=$pod_spot_id"
+echo "  Proof:        $console/?key=$cmr_spot_id"
 echo "  No-POD order: $console/?key=$shipment_no_pod"
