@@ -1,11 +1,11 @@
 using Microsoft.Extensions.Time.Testing;
-using NSubstitute;
 using Norvia.Tms.Application.Fleet;
 using Norvia.Tms.Application.Fleet.Availability;
 using Norvia.Tms.Application.Fleet.Planning;
 using Norvia.Tms.Application.UnitTests.Fleet.Planning;
 using Norvia.Tms.Application.UnitTests.TransportOrders;
 using Norvia.Tms.Domain.Fleet;
+using NSubstitute;
 
 namespace Norvia.Tms.Application.UnitTests.Fleet.Availability;
 
