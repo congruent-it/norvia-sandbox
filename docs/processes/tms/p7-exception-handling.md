@@ -294,7 +294,7 @@ P7 is built for Carrier Shipments. Exceptions from the Own fleet's Tracking even
 
 ### Message trail
 
-P7 leaves several Message trails, one per cause or Planner action. Each is named with the Hops as the [Integration console](../../operations/integration-console.md#message-trail) shows them, in time order. The Planner's actions run under a correlation ID that the TMS UI creates for each action. The Hops that the TMS makes belong to the Flow `exception-handling`, and the two Logic Apps' own Hops to the Flows `shipper-notification` and `carrier-cancellation`.
+P7 leaves several Message trails, one per cause or Planner action. Each is named with the Hops as the [Integration console](../../operations/integration-console.md#message-trail) shows them, in time order. The Planner's actions run under a new correlation ID that the TMS API creates for each action and returns to the TMS UI. The Hops that the TMS makes belong to the Flow `exception-handling`, and the two Logic Apps' own Hops to the Flows `shipper-notification` and `carrier-cancellation`.
 
 **Opening.** An Exception opens inside the call that causes it, so it adds no Hop of its own, only a publish at the end of that call's trail. The trails are those of [P5](p5-shipment-tracking.md#message-trail) (a Tracking event) and [P6](p6-proof-of-delivery.md#message-trail) (a Proof of delivery with reservations).
 
