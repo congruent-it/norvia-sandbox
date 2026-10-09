@@ -157,7 +157,9 @@ Within the first week of the Planning horizon, one rigid truck is Off the road f
 
 ## Implementation
 
-The Driving-hour budget is built: `DrivingHourBudget` in the TMS domain works out the hours left today, this week and this fortnight, and the extensions left this week, from the day it is and the Trip durations it is given. The limits are the `DrivingHours` TMS settings. Until P11 supplies Trip durations, every budget is full, and the Drivers tab shows it. The rest of P10 is not built yet.
+The Driving-hour budget is built: `DrivingHourBudget` in the TMS domain works out the hours left today, this week and this fortnight, and the extensions left this week, from the day it is and the Trip durations it is given. The limits are the `DrivingHours` TMS settings. Until P11 supplies Trip durations, every budget is full, and the Drivers tab shows it.
+
+The availability rules are built: `TripAvailabilityRules` in the TMS application answers for a `TripProposal` (day, Vehicle, Driver, planned driving duration, total weight and pallets) with every rule it breaks, each a `TripAvailabilityFailure` with its code and message. It reads the day's Shifts and available Vehicles from the Planning day and the Driving-hour budget from `DrivingHourBudget.Fits`, so it holds no availability logic of its own. P11 owns Trips, so the proposal says whether the Vehicle or Driver has another Trip that day, and what is not set on a Draft is not checked. The rest of P10 is not built yet.
 
 ## Deferred
 
