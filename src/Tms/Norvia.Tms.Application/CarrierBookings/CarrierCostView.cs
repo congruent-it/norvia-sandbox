@@ -33,7 +33,8 @@ public sealed record CarrierCostView(
         && Source == other.Source
         && CalculatedAt == other.CalculatedAt;
 
-    public override int GetHashCode() => HashCode.Combine(Currency, Total, ChargeLines.Count, Source, CalculatedAt);
+    public override int GetHashCode() =>
+        ChargeLines.Aggregate(HashCode.Combine(Currency, Total, Source, CalculatedAt), (hash, line) => HashCode.Combine(hash, line));
 }
 
 /// <param name="Kind">Where the Carrier cost came from, such as <c>CarrierRateCard</c>.</param>

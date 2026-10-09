@@ -16,13 +16,13 @@ using Norvia.PartnerPortal.Application.CarrierShipments.TrackingSettings;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Application.Personas.List;
 using Norvia.PartnerPortal.Application.ShipperTracking;
-using Norvia.PartnerPortal.Domain.Personas;
 using Norvia.PartnerPortal.Application.ShipperTracking.DownloadFile;
 using Norvia.PartnerPortal.Application.ShipperTracking.FindTransportOrder;
 using Norvia.PartnerPortal.Application.ShipperTracking.GetTransportOrder;
 using Norvia.PartnerPortal.Application.ShipperTracking.List;
 using Norvia.PartnerPortal.Domain.Bookings;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
+using Norvia.PartnerPortal.Domain.Personas;
 using Norvia.PartnerPortal.Web.Bookings;
 using Norvia.PartnerPortal.Web.CarrierShipments;
 

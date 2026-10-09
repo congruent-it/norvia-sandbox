@@ -1,5 +1,5 @@
-using Norvia.Tms.Domain.ShipperTracking;
 using Norvia.Tms.Domain.Shipments;
+using Norvia.Tms.Domain.ShipperTracking;
 
 namespace Norvia.Tms.Domain.UnitTests.ShipperTracking;
 

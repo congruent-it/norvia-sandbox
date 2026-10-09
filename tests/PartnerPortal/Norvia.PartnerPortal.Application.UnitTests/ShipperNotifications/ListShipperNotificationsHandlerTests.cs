@@ -1,6 +1,6 @@
-using Norvia.PartnerPortal.Domain.Personas;
 using Ardalis.SharedKernel;
 using Norvia.PartnerPortal.Application.ShipperNotifications.List;
+using Norvia.PartnerPortal.Domain.Personas;
 using Norvia.PartnerPortal.Domain.ShipperNotifications;
 
 namespace Norvia.PartnerPortal.Application.UnitTests.ShipperNotifications;

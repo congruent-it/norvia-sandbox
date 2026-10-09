@@ -1,4 +1,3 @@
-using Norvia.PartnerPortal.Domain.Personas;
 using Ardalis.SharedKernel;
 using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Time.Testing;
@@ -6,6 +5,7 @@ using Norvia.PartnerPortal.Application.CarrierShipments;
 using Norvia.PartnerPortal.Application.CarrierShipments.Send;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
+using Norvia.PartnerPortal.Domain.Personas;
 
 namespace Norvia.PartnerPortal.Application.UnitTests.CarrierShipments;
 

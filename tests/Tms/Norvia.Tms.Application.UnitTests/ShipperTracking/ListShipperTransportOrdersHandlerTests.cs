@@ -1,8 +1,8 @@
 using Ardalis.SharedKernel;
 using Norvia.Tms.Application.ShipperTracking.ListTransportOrders;
 using Norvia.Tms.Application.UnitTests.TransportOrders;
-using Norvia.Tms.Domain.Carriers;
 using Norvia.Tms.Domain.CarrierBookings;
+using Norvia.Tms.Domain.Carriers;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.Shippers;
 using Norvia.Tms.Domain.ShipperTracking;

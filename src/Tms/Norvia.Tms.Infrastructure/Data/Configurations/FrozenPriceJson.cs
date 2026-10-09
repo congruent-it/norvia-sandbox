@@ -6,10 +6,10 @@ using Norvia.Tms.Domain.TransportOrders;
 namespace Norvia.Tms.Infrastructure.Data.Configurations;
 
 /// <summary>
-/// How a frozen Freight Charge is stored: amounts as plain numbers, the Rate Card ID as a plain string, and charge line
-/// types by name, so the column reads like the Canonical Model's Freight Charge.
+/// How a frozen price, a Transport Order's Freight Charge or a Carrier booking's Carrier cost, is stored: amounts as plain numbers, the Rate Card ID as a plain string, and charge line
+/// types by name, so the column reads like the Canonical Model's document.
 /// </summary>
-internal static class FreightChargeJson
+internal static class FrozenPriceJson
 {
     public static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web)
     {

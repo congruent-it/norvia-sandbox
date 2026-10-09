@@ -1,8 +1,8 @@
-using Norvia.PartnerPortal.Domain.Personas;
 using Microsoft.Extensions.DependencyInjection;
 using Norvia.PartnerPortal.Application.CarrierBookings;
 using Norvia.PartnerPortal.Application.CarrierBookings.Answer;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
+using Norvia.PartnerPortal.Domain.Personas;
 using Norvia.PartnerPortal.Web.CarrierBookings;
 
 namespace Norvia.PartnerPortal.Web.UnitTests.CarrierBookings;

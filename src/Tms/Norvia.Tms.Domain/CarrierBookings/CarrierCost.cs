@@ -21,5 +21,6 @@ public sealed record CarrierCost(IReadOnlyList<ChargeLine> ChargeLines, CarrierC
     public bool Equals(CarrierCost? other) =>
         other is not null && Source == other.Source && CalculatedAt == other.CalculatedAt && ChargeLines.SequenceEqual(other.ChargeLines);
 
-    public override int GetHashCode() => HashCode.Combine(Source, CalculatedAt, ChargeLines.Count);
+    public override int GetHashCode() =>
+        ChargeLines.Aggregate(HashCode.Combine(Source, CalculatedAt), (hash, line) => HashCode.Combine(hash, line));
 }

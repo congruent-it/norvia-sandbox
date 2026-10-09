@@ -82,7 +82,7 @@ public abstract class BrowserPage(TmsUiFixture tms) : IAsyncLifetime
         return (shipmentNumber, bookingNumber);
     }
 
-        /// <summary>Releases a new Transport Order to Van Dijk Transport, has it confirm the booking and report the Shipment In transit.</summary>
+    /// <summary>Releases a new Transport Order to Van Dijk Transport, has it confirm the booking and report the Shipment In transit.</summary>
     protected async Task<(string ShipmentNumber, string Reference)> InTransitShipmentAsync()
     {
         var (shipmentNumber, bookingNumber) = await ReleaseToCarrierAsync("Van Dijk Transport");

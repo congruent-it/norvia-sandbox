@@ -1,7 +1,7 @@
-using Norvia.PartnerPortal.Domain.Personas;
 using Ardalis.SharedKernel;
 using Norvia.PartnerPortal.Application.CarrierShipments.List;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
+using Norvia.PartnerPortal.Domain.Personas;
 
 namespace Norvia.PartnerPortal.Application.UnitTests.CarrierShipments;
 

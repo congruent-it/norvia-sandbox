@@ -1,6 +1,6 @@
 using Norvia.PartnerPortal.Application.ShipperTracking;
-using Norvia.PartnerPortal.Domain.Personas;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
+using Norvia.PartnerPortal.Domain.Personas;
 
 namespace Norvia.PartnerPortal.Web.UnitTests.ShipperTracking;
 

@@ -58,8 +58,8 @@ internal sealed class CarrierBookingConfiguration : IEntityTypeConfiguration<Car
         // The Carrier cost is frozen whole at release, as one JSON document, like a Transport Order's Freight Charge (P9).
         builder.Property(booking => booking.CarrierCost)
             .HasConversion(
-                carrierCost => JsonSerializer.Serialize(carrierCost, FreightChargeJson.Options),
-                json => JsonSerializer.Deserialize<CarrierCost>(json, FreightChargeJson.Options)!,
+                carrierCost => JsonSerializer.Serialize(carrierCost, FrozenPriceJson.Options),
+                json => JsonSerializer.Deserialize<CarrierCost>(json, FrozenPriceJson.Options)!,
                 new ValueComparer<CarrierCost?>(
                     (left, right) => Equals(left, right),
                     carrierCost => carrierCost == null ? 0 : carrierCost.GetHashCode(),
