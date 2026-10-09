@@ -1,4 +1,6 @@
+using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Carriers;
+using Norvia.Tms.Domain.RateCards;
 using Norvia.Tms.Domain.TransportOrders;
 using static System.FormattableString;
 
@@ -43,6 +45,37 @@ public static class AssignmentRules
     {
         ArgumentNullException.ThrowIfNull(shipment);
         return CheckShipment(shipment, PlanningAction.Release);
+    }
+
+    /// <summary>
+    /// Prices the Carrier booking a release creates from the Carrier's Carrier Rate Card (P9), by P2's steps against the
+    /// Carrier Rate Card instead of the Shipper's Rate Card: its Carrier cost, or the refusal naming the Carrier and why the
+    /// Carrier Rate Card can't price it, with the same codes as Rating's failures.
+    /// </summary>
+    /// <param name="carrierRateCard">The Carrier's Carrier Rate Card, or null when it has none.</param>
+    public static (CarrierCost? Cost, AssignmentRefusal? Refusal) PriceCarrierBooking(
+        Carrier carrier, CarrierRateCard? carrierRateCard, TransportOrderDetails details, DateTimeOffset calculatedAt)
+    {
+        ArgumentNullException.ThrowIfNull(carrier);
+        ArgumentNullException.ThrowIfNull(details);
+        var outcome = carrierRateCard?.Rate(details)
+            ?? RatingOutcome.Failed(RatingFailureCode.NoRateCard, Invariant($"{Describe(carrier.Id, carrier)} has no Carrier Rate Card."));
+        if (outcome.FreightCharge is { } priced)
+        {
+            return (CarrierCost.From(priced, calculatedAt), null);
+        }
+
+        var failure = outcome.Failure!;
+        return (null, new(
+            failure.Code switch
+            {
+                RatingFailureCode.NoRateCard => AssignmentRefusalCode.NoRateCard,
+                RatingFailureCode.NoValidRateCardVersion => AssignmentRefusalCode.NoValidRateCardVersion,
+                RatingFailureCode.NoMatchingLane => AssignmentRefusalCode.NoMatchingLane,
+                RatingFailureCode.WeightAboveHighestBreak => AssignmentRefusalCode.WeightAboveHighestBreak,
+                _ => throw new ArgumentOutOfRangeException(nameof(carrierRateCard), failure.Code, "A rating failure with no release refusal code."),
+            },
+            Invariant($"{Describe(carrier.Id, carrier)} can't price the Carrier booking. {failure.Message}")));
     }
 
     private static AssignmentRefusal? CheckShipment(Shipment shipment, PlanningAction action) => shipment.Status == ShipmentStatus.Planned

@@ -20,7 +20,8 @@ public sealed class CarrierBooking : EntityBase<CarrierBookingId>, IAggregateRoo
         ShipmentNumber shipmentNumber,
         CarrierId carrierId,
         CorrelationId correlationId,
-        DateTimeOffset requestedAt)
+        DateTimeOffset requestedAt,
+        CarrierCost? carrierCost)
     {
         Id = id;
         Number = number;
@@ -29,6 +30,7 @@ public sealed class CarrierBooking : EntityBase<CarrierBookingId>, IAggregateRoo
         CarrierId = carrierId;
         CorrelationId = correlationId;
         RequestedAt = requestedAt;
+        CarrierCost = carrierCost;
         Status = CarrierBookingStatus.Requested;
     }
 
@@ -49,6 +51,13 @@ public sealed class CarrierBooking : EntityBase<CarrierBookingId>, IAggregateRoo
     public CorrelationId CorrelationId { get; private set; }
 
     public DateTimeOffset RequestedAt { get; private set; }
+
+    /// <summary>
+    /// What Norvia pays the Carrier for the booking, calculated at release and frozen: never recalculated (P9). A new
+    /// release after a rejection makes a new booking with a new Carrier cost. Null only for a booking requested before
+    /// release priced it.
+    /// </summary>
+    public CarrierCost? CarrierCost { get; private set; }
 
     /// <summary>The Message trail of the Carrier's own answer; null while the booking is Requested.</summary>
     public CorrelationId? AnswerCorrelationId { get; private set; }
@@ -113,8 +122,8 @@ public sealed class CarrierBooking : EntityBase<CarrierBookingId>, IAggregateRoo
     public bool IsCarrierNotTold => CarrierNotToldAt is not null;
 
     /// <summary>
-    /// Requests a Carrier booking for a Shipment's release, Requested. Raises no domain event of its own: the release
-    /// that creates it announces both in <c>ShipmentReleased</c>.
+    /// Requests a Carrier booking for a Shipment's release, Requested, with the Carrier cost the release froze on it
+    /// (P9). Raises no domain event of its own: the release that creates it announces both in <c>ShipmentReleased</c>.
     /// </summary>
     public static CarrierBooking Request(
         CarrierBookingNumber number,
@@ -122,10 +131,11 @@ public sealed class CarrierBooking : EntityBase<CarrierBookingId>, IAggregateRoo
         ShipmentNumber shipmentNumber,
         CarrierId carrierId,
         CorrelationId correlationId,
-        DateTimeOffset requestedAt)
+        DateTimeOffset requestedAt,
+        CarrierCost? carrierCost = null)
     {
         ArgumentNullException.ThrowIfNull(carrierId);
-        return new CarrierBooking(CarrierBookingId.New(), number, shipmentId, shipmentNumber, carrierId, correlationId, requestedAt);
+        return new CarrierBooking(CarrierBookingId.New(), number, shipmentId, shipmentNumber, carrierId, correlationId, requestedAt, carrierCost);
     }
 
     /// <summary>

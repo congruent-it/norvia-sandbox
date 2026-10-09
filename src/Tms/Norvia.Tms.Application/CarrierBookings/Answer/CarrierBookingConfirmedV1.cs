@@ -6,7 +6,7 @@ namespace Norvia.Tms.Application.CarrierBookings.Answer;
 /// <summary>
 /// The Canonical Model event <c>CarrierBookingConfirmed</c>, version 1
 /// (contracts/canonical-model/carrier-booking-confirmed.v1.schema.json). The Carrier confirmed a Requested Carrier
-/// booking with its own booking reference and, optionally, a planned collection time; the Carrier booking became
+/// booking with its own booking reference and, optionally, a planned collection time, and with the total of the Carrier cost it accepted (P9); the Carrier booking became
 /// Confirmed and the Shipment Booked, which carries no event of its own.
 /// </summary>
 public sealed record CarrierBookingConfirmedV1(
@@ -18,7 +18,8 @@ public sealed record CarrierBookingConfirmedV1(
     string TransportOrderNumber,
     string CarrierId,
     string CarrierBookingReference,
-    DateTimeOffset? PlannedCollectionTime)
+    DateTimeOffset? PlannedCollectionTime,
+    decimal? CarrierCostTotal = null)
     : IntegrationEvent(EventId, OccurredAt, CorrelationId)
 {
     public override string EventType => "CarrierBookingConfirmed";
@@ -40,7 +41,8 @@ public sealed record CarrierBookingConfirmedV1(
             confirmed.TransportOrderNumber.Value,
             booking.CarrierId.Value,
             booking.CarrierBookingReference!,
-            booking.PlannedCollectionTime);
+            booking.PlannedCollectionTime,
+            booking.CarrierCost?.Total.Amount);
     }
 
     protected override IEnumerable<KeyValuePair<string, object>> TrackingProperties()

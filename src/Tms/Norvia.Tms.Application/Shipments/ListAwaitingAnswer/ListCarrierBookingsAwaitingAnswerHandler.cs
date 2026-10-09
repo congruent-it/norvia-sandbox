@@ -1,5 +1,6 @@
 using Ardalis.SharedKernel;
 using Mediator;
+using Norvia.Tms.Application.CarrierBookings;
 using Norvia.Tms.Application.Carriers;
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Shipments;
@@ -50,7 +51,8 @@ public sealed class ListCarrierBookingsAwaitingAnswerHandler(
             booking.RequestedAt,
             booking.SentAt,
             earliest,
-            rules.IsOverdue(booking.RequestedAt, earliest, now));
+            rules.IsOverdue(booking.RequestedAt, earliest, now),
+            CarrierCostView.From(booking.CarrierCost));
     }
 
     private static Shipment ShipmentOf(CarrierBooking booking, Dictionary<ShipmentId, Shipment> shipmentsById) =>

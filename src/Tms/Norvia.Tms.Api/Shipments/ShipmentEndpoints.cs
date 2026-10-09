@@ -105,7 +105,9 @@ public static class ShipmentEndpoints
                 + "for a Carrier Shipment, in one transaction. Each release gets a new correlation ID, which ShipmentReleased carries with the Transport Order number. A "
                 + "release sent again under its Idempotency-Key is answered as before, flagged as a repeat, without releasing again. A release "
                 + "that breaks an assignment rule is refused, changing and publishing nothing, with a problem whose code says which, and whose correlationId names the Message trail the refusal is traced on: "
-                + "ShipmentNotFound (404) or ShipmentNotPlanned (409).");
+                + "ShipmentNotFound (404), ShipmentNotPlanned (409), or, for a Carrier Shipment its Carrier's Carrier Rate Card can't price, NoRateCard, "
+                + "NoValidRateCardVersion, NoMatchingLane or WeightAboveHighestBreak (422), naming the Carrier, and creating no Carrier booking. A Carrier Shipment "
+                + "is priced at release, and its Carrier cost is frozen on the Carrier booking and carried by ShipmentReleased (P9).");
 
         return app;
     }

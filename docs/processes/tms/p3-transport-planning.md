@@ -188,7 +188,7 @@ Designed in this document and not built yet:
 
 | Gap | Where it stands |
 |---|---|
-| Pricing a Carrier Shipment from its Carrier Rate Card at release, and releasing with a Spot price | Designed in [P9](p9-freight-settlement.md#pricing-a-carrier-booking-at-release). The release does not price anything yet |
+| Releasing with a Spot price, and the Planner's list showing why a release couldn't be priced | Designed in [P9](p9-freight-settlement.md#when-the-carrier-rate-card-cant-price-the-shipment). A Carrier Shipment is priced from its Carrier Rate Card at release ([AssignmentRules.cs](../../../src/Tms/Norvia.Tms.Domain/Shipments/AssignmentRules.cs) `PriceCarrierBooking`) and a release it can't price is refused with `NoRateCard`, `NoValidRateCardVersion`, `NoMatchingLane` or `WeightAboveHighestBreak` (422). There is no Spot price, and the TMS UI doesn't show the refusal's code yet |
 | Handing an Own fleet Shipment over to a Trip, and P10's load check as a warning when assigning to Own fleet | Own fleet capacity and Trips are P10 and P11. A Released Own fleet Shipment waits |
 | The ERP and the Carrier master-data sync | Carriers come from the seed file ([Carriers in the TMS](#carriers-in-the-tms)) |
 | Suggested or automatic assignment, coverage rules, groupage, un-planning, a dispatcher role | Left out on purpose ([Deferred](#deferred)) |

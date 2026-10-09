@@ -47,6 +47,8 @@ internal static class AssignmentCalls
     {
         AssignmentRefusalCode.TransportOrderNotFound or AssignmentRefusalCode.ShipmentNotFound => StatusCodes.Status404NotFound,
         AssignmentRefusalCode.UnknownCarrier or AssignmentRefusalCode.InactiveCarrier => StatusCodes.Status422UnprocessableEntity,
+        AssignmentRefusalCode.NoRateCard or AssignmentRefusalCode.NoValidRateCardVersion
+            or AssignmentRefusalCode.NoMatchingLane or AssignmentRefusalCode.WeightAboveHighestBreak => StatusCodes.Status422UnprocessableEntity,
         _ => StatusCodes.Status409Conflict,
     };
 }

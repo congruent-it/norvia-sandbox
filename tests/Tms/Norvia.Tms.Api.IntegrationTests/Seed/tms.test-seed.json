@@ -103,5 +103,45 @@
         }
       ]
     }
+  ],
+  "carrierRateCards": [
+    {
+      "$comment": "Proef Transport's Carrier Rate Card. CAR-TEST-0003 deliberately has none, so a release to it fails with NoRateCard.",
+      "id": "CRC-TEST-0001",
+      "carrierId": "CAR-TEST-0001",
+      "versions": [
+        {
+          "$comment": "Covers Bookings.Valid: Rotterdam to Utrecht, 910.5 kg in the band up to 2,000 kg, so 910.5 ÷ 100 × 9.50 = 86.4975, a Carrier cost of 86.50. A booking of 100 kg is 11.00 under a minimum charge of 35.00, so it gets a 24.00 adjustment. Its Lane prices up to 5,000 kg only, so a heavier order fails with WeightAboveHighestBreak. A delivery to a postcode in no Zone, such as Groningen's 97, fails with NoMatchingLane. No version is valid from 2040, so an order collected then fails with NoValidRateCardVersion.",
+          "version": 1,
+          "validFrom": "2020-01-01",
+          "validTo": "2039-12-31",
+          "zones": [
+            { "name": "Rotterdam", "country": "NL", "postcodePrefixes": ["30", "31"] },
+            { "name": "Utrecht", "country": "NL", "postcodePrefixes": ["35"] },
+            { "name": "Düsseldorf", "country": "DE", "postcodePrefixes": ["40"] }
+          ],
+          "lanes": [
+            {
+              "origin": "Rotterdam",
+              "destination": "Utrecht",
+              "minimumCharge": 35.00,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 11.00 },
+                { "upToKg": 2000, "pricePer100Kg": 9.50 },
+                { "upToKg": 5000, "pricePer100Kg": 7.25 }
+              ]
+            },
+            {
+              "origin": "Rotterdam",
+              "destination": "Düsseldorf",
+              "minimumCharge": 60.00,
+              "weightBreaks": [
+                { "upToKg": 5000, "pricePer100Kg": 12.00 }
+              ]
+            }
+          ]
+        }
+      ]
+    }
   ]
 }

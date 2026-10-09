@@ -1,11 +1,14 @@
 using Ardalis.SharedKernel;
 using Microsoft.Extensions.Time.Testing;
+using Norvia.Tms.Application.CarrierBookings;
 using Norvia.Tms.Application.Carriers;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shipments.ListAwaitingAnswer;
+using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.UnitTests.TransportOrders;
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Carriers;
+using Norvia.Tms.Domain.RateCards;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TransportOrders;
 using NSubstitute;
@@ -65,6 +68,25 @@ public sealed class ListCarrierBookingsAwaitingAnswerHandlerTests
     }
 
     [Fact]
+    public async Task Handle_ABookingWithAFrozenCarrierCost_ListsItWithItsSource()
+    {
+        var cost = new CarrierCost(
+            [new ChargeLine(ChargeLineType.Freight, new Money(86.50m))],
+            CarrierCostSource.CarrierRateCard(new RateCardVersionReference(new RateCardId("CRC-0001"), 2)),
+            Samples.Now.AddHours(1));
+        Requested(sequence: 7, shipmentSequence: 12, carrierCost: cost);
+
+        var listed = await _handler.Handle(new ListCarrierBookingsAwaitingAnswerQuery(), CancellationToken.None);
+
+        listed.Should().ContainSingle().Which.CarrierCost.Should().Be(new CarrierCostView(
+            "EUR",
+            86.50m,
+            [new ChargeLineView("Freight", 86.50m)],
+            new CarrierCostSourceView("CarrierRateCard", new RateCardVersionView("CRC-0001", 2)),
+            Samples.Now.AddHours(1)));
+    }
+
+    [Fact]
     public async Task Handle_ARequestedBookingMarkedSent_ListsItsSentTime()
     {
         var (booking, _) = Requested(sequence: 7, shipmentSequence: 12);
@@ -118,7 +140,7 @@ public sealed class ListCarrierBookingsAwaitingAnswerHandlerTests
         listed.Select(summary => summary.CarrierBookingNumber).Should().Equal(early.Number.Value, late.Number.Value);
     }
 
-    private (CarrierBooking Booking, Shipment Shipment) Requested(long sequence, long shipmentSequence, int collectionWindowOffsetDays = 1)
+    private (CarrierBooking Booking, Shipment Shipment) Requested(long sequence, long shipmentSequence, int collectionWindowOffsetDays = 1, CarrierCost? carrierCost = null)
     {
         var order = Samples.AcceptedOrder(sequence);
         if (collectionWindowOffsetDays != 1)
@@ -134,7 +156,7 @@ public sealed class ListCarrierBookingsAwaitingAnswerHandlerTests
 
         var shipment = Samples.Planned(order, CarriedBy.Carrier(VanDijk), shipmentSequence);
         var booking = CarrierBooking.Request(
-            CarrierBookingNumber.FromSequence(sequence), shipment.Id, shipment.Number, VanDijk, new CorrelationId($"corr-release-{sequence}"), Samples.Now.AddHours(1));
+            CarrierBookingNumber.FromSequence(sequence), shipment.Id, shipment.Number, VanDijk, new CorrelationId($"corr-release-{sequence}"), Samples.Now.AddHours(1), carrierCost);
 
         _allBookings.Add(booking);
         _allShipments.Add(shipment);

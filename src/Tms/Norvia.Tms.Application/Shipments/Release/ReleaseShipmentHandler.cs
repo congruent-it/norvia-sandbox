@@ -3,6 +3,7 @@ using Ardalis.SharedKernel;
 using Mediator;
 using Norvia.Tms.Application.CarrierBookings;
 using Norvia.Tms.Application.Carriers;
+using Norvia.Tms.Application.RateCards;
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TransportOrders;
@@ -15,6 +16,7 @@ public sealed class ReleaseShipmentHandler(
     IRepository<CarrierBooking> carrierBookings,
     ICarrierBookingNumbers carrierBookingNumbers,
     ICarrierDirectory carriers,
+    ICarrierRateCardDirectory carrierRateCards,
     TimeProvider time)
     : ICommandHandler<ReleaseShipmentCommand, Result<ReleaseShipmentResult>>
 {
@@ -43,15 +45,32 @@ public sealed class ReleaseShipmentHandler(
         var order = await transportOrders.SingleOrDefaultAsync(new TransportOrderByNumberSpec(shipment.TransportOrderNumber), cancellationToken)
             ?? throw new InvalidOperationException($"Shipment {number} carries out Transport Order {shipment.TransportOrderNumber}, which the TMS doesn't have.");
 
+        // A Carrier Shipment is priced from its Carrier's Carrier Rate Card first, so one it can't price is refused before
+        // anything changes, and no booking is created (P9). Each Shipment of a multi-select release is released on its own.
+        var now = time.GetUtcNow();
+        CarrierCost? carrierCost = null;
+        if (shipment.CarriedBy.CarrierId is { } carrierId)
+        {
+            var carrier = carriers.Find(carrierId)
+                ?? throw new InvalidOperationException($"Shipment {number} is carried by Carrier {carrierId}, which the TMS doesn't have.");
+            var (cost, notPriced) = AssignmentRules.PriceCarrierBooking(carrier, carrierRateCards.FindFor(carrierId), order.Details, now);
+            if (notPriced is not null)
+            {
+                return AssignmentRefused.Because<ReleaseShipmentResult>(notPriced);
+            }
+
+            carrierCost = cost;
+        }
+
         // A Carrier Shipment gets its Carrier booking number before the release, so ShipmentReleased carries it (P4).
         var carrierBookingNumber = shipment.CarriedBy.IsOwnFleet ? null : await carrierBookingNumbers.NextAsync(cancellationToken);
-        var release = shipment.Release(order, key, new CorrelationId(command.CorrelationId), time.GetUtcNow(), carrierBookingNumber)
+        var release = shipment.Release(order, key, new CorrelationId(command.CorrelationId), now, carrierBookingNumber, carrierCost)
             ?? throw new InvalidOperationException($"Shipment {number} passed the assignment rules but wasn't released.");
 
         if (carrierBookingNumber is not null)
         {
             var booking = CarrierBooking.Request(
-                carrierBookingNumber, shipment.Id, shipment.Number, shipment.CarriedBy.CarrierId!, release.CorrelationId, release.ReleasedAt);
+                carrierBookingNumber, shipment.Id, shipment.Number, shipment.CarriedBy.CarrierId!, release.CorrelationId, release.ReleasedAt, carrierCost);
 
             // Adding the Carrier booking saves the tracked Shipment's release and ShipmentReleased's outbox message with it,
             // in one transaction (P4).

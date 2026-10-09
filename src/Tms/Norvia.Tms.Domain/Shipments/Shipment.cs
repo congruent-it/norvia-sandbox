@@ -113,8 +113,14 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
     /// <param name="carrierBookingNumber">
     /// The Carrier booking number the release creates (P4); required for a Carrier Shipment, and none for an Own fleet one.
     /// </param>
+    /// <param name="carrierCost">The Carrier cost the release froze on the Carrier booking (P9), which ShipmentReleased carries.</param>
     public ShipmentRelease? Release(
-        TransportOrder order, IdempotencyKey key, CorrelationId correlationId, DateTimeOffset releasedAt, CarrierBookingNumber? carrierBookingNumber = null)
+        TransportOrder order,
+        IdempotencyKey key,
+        CorrelationId correlationId,
+        DateTimeOffset releasedAt,
+        CarrierBookingNumber? carrierBookingNumber = null,
+        CarrierCost? carrierCost = null)
     {
         ArgumentNullException.ThrowIfNull(order);
         ArgumentNullException.ThrowIfNull(key);
@@ -139,7 +145,7 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
         var release = new ShipmentRelease(correlationId, releasedAt, key, carrierBookingNumber);
         Status = ShipmentStatus.Released;
         LastRelease = release;
-        RegisterDomainEvent(new ShipmentReleasedEvent(this, order, release));
+        RegisterDomainEvent(new ShipmentReleasedEvent(this, order, release, carrierCost));
         return release;
     }
 

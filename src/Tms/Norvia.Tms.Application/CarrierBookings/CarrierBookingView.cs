@@ -11,6 +11,7 @@ namespace Norvia.Tms.Application.CarrierBookings;
 /// <param name="NotDeliveredStatusCode">The technical cause's status code; null unless <see cref="Status"/> is NotDelivered.</param>
 /// <param name="NotDeliveredMessage">The technical cause's message; null unless <see cref="Status"/> is NotDelivered.</param>
 /// <param name="WithdrawnAt">When the Planner withdrew it; null unless <see cref="Status"/> is Withdrawn.</param>
+/// <param name="CarrierCost">The Carrier cost frozen on the booking at release (P9).</param>
 public sealed record CarrierBookingView(
     string CarrierBookingNumber,
     CarrierView Carrier,
@@ -24,7 +25,8 @@ public sealed record CarrierBookingView(
     DateTimeOffset? SentAt,
     int? NotDeliveredStatusCode,
     string? NotDeliveredMessage,
-    DateTimeOffset? WithdrawnAt)
+    DateTimeOffset? WithdrawnAt,
+    CarrierCostView? CarrierCost = null)
 {
     public static CarrierBookingView Of(CarrierBooking booking, ICarrierDirectory carriers)
     {
@@ -42,7 +44,8 @@ public sealed record CarrierBookingView(
             booking.SentAt,
             booking.NotDeliveredStatusCode,
             booking.NotDeliveredMessage,
-            booking.WithdrawnAt);
+            booking.WithdrawnAt,
+            CarrierCostView.From(booking.CarrierCost));
     }
 }
 

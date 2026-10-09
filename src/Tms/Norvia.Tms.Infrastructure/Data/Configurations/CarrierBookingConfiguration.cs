@@ -1,4 +1,6 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Carriers;
@@ -52,6 +54,16 @@ internal sealed class CarrierBookingConfiguration : IEntityTypeConfiguration<Car
             .IsRequired();
 
         builder.Property(booking => booking.RequestedAt).IsRequired();
+
+        // The Carrier cost is frozen whole at release, as one JSON document, like a Transport Order's Freight Charge (P9).
+        builder.Property(booking => booking.CarrierCost)
+            .HasConversion(
+                carrierCost => JsonSerializer.Serialize(carrierCost, FreightChargeJson.Options),
+                json => JsonSerializer.Deserialize<CarrierCost>(json, FreightChargeJson.Options)!,
+                new ValueComparer<CarrierCost?>(
+                    (left, right) => Equals(left, right),
+                    carrierCost => carrierCost == null ? 0 : carrierCost.GetHashCode(),
+                    carrierCost => carrierCost));
 
         // All null while the booking is Requested; set together when the Carrier's answer is recorded (P4).
         builder.Property(booking => booking.AnswerCorrelationId)
