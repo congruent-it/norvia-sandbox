@@ -189,6 +189,148 @@ After a deployment, and not in CI, the presenter checks the TMS side of Freight 
 
 The script prints `PASS` or `FAIL` per check, never a body, a token or a key. The Billing and Carrier cost Logic Apps and the ERP billing API aren't built yet, so it checks that both events were published, not that the ERP received them. If a check fails, file the gap as its own issue against P9, rather than working around it in the run book.
 
+## Implementation
+
+For engineers and coding agents. It shows what the estate does for the TMS half of Freight settlement, where each step lives in the repository, what plays each Azure piece on a developer's machine, and what is designed but not built. It follows the template set by [P1's Implementation section](p1-transport-order-intake.md#implementation). Azure is the estate [c4.md](../../architecture/c4.md) draws. The ERP half (E1, E2) isn't built, so it is under [Gaps](#gaps).
+
+P9 has no API Management operation, Function or Logic App of its own yet. The TMS decides everything inside the transactions of the processes around it and publishes `TransportOrderBillable` and `CarrierCostIncurred` to the topics `transport-order-events` and `shipment-events`. What it adds to the Message trails are Hops at the end of those of P4, P5, P6 and P7, and two trails that start in the TMS UI.
+
+### Message trail
+
+The Hops of the TMS half, named as the [Integration console](../../operations/integration-console.md#message-trail) shows them, in time order. A Hop is grouped under the Flow it carries in the tracking contract, which is not always the Flow of the call it ends: `publish TransportOrderBillable` is always in Flow `billing`. The Carrier side and the Shipper side leave three trails, drawn one by one. Each trail has a correlation ID of its own, and a Transport Order number or Shipment number finds them together.
+
+**1. Release with a Spot price.** The Planner's action starts the trail, with a new correlation ID.
+
+```mermaid
+sequenceDiagram
+    box transparent Flow transport-planning
+        participant ui as tms-web: Release Shipment with Spot price
+        participant call as tms-api: POST /v1/shipments/SH-0000042/release-with-spot-price
+        participant pub as tms-api: publish ShipmentReleased
+    end
+    box transparent Flow carrier-booking
+        participant booking as logic-booking: carrier-booking
+    end
+    ui->>call: Spot price and remark, with an Idempotency-Key
+    call->>call: Carrier Rate Card can't price it, Spot price frozen on the Carrier booking, in one transaction
+    call-)pub: outbox, within a second (carries the Carrier cost)
+    pub-)booking: shipment-events, subscription carrier-booking
+```
+
+The Carrier then confirms or rejects in the Partner portal ([P4](p4-carrier-booking.md#message-trail)). A release the Carrier Rate Card can't price is refused in `tms-api: POST /v1/shipments/SH-0000042/release` (422, with the failure code) and publishes nothing. A Spot price release the Carrier Rate Card could have priced is refused with `CarrierRateCardPricesShipment` (409). The plain release's Hops are those of [P3](p3-transport-planning.md#message-trail).
+
+**2. The Delivered Tracking event.** It is the trail of [P5](p5-shipment-tracking.md#message-trail), on the correlation ID API Management creates, with one more publish at its end.
+
+```mermaid
+sequenceDiagram
+    box transparent Flow carrier-tracking
+        participant apim as apim-norvia: Submit Carrier tracking
+        participant queue as carrier-tracking (queue)
+        participant logic as logic-tracking: carrier-tracking
+        participant tms as tms-api: POST /v1/tracking-events
+        participant delivered as tms-api: publish ShipmentDelivered
+        participant incurred as tms-api: publish CarrierCostIncurred
+    end
+    box transparent Flow billing
+        participant billable as tms-api: publish TransportOrderBillable
+    end
+    apim->>queue: Carrier tracking message (POD), 202 Accepted to the Carrier
+    queue-)logic: When_a_Carrier_tracking_message_is_available
+    logic->>tms: Record_in_the_TMS
+    tms->>tms: Shipment Delivered, Carrier cost incurred, Billable decided, with the outbox messages, in one transaction
+    tms-)delivered: outbox, within a second
+    tms-)incurred: outbox, within a second, Carrier Shipments only
+    tms-)billable: outbox, within a second, when this made the last condition true
+```
+
+`publish CarrierCostIncurred` appears next to `publish ShipmentDelivered`, only for a Confirmed Carrier booking with a Carrier cost. An Own fleet Shipment publishes neither.
+
+**3. The Proof of delivery.** It is the trail of [P6](p6-proof-of-delivery.md#message-trail), with `publish TransportOrderBillable` at its end when the Proof of delivery was the last condition.
+
+```mermaid
+sequenceDiagram
+    box transparent Flow carrier-proof-of-delivery
+        participant apim as apim-norvia: Submit Carrier Proof of delivery
+        participant queue as carrier-proof-of-delivery (queue)
+        participant logic as logic-proof-of-delivery: carrier-proof-of-delivery
+        participant tms as tms-api: POST /v1/proofs-of-delivery
+    end
+    box transparent Flow billing
+        participant billable as tms-api: publish TransportOrderBillable
+    end
+    apim->>queue: the blob's reference, 202 Accepted to the Carrier
+    queue-)logic: When_a_Carrier_Proof_of_delivery_is_available
+    logic->>tms: Record_in_the_TMS (multipart: canonical metadata plus files)
+    tms->>tms: Proof of delivery recorded, Billable decided, with the outbox message, in one transaction
+    tms-)billable: outbox, within a second, when this made the last condition true
+```
+
+**Customer service's release.** It starts a trail in the TMS UI, in Flow `billing` throughout, with a new correlation ID.
+
+```mermaid
+sequenceDiagram
+    box transparent Flow billing
+        participant ui as tms-web: Release without Proof of delivery
+        participant call as tms-api: POST /v1/transport-orders/TO-0000042/release-without-proof-of-delivery
+        participant pub as tms-api: publish TransportOrderBillable
+    end
+    ui->>call: remark and who released it
+    call->>call: release recorded, Billable decided, with the outbox message, in one transaction
+    call-)pub: outbox, within a second, when the release made the last condition true
+```
+
+- The Billable check adds no Hop of its own. It runs in any call that can complete the last condition: the Tracking event and the Proof of delivery above, the rating or re-rate (`tms-api: Rate Transport Order`, Flow `transport-order-rating`, on the intake's trail, [P2](p2-rating.md#implementation)), the resolution of an Exception ([P7](p7-exception-handling.md#message-trail), Flow `exception-handling`) and Customer service's release.
+- A release that isn't allowed (the order isn't in billing state Not yet billable, or its Shipment isn't Delivered) is refused in the TMS call and publishes nothing. A release that leaves another condition unmet records the release and publishes nothing yet.
+- The publish Hops appear only once the outbox has sent the message ([failure behaviour](../../architecture/failure-behaviour.md#the-tms-outbox)).
+- The trails end at the two events. The Billing and Carrier cost Logic Apps that would take them from the `billing` and `carrier-cost` subscriptions, and the ERP billing API behind them, aren't built ([Gaps](#gaps)).
+
+### Code map
+
+Links go to files, not lines, so they stay true as the code moves. The numbers are those of [Steps](#steps).
+
+| Step | Where |
+|---|---|
+| Shipper 1. Deliver | The Delivered Tracking event is the P5 path ([code map](p5-shipment-tracking.md#code-map)). Its handler passes the change to the check in *Shipper 2* |
+| Shipper 2. Complete | Every change that can complete a condition calls [BillingCheck.cs](../../../src/Tms/Norvia.Tms.Application/Billing/BillingCheck.cs) with a [BillingChange.cs](../../../src/Tms/Norvia.Tms.Application/Billing/BillingChange.cs) before it saves: [RecordTrackingHandler.cs](../../../src/Tms/Norvia.Tms.Application/TrackingEvents/Record/RecordTrackingHandler.cs) (Delivered, and an Exception it opens), [RateTransportOrderHandler.cs](../../../src/Tms/Norvia.Tms.Application/TransportOrders/Rate/RateTransportOrderHandler.cs) (Rated or re-rated), [RecordProofOfDeliveryHandler.cs](../../../src/Tms/Norvia.Tms.Application/ProofsOfDelivery/Record/RecordProofOfDeliveryHandler.cs), [ResolveExceptionHandler.cs](../../../src/Tms/Norvia.Tms.Application/Exceptions/Resolve/ResolveExceptionHandler.cs) and [ReleaseWithoutProofOfDeliveryHandler.cs](../../../src/Tms/Norvia.Tms.Application/Billing/Release/ReleaseWithoutProofOfDeliveryHandler.cs). None of them reads a Service Bus event |
+| Shipper 2. Customer service's release | Endpoint `POST /v1/transport-orders/{number}/release-without-proof-of-delivery` in [TransportOrderEndpoints.cs](../../../src/Tms/Norvia.Tms.Api/TransportOrders/TransportOrderEndpoints.cs) (`ReleaseWithoutProofOfDeliveryAsync`, tracked as `Flows.Billing`). Command [ReleaseWithoutProofOfDeliveryCommand.cs](../../../src/Tms/Norvia.Tms.Application/Billing/Release/ReleaseWithoutProofOfDeliveryCommand.cs), handler above, refusal codes [BillingRefusalCode.cs](../../../src/Tms/Norvia.Tms.Domain/TransportOrders/BillingRefusalCode.cs) |
+| Shipper 3. Billable | Aggregate methods `TryBecomeBillable` and `ReleaseWithoutProofOfDelivery` in [TransportOrder.cs](../../../src/Tms/Norvia.Tms.Domain/TransportOrders/TransportOrder.cs), with [BillingState.cs](../../../src/Tms/Norvia.Tms.Domain/TransportOrders/BillingState.cs), [BillingFacts.cs](../../../src/Tms/Norvia.Tms.Domain/TransportOrders/BillingFacts.cs) and [FreightCharge.cs](../../../src/Tms/Norvia.Tms.Domain/TransportOrders/FreightCharge.cs). Stored by [TransportOrderConfiguration.cs](../../../src/Tms/Norvia.Tms.Infrastructure/Data/Configurations/TransportOrderConfiguration.cs) |
+| Shipper 3. Publish | Event type [TransportOrderBillableEvent.cs](../../../src/Tms/Norvia.Tms.Domain/TransportOrders/TransportOrderBillableEvent.cs), publisher [PublishTransportOrderBillable.cs](../../../src/Tms/Norvia.Tms.Application/Billing/PublishTransportOrderBillable.cs), message [TransportOrderBillableV1.cs](../../../src/Tms/Norvia.Tms.Application/Billing/TransportOrderBillableV1.cs) (Flow in [Flows.cs](../../../src/Tms/Norvia.Tms.Application/IntegrationEvents/Flows.cs)), sent by [OutboxPublisher.cs](../../../src/Tms/Norvia.Tms.Infrastructure/Outbox/OutboxPublisher.cs). Schema [transport-order-billable.v1.schema.json](../../../contracts/canonical-model/transport-order-billable.v1.schema.json). Topic `transport-order-events` and its `monitoring` subscription: [messaging.bicep](../../../infra/estate/messaging.bicep) |
+| Shipper 4. Hand over | Not built: the Billing Logic App, its `billing` subscription and the ERP billing API ([Gaps](#gaps)). Who reads the event is in the [event catalogue](../../architecture/events.md#catalogue) |
+| Customer service's list | Handler [ListTransportOrdersNotYetBillableHandler.cs](../../../src/Tms/Norvia.Tms.Application/Billing/ListNotYetBillable/ListTransportOrdersNotYetBillableHandler.cs) with [TransportOrdersNotYetBillableSpec.cs](../../../src/Tms/Norvia.Tms.Domain/TransportOrders/TransportOrdersNotYetBillableSpec.cs), [BillingBlockingReason.cs](../../../src/Tms/Norvia.Tms.Application/Billing/ListNotYetBillable/BillingBlockingReason.cs) and [TransportOrderNotYetBillableSummary.cs](../../../src/Tms/Norvia.Tms.Application/Billing/ListNotYetBillable/TransportOrderNotYetBillableSummary.cs). Endpoint `GET /v1/transport-orders/not-yet-billable` in [TransportOrderEndpoints.cs](../../../src/Tms/Norvia.Tms.Api/TransportOrders/TransportOrderEndpoints.cs) |
+| Customer service in the TMS UI | [NotYetBillable.razor](../../../src/Tms/Norvia.Tms.Web/TransportOrders/NotYetBillable.razor) (the list, which re-reads every second by default through [LiveTransportOrderList.cs](../../../src/Tms/Norvia.Tms.Web/TransportOrders/LiveTransportOrderList.cs)) and [ReleaseWithoutProofOfDeliveryPanel.razor](../../../src/Tms/Norvia.Tms.Web/TransportOrders/ReleaseWithoutProofOfDeliveryPanel.razor), calling through [TmsApiClient.cs](../../../src/Tms/Norvia.Tms.Web/TmsApi/TmsApiClient.cs) (the `Release without Proof of delivery` Hop) |
+| Carrier Rate Cards | [CarrierRateCard.cs](../../../src/Tms/Norvia.Tms.Domain/RateCards/CarrierRateCard.cs), read through [ICarrierRateCardDirectory.cs](../../../src/Tms/Norvia.Tms.Application/RateCards/ICarrierRateCardDirectory.cs) from [SeedFileCarrierRateCardDirectory.cs](../../../src/Tms/Norvia.Tms.Infrastructure/RateCards/SeedFileCarrierRateCardDirectory.cs), loaded at startup by [LoadSeedOnStart.cs](../../../src/Tms/Norvia.Tms.Infrastructure/Seed/LoadSeedOnStart.cs) from `carrierRateCards` in [norvia.seed.json](../../../seed/norvia.seed.json). The Zones, Lanes and Weight Breaks are those of P2's [Rate Cards](p2-rating.md#implementation) |
+| Carrier 1. Price | Handler [ReleaseShipmentHandler.cs](../../../src/Tms/Norvia.Tms.Application/Shipments/Release/ReleaseShipmentHandler.cs). Rules `PriceCarrierBooking` and `PriceCarrierBookingAtSpot` in [AssignmentRules.cs](../../../src/Tms/Norvia.Tms.Domain/Shipments/AssignmentRules.cs). Frozen on the booking as [CarrierCost.cs](../../../src/Tms/Norvia.Tms.Domain/CarrierBookings/CarrierCost.cs) with its source [CarrierCostSource.cs](../../../src/Tms/Norvia.Tms.Domain/CarrierBookings/CarrierCostSource.cs), by `Request` in [CarrierBooking.cs](../../../src/Tms/Norvia.Tms.Domain/CarrierBookings/CarrierBooking.cs) |
+| Carrier 1. Release with a Spot price | Endpoint `POST /v1/shipments/{number}/release-with-spot-price` in [ShipmentEndpoints.cs](../../../src/Tms/Norvia.Tms.Api/Shipments/ShipmentEndpoints.cs) (`ReleaseWithSpotPriceAsync`, tracked as `Flows.TransportPlanning`) with [ReleaseWithSpotPriceRequest.cs](../../../src/Tms/Norvia.Tms.Api/Shipments/ReleaseWithSpotPriceRequest.cs), carried to the handler as [SpotPrice.cs](../../../src/Tms/Norvia.Tms.Application/Shipments/Release/SpotPrice.cs) in [ReleaseShipmentCommand.cs](../../../src/Tms/Norvia.Tms.Application/Shipments/Release/ReleaseShipmentCommand.cs) |
+| Carrier 1. The Planner's list and UI | [ListShipmentsToReleaseHandler.cs](../../../src/Tms/Norvia.Tms.Application/Shipments/ListToRelease/ListShipmentsToReleaseHandler.cs) (the pricing failure per Shipment), [ShipmentsToRelease.razor](../../../src/Tms/Norvia.Tms.Web/Shipments/ShipmentsToRelease.razor), [ReleaseWithSpotPricePanel.razor](../../../src/Tms/Norvia.Tms.Web/Shipments/ReleaseWithSpotPricePanel.razor) and [BookingsAwaitingAnswer.razor](../../../src/Tms/Norvia.Tms.Web/Shipments/BookingsAwaitingAnswer.razor) (Carrier cost and source). The `Release Shipment with Spot price` Hop is in the [TmsApiClient.cs](../../../src/Tms/Norvia.Tms.Web/TmsApi/TmsApiClient.cs) already linked for Customer service |
+| Carrier 2. Book | The release carries the Carrier cost in [ShipmentReleasedV1.cs](../../../src/Tms/Norvia.Tms.Application/Shipments/Release/ShipmentReleasedV1.cs) ([schema](../../../contracts/canonical-model/shipment-released.v1.schema.json), [carrier-cost.v1.schema.json](../../../contracts/canonical-model/carrier-cost.v1.schema.json)). The P4 Logic App [workflow.json](../../../src/Integration/BookingLogicApp/carrier-booking/workflow.json) maps it into the booking request with [CarrierBookingMap.cs](../../../src/Integration/Norvia.Integration.CarrierBooking/CarrierBookingMap.cs); the Freight Charge isn't in it. Samples in [contracts/partner-api](../../../contracts/partner-api/README.md) |
+| Carrier 2. Answer | The Partner portal shows the cost next to *Confirm* in [BookingRequests.razor](../../../src/PartnerPortal/Norvia.PartnerPortal.Web/CarrierBookings/BookingRequests.razor) and offers `PriceNotAccepted` ([CarrierRejectionReason.cs](../../../src/PartnerPortal/Norvia.PartnerPortal.Domain/CarrierBookings/CarrierRejectionReason.cs)). [CarrierAnswerMap.cs](../../../src/Integration/Norvia.Integration.CarrierBooking/CarrierAnswerMap.cs) maps `PRICE_NOT_ACCEPTED`, and the TMS accepts it as [CarrierBookingRejectionReason.cs](../../../src/Tms/Norvia.Tms.Domain/CarrierBookings/CarrierBookingRejectionReason.cs) |
+| Carrier 3. Deliver and publish | `IncurCarrierCost` in [Shipment.cs](../../../src/Tms/Norvia.Tms.Domain/Shipments/Shipment.cs), called by the tracking handler in *Shipper 2*. Event type [CarrierCostIncurredEvent.cs](../../../src/Tms/Norvia.Tms.Domain/CarrierBookings/CarrierCostIncurredEvent.cs), publisher [PublishCarrierCostIncurred.cs](../../../src/Tms/Norvia.Tms.Application/TrackingEvents/Record/PublishCarrierCostIncurred.cs), message [CarrierCostIncurredV1.cs](../../../src/Tms/Norvia.Tms.Application/TrackingEvents/Record/CarrierCostIncurredV1.cs), schema [carrier-cost-incurred.v1.schema.json](../../../contracts/canonical-model/carrier-cost-incurred.v1.schema.json). Topic `shipment-events`: [messaging.bicep](../../../infra/estate/messaging.bicep) |
+| Carrier 4. Hand over | Not built: the Carrier cost Logic App, its `carrier-cost` subscription and the ERP billing API ([Gaps](#gaps)) |
+| The Shipment's timeline | [ShipmentBillingView.cs](../../../src/Tms/Norvia.Tms.Application/TrackingEvents/Timeline/ShipmentBillingView.cs) and [CarrierCostView.cs](../../../src/Tms/Norvia.Tms.Application/CarrierBookings/CarrierCostView.cs), shown by [TrackingTimeline.razor](../../../src/Tms/Norvia.Tms.Web/Shipments/TrackingTimeline.razor) |
+| The applications | The TMS API, TMS UI and Partner portal are declared in the [AppHost](../../../src/Norvia.AppHost/AppHost.cs). P9 adds no Function, Logic App or Bicep resource |
+| The presenter smoke run | [smoke-test-freight-settlement.sh](../../../infra/smoke-test-freight-settlement.sh), run after the smoke runs of [Carrier booking](../../../infra/smoke-test-carrier-booking.sh), [Proof of delivery](../../../infra/smoke-test-proof-of-delivery.sh) and [Exception handling](../../../infra/smoke-test-exception-handling.sh) |
+
+### Locally
+
+P9 needs no stand-in of its own. The decision to bill and the Carrier cost are in the TMS API and TMS UI, which are the same applications locally and in Azure, and the Carrier Rate Cards come from the seed file in both. The paths around it run as they do for the processes they belong to: `LocalPartnerApi` plays API Management, `LocalTrackingWorker` plays the Carrier-tracking Logic App and `LocalProofOfDeliveryWorker` the Proof of delivery one ([CarrierTrackingFlow.cs](../../../src/Integration/Norvia.Integration.LocalTrackingWorker/CarrierTrackingFlow.cs), [CarrierProofOfDeliveryFlow.cs](../../../src/Integration/Norvia.Integration.LocalProofOfDeliveryWorker/CarrierProofOfDeliveryFlow.cs)), and `LocalBookingWorker` plays the booking Logic App, which sends the Carrier cost on ([CarrierBookingFlow.cs](../../../src/Integration/Norvia.Integration.LocalBookingWorker/CarrierBookingFlow.cs)). The Service Bus emulator plays Service Bus, and the Aspire dashboard plays Application Insights, so the `publish` Hops of both events are searched there. The full map is in [local-vs-azure.md](../../architecture/local-vs-azure.md).
+
+Nothing plays the Billing and Carrier cost Logic Apps or the ERP billing API, because they don't exist in Azure either. Locally `TransportOrderBillable` and `CarrierCostIncurred` reach the `monitoring` subscription of their topics and stop there.
+
+### Gaps
+
+Designed in this document and not built yet:
+
+| Gap | Where it stands |
+|---|---|
+| Shipper 4. Hand over: the Billing Logic App, the `billing` subscription of `transport-order-events` and the call to the ERP billing API | Not built. `TransportOrderBillable` is published and the catalogue lists the subscription as *planned* ([events.md](../../architecture/events.md#catalogue)) |
+| Carrier 4. Hand over: the Carrier cost Logic App, the `carrier-cost` subscription of `shipment-events` and the call to the ERP billing API | Not built. `CarrierCostIncurred` is published and the subscription is *planned* |
+| The ERP, its billing API, [E1 Invoicing](../erp/e1-invoicing.md) and [E2 Carrier invoice matching](../erp/e2-carrier-invoice-matching.md) | The ERP half of Freight settlement isn't built. The TMS never learns an invoice number ([Scope](#scope)) |
+| Retry, dead-letter and idempotent resubmit when the ERP can't be reached ([When the ERP can't be reached](#when-the-erp-cant-be-reached)) | Belong to the two Logic Apps. Nothing in the estate does them yet |
+| What was left out on purpose | Listed with their reasons in [Deferred](#deferred) |
+| As-found toggles and presenter-panel faults for P9 | None added. No Bicep parameter switches anything broken in billing, so none of the candidates in [Deferred](#deferred) exist: no alert on the dead-letter queue of the `billing` subscription, and the ERP billing API being down. [Failure behaviour](../../architecture/failure-behaviour.md#planned-processes) lists the candidates |
+| Alerts on P9 | None built: there is no subscription to alert on, and [monitoring.bicep](../../../infra/estate/monitoring.bicep) declares no alert rule |
+| The Billing and Carrier cost Logic Apps in the Integration console's failed runs and dead-letter panels | Nothing to show until they are built. Finding the Hops of the TMS half by the Transport Order number is built |
+
 ## Deferred
 
 These were left out on purpose while designing P9, each with its reason.
