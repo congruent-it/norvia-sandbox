@@ -31,7 +31,7 @@
                         break;
                     case ReleaseAnswer.Refused refused:
                         <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
-                            Shipment @outcome.ShipmentNumber wasn't released@(refused.Code is { } code && refused.FailedOnCarrierRateCard ? $" ({code})" : string.Empty): @refused.Reason
+                            Shipment @outcome.ShipmentNumber wasn't released@(refused.FailedOnCarrierRateCard ? $" ({refused.Code})" : string.Empty): @refused.Reason
                         </FluentMessageBar>
                         break;
                     default:
@@ -101,7 +101,7 @@
         <TemplateColumn Title="Pricing failure">
             @if (_pricingFailures.TryGetValue(context.ShipmentNumber, out var pricingFailure))
             {
-                <strong>@pricingFailure.Code</strong>
+                <strong>@pricingFailure</strong>
             }
         </TemplateColumn>
         <TemplateColumn Title="Reassign to">
@@ -151,7 +151,7 @@
     private readonly Dictionary<string, string> _reassignTo = [];
     private readonly List<ReleaseOutcome> _releaseOutcomes = [];
     // The Shipments whose last release failed on the Carrier Rate Card, with the refusal: they can be released with a Spot price.
-    private readonly Dictionary<string, (string Code, string Reason)> _pricingFailures = [];
+    private readonly Dictionary<string, string> _pricingFailures = [];
     private string? _spotPriceFor;
     private LiveTransportOrderList<ShipmentToReleaseSummary> _list = null!;
     private IReadOnlyList<CarrierView>? _carriers;
@@ -241,9 +241,9 @@
 
     private void NotePricingFailure(string number, ReleaseAnswer? answer)
     {
-        if (answer is ReleaseAnswer.Refused { FailedOnCarrierRateCard: true, Code: { } code } refused)
+        if (answer is ReleaseAnswer.Refused { FailedOnCarrierRateCard: true, Code: { } code })
         {
-            _pricingFailures[number] = (code, refused.Reason);
+            _pricingFailures[number] = code;
         }
         else if (answer is not null)
         {
