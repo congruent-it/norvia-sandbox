@@ -112,22 +112,23 @@ public sealed class CapacityTabsTests : TmsWebContext
     {
         Queries.ListPlanningDaysAsync(Arg.Any<CancellationToken>()).Returns(
         [
-            new PlanningDayView(new DateOnly(2026, 10, 12), 6, [new ShiftView("DRV-0001", "Anouk de Vries", new TimeOnly(6, 0), new TimeOnly(14, 30), false)]),
-            new PlanningDayView(new DateOnly(2026, 10, 17), 5, []),
+            new PlanningDayView(new DateOnly(2026, 10, 12), 6, [new ShiftView("DRV-0001", "Anouk de Vries", new TimeOnly(6, 0), new TimeOnly(14, 30), false)], new DayLoadView(10000, 18, 12000, 10, true)),
+            new PlanningDayView(new DateOnly(2026, 10, 17), 5, [], new DayLoadView(0, 0, 0, 0, false)),
             new PlanningDayView(new DateOnly(2026, 10, 13), 6,
             [
                 new ShiftView("DRV-0001", "Anouk de Vries", new TimeOnly(5, 0), new TimeOnly(13, 0), true),
                 new ShiftView("DRV-0002", "Joost Bakker", new TimeOnly(7, 0), new TimeOnly(15, 30), false),
-            ]),
+            ],
+            new DayLoadView(34000, 51, 8500, 12, false)),
         ]);
 
         var page = Render<DaysTab>();
 
         page.WaitForAssertion(() => page.FindAll("tbody tr").Select(row => row.QuerySelectorAll("td").Select(cell => cell.TextContent.Trim()).ToList())
             .Should().SatisfyRespectively(
-                first => first.Should().Equal("Mon 12 Oct", "6", "Anouk de Vries 06:00-14:30"),
-                second => second.Should().Equal("Sat 17 Oct", "5", string.Empty),
-                third => third.Should().Equal("Tue 13 Oct", "6", "Anouk de Vries 05:00-13:00 (edited); Joost Bakker 07:00-15:30")));
+                first => first.Should().Equal("Mon 12 Oct", "6", "Anouk de Vries 06:00-14:30", "12,000 / 10,000 kg", "10 / 18", "Over capacity"),
+                second => second.Should().Equal("Sat 17 Oct", "5", string.Empty, "0 / 0 kg", "0 / 0", string.Empty),
+                third => third.Should().Equal("Tue 13 Oct", "6", "Anouk de Vries 05:00-13:00 (edited); Joost Bakker 07:00-15:30", "8,500 / 34,000 kg", "12 / 51", string.Empty)));
     }
 
     [Fact]
@@ -143,8 +144,8 @@ public sealed class CapacityTabsTests : TmsWebContext
     [Fact]
     public void Render_DaysTab_WhenADayOpensWhileTheTabIsOpen_ShowsItWithoutARefresh()
     {
-        var monday = new PlanningDayView(new DateOnly(2026, 10, 12), 6, []);
-        Queries.ListPlanningDaysAsync(Arg.Any<CancellationToken>()).Returns([monday], [monday, new PlanningDayView(new DateOnly(2026, 10, 13), 6, [])]);
+        var monday = new PlanningDayView(new DateOnly(2026, 10, 12), 6, [], new DayLoadView(0, 0, 0, 0, false));
+        Queries.ListPlanningDaysAsync(Arg.Any<CancellationToken>()).Returns([monday], [monday, new PlanningDayView(new DateOnly(2026, 10, 13), 6, [], new DayLoadView(0, 0, 0, 0, false))]);
         var page = Render<DaysTab>();
         page.WaitForAssertion(() => page.Markup.Should().Contain("Mon 12 Oct"));
 
