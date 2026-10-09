@@ -49,7 +49,19 @@ public sealed class BookingRequestsTests : PortalWebContext
         var text = RenderPage().Find("tbody tr").TextContent;
 
         text.Should().Contain("412.50 EUR").And.Contain("Freight 400.00").And.Contain("Minimum charge adjustment 12.50")
-            .And.NotContain("Spot").And.NotContain("Freight Charge");
+            .And.NotContain("Spot");
+    }
+
+    [Fact]
+    public void Render_AnOpenRequestWithACarrierCost_SaysNextToConfirmThatConfirmingAcceptsIt()
+    {
+        var request = Request();
+        request = request with { Details = request.Details with { CarrierCost = new CarrierCost("EUR", 380m, [new CarrierChargeLine("Freight", 380m)], IsSpot: true) } };
+        Portal.ListCarrierBookingRequestsAsync(new PersonaId("van-dijk-transport"), Arg.Any<CancellationToken>()).Returns([request]);
+
+        var answer = RenderPage().Find("[aria-label=\"Confirm CB-0000001\"]").ParentElement!.ParentElement!;
+
+        answer.TextContent.Should().Contain("Confirming accepts 380.00 EUR (Spot price).");
     }
 
     [Fact]

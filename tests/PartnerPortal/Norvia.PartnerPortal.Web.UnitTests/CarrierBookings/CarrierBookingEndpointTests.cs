@@ -11,6 +11,8 @@ namespace Norvia.PartnerPortal.Web.UnitTests.CarrierBookings;
 
 public sealed class CarrierBookingEndpointTests
 {
+    private static readonly System.Text.Json.JsonSerializerOptions WebJson = new(System.Text.Json.JsonSerializerDefaults.Web);
+
     private readonly IMediator _mediator = Substitute.For<IMediator>();
     private readonly IOptions<CarrierEndpointOptions> _options =
         Options.Create(new CarrierEndpointOptions { ApiKeys = { ["CAR-0001"] = "carrier-secret" } });
@@ -72,6 +74,49 @@ public sealed class CarrierBookingEndpointTests
                 && command.Details.CarrierCost.ChargeLines[1].Type == "MinimumChargeAdjustment"
                 && command.Details.CarrierCost.ChargeLines[1].Amount == 12.50m),
             Arg.Any<CancellationToken>());
+    }
+
+    public static TheoryData<CarrierCostBody> IncompleteCosts => new()
+    {
+        new CarrierCostBody(null, 10m, [new CarrierChargeLineBody("Freight", 10m)], false),
+        new CarrierCostBody("USD", 10m, [new CarrierChargeLineBody("Freight", 10m)], false),
+        new CarrierCostBody("EUR", null, [new CarrierChargeLineBody("Freight", 10m)], false),
+        new CarrierCostBody("EUR", 10m, [new CarrierChargeLineBody("Freight", 10m)], null),
+        new CarrierCostBody("EUR", 10m, null, false),
+        new CarrierCostBody("EUR", 10m, [], false),
+        new CarrierCostBody("EUR", 10m, [new CarrierChargeLineBody(null, 10m)], false),
+        new CarrierCostBody("EUR", 10m, [new CarrierChargeLineBody("FreightCharge", 10m)], false),
+        new CarrierCostBody("EUR", 10m, [new CarrierChargeLineBody("Freight", null)], false),
+        new CarrierCostBody("EUR", 11m, [new CarrierChargeLineBody("Freight", 10m)], false),
+    };
+
+    [Theory]
+    [MemberData(nameof(IncompleteCosts))]
+    public async Task Receive_AnIncompleteCarrierCost_IsABadRequest_SoNoOneConfirmsWithoutSeeingAPrice(CarrierCostBody cost)
+    {
+        var result = await Receive(body: Body() with { CarrierCost = cost });
+
+        result.Result.Should().BeOfType<ProblemHttpResult>().Which.StatusCode.Should().Be(StatusCodes.Status400BadRequest);
+        await _mediator.DidNotReceiveWithAnyArgs().Send(Arg.Any<ReceiveCarrierBookingCommand>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Receive_AShippersFreightChargeInTheBody_NeverReachesTheInbox()
+    {
+        ReceiveCarrierBookingCommand? received = null;
+        _mediator.Send(Arg.Do<ReceiveCarrierBookingCommand>(command => received = command), Arg.Any<CancellationToken>())
+            .Returns(Result.Success(new ReceiveCarrierBookingResult("CB-0000001", Repeated: false)));
+        const string json = """
+            {"carrierBookingNumber":"CB-0000001","shipmentNumber":"SH-0000042",
+             "carrierCost":{"currency":"EUR","total":10,"chargeLines":[{"type":"Freight","amount":10}],"isSpot":false},
+             "freightCharge":{"total":987.65}}
+            """;
+        var body = System.Text.Json.JsonSerializer.Deserialize<CarrierBookingRequestBody>(json, WebJson)!;
+
+        await Receive(body: body);
+
+        var stored = System.Text.Json.JsonSerializer.Serialize(received!.Details);
+        stored.Should().NotContain("987").And.NotContainEquivalentOf("freightCharge");
     }
 
     [Fact]

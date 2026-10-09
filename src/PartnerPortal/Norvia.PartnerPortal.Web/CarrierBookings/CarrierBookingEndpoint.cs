@@ -92,7 +92,49 @@ public static partial class CarrierBookingEndpoint
             problems.Add("The request needs a shipmentNumber.");
         }
 
+        problems.AddRange(CostProblems(body.CarrierCost));
         return problems;
+    }
+
+    private static readonly string[] ChargeLineTypes = ["Freight", "MinimumChargeAdjustment"];
+
+    // The Carrier confirms by accepting the cost, so a cost that is there must be whole: carrier-booking.v1 requires all of it.
+    private static IEnumerable<string> CostProblems(CarrierCostBody? cost)
+    {
+        if (cost is null)
+        {
+            yield break;
+        }
+
+        if (cost.Currency != "EUR")
+        {
+            yield return "The carrierCost needs a currency of EUR.";
+        }
+
+        if (cost.Total is null or < 0)
+        {
+            yield return "The carrierCost needs a total of zero or more.";
+        }
+
+        if (cost.IsSpot is null)
+        {
+            yield return "The carrierCost needs isSpot.";
+        }
+
+        if (cost.ChargeLines is not { Count: > 0 })
+        {
+            yield return "The carrierCost needs at least one charge line.";
+            yield break;
+        }
+
+        if (cost.ChargeLines.Any(line => line.Type is null || !ChargeLineTypes.Contains(line.Type) || line.Amount is null or < 0))
+        {
+            yield return "Every charge line of the carrierCost needs a type of Freight or MinimumChargeAdjustment and an amount of zero or more.";
+        }
+        else if (cost.Total is { } total && cost.ChargeLines.Sum(line => line.Amount!.Value) != total)
+        {
+            yield return "The total of the carrierCost must be the sum of its charge lines.";
+        }
     }
 
     private static CarrierBookingDetails DetailsOf(CarrierBookingRequestBody body) => new(
@@ -103,12 +145,13 @@ public static partial class CarrierBookingEndpoint
             line.PackageType, line.Quantity, line.WeightKg, line.LengthCm, line.WidthCm, line.HeightCm))],
         CostOf(body.CarrierCost));
 
-    private static CarrierCost? CostOf(CarrierCostBody? cost) => cost is { Total: { } total }
-        ? new CarrierCost(
-            cost.Currency ?? "EUR", total,
-            [.. (cost.ChargeLines ?? []).Where(line => line.Amount is not null).Select(line => new CarrierChargeLine(line.Type ?? string.Empty, line.Amount!.Value))],
-            cost.IsSpot)
-        : null;
+    // Only called for a cost that passed CostProblems, so its parts are all there.
+    private static CarrierCost? CostOf(CarrierCostBody? cost) => cost is null
+        ? null
+        : new CarrierCost(
+            cost.Currency!, cost.Total!.Value,
+            [.. cost.ChargeLines!.Select(line => new CarrierChargeLine(line.Type!, line.Amount!.Value))],
+            cost.IsSpot!.Value);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Refused a booking request for Carrier {CarrierId}: the credential is missing or wrong")]
     private static partial void LogRefused(ILogger logger, string carrierId);

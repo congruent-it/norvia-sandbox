@@ -108,6 +108,10 @@ else
         <TemplateColumn Title="Answer">
             @if (context.IsOpen)
             {
+                @if (context.Details.CarrierCost is { } offered)
+                {
+                    <div class="mb-2 text-xs">Confirming accepts @CarrierCostText.Total(offered)@(offered.IsSpot ? " (Spot price)" : "").</div>
+                }
                 <div class="flex flex-wrap gap-2">
                     <FluentButton Appearance="Appearance.Accent" OnClick="() => Choose(context, AnswerKind.Confirm)" aria-label="@($"Confirm {context.CarrierBookingNumber}")">Confirm</FluentButton>
                     <FluentButton Appearance="Appearance.Outline" OnClick="() => Choose(context, AnswerKind.Reject)" aria-label="@($"Reject {context.CarrierBookingNumber}")">Reject</FluentButton>
