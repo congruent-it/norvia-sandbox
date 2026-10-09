@@ -1,6 +1,6 @@
 # P10 Fleet capacity planning
 
-Fleet capacity planning keeps track, day by day, of which Vehicles and Drivers Norvia's Own fleet can use, and how many driving hours each Driver has left. It compares that capacity with the Own fleet work already planned, so the Planner sees a day that is Over capacity before it happens. The Planner keeps it up to date in the TMS UI. Trip dispatch (P11) draws its Vehicles and Drivers from it. Terms are defined in [CONTEXT.md](../../../CONTEXT.md).
+Fleet capacity planning keeps track, day by day, of which Vehicles and Drivers Norvia's Own fleet can use, and how many driving hours each Driver has left. It compares that capacity with the Own fleet work already planned, so the Planner sees a day that is Over capacity before it happens. The Planner keeps it up to date in the TMS UI. Trip dispatch (P11) draws its Vehicles and Drivers from it. Terms are defined in [GLOSSARY.md](../../../GLOSSARY.md).
 
 | | |
 |---|---|

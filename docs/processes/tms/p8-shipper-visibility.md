@@ -1,6 +1,6 @@
 # P8 Shipper visibility
 
-Shipper visibility lets a Shipper see where its Transport Orders stand. The Shipper asks, and the TMS answers straight away through API Management. What the Shipper sees is a Tracking status and the progress so far, not the workings of the Shipment: which Carrier carries it, what went wrong and how the Planner handles it stay inside Norvia (ADR 0011). Terms are defined in [CONTEXT.md](../../../CONTEXT.md).
+Shipper visibility lets a Shipper see where its Transport Orders stand. The Shipper asks, and the TMS answers straight away through API Management. What the Shipper sees is a Tracking status and the progress so far, not the workings of the Shipment: which Carrier carries it, what went wrong and how the Planner handles it stay inside Norvia (ADR 0011). Terms are defined in [GLOSSARY.md](../../../GLOSSARY.md).
 
 | | |
 |---|---|

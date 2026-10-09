@@ -1,6 +1,6 @@
 # P1 Transport Order intake
 
-Transport Order intake takes a Shipper's booking into the TMS and accepts or rejects it. This document covers the Transport-only service through the Shipper API, the only intake channel built so far. It was written from the P1 spec (GitHub issue #1). Terms are defined in [CONTEXT.md](../../../CONTEXT.md).
+Transport Order intake takes a Shipper's booking into the TMS and accepts or rejects it. This document covers the Transport-only service through the Shipper API, the only intake channel built so far. It was written from the P1 spec (GitHub issue #1). Terms are defined in [GLOSSARY.md](../../../GLOSSARY.md).
 
 | | |
 |---|---|

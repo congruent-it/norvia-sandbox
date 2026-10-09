@@ -1,6 +1,6 @@
 # P5 Shipment tracking
 
-Shipment tracking records what happens to a Shipment after it has been handed over, and keeps its status and ETA up to date. Carriers, and later Drivers, report Tracking events. The TMS keeps every Tracking event and works out the Shipment's status from them. A Carrier's Tracking events are accepted asynchronously, so when one fails inside the integration layer, only Norvia can notice. Terms are defined in [CONTEXT.md](../../../CONTEXT.md).
+Shipment tracking records what happens to a Shipment after it has been handed over, and keeps its status and ETA up to date. Carriers, and later Drivers, report Tracking events. The TMS keeps every Tracking event and works out the Shipment's status from them. A Carrier's Tracking events are accepted asynchronously, so when one fails inside the integration layer, only Norvia can notice. Terms are defined in [GLOSSARY.md](../../../GLOSSARY.md).
 
 | | |
 |---|---|

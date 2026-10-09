@@ -17,7 +17,7 @@ The estate can also run *as found*, reproducing the problems a health check woul
 | Read | For |
 |---|---|
 | [SCENARIO.md](SCENARIO.md) | The company, its systems, the cast, and the headline incident the first slice re-enacts |
-| [CONTEXT.md](CONTEXT.md) | The glossary. Every domain term used in code, docs and issues, and the synonyms to avoid |
+| [GLOSSARY.md](GLOSSARY.md) | The glossary. Every domain term used in code, docs and issues, and the synonyms to avoid |
 | [docs/architecture/](docs/architecture/README.md) | How the estate is put together: C4 context, containers and the integration layer, the event catalogue, the identity and access matrix, failure behaviour per Flow, and the local-vs-Azure map |
 | [docs/adr/](docs/adr/) | Architectural decisions, numbered 0001 onwards |
 | [docs/processes/tms/](docs/processes/tms/README.md) | The TMS process catalogue, P1 Transport Order intake to P12 Trip execution, each with a design doc and a BPMN diagram |
@@ -143,7 +143,7 @@ The applications hold no secrets. The TMS reaches SQL and Service Bus with its m
 ## Contributing
 
 - Issues and specs live in GitHub Issues for `congruent-it/norvia-sandbox`, triaged with the labels in [docs/agents/triage-labels.md](docs/agents/triage-labels.md).
-- Use the terms in [CONTEXT.md](CONTEXT.md). If a term is missing, add it there before you use it in code.
+- Use the terms in [GLOSSARY.md](GLOSSARY.md). If a term is missing, add it there before you use it in code.
 - A decision that is hard to reverse, surprising, or the result of a real trade-off gets an ADR in [docs/adr/](docs/adr/).
 - Every change goes through a pull request with at least one review, and keeps to one issue.
 

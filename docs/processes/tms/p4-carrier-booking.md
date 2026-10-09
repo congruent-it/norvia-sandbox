@@ -1,6 +1,6 @@
 # P4 Carrier booking
 
-Carrier booking asks a Carrier to carry a Shipment that the Planner released to it, and records the Carrier's answer. The TMS creates the Carrier booking at release. A Logic App sends it to the Carrier, and the Carrier confirms or rejects it later. A confirmed booking makes the Shipment Booked. Any other end sends the Shipment back to the Planner. Terms are defined in [CONTEXT.md](../../../CONTEXT.md).
+Carrier booking asks a Carrier to carry a Shipment that the Planner released to it, and records the Carrier's answer. The TMS creates the Carrier booking at release. A Logic App sends it to the Carrier, and the Carrier confirms or rejects it later. A confirmed booking makes the Shipment Booked. Any other end sends the Shipment back to the Planner. Terms are defined in [GLOSSARY.md](../../../GLOSSARY.md).
 
 | | |
 |---|---|

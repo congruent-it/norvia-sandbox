@@ -1,6 +1,6 @@
 # P11 Trip dispatch
 
-Trip dispatch brings Released Own fleet Shipments together on Trips and sends each Trip to its Driver. The Planner builds a Trip by hand in the TMS UI: picks its Shipments, puts their Stops in order, and gives it a Vehicle, a Driver, a planned start and a planned driving duration from what P10 says is available. Dispatching it pushes the whole Trip to the Driver app through a Logic App. Terms are defined in [CONTEXT.md](../../../CONTEXT.md).
+Trip dispatch brings Released Own fleet Shipments together on Trips and sends each Trip to its Driver. The Planner builds a Trip by hand in the TMS UI: picks its Shipments, puts their Stops in order, and gives it a Vehicle, a Driver, a planned start and a planned driving duration from what P10 says is available. Dispatching it pushes the whole Trip to the Driver app through a Logic App. Terms are defined in [GLOSSARY.md](../../../GLOSSARY.md).
 
 | | |
 |---|---|

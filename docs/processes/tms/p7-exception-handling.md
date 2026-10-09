@@ -1,6 +1,6 @@
 # P7 Exception handling
 
-Exception handling makes sure someone acts when a Shipment on its way goes wrong. The TMS opens an Exception when a Tracking event reports a failed collection, a failed delivery or damage, when a Proof of delivery comes with reservations, or when a Shipment will be late. The Planner then decides what to do. They can notify the Shipper, cancel the Carrier booking and re-plan, agree a new delivery window, or conclude that nothing needs doing. Finally they resolve the Exception with an outcome. Terms are defined in [CONTEXT.md](../../../CONTEXT.md).
+Exception handling makes sure someone acts when a Shipment on its way goes wrong. The TMS opens an Exception when a Tracking event reports a failed collection, a failed delivery or damage, when a Proof of delivery comes with reservations, or when a Shipment will be late. The Planner then decides what to do. They can notify the Shipper, cancel the Carrier booking and re-plan, agree a new delivery window, or conclude that nothing needs doing. Finally they resolve the Exception with an outcome. Terms are defined in [GLOSSARY.md](../../../GLOSSARY.md).
 
 | | |
 |---|---|

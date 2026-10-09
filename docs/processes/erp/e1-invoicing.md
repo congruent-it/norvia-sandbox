@@ -1,6 +1,6 @@
 # E1 Invoicing
 
-Invoicing turns the Billable Transport Orders the TMS hands over into Shipper invoices, one per Shipper per Invoice run, and sends them to the Shipper. Finance corrects an issued invoice with a Credit note. This is the ERP half of [P9 Freight settlement](../tms/p9-freight-settlement.md). Terms are defined in [CONTEXT.md](../../../CONTEXT.md).
+Invoicing turns the Billable Transport Orders the TMS hands over into Shipper invoices, one per Shipper per Invoice run, and sends them to the Shipper. Finance corrects an issued invoice with a Credit note. This is the ERP half of [P9 Freight settlement](../tms/p9-freight-settlement.md). Terms are defined in [GLOSSARY.md](../../../GLOSSARY.md).
 
 | | |
 |---|---|

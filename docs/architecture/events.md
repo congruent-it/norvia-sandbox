@@ -1,6 +1,6 @@
 # Events: publishers and subscribers
 
-The event catalogue. Every event the estate publishes, with the topic it goes to, who publishes it, the subscriptions that receive it, who reads each subscription, and the process that owns it. This page alone owns publishers and subscribers: a process doc's Events table says what the event carries and links here for who reads it. Terms are defined in [CONTEXT.md](../../CONTEXT.md).
+The event catalogue. Every event the estate publishes, with the topic it goes to, who publishes it, the subscriptions that receive it, who reads each subscription, and the process that owns it. This page alone owns publishers and subscribers: a process doc's Events table says what the event carries and links here for who reads it. Terms are defined in [GLOSSARY.md](../../GLOSSARY.md).
 
 An event's body is its [Canonical Model](../../contracts/canonical-model/README.md) schema, linked from the first column. Events go out as Service Bus messages ([ADR 0003](../adr/0003-http-in-events-out.md)); the topics and subscriptions are declared in [messaging.bicep](../../infra/estate/messaging.bicep) for Azure and in the [AppHost](../../src/Norvia.AppHost/AppHost.cs) for the local emulator. Every subscription's filter also passes a message resubmitted from the Integration console to the subscription it was dead-lettered from alone ([coding guidelines §7](../coding-guidelines.md)); the sentences below leave that out.
 

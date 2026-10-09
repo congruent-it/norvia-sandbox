@@ -1,6 +1,6 @@
 # Canonical Model
 
-Norvia's own message format ([CONTEXT.md](../../CONTEXT.md#integration)): one JSON Schema per business document or event, named with the glossary's terms and versioned in the file name. Partner formats are mapped to and from these at the edges. Changes to a published version are additive; a breaking change is a new version.
+Norvia's own message format ([GLOSSARY.md](../../GLOSSARY.md#integration)): one JSON Schema per business document or event, named with the glossary's terms and versioned in the file name. Partner formats are mapped to and from these at the edges. Changes to a published version are additive; a breaking change is a new version.
 
 | Schema | What it is |
 |---|---|

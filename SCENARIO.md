@@ -1,6 +1,6 @@
 # Scenario: Norvia Logistics B.V.
 
-The fictional company behind everything in this sandbox. Every application, flow, demo and seed record belongs to this one coherent world. Terms in **bold** are defined in [CONTEXT.md](CONTEXT.md).
+The fictional company behind everything in this sandbox. Every application, flow, demo and seed record belongs to this one coherent world. Terms in **bold** are defined in [GLOSSARY.md](GLOSSARY.md).
 
 This is the sandbox's own copy of the scenario. The health-check repo keeps a separate copy for its audit samples; the two may drift, and where they differ, this file is the reference for the sandbox. The main differences are listed at the end.
 

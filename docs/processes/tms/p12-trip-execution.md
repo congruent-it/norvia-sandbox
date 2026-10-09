@@ -1,6 +1,6 @@
 # P12 Trip execution
 
-Trip execution is the Driver working a Dispatched Trip on the road. In the Driver app the Driver starts the Trip, completes each Stop (collected, delivered with a Proof of delivery, or failed) and ends the Trip. The Driver app publishes each report as an event. A Logic App processes one Trip's reports in order and hands them to the TMS, which records them as Tracking events (P5), Proofs of delivery (P6) and changes to the Trip. The Logic App then tells the Driver app whether each report was recorded. Terms are defined in [CONTEXT.md](../../../CONTEXT.md).
+Trip execution is the Driver working a Dispatched Trip on the road. In the Driver app the Driver starts the Trip, completes each Stop (collected, delivered with a Proof of delivery, or failed) and ends the Trip. The Driver app publishes each report as an event. A Logic App processes one Trip's reports in order and hands them to the TMS, which records them as Tracking events (P5), Proofs of delivery (P6) and changes to the Trip. The Logic App then tells the Driver app whether each report was recorded. Terms are defined in [GLOSSARY.md](../../../GLOSSARY.md).
 
 | | |
 |---|---|

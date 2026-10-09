@@ -1,6 +1,6 @@
 # P6 Proof of delivery
 
-Proof of delivery records the Consignee's confirmation that it received a Shipment's goods, and keeps it on the Shipment. Carriers, and later Drivers, send a Proof of delivery with its files. The TMS stores it, makes it the Shipment's current one, and flags Delivered Shipments that are still missing one. A Carrier's Proof of delivery travels as a claim check and is accepted asynchronously, so when one fails inside the integration layer, only Norvia can notice. Terms are defined in [CONTEXT.md](../../../CONTEXT.md).
+Proof of delivery records the Consignee's confirmation that it received a Shipment's goods, and keeps it on the Shipment. Carriers, and later Drivers, send a Proof of delivery with its files. The TMS stores it, makes it the Shipment's current one, and flags Delivered Shipments that are still missing one. A Carrier's Proof of delivery travels as a claim check and is accepted asynchronously, so when one fails inside the integration layer, only Norvia can notice. Terms are defined in [GLOSSARY.md](../../../GLOSSARY.md).
 
 | | |
 |---|---|
