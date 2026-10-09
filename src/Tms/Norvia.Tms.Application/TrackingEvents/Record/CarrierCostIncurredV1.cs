@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Norvia.Tms.Application.CarrierBookings;
 using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.Shipments;
@@ -13,6 +14,7 @@ namespace Norvia.Tms.Application.TrackingEvents.Record;
 /// <param name="OccurredAt">When the TMS recorded the Delivered Tracking event.</param>
 /// <param name="CarrierBookingReference">The Carrier's own reference for the booking.</param>
 /// <param name="DeliveryTime">When the goods were delivered, with the offset of where.</param>
+/// <param name="SourceMessageId">The Carrier's ID for the Delivered Tracking event; it travels as a tracking property, not in the body.</param>
 public sealed record CarrierCostIncurredV1(
     Guid EventId,
     DateTimeOffset OccurredAt,
@@ -23,7 +25,8 @@ public sealed record CarrierCostIncurredV1(
     string TransportOrderNumber,
     string CarrierId,
     CarrierCostView CarrierCost,
-    DateTimeOffset DeliveryTime)
+    DateTimeOffset DeliveryTime,
+    [property: JsonIgnore] string SourceMessageId)
     : IntegrationEvent(EventId, OccurredAt, CorrelationId)
 {
     public override string EventType => "CarrierCostIncurred";
@@ -47,7 +50,8 @@ public sealed record CarrierCostIncurredV1(
             incurred.Shipment.TransportOrderNumber.Value,
             booking.CarrierId.Value,
             CarrierCostView.From(incurred.CarrierCost)!,
-            delivered.EventTime);
+            delivered.EventTime,
+            delivered.SourceEventId);
     }
 
     protected override IEnumerable<KeyValuePair<string, object>> TrackingProperties() =>
@@ -57,6 +61,7 @@ public sealed record CarrierCostIncurredV1(
         new(TrackingKeys.TransportOrderNumber, TransportOrderNumber),
         new(TrackingKeys.ShipmentNumber, ShipmentNumber),
         new(TrackingKeys.CarrierBookingNumber, CarrierBookingNumber),
+        new(TrackingKeys.SourceMessageId, SourceMessageId),
     ];
 
     // The Carrier cost Logic App's subscription filters on it: only Carrier Shipments have a Carrier cost.

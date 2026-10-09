@@ -3,6 +3,7 @@ using System.Net;
 using System.Text.Json.Nodes;
 using Azure.Messaging.ServiceBus;
 using Norvia.Tms.Api.IntegrationTests.CarrierBookings;
+using Norvia.Tms.Api.IntegrationTests.Exceptions;
 using Norvia.Tms.Api.IntegrationTests.Planning;
 using Norvia.Tms.Api.IntegrationTests.TrackingEvents;
 using Norvia.Tms.Api.IntegrationTests.TransportOrders;
@@ -29,7 +30,8 @@ public sealed class CarrierCostIncurredTests(TmsFixture tms)
         var correlationId = TmsCalls.NewCorrelationId();
         var deliveredAt = DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.AddMinutes(-1).ToUnixTimeSeconds());
 
-        await tms.RecordedAsync(TrackingEventCalls.Event("Delivered", reference, deliveredAt), _cancellationToken, correlationId);
+        var eventId = Guid.NewGuid().ToString();
+        await tms.RecordedAsync(TrackingEventCalls.Event("Delivered", reference, deliveredAt, eventId), _cancellationToken, correlationId);
 
         var message = (await tms.PublishedAsync(correlationId, "CarrierCostIncurred", _cancellationToken)).Should().ContainSingle().Subject;
         var body = JsonNode.Parse(message.Body.ToString())!;
@@ -52,6 +54,7 @@ public sealed class CarrierCostIncurredTests(TmsFixture tms)
             ["transportOrderNumber"] = transportOrderNumber,
             ["shipmentNumber"] = shipmentNumber,
             ["carrierBookingNumber"] = bookingNumber,
+            ["sourceMessageId"] = eventId,
             ["assignedTo"] = "Carrier",
         });
     }
@@ -127,6 +130,72 @@ public sealed class CarrierCostIncurredTests(TmsFixture tms)
     }
 
     [Fact]
+    public async Task WithdrawnBooking_NeverPublishesCarrierCostIncurred()
+    {
+        var (bookingNumber, shipmentNumber) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
+        await tms.WithdrawnAsync(bookingNumber, _cancellationToken);
+
+        await DeliveredRefusedAsync(bookingNumber);
+
+        await ExpectNoCarrierCostAsync(shipmentNumber, "Planned");
+    }
+
+    [Fact]
+    public async Task NotDeliveredBooking_NeverPublishesCarrierCostIncurred()
+    {
+        var (bookingNumber, shipmentNumber) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
+        await tms.ReportedNotDeliveredAsync(bookingNumber, _cancellationToken);
+
+        await DeliveredRefusedAsync(bookingNumber);
+
+        await ExpectNoCarrierCostAsync(shipmentNumber, "Planned");
+    }
+
+    [Fact]
+    public async Task CancelledBooking_NeverPublishesCarrierCostIncurred_EvenForItsOwnReference()
+    {
+        var (shipmentNumber, _, reference, exceptionNumber) = await tms.BookedWithDeliveryFailedAsync(_cancellationToken);
+        using var cancelled = await tms.CancelCarrierBookingAsync(exceptionNumber, ExceptionCalls.Cancellation(), _cancellationToken);
+        cancelled.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        await tms.RecordRefusedAsync(
+            TrackingEventCalls.Event("Delivered", reference, DateTimeOffset.UtcNow.AddMinutes(-1)), HttpStatusCode.NotFound, _cancellationToken);
+
+        await ExpectNoCarrierCostAsync(shipmentNumber, "Planned");
+    }
+
+    [Fact]
+    public async Task OwnFleetDeliveredEvent_NeverPublishesCarrierCostIncurred()
+    {
+        var (shipmentNumber, _, reference) = await tms.BookedShipmentWithNumberAsync(_cancellationToken);
+
+        await tms.RecordRefusedAsync(
+            TrackingEventCalls.Event("Delivered", reference, DateTimeOffset.UtcNow.AddMinutes(-1), source: new JsonObject { ["type"] = "OwnFleet" }),
+            HttpStatusCode.NotFound,
+            _cancellationToken);
+
+        await ExpectNoCarrierCostAsync(shipmentNumber, "Booked");
+    }
+
+    [Fact]
+    public async Task TheSameDeliveredEventReportedConcurrently_CommitsOnce_AndPublishesCarrierCostIncurredOnce()
+    {
+        var (shipmentNumber, _, reference) = await tms.BookedShipmentWithNumberAsync(_cancellationToken);
+        var delivered = TrackingEventCalls.Event("Delivered", reference, DateTimeOffset.UtcNow.AddMinutes(-1));
+
+        // Calls that lose the race roll back with their outbox messages, or find the event recorded already.
+        var responses = await Task.WhenAll(Enumerable.Range(0, 5).Select(async _ =>
+        {
+            using var response = await tms.RecordAsync(JsonNode.Parse(delivered.ToJsonString())!.AsObject(), _cancellationToken);
+            return response.StatusCode;
+        }));
+
+        responses.Should().Contain(HttpStatusCode.OK);
+        await TmsFixture.SettleOutboxAsync(_cancellationToken);
+        CostIncurredFor(shipmentNumber).Should().ContainSingle("only the call that committed publishes");
+    }
+
+    [Fact]
     public async Task RefusedDeliveredEvent_PublishesNoCarrierCostIncurred()
     {
         var (shipmentNumber, _, reference) = await tms.BookedShipmentWithNumberAsync(_cancellationToken);
@@ -137,6 +206,21 @@ public sealed class CarrierCostIncurredTests(TmsFixture tms)
         await TmsFixture.SettleOutboxAsync(_cancellationToken);
         CostIncurredFor(shipmentNumber).Should().BeEmpty("the change didn't commit, so nothing is published");
         (await tms.GetShipmentAsync(shipmentNumber, _cancellationToken))["status"]!.GetValue<string>().Should().Be("Booked");
+    }
+
+    // Withdrawn and Not delivered bookings have no Carrier reference, so a Carrier can only name them by the TMS's booking number.
+    private async Task DeliveredRefusedAsync(string bookingNumber)
+    {
+        var delivered = TrackingEventCalls.Event("Delivered", "NO-CONFIRMED-BOOKING", DateTimeOffset.UtcNow.AddMinutes(-1));
+        delivered["carrierBookingNumber"] = bookingNumber;
+        await tms.RecordRefusedAsync(delivered, HttpStatusCode.NotFound, _cancellationToken);
+    }
+
+    private async Task ExpectNoCarrierCostAsync(string shipmentNumber, string status)
+    {
+        await TmsFixture.SettleOutboxAsync(_cancellationToken);
+        CostIncurredFor(shipmentNumber).Should().BeEmpty();
+        (await tms.GetShipmentAsync(shipmentNumber, _cancellationToken))["status"]!.GetValue<string>().Should().Be(status);
     }
 
     private IReadOnlyList<ServiceBusReceivedMessage> CostIncurredFor(string shipmentNumber) =>

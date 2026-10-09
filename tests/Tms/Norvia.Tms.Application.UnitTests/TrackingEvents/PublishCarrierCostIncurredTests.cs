@@ -54,6 +54,7 @@ public sealed class PublishCarrierCostIncurredTests
             ["transportOrderNumber"] = "TO-0000007",
             ["shipmentNumber"] = "SH-0000012",
             ["carrierBookingNumber"] = "CB-0000001",
+            ["sourceMessageId"] = "evt-1",
             ["assignedTo"] = "Carrier",
         });
     }
