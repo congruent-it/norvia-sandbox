@@ -26,6 +26,7 @@ Norvia's own message format ([CONTEXT.md](../../CONTEXT.md#integration)): one JS
 | [shipment-delivered.v1](shipment-delivered.v1.schema.json) | Event: a Tracking event moved a Shipment to Delivered |
 | [shipment-exception-reported.v1](shipment-exception-reported.v1.schema.json) | Event: an exception Tracking event was recorded for a Shipment, with the exception type and remark |
 | [proof-of-delivery-received.v1](proof-of-delivery-received.v1.schema.json) | Event: a Proof of delivery was recorded as a Shipment's current one, with who received the goods, when, in which condition and how many files; never the files themselves |
+| [carrier-cost-incurred.v1](carrier-cost-incurred.v1.schema.json) | Event: a Carrier Shipment moved to Delivered, so the Carrier earned the Carrier cost of its Confirmed Carrier booking, with the booking number and reference, the Shipment and Transport Order numbers, the Carrier, the Carrier cost with its charge lines and source, and the delivery time |
 | [exception-opened.v1](exception-opened.v1.schema.json) | Event: the TMS opened an Exception for a Shipment, with its Exception number, type, cause and who carries the Shipment |
 | [exception-resolved.v1](exception-resolved.v1.schema.json) | Event: the Planner resolved an Exception, with its outcome and remark |
 | [carrier-booking-cancelled.v1](carrier-booking-cancelled.v1.schema.json) | Event: the Planner cancelled a Confirmed Carrier booking before collection, with a reason, sending the Shipment back to Planned |

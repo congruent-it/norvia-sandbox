@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/carrier-cost-incurred.v1.schema.json",
+  "title": "CarrierCostIncurred",
+  "description": "A Carrier Shipment moved to Delivered, so the Carrier earned the Carrier cost frozen on the Confirmed Carrier booking that carried it (P9). It doesn't wait for a Proof of delivery or for the Transport Order to be Billable. Rejected, Not delivered, Withdrawn and Cancelled bookings never publish one, and neither do Own fleet Shipments. Published on the Shipment events topic, with the assignedTo property for filtering, under the correlation ID of the Delivered Tracking event, through the TMS's transactional outbox (Canonical Model event, version 1).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "carrierBookingNumber", "carrierBookingReference", "shipmentNumber", "transportOrderNumber", "carrierId", "carrierCost", "deliveryTime"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "const": "CarrierCostIncurred" },
+    "eventVersion": { "const": 1 },
+    "occurredAt": { "description": "When the TMS recorded the Delivered Tracking event.", "type": "string", "format": "date-time" },
+    "correlationId": { "description": "The Delivered Tracking event's own correlation ID, which API Management creates.", "type": "string", "minLength": 1 },
+    "carrierBookingNumber": { "description": "The TMS's number for the Confirmed Carrier booking that carried the Shipment.", "type": "string", "pattern": "^CB-[0-9]{7}$" },
+    "carrierBookingReference": { "description": "The Carrier's own reference for the booking, given on confirmation.", "type": "string", "minLength": 1 },
+    "shipmentNumber": { "type": "string", "pattern": "^SH-[0-9]{7}$" },
+    "transportOrderNumber": { "description": "The Transport Order the Shipment carries out.", "type": "string", "pattern": "^TO-[0-9]{7}$" },
+    "carrierId": { "description": "The Carrier that carried the Shipment.", "type": "string", "minLength": 1 },
+    "carrierCost": {
+      "description": "The Carrier cost frozen on the Carrier booking at release, with its charge lines and its source: the Carrier Rate Card version, or Spot with its remark. The Shipper's Freight Charge is never part of it.",
+      "$ref": "carrier-cost.v1.schema.json"
+    },
+    "deliveryTime": { "description": "When the goods were delivered, with the offset of where.", "type": "string", "format": "date-time" }
+  }
+}

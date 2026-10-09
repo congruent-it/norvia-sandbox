@@ -81,9 +81,12 @@ public sealed class RecordTrackingHandler(
 
         await CheckLateDeliveryAsync(shipment, trackingEvent, now, cancellationToken);
 
-        // The Shipment moving to Delivered can complete its Transport Order's conditions to be Billable (P9).
         if (trackingEvent is { Type: TrackingEventType.Delivered, MovedShipment: true })
         {
+            // The Carrier has earned the Carrier cost of the Confirmed Carrier booking that carried the Shipment (P9).
+            shipment.IncurCarrierCost(booking, trackingEvent);
+
+            // The Shipment moving to Delivered can also complete its Transport Order's conditions to be Billable (P9).
             await billing.CheckAsync(shipment, new BillingChange(correlationId, now, DeliveredAt: trackingEvent.EventTime, ExceptionOpened: cause is not null), cancellationToken);
         }
 

@@ -34,7 +34,7 @@ Subscriptions and subscribers marked *planned* are designed in a process doc but
 | [`CarrierBookingCancelled`](../../contracts/canonical-model/carrier-booking-cancelled.v1.schema.json) | `shipment-events` | TMS | `monitoring` (every message)<br/>`carrier-cancellation` (`CarrierBookingCancelled` and `CarrierBookingWithdrawn` only) | Monitoring<br/>Carrier cancellation Logic App (P7) | [P7](../processes/tms/p7-exception-handling.md) |
 | [`CarrierCancellationNotDelivered`](../../contracts/canonical-model/carrier-cancellation-not-delivered.v1.schema.json) | `shipment-events` | TMS | `monitoring` (every message) | Monitoring | [P7](../processes/tms/p7-exception-handling.md) |
 | [`ShipmentDeliveryWindowAgreed`](../../contracts/canonical-model/shipment-delivery-window-agreed.v1.schema.json) | `shipment-events` | TMS | `monitoring` (every message) | Monitoring | [P7](../processes/tms/p7-exception-handling.md) |
-| `CarrierCostIncurred` *planned* | `shipment-events` | TMS | `carrier-cost` *planned* (`CarrierCostIncurred` only) | Carrier cost Logic App (P9) *planned* | [P9](../processes/tms/p9-freight-settlement.md) |
+| [`CarrierCostIncurred`](../../contracts/canonical-model/carrier-cost-incurred.v1.schema.json) | `shipment-events` | TMS | `carrier-cost` *planned* (`CarrierCostIncurred` only) | Carrier cost Logic App (P9) *planned* | [P9](../processes/tms/p9-freight-settlement.md) |
 
 ## Reading the table
 
