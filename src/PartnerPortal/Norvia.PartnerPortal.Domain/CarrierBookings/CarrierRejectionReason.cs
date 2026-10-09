@@ -7,5 +7,6 @@ public enum CarrierRejectionReason
     LaneNotServed,
     WindowNotFeasible,
     GoodsNotAccepted,
+    PriceNotAccepted,
     Other,
 }

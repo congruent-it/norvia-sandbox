@@ -37,7 +37,7 @@
       "properties": {
         "carrierBookingNumber": true,
         "decision": { "const": "DECLINED" },
-        "declineReason": { "enum": ["NO_CAPACITY", "LANE_NOT_SERVED", "WINDOW_NOT_FEASIBLE", "GOODS_NOT_ACCEPTED", "OTHER"] },
+        "declineReason": { "enum": ["NO_CAPACITY", "LANE_NOT_SERVED", "WINDOW_NOT_FEASIBLE", "GOODS_NOT_ACCEPTED", "PRICE_NOT_ACCEPTED", "OTHER"] },
         "declineText": { "description": "The reason in plain language. Required when declineReason is OTHER.", "type": "string", "minLength": 1, "pattern": "\\S" }
       },
       "if": { "properties": { "declineReason": { "const": "OTHER" } } },

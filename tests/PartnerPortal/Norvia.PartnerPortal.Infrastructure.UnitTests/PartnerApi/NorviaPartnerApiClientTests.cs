@@ -359,6 +359,7 @@ public sealed class NorviaPartnerApiClientTests : IDisposable
     [InlineData(CarrierRejectionReason.LaneNotServed, "Not our lane", """{ "carrierBookingNumber": "CB-0000042", "decision": "DECLINED", "declineReason": "LANE_NOT_SERVED", "declineText": "Not our lane" }""")]
     [InlineData(CarrierRejectionReason.WindowNotFeasible, null, """{ "carrierBookingNumber": "CB-0000042", "decision": "DECLINED", "declineReason": "WINDOW_NOT_FEASIBLE" }""")]
     [InlineData(CarrierRejectionReason.GoodsNotAccepted, null, """{ "carrierBookingNumber": "CB-0000042", "decision": "DECLINED", "declineReason": "GOODS_NOT_ACCEPTED" }""")]
+    [InlineData(CarrierRejectionReason.PriceNotAccepted, null, """{ "carrierBookingNumber": "CB-0000042", "decision": "DECLINED", "declineReason": "PRICE_NOT_ACCEPTED" }""")]
     [InlineData(CarrierRejectionReason.Other, "No trucks on Friday", """{ "carrierBookingNumber": "CB-0000042", "decision": "DECLINED", "declineReason": "OTHER", "declineText": "No trucks on Friday" }""")]
     public async Task AnswerAsync_ARejection_IsSentWithTheCarriersOwnReasonCode(CarrierRejectionReason reason, string? text, string expected)
     {

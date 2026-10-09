@@ -22,6 +22,7 @@ public static class CarrierAnswerMap
         ["LANE_NOT_SERVED"] = "LaneNotServed",
         ["WINDOW_NOT_FEASIBLE"] = "WindowNotFeasible",
         ["GOODS_NOT_ACCEPTED"] = "GoodsNotAccepted",
+        ["PRICE_NOT_ACCEPTED"] = "PriceNotAccepted",
         ["OTHER"] = "Other",
     };
 
@@ -76,7 +77,7 @@ public static class CarrierAnswerMap
 
         if (!ReasonCodes.TryGetValue(code, out var reasonCode))
         {
-            return MappedCarrierAnswer.Invalid(number, "The declineReason must be NO_CAPACITY, LANE_NOT_SERVED, WINDOW_NOT_FEASIBLE, GOODS_NOT_ACCEPTED or OTHER.");
+            return MappedCarrierAnswer.Invalid(number, "The declineReason must be NO_CAPACITY, LANE_NOT_SERVED, WINDOW_NOT_FEASIBLE, GOODS_NOT_ACCEPTED, PRICE_NOT_ACCEPTED or OTHER.");
         }
 
         var text = JsonFields.Text(answer, "declineText");

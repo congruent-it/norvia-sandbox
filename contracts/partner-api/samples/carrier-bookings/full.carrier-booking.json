@@ -13,6 +13,7 @@
   "deliveryCountry": "DEU",
   "deliverFrom": "2030-10-03T08:00:00",
   "deliverUntil": "2030-10-03T16:30:00",
+  "carrierCost": { "currency": "EUR", "total": 310.00, "chargeLines": [ { "type": "Freight", "amount": 290.00 }, { "type": "MinimumChargeAdjustment", "amount": 20.00 } ], "isSpot": false },
   "consigneeName": "Getränke Schmitz GmbH",
   "goods": [
     { "packageType": "pallet", "quantity": 4, "weightKg": 2400, "lengthCm": 120, "widthCm": 80, "heightCm": 160 },

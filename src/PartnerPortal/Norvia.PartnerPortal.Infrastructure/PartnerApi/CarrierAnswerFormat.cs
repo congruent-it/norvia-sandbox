@@ -47,6 +47,7 @@ internal static class CarrierAnswerFormat
         CarrierRejectionReason.LaneNotServed => "LANE_NOT_SERVED",
         CarrierRejectionReason.WindowNotFeasible => "WINDOW_NOT_FEASIBLE",
         CarrierRejectionReason.GoodsNotAccepted => "GOODS_NOT_ACCEPTED",
+        CarrierRejectionReason.PriceNotAccepted => "PRICE_NOT_ACCEPTED",
         CarrierRejectionReason.Other => "OTHER",
         _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, "Every reason has a Carrier answer code."),
     };

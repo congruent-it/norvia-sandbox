@@ -21,6 +21,7 @@
     "deliveryCountry": { "$ref": "#/$defs/alpha3" },
     "deliverFrom": { "$ref": "#/$defs/localTime" },
     "deliverUntil": { "$ref": "#/$defs/localTime" },
+    "carrierCost": { "$ref": "#/$defs/carrierCost" },
     "consigneeName": { "description": "Who receives the goods, the only thing the Carrier is told about the Consignee.", "type": "string" },
     "goods": {
       "type": "array",
@@ -33,6 +34,30 @@
       "description": "Local date/time at the address the window belongs to, without an offset.",
       "type": "string",
       "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$"
+    },
+    "carrierCost": {
+      "description": "What Norvia offers the Carrier for the booking, frozen at release. By confirming, the Carrier accepts it; it rejects the booking with PRICE_NOT_ACCEPTED otherwise. It is never the Shipper's Freight Charge.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["currency", "total", "chargeLines", "isSpot"],
+      "properties": {
+        "currency": { "const": "EUR" },
+        "total": { "description": "The sum of the charge lines, without VAT.", "type": "number", "minimum": 0, "multipleOf": 0.01 },
+        "chargeLines": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "amount"],
+            "properties": {
+              "type": { "enum": ["Freight", "MinimumChargeAdjustment"] },
+              "amount": { "type": "number", "minimum": 0, "multipleOf": 0.01 }
+            }
+          }
+        },
+        "isSpot": { "description": "True when the Planner entered the price by hand, after the Carrier's rate card failed to price the Shipment.", "type": "boolean" }
+      }
     },
     "goodsLine": {
       "type": "object",
