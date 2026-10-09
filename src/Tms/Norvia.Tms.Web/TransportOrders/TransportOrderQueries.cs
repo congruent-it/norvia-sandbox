@@ -8,7 +8,10 @@ using Norvia.Tms.Application.Fleet;
 using Norvia.Tms.Application.Fleet.ListDrivers;
 using Norvia.Tms.Application.Fleet.ListVehicles;
 using Norvia.Tms.Application.Fleet.Planning;
+using Norvia.Tms.Application.Fleet.Planning.ListAbsences;
+using Norvia.Tms.Application.Fleet.Planning.ListOffTheRoadDays;
 using Norvia.Tms.Application.Fleet.Planning.ListOpenDays;
+using Norvia.Tms.Application.Fleet.Planning.ListRosters;
 using Norvia.Tms.Application.ProofsOfDelivery.ListMissing;
 using Norvia.Tms.Application.ProofsOfDelivery.Read;
 using Norvia.Tms.Application.Shipments;
@@ -56,6 +59,15 @@ internal sealed class TransportOrderQueries(IServiceScopeFactory scopes) : ITran
 
     public Task<IReadOnlyList<PlanningDayView>> ListPlanningDaysAsync(CancellationToken cancellationToken) =>
         SendAsync(new ListOpenPlanningDaysQuery(), cancellationToken);
+
+    public Task<IReadOnlyList<RosterView>> ListRostersAsync(CancellationToken cancellationToken) =>
+        SendAsync(new ListRostersQuery(), cancellationToken);
+
+    public Task<IReadOnlyList<AbsenceView>> ListAbsencesAsync(CancellationToken cancellationToken) =>
+        SendAsync(new ListAbsencesQuery(), cancellationToken);
+
+    public Task<IReadOnlyList<OffTheRoadDayView>> ListOffTheRoadDaysAsync(CancellationToken cancellationToken) =>
+        SendAsync(new ListOffTheRoadDaysQuery(), cancellationToken);
 
     public async Task<TransportOrderView?> FindAsync(string transportOrderNumber, CancellationToken cancellationToken) =>
         FoundOrNull(await SendAsync(new GetTransportOrderQuery(transportOrderNumber), cancellationToken), $"Transport Order {transportOrderNumber}");

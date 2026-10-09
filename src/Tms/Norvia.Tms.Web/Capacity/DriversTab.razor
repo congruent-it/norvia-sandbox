@@ -2,12 +2,15 @@
 @rendermode InteractiveServer
 @using Microsoft.Extensions.Options
 @using Norvia.Tms.Application.Fleet
+@using Norvia.Tms.Application.Fleet.Planning
 @using Norvia.Tms.Web.TransportOrders
 @implements IAsyncDisposable
 @inject ITransportOrderQueries Queries
 @inject TimeProvider Time
 @inject IOptions<LiveListOptions> Options
 @inject ILogger<LiveTransportOrderList<DriverView>> Logger
+@inject ILogger<LiveTransportOrderList<RosterView>> RosterLogger
+@inject ILogger<LiveTransportOrderList<AbsenceView>> AbsenceLogger
 
 <PageTitle>Capacity · Drivers · Norvia TMS</PageTitle>
 
@@ -25,15 +28,51 @@
     </FluentDataGrid>
 </LiveListStates>
 
+<h2>Rosters</h2>
+<LiveListStates Items="_rosters.Items" LastReadFailed="_rosters.LastReadFailed" Name="Rosters"
+                Empty="There are no Rosters." Context="rosters">
+    <FluentDataGrid Items="rosters.AsQueryable()" TGridItem="RosterView" Class="flatly-table" aria-label="Rosters"
+                    GridTemplateColumns="1.6fr 3.4fr" MultiLine="true">
+        <PropertyColumn Title="Driver" Property="@(roster => roster.DriverName)" />
+        <PropertyColumn Title="Roster" Property="@(roster => FleetText.Roster(roster.Weekdays))" />
+    </FluentDataGrid>
+</LiveListStates>
+
+<h2>Absences</h2>
+<LiveListStates Items="_absences.Items" LastReadFailed="_absences.LastReadFailed" Name="Absences"
+                Empty="There are no Absences." Context="absences">
+    <FluentDataGrid Items="absences.AsQueryable()" TGridItem="AbsenceView" Class="flatly-table" aria-label="Absences"
+                    GridTemplateColumns="1fr 1.6fr 2.4fr" MultiLine="true">
+        <PropertyColumn Title="Day" Property="@(absence => FleetText.Day(absence.Date))" />
+        <PropertyColumn Title="Driver" Property="@(absence => absence.DriverName)" />
+        <PropertyColumn Title="Reason" Property="@(absence => FleetText.Reason(absence.Reason, absence.Remark))" />
+    </FluentDataGrid>
+</LiveListStates>
+
 @code {
     private LiveTransportOrderList<DriverView> _list = null!;
+    private LiveTransportOrderList<RosterView> _rosters = null!;
+    private LiveTransportOrderList<AbsenceView> _absences = null!;
 
     protected override void OnInitialized()
     {
         _list = new LiveTransportOrderList<DriverView>(Queries.ListDriversAsync, "the Drivers", Time, Options.Value.RefreshInterval, Logger);
         _list.Changed += () => InvokeAsync(StateHasChanged);
         _list.Start();
+
+        _rosters = new LiveTransportOrderList<RosterView>(Queries.ListRostersAsync, "the Rosters", Time, Options.Value.RefreshInterval, RosterLogger);
+        _rosters.Changed += () => InvokeAsync(StateHasChanged);
+        _rosters.Start();
+
+        _absences = new LiveTransportOrderList<AbsenceView>(Queries.ListAbsencesAsync, "the Absences", Time, Options.Value.RefreshInterval, AbsenceLogger);
+        _absences.Changed += () => InvokeAsync(StateHasChanged);
+        _absences.Start();
     }
 
-    public ValueTask DisposeAsync() => _list.DisposeAsync();
+    public async ValueTask DisposeAsync()
+    {
+        await _list.DisposeAsync();
+        await _rosters.DisposeAsync();
+        await _absences.DisposeAsync();
+    }
 }

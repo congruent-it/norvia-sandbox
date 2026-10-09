@@ -51,6 +51,15 @@ public interface ITransportOrderQueries
     /// <summary>The open days of the Planning horizon (P10), earliest first, each with the Drivers on shift and the Vehicles available.</summary>
     Task<IReadOnlyList<PlanningDayView>> ListPlanningDaysAsync(CancellationToken cancellationToken);
 
+    /// <summary>The Rosters of the Own fleet's active Drivers (P10), by name.</summary>
+    Task<IReadOnlyList<RosterView>> ListRostersAsync(CancellationToken cancellationToken);
+
+    /// <summary>The Absences of today and later (P10), earliest first.</summary>
+    Task<IReadOnlyList<AbsenceView>> ListAbsencesAsync(CancellationToken cancellationToken);
+
+    /// <summary>The Off the road days of today and later (P10), earliest first.</summary>
+    Task<IReadOnlyList<OffTheRoadDayView>> ListOffTheRoadDaysAsync(CancellationToken cancellationToken);
+
     /// <summary>The Shipment with this number, or null when there is none.</summary>
     Task<ShipmentView?> FindShipmentAsync(string shipmentNumber, CancellationToken cancellationToken);
 

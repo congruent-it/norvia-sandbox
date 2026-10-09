@@ -17,7 +17,10 @@ public sealed class OpenPlanningDaysTests
     private static readonly DriverId Joost = new("DRV-0002");
 
     private readonly List<PlanningDay> _stored = [];
-    private readonly IRepository<PlanningDay> _days = Substitute.For<IRepository<PlanningDay>>();
+    private readonly List<Roster> _changedRosters = [];
+    private readonly List<Absence> _absences = [];
+    private readonly List<OffTheRoadDay> _offTheRoad = [];
+    private readonly IRepository<PlanningDay> _days;
     private readonly IRosterDirectory _rosters = Substitute.For<IRosterDirectory>();
     private readonly IDriverDirectory _drivers = Substitute.For<IDriverDirectory>();
     private readonly IVehicleDirectory _vehicles = Substitute.For<IVehicleDirectory>();
@@ -25,17 +28,10 @@ public sealed class OpenPlanningDaysTests
 
     public OpenPlanningDaysTests()
     {
+        _days = InMemoryRepository.Over(_stored);
         _rosters.List().Returns([Roster(Anouk, 6, 14), Roster(Joost, 8, 16)]);
         _drivers.ListActive().Returns([Driver(Anouk), Driver(Joost)]);
         _vehicles.ListActive().Returns([new Vehicle(new VehicleId("VEH-0001"), "VN-101-A", VehicleType.Van, 1200, 4, true)]);
-        _days.ListAsync(Arg.Any<ISpecification<PlanningDay>>(), Arg.Any<CancellationToken>())
-            .Returns(call => call.Arg<ISpecification<PlanningDay>>().Evaluate(_stored).ToList());
-        _days.AddAsync(Arg.Any<PlanningDay>(), Arg.Any<CancellationToken>())
-            .Returns(call =>
-            {
-                _stored.Add(call.Arg<PlanningDay>());
-                return call.Arg<PlanningDay>();
-            });
         SetLocalTime(Monday, 0, 0);
     }
 
@@ -117,8 +113,44 @@ public sealed class OpenPlanningDaysTests
         result.Closed.Should().Be(0);
     }
 
+    [Fact]
+    public async Task Handle_AnAbsenceBeyondTheHorizonEdge_TakesEffectWhenThatDayOpens()
+    {
+        var farDay = Monday.AddDays(22);
+        _absences.Add(Absence.Record(Anouk, farDay, AbsenceReason.Leave, null));
+        await Run();
+        _stored.Should().NotContain(day => day.Date == farDay);
+
+        SetLocalTime(Monday.AddDays(8), 0, 0);
+        await Run();
+
+        _stored.Single(day => day.Date == farDay).Shifts.Select(shift => shift.DriverId).Should().Equal(Joost);
+    }
+
+    [Fact]
+    public async Task Handle_AnOffTheRoadDay_KeepsTheVehicleOutOfTheDayItOpens()
+    {
+        _offTheRoad.Add(OffTheRoadDay.Record(new VehicleId("VEH-0001"), Monday.AddDays(2), OffTheRoadReason.Maintenance, null));
+
+        await Run();
+
+        _stored.Single(day => day.Date == Monday.AddDays(2)).AvailableVehicles.Should().BeEmpty();
+        _stored.Single(day => day.Date == Monday.AddDays(1)).AvailableVehicles.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task Handle_AChangedRoster_IsUsedInsteadOfTheSeededOne()
+    {
+        _changedRosters.Add(new Roster(Anouk, new Dictionary<DayOfWeek, ShiftTimes> { [DayOfWeek.Monday] = new(new TimeOnly(5, 0), new TimeOnly(13, 0)) }));
+
+        await Run();
+
+        _stored.Single(day => day.Date == Monday).Shifts.Single(shift => shift.DriverId == Anouk).Start.Should().Be(new TimeOnly(5, 0));
+        _stored.Single(day => day.Date == Monday.AddDays(1)).Shifts.Should().NotContain(shift => shift.DriverId == Anouk);
+    }
+
     private async Task<OpenPlanningDaysResult> Run() =>
-        await new OpenPlanningDaysHandler(_days, _rosters, _drivers, _vehicles, new PlanningHorizonRules(14, Amsterdam), _time)
+        await new OpenPlanningDaysHandler(_days, new EffectiveRosters(_rosters, InMemoryRepository.Over(_changedRosters).AsRead()), InMemoryRepository.Over(_absences).AsRead(), InMemoryRepository.Over(_offTheRoad).AsRead(), _drivers, _vehicles, new PlanningHorizonRules(14, Amsterdam), _time)
             .Handle(new OpenPlanningDaysCommand(), CancellationToken.None);
 
     private void SetLocalTime(DateOnly date, int hour, int minute)

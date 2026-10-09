@@ -28,19 +28,26 @@ public sealed class PlanningDay : EntityBase<PlanningDayId>, IAggregateRoot
     public IReadOnlyList<VehicleId> AvailableVehicles { get; private set; }
 
     /// <summary>
-    /// Opens a day: each Driver whose Roster has work that weekday gets a Shift, and every Vehicle given is available.
+    /// Opens a day: each Driver whose Roster has work that weekday gets a Shift, unless they have an Absence that day, and
+    /// every Vehicle given is available, unless it is Off the road that day.
     /// </summary>
-    public static PlanningDay Open(DateOnly date, IEnumerable<Roster> rosters, IEnumerable<VehicleId> vehicles)
+    public static PlanningDay Open(
+        DateOnly date,
+        IEnumerable<Roster> rosters,
+        IEnumerable<VehicleId> vehicles,
+        IReadOnlySet<DriverId>? absentDrivers = null,
+        IReadOnlySet<VehicleId>? offTheRoadVehicles = null)
     {
         ArgumentNullException.ThrowIfNull(rosters);
         ArgumentNullException.ThrowIfNull(vehicles);
         IReadOnlyList<Shift> shifts =
         [
-            .. rosters.Select(roster => (roster.DriverId, Times: roster.ShiftOn(date)))
+            .. rosters.Where(roster => absentDrivers?.Contains(roster.DriverId) != true)
+                .Select(roster => (roster.DriverId, Times: roster.ShiftOn(date)))
                 .Where(entry => entry.Times is not null)
                 .Select(entry => new Shift(entry.DriverId, entry.Times!.Start, entry.Times.End, EditedByHand: false)),
         ];
-        return new PlanningDay(date, shifts, [.. vehicles]);
+        return new PlanningDay(date, shifts, [.. vehicles.Where(vehicle => offTheRoadVehicles?.Contains(vehicle) != true)]);
     }
 
     /// <summary>Closes the day. Closing a closed day changes nothing.</summary>
@@ -76,4 +83,82 @@ public sealed class PlanningDay : EntityBase<PlanningDayId>, IAggregateRoot
         Shifts = [.. Shifts.Where(shift => shift.DriverId != driverId), edited];
         return null;
     }
+
+    /// <summary>
+    /// The Driver can't work this day: their Shift goes, whether the Roster or the Planner gave it. Always accepted, even
+    /// when a Trip would use the Driver; P11 flags such a Trip. Refuses only on a closed day.
+    /// </summary>
+    public PlanningRefusal? RecordAbsence(DriverId driverId)
+    {
+        ArgumentNullException.ThrowIfNull(driverId);
+        if (Status == PlanningDayStatus.Closed)
+        {
+            return PlanningRefusal.DayClosed(Date);
+        }
+
+        Shifts = [.. Shifts.Where(shift => shift.DriverId != driverId)];
+        return null;
+    }
+
+    /// <summary>The Driver can work this day again, with the Shift from their Roster, if it has one.</summary>
+    public PlanningRefusal? EndAbsence(DriverId driverId, Roster? roster)
+    {
+        ArgumentNullException.ThrowIfNull(driverId);
+        if (Status == PlanningDayStatus.Closed)
+        {
+            return PlanningRefusal.DayClosed(Date);
+        }
+
+        Shifts = [.. Shifts.Where(shift => shift.DriverId != driverId), .. ShiftFrom(roster)];
+        return null;
+    }
+
+    /// <summary>The Vehicle can't be used this day. Always accepted, as an Absence is.</summary>
+    public PlanningRefusal? TakeOffTheRoad(VehicleId vehicleId)
+    {
+        ArgumentNullException.ThrowIfNull(vehicleId);
+        if (Status == PlanningDayStatus.Closed)
+        {
+            return PlanningRefusal.DayClosed(Date);
+        }
+
+        AvailableVehicles = [.. AvailableVehicles.Where(vehicle => vehicle != vehicleId)];
+        return null;
+    }
+
+    /// <summary>The Vehicle can be used this day again.</summary>
+    public PlanningRefusal? PutBackOnTheRoad(VehicleId vehicleId)
+    {
+        ArgumentNullException.ThrowIfNull(vehicleId);
+        if (Status == PlanningDayStatus.Closed)
+        {
+            return PlanningRefusal.DayClosed(Date);
+        }
+
+        if (!AvailableVehicles.Contains(vehicleId))
+        {
+            AvailableVehicles = [.. AvailableVehicles, vehicleId];
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Rewrites the Driver's Shift from their changed Roster, unless the day is closed, the Planner edited that Shift by
+    /// hand, or the Driver has an Absence. Returns whether the Shift changed hands, for the log.
+    /// </summary>
+    public bool ApplyRoster(Roster roster, bool absent)
+    {
+        ArgumentNullException.ThrowIfNull(roster);
+        if (Status == PlanningDayStatus.Closed || absent || Shifts.Any(shift => shift.DriverId == roster.DriverId && shift.EditedByHand))
+        {
+            return false;
+        }
+
+        Shifts = [.. Shifts.Where(shift => shift.DriverId != roster.DriverId), .. ShiftFrom(roster)];
+        return true;
+    }
+
+    private IEnumerable<Shift> ShiftFrom(Roster? roster) =>
+        roster?.ShiftOn(Date) is { } times ? [new Shift(roster.DriverId, times.Start, times.End, EditedByHand: false)] : [];
 }

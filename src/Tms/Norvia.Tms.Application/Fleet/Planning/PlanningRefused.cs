@@ -14,4 +14,10 @@ public static class PlanningRefused
         ArgumentNullException.ThrowIfNull(refusal);
         return Result<TResult>.Invalid(new ValidationError("PlanningDay", refusal.Message, refusal.Code.ToString(), ValidationSeverity.Error));
     }
+
+    public static Result Because(PlanningRefusal refusal)
+    {
+        ArgumentNullException.ThrowIfNull(refusal);
+        return Result.Invalid(new ValidationError("PlanningDay", refusal.Message, refusal.Code.ToString(), ValidationSeverity.Error));
+    }
 }

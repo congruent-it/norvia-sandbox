@@ -17,4 +17,19 @@ public enum PlanningRefusalCode
 
     /// <summary>A Shift ends after it starts, on the same day.</summary>
     ShiftInvalid,
+
+    /// <summary>The Own fleet has no active Vehicle with that ID.</summary>
+    VehicleNotFound,
+
+    /// <summary>The Driver has no such Absence.</summary>
+    AbsenceNotFound,
+
+    /// <summary>The Vehicle has no such Off the road day.</summary>
+    OffTheRoadDayNotFound,
+
+    /// <summary>A period of days ends before it starts, or is longer than the TMS records at once.</summary>
+    PeriodInvalid,
+
+    /// <summary>A remark is longer than the TMS keeps.</summary>
+    RemarkTooLong,
 }

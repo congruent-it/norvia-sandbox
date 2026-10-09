@@ -16,4 +16,19 @@ public sealed record PlanningRefusal(PlanningRefusalCode Code, string Message)
 
     public static PlanningRefusal ShiftInvalid() =>
         new(PlanningRefusalCode.ShiftInvalid, "A Shift must end after it starts.");
+
+    public static PlanningRefusal VehicleNotFound(string vehicleId) =>
+        new(PlanningRefusalCode.VehicleNotFound, Invariant($"The Own fleet has no active Vehicle {vehicleId}."));
+
+    public static PlanningRefusal AbsenceNotFound() =>
+        new(PlanningRefusalCode.AbsenceNotFound, "The Driver has no such Absence.");
+
+    public static PlanningRefusal OffTheRoadDayNotFound() =>
+        new(PlanningRefusalCode.OffTheRoadDayNotFound, "The Vehicle has no such Off the road day.");
+
+    public static PlanningRefusal PeriodInvalid(int maxDays) =>
+        new(PlanningRefusalCode.PeriodInvalid, Invariant($"A period must end on or after the day it starts, and cover at most {maxDays} days."));
+
+    public static PlanningRefusal RemarkTooLong(int maxLength) =>
+        new(PlanningRefusalCode.RemarkTooLong, Invariant($"A remark can be at most {maxLength} characters."));
 }
