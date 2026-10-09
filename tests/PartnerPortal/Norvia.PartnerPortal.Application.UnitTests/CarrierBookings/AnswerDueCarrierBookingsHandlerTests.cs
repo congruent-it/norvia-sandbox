@@ -68,6 +68,25 @@ public sealed class AnswerDueCarrierBookingsHandlerTests
     }
 
     [Fact]
+    public async Task Handle_ADueConfirm_ConfirmsWhateverTheCarrierCost()
+    {
+        var spot = new CarrierCost("EUR", 9999.99m, [new CarrierChargeLine("Freight", 9999.99m)], IsSpot: true);
+        var request = CarrierBookingRequest.Receive(
+            Samples.KesslerSpedition.Id, "CB-0000042", "SH-0000042", "release-1", Samples.Now.AddSeconds(-5),
+            new CarrierBookingDetails(new CarrierBookingStop(null, null, "Rotterdam", "NLD", null, null), new CarrierBookingStop(null, null, "Utrecht", "NLD", null, null), null, [], spot),
+            Due());
+        DueRequests(request);
+        NextDue(null);
+        NorviaTakes(request);
+
+        await _handler.Handle(new AnswerDueCarrierBookingsCommand(), CancellationToken.None);
+
+        await _mediator.Received(1).Send(
+            Arg.Is<AnswerCarrierBookingCommand>(command => command.Answer is CarrierAnswer.Confirmation),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Handle_ADueReject_SendsARejectionWithTheChosenReason()
     {
         var request = Request(Due(CarrierAnswerMode.AutoReject, CarrierRejectionReason.WindowNotFeasible));

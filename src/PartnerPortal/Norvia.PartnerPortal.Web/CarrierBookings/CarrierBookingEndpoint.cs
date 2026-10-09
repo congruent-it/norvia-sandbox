@@ -100,7 +100,15 @@ public static partial class CarrierBookingEndpoint
         new CarrierBookingStop(body.DeliveryStreet, body.DeliveryPostcode, body.DeliveryCity, body.DeliveryCountry, body.DeliverFrom, body.DeliverUntil),
         body.ConsigneeName,
         [.. (body.Goods ?? []).Select(line => new CarrierBookingGoodsLine(
-            line.PackageType, line.Quantity, line.WeightKg, line.LengthCm, line.WidthCm, line.HeightCm))]);
+            line.PackageType, line.Quantity, line.WeightKg, line.LengthCm, line.WidthCm, line.HeightCm))],
+        CostOf(body.CarrierCost));
+
+    private static CarrierCost? CostOf(CarrierCostBody? cost) => cost is { Total: { } total }
+        ? new CarrierCost(
+            cost.Currency ?? "EUR", total,
+            [.. (cost.ChargeLines ?? []).Where(line => line.Amount is not null).Select(line => new CarrierChargeLine(line.Type ?? string.Empty, line.Amount!.Value))],
+            cost.IsSpot)
+        : null;
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Refused a booking request for Carrier {CarrierId}: the credential is missing or wrong")]
     private static partial void LogRefused(ILogger logger, string carrierId);

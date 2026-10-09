@@ -34,6 +34,43 @@ public sealed class BookingRequestsTests : PortalWebContext
     }
 
     [Fact]
+    public void Render_ShowsTheCarrierCostWithItsChargeLines_AndNeverAFreightCharge()
+    {
+        var request = Request();
+        request = request with
+        {
+            Details = request.Details with
+            {
+                CarrierCost = new CarrierCost("EUR", 412.50m, [new CarrierChargeLine("Freight", 400m), new CarrierChargeLine("MinimumChargeAdjustment", 12.50m)], IsSpot: false),
+            },
+        };
+        Portal.ListCarrierBookingRequestsAsync(new PersonaId("van-dijk-transport"), Arg.Any<CancellationToken>()).Returns([request]);
+
+        var text = RenderPage().Find("tbody tr").TextContent;
+
+        text.Should().Contain("412.50 EUR").And.Contain("Freight 400.00").And.Contain("Minimum charge adjustment 12.50")
+            .And.NotContain("Spot").And.NotContain("Freight Charge");
+    }
+
+    [Fact]
+    public void Render_ASpotCarrierCost_SaysItIsASpotPrice()
+    {
+        var request = Request();
+        request = request with { Details = request.Details with { CarrierCost = new CarrierCost("EUR", 380m, [new CarrierChargeLine("Freight", 380m)], IsSpot: true) } };
+        Portal.ListCarrierBookingRequestsAsync(new PersonaId("van-dijk-transport"), Arg.Any<CancellationToken>()).Returns([request]);
+
+        RenderPage().Find("tbody tr").TextContent.Should().Contain("380.00 EUR").And.Contain("Spot price");
+    }
+
+    [Fact]
+    public void Render_ARequestWithoutACarrierCost_ShowsNoPrice()
+    {
+        Portal.ListCarrierBookingRequestsAsync(new PersonaId("van-dijk-transport"), Arg.Any<CancellationToken>()).Returns([Request()]);
+
+        RenderPage().Find("tbody tr").TextContent.Should().NotContain("EUR");
+    }
+
+    [Fact]
     public void Render_ARequestWithAnAutomaticAnswerComingUp_SaysWhen()
     {
         Portal.ListCarrierBookingRequestsAsync(new PersonaId("van-dijk-transport"), Arg.Any<CancellationToken>()).Returns(

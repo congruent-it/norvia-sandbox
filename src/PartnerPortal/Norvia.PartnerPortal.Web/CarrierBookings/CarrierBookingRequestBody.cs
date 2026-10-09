@@ -17,7 +17,12 @@ public sealed record CarrierBookingRequestBody(
     DateTime? DeliverFrom,
     DateTime? DeliverUntil,
     string? ConsigneeName,
-    IReadOnlyList<CarrierBookingGoodsLineBody>? Goods);
+    IReadOnlyList<CarrierBookingGoodsLineBody>? Goods,
+    CarrierCostBody? CarrierCost = null);
+
+public sealed record CarrierCostBody(string? Currency, decimal? Total, IReadOnlyList<CarrierChargeLineBody>? ChargeLines, bool IsSpot);
+
+public sealed record CarrierChargeLineBody(string? Type, decimal? Amount);
 
 public sealed record CarrierBookingGoodsLineBody(
     string? PackageType,

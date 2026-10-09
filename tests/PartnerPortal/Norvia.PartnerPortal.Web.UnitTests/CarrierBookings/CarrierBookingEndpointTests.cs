@@ -54,6 +54,38 @@ public sealed class CarrierBookingEndpointTests
     }
 
     [Fact]
+    public async Task Receive_TheCarrierCost_IsPassedOnWithItsChargeLinesAndWhetherItIsSpot()
+    {
+        _mediator.Send(Arg.Any<ReceiveCarrierBookingCommand>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Success(new ReceiveCarrierBookingResult("CB-0000001", Repeated: false)));
+        var cost = new CarrierCostBody("EUR", 412.50m, [new CarrierChargeLineBody("Freight", 400m), new CarrierChargeLineBody("MinimumChargeAdjustment", 12.50m)], IsSpot: true);
+
+        await Receive(body: Body() with { CarrierCost = cost });
+
+        await _mediator.Received(1).Send(
+            Arg.Is<ReceiveCarrierBookingCommand>(command =>
+                command.Details.CarrierCost != null
+                && command.Details.CarrierCost.Currency == "EUR"
+                && command.Details.CarrierCost.Total == 412.50m
+                && command.Details.CarrierCost.IsSpot
+                && command.Details.CarrierCost.ChargeLines.Count == 2
+                && command.Details.CarrierCost.ChargeLines[1].Type == "MinimumChargeAdjustment"
+                && command.Details.CarrierCost.ChargeLines[1].Amount == 12.50m),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Receive_ARequestWithoutACarrierCost_IsStillTaken()
+    {
+        _mediator.Send(Arg.Any<ReceiveCarrierBookingCommand>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Success(new ReceiveCarrierBookingResult("CB-0000001", Repeated: false)));
+
+        await Receive();
+
+        await _mediator.Received(1).Send(Arg.Is<ReceiveCarrierBookingCommand>(command => command.Details.CarrierCost == null), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Receive_ARepeatedRequest_IsAnsweredAsSuccess_FlaggedAsRepeated()
     {
         _mediator.Send(Arg.Any<ReceiveCarrierBookingCommand>(), Arg.Any<CancellationToken>())
