@@ -130,6 +130,13 @@
     padding: 0;
 }
 
+/* A header that doesn't fit wraps at its words instead of being cut off with an ellipsis. */
+.flatly-table.fluent-data-grid .col-title-text {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+}
+
 .flatly-table.fluent-data-grid tbody tr:hover td {
     background-color: var(--color-light);
 }
