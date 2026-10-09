@@ -10,24 +10,24 @@ public sealed class DrivingHourOptions
 
     /// <summary>The planned driving a day normally allows.</summary>
     [Range(typeof(decimal), "0.5", "24")]
-    public decimal DailyHours { get; init; } = 9m;
+    public decimal DailyHours { get; init; } = (decimal)DrivingHourLimits.Default.Daily.TotalHours;
 
     /// <summary>What a day may be extended to, using one of the week's extensions.</summary>
     [Range(typeof(decimal), "0.5", "24")]
-    public decimal ExtendedDailyHours { get; init; } = 10m;
+    public decimal ExtendedDailyHours { get; init; } = (decimal)DrivingHourLimits.Default.ExtendedDaily.TotalHours;
 
     /// <summary>How many days in a fixed week (Monday to Sunday) may be extended.</summary>
     [Range(0, 7)]
-    public int ExtensionsPerWeek { get; init; } = 2;
+    public int ExtensionsPerWeek { get; init; } = DrivingHourLimits.Default.ExtensionsPerWeek;
 
     [Range(typeof(decimal), "0.5", "168")]
-    public decimal WeeklyHours { get; init; } = 56m;
+    public decimal WeeklyHours { get; init; } = (decimal)DrivingHourLimits.Default.Weekly.TotalHours;
 
     /// <summary>The limit over this week and the previous one.</summary>
     [Range(typeof(decimal), "0.5", "336")]
-    public decimal FortnightlyHours { get; init; } = 90m;
+    public decimal FortnightlyHours { get; init; } = (decimal)DrivingHourLimits.Default.Fortnightly.TotalHours;
 
-    public bool IsConsistent => ExtendedDailyHours >= DailyHours && FortnightlyHours >= WeeklyHours;
+    public bool IsConsistent => ToLimits().IsConsistent;
 
     public DrivingHourLimits ToLimits() => new(
         TimeSpan.FromHours((double)DailyHours),

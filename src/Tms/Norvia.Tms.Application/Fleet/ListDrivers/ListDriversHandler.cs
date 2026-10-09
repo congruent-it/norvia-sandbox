@@ -14,8 +14,8 @@ public sealed class ListDriversHandler(
     {
         ArgumentNullException.ThrowIfNull(query);
         var today = horizon.Today(time.GetUtcNow());
-        // The previous week starts at most 13 days back and this week ends at most 6 days ahead.
-        var planned = await plannedDriving.ListAsync(today.AddDays(-13), today.AddDays(6), cancellationToken);
+        var (first, last) = DrivingHourBudget.Window(today);
+        var planned = await plannedDriving.ListAsync(first, last, cancellationToken);
         var byDriver = planned.ToLookup(driving => driving.DriverId);
 
         return

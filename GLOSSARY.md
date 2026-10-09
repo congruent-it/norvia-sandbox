@@ -222,6 +222,10 @@ _Avoid_: VOR, downtime, out of service
 The planned driving hours a Driver has left under the daily, weekly and fortnightly limits, a simplified form of EU Regulation 561/2006. Trips use it up.
 _Avoid_: tacho hours, working time
 
+**Extension**:
+A day on which a Driver's planned driving goes over the daily limit, up to the extended daily limit (10 h by default). The Driving-hour budget allows at most two a fixed week and uses one automatically when a day goes over.
+_Avoid_: overtime, exception
+
 **Load check**:
 A rough comparison, for a day, of what the Own fleet can carry against the Own fleet work planned for it. It is a figure for the Planner, not a plan. When a Shipment is assigned to Own fleet in P3, the load check for its collection day, with that Shipment counted, comes back as a warning, or says the day is outside the Planning horizon.
 _Avoid_: capacity check, capacity warning

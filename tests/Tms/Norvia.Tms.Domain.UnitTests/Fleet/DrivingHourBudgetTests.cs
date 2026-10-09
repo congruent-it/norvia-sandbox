@@ -129,4 +129,34 @@ public sealed class DrivingHourBudgetTests
 
         left.Should().Be(new DrivingHoursLeft(TimeSpan.FromHours(0.5), TimeSpan.FromHours(5.5), TimeSpan.FromHours(10.5), 0));
     }
+
+    [Fact]
+    public void Left_ADayOverNineHours_WithBothExtensionsUsedElsewhere_HasNothingLeft()
+    {
+        var left = Left(Drive(10, 12, 10), Drive(10, 13, 10), Drive(10, 14, 9.5));
+
+        left.Today.Should().Be(TimeSpan.Zero);
+        left.ExtensionsLeft.Should().Be(0);
+    }
+
+    [Fact]
+    public void Window_IsFromTheMondayOfThePreviousWeekToTheSundayOfThisOne()
+    {
+        DrivingHourBudget.Window(Wednesday).Should().Be((new DateOnly(2026, 10, 5), new DateOnly(2026, 10, 18)));
+        DrivingHourBudget.Window(new DateOnly(2026, 10, 18)).Should().Be((new DateOnly(2026, 10, 5), new DateOnly(2026, 10, 18)));
+    }
+
+    [Fact]
+    public void Left_WhenItIsMondayInAmsterdamButStillSundayInUtc_TheNewWeekHasStarted()
+    {
+        // 00:30 in Amsterdam on Monday 12 October (CEST) is 22:30 UTC on Sunday the 11th.
+        var instant = new DateTimeOffset(2026, 10, 11, 22, 30, 0, TimeSpan.Zero);
+        var today = new PlanningHorizonRules(14, TimeZoneInfo.FindSystemTimeZoneById("Europe/Amsterdam")).Today(instant);
+
+        var left = DrivingHourBudget.Left([Drive(10, 11, 8), Drive(10, 12, 2)], today, Limits);
+
+        left.Week.Should().Be(TimeSpan.FromHours(54));
+        left.Fortnight.Should().Be(TimeSpan.FromHours(80));
+        left.Today.Should().Be(TimeSpan.FromHours(7));
+    }
 }

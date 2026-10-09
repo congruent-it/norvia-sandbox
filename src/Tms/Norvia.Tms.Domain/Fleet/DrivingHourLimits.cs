@@ -11,4 +11,7 @@ public sealed record DrivingHourLimits(TimeSpan Daily, TimeSpan ExtendedDaily, i
     /// <summary>9 h a day, 10 h at most twice a week, 56 h a week and 90 h a fortnight.</summary>
     public static readonly DrivingHourLimits Default =
         new(TimeSpan.FromHours(9), TimeSpan.FromHours(10), 2, TimeSpan.FromHours(56), TimeSpan.FromHours(90));
+
+    /// <summary>False when a day may be extended to less than a day, or a fortnight holds less than a week.</summary>
+    public bool IsConsistent => ExtendedDaily >= Daily && Fortnightly >= Weekly;
 }

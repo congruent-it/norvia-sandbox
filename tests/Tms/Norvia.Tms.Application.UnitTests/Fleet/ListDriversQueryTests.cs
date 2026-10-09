@@ -58,7 +58,7 @@ public sealed class ListDriversQueryTests
     public async Task Handle_DriversWithTrips_ShowTheirOwnBudgetFromTheTripDurations()
     {
         _drivers.ListActive().Returns([Driver("DRV-0001", "Anouk de Vries", LicenceCategory.B), Driver("DRV-0006", "Cor Smit", LicenceCategory.B)]);
-        _plannedDriving.ListAsync(new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 20), Arg.Any<CancellationToken>()).Returns(
+        _plannedDriving.ListAsync(new DateOnly(2026, 10, 5), new DateOnly(2026, 10, 18), Arg.Any<CancellationToken>()).Returns(
         [
             new PlannedDriving(new DriverId("DRV-0001"), new DateOnly(2026, 10, 14), TimeSpan.FromHours(9.5)),
             new PlannedDriving(new DriverId("DRV-0001"), new DateOnly(2026, 10, 11), TimeSpan.FromHours(6)),
