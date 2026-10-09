@@ -31,7 +31,7 @@ public sealed class EditShiftTests
     {
         _stored.Add(PlanningDay.Open(Monday, [], []));
 
-        var result = await Handle(Monday, "DRV-0001");
+        var result = await Handle(Monday, Anouk);
 
         result.IsSuccess.Should().BeTrue();
         _stored.Single().Shifts.Should().ContainSingle().Which.EditedByHand.Should().BeTrue();
@@ -43,7 +43,7 @@ public sealed class EditShiftTests
     {
         _stored.Add(PlanningDay.Open(Monday.AddDays(-1), [], []));
 
-        var result = await Handle(Monday.AddDays(-1), "DRV-0001");
+        var result = await Handle(Monday.AddDays(-1), Anouk);
 
         Refusal(result).Should().Be(PlanningRefusalCode.DayClosed.ToString());
         _stored.Single().Shifts.Should().BeEmpty();
@@ -53,7 +53,7 @@ public sealed class EditShiftTests
     [Fact]
     public async Task Handle_ADayTheHorizonDoesNotHave_IsRefusedAsNotFound()
     {
-        var result = await Handle(Monday.AddDays(30), "DRV-0001");
+        var result = await Handle(Monday.AddDays(30), Anouk);
 
         Refusal(result).Should().Be(PlanningRefusalCode.PlanningDayNotFound.ToString());
     }
@@ -63,12 +63,12 @@ public sealed class EditShiftTests
     {
         _stored.Add(PlanningDay.Open(Monday, [], []));
 
-        var result = await Handle(Monday, "DRV-9999");
+        var result = await Handle(Monday, new DriverId("DRV-9999"));
 
         Refusal(result).Should().Be(PlanningRefusalCode.DriverNotFound.ToString());
     }
 
-    private async Task<Ardalis.Result.Result<EditShiftResult>> Handle(DateOnly date, string driverId) =>
+    private async Task<Ardalis.Result.Result<EditShiftResult>> Handle(DateOnly date, DriverId driverId) =>
         await new EditShiftHandler(_days, _drivers, new PlanningHorizonRules(14, Amsterdam), _time)
             .Handle(new EditShiftCommand(date, driverId, new TimeOnly(5, 0), new TimeOnly(13, 0)), CancellationToken.None);
 

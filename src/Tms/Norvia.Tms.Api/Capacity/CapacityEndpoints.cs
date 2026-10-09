@@ -26,14 +26,14 @@ public static class CapacityEndpoints
                 + "Each day shows how many Vehicles are available and which Drivers work, with their Shift start and end and whether the Planner edited it by hand.");
 
         // The Planner edits from the TMS UI. P10's actions have no correlation ID: they publish nothing and start no Message trail.
-        capacity.MapPut("/days/{date}/shifts/{driverId}", EditShiftAsync)
+        capacity.MapPut("/days/{date}/shifts/{id}", EditShiftAsync)
             .WithName("EditShift")
             .RequireAuthorization(policy => policy.RequireRole(TransportOrderEndpoints.ManageRole))
             .WithSummary("Set one Driver's Shift on an open day.")
             .WithDescription(
-                "start and end are required, and the Shift ends after it starts; otherwise the call is a 400. The Shift replaces the one from the Driver's Roster, "
+                "start and end are required, otherwise the call is a 400. The Shift replaces the one from the Driver's Roster, "
                 + "or adds one on a day off, and is marked as edited by hand. A change that breaks a rule is refused, changing nothing, with a problem whose code says which: "
-                + "PlanningDayNotFound (404), DriverNotFound (404) or DayClosed (409): days before today are closed and read-only.");
+                + "PlanningDayNotFound (404), DriverNotFound (404), DayClosed (409): days before today are closed and read-only, or ShiftInvalid (400): a Shift ends after it starts.");
 
         return app;
     }
@@ -43,7 +43,7 @@ public static class CapacityEndpoints
 
     private static async Task<Results<Ok<EditShiftResult>, ProblemHttpResult, ValidationProblem>> EditShiftAsync(
         DateOnly date,
-        string driverId,
+        string id,
         EditShiftRequest request,
         IMediator mediator,
         CancellationToken cancellationToken)
@@ -64,12 +64,7 @@ public static class CapacityEndpoints
             return TypedResults.ValidationProblem(errors);
         }
 
-        if (start >= end)
-        {
-            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { [nameof(EditShiftRequest.End)] = ["A Shift must end after it starts."] });
-        }
-
-        var result = await mediator.Send(new EditShiftCommand(date, driverId, start, end), cancellationToken);
+        var result = await mediator.Send(new EditShiftCommand(date, new DriverId(id), start, end), cancellationToken);
         if (result.IsSuccess)
         {
             return TypedResults.Ok(result.Value);

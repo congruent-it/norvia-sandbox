@@ -18,7 +18,7 @@ public sealed class OpenPlanningDaysHandler(
         var today = horizon.Today(time.GetUtcNow());
 
         var closed = 0;
-        foreach (var day in await days.ListAsync(new OpenPlanningDaysSpec(), cancellationToken))
+        foreach (var day in await days.ListAsync(new OpenPlanningDaysToCloseSpec(), cancellationToken))
         {
             day.CloseIfBefore(today);
             if (day.Status == PlanningDayStatus.Closed)

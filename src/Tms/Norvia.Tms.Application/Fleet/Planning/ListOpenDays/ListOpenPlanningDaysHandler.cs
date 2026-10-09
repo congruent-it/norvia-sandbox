@@ -14,7 +14,7 @@ public sealed class ListOpenPlanningDaysHandler(IReadRepository<PlanningDay> day
 
         return
         [
-            .. (await days.ListAsync(new OpenPlanningDaysSpec(readOnly: true), cancellationToken)).Select(day => new PlanningDayView(
+            .. (await days.ListAsync(new OpenPlanningDaysSpec(), cancellationToken)).Select(day => new PlanningDayView(
                 day.Date,
                 day.AvailableVehicles.Count,
                 [

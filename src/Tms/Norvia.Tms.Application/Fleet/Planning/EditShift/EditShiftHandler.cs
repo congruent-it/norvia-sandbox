@@ -17,14 +17,13 @@ public sealed class EditShiftHandler(IRepository<PlanningDay> days, IDriverDirec
             return PlanningRefused.Because<EditShiftResult>(PlanningRefusal.DayNotFound(command.Date));
         }
 
-        var driverId = new DriverId(command.DriverId);
-        if (drivers.ListActive().All(driver => driver.Id != driverId))
+        if (drivers.ListActive().All(driver => driver.Id != command.DriverId))
         {
-            return PlanningRefused.Because<EditShiftResult>(PlanningRefusal.DriverNotFound(command.DriverId));
+            return PlanningRefused.Because<EditShiftResult>(PlanningRefusal.DriverNotFound(command.DriverId.Value));
         }
 
         day.CloseIfBefore(horizon.Today(time.GetUtcNow()));
-        if (day.EditShift(driverId, command.Start, command.End) is { } refusal)
+        if (day.EditShift(command.DriverId, command.Start, command.End) is { } refusal)
         {
             return PlanningRefused.Because<EditShiftResult>(refusal);
         }
