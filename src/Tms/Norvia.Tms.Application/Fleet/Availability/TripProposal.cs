@@ -11,6 +11,7 @@ namespace Norvia.Tms.Application.Fleet.Availability;
 /// <param name="DrivingDuration">The planned driving duration the Planner entered.</param>
 /// <param name="VehicleHasOtherTrip">True when the Vehicle has another Trip that day. P11 owns Trips, so it says so.</param>
 /// <param name="DriverHasOtherTrip">True when the Driver has another Trip that day.</param>
+/// <param name="PlannedDriving">When the Trip is already planned (an Amend, or Dispatch of a Draft), the driving it is counted as now, so it isn't counted twice against the Driver's budget.</param>
 public sealed record TripProposal(
     DateOnly Day,
     FleetLoad Load,
@@ -18,4 +19,5 @@ public sealed record TripProposal(
     DriverId? Driver = null,
     TimeSpan? DrivingDuration = null,
     bool VehicleHasOtherTrip = false,
-    bool DriverHasOtherTrip = false);
+    bool DriverHasOtherTrip = false,
+    PlannedDriving? PlannedDriving = null);

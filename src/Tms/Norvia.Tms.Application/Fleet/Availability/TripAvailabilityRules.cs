@@ -40,25 +40,31 @@ public sealed class TripAvailabilityRules(
             failures.Add(TripAvailabilityFailure.LicenceNotHeld(driver.Id.Value, vehicle.Id.Value, LicenceRules.Needed(vehicle.Type)));
         }
 
-        if (driver is not null && trip.DrivingDuration is { } duration && !await FitsBudgetAsync(driver, trip.Day, duration, cancellationToken))
+        if (driver is not null && trip.DrivingDuration is { } duration && !await FitsBudgetAsync(driver, trip, duration, cancellationToken))
         {
             failures.Add(TripAvailabilityFailure.DrivingHoursExceeded(driver.Id.Value, duration));
         }
 
         if (vehicle is not null)
         {
-            if (trip.Load.WeightKg > vehicle.PayloadKg)
-            {
-                failures.Add(TripAvailabilityFailure.PayloadExceeded(vehicle.Id.Value, trip.Load.WeightKg, vehicle.PayloadKg));
-            }
-
-            if (trip.Load.PalletPlaces > vehicle.PalletPlaces)
-            {
-                failures.Add(TripAvailabilityFailure.PalletPlacesExceeded(vehicle.Id.Value, trip.Load.PalletPlaces, vehicle.PalletPlaces));
-            }
+            CheckLoad(trip.Load, vehicle, failures);
         }
 
-        return Ordered(failures);
+        failures.Sort((a, b) => a.Code.CompareTo(b.Code));
+        return failures;
+    }
+
+    private static void CheckLoad(FleetLoad load, Vehicle vehicle, List<TripAvailabilityFailure> failures)
+    {
+        if (load.WeightKg > vehicle.PayloadKg)
+        {
+            failures.Add(TripAvailabilityFailure.PayloadExceeded(vehicle.Id.Value, load.WeightKg, vehicle.PayloadKg));
+        }
+
+        if (load.PalletPlaces > vehicle.PalletPlaces)
+        {
+            failures.Add(TripAvailabilityFailure.PalletPlacesExceeded(vehicle.Id.Value, load.PalletPlaces, vehicle.PalletPlaces));
+        }
     }
 
     private static void CheckVehicle(TripProposal trip, PlanningDay? day, Vehicle? vehicle, List<TripAvailabilityFailure> failures)
@@ -69,13 +75,13 @@ public sealed class TripAvailabilityRules(
         }
 
         // An inactive or unknown Vehicle isn't in the active list; a day we can't see says nothing about it.
-        var why = vehicle is null ? "it is not an active Vehicle"
-            : day is not null && !day.AvailableVehicles.Contains(vehicleId) ? "it is off the road"
+        var reason = vehicle is null ? "it is not an active Vehicle"
+            : day is not null && !day.IsAvailable(vehicleId) ? "it is off the road"
             : trip.VehicleHasOtherTrip ? "it has another Trip that day"
             : null;
-        if (why is not null)
+        if (reason is not null)
         {
-            failures.Add(TripAvailabilityFailure.VehicleNotAvailable(vehicleId.Value, trip.Day, why));
+            failures.Add(TripAvailabilityFailure.VehicleNotAvailable(vehicleId.Value, trip.Day, reason));
         }
     }
 
@@ -87,26 +93,27 @@ public sealed class TripAvailabilityRules(
         }
 
         // An Absence takes the Shift away, so a Driver with a Shift has no Absence.
-        var why = driver is null ? "they are not an active Driver"
-            : day is not null && day.Shifts.All(shift => shift.DriverId != driverId) ? "they have no Shift that day"
+        var reason = driver is null ? "they are not an active Driver"
+            : day is not null && !day.HasShift(driverId) ? "they have no Shift that day"
             : trip.DriverHasOtherTrip ? "they have another Trip that day"
             : null;
-        if (why is not null)
+        if (reason is not null)
         {
-            failures.Add(TripAvailabilityFailure.DriverNotAvailable(driverId.Value, trip.Day, why));
+            failures.Add(TripAvailabilityFailure.DriverNotAvailable(driverId.Value, trip.Day, reason));
         }
     }
 
-    private async Task<bool> FitsBudgetAsync(Driver driver, DateOnly tripDay, TimeSpan duration, CancellationToken cancellationToken)
+    private async Task<bool> FitsBudgetAsync(Driver driver, TripProposal trip, TimeSpan duration, CancellationToken cancellationToken)
     {
-        var (first, last) = DrivingHourBudget.Window(tripDay);
-        var planned = await plannedDriving.ListAsync(first, last, cancellationToken);
-        return DrivingHourBudget.Fits(planned.Where(driving => driving.DriverId == driver.Id), new PlannedDriving(driver.Id, tripDay, duration), limits);
-    }
+        var (first, last) = DrivingHourBudget.Window(trip.Day);
+        var others = (await plannedDriving.ListAsync(first, last, cancellationToken)).Where(driving => driving.DriverId == driver.Id).ToList();
 
-    private static List<TripAvailabilityFailure> Ordered(List<TripAvailabilityFailure> failures)
-    {
-        failures.Sort((a, b) => a.Code.CompareTo(b.Code));
-        return failures;
+        // A Trip already planned is among them: leave it out, as the new duration replaces it.
+        if (trip.PlannedDriving is { } own)
+        {
+            others.Remove(own);
+        }
+
+        return DrivingHourBudget.Fits(others, new PlannedDriving(driver.Id, trip.Day, duration), limits);
     }
 }

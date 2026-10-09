@@ -27,6 +27,12 @@ public sealed class PlanningDay : EntityBase<PlanningDayId>, IAggregateRoot
     /// <summary>The active Vehicles the Own fleet can use this day.</summary>
     public IReadOnlyList<VehicleId> AvailableVehicles { get; private set; }
 
+    /// <summary>True when the Driver works this day: they have a Shift, which an Absence takes away.</summary>
+    public bool HasShift(DriverId driverId) => Shifts.Any(shift => shift.DriverId == driverId);
+
+    /// <summary>True when the Vehicle can be used this day: it isn't Off the road.</summary>
+    public bool IsAvailable(VehicleId vehicleId) => AvailableVehicles.Contains(vehicleId);
+
     /// <summary>
     /// Opens a day: each Driver whose Roster has work that weekday gets a Shift, unless they have an Absence that day, and
     /// every Vehicle given is available, unless it is Off the road that day.

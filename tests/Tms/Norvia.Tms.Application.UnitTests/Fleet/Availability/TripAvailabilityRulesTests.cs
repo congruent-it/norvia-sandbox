@@ -61,7 +61,7 @@ public sealed class TripAvailabilityRulesTests
     }
 
     [Fact]
-    public async Task Check_ADriverWithAnAbsenceOrNoShift_IsDriverNotAvailable()
+    public async Task Check_ADriverWithAnAbsence_IsDriverNotAvailable()
     {
         _days[0].RecordAbsence(AnoukId);
 
@@ -69,6 +69,14 @@ public sealed class TripAvailabilityRulesTests
 
         failures.Should().ContainSingle().Which.Should().Be(
             new TripAvailabilityFailure(TripAvailabilityCode.DriverNotAvailable, "Driver DRV-0001 is not available on 2026-09-25: they have no Shift that day."));
+    }
+
+    [Fact]
+    public async Task Check_ADriverWithNoShiftThatDay_IsDriverNotAvailable()
+    {
+        _days[0] = PlanningDay.Open(Friday, [], [TruckId]);
+
+        (await CheckAsync(Valid())).Should().ContainSingle().Which.Code.Should().Be(TripAvailabilityCode.DriverNotAvailable);
     }
 
     [Fact]
@@ -107,6 +115,18 @@ public sealed class TripAvailabilityRulesTests
 
         failures.Should().ContainSingle().Which.Should().Be(
             new TripAvailabilityFailure(TripAvailabilityCode.DrivingHoursExceeded, "A planned driving duration of 3 h does not fit in Driver DRV-0001's Driving-hour budget."));
+    }
+
+    [Fact]
+    public async Task Check_ATripAlreadyPlanned_IsNotCountedTwiceAgainstTheBudget()
+    {
+        var own = new PlannedDriving(AnoukId, Friday, TimeSpan.FromHours(6));
+        _planned.Add(own);
+        _planned.Add(new PlannedDriving(AnoukId, Friday, TimeSpan.FromHours(3)));
+        var amend = Valid() with { DrivingDuration = TimeSpan.FromHours(6) };
+
+        (await CheckAsync(amend)).Should().ContainSingle().Which.Code.Should().Be(TripAvailabilityCode.DrivingHoursExceeded);
+        (await CheckAsync(amend with { PlannedDriving = own })).Should().BeEmpty();
     }
 
     [Fact]

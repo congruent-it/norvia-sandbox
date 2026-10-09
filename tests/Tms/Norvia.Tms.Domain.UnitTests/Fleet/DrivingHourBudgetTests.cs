@@ -164,35 +164,37 @@ public sealed class DrivingHourBudgetTests
         DrivingHourBudget.Fits(others, Drive(10, 14, hours), Limits);
 
     [Fact]
-    public void Fits_ADayUpToNineHours_Fits() => Fits(9).Should().BeTrue();
+    public void Fits_ADayUpToNineHours_IsTrue() => Fits(9).Should().BeTrue();
 
     [Fact]
-    public void Fits_ADayOverNineHours_UsesAnExtensionWhenOneIsLeft()
-    {
-        Fits(10).Should().BeTrue();
-        Fits(10.5).Should().BeFalse();
-    }
+    public void Fits_ADayOverNineHours_UsesAnExtensionWhenOneIsLeft() => Fits(10).Should().BeTrue();
+
+    [Fact]
+    public void Fits_ADayOverTenHours_IsFalse() => Fits(10.5).Should().BeFalse();
 
     [Fact]
     public void Fits_ADayOverNineHours_DoesNotFitWhenBothExtensionsAreUsedElsewhere() =>
         Fits(9.5, Drive(10, 12, 10), Drive(10, 13, 10)).Should().BeFalse();
 
     [Fact]
-    public void Fits_TheWeek_StopsAtFiftySixHours()
-    {
-        PlannedDriving[] others = [Drive(10, 12, 9), Drive(10, 13, 9), Drive(10, 15, 9), Drive(10, 16, 9), Drive(10, 17, 9)];
-
-        Fits(9, others).Should().BeTrue();
-        Fits(9, [.. others, Drive(10, 18, 2)]).Should().BeTrue();
-        Fits(9, [.. others, Drive(10, 18, 3)]).Should().BeFalse();
-    }
+    public void Fits_TheWeek_AllowsExactlyFiftySixHours() =>
+        Fits(9, WeekOf45Hours(Drive(10, 18, 2))).Should().BeTrue();
 
     [Fact]
-    public void Fits_TheFortnight_StopsAtNinetyHours()
-    {
-        PlannedDriving[] lastWeek = [Drive(10, 5, 9), Drive(10, 6, 9), Drive(10, 7, 9), Drive(10, 8, 9), Drive(10, 9, 9), Drive(10, 10, 9)];
+    public void Fits_TheWeek_RefusesMoreThanFiftySixHours() =>
+        Fits(9, WeekOf45Hours(Drive(10, 18, 3))).Should().BeFalse();
 
-        Fits(9, [.. lastWeek, Drive(10, 12, 9), Drive(10, 13, 9)]).Should().BeTrue();
-        Fits(9, [.. lastWeek, Drive(10, 12, 9), Drive(10, 13, 9), Drive(10, 15, 1), Drive(10, 16, 9)]).Should().BeFalse();
-    }
+    private static PlannedDriving[] WeekOf45Hours(PlannedDriving extra) =>
+        [Drive(10, 12, 9), Drive(10, 13, 9), Drive(10, 15, 9), Drive(10, 16, 9), Drive(10, 17, 9), extra];
+
+    [Fact]
+    public void Fits_TheFortnight_AllowsUpToNinetyHours() =>
+        Fits(9, [.. LastWeek, Drive(10, 12, 9), Drive(10, 13, 9)]).Should().BeTrue();
+
+    [Fact]
+    public void Fits_TheFortnight_RefusesMoreThanNinetyHours() =>
+        Fits(9, [.. LastWeek, Drive(10, 12, 9), Drive(10, 13, 9), Drive(10, 15, 1), Drive(10, 16, 9)]).Should().BeFalse();
+
+    private static PlannedDriving[] LastWeek =>
+        [Drive(10, 5, 9), Drive(10, 6, 9), Drive(10, 7, 9), Drive(10, 8, 9), Drive(10, 9, 9), Drive(10, 10, 9)];
 }
