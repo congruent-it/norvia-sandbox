@@ -97,6 +97,21 @@ internal static class PlanningCalls
         return await tms.TmsUi.SendAsync(request, cancellationToken);
     }
 
+    /// <summary>Releases the Shipment at a Spot price as the Planner does, through the TMS UI, or as the given caller does.</summary>
+    public static async Task<HttpResponseMessage> ReleaseWithSpotPriceAsync(
+        this TmsFixture tms, string shipmentNumber, JsonObject spotPrice, CancellationToken cancellationToken, HttpClient? caller = null)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"/v1/shipments/{shipmentNumber}/release-with-spot-price", UriKind.Relative))
+        {
+            Content = JsonContent.Create(spotPrice),
+        };
+        request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
+        return await (caller ?? tms.TmsUi).SendAsync(request, cancellationToken);
+    }
+
+    /// <summary>The body of a release with a Spot price.</summary>
+    public static JsonObject Spot(decimal? amount, string? remark) => new() { ["amount"] = amount, ["remark"] = remark };
+
     /// <summary>Releases the Shipment, which the TMS must do, and returns what it answered.</summary>
     public static async Task<JsonNode> ReleasedAsync(this TmsFixture tms, string shipmentNumber, CancellationToken cancellationToken)
     {

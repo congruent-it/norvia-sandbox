@@ -44,4 +44,10 @@ public enum AssignmentRefusalCode
 
     /// <summary>The release can't price the Carrier booking, because the total weight is above the Lane's highest Weight Break (P9).</summary>
     WeightAboveHighestBreak,
+
+    /// <summary>The release with a Spot price is refused, because the Carrier's Carrier Rate Card can price the Shipment (P9).</summary>
+    CarrierRateCardPricesShipment,
+
+    /// <summary>The release with a Spot price is refused, because Own fleet has no Carrier cost (P9).</summary>
+    SpotPriceNotAllowed,
 }

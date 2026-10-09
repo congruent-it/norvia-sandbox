@@ -49,11 +49,22 @@ public sealed class ReleaseShipmentHandler(
         // anything changes, and no booking is created (P9). Each Shipment of a multi-select release is released on its own.
         var now = time.GetUtcNow();
         CarrierCost? carrierCost = null;
+        if (command.SpotPrice is not null && shipment.CarriedBy.IsOwnFleet)
+        {
+            return AssignmentRefused.Because<ReleaseShipmentResult>(AssignmentRules.SpotPriceForOwnFleet(shipment));
+        }
+
         if (shipment.CarriedBy.CarrierId is { } carrierId)
         {
             var carrier = carriers.Find(carrierId)
                 ?? throw new InvalidOperationException($"Shipment {number} is carried by Carrier {carrierId}, which the TMS doesn't have.");
             var (cost, notPriced) = AssignmentRules.PriceCarrierBooking(carrier, carrierRateCards.FindFor(carrierId), order.Details, now);
+            if (command.SpotPrice is { } spot)
+            {
+                // The Planner prices it by hand only after the Carrier Rate Card failed for this release.
+                (cost, notPriced) = AssignmentRules.PriceCarrierBookingAtSpot(carrier, notPriced, new Money(spot.Amount), spot.Remark, now);
+            }
+
             if (notPriced is not null)
             {
                 return AssignmentRefused.Because<ReleaseShipmentResult>(notPriced);

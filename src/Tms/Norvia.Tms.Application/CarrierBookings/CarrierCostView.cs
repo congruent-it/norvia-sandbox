@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.TransportOrders;
@@ -37,15 +38,20 @@ public sealed record CarrierCostView(
         ChargeLines.Aggregate(HashCode.Combine(Currency, Total, Source, CalculatedAt), (hash, line) => HashCode.Combine(hash, line));
 }
 
-/// <param name="Kind">Where the Carrier cost came from, such as <c>CarrierRateCard</c>.</param>
-/// <param name="RateCardVersion">The version of the Carrier Rate Card that priced it.</param>
-public sealed record CarrierCostSourceView(string Kind, RateCardVersionView? RateCardVersion)
+/// <param name="Kind">Where the Carrier cost came from: <c>CarrierRateCard</c> or <c>Spot</c>.</param>
+/// <param name="RateCardVersion">The version of the Carrier Rate Card that priced it; none for a Spot price.</param>
+/// <param name="Remark">The Planner's remark with a Spot price; none for a Carrier Rate Card.</param>
+public sealed record CarrierCostSourceView(
+    string Kind,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] RateCardVersionView? RateCardVersion,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Remark = null)
 {
     public static CarrierCostSourceView From(CarrierCostSource source)
     {
         ArgumentNullException.ThrowIfNull(source);
         return new(
             source.Kind.ToString(),
-            source.RateCardVersion is { } version ? new RateCardVersionView(version.RateCardId.Value, version.Version) : null);
+            source.RateCardVersion is { } version ? new RateCardVersionView(version.RateCardId.Value, version.Version) : null,
+            source.Remark);
     }
 }
