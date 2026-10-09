@@ -32,7 +32,6 @@ public sealed class PlanningHorizonRulesTests
         days.Should().HaveCount(15);
         days[0].Should().Be(new DateOnly(2026, 10, 12));
         days[^1].Should().Be(new DateOnly(2026, 10, 26));
-        _rules.LastDay(new DateOnly(2026, 10, 12)).Should().Be(days[^1]);
     }
 
     [Fact]

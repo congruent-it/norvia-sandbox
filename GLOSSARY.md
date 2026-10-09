@@ -198,6 +198,10 @@ _Avoid_: stock levels
 The days ahead, today and the next 14 by default, whose Own fleet availability is open for planning. A daily job opens each new day from the Drivers' Rosters.
 _Avoid_: planning window, schedule
 
+**Open day**:
+A day of the Planning horizon, today or later, that the Planner can still change. Days before today are closed and read-only.
+_Avoid_: active day
+
 **Roster**:
 A Driver's standard weekly working pattern: a Shift start and end for each weekday they work. It is copied onto each day as the day opens.
 _Avoid_: schedule, rota
