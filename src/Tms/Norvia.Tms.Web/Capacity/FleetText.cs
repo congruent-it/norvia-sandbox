@@ -31,6 +31,15 @@ internal static class FleetText
     public static string DriversOnShift(IEnumerable<ShiftView> shifts) =>
         string.Join("; ", shifts.Select(shift => $"{shift.DriverName} {Shift(shift.Start, shift.End, shift.EditedByHand)}"));
 
+    /// <summary>A day's weight against its capacity, such as "8,500 / 10,000 kg".</summary>
+    public static string WeightLoad(DayLoadView load) => $"{load.DemandKg:N0} / {load.CapacityKg:N0} kg";
+
+    /// <summary>A day's pallet places against its capacity, such as "12 / 18".</summary>
+    public static string PalletLoad(DayLoadView load) => $"{load.DemandPalletPlaces:N0} / {load.CapacityPalletPlaces:N0}";
+
+    /// <summary>"Over capacity" for a day whose demand is more than its capacity, and nothing for one that fits.</summary>
+    public static string OverCapacity(DayLoadView load) => load.Over ? "Over capacity" : string.Empty;
+
     /// <summary>A Roster as "Mon 06:00-14:00; Tue 06:00-14:00", or "No work" when the Driver has no Roster.</summary>
     public static string Roster(IEnumerable<RosterWeekdayView> weekdays)
     {

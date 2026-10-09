@@ -31,7 +31,8 @@ public static class CapacityEndpoints
             .WithSummary("List the open days of the Planning horizon, one per day, earliest first.")
             .WithDescription(
                 "The horizon job opens today and the next days at 00:00 Europe/Amsterdam (14 by default) and closes the days before today, which leave the list. "
-                + "Each day shows how many Vehicles are available and which Drivers work, with their Shift start and end and whether the Planner edited it by hand.");
+                + "Each day shows how many Vehicles are available and which Drivers work, with their Shift start and end and whether the Planner edited it by hand. "
+                + "It also shows the day's load check: capacity (available Vehicles paired with available Drivers) against demand (Planned and Released Own fleet Shipments collecting that day, Europe/Amsterdam) in kg and pallet places, and whether the day is Over capacity.");
 
         // The Planner edits from the TMS UI. P10's actions have no correlation ID: they publish nothing and start no Message trail.
         capacity.MapPut("/days/{date}/shifts/{id}", EditShiftAsync)

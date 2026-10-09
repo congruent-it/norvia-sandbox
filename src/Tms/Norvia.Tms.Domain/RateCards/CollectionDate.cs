@@ -2,8 +2,8 @@ using Norvia.Tms.Domain.TransportOrders;
 
 namespace Norvia.Tms.Domain.RateCards;
 
-/// <summary>The day a Rate Card version must be valid on to rate a Transport Order.</summary>
-internal static class CollectionDate
+/// <summary>The day a Transport Order collects: the day a Rate Card version must be valid on to rate it, and the day of the Own fleet's demand (P10).</summary>
+public static class CollectionDate
 {
     private static readonly TimeZoneInfo Norvia = TimeZoneInfo.FindSystemTimeZoneById("Europe/Amsterdam");
 
