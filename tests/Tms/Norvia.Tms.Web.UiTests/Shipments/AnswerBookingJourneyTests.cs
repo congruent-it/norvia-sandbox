@@ -34,7 +34,7 @@ public sealed class AnswerBookingJourneyTests(TmsUiFixture tms) : BrowserPage(tm
         await Expect(request).ToContainTextAsync($"Confirmed, your reference {reference}");
 
         await Page.GotoAsync($"/shipments/{shipmentNumber}");
-        var booking = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = bookingNumber });
+        var booking = Page.GetByRole(AriaRole.Table, new() { Name = "Carrier bookings" }).GetByRole(AriaRole.Row).Filter(new() { HasText = bookingNumber });
         await Expect(booking).ToContainTextAsync($"Carrier booking reference {reference}");
         await Expect(Page.GetByText("Booked", new() { Exact = true }).First).ToBeVisibleAsync();
         await Page.GetByRole(AriaRole.Link, new() { Name = "Bookings awaiting an answer" }).ClickAsync();

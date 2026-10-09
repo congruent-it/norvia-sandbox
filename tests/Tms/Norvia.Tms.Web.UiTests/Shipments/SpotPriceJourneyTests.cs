@@ -31,6 +31,11 @@ public sealed class SpotPriceJourneyTests(TmsUiFixture tms) : BrowserPage(tms)
 
         await Page.GetByRole(AriaRole.Link, new() { Name = "Shipments to release" }).ClickAsync();
         var shipmentRow = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipmentNumber });
+
+        // The TMS says it can't price the Shipment before any release is tried, and says so again after a reload.
+        await Expect(shipmentRow).ToContainTextAsync("NoMatchingLane");
+        await Page.ReloadAsync();
+        await Expect(shipmentRow).ToContainTextAsync("NoMatchingLane");
         await shipmentRow.GetByRole(AriaRole.Checkbox, new() { Name = $"Select {shipmentNumber}" }).ClickAsync();
         await Page.GetByRole(AriaRole.Group, new() { Name = "Release" }).GetByRole(AriaRole.Button, new() { Name = "Release selected" }).ClickAsync();
 
@@ -56,7 +61,9 @@ public sealed class SpotPriceJourneyTests(TmsUiFixture tms) : BrowserPage(tms)
         await Expect(awaiting).ToContainTextAsync("480.50 EUR · Spot price: agreed with Van Dijk by phone, €480.50");
 
         await Page.GotoAsync($"/shipments/{shipmentNumber}");
-        var booking = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = "CB-" });
+        var booking = Page.GetByRole(AriaRole.Table, new() { Name = "Carrier bookings" }).GetByRole(AriaRole.Row).Filter(new() { HasText = "CB-" });
         await Expect(booking).ToContainTextAsync("480.50 EUR · Spot price: agreed with Van Dijk by phone, €480.50");
+        var timeline = Page.GetByRole(AriaRole.Table, new() { Name = "Carrier cost by Carrier booking" }).GetByRole(AriaRole.Row).Filter(new() { HasText = "CB-" });
+        await Expect(timeline).ToContainTextAsync("480.50 EUR · Spot price: agreed with Van Dijk by phone, €480.50");
     }
 }

@@ -358,9 +358,35 @@ public sealed class ShipmentsToReleaseTests : TmsWebContext
     }
 
     [Fact]
-    public void Release_WhenTheCarrierRateCardCantPriceOne_ShowsItsCodeInTheOutcomeAndOnItsRow_AndStillReleasesTheOthers()
+    public void Render_AShipmentTheCarrierRateCardCantPrice_ShowsItsCodeOnItsRow_AndOffersASpotPrice()
     {
-        var page = RenderWith(Samples.ToRelease("SH-0000012"), Samples.ToRelease("SH-0000013"));
+        var page = RenderWith(PricingFailed("SH-0000012"), Samples.ToRelease("SH-0000013"));
+
+        CellsOf(page, "SH-0000012").Should().Contain("NoMatchingLane");
+        CellsOf(page, "SH-0000013").Should().NotContain("NoMatchingLane");
+        SpotPriceButton(page, "SH-0000012").Should().NotBeNull();
+        page.FindAll("fluent-button[aria-label='Release SH-0000013 with Spot price']").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Render_APricingFailureTheTmsNoLongerReports_NoLongerOffersASpotPrice()
+    {
+        Queries.ListShipmentsToReleaseAsync(Arg.Any<CancellationToken>()).Returns(
+            [PricingFailed("SH-0000012")],
+            [Samples.ToRelease("SH-0000012")]);
+        var page = Render<ShipmentsToRelease>();
+        SpotPriceButton(page, "SH-0000012");
+
+        Time.Advance(RefreshInterval);
+
+        page.WaitForAssertion(() => page.FindAll("fluent-button[aria-label='Release SH-0000012 with Spot price']").Should().BeEmpty());
+        CellsOf(page, "SH-0000012").Should().NotContain("NoMatchingLane");
+    }
+
+    [Fact]
+    public void Release_WhenTheCarrierRateCardCantPriceOne_ShowsItsCodeInTheOutcome_AndStillReleasesTheOthers()
+    {
+        var page = RenderWith(PricingFailed("SH-0000012"), Samples.ToRelease("SH-0000013"));
         Commands.ReleaseAsync("SH-0000012", Arg.Any<CancellationToken>())
             .Returns(new ReleaseAnswer.Refused("Van Dijk Transport has no Lane for it.", "NoMatchingLane"));
         Commands.ReleaseAsync("SH-0000013", Arg.Any<CancellationToken>()).Returns(new ReleaseAnswer.Released());
@@ -371,34 +397,6 @@ public sealed class ShipmentsToReleaseTests : TmsWebContext
         page.WaitForAssertion(() => Outcomes(page).Should().Equal(
             "Shipment SH-0000012 wasn't released (NoMatchingLane): Van Dijk Transport has no Lane for it.",
             "Shipment SH-0000013 is released."));
-        CellsOf(page, "SH-0000012").Should().Contain("NoMatchingLane");
-        CellsOf(page, "SH-0000013").Should().NotContain("NoMatchingLane");
-    }
-
-    [Theory]
-    [InlineData("NoRateCard")]
-    [InlineData("NoValidRateCardVersion")]
-    [InlineData("NoMatchingLane")]
-    [InlineData("WeightAboveHighestBreak")]
-    public void SpotPrice_IsOfferedForAShipmentWhoseReleaseFailedOnTheCarrierRateCard(string code)
-    {
-        var page = RenderWith(Samples.ToRelease("SH-0000012"), Samples.ToRelease("SH-0000013"));
-        Commands.ReleaseAsync("SH-0000012", Arg.Any<CancellationToken>()).Returns(new ReleaseAnswer.Refused("It can't be priced.", code));
-        Commands.ReleaseAsync("SH-0000013", Arg.Any<CancellationToken>()).Returns(new ReleaseAnswer.Refused("Shipment SH-0000013 isn't Planned.", "ShipmentNotPlanned"));
-        SelectAll(page, "SH-0000012", "SH-0000013");
-
-        ReleaseButton(page).Click();
-
-        page.WaitForAssertion(() => SpotPriceButton(page, "SH-0000012").Should().NotBeNull());
-        page.FindAll("fluent-button[aria-label='Release SH-0000013 with Spot price']").Should().BeEmpty();
-    }
-
-    [Fact]
-    public void SpotPrice_IsNotOfferedForAShipmentNeverRefused()
-    {
-        var page = RenderWith(Samples.ToRelease("SH-0000012"));
-
-        page.FindAll("fluent-button[aria-label^='Release SH-']").Should().BeEmpty();
     }
 
     [Fact]
@@ -415,7 +413,6 @@ public sealed class ShipmentsToReleaseTests : TmsWebContext
         page.WaitForAssertion(() => Commands.Received(1).ReleaseWithSpotPriceAsync("SH-0000012", 480.5m, "agreed by phone, €480.50", Arg.Any<CancellationToken>()));
         page.WaitForAssertion(() => Outcomes(page).Should().Equal("Shipment SH-0000012 is released."));
         page.FindAll("section[aria-label='Release SH-0000012 with Spot price']").Should().BeEmpty();
-        page.FindAll("fluent-button[aria-label='Release SH-0000012 with Spot price']").Should().BeEmpty();
     }
 
     [Theory]
@@ -497,30 +494,12 @@ public sealed class ShipmentsToReleaseTests : TmsWebContext
         Commands.DidNotReceive().ReleaseWithSpotPriceAsync(Arg.Any<string>(), Arg.Any<decimal>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
-    [Fact]
-    public void Reassign_AfterAPricingFailure_NoLongerOffersASpotPriceForThatCarrier()
+    private static ShipmentToReleaseSummary PricingFailed(string number) => Samples.ToRelease(number) with
     {
-        var page = RenderPricingFailure("SH-0000012");
-        Commands.ReassignAsync("SH-0000012", Samples.Kessler.Id, Arg.Any<CancellationToken>())
-            .Returns(new ReassignAnswer.Reassigned(new CarriedByView(AssignedTo.Carrier, Samples.Kessler)));
-        Choose(page, "SH-0000012", Samples.Kessler.Id);
+        PricingFailure = new PricingFailureView("NoMatchingLane", "Van Dijk Transport can't price the Carrier booking."),
+    };
 
-        ReassignButton(page, "SH-0000012").Click();
-
-        page.WaitForAssertion(() => page.FindAll("fluent-button[aria-label='Release SH-0000012 with Spot price']").Should().BeEmpty());
-        CellsOf(page, "SH-0000012").Should().NotContain("NoMatchingLane");
-    }
-
-    private IRenderedComponent<ShipmentsToRelease> RenderPricingFailure(string number)
-    {
-        var page = RenderWith(Samples.ToRelease(number));
-        Commands.ReleaseAsync(number, Arg.Any<CancellationToken>())
-            .Returns(new ReleaseAnswer.Refused("Van Dijk Transport has no Lane for it.", "NoMatchingLane"));
-        Select(page, number);
-        ReleaseButton(page).Click();
-        page.WaitForAssertion(() => SpotPriceButton(page, number).Should().NotBeNull());
-        return page;
-    }
+    private IRenderedComponent<ShipmentsToRelease> RenderPricingFailure(string number) => RenderWith(PricingFailed(number));
 
     private static IElement SpotPriceButton(IRenderedComponent<ShipmentsToRelease> page, string number) =>
         page.Find($"fluent-button[aria-label='Release {number} with Spot price']");

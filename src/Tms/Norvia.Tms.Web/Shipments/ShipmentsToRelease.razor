@@ -31,7 +31,7 @@
                         break;
                     case ReleaseAnswer.Refused refused:
                         <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
-                            Shipment @outcome.ShipmentNumber wasn't released@(refused.FailedOnCarrierRateCard ? $" ({refused.Code})" : string.Empty): @refused.Reason
+                            Shipment @outcome.ShipmentNumber wasn't released@(refused.Code is { } code ? $" ({code})" : string.Empty): @refused.Reason
                         </FluentMessageBar>
                         break;
                     default:
@@ -99,9 +99,9 @@
             }
         </TemplateColumn>
         <TemplateColumn Title="Pricing failure">
-            @if (_pricingFailures.TryGetValue(context.ShipmentNumber, out var pricingFailure))
+            @if (context.PricingFailure is { } pricingFailure)
             {
-                <strong>@pricingFailure</strong>
+                <strong title="@pricingFailure.Message">@pricingFailure.Code</strong>
             }
         </TemplateColumn>
         <TemplateColumn Title="Reassign to">
@@ -124,8 +124,8 @@
             </FluentButton>
         </TemplateColumn>
         <TemplateColumn Title="Spot price">
-            @* Only a Shipment whose release failed on its Carrier's Carrier Rate Card: a Spot price can't override a Carrier Rate Card that prices it (P9). *@
-            @if (_pricingFailures.ContainsKey(context.ShipmentNumber))
+            @* Only a Shipment its Carrier's Carrier Rate Card can't price, as the TMS says: a Spot price can't override a Carrier Rate Card that prices it (P9). *@
+            @if (context.PricingFailure is not null)
             {
                 <FluentButton Appearance="Appearance.Outline" OnClick="() => OpenSpotPrice(context.ShipmentNumber)"
                               aria-label="@($"Release {context.ShipmentNumber} with Spot price")">
@@ -135,7 +135,7 @@
         </TemplateColumn>
     </FluentDataGrid>
 
-    @if (_spotPriceFor is { } spotPriceShipment && _pricingFailures.ContainsKey(spotPriceShipment))
+    @if (_spotPriceFor is { } spotPriceShipment && shipments.Any(shipment => shipment.ShipmentNumber == spotPriceShipment && shipment.PricingFailure is not null))
     {
         <ReleaseWithSpotPricePanel @key="spotPriceShipment" ShipmentNumber="@spotPriceShipment" OnClosed="CloseSpotPrice" OnReleased="() => SpotPriceReleasedAsync(spotPriceShipment)" />
     }
@@ -150,8 +150,6 @@
     private readonly HashSet<string> _reassigning = [];
     private readonly Dictionary<string, string> _reassignTo = [];
     private readonly List<ReleaseOutcome> _releaseOutcomes = [];
-    // The Shipments whose last release failed on the Carrier Rate Card, with the refusal: they can be released with a Spot price.
-    private readonly Dictionary<string, string> _pricingFailures = [];
     private string? _spotPriceFor;
     private LiveTransportOrderList<ShipmentToReleaseSummary> _list = null!;
     private IReadOnlyList<CarrierView>? _carriers;
@@ -229,25 +227,12 @@
                 }
 
                 _releaseOutcomes.Add(new ReleaseOutcome(number, answer));
-                NotePricingFailure(number, answer);
                 StateHasChanged();
             }
         }
         finally
         {
             _releasing = false;
-        }
-    }
-
-    private void NotePricingFailure(string number, ReleaseAnswer? answer)
-    {
-        if (answer is ReleaseAnswer.Refused { FailedOnCarrierRateCard: true, Code: { } code })
-        {
-            _pricingFailures[number] = code;
-        }
-        else if (answer is not null)
-        {
-            _pricingFailures.Remove(number);
         }
     }
 
@@ -258,7 +243,6 @@
     private Task SpotPriceReleasedAsync(string number)
     {
         _spotPriceFor = null;
-        _pricingFailures.Remove(number);
         _selected.Remove(number);
         _releaseOutcomes.RemoveAll(outcome => outcome.ShipmentNumber == number);
         _releaseOutcomes.Add(new ReleaseOutcome(number, new ReleaseAnswer.Released()));
@@ -287,12 +271,6 @@
                 ReassignAnswer.Refused refused => (MessageIntent.Warning, $"Shipment {shipmentNumber} wasn't reassigned: {refused.Reason}"),
                 var answer => throw new InvalidOperationException($"Unknown reassign answer {answer}."),
             };
-
-            // Another Carrier has its own Carrier Rate Card, so the failure of the one before no longer holds.
-            if (_reassignOutcome is { Intent: MessageIntent.Success })
-            {
-                _pricingFailures.Remove(shipmentNumber);
-            }
         }
         catch (OperationCanceledException) when (_closed.IsCancellationRequested)
         {

@@ -34,7 +34,11 @@ public static class ShipmentEndpoints
             .RequireAuthorization()
             .WithName("ListShipmentsToRelease")
             .WithSummary("List the Shipments to release: the Planned Shipments, with who carries each, in the order they were planned.")
-            .WithDescription("Each Shipment that came back from a Carrier booking shows its last one's outcome and reason, when it has one.");
+            .WithDescription(
+                "Each Shipment that came back from a Carrier booking shows its last one's outcome and reason, when it has one. A Carrier Shipment its "
+                + "Carrier's Carrier Rate Card can't price shows pricingFailure, with the code a release would be refused with (NoRateCard, "
+                + "NoValidRateCardVersion, NoMatchingLane or WeightAboveHighestBreak) and a message naming the Carrier: only such a Shipment can be "
+                + "released with a Spot price (P9).");
 
         shipments.MapGet("/bookings-awaiting-answer", ListBookingsAwaitingAnswerAsync)
             .RequireAuthorization()

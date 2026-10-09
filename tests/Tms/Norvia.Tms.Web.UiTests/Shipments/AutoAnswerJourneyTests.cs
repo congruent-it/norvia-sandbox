@@ -20,7 +20,7 @@ public sealed class AutoAnswerJourneyTests(TmsUiFixture tms) : BrowserPage(tms)
         // The portal's inbox refreshes itself, so it says when the Persona has answered; the TMS's pages are read after that.
         await WaitForAnswerAsync("kessler-spedition", bookingNumber, "Confirmed");
         await Page.GotoAsync($"/shipments/{shipmentNumber}");
-        await Expect(Page.GetByRole(AriaRole.Row).Filter(new() { HasText = bookingNumber }))
+        await Expect(Page.GetByRole(AriaRole.Table, new() { Name = "Carrier bookings" }).GetByRole(AriaRole.Row).Filter(new() { HasText = bookingNumber }))
             .ToContainTextAsync(new Regex(@"Carrier booking reference KES-\d{6}-\d{4}"));
         await Expect(Page.GetByText("Booked", new() { Exact = true }).First).ToBeVisibleAsync();
     }

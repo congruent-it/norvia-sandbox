@@ -1,8 +1,10 @@
 using AngleSharp.Dom;
+using Norvia.Tms.Application.CarrierBookings;
 using Norvia.Tms.Application.Exceptions.Timeline;
 using Norvia.Tms.Application.ProofsOfDelivery.Read;
 using Norvia.Tms.Application.TrackingEvents.Timeline;
 using Norvia.Tms.Application.TransportOrders;
+using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Domain.ProofsOfDelivery;
 using Norvia.Tms.Domain.ShipperNotifications;
@@ -242,6 +244,36 @@ public sealed class TrackingTimelineTests : TmsWebContext
 
         page.WaitForAssertion(() => page.Find("section[aria-labelledby='section-tracking-timeline']"));
         page.FindAll("section[aria-labelledby='section-billing']").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Render_CarrierBookings_ShowEachWithItsCarrierCostAndSourceInTheOrderTheyWereRequested()
+    {
+        var requested = new DateTimeOffset(2026, 9, 24, 9, 45, 0, TimeSpan.Zero);
+        var rejected = new CarrierBookingView("CB-0000001", Samples.VanDijk, CarrierBookingStatus.Rejected, requested, null, null, null, CarrierBookingRejectionReason.PriceNotAccepted, null, null, null, null, null,
+            new CarrierCostView("EUR", 480m, [new ChargeLineView("Freight", 480m)], new CarrierCostSourceView("Spot", null, "agreed by phone"), requested));
+        var confirmed = new CarrierBookingView("CB-0000002", Samples.Kessler, CarrierBookingStatus.Confirmed, requested.AddHours(1), null, "KS-1", null, null, null, null, null, null, null,
+            new CarrierCostView("EUR", 412.5m, [new ChargeLineView("Freight", 412.5m)], new CarrierCostSourceView("CarrierRateCard", new RateCardVersionView("CRC-0002", 3)), requested.AddHours(1)));
+        Queries.FindTrackingTimelineAsync("SH-0000012", Arg.Any<CancellationToken>())
+            .Returns(new ShipmentTimeline([], [], [], [], null, [rejected, confirmed]));
+
+        var page = RenderTimeline("SH-0000012");
+
+        var section = page.WaitForElement("section[aria-labelledby='section-carrier-cost']");
+        section.QuerySelectorAll("tbody tr").Select(row => string.Join(" | ", row.QuerySelectorAll("td").Select(cell => cell.TextContent.Trim()))).Should().Equal(
+            "CB-0000001 | Van Dijk Transport | Rejected | Thu 24 Sep 2026, 11:45 | 480.00 EUR · Spot price: agreed by phone",
+            "CB-0000002 | Kessler Spedition | Confirmed | Thu 24 Sep 2026, 12:45 | 412.50 EUR · Carrier Rate Card version 3");
+    }
+
+    [Fact]
+    public void Render_AShipmentWithoutCarrierBookings_ShowsNoCarrierCostSection()
+    {
+        Queries.FindTrackingTimelineAsync("SH-0000012", Arg.Any<CancellationToken>()).Returns(new ShipmentTimeline([], [], [], []));
+
+        var page = RenderTimeline("SH-0000012");
+
+        page.WaitForAssertion(() => page.Find("section[aria-labelledby='section-tracking-timeline']"));
+        page.FindAll("section[aria-labelledby='section-carrier-cost']").Should().BeEmpty();
     }
 
     private static List<(string Term, string Description)> DescriptionsOf(IElement section) =>
