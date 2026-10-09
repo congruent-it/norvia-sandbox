@@ -34,7 +34,7 @@ public sealed class ListOpenPlanningDaysHandler(
                 var load = demand.GetValueOrDefault(day.Date, FleetLoad.None);
                 return new PlanningDayView(
                     day.Date,
-                    day.AvailableVehicles.Count,
+                    day.AvailableVehicles.Count(activeVehicles.ContainsKey),
                     [
                         .. shifts
                             .Select(shift => new ShiftView(shift.DriverId.Value, activeDrivers[shift.DriverId].Name, shift.Start, shift.End, shift.EditedByHand))
