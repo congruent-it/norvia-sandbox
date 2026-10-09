@@ -233,15 +233,15 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
     /// <summary>
     /// The Shipment's delivery has earned its Confirmed Carrier booking's Carrier cost (P9): raises <c>CarrierCostIncurred</c>.
     /// Call it when <paramref name="deliveredEvent"/> moved the Shipment to Delivered. Raises nothing for a booking that isn't
-    /// Confirmed or that has no Carrier cost.
+    /// Confirmed or that has no Carrier cost or Carrier booking reference.
     /// </summary>
     public void IncurCarrierCost(CarrierBooking booking, TrackingEvent deliveredEvent)
     {
         ArgumentNullException.ThrowIfNull(booking);
         ArgumentNullException.ThrowIfNull(deliveredEvent);
-        if (booking is { Status: CarrierBookingStatus.Confirmed, CarrierCost: { } carrierCost })
+        if (booking is { Status: CarrierBookingStatus.Confirmed, CarrierCost: not null, CarrierBookingReference: not null })
         {
-            RegisterDomainEvent(new CarrierCostIncurredEvent(this, booking, carrierCost, deliveredEvent));
+            RegisterDomainEvent(new CarrierCostIncurredEvent(this, booking, deliveredEvent));
         }
     }
 
