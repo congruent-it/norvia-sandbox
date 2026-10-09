@@ -3,9 +3,11 @@
 @using Microsoft.Extensions.Options
 @using Norvia.Tms.Application.Fleet
 @using Norvia.Tms.Application.Fleet.Planning
+@using Norvia.Tms.Domain.Fleet
 @using Norvia.Tms.Web.TransportOrders
 @implements IAsyncDisposable
 @inject ITransportOrderQueries Queries
+@inject ITransportOrderCommands Commands
 @inject TimeProvider Time
 @inject IOptions<LiveListOptions> Options
 @inject ILogger<LiveTransportOrderList<DriverView>> Logger
@@ -17,6 +19,18 @@
 <h1>Capacity</h1>
 
 <CapacityTabs />
+
+<PeriodForm Title="Record an Absence" SubjectLabel="Driver" Subjects="DriverChoices" Reasons="AbsenceReasons"
+            SubmitText="Record Absence" Submit="@((entry, token) => Commands.RecordAbsenceAsync(entry, token))" />
+<RosterForm Rosters="_rosters.Items ?? []" Submit="@((driverId, weekdays, token) => Commands.ChangeRosterAsync(driverId, weekdays, token))" />
+<ShiftForm Drivers="DriverChoices" Submit="@((day, driverId, start, end, token) => Commands.EditShiftAsync(day, driverId, start, end, token))" />
+
+@if (_removal is { } removal)
+{
+    <div role="@(removal.Failed ? "alert" : "status")" class="mb-4">
+        <FluentMessageBar Intent="@(removal.Failed ? MessageIntent.Warning : MessageIntent.Success)" AllowDismiss="false">@removal.Text</FluentMessageBar>
+    </div>
+}
 
 <LiveListStates Items="_list.Items" LastReadFailed="_list.LastReadFailed" Name="Drivers"
                 Empty="There are no Drivers in the Own fleet." Context="drivers">
@@ -42,10 +56,14 @@
 <LiveListStates Items="_absences.Items" LastReadFailed="_absences.LastReadFailed" Name="Absences"
                 Empty="There are no Absences." Context="absences">
     <FluentDataGrid Items="absences.AsQueryable()" TGridItem="AbsenceView" Class="flatly-table" aria-label="Absences"
-                    GridTemplateColumns="1fr 1.6fr 2.4fr" MultiLine="true">
+                    GridTemplateColumns="1fr 1.6fr 2.4fr 1fr" MultiLine="true">
         <PropertyColumn Title="Day" Property="@(absence => FleetText.Day(absence.Date))" />
         <PropertyColumn Title="Driver" Property="@(absence => absence.DriverName)" />
         <PropertyColumn Title="Reason" Property="@(absence => FleetText.Reason(absence.Reason, absence.Remark))" />
+        <TemplateColumn Title="Actions">
+            <FluentButton Appearance="Appearance.Outline" OnClick="@(() => RemoveAbsenceAsync(context))"
+                          aria-label="@($"Remove Absence of {context.DriverName} on {FleetText.Day(context.Date)}")">Remove</FluentButton>
+        </TemplateColumn>
     </FluentDataGrid>
 </LiveListStates>
 
@@ -53,19 +71,42 @@
     private LiveTransportOrderList<DriverView> _list = null!;
     private LiveTransportOrderList<RosterView> _rosters = null!;
     private LiveTransportOrderList<AbsenceView> _absences = null!;
+    private Removal? _removal;
+
+    private static readonly IReadOnlyList<string> AbsenceReasons = [.. Enum.GetNames<AbsenceReason>()];
+
+    private IReadOnlyList<PeriodSubject> DriverChoices => [.. (_list.Items ?? []).Select(driver => new PeriodSubject(driver.Id, driver.Name))];
+
+    private sealed record Removal(string Text, bool Failed);
+
+    private async Task RemoveAbsenceAsync(AbsenceView absence)
+    {
+        try
+        {
+            _removal = await Commands.RemoveAbsenceAsync(absence.Id, CancellationToken.None) switch
+            {
+                CapacityAnswer.Refused refused => new Removal($"Absence not removed: {refused.Reason}", Failed: true),
+                _ => new Removal($"Absence of {absence.DriverName} on {FleetText.Day(absence.Date)} removed.", Failed: false),
+            };
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            AbsenceLogger.LogWarning(exception, "Removing Absence {AbsenceId} failed", absence.Id);
+            _removal = new Removal("The TMS couldn't remove the Absence. Try again.", Failed: true);
+        }
+    }
 
     protected override void OnInitialized()
     {
+        // Every list exists before any starts: a read that finishes at once renders the page, which reads all of them.
         _list = new LiveTransportOrderList<DriverView>(Queries.ListDriversAsync, "the Drivers", Time, Options.Value.RefreshInterval, Logger);
-        _list.Changed += () => InvokeAsync(StateHasChanged);
-        _list.Start();
-
         _rosters = new LiveTransportOrderList<RosterView>(Queries.ListRostersAsync, "the Rosters", Time, Options.Value.RefreshInterval, RosterLogger);
-        _rosters.Changed += () => InvokeAsync(StateHasChanged);
-        _rosters.Start();
-
         _absences = new LiveTransportOrderList<AbsenceView>(Queries.ListAbsencesAsync, "the Absences", Time, Options.Value.RefreshInterval, AbsenceLogger);
+        _list.Changed += () => InvokeAsync(StateHasChanged);
+        _rosters.Changed += () => InvokeAsync(StateHasChanged);
         _absences.Changed += () => InvokeAsync(StateHasChanged);
+        _list.Start();
+        _rosters.Start();
         _absences.Start();
     }
 

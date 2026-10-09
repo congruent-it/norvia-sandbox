@@ -1,0 +1,116 @@
+@using System.Globalization
+@implements IDisposable
+@inject ILogger<ShiftForm> Logger
+
+@* Sets one Driver's Shift on a single open day, for example to start early. A Roster change leaves that day alone afterwards. *@
+<section role="group" aria-label="Edit a Shift" class="mb-6 rounded-flatly border border-border p-4">
+    <h2 class="!mb-3 !text-xl">Edit a Shift</h2>
+
+    @if (_failure is { } failure)
+    {
+        <div role="alert" class="mb-4">
+            <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">@failure</FluentMessageBar>
+        </div>
+    }
+    @if (_done is { } done)
+    {
+        <div role="status" class="mb-4">
+            <FluentMessageBar Intent="MessageIntent.Success" AllowDismiss="false">@done</FluentMessageBar>
+        </div>
+    }
+
+    <div class="flex flex-wrap items-end gap-4">
+        <FluentSelect TOption="string" Label="Driver" aria-label="Driver" @bind-Value="_driverId" Width="14rem">
+            <FluentOption TOption="string" Value="">Choose a driver</FluentOption>
+            @foreach (var driver in Drivers)
+            {
+                <FluentOption TOption="string" Value="@driver.Id">@driver.Name</FluentOption>
+            }
+        </FluentSelect>
+        <FluentTextField Placeholder="yyyy-MM-dd" Label="Day" aria-label="Day" @bind-Value="_day" Immediate="true" />
+        <FluentTextField Placeholder="HH:mm" Label="Shift start" aria-label="Shift start" @bind-Value="_start" Immediate="true" />
+        <FluentTextField Placeholder="HH:mm" Label="Shift end" aria-label="Shift end" @bind-Value="_end" Immediate="true" />
+        <FluentButton Appearance="Appearance.Accent" OnClick="SubmitAsync" Disabled="_working">Edit Shift</FluentButton>
+    </div>
+</section>
+
+@code {
+    private readonly CancellationTokenSource _closed = new();
+    private string _driverId = string.Empty;
+    private string _day = string.Empty;
+    private string _start = "06:00";
+    private string _end = "14:30";
+    private string? _failure;
+    private string? _done;
+    private bool _working;
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<PeriodSubject> Drivers { get; set; } = [];
+
+    /// <summary>Sends the Shift to the TMS and answers what it said.</summary>
+    [Parameter, EditorRequired]
+    public Func<DateOnly, string, TimeOnly, TimeOnly, CancellationToken, Task<CapacityAnswer>> Submit { get; set; } = null!;
+
+    private async Task SubmitAsync()
+    {
+        if (_working)
+        {
+            return;
+        }
+
+        _failure = null;
+        _done = null;
+        if (_driverId.Length == 0)
+        {
+            _failure = "Choose a driver.";
+            return;
+        }
+
+        if (!DateOnly.TryParseExact(_day, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day))
+        {
+            _failure = "Enter the day.";
+            return;
+        }
+
+        if (!TimeOnly.TryParseExact(_start, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var start)
+            || !TimeOnly.TryParseExact(_end, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var end)
+            || start >= end)
+        {
+            _failure = "Enter a start and an end, with the end after the start.";
+            return;
+        }
+
+        _working = true;
+        try
+        {
+            switch (await Submit(day, _driverId, start, end, _closed.Token))
+            {
+                case CapacityAnswer.Done:
+                    _done = $"Shift set for {day.ToString("ddd d MMM", CultureInfo.InvariantCulture)}.";
+                    break;
+                case CapacityAnswer.Refused refused:
+                    _failure = $"Shift not set: {refused.Reason}";
+                    break;
+            }
+        }
+        catch (OperationCanceledException) when (_closed.IsCancellationRequested)
+        {
+            // The page closed while the TMS was answering.
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning(exception, "Editing the Shift of Driver {DriverId} failed", _driverId);
+            _failure = "The TMS couldn't set the Shift. Try again.";
+        }
+        finally
+        {
+            _working = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        _closed.Cancel();
+        _closed.Dispose();
+    }
+}

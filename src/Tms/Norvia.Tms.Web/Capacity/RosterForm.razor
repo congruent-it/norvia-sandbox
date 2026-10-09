@@ -1,0 +1,155 @@
+@using System.Globalization
+@using Norvia.Tms.Application.Fleet.Planning
+@implements IDisposable
+@inject ILogger<RosterForm> Logger
+
+@* Changes a Driver's Roster: for each weekday, whether they work and from when to when. Choosing a Driver fills in their Roster. *@
+<section role="group" aria-label="Change a Roster" class="mb-6 rounded-flatly border border-border p-4">
+    <h2 class="!mb-3 !text-xl">Change a Roster</h2>
+
+    @if (_failure is { } failure)
+    {
+        <div role="alert" class="mb-4">
+            <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">@failure</FluentMessageBar>
+        </div>
+    }
+    @if (_done is { } done)
+    {
+        <div role="status" class="mb-4">
+            <FluentMessageBar Intent="MessageIntent.Success" AllowDismiss="false">@done</FluentMessageBar>
+        </div>
+    }
+
+    <FluentSelect TOption="string" Label="Driver" aria-label="Driver" Value="@_driverId" ValueChanged="Choose" Width="14rem">
+        <FluentOption TOption="string" Value="">Choose a driver</FluentOption>
+        @foreach (var roster in Rosters)
+        {
+            <FluentOption TOption="string" Value="@roster.DriverId">@roster.DriverName</FluentOption>
+        }
+    </FluentSelect>
+
+    @if (_driverId.Length > 0)
+    {
+        <ul aria-label="Weekdays" class="my-4 list-none p-0">
+            @foreach (var row in _rows)
+            {
+                <li class="mb-2 flex flex-wrap items-end gap-4">
+                    <FluentCheckbox Label="@row.Name" @bind-Value="row.Works" />
+                    <FluentTextField Placeholder="HH:mm" Label="@($"{row.Name} start")" aria-label="@($"{row.Name} start")" @bind-Value="row.Start" Immediate="true" Disabled="!row.Works" />
+                    <FluentTextField Placeholder="HH:mm" Label="@($"{row.Name} end")" aria-label="@($"{row.Name} end")" @bind-Value="row.End" Immediate="true" Disabled="!row.Works" />
+                </li>
+            }
+        </ul>
+        <p class="text-muted">Open days that aren't edited by hand and have no Absence get the new Roster. A weekday left unticked is a day off.</p>
+        <FluentButton Appearance="Appearance.Accent" OnClick="SubmitAsync" Disabled="_working">Change Roster</FluentButton>
+    }
+</section>
+
+@code {
+    private static readonly DayOfWeek[] WeekOrder =
+        [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday];
+
+    private readonly CancellationTokenSource _closed = new();
+    private List<Row> _rows = [];
+    private string _driverId = string.Empty;
+    private string? _failure;
+    private string? _done;
+    private bool _working;
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<RosterView> Rosters { get; set; } = [];
+
+    /// <summary>Sends the new Roster to the TMS and answers what it said.</summary>
+    [Parameter, EditorRequired]
+    public Func<string, IReadOnlyList<RosterWeekdayView>, CancellationToken, Task<CapacityAnswer>> Submit { get; set; } = null!;
+
+    private sealed class Row(DayOfWeek weekday)
+    {
+        public DayOfWeek Weekday { get; } = weekday;
+
+        public string Name => CultureInfo.InvariantCulture.DateTimeFormat.GetDayName(Weekday);
+
+        public bool Works { get; set; }
+
+        public string Start { get; set; } = "08:00";
+
+        public string End { get; set; } = "16:30";
+    }
+
+    private void Choose(string driverId)
+    {
+        _driverId = driverId;
+        _failure = null;
+        _done = null;
+        var current = Rosters.FirstOrDefault(roster => roster.DriverId == driverId)?.Weekdays ?? [];
+        _rows = [.. WeekOrder.Select(weekday =>
+        {
+            var row = new Row(weekday);
+            if (current.FirstOrDefault(entry => entry.Weekday == weekday) is { } shift)
+            {
+                row.Works = true;
+                row.Start = shift.Start.ToString("HH:mm", CultureInfo.InvariantCulture);
+                row.End = shift.End.ToString("HH:mm", CultureInfo.InvariantCulture);
+            }
+
+            return row;
+        })];
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (_working)
+        {
+            return;
+        }
+
+        _failure = null;
+        _done = null;
+        var weekdays = new List<RosterWeekdayView>();
+        foreach (var row in _rows.Where(row => row.Works))
+        {
+            if (!TimeOnly.TryParseExact(row.Start, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var start)
+                || !TimeOnly.TryParseExact(row.End, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var end)
+                || start >= end)
+            {
+                _failure = $"{row.Name}: enter a start and an end, with the end after the start.";
+                return;
+            }
+
+            weekdays.Add(new RosterWeekdayView(row.Weekday, start, end));
+        }
+
+        _working = true;
+        try
+        {
+            switch (await Submit(_driverId, weekdays, _closed.Token))
+            {
+                case CapacityAnswer.Done:
+                    _done = "Roster changed.";
+                    break;
+                case CapacityAnswer.Refused refused:
+                    _failure = $"Roster not changed: {refused.Reason}";
+                    break;
+            }
+        }
+        catch (OperationCanceledException) when (_closed.IsCancellationRequested)
+        {
+            // The page closed while the TMS was answering.
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning(exception, "Changing the Roster of Driver {DriverId} failed", _driverId);
+            _failure = "The TMS couldn't change the Roster. Try again.";
+        }
+        finally
+        {
+            _working = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        _closed.Cancel();
+        _closed.Dispose();
+    }
+}

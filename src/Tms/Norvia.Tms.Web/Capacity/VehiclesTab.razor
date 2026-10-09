@@ -3,9 +3,11 @@
 @using Microsoft.Extensions.Options
 @using Norvia.Tms.Application.Fleet
 @using Norvia.Tms.Application.Fleet.Planning
+@using Norvia.Tms.Domain.Fleet
 @using Norvia.Tms.Web.TransportOrders
 @implements IAsyncDisposable
 @inject ITransportOrderQueries Queries
+@inject ITransportOrderCommands Commands
 @inject TimeProvider Time
 @inject IOptions<LiveListOptions> Options
 @inject ILogger<LiveTransportOrderList<VehicleView>> Logger
@@ -16,6 +18,16 @@
 <h1>Capacity</h1>
 
 <CapacityTabs />
+
+<PeriodForm Title="Take a Vehicle off the road" SubjectLabel="Vehicle" Subjects="VehicleChoices" Reasons="OffTheRoadReasons"
+            SubmitText="Take off the road" Submit="@((entry, token) => Commands.RecordOffTheRoadAsync(entry, token))" />
+
+@if (_removal is { } removal)
+{
+    <div role="@(removal.Failed ? "alert" : "status")" class="mb-4">
+        <FluentMessageBar Intent="@(removal.Failed ? MessageIntent.Warning : MessageIntent.Success)" AllowDismiss="false">@removal.Text</FluentMessageBar>
+    </div>
+}
 
 <LiveListStates Items="_list.Items" LastReadFailed="_list.LastReadFailed" Name="Vehicles"
                 Empty="There are no Vehicles in the Own fleet." Context="vehicles">
@@ -33,25 +45,53 @@
 <LiveListStates Items="_offTheRoad.Items" LastReadFailed="_offTheRoad.LastReadFailed" Name="Off the road days"
                 Empty="No Vehicle is Off the road." Context="days">
     <FluentDataGrid Items="days.AsQueryable()" TGridItem="OffTheRoadDayView" Class="flatly-table" aria-label="Off the road days"
-                    GridTemplateColumns="1fr 1.6fr 2.4fr" MultiLine="true">
+                    GridTemplateColumns="1fr 1.6fr 2.4fr 1fr" MultiLine="true">
         <PropertyColumn Title="Day" Property="@(day => FleetText.Day(day.Date))" />
         <PropertyColumn Title="Vehicle" Property="@(day => day.Registration)" />
         <PropertyColumn Title="Reason" Property="@(day => FleetText.Reason(day.Reason, day.Remark))" />
+        <TemplateColumn Title="Actions">
+            <FluentButton Appearance="Appearance.Outline" OnClick="@(() => RemoveOffTheRoadAsync(context))"
+                          aria-label="@($"Remove Off the road day of {context.Registration} on {FleetText.Day(context.Date)}")">Remove</FluentButton>
+        </TemplateColumn>
     </FluentDataGrid>
 </LiveListStates>
 
 @code {
     private LiveTransportOrderList<VehicleView> _list = null!;
     private LiveTransportOrderList<OffTheRoadDayView> _offTheRoad = null!;
+    private Removal? _removal;
+
+    private static readonly IReadOnlyList<string> OffTheRoadReasons = [.. Enum.GetNames<OffTheRoadReason>()];
+
+    private IReadOnlyList<PeriodSubject> VehicleChoices => [.. (_list.Items ?? []).Select(vehicle => new PeriodSubject(vehicle.Id, vehicle.Registration))];
+
+    private sealed record Removal(string Text, bool Failed);
+
+    private async Task RemoveOffTheRoadAsync(OffTheRoadDayView day)
+    {
+        try
+        {
+            _removal = await Commands.RemoveOffTheRoadAsync(day.Id, CancellationToken.None) switch
+            {
+                CapacityAnswer.Refused refused => new Removal($"Off the road day not removed: {refused.Reason}", Failed: true),
+                _ => new Removal($"{day.Registration} is back on the road on {FleetText.Day(day.Date)}.", Failed: false),
+            };
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            OffTheRoadLogger.LogWarning(exception, "Removing Off the road day {OffTheRoadDayId} failed", day.Id);
+            _removal = new Removal("The TMS couldn't remove the Off the road day. Try again.", Failed: true);
+        }
+    }
 
     protected override void OnInitialized()
     {
+        // Both lists exist before either starts: a read that finishes at once renders the page, which reads both.
         _list = new LiveTransportOrderList<VehicleView>(Queries.ListVehiclesAsync, "the Vehicles", Time, Options.Value.RefreshInterval, Logger);
-        _list.Changed += () => InvokeAsync(StateHasChanged);
-        _list.Start();
-
         _offTheRoad = new LiveTransportOrderList<OffTheRoadDayView>(Queries.ListOffTheRoadDaysAsync, "the Off the road days", Time, Options.Value.RefreshInterval, OffTheRoadLogger);
+        _list.Changed += () => InvokeAsync(StateHasChanged);
         _offTheRoad.Changed += () => InvokeAsync(StateHasChanged);
+        _list.Start();
         _offTheRoad.Start();
     }
 

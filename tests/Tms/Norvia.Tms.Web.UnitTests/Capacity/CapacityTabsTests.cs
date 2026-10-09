@@ -177,8 +177,8 @@ public sealed class CapacityTabsTests : TmsWebContext
                 first => first.Should().Equal("Anouk de Vries", "Mon 06:00-14:00; Tue 07:00-15:00"),
                 second => second.Should().Equal("Sanne Jansen", "No work"));
             Rows(page, "Absences").Should().SatisfyRespectively(
-                first => first.Should().Equal("Wed 14 Oct", "Anouk de Vries", "Leave: Holiday"),
-                second => second.Should().Equal("Thu 15 Oct", "Sanne Jansen", "Sickness"));
+                first => first.Should().Equal("Wed 14 Oct", "Anouk de Vries", "Leave: Holiday", "Remove"),
+                second => second.Should().Equal("Thu 15 Oct", "Sanne Jansen", "Sickness", "Remove"));
         });
     }
 
@@ -194,7 +194,7 @@ public sealed class CapacityTabsTests : TmsWebContext
 
         Time.Advance(RefreshInterval);
 
-        page.WaitForAssertion(() => Rows(page, "Absences").Should().ContainSingle().Which.Should().Equal("Wed 14 Oct", "Anouk de Vries", "Training"));
+        page.WaitForAssertion(() => Rows(page, "Absences").Should().ContainSingle().Which.Should().Equal("Wed 14 Oct", "Anouk de Vries", "Training", "Remove"));
     }
 
     [Fact]
@@ -205,7 +205,7 @@ public sealed class CapacityTabsTests : TmsWebContext
         var second = new OffTheRoadDayView(Guid.NewGuid(), "VEH-0003", "RT-201-C", new DateOnly(2026, 10, 15), OffTheRoadReason.Repair, string.Empty);
         Queries.ListOffTheRoadDaysAsync(Arg.Any<CancellationToken>()).Returns([first], [first, second]);
         var page = Render<VehiclesTab>();
-        page.WaitForAssertion(() => Rows(page, "Off the road days").Should().ContainSingle().Which.Should().Equal("Wed 14 Oct", "RT-201-C", "Maintenance: Service"));
+        page.WaitForAssertion(() => Rows(page, "Off the road days").Should().ContainSingle().Which.Should().Equal("Wed 14 Oct", "RT-201-C", "Maintenance: Service", "Remove"));
 
         Time.Advance(RefreshInterval);
 
