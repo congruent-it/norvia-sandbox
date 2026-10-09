@@ -2,7 +2,7 @@ namespace Norvia.Tms.Domain.CarrierBookings;
 
 /// <summary>
 /// Why a Carrier rejected a Carrier booking. The names are stable codes that callers and monitoring rely on: never
-/// rename one, only add. <c>PriceNotAccepted</c> is P9's addition, deferred with the Carrier cost.
+/// rename one, only add.
 /// </summary>
 public enum CarrierBookingRejectionReason
 {
@@ -17,6 +17,9 @@ public enum CarrierBookingRejectionReason
 
     /// <summary>The Carrier doesn't take these goods.</summary>
     GoodsNotAccepted,
+
+    /// <summary>The Carrier doesn't accept the Carrier cost. There is no counter-offer: the Planner releases again.</summary>
+    PriceNotAccepted,
 
     /// <summary>Anything else. A later ticket requires the reason text for this code.</summary>
     Other,

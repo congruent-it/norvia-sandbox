@@ -1,6 +1,7 @@
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Microsoft.Extensions.Time.Testing;
+using Norvia.Tms.Application.CarrierBookings;
 using Norvia.Tms.Application.Carriers;
 using Norvia.Tms.Application.Exceptions.Timeline;
 using Norvia.Tms.Application.Shipments;
@@ -308,6 +309,25 @@ public sealed class TrackingQueriesTests
     }
 
     [Fact]
+    public async Task Timeline_ShowsEveryCarrierBooking_ARejectedOneWithItsReasonCode()
+    {
+        var shipment = Booked(sequence: 12);
+        _shipments.FirstOrDefaultAsync(Arg.Any<ShipmentByNumberSpec>(), Arg.Any<CancellationToken>()).Returns(shipment);
+        _events.ListAsync(Arg.Any<TrackingTimelineSpec>(), Arg.Any<CancellationToken>()).Returns([]);
+        var rejected = CarrierBooking.Request(CarrierBookingNumber.FromSequence(11), shipment.Id, shipment.Number, VanDijk, new CorrelationId("corr-booking-1"), Samples.Now);
+        rejected.Reject(CarrierBookingRejectionReason.PriceNotAccepted, reasonText: null, new CorrelationId("corr-answer"), Samples.Now.AddHours(1));
+        var requested = CarrierBooking.Request(CarrierBookingNumber.FromSequence(12), shipment.Id, shipment.Number, VanDijk, new CorrelationId("corr-booking-2"), Samples.Now.AddHours(2));
+        _carrierBookings.ListAsync(Arg.Any<CarrierBookingsByShipmentSpec>(), Arg.Any<CancellationToken>()).Returns([rejected, requested]);
+
+        var result = await TimelineHandler().Handle(new GetTrackingTimelineQuery("SH-0000012"), CancellationToken.None);
+
+        result.Value.CarrierBookings.Should().HaveCount(2);
+        result.Value.CarrierBookings![0].Should().Match<CarrierBookingView>(
+            booking => booking.CarrierBookingNumber == "CB-0000011" && booking.Status == CarrierBookingStatus.Rejected && booking.ReasonCode == CarrierBookingRejectionReason.PriceNotAccepted);
+        result.Value.CarrierBookings[1].Status.Should().Be(CarrierBookingStatus.Requested);
+    }
+
+    [Fact]
     public async Task Timeline_ShowsTheCarrierBookingCancellationOnTheExceptionItWasMadeFrom_AndEachAgreedDeliveryWindow()
     {
         var shipment = Booked(sequence: 12);
@@ -371,7 +391,7 @@ public sealed class TrackingQueriesTests
 
     private ListShipmentsInProgressHandler InProgressHandler() => new(_shipments, _events, _orders, _proofsOfDelivery, _exceptions, _carriers, new ShipmentStaleRules(TimeSpan.FromHours(2), TimeSpan.FromHours(24), TimeSpan.FromHours(2)), _time);
 
-    private GetTrackingTimelineHandler TimelineHandler() => new(_shipments, _events, _proofsOfDelivery, _exceptions, _notifications, _carrierBookings, _orders);
+    private GetTrackingTimelineHandler TimelineHandler() => new(_shipments, _events, _proofsOfDelivery, _exceptions, _notifications, _carrierBookings, _orders, _carriers);
 
     private static TrackingEvent Report(
         Shipment shipment, TrackingEventType type, string id, DateTimeOffset eventTime, DateTimeOffset receivedAt, DateTimeOffset? eta) =>

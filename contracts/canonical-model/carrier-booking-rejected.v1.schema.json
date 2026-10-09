@@ -17,7 +17,7 @@
     "carrierId": { "description": "The Carrier that rejected the booking.", "type": "string", "minLength": 1 },
     "reasonCode": {
       "description": "The Carrier's stable reason for rejecting.",
-      "enum": ["NoCapacity", "LaneNotServed", "WindowNotFeasible", "GoodsNotAccepted", "Other"]
+      "enum": ["NoCapacity", "LaneNotServed", "WindowNotFeasible", "GoodsNotAccepted", "PriceNotAccepted", "Other"]
     },
     "reasonText": { "description": "The Carrier's reason in plain language, if it gave one.", "type": ["string", "null"], "minLength": 1 }
   }

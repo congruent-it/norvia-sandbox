@@ -23,6 +23,7 @@ public sealed class CarrierBookingTextTests
     [InlineData(CarrierBookingRejectionReason.LaneNotServed, "Lane not served")]
     [InlineData(CarrierBookingRejectionReason.WindowNotFeasible, "Window not feasible")]
     [InlineData(CarrierBookingRejectionReason.GoodsNotAccepted, "Goods not accepted")]
+    [InlineData(CarrierBookingRejectionReason.PriceNotAccepted, "Price not accepted")]
     [InlineData(CarrierBookingRejectionReason.Other, "No reason given")]
     public void LastOutcome_RejectedWithoutText_ReadsTheReasonCode(CarrierBookingRejectionReason code, string expected)
     {

@@ -1,6 +1,8 @@
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Mediator;
+using Norvia.Tms.Application.CarrierBookings;
+using Norvia.Tms.Application.Carriers;
 using Norvia.Tms.Application.Exceptions.Timeline;
 using Norvia.Tms.Application.ProofsOfDelivery.Read;
 using Norvia.Tms.Domain.CarrierBookings;
@@ -20,7 +22,8 @@ public sealed class GetTrackingTimelineHandler(
     IReadRepository<ExceptionCase> exceptions,
     IReadRepository<ShipperNotification> notifications,
     IReadRepository<CarrierBooking> carrierBookings,
-    IReadRepository<TransportOrder> transportOrders)
+    IReadRepository<TransportOrder> transportOrders,
+    ICarrierDirectory carriers)
     : IQueryHandler<GetTrackingTimelineQuery, Result<ShipmentTimeline>>
 {
     public async ValueTask<Result<ShipmentTimeline>> Handle(GetTrackingTimelineQuery query, CancellationToken cancellationToken)
@@ -44,15 +47,17 @@ public sealed class GetTrackingTimelineHandler(
         var shipperNotifications = shipmentExceptions.Count == 0
             ? []
             : await notifications.ListAsync(new ShipperNotificationsOfExceptionsSpec([.. shipmentExceptions.Select(exception => exception.Id)]), cancellationToken);
+        var bookings = await carrierBookings.ListAsync(new CarrierBookingsByShipmentSpec(shipment.Id), cancellationToken);
         var cancelledBookings = shipmentExceptions.Count == 0
             ? []
-            : (await carrierBookings.ListAsync(new CarrierBookingsByShipmentSpec(shipment.Id), cancellationToken)).Where(booking => booking.CancelledAt is not null).ToList();
+            : bookings.Where(booking => booking.CancelledAt is not null).ToList();
         var order = await transportOrders.FirstOrDefaultAsync(new TransportOrderByIdSpec(shipment.TransportOrderId), cancellationToken);
         return new ShipmentTimeline(
             [.. events.Select(TrackingTimelineEntry.Of)],
             [.. proofs.Select(ProofOfDeliveryView.Of)],
             [.. shipmentExceptions.Select(exception => ExceptionTimelineEntry.Of(exception, shipperNotifications, cancelledBookings))],
             [.. shipment.AgreedDeliveryWindows.Select(AgreedDeliveryWindowView.Of)],
-            order is null ? null : ShipmentBillingView.Of(order));
+            order is null ? null : ShipmentBillingView.Of(order),
+            [.. bookings.Select(booking => CarrierBookingView.Of(booking, carriers))]);
     }
 }

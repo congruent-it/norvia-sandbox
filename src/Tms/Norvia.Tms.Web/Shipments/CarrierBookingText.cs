@@ -53,6 +53,7 @@ public static class CarrierBookingText
             CarrierBookingRejectionReason.LaneNotServed => "Lane not served",
             CarrierBookingRejectionReason.WindowNotFeasible => "Window not feasible",
             CarrierBookingRejectionReason.GoodsNotAccepted => "Goods not accepted",
+            CarrierBookingRejectionReason.PriceNotAccepted => "Price not accepted",
             _ => "No reason given",
         };
 }

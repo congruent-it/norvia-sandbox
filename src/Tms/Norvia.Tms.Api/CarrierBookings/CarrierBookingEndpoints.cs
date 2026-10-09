@@ -43,7 +43,7 @@ public static class CarrierBookingEndpoints
             .WithDescription(
                 "A confirmation carries the Carrier's own booking reference (required) and, optionally, a planned collection time: the booking "
                 + "becomes Confirmed and the Shipment Booked. A rejection carries a reason code (required, one of NoCapacity, LaneNotServed, "
-                + "WindowNotFeasible, GoodsNotAccepted or Other) and, for Other, a reason text (required): the booking becomes Rejected and the "
+                + "WindowNotFeasible, GoodsNotAccepted, PriceNotAccepted or Other) and, for Other, a reason text (required): the booking becomes Rejected and the "
                 + "Shipment goes back to Planned. Either way, the matching event is published on the Shipment events topic in the same "
                 + "transaction; the Shipment's move publishes no event of its own. An answer sent again with the same outcome and content is "
                 + "answered as before, flagged as a repeat, without recording anything again or publishing a new event. An answer is refused, "
