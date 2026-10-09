@@ -601,6 +601,55 @@
       "active": true
     }
   ],
+  "demoOverCapacityDay": {
+    "$comment": "Makes one day in the first week Over capacity (P10). The day is the first weekday on or after 'firstDayFromStart' days after the TMS first starts with no Absences or Off the road days recorded: a rigid truck is Off the road and a CE Driver is on leave that day, and four Own fleet Transport Orders from the Shipper, 80 pallet places in all, are collected that day and assigned to Own fleet. The day then carries 80 of 77 pallet places. Left out, the TMS seeds none of it.",
+    "firstDayFromStart": 2,
+    "offTheRoad": { "vehicleId": "VEH-0004", "reason": "Maintenance", "remark": "Annual inspection" },
+    "absence": { "driverId": "DRV-0001", "reason": "Leave", "remark": "Annual leave" },
+    "shipperId": "SHP-0001",
+    "collection": {
+      "street": "Waalhaven Oostzijde 88", "postcode": "3087 BM", "city": "Rotterdam", "country": "NL",
+      "earliest": "08:00", "latest": "12:00"
+    },
+    "transportOrders": [
+        {
+          "shipperReference": "DEMO-OC-1",
+          "delivery": {
+            "street": "Oudegracht 112", "postcode": "3511 AW", "city": "Utrecht", "country": "NL",
+            "consignee": { "name": "Café De Zwaan", "contactName": "Sanne de Vries", "phone": "+31 30 555 0142" }
+          },
+          "pallets": 20,
+          "weightKgPerPallet": 450
+        },
+        {
+          "shipperReference": "DEMO-OC-2",
+          "delivery": {
+            "street": "Oudegracht 112", "postcode": "3511 AW", "city": "Utrecht", "country": "NL",
+            "consignee": { "name": "Café De Zwaan", "contactName": "Sanne de Vries", "phone": "+31 30 555 0142" }
+          },
+          "pallets": 20,
+          "weightKgPerPallet": 450
+        },
+        {
+          "shipperReference": "DEMO-OC-3",
+          "delivery": {
+            "street": "Noorderlaan 120", "postcode": "2030", "city": "Antwerpen", "country": "BE",
+            "consignee": { "name": "Drankenhandel De Schelde BV", "contactName": "Pieter Janssens", "phone": "+32 3 555 0117" }
+          },
+          "pallets": 20,
+          "weightKgPerPallet": 450
+        },
+        {
+          "shipperReference": "DEMO-OC-4",
+          "delivery": {
+            "street": "Noorderlaan 120", "postcode": "2030", "city": "Antwerpen", "country": "BE",
+            "consignee": { "name": "Drankenhandel De Schelde BV", "contactName": "Pieter Janssens", "phone": "+32 3 555 0117" }
+          },
+          "pallets": 20,
+          "weightKgPerPallet": 450
+        }
+    ]
+  },
   "personas": [
     {
       "$comment": "A Shipper Persona's tracking screen asks Norvia again every few seconds while it is open (P8). 'shipper.trackingPollSeconds' sets that per Persona; one without it polls every 5 seconds.",

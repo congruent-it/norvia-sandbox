@@ -3,8 +3,11 @@ namespace Norvia.Tms.Domain.Fleet;
 /// <summary>The Planning horizon (P10): today and the next days, counted in Norvia's local time, with the length from the TMS settings.</summary>
 public sealed class PlanningHorizonRules(int days, TimeZoneInfo zone)
 {
+    /// <summary>The time zone whose midnight starts a new day.</summary>
+    public TimeZoneInfo Zone { get; } = zone;
+
     /// <summary>The day it is now where Norvia works.</summary>
-    public DateOnly Today(DateTimeOffset now) => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, zone).DateTime);
+    public DateOnly Today(DateTimeOffset now) => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, Zone).DateTime);
 
     /// <summary>The days of the Planning horizon from today, in order.</summary>
     public IEnumerable<DateOnly> DaysFrom(DateOnly today) =>

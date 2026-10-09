@@ -155,11 +155,29 @@ Seven Drivers: two with CE, three with C and two with B. All have a Monday to Fr
 
 Within the first week of the Planning horizon, one rigid truck is Off the road for maintenance and one CE Driver is on leave. Together with the seeded Own fleet Transport Orders, this makes one day Over capacity. The demo shows the warning in P3 and the Planner moving a Shipment to a Carrier. The seed gives these dates relative to the day the demo starts.
 
+The seed file's `demoOverCapacityDay` part holds the Off the road Vehicle (`VEH-0004`, a rigid truck), the Driver on leave (`DRV-0001`, a CE Driver) and four Own fleet Transport Orders from Brouwer Dranken, Rotterdam to Utrecht and Antwerp, of 20 pallet places each. The day is the first weekday on or after two days from the day the TMS first starts. With the truck gone, the available Vehicles can carry 77 pallet places and 46,400 kg, and the four orders ask for 80 pallet places, so the day is Over capacity. Putting the truck back, which the Planner can do by removing its Off the road day, brings it back under capacity.
+
+The TMS seeds this once, the first time it starts on a database holding no Absences or Off the road days. It books the four orders and assigns them to Own fleet through the same commands as the Partner API and the Planner, then records the Off the road day and the Absence. A restart, or a Planner who has recorded any Absence or Off the road day, seeds nothing more.
+
+## Presenter smoke run
+
+After a deployment, and not in CI, the presenter checks user story 14 on the deployed estate: one more Own fleet Shipment on the Over capacity day shows the warning in P3, and moving it to Kessler Spedition works. Do it after the presenter smoke run of Transport planning ([P3](p3-transport-planning.md#presenter-smoke-run)). Open the Partner portal and the TMS UI side by side.
+
+1. **Find the day.** Run `infra/smoke-test-over-capacity-day.sh` without arguments. It reads the Capacity view as the intake identity, from a throwaway Container Apps job, and checks that the seeded day is Over capacity with a Vehicle fewer and a Driver fewer at work. It prints the day to book for. In the TMS UI, open *Capacity*, then *Days*, to see it flagged.
+2. **Book one more.** In the Partner portal, book a Transport Order as Brouwer Dranken from Rotterdam, collected on that day. Note its Transport Order number.
+3. **Assign to Own fleet.** In the TMS UI, assign the Transport Order to *Own fleet*. The Over capacity warning shows, for example "Wed 7 Oct: Over capacity, 84 of 77 pallet places after this assignment", and the assignment goes ahead.
+4. **Reassign to Kessler Spedition.** Reassign the Shipment to *Kessler Spedition*. It succeeds, and the day goes back to what it was seeded with.
+5. **Check the TMS.** Run `infra/smoke-test-over-capacity-day.sh <Transport Order number>`. It checks that the day is still Over capacity, that the Transport Order is Planned for a Shipment carried by Kessler Spedition and collecting on that day, that the Shipment's history of assignments shows Own fleet and then Kessler Spedition, and that the assignment and the reassignment each ran on a Message trail of their own under the Transport Order number, publishing `ShipmentPlanned` and `ShipmentReassigned` in turn.
+
+The script prints `PASS` or `FAIL` per check, never a body. The warning is shown to the Planner when the assignment is made and kept nowhere, so the script can't check it: step 3 is the presenter's to see. It checks what makes the warning appear, the Over capacity day, and what the Planner does next. If a check fails, file the gap as its own issue against P10, rather than working around it in the run book.
+
 ## Implementation
 
 The Driving-hour budget is built: `DrivingHourBudget` in the TMS domain works out the hours left today, this week and this fortnight, and the extensions left this week, from the day it is and the Trip durations it is given. The limits are the `DrivingHours` TMS settings. Until P11 supplies Trip durations, every budget is full, and the Drivers tab shows it.
 
 The availability rules are built: `TripAvailabilityRules` in the TMS application answers for a `TripProposal` (day, Vehicle, Driver, planned driving duration, total weight and pallets) with every rule it breaks, each a `TripAvailabilityFailure` with its code and message. It reads the day's Shifts and available Vehicles from the Planning day and the Driving-hour budget from `DrivingHourBudget.Fits`, so it holds no availability logic of its own. P11 owns Trips, so the proposal says whether the Vehicle or Driver has another Trip that day, and, for a Trip already planned, the driving it is counted as now so an Amend does not count it twice. What is not set on a Draft is not checked. The rest of P10 is not built yet.
+
+The demo seed is built: `DemoOverCapacityDaySeeder` in the TMS Infrastructure project seeds the Over capacity day once, as the TMS API starts, from the seed file's `demoOverCapacityDay` part. The presenter smoke run is [smoke-test-over-capacity-day.sh](../../../infra/smoke-test-over-capacity-day.sh), run after the [Transport planning](../../../infra/smoke-test-transport-planning.sh) smoke run.
 
 ## Deferred
 

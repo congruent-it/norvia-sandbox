@@ -150,14 +150,16 @@ public static class DependencyInjection
     }
 
     /// <summary>
-    /// Opens the days of the Planning horizon every midnight (P10). Only the process that takes in Transport Orders runs it,
-    /// as it runs the rating worker; the TMS UI shares the database and only reads the days.
+    /// Opens the days of the Planning horizon every midnight (P10), and seeds the demo's Over capacity day the first time. Only the process
+    /// that takes in Transport Orders runs them, as it runs the rating worker; the TMS UI shares the database and only reads the days.
     /// </summary>
     public static IHostApplicationBuilder AddTmsPlanningHorizonJob(this IHostApplicationBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
 
         builder.Services.AddHostedService<PlanningHorizonWorker>();
+        builder.Services.AddSingleton(services => DemoSeed.Read(services.GetRequiredService<IOptions<SeedOptions>>()));
+        builder.Services.AddHostedService<DemoOverCapacityDaySeeder>();
 
         return builder;
     }
