@@ -10,7 +10,8 @@ namespace Norvia.Tms.Web.UnitTests.Capacity;
 /// <summary>The Planner's forms on the Drivers and Vehicles tabs (P10): what they send, and what they say back.</summary>
 public sealed class CapacityFormsTests : TmsWebContext
 {
-    private static readonly DriverView Anouk = new("DRV-0001", "Anouk de Vries", [LicenceCategory.CE], [VehicleType.Van]);
+    private static readonly DriverView Anouk = new("DRV-0001", "Anouk de Vries", [LicenceCategory.CE], [VehicleType.Van],
+        new DrivingHoursLeft(TimeSpan.FromHours(9), TimeSpan.FromHours(56), TimeSpan.FromHours(90), 2));
     private static readonly VehicleView Truck = new("VEH-0003", "RT-201-C", VehicleType.RigidTruck, 10000, 18, LicenceCategory.C);
 
     [Fact]

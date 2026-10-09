@@ -10,9 +10,11 @@ public sealed class CapacityTabsTests : TmsWebContext
 {
     private static readonly VehicleView Van = new("VEH-0001", "VN-101-A", VehicleType.Van, 1200, 4, LicenceCategory.B);
     private static readonly VehicleView Truck = new("VEH-0003", "RT-201-C", VehicleType.RigidTruck, 10000, 18, LicenceCategory.C);
+    private static readonly DrivingHoursLeft Full = new(TimeSpan.FromHours(9), TimeSpan.FromHours(56), TimeSpan.FromHours(90), 2);
     private static readonly DriverView Anouk = new("DRV-0001", "Anouk de Vries", [LicenceCategory.B, LicenceCategory.C, LicenceCategory.CE],
-        [VehicleType.Van, VehicleType.RigidTruck, VehicleType.TractorWithTrailer]);
-    private static readonly DriverView Sanne = new("DRV-0006", "Sanne Jansen", [LicenceCategory.B], [VehicleType.Van]);
+        [VehicleType.Van, VehicleType.RigidTruck, VehicleType.TractorWithTrailer], Full);
+    private static readonly DriverView Sanne = new("DRV-0006", "Sanne Jansen", [LicenceCategory.B], [VehicleType.Van],
+        new DrivingHoursLeft(TimeSpan.FromHours(0.5), TimeSpan.FromHours(40.25), TimeSpan.FromHours(74), 0));
 
     [Fact]
     public void Render_VehiclesTab_BeforeTheVehiclesAreRead_ShowsLoading()
@@ -70,8 +72,8 @@ public sealed class CapacityTabsTests : TmsWebContext
 
         page.WaitForAssertion(() => page.FindAll("tbody tr").Select(row => row.QuerySelectorAll("td").Select(cell => cell.TextContent.Trim()).ToList())
             .Should().SatisfyRespectively(
-                first => first.Should().Equal("Anouk de Vries", "B, C, CE", "Van, Rigid truck, Tractor with trailer"),
-                second => second.Should().Equal("Sanne Jansen", "B", "Van")));
+                first => first.Should().Equal("Anouk de Vries", "B, C, CE", "Van, Rigid truck, Tractor with trailer", "9 h", "56 h", "90 h", "2"),
+                second => second.Should().Equal("Sanne Jansen", "B", "Van", "0.5 h", "40.25 h", "74 h", "0")));
     }
 
     [Fact]

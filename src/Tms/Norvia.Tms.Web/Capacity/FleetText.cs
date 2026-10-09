@@ -21,6 +21,9 @@ internal static class FleetText
 
     public static string VehicleTypes(IEnumerable<VehicleType> types) => string.Join(", ", types.Select(VehicleType));
 
+    /// <summary>Driving hours as "9 h" or "7.5 h".</summary>
+    public static string Hours(TimeSpan hours) => $"{hours.TotalHours.ToString("0.##", CultureInfo.InvariantCulture)} h";
+
     /// <summary>A day as the Planner reads it, such as "Mon 12 Oct".</summary>
     public static string Day(DateOnly date) => date.ToString("ddd d MMM", CultureInfo.InvariantCulture);
 
