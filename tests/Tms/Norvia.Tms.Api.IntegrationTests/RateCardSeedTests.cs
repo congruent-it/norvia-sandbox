@@ -9,16 +9,19 @@ using Norvia.AppHost;
 namespace Norvia.Tms.Api.IntegrationTests;
 
 /// <summary>
-/// A Rate Card whose Zones overlap is a broken seed: the TMS refuses to start on it rather than rate against it. The
-/// test runs an AppHost of its own, whose TMS API reads a seed where two Zones claim the same postcode prefix.
+/// A Rate Card or a Carrier Rate Card whose Zones overlap is a broken seed: the TMS refuses to start on it rather than
+/// rate against it. Each test runs an AppHost of its own, whose TMS API reads a seed where two Zones claim the same
+/// postcode prefix.
 /// </summary>
 [Trait("AppHost", "Own1")]
 public sealed class RateCardSeedTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromMinutes(5);
 
-    [Fact]
-    public async Task Start_RateCardWithOverlappingZones_TheTmsApiFailsAtStartup()
+    [Theory]
+    [InlineData("tms.overlapping-zones-seed.json", "Rate Card RC-TEST-OVERLAP")]
+    [InlineData("tms.overlapping-carrier-zones-seed.json", "Carrier Rate Card CRC-TEST-OVERLAP")]
+    public async Task Start_RateCardWithOverlappingZones_TheTmsApiFailsAtStartup(string seedFile, string card)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         timeout.CancelAfter(Timeout);
@@ -28,7 +31,7 @@ public sealed class RateCardSeedTests
             timeout.Token);
         builder.RemoveWhatTheTmsApiTestsDontUse();
         builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(r => r.Name == "tms-api"))
-            .WithEnvironment("Seed__Path", Path.Combine(AppContext.BaseDirectory, "Seed", "tms.overlapping-zones-seed.json"));
+            .WithEnvironment("Seed__Path", Path.Combine(AppContext.BaseDirectory, "Seed", seedFile));
         await using var app = await builder.BuildAsync(timeout.Token);
 
         // Not awaited: starting completes only once every resource has, and what waits for the TMS API never does.
@@ -48,7 +51,7 @@ public sealed class RateCardSeedTests
             await Task.Delay(TmsFixture.PollInterval, timeout.Token);
         }
 
-        logs.Should().Contain(line => line.Contains("Rotterdam and Rijnmond both claim NL 31", StringComparison.Ordinal));
+        logs.Should().Contain(line => line.Contains(card, StringComparison.Ordinal) && line.Contains("Rotterdam and Rijnmond both claim NL 31", StringComparison.Ordinal));
 
         await stopStarting.CancelAsync();
         await starting.ContinueWith(_ => { }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);

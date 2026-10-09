@@ -30,8 +30,9 @@ public sealed record RateCardVersion(
     /// Rates a Transport Order: its Freight Charge, or why this version can't price it because no Lane covers its
     /// Zones or its weight is above the Lane's highest Weight Break.
     /// </summary>
-    /// <param name="rateCardId">The Rate Card this version belongs to, which the Freight Charge refers to.</param>
-    public RatingOutcome Rate(RateCardId rateCardId, TransportOrderDetails details)
+    /// <param name="kind">Which kind of card this version belongs to, which a failure message names.</param>
+    /// <param name="rateCardId">The card this version belongs to, which the Freight Charge refers to.</param>
+    internal RatingOutcome Rate(RateCardKind kind, RateCardId rateCardId, TransportOrderDetails details)
     {
         ArgumentNullException.ThrowIfNull(details);
         var origin = ZoneOf(details.Collection?.Address);
@@ -39,14 +40,14 @@ public sealed record RateCardVersion(
         if (Lanes.FirstOrDefault(lane => lane.Origin == origin?.Name && lane.Destination == destination?.Name) is not { } lane)
         {
             return RatingOutcome.Failed(RatingFailureCode.NoMatchingLane, Invariant(
-                $"Rate Card {rateCardId} version {Version} has no Lane from {Describe(origin, details.Collection?.Address)} to {Describe(destination, details.Delivery?.Address)}."));
+                $"{kind.DisplayName()} {rateCardId} version {Version} has no Lane from {Describe(origin, details.Collection?.Address)} to {Describe(destination, details.Delivery?.Address)}."));
         }
 
         var weightKg = details.TotalWeightKg();
         return lane.ChargeLinesFor(weightKg) is { } chargeLines
             ? RatingOutcome.Priced(new FreightCharge(chargeLines, new RateCardVersionReference(rateCardId, Version)))
             : RatingOutcome.Failed(RatingFailureCode.WeightAboveHighestBreak, Invariant(
-                $"The total weight of {weightKg} kg is above the highest Weight Break, up to {lane.HighestWeightBreakKg} kg, of the Lane from {lane.Origin} to {lane.Destination} in Rate Card {rateCardId} version {Version}."));
+                $"The total weight of {weightKg} kg is above the highest Weight Break, up to {lane.HighestWeightBreakKg} kg, of the Lane from {lane.Origin} to {lane.Destination} in {kind.DisplayName()} {rateCardId} version {Version}."));
     }
 
     /// <summary>An end of a Lane the message names: its Zone, or the address when it lies in none.</summary>

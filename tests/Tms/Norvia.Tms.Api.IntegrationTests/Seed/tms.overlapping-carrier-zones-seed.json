@@ -1,0 +1,62 @@
+{
+  "$comment": "A broken seed: two of a Carrier Rate Card's Zones both claim NL 31, so the TMS must refuse to start on it as it does for a Rate Card.",
+  "shippers": [
+    {
+      "id": "SHP-0001",
+      "name": "Brouwer Dranken",
+      "active": true,
+      "addresses": []
+    }
+  ],
+  "rateCards": [],
+  "carrierRateCards": [
+    {
+      "id": "CRC-TEST-OVERLAP",
+      "carrierId": "CAR-0001",
+      "versions": [
+        {
+          "version": 1,
+          "validFrom": "2020-01-01",
+          "validTo": null,
+          "zones": [
+            {
+              "name": "Rotterdam",
+              "country": "NL",
+              "postcodePrefixes": [
+                "30",
+                "31"
+              ]
+            },
+            {
+              "name": "Rijnmond",
+              "country": "NL",
+              "postcodePrefixes": [
+                "31"
+              ]
+            }
+          ],
+          "lanes": [
+            {
+              "origin": "Rotterdam",
+              "destination": "Rijnmond",
+              "minimumCharge": 45.0,
+              "weightBreaks": [
+                {
+                  "upToKg": 24000,
+                  "pricePer100Kg": 9.75
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "carriers": [
+    {
+      "id": "CAR-0001",
+      "name": "Van Dijk Transport",
+      "active": true
+    }
+  ]
+}
