@@ -196,6 +196,7 @@ result["toReleaseListed"] = bool(released)
 result["billingState"] = order.get("billingState")
 result["released"] = order.get("proofOfDeliveryRelease") is not None
 result["releasedRemark"] = (order.get("proofOfDeliveryRelease") or {}).get("remark")
+result["releasedBy"] = (order.get("proofOfDeliveryRelease") or {}).get("releasedBy")
 result["notYetBillable"] = {"listed": bool(unbilled), "blockingReasons": unbilled[0]["blockingReasons"] if unbilled else None}
 print("SMOKE-RESULT " + json.dumps(result))
 PYTHON'
@@ -427,14 +428,15 @@ pass "PriceNotAccepted from Van Dijk's inbox sent Shipment $shipment_rejected ba
 # 5. Delivered without a Proof of delivery, released by Customer service with a remark.
 echo
 echo "Delivered without a Proof of delivery"
+result=$(look "$no_pod_order" kessler-spedition)
+jq -e --arg kessler "$kessler_id" '.status == "Booked" and .carrierId == $kessler and .reference != null' <<<"$result" >/dev/null \
+  || fail "Transport Order $no_pod_order isn't Booked and carried by Kessler Spedition with a Confirmed Carrier booking: $(jq -c '{status, carrierId, reference}' <<<"$result")"
 result=$(run_steps "$(jq -nc '[
   {name: "PU", kind: "track", statusCode: "PU", wait: "Collected"},
   {name: "DEP", kind: "track", statusCode: "DEP", wait: "In transit"},
   {name: "POD", kind: "track", statusCode: "POD", wait: "Delivered"}]')" "$no_pod_order" kessler-spedition 0)
 shipment_no_pod=$(jq -r '.shipmentNumber // empty' <<<"$result")
 [ -n "$shipment_no_pod" ] || fail "Transport Order $no_pod_order has no Shipment, or the TMS doesn't answer for it"
-jq -e --arg kessler "$kessler_id" '.carrierId == $kessler and .reference != null' <<<"$result" >/dev/null \
-  || fail "Shipment $shipment_no_pod isn't carried by Kessler Spedition with a Confirmed Carrier booking: $(jq -c '{status, carrierId, reference}' <<<"$result")"
 for code in PU DEP POD; do step_accepted "$result" "$code" "Kessler Spedition"; done
 pod_no_pod_id=$(step_id "$result" POD)
 result=$(look_until "$no_pod_order" kessler-spedition '.notYetBillable.listed')
@@ -444,7 +446,7 @@ pass "Delivered Transport Order $no_pod_order shows in Customer service's list w
 wait_for_presenter "In the TMS UI ($tms_ui), in Customer service's list of Transport Orders not yet billable, release $no_pod_order without a Proof of delivery,
 with the remark \"CMR received by post, scanned in the dossier\"."
 result=$(look_until "$no_pod_order" kessler-spedition '.billingState == "Billable"')
-jq -e '.billingState == "Billable" and .released and (.releasedRemark | . != null and . != "") and (.notYetBillable.listed | not)' <<<"$result" >/dev/null \
+jq -e '.billingState == "Billable" and .released and (.releasedBy | . != null and . != "") and (.releasedRemark | . != null and . != "") and (.notYetBillable.listed | not)' <<<"$result" >/dev/null \
   || fail "Transport Order $no_pod_order isn't Billable, released with its remark, and out of the list: $(jq -c '{billingState, released, notYetBillable}' <<<"$result")"
 published_by_action "Shipment $shipment_no_pod" "$shipment_no_pod" billing TransportOrderBillable
 pass "Transport Order $no_pod_order was released with a remark, is Billable and published TransportOrderBillable"
