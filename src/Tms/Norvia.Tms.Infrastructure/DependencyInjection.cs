@@ -106,6 +106,7 @@ public static class DependencyInjection
         builder.Services.AddSingleton<IVehicleDirectory, SeedFileVehicleDirectory>();
         builder.Services.AddSingleton<IDriverDirectory, SeedFileDriverDirectory>();
         builder.Services.AddSingleton<IRosterDirectory, SeedFileRosterDirectory>();
+        builder.Services.AddScoped<EffectiveRosters>();
         builder.Services.AddOptions<PlanningHorizonOptions>().BindConfiguration(PlanningHorizonOptions.SectionName)
             .ValidateDataAnnotations()
             .Validate(options => TimeZoneInfo.TryFindSystemTimeZoneById(options.TimeZone, out _), "PlanningHorizon:TimeZone isn't a time zone this host knows.")

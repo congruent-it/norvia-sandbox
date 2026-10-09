@@ -1,4 +1,6 @@
+using Norvia.Tms.Application.Fleet.Planning;
 using Norvia.Tms.Domain.Exceptions;
+using Norvia.Tms.Web.Capacity;
 using Norvia.Tms.Web.Exceptions;
 using Norvia.Tms.Web.Shipments;
 
@@ -63,4 +65,22 @@ public interface ITransportOrderCommands
     /// needs (P9). The order becomes Billable only when nothing else blocks it.
     /// </summary>
     Task<ReleaseWithoutProofOfDeliveryAnswer> ReleaseWithoutProofOfDeliveryAsync(string transportOrderNumber, string remark, CancellationToken cancellationToken);
+
+    /// <summary>The Planner records an Absence for a Driver, for the days from first to last (P10).</summary>
+    Task<CapacityAnswer> RecordAbsenceAsync(PeriodEntry entry, CancellationToken cancellationToken);
+
+    /// <summary>The Planner removes an Absence (P10).</summary>
+    Task<CapacityAnswer> RemoveAbsenceAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>The Planner takes a Vehicle off the road for the days from first to last (P10).</summary>
+    Task<CapacityAnswer> RecordOffTheRoadAsync(PeriodEntry entry, CancellationToken cancellationToken);
+
+    /// <summary>The Planner removes an Off the road day (P10).</summary>
+    Task<CapacityAnswer> RemoveOffTheRoadAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>The Planner changes a Driver's Roster (P10); a weekday left out is a day off.</summary>
+    Task<CapacityAnswer> ChangeRosterAsync(string driverId, IReadOnlyList<RosterWeekdayView> weekdays, CancellationToken cancellationToken);
+
+    /// <summary>The Planner sets one Driver's Shift on a single open day (P10).</summary>
+    Task<CapacityAnswer> EditShiftAsync(DateOnly day, string driverId, TimeOnly startsAt, TimeOnly endsAt, CancellationToken cancellationToken);
 }

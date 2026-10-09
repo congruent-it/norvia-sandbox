@@ -30,4 +30,18 @@ internal static class FleetText
 
     public static string DriversOnShift(IEnumerable<ShiftView> shifts) =>
         string.Join("; ", shifts.Select(shift => $"{shift.DriverName} {Shift(shift.Start, shift.End, shift.EditedByHand)}"));
+
+    /// <summary>A Roster as "Mon 06:00-14:00; Tue 06:00-14:00", or "No work" when the Driver has no Roster.</summary>
+    public static string Roster(IEnumerable<RosterWeekdayView> weekdays)
+    {
+        var text = string.Join("; ", weekdays.Select(weekday => $"{Weekday(weekday.Weekday)} {Shift(weekday.Start, weekday.End, editedByHand: false)}"));
+        return text.Length == 0 ? "No work" : text;
+    }
+
+    public static string Weekday(DayOfWeek weekday) => CultureInfo.InvariantCulture.DateTimeFormat.GetAbbreviatedDayName(weekday);
+
+    /// <summary>A reason as the Planner reads it, such as "Leave" or "Maintenance"; the remark follows when there is one.</summary>
+    public static string Reason<TReason>(TReason reason, string remark)
+        where TReason : struct, Enum =>
+        remark.Length == 0 ? reason.ToString() : $"{reason}: {remark}";
 }

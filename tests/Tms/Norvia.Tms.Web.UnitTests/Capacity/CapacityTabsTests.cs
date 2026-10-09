@@ -152,4 +152,77 @@ public sealed class CapacityTabsTests : TmsWebContext
 
         page.WaitForAssertion(() => page.Markup.Should().Contain("Tue 13 Oct"));
     }
+
+    [Fact]
+    public void Render_DriversTab_ListsEachDriversRoster_AndTheAbsencesWithTheirReasonAndRemark()
+    {
+        Queries.ListDriversAsync(Arg.Any<CancellationToken>()).Returns([Anouk]);
+        Queries.ListRostersAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new RosterView("DRV-0001", "Anouk de Vries",
+                [new RosterWeekdayView(DayOfWeek.Monday, new TimeOnly(6, 0), new TimeOnly(14, 0)), new RosterWeekdayView(DayOfWeek.Tuesday, new TimeOnly(7, 0), new TimeOnly(15, 0))]),
+            new RosterView("DRV-0006", "Sanne Jansen", []),
+        ]);
+        Queries.ListAbsencesAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new AbsenceView(Guid.NewGuid(), "DRV-0001", "Anouk de Vries", new DateOnly(2026, 10, 14), AbsenceReason.Leave, "Holiday"),
+            new AbsenceView(Guid.NewGuid(), "DRV-0006", "Sanne Jansen", new DateOnly(2026, 10, 15), AbsenceReason.Sickness, string.Empty),
+        ]);
+
+        var page = Render<DriversTab>();
+
+        page.WaitForAssertion(() =>
+        {
+            Rows(page, "Rosters").Should().SatisfyRespectively(
+                first => first.Should().Equal("Anouk de Vries", "Mon 06:00-14:00; Tue 07:00-15:00"),
+                second => second.Should().Equal("Sanne Jansen", "No work"));
+            Rows(page, "Absences").Should().SatisfyRespectively(
+                first => first.Should().Equal("Wed 14 Oct", "Anouk de Vries", "Leave: Holiday", "Remove"),
+                second => second.Should().Equal("Thu 15 Oct", "Sanne Jansen", "Sickness", "Remove"));
+        });
+    }
+
+    [Fact]
+    public void Render_DriversTab_WithNoAbsences_SaysSo_AndAnAbsenceRecordedWhileOpenAppearsWithoutARefresh()
+    {
+        Queries.ListDriversAsync(Arg.Any<CancellationToken>()).Returns([Anouk]);
+        Queries.ListAbsencesAsync(Arg.Any<CancellationToken>()).Returns(
+            [],
+            [new AbsenceView(Guid.NewGuid(), "DRV-0001", "Anouk de Vries", new DateOnly(2026, 10, 14), AbsenceReason.Training, string.Empty)]);
+        var page = Render<DriversTab>();
+        page.WaitForAssertion(() => page.Markup.Should().Contain("There are no Absences."));
+
+        Time.Advance(RefreshInterval);
+
+        page.WaitForAssertion(() => Rows(page, "Absences").Should().ContainSingle().Which.Should().Equal("Wed 14 Oct", "Anouk de Vries", "Training", "Remove"));
+    }
+
+    [Fact]
+    public void Render_VehiclesTab_ListsTheOffTheRoadDays_AndOneRecordedWhileOpenAppearsWithoutARefresh()
+    {
+        Queries.ListVehiclesAsync(Arg.Any<CancellationToken>()).Returns([Truck]);
+        var first = new OffTheRoadDayView(Guid.NewGuid(), "VEH-0003", "RT-201-C", new DateOnly(2026, 10, 14), OffTheRoadReason.Maintenance, "Service");
+        var second = new OffTheRoadDayView(Guid.NewGuid(), "VEH-0003", "RT-201-C", new DateOnly(2026, 10, 15), OffTheRoadReason.Repair, string.Empty);
+        Queries.ListOffTheRoadDaysAsync(Arg.Any<CancellationToken>()).Returns([first], [first, second]);
+        var page = Render<VehiclesTab>();
+        page.WaitForAssertion(() => Rows(page, "Off the road days").Should().ContainSingle().Which.Should().Equal("Wed 14 Oct", "RT-201-C", "Maintenance: Service", "Remove"));
+
+        Time.Advance(RefreshInterval);
+
+        page.WaitForAssertion(() => Rows(page, "Off the road days").Should().HaveCount(2));
+    }
+
+    [Fact]
+    public void Render_VehiclesTab_WithNoVehicleOffTheRoad_SaysSo()
+    {
+        Queries.ListVehiclesAsync(Arg.Any<CancellationToken>()).Returns([Truck]);
+        Queries.ListOffTheRoadDaysAsync(Arg.Any<CancellationToken>()).Returns([]);
+
+        var page = Render<VehiclesTab>();
+
+        page.WaitForAssertion(() => page.Markup.Should().Contain("No Vehicle is Off the road."));
+    }
+
+    private static List<List<string>> Rows(IRenderedComponent<Microsoft.AspNetCore.Components.IComponent> page, string gridLabel) =>
+        [.. page.Find($"[aria-label='{gridLabel}']").QuerySelectorAll("tbody tr").Select(row => row.QuerySelectorAll("td").Select(cell => cell.TextContent.Trim()).ToList())];
 }

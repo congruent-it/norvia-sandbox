@@ -258,6 +258,82 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                     b.ToTable("Exceptions", (string)null);
                 });
 
+            modelBuilder.Entity("Norvia.Tms.Domain.Fleet.Absence", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<string>("DriverId")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("Remark")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Date");
+
+                    b.HasIndex("DriverId", "Date")
+                        .IsUnique();
+
+                    b.ToTable("Absences", (string)null);
+                });
+
+            modelBuilder.Entity("Norvia.Tms.Domain.Fleet.OffTheRoadDay", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("nvarchar(12)");
+
+                    b.Property<string>("Remark")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("VehicleId")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Date");
+
+                    b.HasIndex("VehicleId", "Date")
+                        .IsUnique();
+
+                    b.ToTable("OffTheRoadDays", (string)null);
+                });
+
             modelBuilder.Entity("Norvia.Tms.Domain.Fleet.PlanningDay", b =>
                 {
                     b.Property<DateOnly>("Date")
@@ -284,6 +360,21 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                     b.HasKey("Date");
 
                     b.ToTable("PlanningDays", (string)null);
+                });
+
+            modelBuilder.Entity("Norvia.Tms.Domain.Fleet.Roster", b =>
+                {
+                    b.Property<string>("DriverId")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Weekdays")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("DriverId");
+
+                    b.ToTable("Rosters", (string)null);
                 });
 
             modelBuilder.Entity("Norvia.Tms.Domain.ProofsOfDelivery.ProofOfDelivery", b =>

@@ -1,0 +1,144 @@
+@using System.Globalization
+@implements IDisposable
+@inject ILogger<PeriodForm> Logger
+
+@* Records an Absence or an Off the road period: who, the days from first to last, why and a remark. The two share this form. *@
+<section role="group" aria-label="@Title" class="mb-6 rounded-flatly border border-border p-4">
+    <h2 class="!mb-3 !text-xl">@Title</h2>
+
+    @if (_failure is { } failure)
+    {
+        <div role="alert" class="mb-4">
+            <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">@failure</FluentMessageBar>
+        </div>
+    }
+    @if (_done is { } done)
+    {
+        <div role="status" class="mb-4">
+            <FluentMessageBar Intent="MessageIntent.Success" AllowDismiss="false">@done</FluentMessageBar>
+        </div>
+    }
+
+    <div class="flex flex-wrap items-end gap-4">
+        <div class="flex items-center gap-2">
+            <FluentSelect TOption="string" Label="@SubjectLabel" aria-label="@SubjectLabel" @bind-Value="_subjectId" Width="14rem">
+                <FluentOption TOption="string" Value="">Choose a @SubjectLabel.ToLowerInvariant()</FluentOption>
+                @foreach (var subject in Subjects)
+                {
+                    <FluentOption TOption="string" Value="@subject.Id">@subject.Name</FluentOption>
+                }
+            </FluentSelect>
+        </div>
+        <div class="flex items-center gap-2">
+            <FluentDatePicker Label="From" aria-label="From" @bind-Value="_from" />
+        </div>
+        <div class="flex items-center gap-2">
+            <FluentDatePicker Label="To" aria-label="To" @bind-Value="_to" />
+        </div>
+        <div class="flex items-center gap-2">
+            <FluentSelect TOption="string" Label="Reason" aria-label="Reason" @bind-Value="_reason" Width="12rem">
+                @foreach (var reason in Reasons)
+                {
+                    <FluentOption TOption="string" Value="@reason">@reason</FluentOption>
+                }
+            </FluentSelect>
+        </div>
+        <div class="flex items-center gap-2">
+            <FluentTextField Label="Remark" aria-label="Remark" @bind-Value="_remark" Immediate="true" MaxLength="500" />
+        </div>
+        <FluentButton Appearance="Appearance.Accent" OnClick="SubmitAsync" Disabled="_working">@SubmitText</FluentButton>
+    </div>
+</section>
+
+@code {
+    private readonly CancellationTokenSource _closed = new();
+    private string _subjectId = string.Empty;
+    private DateTime? _from;
+    private DateTime? _to;
+    private string _reason = string.Empty;
+    private string _remark = string.Empty;
+    private string? _failure;
+    private string? _done;
+    private bool _working;
+
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>"Driver" or "Vehicle".</summary>
+    [Parameter, EditorRequired]
+    public string SubjectLabel { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<PeriodSubject> Subjects { get; set; } = [];
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<string> Reasons { get; set; } = [];
+
+    [Parameter, EditorRequired]
+    public string SubmitText { get; set; } = string.Empty;
+
+    /// <summary>Sends the entry to the TMS and answers what it said.</summary>
+    [Parameter, EditorRequired]
+    public Func<PeriodEntry, CancellationToken, Task<CapacityAnswer>> Submit { get; set; } = null!;
+
+    protected override void OnInitialized() => _reason = Reasons.FirstOrDefault() ?? string.Empty;
+
+    private async Task SubmitAsync()
+    {
+        if (_working)
+        {
+            return;
+        }
+
+        _failure = null;
+        _done = null;
+        if (_subjectId.Length == 0)
+        {
+            _failure = $"Choose a {SubjectLabel.ToLowerInvariant()}.";
+            return;
+        }
+
+        if (_from is not { } first || _to is not { } last)
+        {
+            _failure = "Enter the first and the last day.";
+            return;
+        }
+
+        var from = DateOnly.FromDateTime(first);
+        var to = DateOnly.FromDateTime(last);
+
+        _working = true;
+        try
+        {
+            switch (await Submit(new PeriodEntry(_subjectId, from, to, _reason, _remark.Trim()), _closed.Token))
+            {
+                case CapacityAnswer.Done:
+                    _done = $"{Title}: recorded for {from.ToString("ddd d MMM", CultureInfo.InvariantCulture)} to {to.ToString("ddd d MMM", CultureInfo.InvariantCulture)}.";
+                    _remark = string.Empty;
+                    break;
+                case CapacityAnswer.Refused refused:
+                    _failure = $"Not recorded: {refused.Reason}";
+                    break;
+            }
+        }
+        catch (OperationCanceledException) when (_closed.IsCancellationRequested)
+        {
+            // The page closed while the TMS was answering.
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning(exception, "{Title} failed", Title);
+            _failure = "The TMS couldn't record that. Try again.";
+        }
+        finally
+        {
+            _working = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        _closed.Cancel();
+        _closed.Dispose();
+    }
+}

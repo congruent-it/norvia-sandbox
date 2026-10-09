@@ -6,7 +6,9 @@ namespace Norvia.Tms.Application.Fleet.Planning.OpenDays;
 
 public sealed class OpenPlanningDaysHandler(
     IRepository<PlanningDay> days,
-    IRosterDirectory rosters,
+    EffectiveRosters rosters,
+    IReadRepository<Absence> absences,
+    IReadRepository<OffTheRoadDay> offTheRoadDays,
     IDriverDirectory drivers,
     IVehicleDirectory vehicles,
     PlanningHorizonRules horizon,
@@ -29,13 +31,18 @@ public sealed class OpenPlanningDaysHandler(
 
         var existing = (await days.ListAsync(new PlanningDaysFromSpec(today), cancellationToken)).Select(day => day.Date).ToHashSet();
         var activeDrivers = drivers.ListActive().Select(driver => driver.Id).ToHashSet();
-        var activeRosters = rosters.List().Where(roster => activeDrivers.Contains(roster.DriverId)).ToList();
+        var activeRosters = (await rosters.ListAsync(cancellationToken)).Where(roster => activeDrivers.Contains(roster.DriverId)).ToList();
         var availableVehicles = vehicles.ListActive().Select(vehicle => vehicle.Id).ToList();
+
+        var absentOn = (await absences.ListAsync(new AbsencesFromSpec(today), cancellationToken))
+            .GroupBy(absence => absence.Date).ToDictionary(group => group.Key, group => group.Select(absence => absence.DriverId).ToHashSet());
+        var offTheRoadOn = (await offTheRoadDays.ListAsync(new OffTheRoadDaysFromSpec(today), cancellationToken))
+            .GroupBy(day => day.Date).ToDictionary(group => group.Key, group => group.Select(day => day.VehicleId).ToHashSet());
 
         var missing = horizon.DaysFrom(today).Where(date => !existing.Contains(date)).ToList();
         foreach (var date in missing)
         {
-            await days.AddAsync(PlanningDay.Open(date, activeRosters, availableVehicles), cancellationToken);
+            await days.AddAsync(PlanningDay.Open(date, activeRosters, availableVehicles, absentOn.GetValueOrDefault(date), offTheRoadOn.GetValueOrDefault(date)), cancellationToken);
         }
 
         await days.SaveChangesAsync(cancellationToken);

@@ -58,4 +58,21 @@ internal static class CapacityCalls
         return await tms.TmsUi.PutAsJsonAsync(
             new Uri($"/v1/capacity/days/{day:yyyy-MM-dd}/shifts/{driverId}", UriKind.Relative), new { start, end }, cancellationToken);
     }
+
+    /// <summary>The Planner records an Absence, or an Off the road period, for the days from the first to the last.</summary>
+    public static async Task<HttpResponseMessage> RecordPeriodAsync(
+        this TmsFixture tms, string path, string id, DateOnly from, DateOnly to, string reason, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(tms);
+        return await tms.TmsUi.PostAsJsonAsync(new Uri(path, UriKind.Relative), new { id, from = $"{from:yyyy-MM-dd}", to = $"{to:yyyy-MM-dd}", reason, remark = "Planned" }, cancellationToken);
+    }
+
+    /// <summary>The Planner changes a Driver's Roster to the same Shift on each of the weekdays given.</summary>
+    public static async Task<HttpResponseMessage> ChangeRosterAsync(
+        this TmsFixture tms, string driverId, IEnumerable<DayOfWeek> weekdays, string start, string end, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(tms);
+        var body = new { weekdays = weekdays.ToDictionary(weekday => weekday.ToString(), _ => new { start, end }) };
+        return await tms.TmsUi.PutAsJsonAsync(new Uri($"/v1/capacity/rosters/{driverId}", UriKind.Relative), body, cancellationToken);
+    }
 }
