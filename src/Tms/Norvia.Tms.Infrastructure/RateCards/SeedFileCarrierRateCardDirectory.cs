@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.Extensions.Options;
 using Norvia.Tms.Application.RateCards;
 using Norvia.Tms.Domain.Carriers;
@@ -14,14 +13,11 @@ namespace Norvia.Tms.Infrastructure.RateCards;
 /// </summary>
 internal sealed class SeedFileCarrierRateCardDirectory : ICarrierRateCardDirectory
 {
-    private static readonly JsonSerializerOptions SeedJson = new(JsonSerializerDefaults.Web);
     private readonly Dictionary<CarrierId, CarrierRateCard> _carrierRateCards;
 
     public SeedFileCarrierRateCardDirectory(IOptions<SeedOptions> options)
     {
-        using var file = File.OpenRead(options.Value.Path);
-        var seed = JsonSerializer.Deserialize<SeedFile>(file, SeedJson)
-            ?? throw new InvalidDataException($"The seed file '{options.Value.Path}' is empty.");
+        var seed = SeedFileReader.Read<SeedFile>(options);
 
         _carrierRateCards = (seed.CarrierRateCards ?? [])
             .Select(carrierRateCard => ToCarrierRateCard(carrierRateCard, options.Value.Path))
@@ -33,7 +29,7 @@ internal sealed class SeedFileCarrierRateCardDirectory : ICarrierRateCardDirecto
     private static CarrierRateCard ToCarrierRateCard(SeedCarrierRateCard carrierRateCard, string path) => new(
         new RateCardId(carrierRateCard.Id),
         new CarrierId(carrierRateCard.CarrierId),
-        [.. carrierRateCard.Versions.Select(version => SeedRateCardVersions.ToVersion(version, "Carrier Rate Card", carrierRateCard.Id, path))]);
+        [.. carrierRateCard.Versions.Select(version => SeedRateCardVersionMapper.ToVersion(version, RateCardKind.CarrierRateCard, carrierRateCard.Id, path))]);
 
     private sealed record SeedFile(IReadOnlyList<SeedCarrierRateCard>? CarrierRateCards);
 

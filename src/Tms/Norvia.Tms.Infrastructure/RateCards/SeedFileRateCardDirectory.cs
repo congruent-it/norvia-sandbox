@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.Extensions.Options;
 using Norvia.Tms.Application.RateCards;
 using Norvia.Tms.Domain.RateCards;
@@ -15,14 +14,11 @@ namespace Norvia.Tms.Infrastructure.RateCards;
 /// </summary>
 internal sealed class SeedFileRateCardDirectory : IRateCardDirectory
 {
-    private static readonly JsonSerializerOptions SeedJson = new(JsonSerializerDefaults.Web);
     private readonly Dictionary<ShipperId, RateCard> _rateCards;
 
     public SeedFileRateCardDirectory(IOptions<SeedOptions> options)
     {
-        using var file = File.OpenRead(options.Value.Path);
-        var seed = JsonSerializer.Deserialize<SeedFile>(file, SeedJson)
-            ?? throw new InvalidDataException($"The seed file '{options.Value.Path}' is empty.");
+        var seed = SeedFileReader.Read<SeedFile>(options);
 
         _rateCards = (seed.RateCards ?? [])
             .Select(rateCard => ToRateCard(rateCard, options.Value.Path))
@@ -34,7 +30,7 @@ internal sealed class SeedFileRateCardDirectory : IRateCardDirectory
     private static RateCard ToRateCard(SeedRateCard rateCard, string path) => new(
         new RateCardId(rateCard.Id),
         new ShipperId(rateCard.ShipperId),
-        [.. rateCard.Versions.Select(version => SeedRateCardVersions.ToVersion(version, "Rate Card", rateCard.Id, path))]);
+        [.. rateCard.Versions.Select(version => SeedRateCardVersionMapper.ToVersion(version, RateCardKind.RateCard, rateCard.Id, path))]);
 
     private sealed record SeedFile(IReadOnlyList<SeedRateCard>? RateCards);
 

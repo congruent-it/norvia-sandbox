@@ -15,5 +15,5 @@ public sealed record RateCard(RateCardId Id, ShipperId ShipperId, IReadOnlyList<
     /// can't price it.
     /// </summary>
     public RatingOutcome Rate(TransportOrderDetails details) =>
-        VersionedRates.Rate(VersionedRates.RateCardName, Id, Versions, details);
+        RateCardRating.Rate(RateCardKind.RateCard, Id, Versions, details);
 }

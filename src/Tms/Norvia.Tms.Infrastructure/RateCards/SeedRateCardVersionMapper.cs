@@ -17,14 +17,14 @@ internal sealed record SeedLane(string Origin, string Destination, IReadOnlyList
 
 internal sealed record SeedWeightBreak(decimal UpToKg, decimal PricePer100Kg);
 
-internal static class SeedRateCardVersions
+internal static class SeedRateCardVersionMapper
 {
     /// <summary>
     /// Maps a seed version to the domain's. A version whose Zones overlap, or a Lane without a minimum charge, is a
     /// broken seed.
     /// </summary>
-    /// <param name="cardName">What the card is called in the error: Rate Card or Carrier Rate Card.</param>
-    public static RateCardVersion ToVersion(SeedRateCardVersion version, string cardName, string cardId, string path)
+    /// <param name="kind">Which kind of card the version belongs to, which the error names.</param>
+    public static RateCardVersion ToVersion(SeedRateCardVersion version, RateCardKind kind, string cardId, string path)
     {
         try
         {
@@ -43,7 +43,7 @@ internal static class SeedRateCardVersions
         catch (Exception exception) when (exception is ArgumentException or InvalidDataException)
         {
             throw new InvalidDataException(
-                $"{cardName} {cardId} version {version.Version} in the seed file '{path}' is invalid. {exception.Message}", exception);
+                $"{kind.DisplayName()} {cardId} version {version.Version} in the seed file '{path}' is invalid. {exception.Message}", exception);
         }
     }
 }
