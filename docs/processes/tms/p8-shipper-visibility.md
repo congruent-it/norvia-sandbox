@@ -155,6 +155,68 @@ After a deployment, and not in CI, the presenter checks Shipper visibility end t
 
 The script prints `PASS` or `FAIL` per check, never a body, a token or a key. If a check fails, file the gap as its own issue against P8, rather than working around it in the run book.
 
+## Implementation
+
+For engineers and coding agents. It shows what the estate does when a Shipper queries its Transport Orders, where each step lives in the repository, what plays each Azure piece on a developer's machine, and what is designed but not built. It follows the template set by [P1's Implementation section](p1-transport-order-intake.md#implementation). Azure is the estate [c4.md](../../architecture/c4.md) draws.
+
+P8 is read only: there is no Logic App, queue or event, so the trail is short and every call returns before the one that started it does.
+
+### Message trail
+
+The Hops a Shipper's query leaves on its Message trail, named as the [Integration console](../../operations/integration-console.md#message-trail) shows them, in time order. All of them belong to the one Flow `shipper-tracking`, on the correlation ID that API Management creates. The diagram shows "Get Transport Order". List, Find and Download Proof of delivery file have the same shape, with their own operation and TMS route.
+
+```mermaid
+sequenceDiagram
+    box transparent Flow shipper-tracking
+        participant portal as partner-portal-web: Get Transport Order
+        participant apim as apim-norvia: Get Transport Order
+        participant tms as tms-api: GET /v1/shipper-tracking/transport-orders/{transportOrderNumber}
+    end
+    portal->>apim: GET /partner/v1/transport-orders/{number} (Persona token and subscription key)
+    apim->>apim: token, role Tracking.Read, Shipper ID from azp, rate limit, correlation ID
+    apim->>tms: managed identity, X-Shipper-ID, X-Correlation-ID
+    tms-->>apim: the Shipper's view (Canonical Model), or 404, or 5xx
+    apim->>apim: Liquid map, Canonical to Shipper tracking format
+    apim-->>portal: the Shipper tracking format, or 403, 429 or 503
+```
+
+- A refused call stops at `apim-norvia` with `Refused` and a `failureCode`: `NotAllowedToReadTracking` (a Carrier Persona's token), `NoShipperForClient` or a rate-limited call. A TMS that doesn't answer in 5 seconds, or answers with a server error, ends the trail at `apim-norvia` with `TmsUnavailable`. The TMS hop is missing when it never got the call.
+- The TMS's 4xx answers (`TransportOrderNotFound`, `ProofOfDeliveryNotFound`) pass through as `TmsRefused`.
+- A Tracking status or event type the Shipper format has no code for gives `TrackingNotMapped`, a 503. The Shipper never gets a wrong answer.
+- Nothing is published, so no publish Hop appears. The failure rows are in [failure behaviour](../../architecture/failure-behaviour.md#p8-shipper-visibility).
+
+### Code map
+
+Links go to files, not lines, so they stay true as the code moves.
+
+| Step | Where |
+|---|---|
+| 1. Ask | The screens [TrackedOrders.razor](../../../src/PartnerPortal/Norvia.PartnerPortal.Web/ShipperTracking/TrackedOrders.razor) (list and search) and [TrackedOrder.razor](../../../src/PartnerPortal/Norvia.PartnerPortal.Web/ShipperTracking/TrackedOrder.razor) (detail), polling through [PollingPage.cs](../../../src/PartnerPortal/Norvia.PartnerPortal.Web/ShipperTracking/PollingPage.cs) and keeping the last answer in [LastAnswer.cs](../../../src/PartnerPortal/Norvia.PartnerPortal.Web/ShipperTracking/LastAnswer.cs). Handlers: [ListShipperTrackingHandler.cs](../../../src/PartnerPortal/Norvia.PartnerPortal.Application/ShipperTracking/List/ListShipperTrackingHandler.cs), [GetShipperTrackingHandler.cs](../../../src/PartnerPortal/Norvia.PartnerPortal.Application/ShipperTracking/GetTransportOrder/GetShipperTrackingHandler.cs) and [FindShipperTrackingHandler.cs](../../../src/PartnerPortal/Norvia.PartnerPortal.Application/ShipperTracking/FindTransportOrder/FindShipperTrackingHandler.cs). The calls (the portal's Hops): [NorviaPartnerApiClient.cs](../../../src/PartnerPortal/Norvia.PartnerPortal.Infrastructure/PartnerApi/NorviaPartnerApiClient.cs), with [ShipperTrackingFormat.cs](../../../src/PartnerPortal/Norvia.PartnerPortal.Infrastructure/PartnerApi/ShipperTrackingFormat.cs) reading the answer and [ShipperTrackingFailures.cs](../../../src/PartnerPortal/Norvia.PartnerPortal.Infrastructure/PartnerApi/ShipperTrackingFailures.cs) classifying errors. Poll interval: `shipper.trackingPollSeconds` in [SeedFilePersonaDirectory.cs](../../../src/PartnerPortal/Norvia.PartnerPortal.Infrastructure/Personas/SeedFilePersonaDirectory.cs), from [norvia.seed.json](../../../seed/norvia.seed.json) |
+| 1. Download a file | [ProofOfDeliveryFileEndpoint.cs](../../../src/PartnerPortal/Norvia.PartnerPortal.Web/ShipperTracking/ProofOfDeliveryFileEndpoint.cs), with [DownloadProofOfDeliveryFileHandler.cs](../../../src/PartnerPortal/Norvia.PartnerPortal.Application/ShipperTracking/DownloadFile/DownloadProofOfDeliveryFileHandler.cs). It fetches the file from API Management as the Persona |
+| 2. Check at the edge | API Management: [list-shipper-transport-orders.policy.xml](../../../infra/estate/partner-api/list-shipper-transport-orders.policy.xml), [get-shipper-transport-order.policy.xml](../../../infra/estate/partner-api/get-shipper-transport-order.policy.xml), [find-shipper-transport-order.policy.xml](../../../infra/estate/partner-api/find-shipper-transport-order.policy.xml) and [get-shipper-proof-of-delivery-file.policy.xml](../../../infra/estate/partner-api/get-shipper-proof-of-delivery-file.policy.xml). The operations are declared in [partner-api.bicep](../../../infra/estate/partner-api.bicep). The rate limit is the `rate-limit-by-key` in each policy |
+| 3. Query | The TMS endpoints in [ShipperTrackingEndpoints.cs](../../../src/Tms/Norvia.Tms.Api/ShipperTracking/ShipperTrackingEndpoints.cs), which require the `ShipperTracking.Read` role and the Shipper ID header. The role is assigned in [identities.bicep](../../../infra/estate/identities.bicep) |
+| 4. Project | Queries and handlers under [ShipperTracking/](../../../src/Tms/Norvia.Tms.Application/ShipperTracking/): [ListShipperTransportOrdersHandler.cs](../../../src/Tms/Norvia.Tms.Application/ShipperTracking/ListTransportOrders/ListShipperTransportOrdersHandler.cs), [GetShipperTransportOrderHandler.cs](../../../src/Tms/Norvia.Tms.Application/ShipperTracking/GetTransportOrder/GetShipperTransportOrderHandler.cs), [FindShipperTransportOrderHandler.cs](../../../src/Tms/Norvia.Tms.Application/ShipperTracking/GetTransportOrder/FindShipperTransportOrderHandler.cs) and [ShipperTransportOrderDetailProjection.cs](../../../src/Tms/Norvia.Tms.Application/ShipperTracking/GetTransportOrder/ShipperTransportOrderDetailProjection.cs), which decides what the Shipper may see. Specifications: [ShipperTransportOrdersSpec.cs](../../../src/Tms/Norvia.Tms.Domain/ShipperTracking/ShipperTransportOrdersSpec.cs), [ShipperTransportOrderByNumberSpec.cs](../../../src/Tms/Norvia.Tms.Domain/ShipperTracking/ShipperTransportOrderByNumberSpec.cs) and [ShipperTransportOrderByReferenceSpec.cs](../../../src/Tms/Norvia.Tms.Domain/ShipperTracking/ShipperTransportOrderByReferenceSpec.cs). Tracking status: [TrackingStatuses.cs](../../../src/Tms/Norvia.Tms.Domain/ShipperTracking/TrackingStatuses.cs). Refusals: [ShipperTrackingRefusalCode.cs](../../../src/Tms/Norvia.Tms.Domain/ShipperTracking/ShipperTrackingRefusalCode.cs). Proof of delivery file: [GetShipperProofOfDeliveryFileHandler.cs](../../../src/Tms/Norvia.Tms.Application/ShipperTracking/ReadProofOfDeliveryFile/GetShipperProofOfDeliveryFileHandler.cs). There is no aggregate method and no event: P8 changes nothing |
+| 5. Map | The Liquid templates [shipper-tracking.liquid](../../../infra/estate/partner-api/shipper-tracking.liquid) and [shipper-tracking-list.liquid](../../../infra/estate/partner-api/shipper-tracking-list.liquid), loaded into the policies by [partner-api.bicep](../../../infra/estate/partner-api.bicep) ([ADR 0035](../../adr/0035-the-shipper-tracking-map-is-liquid-with-the-clock-rules-written-out.md)). Contracts, schemas and samples: [shipper-tracking.v1.schema.json](../../../contracts/partner-api/shipper-tracking.v1.schema.json), [shipper-tracking-list-item.v1.schema.json](../../../contracts/partner-api/shipper-tracking-list-item.v1.schema.json) and [contracts/partner-api](../../../contracts/partner-api/README.md). The Canonical Model side: [shipper-transport-order-detail.v1.schema.json](../../../contracts/canonical-model/shipper-transport-order-detail.v1.schema.json) and [shipper-transport-order-list-item.v1.schema.json](../../../contracts/canonical-model/shipper-transport-order-list-item.v1.schema.json) |
+| The applications | The TMS API and Partner portal are declared in the [AppHost](../../../src/Norvia.AppHost/AppHost.cs). P8 adds no Logic App, Function, queue, topic or subscription |
+| After a deploy | [smoke-test-shipper-visibility.sh](../../../infra/smoke-test-shipper-visibility.sh) |
+
+### Locally
+
+Under Aspire there is no API Management. `Norvia.Integration.LocalPartnerApi` plays it for a query: [ShipperTrackingQueries.cs](../../../src/Integration/Norvia.Integration.LocalPartnerApi/ShipperTrackingQueries.cs) answers the same `/partner/v1/transport-orders` routes, makes the edge's checks, applies [TrackingRateLimit.cs](../../../src/Integration/Norvia.Integration.LocalPartnerApi/TrackingRateLimit.cs), calls the TMS as API Management's identity through [TmsShipperTracking.cs](../../../src/Integration/Norvia.Integration.LocalPartnerApi/TmsShipperTracking.cs) and maps the answer with [ShipperTrackingMap.cs](../../../src/Integration/Norvia.Integration.LocalPartnerApi/ShipperTrackingMap.cs), which runs the same Liquid templates through DotLiquid. The Partner portal and the TMS API are the same applications in both, and the Aspire dashboard plays Application Insights. No worker plays a part, because there is no Logic App. The full map, and the places where the two can differ, are in [local-vs-azure.md](../../architecture/local-vs-azure.md).
+
+Two differences matter for P8. The Liquid maps run in API Management in Azure and in DotLiquid locally, so a template can behave differently on a value neither tested. The policy's checks and the stand-in's are two implementations kept close by tests.
+
+### Gaps
+
+Designed in this document and not built yet:
+
+| Gap | Where it stands |
+|---|---|
+| Consignee tracking, pushing progress to the Shipper, a tracking read model or caching, the Freight Charge, Fulfilment Transport Orders | Left out on purpose ([Deferred](#deferred)) |
+| As-found toggles and presenter-panel faults for P8 | None added. No Bicep parameter switches API Management response caching or the rate limit, and nothing in the Partner portal makes the TMS Shipper tracking API fail for a few minutes ([Deferred](#deferred)). [Failure behaviour](../../architecture/failure-behaviour.md#p8-shipper-visibility) lists the toggles as planned |
+| Alerts on P8 | None built: failed requests on the Shipper tracking operations are planned only ([monitoring.bicep](../../../infra/estate/monitoring.bicep) declares no alert rule) |
+| The Integration console's panels for P8 | None. API Management's failures can be found by search only, with no panel |
+
 ## Deferred
 
 These were left out on purpose while designing P8, each with its reason.
