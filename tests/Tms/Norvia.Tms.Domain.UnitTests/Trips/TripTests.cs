@@ -41,8 +41,8 @@ public sealed class TripTests
         // Dispatch isn't built yet (a later P11 slice), so put the Trip in the status it will have.
         typeof(Trip).GetProperty(nameof(Trip.Status))!.SetValue(dispatched, TripStatus.Dispatched);
 
-        draft.CanBeDiscarded().Should().BeNull();
-        dispatched.CanBeDiscarded()!.Code.Should().Be(TripRefusalCode.TripNotDraft);
+        draft.EnsureDraft().Should().BeNull();
+        dispatched.EnsureDraft()!.Code.Should().Be(TripRefusalCode.TripNotDraft);
         dispatched.Pick(null, null)!.Code.Should().Be(TripRefusalCode.TripNotDraft);
     }
 

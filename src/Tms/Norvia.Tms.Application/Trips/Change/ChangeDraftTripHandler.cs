@@ -17,7 +17,7 @@ public sealed class ChangeDraftTripHandler(IRepository<Trip> trips, TripPlanning
             return TripRefused.Because(TripRefusal.TripNotFound(command.Number));
         }
 
-        if (trip.CanBeDiscarded() is { } notDraft)
+        if (trip.EnsureDraft() is { } notDraft)
         {
             return TripRefused.Because(notDraft);
         }
@@ -25,7 +25,7 @@ public sealed class ChangeDraftTripHandler(IRepository<Trip> trips, TripPlanning
         var failures = await checks.CheckAsync(trip.Day, command.VehicleId, command.DriverId, trip, cancellationToken);
         if (failures.Count > 0)
         {
-            return Result.Invalid([.. TripRefused.Because<bool>(failures).ValidationErrors]);
+            return TripRefused.Because(failures);
         }
 
         trip.Pick(command.VehicleId, command.DriverId);

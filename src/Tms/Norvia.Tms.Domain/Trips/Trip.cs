@@ -39,7 +39,7 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
     /// <summary>Gives the Draft this Vehicle and Driver, or none, which gives the previous ones back. Returns null when it is done.</summary>
     public TripRefusal? Pick(VehicleId? vehicleId, DriverId? driverId)
     {
-        if (CanBeDiscarded() is { } refusal)
+        if (EnsureDraft() is { } refusal)
         {
             return refusal;
         }
@@ -49,6 +49,6 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
         return null;
     }
 
-    /// <summary>Null when the Trip is a Draft, which can be discarded; a Dispatched Trip is never deleted.</summary>
-    public TripRefusal? CanBeDiscarded() => Status == TripStatus.Draft ? null : TripRefusal.TripNotDraft(Number);
+    /// <summary>Null when the Trip is a Draft, which can be changed or discarded; a Dispatched Trip is neither, and is never deleted.</summary>
+    public TripRefusal? EnsureDraft() => Status == TripStatus.Draft ? null : TripRefusal.TripNotDraft(Number);
 }

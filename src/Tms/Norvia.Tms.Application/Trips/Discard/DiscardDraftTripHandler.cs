@@ -17,7 +17,7 @@ public sealed class DiscardDraftTripHandler(IRepository<Trip> trips) : ICommandH
             return TripRefused.Because(TripRefusal.TripNotFound(command.Number));
         }
 
-        if (trip.CanBeDiscarded() is { } notDraft)
+        if (trip.EnsureDraft() is { } notDraft)
         {
             return TripRefused.Because(notDraft);
         }

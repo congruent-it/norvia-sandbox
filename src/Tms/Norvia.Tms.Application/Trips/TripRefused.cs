@@ -22,9 +22,15 @@ public static class TripRefused
         return Result.Invalid(new ValidationError("Trip", refusal.Message, refusal.Code.ToString(), ValidationSeverity.Error));
     }
 
-    public static Result<TResult> Because<TResult>(IReadOnlyList<TripAvailabilityFailure> failures)
+    public static Result<TResult> Because<TResult>(IReadOnlyList<TripAvailabilityFailure> failures) =>
+        Result<TResult>.Invalid(ErrorsOf(failures));
+
+    public static Result Because(IReadOnlyList<TripAvailabilityFailure> failures) =>
+        Result.Invalid(ErrorsOf(failures));
+
+    private static List<ValidationError> ErrorsOf(IReadOnlyList<TripAvailabilityFailure> failures)
     {
         ArgumentNullException.ThrowIfNull(failures);
-        return Result<TResult>.Invalid([.. failures.Select(failure => new ValidationError("Trip", failure.Message, failure.Code.ToString(), ValidationSeverity.Error))]);
+        return [.. failures.Select(failure => new ValidationError("Trip", failure.Message, failure.Code.ToString(), ValidationSeverity.Error))];
     }
 }
