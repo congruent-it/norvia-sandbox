@@ -8,5 +8,8 @@ public sealed record TripPlanningCheck(IReadOnlyList<TripAvailabilityFailure> Fa
 {
     public static readonly TripPlanningCheck Passed = new([], [], []);
 
+    /// <summary>The same check with these refusals first, such as a Shipment number that is no Shipment.</summary>
+    public TripPlanningCheck WithRefusalsFirst(IReadOnlyList<TripRefusal> first) => this with { Refusals = [.. first, .. Refusals] };
+
     public bool IsOk => Failures.Count == 0 && Refusals.Count == 0;
 }

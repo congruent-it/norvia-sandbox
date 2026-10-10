@@ -243,6 +243,21 @@ public sealed class AddShipmentsToTripTests
         _fixture.Stored.Single().ShipmentIds.Should().Equal(first.Id, second.Id);
     }
 
+    [Fact]
+    public async Task CreatingATripAgainUnderTheSameKey_IsAnsweredWithTheSameWarnings()
+    {
+        var create = new CreateDraftTripHandler(_fixture.Trips, _fixture.Numbers, _fixture.Checks, _fixture.TripShipments);
+        var late = _fixture.ReleasedShipment(Tuesday, deliveryDay: Tuesday.AddDays(1));
+        var command = new CreateDraftTripCommand(Tuesday, Truck, null, new("k-retry"), ShipmentNumbers: [late.Number.Value]);
+
+        var first = await create.Handle(command, CancellationToken.None);
+        var again = await create.Handle(command, CancellationToken.None);
+
+        _fixture.Stored.Should().ContainSingle();
+        again.Value.Number.Should().Be(first.Value.Number);
+        again.Value.Warnings.Should().Equal(first.Value.Warnings!).And.HaveCount(1);
+    }
+
     private AddShipmentsToTripHandler _handlerFor() => new(_fixture.Trips, _fixture.Checks, _fixture.TripShipments);
 
     private async Task<Result<AddShipmentsToTripResult>> Add(Trip trip, params Shipment[] shipments) =>

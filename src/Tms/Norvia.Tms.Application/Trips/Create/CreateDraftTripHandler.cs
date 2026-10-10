@@ -14,7 +14,11 @@ public sealed class CreateDraftTripHandler(IRepository<Trip> trips, ITripNumbers
 
         if (await trips.FirstOrDefaultAsync(new TripByIdempotencyKeySpec(command.IdempotencyKey), cancellationToken) is { } created)
         {
-            return new CreateDraftTripResult(created.Number.Value);
+            // A retry is answered as the first call was, warnings included.
+            var onTrip = await shipments.OfAsync([.. created.ShipmentIds], cancellationToken);
+            return new CreateDraftTripResult(
+                created.Number.Value,
+                [.. onTrip.Where(item => item.DeliversOutside(created.Day)).Select(item => TripWarning.DeliveryWindowOutside(item.Shipment.Number.Value, created.Day))]);
         }
 
         var (added, notFound) = await shipments.FindAsync(command.ShipmentNumbers ?? [], cancellationToken);
@@ -22,7 +26,7 @@ public sealed class CreateDraftTripHandler(IRepository<Trip> trips, ITripNumbers
             command.Day, command.VehicleId, command.DriverId, command.PlannedStart, command.PlannedDrivingDuration, current: null, added, added, cancellationToken);
         if (notFound.Count > 0 || !check.IsOk)
         {
-            return TripRefused.Because<CreateDraftTripResult>(check with { Refusals = [.. notFound, .. check.Refusals] });
+            return TripRefused.Because<CreateDraftTripResult>(check.WithRefusalsFirst(notFound));
         }
 
         var trip = Trip.CreateDraft(await numbers.NextAsync(cancellationToken), command.Day, command.VehicleId, command.DriverId, command.IdempotencyKey);

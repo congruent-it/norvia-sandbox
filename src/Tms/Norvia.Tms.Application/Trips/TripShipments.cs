@@ -18,7 +18,7 @@ public sealed class TripShipments(IReadRepository<Shipment> shipments, IReadRepo
         }
 
         var found = await shipments.ListAsync(new ShipmentsByIdsSpec(ids), cancellationToken);
-        return await WithDetailsAsync([.. found.OrderBy(shipment => ids.ToList().IndexOf(shipment.Id))], cancellationToken);
+        return await WithDetailsAsync([.. found.OrderBy(shipment => IndexIn(ids, shipment.Id))], cancellationToken);
     }
 
     /// <summary>The Shipments with these numbers, in the order of the numbers; one that doesn't exist is left out.</summary>
@@ -31,7 +31,7 @@ public sealed class TripShipments(IReadRepository<Shipment> shipments, IReadRepo
         }
 
         var found = await shipments.ListAsync(new ShipmentsByNumbersSpec(numbers), cancellationToken);
-        return await WithDetailsAsync([.. found.OrderBy(shipment => numbers.ToList().IndexOf(shipment.Number))], cancellationToken);
+        return await WithDetailsAsync([.. found.OrderBy(shipment => IndexIn(numbers, shipment.Number))], cancellationToken);
     }
 
     /// <summary>The Shipments with these numbers as the Planner typed or picked them, each once, and a refusal for each that is no Shipment.</summary>
@@ -43,6 +43,19 @@ public sealed class TripShipments(IReadRepository<Shipment> shipments, IReadRepo
         var found = await ByNumbersAsync(parsed, cancellationToken);
         var known = found.Select(item => item.Shipment.Number.Value).ToHashSet(StringComparer.Ordinal);
         return (found, [.. distinct.Where(number => !known.Contains(number)).Select(TripRefusal.ShipmentNotFound)]);
+    }
+
+    private static int IndexIn<T>(IReadOnlyList<T> items, T item)
+    {
+        for (var i = 0; i < items.Count; i++)
+        {
+            if (EqualityComparer<T>.Default.Equals(items[i], item))
+            {
+                return i;
+            }
+        }
+
+        return -1;
     }
 
     private async Task<IReadOnlyList<ShipmentOnTrip>> WithDetailsAsync(IReadOnlyList<Shipment> found, CancellationToken cancellationToken)

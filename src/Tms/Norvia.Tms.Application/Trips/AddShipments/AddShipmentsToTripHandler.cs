@@ -29,7 +29,7 @@ public sealed class AddShipmentsToTripHandler(IRepository<Trip> trips, TripPlann
             trip.Day, trip.VehicleId, trip.DriverId, trip.PlannedStart, trip.PlannedDrivingDuration, trip, all, added, cancellationToken);
         if (notFound.Count > 0 || !check.IsOk)
         {
-            return TripRefused.Because<AddShipmentsToTripResult>(check with { Refusals = [.. notFound, .. check.Refusals] });
+            return TripRefused.Because<AddShipmentsToTripResult>(check.WithRefusalsFirst(notFound));
         }
 
         if (added.Count > 0)

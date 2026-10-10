@@ -23,6 +23,9 @@ public sealed record TripRefusal(TripRefusalCode Code, string Message)
     public static TripRefusal ShipmentOnAnotherTrip(string number, TripNumber trip) =>
         new(TripRefusalCode.ShipmentOnAnotherTrip, $"Shipment {number} is on Trip {trip} already.");
 
-    public static TripRefusal CollectionDayMismatch(string number, DateOnly? collectionDay, DateOnly tripDay) =>
-        new(TripRefusalCode.CollectionDayMismatch, Invariant($"Shipment {number} collects on {(collectionDay is { } day ? day.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) : "no known day")}, not on the Trip's day {tripDay:yyyy-MM-dd}."));
+    public static TripRefusal CollectionDayMismatch(string number, DateOnly? collectionDay, DateOnly tripDay)
+    {
+        var collects = collectionDay is { } day ? Invariant($"{day:yyyy-MM-dd}") : "no known day";
+        return new(TripRefusalCode.CollectionDayMismatch, Invariant($"Shipment {number} collects on {collects}, not on the Trip's day {tripDay:yyyy-MM-dd}."));
+    }
 }

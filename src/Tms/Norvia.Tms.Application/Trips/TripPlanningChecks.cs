@@ -49,7 +49,7 @@ public sealed class TripPlanningChecks(IReadRepository<Trip> trips, IReadReposit
         return new TripPlanningCheck(failures, refusals, warnings);
     }
 
-    private async Task<IEnumerable<TripRefusal>> CheckAddedAsync(DateOnly day, IReadOnlyList<ShipmentOnTrip> added, Trip? current, CancellationToken cancellationToken)
+    private async Task<List<TripRefusal>> CheckAddedAsync(DateOnly day, IReadOnlyList<ShipmentOnTrip> added, Trip? current, CancellationToken cancellationToken)
     {
         if (added.Count == 0)
         {
