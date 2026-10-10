@@ -158,4 +158,65 @@ public sealed class TripTests
         TripRefusal.CollectionDayMismatch("SH-0000009", new DateOnly(2026, 10, 15), Day).Message.Should().Contain("2026-10-15").And.Contain("2026-10-14");
         TripRefusal.CollectionDayMismatch("SH-0000009", null, Day).Message.Should().Contain("no known day");
     }
+
+    [Fact]
+    public void ReorderStops_PutsTheStopsInTheNewOrder_WithPositionsFromZero()
+    {
+        var (trip, first, second) = TripWithTwoShipments();
+
+        var fault = trip.ReorderStops(
+            [(second, StopKind.Collection), (first, StopKind.Collection), (first, StopKind.Delivery), (second, StopKind.Delivery)]);
+
+        fault.Should().BeNull();
+        trip.Stops.Select(stop => (stop.ShipmentId, stop.Kind, stop.Position)).Should().Equal(
+            (second, StopKind.Collection, 0), (first, StopKind.Collection, 1), (first, StopKind.Delivery, 2), (second, StopKind.Delivery, 3));
+    }
+
+    [Fact]
+    public void ReorderStops_ADeliveryBeforeItsCollection_IsRefusedWithCollectionBeforeDelivery_AndTheOrderIsUnchanged()
+    {
+        var (trip, first, second) = TripWithTwoShipments();
+        var before = trip.Stops.ToList();
+
+        var fault = trip.ReorderStops(
+            [(first, StopKind.Delivery), (first, StopKind.Collection), (second, StopKind.Collection), (second, StopKind.Delivery)]);
+
+        fault.Should().Be(new StopOrderFault(TripRefusalCode.CollectionBeforeDelivery, first));
+        trip.Stops.Should().Equal(before);
+    }
+
+    [Fact]
+    public void ReorderStops_AnOrderThatIsNotTheTripsStops_IsRefusedWithStopsNotTheTripsStops()
+    {
+        var (trip, first, second) = TripWithTwoShipments();
+        var before = trip.Stops.ToList();
+
+        trip.ReorderStops([(first, StopKind.Collection), (first, StopKind.Delivery)])!.Code.Should().Be(TripRefusalCode.StopsNotTheTripsStops);
+        trip.ReorderStops(
+            [(first, StopKind.Collection), (first, StopKind.Collection), (first, StopKind.Delivery), (second, StopKind.Delivery)])!.Code
+            .Should().Be(TripRefusalCode.StopsNotTheTripsStops);
+        trip.ReorderStops(
+            [(first, StopKind.Collection), (first, StopKind.Delivery), (second, StopKind.Collection), (ShipmentId.New(), StopKind.Delivery)])!.Code
+            .Should().Be(TripRefusalCode.StopsNotTheTripsStops);
+        trip.Stops.Should().Equal(before);
+    }
+
+    [Fact]
+    public void ReorderStops_OnADispatchedTrip_IsABug()
+    {
+        var (trip, first, second) = TripWithTwoShipments();
+        typeof(Trip).GetProperty(nameof(Trip.Status))!.SetValue(trip, TripStatus.Dispatched);
+
+        trip.Invoking(t => t.ReorderStops([(first, StopKind.Collection), (first, StopKind.Delivery), (second, StopKind.Collection), (second, StopKind.Delivery)]))
+            .Should().Throw<InvalidOperationException>();
+    }
+
+    private static (Trip Trip, ShipmentId First, ShipmentId Second) TripWithTwoShipments()
+    {
+        var trip = Trip.CreateDraft(TripNumber.FromSequence(1), Day, null, null, new IdempotencyKey("k"));
+        var (first, second) = (ShipmentId.New(), ShipmentId.New());
+        trip.AddShipment(first);
+        trip.AddShipment(second);
+        return (trip, first, second);
+    }
 }

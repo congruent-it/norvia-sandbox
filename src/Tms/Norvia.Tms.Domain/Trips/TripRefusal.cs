@@ -28,4 +28,10 @@ public sealed record TripRefusal(TripRefusalCode Code, string Message)
         var collects = collectionDay is { } day ? Invariant($"{day:yyyy-MM-dd}") : "no known day";
         return new(TripRefusalCode.CollectionDayMismatch, Invariant($"Shipment {number} collects on {collects}, not on the Trip's day {tripDay:yyyy-MM-dd}."));
     }
+
+    public static TripRefusal CollectionBeforeDelivery(string number) =>
+        new(TripRefusalCode.CollectionBeforeDelivery, $"Shipment {number}'s delivery can't come before its collection.");
+
+    public static TripRefusal StopsNotTheTripsStops(TripNumber trip) =>
+        new(TripRefusalCode.StopsNotTheTripsStops, $"The order must name each Stop of Trip {trip} once, and no others.");
 }

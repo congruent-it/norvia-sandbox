@@ -10,6 +10,7 @@ using Norvia.Tms.Application.Trips.Create;
 using Norvia.Tms.Application.Trips.Discard;
 using Norvia.Tms.Application.Trips.GetByNumber;
 using Norvia.Tms.Application.Trips.List;
+using Norvia.Tms.Application.Trips.ReorderStops;
 using Norvia.Tms.Domain.Fleet;
 using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Domain.Trips;
@@ -59,6 +60,15 @@ public static class TripEndpoints
                 + "The problem's code names the first rule broken: ShipmentNotReleased, ShipmentOnAnotherTrip, CollectionDayMismatch, PayloadExceeded or PalletPlacesExceeded (409), "
                 + "ShipmentNotFound or TripNotFound (404), or TripNotDraft (409); failures lists every rule broken. A Shipment whose delivery window doesn't include the Trip's day is accepted, "
                 + "with a warning. A Shipment already on the Trip stays where it is, so sending the same call again changes nothing. Nothing is published.");
+
+        trips.MapPut("/{number}/stops", ReorderStopsAsync)
+            .WithName("ReorderTripStops")
+            .RequireAuthorization(policy => policy.RequireRole(TransportOrderEndpoints.ManageRole))
+            .WithSummary("Put the Stops of a Draft Trip in order.")
+            .WithDescription(
+                "stops names every Stop of the Trip once, as a Shipment number and Collection or Delivery, in the order the Driver visits them. Two Stops at the same address stay two Stops. "
+                + "A Shipment's delivery before its collection is refused with CollectionBeforeDelivery (409), and an order that leaves out a Stop, repeats one or names another is StopsNotTheTripsStops (409); "
+                + "a refusal leaves the order as it was. Also TripNotDraft (409) or TripNotFound (404). Sending the same order again changes nothing. Nothing is published.");
 
         trips.MapPut("/{number}", ChangeDraftAsync)
             .WithName("ChangeDraftTrip")
@@ -135,6 +145,21 @@ public static class TripEndpoints
         return result.IsSuccess ? TypedResults.Ok(result.Value) : Refused(result.ValidationErrors, "The Shipments can't be put on the Trip.");
     }
 
+    private static async Task<Results<NoContent, ProblemHttpResult, ValidationProblem>> ReorderStopsAsync(
+        string number,
+        ReorderStopsRequest request,
+        IMediator mediator,
+        CancellationToken cancellationToken)
+    {
+        if (request.Stops is not { Count: > 0 } stops || !AreStops(stops))
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { [nameof(ReorderStopsRequest.Stops)] = ["Give every Stop of the Trip as a Shipment number and Collection or Delivery."] });
+        }
+
+        var result = await mediator.Send(new ReorderTripStopsCommand(number, stops), cancellationToken);
+        return result.IsSuccess ? TypedResults.NoContent() : Refused(result.ValidationErrors, "The Stops can't be put in that order.");
+    }
+
     private static async Task<Results<NoContent, ProblemHttpResult, ValidationProblem>> ChangeDraftAsync(
         string number,
         ChangeTripRequest request,
@@ -158,6 +183,10 @@ public static class TripEndpoints
         var result = await mediator.Send(new DiscardDraftTripCommand(number), cancellationToken);
         return result.IsSuccess ? TypedResults.NoContent() : Refused(result.ValidationErrors, "The Trip can't be discarded.");
     }
+
+    // A missing shipmentNumber binds as null, whatever the type says.
+    private static bool AreStops(IReadOnlyList<StopReference> stops) =>
+        stops.All(stop => !string.IsNullOrWhiteSpace(stop.ShipmentNumber) && Enum.IsDefined(stop.Kind));
 
     private static void AddDurationError(Dictionary<string, string[]> errors, TimeSpan? duration)
     {

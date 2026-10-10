@@ -124,6 +124,47 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
         _stops.Add(new TripStop(shipment, StopKind.Delivery, _stops.Count));
     }
 
+    /// <summary>
+    /// Puts the Draft's Stops in this order. The order must name each Stop of the Trip once and no others, and every Shipment's collection must
+    /// come before its delivery; otherwise the Trip is left as it was and the fault says why. Two Stops at the same address stay two Stops,
+    /// since a Stop is a Shipment's collection or delivery, not a place. The caller checks <see cref="EnsureDraft"/> first, as for <see cref="Pick"/>.
+    /// </summary>
+    public StopOrderFault? ReorderStops(IReadOnlyList<(ShipmentId Shipment, StopKind Kind)> order)
+    {
+        ArgumentNullException.ThrowIfNull(order);
+        if (EnsureDraft() is not null)
+        {
+            throw new InvalidOperationException($"Trip {Number} is Dispatched, so its Stops change only by Amend.");
+        }
+
+        if (order.Count != _stops.Count || !_stops.Select(stop => (stop.ShipmentId, stop.Kind)).ToHashSet().SetEquals(order))
+        {
+            return new StopOrderFault(TripRefusalCode.StopsNotTheTripsStops);
+        }
+
+        var delivered = new HashSet<ShipmentId>();
+        foreach (var (shipment, kind) in order)
+        {
+            if (kind == StopKind.Delivery)
+            {
+                delivered.Add(shipment);
+            }
+            else if (delivered.Contains(shipment))
+            {
+                return new StopOrderFault(TripRefusalCode.CollectionBeforeDelivery, shipment);
+            }
+        }
+
+        var reordered = order.Select((stop, position) => new TripStop(stop.Shipment, stop.Kind, position)).ToList();
+        if (!reordered.SequenceEqual(Stops))
+        {
+            _stops.Clear();
+            _stops.AddRange(reordered);
+        }
+
+        return null;
+    }
+
     /// <summary>Null when the Trip is a Draft, which can be changed or discarded; a Dispatched Trip is neither, and is never deleted.</summary>
     public TripRefusal? EnsureDraft() => Status == TripStatus.Draft ? null : TripRefusal.TripNotDraft(Number);
 }

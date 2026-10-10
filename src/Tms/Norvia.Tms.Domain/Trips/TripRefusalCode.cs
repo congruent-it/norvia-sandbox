@@ -26,4 +26,10 @@ public enum TripRefusalCode
 
     /// <summary>The Shipment collects on another day than the Trip's.</summary>
     CollectionDayMismatch,
+
+    /// <summary>A Shipment's delivery Stop comes before its collection Stop.</summary>
+    CollectionBeforeDelivery,
+
+    /// <summary>The order given doesn't name every Stop of the Trip once, and no others.</summary>
+    StopsNotTheTripsStops,
 }

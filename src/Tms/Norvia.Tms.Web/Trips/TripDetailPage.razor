@@ -2,12 +2,16 @@
 @rendermode InteractiveServer
 @using Microsoft.Extensions.Options
 @using Norvia.Tms.Application.Trips.GetByNumber
+@using Norvia.Tms.Application.Trips.ReorderStops
+@using Norvia.Tms.Domain.Trips
 @using Norvia.Tms.Web.Capacity
 @implements IAsyncDisposable
 @inject ITransportOrderQueries Queries
+@inject ITransportOrderCommands Commands
 @inject TimeProvider Time
 @inject IOptions<LiveListOptions> Options
-@inject ILogger<LiveTransportOrderList<TripDetailView>> Logger
+@inject ILogger<LiveTransportOrderList<TripDetailView>> ReadLogger
+@inject ILogger<TripDetailPage> Logger
 
 <PageTitle>Trip @Number · Norvia TMS</PageTitle>
 
@@ -26,6 +30,13 @@
         <dt>Planned driving</dt><dd>@TripTimes.DurationOrDash(trip.PlannedDrivingDuration)</dd>
         <dt>Load</dt><dd>@TripText.Load(trip)</dd>
     </dl>
+
+    @if (_refusal is { } refusal)
+    {
+        <div role="alert" class="mb-4">
+            <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">@refusal</FluentMessageBar>
+        </div>
+    }
 
     @if (detail.Failures.Count > 0)
     {
@@ -58,29 +69,26 @@
     else
     {
         <h2>Stops</h2>
-        <FluentDataGrid Items="detail.Stops.AsQueryable()" TGridItem="TripStopView" Class="flatly-table" aria-label="Stops"
-                        GridTemplateColumns="auto 1fr 1.2fr 2.5fr 2fr 1.5fr" MultiLine="true">
-            <PropertyColumn Title="#" Property="@(stop => stop.Position + 1)" />
-            <PropertyColumn Title="Stop" Property="@(stop => TripText.Kind(stop.Kind))" />
-            <TemplateColumn Title="Shipment">
-                <a href="/shipments/@context.ShipmentNumber">@context.ShipmentNumber</a>
-            </TemplateColumn>
-            <PropertyColumn Title="Place" Property="@(stop => TripText.Place(stop))" />
-            <PropertyColumn Title="Window" Property="@(stop => NorviaTime.FormatWindow(stop.WindowEarliest, stop.WindowLatest))" />
-            <PropertyColumn Title="Goods" Property="@(stop => stop.Goods)" />
-        </FluentDataGrid>
+        @if (trip.Status == TripStatus.Draft)
+        {
+            <p class="mb-2">Drag a Stop to where it should go, or use its arrows.</p>
+        }
+        <TripStopsTable Stops="detail.Stops" Reorderable="@(trip.Status == TripStatus.Draft)" Disabled="_working" OnReorder="ReorderAsync" />
     }
 </LiveListStates>
 
 @code {
     private LiveTransportOrderList<TripDetailView> _detail = null!;
+    private readonly CancellationTokenSource _closed = new();
+    private string? _refusal;
+    private bool _working;
 
     [Parameter]
     public string Number { get; set; } = string.Empty;
 
     protected override void OnInitialized()
     {
-        _detail = new LiveTransportOrderList<TripDetailView>(ReadAsync, $"Trip {Number}", Time, Options.Value.RefreshInterval, Logger);
+        _detail = new LiveTransportOrderList<TripDetailView>(ReadAsync, $"Trip {Number}", Time, Options.Value.RefreshInterval, ReadLogger);
         _detail.Changed += () => InvokeAsync(StateHasChanged);
         _detail.Start();
     }
@@ -89,5 +97,42 @@
     private async Task<IReadOnlyList<TripDetailView>> ReadAsync(CancellationToken cancellationToken) =>
         await Queries.FindTripAsync(Number, cancellationToken) is { } detail ? [detail] : [];
 
-    public async ValueTask DisposeAsync() => await _detail.DisposeAsync();
+    // The TMS checks the order; a refusal leaves the Stops as they were, and the reason is shown until the next move.
+    private async Task ReorderAsync(IReadOnlyList<TripStopView> order)
+    {
+        _working = true;
+        _refusal = null;
+        try
+        {
+            var answer = await Commands.ReorderTripStopsAsync(Number, [.. order.Select(stop => new StopReference(stop.ShipmentNumber, stop.Kind))], _closed.Token);
+            if (answer is TripAnswer.Refused refused)
+            {
+                _refusal = $"The Stops were not reordered: {refused.Reason}";
+            }
+            else
+            {
+                await _detail.RefreshAsync();
+            }
+        }
+        catch (OperationCanceledException) when (_closed.IsCancellationRequested)
+        {
+            // The page closed while the TMS was answering.
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning(exception, "Reordering the Stops of Trip {Number} failed", Number);
+            _refusal = "The TMS couldn't reorder the Stops. Try again.";
+        }
+        finally
+        {
+            _working = false;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _closed.CancelAsync();
+        _closed.Dispose();
+        await _detail.DisposeAsync();
+    }
 }
