@@ -244,8 +244,8 @@ public sealed class AppHostModelTests
 
         var bicep = builder.Resources.OfType<AzureSqlServerResource>().Single().GetBicepTemplateString();
 
-        Regex.Count(bicep, "useFreeLimit: true").Should().Be(2, "both databases stay on the free offer");
-        Regex.Count(bicep, "freeLimitExhaustionBehavior: 'BillOverUsage'").Should().Be(2, "a paused database fails the migrations and the demo");
+        Regex.Count(bicep, "useFreeLimit: true").Should().Be(3, "all three databases stay on the free offer");
+        Regex.Count(bicep, "freeLimitExhaustionBehavior: 'BillOverUsage'").Should().Be(3, "a paused database fails the migrations and the demo");
     }
 
     [Fact]

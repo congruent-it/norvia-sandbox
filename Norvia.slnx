@@ -26,6 +26,14 @@
     <Project Path="src/IntegrationConsole/Norvia.IntegrationConsole.Infrastructure/Norvia.IntegrationConsole.Infrastructure.csproj" />
     <Project Path="src/IntegrationConsole/Norvia.IntegrationConsole.Web/Norvia.IntegrationConsole.Web.csproj" />
   </Folder>
+  <Folder Name="/src/DriverApp/">
+    <Project Path="src/DriverApp/Norvia.DriverApp.Api/Norvia.DriverApp.Api.csproj" />
+    <Project Path="src/DriverApp/Norvia.DriverApp.Application/Norvia.DriverApp.Application.csproj" />
+    <Project Path="src/DriverApp/Norvia.DriverApp.Domain/Norvia.DriverApp.Domain.csproj" />
+    <Project Path="src/DriverApp/Norvia.DriverApp.Infrastructure/Norvia.DriverApp.Infrastructure.csproj" />
+    <Project Path="src/DriverApp/Norvia.DriverApp.Migrations/Norvia.DriverApp.Migrations.csproj" />
+    <Project Path="src/DriverApp/Norvia.DriverApp.Web/Norvia.DriverApp.Web.csproj" />
+  </Folder>
   <Folder Name="/src/PartnerPortal/">
     <Project Path="src/PartnerPortal/Norvia.PartnerPortal.Application/Norvia.PartnerPortal.Application.csproj" />
     <Project Path="src/PartnerPortal/Norvia.PartnerPortal.Domain/Norvia.PartnerPortal.Domain.csproj" />
@@ -58,6 +66,10 @@
     <Project Path="tests/IntegrationConsole/Norvia.IntegrationConsole.Infrastructure.UnitTests/Norvia.IntegrationConsole.Infrastructure.UnitTests.csproj" />
     <Project Path="tests/IntegrationConsole/Norvia.IntegrationConsole.Web.UiTests/Norvia.IntegrationConsole.Web.UiTests.csproj" />
     <Project Path="tests/IntegrationConsole/Norvia.IntegrationConsole.Web.UnitTests/Norvia.IntegrationConsole.Web.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/tests/DriverApp/">
+    <Project Path="tests/DriverApp/Norvia.DriverApp.Api.IntegrationTests/Norvia.DriverApp.Api.IntegrationTests.csproj" />
+    <Project Path="tests/DriverApp/Norvia.DriverApp.ArchitectureTests/Norvia.DriverApp.ArchitectureTests.csproj" />
   </Folder>
   <Folder Name="/tests/PartnerPortal/">
     <Project Path="tests/PartnerPortal/Norvia.PartnerPortal.Application.UnitTests/Norvia.PartnerPortal.Application.UnitTests.csproj" />

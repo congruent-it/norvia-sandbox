@@ -1,0 +1,69 @@
+@page "/"
+@using Norvia.DriverApp.Application.Trips.GetForDriver
+@using Norvia.DriverApp.Web.Sessions
+@inject Mediator.IMediator Mediator
+@inject NavigationManager Navigation
+@inject ILogger<Trips> Logger
+
+<PageTitle>My Trips</PageTitle>
+
+@if (_driver is not null)
+{
+    <div class="trips-heading">
+        <h1>@_driver.Name</h1>
+        <form method="post" action="/sign-out">
+            <AntiforgeryToken />
+            <button type="submit" class="link-button">Not you? Sign out</button>
+        </form>
+    </div>
+
+    @if (_loadFailed)
+    {
+        <div role="alert">
+            <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+                Your Trips couldn't be loaded. Reload the page to try again.
+            </FluentMessageBar>
+        </div>
+    }
+    else if (_trips.Count == 0)
+    {
+        <p role="status">No Trips have been sent to you yet.</p>
+    }
+
+    @foreach (var trip in _trips)
+    {
+        <TripCard Trip="trip" />
+    }
+}
+
+@code {
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    private DriverView? _driver;
+    private IReadOnlyList<DriverTripView> _trips = [];
+    private bool _loadFailed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var drivers = await Mediator.Send(new Norvia.DriverApp.Application.Drivers.List.ListDriversQuery());
+        _driver = DriverSession.Current(HttpContext, drivers);
+        if (_driver is null)
+        {
+            Navigation.NavigateTo("/sign-in");
+            return;
+        }
+
+        try
+        {
+            _trips = await Mediator.Send(new GetDriverTripsQuery(_driver.Id));
+        }
+#pragma warning disable CA1031 // Whatever fails to load, the Driver gets a message rather than an error page.
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            Logger.LogError(ex, "The Trips of Driver {DriverId} couldn't be loaded", _driver.Id);
+            _loadFailed = true;
+        }
+    }
+}

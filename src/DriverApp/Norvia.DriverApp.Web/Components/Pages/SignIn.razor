@@ -1,0 +1,25 @@
+@page "/sign-in"
+@inject Mediator.IMediator Mediator
+
+<PageTitle>Sign in</PageTitle>
+
+<h1>Who is driving?</h1>
+<p>Pick your name. This is a demo: there is no password.</p>
+
+<form method="post" action="/sign-in" aria-label="Sign in" class="driver-list">
+    <AntiforgeryToken />
+    @foreach (var driver in _drivers)
+    {
+        <button type="submit" name="driver" value="@driver.Id" class="driver-button">
+            <span class="driver-name">@driver.Name</span>
+            <span class="driver-id">@driver.Id</span>
+        </button>
+    }
+</form>
+
+@code {
+    private IReadOnlyList<DriverView> _drivers = [];
+
+    protected override async Task OnInitializedAsync() =>
+        _drivers = await Mediator.Send(new Norvia.DriverApp.Application.Drivers.List.ListDriversQuery());
+}

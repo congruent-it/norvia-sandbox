@@ -1,0 +1,40 @@
+@* One Trip with its Stops in order: what the Driver reads, never changes. *@
+<FluentCard Class="trip" role="region" aria-label="@($"Trip {Trip.TripNumber}")">
+    <h2>
+        @Trip.TripNumber
+        <FluentBadge Appearance="Appearance.Accent">Version @Trip.Version</FluentBadge>
+    </h2>
+    <dl class="trip-facts">
+        <dt>Day</dt>
+        <dd>@TripText.Day(Trip.Day)</dd>
+        <dt>Planned start</dt>
+        <dd>@TripText.Time(Trip.PlannedStart)</dd>
+        <dt>Driving</dt>
+        <dd>@TripText.Duration(Trip.PlannedDrivingDuration)</dd>
+        <dt>Vehicle</dt>
+        <dd>@Trip.Vehicle.Registration (@TripText.VehicleType(Trip.Vehicle.VehicleType))</dd>
+    </dl>
+
+    @if (Trip.Stops.Count == 0)
+    {
+        <div role="status">
+            <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
+                This Trip has no Stops: its Shipments were taken off.
+            </FluentMessageBar>
+        </div>
+    }
+    else
+    {
+        <ol class="stops">
+            @foreach (var stop in Trip.Stops.OrderBy(stop => stop.Sequence))
+            {
+                <StopItem Stop="stop" />
+            }
+        </ol>
+    }
+</FluentCard>
+
+@code {
+    [Parameter, EditorRequired]
+    public DriverTripView Trip { get; set; } = null!;
+}

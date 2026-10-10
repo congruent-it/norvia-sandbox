@@ -26,6 +26,8 @@ var sql = builder.AddAzureSqlServer("sql").RunAsContainer(container => container
 var tmsDatabase = sql.AddDatabase("tms");
 // The Partner portal's own records of what each Persona sent Norvia. It never reads the TMS's database (ADR 0002).
 var partnerPortalDatabase = sql.AddDatabase("partner-portal");
+// The Driver app's own records of the Trips it was sent. It never reads the TMS's database (ADR 0002).
+var driverAppDatabase = sql.AddDatabase("driver-app");
 
 // The estate Bicep owns Service Bus in Azure (ADR 0004); locally the emulator stands in for it.
 var messaging = builder.AddAzureServiceBus("messaging");
@@ -72,6 +74,21 @@ var partnerPortal = builder.AddProject<Projects.Norvia_PartnerPortal_Web>("partn
     .WithHttpHealthCheck("/health")
     .WithUrlForEndpoint("http", url => url.DisplayText = "Partner portal");
 
+// The Driver app is its own application and reaches the TMS only through the Trip dispatch Logic App (ADR 0001).
+var driverAppMigrations = builder.AddProject<Projects.Norvia_DriverApp_Migrations>("driver-app-migrations")
+    .WithReference(driverAppDatabase).WaitFor(driverAppDatabase)
+    .PublishAsAzureContainerAppJob();
+
+var driverAppApi = builder.AddProject<Projects.Norvia_DriverApp_Api>("driver-app-api")
+    .WithReference(driverAppDatabase).WaitForCompletion(driverAppMigrations)
+    .WithHttpHealthCheck("/health");
+
+// The Driver's screens: sign in by picking a seeded Driver, then a read-only list of that Driver's Trips.
+var driverAppWeb = builder.AddProject<Projects.Norvia_DriverApp_Web>("driver-app-web")
+    .WithReference(driverAppDatabase).WaitForCompletion(driverAppMigrations)
+    .WithHttpHealthCheck("/health")
+    .WithUrlForEndpoint("http", url => url.DisplayText = "Driver app");
+
 // The Integration console, for the Integration operator. It has no database: it reads what the estate records (ADR 0017).
 var integrationConsole = builder.AddProject<Projects.Norvia_IntegrationConsole_Web>("integration-console-web")
     .WithHttpHealthCheck("/health")
@@ -80,7 +97,7 @@ var integrationConsole = builder.AddProject<Projects.Norvia_IntegrationConsole_W
 // Locally the TMS and the Partner portal read the repo's seed file; in Azure the copy each image carries, next to the
 // app (the image's working directory).
 var seedPath = builder.ExecutionContext.IsPublishMode ? Path.Combine("seed", "norvia.seed.json") : seedFile;
-foreach (var readerOfTheSeedFile in new[] { tmsApi, tmsWeb, partnerPortal })
+foreach (var readerOfTheSeedFile in new[] { tmsApi, tmsWeb, partnerPortal, driverAppApi, driverAppWeb })
 {
     readerOfTheSeedFile.WithEnvironment("Seed__Path", seedPath);
 }
@@ -99,7 +116,7 @@ if (builder.ExecutionContext.IsPublishMode)
     messaging.PublishAsExisting(estate.ServiceBusNamespace, null);
 
     var insights = builder.AddAzureApplicationInsights("insights").PublishAsExisting(estate.ApplicationInsights, null);
-    foreach (var project in new[] { tmsMigrations, tmsApi, tmsWeb, partnerPortalMigrations, partnerPortal, integrationConsole })
+    foreach (var project in new[] { tmsMigrations, tmsApi, tmsWeb, partnerPortalMigrations, partnerPortal, driverAppMigrations, driverAppApi, driverAppWeb, integrationConsole })
     {
         project.WithReference(insights);
     }
