@@ -4,8 +4,8 @@ namespace Norvia.Tms.Domain.Shipments;
 public sealed class ShipmentStaleRules(TimeSpan collectionGrace, TimeSpan silenceLimit, TimeSpan deliveryGrace)
 {
     /// <summary>
-    /// A Shipment on its way is Stale when its next expected Tracking event is late: a Booked (or, Own fleet, Dispatched) one not collected the
-    /// collection grace after its collection window's latest time; a Collected or In transit one with no Tracking event
+    /// A Shipment on its way is Stale when its next expected Tracking event is late: a Booked or Dispatched one (awaiting collection) not
+    /// collected the collection grace after its collection window's latest time; a Collected or In transit one with no Tracking event
     /// for the silence limit; any one not Delivered the delivery grace after its delivery window's latest time. It is
     /// worked out from the Shipment and its events each time, so it clears once a Tracking event makes its rule untrue.
     /// Stale is only a flag: nothing acts on it.
