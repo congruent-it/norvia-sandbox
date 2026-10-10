@@ -1,4 +1,5 @@
 using Norvia.Tms.Application.Fleet.Planning;
+using Norvia.Tms.Application.Trips.ReorderStops;
 using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Web.Capacity;
 using Norvia.Tms.Web.Exceptions;
@@ -95,7 +96,7 @@ public interface ITransportOrderCommands
     Task<TripAnswer> AddShipmentsToTripAsync(string number, IReadOnlyList<string> shipmentNumbers, CancellationToken cancellationToken);
 
     /// <summary>The Planner puts the Stops of a Draft Trip in order: every Stop once. A delivery before its collection is refused (P11).</summary>
-    Task<TripAnswer> ReorderTripStopsAsync(string number, IReadOnlyList<StopOrder> stops, CancellationToken cancellationToken);
+    Task<TripAnswer> ReorderTripStopsAsync(string number, IReadOnlyList<StopReference> stops, CancellationToken cancellationToken);
 
     /// <summary>The Planner discards a Draft Trip, which gives its Vehicle and Driver back (P11).</summary>
     Task<TripAnswer> DiscardDraftTripAsync(string number, CancellationToken cancellationToken);

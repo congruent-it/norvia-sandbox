@@ -151,13 +151,12 @@ public static class TripEndpoints
         IMediator mediator,
         CancellationToken cancellationToken)
     {
-        if (request.Stops is not { Count: > 0 } || request.Stops.Any(stop => string.IsNullOrWhiteSpace(stop.ShipmentNumber) || !Enum.IsDefined(stop.Kind)))
+        if (request.Stops is not { Count: > 0 } stops || !AreStops(stops))
         {
             return TypedResults.ValidationProblem(new Dictionary<string, string[]> { [nameof(ReorderStopsRequest.Stops)] = ["Give every Stop of the Trip as a Shipment number and Collection or Delivery."] });
         }
 
-        var result = await mediator.Send(
-            new ReorderTripStopsCommand(number, [.. request.Stops.Select(stop => new StopReference(stop.ShipmentNumber!, stop.Kind))]), cancellationToken);
+        var result = await mediator.Send(new ReorderTripStopsCommand(number, stops), cancellationToken);
         return result.IsSuccess ? TypedResults.NoContent() : Refused(result.ValidationErrors, "The Stops can't be put in that order.");
     }
 
@@ -184,6 +183,10 @@ public static class TripEndpoints
         var result = await mediator.Send(new DiscardDraftTripCommand(number), cancellationToken);
         return result.IsSuccess ? TypedResults.NoContent() : Refused(result.ValidationErrors, "The Trip can't be discarded.");
     }
+
+    // A missing shipmentNumber binds as null, whatever the type says.
+    private static bool AreStops(IReadOnlyList<StopReference> stops) =>
+        stops.All(stop => !string.IsNullOrWhiteSpace(stop.ShipmentNumber) && Enum.IsDefined(stop.Kind));
 
     private static void AddDurationError(Dictionary<string, string[]> errors, TimeSpan? duration)
     {

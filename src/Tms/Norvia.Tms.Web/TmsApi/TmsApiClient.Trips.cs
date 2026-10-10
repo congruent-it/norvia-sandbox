@@ -4,6 +4,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.Trips;
+using Norvia.Tms.Application.Trips.ReorderStops;
 using Norvia.Tms.Web.Trips;
 
 namespace Norvia.Tms.Web.TmsApi;
@@ -36,7 +37,7 @@ internal sealed partial class TmsApiClient
         return SendTripAsync("Add Shipments to Trip", HttpMethod.Post, $"/v1/trips/{Uri.EscapeDataString(number)}/shipments", number, new AddShipmentsBody(shipmentNumbers), cancellationToken);
     }
 
-    public Task<TripAnswer> ReorderTripStopsAsync(string number, IReadOnlyList<StopOrder> stops, CancellationToken cancellationToken)
+    public Task<TripAnswer> ReorderTripStopsAsync(string number, IReadOnlyList<StopReference> stops, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(stops);
         return SendTripAsync("Reorder Trip Stops", HttpMethod.Put, $"/v1/trips/{Uri.EscapeDataString(number)}/stops", number, new ReorderStopsBody(stops), cancellationToken);
@@ -114,7 +115,7 @@ internal sealed partial class TmsApiClient
 
     private sealed record AddShipmentsBody(IReadOnlyList<string> ShipmentNumbers);
 
-    private sealed record ReorderStopsBody(IReadOnlyList<StopOrder> Stops);
+    private sealed record ReorderStopsBody(IReadOnlyList<StopReference> Stops);
 
     private sealed record AddedShipments(string Number, List<TripWarning>? Warnings);
 

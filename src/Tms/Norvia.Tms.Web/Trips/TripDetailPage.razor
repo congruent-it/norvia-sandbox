@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @using Microsoft.Extensions.Options
 @using Norvia.Tms.Application.Trips.GetByNumber
+@using Norvia.Tms.Application.Trips.ReorderStops
 @using Norvia.Tms.Domain.Trips
 @using Norvia.Tms.Web.Capacity
 @implements IAsyncDisposable
@@ -9,8 +10,8 @@
 @inject ITransportOrderCommands Commands
 @inject TimeProvider Time
 @inject IOptions<LiveListOptions> Options
-@inject ILogger<LiveTransportOrderList<TripDetailView>> Logger
-@inject ILogger<TripDetailPage> PageLogger
+@inject ILogger<LiveTransportOrderList<TripDetailView>> ReadLogger
+@inject ILogger<TripDetailPage> Logger
 
 <PageTitle>Trip @Number · Norvia TMS</PageTitle>
 
@@ -87,7 +88,7 @@
 
     protected override void OnInitialized()
     {
-        _detail = new LiveTransportOrderList<TripDetailView>(ReadAsync, $"Trip {Number}", Time, Options.Value.RefreshInterval, Logger);
+        _detail = new LiveTransportOrderList<TripDetailView>(ReadAsync, $"Trip {Number}", Time, Options.Value.RefreshInterval, ReadLogger);
         _detail.Changed += () => InvokeAsync(StateHasChanged);
         _detail.Start();
     }
@@ -103,7 +104,7 @@
         _refusal = null;
         try
         {
-            var answer = await Commands.ReorderTripStopsAsync(Number, [.. order.Select(stop => new StopOrder(stop.ShipmentNumber, stop.Kind))], _closed.Token);
+            var answer = await Commands.ReorderTripStopsAsync(Number, [.. order.Select(stop => new StopReference(stop.ShipmentNumber, stop.Kind))], _closed.Token);
             if (answer is TripAnswer.Refused refused)
             {
                 _refusal = $"The Stops were not reordered: {refused.Reason}";
@@ -119,7 +120,7 @@
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            PageLogger.LogWarning(exception, "Reordering the Stops of Trip {Number} failed", Number);
+            Logger.LogWarning(exception, "Reordering the Stops of Trip {Number} failed", Number);
             _refusal = "The TMS couldn't reorder the Stops. Try again.";
         }
         finally
