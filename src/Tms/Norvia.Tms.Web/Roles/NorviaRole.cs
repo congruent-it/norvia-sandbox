@@ -21,6 +21,7 @@ public sealed record NorviaRole(string Key, string Name, IReadOnlyList<RoleView>
             new("/shipments/delivered-without-proof-of-delivery", "Delivered without Proof of delivery"),
             new("/exceptions", "Open Exceptions"),
             new("/capacity", "Capacity"),
+            new("/trips/shipments", "Shipments to put on Trips"),
             new("/trips", "Trips"),
         ]);
 

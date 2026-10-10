@@ -11,6 +11,7 @@ using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shipments.GetByNumber;
 using Norvia.Tms.Application.Shipments.ListAwaitingAnswer;
 using Norvia.Tms.Application.Shipments.ListInProgress;
+using Norvia.Tms.Application.Shipments.ListToPutOnTrips;
 using Norvia.Tms.Application.Shipments.ListToRelease;
 using Norvia.Tms.Application.Shipments.Reassign;
 using Norvia.Tms.Application.Shipments.Release;
@@ -39,6 +40,14 @@ public static class ShipmentEndpoints
                 + "Carrier's Carrier Rate Card can't price shows pricingFailure, with the code a release would be refused with (NoRateCard, "
                 + "NoValidRateCardVersion, NoMatchingLane or WeightAboveHighestBreak) and a message naming the Carrier: only such a Shipment can be "
                 + "released with a Spot price (P9).");
+
+        shipments.MapGet("/to-put-on-trips", ListToPutOnTripsAsync)
+            .RequireAuthorization()
+            .WithName("ListShipmentsToPutOnTrips")
+            .WithSummary("List the Released Own fleet Shipments not on a Trip yet, by collection time, optionally for one collection day.")
+            .WithDescription(
+                "Each Shipment shows its Shipper, where and when it collects and delivers, its weight and its pallets (P11). Pass day (yyyy-MM-dd) to keep the "
+                + "Shipments that collect that day, the date of the collection window's earliest time in Europe/Amsterdam. A Shipment leaves the list when it is put on a Trip.");
 
         shipments.MapGet("/bookings-awaiting-answer", ListBookingsAwaitingAnswerAsync)
             .RequireAuthorization()
@@ -230,6 +239,12 @@ public static class ShipmentEndpoints
         IMediator mediator,
         CancellationToken cancellationToken) =>
         TypedResults.Ok(await mediator.Send(new ListDeliveredShipmentsWithoutProofOfDeliveryQuery(), cancellationToken));
+
+    private static async Task<Ok<IReadOnlyList<ShipmentToPutOnTripSummary>>> ListToPutOnTripsAsync(
+        DateOnly? day,
+        IMediator mediator,
+        CancellationToken cancellationToken) =>
+        TypedResults.Ok(await mediator.Send(new ListShipmentsToPutOnTripsQuery(day), cancellationToken));
 
     private static async Task<Ok<IReadOnlyList<ShipmentInProgressSummary>>> ListInProgressAsync(
         IMediator mediator,

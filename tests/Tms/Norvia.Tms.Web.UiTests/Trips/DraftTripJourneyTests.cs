@@ -13,7 +13,7 @@ public sealed class DraftTripJourneyTests(TmsUiFixture tms) : BrowserPage(tms)
     public async Task ThePlanner_CreatesADraftTrip_PicksAVehicleAndDriver_AndDiscardsIt()
     {
         await Page.GotoAsync("/");
-        await Page.GetByRole(AriaRole.Navigation, new() { Name = "Main" }).GetByRole(AriaRole.Link, new() { Name = "Trips" }).ClickAsync();
+        await Page.GetByRole(AriaRole.Navigation, new() { Name = "Main" }).GetByRole(AriaRole.Link, new() { Name = "Trips", Exact = true }).ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Trips", Level = 1 })).ToBeVisibleAsync();
         // The page is interactive once the lists it reads from the database have loaded.
         await Expect(Page.GetByRole(AriaRole.Status).Filter(new() { HasText = "Loading the" })).ToHaveCountAsync(0);

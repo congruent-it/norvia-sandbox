@@ -142,6 +142,26 @@ public sealed class DemoSeedTests(TmsFixture tms)
         compared.Should().BePositive("the Carrier prices Lanes the Shipper's Rate Card has too");
     }
 
+    [Fact]
+    public void TripDay_HasShipmentsForARigidTruckTripAndAVanTrip_AndOneTooHeavyForTheVan()
+    {
+        var vehicles = DemoSeed()["vehicles"]!.AsArray();
+        var van = vehicles.First(vehicle => vehicle!["type"]!.GetValue<string>() == "Van")!;
+        var truck = vehicles.First(vehicle => vehicle!["type"]!.GetValue<string>() == "RigidTruck")!;
+        var orders = DemoSeed()["demoTripDay"]!["transportOrders"]!.AsArray()
+            .ToDictionary(order => order!["shipperReference"]!.GetValue<string>(), order => (Pallets: order!["pallets"]!.GetValue<int>(), Kg: order["pallets"]!.GetValue<int>() * order["weightKgPerPallet"]!.GetValue<decimal>()));
+        var truckTrip = orders.Where(order => order.Key is "DEMO-TRIP-1" or "DEMO-TRIP-2" or "DEMO-TRIP-3").Select(order => order.Value).ToList();
+        var vanTrip = orders.Where(order => order.Key is "DEMO-TRIP-4" or "DEMO-TRIP-5").Select(order => order.Value).ToList();
+        var heavy = orders["DEMO-TRIP-HEAVY"];
+
+        truckTrip.Sum(order => order.Pallets).Should().BeInRange(van["palletPlaces"]!.GetValue<int>() + 1, truck["palletPlaces"]!.GetValue<int>(), "too many for a van, and they fit the rigid truck");
+        truckTrip.Sum(order => order.Kg).Should().BeLessThanOrEqualTo(truck["payloadKg"]!.GetValue<int>());
+        vanTrip.Sum(order => order.Pallets).Should().BeLessThanOrEqualTo(van["palletPlaces"]!.GetValue<int>());
+        vanTrip.Sum(order => order.Kg).Should().BeLessThanOrEqualTo(van["payloadKg"]!.GetValue<int>());
+        (vanTrip.Sum(order => order.Kg) + heavy.Kg).Should().BeGreaterThan(van["payloadKg"]!.GetValue<int>(), "adding it to the van's Trip shows PayloadExceeded");
+        heavy.Kg.Should().BeLessThanOrEqualTo(truck["payloadKg"]!.GetValue<int>());
+    }
+
     private static List<SeedLane> LanesOf(string carrier) => LanesOf(CarrierRateCard(carrier));
 
     private static List<SeedLane> LanesOf(JsonNode card) =>

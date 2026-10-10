@@ -17,12 +17,27 @@ public sealed class ListTripsTests
         _fixture.Existing(TripsFixture.Tuesday, Van, Anouk);
         _fixture.Existing(Monday.AddDays(-1), null, null);
 
-        var trips = await new ListTripsHandler(_fixture.Trips.AsRead(), _fixture.Planning.Vehicles, _fixture.Planning.Drivers)
+        var trips = await new ListTripsHandler(_fixture.Trips.AsRead(), _fixture.TripShipments, _fixture.Planning.Vehicles, _fixture.Planning.Drivers)
             .Handle(new ListTripsQuery(), CancellationToken.None);
 
         trips.Select(trip => trip.Day).Should().Equal(Monday.AddDays(-1), TripsFixture.Tuesday, TripsFixture.Tuesday.AddDays(1));
-        trips[1].Should().Be(new TripView("TR-0000101", TripsFixture.Tuesday, TripStatus.Draft, "VEH-0002", "VV-102-B", "DRV-0001", "DRV-0001", null, null));
+        trips[1].Should().Be(new TripView("TR-0000101", TripsFixture.Tuesday, TripStatus.Draft, "VEH-0002", "VV-102-B", "DRV-0001", "DRV-0001", null, null, PayloadKg: 1200, VehiclePalletPlaces: 4));
         trips[0].VehicleId.Should().BeNull();
         trips[0].DriverName.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Handle_ShowsTheStopCountAndTheLoadAgainstTheVehiclesCapacity()
+    {
+        var trip = _fixture.Existing(TripsFixture.Tuesday, Van, null);
+        trip.AddShipment(_fixture.ReleasedShipment(TripsFixture.Tuesday, pallets: 2, weightKg: 400m).Id);
+        trip.AddShipment(_fixture.ReleasedShipment(TripsFixture.Tuesday, pallets: 1, weightKg: 250m).Id);
+        _fixture.Existing(TripsFixture.Tuesday.AddDays(1), null, null);
+
+        var trips = await new ListTripsHandler(_fixture.Trips.AsRead(), _fixture.TripShipments, _fixture.Planning.Vehicles, _fixture.Planning.Drivers)
+            .Handle(new ListTripsQuery(), CancellationToken.None);
+
+        trips[0].Should().Match<TripView>(view => view.StopCount == 4 && view.LoadWeightKg == 650m && view.LoadPalletPlaces == 3 && view.PayloadKg == 1200 && view.VehiclePalletPlaces == 4);
+        trips[1].Should().Match<TripView>(view => view.StopCount == 0 && view.LoadWeightKg == 0m && view.PayloadKg == null && view.VehiclePalletPlaces == null);
     }
 }

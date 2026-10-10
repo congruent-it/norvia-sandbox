@@ -1,5 +1,6 @@
 using Ardalis.SharedKernel;
 using Norvia.Tms.Domain.Fleet;
+using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TransportOrders;
 
 namespace Norvia.Tms.Domain.Trips;
@@ -20,6 +21,8 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
         Status = TripStatus.Draft;
         IdempotencyKey = idempotencyKey;
     }
+
+    private readonly List<TripStop> _stops = [];
 
     public TripNumber Number { get; private set; }
 
@@ -46,6 +49,14 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
 
     /// <summary>True when the duration is more than nothing and at most <see cref="MaxPlannedDrivingDuration"/>.</summary>
     public static bool IsPlannableDuration(TimeSpan duration) => duration > TimeSpan.Zero && duration <= MaxPlannedDrivingDuration;
+
+    /// <summary>The Stops in the order the Driver visits them: each Shipment's collection, then its delivery, in the order the Shipments were added.</summary>
+    public IReadOnlyList<TripStop> Stops => [.. _stops.OrderBy(stop => stop.Position)];
+
+    /// <summary>The Shipments on the Trip, in the order they were added.</summary>
+    public IEnumerable<ShipmentId> ShipmentIds => Stops.Select(stop => stop.ShipmentId).Distinct();
+
+    public bool HasShipment(ShipmentId shipment) => Stops.Any(stop => stop.ShipmentId == shipment);
 
     /// <summary>The key of the request that created the Trip, so the same request sent again as a retry finds it instead of creating another.</summary>
     public IdempotencyKey IdempotencyKey { get; private set; }
@@ -91,6 +102,26 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
 
         PlannedStart = start;
         PlannedDrivingDuration = drivingDuration;
+    }
+
+    /// <summary>
+    /// Puts the Shipment on the Draft: its collection Stop and then its delivery Stop go at the end of the sequence. A Shipment already
+    /// on the Trip stays where it is. The caller checks the rules first, as for <see cref="Pick"/>.
+    /// </summary>
+    public void AddShipment(ShipmentId shipment)
+    {
+        if (EnsureDraft() is not null)
+        {
+            throw new InvalidOperationException($"Trip {Number} is Dispatched, so its Shipments change only by Amend.");
+        }
+
+        if (HasShipment(shipment))
+        {
+            return;
+        }
+
+        _stops.Add(new TripStop(shipment, StopKind.Collection, _stops.Count));
+        _stops.Add(new TripStop(shipment, StopKind.Delivery, _stops.Count));
     }
 
     /// <summary>Null when the Trip is a Draft, which can be changed or discarded; a Dispatched Trip is neither, and is never deleted.</summary>

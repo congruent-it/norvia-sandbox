@@ -14,4 +14,16 @@ public enum TripRefusalCode
 
     /// <summary>The planned start is not inside the Driver's Shift that day.</summary>
     OutsideShift,
+
+    /// <summary>There is no Shipment with that number.</summary>
+    ShipmentNotFound,
+
+    /// <summary>The Shipment is not a Released Own fleet Shipment, so it can't go on a Trip.</summary>
+    ShipmentNotReleased,
+
+    /// <summary>The Shipment is on another Trip already.</summary>
+    ShipmentOnAnotherTrip,
+
+    /// <summary>The Shipment collects on another day than the Trip's.</summary>
+    CollectionDayMismatch,
 }

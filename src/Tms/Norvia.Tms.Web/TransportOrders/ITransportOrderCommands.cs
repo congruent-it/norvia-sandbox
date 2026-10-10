@@ -91,6 +91,9 @@ public interface ITransportOrderCommands
     /// <summary>The Planner picks the Vehicle, Driver, planned start and driving duration of a Draft Trip, or gives them back with null (P11).</summary>
     Task<TripAnswer> ChangeDraftTripAsync(string number, TripEntry entry, CancellationToken cancellationToken);
 
+    /// <summary>The Planner puts Shipments on a Draft Trip: each adds its collection and delivery Stops at the end. All go on or none (P11).</summary>
+    Task<TripAnswer> AddShipmentsToTripAsync(string number, IReadOnlyList<string> shipmentNumbers, CancellationToken cancellationToken);
+
     /// <summary>The Planner discards a Draft Trip, which gives its Vehicle and Driver back (P11).</summary>
     Task<TripAnswer> DiscardDraftTripAsync(string number, CancellationToken cancellationToken);
 }

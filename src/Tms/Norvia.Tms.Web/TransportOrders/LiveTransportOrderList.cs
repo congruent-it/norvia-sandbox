@@ -28,6 +28,16 @@ internal sealed partial class LiveTransportOrderList<TItem>(
     /// <summary>True when the last read failed; <see cref="Items"/> then still holds what was read before.</summary>
     public bool LastReadFailed { get; private set; }
 
+    /// <summary>Reads the list now rather than at the next tick, such as after the Planner changed the day it is filtered by.</summary>
+    public async Task RefreshAsync()
+    {
+        await ReadAsync(_stopped.Token);
+        if (Changed is { } changed)
+        {
+            await changed();
+        }
+    }
+
     public void Start() => _refreshing = RefreshUntilStoppedAsync(_stopped.Token);
 
     private async Task RefreshUntilStoppedAsync(CancellationToken cancellationToken)

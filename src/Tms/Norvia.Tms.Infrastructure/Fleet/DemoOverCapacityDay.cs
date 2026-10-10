@@ -1,4 +1,3 @@
-using System.Globalization;
 using Microsoft.Extensions.Options;
 using Norvia.Tms.Application.CanonicalModel;
 using Norvia.Tms.Domain.Fleet;
@@ -22,47 +21,15 @@ internal sealed record DemoOverCapacityDay(
     IReadOnlyList<DemoTransportOrder> TransportOrders)
 {
     /// <summary>The first weekday on or after <see cref="FirstDayFromStart"/> days from the day the demo starts, so Drivers are rostered to work that day.</summary>
-    public DateOnly DayFor(DateOnly start)
-    {
-        var day = start.AddDays(FirstDayFromStart);
-        while (day.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
-        {
-            day = day.AddDays(1);
-        }
-
-        return day;
-    }
+    public DateOnly DayFor(DateOnly start) => DemoBookings.WeekdayOnOrAfter(start.AddDays(FirstDayFromStart));
 
     /// <summary>The booking for one of the demo's Transport Orders, collected on <paramref name="day"/> in <paramref name="zone"/>. Its Shipper reference carries the day, so a demo started on another day books its own.</summary>
-    public CanonicalTransportOrder BookingFor(DateOnly day, DemoTransportOrder order, TimeZoneInfo zone)
-    {
-        ArgumentNullException.ThrowIfNull(order);
-        ArgumentNullException.ThrowIfNull(zone);
-        var delivery = order.Delivery;
-        return new CanonicalTransportOrder(
-            null,
-            ShipperId,
-            string.Create(CultureInfo.InvariantCulture, $"{order.ShipperReference}-{day:yyyyMMdd}"),
-            new CanonicalCollectionDetails(
-                new CanonicalAddress(Collection.Street, Collection.Postcode, Collection.City, Collection.Country),
-                new CanonicalTimeWindow(At(day, Collection.Earliest, zone), At(day, Collection.Latest, zone))),
-            new CanonicalDeliveryDetails(
-                new CanonicalAddress(delivery.Street, delivery.Postcode, delivery.City, delivery.Country),
-                new CanonicalConsignee(delivery.Consignee.Name, delivery.Consignee.ContactName, delivery.Consignee.Phone, null),
-                null),
-            [new CanonicalGoodsLine("pallet", order.Pallets, order.Pallets * order.WeightKgPerPallet, null)],
-            null);
-    }
+    public CanonicalTransportOrder BookingFor(DateOnly day, DemoTransportOrder order, TimeZoneInfo zone) =>
+        DemoBookings.For(ShipperId, Collection, day, order, zone);
 
     public VehicleId VehicleId => new(OffTheRoad.VehicleId);
 
     public DriverId DriverId => new(Absence.DriverId);
-
-    private static DateTimeOffset At(DateOnly day, string time, TimeZoneInfo zone)
-    {
-        var local = day.ToDateTime(TimeOnly.ParseExact(time, "HH:mm", CultureInfo.InvariantCulture));
-        return new DateTimeOffset(local, zone.GetUtcOffset(local));
-    }
 }
 
 internal sealed record DemoOffTheRoad(string VehicleId, string Reason, string? Remark);
@@ -77,11 +44,14 @@ internal sealed record DemoConsignee(string Name, string ContactName, string Pho
 
 internal sealed record DemoTransportOrder(string ShipperReference, DemoDelivery Delivery, int Pallets, decimal WeightKgPerPallet);
 
-/// <summary>What the seed file holds for the demo's Over capacity day: nothing when it has no such part.</summary>
-internal sealed record DemoSeed(DemoOverCapacityDay? OverCapacityDay)
+/// <summary>What the seed file holds for the demo's Over capacity day and Trip day: nothing for a part it doesn't have.</summary>
+internal sealed record DemoSeed(DemoOverCapacityDay? OverCapacityDay, DemoTripDay? TripDay = null)
 {
-    public static DemoSeed Read(IOptions<SeedOptions> options) =>
-        new(SeedFileReader.Read<SeedFile>(options).DemoOverCapacityDay);
+    public static DemoSeed Read(IOptions<SeedOptions> options)
+    {
+        var file = SeedFileReader.Read<SeedFile>(options);
+        return new(file.DemoOverCapacityDay, file.DemoTripDay);
+    }
 
-    private sealed record SeedFile(DemoOverCapacityDay? DemoOverCapacityDay);
+    private sealed record SeedFile(DemoOverCapacityDay? DemoOverCapacityDay, DemoTripDay? DemoTripDay);
 }

@@ -47,6 +47,53 @@ public sealed class TmsApiClientTripsTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateDraftTripAsync_WithShipments_PostsTheirNumbers_AndAnswersTheWarnings()
+    {
+        _tmsApi.Answer(HttpStatusCode.Created, """{ "number": "TR-0000001", "warnings": [{ "code": "DeliveryWindowOutsideTripDay", "message": "Shipment SH-0000012's delivery window doesn't include the Trip's day." }] }""");
+
+        var answer = await _client.CreateDraftTripAsync(new TripEntry(new DateOnly(2026, 10, 14), null, null, ShipmentNumbers: ["SH-0000012", "SH-0000013"]), Cancel);
+
+        answer.Should().BeOfType<TripAnswer.Created>().Which.Warnings.Should().ContainSingle().Which.Code.Should().Be("DeliveryWindowOutsideTripDay");
+        _tmsApi.RequestBody.Should().Be("""{"day":"2026-10-14","shipmentNumbers":["SH-0000012","SH-0000013"]}""");
+    }
+
+    [Fact]
+    public async Task AddShipmentsToTripAsync_PostsTheNumbersToTheTrip_AndAnswersTheWarnings()
+    {
+        _tmsApi.Answer(HttpStatusCode.OK, """{ "number": "TR-0000001", "warnings": [] }""");
+
+        var answer = await _client.AddShipmentsToTripAsync("TR-0000001", ["SH-0000012"], Cancel);
+
+        answer.Should().BeOfType<TripAnswer.Added>().Which.Warnings.Should().BeEmpty();
+        _tmsApi.Request!.Method.Should().Be(HttpMethod.Post);
+        _tmsApi.Request.RequestUri.Should().Be(new Uri("http://tms-api.example/v1/trips/TR-0000001/shipments"));
+        _tmsApi.RequestBody.Should().Be("""{"shipmentNumbers":["SH-0000012"]}""");
+        _tmsApi.Request.Headers.Contains("Idempotency-Key").Should().BeFalse("adding a Shipment that is on the Trip already changes nothing");
+        ScopeOf(_logger.LatestRecord).Should().Contain(new Dictionary<string, object?>
+        {
+            ["flow"] = "trip-planning",
+            ["outcome"] = "Succeeded",
+            ["tripNumber"] = "TR-0000001",
+        });
+    }
+
+    [Fact]
+    public async Task AddShipmentsToTripAsync_ARefusal_AnswersItsReason_AndTracksItsCode()
+    {
+        _tmsApi.Answer(HttpStatusCode.Conflict, """{ "title": "The Shipments can't be put on the Trip.", "detail": "The Trip's 1,500 kg is more than Vehicle VEH-0001's 1,200 kg payload.", "code": "PayloadExceeded" }""");
+
+        var answer = await _client.AddShipmentsToTripAsync("TR-0000001", ["SH-0000012"], Cancel);
+
+        answer.Should().Be(new TripAnswer.Refused("The Trip's 1,500 kg is more than Vehicle VEH-0001's 1,200 kg payload."));
+        ScopeOf(_logger.LatestRecord).Should().Contain(new Dictionary<string, object?>
+        {
+            ["flow"] = "trip-planning",
+            ["outcome"] = "Refused",
+            ["failureCode"] = "PayloadExceeded",
+        });
+    }
+
+    [Fact]
     public async Task ChangeDraftTripAsync_PutsTheVehicleAndDriver_AndTracksTheTripNumber()
     {
         _tmsApi.Answer(HttpStatusCode.NoContent, string.Empty);

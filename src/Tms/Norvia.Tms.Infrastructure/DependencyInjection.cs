@@ -23,6 +23,7 @@ using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.Rate;
 using Norvia.Tms.Application.TransportOrders.Submit;
 using Norvia.Tms.Application.Trips;
+using Norvia.Tms.Application.Trips.AddShipments;
 using Norvia.Tms.Application.Trips.Change;
 using Norvia.Tms.Application.Trips.Create;
 using Norvia.Tms.Domain.CarrierBookings;
@@ -106,6 +107,8 @@ public static class DependencyInjection
         builder.Services.AddScoped<IExceptionNumbers, SqlExceptionNumbers>();
         builder.Services.AddScoped<ITripNumbers, SqlTripNumbers>();
         builder.Services.AddScoped<TripPlanningChecks>();
+        builder.Services.AddScoped<TripShipments>();
+        builder.Services.AddScoped<IPipelineBehavior<AddShipmentsToTripCommand, Result<AddShipmentsToTripResult>>, RetryTripThatLostARace<AddShipmentsToTripCommand, Result<AddShipmentsToTripResult>>>();
         builder.Services.AddScoped<IPipelineBehavior<CreateDraftTripCommand, Result<CreateDraftTripResult>>, RetryTripThatLostARace<CreateDraftTripCommand, Result<CreateDraftTripResult>>>();
         builder.Services.AddScoped<IPipelineBehavior<ChangeDraftTripCommand, Result>, RetryTripThatLostARace<ChangeDraftTripCommand, Result>>();
         builder.Services.AddScoped<IPipelineBehavior<SubmitTransportOrderCommand, Result<SubmitTransportOrderResult>>, RetrySubmissionThatLostARace>();
@@ -168,6 +171,7 @@ public static class DependencyInjection
         builder.Services.AddHostedService<PlanningHorizonWorker>();
         builder.Services.AddSingleton(services => DemoSeed.Read(services.GetRequiredService<IOptions<SeedOptions>>()));
         builder.Services.AddHostedService<DemoOverCapacityDaySeeder>();
+        builder.Services.AddHostedService<DemoTripDaySeeder>();
 
         return builder;
     }

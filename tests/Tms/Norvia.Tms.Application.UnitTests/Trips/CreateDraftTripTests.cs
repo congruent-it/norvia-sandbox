@@ -115,6 +115,6 @@ public sealed class CreateDraftTripTests
     private static string[] Codes(Ardalis.Result.Result<CreateDraftTripResult> result) => [.. result.ValidationErrors.Select(error => error.ErrorCode)];
 
     private async Task<Ardalis.Result.Result<CreateDraftTripResult>> Handle(DateOnly day, VehicleId? vehicle, DriverId? driver, string? key = null) =>
-        await new CreateDraftTripHandler(_fixture.Trips, _fixture.Numbers, _fixture.Checks)
+        await new CreateDraftTripHandler(_fixture.Trips, _fixture.Numbers, _fixture.Checks, _fixture.TripShipments)
             .Handle(new CreateDraftTripCommand(day, vehicle, driver, new IdempotencyKey(key ?? Guid.NewGuid().ToString())), CancellationToken.None);
 }

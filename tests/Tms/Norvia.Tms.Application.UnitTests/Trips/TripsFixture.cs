@@ -3,7 +3,10 @@ using Norvia.Tms.Application.Fleet;
 using Norvia.Tms.Application.Fleet.Availability;
 using Norvia.Tms.Application.Trips;
 using Norvia.Tms.Application.UnitTests.Fleet.Planning;
+using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Fleet;
+using Norvia.Tms.Domain.Shipments;
+using Norvia.Tms.Domain.Shippers;
 using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Domain.Trips;
 using NSubstitute;
@@ -36,7 +39,20 @@ internal sealed class TripsFixture
         });
         var rules = new TripAvailabilityRules(Planning.Days.AsRead(), Planning.Vehicles, Planning.Drivers, plannedDriving, DrivingHourLimits.Default, Planning.Horizon, Planning.Time);
         Checks = new TripPlanningChecks(Trips.AsRead(), Planning.Days.AsRead(), rules);
+        Shipments = InMemoryRepository.Over(StoredShipments);
+        TransportOrders = InMemoryRepository.Over(StoredOrders);
+        TripShipments = new TripShipments(Shipments.AsRead(), TransportOrders.AsRead());
     }
+
+    public List<Shipment> StoredShipments { get; } = [];
+
+    public List<TransportOrder> StoredOrders { get; } = [];
+
+    public IRepository<Shipment> Shipments { get; }
+
+    public IRepository<TransportOrder> TransportOrders { get; }
+
+    public TripShipments TripShipments { get; }
 
     /// <summary>What the infrastructure reports: the planned driving of every stored Trip.</summary>
     public IPlannedDrivingHours PlannedDriving { get; } = Substitute.For<IPlannedDrivingHours>();
@@ -57,4 +73,36 @@ internal sealed class TripsFixture
         Stored.Add(trip);
         return trip;
     }
+
+    /// <summary>
+    /// A Released Own fleet Shipment that collects on <paramref name="collectionDay"/> (08:00-12:00 in Amsterdam) and delivers on <paramref name="deliveryDay"/>
+    /// (default the same day), carrying <paramref name="pallets"/> pallets of <paramref name="weightKg"/> kg in all.
+    /// </summary>
+    public Shipment ReleasedShipment(DateOnly collectionDay, int pallets = 2, decimal weightKg = 500m, DateOnly? deliveryDay = null, bool release = true, CarriedBy? carriedBy = null)
+    {
+        var sequence = ++_shipmentSequence;
+        var delivery = deliveryDay ?? collectionDay;
+        var details = new TransportOrderDetails(
+            $"REF-{sequence}",
+            new CollectionDetails(new Address("Waalhaven Oostzijde 88", "3087 BM", "Rotterdam", "NL"), new TimeWindow(At(collectionDay, 8), At(collectionDay, 12))),
+            new DeliveryDetails(new Address("Oudegracht 112", "3511 AW", "Utrecht", "NL"), new Consignee("Café De Zwaan", null, null, null), new TimeWindow(At(delivery, 13), At(delivery, 17))),
+            [new GoodsLine("pallet", pallets, weightKg, null)],
+            null);
+        var order = TransportOrder.Accept(new ShipperId("SHP-0001"), details, TransportOrderNumber.FromSequence(sequence), IntakeChannel.ShipperApi, new CorrelationId("corr"), Planning.Time.GetUtcNow());
+        var shipment = order.Plan(ShipmentNumber.FromSequence(sequence), carriedBy ?? CarriedBy.OwnFleet, new IdempotencyKey($"plan-{sequence}"), new CorrelationId("corr"), Planning.Time.GetUtcNow())!;
+        if (release)
+        {
+            shipment.Release(order, new IdempotencyKey($"release-{sequence}"), new CorrelationId("corr"), Planning.Time.GetUtcNow(), carriedBy is { IsOwnFleet: false } ? CarrierBookingNumber.FromSequence(sequence) : null);
+        }
+
+        shipment.ClearDomainEvents();
+        StoredOrders.Add(order);
+        StoredShipments.Add(shipment);
+        return shipment;
+    }
+
+    private long _shipmentSequence;
+
+    private static DateTimeOffset At(DateOnly day, int hour) =>
+        new(day.ToDateTime(new TimeOnly(hour, 0)), TimeZoneInfo.FindSystemTimeZoneById("Europe/Amsterdam").GetUtcOffset(day.ToDateTime(new TimeOnly(hour, 0))));
 }

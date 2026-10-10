@@ -214,4 +214,18 @@ public sealed class TripsPageTests : TmsWebContext
 
     private static void Click(AngleSharp.Dom.IElement scope, string label) =>
         scope.QuerySelectorAll("fluent-button").Single(button => button.TextContent.Trim() == label).Click();
+
+    [Fact]
+    public void ListsTheStopCountAndTheLoadAgainstTheVehiclesCapacity_AndLinksToTheTripDetail()
+    {
+        Queries.ListTripsAsync(Arg.Any<CancellationToken>()).Returns(
+            [Full with { StopCount = 4, LoadWeightKg = 650m, LoadPalletPlaces = 3, PayloadKg = 1_200, VehiclePalletPlaces = 4 }, Empty]);
+
+        var page = Render<TripsPage>();
+
+        var rows = page.WaitForElements("tbody tr");
+        rows[0].TextContent.Should().Contain("4").And.Contain("650 / 1,200 kg · 3 / 4 pallets");
+        rows[0].QuerySelector("a[href='/trips/TR-0000002']").Should().NotBeNull();
+        rows[1].TextContent.Should().Contain("0 kg · 0 pallets");
+    }
 }

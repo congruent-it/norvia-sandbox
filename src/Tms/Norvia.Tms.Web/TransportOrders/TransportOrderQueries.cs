@@ -18,6 +18,7 @@ using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shipments.GetByNumber;
 using Norvia.Tms.Application.Shipments.ListAwaitingAnswer;
 using Norvia.Tms.Application.Shipments.ListInProgress;
+using Norvia.Tms.Application.Shipments.ListToPutOnTrips;
 using Norvia.Tms.Application.Shipments.ListToRelease;
 using Norvia.Tms.Application.TrackingEvents.Timeline;
 using Norvia.Tms.Application.TransportOrders;
@@ -28,6 +29,7 @@ using Norvia.Tms.Application.TransportOrders.RatingExceptions;
 using Norvia.Tms.Application.TransportOrders.ToPlan;
 using Norvia.Tms.Application.Trips;
 using Norvia.Tms.Application.Trips.Choices;
+using Norvia.Tms.Application.Trips.GetByNumber;
 using Norvia.Tms.Application.Trips.List;
 using Norvia.Tms.Domain.TransportOrders;
 
@@ -62,6 +64,15 @@ internal sealed class TransportOrderQueries(IServiceScopeFactory scopes) : ITran
 
     public Task<IReadOnlyList<TripView>> ListTripsAsync(CancellationToken cancellationToken) =>
         SendAsync(new ListTripsQuery(), cancellationToken);
+
+    public async Task<TripDetailView?> FindTripAsync(string number, CancellationToken cancellationToken)
+    {
+        var result = await SendAsync(new GetTripQuery(number), cancellationToken);
+        return result.IsSuccess ? result.Value : null;
+    }
+
+    public Task<IReadOnlyList<ShipmentToPutOnTripSummary>> ListShipmentsToPutOnTripsAsync(DateOnly? day, CancellationToken cancellationToken) =>
+        SendAsync(new ListShipmentsToPutOnTripsQuery(day), cancellationToken);
 
     public Task<TripChoices> ListTripChoicesAsync(DateOnly day, string? forTrip, CancellationToken cancellationToken) =>
         SendAsync(new ListTripChoicesQuery(day, forTrip), cancellationToken);
