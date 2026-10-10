@@ -14,7 +14,7 @@ public sealed class TrackingSpecsTests
     private static readonly DateTimeOffset Now = new(2026, 9, 24, 10, 15, 0, TimeSpan.Zero);
 
     [Fact]
-    public void ShipmentsInProgressSpec_FindsTheBookedCollectedAndInTransitShipments_InTheOrderTheyWerePlanned()
+    public void ShipmentsInProgressSpec_FindsTheBookedDispatchedCollectedAndInTransitShipments_InTheOrderTheyWerePlanned()
     {
         var planned = Shipment(1);
         var released = Shipment(2, ShipmentStatus.Released);
@@ -22,10 +22,11 @@ public sealed class TrackingSpecsTests
         var collected = Shipment(4, ShipmentStatus.Collected, plannedAt: Now.AddMinutes(-2));
         var inTransit = Shipment(5, ShipmentStatus.InTransit, plannedAt: Now.AddMinutes(-3));
         var delivered = Shipment(6, ShipmentStatus.Delivered);
+        var dispatched = Shipment(7, ShipmentStatus.Dispatched, plannedAt: Now.AddMinutes(-4));
 
-        var found = new ShipmentsInProgressSpec().Evaluate([delivered, inTransit, planned, collected, released, booked]);
+        var found = new ShipmentsInProgressSpec().Evaluate([delivered, inTransit, planned, collected, released, booked, dispatched]);
 
-        found.Select(shipment => shipment.Number).Should().Equal(inTransit.Number, collected.Number, booked.Number);
+        found.Select(shipment => shipment.Number).Should().Equal(dispatched.Number, inTransit.Number, collected.Number, booked.Number);
     }
 
     [Fact]

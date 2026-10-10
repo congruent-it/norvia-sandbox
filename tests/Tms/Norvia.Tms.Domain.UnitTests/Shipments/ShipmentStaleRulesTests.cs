@@ -21,6 +21,19 @@ public sealed class ShipmentStaleRulesTests
     }
 
     [Fact]
+    public void NotCollected_ADispatchedShipmentFollowsTheSameCollectionRuleAsABookedOne()
+    {
+        _rules.IsStale(ShipmentStatus.Dispatched, Window, null, null, Window.AddHours(2).AddTicks(-1)).Should().BeFalse();
+        _rules.IsStale(ShipmentStatus.Dispatched, Window, null, null, Window.AddHours(2)).Should().BeTrue();
+    }
+
+    [Fact]
+    public void NotCollected_ADispatchedShipmentIsNotStaleForSilence()
+    {
+        _rules.IsStale(ShipmentStatus.Dispatched, null, null, Window, Window.AddDays(10)).Should().BeFalse();
+    }
+
+    [Fact]
     public void NotCollected_WithoutACollectionWindow_IsNotStaleForIt()
     {
         _rules.IsStale(ShipmentStatus.Booked, null, null, null, Window.AddDays(30)).Should().BeFalse();
@@ -58,6 +71,7 @@ public sealed class ShipmentStaleRulesTests
 
     [Theory]
     [InlineData(ShipmentStatus.Booked)]
+    [InlineData(ShipmentStatus.Dispatched)]
     [InlineData(ShipmentStatus.Collected)]
     [InlineData(ShipmentStatus.InTransit)]
     public void NotDelivered_AtTheThresholdAfterTheDeliveryWindow_IsStale(ShipmentStatus status)
