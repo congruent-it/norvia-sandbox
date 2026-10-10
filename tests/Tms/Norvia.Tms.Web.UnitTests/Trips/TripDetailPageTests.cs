@@ -226,7 +226,7 @@ public sealed class TripDetailPageTests : TmsWebContext
         Queries.FindTripAsync("TR-0000001", Arg.Any<CancellationToken>()).Returns(new TripDetailView(
             Trip with { Status = TripStatus.Dispatched, LatestDelivery = TripDeliveryState.NotDelivered }, [Collect, Deliver], [], [])
         {
-            Versions = [new TripVersionView(1, TripDeliveryState.NotDelivered, "old"), new TripVersionView(2, TripDeliveryState.NotDelivered, "new")],
+            Versions = [new TripVersionView(1, TripDeliveryState.NotDelivered, "old"), new TripVersionView(2, TripDeliveryState.NotDelivered, "new", CanSendAgain: true)],
         });
         Commands.SendTripAgainAsync("TR-0000001", 2, Arg.Any<CancellationToken>()).Returns(new TripAnswer.SentAgain(2, "corr-again"));
         var page = Render<TripDetailPage>(parameters => parameters.Add(detail => detail.Number, "TR-0000001"));
@@ -262,7 +262,7 @@ public sealed class TripDetailPageTests : TmsWebContext
         Queries.FindTripAsync("TR-0000001", Arg.Any<CancellationToken>()).Returns(new TripDetailView(
             Trip with { Status = TripStatus.Dispatched, LatestDelivery = TripDeliveryState.NotDelivered }, [Collect, Deliver], [], [])
         {
-            Versions = [new TripVersionView(1, TripDeliveryState.NotDelivered, "x")],
+            Versions = [new TripVersionView(1, TripDeliveryState.NotDelivered, "x", CanSendAgain: true)],
         });
         Commands.SendTripAgainAsync("TR-0000001", 1, Arg.Any<CancellationToken>())
             .Returns(new TripAnswer.Refused("Version 1 of Trip TR-0000001 is Sending, so there is nothing to send again."));

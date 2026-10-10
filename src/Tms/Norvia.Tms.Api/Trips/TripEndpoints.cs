@@ -96,7 +96,7 @@ public static class TripEndpoints
             .WithSummary("Send a Not delivered version of a Trip to the Driver app again.")
             .WithDescription(
                 "Only the Trip's latest version can be sent again, and only while it is Not delivered. The version is Sending once more, and, in one transaction, exactly one TripDispatched with the same version and the whole Trip as it stands now "
-                + "is written to the outbox for the Trip events topic, under a new correlation ID that the answer returns. TripVersionNotUndelivered (409) for a version that is Sending or Delivered, TripVersionNotLatest (409) for an older version, "
+                + "is written to the outbox for the Trip events topic, under a new correlation ID that the answer returns. NothingToSendAgain (409) for a version that is Sending or Delivered, TripVersionNotLatest (409) for an older version, "
                 + "TripNotDispatched (409) for a Draft, VehicleOrDriverInactive (409) when the Trip's Vehicle or Driver is no longer active, TripVersionNotFound or TripNotFound (404).");
 
         trips.MapPost("/{number}/versions/{tripVersion:int}/report-delivered", ReportDeliveredAsync)
@@ -265,17 +265,7 @@ public static class TripEndpoints
         IConflictRetrier retrier,
         CancellationToken cancellationToken)
     {
-        var errors = new Dictionary<string, string[]>();
-        if (string.IsNullOrWhiteSpace(correlationId))
-        {
-            errors = CorrelationIdMissing();
-        }
-
-        if (string.IsNullOrWhiteSpace(report.Cause))
-        {
-            errors[nameof(TripNotDeliveredRequest.Cause)] = ["A not-delivered report needs the technical cause."];
-        }
-
+        var errors = NotDeliveredErrors(correlationId, report.Cause);
         if (errors.Count > 0 || correlationId is null || report.Cause is not { } cause)
         {
             return TypedResults.ValidationProblem(errors);
@@ -283,6 +273,17 @@ public static class TripEndpoints
 
         var result = await retrier.RunAsync(mediator => mediator.Send(new ReportTripNotDeliveredCommand(number, tripVersion, correlationId, cause), cancellationToken).AsTask());
         return result.IsSuccess ? TypedResults.Ok(result.Value) : ReportRefused(result, correlationId);
+    }
+
+    private static Dictionary<string, string[]> NotDeliveredErrors(string? correlationId, string? cause)
+    {
+        var errors = string.IsNullOrWhiteSpace(correlationId) ? CorrelationIdMissing() : [];
+        if (string.IsNullOrWhiteSpace(cause))
+        {
+            errors[nameof(TripNotDeliveredRequest.Cause)] = ["A not-delivered report needs the technical cause."];
+        }
+
+        return errors;
     }
 
     private static Dictionary<string, string[]> CorrelationIdMissing() =>

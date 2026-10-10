@@ -46,13 +46,16 @@ internal sealed partial class TmsApiClient
     public Task<TripAnswer> DispatchTripAsync(string number, CancellationToken cancellationToken) =>
         SendTripAsync("Dispatch Trip", HttpMethod.Post, $"/v1/trips/{Uri.EscapeDataString(number)}/dispatch", number, null, cancellationToken, Flows.TripDispatch);
 
-    public Task<TripAnswer> SendTripAgainAsync(string number, int version, CancellationToken cancellationToken) =>
-        SendTripAsync(SendAgainAction, HttpMethod.Post, $"/v1/trips/{Uri.EscapeDataString(number)}/versions/{version}/send-again", number, null, cancellationToken, Flows.TripDispatch);
+    public async Task<TripAnswer> SendTripAgainAsync(string number, int version, CancellationToken cancellationToken)
+    {
+        var answer = await SendTripAsync("Send Trip again", HttpMethod.Post, $"/v1/trips/{Uri.EscapeDataString(number)}/versions/{version}/send-again", number, null, cancellationToken, Flows.TripDispatch);
+
+        // The TMS answers a send-again like a dispatch; the Planner is told it was the same version sent once more.
+        return answer is TripAnswer.Dispatched sent ? new TripAnswer.SentAgain(sent.Version, sent.CorrelationId) : answer;
+    }
 
     public Task<TripAnswer> DiscardDraftTripAsync(string number, CancellationToken cancellationToken) =>
         SendTripAsync("Discard Draft Trip", HttpMethod.Delete, $"/v1/trips/{Uri.EscapeDataString(number)}", number, null, cancellationToken);
-
-    private const string SendAgainAction = "Send Trip again";
 
     // A dispatch has a flow and an answer of its own; every other action is the Planner building a Trip.
     private async Task<TripAnswer> SendTripAsync(string action, HttpMethod method, string path, string? tripNumber, object? body, CancellationToken cancellationToken, string flow = Flows.TripPlanning)
@@ -91,9 +94,7 @@ internal sealed partial class TmsApiClient
                     LogTripActionDone(action);
                 }
 
-                return action == SendAgainAction
-                    ? new TripAnswer.SentAgain(dispatched.Version, dispatched.CorrelationId)
-                    : new TripAnswer.Dispatched(dispatched.Version, dispatched.CorrelationId);
+                return new TripAnswer.Dispatched(dispatched.Version, dispatched.CorrelationId);
             case HttpStatusCode.OK:
                 var added = await response.Content.ReadFromJsonAsync<AddedShipments>(Json, cancellationToken)
                     ?? throw new HttpRequestException("The TMS API answered added Shipments without a body.");

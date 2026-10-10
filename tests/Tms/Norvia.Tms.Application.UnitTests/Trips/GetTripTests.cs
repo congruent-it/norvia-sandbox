@@ -61,7 +61,7 @@ public sealed class GetTripTests
 
         var result = await Get(trip);
 
-        result.Value.Versions.Should().Equal(new TripVersionView(1, TripDeliveryState.NotDelivered, "The Driver app answered 503."));
+        result.Value.Versions.Should().Equal(new TripVersionView(1, TripDeliveryState.NotDelivered, "The Driver app answered 503.", CanSendAgain: true));
         result.Value.Trip.LatestDelivery.Should().Be(TripDeliveryState.NotDelivered);
     }
 

@@ -36,7 +36,7 @@ public sealed class GetTripHandler(
             ],
             check.Warnings)
         {
-            Versions = [.. trip.Deliveries.OrderBy(delivery => delivery.Version).Select(delivery => new TripVersionView(delivery.Version, delivery.State, delivery.Cause))],
+            Versions = [.. trip.Deliveries.OrderBy(delivery => delivery.Version).Select(delivery => new TripVersionView(delivery.Version, delivery.State, delivery.Cause, trip.EnsureCanSendAgain(delivery.Version) is null))],
         };
     }
 }

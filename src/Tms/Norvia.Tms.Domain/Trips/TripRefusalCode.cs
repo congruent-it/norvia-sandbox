@@ -46,7 +46,7 @@ public enum TripRefusalCode
     TripVersionNotLatest,
 
     /// <summary>The version is Sending or Delivered, so there is nothing to send again.</summary>
-    TripVersionNotUndelivered,
+    NothingToSendAgain,
 
     /// <summary>The Trip's Vehicle or Driver is no longer active, so the Trip can't be sent to its Driver again as it is.</summary>
     VehicleOrDriverInactive,

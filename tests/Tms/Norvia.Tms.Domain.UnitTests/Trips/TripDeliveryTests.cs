@@ -131,9 +131,9 @@ public sealed class TripDeliveryTests
         trip.ReportNotDelivered(1, "x", Report, At);
         trip.EnsureCanSendAgain(3)!.Code.Should().Be(TripRefusalCode.TripVersionNotFound);
         trip.EnsureCanSendAgain(1)!.Code.Should().Be(TripRefusalCode.TripVersionNotLatest);
-        trip.EnsureCanSendAgain(2)!.Code.Should().Be(TripRefusalCode.TripVersionNotUndelivered, "version 2 is still Sending");
+        trip.EnsureCanSendAgain(2)!.Code.Should().Be(TripRefusalCode.NothingToSendAgain, "version 2 is still Sending");
         trip.ReportDelivered(2, At);
-        trip.EnsureCanSendAgain(2)!.Code.Should().Be(TripRefusalCode.TripVersionNotUndelivered, "version 2 was delivered");
+        trip.EnsureCanSendAgain(2)!.Code.Should().Be(TripRefusalCode.NothingToSendAgain, "version 2 was delivered");
     }
 
     [Fact]

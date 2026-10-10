@@ -30,14 +30,14 @@ public sealed class SendTripAgainTests
     }
 
     [Fact]
-    public async Task AVersionThatIsStillSending_IsRefusedWithTripVersionNotUndelivered_AndNothingChanges()
+    public async Task AVersionThatIsStillSending_IsRefusedWithNothingToSendAgain_AndNothingChanges()
     {
         var trip = await _fixture.DispatchedAsync();
         _fixture.Trips.ClearReceivedCalls();
 
         var result = await SendAgain(trip.Number.Value, 1, "corr-again");
 
-        Codes(result).Should().Equal(nameof(TripRefusalCode.TripVersionNotUndelivered));
+        Codes(result).Should().Equal(nameof(TripRefusalCode.NothingToSendAgain));
         trip.DomainEvents.Should().BeEmpty();
         await _fixture.Trips.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }

@@ -47,8 +47,8 @@ public sealed record TripRefusal(TripRefusalCode Code, string Message)
     public static TripRefusal TripVersionNotLatest(TripNumber number, int version, int latest) =>
         new(TripRefusalCode.TripVersionNotLatest, Invariant($"Version {version} of Trip {number} is not its latest, which is version {latest}."));
 
-    public static TripRefusal TripVersionNotUndelivered(TripNumber number, int version, TripDeliveryState state) =>
-        new(TripRefusalCode.TripVersionNotUndelivered, Invariant($"Version {version} of Trip {number} is {state}, so there is nothing to send again."));
+    public static TripRefusal NothingToSendAgain(TripNumber number, int version, TripDeliveryState state) =>
+        new(TripRefusalCode.NothingToSendAgain, Invariant($"Version {version} of Trip {number} is {state}, so there is nothing to send again."));
 
     public static TripRefusal VehicleOrDriverInactive(TripNumber number) =>
         new(TripRefusalCode.VehicleOrDriverInactive, $"The Vehicle or the Driver of Trip {number} is no longer active, so it can't be sent again as it is.");

@@ -172,9 +172,9 @@ public sealed class TripDeliveryTests(TripsTmsFixture tms) : IClassFixture<Trips
     {
         var (trip, dispatchCorrelationId) = await DispatchedTripAsync(5800);
 
-        await AssertRefusedAsync(await SendAgainAsync(trip, 1), HttpStatusCode.Conflict, "TripVersionNotUndelivered");
+        await AssertRefusedAsync(await SendAgainAsync(trip, 1), HttpStatusCode.Conflict, "NothingToSendAgain");
         await ReportDeliveredAsync(trip, 1, dispatchCorrelationId);
-        await AssertRefusedAsync(await SendAgainAsync(trip, 1), HttpStatusCode.Conflict, "TripVersionNotUndelivered");
+        await AssertRefusedAsync(await SendAgainAsync(trip, 1), HttpStatusCode.Conflict, "NothingToSendAgain");
         await AssertRefusedAsync(await SendAgainAsync(trip, 2), HttpStatusCode.NotFound, "TripVersionNotFound");
         await AssertRefusedAsync(await SendAgainAsync("TR-9999999", 1), HttpStatusCode.NotFound, "TripNotFound");
 

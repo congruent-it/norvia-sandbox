@@ -13,18 +13,8 @@ public sealed class ReportTripNotDeliveredHandler(IRepository<Trip> trips, TimeP
     {
         ArgumentNullException.ThrowIfNull(command);
 
-        if (await trips.FindAsync(command.Number, cancellationToken) is not { } trip)
-        {
-            return TripRefused.Because<TripDeliveryReportResult>(TripRefusal.TripNotFound(command.Number));
-        }
-
         // One save writes the version's state and TripNotDelivered's outbox message together.
-        var report = trip.ReportNotDelivered(command.Version, command.Cause, new CorrelationId(command.CorrelationId), time.GetUtcNow());
-        if (report == TripDeliveryReport.Recorded)
-        {
-            await trips.SaveChangesAsync(cancellationToken);
-        }
-
-        return TripDeliveryReports.Answer(trip, command.Version, report);
+        return await TripDeliveryReports.HandleAsync(
+            trips, command.Number, command.Version, trip => trip.ReportNotDelivered(command.Version, command.Cause, new CorrelationId(command.CorrelationId), time.GetUtcNow()), cancellationToken);
     }
 }

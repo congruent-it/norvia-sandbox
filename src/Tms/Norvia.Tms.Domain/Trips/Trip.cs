@@ -37,6 +37,12 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
     /// <summary>Whether the Driver app has each version, in version order. A Draft has none.</summary>
     public IReadOnlyList<TripVersionDelivery> Deliveries => _deliveries;
 
+    /// <summary>Whether the Driver app has the Trip's latest version; null while the Trip is a Draft.</summary>
+    public TripVersionDelivery? LatestDelivery => DeliveryOf(Version);
+
+    /// <summary>The delivery of this version, or null when the Trip never had it.</summary>
+    public TripVersionDelivery? DeliveryOf(int version) => _deliveries.Find(delivery => delivery.Version == version);
+
     public VehicleId? VehicleId { get; private set; }
 
     public DriverId? DriverId { get; private set; }
@@ -286,7 +292,7 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
             return TripRefusal.TripNotDispatched(Number);
         }
 
-        if (_deliveries.Find(delivery => delivery.Version == version) is not { } delivery)
+        if (DeliveryOf(version) is not { } delivery)
         {
             return TripRefusal.TripVersionNotFound(Number, version);
         }
@@ -296,7 +302,7 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
             return TripRefusal.TripVersionNotLatest(Number, version, Version);
         }
 
-        return delivery.State == TripDeliveryState.NotDelivered ? null : TripRefusal.TripVersionNotUndelivered(Number, version, delivery.State);
+        return delivery.State == TripDeliveryState.NotDelivered ? null : TripRefusal.NothingToSendAgain(Number, version, delivery.State);
     }
 
     /// <summary>
@@ -314,14 +320,14 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
             throw new InvalidOperationException(refusal.Message);
         }
 
-        _deliveries.Single(delivery => delivery.Version == version).SendAgain();
+        DeliveryOf(version)!.SendAgain();
         RegisterDomainEvent(new TripDispatchedEvent(this, correlationId, sentAt, vehicle, driver, shipments));
     }
 
     // The version's delivery when a report applies to it: a Sending one. Otherwise why not.
     private TripVersionDelivery? SendingVersion(int version, out TripDeliveryReport report)
     {
-        var delivery = _deliveries.Find(candidate => candidate.Version == version);
+        var delivery = DeliveryOf(version);
         report = delivery is null ? TripDeliveryReport.UnknownVersion : TripDeliveryReport.Ignored;
         return delivery is { State: TripDeliveryState.Sending } ? delivery : null;
     }

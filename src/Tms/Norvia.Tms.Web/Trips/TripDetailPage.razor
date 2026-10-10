@@ -90,7 +90,7 @@
                         <td>@TripText.Delivery(version.State)</td>
                         <td>@(version.Cause ?? "—")</td>
                         <td>
-                            @if (version.State == TripDeliveryState.NotDelivered && version.Version == detail.Versions.Max(listed => listed.Version))
+                            @if (version.CanSendAgain)
                             {
                                 <FluentButton Appearance="Appearance.Outline" Disabled="_working" OnClick="@(() => SendAgainAsync(version.Version))"
                                               aria-label="@($"Send version {version.Version} again")">Send again</FluentButton>
