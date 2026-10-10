@@ -12,6 +12,7 @@ public sealed class TmsApiClientTripsTests : IDisposable
 
     private readonly StubHandler _tmsApi = new();
     private readonly ITmsApiTokens _tokens = Substitute.For<ITmsApiTokens>();
+    private readonly FakeLogger<TmsApiClient> _logger = new();
     private readonly TmsUiActivities _activities = new("Norvia.Tms.Web.Tests");
     private readonly HttpClient _http;
     private readonly TmsApiClient _client;
@@ -20,7 +21,7 @@ public sealed class TmsApiClientTripsTests : IDisposable
     {
         _http = new HttpClient(_tmsApi) { BaseAddress = new Uri("http://tms-api.example") };
         _tokens.GetTokenAsync(Arg.Any<CancellationToken>()).Returns("tms-ui-token");
-        _client = new TmsApiClient(_http, _tokens, _activities, new FakeLogger<TmsApiClient>());
+        _client = new TmsApiClient(_http, _tokens, _activities, _logger);
     }
 
     public void Dispose()
@@ -42,10 +43,11 @@ public sealed class TmsApiClientTripsTests : IDisposable
         _tmsApi.Request.RequestUri.Should().Be(new Uri("http://tms-api.example/v1/trips"));
         _tmsApi.Request.Headers.Authorization!.Parameter.Should().Be("tms-ui-token");
         _tmsApi.RequestBody.Should().Be("""{"day":"2026-10-14","vehicleId":"VEH-0001"}""");
+        _tmsApi.Request.Headers.GetValues("Idempotency-Key").Single().Should().NotBeNullOrWhiteSpace("a retried create must not make another Draft");
     }
 
     [Fact]
-    public async Task ChangeDraftTripAsync_PutsTheVehicleAndDriver()
+    public async Task ChangeDraftTripAsync_PutsTheVehicleAndDriver_AndTracksTheTripNumber()
     {
         _tmsApi.Answer(HttpStatusCode.NoContent, string.Empty);
 
@@ -55,6 +57,12 @@ public sealed class TmsApiClientTripsTests : IDisposable
         _tmsApi.Request!.Method.Should().Be(HttpMethod.Put);
         _tmsApi.Request.RequestUri.Should().Be(new Uri("http://tms-api.example/v1/trips/TR-0000001"));
         _tmsApi.RequestBody.Should().Be("""{"vehicleId":"VEH-0001","driverId":"DRV-0002"}""");
+        ScopeOf(_logger.LatestRecord).Should().Contain(new Dictionary<string, object?>
+        {
+            ["flow"] = "trip-planning",
+            ["outcome"] = "Succeeded",
+            ["tripNumber"] = "TR-0000001",
+        });
     }
 
     [Fact]
@@ -79,6 +87,12 @@ public sealed class TmsApiClientTripsTests : IDisposable
         var answer = await _client.CreateDraftTripAsync(new TripEntry(new DateOnly(2026, 10, 14), "VEH-0001", null), Cancel);
 
         answer.Should().Be(new TripAnswer.Refused("Vehicle VEH-0001 is not available on 2026-10-14: it has another Trip that day."));
+        ScopeOf(_logger.LatestRecord).Should().Contain(new Dictionary<string, object?>
+        {
+            ["flow"] = "trip-planning",
+            ["outcome"] = "Refused",
+            ["failureCode"] = "VehicleNotAvailable",
+        });
     }
 
     [Fact]
@@ -88,6 +102,9 @@ public sealed class TmsApiClientTripsTests : IDisposable
 
         (await _client.DiscardDraftTripAsync("TR-0000001", Cancel)).Should().Be(new TripAnswer.Refused("Discard Draft Trip was refused."));
     }
+
+    private static Dictionary<string, object?> ScopeOf(FakeLogRecord record) =>
+        record.Scopes.OfType<IEnumerable<KeyValuePair<string, object?>>>().SelectMany(keys => keys).ToDictionary();
 
     [Fact]
     public async Task AnUnexpectedStatus_Throws()

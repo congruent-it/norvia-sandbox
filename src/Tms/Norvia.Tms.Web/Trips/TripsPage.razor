@@ -41,7 +41,7 @@
                     GridTemplateColumns="1.2fr 1.2fr 1fr 1.6fr 1.8fr 2fr" MultiLine="true">
         <PropertyColumn Title="Trip" Property="@(trip => trip.Number)" />
         <PropertyColumn Title="Day" Property="@(trip => FleetText.Day(trip.Day))" />
-        <PropertyColumn Title="Status" Property="@(trip => TripsText.Status(trip.Status))" />
+        <PropertyColumn Title="Status" Property="@(trip => trip.Status.ToString())" />
         <PropertyColumn Title="Vehicle" Property="@(trip => trip.VehicleRegistration ?? "—")" />
         <PropertyColumn Title="Driver" Property="@(trip => trip.DriverName ?? "—")" />
         <TemplateColumn Title="Actions">

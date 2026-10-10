@@ -116,7 +116,12 @@
         }
     }
 
-    private static string Iso(DateOnly day) => day.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+    private const string DayFormat = "yyyy-MM-dd";
+
+    private static string Iso(DateOnly day) => day.ToString(DayFormat, System.Globalization.CultureInfo.InvariantCulture);
+
+    private static bool TryParseDay(string text, out DateOnly day) =>
+        DateOnly.TryParseExact(text, DayFormat, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out day);
 
     private async Task DayChangedAsync(string value)
     {
@@ -124,7 +129,7 @@
         _vehicleId = string.Empty;
         _driverId = string.Empty;
         _choices = new TripChoices([], []);
-        if (DateOnly.TryParseExact(value, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var day))
+        if (TryParseDay(value, out var day))
         {
             await LoadChoicesAsync(day);
         }
@@ -156,7 +161,7 @@
 
         _failure = null;
         _done = null;
-        if (!DateOnly.TryParseExact(_day, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var day))
+        if (!TryParseDay(_day, out var day))
         {
             _failure = "Choose a day.";
             return;

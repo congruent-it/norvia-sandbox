@@ -1,6 +1,7 @@
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Mediator;
+using Norvia.Tms.Domain.Fleet;
 using Norvia.Tms.Domain.Trips;
 
 namespace Norvia.Tms.Application.Trips.Change;
@@ -11,8 +12,7 @@ public sealed class ChangeDraftTripHandler(IRepository<Trip> trips, TripPlanning
     {
         ArgumentNullException.ThrowIfNull(command);
 
-        if (!TripNumber.TryParse(command.Number, out var number)
-            || await trips.FirstOrDefaultAsync(new TripByNumberSpec(number), cancellationToken) is not { } trip)
+        if (await trips.FindAsync(command.Number, cancellationToken) is not { } trip)
         {
             return TripRefused.Because(TripRefusal.TripNotFound(command.Number));
         }
@@ -22,7 +22,10 @@ public sealed class ChangeDraftTripHandler(IRepository<Trip> trips, TripPlanning
             return TripRefused.Because(notDraft);
         }
 
-        var failures = await checks.CheckAsync(trip.Day, command.VehicleId, command.DriverId, trip, cancellationToken);
+        // Giving the Vehicle and Driver back is always allowed, also when the day has since left the Planning horizon.
+        IReadOnlyList<TripAvailabilityFailure> failures = command.VehicleId is null && command.DriverId is null
+            ? []
+            : await checks.CheckAsync(trip.Day, command.VehicleId, command.DriverId, trip, cancellationToken);
         if (failures.Count > 0)
         {
             return TripRefused.Because(failures);

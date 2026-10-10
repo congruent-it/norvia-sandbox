@@ -82,5 +82,15 @@ internal sealed partial class TmsApiClient
     private sealed record ExceptionActed(string? ShipmentNumber, string? CorrelationId);
 
     // A refusal (a problem with a code and a detail) or an invalid request (a validation problem with its errors).
+    /// <summary>A refusal's problem, and the reason to show: its detail, else its validation errors, else <paramref name="fallback"/>.</summary>
+    private static async Task<(ExceptionRefusal? Problem, string Reason)> ReadRefusalAsync(HttpResponseMessage response, string fallback, CancellationToken cancellationToken)
+    {
+        var problem = await response.Content.ReadFromJsonAsync<ExceptionRefusal>(Json, cancellationToken);
+        var reason = problem?.Detail
+            ?? (problem?.Errors is { Count: > 0 } errors ? string.Join(' ', errors.Values.SelectMany(messages => messages)) : null)
+            ?? fallback;
+        return (problem, reason);
+    }
+
     private sealed record ExceptionRefusal(string? Detail, string? Code, string? CorrelationId, Dictionary<string, string[]>? Errors);
 }

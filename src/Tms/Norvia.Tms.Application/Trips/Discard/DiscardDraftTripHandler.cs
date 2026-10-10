@@ -11,8 +11,7 @@ public sealed class DiscardDraftTripHandler(IRepository<Trip> trips) : ICommandH
     {
         ArgumentNullException.ThrowIfNull(command);
 
-        if (!TripNumber.TryParse(command.Number, out var number)
-            || await trips.FirstOrDefaultAsync(new TripByNumberSpec(number), cancellationToken) is not { } trip)
+        if (await trips.FindAsync(command.Number, cancellationToken) is not { } trip)
         {
             return TripRefused.Because(TripRefusal.TripNotFound(command.Number));
         }

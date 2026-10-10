@@ -24,6 +24,7 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                     Status = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
                     VehicleId = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
                     DriverId = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
+                    IdempotencyKey = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     RowVersion = table.Column<byte[]>(type: "rowversion", rowVersion: true, nullable: true)
                 },
                 constraints: table =>
@@ -49,6 +50,12 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                 columns: new[] { "Day", "VehicleId" },
                 unique: true,
                 filter: "[VehicleId] IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Trips_IdempotencyKey",
+                table: "Trips",
+                column: "IdempotencyKey",
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Trips_Number",

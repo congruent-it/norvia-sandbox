@@ -1,5 +1,6 @@
 using Ardalis.SharedKernel;
 using Norvia.Tms.Domain.Fleet;
+using Norvia.Tms.Domain.TransportOrders;
 
 namespace Norvia.Tms.Domain.Trips;
 
@@ -9,7 +10,7 @@ namespace Norvia.Tms.Domain.Trips;
 /// </summary>
 public sealed class Trip : EntityBase<TripId>, IAggregateRoot
 {
-    private Trip(TripNumber number, DateOnly day, VehicleId? vehicleId, DriverId? driverId)
+    private Trip(TripNumber number, DateOnly day, VehicleId? vehicleId, DriverId? driverId, IdempotencyKey idempotencyKey)
     {
         Id = TripId.New();
         Number = number;
@@ -17,6 +18,7 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
         VehicleId = vehicleId;
         DriverId = driverId;
         Status = TripStatus.Draft;
+        IdempotencyKey = idempotencyKey;
     }
 
     public TripNumber Number { get; private set; }
@@ -29,24 +31,30 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
 
     public DriverId? DriverId { get; private set; }
 
+    /// <summary>The key of the request that created the Trip, so the same request sent again as a retry finds it instead of creating another.</summary>
+    public IdempotencyKey IdempotencyKey { get; private set; }
+
     /// <summary>A new Draft. Either of the Vehicle and the Driver may be empty.</summary>
-    public static Trip CreateDraft(TripNumber number, DateOnly day, VehicleId? vehicleId, DriverId? driverId)
+    public static Trip CreateDraft(TripNumber number, DateOnly day, VehicleId? vehicleId, DriverId? driverId, IdempotencyKey idempotencyKey)
     {
         ArgumentNullException.ThrowIfNull(number);
-        return new Trip(number, day, vehicleId, driverId);
+        ArgumentNullException.ThrowIfNull(idempotencyKey);
+        return new Trip(number, day, vehicleId, driverId, idempotencyKey);
     }
 
-    /// <summary>Gives the Draft this Vehicle and Driver, or none, which gives the previous ones back. Returns null when it is done.</summary>
-    public TripRefusal? Pick(VehicleId? vehicleId, DriverId? driverId)
+    /// <summary>
+    /// Gives the Draft this Vehicle and Driver, or none, which gives the previous ones back. The caller checks <see cref="EnsureDraft"/>
+    /// first, so a Dispatched Trip reaching here is a bug.
+    /// </summary>
+    public void Pick(VehicleId? vehicleId, DriverId? driverId)
     {
-        if (EnsureDraft() is { } refusal)
+        if (EnsureDraft() is not null)
         {
-            return refusal;
+            throw new InvalidOperationException($"Trip {Number} is Dispatched, so its Vehicle and Driver change only by Amend.");
         }
 
         VehicleId = vehicleId;
         DriverId = driverId;
-        return null;
     }
 
     /// <summary>Null when the Trip is a Draft, which can be changed or discarded; a Dispatched Trip is neither, and is never deleted.</summary>

@@ -27,12 +27,12 @@ public sealed class ListTripChoicesHandler(
         return new TripChoices(
             [
                 .. vehicles.ListActive()
-                    .Where(vehicle => day.IsAvailable(vehicle.Id) && others.All(trip => trip.VehicleId != vehicle.Id))
+                    .Where(vehicle => day.IsAvailable(vehicle.Id) && !others.Vehicle(vehicle.Id))
                     .Select(vehicle => new VehicleChoice(vehicle.Id.Value, vehicle.Registration)),
             ],
             [
                 .. drivers.ListActive()
-                    .Where(driver => day.HasShift(driver.Id) && others.All(trip => trip.DriverId != driver.Id))
+                    .Where(driver => day.HasShift(driver.Id) && !others.Driver(driver.Id))
                     .Select(driver => new DriverChoice(driver.Id.Value, driver.Name)),
             ]);
     }

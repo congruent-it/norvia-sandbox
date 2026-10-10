@@ -1,6 +1,7 @@
 using Ardalis.Result;
 using Mediator;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
 using Norvia.Tms.Api.TransportOrders;
 using Norvia.Tms.Application.Trips;
 using Norvia.Tms.Application.Trips.Change;
@@ -8,6 +9,7 @@ using Norvia.Tms.Application.Trips.Create;
 using Norvia.Tms.Application.Trips.Discard;
 using Norvia.Tms.Application.Trips.List;
 using Norvia.Tms.Domain.Fleet;
+using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Domain.Trips;
 
 namespace Norvia.Tms.Api.Trips;
@@ -32,7 +34,7 @@ public static class TripEndpoints
             .RequireAuthorization(policy => policy.RequireRole(TransportOrderEndpoints.ManageRole))
             .WithSummary("Create a Draft Trip for an open day, with or without a Vehicle and Driver.")
             .WithDescription(
-                "day is required, otherwise the call is a 400. A Vehicle or Driver given must pass P10's availability rules and have no other Trip that day, Drafts included. "
+                "day and an Idempotency-Key header (the same for each retry, which is answered with the Draft the first call created) are required, otherwise the call is a 400. A Vehicle or Driver given must pass P10's availability rules and have no other Trip that day, Drafts included. "
                 + "A request that breaks a rule is refused, creating nothing, with a 409 problem whose code names the first rule broken (VehicleNotAvailable, DriverNotAvailable, LicenceNotHeld or DayNotOpen) "
                 + "and whose failures lists every rule broken.");
 
@@ -58,15 +60,29 @@ public static class TripEndpoints
 
     private static async Task<Results<Created<CreateDraftTripResult>, ProblemHttpResult, ValidationProblem>> CreateDraftAsync(
         CreateTripRequest request,
+        [FromHeader(Name = TransportOrderEndpoints.IdempotencyKeyHeader)] string? idempotencyKey,
         IMediator mediator,
         CancellationToken cancellationToken)
     {
-        if (request.Day is not { } day)
+        var errors = new Dictionary<string, string[]>();
+        if (request.Day is null)
         {
-            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { [nameof(CreateTripRequest.Day)] = ["A Trip needs its day."] });
+            errors[nameof(CreateTripRequest.Day)] = ["A Trip needs its day."];
         }
 
-        var result = await mediator.Send(new CreateDraftTripCommand(day, VehicleOf(request.VehicleId), DriverOf(request.DriverId)), cancellationToken);
+        if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Length > IdempotencyKey.MaxLength)
+        {
+            errors[TransportOrderEndpoints.IdempotencyKeyHeader] =
+                [$"Creating a Trip needs an {TransportOrderEndpoints.IdempotencyKeyHeader} of 1 to {IdempotencyKey.MaxLength} characters, the same for each retry."];
+        }
+
+        if (errors.Count > 0 || request.Day is not { } day)
+        {
+            return TypedResults.ValidationProblem(errors);
+        }
+
+        var result = await mediator.Send(
+            new CreateDraftTripCommand(day, VehicleOf(request.VehicleId), DriverOf(request.DriverId), new IdempotencyKey(idempotencyKey!)), cancellationToken);
         return result.IsSuccess
             ? TypedResults.Created($"/v1/trips/{result.Value.Number}", result.Value)
             : Refused(result.ValidationErrors, "The Trip can't be created.");
@@ -97,7 +113,9 @@ public static class TripEndpoints
         var all = refusals.ToList();
         var first = all[0];
         return TypedResults.Problem(
-            statusCode: first.ErrorCode == nameof(TripRefusalCode.TripNotFound) ? StatusCodes.Status404NotFound : StatusCodes.Status409Conflict,
+            statusCode: Enum.TryParse<TripRefusalCode>(first.ErrorCode, out var code) && code == TripRefusalCode.TripNotFound
+                ? StatusCodes.Status404NotFound
+                : StatusCodes.Status409Conflict,
             title: title,
             detail: first.ErrorMessage,
             extensions: new Dictionary<string, object?>

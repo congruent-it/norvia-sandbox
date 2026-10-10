@@ -4,6 +4,7 @@ using Norvia.Tms.Application.Fleet.Availability;
 using Norvia.Tms.Application.Trips;
 using Norvia.Tms.Application.UnitTests.Fleet.Planning;
 using Norvia.Tms.Domain.Fleet;
+using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Domain.Trips;
 using NSubstitute;
 
@@ -42,7 +43,7 @@ internal sealed class TripsFixture
 
     public Trip Existing(DateOnly day, VehicleId? vehicle, DriverId? driver)
     {
-        var trip = Trip.CreateDraft(TripNumber.FromSequence(100 + Stored.Count), day, vehicle, driver);
+        var trip = Trip.CreateDraft(TripNumber.FromSequence(100 + Stored.Count), day, vehicle, driver, new IdempotencyKey(Guid.NewGuid().ToString()));
         Stored.Add(trip);
         return trip;
     }

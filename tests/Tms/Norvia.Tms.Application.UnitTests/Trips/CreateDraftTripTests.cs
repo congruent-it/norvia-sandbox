@@ -1,5 +1,6 @@
 using Norvia.Tms.Application.Trips.Create;
 using Norvia.Tms.Domain.Fleet;
+using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Domain.Trips;
 using NSubstitute;
 using static Norvia.Tms.Application.UnitTests.Fleet.Planning.PlanningEditsFixture;
@@ -99,9 +100,21 @@ public sealed class CreateDraftTripTests
         Codes(result).Should().Equal(nameof(TripAvailabilityCode.VehicleNotAvailable));
     }
 
+    [Fact]
+    public async Task Handle_TheSameRequestSentAgain_IsAnsweredWithTheDraftItCreated_AndCreatesNoOther()
+    {
+        var first = await Handle(TripsFixture.Tuesday, Van, Anouk, key: "retry-1");
+
+        var again = await Handle(TripsFixture.Tuesday, Van, Anouk, key: "retry-1");
+
+        again.IsSuccess.Should().BeTrue("the Vehicle and Driver it holds are its own, not another Trip's");
+        again.Value.Number.Should().Be(first.Value.Number);
+        _fixture.Stored.Should().ContainSingle();
+    }
+
     private static string[] Codes(Ardalis.Result.Result<CreateDraftTripResult> result) => [.. result.ValidationErrors.Select(error => error.ErrorCode)];
 
-    private async Task<Ardalis.Result.Result<CreateDraftTripResult>> Handle(DateOnly day, VehicleId? vehicle, DriverId? driver) =>
+    private async Task<Ardalis.Result.Result<CreateDraftTripResult>> Handle(DateOnly day, VehicleId? vehicle, DriverId? driver, string? key = null) =>
         await new CreateDraftTripHandler(_fixture.Trips, _fixture.Numbers, _fixture.Checks)
-            .Handle(new CreateDraftTripCommand(day, vehicle, driver), CancellationToken.None);
+            .Handle(new CreateDraftTripCommand(day, vehicle, driver, new IdempotencyKey(key ?? Guid.NewGuid().ToString())), CancellationToken.None);
 }

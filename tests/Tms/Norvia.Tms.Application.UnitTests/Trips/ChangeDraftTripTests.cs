@@ -81,6 +81,17 @@ public sealed class ChangeDraftTripTests
         trip.DriverId.Should().BeNull();
     }
 
+    [Fact]
+    public async Task Handle_GivingTheVehicleAndDriverBack_IsAllowedOnADayThatLeftThePlanningHorizon()
+    {
+        var trip = _fixture.Existing(Monday.AddDays(-3), Van, Anouk);
+
+        (await Handle(trip.Number.Value, null, null)).IsSuccess.Should().BeTrue();
+
+        trip.VehicleId.Should().BeNull();
+        trip.DriverId.Should().BeNull();
+    }
+
     private static string[] Codes(Result result) => [.. result.ValidationErrors.Select(error => error.ErrorCode)];
 
     private async Task<Result> Handle(string number, VehicleId? vehicle, DriverId? driver) =>

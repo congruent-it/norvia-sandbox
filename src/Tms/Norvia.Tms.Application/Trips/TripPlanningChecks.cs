@@ -15,14 +15,14 @@ public sealed class TripPlanningChecks(IReadRepository<Trip> trips, TripAvailabi
     public async Task<IReadOnlyList<TripAvailabilityFailure>> CheckAsync(
         DateOnly day, VehicleId? vehicle, DriverId? driver, Trip? current, CancellationToken cancellationToken)
     {
-        var others = (await trips.ListAsync(new TripsOnDaySpec(day), cancellationToken)).Where(trip => trip != current).ToList();
+        var others = (await trips.ListAsync(new TripsOnDaySpec(day), cancellationToken)).Where(trip => trip.Number != current?.Number).ToList();
         var proposal = new TripProposal(
             day,
             FleetLoad.None,
             vehicle,
             driver,
-            VehicleHasOtherTrip: vehicle is { } v && others.Any(trip => trip.VehicleId == v),
-            DriverHasOtherTrip: driver is { } d && others.Any(trip => trip.DriverId == d));
+            VehicleHasOtherTrip: vehicle is { } v && others.Vehicle(v),
+            DriverHasOtherTrip: driver is { } d && others.Driver(d));
         return await rules.CheckAsync(proposal, cancellationToken);
     }
 }

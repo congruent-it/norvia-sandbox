@@ -56,10 +56,7 @@ internal sealed partial class TmsApiClient
                 return new CapacityAnswer.Done();
             // A refused edit: its problem's detail is the refusal's readable message, and its code says which rule.
             case HttpStatusCode.NotFound or HttpStatusCode.Conflict or HttpStatusCode.BadRequest:
-                var problem = await response.Content.ReadFromJsonAsync<ExceptionRefusal>(Json, cancellationToken);
-                var reason = problem?.Detail
-                    ?? (problem?.Errors is { Count: > 0 } errors ? string.Join(' ', errors.Values.SelectMany(messages => messages)) : null)
-                    ?? $"{action} was refused.";
+                var (problem, reason) = await ReadRefusalAsync(response, $"{action} was refused.", cancellationToken);
                 LogCapacityRefused(action, problem?.Code ?? "unknown", reason);
                 return new CapacityAnswer.Refused(reason);
             default:

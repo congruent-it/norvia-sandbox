@@ -889,6 +889,11 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<string>("Number")
                         .IsRequired()
                         .HasMaxLength(10)
@@ -915,13 +920,16 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                     b.HasIndex("Number")
                         .IsUnique();
 
-                    b.HasIndex("Day", "DriverId")
+                    b.HasIndex(new[] { "Day", "DriverId" }, "IX_Trips_Day_DriverId")
                         .IsUnique()
                         .HasFilter("[DriverId] IS NOT NULL");
 
-                    b.HasIndex("Day", "VehicleId")
+                    b.HasIndex(new[] { "Day", "VehicleId" }, "IX_Trips_Day_VehicleId")
                         .IsUnique()
                         .HasFilter("[VehicleId] IS NOT NULL");
+
+                    b.HasIndex(new[] { "IdempotencyKey" }, "IX_Trips_IdempotencyKey")
+                        .IsUnique();
 
                     b.ToTable("Trips", (string)null);
                 });

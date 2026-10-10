@@ -113,6 +113,43 @@ public sealed class TripDraftTests(TripsTmsFixture tms) : IClassFixture<TripsTms
     }
 
     [Fact]
+    public async Task TwoRequestsAskingAtOnceForTheSameVehicle_CreateOneTrip_AndTheOtherIsRefusedWithAStableCode()
+    {
+        var day = (await OpenHorizonAsync(1600)).AddDays(1);
+
+        var answers = await Task.WhenAll(Enumerable.Range(0, 6).Select(_ => CreateAsync(day, Van, null)));
+
+        answers.Count(answer => answer.StatusCode == HttpStatusCode.Created).Should().Be(1);
+        foreach (var refused in answers.Where(answer => answer.StatusCode != HttpStatusCode.Created))
+        {
+            await AssertRefusedAsync(refused, HttpStatusCode.Conflict, "VehicleNotAvailable");
+        }
+
+        (await ListAsync()).Count(trip => trip["day"]!.GetValue<string>() == $"{day:yyyy-MM-dd}").Should().Be(1);
+    }
+
+    [Fact]
+    public async Task TheSameRequestSentAgain_IsAnsweredWithTheDraftItCreated()
+    {
+        var day = (await OpenHorizonAsync(1700)).AddDays(1);
+
+        using var first = await CreateAsync(day, Van, Anouk, key: "trip-retry-1");
+        using var again = await CreateAsync(day, Van, Anouk, key: "trip-retry-1");
+
+        again.StatusCode.Should().Be(HttpStatusCode.Created);
+        (await NumberOf(again)).Should().Be(await NumberOf(first));
+        (await ListAsync()).Count(trip => trip["day"]!.GetValue<string>() == $"{day:yyyy-MM-dd}").Should().Be(1);
+    }
+
+    [Fact]
+    public async Task CreatingADraft_WithoutAnIdempotencyKey_IsABadRequest()
+    {
+        using var response = await tms.TmsUi.PostAsJsonAsync(new Uri("/v1/trips", UriKind.Relative), new { day = "2026-12-01" }, _cancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
     public async Task CreatingChangingOrDiscardingADraft_PublishesNothing()
     {
         var day = (await OpenHorizonAsync(1500)).AddDays(1);
@@ -145,8 +182,15 @@ public sealed class TripDraftTests(TripsTmsFixture tms) : IClassFixture<TripsTms
         return first;
     }
 
-    private Task<HttpResponseMessage> CreateAsync(DateOnly day, string? vehicleId, string? driverId) =>
-        tms.TmsUi.PostAsJsonAsync(new Uri("/v1/trips", UriKind.Relative), new { day = $"{day:yyyy-MM-dd}", vehicleId, driverId }, _cancellationToken);
+    private async Task<HttpResponseMessage> CreateAsync(DateOnly day, string? vehicleId, string? driverId, string? key = null)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("/v1/trips", UriKind.Relative))
+        {
+            Content = JsonContent.Create(new { day = $"{day:yyyy-MM-dd}", vehicleId, driverId }),
+        };
+        request.Headers.Add("Idempotency-Key", key ?? Guid.NewGuid().ToString());
+        return await tms.TmsUi.SendAsync(request, _cancellationToken);
+    }
 
     private Task<HttpResponseMessage> ChangeAsync(string number, string? vehicleId, string? driverId) =>
         tms.TmsUi.PutAsJsonAsync(new Uri($"/v1/trips/{number}", UriKind.Relative), new { vehicleId, driverId }, _cancellationToken);

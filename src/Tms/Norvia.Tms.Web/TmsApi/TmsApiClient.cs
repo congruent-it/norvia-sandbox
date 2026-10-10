@@ -277,6 +277,7 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
             (TrackingKeys.PartyId, business.PartyId),
             (TrackingKeys.ShipmentNumber, business.ShipmentNumber),
             (TrackingKeys.CarrierBookingNumber, business.CarrierBookingNumber),
+            (TrackingKeys.TripNumber, business.TripNumber),
         })
         {
             if (!string.IsNullOrWhiteSpace(value))
@@ -332,6 +333,8 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
         public string? ShipmentNumber { get; init; }
 
         public string? CarrierBookingNumber { get; init; }
+
+        public string? TripNumber { get; init; }
     }
 
     private enum TmsCommand
