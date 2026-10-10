@@ -7,7 +7,7 @@ namespace Norvia.Tms.Api.IntegrationTests;
 /// writes (<c>Clock:ControlFile</c>), and keeps the system's time until a test sets one. Setting it moves the time of
 /// every call to this TMS, so only a test class of its own may use it.
 /// </summary>
-public sealed class ControlledClockTmsFixture : TmsFixture
+public class ControlledClockTmsFixture : TmsFixture
 {
     private readonly string _clockFile = Path.Combine(Path.GetTempPath(), $"norvia-tms-clock-{Guid.NewGuid():N}.txt");
 

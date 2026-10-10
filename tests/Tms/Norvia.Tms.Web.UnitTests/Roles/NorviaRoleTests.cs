@@ -38,7 +38,7 @@ public sealed class NorviaRoleTests
     }
 
     [Fact]
-    public void Views_OfPlanner_AreWaitingForPlanningThenShipmentsToReleaseThenBookingsAwaitingAnAnswerThenShipmentsInProgressThenDeliveredWithoutProofOfDeliveryThenOpenExceptionsThenCapacity()
+    public void Views_OfPlanner_AreWaitingForPlanningThenShipmentsToReleaseThenBookingsAwaitingAnAnswerThenShipmentsInProgressThenDeliveredWithoutProofOfDeliveryThenOpenExceptionsThenCapacityThenTrips()
     {
         NorviaRole.Planner.Views.Select(view => (view.Path, view.Title)).Should().Equal(
             ("/transport-orders", "Waiting for planning"),
@@ -47,7 +47,8 @@ public sealed class NorviaRoleTests
             ("/shipments/in-progress", "Shipments in progress"),
             ("/shipments/delivered-without-proof-of-delivery", "Delivered without Proof of delivery"),
             ("/exceptions", "Open Exceptions"),
-            ("/capacity", "Capacity"));
+            ("/capacity", "Capacity"),
+            ("/trips", "Trips"));
     }
 
     [Fact]

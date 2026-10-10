@@ -204,7 +204,28 @@ As-found: a presenter-panel fault, **Driver app unavailable**, makes the Driver 
 
 ## Implementation
 
-Not built yet.
+For engineers and coding agents. It shows where the built part of P11 lives in the repository, and what isn't built yet. It follows the [P10 section](p10-fleet-capacity-planning.md#implementation).
+
+### Built so far
+
+The Trip tracer bullet: the Planner creates an empty Draft Trip for an open day, picks its Vehicle and Driver from that day's available ones, sees the Trips in a view that updates without a refresh, and discards a Draft. Creating, changing or discarding a Draft publishes nothing, so there is no Message trail yet.
+
+### Code map
+
+Links go to files, not lines, so they stay true as the code moves.
+
+| Step | Where |
+|---|---|
+| Trips | [Trip.cs](../../../src/Tms/Norvia.Tms.Domain/Trips/Trip.cs) with [TripNumber.cs](../../../src/Tms/Norvia.Tms.Domain/Trips/TripNumber.cs), [TripStatus.cs](../../../src/Tms/Norvia.Tms.Domain/Trips/TripStatus.cs) and the refusals [TripRefusal.cs](../../../src/Tms/Norvia.Tms.Domain/Trips/TripRefusal.cs) (`TripNotFound`, `TripNotDraft`). Specifications [TripsOnDaySpec.cs](../../../src/Tms/Norvia.Tms.Domain/Trips/TripsOnDaySpec.cs), [TripByNumberSpec.cs](../../../src/Tms/Norvia.Tms.Domain/Trips/TripByNumberSpec.cs) and [TripsFromSpec.cs](../../../src/Tms/Norvia.Tms.Domain/Trips/TripsFromSpec.cs) |
+| 2. Build: create, pick, discard | `POST /v1/trips`, `PUT /v1/trips/{number}` and `DELETE /v1/trips/{number}` in [TripEndpoints.cs](../../../src/Tms/Norvia.Tms.Api/Trips/TripEndpoints.cs), with [CreateDraftTripHandler.cs](../../../src/Tms/Norvia.Tms.Application/Trips/Create/CreateDraftTripHandler.cs), [ChangeDraftTripHandler.cs](../../../src/Tms/Norvia.Tms.Application/Trips/Change/ChangeDraftTripHandler.cs) and [DiscardDraftTripHandler.cs](../../../src/Tms/Norvia.Tms.Application/Trips/Discard/DiscardDraftTripHandler.cs) |
+| Trip rules | [TripPlanningChecks.cs](../../../src/Tms/Norvia.Tms.Application/Trips/TripPlanningChecks.cs) tells P10's [TripAvailabilityRules.cs](../../../src/Tms/Norvia.Tms.Application/Fleet/Availability/TripAvailabilityRules.cs) whether the Vehicle or Driver has another Trip that day (Drafts count), so a second Trip is `VehicleNotAvailable` or `DriverNotAvailable`. A refusal is a 409 problem whose `code` is the first rule broken and whose `failures` lists them all; a refused change leaves the Trip as it was |
+| Planner's views | `GET /v1/trips` ([ListTripsHandler.cs](../../../src/Tms/Norvia.Tms.Application/Trips/List/ListTripsHandler.cs)). The Vehicles and Drivers on offer for a day: [ListTripChoicesHandler.cs](../../../src/Tms/Norvia.Tms.Application/Trips/Choices/ListTripChoicesHandler.cs). UI: [TripsPage.razor](../../../src/Tms/Norvia.Tms.Web/Trips/TripsPage.razor) and [TripForm.razor](../../../src/Tms/Norvia.Tms.Web/Trips/TripForm.razor), which read again every few seconds as the other live lists do. API client: [TmsApiClient.Trips.cs](../../../src/Tms/Norvia.Tms.Web/TmsApi/TmsApiClient.Trips.cs) |
+| Persistence | [TripConfiguration.cs](../../../src/Tms/Norvia.Tms.Infrastructure/Data/Configurations/TripConfiguration.cs), with unique indexes on (day, Vehicle) and (day, Driver) as a backstop to the rule, [SqlTripNumbers.cs](../../../src/Tms/Norvia.Tms.Infrastructure/Trips/SqlTripNumbers.cs) and the migration [TripsDrafts](../../../src/Tms/Norvia.Tms.Infrastructure/Data/Migrations/20261010083102_TripsDrafts.cs) |
+| Tests through the TMS boundary | [TripDraftTests.cs](../../../tests/Tms/Norvia.Tms.Api.IntegrationTests/Trips/TripDraftTests.cs), on a TMS with P10's controllable clock |
+
+### Not built yet
+
+Stops and Shipments on a Trip, the planned start and driving duration (so `IPlannedDrivingHours` still reports none), the load, Shift and Shipment rules, Dispatch and Amend, `TripDispatched` and the Trip dispatch Logic App, the delivery state, the Driver app, the *Needs a Driver* and *Needs a Vehicle* flags, and the Shipments to put on Trips view. Each is a later slice of [#13](https://github.com/congruent-it/norvia-sandbox/issues/13).
 
 ## Deferred
 

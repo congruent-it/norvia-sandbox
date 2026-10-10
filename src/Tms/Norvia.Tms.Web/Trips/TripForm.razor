@@ -1,0 +1,205 @@
+@using Norvia.Tms.Application.Trips.Choices
+@using Norvia.Tms.Web.Capacity
+@implements IDisposable
+@inject ITransportOrderQueries Queries
+@inject ILogger<TripForm> Logger
+
+@* Creates a Draft Trip, or picks the Vehicle and Driver of one. The Vehicles and Drivers offered are the day's available ones that hold no other Trip. *@
+<section role="group" aria-label="@Title" class="mb-6 rounded-flatly border border-border p-4">
+    <h2 class="!mb-3 !text-xl">@Title</h2>
+
+    @if (_failure is { } failure)
+    {
+        <div role="alert" class="mb-4">
+            <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">@failure</FluentMessageBar>
+        </div>
+    }
+    @if (_done is { } done)
+    {
+        <div role="status" class="mb-4">
+            <FluentMessageBar Intent="MessageIntent.Success" AllowDismiss="false">@done</FluentMessageBar>
+        </div>
+    }
+
+    <div class="flex flex-wrap items-end gap-4">
+        @if (Days is not null)
+        {
+            <div class="flex items-center gap-2">
+                <FluentSelect TOption="string" Label="Day" aria-label="Day" Value="@_day" ValueChanged="DayChangedAsync" Width="12rem">
+                    <FluentOption TOption="string" Value="">Choose a day</FluentOption>
+                    @foreach (var day in Days)
+                    {
+                        <FluentOption TOption="string" Value="@Iso(day)">@FleetText.Day(day)</FluentOption>
+                    }
+                </FluentSelect>
+            </div>
+        }
+        <div class="flex items-center gap-2">
+            <FluentSelect TOption="string" Label="Vehicle" aria-label="Vehicle" @bind-Value="_vehicleId" Width="14rem">
+                <FluentOption TOption="string" Value="">No Vehicle yet</FluentOption>
+                @foreach (var vehicle in _choices.Vehicles)
+                {
+                    <FluentOption TOption="string" Value="@vehicle.Id">@vehicle.Registration</FluentOption>
+                }
+            </FluentSelect>
+        </div>
+        <div class="flex items-center gap-2">
+            <FluentSelect TOption="string" Label="Driver" aria-label="Driver" @bind-Value="_driverId" Width="14rem">
+                <FluentOption TOption="string" Value="">No Driver yet</FluentOption>
+                @foreach (var driver in _choices.Drivers)
+                {
+                    <FluentOption TOption="string" Value="@driver.Id">@driver.Name</FluentOption>
+                }
+            </FluentSelect>
+        </div>
+        <FluentButton Appearance="Appearance.Accent" OnClick="SubmitAsync" Disabled="_working">@SubmitText</FluentButton>
+        @if (OnCancel.HasDelegate)
+        {
+            <FluentButton Appearance="Appearance.Outline" OnClick="OnCancel">Cancel</FluentButton>
+        }
+    </div>
+</section>
+
+@code {
+    private readonly CancellationTokenSource _closed = new();
+    private string _day = string.Empty;
+    private string _vehicleId = string.Empty;
+    private string _driverId = string.Empty;
+    private TripChoices _choices = new([], []);
+    private string? _failure;
+    private string? _done;
+    private bool _working;
+
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string SubmitText { get; set; } = string.Empty;
+
+    /// <summary>The open days to choose from when creating a Trip; null when the form changes a Trip, whose day is <see cref="FixedDay"/>.</summary>
+    [Parameter]
+    public IReadOnlyList<DateOnly>? Days { get; set; }
+
+    /// <summary>The day of the Trip being changed.</summary>
+    [Parameter]
+    public DateOnly? FixedDay { get; set; }
+
+    /// <summary>The number of the Trip being changed, whose Vehicle and Driver stay on offer.</summary>
+    [Parameter]
+    public string? ForTrip { get; set; }
+
+    [Parameter]
+    public string? InitialVehicleId { get; set; }
+
+    [Parameter]
+    public string? InitialDriverId { get; set; }
+
+    /// <summary>Sends the entry to the TMS and answers what it said.</summary>
+    [Parameter, EditorRequired]
+    public Func<TripEntry, CancellationToken, Task<TripAnswer>> Submit { get; set; } = null!;
+
+    /// <summary>Raised when the TMS took the entry, so a page can close the form or read its list again.</summary>
+    [Parameter]
+    public EventCallback OnDone { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _vehicleId = InitialVehicleId ?? string.Empty;
+        _driverId = InitialDriverId ?? string.Empty;
+        if (FixedDay is { } day)
+        {
+            _day = Iso(day);
+            await LoadChoicesAsync(day);
+        }
+    }
+
+    private static string Iso(DateOnly day) => day.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+
+    private async Task DayChangedAsync(string value)
+    {
+        _day = value;
+        _vehicleId = string.Empty;
+        _driverId = string.Empty;
+        _choices = new TripChoices([], []);
+        if (DateOnly.TryParseExact(value, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var day))
+        {
+            await LoadChoicesAsync(day);
+        }
+    }
+
+    private async Task LoadChoicesAsync(DateOnly day)
+    {
+        try
+        {
+            _choices = await Queries.ListTripChoicesAsync(day, ForTrip, _closed.Token);
+        }
+        catch (OperationCanceledException) when (_closed.IsCancellationRequested)
+        {
+            // The page closed.
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning(exception, "Reading the choices for a Trip on {Day} failed", day);
+            _failure = "The Vehicles and Drivers couldn't be loaded. Choose the day again.";
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (_working)
+        {
+            return;
+        }
+
+        _failure = null;
+        _done = null;
+        if (!DateOnly.TryParseExact(_day, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var day))
+        {
+            _failure = "Choose a day.";
+            return;
+        }
+
+        _working = true;
+        try
+        {
+            var entry = new TripEntry(day, _vehicleId.Length == 0 ? null : _vehicleId, _driverId.Length == 0 ? null : _driverId);
+            switch (await Submit(entry, _closed.Token))
+            {
+                case TripAnswer.Refused refused:
+                    _failure = $"Not saved: {refused.Reason}";
+                    break;
+                case TripAnswer.Created created:
+                    _done = $"Draft Trip {created.Number} created for {FleetText.Day(day)}.";
+                    await DayChangedAsync(_day);
+                    await OnDone.InvokeAsync();
+                    break;
+                default:
+                    _done = $"Trip saved for {FleetText.Day(day)}.";
+                    await OnDone.InvokeAsync();
+                    break;
+            }
+        }
+        catch (OperationCanceledException) when (_closed.IsCancellationRequested)
+        {
+            // The page closed while the TMS was answering.
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning(exception, "{Title} failed", Title);
+            _failure = "The TMS couldn't save that. Try again.";
+        }
+        finally
+        {
+            _working = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        _closed.Cancel();
+        _closed.Dispose();
+    }
+}

@@ -26,6 +26,9 @@ using Norvia.Tms.Application.TransportOrders.GetRejectedBooking;
 using Norvia.Tms.Application.TransportOrders.List;
 using Norvia.Tms.Application.TransportOrders.RatingExceptions;
 using Norvia.Tms.Application.TransportOrders.ToPlan;
+using Norvia.Tms.Application.Trips;
+using Norvia.Tms.Application.Trips.Choices;
+using Norvia.Tms.Application.Trips.List;
 using Norvia.Tms.Domain.TransportOrders;
 
 namespace Norvia.Tms.Web.TransportOrders;
@@ -56,6 +59,12 @@ internal sealed class TransportOrderQueries(IServiceScopeFactory scopes) : ITran
 
     public Task<IReadOnlyList<DriverView>> ListDriversAsync(CancellationToken cancellationToken) =>
         SendAsync(new ListDriversQuery(), cancellationToken);
+
+    public Task<IReadOnlyList<TripView>> ListTripsAsync(CancellationToken cancellationToken) =>
+        SendAsync(new ListTripsQuery(), cancellationToken);
+
+    public Task<TripChoices> ListTripChoicesAsync(DateOnly day, string? forTrip, CancellationToken cancellationToken) =>
+        SendAsync(new ListTripChoicesQuery(day, forTrip), cancellationToken);
 
     public Task<IReadOnlyList<PlanningDayView>> ListPlanningDaysAsync(CancellationToken cancellationToken) =>
         SendAsync(new ListOpenPlanningDaysQuery(), cancellationToken);
