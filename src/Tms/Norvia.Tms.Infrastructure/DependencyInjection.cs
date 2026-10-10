@@ -26,6 +26,7 @@ using Norvia.Tms.Application.Trips;
 using Norvia.Tms.Application.Trips.AddShipments;
 using Norvia.Tms.Application.Trips.Change;
 using Norvia.Tms.Application.Trips.Create;
+using Norvia.Tms.Application.Trips.ReorderStops;
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Domain.Fleet;
@@ -111,6 +112,7 @@ public static class DependencyInjection
         builder.Services.AddScoped<IPipelineBehavior<AddShipmentsToTripCommand, Result<AddShipmentsToTripResult>>, RetryTripThatLostARace<AddShipmentsToTripCommand, Result<AddShipmentsToTripResult>>>();
         builder.Services.AddScoped<IPipelineBehavior<CreateDraftTripCommand, Result<CreateDraftTripResult>>, RetryTripThatLostARace<CreateDraftTripCommand, Result<CreateDraftTripResult>>>();
         builder.Services.AddScoped<IPipelineBehavior<ChangeDraftTripCommand, Result>, RetryTripThatLostARace<ChangeDraftTripCommand, Result>>();
+        builder.Services.AddScoped<IPipelineBehavior<ReorderTripStopsCommand, Result>, RetryTripThatLostARace<ReorderTripStopsCommand, Result>>();
         builder.Services.AddScoped<IPipelineBehavior<SubmitTransportOrderCommand, Result<SubmitTransportOrderResult>>, RetrySubmissionThatLostARace>();
         builder.Services.AddSingleton<IShipperDirectory, SeedFileShipperDirectory>();
         builder.Services.AddSingleton<IRateCardDirectory, SeedFileRateCardDirectory>();

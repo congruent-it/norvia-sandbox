@@ -31,7 +31,7 @@ public sealed class ReorderTripStopsHandler(IRepository<Trip> trips, TripShipmen
         }
 
         var order = command.Stops.Select(stop => (idOf[stop.ShipmentNumber], stop.Kind)).ToList();
-        if (trip.ReorderStops(order, id => numberOf[id]) is { } refusal)
+        if (trip.ReorderStops(order, id => numberOf.GetValueOrDefault(id, id.ToString())) is { } refusal)
         {
             return TripRefused.Because(refusal);
         }

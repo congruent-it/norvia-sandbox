@@ -35,8 +35,9 @@ public sealed class TripStopOrderTests(TripsTmsFixture tms) : IClassFixture<Trip
         reordered.StatusCode.Should().Be(HttpStatusCode.NoContent, await reordered.Content.ReadAsStringAsync(_cancellationToken));
         var stops = Stops(await GetTripAsync(trip)).ToList();
         stops.Should().Equal($"Collection {second}", $"Collection {first}", $"Delivery {second}", $"Delivery {first}");
-        (await GetTripAsync(trip))["stops"]!.AsArray().Select(stop => stop!["place"]!.GetValue<string>()).Take(2).Distinct().Should()
-            .ContainSingle("both Shipments collect at the same address, and each still has its own Stop");
+        var places = (await GetTripAsync(trip))["stops"]!.AsArray().Select(stop => stop!["place"]!.GetValue<string>()).ToList();
+        places.Should().HaveCount(4);
+        places.Take(2).Distinct().Should().ContainSingle("both Shipments collect at the same address, and each still has its own Stop");
         using var again = await ReorderAsync(trip, ("Collection", second), ("Collection", first), ("Delivery", second), ("Delivery", first));
         again.StatusCode.Should().Be(HttpStatusCode.NoContent, "the same order sent again changes nothing");
     }
