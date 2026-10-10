@@ -123,9 +123,9 @@ public sealed class PlanDraftTripTests
     [Fact]
     public async Task Create_WithAStartAndDuration_SavesThemOnTheDraft_AndRefusesThemUnderTheSameRules()
     {
-        var created = await new CreateDraftTripHandler(_fixture.Trips, _fixture.Numbers, _fixture.Checks)
+        var created = await new CreateDraftTripHandler(_fixture.Trips, _fixture.Numbers, _fixture.Checks, _fixture.TripShipments)
             .Handle(new CreateDraftTripCommand(TripsFixture.Tuesday, Van, Anouk, new IdempotencyKey("a"), new TimeOnly(7, 0), SixHours), CancellationToken.None);
-        var refused = await new CreateDraftTripHandler(_fixture.Trips, _fixture.Numbers, _fixture.Checks)
+        var refused = await new CreateDraftTripHandler(_fixture.Trips, _fixture.Numbers, _fixture.Checks, _fixture.TripShipments)
             .Handle(new CreateDraftTripCommand(TripsFixture.Tuesday.AddDays(1), Van, Anouk, new IdempotencyKey("b"), new TimeOnly(5, 0), TimeSpan.FromHours(11)), CancellationToken.None);
 
         created.IsSuccess.Should().BeTrue();
@@ -183,6 +183,6 @@ public sealed class PlanDraftTripTests
     private static string[] Codes<T>(Result<T> result) => [.. result.ValidationErrors.Select(error => error.ErrorCode)];
 
     private async Task<Result> Change(Trip trip, VehicleId? vehicle, DriverId? driver, TimeOnly? start, TimeSpan? duration) =>
-        await new ChangeDraftTripHandler(_fixture.Trips, _fixture.Checks)
+        await new ChangeDraftTripHandler(_fixture.Trips, _fixture.Checks, _fixture.TripShipments)
             .Handle(new ChangeDraftTripCommand(trip.Number.Value, vehicle, driver, start, duration), CancellationToken.None);
 }

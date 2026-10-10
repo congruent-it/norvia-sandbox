@@ -6,7 +6,7 @@ using Norvia.Tms.Domain.Trips;
 
 namespace Norvia.Tms.Application.Trips.Change;
 
-public sealed class ChangeDraftTripHandler(IRepository<Trip> trips, TripPlanningChecks checks) : ICommandHandler<ChangeDraftTripCommand, Result>
+public sealed class ChangeDraftTripHandler(IRepository<Trip> trips, TripPlanningChecks checks, TripShipments shipments) : ICommandHandler<ChangeDraftTripCommand, Result>
 {
     public async ValueTask<Result> Handle(ChangeDraftTripCommand command, CancellationToken cancellationToken)
     {
@@ -25,7 +25,8 @@ public sealed class ChangeDraftTripHandler(IRepository<Trip> trips, TripPlanning
         // Giving everything back is always allowed, also when the day has since left the Planning horizon.
         var check = command.GivesEverythingBack
             ? TripPlanningCheck.Passed
-            : await checks.CheckAsync(trip.Day, command.VehicleId, command.DriverId, command.PlannedStart, command.PlannedDrivingDuration, trip, cancellationToken);
+            : await checks.CheckAsync(
+                trip.Day, command.VehicleId, command.DriverId, command.PlannedStart, command.PlannedDrivingDuration, trip, await shipments.OfAsync([.. trip.ShipmentIds], cancellationToken), [], cancellationToken);
         if (!check.IsOk)
         {
             return TripRefused.Because(check);

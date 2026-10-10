@@ -4,9 +4,11 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Norvia.Tms.Api.TransportOrders;
 using Norvia.Tms.Application.Trips;
+using Norvia.Tms.Application.Trips.AddShipments;
 using Norvia.Tms.Application.Trips.Change;
 using Norvia.Tms.Application.Trips.Create;
 using Norvia.Tms.Application.Trips.Discard;
+using Norvia.Tms.Application.Trips.GetByNumber;
 using Norvia.Tms.Application.Trips.List;
 using Norvia.Tms.Domain.Fleet;
 using Norvia.Tms.Domain.TransportOrders;
@@ -29,14 +31,34 @@ public static class TripEndpoints
             .WithSummary("List the Trips of today and later, by day.")
             .WithDescription("Each Trip shows its status (Draft or Dispatched), its day, and its Vehicle and Driver when it has them.");
 
+        trips.MapGet("/{number}", GetTripAsync)
+            .RequireAuthorization()
+            .WithName("GetTrip")
+            .WithSummary("Show one Trip with its Stops in order, its load against the Vehicle's capacity, the rules it breaks now and its warnings.")
+            .WithDescription(
+                "Each Stop is derived from its Shipment: the collection or the delivery, its place, its window and its goods. The load counts the whole Trip as loaded at once. "
+                + "failures lists the rules the Trip breaks as it stands, such as a Vehicle that has since gone Off the road; warnings lists what doesn't stop it, such as a Shipment "
+                + "whose delivery window doesn't include the Trip's day. An unknown Trip is TripNotFound (404).");
+
         trips.MapPost("/", CreateDraftAsync)
             .WithName("CreateDraftTrip")
             .RequireAuthorization(policy => policy.RequireRole(TransportOrderEndpoints.ManageRole))
             .WithSummary("Create a Draft Trip for an open day, with or without a Vehicle, Driver, planned start and planned driving duration.")
             .WithDescription(
-                "day and an Idempotency-Key header (the same for each retry, which is answered with the Draft the first call created) are required, otherwise the call is a 400. A Vehicle or Driver given must pass P10's availability rules and have no other Trip that day, Drafts included. "
-                + "A request that breaks a rule is refused, creating nothing, with a 409 problem whose code names the first rule broken (VehicleNotAvailable, DriverNotAvailable, LicenceNotHeld or DayNotOpen) "
+                "Shipments to put on the Trip can be given as shipmentNumbers: they go on together or not at all, with the rules of adding Shipments to a Trip. "
+                + "day and an Idempotency-Key header (the same for each retry, which is answered with the Draft the first call created) are required, otherwise the call is a 400. A Vehicle or Driver given must pass P10's availability rules and have no other Trip that day, Drafts included. "
+                + "A request that breaks a rule is refused, creating nothing, with a 409 problem whose code names the first rule broken (VehicleNotAvailable, DriverNotAvailable, LicenceNotHeld, DayNotOpen, or for a Shipment ShipmentNotReleased, ShipmentOnAnotherTrip, CollectionDayMismatch, PayloadExceeded or PalletPlacesExceeded) "
                 + "and whose failures lists every rule broken. A plannedStart must be inside the Driver's Shift that day (OutsideShift), and a plannedDrivingDuration (more than nothing, at most 24 hours) must fit the Driver's Driving-hour budget (DrivingHoursExceeded).");
+
+        trips.MapPost("/{number}/shipments", AddShipmentsAsync)
+            .WithName("AddShipmentsToTrip")
+            .RequireAuthorization(policy => policy.RequireRole(TransportOrderEndpoints.ManageRole))
+            .WithSummary("Put Shipments on a Draft Trip: each adds its collection Stop and its delivery Stop at the end of the sequence.")
+            .WithDescription(
+                "The Shipments go on together or not at all: the Trip is checked as it would become, and a refusal leaves it as it was. The load rules count the whole Trip as loaded at once. "
+                + "The problem's code names the first rule broken: ShipmentNotReleased, ShipmentOnAnotherTrip, CollectionDayMismatch, PayloadExceeded or PalletPlacesExceeded (409), "
+                + "ShipmentNotFound or TripNotFound (404), or TripNotDraft (409); failures lists every rule broken. A Shipment whose delivery window doesn't include the Trip's day is accepted, "
+                + "with a warning. A Shipment already on the Trip stays where it is, so sending the same call again changes nothing. Nothing is published.");
 
         trips.MapPut("/{number}", ChangeDraftAsync)
             .WithName("ChangeDraftTrip")
@@ -85,11 +107,32 @@ public static class TripEndpoints
 
         var result = await mediator.Send(
             new CreateDraftTripCommand(
-                day, VehicleOf(request.VehicleId), DriverOf(request.DriverId), new IdempotencyKey(idempotencyKey!), request.PlannedStart, request.PlannedDrivingDuration),
+                day, VehicleOf(request.VehicleId), DriverOf(request.DriverId), new IdempotencyKey(idempotencyKey!), request.PlannedStart, request.PlannedDrivingDuration, request.ShipmentNumbers),
             cancellationToken);
         return result.IsSuccess
             ? TypedResults.Created($"/v1/trips/{result.Value.Number}", result.Value)
             : Refused(result.ValidationErrors, "The Trip can't be created.");
+    }
+
+    private static async Task<Results<Ok<TripDetailView>, ProblemHttpResult>> GetTripAsync(string number, IMediator mediator, CancellationToken cancellationToken)
+    {
+        var result = await mediator.Send(new GetTripQuery(number), cancellationToken);
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : Refused(result.ValidationErrors, "The Trip can't be shown.");
+    }
+
+    private static async Task<Results<Ok<AddShipmentsToTripResult>, ProblemHttpResult, ValidationProblem>> AddShipmentsAsync(
+        string number,
+        AddShipmentsRequest request,
+        IMediator mediator,
+        CancellationToken cancellationToken)
+    {
+        if (request.ShipmentNumbers is not { Count: > 0 })
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { [nameof(AddShipmentsRequest.ShipmentNumbers)] = ["Give the numbers of the Shipments to put on the Trip."] });
+        }
+
+        var result = await mediator.Send(new AddShipmentsToTripCommand(number, request.ShipmentNumbers), cancellationToken);
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : Refused(result.ValidationErrors, "The Shipments can't be put on the Trip.");
     }
 
     private static async Task<Results<NoContent, ProblemHttpResult, ValidationProblem>> ChangeDraftAsync(
@@ -133,7 +176,7 @@ public static class TripEndpoints
         var all = refusals.ToList();
         var first = all[0];
         return TypedResults.Problem(
-            statusCode: Enum.TryParse<TripRefusalCode>(first.ErrorCode, out var code) && code == TripRefusalCode.TripNotFound
+            statusCode: Enum.TryParse<TripRefusalCode>(first.ErrorCode, out var code) && code is TripRefusalCode.TripNotFound or TripRefusalCode.ShipmentNotFound
                 ? StatusCodes.Status404NotFound
                 : StatusCodes.Status409Conflict,
             title: title,

@@ -7,9 +7,9 @@ using Norvia.Tms.Infrastructure.Data.Configurations;
 namespace Norvia.Tms.Infrastructure.Trips;
 
 /// <summary>
-/// When two requests ask at once for the same Vehicle or Driver on a day, or the same request arrives twice, both find no
+/// When two requests ask at once for the same Vehicle or Driver on a day, or the same request arrives twice, or two Planners put the same Shipment on a Trip (or on different ones), both find no
 /// Trip holding it and the unique indexes let only one be saved. The other is run once more: by then the winner is
-/// committed, so it is refused with <c>VehicleNotAvailable</c> or <c>DriverNotAvailable</c>, or answered with the Draft the
+/// committed, so it is refused with <c>VehicleNotAvailable</c>, <c>DriverNotAvailable</c> or <c>ShipmentOnAnotherTrip</c>, or answered with the Draft the
 /// first one created, instead of failing.
 /// </summary>
 internal sealed class RetryTripThatLostARace<TCommand, TResponse>(TmsDbContext dbContext) : IPipelineBehavior<TCommand, TResponse>
@@ -17,7 +17,7 @@ internal sealed class RetryTripThatLostARace<TCommand, TResponse>(TmsDbContext d
 {
     private const int DuplicateKeyInUniqueIndex = 2601;
 
-    private static readonly string[] Indexes = [TripConfiguration.VehicleDayIndex, TripConfiguration.DriverDayIndex, TripConfiguration.IdempotencyKeyIndex];
+    private static readonly string[] Indexes = [TripConfiguration.VehicleDayIndex, TripConfiguration.DriverDayIndex, TripConfiguration.IdempotencyKeyIndex, TripConfiguration.StopShipmentIndex, TripConfiguration.StopPositionIndex];
 
     public async ValueTask<TResponse> Handle(TCommand message, MessageHandlerDelegate<TCommand, TResponse> next, CancellationToken cancellationToken)
     {

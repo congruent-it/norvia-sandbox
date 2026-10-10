@@ -67,6 +67,39 @@ public sealed class ShipmentSpecsTests
         found.Select(shipment => shipment.Number).Should().BeEquivalentTo([first.Number, third.Number]);
     }
 
+    [Fact]
+    public void ShipmentsByNumbersSpec_FindsOnlyTheShipmentsWithThoseNumbers()
+    {
+        var first = Planned(1, 1);
+        var second = Planned(2, 2);
+        var third = Planned(3, 3);
+
+        var found = new ShipmentsByNumbersSpec([first.Number, third.Number]).Evaluate([first, second, third]);
+
+        found.Select(shipment => shipment.Number).Should().BeEquivalentTo([first.Number, third.Number]);
+    }
+
+    [Fact]
+    public void ReleasedOwnFleetShipmentsSpec_FindsTheReleasedOwnFleetShipments_InTheOrderTheyWerePlanned()
+    {
+        var planned = Planned(1, 1);
+        var later = Released(2, 2, CarriedBy.OwnFleet, minutes: 5);
+        var earlier = Released(3, 3, CarriedBy.OwnFleet, minutes: 1);
+        var carrier = Released(4, 4, CarriedBy.Carrier(new Norvia.Tms.Domain.Carriers.CarrierId("CAR-0001")), minutes: 2, bookingNumber: Norvia.Tms.Domain.CarrierBookings.CarrierBookingNumber.FromSequence(1));
+
+        var found = new ReleasedOwnFleetShipmentsSpec().Evaluate([planned, later, carrier, earlier]);
+
+        found.Select(shipment => shipment.Number).Should().Equal(earlier.Number, later.Number);
+    }
+
+    private static Shipment Released(long orderSequence, long shipmentSequence, CarriedBy carriedBy, int minutes, Norvia.Tms.Domain.CarrierBookings.CarrierBookingNumber? bookingNumber = null)
+    {
+        var order = Accepted(orderSequence);
+        var shipment = order.Plan(ShipmentNumber.FromSequence(shipmentSequence), carriedBy, new IdempotencyKey("key"), new CorrelationId("corr"), Now.AddMinutes(minutes))!;
+        shipment.Release(order, new IdempotencyKey("key-rel"), new CorrelationId("corr-rel"), Now.AddMinutes(minutes + 1), bookingNumber);
+        return shipment;
+    }
+
     private static Shipment Planned(long orderSequence, long shipmentSequence) =>
         Accepted(orderSequence).Plan(
             ShipmentNumber.FromSequence(shipmentSequence), CarriedBy.OwnFleet, new IdempotencyKey("key"), new CorrelationId("corr"), Now)!;

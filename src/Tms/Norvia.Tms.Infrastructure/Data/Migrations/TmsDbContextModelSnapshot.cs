@@ -1049,6 +1049,48 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
+
+            modelBuilder.Entity("Norvia.Tms.Domain.Trips.Trip", b =>
+                {
+                    b.OwnsMany("Norvia.Tms.Domain.Trips.TripStop", "Stops", b1 =>
+                        {
+                            b1.Property<int>("Id")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("int");
+
+                            SqlServerPropertyBuilderExtensions.UseIdentityColumn(b1.Property<int>("Id"));
+
+                            b1.Property<string>("Kind")
+                                .IsRequired()
+                                .HasMaxLength(10)
+                                .HasColumnType("nvarchar(10)");
+
+                            b1.Property<int>("Position")
+                                .HasColumnType("int");
+
+                            b1.Property<Guid>("ShipmentId")
+                                .HasColumnType("uniqueidentifier");
+
+                            b1.Property<Guid>("TripId")
+                                .HasColumnType("uniqueidentifier");
+
+                            b1.HasKey("Id");
+
+                            b1.HasIndex("TripId", "Position")
+                                .IsUnique()
+                                .HasDatabaseName("IX_TripStops_TripId_Position");
+
+                            b1.HasIndex(new[] { "ShipmentId", "Kind" }, "IX_TripStops_ShipmentId_Kind")
+                                .IsUnique();
+
+                            b1.ToTable("TripStops", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("TripId");
+                        });
+
+                    b.Navigation("Stops");
+                });
 #pragma warning restore 612, 618
         }
     }

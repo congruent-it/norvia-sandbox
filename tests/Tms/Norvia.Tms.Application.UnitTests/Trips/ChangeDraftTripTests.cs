@@ -95,6 +95,6 @@ public sealed class ChangeDraftTripTests
     private static string[] Codes(Result result) => [.. result.ValidationErrors.Select(error => error.ErrorCode)];
 
     private async Task<Result> Handle(string number, VehicleId? vehicle, DriverId? driver) =>
-        await new ChangeDraftTripHandler(_fixture.Trips, _fixture.Checks)
+        await new ChangeDraftTripHandler(_fixture.Trips, _fixture.Checks, _fixture.TripShipments)
             .Handle(new ChangeDraftTripCommand(number, vehicle, driver), CancellationToken.None);
 }

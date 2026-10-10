@@ -12,7 +12,9 @@ using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.List;
 using Norvia.Tms.Application.TransportOrders.RatingExceptions;
 using Norvia.Tms.Application.TransportOrders.ToPlan;
+using Norvia.Tms.Application.Shipments.ListToPutOnTrips;
 using Norvia.Tms.Application.Trips;
+using Norvia.Tms.Application.Trips.GetByNumber;
 using Norvia.Tms.Application.Trips.Choices;
 
 namespace Norvia.Tms.Web.TransportOrders;
@@ -88,6 +90,12 @@ public interface ITransportOrderQueries
 
     /// <summary>The Trips of today and later (P11), by day.</summary>
     Task<IReadOnlyList<TripView>> ListTripsAsync(CancellationToken cancellationToken);
+
+    /// <summary>One Trip with its Stops in order, load, rule failures and warnings (P11); null when there is none.</summary>
+    Task<TripDetailView?> FindTripAsync(string number, CancellationToken cancellationToken);
+
+    /// <summary>The Released Own fleet Shipments not on a Trip (P11), by collection time; <paramref name="day"/> keeps those collecting that day.</summary>
+    Task<IReadOnlyList<ShipmentToPutOnTripSummary>> ListShipmentsToPutOnTripsAsync(DateOnly? day, CancellationToken cancellationToken);
 
     /// <summary>The Vehicles and Drivers the Planner can pick for a Trip on a day (P11); <paramref name="forTrip"/> keeps what that Trip holds.</summary>
     Task<TripChoices> ListTripChoicesAsync(DateOnly day, string? forTrip, CancellationToken cancellationToken);

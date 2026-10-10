@@ -1,0 +1,244 @@
+@page "/trips/shipments"
+@rendermode InteractiveServer
+@using Microsoft.Extensions.Options
+@using Norvia.Tms.Application.Shipments.ListToPutOnTrips
+@using Norvia.Tms.Application.Trips
+@using Norvia.Tms.Domain.Trips
+@using Norvia.Tms.Web.Capacity
+@implements IAsyncDisposable
+@inject ITransportOrderQueries Queries
+@inject ITransportOrderCommands Commands
+@inject TimeProvider Time
+@inject IOptions<LiveListOptions> Options
+@inject ILogger<LiveTransportOrderList<ShipmentToPutOnTripSummary>> ShipmentsLogger
+@inject ILogger<LiveTransportOrderList<TripView>> TripsLogger
+@inject ILogger<LiveTransportOrderList<DateOnly>> DaysLogger
+@inject ILogger<ShipmentsToPutOnTrips> Logger
+
+<PageTitle>Shipments to put on Trips · Norvia TMS</PageTitle>
+
+<h1>Shipments to put on Trips</h1>
+
+@if (_outcome is { } outcome)
+{
+    <div role="@(outcome.Intent == MessageIntent.Success ? "status" : "alert")" class="mb-4">
+        <FluentMessageBar Intent="outcome.Intent" AllowDismiss="false">@outcome.Text</FluentMessageBar>
+        @foreach (var warning in outcome.Warnings)
+        {
+            <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">@warning.Message</FluentMessageBar>
+        }
+    </div>
+}
+
+<div role="group" aria-label="Filter" class="mb-4 flex flex-wrap items-end gap-4">
+    <FluentSelect TOption="string" Label="Collection day" aria-label="Collection day" Value="@_day" ValueChanged="DayChanged" Width="14rem">
+        <FluentOption TOption="string" Value="">All days</FluentOption>
+        @foreach (var day in OpenDays)
+        {
+            <FluentOption TOption="string" Value="@Iso(day)">@FleetText.Day(day)</FluentOption>
+        }
+    </FluentSelect>
+</div>
+
+<LiveListStates Items="_shipments.Items" LastReadFailed="_shipments.LastReadFailed" Name="Shipments to put on Trips"
+                Empty="No Released Own fleet Shipments are waiting for a Trip." Context="shipments">
+    <div role="group" aria-label="Put on a Trip" class="mb-4 flex flex-wrap items-end gap-4">
+        <FluentButton Appearance="Appearance.Accent" OnClick="CreateAsync" Disabled="!CanAct(shipments)">
+            Create Trip (@SelectedIn(shipments).Count)
+        </FluentButton>
+        <FluentSelect TOption="string" Label="Add to Trip" aria-label="Add to Trip" @bind-Value="_addTo" Width="16rem">
+            <FluentOption TOption="string" Value="">Choose a Draft Trip</FluentOption>
+            @foreach (var trip in TripsOnSelectedDay(shipments))
+            {
+                <FluentOption TOption="string" Value="@trip.Number">@($"{trip.Number} · {TripText.Load(trip)}")</FluentOption>
+            }
+        </FluentSelect>
+        <FluentButton Appearance="Appearance.Outline" OnClick="AddAsync" Disabled="@(!CanAct(shipments) || string.IsNullOrEmpty(_addTo))">
+            Add selected to Trip
+        </FluentButton>
+    </div>
+
+    <FluentDataGrid Items="shipments.AsQueryable()" TGridItem="ShipmentToPutOnTripSummary" Class="flatly-table" aria-label="Shipments to put on Trips"
+                    GridTemplateColumns="auto 1.1fr 1.2fr 2fr 2fr 1fr 1fr" MultiLine="true">
+        <TemplateColumn Title="Select">
+            <FluentCheckbox Value="_selected.Contains(context.ShipmentNumber)"
+                            ValueChanged="@((bool selected) => Select(context.ShipmentNumber, selected))"
+                            aria-label="@($"Select {context.ShipmentNumber}")" />
+        </TemplateColumn>
+        <TemplateColumn Title="Shipment">
+            <a href="/shipments/@context.ShipmentNumber">@context.ShipmentNumber</a>
+        </TemplateColumn>
+        <PropertyColumn Title="Shipper" Property="@(shipment => shipment.Shipper.Name ?? shipment.Shipper.Id)" />
+        <PropertyColumn Title="Collect" Property="@(shipment => $"{shipment.CollectionPlace}, {NorviaTime.FormatWindow(shipment.CollectionEarliest, shipment.CollectionLatest)}")" />
+        <PropertyColumn Title="Deliver" Property="@(shipment => $"{shipment.DeliveryPlace}, {NorviaTime.FormatWindow(shipment.DeliveryEarliest, shipment.DeliveryLatest)}")" />
+        <PropertyColumn Title="Weight" Property="@(shipment => FleetText.Payload((int)shipment.WeightKg))" />
+        <PropertyColumn Title="Pallets" Property="@(shipment => shipment.PalletPlaces)" />
+    </FluentDataGrid>
+</LiveListStates>
+
+@code {
+    private readonly CancellationTokenSource _closed = new();
+    private readonly HashSet<string> _selected = [];
+    private LiveTransportOrderList<ShipmentToPutOnTripSummary> _shipments = null!;
+    private LiveTransportOrderList<TripView> _trips = null!;
+    private LiveTransportOrderList<DateOnly> _days = null!;
+    private string _day = string.Empty;
+    private string _addTo = string.Empty;
+    private bool _working;
+    private Outcome? _outcome;
+
+    private sealed record Outcome(MessageIntent Intent, string Text, IReadOnlyList<TripWarning> Warnings);
+
+    private IReadOnlyList<DateOnly> OpenDays => _days.Items ?? [];
+
+    private const string DayFormat = "yyyy-MM-dd";
+
+    private static string Iso(DateOnly day) => day.ToString(DayFormat, System.Globalization.CultureInfo.InvariantCulture);
+
+    private DateOnly? FilterDay =>
+        DateOnly.TryParseExact(_day, DayFormat, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var day) ? day : null;
+
+    protected override void OnInitialized()
+    {
+        // All lists exist before any starts: a read that finishes at once renders the page, which reads all of them.
+        _shipments = new LiveTransportOrderList<ShipmentToPutOnTripSummary>(
+            token => Queries.ListShipmentsToPutOnTripsAsync(FilterDay, token), "the Shipments to put on Trips", Time, Options.Value.RefreshInterval, ShipmentsLogger);
+        _trips = new LiveTransportOrderList<TripView>(Queries.ListTripsAsync, "the Trips", Time, Options.Value.RefreshInterval, TripsLogger);
+        _days = new LiveTransportOrderList<DateOnly>(OpenDaysAsync, "the open days", Time, Options.Value.RefreshInterval, DaysLogger);
+        _shipments.Changed += () => InvokeAsync(StateHasChanged);
+        _trips.Changed += () => InvokeAsync(StateHasChanged);
+        _days.Changed += () => InvokeAsync(StateHasChanged);
+        _shipments.Start();
+        _trips.Start();
+        _days.Start();
+    }
+
+    private async Task<IReadOnlyList<DateOnly>> OpenDaysAsync(CancellationToken cancellationToken) =>
+        [.. (await Queries.ListPlanningDaysAsync(cancellationToken)).Select(day => day.Date)];
+
+    private async Task DayChanged(string value)
+    {
+        _day = value;
+        _selected.Clear();
+        _addTo = string.Empty;
+        await _shipments.RefreshAsync();
+    }
+
+    private void Select(string number, bool selected)
+    {
+        if (selected)
+        {
+            _selected.Add(number);
+        }
+        else
+        {
+            _selected.Remove(number);
+        }
+    }
+
+    // Only what the list still shows: a Shipment put on a Trip meanwhile has left it.
+    private List<ShipmentToPutOnTripSummary> SelectedIn(IReadOnlyList<ShipmentToPutOnTripSummary> shipments) =>
+        [.. shipments.Where(shipment => _selected.Contains(shipment.ShipmentNumber))];
+
+    private bool CanAct(IReadOnlyList<ShipmentToPutOnTripSummary> shipments) => !_working && SelectedIn(shipments).Count > 0;
+
+    // The Draft Trips of the day the selected Shipments collect on; none while they collect on different days.
+    private IEnumerable<TripView> TripsOnSelectedDay(IReadOnlyList<ShipmentToPutOnTripSummary> shipments) =>
+        SelectedDay(SelectedIn(shipments)) is { } day
+            ? (_trips.Items ?? []).Where(trip => trip.Status == TripStatus.Draft && trip.Day == day)
+            : [];
+
+    private static DateOnly? SelectedDay(List<ShipmentToPutOnTripSummary> selected) =>
+        selected.Select(shipment => shipment.CollectionDay).Distinct().ToList() is [{ } day] ? day : null;
+
+    private async Task CreateAsync()
+    {
+        if (_shipments.Items is not { } shipments || !CanAct(shipments))
+        {
+            return;
+        }
+
+        var selected = SelectedIn(shipments);
+        if (SelectedDay(selected) is not { } day)
+        {
+            _outcome = new Outcome(MessageIntent.Warning, "A Trip runs on one day. Select Shipments that collect on the same day.", []);
+            return;
+        }
+
+        await RunAsync(
+            "Creating a Trip",
+            async token =>
+            {
+                var entry = new TripEntry(day, null, null, null, null, [.. selected.Select(shipment => shipment.ShipmentNumber)]);
+                return await Commands.CreateDraftTripAsync(entry, token) switch
+                {
+                    TripAnswer.Created created => new Outcome(MessageIntent.Success, $"Draft Trip {created.Number} created for {FleetText.Day(day)} with {selected.Count} Shipment(s).", created.Warnings ?? []),
+                    TripAnswer.Refused refused => new Outcome(MessageIntent.Warning, $"No Trip was created: {refused.Reason}", []),
+                    var answer => throw new InvalidOperationException($"Unknown answer {answer}."),
+                };
+            },
+            selected);
+    }
+
+    private async Task AddAsync()
+    {
+        if (_shipments.Items is not { } shipments || !CanAct(shipments) || string.IsNullOrEmpty(_addTo))
+        {
+            return;
+        }
+
+        var selected = SelectedIn(shipments);
+        var trip = _addTo;
+        await RunAsync(
+            "Adding Shipments to a Trip",
+            async token => await Commands.AddShipmentsToTripAsync(trip, [.. selected.Select(shipment => shipment.ShipmentNumber)], token) switch
+            {
+                TripAnswer.Added added => new Outcome(MessageIntent.Success, $"{selected.Count} Shipment(s) added to Trip {trip}.", added.Warnings),
+                TripAnswer.Refused refused => new Outcome(MessageIntent.Warning, $"Nothing was added to Trip {trip}: {refused.Reason}", []),
+                var answer => throw new InvalidOperationException($"Unknown answer {answer}."),
+            },
+            selected);
+    }
+
+    // A refusal leaves the selection as it was, to change and try again; what was put on a Trip leaves the list shortly, on its next read.
+    private async Task RunAsync(string what, Func<CancellationToken, Task<Outcome>> act, List<ShipmentToPutOnTripSummary> selected)
+    {
+        _working = true;
+        _outcome = null;
+        try
+        {
+            _outcome = await act(_closed.Token);
+            if (_outcome.Intent == MessageIntent.Success)
+            {
+                foreach (var shipment in selected)
+                {
+                    _selected.Remove(shipment.ShipmentNumber);
+                }
+
+                _addTo = string.Empty;
+            }
+        }
+        catch (OperationCanceledException) when (_closed.IsCancellationRequested)
+        {
+            // The page closed while the TMS was answering.
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning(exception, "{What} failed", what);
+            _outcome = new Outcome(MessageIntent.Error, "The TMS couldn't do that. Try again.", []);
+        }
+        finally
+        {
+            _working = false;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _closed.CancelAsync();
+        _closed.Dispose();
+        await _shipments.DisposeAsync();
+        await _trips.DisposeAsync();
+        await _days.DisposeAsync();
+    }
+}

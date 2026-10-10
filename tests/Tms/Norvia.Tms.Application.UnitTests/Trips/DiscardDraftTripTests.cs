@@ -22,7 +22,7 @@ public sealed class DiscardDraftTripTests
         result.IsSuccess.Should().BeTrue();
         _fixture.Stored.Should().BeEmpty();
         await _fixture.Trips.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
-        var another = await new CreateDraftTripHandler(_fixture.Trips, _fixture.Numbers, _fixture.Checks)
+        var another = await new CreateDraftTripHandler(_fixture.Trips, _fixture.Numbers, _fixture.Checks, _fixture.TripShipments)
             .Handle(new CreateDraftTripCommand(TripsFixture.Tuesday, Van, Anouk, new IdempotencyKey("second")), CancellationToken.None);
         another.IsSuccess.Should().BeTrue();
     }
