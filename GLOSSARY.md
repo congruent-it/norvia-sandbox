@@ -120,6 +120,10 @@ _Avoid_: driving time, trip duration
 The Planner deleting a Draft, which gives its Vehicle and Driver back. Only a Draft can be discarded.
 _Avoid_: delete trip, cancel trip
 
+**Dispatched Shipment**:
+An Own fleet Shipment whose Trip the Planner has dispatched: the Own fleet counterpart of a Booked Carrier Shipment. It moves Planned, Released, Dispatched, Collected. Dispatching a Trip sets it, and no event is published per Shipment, because the Trip's `TripDispatched` lists them.
+_Avoid_: sent, assigned to a Trip
+
 **Stop**:
 One Shipment's collection or its delivery, at its place in a Trip's sequence. A Shipment on a Trip has exactly two Stops, and its collection comes before its delivery, or only its delivery Stop on a Re-delivery. A Stop is derived from its Shipment and has no life of its own. The Driver completes a Stop by giving it an outcome on that Trip: collected or collection failed, delivered or delivery failed.
 _Avoid_: drop, visit, leg

@@ -31,6 +31,7 @@ public class TmsFixture : IAsyncLifetime
 {
     public const string TransportOrderEventsTopic = "transport-order-events";
     public const string ShipmentEventsTopic = "shipment-events";
+    public const string TripEventsTopic = "trip-events";
     private const string TestSubscription = "tms-api-integration-tests";
     public const string IntakeRole = "TransportOrders.Intake";
 
@@ -159,7 +160,7 @@ public class TmsFixture : IAsyncLifetime
         ProofOfDeliveryRecord = CreateTmsClient(IssueToken([ProofOfDeliveryRecordRole], clientId: "norvia-test-carrier-proof-of-delivery-logic-app"));
 
         _serviceBus = new ServiceBusClient(await _app!.GetConnectionStringAsync("messaging", startup.Token));
-        foreach (var topicName in new[] { TransportOrderEventsTopic, ShipmentEventsTopic })
+        foreach (var topicName in new[] { TransportOrderEventsTopic, ShipmentEventsTopic, TripEventsTopic })
         {
             var processor = _serviceBus.CreateProcessor(topicName, TestSubscription);
             processor.ProcessMessageAsync += args =>
@@ -179,7 +180,7 @@ public class TmsFixture : IAsyncLifetime
             [$"Parameters:{LocalTokens.SigningKeyParameter}={_tokenSigningKey}"],
             cancellationToken);
         builder.RemoveWhatTheTmsApiTestsDontUse();
-        foreach (var topicName in new[] { TransportOrderEventsTopic, ShipmentEventsTopic })
+        foreach (var topicName in new[] { TransportOrderEventsTopic, ShipmentEventsTopic, TripEventsTopic })
         {
             var topic = builder.Resources.OfType<AzureServiceBusTopicResource>().Single(t => t.TopicName == topicName);
             builder.CreateResourceBuilder(topic).AddServiceBusSubscription($"{topicName}-{TestSubscription}", TestSubscription);

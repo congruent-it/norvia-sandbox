@@ -57,4 +57,10 @@ public static class Flows
     /// so the trail is the TMS UI's hop and the TMS API's.
     /// </summary>
     public const string TripPlanning = "trip-planning";
+
+    /// <summary>
+    /// A Planner's dispatch of a Trip to its Driver (P11), which starts in the TMS UI and so gets a Message trail of its own that
+    /// the Trip dispatch Logic App continues.
+    /// </summary>
+    public const string TripDispatch = "trip-dispatch";
 }

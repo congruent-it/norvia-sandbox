@@ -25,6 +25,7 @@ internal sealed class TripConfiguration : IEntityTypeConfiguration<Trip>
 
         builder.Property(trip => trip.Number).HasConversion(number => number.Value, value => TripNumber.Parse(value)).HasMaxLength(10).IsRequired();
         builder.Property(trip => trip.Status).HasConversion<string>().HasMaxLength(10);
+        builder.Property(trip => trip.Version);
         builder.Property(trip => trip.VehicleId).HasConversion(id => id!.Value, value => new VehicleId(value)).HasMaxLength(20);
         builder.Property(trip => trip.DriverId).HasConversion(id => id!.Value, value => new DriverId(value)).HasMaxLength(20);
 

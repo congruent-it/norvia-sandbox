@@ -98,6 +98,9 @@ public interface ITransportOrderCommands
     /// <summary>The Planner puts the Stops of a Draft Trip in order: every Stop once. A delivery before its collection is refused (P11).</summary>
     Task<TripAnswer> ReorderTripStopsAsync(string number, IReadOnlyList<StopReference> stops, CancellationToken cancellationToken);
 
+    /// <summary>The Planner dispatches a Draft Trip to its Driver: the TMS re-checks every rule, then sends it as version 1 (P11).</summary>
+    Task<TripAnswer> DispatchTripAsync(string number, CancellationToken cancellationToken);
+
     /// <summary>The Planner discards a Draft Trip, which gives its Vehicle and Driver back (P11).</summary>
     Task<TripAnswer> DiscardDraftTripAsync(string number, CancellationToken cancellationToken);
 }

@@ -130,6 +130,41 @@ public sealed class TmsApiClientTripsTests : IDisposable
     }
 
     [Fact]
+    public async Task DispatchTripAsync_PostsTheDispatch_AnswersItsVersion_AndTracksTheTripAndItsNewMessageTrail()
+    {
+        _tmsApi.Answer(HttpStatusCode.OK, """{ "number": "TR-0000001", "version": 1, "correlationId": "corr-dispatch" }""");
+
+        var answer = await _client.DispatchTripAsync("TR-0000001", Cancel);
+
+        answer.Should().Be(new TripAnswer.Dispatched(1, "corr-dispatch"));
+        _tmsApi.Request!.Method.Should().Be(HttpMethod.Post);
+        _tmsApi.Request.RequestUri.Should().Be(new Uri("http://tms-api.example/v1/trips/TR-0000001/dispatch"));
+        ScopeOf(_logger.LatestRecord).Should().Contain(new Dictionary<string, object?>
+        {
+            ["flow"] = "trip-dispatch",
+            ["outcome"] = "Succeeded",
+            ["tripNumber"] = "TR-0000001",
+            ["correlationId"] = "corr-dispatch",
+        });
+    }
+
+    [Fact]
+    public async Task DispatchTripAsync_AnIncompleteTrip_AnswersItsReason_AndTracksItsCode()
+    {
+        _tmsApi.Answer(HttpStatusCode.Conflict, """{ "title": "The Trip can't be dispatched.", "detail": "Trip TR-0000001 can't be dispatched without a Driver.", "code": "TripIncomplete" }""");
+
+        var answer = await _client.DispatchTripAsync("TR-0000001", Cancel);
+
+        answer.Should().Be(new TripAnswer.Refused("Trip TR-0000001 can't be dispatched without a Driver."));
+        ScopeOf(_logger.LatestRecord).Should().Contain(new Dictionary<string, object?>
+        {
+            ["flow"] = "trip-dispatch",
+            ["outcome"] = "Refused",
+            ["failureCode"] = "TripIncomplete",
+        });
+    }
+
+    [Fact]
     public async Task ChangeDraftTripAsync_PutsTheVehicleAndDriver_AndTracksTheTripNumber()
     {
         _tmsApi.Answer(HttpStatusCode.NoContent, string.Empty);

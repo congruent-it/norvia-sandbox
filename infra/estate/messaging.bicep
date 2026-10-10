@@ -62,6 +62,28 @@ resource monitoringFilter 'Microsoft.ServiceBus/namespaces/topics/subscriptions/
   }
 }
 
+resource tripEvents 'Microsoft.ServiceBus/namespaces/topics@2024-01-01' = {
+  parent: serviceBus
+  name: 'trip-events'
+}
+
+// Monitoring is the first consumer of Trip events (P11).
+resource tripMonitoring 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01' = {
+  parent: tripEvents
+  name: 'monitoring'
+}
+
+resource tripMonitoringFilter 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
+  parent: tripMonitoring
+  name: '$Default'
+  properties: {
+    filterType: 'SqlFilter'
+    sqlFilter: {
+      sqlExpression: 'resubmitTo IS NULL OR resubmitTo = \'monitoring\''
+    }
+  }
+}
+
 resource shipmentEvents 'Microsoft.ServiceBus/namespaces/topics@2024-01-01' = {
   parent: serviceBus
   name: 'shipment-events'

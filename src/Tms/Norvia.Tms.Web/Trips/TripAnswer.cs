@@ -15,6 +15,9 @@ public abstract record TripAnswer
     /// <summary>The TMS put the Shipments on the Draft; <paramref name="Warnings"/> says what to know about the Trip now, such as a delivery window outside its day.</summary>
     public sealed record Added(IReadOnlyList<TripWarning> Warnings) : TripAnswer;
 
+    /// <summary>The TMS dispatched the Trip as this version, under a new Message trail.</summary>
+    public sealed record Dispatched(int Version, string CorrelationId) : TripAnswer;
+
     /// <summary>The TMS changed or discarded the Draft.</summary>
     public sealed record Done : TripAnswer;
 

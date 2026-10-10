@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/trip-dispatched.v1.schema.json",
+  "title": "TripDispatched",
+  "description": "A Planner dispatched a Trip, so the TMS set it and its Shipments to Dispatched (Canonical Model event, version 1). Carries the whole Trip: its Vehicle, Driver, planned start and planned driving duration, and every Stop in the order the Driver visits them, each derived from its Shipment. The latest version replaces whatever the Driver app held (ADR 0015), so a Trip is never sent as changes. Published on the Trip events topic, once per Dispatch and never per Shipment, under the correlation ID of the Dispatch, which starts a Message trail of its own; the Trip number and version trace the Trip, and every Stop carries its Shipment number and Transport Order number.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "tripNumber", "version", "day", "plannedStart", "plannedDrivingDuration", "vehicle", "driver", "stops"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "const": "TripDispatched" },
+    "eventVersion": { "const": 1 },
+    "occurredAt": { "description": "When the Planner dispatched the Trip.", "type": "string", "format": "date-time" },
+    "correlationId": { "description": "The Dispatch's own correlation ID, which the Trip dispatch Logic App passes on to the Driver app.", "type": "string", "minLength": 1 },
+    "tripNumber": { "description": "The Trip's number, the same since it was created.", "type": "string", "pattern": "^TR-[0-9]{7}$" },
+    "version": { "description": "1 at Dispatch; each Amend raises it, and sending a version again keeps it.", "type": "integer", "minimum": 1 },
+    "day": { "description": "The day of the Trip, in Norvia's local time.", "type": "string", "format": "date" },
+    "plannedStart": { "description": "The time on the Trip's day the Trip starts, in Norvia's local time.", "type": "string", "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$" },
+    "plannedDrivingDuration": { "description": "How long the Driver drives on the Trip: more than nothing and at most 24 hours, as an ISO 8601 duration.", "type": "string", "format": "duration" },
+    "vehicle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["vehicleId", "registration", "vehicleType"],
+      "properties": {
+        "vehicleId": { "type": "string", "minLength": 1 },
+        "registration": { "type": "string", "minLength": 1 },
+        "vehicleType": { "enum": ["Van", "RigidTruck", "TractorWithTrailer"] }
+      }
+    },
+    "driver": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["driverId", "name"],
+      "properties": {
+        "driverId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 }
+      }
+    },
+    "stops": {
+      "description": "The Stops in the order the Driver visits them. A Shipment taken off appears only as a version without its Stops.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sequence", "kind", "shipmentNumber", "transportOrderNumber", "shipperId", "address", "window", "goodsLines", "consignee"],
+        "properties": {
+          "sequence": { "description": "The Stop's place in the sequence, counting from 1.", "type": "integer", "minimum": 1 },
+          "kind": { "enum": ["Collection", "Delivery"] },
+          "shipmentNumber": { "type": "string", "pattern": "^SH-[0-9]{7}$" },
+          "transportOrderNumber": { "type": "string", "pattern": "^TO-[0-9]{7}$" },
+          "shipperId": { "type": "string", "minLength": 1 },
+          "address": { "$ref": "transport-order.v1.schema.json#/$defs/address" },
+          "window": { "description": "The collection window, or for a delivery the last agreed delivery window, otherwise the Shipper's.", "$ref": "transport-order.v1.schema.json#/$defs/timeWindow" },
+          "goodsLines": { "type": "array", "items": { "$ref": "transport-order.v1.schema.json#/$defs/goodsLine" } },
+          "consignee": { "description": "Who receives the goods at a delivery Stop; null at a collection Stop.", "$ref": "transport-order.v1.schema.json#/$defs/consignee" }
+        }
+      }
+    }
+  }
+}

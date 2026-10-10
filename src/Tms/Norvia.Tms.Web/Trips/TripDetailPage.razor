@@ -31,6 +31,21 @@
         <dt>Load</dt><dd>@TripText.Load(trip)</dd>
     </dl>
 
+    @if (_notice is { } notice)
+    {
+        <div role="status" class="mb-4">
+            <FluentMessageBar Intent="MessageIntent.Success" AllowDismiss="false">@notice</FluentMessageBar>
+        </div>
+    }
+
+    @if (trip.Status == TripStatus.Draft)
+    {
+        <p class="mb-4">
+            <FluentButton Appearance="Appearance.Accent" Disabled="_working" OnClick="DispatchAsync"
+                          aria-label="@($"Dispatch {Number}")">Dispatch</FluentButton>
+        </p>
+    }
+
     @if (_refusal is { } refusal)
     {
         <div role="alert" class="mb-4">
@@ -81,6 +96,7 @@
     private LiveTransportOrderList<TripDetailView> _detail = null!;
     private readonly CancellationTokenSource _closed = new();
     private string? _refusal;
+    private string? _notice;
     private bool _working;
 
     [Parameter]
@@ -122,6 +138,40 @@
         {
             Logger.LogWarning(exception, "Reordering the Stops of Trip {Number} failed", Number);
             _refusal = "The TMS couldn't reorder the Stops. Try again.";
+        }
+        finally
+        {
+            _working = false;
+        }
+    }
+
+    // The TMS checks every rule again; a refusal leaves the Trip a Draft, and the reason is shown until the next action.
+    private async Task DispatchAsync()
+    {
+        _working = true;
+        _refusal = null;
+        _notice = null;
+        try
+        {
+            var answer = await Commands.DispatchTripAsync(Number, _closed.Token);
+            if (answer is TripAnswer.Dispatched dispatched)
+            {
+                _notice = $"Trip {Number} dispatched as version {dispatched.Version}.";
+                await _detail.RefreshAsync();
+            }
+            else if (answer is TripAnswer.Refused refused)
+            {
+                _refusal = $"The Trip was not dispatched: {refused.Reason}";
+            }
+        }
+        catch (OperationCanceledException) when (_closed.IsCancellationRequested)
+        {
+            // The page closed while the TMS was answering.
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning(exception, "Dispatching Trip {Number} failed", Number);
+            _refusal = "The TMS couldn't dispatch the Trip. Try again.";
         }
         finally
         {

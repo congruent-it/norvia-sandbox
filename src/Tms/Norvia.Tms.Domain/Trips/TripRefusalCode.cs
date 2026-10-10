@@ -32,4 +32,7 @@ public enum TripRefusalCode
 
     /// <summary>The order given doesn't name every Stop of the Trip once, and no others.</summary>
     StopsNotTheTripsStops,
+
+    /// <summary>The Trip lacks a Vehicle, a Driver, a planned start, a planned driving duration or a Shipment, so it can't be dispatched.</summary>
+    TripIncomplete,
 }

@@ -1,10 +1,10 @@
+using Norvia.Tms.Application.Shipments.ListToPutOnTrips;
 using Norvia.Tms.Application.Shippers;
 using Norvia.Tms.Application.Trips;
-using Norvia.Tms.Application.Shipments.ListToPutOnTrips;
+using Norvia.Tms.Application.UnitTests.Fleet.Planning;
 using Norvia.Tms.Domain.Carriers;
 using Norvia.Tms.Domain.Shipments;
 using NSubstitute;
-using Norvia.Tms.Application.UnitTests.Fleet.Planning;
 
 namespace Norvia.Tms.Application.UnitTests.Trips;
 

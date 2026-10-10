@@ -1,0 +1,38 @@
+{
+  "eventId": "0197a0c2-5b1e-7c3a-9d4e-2f6b8a1c3e50",
+  "eventType": "TripDispatched",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-13T09:00:00+00:00",
+  "correlationId": "0197a0c2-5b1e-7c3a-9d4e-2f6b8a1c3e4f",
+  "tripNumber": "TR-0000007",
+  "version": 1,
+  "day": "2026-10-14",
+  "plannedStart": "07:30:00",
+  "plannedDrivingDuration": "PT6H",
+  "vehicle": { "vehicleId": "VEH-0002", "registration": "TT-201-R", "vehicleType": "RigidTruck" },
+  "driver": { "driverId": "DRV-0001", "name": "Joost Bakker" },
+  "stops": [
+    {
+      "sequence": 1,
+      "kind": "Collection",
+      "shipmentNumber": "SH-0000012",
+      "transportOrderNumber": "TO-0000003",
+      "shipperId": "SHP-0001",
+      "address": { "street": "Waalhaven Oostzijde 88", "postcode": "3087 BM", "city": "Rotterdam", "country": "NL" },
+      "window": { "earliest": "2026-10-14T05:00:00+00:00", "latest": "2026-10-14T09:00:00+00:00" },
+      "goodsLines": [{ "packageType": "pallet", "quantity": 2, "weightKg": 850, "dimensionsCm": { "length": 120, "width": 80, "height": 150 } }],
+      "consignee": null
+    },
+    {
+      "sequence": 2,
+      "kind": "Delivery",
+      "shipmentNumber": "SH-0000012",
+      "transportOrderNumber": "TO-0000003",
+      "shipperId": "SHP-0001",
+      "address": { "street": "Oudegracht 112", "postcode": "3511 AW", "city": "Utrecht", "country": "NL" },
+      "window": { "earliest": "2026-10-14T09:00:00+00:00", "latest": "2026-10-14T13:00:00+00:00" },
+      "goodsLines": [{ "packageType": "pallet", "quantity": 2, "weightKg": 850, "dimensionsCm": { "length": 120, "width": 80, "height": 150 } }],
+      "consignee": { "name": "Café De Zwaan", "contactName": "Sanne de Vries", "phone": "+31 30 555 0142", "email": null }
+    }
+  ]
+}
