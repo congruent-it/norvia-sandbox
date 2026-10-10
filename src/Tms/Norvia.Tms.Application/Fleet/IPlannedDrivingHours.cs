@@ -3,8 +3,8 @@ using Norvia.Tms.Domain.Fleet;
 namespace Norvia.Tms.Application.Fleet;
 
 /// <summary>
-/// The planned driving duration of the Own fleet's Trips, Draft and Dispatched (P11 plans them). Until P11 exists no Trip
-/// does, so every Driving-hour budget is full.
+/// The planned driving duration of the Own fleet's Trips, Draft and Dispatched (P11 plans them). A Trip without a Driver or a
+/// duration uses no hours.
 /// </summary>
 public interface IPlannedDrivingHours
 {

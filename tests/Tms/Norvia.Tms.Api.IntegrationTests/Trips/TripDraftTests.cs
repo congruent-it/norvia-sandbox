@@ -113,6 +113,78 @@ public sealed class TripDraftTests(TripsTmsFixture tms) : IClassFixture<TripsTms
     }
 
     [Fact]
+    public async Task AStartInsideTheShiftAndADurationThatFits_AreSaved_AndTheTripsViewListsThem()
+    {
+        var day = (await OpenHorizonAsync(1800)).AddDays(1);
+
+        using var created = await CreateAsync(day, Van, Anouk, start: "06:00", duration: "06:30:00");
+
+        created.StatusCode.Should().Be(HttpStatusCode.Created, await created.Content.ReadAsStringAsync(_cancellationToken));
+        var number = await NumberOf(created);
+        var trip = (await ListAsync()).Single(item => item["number"]!.GetValue<string>() == number);
+        trip["plannedStart"]!.GetValue<string>().Should().Be("06:00:00");
+        trip["plannedDrivingDuration"]!.GetValue<string>().Should().Be("06:30:00");
+    }
+
+    [Theory]
+    [InlineData("05:59", 1900)]
+    [InlineData("14:30", 1950)]
+    public async Task OutsideShift_IsReturnedForAStartOutsideTheDriversShift_AndTheTripIsUnchanged(string start, int daysAhead)
+    {
+        var day = (await OpenHorizonAsync(daysAhead)).AddDays(1);
+        var number = await NumberOf(await CreateAsync(day, Van, Anouk, start: "07:00", duration: "04:00:00"));
+
+        using var response = await ChangeAsync(number, Van, Anouk, start, "05:00:00");
+
+        await AssertRefusedAsync(response, HttpStatusCode.Conflict, "OutsideShift");
+        var unchanged = (await ListAsync()).Single(item => item["number"]!.GetValue<string>() == number);
+        unchanged["plannedStart"]!.GetValue<string>().Should().Be("07:00:00");
+        unchanged["plannedDrivingDuration"]!.GetValue<string>().Should().Be("04:00:00");
+    }
+
+    [Fact]
+    public async Task DrivingHoursExceeded_IsReturnedWhenTheDurationDoesNotFitTheBudget()
+    {
+        var day = (await OpenHorizonAsync(2000)).AddDays(1);
+
+        using var response = await CreateAsync(day, Van, Anouk, start: "07:00", duration: "10:30:00");
+
+        await AssertRefusedAsync(response, HttpStatusCode.Conflict, "DrivingHoursExceeded");
+        (await ListAsync()).Should().NotContain(trip => trip["day"]!.GetValue<string>() == $"{day:yyyy-MM-dd}");
+    }
+
+    [Theory]
+    [InlineData("00:00:00")]
+    [InlineData("-01:00:00")]
+    [InlineData("1.01:00:00")]
+    public async Task ADurationOutsideADay_IsABadRequest(string duration)
+    {
+        var day = (await OpenHorizonAsync(2100)).AddDays(1);
+
+        using var response = await CreateAsync(day, Van, Anouk, duration: duration);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task ADraftsDuration_UsesUpTheDriversHours_AndDiscardingTheDraftGivesThemBack()
+    {
+        // The daily limit is 9 h, or 10 h on at most two days of a week. Tuesday and Wednesday use both extensions.
+        var monday = await OpenHorizonAsync(2200);
+        var tuesday = await NumberOf(await CreateAsync(monday.AddDays(1), Van, Anouk, duration: "10:00:00"));
+        using var wednesday = await CreateAsync(monday.AddDays(2), Van, Anouk, duration: "10:00:00");
+        wednesday.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var refused = await CreateAsync(monday.AddDays(3), Van, Anouk, duration: "10:00:00");
+        using var discarded = await tms.TmsUi.DeleteAsync(new Uri($"/v1/trips/{tuesday}", UriKind.Relative), _cancellationToken);
+        using var again = await CreateAsync(monday.AddDays(3), Van, Anouk, duration: "10:00:00");
+
+        await AssertRefusedAsync(refused, HttpStatusCode.Conflict, "DrivingHoursExceeded");
+        discarded.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        again.StatusCode.Should().Be(HttpStatusCode.Created, await again.Content.ReadAsStringAsync(_cancellationToken));
+    }
+
+    [Fact]
     public async Task TwoRequestsAskingAtOnceForTheSameVehicle_CreateOneTrip_AndTheOtherIsRefusedWithAStableCode()
     {
         var day = (await OpenHorizonAsync(1600)).AddDays(1);
@@ -182,18 +254,20 @@ public sealed class TripDraftTests(TripsTmsFixture tms) : IClassFixture<TripsTms
         return first;
     }
 
-    private async Task<HttpResponseMessage> CreateAsync(DateOnly day, string? vehicleId, string? driverId, string? key = null)
+    private async Task<HttpResponseMessage> CreateAsync(
+        DateOnly day, string? vehicleId, string? driverId, string? key = null, string? start = null, string? duration = null)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("/v1/trips", UriKind.Relative))
         {
-            Content = JsonContent.Create(new { day = $"{day:yyyy-MM-dd}", vehicleId, driverId }),
+            Content = JsonContent.Create(new { day = $"{day:yyyy-MM-dd}", vehicleId, driverId, plannedStart = start, plannedDrivingDuration = duration }),
         };
         request.Headers.Add("Idempotency-Key", key ?? Guid.NewGuid().ToString());
         return await tms.TmsUi.SendAsync(request, _cancellationToken);
     }
 
-    private Task<HttpResponseMessage> ChangeAsync(string number, string? vehicleId, string? driverId) =>
-        tms.TmsUi.PutAsJsonAsync(new Uri($"/v1/trips/{number}", UriKind.Relative), new { vehicleId, driverId }, _cancellationToken);
+    private Task<HttpResponseMessage> ChangeAsync(string number, string? vehicleId, string? driverId, string? start = null, string? duration = null) =>
+        tms.TmsUi.PutAsJsonAsync(
+            new Uri($"/v1/trips/{number}", UriKind.Relative), new { vehicleId, driverId, plannedStart = start, plannedDrivingDuration = duration }, _cancellationToken);
 
     private async Task<string> NumberOf(HttpResponseMessage created) =>
         JsonNode.Parse(await created.Content.ReadAsStringAsync(_cancellationToken))!["number"]!.GetValue<string>();

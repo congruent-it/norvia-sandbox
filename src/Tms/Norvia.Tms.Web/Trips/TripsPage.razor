@@ -31,19 +31,22 @@
     @* Keyed by the Trip, so picking for another Trip starts a form of its own. *@
     <TripForm @key="changing.Number" Title="@($"Pick the Vehicle and Driver of {changing.Number}")" SubmitText="Save" FixedDay="changing.Day" ForTrip="@changing.Number"
               InitialVehicleId="@changing.VehicleId" InitialDriverId="@changing.DriverId"
-              Submit="@((entry, token) => Commands.ChangeDraftTripAsync(changing.Number, entry.VehicleId, entry.DriverId, token))"
+              InitialStart="@changing.PlannedStart" InitialDrivingDuration="@changing.PlannedDrivingDuration"
+              Submit="@((entry, token) => Commands.ChangeDraftTripAsync(changing.Number, entry, token))"
               OnDone="@(() => { _changing = null; })" OnCancel="@(() => { _changing = null; })" />
 }
 
 <LiveListStates Items="_trips.Items" LastReadFailed="_trips.LastReadFailed" Name="Trips"
                 Empty="There are no Trips yet." Context="trips">
     <FluentDataGrid Items="trips.AsQueryable()" TGridItem="TripView" Class="flatly-table" aria-label="Trips"
-                    GridTemplateColumns="1.2fr 1.2fr 1fr 1.6fr 1.8fr 2fr" MultiLine="true">
+                    GridTemplateColumns="1.2fr 1.2fr 1fr 1.6fr 1.8fr 1fr 1.2fr 2fr" MultiLine="true">
         <PropertyColumn Title="Trip" Property="@(trip => trip.Number)" />
         <PropertyColumn Title="Day" Property="@(trip => FleetText.Day(trip.Day))" />
         <PropertyColumn Title="Status" Property="@(trip => trip.Status.ToString())" />
         <PropertyColumn Title="Vehicle" Property="@(trip => trip.VehicleRegistration ?? "—")" />
         <PropertyColumn Title="Driver" Property="@(trip => trip.DriverName ?? "—")" />
+        <PropertyColumn Title="Start" Property="@(trip => TripTimes.StartOrDash(trip.PlannedStart))" />
+        <PropertyColumn Title="Driving" Property="@(trip => TripTimes.DurationOrDash(trip.PlannedDrivingDuration))" />
         <TemplateColumn Title="Actions">
             @if (context.Status == TripStatus.Draft)
             {

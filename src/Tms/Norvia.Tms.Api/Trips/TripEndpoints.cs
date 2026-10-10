@@ -32,19 +32,19 @@ public static class TripEndpoints
         trips.MapPost("/", CreateDraftAsync)
             .WithName("CreateDraftTrip")
             .RequireAuthorization(policy => policy.RequireRole(TransportOrderEndpoints.ManageRole))
-            .WithSummary("Create a Draft Trip for an open day, with or without a Vehicle and Driver.")
+            .WithSummary("Create a Draft Trip for an open day, with or without a Vehicle, Driver, planned start and planned driving duration.")
             .WithDescription(
                 "day and an Idempotency-Key header (the same for each retry, which is answered with the Draft the first call created) are required, otherwise the call is a 400. A Vehicle or Driver given must pass P10's availability rules and have no other Trip that day, Drafts included. "
                 + "A request that breaks a rule is refused, creating nothing, with a 409 problem whose code names the first rule broken (VehicleNotAvailable, DriverNotAvailable, LicenceNotHeld or DayNotOpen) "
-                + "and whose failures lists every rule broken.");
+                + "and whose failures lists every rule broken. A plannedStart must be inside the Driver's Shift that day (OutsideShift), and a plannedDrivingDuration (more than nothing, at most 24 hours) must fit the Driver's Driving-hour budget (DrivingHoursExceeded).");
 
         trips.MapPut("/{number}", ChangeDraftAsync)
             .WithName("ChangeDraftTrip")
             .RequireAuthorization(policy => policy.RequireRole(TransportOrderEndpoints.ManageRole))
-            .WithSummary("Pick the Vehicle and Driver of a Draft Trip, or give them back by leaving them out.")
+            .WithSummary("Pick the Vehicle, Driver, planned start and planned driving duration of a Draft Trip, or give them back by leaving them out.")
             .WithDescription(
-                "The Vehicle and Driver replace the Draft's. A change that breaks a rule is refused, leaving the Trip as it was, with a problem whose code says which: "
-                + "VehicleNotAvailable, DriverNotAvailable, LicenceNotHeld or DayNotOpen (409), TripNotDraft (409) or TripNotFound (404).");
+                "What is given replaces what the Draft had. A change that breaks a rule is refused, leaving the Trip as it was, with a problem whose code says which: "
+                + "VehicleNotAvailable, DriverNotAvailable, LicenceNotHeld, DrivingHoursExceeded, OutsideShift or DayNotOpen (409), TripNotDraft (409) or TripNotFound (404).");
 
         trips.MapDelete("/{number}", DiscardDraftAsync)
             .WithName("DiscardDraftTrip")
@@ -76,25 +76,37 @@ public static class TripEndpoints
                 [$"Creating a Trip needs an {TransportOrderEndpoints.IdempotencyKeyHeader} of 1 to {IdempotencyKey.MaxLength} characters, the same for each retry."];
         }
 
+        AddDurationError(errors, request.PlannedDrivingDuration);
+
         if (errors.Count > 0 || request.Day is not { } day)
         {
             return TypedResults.ValidationProblem(errors);
         }
 
         var result = await mediator.Send(
-            new CreateDraftTripCommand(day, VehicleOf(request.VehicleId), DriverOf(request.DriverId), new IdempotencyKey(idempotencyKey!)), cancellationToken);
+            new CreateDraftTripCommand(
+                day, VehicleOf(request.VehicleId), DriverOf(request.DriverId), new IdempotencyKey(idempotencyKey!), request.PlannedStart, request.PlannedDrivingDuration),
+            cancellationToken);
         return result.IsSuccess
             ? TypedResults.Created($"/v1/trips/{result.Value.Number}", result.Value)
             : Refused(result.ValidationErrors, "The Trip can't be created.");
     }
 
-    private static async Task<Results<NoContent, ProblemHttpResult>> ChangeDraftAsync(
+    private static async Task<Results<NoContent, ProblemHttpResult, ValidationProblem>> ChangeDraftAsync(
         string number,
         ChangeTripRequest request,
         IMediator mediator,
         CancellationToken cancellationToken)
     {
-        var result = await mediator.Send(new ChangeDraftTripCommand(number, VehicleOf(request.VehicleId), DriverOf(request.DriverId)), cancellationToken);
+        var errors = new Dictionary<string, string[]>();
+        AddDurationError(errors, request.PlannedDrivingDuration);
+        if (errors.Count > 0)
+        {
+            return TypedResults.ValidationProblem(errors);
+        }
+
+        var result = await mediator.Send(
+            new ChangeDraftTripCommand(number, VehicleOf(request.VehicleId), DriverOf(request.DriverId), request.PlannedStart, request.PlannedDrivingDuration), cancellationToken);
         return result.IsSuccess ? TypedResults.NoContent() : Refused(result.ValidationErrors, "The Trip can't be changed.");
     }
 
@@ -102,6 +114,14 @@ public static class TripEndpoints
     {
         var result = await mediator.Send(new DiscardDraftTripCommand(number), cancellationToken);
         return result.IsSuccess ? TypedResults.NoContent() : Refused(result.ValidationErrors, "The Trip can't be discarded.");
+    }
+
+    private static void AddDurationError(Dictionary<string, string[]> errors, TimeSpan? duration)
+    {
+        if (duration is { } value && (value <= TimeSpan.Zero || value > TimeSpan.FromHours(24)))
+        {
+            errors[nameof(CreateTripRequest.PlannedDrivingDuration)] = ["A planned driving duration is more than nothing and at most 24 hours."];
+        }
     }
 
     private static VehicleId? VehicleOf(string? id) => string.IsNullOrWhiteSpace(id) ? null : new VehicleId(id);

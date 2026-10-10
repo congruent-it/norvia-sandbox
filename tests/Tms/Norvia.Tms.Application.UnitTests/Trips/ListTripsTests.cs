@@ -21,7 +21,7 @@ public sealed class ListTripsTests
             .Handle(new ListTripsQuery(), CancellationToken.None);
 
         trips.Select(trip => trip.Day).Should().Equal(Monday.AddDays(-1), TripsFixture.Tuesday, TripsFixture.Tuesday.AddDays(1));
-        trips[1].Should().Be(new TripView("TR-0000101", TripsFixture.Tuesday, TripStatus.Draft, "VEH-0002", "VV-102-B", "DRV-0001", "DRV-0001"));
+        trips[1].Should().Be(new TripView("TR-0000101", TripsFixture.Tuesday, TripStatus.Draft, "VEH-0002", "VV-102-B", "DRV-0001", "DRV-0001", null, null));
         trips[0].VehicleId.Should().BeNull();
         trips[0].DriverName.Should().BeNull();
     }

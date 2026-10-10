@@ -209,7 +209,7 @@ Designed in this document and not built yet:
 
 | Gap | Where it stands |
 |---|---|
-| Trips, and so everything that draws on availability | P11 is not built. `TripAvailabilityRules` has no caller, and `NoTripsPlannedDrivingHours` ([NoTripsPlannedDrivingHours.cs](../../../src/Tms/Norvia.Tms.Infrastructure/Fleet/NoTripsPlannedDrivingHours.cs)) reports no planned driving, so every Driving-hour budget is full |
+| Trips, and so everything that draws on availability | P11 is not built. P11 applies `TripAvailabilityRules` to Draft Trips, and [TripPlannedDrivingHours.cs](../../../src/Tms/Norvia.Tms.Application/Trips/TripPlannedDrivingHours.cs) reports their planned driving, so a Draft uses up Driving hours. Dispatched Trips, Shipments and the load come with later P11 slices |
 | The *Needs a Driver* and *Needs a Vehicle* flags on a Trip | Recording an Absence or an Off the road day is accepted, but with no Trips there is nothing to flag ([When availability changes under a Trip](#when-availability-changes-under-a-trip)) |
 | Part-day Absences, tachograph data, breaks and rest periods, estimating driving hours, more than one Trip per Vehicle per day | Left out on purpose ([Deferred](#deferred)) |
 | The ERP and master-data sync | Vehicles and Drivers come from the seed file for now |

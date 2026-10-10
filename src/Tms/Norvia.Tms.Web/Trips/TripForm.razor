@@ -52,6 +52,12 @@
                 }
             </FluentSelect>
         </div>
+        <div class="flex items-center gap-2">
+            <FluentTextField Label="Planned start" aria-label="Planned start" @bind-Value="_start" Immediate="true" Placeholder="07:30" />
+        </div>
+        <div class="flex items-center gap-2">
+            <FluentTextField Label="Driving time (h:mm)" aria-label="Driving time" @bind-Value="_duration" Immediate="true" Placeholder="6:30" />
+        </div>
         <FluentButton Appearance="Appearance.Accent" OnClick="SubmitAsync" Disabled="_working">@SubmitText</FluentButton>
         @if (OnCancel.HasDelegate)
         {
@@ -65,6 +71,8 @@
     private string _day = string.Empty;
     private string _vehicleId = string.Empty;
     private string _driverId = string.Empty;
+    private string _start = string.Empty;
+    private string _duration = string.Empty;
     private TripChoices _choices = new([], []);
     private string? _failure;
     private string? _done;
@@ -94,6 +102,12 @@
     [Parameter]
     public string? InitialDriverId { get; set; }
 
+    [Parameter]
+    public TimeOnly? InitialStart { get; set; }
+
+    [Parameter]
+    public TimeSpan? InitialDrivingDuration { get; set; }
+
     /// <summary>Sends the entry to the TMS and answers what it said.</summary>
     [Parameter, EditorRequired]
     public Func<TripEntry, CancellationToken, Task<TripAnswer>> Submit { get; set; } = null!;
@@ -109,6 +123,8 @@
     {
         _vehicleId = InitialVehicleId ?? string.Empty;
         _driverId = InitialDriverId ?? string.Empty;
+        _start = InitialStart is { } start ? TripTimes.Start(start) : string.Empty;
+        _duration = InitialDrivingDuration is { } duration ? TripTimes.Duration(duration) : string.Empty;
         if (FixedDay is { } day)
         {
             _day = Iso(day);
@@ -167,10 +183,34 @@
             return;
         }
 
+        TimeOnly? plannedStart = null;
+        if (_start.Trim().Length > 0)
+        {
+            if (!TripTimes.TryParseStart(_start, out var parsedStart))
+            {
+                _failure = "Enter the planned start as hours and minutes, such as 07:30.";
+                return;
+            }
+
+            plannedStart = parsedStart;
+        }
+
+        TimeSpan? drivingDuration = null;
+        if (_duration.Trim().Length > 0)
+        {
+            if (!TripTimes.TryParseDuration(_duration, out var parsedDuration))
+            {
+                _failure = "Enter the driving time as hours and minutes, such as 6:30, of more than nothing and at most 24 hours.";
+                return;
+            }
+
+            drivingDuration = parsedDuration;
+        }
+
         _working = true;
         try
         {
-            var entry = new TripEntry(day, _vehicleId.Length == 0 ? null : _vehicleId, _driverId.Length == 0 ? null : _driverId);
+            var entry = new TripEntry(day, _vehicleId.Length == 0 ? null : _vehicleId, _driverId.Length == 0 ? null : _driverId, plannedStart, drivingDuration);
             switch (await Submit(entry, _closed.Token))
             {
                 case TripAnswer.Refused refused:
@@ -178,6 +218,8 @@
                     break;
                 case TripAnswer.Created created:
                     _done = $"Draft Trip {created.Number} created for {FleetText.Day(day)}.";
+                    _start = string.Empty;
+                    _duration = string.Empty;
                     await DayChangedAsync(_day);
                     await OnDone.InvokeAsync();
                     break;

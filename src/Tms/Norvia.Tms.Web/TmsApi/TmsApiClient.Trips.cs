@@ -14,11 +14,20 @@ internal sealed partial class TmsApiClient
     public Task<TripAnswer> CreateDraftTripAsync(TripEntry entry, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        return SendTripAsync("Create Draft Trip", HttpMethod.Post, "/v1/trips", tripNumber: null, new CreateTripBody(entry.Day, entry.VehicleId, entry.DriverId), cancellationToken);
+        return SendTripAsync("Create Draft Trip", HttpMethod.Post, "/v1/trips", tripNumber: null, new CreateTripBody(entry.Day, entry.VehicleId, entry.DriverId, entry.PlannedStart, entry.PlannedDrivingDuration), cancellationToken);
     }
 
-    public Task<TripAnswer> ChangeDraftTripAsync(string number, string? vehicleId, string? driverId, CancellationToken cancellationToken) =>
-        SendTripAsync("Change Draft Trip", HttpMethod.Put, $"/v1/trips/{Uri.EscapeDataString(number)}", number, new ChangeTripBody(vehicleId, driverId), cancellationToken);
+    public Task<TripAnswer> ChangeDraftTripAsync(string number, TripEntry entry, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        return SendTripAsync(
+            "Change Draft Trip",
+            HttpMethod.Put,
+            $"/v1/trips/{Uri.EscapeDataString(number)}",
+            number,
+            new ChangeTripBody(entry.VehicleId, entry.DriverId, entry.PlannedStart, entry.PlannedDrivingDuration),
+            cancellationToken);
+    }
 
     public Task<TripAnswer> DiscardDraftTripAsync(string number, CancellationToken cancellationToken) =>
         SendTripAsync("Discard Draft Trip", HttpMethod.Delete, $"/v1/trips/{Uri.EscapeDataString(number)}", number, null, cancellationToken);
@@ -79,9 +88,9 @@ internal sealed partial class TmsApiClient
     private partial void LogTripRefused(string action, string code, string reason);
 
     // What the TMS UI asks the TMS API to do, and what it answers.
-    private sealed record CreateTripBody(DateOnly Day, string? VehicleId, string? DriverId);
+    private sealed record CreateTripBody(DateOnly Day, string? VehicleId, string? DriverId, TimeOnly? PlannedStart, TimeSpan? PlannedDrivingDuration);
 
-    private sealed record ChangeTripBody(string? VehicleId, string? DriverId);
+    private sealed record ChangeTripBody(string? VehicleId, string? DriverId, TimeOnly? PlannedStart, TimeSpan? PlannedDrivingDuration);
 
     private sealed record CreatedTrip(string Number);
 }

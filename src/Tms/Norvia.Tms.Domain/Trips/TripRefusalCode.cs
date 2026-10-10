@@ -11,4 +11,7 @@ public enum TripRefusalCode
 
     /// <summary>The Trip is Dispatched, so it can't be changed by hand as a Draft can, nor discarded.</summary>
     TripNotDraft,
+
+    /// <summary>The planned start is not inside the Driver's Shift that day.</summary>
+    OutsideShift,
 }

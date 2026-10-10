@@ -31,6 +31,16 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
 
     public DriverId? DriverId { get; private set; }
 
+    /// <summary>When the Trip starts, a time on <see cref="Day"/> that is inside the Driver's Shift. Empty until the Planner enters it.</summary>
+    public TimeOnly? PlannedStart { get; private set; }
+
+    /// <summary>How long the Driver drives on the Trip, which uses up their Driving-hour budget. Empty until the Planner enters it.</summary>
+    public TimeSpan? PlannedDrivingDuration { get; private set; }
+
+    /// <summary>The driving this Trip uses up, or null while the Trip has no Driver or no duration.</summary>
+    public PlannedDriving? PlannedDriving =>
+        DriverId is { } driver && PlannedDrivingDuration is { } duration ? new PlannedDriving(driver, Day, duration) : null;
+
     /// <summary>The key of the request that created the Trip, so the same request sent again as a retry finds it instead of creating another.</summary>
     public IdempotencyKey IdempotencyKey { get; private set; }
 
@@ -55,6 +65,26 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
 
         VehicleId = vehicleId;
         DriverId = driverId;
+    }
+
+    /// <summary>
+    /// Sets the planned start and driving duration of the Draft, or gives them back with null. The caller checks the Shift and the
+    /// Driving-hour budget first, as for <see cref="Pick"/>.
+    /// </summary>
+    public void Plan(TimeOnly? start, TimeSpan? drivingDuration)
+    {
+        if (EnsureDraft() is not null)
+        {
+            throw new InvalidOperationException($"Trip {Number} is Dispatched, so its planned start and duration change only by Amend.");
+        }
+
+        if (drivingDuration is { } duration && (duration <= TimeSpan.Zero || duration > TimeSpan.FromHours(24)))
+        {
+            throw new ArgumentOutOfRangeException(nameof(drivingDuration), duration, "A driving duration is more than nothing and at most a day.");
+        }
+
+        PlannedStart = start;
+        PlannedDrivingDuration = drivingDuration;
     }
 
     /// <summary>Null when the Trip is a Draft, which can be changed or discarded; a Dispatched Trip is neither, and is never deleted.</summary>
