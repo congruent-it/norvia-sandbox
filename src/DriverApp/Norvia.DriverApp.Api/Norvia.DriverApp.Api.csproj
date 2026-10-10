@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <PackageReference Include="Mediator.SourceGenerator" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Norvia.ServiceDefaults\Norvia.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\Norvia.DriverApp.Application\Norvia.DriverApp.Application.csproj" />
+    <ProjectReference Include="..\Norvia.DriverApp.Infrastructure\Norvia.DriverApp.Infrastructure.csproj" />
+  </ItemGroup>
+  <!-- The Driver app reads its Drivers from the seed file, so the published image carries it (Seed:Path in Azure). -->
+  <ItemGroup>
+    <None Include="..\..\..\seed\norvia.seed.json" Link="seed\norvia.seed.json" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

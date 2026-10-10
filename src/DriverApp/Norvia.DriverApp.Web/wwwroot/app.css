@@ -1,0 +1,44 @@
+:root {
+    --ink: #1c1c1c;
+    --muted: #5f6368;
+    --rule: #d9dce0;
+    --accent: #0f6cbd;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: var(--ink);
+}
+
+body { margin: 0; background: #f6f7f9; }
+
+.app-header {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem;
+    padding: 0.75rem 1rem; background: #fff; border-bottom: 1px solid var(--rule);
+}
+.app-brand { font-weight: 700; color: var(--ink); text-decoration: none; letter-spacing: 0.05em; }
+.app-header nav a { color: var(--muted); text-decoration: none; }
+.app-main { max-width: 40rem; margin: 0 auto; padding: 1rem; }
+
+h1 { font-size: 1.5rem; margin: 0.5rem 0; }
+h2 { font-size: 1.125rem; margin: 0 0 0.5rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.muted { color: var(--muted); font-size: 0.875rem; }
+
+.driver-list { display: grid; gap: 0.5rem; }
+.driver-button {
+    display: flex; justify-content: space-between; align-items: center; gap: 1rem; width: 100%; box-sizing: border-box;
+    padding: 1rem; font: inherit; text-align: left; background: #fff; border: 1px solid var(--rule); border-radius: 0.5rem; cursor: pointer;
+}
+.driver-button:hover { border-color: var(--accent); }
+.driver-name { font-weight: 600; }
+.driver-id { color: var(--muted); font-size: 0.875rem; }
+
+.trips-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.5rem 1rem; }
+.link-button { font: inherit; color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; }
+.primary-button { font: inherit; padding: 0.75rem 1rem; color: #fff; background: var(--accent); border: 0; border-radius: 0.5rem; cursor: pointer; }
+
+.trip { margin: 1rem 0; padding: 1rem; background: #fff; border: 1px solid var(--rule); border-radius: 0.5rem; }
+.badge { font-size: 0.75rem; font-weight: 600; padding: 0.125rem 0.5rem; color: var(--accent); border: 1px solid var(--accent); border-radius: 1rem; }
+.trip-facts { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; margin: 0 0 1rem; }
+.trip-facts dt { color: var(--muted); }
+.trip-facts dd { margin: 0; }
+.stops { margin: 0; padding-left: 1.5rem; display: grid; gap: 0.75rem; }
+.stop-title { display: flex; flex-wrap: wrap; gap: 0.25rem 0.75rem; }
+.no-stops { padding: 0.75rem; background: #fff4ce; border-radius: 0.5rem; }

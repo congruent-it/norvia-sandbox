@@ -15,6 +15,9 @@
     <PackageReference Include="CommunityToolkit.Aspire.Hosting.SqlServer.Extensions" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\DriverApp\Norvia.DriverApp.Api\Norvia.DriverApp.Api.csproj" />
+    <ProjectReference Include="..\DriverApp\Norvia.DriverApp.Migrations\Norvia.DriverApp.Migrations.csproj" />
+    <ProjectReference Include="..\DriverApp\Norvia.DriverApp.Web\Norvia.DriverApp.Web.csproj" />
     <ProjectReference Include="..\Integration\Norvia.Integration.LocalBookingWorker\Norvia.Integration.LocalBookingWorker.csproj" />
     <ProjectReference Include="..\Integration\Norvia.Integration.LocalShipperNotificationWorker\Norvia.Integration.LocalShipperNotificationWorker.csproj" />
     <ProjectReference Include="..\Integration\Norvia.Integration.LocalCarrierCancellationWorker\Norvia.Integration.LocalCarrierCancellationWorker.csproj" />

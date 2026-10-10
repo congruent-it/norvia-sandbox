@@ -1,0 +1,94 @@
+@page "/"
+@using Norvia.DriverApp.Application.Trips.GetForDriver
+@using Norvia.DriverApp.Web.Sessions
+@inject Mediator.IMediator Mediator
+@inject NavigationManager Navigation
+
+<PageTitle>My Trips</PageTitle>
+
+@if (_driver is not null)
+{
+    <div class="trips-heading">
+        <h1>@_driver.Name</h1>
+        <form method="post" action="/sign-out">
+            <AntiforgeryToken />
+            <button type="submit" class="link-button">Not you? Sign out</button>
+        </form>
+    </div>
+
+    @if (_trips.Count == 0)
+    {
+        <p role="status">No Trips have been sent to you yet.</p>
+    }
+
+    @foreach (var trip in _trips)
+    {
+        <section class="trip" aria-label="Trip @trip.TripNumber">
+            <h2>
+                @trip.TripNumber
+                <span class="badge">Version @trip.Version</span>
+            </h2>
+            <dl class="trip-facts">
+                <dt>Day</dt>
+                <dd>@TripText.Day(trip.Day)</dd>
+                <dt>Planned start</dt>
+                <dd>@TripText.Time(trip.PlannedStart)</dd>
+                <dt>Driving</dt>
+                <dd>@TripText.Duration(trip.PlannedDrivingDuration)</dd>
+                <dt>Vehicle</dt>
+                <dd>@trip.Vehicle.Registration (@TripText.VehicleType(trip.Vehicle.VehicleType))</dd>
+            </dl>
+
+            @if (trip.Stops.Count == 0)
+            {
+                <p class="no-stops" role="status">This Trip has no Stops: its Shipments were taken off.</p>
+            }
+            else
+            {
+                <ol class="stops">
+                    @foreach (var stop in trip.Stops.OrderBy(stop => stop.Sequence))
+                    {
+                        <li class="stop">
+                            <div class="stop-title">
+                                <strong>@(stop.Kind == StopKind.Collection ? "Collect" : "Deliver")</strong>
+                                <span>@stop.ShipmentNumber</span>
+                                <span class="muted">@stop.TransportOrderNumber</span>
+                            </div>
+                            <div>@TripText.Address(stop.Address)</div>
+                            @if (stop.Consignee?.Name is { } consignee)
+                            {
+                                <div>@consignee@(stop.Consignee.Phone is { } phone ? $", {phone}" : "")</div>
+                            }
+                            <div class="muted">@TripText.Window(stop.Window)</div>
+                            @foreach (var line in stop.GoodsLines)
+                            {
+                                <div class="muted">@TripText.GoodsLine(line)</div>
+                            }
+                        </li>
+                    }
+                </ol>
+            }
+        </section>
+    }
+}
+
+@code {
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    private DriverView? _driver;
+    private IReadOnlyList<DriverTripView> _trips = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var drivers = await Mediator.Send(new Norvia.DriverApp.Application.Drivers.List.ListDriversQuery());
+        _driver = DriverSession.Current(HttpContext, drivers);
+        if (_driver is null)
+        {
+            Navigation.NavigateTo("/sign-in");
+            return;
+        }
+
+        _trips = await Mediator.Send(new GetDriverTripsQuery(_driver.Id));
+    }
+}
