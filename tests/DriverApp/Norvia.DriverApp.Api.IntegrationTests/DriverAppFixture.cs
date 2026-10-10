@@ -16,18 +16,24 @@ public sealed class DriverAppFixture : IAsyncLifetime
     [
         "dbgate", "tms", "tms-migrations", "tms-api", "tms-web", "partner-portal", "partner-portal-migrations", "partner-portal-web",
         "integration-console-web", "partner-api", "booking-worker", "shipper-notification-worker", "carrier-cancellation-worker",
-        "tracking-worker", "proof-of-delivery-worker", "messaging", "storage", "blobs",
+        "trip-dispatch-worker", "tracking-worker", "proof-of-delivery-worker", "messaging", "storage", "blobs",
     ];
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
     private DistributedApplication? _app;
 
-    /// <summary>Calls the Driver app's API as the Trip dispatch Logic App and the Driver app's own screens do.</summary>
+    /// <summary>The credential the Driver app's Trip endpoint asks of the Trip dispatch Logic App; Key Vault holds it in Azure.</summary>
+    public const string EndpointKey = "0123456789abcdef0123456789abcdef";
+
+    /// <summary>Calls the Driver app's API as the Trip dispatch Logic App does, with the credential, and the Driver app's own screens.</summary>
     public HttpClient DriverApp { get; private set; } = null!;
+
+    /// <summary>Calls the Driver app's API without the credential.</summary>
+    public HttpClient Anonymous { get; private set; } = null!;
 
     public async ValueTask InitializeAsync()
     {
         using var startup = new CancellationTokenSource(StartupTimeout);
-        var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(startup.Token);
+        var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>([$"Parameters:driver-app-endpoint-key={EndpointKey}"], startup.Token);
         foreach (var resource in builder.Resources
             .Where(resource => Unneeded.Any(name => resource.Name == name || resource.Name.StartsWith($"{name}-", StringComparison.Ordinal) && resource.Name.EndsWith("-rebuilder", StringComparison.Ordinal)))
             .ToList())
@@ -39,11 +45,14 @@ public sealed class DriverAppFixture : IAsyncLifetime
         await _app.StartAsync(startup.Token);
         await _app.ResourceNotifications.WaitForResourceHealthyAsync("driver-app-api", startup.Token);
         DriverApp = _app.CreateHttpClient("driver-app-api");
+        DriverApp.DefaultRequestHeaders.Add("X-Api-Key", EndpointKey);
+        Anonymous = _app.CreateHttpClient("driver-app-api");
     }
 
     public async ValueTask DisposeAsync()
     {
         DriverApp?.Dispose();
+        Anonymous?.Dispose();
         if (_app is not null)
         {
             await _app.DisposeAsync();

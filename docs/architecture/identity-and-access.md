@@ -26,6 +26,8 @@ Both Logic App triggers sit behind Easy Auth, and the workflow's first step refu
 | `booking` | The Carrier booking Logic App (P4) | `CarrierBookings.Report` | Receives the `carrier-booking` subscription. Reads each Carrier's endpoint key |
 | `carrier-cancellation` | The Carrier cancellation Logic App (P7) | `CarrierBookings.Report` | Receives the `carrier-cancellation` subscription. Reads each Carrier's endpoint key |
 | `shipper-notification` | The Shipper notification Logic App (P7) | `ShipperNotifications.Report` | Receives the `shipper-notification` subscription. Reads each Shipper's endpoint key |
+| `trip-dispatch` | The Trip dispatch Logic App (P11) | `Trips.ReportDelivery` | Receives the `trip-dispatch` subscription. Reads the Driver app's endpoint key |
+| `driver-app` | The Driver app's API (P11) | None: it reaches the TMS only through the integration layer | Reads the Driver app's endpoint key |
 | `tracking` | The Carrier-tracking Logic App (P5) | `TrackingEvents.Record` | Receives the `carrier-tracking` queue |
 | `proof-of-delivery` | The Carrier Proof of delivery Logic App (P6) | `ProofsOfDelivery.Record` | Receives the `carrier-proof-of-delivery` queue. Reads and deletes blobs in the inbound container |
 | `tms-ui` | The TMS UI | `TransportOrders.Manage` | |
@@ -48,7 +50,7 @@ The TMS validates the token and the role; the Shipper or Carrier a call is for c
 | `CarrierBookings.Answer` | `answer` | Record a Carrier's confirmation or rejection | [P4](../processes/tms/p4-carrier-booking.md) |
 | `CarrierBookings.Report` | `booking`, `carrier-cancellation` | Report a Carrier booking's request, cancellation or withdrawal as sent or not delivered | [P4](../processes/tms/p4-carrier-booking.md), [P7](../processes/tms/p7-exception-handling.md) |
 | `ShipperNotifications.Report` | `shipper-notification` | Report a Shipper notification as sent or not delivered | [P7](../processes/tms/p7-exception-handling.md) |
-| `Trips.ReportDelivery` | The Trip dispatch Logic App's identity, once that Logic App exists | Report a Trip version as delivered to the Driver app or not delivered | [P11](../processes/tms/p11-trip-dispatch.md#tms-api) |
+| `Trips.ReportDelivery` | `trip-dispatch` | Report a Trip version as delivered to the Driver app or not delivered | [P11](../processes/tms/p11-trip-dispatch.md#tms-api) |
 | `TrackingEvents.Record` | `tracking` | Record a Tracking event | [P5](../processes/tms/p5-shipment-tracking.md) |
 | `ProofsOfDelivery.Record` | `proof-of-delivery` | Record a Proof of delivery with its files | [P6](../processes/tms/p6-proof-of-delivery.md) |
 | `ShipperTracking.Read` | `apim` | List, get and find a Shipper's Transport Orders, and read a current Proof of delivery file. The TMS trusts the Shipper ID header only from this caller | [P8](../processes/tms/p8-shipper-visibility.md) |
@@ -102,6 +104,7 @@ Azure RBAC, scoped as narrowly as the resource allows, so an identity sees its o
 | Service Bus subscription `carrier-booking` | The subscription | `booking` | Data Receiver |
 | Service Bus subscription `shipper-notification` | The subscription | `shipper-notification` | Data Receiver |
 | Service Bus subscription `carrier-cancellation` | The subscription | `carrier-cancellation` | Data Receiver |
+| Service Bus subscription `trip-dispatch` | The subscription | `trip-dispatch` | Data Receiver |
 | Service Bus queue `carrier-tracking` | The queue | `apim` | Data Sender |
 | | | `tracking` | Data Receiver |
 | Service Bus queue `carrier-proof-of-delivery` | The queue | `apim` | Data Sender |
@@ -110,6 +113,7 @@ Azure RBAC, scoped as narrowly as the resource allows, so an identity sees its o
 | Partner portal's Key Vault | The vault | `partner-portal` | Key Vault Secrets User |
 | Each Carrier endpoint key | The secret | `booking`, `carrier-cancellation` | Key Vault Secrets User |
 | Each Shipper endpoint key | The secret | `shipper-notification` | Key Vault Secrets User |
+| The Driver app's endpoint key (`driver-app-endpoint-key`, in the Driver app's Key Vault) | The secret | `driver-app`, `trip-dispatch` | Key Vault Secrets User |
 | Logic App's content connection string | The secret | The Logic App's host identity | Key Vault Secrets User |
 | Logic App's storage account | The account | The Logic App's host identity | Blob Data Owner, Queue and Table Data Contributor, Account Contributor |
 | Log Analytics workspace | The workspace | `integration-console` | Log Analytics Reader |

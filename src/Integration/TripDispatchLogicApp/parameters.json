@@ -1,0 +1,18 @@
+{
+  "tmsBaseUrl": {
+    "type": "String",
+    "value": "@appsetting('TMS_BASE_URL')"
+  },
+  "tmsAudience": {
+    "type": "String",
+    "value": "@appsetting('TMS_API_CLIENT_ID')"
+  },
+  "tripDispatchIdentityId": {
+    "type": "String",
+    "value": "@appsetting('TRIP_DISPATCH_IDENTITY_ID')"
+  },
+  "driverAppBaseUrl": {
+    "type": "String",
+    "value": "@appsetting('DRIVER_APP_BASE_URL')"
+  }
+}

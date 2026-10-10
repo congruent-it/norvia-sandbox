@@ -12,6 +12,7 @@ public static class TrackingKeys
     public const string TransportOrderNumber = "transportOrderNumber";
     public const string ShipmentNumber = "shipmentNumber";
     public const string CarrierBookingNumber = "carrierBookingNumber";
+    public const string TripNumber = "tripNumber";
     public const string SourceMessageId = "sourceMessageId";
     public const string Outcome = "outcome";
     public const string FailureCode = "failureCode";
@@ -30,6 +31,9 @@ public static class TrackingKeys
 
     /// <summary>The <see cref="Flow"/> of a Carrier cancellation or withdrawal, from the event to the report to the TMS.</summary>
     public const string CarrierCancellation = "carrier-cancellation";
+
+    /// <summary>The <see cref="Flow"/> of a Trip version sent to the Driver app, from the dispatch to the report to the TMS.</summary>
+    public const string TripDispatch = "trip-dispatch";
 
     /// <summary>The <see cref="Flow"/> of a Carrier's tracking message, from the edge to the TMS.</summary>
     public const string CarrierTracking = "carrier-tracking";

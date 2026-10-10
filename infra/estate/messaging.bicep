@@ -14,6 +14,9 @@ param shipperNotificationPrincipalId string
 @description('The P7 Carrier cancellation Logic App\'s identity, which receives from its own subscription and from nothing else.')
 param carrierCancellationPrincipalId string
 
+@description('The P11 Trip dispatch Logic App\'s identity, which receives from its own subscription and from nothing else.')
+param tripDispatchPrincipalId string
+
 @description('The Carrier-tracking Logic App\'s identity, which receives from the tracking queue and from nothing else.')
 param trackingPrincipalId string
 
@@ -80,6 +83,25 @@ resource tripMonitoringFilter 'Microsoft.ServiceBus/namespaces/topics/subscripti
     filterType: 'SqlFilter'
     sqlFilter: {
       sqlExpression: 'resubmitTo IS NULL OR resubmitTo = \'monitoring\''
+    }
+  }
+}
+
+// The P11 Trip dispatch Logic App's subscription: TripDispatched only, as the message's eventType property says. Its filter also
+// routes resubmits from the console, like every subscription's (coding guidelines §7). The AppHost's emulator gives the same
+// subscription the same condition (ResubmitAwareFilters).
+resource tripDispatch 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01' = {
+  parent: tripEvents
+  name: 'trip-dispatch'
+}
+
+resource tripDispatchFilter 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
+  parent: tripDispatch
+  name: '$Default'
+  properties: {
+    filterType: 'SqlFilter'
+    sqlFilter: {
+      sqlExpression: '(eventType = \'TripDispatched\' AND resubmitTo IS NULL) OR resubmitTo = \'trip-dispatch\''
     }
   }
 }
@@ -203,6 +225,17 @@ resource carrierCancellationReceivesItsMessages 'Microsoft.Authorization/roleAss
   scope: carrierCancellation
   properties: {
     principalId: carrierCancellationPrincipalId
+    roleDefinitionId: serviceBusDataReceiver
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Scoped to the subscription, so the Trip dispatch Logic App reads dispatched Trips and no other message.
+resource tripDispatchReceivesItsMessages 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(tripDispatch.id, tripDispatchPrincipalId, serviceBusDataReceiver)
+  scope: tripDispatch
+  properties: {
+    principalId: tripDispatchPrincipalId
     roleDefinitionId: serviceBusDataReceiver
     principalType: 'ServicePrincipal'
   }

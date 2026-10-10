@@ -182,6 +182,17 @@ if (builder.ExecutionContext.IsPublishMode)
         partnerPortal.WithEnvironment($"PartnerApi__SubscriptionKeys__{persona.Id}", partnerPortalSecrets.Resource.GetSecret($"subscription-key-{persona.Id}"));
     }
 
+    // The Driver app's Trip endpoint asks its caller, the P11 Trip dispatch Logic App, for a credential the estate keeps in a
+    // vault of its own as driver-app-endpoint-key. The Logic App runs outside the Container Apps environment, so the API is
+    // reachable from outside it.
+    var driverAppIdentity = builder.AddAzureUserAssignedIdentity("driver-app-identity")
+        .PublishAsExisting(estate.DriverAppIdentity, null);
+    var driverAppSecrets = builder.AddAzureKeyVault("driver-app-secrets")
+        .PublishAsExisting(estate.DriverAppKeyVault, null);
+    driverAppApi.WithExternalHttpEndpoints()
+        .WithAzureUserAssignedIdentity(driverAppIdentity)
+        .WithEnvironment("DriverEndpoint__ApiKey", driverAppSecrets.Resource.GetSecret("driver-app-endpoint-key"));
+
     // Each Carrier Persona's booking endpoint asks its caller, the P4 booking Logic App, for the credential the estate
     // keeps in the same vault as carrier-endpoint-key-<Carrier ID>.
     foreach (var carrier in personas.Where(persona => !persona.IsShipper))
@@ -210,9 +221,11 @@ else
     shipmentEvents.AddServiceBusSubscription("shipper-notification");
     // The P7 Carrier cancellation Logic App's subscription: CarrierBookingCancelled and CarrierBookingWithdrawn only (see ResubmitAwareFilters).
     shipmentEvents.AddServiceBusSubscription("carrier-cancellation");
-    // The Trip events topic (P11). Monitoring is its first consumer; the Trip dispatch Logic App's subscription comes with that Logic App.
-    messaging.AddServiceBusTopic("trip-events")
-        .AddServiceBusSubscription("trip-events-monitoring", subscriptionName: "monitoring");
+    // The Trip events topic (P11). Monitoring is its first consumer, then the Trip dispatch Logic App with a subscription of its
+    // own: TripDispatched only (see ResubmitAwareFilters).
+    var tripEvents = messaging.AddServiceBusTopic("trip-events");
+    tripEvents.AddServiceBusSubscription("trip-events-monitoring", subscriptionName: "monitoring");
+    tripEvents.AddServiceBusSubscription("trip-dispatch");
     // The tracking queue API Management puts a Carrier's tracking message on and the Carrier-tracking Logic App reads
     // (ADR 0008). A message the TMS refuses is dead-lettered; one it can't be given to is delivered again up to the
     // maximum delivery count, then dead-lettered by Service Bus itself. The estate Bicep sets the same count.
@@ -328,6 +341,25 @@ else
         .WithEnvironment("CarrierCancellation__TmsTokens__Issuer", LocalTokens.Issuer)
         .WithEnvironment("CarrierCancellation__TmsTokens__Audience", LocalTokens.TmsAudience)
         .WithEnvironment("CarrierCancellation__TmsTokens__ClientId", LocalTokens.CarrierCancellationLogicAppClientId);
+    // Locally a worker plays the P11 Trip dispatch Logic App as well. It reads its subscription, sends each dispatched Trip to the
+    // Driver app's Trip endpoint with the credential for the run, and reports the version delivered or not delivered to the TMS as
+    // the identity holding the Trip delivery report role.
+    var driverEndpointKey = builder.AddParameter(
+        "driver-app-endpoint-key",
+        new GenerateParameterDefault { MinLength = 32, Special = false },
+        secret: true,
+        persist: true);
+    driverAppApi.WithEnvironment("DriverEndpoint__ApiKey", driverEndpointKey);
+    var tripDispatchWorker = builder.AddProject<Projects.Norvia_Integration_LocalTripDispatchWorker>("trip-dispatch-worker")
+        .WithReference(messaging).WaitFor(messaging)
+        .WithReference(tmsApi).WaitFor(tmsApi)
+        .WaitFor(driverAppApi)
+        .WithEnvironment("TripDispatch__TmsBaseAddress", tmsApi.GetEndpoint("http"))
+        .WithEnvironment("TripDispatch__TmsTokens__Issuer", LocalTokens.Issuer)
+        .WithEnvironment("TripDispatch__TmsTokens__Audience", LocalTokens.TmsAudience)
+        .WithEnvironment("TripDispatch__TmsTokens__ClientId", LocalTokens.TripDispatchLogicAppClientId)
+        .WithEnvironment("TripDispatch__DriverApp__Address", ReferenceExpression.Create($"{driverAppApi.GetEndpoint("http")}/v1/trips"))
+        .WithEnvironment("TripDispatch__DriverApp__ApiKey", driverEndpointKey);
     // Locally a worker plays the Carrier-tracking Logic App too (ADR 0031). It reads the tracking queue API Management's
     // stand-in fills and records each Tracking event with the TMS as the identity holding the record role.
     var trackingWorker = builder.AddProject<Projects.Norvia_Integration_LocalTrackingWorker>("tracking-worker")
@@ -408,6 +440,7 @@ else
         (bookingWorker.Resource, "Booking__TmsTokens__SigningKey"),
         (shipperNotificationWorker.Resource, "ShipperNotification__TmsTokens__SigningKey"),
         (carrierCancellationWorker.Resource, "CarrierCancellation__TmsTokens__SigningKey"),
+        (tripDispatchWorker.Resource, "TripDispatch__TmsTokens__SigningKey"),
         (trackingWorker.Resource, "Tracking__TmsTokens__SigningKey"),
         (proofOfDeliveryWorker.Resource, "ProofOfDelivery__TmsTokens__SigningKey"),
         (partnerPortal.Resource, "PartnerApi__LocalTokens__SigningKey"),

@@ -16,6 +16,9 @@ param tmsBaseUrl = readEnvironmentVariable('ESTATE_TMS_BASE_URL', '')
 // The postdeploy hook stores the Partner portal's address once Aspire has deployed it.
 param partnerPortalBaseUrl = readEnvironmentVariable('ESTATE_PARTNER_PORTAL_BASE_URL', '')
 
+// The postdeploy hook stores the Driver app API's address once Aspire has deployed it.
+param driverAppBaseUrl = readEnvironmentVariable('ESTATE_DRIVER_APP_BASE_URL', '')
+
 // The postdeploy hook stores the demo UIs' sign-in callbacks once Aspire has deployed them.
 param demoUiRedirectUris = readEnvironmentVariable('ESTATE_DEMO_UI_REDIRECT_URIS', '')
 
