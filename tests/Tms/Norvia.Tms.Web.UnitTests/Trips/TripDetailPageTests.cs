@@ -163,4 +163,42 @@ public sealed class TripDetailPageTests : TmsWebContext
         page.WaitForElements("[aria-label='Stops'] tbody tr");
         page.FindAll("fluent-button[aria-label^='Move stop']").Should().BeEmpty();
     }
+
+    [Fact]
+    public void ADraft_HasADispatchAction_ThatSendsTheTripAndSaysWhichVersionWentOut()
+    {
+        Queries.FindTripAsync("TR-0000001", Arg.Any<CancellationToken>()).Returns(new TripDetailView(Trip, [Collect, Deliver], [], []));
+        Commands.DispatchTripAsync("TR-0000001", Arg.Any<CancellationToken>()).Returns(new TripAnswer.Dispatched(1, "corr-dispatch"));
+        var page = Render<TripDetailPage>(parameters => parameters.Add(detail => detail.Number, "TR-0000001"));
+
+        page.WaitForElement("fluent-button[aria-label='Dispatch TR-0000001']").Click();
+
+        Commands.Received(1).DispatchTripAsync("TR-0000001", Arg.Any<CancellationToken>());
+        page.WaitForAssertion(() => page.Find("[role=status]").TextContent.Should().Contain("dispatched").And.Contain("version 1"));
+    }
+
+    [Fact]
+    public void ARefusedDispatch_ShowsTheReason()
+    {
+        Queries.FindTripAsync("TR-0000001", Arg.Any<CancellationToken>()).Returns(new TripDetailView(Trip, [Collect, Deliver], [], []));
+        Commands.DispatchTripAsync("TR-0000001", Arg.Any<CancellationToken>())
+            .Returns(new TripAnswer.Refused("Trip TR-0000001 can't be dispatched without a Driver."));
+        var page = Render<TripDetailPage>(parameters => parameters.Add(detail => detail.Number, "TR-0000001"));
+
+        page.WaitForElement("fluent-button[aria-label='Dispatch TR-0000001']").Click();
+
+        page.WaitForAssertion(() => page.Find("[role=alert]").TextContent.Should().Contain("without a Driver"));
+    }
+
+    [Fact]
+    public void ADispatchedTrip_HasNoDispatchAction()
+    {
+        Queries.FindTripAsync("TR-0000001", Arg.Any<CancellationToken>())
+            .Returns(new TripDetailView(Trip with { Status = TripStatus.Dispatched }, [Collect, Deliver], [], []));
+
+        var page = Render<TripDetailPage>(parameters => parameters.Add(detail => detail.Number, "TR-0000001"));
+
+        page.WaitForElements("[aria-label='Stops'] tbody tr");
+        page.FindAll("fluent-button[aria-label^='Dispatch']").Should().BeEmpty();
+    }
 }

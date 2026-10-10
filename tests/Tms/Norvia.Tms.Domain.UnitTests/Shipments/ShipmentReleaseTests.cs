@@ -164,6 +164,40 @@ public sealed class ShipmentReleaseTests
         refusal.Message.Should().Be("Shipment SH-0000003 is Released. Only a Planned Shipment can be reassigned.");
     }
 
+    [Fact]
+    public void Dispatch_ReleasedOwnFleetShipment_MakesItDispatched_AndRaisesNoEventOfItsOwn()
+    {
+        var (order, shipment) = Planned(CarriedBy.OwnFleet);
+        shipment.Release(order, Key, Release, ReleasedAt);
+        shipment.ClearDomainEvents();
+
+        shipment.Dispatch().Should().BeTrue();
+
+        shipment.Status.Should().Be(ShipmentStatus.Dispatched);
+        shipment.DomainEvents.Should().BeEmpty("TripDispatched lists the Shipments, so there is no event per Shipment");
+    }
+
+    [Fact]
+    public void Dispatch_PlannedShipment_ChangesNothing()
+    {
+        var (_, shipment) = Planned(CarriedBy.OwnFleet);
+
+        shipment.Dispatch().Should().BeFalse();
+
+        shipment.Status.Should().Be(ShipmentStatus.Planned);
+    }
+
+    [Fact]
+    public void Dispatch_ReleasedCarrierShipment_ChangesNothing()
+    {
+        var (order, shipment) = Planned(VanDijk);
+        shipment.Release(order, Key, Release, ReleasedAt, BookingNumber);
+
+        shipment.Dispatch().Should().BeFalse();
+
+        shipment.Status.Should().Be(ShipmentStatus.Released);
+    }
+
     private static (TransportOrder Order, Shipment Shipment) Planned(CarriedBy carriedBy, long orderSequence = 7)
     {
         var order = TransportOrder.Accept(

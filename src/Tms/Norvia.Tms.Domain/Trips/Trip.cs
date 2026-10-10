@@ -30,6 +30,9 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
 
     public TripStatus Status { get; private set; }
 
+    /// <summary>0 while the Trip is a Draft, 1 from Dispatch, and up with each Amend (ADR 0015).</summary>
+    public int Version { get; private set; }
+
     public VehicleId? VehicleId { get; private set; }
 
     public DriverId? DriverId { get; private set; }
@@ -163,6 +166,63 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
         }
 
         return null;
+    }
+
+    /// <summary>What Dispatch still needs, each as "a Vehicle", "a Driver" and so on; empty when the Trip is complete.</summary>
+    public IReadOnlyList<string> MissingParts()
+    {
+        var missing = new List<string>();
+        if (VehicleId is null)
+        {
+            missing.Add("a Vehicle");
+        }
+
+        if (DriverId is null)
+        {
+            missing.Add("a Driver");
+        }
+
+        if (PlannedStart is null)
+        {
+            missing.Add("a planned start");
+        }
+
+        if (PlannedDrivingDuration is null)
+        {
+            missing.Add("a planned driving duration");
+        }
+
+        if (_stops.Count == 0)
+        {
+            missing.Add("at least one Shipment");
+        }
+
+        return missing;
+    }
+
+    /// <summary>
+    /// Sends the complete Draft to its Driver as version 1 and raises <see cref="TripDispatchedEvent"/>. The caller checks <see cref="EnsureDraft"/>,
+    /// <see cref="MissingParts"/> and the Trip rules first, as for <see cref="Pick"/>, and has dispatched the Shipments.
+    /// </summary>
+    public void Dispatch(CorrelationId correlationId, DateTimeOffset dispatchedAt, Vehicle vehicle, Driver driver, IReadOnlyList<DispatchedShipment> shipments)
+    {
+        ArgumentNullException.ThrowIfNull(correlationId);
+        ArgumentNullException.ThrowIfNull(vehicle);
+        ArgumentNullException.ThrowIfNull(driver);
+        ArgumentNullException.ThrowIfNull(shipments);
+        if (EnsureDraft() is not null)
+        {
+            throw new InvalidOperationException($"Trip {Number} is Dispatched already.");
+        }
+
+        if (MissingParts() is { Count: > 0 } missing)
+        {
+            throw new InvalidOperationException($"Trip {Number} can't be dispatched without {string.Join(", ", missing)}.");
+        }
+
+        Status = TripStatus.Dispatched;
+        Version = 1;
+        RegisterDomainEvent(new TripDispatchedEvent(this, correlationId, dispatchedAt, vehicle, driver, shipments));
     }
 
     /// <summary>Null when the Trip is a Draft, which can be changed or discarded; a Dispatched Trip is neither, and is never deleted.</summary>

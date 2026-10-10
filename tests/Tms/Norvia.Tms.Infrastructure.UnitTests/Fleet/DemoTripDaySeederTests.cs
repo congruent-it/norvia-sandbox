@@ -10,8 +10,8 @@ using Norvia.Tms.Application.Shipments.Release;
 using Norvia.Tms.Application.TransportOrders.Assign;
 using Norvia.Tms.Application.TransportOrders.Submit;
 using Norvia.Tms.Domain.Fleet;
-using Norvia.Tms.Domain.Trips;
 using Norvia.Tms.Domain.TransportOrders;
+using Norvia.Tms.Domain.Trips;
 using Norvia.Tms.Infrastructure.Fleet;
 using Norvia.Tms.Infrastructure.Shippers;
 

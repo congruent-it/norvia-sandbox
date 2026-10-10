@@ -8,6 +8,7 @@ using Norvia.Tms.Application.Trips.AddShipments;
 using Norvia.Tms.Application.Trips.Change;
 using Norvia.Tms.Application.Trips.Create;
 using Norvia.Tms.Application.Trips.Discard;
+using Norvia.Tms.Application.Trips.Dispatch;
 using Norvia.Tms.Application.Trips.GetByNumber;
 using Norvia.Tms.Application.Trips.List;
 using Norvia.Tms.Application.Trips.ReorderStops;
@@ -69,6 +70,17 @@ public static class TripEndpoints
                 "stops names every Stop of the Trip once, as a Shipment number and Collection or Delivery, in the order the Driver visits them. Two Stops at the same address stay two Stops. "
                 + "A Shipment's delivery before its collection is refused with CollectionBeforeDelivery (409), and an order that leaves out a Stop, repeats one or names another is StopsNotTheTripsStops (409); "
                 + "a refusal leaves the order as it was. Also TripNotDraft (409) or TripNotFound (404). Sending the same order again changes nothing. Nothing is published.");
+
+        trips.MapPost("/{number}/dispatch", DispatchAsync)
+            .WithName("DispatchTrip")
+            .RequireAuthorization(policy => policy.RequireRole(TransportOrderEndpoints.ManageRole))
+            .WithSummary("Dispatch a Draft Trip to its Driver.")
+            .WithDescription(
+                "The Trip needs a Vehicle, a Driver, a planned start, a planned driving duration and at least one Shipment: each part it lacks is a TripIncomplete (409) and the Trip stays a Draft. "
+                + "Every Trip rule is checked again, so a Draft that became invalid, such as after an Absence was recorded on its Driver, is refused with that rule's code (DriverNotAvailable, VehicleNotAvailable, LicenceNotHeld, DrivingHoursExceeded, "
+                + "PayloadExceeded, PalletPlacesExceeded, DayNotOpen, OutsideShift, or for a Shipment ShipmentNotReleased, ShipmentOnAnotherTrip or CollectionDayMismatch), and nothing changes. "
+                + "On success, in one transaction, the Trip becomes Dispatched at version 1, its Shipments become Dispatched, and exactly one TripDispatched (version 1, the whole Trip with its Stops in order) is written to the outbox for the Trip events topic, "
+                + "under a new correlation ID that the answer returns. There is no event per Shipment. A Trip that is Dispatched already is TripNotDraft (409); an unknown Trip is TripNotFound (404).");
 
         trips.MapPut("/{number}", ChangeDraftAsync)
             .WithName("ChangeDraftTrip")
@@ -176,6 +188,13 @@ public static class TripEndpoints
         var result = await mediator.Send(
             new ChangeDraftTripCommand(number, VehicleOf(request.VehicleId), DriverOf(request.DriverId), request.PlannedStart, request.PlannedDrivingDuration), cancellationToken);
         return result.IsSuccess ? TypedResults.NoContent() : Refused(result.ValidationErrors, "The Trip can't be changed.");
+    }
+
+    private static async Task<Results<Ok<DispatchTripResult>, ProblemHttpResult>> DispatchAsync(string number, IMediator mediator, CancellationToken cancellationToken)
+    {
+        // The action starts in the TMS UI, not at API Management, so the TMS starts its Message trail.
+        var result = await mediator.Send(new DispatchTripCommand(number, CorrelationId.New().Value), cancellationToken);
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : Refused(result.ValidationErrors, "The Trip can't be dispatched.");
     }
 
     private static async Task<Results<NoContent, ProblemHttpResult>> DiscardDraftAsync(string number, IMediator mediator, CancellationToken cancellationToken)

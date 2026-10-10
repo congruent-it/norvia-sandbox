@@ -919,6 +919,9 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<int>("Version")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Day");

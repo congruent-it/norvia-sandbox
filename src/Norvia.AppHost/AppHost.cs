@@ -193,6 +193,9 @@ else
     shipmentEvents.AddServiceBusSubscription("shipper-notification");
     // The P7 Carrier cancellation Logic App's subscription: CarrierBookingCancelled and CarrierBookingWithdrawn only (see ResubmitAwareFilters).
     shipmentEvents.AddServiceBusSubscription("carrier-cancellation");
+    // The Trip events topic (P11). Monitoring is its first consumer; the Trip dispatch Logic App's subscription comes with that Logic App.
+    messaging.AddServiceBusTopic("trip-events")
+        .AddServiceBusSubscription("trip-events-monitoring", subscriptionName: "monitoring");
     // The tracking queue API Management puts a Carrier's tracking message on and the Carrier-tracking Logic App reads
     // (ADR 0008). A message the TMS refuses is dead-lettered; one it can't be given to is delivered again up to the
     // maximum delivery count, then dead-lettered by Service Bus itself. The estate Bicep sets the same count.

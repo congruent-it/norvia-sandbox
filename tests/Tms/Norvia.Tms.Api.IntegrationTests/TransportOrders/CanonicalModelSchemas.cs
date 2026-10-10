@@ -42,6 +42,14 @@ internal static class CanonicalModelSchemas
         return Load("shipment-released.v1.schema.json");
     });
 
+    private static readonly Lazy<JsonSchema> TripDispatchedSchema = new(() =>
+    {
+        _ = TransportOrderSchema.Value;
+        return Load("trip-dispatched.v1.schema.json");
+    });
+
+    public static EvaluationResults ValidateTripDispatched(JsonNode body) => Validate(TripDispatchedSchema.Value, body);
+
     private static readonly Lazy<JsonSchema> CarrierBookingConfirmedSchema = new(() => Load("carrier-booking-confirmed.v1.schema.json"));
 
     private static readonly Lazy<JsonSchema> CarrierBookingRejectedSchema = new(() => Load("carrier-booking-rejected.v1.schema.json"));

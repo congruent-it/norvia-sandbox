@@ -219,4 +219,70 @@ public sealed class TripTests
         trip.AddShipment(second);
         return (trip, first, second);
     }
+
+    [Fact]
+    public void MissingParts_OfAnEmptyDraft_NamesEachPartDispatchNeeds()
+    {
+        var trip = Trip.CreateDraft(TripNumber.FromSequence(1), Day, null, null, new IdempotencyKey("k"));
+
+        trip.MissingParts().Should().Equal("a Vehicle", "a Driver", "a planned start", "a planned driving duration", "at least one Shipment");
+    }
+
+    [Fact]
+    public void MissingParts_OfACompleteDraft_IsEmpty()
+    {
+        var trip = CompleteDraft(ShipmentId.New());
+
+        trip.MissingParts().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Dispatch_ACompleteDraft_MakesItDispatchedAtVersion1_AndRaisesOneTripDispatched()
+    {
+        var shipment = ShipmentId.New();
+        var trip = CompleteDraft(shipment);
+        var correlation = new CorrelationId("corr-dispatch");
+        var at = new DateTimeOffset(2026, 10, 13, 9, 0, 0, TimeSpan.Zero);
+
+        trip.Dispatch(correlation, at, Truck, Joost, []);
+
+        trip.Status.Should().Be(TripStatus.Dispatched);
+        trip.Version.Should().Be(1);
+        var raised = trip.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<TripDispatchedEvent>().Subject;
+        raised.Trip.Should().BeSameAs(trip);
+        raised.CorrelationId.Should().Be(correlation);
+        raised.DispatchedAt.Should().Be(at);
+        raised.Vehicle.Should().Be(Truck);
+        raised.Driver.Should().Be(Joost);
+    }
+
+    [Fact]
+    public void Dispatch_AnIncompleteDraft_IsABug()
+    {
+        var trip = Trip.CreateDraft(TripNumber.FromSequence(1), Day, null, null, new IdempotencyKey("k"));
+
+        trip.Invoking(t => t.Dispatch(new CorrelationId("c"), DateTimeOffset.UtcNow, Truck, Joost, [])).Should().Throw<InvalidOperationException>();
+        trip.Status.Should().Be(TripStatus.Draft);
+    }
+
+    [Fact]
+    public void Dispatch_ADispatchedTrip_IsABug()
+    {
+        var trip = CompleteDraft(ShipmentId.New());
+        trip.Dispatch(new CorrelationId("c"), DateTimeOffset.UtcNow, Truck, Joost, []);
+
+        trip.Invoking(t => t.Dispatch(new CorrelationId("c"), DateTimeOffset.UtcNow, Truck, Joost, [])).Should().Throw<InvalidOperationException>();
+    }
+
+    private static readonly Vehicle Truck = new(new VehicleId("VEH-0002"), "TT-201-R", VehicleType.RigidTruck, 8000, 18, true);
+
+    private static readonly Driver Joost = new(new DriverId("DRV-0001"), "Joost Bakker", new HashSet<LicenceCategory> { LicenceCategory.C }, true);
+
+    private static Trip CompleteDraft(ShipmentId shipment)
+    {
+        var trip = Trip.CreateDraft(TripNumber.FromSequence(1), Day, Truck.Id, Joost.Id, new IdempotencyKey("k"));
+        trip.Plan(new TimeOnly(7, 30), TimeSpan.FromHours(6));
+        trip.AddShipment(shipment);
+        return trip;
+    }
 }

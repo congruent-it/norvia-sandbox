@@ -34,4 +34,7 @@ public sealed record TripRefusal(TripRefusalCode Code, string Message)
 
     public static TripRefusal StopsNotTheTripsStops(TripNumber trip) =>
         new(TripRefusalCode.StopsNotTheTripsStops, $"The order must name each Stop of Trip {trip} once, and no others.");
+
+    public static TripRefusal TripIncomplete(TripNumber trip, string part) =>
+        new(TripRefusalCode.TripIncomplete, $"Trip {trip} can't be dispatched without {part}.");
 }

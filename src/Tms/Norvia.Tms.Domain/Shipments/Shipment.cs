@@ -166,6 +166,21 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
     }
 
     /// <summary>
+    /// Marks a Released Own fleet Shipment as Dispatched, once its Trip is (P11). Raises no domain event of its own: TripDispatched lists the
+    /// Shipments. Returns false, changing nothing, for a Shipment that isn't a Released Own fleet one.
+    /// </summary>
+    public bool Dispatch()
+    {
+        if (Status != ShipmentStatus.Released || !CarriedBy.IsOwnFleet)
+        {
+            return false;
+        }
+
+        Status = ShipmentStatus.Dispatched;
+        return true;
+    }
+
+    /// <summary>
     /// Sends a Released Shipment back to Planned, because its Carrier booking ended without confirmation (P4): rejected,
     /// not delivered or withdrawn. Raises no domain event of its own: the Carrier booking's own event already says so.
     /// Returns false, changing nothing, for a Shipment that isn't Released.

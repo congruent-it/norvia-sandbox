@@ -11,7 +11,7 @@ public static class TrackingStatuses
     public static TrackingStatus Of(ShipmentStatus? shipment) => shipment switch
     {
         null => TrackingStatus.Received,
-        ShipmentStatus.Planned or ShipmentStatus.Released or ShipmentStatus.Booked => TrackingStatus.Scheduled,
+        ShipmentStatus.Planned or ShipmentStatus.Released or ShipmentStatus.Booked or ShipmentStatus.Dispatched => TrackingStatus.Scheduled,
         ShipmentStatus.Collected => TrackingStatus.Collected,
         ShipmentStatus.InTransit => TrackingStatus.InTransit,
         ShipmentStatus.Delivered => TrackingStatus.Delivered,

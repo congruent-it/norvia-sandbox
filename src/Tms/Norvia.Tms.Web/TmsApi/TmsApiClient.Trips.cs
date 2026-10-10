@@ -43,6 +43,9 @@ internal sealed partial class TmsApiClient
         return SendTripAsync("Reorder Trip Stops", HttpMethod.Put, $"/v1/trips/{Uri.EscapeDataString(number)}/stops", number, new ReorderStopsBody(stops), cancellationToken);
     }
 
+    public Task<TripAnswer> DispatchTripAsync(string number, CancellationToken cancellationToken) =>
+        SendTripAsync("Dispatch Trip", HttpMethod.Post, $"/v1/trips/{Uri.EscapeDataString(number)}/dispatch", number, null, cancellationToken);
+
     public Task<TripAnswer> DiscardDraftTripAsync(string number, CancellationToken cancellationToken) =>
         SendTripAsync("Discard Draft Trip", HttpMethod.Delete, $"/v1/trips/{Uri.EscapeDataString(number)}", number, null, cancellationToken);
 
@@ -74,6 +77,15 @@ internal sealed partial class TmsApiClient
                 }
 
                 return new TripAnswer.Created(created.Number, created.Warnings is { Count: > 0 } warnings ? warnings : null);
+            case HttpStatusCode.OK when method == HttpMethod.Post && path.EndsWith("/dispatch", StringComparison.Ordinal):
+                var dispatched = await response.Content.ReadFromJsonAsync<DispatchedTrip>(Json, cancellationToken)
+                    ?? throw new HttpRequestException("The TMS API answered a dispatched Trip without a body.");
+                using (Track(Flows.TripDispatch, TrackingKeys.Succeeded, new() { TripNumber = tripNumber, CorrelationId = dispatched.CorrelationId }))
+                {
+                    LogTripEdited(action);
+                }
+
+                return new TripAnswer.Dispatched(dispatched.Version, dispatched.CorrelationId);
             case HttpStatusCode.OK:
                 var added = await response.Content.ReadFromJsonAsync<AddedShipments>(Json, cancellationToken)
                     ?? throw new HttpRequestException("The TMS API answered added Shipments without a body.");
@@ -93,7 +105,7 @@ internal sealed partial class TmsApiClient
             // A refused action: its problem's detail is the refusal's readable message, and its code says which rule.
             case HttpStatusCode.NotFound or HttpStatusCode.Conflict or HttpStatusCode.BadRequest:
                 var (problem, reason) = await ReadRefusalAsync(response, $"{action} was refused.", cancellationToken);
-                using (Track(Flows.TripPlanning, TrackingKeys.Refused, new() { TripNumber = tripNumber, FailureCode = problem?.Code }))
+                using (Track(path.EndsWith("/dispatch", StringComparison.Ordinal) ? Flows.TripDispatch : Flows.TripPlanning, TrackingKeys.Refused, new() { TripNumber = tripNumber, FailureCode = problem?.Code }))
                 {
                     LogTripRefused(action, problem?.Code ?? "unknown", reason);
                 }
@@ -116,6 +128,8 @@ internal sealed partial class TmsApiClient
     private sealed record AddShipmentsBody(IReadOnlyList<string> ShipmentNumbers);
 
     private sealed record ReorderStopsBody(IReadOnlyList<StopReference> Stops);
+
+    private sealed record DispatchedTrip(string Number, int Version, string CorrelationId);
 
     private sealed record AddedShipments(string Number, List<TripWarning>? Warnings);
 
