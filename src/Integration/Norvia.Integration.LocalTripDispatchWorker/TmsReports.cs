@@ -14,32 +14,31 @@ internal sealed partial class TmsReports(HttpClient http, IOptions<TripDispatchW
 {
     private const string ReportRole = "Trips.ReportDelivery";
 
-    /// <summary>The TMS's status, or 0 when it didn't answer.</summary>
-    public Task<int> ReportDeliveredAsync(string tripNumber, int version, string correlationId, CancellationToken cancellationToken) =>
-        PostAsync(tripNumber, version, "report-delivered", correlationId, content: null, cancellationToken);
+    public Task<TmsAnswer> ReportDeliveredAsync(TripVersionRef version, CancellationToken cancellationToken) =>
+        PostAsync(version, "report-delivered", content: null, cancellationToken);
 
-    public Task<int> ReportNotDeliveredAsync(string tripNumber, int version, string correlationId, string cause, CancellationToken cancellationToken) =>
-        PostAsync(tripNumber, version, "report-not-delivered", correlationId, JsonContent.Create(new { cause }), cancellationToken);
+    public Task<TmsAnswer> ReportNotDeliveredAsync(TripVersionRef version, string cause, CancellationToken cancellationToken) =>
+        PostAsync(version, "report-not-delivered", JsonContent.Create(new { cause }), cancellationToken);
 
-    private async Task<int> PostAsync(string tripNumber, int version, string report, string correlationId, HttpContent? content, CancellationToken cancellationToken)
+    private async Task<TmsAnswer> PostAsync(TripVersionRef version, string report, HttpContent? content, CancellationToken cancellationToken)
     {
         try
         {
             using var request = new HttpRequestMessage(
-                HttpMethod.Post, new Uri($"/v1/trips/{Uri.EscapeDataString(tripNumber)}/versions/{version}/{report}", UriKind.Relative))
+                HttpMethod.Post, new Uri($"/v1/trips/{Uri.EscapeDataString(version.TripNumber)}/versions/{version.Version}/{report}", UriKind.Relative))
             {
                 Content = content,
             };
-            request.Headers.Add("X-Correlation-ID", correlationId);
+            request.Headers.Add("X-Correlation-ID", version.CorrelationId);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", TmsTokens.Create(options.Value.TmsTokens, time, options.Value.TmsTokens.ClientId!, ReportRole));
 
             using var response = await http.SendAsync(request, cancellationToken);
-            return (int)response.StatusCode;
+            return new((int)response.StatusCode);
         }
         catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
         {
             LogTmsUnreachable(exception);
-            return 0;
+            return new(0);
         }
     }
 

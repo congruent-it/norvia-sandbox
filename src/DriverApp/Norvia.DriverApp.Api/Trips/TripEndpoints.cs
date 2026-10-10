@@ -39,7 +39,7 @@ public static class TripEndpoints
     {
         if (!EndpointCredential.IsValid(apiKey, options.Value.ApiKey))
         {
-            return Results.Unauthorized();
+            return Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "The Trip endpoint needs the Driver app's endpoint credential.");
         }
 
         var command = request.ToCommand();

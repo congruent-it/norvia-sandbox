@@ -37,7 +37,7 @@ internal sealed partial class TripDispatchFlow(
 
     public async Task<TripDispatchFlowOutcome> RunAsync(string tripDispatched, CancellationToken cancellationToken)
     {
-        var request = Parse(tripDispatched) is { } parsed ? EventOf(parsed) : null;
+        var request = Parse(tripDispatched) is { } parsed ? TryReadTripEvent(parsed) : null;
         if (request is null)
         {
             using var unreadable = logger.BeginScope(TrackingKeys.OutcomeOf(TrackingKeys.Failed, TripDispatchFailureCodes.Unreadable));
@@ -45,21 +45,18 @@ internal sealed partial class TripDispatchFlow(
             return TripDispatchFlowOutcome.Unreadable;
         }
 
-        using var trail = logger.BeginScope(request.Keys);
+        using var trail = logger.BeginScope(request.ContractKeys);
         var (answer, attempts) = await SendAsync(request, tripDispatched, cancellationToken);
 
-        var status = answer.Succeeded
-            ? await tms.ReportDeliveredAsync(request.TripNumber, request.Version, request.CorrelationId, cancellationToken)
-            : await tms.ReportNotDeliveredAsync(request.TripNumber, request.Version, request.CorrelationId, CauseOf(answer, attempts), cancellationToken);
+        var reported = answer.Succeeded
+            ? await tms.ReportDeliveredAsync(request.Version, cancellationToken)
+            : await tms.ReportNotDeliveredAsync(request.Version, answer.CauseAfter(attempts), cancellationToken);
 
-        using var reported = logger.BeginScope(ReportOutcome(answer, status));
-        LogReported(answer.Succeeded ? "delivered" : "not delivered", status);
-        return status switch
-        {
-            >= 200 and < 300 => TripDispatchFlowOutcome.Done,
-            0 or 408 or 429 or >= 500 => TripDispatchFlowOutcome.TmsUnavailable,
-            _ => TripDispatchFlowOutcome.TmsRefused,
-        };
+        // The outcome of the step that reports to the TMS, as the workflow's tracked properties work it out.
+        var failureCode = reported.FailureCode ?? answer.FailureCode;
+        using var outcome = logger.BeginScope(TrackingKeys.OutcomeOf(failureCode is null ? TrackingKeys.Succeeded : TrackingKeys.Failed, failureCode));
+        LogReported(answer.Succeeded ? "delivered" : "not delivered", reported.StatusCode);
+        return reported.Outcome;
     }
 
     private async Task<(DriverAppAnswer Answer, int Attempts)> SendAsync(TripEvent request, string trip, CancellationToken cancellationToken)
@@ -68,7 +65,7 @@ internal sealed partial class TripDispatchFlow(
         var retry = options.Value.Retry;
         for (var attempt = 0; ; attempt++)
         {
-            var answer = await driverApp.SendAsync(endpoint, trip, request.CorrelationId, cancellationToken);
+            var answer = await driverApp.SendAsync(endpoint, trip, request.Version.CorrelationId, cancellationToken);
             if (answer.Succeeded || !answer.IsRetryable || attempt >= retry.Count)
             {
                 return (answer, attempt + 1);
@@ -79,23 +76,6 @@ internal sealed partial class TripDispatchFlow(
             LogRetrying(answer.StatusCode, attempt + 1, retry.Count, wait);
             await Task.Delay(wait, time, cancellationToken);
         }
-    }
-
-    // The technical cause the Planner reads on the version, and the TMS publishes on TripNotDelivered.
-    private static string CauseOf(DriverAppAnswer answer, int attempts) =>
-        $"{(answer.StatusCode == 0 ? "The Driver app didn't answer" : $"The Driver app answered {answer.StatusCode}")}: {answer.Message} ({attempts} {(attempts == 1 ? "attempt" : "attempts")}).";
-
-    // The outcome of the step that reports to the TMS, as the workflow's tracked properties work it out.
-    private static Dictionary<string, object?> ReportOutcome(DriverAppAnswer answer, int tmsStatus)
-    {
-        if (tmsStatus is >= 200 and < 300)
-        {
-            return answer.Succeeded
-                ? TrackingKeys.OutcomeOf(TrackingKeys.Succeeded)
-                : TrackingKeys.OutcomeOf(TrackingKeys.Failed, answer.IsRetryable ? TripDispatchFailureCodes.DriverAppUnavailable : TripDispatchFailureCodes.DriverAppRefused);
-        }
-
-        return TrackingKeys.OutcomeOf(TrackingKeys.Failed, tmsStatus is 0 or 408 or 429 or >= 500 ? TripDispatchFailureCodes.TmsUnavailable : TripDispatchFailureCodes.TmsCallRefused);
     }
 
     private static JsonObject? Parse(string tripDispatched)
@@ -110,13 +90,13 @@ internal sealed partial class TripDispatchFlow(
         }
     }
 
-    private static TripEvent? EventOf(JsonObject parsed) =>
+    private static TripEvent? TryReadTripEvent(JsonObject parsed) =>
         Text(parsed, "eventType") == EventType
         && Text(parsed, "correlationId") is { } correlationId
         && Text(parsed, "tripNumber") is { } tripNumber
         && parsed["version"] is JsonValue version && version.TryGetValue<int>(out var number) && number > 0
         && parsed["driver"] is JsonObject driver && Text(driver, "driverId") is { } driverId
-            ? new(correlationId, tripNumber, number, driverId, Text(parsed, "eventId"))
+            ? new(new(tripNumber, number, correlationId), driverId, Text(parsed, "eventId"))
             : null;
 
     private static string? Text(JsonObject node, string name) =>
@@ -132,16 +112,16 @@ internal sealed partial class TripDispatchFlow(
     private partial void LogReported(string report, int statusCode);
 
     /// <summary>What the event names, and the tracking contract's keys it gives the trail.</summary>
-    private sealed record TripEvent(string CorrelationId, string TripNumber, int Version, string DriverId, string? EventId)
+    private sealed record TripEvent(TripVersionRef Version, string DriverId, string? EventId)
     {
-        public Dictionary<string, object?> Keys
+        public Dictionary<string, object?> ContractKeys
         {
             get
             {
                 var keys = new Dictionary<string, object?>
                 {
-                    [TrackingKeys.TripNumber] = TripNumber,
-                    [TrackingKeys.CorrelationId] = CorrelationId,
+                    [TrackingKeys.TripNumber] = Version.TripNumber,
+                    [TrackingKeys.CorrelationId] = Version.CorrelationId,
                     [TrackingKeys.Flow] = TrackingKeys.TripDispatch,
                     [TrackingKeys.PartyId] = DriverId,
                 };

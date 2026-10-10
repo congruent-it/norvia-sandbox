@@ -41,8 +41,15 @@ internal sealed class DriverAppEndpoint(HttpClient http)
 /// <param name="Message">What the endpoint said, or the technical cause.</param>
 internal sealed record DriverAppAnswer(int StatusCode, string Message)
 {
-    public bool Succeeded => StatusCode is >= 200 and < 300;
+    public bool Succeeded => HttpStatus.IsSuccess(StatusCode);
 
     /// <summary>A server error, a timeout or no answer, as the workflow's policy retries; a client error is the Driver app refusing the Trip.</summary>
-    public bool IsRetryable => StatusCode is 0 or 408 or 429 or >= 500;
+    public bool IsRetryable => HttpStatus.IsTransient(StatusCode);
+
+    /// <summary>The failure code the workflow tracks for the send, or none when it succeeded.</summary>
+    public string? FailureCode => Succeeded ? null : IsRetryable ? TripDispatchFailureCodes.DriverAppUnavailable : TripDispatchFailureCodes.DriverAppRefused;
+
+    /// <summary>The technical cause the Planner reads on the version, and the TMS publishes on <c>TripNotDelivered</c>.</summary>
+    public string CauseAfter(int attempts) =>
+        $"{(StatusCode == 0 ? "The Driver app didn't answer" : $"The Driver app answered {StatusCode}")}: {Message} ({attempts} {(attempts == 1 ? "attempt" : "attempts")}).";
 }

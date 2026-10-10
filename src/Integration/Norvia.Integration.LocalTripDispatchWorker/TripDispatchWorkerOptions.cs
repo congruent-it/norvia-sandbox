@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.Extensions.Options;
 
 using Norvia.Integration.LocalSupport;
 
@@ -22,10 +23,12 @@ public sealed class TripDispatchWorkerOptions
 
     /// <summary>The Trip dispatch Logic App's token for the TMS, with the role <c>Trips.ReportDelivery</c>.</summary>
     [Required]
+    [ValidateObjectMembers]
     public LocalTokenOptions TmsTokens { get; set; } = new();
 
     /// <summary>The Driver app's Trip endpoint and credential.</summary>
     [Required]
+    [ValidateObjectMembers]
     public DriverAppEndpointOptions DriverApp { get; set; } = new();
 
     /// <summary>The bounded exponential retry policy, with the numbers of the workflow's <c>retryPolicy</c>.</summary>
