@@ -23,8 +23,7 @@ public sealed class ChangeDraftTripHandler(IRepository<Trip> trips, TripPlanning
         }
 
         // Giving everything back is always allowed, also when the day has since left the Planning horizon.
-        var giveBack = command.VehicleId is null && command.DriverId is null && command.PlannedStart is null && command.PlannedDrivingDuration is null;
-        var check = giveBack
+        var check = command.GivesEverythingBack
             ? TripPlanningCheck.Passed
             : await checks.CheckAsync(trip.Day, command.VehicleId, command.DriverId, command.PlannedStart, command.PlannedDrivingDuration, trip, cancellationToken);
         if (!check.IsOk)

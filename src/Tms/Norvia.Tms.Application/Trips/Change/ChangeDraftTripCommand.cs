@@ -9,4 +9,8 @@ namespace Norvia.Tms.Application.Trips.Change;
 /// with null. P10's availability rules apply to what is given, and so does the Shift rule (<c>OutsideShift</c>); a refused change
 /// leaves the Trip as it was. Nothing is published.
 /// </summary>
-public sealed record ChangeDraftTripCommand(string Number, VehicleId? VehicleId, DriverId? DriverId, TimeOnly? PlannedStart = null, TimeSpan? PlannedDrivingDuration = null) : ICommand<Result>;
+public sealed record ChangeDraftTripCommand(string Number, VehicleId? VehicleId, DriverId? DriverId, TimeOnly? PlannedStart = null, TimeSpan? PlannedDrivingDuration = null) : ICommand<Result>
+{
+    /// <summary>True when nothing is given, so the Trip gives everything back, which is always allowed.</summary>
+    public bool GivesEverythingBack => VehicleId is null && DriverId is null && PlannedStart is null && PlannedDrivingDuration is null;
+}

@@ -4,7 +4,6 @@ using Norvia.Tms.Application.Trips;
 using Norvia.Tms.Application.Trips.Change;
 using Norvia.Tms.Application.Trips.Create;
 using Norvia.Tms.Application.Trips.Discard;
-using Norvia.Tms.Application.UnitTests.Fleet.Planning;
 using Norvia.Tms.Domain.Fleet;
 using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Domain.Trips;
@@ -158,8 +157,8 @@ public sealed class PlanDraftTripTests
     [Fact]
     public async Task TheDriversTab_ShowsTheReducedBudget_AndTheHoursComeBackWhenTheDraftIsDiscarded()
     {
-        // The Drivers tab reads the budget through the planned driving of the stored Trips, as in production.
-        var tab = new ListDriversHandler(_fixture.Planning.Drivers, new TripPlannedDrivingHours(_fixture.Trips.AsRead()), DrivingHourLimits.Default, _fixture.Planning.Horizon, _fixture.Planning.Time);
+        // The Drivers tab reads the budget through the planned driving of the stored Trips.
+        var tab = new ListDriversHandler(_fixture.Planning.Drivers, _fixture.PlannedDriving, DrivingHourLimits.Default, _fixture.Planning.Horizon, _fixture.Planning.Time);
         var draft = _fixture.Existing(Monday, Van, Anouk);
         await Change(draft, Van, Anouk, null, SixHours);
 

@@ -118,9 +118,9 @@ public static class TripEndpoints
 
     private static void AddDurationError(Dictionary<string, string[]> errors, TimeSpan? duration)
     {
-        if (duration is { } value && (value <= TimeSpan.Zero || value > TimeSpan.FromHours(24)))
+        if (duration is { } value && !Trip.IsPlannableDuration(value))
         {
-            errors[nameof(CreateTripRequest.PlannedDrivingDuration)] = ["A planned driving duration is more than nothing and at most 24 hours."];
+            errors[nameof(CreateTripRequest.PlannedDrivingDuration)] = [$"A planned driving duration is more than nothing and at most {Trip.MaxPlannedDrivingDuration.TotalHours} hours."];
         }
     }
 

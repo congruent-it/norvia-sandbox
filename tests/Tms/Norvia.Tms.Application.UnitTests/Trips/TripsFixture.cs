@@ -25,7 +25,7 @@ internal sealed class TripsFixture
         Planning.OpenDays();
         Trips = InMemoryRepository.Over(Stored);
         Numbers.NextAsync(Arg.Any<CancellationToken>()).Returns(_ => Task.FromResult(TripNumber.FromSequence(++_sequence)));
-        var plannedDriving = Substitute.For<IPlannedDrivingHours>();
+        var plannedDriving = PlannedDriving;
 
         // What the infrastructure does: the planned driving of every stored Trip, so a Draft uses up hours and discarding it gives them back.
         plannedDriving.ListAsync(Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), Arg.Any<CancellationToken>()).Returns(call =>
@@ -37,6 +37,9 @@ internal sealed class TripsFixture
         var rules = new TripAvailabilityRules(Planning.Days.AsRead(), Planning.Vehicles, Planning.Drivers, plannedDriving, DrivingHourLimits.Default, Planning.Horizon, Planning.Time);
         Checks = new TripPlanningChecks(Trips.AsRead(), Planning.Days.AsRead(), rules);
     }
+
+    /// <summary>What the infrastructure reports: the planned driving of every stored Trip.</summary>
+    public IPlannedDrivingHours PlannedDriving { get; } = Substitute.For<IPlannedDrivingHours>();
 
     public PlanningEditsFixture Planning { get; } = new();
 

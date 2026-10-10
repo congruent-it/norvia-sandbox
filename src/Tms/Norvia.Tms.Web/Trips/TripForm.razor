@@ -56,7 +56,7 @@
             <FluentTextField Label="Planned start" aria-label="Planned start" @bind-Value="_start" Immediate="true" Placeholder="07:30" />
         </div>
         <div class="flex items-center gap-2">
-            <FluentTextField Label="Driving time (h:mm)" aria-label="Driving time" @bind-Value="_duration" Immediate="true" Placeholder="6:30" />
+            <FluentTextField Label="Planned driving duration (h:mm)" aria-label="Planned driving duration" @bind-Value="_duration" Immediate="true" Placeholder="6:30" />
         </div>
         <FluentButton Appearance="Appearance.Accent" OnClick="SubmitAsync" Disabled="_working">@SubmitText</FluentButton>
         @if (OnCancel.HasDelegate)
@@ -183,28 +183,10 @@
             return;
         }
 
-        TimeOnly? plannedStart = null;
-        if (_start.Trim().Length > 0)
+        if (!TryRead<TimeOnly>(_start, TripTimes.TryParseStart, "Enter the planned start as hours and minutes, such as 07:30.", out var plannedStart)
+            || !TryRead<TimeSpan>(_duration, TripTimes.TryParseDuration, "Enter the planned driving duration as hours and minutes, such as 6:30, of more than nothing and at most 24 hours.", out var drivingDuration))
         {
-            if (!TripTimes.TryParseStart(_start, out var parsedStart))
-            {
-                _failure = "Enter the planned start as hours and minutes, such as 07:30.";
-                return;
-            }
-
-            plannedStart = parsedStart;
-        }
-
-        TimeSpan? drivingDuration = null;
-        if (_duration.Trim().Length > 0)
-        {
-            if (!TripTimes.TryParseDuration(_duration, out var parsedDuration))
-            {
-                _failure = "Enter the driving time as hours and minutes, such as 6:30, of more than nothing and at most 24 hours.";
-                return;
-            }
-
-            drivingDuration = parsedDuration;
+            return;
         }
 
         _working = true;
@@ -242,6 +224,28 @@
         {
             _working = false;
         }
+    }
+
+    private delegate bool Parse<T>(string text, out T value);
+
+    /// <summary>Reads an optional field: empty is none, otherwise it must parse, or the form says why not.</summary>
+    private bool TryRead<T>(string text, Parse<T> parse, string failure, out T? value)
+        where T : struct
+    {
+        value = null;
+        if (text.Trim().Length == 0)
+        {
+            return true;
+        }
+
+        if (parse(text, out var parsed))
+        {
+            value = parsed;
+            return true;
+        }
+
+        _failure = failure;
+        return false;
     }
 
     public void Dispose()

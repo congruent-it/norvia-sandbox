@@ -41,6 +41,12 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
     public PlannedDriving? PlannedDriving =>
         DriverId is { } driver && PlannedDrivingDuration is { } duration ? new PlannedDriving(driver, Day, duration) : null;
 
+    /// <summary>The most driving a Trip can plan: a day.</summary>
+    public static readonly TimeSpan MaxPlannedDrivingDuration = TimeSpan.FromHours(24);
+
+    /// <summary>True when the duration is more than nothing and at most <see cref="MaxPlannedDrivingDuration"/>.</summary>
+    public static bool IsPlannableDuration(TimeSpan duration) => duration > TimeSpan.Zero && duration <= MaxPlannedDrivingDuration;
+
     /// <summary>The key of the request that created the Trip, so the same request sent again as a retry finds it instead of creating another.</summary>
     public IdempotencyKey IdempotencyKey { get; private set; }
 
@@ -78,7 +84,7 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
             throw new InvalidOperationException($"Trip {Number} is Dispatched, so its planned start and duration change only by Amend.");
         }
 
-        if (drivingDuration is { } duration && (duration <= TimeSpan.Zero || duration > TimeSpan.FromHours(24)))
+        if (drivingDuration is { } duration && !IsPlannableDuration(duration))
         {
             throw new ArgumentOutOfRangeException(nameof(drivingDuration), duration, "A driving duration is more than nothing and at most a day.");
         }

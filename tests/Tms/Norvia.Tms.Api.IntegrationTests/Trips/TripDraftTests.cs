@@ -153,6 +153,16 @@ public sealed class TripDraftTests(TripsTmsFixture tms) : IClassFixture<TripsTms
         (await ListAsync()).Should().NotContain(trip => trip["day"]!.GetValue<string>() == $"{day:yyyy-MM-dd}");
     }
 
+    [Fact]
+    public async Task ADurationOfTenHours_FitsWhileADailyExtensionIsLeft()
+    {
+        var day = (await OpenHorizonAsync(2150)).AddDays(1);
+
+        using var response = await CreateAsync(day, Van, Anouk, start: "07:00", duration: "10:00:00");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created, await response.Content.ReadAsStringAsync(_cancellationToken));
+    }
+
     [Theory]
     [InlineData("00:00:00")]
     [InlineData("-01:00:00")]

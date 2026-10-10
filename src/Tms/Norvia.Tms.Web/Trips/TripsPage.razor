@@ -29,7 +29,7 @@
 @if (_changing is { } changing)
 {
     @* Keyed by the Trip, so picking for another Trip starts a form of its own. *@
-    <TripForm @key="changing.Number" Title="@($"Pick the Vehicle and Driver of {changing.Number}")" SubmitText="Save" FixedDay="changing.Day" ForTrip="@changing.Number"
+    <TripForm @key="changing.Number" Title="@($"Plan {changing.Number}")" SubmitText="Save" FixedDay="changing.Day" ForTrip="@changing.Number"
               InitialVehicleId="@changing.VehicleId" InitialDriverId="@changing.DriverId"
               InitialStart="@changing.PlannedStart" InitialDrivingDuration="@changing.PlannedDrivingDuration"
               Submit="@((entry, token) => Commands.ChangeDraftTripAsync(changing.Number, entry, token))"
@@ -51,7 +51,7 @@
             @if (context.Status == TripStatus.Draft)
             {
                 <FluentButton Appearance="Appearance.Outline" OnClick="@(() => { _changing = context; _notice = null; })"
-                              aria-label="@($"Pick Vehicle and Driver of {context.Number}")">Pick</FluentButton>
+                              aria-label="@($"Plan {context.Number}")">Plan</FluentButton>
                 <FluentButton Appearance="Appearance.Outline" OnClick="@(() => DiscardAsync(context))"
                               aria-label="@($"Discard {context.Number}")">Discard</FluentButton>
             }

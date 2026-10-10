@@ -53,8 +53,8 @@ public sealed class TripsPageTests : TmsWebContext
     {
         Commands.ChangeDraftTripAsync(Arg.Any<string>(), Arg.Any<TripEntry>(), Arg.Any<CancellationToken>()).Returns(new TripAnswer.Done());
         var page = Render<TripsPage>();
-        page.WaitForElement("fluent-button[aria-label='Pick Vehicle and Driver of TR-0000002']").Click();
-        var form = page.WaitForElement("section[aria-label='Pick the Vehicle and Driver of TR-0000002']");
+        page.WaitForElement("fluent-button[aria-label='Plan TR-0000002']").Click();
+        var form = page.WaitForElement("section[aria-label='Plan TR-0000002']");
         var fields = form.QuerySelectorAll("fluent-text-field");
         fields[0].GetAttribute("current-value").Should().Be("07:30");
         fields[1].GetAttribute("current-value").Should().Be("6:30");
@@ -75,8 +75,8 @@ public sealed class TripsPageTests : TmsWebContext
     public void Pick_ATimeThatIsNoTime_IsNotSent_AndSaysWhatToEnter(string start, string duration)
     {
         var page = Render<TripsPage>();
-        page.WaitForElement("fluent-button[aria-label='Pick Vehicle and Driver of TR-0000002']").Click();
-        var form = page.WaitForElement("section[aria-label='Pick the Vehicle and Driver of TR-0000002']");
+        page.WaitForElement("fluent-button[aria-label='Plan TR-0000002']").Click();
+        var form = page.WaitForElement("section[aria-label='Plan TR-0000002']");
         var fields = form.QuerySelectorAll("fluent-text-field");
         fields[0].Change(start);
         fields[1].Change(duration);
@@ -159,8 +159,8 @@ public sealed class TripsPageTests : TmsWebContext
     {
         Commands.ChangeDraftTripAsync(Arg.Any<string>(), Arg.Any<TripEntry>(), Arg.Any<CancellationToken>()).Returns(new TripAnswer.Done());
         var page = Render<TripsPage>();
-        page.WaitForElement("fluent-button[aria-label='Pick Vehicle and Driver of TR-0000001']").Click();
-        var form = page.WaitForElement("section[aria-label='Pick the Vehicle and Driver of TR-0000001']");
+        page.WaitForElement("fluent-button[aria-label='Plan TR-0000001']").Click();
+        var form = page.WaitForElement("section[aria-label='Plan TR-0000001']");
         page.WaitForAssertion(() => Queries.Received().ListTripChoicesAsync(Wednesday, "TR-0000001", Arg.Any<CancellationToken>()));
         page.WaitForAssertion(() => form.QuerySelectorAll("fluent-option").Should().Contain(option => option.TextContent.Contains("VN-101-A", StringComparison.Ordinal)));
         form.QuerySelectorAll("fluent-select")[0].Change("VEH-0001");
@@ -169,19 +169,19 @@ public sealed class TripsPageTests : TmsWebContext
         Click(form, "Save");
 
         page.WaitForAssertion(() => Commands.Received(1).ChangeDraftTripAsync("TR-0000001", new TripEntry(Wednesday, "VEH-0001", "DRV-0001"), Arg.Any<CancellationToken>()));
-        page.WaitForAssertion(() => page.FindAll("section[aria-label='Pick the Vehicle and Driver of TR-0000001']").Should().BeEmpty("the form closes once the TMS took the change"));
+        page.WaitForAssertion(() => page.FindAll("section[aria-label='Plan TR-0000001']").Should().BeEmpty("the form closes once the TMS took the change"));
     }
 
     [Fact]
     public void Pick_Cancel_ClosesTheForm()
     {
         var page = Render<TripsPage>();
-        page.WaitForElement("fluent-button[aria-label='Pick Vehicle and Driver of TR-0000002']").Click();
-        var form = page.WaitForElement("section[aria-label='Pick the Vehicle and Driver of TR-0000002']");
+        page.WaitForElement("fluent-button[aria-label='Plan TR-0000002']").Click();
+        var form = page.WaitForElement("section[aria-label='Plan TR-0000002']");
 
         Click(form, "Cancel");
 
-        page.WaitForAssertion(() => page.FindAll("section[aria-label='Pick the Vehicle and Driver of TR-0000002']").Should().BeEmpty());
+        page.WaitForAssertion(() => page.FindAll("section[aria-label='Plan TR-0000002']").Should().BeEmpty());
     }
 
     [Fact]

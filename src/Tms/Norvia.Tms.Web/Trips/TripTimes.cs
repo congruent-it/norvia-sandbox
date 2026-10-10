@@ -1,4 +1,5 @@
 using System.Globalization;
+using Norvia.Tms.Domain.Trips;
 
 namespace Norvia.Tms.Web.Trips;
 
@@ -19,7 +20,7 @@ public static class TripTimes
     public static bool TryParseStart(string text, out TimeOnly start) =>
         TimeOnly.TryParseExact(text.Trim(), ["HH:mm", "H:mm"], CultureInfo.InvariantCulture, DateTimeStyles.None, out start);
 
-    /// <summary>Hours and minutes, such as <c>6:30</c>; more than nothing and at most 24 hours.</summary>
+    /// <summary>Hours and minutes, such as <c>6:30</c>; as <see cref="Trip.IsPlannableDuration"/> says.</summary>
     public static bool TryParseDuration(string text, out TimeSpan duration)
     {
         duration = default;
@@ -34,6 +35,6 @@ public static class TripTimes
         }
 
         duration = new TimeSpan(hours, minutes, 0);
-        return duration > TimeSpan.Zero && duration <= TimeSpan.FromHours(24);
+        return Trip.IsPlannableDuration(duration);
     }
 }
