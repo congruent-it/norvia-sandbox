@@ -105,4 +105,61 @@ public sealed class TripDetailPageTests : TmsWebContext
 
         page.WaitForAssertion(() => page.FindAll("[aria-label='Stops'] tbody tr").Should().HaveCount(2));
     }
+
+    [Fact]
+    public void ADraftsStops_CanBeMovedWithTheArrows_AndAreSentInTheNewOrder()
+    {
+        Queries.FindTripAsync("TR-0000001", Arg.Any<CancellationToken>()).Returns(new TripDetailView(Trip, [Collect, Deliver], [], []));
+        Commands.ReorderTripStopsAsync("TR-0000001", Arg.Any<IReadOnlyList<StopOrder>>(), Arg.Any<CancellationToken>()).Returns(new TripAnswer.Done());
+        var page = Render<TripDetailPage>(parameters => parameters.Add(detail => detail.Number, "TR-0000001"));
+
+        page.WaitForElement("fluent-button[aria-label='Move stop 1 down']").Click();
+
+        Commands.Received(1).ReorderTripStopsAsync(
+            "TR-0000001",
+            Arg.Is<IReadOnlyList<StopOrder>>(order => order.SequenceEqual(new[] { new StopOrder("SH-0000001", StopKind.Delivery), new StopOrder("SH-0000001", StopKind.Collection) })),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void ADraftsStops_CanBeDraggedOntoAnotherStop_AndAreSentInTheNewOrder()
+    {
+        Queries.FindTripAsync("TR-0000001", Arg.Any<CancellationToken>()).Returns(new TripDetailView(Trip, [Collect, Deliver], [], []));
+        Commands.ReorderTripStopsAsync("TR-0000001", Arg.Any<IReadOnlyList<StopOrder>>(), Arg.Any<CancellationToken>()).Returns(new TripAnswer.Done());
+        var page = Render<TripDetailPage>(parameters => parameters.Add(detail => detail.Number, "TR-0000001"));
+        page.WaitForElements("table[aria-label='Stops'] tbody tr")[0].DragStart();
+        page.FindAll("table[aria-label='Stops'] tbody tr")[1].Drop();
+
+        Commands.Received(1).ReorderTripStopsAsync(
+            "TR-0000001",
+            Arg.Is<IReadOnlyList<StopOrder>>(order => order.Select(stop => stop.Kind).SequenceEqual(new[] { StopKind.Delivery, StopKind.Collection })),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void ARefusedMove_ShowsTheReason_AndTheStopsStayAsTheyWere()
+    {
+        Queries.FindTripAsync("TR-0000001", Arg.Any<CancellationToken>()).Returns(new TripDetailView(Trip, [Collect, Deliver], [], []));
+        Commands.ReorderTripStopsAsync("TR-0000001", Arg.Any<IReadOnlyList<StopOrder>>(), Arg.Any<CancellationToken>())
+            .Returns(new TripAnswer.Refused("Shipment SH-0000001's delivery can't come before its collection."));
+        var page = Render<TripDetailPage>(parameters => parameters.Add(detail => detail.Number, "TR-0000001"));
+
+        page.WaitForElement("fluent-button[aria-label='Move stop 1 down']").Click();
+
+        page.WaitForAssertion(() => page.Find("[role=alert]").TextContent.Should().Contain("delivery can't come before its collection"));
+        var rows = page.FindAll("table[aria-label='Stops'] tbody tr");
+        rows[0].TextContent.Should().Contain("Collect");
+    }
+
+    [Fact]
+    public void ADispatchedTripsStops_CantBeMoved()
+    {
+        Queries.FindTripAsync("TR-0000001", Arg.Any<CancellationToken>())
+            .Returns(new TripDetailView(Trip with { Status = TripStatus.Dispatched }, [Collect, Deliver], [], []));
+
+        var page = Render<TripDetailPage>(parameters => parameters.Add(detail => detail.Number, "TR-0000001"));
+
+        page.WaitForElements("[aria-label='Stops'] tbody tr");
+        page.FindAll("fluent-button[aria-label^='Move stop']").Should().BeEmpty();
+    }
 }

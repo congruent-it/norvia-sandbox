@@ -94,6 +94,9 @@ public interface ITransportOrderCommands
     /// <summary>The Planner puts Shipments on a Draft Trip: each adds its collection and delivery Stops at the end. All go on or none (P11).</summary>
     Task<TripAnswer> AddShipmentsToTripAsync(string number, IReadOnlyList<string> shipmentNumbers, CancellationToken cancellationToken);
 
+    /// <summary>The Planner puts the Stops of a Draft Trip in order: every Stop once. A delivery before its collection is refused (P11).</summary>
+    Task<TripAnswer> ReorderTripStopsAsync(string number, IReadOnlyList<StopOrder> stops, CancellationToken cancellationToken);
+
     /// <summary>The Planner discards a Draft Trip, which gives its Vehicle and Driver back (P11).</summary>
     Task<TripAnswer> DiscardDraftTripAsync(string number, CancellationToken cancellationToken);
 }

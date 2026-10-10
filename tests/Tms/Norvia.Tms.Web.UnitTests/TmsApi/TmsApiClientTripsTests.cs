@@ -1,5 +1,6 @@
 using System.Net;
 using Microsoft.Extensions.Logging.Testing;
+using Norvia.Tms.Domain.Trips;
 using Norvia.Tms.Web.TmsApi;
 using Norvia.Tms.Web.Trips;
 
@@ -90,6 +91,41 @@ public sealed class TmsApiClientTripsTests : IDisposable
             ["flow"] = "trip-planning",
             ["outcome"] = "Refused",
             ["failureCode"] = "PayloadExceeded",
+        });
+    }
+
+    [Fact]
+    public async Task ReorderTripStopsAsync_PutsTheStopsInOrder_AndTracksTheTripNumber()
+    {
+        _tmsApi.Answer(HttpStatusCode.NoContent, string.Empty);
+
+        var answer = await _client.ReorderTripStopsAsync("TR-0000001", [new("SH-0000002", StopKind.Collection), new("SH-0000002", StopKind.Delivery)], Cancel);
+
+        answer.Should().Be(new TripAnswer.Done());
+        _tmsApi.Request!.Method.Should().Be(HttpMethod.Put);
+        _tmsApi.Request.RequestUri.Should().Be(new Uri("http://tms-api.example/v1/trips/TR-0000001/stops"));
+        _tmsApi.RequestBody.Should().Be("""{"stops":[{"shipmentNumber":"SH-0000002","kind":"Collection"},{"shipmentNumber":"SH-0000002","kind":"Delivery"}]}""");
+        ScopeOf(_logger.LatestRecord).Should().Contain(new Dictionary<string, object?>
+        {
+            ["flow"] = "trip-planning",
+            ["outcome"] = "Succeeded",
+            ["tripNumber"] = "TR-0000001",
+        });
+    }
+
+    [Fact]
+    public async Task ReorderTripStopsAsync_ADeliveryBeforeItsCollection_AnswersItsReason_AndTracksItsCode()
+    {
+        _tmsApi.Answer(HttpStatusCode.Conflict, """{ "title": "The Stops can't be put in that order.", "detail": "Shipment SH-0000002's delivery can't come before its collection.", "code": "CollectionBeforeDelivery" }""");
+
+        var answer = await _client.ReorderTripStopsAsync("TR-0000001", [new("SH-0000002", StopKind.Delivery), new("SH-0000002", StopKind.Collection)], Cancel);
+
+        answer.Should().Be(new TripAnswer.Refused("Shipment SH-0000002's delivery can't come before its collection."));
+        ScopeOf(_logger.LatestRecord).Should().Contain(new Dictionary<string, object?>
+        {
+            ["flow"] = "trip-planning",
+            ["outcome"] = "Refused",
+            ["failureCode"] = "CollectionBeforeDelivery",
         });
     }
 

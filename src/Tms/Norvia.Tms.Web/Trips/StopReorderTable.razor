@@ -1,0 +1,83 @@
+@using Norvia.Tms.Application.Trips.GetByNumber
+@using Norvia.Tms.Web.Capacity
+
+@* The Fluent UI data grid has no draggable rows, so the Draft's Stops are a plain table. The Move buttons do what a drag does, for the keyboard. *@
+<table aria-label="Stops" class="mb-4 w-full border-collapse text-left">
+    <thead>
+        <tr>
+            <th scope="col">#</th>
+            <th scope="col">Stop</th>
+            <th scope="col">Shipment</th>
+            <th scope="col">Place</th>
+            <th scope="col">Window</th>
+            <th scope="col">Goods</th>
+            <th scope="col">Order</th>
+        </tr>
+    </thead>
+    <tbody>
+        @for (var index = 0; index < Stops.Count; index++)
+        {
+            var at = index;
+            var stop = Stops[at];
+            <tr draggable="@(Disabled ? "false" : "true")"
+                class="cursor-grab"
+                @ondragstart="() => _dragging = at"
+                @ondragend="() => _dragging = null"
+                @ondragover:preventDefault
+                @ondrop="() => DropAsync(at)"
+                @ondrop:preventDefault>
+                <td>@(at + 1)</td>
+                <td>@TripText.Kind(stop.Kind)</td>
+                <td><a href="/shipments/@stop.ShipmentNumber">@stop.ShipmentNumber</a></td>
+                <td>@TripText.Place(stop)</td>
+                <td>@NorviaTime.FormatWindow(stop.WindowEarliest, stop.WindowLatest)</td>
+                <td>@stop.Goods</td>
+                <td>
+                    <FluentButton Appearance="Appearance.Lightweight" aria-label="@($"Move stop {at + 1} up")" Disabled="@(Disabled || at == 0)"
+                                  OnClick="() => MoveAsync(at, at - 1)">↑</FluentButton>
+                    <FluentButton Appearance="Appearance.Lightweight" aria-label="@($"Move stop {at + 1} down")" Disabled="@(Disabled || at == Stops.Count - 1)"
+                                  OnClick="() => MoveAsync(at, at + 1)">↓</FluentButton>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private int? _dragging;
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<TripStopView> Stops { get; set; } = [];
+
+    /// <summary>True while the TMS is answering an earlier move, so a second one doesn't start from an order that is about to change.</summary>
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    /// <summary>The Planner moved a Stop: the Stops in their new order.</summary>
+    [Parameter, EditorRequired]
+    public EventCallback<IReadOnlyList<TripStopView>> OnReorder { get; set; }
+
+    private async Task DropAsync(int target)
+    {
+        var from = _dragging;
+        _dragging = null;
+        if (from is { } source)
+        {
+            await MoveAsync(source, target);
+        }
+    }
+
+    private async Task MoveAsync(int from, int to)
+    {
+        if (Disabled || from == to || to < 0 || to >= Stops.Count)
+        {
+            return;
+        }
+
+        var order = Stops.ToList();
+        var moved = order[from];
+        order.RemoveAt(from);
+        order.Insert(to, moved);
+        await OnReorder.InvokeAsync(order);
+    }
+}
