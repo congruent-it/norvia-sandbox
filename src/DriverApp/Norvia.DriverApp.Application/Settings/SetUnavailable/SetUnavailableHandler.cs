@@ -10,16 +10,20 @@ public sealed class SetUnavailableHandler(IRepository<DriverAppSettings> setting
     {
         ArgumentNullException.ThrowIfNull(command);
 
-        if (await settings.GetByIdAsync(DriverAppSettings.SingleId, cancellationToken) is { } held)
+        var stored = await settings.GetByIdAsync(DriverAppSettings.SingleId, cancellationToken);
+        var isNew = stored is null;
+        stored ??= new DriverAppSettings();
+        stored.SetUnavailable(command.Unavailable);
+
+        if (isNew)
         {
-            held.SetUnavailable(command.Unavailable);
-            await settings.UpdateAsync(held, cancellationToken);
-            return Unit.Value;
+            await settings.AddAsync(stored, cancellationToken);
+        }
+        else
+        {
+            await settings.UpdateAsync(stored, cancellationToken);
         }
 
-        var created = new DriverAppSettings();
-        created.SetUnavailable(command.Unavailable);
-        await settings.AddAsync(created, cancellationToken);
         return Unit.Value;
     }
 }

@@ -11,13 +11,18 @@ public static class DriverSession
     public const string CookieName = "norvia-driver";
 
     // Long enough that a demo phone stays with its Driver between demos.
-    private static readonly TimeSpan Remembered = TimeSpan.FromDays(365);
+    private static readonly TimeSpan CookieLifetime = TimeSpan.FromDays(365);
 
     public static DriverView? Current(HttpContext? context, IReadOnlyList<DriverView> drivers)
     {
         ArgumentNullException.ThrowIfNull(drivers);
-        var chosen = context?.Request.Cookies[CookieName];
-        return drivers.FirstOrDefault(driver => driver.Id == chosen);
+        return Find(drivers, context?.Request.Cookies[CookieName]);
+    }
+
+    public static DriverView? Find(IReadOnlyList<DriverView> drivers, string? driverId)
+    {
+        ArgumentNullException.ThrowIfNull(drivers);
+        return drivers.FirstOrDefault(driver => driver.Id == driverId);
     }
 
     public static void SignIn(HttpResponse response, DriverView driver)
@@ -30,7 +35,7 @@ public static class DriverSession
             IsEssential = true,
             SameSite = SameSiteMode.Lax,
             Secure = response.HttpContext.Request.IsHttps,
-            MaxAge = Remembered,
+            MaxAge = CookieLifetime,
         });
     }
 

@@ -1,7 +1,6 @@
 using Mediator;
 using Microsoft.FluentUI.AspNetCore.Components;
 using Norvia.DriverApp.Application.Trips.Receive;
-using Norvia.DriverApp.Domain.Trips;
 using Norvia.DriverApp.Infrastructure;
 using Norvia.DriverApp.Web.Components;
 using Norvia.DriverApp.Web.Sessions;
@@ -17,7 +16,7 @@ builder.AddDriverAppSeedDrivers();
 builder.Services.AddMediator(options =>
 {
     options.ServiceLifetime = ServiceLifetime.Scoped;
-    options.Assemblies = [typeof(ReceiveTripVersionCommand), typeof(DriverTrip)];
+    options.Assemblies = [typeof(ReceiveTripVersionCommand)];
 });
 
 // Static server-side rendering throughout: the screens read, and the changes are form posts.

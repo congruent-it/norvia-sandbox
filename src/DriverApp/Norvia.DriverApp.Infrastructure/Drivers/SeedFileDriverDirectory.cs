@@ -10,17 +10,10 @@ internal sealed class SeedFileDriverDirectory : IDriverDirectory
     private static readonly JsonSerializerOptions SeedJson = new(JsonSerializerDefaults.Web);
 
     public SeedFileDriverDirectory(IOptions<SeedOptions> options)
-        : this(File.OpenRead(options.Value.Path))
     {
-    }
-
-    internal SeedFileDriverDirectory(Stream seedFile)
-    {
-        using (seedFile)
-        {
-            var seed = JsonSerializer.Deserialize<SeedFile>(seedFile, SeedJson) ?? throw new InvalidDataException("The seed file is empty.");
-            All = [.. seed.Drivers.Where(driver => driver.Active).Select(driver => new DriverView(driver.Id, driver.Name))];
-        }
+        using var seedFile = File.OpenRead(options.Value.Path);
+        var seed = JsonSerializer.Deserialize<SeedFile>(seedFile, SeedJson) ?? throw new InvalidDataException("The seed file is empty.");
+        All = [.. seed.Drivers.Where(driver => driver.Active).Select(driver => new DriverView(driver.Id, driver.Name))];
     }
 
     public IReadOnlyList<DriverView> All { get; }

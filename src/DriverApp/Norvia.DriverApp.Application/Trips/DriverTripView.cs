@@ -1,5 +1,3 @@
-using Norvia.DriverApp.Domain.Trips;
-
 namespace Norvia.DriverApp.Application.Trips;
 
 /// <summary>The latest version of a Trip, as its Driver sees it.</summary>
@@ -11,5 +9,5 @@ public sealed record DriverTripView(
     DateOnly Day,
     TimeOnly PlannedStart,
     TimeSpan PlannedDrivingDuration,
-    TripVehicle Vehicle,
-    IReadOnlyList<TripStop> Stops);
+    TripVehicleDto Vehicle,
+    IReadOnlyList<StopDto> Stops);

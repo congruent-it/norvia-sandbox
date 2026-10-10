@@ -3,6 +3,7 @@
 @using Norvia.DriverApp.Web.Sessions
 @inject Mediator.IMediator Mediator
 @inject NavigationManager Navigation
+@inject ILogger<Trips> Logger
 
 <PageTitle>My Trips</PageTitle>
 
@@ -16,59 +17,22 @@
         </form>
     </div>
 
-    @if (_trips.Count == 0)
+    @if (_loadFailed)
+    {
+        <div role="alert">
+            <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+                Your Trips couldn't be loaded. Reload the page to try again.
+            </FluentMessageBar>
+        </div>
+    }
+    else if (_trips.Count == 0)
     {
         <p role="status">No Trips have been sent to you yet.</p>
     }
 
     @foreach (var trip in _trips)
     {
-        <section class="trip" aria-label="Trip @trip.TripNumber">
-            <h2>
-                @trip.TripNumber
-                <span class="badge">Version @trip.Version</span>
-            </h2>
-            <dl class="trip-facts">
-                <dt>Day</dt>
-                <dd>@TripText.Day(trip.Day)</dd>
-                <dt>Planned start</dt>
-                <dd>@TripText.Time(trip.PlannedStart)</dd>
-                <dt>Driving</dt>
-                <dd>@TripText.Duration(trip.PlannedDrivingDuration)</dd>
-                <dt>Vehicle</dt>
-                <dd>@trip.Vehicle.Registration (@TripText.VehicleType(trip.Vehicle.VehicleType))</dd>
-            </dl>
-
-            @if (trip.Stops.Count == 0)
-            {
-                <p class="no-stops" role="status">This Trip has no Stops: its Shipments were taken off.</p>
-            }
-            else
-            {
-                <ol class="stops">
-                    @foreach (var stop in trip.Stops.OrderBy(stop => stop.Sequence))
-                    {
-                        <li class="stop">
-                            <div class="stop-title">
-                                <strong>@(stop.Kind == StopKind.Collection ? "Collect" : "Deliver")</strong>
-                                <span>@stop.ShipmentNumber</span>
-                                <span class="muted">@stop.TransportOrderNumber</span>
-                            </div>
-                            <div>@TripText.Address(stop.Address)</div>
-                            @if (stop.Consignee?.Name is { } consignee)
-                            {
-                                <div>@consignee@(stop.Consignee.Phone is { } phone ? $", {phone}" : "")</div>
-                            }
-                            <div class="muted">@TripText.Window(stop.Window)</div>
-                            @foreach (var line in stop.GoodsLines)
-                            {
-                                <div class="muted">@TripText.GoodsLine(line)</div>
-                            }
-                        </li>
-                    }
-                </ol>
-            }
-        </section>
+        <TripCard Trip="trip" />
     }
 }
 
@@ -78,6 +42,7 @@
 
     private DriverView? _driver;
     private IReadOnlyList<DriverTripView> _trips = [];
+    private bool _loadFailed;
 
     protected override async Task OnInitializedAsync()
     {
@@ -89,6 +54,16 @@
             return;
         }
 
-        _trips = await Mediator.Send(new GetDriverTripsQuery(_driver.Id));
+        try
+        {
+            _trips = await Mediator.Send(new GetDriverTripsQuery(_driver.Id));
+        }
+#pragma warning disable CA1031 // Whatever fails to load, the Driver gets a message rather than an error page.
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            Logger.LogError(ex, "The Trips of Driver {DriverId} couldn't be loaded", _driver.Id);
+            _loadFailed = true;
+        }
     }
 }

@@ -12,32 +12,3 @@ public sealed record TripDetails(
     string DriverName,
     string CorrelationId,
     IReadOnlyList<TripStop> Stops);
-
-public sealed record TripVehicle(string VehicleId, string Registration, string VehicleType);
-
-public enum StopKind
-{
-    Collection,
-    Delivery,
-}
-
-public sealed record TripStop(
-    int Sequence,
-    StopKind Kind,
-    string ShipmentNumber,
-    string TransportOrderNumber,
-    string ShipperId,
-    StopAddress? Address,
-    StopWindow? Window,
-    IReadOnlyList<StopGoodsLine> GoodsLines,
-    StopConsignee? Consignee);
-
-public sealed record StopAddress(string? Street, string? Postcode, string? City, string? Country);
-
-public sealed record StopWindow(DateTimeOffset? Earliest, DateTimeOffset? Latest);
-
-public sealed record StopGoodsLine(string? PackageType, int? Quantity, decimal? WeightKg, StopDimensions? DimensionsCm);
-
-public sealed record StopDimensions(decimal? Length, decimal? Width, decimal? Height);
-
-public sealed record StopConsignee(string? Name, string? ContactName, string? Phone, string? Email);

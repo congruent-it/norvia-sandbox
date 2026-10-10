@@ -1,3 +1,4 @@
+using System.Xml;
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Mediator;
@@ -13,24 +14,41 @@ public sealed class ReceiveTripVersionHandler(IRepository<DriverTrip> trips, IRe
     {
         ArgumentNullException.ThrowIfNull(command);
 
+        // The demo fault refuses everything, a malformed version included.
         if (await settings.GetByIdAsync(DriverAppSettings.SingleId, cancellationToken) is { Unavailable: true })
         {
             return Result.Unavailable("The Driver app is unavailable.");
         }
 
-        var held = await trips.GetByIdAsync(new TripNumber(command.TripNumber), cancellationToken);
-        if (held is null)
+        if (ReceiveTripVersionValidator.Validate(command) is { Count: > 0 } errors)
         {
-            await trips.AddAsync(new DriverTrip(command.TripNumber, command.Version, command.DriverId, command.Details), cancellationToken);
+            return Result.Invalid(errors);
+        }
+
+        var tripNumber = new TripNumber(command.TripNumber);
+        var driverId = new DriverId(command.DriverId);
+        var details = new TripDetails(
+            command.Day,
+            command.PlannedStart,
+            XmlConvert.ToTimeSpan(command.PlannedDrivingDuration),
+            new TripVehicle(command.Vehicle.VehicleId, command.Vehicle.Registration, command.Vehicle.VehicleType),
+            command.DriverName,
+            command.CorrelationId,
+            [.. command.Stops.Select(stop => stop.ToDomain())]);
+
+        var stored = await trips.GetByIdAsync(tripNumber, cancellationToken);
+        if (stored is null)
+        {
+            await trips.AddAsync(new DriverTrip(tripNumber, command.Version, driverId, details), cancellationToken);
             return TripVersionOutcome.Stored;
         }
 
-        if (!held.ReplaceWith(command.Version, command.DriverId, command.Details))
+        if (!stored.ReplaceWith(command.Version, driverId, details))
         {
             return TripVersionOutcome.Ignored;
         }
 
-        await trips.UpdateAsync(held, cancellationToken);
+        await trips.UpdateAsync(stored, cancellationToken);
         return TripVersionOutcome.Stored;
     }
 }

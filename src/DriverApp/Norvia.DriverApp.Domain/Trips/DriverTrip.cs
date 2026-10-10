@@ -11,41 +11,39 @@ public sealed class DriverTrip : EntityBase<TripNumber>, IAggregateRoot
 {
     private DriverTrip()
     {
-        DriverId = string.Empty;
         Details = null!;
     }
 
-    public DriverTrip(string tripNumber, int version, string driverId, TripDetails details)
+    public DriverTrip(TripNumber tripNumber, int version, DriverId driverId, TripDetails details)
         : this()
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(tripNumber);
-        Id = new TripNumber(tripNumber);
-        Apply(version, driverId, details);
+        Id = tripNumber;
+        Take(version, driverId, details);
     }
 
     public int Version { get; private set; }
 
     /// <summary>The Driver the latest version is for, the only Driver who sees the Trip.</summary>
-    public string DriverId { get; private set; }
+    public DriverId DriverId { get; private set; }
 
     public TripDetails Details { get; private set; }
 
     /// <summary>Replaces the held version with a higher one; returns false, and changes nothing, for an equal or lower one.</summary>
-    public bool ReplaceWith(int version, string driverId, TripDetails details)
+    public bool ReplaceWith(int version, DriverId driverId, TripDetails details)
     {
         if (version <= Version)
         {
             return false;
         }
 
-        Apply(version, driverId, details);
+        Take(version, driverId, details);
         return true;
     }
 
-    private void Apply(int version, string driverId, TripDetails details)
+    private void Take(int version, DriverId driverId, TripDetails details)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(version, 1);
-        ArgumentException.ThrowIfNullOrWhiteSpace(driverId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(driverId.Value);
         ArgumentNullException.ThrowIfNull(details);
         Version = version;
         DriverId = driverId;

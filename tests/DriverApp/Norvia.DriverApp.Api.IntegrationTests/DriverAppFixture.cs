@@ -51,13 +51,14 @@ public sealed class DriverAppFixture : IAsyncLifetime
     }
 
     /// <summary>A sample Trip version from the Canonical Model's samples, with the fields a test changes set.</summary>
-    public static async Task<string> SampleAsync(string name, string tripNumber, int version, string driverId)
+    public static async Task<string> SampleAsync(string name, string tripNumber, int version, string driverId, Action<JsonObject>? edit = null)
     {
         var json = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "Samples", $"{name}.json"), TestContext.Current.CancellationToken);
         var trip = JsonNode.Parse(json)!.AsObject();
         trip["tripNumber"] = tripNumber;
         trip["version"] = version;
         trip["driver"]!["driverId"] = driverId;
+        edit?.Invoke(trip);
         return trip.ToJsonString();
     }
 }

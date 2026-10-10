@@ -34,11 +34,10 @@ h2 { font-size: 1.125rem; margin: 0 0 0.5rem; display: flex; flex-wrap: wrap; al
 .link-button { font: inherit; color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; }
 .primary-button { font: inherit; padding: 0.75rem 1rem; color: #fff; background: var(--accent); border: 0; border-radius: 0.5rem; cursor: pointer; }
 
-.trip { margin: 1rem 0; padding: 1rem; background: #fff; border: 1px solid var(--rule); border-radius: 0.5rem; }
-.badge { font-size: 0.75rem; font-weight: 600; padding: 0.125rem 0.5rem; color: var(--accent); border: 1px solid var(--accent); border-radius: 1rem; }
+.trip { margin: 1rem 0; padding: 1rem; }
+
 .trip-facts { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; margin: 0 0 1rem; }
 .trip-facts dt { color: var(--muted); }
 .trip-facts dd { margin: 0; }
 .stops { margin: 0; padding-left: 1.5rem; display: grid; gap: 0.75rem; }
 .stop-title { display: flex; flex-wrap: wrap; gap: 0.25rem 0.75rem; }
-.no-stops { padding: 0.75rem; background: #fff4ce; border-radius: 0.5rem; }

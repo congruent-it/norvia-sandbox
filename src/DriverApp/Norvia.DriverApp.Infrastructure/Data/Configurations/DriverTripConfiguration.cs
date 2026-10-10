@@ -20,7 +20,7 @@ internal sealed class DriverTripConfiguration : IEntityTypeConfiguration<DriverT
         // Two versions of one Trip racing each other: the one that finds the Version changed gets a conflict, so a lower
         // version can never overwrite a higher one.
         builder.Property(trip => trip.Version).IsConcurrencyToken();
-        builder.Property(trip => trip.DriverId).HasMaxLength(32);
+        builder.Property(trip => trip.DriverId).HasMaxLength(32).HasConversion(id => id.Value, value => new DriverId(value));
         builder.HasIndex(trip => trip.DriverId);
 
         // Everything else a version says is replaced whole and read whole, so it is one JSON document.

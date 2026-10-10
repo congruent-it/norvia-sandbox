@@ -2,6 +2,7 @@
   <ItemGroup>
     <PackageReference Include="Ardalis.Result" />
     <PackageReference Include="Mediator.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Norvia.DriverApp.Domain\Norvia.DriverApp.Domain.csproj" />

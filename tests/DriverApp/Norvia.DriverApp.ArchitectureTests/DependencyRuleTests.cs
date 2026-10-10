@@ -79,6 +79,12 @@ public sealed class DependencyRuleTests
     }
 
     [Fact]
+    public void Presentation_UsesTheApplicationOnly_NotTheDomain()
+    {
+        ShouldHold(Types.InAssemblies([Api, Web]).ShouldNot().HaveDependencyOn(DomainNamespace));
+    }
+
+    [Fact]
     public void DbContext_StaysInsideInfrastructure()
     {
         ShouldHold(Types.InAssemblies([Domain, Application, Api, Web])

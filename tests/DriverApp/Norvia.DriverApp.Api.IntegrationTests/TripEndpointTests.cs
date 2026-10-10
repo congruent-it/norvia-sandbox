@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace Norvia.DriverApp.Api.IntegrationTests;
 
@@ -84,6 +85,87 @@ public sealed class TripEndpointTests(DriverAppFixture driverApp)
         }
 
         (await TripsOfAsync("DRV-1000006")).Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("version", 0)]
+    [InlineData("tripNumber", "TR-12")]
+    [InlineData("plannedDrivingDuration", "six hours")]
+    [InlineData("plannedDrivingDuration", "PT0S")]
+    [InlineData("plannedDrivingDuration", "PT25H")]
+    public async Task AMalformedVersion_IsRefusedWith400_NamingTheField_AndStoresNothing(string field, object value)
+    {
+        var json = await DriverAppFixture.SampleAsync("two-shipments", "TR-1000006", version: 1, driverId: "DRV-1000007", trip =>
+            trip[field] = value is int number ? JsonValue.Create(number) : JsonValue.Create(value.ToString()));
+
+        var response = await PostAsync(json);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await response.Content.ReadAsStringAsync(Ct)).Should().Contain(field);
+        (await TripsOfAsync("DRV-1000007")).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ABlankDriver_IsRefusedWith400_NotFailedWith500()
+    {
+        var json = await DriverAppFixture.SampleAsync("two-shipments", "TR-1000007", version: 1, driverId: "");
+
+        var response = await PostAsync(json);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task ABodyOutsideTheCanonicalModel_IsRefusedWith400()
+    {
+        var json = await DriverAppFixture.SampleAsync("two-shipments", "TR-1000008", version: 1, driverId: "DRV-1000008", trip =>
+            trip["stops"]![0]!["kind"] = "Teleport");
+
+        var response = await PostAsync(json);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task WhileTheDriverAppIsUnavailable_AMalformedVersionIsStillRefusedWith503()
+    {
+        await SetUnavailableAsync(true);
+        try
+        {
+            var json = await DriverAppFixture.SampleAsync("two-shipments", "TR-1000009", version: 0, driverId: "DRV-1000009");
+
+            var response = await PostAsync(json);
+
+            response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        }
+        finally
+        {
+            await SetUnavailableAsync(false);
+        }
+    }
+
+    [Fact]
+    public async Task TheSameVersionSentManyTimesAtOnce_IsAcknowledgedEveryTime_AndStoredOnce()
+    {
+        var json = await DriverAppFixture.SampleAsync("two-shipments", "TR-1000010", version: 1, driverId: "DRV-1000010");
+
+        var responses = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => PostAsync(json)));
+
+        responses.Should().OnlyContain(response => response.StatusCode == HttpStatusCode.OK);
+        (await TripsOfAsync("DRV-1000010")).Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task AVersionAndALowerOne_SentAtOnce_LeaveTheHigherOneStored()
+    {
+        var versions = await Task.WhenAll(Enumerable.Range(1, 6)
+            .Select(version => DriverAppFixture.SampleAsync("two-shipments", "TR-1000011", version, driverId: "DRV-1000011")));
+
+        var responses = await Task.WhenAll(versions.Select(PostAsync));
+
+        responses.Should().OnlyContain(response => response.StatusCode == HttpStatusCode.OK);
+        var trip = (await TripsOfAsync("DRV-1000011")).Should().ContainSingle().Subject;
+        trip.GetProperty("version").GetInt32().Should().Be(6);
     }
 
     private async Task SetUnavailableAsync(bool unavailable)

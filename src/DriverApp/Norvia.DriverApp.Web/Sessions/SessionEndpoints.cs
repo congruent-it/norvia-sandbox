@@ -13,7 +13,7 @@ public static class SessionEndpoints
         endpoints.MapPost("/sign-in", async ([FromForm] string driver, HttpResponse response, IMediator mediator, CancellationToken cancellationToken) =>
         {
             var drivers = await mediator.Send(new ListDriversQuery(), cancellationToken);
-            if (drivers.FirstOrDefault(known => known.Id == driver) is not { } chosen)
+            if (DriverSession.Find(drivers, driver) is not { } chosen)
             {
                 // With a body, so the status code pages don't turn it into the Not Found page.
                 return TypedResults.Problem($"There is no Driver '{driver}'.", statusCode: StatusCodes.Status400BadRequest, title: "Unknown Driver");

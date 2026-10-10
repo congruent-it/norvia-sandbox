@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Norvia.DriverApp.Application;
 using Norvia.DriverApp.Application.Drivers;
 using Norvia.DriverApp.Infrastructure.Data;
 using Norvia.DriverApp.Infrastructure.Drivers;
@@ -21,6 +22,7 @@ public static class DependencyInjection
         builder.AddDriverAppDbContext();
         builder.Services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
         builder.Services.AddScoped(typeof(IReadRepository<>), typeof(EfRepository<>));
+        builder.Services.AddScoped<IConflictRetrier, EfConflictRetrier>();
 
         return builder;
     }
@@ -59,7 +61,7 @@ public static class DependencyInjection
     /// In Azure the database is serverless and pauses after an hour unused, and the first connection then waits while it
     /// resumes, which can take a minute. SqlClient gives up after 15 seconds by default, which would lose the Trip version.
     /// </summary>
-    private static string? WaitingForAResume(string? connectionString)
+    private static string? WithTimeoutForAResume(string? connectionString)
     {
         const int resumeSeconds = 90;
         if (connectionString is null)
@@ -75,7 +77,7 @@ public static class DependencyInjection
     private static void AddDriverAppDbContext(this IHostApplicationBuilder builder)
     {
         builder.Services.AddDbContext<DriverAppDbContext>(options =>
-            options.UseSqlServer(WaitingForAResume(builder.Configuration.GetConnectionString(DatabaseConnectionName))));
+            options.UseSqlServer(WithTimeoutForAResume(builder.Configuration.GetConnectionString(DatabaseConnectionName))));
         builder.EnrichSqlServerDbContext<DriverAppDbContext>();
     }
 }
