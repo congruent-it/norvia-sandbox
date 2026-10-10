@@ -54,6 +54,27 @@ public sealed class GetTripTests
     }
 
     [Fact]
+    public async Task Handle_ADispatchedTrip_ListsEveryVersionWithItsDeliveryState_AndTheLatestOnTheTrip()
+    {
+        var trip = await _fixture.DispatchedAsync();
+        trip.ReportNotDelivered(1, "The Driver app answered 503.", new Norvia.Tms.Domain.TransportOrders.CorrelationId("corr-report"), _fixture.Planning.Time.GetUtcNow());
+
+        var result = await Get(trip);
+
+        result.Value.Versions.Should().Equal(new TripVersionView(1, TripDeliveryState.NotDelivered, "The Driver app answered 503."));
+        result.Value.Trip.LatestDelivery.Should().Be(TripDeliveryState.NotDelivered);
+    }
+
+    [Fact]
+    public async Task Handle_ADraft_HasNoVersions()
+    {
+        var result = await Get(_fixture.Existing(Tuesday, Van, null));
+
+        result.Value.Versions.Should().BeEmpty();
+        result.Value.Trip.LatestDelivery.Should().BeNull();
+    }
+
+    [Fact]
     public async Task Handle_AnUnknownTrip_IsRefusedWithTripNotFound()
     {
         var result = await new GetTripHandler(_fixture.Trips.AsRead(), _fixture.TripShipments, _fixture.Checks, _fixture.Planning.Vehicles, _fixture.Planning.Drivers)

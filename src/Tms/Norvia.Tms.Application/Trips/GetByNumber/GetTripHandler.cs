@@ -34,6 +34,9 @@ public sealed class GetTripHandler(
                 .. check.Failures.Select(failure => new TripRuleFailureView(failure.Code.ToString(), failure.Message)),
                 .. check.Refusals.Select(refusal => new TripRuleFailureView(refusal.Code.ToString(), refusal.Message)),
             ],
-            check.Warnings);
+            check.Warnings)
+        {
+            Versions = [.. trip.Deliveries.OrderBy(delivery => delivery.Version).Select(delivery => new TripVersionView(delivery.Version, delivery.State, delivery.Cause))],
+        };
     }
 }

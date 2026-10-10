@@ -48,13 +48,14 @@ The TMS validates the token and the role; the Shipper or Carrier a call is for c
 | `CarrierBookings.Answer` | `answer` | Record a Carrier's confirmation or rejection | [P4](../processes/tms/p4-carrier-booking.md) |
 | `CarrierBookings.Report` | `booking`, `carrier-cancellation` | Report a Carrier booking's request, cancellation or withdrawal as sent or not delivered | [P4](../processes/tms/p4-carrier-booking.md), [P7](../processes/tms/p7-exception-handling.md) |
 | `ShipperNotifications.Report` | `shipper-notification` | Report a Shipper notification as sent or not delivered | [P7](../processes/tms/p7-exception-handling.md) |
+| `Trips.ReportDelivery` | The Trip dispatch Logic App's identity, once that Logic App exists | Report a Trip version as delivered to the Driver app or not delivered | [P11](../processes/tms/p11-trip-dispatch.md#tms-api) |
 | `TrackingEvents.Record` | `tracking` | Record a Tracking event | [P5](../processes/tms/p5-shipment-tracking.md) |
 | `ProofsOfDelivery.Record` | `proof-of-delivery` | Record a Proof of delivery with its files | [P6](../processes/tms/p6-proof-of-delivery.md) |
 | `ShipperTracking.Read` | `apim` | List, get and find a Shipper's Transport Orders, and read a current Proof of delivery file. The TMS trusts the Shipper ID header only from this caller | [P8](../processes/tms/p8-shipper-visibility.md) |
 
 The TMS API's queries (Transport Orders, Shipments, Exceptions, Proof of delivery files) ask only for a valid token. Because Entra issues one only to a principal holding one of the roles above, in practice the callers are these identities. The TMS UI reads in process and uses the API to change things ([ADR 0028](../adr/0028-the-tms-ui-reads-in-process-and-changes-things-through-the-tms-api.md)).
 
-Planned and not yet in Entra: `Trips.ReportDelivery` for the Trip dispatch Logic App ([P11](../processes/tms/p11-trip-dispatch.md#tms-api)), and `Trips.Start`, `Trips.End`, with `TrackingEvents.Record` and `ProofsOfDelivery.Record`, for the Driver reports Logic App ([P12](../processes/tms/p12-trip-execution.md#tms-api)).
+Planned and not yet in Entra: `Trips.Start`, `Trips.End`, with `TrackingEvents.Record` and `ProofsOfDelivery.Record`, for the Driver reports Logic App ([P12](../processes/tms/p12-trip-execution.md#tms-api)).
 
 ## Partner API roles
 

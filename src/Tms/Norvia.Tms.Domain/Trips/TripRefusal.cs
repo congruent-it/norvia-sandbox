@@ -37,4 +37,19 @@ public sealed record TripRefusal(TripRefusalCode Code, string Message)
 
     public static TripRefusal TripIncomplete(TripNumber trip, string part) =>
         new(TripRefusalCode.TripIncomplete, $"Trip {trip} can't be dispatched without {part}.");
+
+    public static TripRefusal TripNotDispatched(TripNumber number) =>
+        new(TripRefusalCode.TripNotDispatched, $"Trip {number} is a Draft, so no version of it has been sent.");
+
+    public static TripRefusal TripVersionNotFound(TripNumber number, int version) =>
+        new(TripRefusalCode.TripVersionNotFound, Invariant($"Trip {number} has no version {version}."));
+
+    public static TripRefusal TripVersionNotLatest(TripNumber number, int version, int latest) =>
+        new(TripRefusalCode.TripVersionNotLatest, Invariant($"Version {version} of Trip {number} is not its latest, which is version {latest}."));
+
+    public static TripRefusal TripVersionNotUndelivered(TripNumber number, int version, TripDeliveryState state) =>
+        new(TripRefusalCode.TripVersionNotUndelivered, Invariant($"Version {version} of Trip {number} is {state}, so there is nothing to send again."));
+
+    public static TripRefusal VehicleOrDriverInactive(TripNumber number) =>
+        new(TripRefusalCode.VehicleOrDriverInactive, $"The Vehicle or the Driver of Trip {number} is no longer active, so it can't be sent again as it is.");
 }

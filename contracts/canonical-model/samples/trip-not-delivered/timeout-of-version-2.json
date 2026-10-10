@@ -1,0 +1,11 @@
+{
+  "eventId": "0198e7c0-0000-7000-8000-0000000000a2",
+  "eventType": "TripNotDelivered",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-13T11:40:00+00:00",
+  "correlationId": "8c2b9f4e-1a3d-4e57-b0c8-6d5e4f3a2b10",
+  "tripNumber": "TR-0000012",
+  "version": 2,
+  "driverId": "DRV-0002",
+  "cause": "The Driver app did not answer within 30 seconds."
+}

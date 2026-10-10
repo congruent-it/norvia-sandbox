@@ -14,7 +14,7 @@ public sealed class TripsPageTests : TmsWebContext
     private static readonly DateOnly Wednesday = new(2026, 10, 14);
     private static readonly TripView Empty = new("TR-0000001", Wednesday, TripStatus.Draft, null, null, null, null, null, null);
     private static readonly TripView Full = new("TR-0000002", Wednesday.AddDays(1), TripStatus.Draft, "VEH-0001", "VN-101-A", "DRV-0001", "Anouk de Vries", new TimeOnly(7, 30), TimeSpan.FromMinutes(390));
-    private static readonly TripView Sent = new("TR-0000003", Wednesday.AddDays(2), TripStatus.Dispatched, "VEH-0002", "VN-102-B", "DRV-0002", "Joost Bakker", null, null);
+    private static readonly TripView Sent = new("TR-0000003", Wednesday.AddDays(2), TripStatus.Dispatched, "VEH-0002", "VN-102-B", "DRV-0002", "Joost Bakker", null, null, LatestDelivery: TripDeliveryState.NotDelivered);
 
     public TripsPageTests()
     {
@@ -36,6 +36,21 @@ public sealed class TripsPageTests : TmsWebContext
         rows[1].TextContent.Should().Contain("VN-101-A").And.Contain("Anouk de Vries");
         rows[2].TextContent.Should().Contain("Dispatched");
         rows[2].QuerySelectorAll("fluent-button").Should().BeEmpty("a Dispatched Trip is never discarded or picked for");
+    }
+
+    [Theory]
+    [InlineData(TripDeliveryState.Sending, "Sending")]
+    [InlineData(TripDeliveryState.Delivered, "Delivered to Driver app")]
+    [InlineData(TripDeliveryState.NotDelivered, "Not delivered")]
+    public void ShowsTheDeliveryStateOfTheLatestVersion_AndNoneForADraft(TripDeliveryState state, string text)
+    {
+        Queries.ListTripsAsync(Arg.Any<CancellationToken>()).Returns([Empty, Sent with { LatestDelivery = state }]);
+
+        var page = Render<TripsPage>();
+
+        var rows = page.WaitForElements("tbody tr");
+        rows[1].TextContent.Should().Contain(text);
+        rows[0].TextContent.Should().NotContain("Sending").And.NotContain("Delivered").And.NotContain("Not delivered");
     }
 
     [Fact]

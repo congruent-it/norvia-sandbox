@@ -14,6 +14,17 @@ internal static class CanonicalSchemas
         return Load("trip-dispatched.v1.schema.json");
     });
 
+    private static readonly Lazy<JsonSchema> TripNotDeliveredSchema = new(() => Load("trip-not-delivered.v1.schema.json"));
+
+    public static IEnumerable<string> TripNotDeliveredSamples() =>
+        Assembly.GetExecutingAssembly().GetManifestResourceNames()
+            .Where(name => name.StartsWith("CanonicalModel/samples/trip-not-delivered/", StringComparison.Ordinal));
+
+    public static EvaluationResults ValidateTripNotDelivered(JsonNode body) =>
+        TripNotDeliveredSchema.Value.Evaluate(
+            JsonSerializer.SerializeToElement(body),
+            new EvaluationOptions { OutputFormat = OutputFormat.List, RequireFormatValidation = true });
+
     public static IEnumerable<string> TripDispatchedSamples() =>
         Assembly.GetExecutingAssembly().GetManifestResourceNames()
             .Where(name => name.StartsWith("CanonicalModel/samples/trip-dispatched/", StringComparison.Ordinal));

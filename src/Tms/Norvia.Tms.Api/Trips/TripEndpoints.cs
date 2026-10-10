@@ -2,7 +2,10 @@ using Ardalis.Result;
 using Mediator;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Api.TransportOrders;
+using Norvia.Tms.Application;
+using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.Trips;
 using Norvia.Tms.Application.Trips.AddShipments;
 using Norvia.Tms.Application.Trips.Change;
@@ -12,6 +15,8 @@ using Norvia.Tms.Application.Trips.Dispatch;
 using Norvia.Tms.Application.Trips.GetByNumber;
 using Norvia.Tms.Application.Trips.List;
 using Norvia.Tms.Application.Trips.ReorderStops;
+using Norvia.Tms.Application.Trips.ReportDelivery;
+using Norvia.Tms.Application.Trips.SendAgain;
 using Norvia.Tms.Domain.Fleet;
 using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Domain.Trips;
@@ -20,6 +25,9 @@ namespace Norvia.Tms.Api.Trips;
 
 public static class TripEndpoints
 {
+    /// <summary>The app role only the P11 Trip dispatch Logic App's managed identity holds, for its delivered and not-delivered reports.</summary>
+    public const string ReportDeliveryRole = "Trips.ReportDelivery";
+
     public static IEndpointRouteBuilder MapTrips(this IEndpointRouteBuilder app)
     {
         var trips = app.NewVersionedApi("Trips")
@@ -81,6 +89,35 @@ public static class TripEndpoints
                 + "PayloadExceeded, PalletPlacesExceeded, DayNotOpen, OutsideShift, or for a Shipment ShipmentNotReleased, ShipmentOnAnotherTrip or CollectionDayMismatch), and nothing changes. "
                 + "On success, in one transaction, the Trip becomes Dispatched at version 1, its Shipments become Dispatched, and exactly one TripDispatched (version 1, the whole Trip with its Stops in order) is written to the outbox for the Trip events topic, "
                 + "under a new correlation ID that the answer returns. There is no event per Shipment. A Trip that is Dispatched already is TripNotDraft (409), not a repeat: the caller is the TMS UI, which doesn't retry a Dispatch, and a later version goes out by Amend or by sending the version again; an unknown Trip is TripNotFound (404).");
+
+        trips.MapPost("/{number}/versions/{tripVersion:int}/send-again", SendAgainAsync)
+            .WithName("SendTripVersionAgain")
+            .RequireAuthorization(policy => policy.RequireRole(TransportOrderEndpoints.ManageRole))
+            .WithSummary("Send a Not delivered version of a Trip to the Driver app again.")
+            .WithDescription(
+                "Only the Trip's latest version can be sent again, and only while it is Not delivered. The version is Sending once more, and, in one transaction, exactly one TripDispatched with the same version and the whole Trip as it stands now "
+                + "is written to the outbox for the Trip events topic, under a new correlation ID that the answer returns. TripVersionNotUndelivered (409) for a version that is Sending or Delivered, TripVersionNotLatest (409) for an older version, "
+                + "TripNotDispatched (409) for a Draft, VehicleOrDriverInactive (409) when the Trip's Vehicle or Driver is no longer active, TripVersionNotFound or TripNotFound (404).");
+
+        trips.MapPost("/{number}/versions/{tripVersion:int}/report-delivered", ReportDeliveredAsync)
+            .WithName("ReportTripVersionDelivered")
+            .RequireAuthorization(policy => policy.RequireRole(ReportDeliveryRole))
+            .WithMetadata(new TrackedFlow(Flows.TripDispatch))
+            .WithSummary("Report that the Driver app accepted a version of a Trip.")
+            .WithDescription(
+                "Sets the version's delivery state to Delivered to Driver app and publishes nothing. A report for a version that is no longer Sending (a repeat, or one that arrives after the other report) is ignored and logged: it changes and publishes nothing. "
+                + "A report for a version older than the Trip's latest is stored against that version and changes nothing else. "
+                + "The X-Correlation-ID is the correlation ID of the Dispatch or send-again, which the TripDispatched event carried. TripNotFound or TripVersionNotFound (404, with that code).");
+
+        trips.MapPost("/{number}/versions/{tripVersion:int}/report-not-delivered", ReportNotDeliveredAsync)
+            .WithName("ReportTripVersionNotDelivered")
+            .RequireAuthorization(policy => policy.RequireRole(ReportDeliveryRole))
+            .WithMetadata(new TrackedFlow(Flows.TripDispatch))
+            .WithSummary("Report that a version of a Trip never reached the Driver app, with its technical cause.")
+            .WithDescription(
+                "Sets the version's delivery state to Not delivered with the cause and, for the Trip's latest version, publishes TripNotDelivered in the same transaction. "
+                + "A report for a version older than the Trip's latest is stored against that version and publishes nothing. A report for a version that is no longer Sending is ignored and logged: it changes and publishes nothing. "
+                + "The X-Correlation-ID is the correlation ID of the Dispatch or send-again, which the TripDispatched event carried. TripNotFound or TripVersionNotFound (404, with that code).");
 
         trips.MapPut("/{number}", ChangeDraftAsync)
             .WithName("ChangeDraftTrip")
@@ -197,6 +234,63 @@ public static class TripEndpoints
         return result.IsSuccess ? TypedResults.Ok(result.Value) : Refused(result.ValidationErrors, "The Trip can't be dispatched.");
     }
 
+    private static async Task<Results<Ok<SendTripAgainResult>, ProblemHttpResult>> SendAgainAsync(string number, int tripVersion, IMediator mediator, CancellationToken cancellationToken)
+    {
+        // Like a Dispatch, the action starts in the TMS UI, so the TMS starts its Message trail.
+        var result = await mediator.Send(new SendTripAgainCommand(number, tripVersion, CorrelationId.New().Value), cancellationToken);
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : Refused(result.ValidationErrors, "The Trip can't be sent again.");
+    }
+
+    private static async Task<Results<Ok<TripDeliveryReportResult>, ProblemHttpResult, ValidationProblem>> ReportDeliveredAsync(
+        string number,
+        int tripVersion,
+        [FromHeader(Name = TransportOrderEndpoints.CorrelationIdHeader)] string? correlationId,
+        IConflictRetrier retrier,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(correlationId))
+        {
+            return TypedResults.ValidationProblem(CorrelationIdMissing());
+        }
+
+        var result = await retrier.RunAsync(mediator => mediator.Send(new ReportTripDeliveredCommand(number, tripVersion, correlationId), cancellationToken).AsTask());
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : ReportRefused(result, correlationId);
+    }
+
+    private static async Task<Results<Ok<TripDeliveryReportResult>, ProblemHttpResult, ValidationProblem>> ReportNotDeliveredAsync(
+        string number,
+        int tripVersion,
+        [FromHeader(Name = TransportOrderEndpoints.CorrelationIdHeader)] string? correlationId,
+        TripNotDeliveredRequest report,
+        IConflictRetrier retrier,
+        CancellationToken cancellationToken)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (string.IsNullOrWhiteSpace(correlationId))
+        {
+            errors = CorrelationIdMissing();
+        }
+
+        if (string.IsNullOrWhiteSpace(report.Cause))
+        {
+            errors[nameof(TripNotDeliveredRequest.Cause)] = ["A not-delivered report needs the technical cause."];
+        }
+
+        if (errors.Count > 0 || correlationId is null || report.Cause is not { } cause)
+        {
+            return TypedResults.ValidationProblem(errors);
+        }
+
+        var result = await retrier.RunAsync(mediator => mediator.Send(new ReportTripNotDeliveredCommand(number, tripVersion, correlationId, cause), cancellationToken).AsTask());
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : ReportRefused(result, correlationId);
+    }
+
+    private static Dictionary<string, string[]> CorrelationIdMissing() =>
+        new() { [TransportOrderEndpoints.CorrelationIdHeader] = [$"Reporting a Trip's delivery needs an {TransportOrderEndpoints.CorrelationIdHeader}."] };
+
+    private static ProblemHttpResult ReportRefused(Ardalis.Result.Result<TripDeliveryReportResult> result, string correlationId) =>
+        RefusalProblem.Of<TripRefusalCode, TripDeliveryReportResult>(result, "The report can't be recorded.", correlationId, _ => StatusCodes.Status404NotFound);
+
     private static async Task<Results<NoContent, ProblemHttpResult>> DiscardDraftAsync(string number, IMediator mediator, CancellationToken cancellationToken)
     {
         var result = await mediator.Send(new DiscardDraftTripCommand(number), cancellationToken);
@@ -224,7 +318,7 @@ public static class TripEndpoints
         var all = refusals.ToList();
         var first = all[0];
         return TypedResults.Problem(
-            statusCode: Enum.TryParse<TripRefusalCode>(first.ErrorCode, out var code) && code is TripRefusalCode.TripNotFound or TripRefusalCode.ShipmentNotFound
+            statusCode: Enum.TryParse<TripRefusalCode>(first.ErrorCode, out var code) && code is TripRefusalCode.TripNotFound or TripRefusalCode.ShipmentNotFound or TripRefusalCode.TripVersionNotFound
                 ? StatusCodes.Status404NotFound
                 : StatusCodes.Status409Conflict,
             title: title,

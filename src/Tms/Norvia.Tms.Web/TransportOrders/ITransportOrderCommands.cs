@@ -101,6 +101,9 @@ public interface ITransportOrderCommands
     /// <summary>The Planner dispatches a Draft Trip to its Driver: the TMS re-checks every rule, then sends it as version 1 (P11).</summary>
     Task<TripAnswer> DispatchTripAsync(string number, CancellationToken cancellationToken);
 
+    /// <summary>The Planner sends a Not delivered version of a Dispatched Trip to the Driver app again: the same version, under a new Message trail (P11).</summary>
+    Task<TripAnswer> SendTripAgainAsync(string number, int version, CancellationToken cancellationToken);
+
     /// <summary>The Planner discards a Draft Trip, which gives its Vehicle and Driver back (P11).</summary>
     Task<TripAnswer> DiscardDraftTripAsync(string number, CancellationToken cancellationToken);
 }

@@ -201,4 +201,87 @@ public sealed class TripDetailPageTests : TmsWebContext
         page.WaitForElements("[aria-label='Stops'] tbody tr");
         page.FindAll("fluent-button[aria-label^='Dispatch']").Should().BeEmpty();
     }
+
+    [Fact]
+    public void ADispatchedTrip_ListsEveryVersionWithItsDeliveryState_AndTheLatestOnTheSummary()
+    {
+        Queries.FindTripAsync("TR-0000001", Arg.Any<CancellationToken>()).Returns(new TripDetailView(
+            Trip with { Status = TripStatus.Dispatched, LatestDelivery = TripDeliveryState.NotDelivered }, [Collect, Deliver], [], [])
+        {
+            Versions = [new TripVersionView(1, TripDeliveryState.Delivered, null), new TripVersionView(2, TripDeliveryState.NotDelivered, "The Driver app answered 503.")],
+        });
+
+        var page = Render<TripDetailPage>(parameters => parameters.Add(detail => detail.Number, "TR-0000001"));
+
+        page.WaitForElement("dl[aria-label=Trip]").TextContent.Should().Contain("Not delivered");
+        var rows = page.WaitForElements("table[aria-label=Versions] tbody tr");
+        rows.Should().HaveCount(2);
+        rows[0].TextContent.Should().Contain("1").And.Contain("Delivered to Driver app");
+        rows[1].TextContent.Should().Contain("2").And.Contain("Not delivered").And.Contain("The Driver app answered 503.");
+    }
+
+    [Fact]
+    public void OnlyTheLatestVersion_WhenNotDelivered_HasASendAgainAction_ThatSendsItAndSaysSo()
+    {
+        Queries.FindTripAsync("TR-0000001", Arg.Any<CancellationToken>()).Returns(new TripDetailView(
+            Trip with { Status = TripStatus.Dispatched, LatestDelivery = TripDeliveryState.NotDelivered }, [Collect, Deliver], [], [])
+        {
+            Versions = [new TripVersionView(1, TripDeliveryState.NotDelivered, "old"), new TripVersionView(2, TripDeliveryState.NotDelivered, "new")],
+        });
+        Commands.SendTripAgainAsync("TR-0000001", 2, Arg.Any<CancellationToken>()).Returns(new TripAnswer.SentAgain(2, "corr-again"));
+        var page = Render<TripDetailPage>(parameters => parameters.Add(detail => detail.Number, "TR-0000001"));
+
+        page.WaitForElements("table[aria-label=Versions] tbody tr");
+        page.FindAll("fluent-button[aria-label='Send version 1 again']").Should().BeEmpty("only the latest version can be sent again");
+        page.Find("fluent-button[aria-label='Send version 2 again']").Click();
+
+        Commands.Received(1).SendTripAgainAsync("TR-0000001", 2, Arg.Any<CancellationToken>());
+        page.WaitForAssertion(() => page.Find("[role=status]").TextContent.Should().Contain("sent again").And.Contain("version 2"));
+    }
+
+    [Theory]
+    [InlineData(TripDeliveryState.Sending)]
+    [InlineData(TripDeliveryState.Delivered)]
+    public void AVersionThatIsSendingOrDelivered_HasNoSendAgainAction(TripDeliveryState state)
+    {
+        Queries.FindTripAsync("TR-0000001", Arg.Any<CancellationToken>()).Returns(new TripDetailView(
+            Trip with { Status = TripStatus.Dispatched, LatestDelivery = state }, [Collect, Deliver], [], [])
+        {
+            Versions = [new TripVersionView(1, state, null)],
+        });
+
+        var page = Render<TripDetailPage>(parameters => parameters.Add(detail => detail.Number, "TR-0000001"));
+
+        page.WaitForElements("table[aria-label=Versions] tbody tr");
+        page.FindAll("fluent-button[aria-label^='Send version']").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ARefusedSendAgain_ShowsTheReason()
+    {
+        Queries.FindTripAsync("TR-0000001", Arg.Any<CancellationToken>()).Returns(new TripDetailView(
+            Trip with { Status = TripStatus.Dispatched, LatestDelivery = TripDeliveryState.NotDelivered }, [Collect, Deliver], [], [])
+        {
+            Versions = [new TripVersionView(1, TripDeliveryState.NotDelivered, "x")],
+        });
+        Commands.SendTripAgainAsync("TR-0000001", 1, Arg.Any<CancellationToken>())
+            .Returns(new TripAnswer.Refused("Version 1 of Trip TR-0000001 is Sending, so there is nothing to send again."));
+        var page = Render<TripDetailPage>(parameters => parameters.Add(detail => detail.Number, "TR-0000001"));
+
+        page.WaitForElement("fluent-button[aria-label='Send version 1 again']").Click();
+
+        page.WaitForAssertion(() => page.Find("[role=alert]").TextContent.Should().Contain("nothing to send again"));
+    }
+
+    [Fact]
+    public void ADraft_HasNoVersionsAndNoDeliveryState()
+    {
+        Queries.FindTripAsync("TR-0000001", Arg.Any<CancellationToken>()).Returns(new TripDetailView(Trip, [Collect, Deliver], [], []));
+
+        var page = Render<TripDetailPage>(parameters => parameters.Add(detail => detail.Number, "TR-0000001"));
+
+        page.WaitForElements("[aria-label='Stops'] tbody tr");
+        page.FindAll("table[aria-label=Versions]").Should().BeEmpty();
+        page.Find("dl[aria-label=Trip]").TextContent.Should().NotContain("Delivery");
+    }
 }

@@ -27,6 +27,7 @@ internal static class TripViews
             load.WeightKg,
             load.PalletPlaces,
             vehicle?.PayloadKg,
-            vehicle?.PalletPlaces);
+            vehicle?.PalletPlaces,
+            trip.Deliveries.Count > 0 ? trip.Deliveries.MaxBy(delivery => delivery.Version)!.State : null);
     }
 }

@@ -40,4 +40,20 @@ public sealed class ListTripsTests
         trips[0].Should().Match<TripView>(view => view.StopCount == 4 && view.LoadWeightKg == 650m && view.LoadPalletPlaces == 3 && view.PayloadKg == 1200 && view.VehiclePalletPlaces == 4);
         trips[1].Should().Match<TripView>(view => view.StopCount == 0 && view.LoadWeightKg == 0m && view.PayloadKg == null && view.VehiclePalletPlaces == null);
     }
+
+    [Fact]
+    public async Task Handle_ShowsTheDeliveryStateOfTheLatestVersion_AndNoneForADraft()
+    {
+        var dispatched = await _fixture.DispatchedAsync();
+        _fixture.Existing(TripsFixture.Tuesday.AddDays(1), null, null);
+
+        var trips = await new ListTripsHandler(_fixture.Trips.AsRead(), _fixture.TripShipments, _fixture.Planning.Vehicles, _fixture.Planning.Drivers)
+            .Handle(new ListTripsQuery(), CancellationToken.None);
+
+        trips.Single(trip => trip.Number == dispatched.Number.Value).LatestDelivery.Should().Be(TripDeliveryState.Sending);
+        dispatched.ReportDelivered(1, _fixture.Planning.Time.GetUtcNow());
+        (await new ListTripsHandler(_fixture.Trips.AsRead(), _fixture.TripShipments, _fixture.Planning.Vehicles, _fixture.Planning.Drivers)
+            .Handle(new ListTripsQuery(), CancellationToken.None)).Single(trip => trip.Number == dispatched.Number.Value).LatestDelivery.Should().Be(TripDeliveryState.Delivered);
+        trips.Single(trip => trip.Status == TripStatus.Draft).LatestDelivery.Should().BeNull();
+    }
 }

@@ -36,6 +36,7 @@ Subscriptions and subscribers marked *planned* are designed in a process doc but
 | [`ShipmentDeliveryWindowAgreed`](../../contracts/canonical-model/shipment-delivery-window-agreed.v1.schema.json) | `shipment-events` | TMS | `monitoring` (every message) | Monitoring | [P7](../processes/tms/p7-exception-handling.md) |
 | [`CarrierCostIncurred`](../../contracts/canonical-model/carrier-cost-incurred.v1.schema.json) | `shipment-events` | TMS | `carrier-cost` *planned* (`CarrierCostIncurred` only) | Carrier cost Logic App (P9) *planned* | [P9](../processes/tms/p9-freight-settlement.md) |
 | [`TripDispatched`](../../contracts/canonical-model/trip-dispatched.v1.schema.json) | `trip-events` | TMS | `monitoring` (every message) | Monitoring | [P11](../processes/tms/p11-trip-dispatch.md). Carries the whole Trip with its Stops in order; the Trip dispatch Logic App's subscription comes with that Logic App |
+| [`TripNotDelivered`](../../contracts/canonical-model/trip-not-delivered.v1.schema.json) | `trip-events` | TMS | `monitoring` (every message) | Monitoring | [P11](../processes/tms/p11-trip-dispatch.md). The Trip dispatch Logic App gave up sending the Trip's latest version to the Driver app. Carries the Trip number, version, Driver ID and technical cause; an alert comes later |
 
 ## Reading the table
 
