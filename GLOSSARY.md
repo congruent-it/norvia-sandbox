@@ -108,6 +108,14 @@ _Avoid_: route, tour, run
 A Trip the Planner is still building. It can be changed or discarded, and it holds its Vehicle and Driver, so neither has another Trip that day. Dispatching it makes it a Dispatched Trip, which is never deleted. Nothing is published while a Trip is a Draft.
 _Avoid_: unsaved trip, planned trip
 
+**Planned start**:
+The time on a Trip's day at which the Driver is to begin it, entered by the Planner. It must be inside the Driver's Shift that day, from its start up to but not including its end.
+_Avoid_: departure time, start time
+
+**Planned driving duration**:
+How long the Planner expects the Driver to drive on a Trip, entered by the Planner, of more than nothing and at most 24 hours. It uses up the Driver's Driving-hour budget, and a Draft's counts too, so discarding the Draft gives the hours back.
+_Avoid_: driving time, trip duration
+
 **Discard**:
 The Planner deleting a Draft, which gives its Vehicle and Driver back. Only a Draft can be discarded.
 _Avoid_: delete trip, cancel trip

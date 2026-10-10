@@ -51,7 +51,7 @@ public sealed class TmsApiClientTripsTests : IDisposable
     {
         _tmsApi.Answer(HttpStatusCode.NoContent, string.Empty);
 
-        var answer = await _client.ChangeDraftTripAsync("TR-0000001", "VEH-0001", "DRV-0002", Cancel);
+        var answer = await _client.ChangeDraftTripAsync("TR-0000001", new TripEntry(new DateOnly(2026, 10, 14), "VEH-0001", "DRV-0002"), Cancel);
 
         answer.Should().Be(new TripAnswer.Done());
         _tmsApi.Request!.Method.Should().Be(HttpMethod.Put);
@@ -63,6 +63,17 @@ public sealed class TmsApiClientTripsTests : IDisposable
             ["outcome"] = "Succeeded",
             ["tripNumber"] = "TR-0000001",
         });
+    }
+
+    [Fact]
+    public async Task ChangeDraftTripAsync_PutsThePlannedStartAndDrivingDuration()
+    {
+        _tmsApi.Answer(HttpStatusCode.NoContent, string.Empty);
+
+        await _client.ChangeDraftTripAsync(
+            "TR-0000001", new TripEntry(new DateOnly(2026, 10, 14), "VEH-0001", "DRV-0002", new TimeOnly(7, 30), TimeSpan.FromMinutes(390)), Cancel);
+
+        _tmsApi.RequestBody.Should().Be("""{"vehicleId":"VEH-0001","driverId":"DRV-0002","plannedStart":"07:30:00","plannedDrivingDuration":"06:30:00"}""");
     }
 
     [Fact]

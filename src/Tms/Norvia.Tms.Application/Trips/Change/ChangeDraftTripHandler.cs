@@ -22,16 +22,17 @@ public sealed class ChangeDraftTripHandler(IRepository<Trip> trips, TripPlanning
             return TripRefused.Because(notDraft);
         }
 
-        // Giving the Vehicle and Driver back is always allowed, also when the day has since left the Planning horizon.
-        IReadOnlyList<TripAvailabilityFailure> failures = command.VehicleId is null && command.DriverId is null
-            ? []
-            : await checks.CheckAsync(trip.Day, command.VehicleId, command.DriverId, trip, cancellationToken);
-        if (failures.Count > 0)
+        // Giving everything back is always allowed, also when the day has since left the Planning horizon.
+        var check = command.GivesEverythingBack
+            ? TripPlanningCheck.Passed
+            : await checks.CheckAsync(trip.Day, command.VehicleId, command.DriverId, command.PlannedStart, command.PlannedDrivingDuration, trip, cancellationToken);
+        if (!check.IsOk)
         {
-            return TripRefused.Because(failures);
+            return TripRefused.Because(check);
         }
 
         trip.Pick(command.VehicleId, command.DriverId);
+        trip.Plan(command.PlannedStart, command.PlannedDrivingDuration);
         await trips.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }

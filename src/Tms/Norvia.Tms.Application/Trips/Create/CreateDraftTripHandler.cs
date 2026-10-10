@@ -17,13 +17,15 @@ public sealed class CreateDraftTripHandler(IRepository<Trip> trips, ITripNumbers
             return new CreateDraftTripResult(created.Number.Value);
         }
 
-        var failures = await checks.CheckAsync(command.Day, command.VehicleId, command.DriverId, current: null, cancellationToken);
-        if (failures.Count > 0)
+        var check = await checks.CheckAsync(
+            command.Day, command.VehicleId, command.DriverId, command.PlannedStart, command.PlannedDrivingDuration, current: null, cancellationToken);
+        if (!check.IsOk)
         {
-            return TripRefused.Because<CreateDraftTripResult>(failures);
+            return TripRefused.Because<CreateDraftTripResult>(check);
         }
 
         var trip = Trip.CreateDraft(await numbers.NextAsync(cancellationToken), command.Day, command.VehicleId, command.DriverId, command.IdempotencyKey);
+        trip.Plan(command.PlannedStart, command.PlannedDrivingDuration);
         await trips.AddAsync(trip, cancellationToken);
         await trips.SaveChangesAsync(cancellationToken);
         return new CreateDraftTripResult(trip.Number.Value);

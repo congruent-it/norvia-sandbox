@@ -52,6 +52,12 @@
                 }
             </FluentSelect>
         </div>
+        <div class="flex items-center gap-2">
+            <FluentTextField Label="Planned start" aria-label="Planned start" @bind-Value="_start" Immediate="true" Placeholder="07:30" />
+        </div>
+        <div class="flex items-center gap-2">
+            <FluentTextField Label="Planned driving duration (h:mm)" aria-label="Planned driving duration" @bind-Value="_duration" Immediate="true" Placeholder="6:30" />
+        </div>
         <FluentButton Appearance="Appearance.Accent" OnClick="SubmitAsync" Disabled="_working">@SubmitText</FluentButton>
         @if (OnCancel.HasDelegate)
         {
@@ -65,6 +71,8 @@
     private string _day = string.Empty;
     private string _vehicleId = string.Empty;
     private string _driverId = string.Empty;
+    private string _start = string.Empty;
+    private string _duration = string.Empty;
     private TripChoices _choices = new([], []);
     private string? _failure;
     private string? _done;
@@ -94,6 +102,12 @@
     [Parameter]
     public string? InitialDriverId { get; set; }
 
+    [Parameter]
+    public TimeOnly? InitialStart { get; set; }
+
+    [Parameter]
+    public TimeSpan? InitialDrivingDuration { get; set; }
+
     /// <summary>Sends the entry to the TMS and answers what it said.</summary>
     [Parameter, EditorRequired]
     public Func<TripEntry, CancellationToken, Task<TripAnswer>> Submit { get; set; } = null!;
@@ -109,6 +123,8 @@
     {
         _vehicleId = InitialVehicleId ?? string.Empty;
         _driverId = InitialDriverId ?? string.Empty;
+        _start = InitialStart is { } start ? TripTimes.Start(start) : string.Empty;
+        _duration = InitialDrivingDuration is { } duration ? TripTimes.Duration(duration) : string.Empty;
         if (FixedDay is { } day)
         {
             _day = Iso(day);
@@ -167,10 +183,16 @@
             return;
         }
 
+        if (!TryRead<TimeOnly>(_start, TripTimes.TryParseStart, "Enter the planned start as hours and minutes, such as 07:30.", out var plannedStart)
+            || !TryRead<TimeSpan>(_duration, TripTimes.TryParseDuration, "Enter the planned driving duration as hours and minutes, such as 6:30, of more than nothing and at most 24 hours.", out var drivingDuration))
+        {
+            return;
+        }
+
         _working = true;
         try
         {
-            var entry = new TripEntry(day, _vehicleId.Length == 0 ? null : _vehicleId, _driverId.Length == 0 ? null : _driverId);
+            var entry = new TripEntry(day, _vehicleId.Length == 0 ? null : _vehicleId, _driverId.Length == 0 ? null : _driverId, plannedStart, drivingDuration);
             switch (await Submit(entry, _closed.Token))
             {
                 case TripAnswer.Refused refused:
@@ -178,6 +200,8 @@
                     break;
                 case TripAnswer.Created created:
                     _done = $"Draft Trip {created.Number} created for {FleetText.Day(day)}.";
+                    _start = string.Empty;
+                    _duration = string.Empty;
                     await DayChangedAsync(_day);
                     await OnDone.InvokeAsync();
                     break;
@@ -200,6 +224,28 @@
         {
             _working = false;
         }
+    }
+
+    private delegate bool Parse<T>(string text, out T value);
+
+    /// <summary>Reads an optional field: empty is none, otherwise it must parse, or the form says why not.</summary>
+    private bool TryRead<T>(string text, Parse<T> parse, string failure, out T? value)
+        where T : struct
+    {
+        value = null;
+        if (text.Trim().Length == 0)
+        {
+            return true;
+        }
+
+        if (parse(text, out var parsed))
+        {
+            value = parsed;
+            return true;
+        }
+
+        _failure = failure;
+        return false;
     }
 
     public void Dispose()

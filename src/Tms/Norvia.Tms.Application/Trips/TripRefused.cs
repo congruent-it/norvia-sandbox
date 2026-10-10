@@ -22,11 +22,27 @@ public static class TripRefused
         return Result.Invalid(new ValidationError("Trip", refusal.Message, refusal.Code.ToString(), ValidationSeverity.Error));
     }
 
+    public static Result<TResult> Because<TResult>(TripPlanningCheck check) =>
+        Result<TResult>.Invalid(ErrorsOf(check));
+
+    public static Result Because(TripPlanningCheck check) =>
+        Result.Invalid(ErrorsOf(check));
+
     public static Result<TResult> Because<TResult>(IReadOnlyList<TripAvailabilityFailure> failures) =>
         Result<TResult>.Invalid(ErrorsOf(failures));
 
     public static Result Because(IReadOnlyList<TripAvailabilityFailure> failures) =>
         Result.Invalid(ErrorsOf(failures));
+
+    private static List<ValidationError> ErrorsOf(TripPlanningCheck check)
+    {
+        ArgumentNullException.ThrowIfNull(check);
+        return
+        [
+            .. ErrorsOf(check.Failures),
+            .. check.Refusals.Select(refusal => new ValidationError("Trip", refusal.Message, refusal.Code.ToString(), ValidationSeverity.Error)),
+        ];
+    }
 
     private static List<ValidationError> ErrorsOf(IReadOnlyList<TripAvailabilityFailure> failures)
     {

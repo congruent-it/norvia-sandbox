@@ -28,7 +28,9 @@ public sealed class ListTripsHandler(
                 trip.VehicleId?.Value,
                 trip.VehicleId is { } vehicle ? registrations.GetValueOrDefault(vehicle, vehicle.Value) : null,
                 trip.DriverId?.Value,
-                trip.DriverId is { } driver ? names.GetValueOrDefault(driver, driver.Value) : null)),
+                trip.DriverId is { } driver ? names.GetValueOrDefault(driver, driver.Value) : null,
+                trip.PlannedStart,
+                trip.PlannedDrivingDuration)),
         ];
     }
 }

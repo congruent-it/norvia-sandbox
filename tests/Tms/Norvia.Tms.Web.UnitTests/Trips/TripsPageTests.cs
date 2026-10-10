@@ -12,9 +12,9 @@ namespace Norvia.Tms.Web.UnitTests.Trips;
 public sealed class TripsPageTests : TmsWebContext
 {
     private static readonly DateOnly Wednesday = new(2026, 10, 14);
-    private static readonly TripView Empty = new("TR-0000001", Wednesday, TripStatus.Draft, null, null, null, null);
-    private static readonly TripView Full = new("TR-0000002", Wednesday.AddDays(1), TripStatus.Draft, "VEH-0001", "VN-101-A", "DRV-0001", "Anouk de Vries");
-    private static readonly TripView Sent = new("TR-0000003", Wednesday.AddDays(2), TripStatus.Dispatched, "VEH-0002", "VN-102-B", "DRV-0002", "Joost Bakker");
+    private static readonly TripView Empty = new("TR-0000001", Wednesday, TripStatus.Draft, null, null, null, null, null, null);
+    private static readonly TripView Full = new("TR-0000002", Wednesday.AddDays(1), TripStatus.Draft, "VEH-0001", "VN-101-A", "DRV-0001", "Anouk de Vries", new TimeOnly(7, 30), TimeSpan.FromMinutes(390));
+    private static readonly TripView Sent = new("TR-0000003", Wednesday.AddDays(2), TripStatus.Dispatched, "VEH-0002", "VN-102-B", "DRV-0002", "Joost Bakker", null, null);
 
     public TripsPageTests()
     {
@@ -36,6 +36,55 @@ public sealed class TripsPageTests : TmsWebContext
         rows[1].TextContent.Should().Contain("VN-101-A").And.Contain("Anouk de Vries");
         rows[2].TextContent.Should().Contain("Dispatched");
         rows[2].QuerySelectorAll("fluent-button").Should().BeEmpty("a Dispatched Trip is never discarded or picked for");
+    }
+
+    [Fact]
+    public void ListsThePlannedStartAndDrivingTime_AndADashWhenThereIsNone()
+    {
+        var page = Render<TripsPage>();
+
+        var rows = page.WaitForElements("tbody tr");
+        rows[1].TextContent.Should().Contain("07:30").And.Contain("6:30");
+        rows[0].TextContent.Should().NotContain("07:30");
+    }
+
+    [Fact]
+    public void Pick_SendsThePlannedStartAndDrivingTimeTheTripAlreadyHas_AndWhatThePlannerTyped()
+    {
+        Commands.ChangeDraftTripAsync(Arg.Any<string>(), Arg.Any<TripEntry>(), Arg.Any<CancellationToken>()).Returns(new TripAnswer.Done());
+        var page = Render<TripsPage>();
+        page.WaitForElement("fluent-button[aria-label='Plan TR-0000002']").Click();
+        var form = page.WaitForElement("section[aria-label='Plan TR-0000002']");
+        var fields = form.QuerySelectorAll("fluent-text-field");
+        fields[0].GetAttribute("current-value").Should().Be("07:30");
+        fields[1].GetAttribute("current-value").Should().Be("6:30");
+        fields[0].Change("08:15");
+        fields[1].Change("9:00");
+
+        Click(form, "Save");
+
+        page.WaitForAssertion(() => Commands.Received(1).ChangeDraftTripAsync(
+            "TR-0000002", new TripEntry(Wednesday.AddDays(1), "VEH-0001", "DRV-0001", new TimeOnly(8, 15), TimeSpan.FromHours(9)), Arg.Any<CancellationToken>()));
+    }
+
+    [Theory]
+    [InlineData("7h", "6:30")]
+    [InlineData("07:30", "0:00")]
+    [InlineData("07:30", "25:00")]
+    [InlineData("07:30", "6:5")]
+    public void Pick_ATimeThatIsNoTime_IsNotSent_AndSaysWhatToEnter(string start, string duration)
+    {
+        var page = Render<TripsPage>();
+        page.WaitForElement("fluent-button[aria-label='Plan TR-0000002']").Click();
+        var form = page.WaitForElement("section[aria-label='Plan TR-0000002']");
+        var fields = form.QuerySelectorAll("fluent-text-field");
+        fields[0].Change(start);
+        fields[1].Change(duration);
+
+        Click(form, "Save");
+
+        page.WaitForAssertion(() => form.QuerySelector("[role=alert]")!.TextContent.Should().Contain("hours and minutes"));
+        Commands.DidNotReceive().ChangeDraftTripAsync(Arg.Any<string>(), Arg.Any<TripEntry>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -108,10 +157,10 @@ public sealed class TripsPageTests : TmsWebContext
     [Fact]
     public void Pick_OpensTheTripsFormWithItsChoices_AndSendsTheVehicleAndDriver()
     {
-        Commands.ChangeDraftTripAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns(new TripAnswer.Done());
+        Commands.ChangeDraftTripAsync(Arg.Any<string>(), Arg.Any<TripEntry>(), Arg.Any<CancellationToken>()).Returns(new TripAnswer.Done());
         var page = Render<TripsPage>();
-        page.WaitForElement("fluent-button[aria-label='Pick Vehicle and Driver of TR-0000001']").Click();
-        var form = page.WaitForElement("section[aria-label='Pick the Vehicle and Driver of TR-0000001']");
+        page.WaitForElement("fluent-button[aria-label='Plan TR-0000001']").Click();
+        var form = page.WaitForElement("section[aria-label='Plan TR-0000001']");
         page.WaitForAssertion(() => Queries.Received().ListTripChoicesAsync(Wednesday, "TR-0000001", Arg.Any<CancellationToken>()));
         page.WaitForAssertion(() => form.QuerySelectorAll("fluent-option").Should().Contain(option => option.TextContent.Contains("VN-101-A", StringComparison.Ordinal)));
         form.QuerySelectorAll("fluent-select")[0].Change("VEH-0001");
@@ -119,20 +168,20 @@ public sealed class TripsPageTests : TmsWebContext
 
         Click(form, "Save");
 
-        page.WaitForAssertion(() => Commands.Received(1).ChangeDraftTripAsync("TR-0000001", "VEH-0001", "DRV-0001", Arg.Any<CancellationToken>()));
-        page.WaitForAssertion(() => page.FindAll("section[aria-label='Pick the Vehicle and Driver of TR-0000001']").Should().BeEmpty("the form closes once the TMS took the change"));
+        page.WaitForAssertion(() => Commands.Received(1).ChangeDraftTripAsync("TR-0000001", new TripEntry(Wednesday, "VEH-0001", "DRV-0001"), Arg.Any<CancellationToken>()));
+        page.WaitForAssertion(() => page.FindAll("section[aria-label='Plan TR-0000001']").Should().BeEmpty("the form closes once the TMS took the change"));
     }
 
     [Fact]
     public void Pick_Cancel_ClosesTheForm()
     {
         var page = Render<TripsPage>();
-        page.WaitForElement("fluent-button[aria-label='Pick Vehicle and Driver of TR-0000002']").Click();
-        var form = page.WaitForElement("section[aria-label='Pick the Vehicle and Driver of TR-0000002']");
+        page.WaitForElement("fluent-button[aria-label='Plan TR-0000002']").Click();
+        var form = page.WaitForElement("section[aria-label='Plan TR-0000002']");
 
         Click(form, "Cancel");
 
-        page.WaitForAssertion(() => page.FindAll("section[aria-label='Pick the Vehicle and Driver of TR-0000002']").Should().BeEmpty());
+        page.WaitForAssertion(() => page.FindAll("section[aria-label='Plan TR-0000002']").Should().BeEmpty());
     }
 
     [Fact]

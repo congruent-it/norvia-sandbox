@@ -28,8 +28,8 @@ public sealed class DraftTripJourneyTests(TmsUiFixture tms) : BrowserPage(tms)
         var draft = trips.GetByRole(AriaRole.Row).Filter(new() { HasText = "Draft" }).Last;
         await Expect(draft).ToContainTextAsync("—");
 
-        await draft.GetByRole(AriaRole.Button, new() { Name = "Pick Vehicle and Driver" }).ClickAsync();
-        var pick = Page.GetByRole(AriaRole.Group, new() { Name = "Pick the Vehicle and Driver of" });
+        await draft.GetByRole(AriaRole.Button, new() { Name = "Plan" }).ClickAsync();
+        var pick = Page.GetByRole(AriaRole.Group, new() { Name = "Plan" });
         await pick.GetByRole(AriaRole.Combobox, new() { Name = "Vehicle" }).ClickAsync();
         await Page.GetByRole(AriaRole.Option).Nth(1).ClickAsync();
         await pick.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();

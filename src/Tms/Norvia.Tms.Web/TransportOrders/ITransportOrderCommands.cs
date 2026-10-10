@@ -85,11 +85,11 @@ public interface ITransportOrderCommands
     /// <summary>The Planner sets one Driver's Shift on a single open day (P10).</summary>
     Task<CapacityAnswer> EditShiftAsync(DateOnly day, string driverId, TimeOnly startsAt, TimeOnly endsAt, CancellationToken cancellationToken);
 
-    /// <summary>The Planner creates a Draft Trip for an open day, with or without its Vehicle and Driver (P11).</summary>
+    /// <summary>The Planner creates a Draft Trip for an open day, with or without its Vehicle, Driver, planned start and driving duration (P11).</summary>
     Task<TripAnswer> CreateDraftTripAsync(TripEntry entry, CancellationToken cancellationToken);
 
-    /// <summary>The Planner picks the Vehicle and Driver of a Draft Trip, or gives them back with null (P11).</summary>
-    Task<TripAnswer> ChangeDraftTripAsync(string number, string? vehicleId, string? driverId, CancellationToken cancellationToken);
+    /// <summary>The Planner picks the Vehicle, Driver, planned start and driving duration of a Draft Trip, or gives them back with null (P11).</summary>
+    Task<TripAnswer> ChangeDraftTripAsync(string number, TripEntry entry, CancellationToken cancellationToken);
 
     /// <summary>The Planner discards a Draft Trip, which gives its Vehicle and Driver back (P11).</summary>
     Task<TripAnswer> DiscardDraftTripAsync(string number, CancellationToken cancellationToken);

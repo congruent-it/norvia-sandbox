@@ -899,6 +899,12 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");
 
+                    b.Property<TimeSpan?>("PlannedDrivingDuration")
+                        .HasColumnType("time");
+
+                    b.Property<TimeOnly?>("PlannedStart")
+                        .HasColumnType("time");
+
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
