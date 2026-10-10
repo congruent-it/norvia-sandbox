@@ -15,6 +15,7 @@ using Norvia.Tms.Api.ShipperTracking;
 using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Api.TrackingEvents;
 using Norvia.Tms.Api.TransportOrders;
+using Norvia.Tms.Api.Trips;
 using Norvia.Tms.Application.Billing.Release;
 using Norvia.Tms.Application.CarrierBookings.Answer;
 using Norvia.Tms.Application.CarrierBookings.Report;
@@ -173,6 +174,7 @@ app.MapTrackingEvents();
 app.MapProofsOfDelivery();
 app.MapExceptions();
 app.MapCapacity();
+app.MapTrips();
 app.MapShipperNotifications();
 app.MapShipperTracking();
 

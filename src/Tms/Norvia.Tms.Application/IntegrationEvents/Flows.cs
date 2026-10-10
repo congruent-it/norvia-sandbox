@@ -51,4 +51,10 @@ public static class Flows
     /// Deciding that a Transport Order is Billable (P9), on the Message trail of the transaction that completed its last condition.
     /// </summary>
     public const string Billing = "billing";
+
+    /// <summary>
+    /// The Planner's building of Trips (P11), which starts in the TMS UI. Creating, changing and discarding a Draft publish nothing,
+    /// so the trail is the TMS UI's hop and the TMS API's.
+    /// </summary>
+    public const string TripPlanning = "trip-planning";
 }

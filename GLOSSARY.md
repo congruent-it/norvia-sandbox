@@ -104,6 +104,14 @@ _Avoid_: order, pick order, sales order
 One run on one day by a single Vehicle and Driver that visits an ordered sequence of Stops for the Shipments it carries. A Vehicle or Driver has at most one Trip a day. The TMS owns it.
 _Avoid_: route, tour, run
 
+**Draft**:
+A Trip the Planner is still building. It can be changed or discarded, and it holds its Vehicle and Driver, so neither has another Trip that day. Dispatching it makes it a Dispatched Trip, which is never deleted. Nothing is published while a Trip is a Draft.
+_Avoid_: unsaved trip, planned trip
+
+**Discard**:
+The Planner deleting a Draft, which gives its Vehicle and Driver back. Only a Draft can be discarded.
+_Avoid_: delete trip, cancel trip
+
 **Stop**:
 One Shipment's collection or its delivery, at its place in a Trip's sequence. A Shipment on a Trip has exactly two Stops, and its collection comes before its delivery, or only its delivery Stop on a Re-delivery. A Stop is derived from its Shipment and has no life of its own. The Driver completes a Stop by giving it an outcome on that Trip: collected or collection failed, delivered or delivery failed.
 _Avoid_: drop, visit, leg

@@ -12,6 +12,8 @@ using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.List;
 using Norvia.Tms.Application.TransportOrders.RatingExceptions;
 using Norvia.Tms.Application.TransportOrders.ToPlan;
+using Norvia.Tms.Application.Trips;
+using Norvia.Tms.Application.Trips.Choices;
 
 namespace Norvia.Tms.Web.TransportOrders;
 
@@ -83,4 +85,10 @@ public interface ITransportOrderQueries
 
     /// <summary>The message Notify Shipper starts with for the type of this Exception, or null when there is no such Exception.</summary>
     Task<string?> FindShipperNotificationTemplateAsync(string exceptionNumber, CancellationToken cancellationToken);
+
+    /// <summary>The Trips of today and later (P11), by day.</summary>
+    Task<IReadOnlyList<TripView>> ListTripsAsync(CancellationToken cancellationToken);
+
+    /// <summary>The Vehicles and Drivers the Planner can pick for a Trip on a day (P11); <paramref name="forTrip"/> keeps what that Trip holds.</summary>
+    Task<TripChoices> ListTripChoicesAsync(DateOnly day, string? forTrip, CancellationToken cancellationToken);
 }

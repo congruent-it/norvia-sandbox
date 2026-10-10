@@ -31,6 +31,8 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
 
             modelBuilder.HasSequence("TransportOrderNumbers");
 
+            modelBuilder.HasSequence("TripNumbers");
+
             modelBuilder.Entity("Norvia.Tms.Domain.CarrierBookings.CarrierBooking", b =>
                 {
                     b.Property<Guid>("Id")
@@ -873,6 +875,63 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                     b.HasIndex("Status", "ReceivedAt");
 
                     b.ToTable("TransportOrders", (string)null);
+                });
+
+            modelBuilder.Entity("Norvia.Tms.Domain.Trips.Trip", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("Day")
+                        .HasColumnType("date");
+
+                    b.Property<string>("DriverId")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("VehicleId")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Day");
+
+                    b.HasIndex("Number")
+                        .IsUnique();
+
+                    b.HasIndex(new[] { "Day", "DriverId" }, "IX_Trips_Day_DriverId")
+                        .IsUnique()
+                        .HasFilter("[DriverId] IS NOT NULL");
+
+                    b.HasIndex(new[] { "Day", "VehicleId" }, "IX_Trips_Day_VehicleId")
+                        .IsUnique()
+                        .HasFilter("[VehicleId] IS NOT NULL");
+
+                    b.HasIndex(new[] { "IdempotencyKey" }, "IX_Trips_IdempotencyKey")
+                        .IsUnique();
+
+                    b.ToTable("Trips", (string)null);
                 });
 
             modelBuilder.Entity("Norvia.Tms.Infrastructure.Outbox.OutboxMessage", b =>

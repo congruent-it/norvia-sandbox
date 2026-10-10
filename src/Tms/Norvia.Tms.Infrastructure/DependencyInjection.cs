@@ -22,6 +22,9 @@ using Norvia.Tms.Application.Shippers;
 using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.Rate;
 using Norvia.Tms.Application.TransportOrders.Submit;
+using Norvia.Tms.Application.Trips;
+using Norvia.Tms.Application.Trips.Change;
+using Norvia.Tms.Application.Trips.Create;
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Domain.Fleet;
@@ -44,6 +47,7 @@ using Norvia.Tms.Infrastructure.Shipments;
 using Norvia.Tms.Infrastructure.Shippers;
 using Norvia.Tms.Infrastructure.TrackingEvents;
 using Norvia.Tms.Infrastructure.TransportOrders;
+using Norvia.Tms.Infrastructure.Trips;
 
 namespace Norvia.Tms.Infrastructure;
 
@@ -100,6 +104,10 @@ public static class DependencyInjection
         builder.Services.AddScoped<IShipmentNumbers, SqlShipmentNumbers>();
         builder.Services.AddScoped<ICarrierBookingNumbers, SqlCarrierBookingNumbers>();
         builder.Services.AddScoped<IExceptionNumbers, SqlExceptionNumbers>();
+        builder.Services.AddScoped<ITripNumbers, SqlTripNumbers>();
+        builder.Services.AddScoped<TripPlanningChecks>();
+        builder.Services.AddScoped<IPipelineBehavior<CreateDraftTripCommand, Result<CreateDraftTripResult>>, RetryTripThatLostARace<CreateDraftTripCommand, Result<CreateDraftTripResult>>>();
+        builder.Services.AddScoped<IPipelineBehavior<ChangeDraftTripCommand, Result>, RetryTripThatLostARace<ChangeDraftTripCommand, Result>>();
         builder.Services.AddScoped<IPipelineBehavior<SubmitTransportOrderCommand, Result<SubmitTransportOrderResult>>, RetrySubmissionThatLostARace>();
         builder.Services.AddSingleton<IShipperDirectory, SeedFileShipperDirectory>();
         builder.Services.AddSingleton<IRateCardDirectory, SeedFileRateCardDirectory>();
