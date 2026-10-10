@@ -13,6 +13,7 @@ public sealed class TrackingStatusesTests
     [InlineData(ShipmentStatus.Planned, TrackingStatus.Scheduled)]
     [InlineData(ShipmentStatus.Released, TrackingStatus.Scheduled)]
     [InlineData(ShipmentStatus.Booked, TrackingStatus.Scheduled)]
+    [InlineData(ShipmentStatus.Dispatched, TrackingStatus.Scheduled)]
     [InlineData(ShipmentStatus.Collected, TrackingStatus.Collected)]
     [InlineData(ShipmentStatus.InTransit, TrackingStatus.InTransit)]
     [InlineData(ShipmentStatus.Delivered, TrackingStatus.Delivered)]

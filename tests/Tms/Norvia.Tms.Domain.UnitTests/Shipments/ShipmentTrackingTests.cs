@@ -36,6 +36,24 @@ public sealed class ShipmentTrackingTests
     }
 
     [Fact]
+    public void Record_CollectedOnADispatchedOwnFleetShipment_MovesItToCollected_AndRaisesShipmentCollected()
+    {
+        var (order, shipment) = PlannedWithOrder(CarriedBy.OwnFleet);
+        shipment.Release(order, new IdempotencyKey("key-rel1"), new CorrelationId("corr-release"), ReceivedAt.AddHours(3));
+        shipment.Dispatch();
+        shipment.ClearDomainEvents();
+
+        var trackingEvent = shipment.Record(
+            new TrackingReport(TrackingSource.OwnFleet, "evt-1", null, null, TrackingEventType.Collected, EventTime, Location, Eta: null, Remark: null),
+            new CorrelationId("corr-tracking"),
+            ReceivedAt);
+
+        shipment.Status.Should().Be(ShipmentStatus.Collected);
+        trackingEvent.MovedShipment.Should().BeTrue();
+        shipment.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<ShipmentCollectedEvent>();
+    }
+
+    [Fact]
     public void Record_KeepsWhatTheReporterSaid()
     {
         var shipment = Booked();
@@ -281,7 +299,7 @@ public sealed class ShipmentTrackingTests
 
     private static Shipment Planned() => PlannedWithOrder().Shipment;
 
-    private static (TransportOrder Order, Shipment Shipment) PlannedWithOrder()
+    private static (TransportOrder Order, Shipment Shipment) PlannedWithOrder(CarriedBy? carriedBy = null)
     {
         var order = TransportOrder.Accept(
             new ShipperId("SHP-0001"),
@@ -292,7 +310,7 @@ public sealed class ShipmentTrackingTests
             ReceivedAt);
         var shipment = order.Plan(
             ShipmentNumber.FromSequence(3),
-            CarriedBy.Carrier(new CarrierId("CAR-0001")),
+            carriedBy ?? CarriedBy.Carrier(new CarrierId("CAR-0001")),
             new IdempotencyKey("key-1"),
             new CorrelationId("corr-planning"),
             ReceivedAt.AddHours(2))!;

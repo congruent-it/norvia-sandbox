@@ -2,6 +2,8 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Nodes;
 using Norvia.Tms.Api.IntegrationTests.Planning;
+using Norvia.Tms.Api.IntegrationTests.ShipperTracking;
+using Norvia.Tms.Api.IntegrationTests.TrackingEvents;
 using Norvia.Tms.Api.IntegrationTests.TransportOrders;
 using static Norvia.Tms.Api.IntegrationTests.Capacity.CapacityCalls;
 
@@ -137,6 +139,33 @@ public sealed class TripDispatchTests(TripsTmsFixture tms) : IClassFixture<Trips
     }
 
     [Fact]
+    public async Task ADispatchedShipment_ShowsAsScheduledToTheShipper_AndIsStaleWhenNotCollectedInTime_WithoutAnythingHappeningAutomatically()
+    {
+        var day = (await OpenHorizonAsync(4500)).AddDays(1);
+        var shipment = await ReleasedAsync(day);
+        var trip = await NumberOf(await CreateAsync(day, Truck, Joost, "09:00", "04:00:00", shipment));
+        using var dispatched = await DispatchAsync(trip);
+        dispatched.StatusCode.Should().Be(HttpStatusCode.OK, await dispatched.Content.ReadAsStringAsync(_cancellationToken));
+        var order = await tms.TransportOrderOfAsync(shipment, _cancellationToken);
+
+        var tracking = await tms.GotAsync(ShipperTrackingCalls.Shipper, order, _cancellationToken);
+
+        tracking["trackingStatus"]!.GetValue<string>().Should().Be("Scheduled");
+        tracking.ToJsonString().Should().NotContain("Dispatched").And.NotContain(trip, "nothing about Norvia's Trips leaks into tracking");
+        var collectionLatest = tracking["collectionWindow"]!["latest"]!.GetValue<DateTimeOffset>();
+
+        tms.SetClock(collectionLatest.AddHours(2).AddTicks(-1));
+        (await InProgressAsync(shipment))["isStale"]!.GetValue<bool>().Should().BeFalse();
+
+        tms.SetClock(collectionLatest.AddHours(2));
+        var stale = await InProgressAsync(shipment);
+        stale["isStale"]!.GetValue<bool>().Should().BeTrue();
+        stale["status"]!.GetValue<string>().Should().Be("Dispatched");
+        (await GetTripAsync(trip))["status"]!.GetValue<string>().Should().Be("Dispatched", "Stale is only a flag");
+        (await tms.GotAsync(ShipperTrackingCalls.Shipper, order, _cancellationToken))["trackingStatus"]!.GetValue<string>().Should().Be("Scheduled");
+    }
+
+    [Fact]
     public async Task AnUnknownTrip_IsTripNotFound()
     {
         using var refused = await DispatchAsync("TR-9999999");
@@ -202,6 +231,9 @@ public sealed class TripDispatchTests(TripsTmsFixture tms) : IClassFixture<Trips
         response.StatusCode.Should().Be(HttpStatusCode.OK, body);
         return JsonNode.Parse(body)!["trip"]!.AsObject();
     }
+
+    private async Task<JsonNode> InProgressAsync(string shipment) =>
+        (await tms.ListShipmentsInProgressAsync(_cancellationToken)).Single(listed => listed!["shipmentNumber"]!.GetValue<string>() == shipment)!;
 
     private async Task<string> ShipmentStatusAsync(string shipment)
     {
