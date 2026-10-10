@@ -144,6 +144,26 @@ public sealed class AppHostModelTests
     }
 
     [Fact]
+    public async Task Locally_ATripDispatchWorker_PlaysTheTripDispatchLogicApp_AsTheIdentityHoldingTheReportRole_WithTheDriverAppsCredential()
+    {
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(TestContext.Current.CancellationToken);
+
+        var worker = await EnvironmentOfAsync(builder, "trip-dispatch-worker");
+        var driverApp = await EnvironmentOfAsync(builder, "driver-app-api");
+
+        worker.Should().Contain("TripDispatch__TmsTokens__ClientId", "norvia-local-trip-dispatch-logic-app")
+            .And.Contain("TripDispatch__TmsTokens__Audience", "api://norvia-tms")
+            .And.Contain("TripDispatch__DriverApp__Address", "{driver-app-api.bindings.http.url}/v1/trips")
+            .And.ContainKey("TripDispatch__TmsTokens__SigningKey");
+        worker["TripDispatch__DriverApp__ApiKey"].Should().Be(driverApp["DriverEndpoint__ApiKey"], "the Driver app asks its caller for the credential the worker has");
+        var topic = builder.Resources.OfType<AzureServiceBusTopicResource>().Single(t => t.TopicName == "trip-events");
+        builder.Resources.OfType<AzureServiceBusSubscriptionResource>()
+            .Should().Contain(subscription => subscription.Parent == topic && subscription.SubscriptionName == "trip-dispatch");
+        Resource(builder, "trip-dispatch-worker").Annotations.OfType<WaitAnnotation>()
+            .Should().Contain(wait => wait.Resource.Name == "driver-app-api");
+    }
+
+    [Fact]
     public async Task Locally_Azurite_StandsInForTheTmsBlobStorage_AndTheTmsWaitsForIt()
     {
         await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(TestContext.Current.CancellationToken);
@@ -320,7 +340,7 @@ public sealed class AppHostModelTests
 
         var portal = await EnvironmentOfAsync(builder, "partner-portal-web");
 
-        builder.Resources.OfType<AzureKeyVaultResource>().Single().IsExisting().Should().BeTrue();
+        builder.Resources.OfType<AzureKeyVaultResource>().Single(vault => vault.Name == "partner-portal-secrets").IsExisting().Should().BeTrue();
         foreach (var persona in new[] { "brouwer-dranken", "van-dijk-transport", "kessler-spedition", "pakketpunt-express" })
         {
             portal[$"PartnerApi__SubscriptionKeys__{persona}"].Should().Contain($"subscription-key-{persona}");
@@ -328,11 +348,27 @@ public sealed class AppHostModelTests
     }
 
     [Fact]
+    public async Task InAzure_TheDriverApp_AsksItsCallerForTheCredentialInTheEstatesKeyVault_AsItsOwnIdentity()
+    {
+        await using var builder = await CreateForAzureAsync();
+
+        var driverApp = await EnvironmentOfAsync(builder, "driver-app-api");
+
+        driverApp["DriverEndpoint__ApiKey"].Should().Contain("driver-app-endpoint-key");
+        builder.Resources.OfType<AzureKeyVaultResource>().Single(vault => vault.Name == "driver-app-secrets").IsExisting().Should().BeTrue("the estate owns the vault");
+        Resource(builder, "driver-app-api").Annotations.OfType<AppIdentityAnnotation>()
+            .Should().ContainSingle().Which.IdentityResource.Should().BeOfType<AzureUserAssignedIdentityResource>().Which.Name.Should().Be("driver-app-identity");
+        builder.Resources.OfType<AzureUserAssignedIdentityResource>().Single(identity => identity.Name == "driver-app-identity")
+            .IsExisting().Should().BeTrue("the estate owns the identity, because it grants it the credential");
+        Resource(builder, "driver-app-api").Annotations.OfType<EndpointAnnotation>().Should().Contain(endpoint => endpoint.IsExternal, "the Trip dispatch Logic App runs outside the Container Apps environment");
+    }
+
+    [Fact]
     public async Task InAzure_ThereIsNoLocalPartnerApi_ApiManagementIsTheOne()
     {
         await using var builder = await CreateForAzureAsync();
 
-        builder.Resources.Should().NotContain(resource => new[] { "partner-api", "tracking-worker", "proof-of-delivery-worker" }.Contains(resource.Name));
+        builder.Resources.Should().NotContain(resource => new[] { "partner-api", "trip-dispatch-worker", "tracking-worker", "proof-of-delivery-worker" }.Contains(resource.Name));
     }
 
     [Fact]

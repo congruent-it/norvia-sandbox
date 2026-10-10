@@ -63,6 +63,12 @@ public sealed class Estate(IDistributedApplicationBuilder builder)
     /// <summary>The Key Vault that holds each Persona's subscription key as <c>subscription-key-&lt;persona&gt;</c>.</summary>
     public IResourceBuilder<ParameterResource> PartnerPortalKeyVault { get; } = builder.AddParameter("estate-partner-portal-key-vault");
 
+    /// <summary>The Driver app's managed identity, which reads the credential its Trip endpoint asks of its caller.</summary>
+    public IResourceBuilder<ParameterResource> DriverAppIdentity { get; } = builder.AddParameter("estate-driver-app-identity-name");
+
+    /// <summary>The Key Vault that holds the Driver app's Trip endpoint credential as <c>driver-app-endpoint-key</c>.</summary>
+    public IResourceBuilder<ParameterResource> DriverAppKeyVault { get; } = builder.AddParameter("estate-driver-app-key-vault");
+
     /// <summary>
     /// The demo UIs' app registration, which Easy Auth signs the presenter in to in front of the TMS UI and the Partner
     /// portal (ADR 0024). Only the users assigned to it get a token.

@@ -14,6 +14,9 @@ builder.AddServiceDefaults();
 builder.AddDriverAppInfrastructure();
 builder.AddDriverAppSeedDrivers();
 
+builder.Services.AddOptions<DriverEndpointOptions>().BindConfiguration(DriverEndpointOptions.SectionName)
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 builder.Services.AddScoped<IPipelineBehavior<ReceiveTripVersionCommand, Result<TripVersionOutcome>>, TrackTripVersionInLoggingScope>();
 builder.Services.AddMediator(options =>
 {

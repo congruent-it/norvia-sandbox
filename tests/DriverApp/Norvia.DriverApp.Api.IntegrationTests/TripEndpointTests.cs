@@ -23,6 +23,27 @@ public sealed class TripEndpointTests(DriverAppFixture driverApp)
         trip.GetProperty("stops").EnumerateArray().Select(stop => stop.GetProperty("sequence").GetInt32()).Should().Equal(1, 2);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("not-the-credential")]
+    public async Task APostedTripVersion_WithoutTheCredential_IsRefusedWith401_AndStoresNothing(string? apiKey)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/trips")
+        {
+            Content = new StringContent(await DriverAppFixture.SampleAsync("two-shipments", "TR-1000012", version: 1, driverId: "DRV-1000012"), Encoding.UTF8, "application/json"),
+        };
+        if (apiKey is not null)
+        {
+            request.Headers.Add("X-Api-Key", apiKey);
+        }
+
+        var response = await driverApp.Anonymous.SendAsync(request, Ct);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await TripsOfAsync("DRV-1000012")).Should().BeEmpty();
+    }
+
     [Fact]
     public async Task ATripVersion_IsNotShownToAnotherDriver()
     {

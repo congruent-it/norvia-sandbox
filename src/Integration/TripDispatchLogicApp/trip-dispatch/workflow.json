@@ -1,0 +1,302 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "triggers": {
+      "When_a_Trip_is_dispatched": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "topicName": "trip-events",
+            "subscriptionName": "trip-dispatch",
+            "isSessionsEnabled": false
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBus",
+            "operationId": "peekLockTopicMessages",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "correlation": {
+          "clientTrackingId": "@{triggerOutputs()?['body']?['userProperties']?['correlationId']}"
+        }
+      }
+    },
+    "actions": {
+      "Track_the_trip": {
+        "type": "Compose",
+        "inputs": {
+          "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
+          "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['driver']?['driverId']",
+          "tripNumber": "@json(base64ToString(triggerBody()?['contentData']))?['tripNumber']",
+          "version": "@json(base64ToString(triggerBody()?['contentData']))?['version']",
+          "eventType": "@json(base64ToString(triggerBody()?['contentData']))?['eventType']",
+          "sourceMessageId": "@json(base64ToString(triggerBody()?['contentData']))?['eventId']"
+        },
+        "runAfter": {},
+        "trackedProperties": {
+          "correlationId": "@action()?['inputs']?['correlationId']",
+          "flow": "trip-dispatch",
+          "partyId": "@action()?['inputs']?['partyId']",
+          "tripNumber": "@action()?['inputs']?['tripNumber']",
+          "sourceMessageId": "@action()?['inputs']?['sourceMessageId']"
+        }
+      },
+      "Check_the_Trip_version": {
+        "type": "If",
+        "expression": {
+          "equals": [
+            "@and(equals(actions('Track_the_trip')?['status'], 'Succeeded'), equals(actions('Track_the_trip')?['outputs']?['eventType'], 'TripDispatched'), not(empty(actions('Track_the_trip')?['outputs']?['correlationId'])), not(empty(actions('Track_the_trip')?['outputs']?['tripNumber'])), not(empty(actions('Track_the_trip')?['outputs']?['partyId'])), greater(int(coalesce(actions('Track_the_trip')?['outputs']?['version'], 0)), 0))",
+            true
+          ]
+        },
+        "actions": {
+          "Complete_the_message": {
+            "type": "ServiceProvider",
+            "inputs": {
+              "parameters": {
+                "topicName": "trip-events",
+                "subscriptionName": "trip-dispatch",
+                "lockToken": "@triggerBody()?['lockToken']"
+              },
+              "serviceProviderConfiguration": {
+                "connectionName": "serviceBus",
+                "operationId": "completeTopicMessage",
+                "serviceProviderId": "/serviceProviders/serviceBus"
+              }
+            },
+            "runAfter": {}
+          },
+          "Get_the_Driver_app_endpoint_credential": {
+            "type": "ServiceProvider",
+            "inputs": {
+              "parameters": {
+                "secretName": "driver-app-endpoint-key"
+              },
+              "serviceProviderConfiguration": {
+                "connectionName": "keyVault",
+                "operationId": "getSecret",
+                "serviceProviderId": "/serviceProviders/keyVault"
+              }
+            },
+            "runAfter": {
+              "Complete_the_message": [
+                "Succeeded"
+              ]
+            },
+            "runtimeConfiguration": {
+              "secureData": {
+                "properties": [
+                  "outputs"
+                ]
+              }
+            }
+          },
+          "Send_to_the_Driver_app": {
+            "type": "Http",
+            "inputs": {
+              "method": "POST",
+              "uri": "@{parameters('driverAppBaseUrl')}/v1/trips",
+              "headers": {
+                "Content-Type": "application/json",
+                "X-Correlation-ID": "@{outputs('Track_the_trip')?['correlationId']}",
+                "X-Api-Key": "@{body('Get_the_Driver_app_endpoint_credential')?['value']}"
+              },
+              "body": "@json(base64ToString(triggerBody()?['contentData']))",
+              "retryPolicy": {
+                "type": "exponential",
+                "count": 3,
+                "interval": "PT5S",
+                "minimumInterval": "PT5S",
+                "maximumInterval": "PT20S"
+              }
+            },
+            "runAfter": {
+              "Get_the_Driver_app_endpoint_credential": [
+                "Succeeded"
+              ]
+            },
+            "runtimeConfiguration": {
+              "secureData": {
+                "properties": [
+                  "inputs"
+                ]
+              }
+            },
+            "trackedProperties": {
+              "correlationId": "@outputs('Track_the_trip')?['correlationId']",
+              "flow": "trip-dispatch",
+              "partyId": "@outputs('Track_the_trip')?['partyId']",
+              "tripNumber": "@outputs('Track_the_trip')?['tripNumber']",
+              "outcome": "@if(and(greaterOrEquals(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
+              "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 500)), 'DriverAppUnavailable', 'DriverAppRefused'))"
+            }
+          },
+          "Report_the_outcome_to_the_TMS": {
+            "type": "If",
+            "expression": {
+              "and": [
+                {
+                  "greaterOrEquals": [
+                    "@coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0)",
+                    200
+                  ]
+                },
+                {
+                  "less": [
+                    "@coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0)",
+                    300
+                  ]
+                }
+              ]
+            },
+            "actions": {
+              "Report_the_version_delivered": {
+                "type": "Http",
+                "inputs": {
+                  "method": "POST",
+                  "uri": "@{parameters('tmsBaseUrl')}/v1/trips/@{outputs('Track_the_trip')?['tripNumber']}/versions/@{outputs('Track_the_trip')?['version']}/report-delivered",
+                  "headers": {
+                    "Content-Type": "application/json",
+                    "X-Correlation-ID": "@{outputs('Track_the_trip')?['correlationId']}"
+                  },
+                  "authentication": {
+                    "type": "ManagedServiceIdentity",
+                    "identity": "@parameters('tripDispatchIdentityId')",
+                    "audience": "@parameters('tmsAudience')"
+                  },
+                  "retryPolicy": {
+                    "type": "exponential",
+                    "count": 3,
+                    "interval": "PT5S",
+                    "minimumInterval": "PT5S",
+                    "maximumInterval": "PT20S"
+                  }
+                },
+                "runAfter": {},
+                "trackedProperties": {
+                  "correlationId": "@outputs('Track_the_trip')?['correlationId']",
+                  "flow": "trip-dispatch",
+                  "partyId": "@outputs('Track_the_trip')?['partyId']",
+                  "tripNumber": "@outputs('Track_the_trip')?['tripNumber']",
+                  "outcome": "@if(and(greaterOrEquals(coalesce(actions('Report_the_version_delivered')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_version_delivered')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
+                  "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Report_the_version_delivered')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_version_delivered')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Report_the_version_delivered')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Report_the_version_delivered')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Report_the_version_delivered')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Report_the_version_delivered')?['outputs']?['statusCode'], 0), 500)), 'TmsUnavailable', 'TmsCallRefused'))"
+                }
+              }
+            },
+            "else": {
+              "actions": {
+                "Take_the_Driver_apps_answer": {
+                  "type": "Compose",
+                  "inputs": "@string(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['body'], actions('Send_to_the_Driver_app')?['error']?['message'], 'The Driver app did not answer.'))",
+                  "runAfter": {}
+                },
+                "Report_the_version_not_delivered": {
+                  "type": "Http",
+                  "inputs": {
+                    "method": "POST",
+                    "uri": "@{parameters('tmsBaseUrl')}/v1/trips/@{outputs('Track_the_trip')?['tripNumber']}/versions/@{outputs('Track_the_trip')?['version']}/report-not-delivered",
+                    "headers": {
+                      "Content-Type": "application/json",
+                      "X-Correlation-ID": "@{outputs('Track_the_trip')?['correlationId']}"
+                    },
+                    "authentication": {
+                      "type": "ManagedServiceIdentity",
+                      "identity": "@parameters('tripDispatchIdentityId')",
+                      "audience": "@parameters('tmsAudience')"
+                    },
+                    "retryPolicy": {
+                      "type": "exponential",
+                      "count": 3,
+                      "interval": "PT5S",
+                      "minimumInterval": "PT5S",
+                      "maximumInterval": "PT20S"
+                    },
+                    "body": {
+                      "cause": "@concat('The Driver app ', if(equals(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 0), 'didn''t answer', concat('answered ', string(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0)))), ': ', substring(outputs('Take_the_Driver_apps_answer'), 0, min(500, length(outputs('Take_the_Driver_apps_answer')))), ' (', string(add(length(coalesce(actions('Send_to_the_Driver_app')?['retryHistory'], json('[]'))), 1)), if(equals(add(length(coalesce(actions('Send_to_the_Driver_app')?['retryHistory'], json('[]'))), 1), 1), ' attempt', ' attempts'), ').')"
+                    }
+                  },
+                  "runAfter": {
+                    "Take_the_Driver_apps_answer": [
+                      "Succeeded"
+                    ]
+                  },
+                  "trackedProperties": {
+                    "correlationId": "@outputs('Track_the_trip')?['correlationId']",
+                    "flow": "trip-dispatch",
+                    "partyId": "@outputs('Track_the_trip')?['partyId']",
+                    "tripNumber": "@outputs('Track_the_trip')?['tripNumber']",
+                    "outcome": "@if(and(greaterOrEquals(coalesce(actions('Report_the_version_not_delivered')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_version_not_delivered')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
+                    "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Report_the_version_not_delivered')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_version_not_delivered')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Report_the_version_not_delivered')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Report_the_version_not_delivered')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Report_the_version_not_delivered')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Report_the_version_not_delivered')?['outputs']?['statusCode'], 0), 500)), 'TmsUnavailable', 'TmsCallRefused'))"
+                  }
+                }
+              }
+            },
+            "runAfter": {
+              "Send_to_the_Driver_app": [
+                "Succeeded",
+                "Failed",
+                "TimedOut"
+              ]
+            }
+          }
+        },
+        "else": {
+          "actions": {
+            "Dead_letter_the_unreadable_trip": {
+              "type": "ServiceProvider",
+              "inputs": {
+                "parameters": {
+                  "topicName": "trip-events",
+                  "subscriptionName": "trip-dispatch",
+                  "lockToken": "@triggerBody()?['lockToken']",
+                  "deadLetterReason": "TripDispatchUnreadable",
+                  "deadLetterErrorDescription": "The message isn't a Trip version the Driver app can be sent, so nothing was sent to the Driver app."
+                },
+                "serviceProviderConfiguration": {
+                  "connectionName": "serviceBus",
+                  "operationId": "deadLetterTopicMessage",
+                  "serviceProviderId": "/serviceProviders/serviceBus"
+                }
+              },
+              "runAfter": {},
+              "trackedProperties": {
+                "correlationId": "@outputs('Track_the_trip')?['correlationId']",
+                "flow": "trip-dispatch",
+                "partyId": "@outputs('Track_the_trip')?['partyId']",
+                "tripNumber": "@outputs('Track_the_trip')?['tripNumber']",
+                "sourceMessageId": "@outputs('Track_the_trip')?['sourceMessageId']",
+                "outcome": "DeadLettered",
+                "failureCode": "TripDispatchUnreadable"
+              }
+            },
+            "Fail_the_run_on_the_unreadable_trip": {
+              "type": "Terminate",
+              "inputs": {
+                "runStatus": "Failed",
+                "runError": {
+                  "code": "TripDispatchUnreadable",
+                  "message": "The message isn't a Trip version the Driver app can be sent, so it was dead-lettered."
+                }
+              },
+              "runAfter": {
+                "Dead_letter_the_unreadable_trip": [
+                  "Succeeded",
+                  "Failed"
+                ]
+              }
+            }
+          }
+        },
+        "runAfter": {
+          "Track_the_trip": [
+            "Succeeded",
+            "Failed"
+          ]
+        }
+      }
+    },
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

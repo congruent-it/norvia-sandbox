@@ -49,5 +49,7 @@
     <EmbeddedResource Include="..\..\..\src\Integration\ShipperNotificationLogicApp\shipper-notification\workflow.json" LogicalName="ShipperNotificationLogicApp/shipper-notification/workflow.json" />
     <EmbeddedResource Include="..\..\..\src\Integration\CarrierCancellationLogicApp\*.json" LogicalName="CarrierCancellationLogicApp/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\src\Integration\CarrierCancellationLogicApp\carrier-cancellation\workflow.json" LogicalName="CarrierCancellationLogicApp/carrier-cancellation/workflow.json" />
+    <EmbeddedResource Include="..\..\..\src\Integration\TripDispatchLogicApp\*.json" LogicalName="TripDispatchLogicApp/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\src\Integration\TripDispatchLogicApp\trip-dispatch\workflow.json" LogicalName="TripDispatchLogicApp/trip-dispatch/workflow.json" />
   </ItemGroup>
 </Project>

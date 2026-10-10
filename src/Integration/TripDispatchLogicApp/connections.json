@@ -1,0 +1,31 @@
+{
+  "serviceProviderConnections": {
+    "serviceBus": {
+      "displayName": "Trip events",
+      "parameterValues": {
+        "fullyQualifiedNamespace": "@appsetting('SERVICE_BUS_NAMESPACE')",
+        "authProvider": {
+          "Type": "ManagedServiceIdentity",
+          "Identity": "@appsetting('TRIP_DISPATCH_IDENTITY_ID')"
+        }
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/serviceBus"
+      }
+    },
+    "keyVault": {
+      "displayName": "Driver app endpoint credential",
+      "parameterValues": {
+        "VaultUri": "@appsetting('KEY_VAULT_URI')",
+        "authProvider": {
+          "Type": "ManagedServiceIdentity",
+          "Identity": "@appsetting('TRIP_DISPATCH_IDENTITY_ID')"
+        }
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/keyVault"
+      }
+    }
+  },
+  "managedApiConnections": {}
+}

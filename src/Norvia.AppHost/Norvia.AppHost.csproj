@@ -21,6 +21,7 @@
     <ProjectReference Include="..\Integration\Norvia.Integration.LocalBookingWorker\Norvia.Integration.LocalBookingWorker.csproj" />
     <ProjectReference Include="..\Integration\Norvia.Integration.LocalShipperNotificationWorker\Norvia.Integration.LocalShipperNotificationWorker.csproj" />
     <ProjectReference Include="..\Integration\Norvia.Integration.LocalCarrierCancellationWorker\Norvia.Integration.LocalCarrierCancellationWorker.csproj" />
+    <ProjectReference Include="..\Integration\Norvia.Integration.LocalTripDispatchWorker\Norvia.Integration.LocalTripDispatchWorker.csproj" />
     <ProjectReference Include="..\Integration\Norvia.Integration.LocalTrackingWorker\Norvia.Integration.LocalTrackingWorker.csproj" />
     <ProjectReference Include="..\Integration\Norvia.Integration.LocalProofOfDeliveryWorker\Norvia.Integration.LocalProofOfDeliveryWorker.csproj" />
     <ProjectReference Include="..\Integration\Norvia.Integration.LocalPartnerApi\Norvia.Integration.LocalPartnerApi.csproj" />

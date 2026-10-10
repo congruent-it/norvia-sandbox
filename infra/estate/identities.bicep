@@ -131,7 +131,7 @@ resource tmsApi 'Microsoft.Graph/applications@v1.0' = {
       id: tripReportDeliveryRoleId
       value: tripReportDeliveryRole
       displayName: 'Report Trip delivery'
-      description: 'Report that a version of a Trip was accepted by the Driver app, or never reached it (P11). Only the P11 Trip dispatch Logic App will hold it; it is granted with that Logic App\'s identity.'
+      description: 'Report that a version of a Trip was accepted by the Driver app, or never reached it (P11). Only the P11 Trip dispatch Logic App holds it.'
       allowedMemberTypes: [
         'Application'
       ]
@@ -222,6 +222,28 @@ resource shipperNotificationReportRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v
   resourceId: tmsApiPrincipal.id
   appRoleId: shipperNotificationReportRoleId
   principalId: shipperNotificationIdentity.properties.principalId
+}
+
+// The P11 Trip dispatch Logic App's identity, which it runs as. It is the one principal holding the Trip delivery report role, so
+// nothing reports a Trip version's delivery to the TMS without passing the integration layer. It holds no other role.
+resource tripDispatchIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
+  name: 'id-trip-dispatch-${uniqueString(resourceGroup().id)}'
+  location: location
+  tags: tags
+}
+
+resource tripDispatchReportRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: tmsApiPrincipal.id
+  appRoleId: tripReportDeliveryRoleId
+  principalId: tripDispatchIdentity.properties.principalId
+}
+
+// The Driver app's identity, which its API runs as in Azure. It reads the credential its Trip endpoint asks of its caller from
+// Key Vault, and holds no role on the TMS: the Driver app reaches the TMS only through the integration layer (ADR 0001).
+resource driverAppIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
+  name: 'id-driver-app-${uniqueString(resourceGroup().id)}'
+  location: location
+  tags: tags
 }
 
 // The Carrier-answer Logic App's identity, which it runs as. It is the one principal holding the answer role, so nothing
@@ -677,3 +699,10 @@ output demoUisClientId string = demoUis.appId
 output integrationConsoleClientId string = integrationConsole.appId
 output integrationConsoleIdentityName string = integrationConsoleIdentity.name
 output integrationConsolePrincipalId string = integrationConsoleIdentity.properties.principalId
+output tripDispatchIdentityId string = tripDispatchIdentity.id
+output tripDispatchIdentityName string = tripDispatchIdentity.name
+output tripDispatchPrincipalId string = tripDispatchIdentity.properties.principalId
+output tripDispatchClientId string = tripDispatchIdentity.properties.clientId
+output driverAppIdentityName string = driverAppIdentity.name
+output driverAppPrincipalId string = driverAppIdentity.properties.principalId
+output driverAppClientId string = driverAppIdentity.properties.clientId

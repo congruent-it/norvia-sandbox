@@ -80,6 +80,8 @@ public sealed class TmsUiFixture : IAsyncLifetime
         await _app.ResourceNotifications.WaitForResourceAsync("shipper-notification-worker", KnownResourceStates.Running, startup.Token);
         // A cancelled or withdrawn Carrier booking goes through the worker that plays the P7 Carrier cancellation Logic App (ADR 0034) to the portal.
         await _app.ResourceNotifications.WaitForResourceAsync("carrier-cancellation-worker", KnownResourceStates.Running, startup.Token);
+        // A dispatched Trip goes through the worker that plays the P11 Trip dispatch Logic App to the Driver app.
+        await _app.ResourceNotifications.WaitForResourceAsync("trip-dispatch-worker", KnownResourceStates.Running, startup.Token);
         // A Carrier's answer goes through the stand-in that plays API Management and the Carrier-answer Logic App (ADR 0023).
         await _app.ResourceNotifications.WaitForResourceHealthyAsync("partner-api", startup.Token);
 
