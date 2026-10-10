@@ -50,6 +50,10 @@ internal static class CanonicalModelSchemas
 
     public static EvaluationResults ValidateTripDispatched(JsonNode body) => Validate(TripDispatchedSchema.Value, body);
 
+    private static readonly Lazy<JsonSchema> TripNotDeliveredSchema = new(() => Load("trip-not-delivered.v1.schema.json"));
+
+    public static EvaluationResults ValidateTripNotDelivered(JsonNode body) => Validate(TripNotDeliveredSchema.Value, body);
+
     private static readonly Lazy<JsonSchema> CarrierBookingConfirmedSchema = new(() => Load("carrier-booking-confirmed.v1.schema.json"));
 
     private static readonly Lazy<JsonSchema> CarrierBookingRejectedSchema = new(() => Load("carrier-booking-rejected.v1.schema.json"));

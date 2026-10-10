@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/trip-not-delivered.v1.schema.json",
+  "title": "TripNotDelivered",
+  "description": "The Trip dispatch Logic App gave up sending a Trip's latest version to the Driver app (Canonical Model event, version 1). It used up its retries on a server error or timeout, or met a client error. The TMS set the version's delivery state to Not delivered with the technical cause, so the Planner sees that the Driver doesn't have it and can send the version again. A report for a version older than the Trip's latest is stored against that version and publishes nothing. Published on the Trip events topic, under the correlation ID of the Dispatch (or send-again) the report continues; the Trip number and version trace the Trip.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "tripNumber", "version", "driverId", "cause"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "const": "TripNotDelivered" },
+    "eventVersion": { "const": 1 },
+    "occurredAt": { "description": "When the report was recorded.", "type": "string", "format": "date-time" },
+    "correlationId": { "description": "The correlation ID of the Dispatch or send-again that the report continues.", "type": "string", "minLength": 1 },
+    "tripNumber": { "description": "The Trip's number.", "type": "string", "pattern": "^TR-[0-9]{7}$" },
+    "version": { "description": "The version that never reached the Driver app: the Trip's latest.", "type": "integer", "minimum": 1 },
+    "driverId": { "description": "The Driver the Trip was for.", "type": "string", "minLength": 1 },
+    "cause": { "description": "The technical cause in plain language.", "type": "string", "minLength": 1 }
+  }
+}

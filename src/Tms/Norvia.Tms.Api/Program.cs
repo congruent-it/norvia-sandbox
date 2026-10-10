@@ -29,6 +29,7 @@ using Norvia.Tms.Application.ProofsOfDelivery.Record;
 using Norvia.Tms.Application.Shipments.Reassign;
 using Norvia.Tms.Application.Shipments.Release;
 using Norvia.Tms.Application.ShipperNotifications.Report;
+using Norvia.Tms.Application.Trips.ReportDelivery;
 using Norvia.Tms.Application.TrackingEvents.Record;
 using Norvia.Tms.Application.TransportOrders.Assign;
 using Norvia.Tms.Application.TransportOrders.Rate;
@@ -76,6 +77,12 @@ builder.Services
 builder.Services
     .AddScoped<IPipelineBehavior<ReportShipperNotificationNotDeliveredCommand, Result<ShipperNotificationReportResult>>,
         TrackShipperNotificationReportInLoggingScope<ReportShipperNotificationNotDeliveredCommand>>();
+builder.Services
+    .AddScoped<IPipelineBehavior<ReportTripDeliveredCommand, Result<TripDeliveryReportResult>>,
+        TrackTripDeliveryReportInLoggingScope<ReportTripDeliveredCommand>>();
+builder.Services
+    .AddScoped<IPipelineBehavior<ReportTripNotDeliveredCommand, Result<TripDeliveryReportResult>>,
+        TrackTripDeliveryReportInLoggingScope<ReportTripNotDeliveredCommand>>();
 builder.AddTmsInfrastructure();
 builder.AddTmsProofOfDeliveryStorage();
 builder.AddTmsOutboxPublisher();

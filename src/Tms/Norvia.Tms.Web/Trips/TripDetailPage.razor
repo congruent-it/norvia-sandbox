@@ -29,6 +29,10 @@
         <dt>Planned start</dt><dd>@TripTimes.StartOrDash(trip.PlannedStart)</dd>
         <dt>Planned driving</dt><dd>@TripTimes.DurationOrDash(trip.PlannedDrivingDuration)</dd>
         <dt>Load</dt><dd>@TripText.Load(trip)</dd>
+        @if (trip.Status == TripStatus.Dispatched)
+        {
+            <dt>Delivery</dt><dd>@TripText.Delivery(trip.LatestDelivery)</dd>
+        }
     </dl>
 
     @if (_notice is { } notice)
@@ -71,6 +75,31 @@
                 <li><FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">@warning.Message</FluentMessageBar></li>
             }
         </ul>
+    }
+
+    @if (detail.Versions.Count > 0)
+    {
+        <h2>Versions</h2>
+        <table aria-label="Versions" class="flatly-table mb-4">
+            <thead><tr><th>Version</th><th>Delivery</th><th>Cause</th><th>Actions</th></tr></thead>
+            <tbody>
+                @foreach (var version in detail.Versions)
+                {
+                    <tr>
+                        <td>@version.Version</td>
+                        <td>@TripText.Delivery(version.State)</td>
+                        <td>@(version.Cause ?? "—")</td>
+                        <td>
+                            @if (version.CanSendAgain)
+                            {
+                                <FluentButton Appearance="Appearance.Outline" Disabled="_working" OnClick="@(() => SendAgainAsync(version.Version))"
+                                              aria-label="@($"Send version {version.Version} again")">Send again</FluentButton>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
     }
 
     @if (detail.Stops.Count == 0)
@@ -172,6 +201,40 @@
         {
             Logger.LogWarning(exception, "Dispatching Trip {Number} failed", Number);
             _refusal = "The TMS couldn't dispatch the Trip. Try again.";
+        }
+        finally
+        {
+            _working = false;
+        }
+    }
+
+    // The TMS checks that the version is still the latest and still Not delivered; a refusal leaves it as it was, and the reason is shown until the next action.
+    private async Task SendAgainAsync(int version)
+    {
+        _working = true;
+        _refusal = null;
+        _notice = null;
+        try
+        {
+            var answer = await Commands.SendTripAgainAsync(Number, version, _closed.Token);
+            if (answer is TripAnswer.SentAgain sent)
+            {
+                _notice = $"Trip {Number} sent again as version {sent.Version}.";
+                await _detail.RefreshAsync();
+            }
+            else if (answer is TripAnswer.Refused refused)
+            {
+                _refusal = $"The Trip was not sent again: {refused.Reason}";
+            }
+        }
+        catch (OperationCanceledException) when (_closed.IsCancellationRequested)
+        {
+            // The page closed while the TMS was answering.
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning(exception, "Sending Trip {Number} again failed", Number);
+            _refusal = "The TMS couldn't send the Trip again. Try again.";
         }
         finally
         {

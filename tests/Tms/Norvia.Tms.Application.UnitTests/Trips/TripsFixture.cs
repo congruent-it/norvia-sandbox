@@ -75,6 +75,24 @@ internal sealed class TripsFixture
     }
 
     /// <summary>
+    /// A Trip of <see cref="Tuesday"/> with one Released Shipment, Dispatched at version 1 under "corr-dispatch": the Van and Anouk. Its domain
+    /// events are cleared, so what a test sees is what it did.
+    /// </summary>
+    public async Task<Trip> DispatchedAsync()
+    {
+        var trip = Existing(Tuesday, PlanningEditsFixture.Van, PlanningEditsFixture.Anouk);
+        var shipment = ReleasedShipment(Tuesday);
+        trip.Plan(new TimeOnly(9, 0), TimeSpan.FromHours(4));
+        trip.AddShipment(shipment.Id);
+        var onTrip = await TripShipments.OfAsync([shipment.Id], CancellationToken.None);
+        var vehicle = Planning.Vehicles.ListActive().Single(candidate => candidate.Id == PlanningEditsFixture.Van);
+        var driver = Planning.Drivers.ListActive().Single(candidate => candidate.Id == PlanningEditsFixture.Anouk);
+        trip.Dispatch(new CorrelationId("corr-dispatch"), Planning.Time.GetUtcNow(), vehicle, driver, [.. onTrip.Select(item => new DispatchedShipment(item.Shipment, item.Details))]);
+        trip.ClearDomainEvents();
+        return trip;
+    }
+
+    /// <summary>
     /// A Released Own fleet Shipment that collects on <paramref name="collectionDay"/> (08:00-12:00 in Amsterdam) and delivers on <paramref name="deliveryDay"/>
     /// (default the same day), carrying <paramref name="pallets"/> pallets of <paramref name="weightKg"/> kg in all.
     /// </summary>

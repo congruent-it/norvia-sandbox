@@ -165,6 +165,41 @@ public sealed class TmsApiClientTripsTests : IDisposable
     }
 
     [Fact]
+    public async Task SendTripAgainAsync_PostsTheSendAgain_AnswersTheSameVersion_AndTracksTheTripAndItsNewMessageTrail()
+    {
+        _tmsApi.Answer(HttpStatusCode.OK, """{ "number": "TR-0000001", "version": 1, "correlationId": "corr-again" }""");
+
+        var answer = await _client.SendTripAgainAsync("TR-0000001", 1, Cancel);
+
+        answer.Should().Be(new TripAnswer.SentAgain(1, "corr-again"));
+        _tmsApi.Request!.Method.Should().Be(HttpMethod.Post);
+        _tmsApi.Request.RequestUri.Should().Be(new Uri("http://tms-api.example/v1/trips/TR-0000001/versions/1/send-again"));
+        ScopeOf(_logger.LatestRecord).Should().Contain(new Dictionary<string, object?>
+        {
+            ["flow"] = "trip-dispatch",
+            ["outcome"] = "Succeeded",
+            ["tripNumber"] = "TR-0000001",
+            ["correlationId"] = "corr-again",
+        });
+    }
+
+    [Fact]
+    public async Task SendTripAgainAsync_AVersionThatIsNotNotDelivered_AnswersItsReason_AndTracksItsCode()
+    {
+        _tmsApi.Answer(HttpStatusCode.Conflict, """{ "title": "The Trip can't be sent again.", "detail": "Version 1 of Trip TR-0000001 is Delivered, so there is nothing to send again.", "code": "NothingToSendAgain" }""");
+
+        var answer = await _client.SendTripAgainAsync("TR-0000001", 1, Cancel);
+
+        answer.Should().Be(new TripAnswer.Refused("Version 1 of Trip TR-0000001 is Delivered, so there is nothing to send again."));
+        ScopeOf(_logger.LatestRecord).Should().Contain(new Dictionary<string, object?>
+        {
+            ["flow"] = "trip-dispatch",
+            ["outcome"] = "Refused",
+            ["failureCode"] = "NothingToSendAgain",
+        });
+    }
+
+    [Fact]
     public async Task ChangeDraftTripAsync_PutsTheVehicleAndDriver_AndTracksTheTripNumber()
     {
         _tmsApi.Answer(HttpStatusCode.NoContent, string.Empty);

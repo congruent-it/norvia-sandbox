@@ -18,6 +18,9 @@ public abstract record TripAnswer
     /// <summary>The TMS dispatched the Trip as this version, under a new Message trail.</summary>
     public sealed record Dispatched(int Version, string CorrelationId) : TripAnswer;
 
+    /// <summary>The TMS sent the Not delivered version to the Driver app again, under a new Message trail; the version is the same.</summary>
+    public sealed record SentAgain(int Version, string CorrelationId) : TripAnswer;
+
     /// <summary>The TMS changed or discarded the Draft.</summary>
     public sealed record Done : TripAnswer;
 

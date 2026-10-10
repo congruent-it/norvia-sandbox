@@ -1,0 +1,11 @@
+{
+  "eventId": "0198e7c0-0000-7000-8000-0000000000a1",
+  "eventType": "TripNotDelivered",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-13T09:02:14+00:00",
+  "correlationId": "5f1d3a52-7c0e-4c0b-9a86-2f0f7a3a9b11",
+  "tripNumber": "TR-0000007",
+  "version": 1,
+  "driverId": "DRV-0001",
+  "cause": "The Driver app answered 503 Service Unavailable after 4 attempts."
+}

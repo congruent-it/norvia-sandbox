@@ -23,6 +23,7 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
     }
 
     private readonly List<TripStop> _stops = [];
+    private readonly List<TripVersionDelivery> _deliveries = [];
 
     public TripNumber Number { get; private set; }
 
@@ -32,6 +33,15 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
 
     /// <summary>0 while the Trip is a Draft, 1 from Dispatch, and up with each Amend (ADR 0015).</summary>
     public int Version { get; private set; }
+
+    /// <summary>Whether the Driver app has each version, in version order. A Draft has none.</summary>
+    public IReadOnlyList<TripVersionDelivery> Deliveries => _deliveries;
+
+    /// <summary>Whether the Driver app has the Trip's latest version; null while the Trip is a Draft.</summary>
+    public TripVersionDelivery? LatestDelivery => DeliveryOf(Version);
+
+    /// <summary>The delivery of this version, or null when the Trip never had it.</summary>
+    public TripVersionDelivery? DeliveryOf(int version) => _deliveries.Find(delivery => delivery.Version == version);
 
     public VehicleId? VehicleId { get; private set; }
 
@@ -230,9 +240,95 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
 
         Status = TripStatus.Dispatched;
         Version = 1;
+        _deliveries.Add(TripVersionDelivery.Start(Version));
         RegisterDomainEvent(new TripDispatchedEvent(this, correlationId, dispatchedAt, vehicle, driver, shipments));
     }
 
     /// <summary>Null when the Trip is a Draft, which can be changed or discarded; a Dispatched Trip is neither, and is never deleted.</summary>
     public TripRefusal? EnsureDraft() => Status == TripStatus.Draft ? null : TripRefusal.TripNotDraft(Number);
+
+    /// <summary>
+    /// The Trip dispatch Logic App reports the version as accepted by the Driver app. A report for a version that is no longer Sending is
+    /// ignored, and one for an older version than the Trip's latest is stored against that version and changes nothing else.
+    /// </summary>
+    public TripDeliveryReport ReportDelivered(int version, DateTimeOffset at)
+    {
+        if (SendingVersion(version, out var report) is not { } delivery)
+        {
+            return report;
+        }
+
+        delivery.Deliver(at);
+        return TripDeliveryReport.Recorded;
+    }
+
+    /// <summary>
+    /// The Trip dispatch Logic App reports the version as not delivered, with its technical cause. Only the latest version raises
+    /// <see cref="TripNotDeliveredEvent"/>: the Driver app holds a newer one than an older version, so nothing else changes.
+    /// </summary>
+    public TripDeliveryReport ReportNotDelivered(int version, string cause, CorrelationId correlationId, DateTimeOffset at)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(cause);
+        ArgumentNullException.ThrowIfNull(correlationId);
+        if (SendingVersion(version, out var report) is not { } delivery)
+        {
+            return report;
+        }
+
+        delivery.Fail(cause, at);
+        if (version == Version)
+        {
+            RegisterDomainEvent(new TripNotDeliveredEvent(this, version, DriverId ?? throw new InvalidOperationException($"Trip {Number} was dispatched without a Driver."), cause, correlationId, at));
+        }
+
+        return TripDeliveryReport.Recorded;
+    }
+
+    /// <summary>Null when the Planner can send this version again: the Trip's latest version, and Not delivered.</summary>
+    public TripRefusal? EnsureCanSendAgain(int version)
+    {
+        if (Status != TripStatus.Dispatched)
+        {
+            return TripRefusal.TripNotDispatched(Number);
+        }
+
+        if (DeliveryOf(version) is not { } delivery)
+        {
+            return TripRefusal.TripVersionNotFound(Number, version);
+        }
+
+        if (version != Version)
+        {
+            return TripRefusal.TripVersionNotLatest(Number, version, Version);
+        }
+
+        return delivery.State == TripDeliveryState.NotDelivered ? null : TripRefusal.NothingToSendAgain(Number, version, delivery.State);
+    }
+
+    /// <summary>
+    /// Sends the Not delivered latest version again: it is Sending once more, and <see cref="TripDispatchedEvent"/> is raised with the same
+    /// version under a new correlation ID. The caller checks <see cref="EnsureCanSendAgain"/> first.
+    /// </summary>
+    public void SendAgain(int version, CorrelationId correlationId, DateTimeOffset sentAt, Vehicle vehicle, Driver driver, IReadOnlyList<DispatchedShipment> shipments)
+    {
+        ArgumentNullException.ThrowIfNull(correlationId);
+        ArgumentNullException.ThrowIfNull(vehicle);
+        ArgumentNullException.ThrowIfNull(driver);
+        ArgumentNullException.ThrowIfNull(shipments);
+        if (EnsureCanSendAgain(version) is { } refusal)
+        {
+            throw new InvalidOperationException(refusal.Message);
+        }
+
+        DeliveryOf(version)!.SendAgain();
+        RegisterDomainEvent(new TripDispatchedEvent(this, correlationId, sentAt, vehicle, driver, shipments));
+    }
+
+    // The version's delivery when a report applies to it: a Sending one. Otherwise why not.
+    private TripVersionDelivery? SendingVersion(int version, out TripDeliveryReport report)
+    {
+        var delivery = DeliveryOf(version);
+        report = delivery is null ? TripDeliveryReport.UnknownVersion : TripDeliveryReport.Ignored;
+        return delivery is { State: TripDeliveryState.Sending } ? delivery : null;
+    }
 }

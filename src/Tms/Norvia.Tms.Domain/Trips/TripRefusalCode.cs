@@ -35,4 +35,19 @@ public enum TripRefusalCode
 
     /// <summary>The Trip lacks a Vehicle, a Driver, a planned start, a planned driving duration or a Shipment, so it can't be dispatched.</summary>
     TripIncomplete,
+
+    /// <summary>The Trip is a Draft, so there is no version to send.</summary>
+    TripNotDispatched,
+
+    /// <summary>The Trip never had that version.</summary>
+    TripVersionNotFound,
+
+    /// <summary>A newer version of the Trip exists, so only that one can be sent again.</summary>
+    TripVersionNotLatest,
+
+    /// <summary>The version is Sending or Delivered, so there is nothing to send again.</summary>
+    NothingToSendAgain,
+
+    /// <summary>The Trip's Vehicle or Driver is no longer active, so the Trip can't be sent to its Driver again as it is.</summary>
+    VehicleOrDriverInactive,
 }

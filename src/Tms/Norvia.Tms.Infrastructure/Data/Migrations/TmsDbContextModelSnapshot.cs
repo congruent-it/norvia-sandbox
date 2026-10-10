@@ -1092,6 +1092,46 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                                 .HasForeignKey("TripId");
                         });
 
+                    b.OwnsMany("Norvia.Tms.Domain.Trips.TripVersionDelivery", "Deliveries", b1 =>
+                        {
+                            b1.Property<int>("Id")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("int");
+
+                            SqlServerPropertyBuilderExtensions.UseIdentityColumn(b1.Property<int>("Id"));
+
+                            b1.Property<string>("Cause")
+                                .HasMaxLength(2000)
+                                .HasColumnType("nvarchar(2000)");
+
+                            b1.Property<DateTimeOffset?>("ReportedAt")
+                                .HasColumnType("datetimeoffset");
+
+                            b1.Property<string>("State")
+                                .IsRequired()
+                                .HasMaxLength(15)
+                                .HasColumnType("nvarchar(15)");
+
+                            b1.Property<Guid>("TripId")
+                                .HasColumnType("uniqueidentifier");
+
+                            b1.Property<int>("Version")
+                                .HasColumnType("int");
+
+                            b1.HasKey("Id");
+
+                            b1.HasIndex("TripId", "Version")
+                                .IsUnique()
+                                .HasDatabaseName("IX_TripVersionDeliveries_TripId_Version");
+
+                            b1.ToTable("TripVersionDeliveries", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("TripId");
+                        });
+
+                    b.Navigation("Deliveries");
+
                     b.Navigation("Stops");
                 });
 #pragma warning restore 612, 618

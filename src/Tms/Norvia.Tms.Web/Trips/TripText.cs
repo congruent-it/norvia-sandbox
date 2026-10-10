@@ -20,6 +20,16 @@ public static class TripText
             CultureInfo.InvariantCulture,
             $"{weightKg:N0}{(payloadKg is { } payload ? $" / {payload:N0}" : string.Empty)} kg · {palletPlaces}{(vehiclePalletPlaces is { } places ? $" / {places}" : string.Empty)} pallets");
 
+    /// <summary>Whether the Driver app has a Trip version, as the Planner reads it; a dash while there is none to speak of (a Draft).</summary>
+    public static string Delivery(TripDeliveryState? state) =>
+        state switch
+        {
+            TripDeliveryState.Sending => "Sending",
+            TripDeliveryState.Delivered => "Delivered to Driver app",
+            TripDeliveryState.NotDelivered => "Not delivered",
+            _ => "—",
+        };
+
     public static string Kind(StopKind kind) => kind == StopKind.Collection ? "Collect" : "Deliver";
 
     /// <summary>Where a Stop is, led by who receives the goods at a delivery: "Café De Zwaan, Oudegracht 112, 3511 AW Utrecht".</summary>

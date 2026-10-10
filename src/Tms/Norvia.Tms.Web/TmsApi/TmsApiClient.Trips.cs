@@ -46,6 +46,14 @@ internal sealed partial class TmsApiClient
     public Task<TripAnswer> DispatchTripAsync(string number, CancellationToken cancellationToken) =>
         SendTripAsync("Dispatch Trip", HttpMethod.Post, $"/v1/trips/{Uri.EscapeDataString(number)}/dispatch", number, null, cancellationToken, Flows.TripDispatch);
 
+    public async Task<TripAnswer> SendTripAgainAsync(string number, int version, CancellationToken cancellationToken)
+    {
+        var answer = await SendTripAsync("Send Trip again", HttpMethod.Post, $"/v1/trips/{Uri.EscapeDataString(number)}/versions/{version}/send-again", number, null, cancellationToken, Flows.TripDispatch);
+
+        // The TMS answers a send-again like a dispatch; the Planner is told it was the same version sent once more.
+        return answer is TripAnswer.Dispatched sent ? new TripAnswer.SentAgain(sent.Version, sent.CorrelationId) : answer;
+    }
+
     public Task<TripAnswer> DiscardDraftTripAsync(string number, CancellationToken cancellationToken) =>
         SendTripAsync("Discard Draft Trip", HttpMethod.Delete, $"/v1/trips/{Uri.EscapeDataString(number)}", number, null, cancellationToken);
 

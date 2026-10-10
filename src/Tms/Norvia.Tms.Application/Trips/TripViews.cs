@@ -27,6 +27,7 @@ internal static class TripViews
             load.WeightKg,
             load.PalletPlaces,
             vehicle?.PayloadKg,
-            vehicle?.PalletPlaces);
+            vehicle?.PalletPlaces,
+            trip.LatestDelivery?.State);
     }
 }

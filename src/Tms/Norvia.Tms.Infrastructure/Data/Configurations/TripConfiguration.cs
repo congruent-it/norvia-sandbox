@@ -13,6 +13,7 @@ internal sealed class TripConfiguration : IEntityTypeConfiguration<Trip>
     public const string DriverDayIndex = "IX_Trips_Day_DriverId";
     public const string IdempotencyKeyIndex = "IX_Trips_IdempotencyKey";
     public const string StopShipmentIndex = "IX_TripStops_ShipmentId_Kind";
+    public const string DeliveryVersionIndex = "IX_TripVersionDeliveries_TripId_Version";
     public const string StopPositionIndex = "IX_TripStops_TripId_Position";
 
     public void Configure(EntityTypeBuilder<Trip> builder)
@@ -50,6 +51,19 @@ internal sealed class TripConfiguration : IEntityTypeConfiguration<Trip>
             stops.HasIndex("TripId", nameof(TripStop.Position)).IsUnique().HasDatabaseName(StopPositionIndex);
         });
         builder.Navigation(trip => trip.Stops).UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        // Whether the Driver app has each version of the Trip (P11).
+        builder.OwnsMany(trip => trip.Deliveries, deliveries =>
+        {
+            deliveries.ToTable("TripVersionDeliveries");
+            deliveries.WithOwner().HasForeignKey("TripId");
+            deliveries.Property<int>("Id").ValueGeneratedOnAdd();
+            deliveries.HasKey("Id");
+            deliveries.Property(delivery => delivery.State).HasConversion<string>().HasMaxLength(15);
+            deliveries.Property(delivery => delivery.Cause).HasMaxLength(2000);
+            deliveries.HasIndex("TripId", nameof(TripVersionDelivery.Version)).IsUnique().HasDatabaseName(DeliveryVersionIndex);
+        });
+        builder.Navigation(trip => trip.Deliveries).UsePropertyAccessMode(PropertyAccessMode.Field);
 
         builder.HasIndex(trip => trip.Number).IsUnique();
         builder.HasIndex(trip => trip.IdempotencyKey, IdempotencyKeyIndex).IsUnique();
