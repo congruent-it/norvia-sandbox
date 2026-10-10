@@ -164,10 +164,10 @@ public sealed class TripTests
     {
         var (trip, first, second) = TripWithTwoShipments();
 
-        var refusal = trip.ReorderStops(
-            [(second, StopKind.Collection), (first, StopKind.Collection), (first, StopKind.Delivery), (second, StopKind.Delivery)], NumberOf);
+        var fault = trip.ReorderStops(
+            [(second, StopKind.Collection), (first, StopKind.Collection), (first, StopKind.Delivery), (second, StopKind.Delivery)]);
 
-        refusal.Should().BeNull();
+        fault.Should().BeNull();
         trip.Stops.Select(stop => (stop.ShipmentId, stop.Kind, stop.Position)).Should().Equal(
             (second, StopKind.Collection, 0), (first, StopKind.Collection, 1), (first, StopKind.Delivery, 2), (second, StopKind.Delivery, 3));
     }
@@ -178,12 +178,10 @@ public sealed class TripTests
         var (trip, first, second) = TripWithTwoShipments();
         var before = trip.Stops.ToList();
 
-        var refusal = trip.ReorderStops(
-            [(first, StopKind.Delivery), (first, StopKind.Collection), (second, StopKind.Collection), (second, StopKind.Delivery)], NumberOf);
+        var fault = trip.ReorderStops(
+            [(first, StopKind.Delivery), (first, StopKind.Collection), (second, StopKind.Collection), (second, StopKind.Delivery)]);
 
-        refusal.Should().NotBeNull();
-        refusal.Code.Should().Be(TripRefusalCode.CollectionBeforeDelivery);
-        refusal.Message.Should().Contain("SH-");
+        fault.Should().Be(new StopOrderFault(TripRefusalCode.CollectionBeforeDelivery, first));
         trip.Stops.Should().Equal(before);
     }
 
@@ -193,28 +191,25 @@ public sealed class TripTests
         var (trip, first, second) = TripWithTwoShipments();
         var before = trip.Stops.ToList();
 
-        trip.ReorderStops([(first, StopKind.Collection), (first, StopKind.Delivery)], NumberOf)!.Code.Should().Be(TripRefusalCode.StopsNotTheTripsStops);
+        trip.ReorderStops([(first, StopKind.Collection), (first, StopKind.Delivery)])!.Code.Should().Be(TripRefusalCode.StopsNotTheTripsStops);
         trip.ReorderStops(
-            [(first, StopKind.Collection), (first, StopKind.Collection), (first, StopKind.Delivery), (second, StopKind.Delivery)], NumberOf)!.Code
+            [(first, StopKind.Collection), (first, StopKind.Collection), (first, StopKind.Delivery), (second, StopKind.Delivery)])!.Code
             .Should().Be(TripRefusalCode.StopsNotTheTripsStops);
         trip.ReorderStops(
-            [(first, StopKind.Collection), (first, StopKind.Delivery), (second, StopKind.Collection), (ShipmentId.New(), StopKind.Delivery)], NumberOf)!.Code
+            [(first, StopKind.Collection), (first, StopKind.Delivery), (second, StopKind.Collection), (ShipmentId.New(), StopKind.Delivery)])!.Code
             .Should().Be(TripRefusalCode.StopsNotTheTripsStops);
         trip.Stops.Should().Equal(before);
     }
 
     [Fact]
-    public void ReorderStops_ADispatchedTrip_IsRefusedWithTripNotDraft()
+    public void ReorderStops_OnADispatchedTrip_IsABug()
     {
         var (trip, first, second) = TripWithTwoShipments();
         typeof(Trip).GetProperty(nameof(Trip.Status))!.SetValue(trip, TripStatus.Dispatched);
 
-        trip.ReorderStops(
-            [(first, StopKind.Collection), (first, StopKind.Delivery), (second, StopKind.Collection), (second, StopKind.Delivery)], NumberOf)!.Code
-            .Should().Be(TripRefusalCode.TripNotDraft);
+        trip.Invoking(t => t.ReorderStops([(first, StopKind.Collection), (first, StopKind.Delivery), (second, StopKind.Collection), (second, StopKind.Delivery)]))
+            .Should().Throw<InvalidOperationException>();
     }
-
-    private static string NumberOf(ShipmentId id) => $"SH-{id.Value.ToString()[..4]}";
 
     private static (Trip Trip, ShipmentId First, ShipmentId Second) TripWithTwoShipments()
     {

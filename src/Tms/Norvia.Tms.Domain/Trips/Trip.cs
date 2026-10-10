@@ -126,22 +126,20 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
 
     /// <summary>
     /// Puts the Draft's Stops in this order. The order must name each Stop of the Trip once and no others, and every Shipment's collection must
-    /// come before its delivery; otherwise the Trip is left as it was and the refusal says why. Two Stops at the same address stay two Stops,
-    /// since a Stop is a Shipment's collection or delivery, not a place.
+    /// come before its delivery; otherwise the Trip is left as it was and the fault says why. Two Stops at the same address stay two Stops,
+    /// since a Stop is a Shipment's collection or delivery, not a place. The caller checks <see cref="EnsureDraft"/> first, as for <see cref="Pick"/>.
     /// </summary>
-    public TripRefusal? ReorderStops(IReadOnlyList<(ShipmentId Shipment, StopKind Kind)> order, Func<ShipmentId, string> numberOf)
+    public StopOrderFault? ReorderStops(IReadOnlyList<(ShipmentId Shipment, StopKind Kind)> order)
     {
         ArgumentNullException.ThrowIfNull(order);
-        ArgumentNullException.ThrowIfNull(numberOf);
-        if (EnsureDraft() is { } notDraft)
+        if (EnsureDraft() is not null)
         {
-            return notDraft;
+            throw new InvalidOperationException($"Trip {Number} is Dispatched, so its Stops change only by Amend.");
         }
 
-        var current = _stops.Select(stop => (stop.ShipmentId, stop.Kind)).ToHashSet();
-        if (order.Count != _stops.Count || !current.SetEquals(order))
+        if (order.Count != _stops.Count || !_stops.Select(stop => (stop.ShipmentId, stop.Kind)).ToHashSet().SetEquals(order))
         {
-            return TripRefusal.StopsNotTheTripsStops(Number);
+            return new StopOrderFault(TripRefusalCode.StopsNotTheTripsStops);
         }
 
         var delivered = new HashSet<ShipmentId>();
@@ -153,11 +151,10 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
             }
             else if (delivered.Contains(shipment))
             {
-                return TripRefusal.CollectionBeforeDelivery(numberOf(shipment));
+                return new StopOrderFault(TripRefusalCode.CollectionBeforeDelivery, shipment);
             }
         }
 
-        // A delivery that comes first is the only way a collection can follow it, so the pass above has found every violation.
         var reordered = order.Select((stop, position) => new TripStop(stop.Shipment, stop.Kind, position)).ToList();
         if (!reordered.SequenceEqual(Stops))
         {

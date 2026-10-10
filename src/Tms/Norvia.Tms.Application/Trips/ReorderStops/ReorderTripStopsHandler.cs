@@ -1,7 +1,6 @@
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Mediator;
-using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.Trips;
 
 namespace Norvia.Tms.Application.Trips.ReorderStops;
@@ -24,16 +23,17 @@ public sealed class ReorderTripStopsHandler(IRepository<Trip> trips, TripShipmen
 
         var onTrip = await shipments.OfAsync([.. trip.ShipmentIds], cancellationToken);
         var idOf = onTrip.ToDictionary(item => item.Shipment.Number.Value, item => item.Shipment.Id, StringComparer.Ordinal);
-        var numberOf = onTrip.ToDictionary(item => item.Shipment.Id, item => item.Shipment.Number.Value);
         if (command.Stops.Any(stop => !idOf.ContainsKey(stop.ShipmentNumber)))
         {
             return TripRefused.Because(TripRefusal.StopsNotTheTripsStops(trip.Number));
         }
 
-        var order = command.Stops.Select(stop => (idOf[stop.ShipmentNumber], stop.Kind)).ToList();
-        if (trip.ReorderStops(order, id => numberOf.GetValueOrDefault(id, id.ToString())) is { } refusal)
+        if (trip.ReorderStops([.. command.Stops.Select(stop => (idOf[stop.ShipmentNumber], stop.Kind))]) is { } fault)
         {
-            return TripRefused.Because(refusal);
+            var number = onTrip.FirstOrDefault(item => item.Shipment.Id == fault.Shipment)?.Shipment.Number.Value ?? string.Empty;
+            return TripRefused.Because(fault.Code == TripRefusalCode.CollectionBeforeDelivery
+                ? TripRefusal.CollectionBeforeDelivery(number)
+                : TripRefusal.StopsNotTheTripsStops(trip.Number));
         }
 
         await trips.SaveChangesAsync(cancellationToken);

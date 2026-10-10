@@ -71,22 +71,8 @@
         @if (trip.Status == TripStatus.Draft)
         {
             <p class="mb-2">Drag a Stop to where it should go, or use its arrows.</p>
-            <StopReorderTable Stops="detail.Stops" Disabled="_working" OnReorder="ReorderAsync" />
         }
-        else
-        {
-            <FluentDataGrid Items="detail.Stops.AsQueryable()" TGridItem="TripStopView" Class="flatly-table" aria-label="Stops"
-                            GridTemplateColumns="auto 1fr 1.2fr 2.5fr 2fr 1.5fr" MultiLine="true">
-                <PropertyColumn Title="#" Property="@(stop => stop.Position + 1)" />
-                <PropertyColumn Title="Stop" Property="@(stop => TripText.Kind(stop.Kind))" />
-                <TemplateColumn Title="Shipment">
-                    <a href="/shipments/@context.ShipmentNumber">@context.ShipmentNumber</a>
-                </TemplateColumn>
-                <PropertyColumn Title="Place" Property="@(stop => TripText.Place(stop))" />
-                <PropertyColumn Title="Window" Property="@(stop => NorviaTime.FormatWindow(stop.WindowEarliest, stop.WindowLatest))" />
-                <PropertyColumn Title="Goods" Property="@(stop => stop.Goods)" />
-            </FluentDataGrid>
-        }
+        <TripStopsTable Stops="detail.Stops" Reorderable="@(trip.Status == TripStatus.Draft)" Disabled="_working" OnReorder="ReorderAsync" />
     }
 </LiveListStates>
 
