@@ -80,7 +80,7 @@ public static class TripEndpoints
                 + "Every Trip rule is checked again, so a Draft that became invalid, such as after an Absence was recorded on its Driver, is refused with that rule's code (DriverNotAvailable, VehicleNotAvailable, LicenceNotHeld, DrivingHoursExceeded, "
                 + "PayloadExceeded, PalletPlacesExceeded, DayNotOpen, OutsideShift, or for a Shipment ShipmentNotReleased, ShipmentOnAnotherTrip or CollectionDayMismatch), and nothing changes. "
                 + "On success, in one transaction, the Trip becomes Dispatched at version 1, its Shipments become Dispatched, and exactly one TripDispatched (version 1, the whole Trip with its Stops in order) is written to the outbox for the Trip events topic, "
-                + "under a new correlation ID that the answer returns. There is no event per Shipment. A Trip that is Dispatched already is TripNotDraft (409); an unknown Trip is TripNotFound (404).");
+                + "under a new correlation ID that the answer returns. There is no event per Shipment. A Trip that is Dispatched already is TripNotDraft (409), not a repeat: the caller is the TMS UI, which doesn't retry a Dispatch, and a later version goes out by Amend or by sending the version again; an unknown Trip is TripNotFound (404).");
 
         trips.MapPut("/{number}", ChangeDraftAsync)
             .WithName("ChangeDraftTrip")

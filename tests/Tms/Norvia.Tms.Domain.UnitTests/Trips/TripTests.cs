@@ -1,7 +1,9 @@
 using Norvia.Tms.Domain.Fleet;
 using Norvia.Tms.Domain.Shipments;
+using Norvia.Tms.Domain.Shippers;
 using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Domain.Trips;
+using Norvia.Tms.Domain.UnitTests.TransportOrders;
 
 namespace Norvia.Tms.Domain.UnitTests.Trips;
 
@@ -257,6 +259,21 @@ public sealed class TripTests
     }
 
     [Fact]
+    public void Dispatch_MakesEachOfItsShipmentsDispatched_AndAShipmentNotOnTheTripIsABug()
+    {
+        var onTrip = ReleasedOwnFleetShipment(1);
+        var other = ReleasedOwnFleetShipment(2);
+        var trip = CompleteDraft(onTrip.Id);
+        var corr = new CorrelationId("c");
+
+        trip.Invoking(t => t.Dispatch(corr, DateTimeOffset.UtcNow, Truck, Joost, [new DispatchedShipment(other, TransportOrderTests.SampleDetails())]))
+            .Should().Throw<InvalidOperationException>();
+
+        trip.Dispatch(corr, DateTimeOffset.UtcNow, Truck, Joost, [new DispatchedShipment(onTrip, TransportOrderTests.SampleDetails())]);
+        onTrip.Status.Should().Be(ShipmentStatus.Dispatched);
+    }
+
+    [Fact]
     public void Dispatch_AnIncompleteDraft_IsABug()
     {
         var trip = Trip.CreateDraft(TripNumber.FromSequence(1), Day, null, null, new IdempotencyKey("k"));
@@ -277,6 +294,16 @@ public sealed class TripTests
     private static readonly Vehicle Truck = new(new VehicleId("VEH-0002"), "TT-201-R", VehicleType.RigidTruck, 8000, 18, true);
 
     private static readonly Driver Joost = new(new DriverId("DRV-0001"), "Joost Bakker", new HashSet<LicenceCategory> { LicenceCategory.C }, true);
+
+    private static Shipment ReleasedOwnFleetShipment(long sequence)
+    {
+        var at = new DateTimeOffset(2026, 10, 10, 9, 0, 0, TimeSpan.Zero);
+        var order = TransportOrder.Accept(
+            new ShipperId("SHP-0001"), TransportOrderTests.SampleDetails(), TransportOrderNumber.FromSequence(sequence), IntakeChannel.ShipperApi, new CorrelationId("i"), at);
+        var shipment = order.Plan(ShipmentNumber.FromSequence(sequence), CarriedBy.OwnFleet, new IdempotencyKey("p"), new CorrelationId("p"), at)!;
+        shipment.Release(order, new IdempotencyKey("r"), new CorrelationId("r"), at);
+        return shipment;
+    }
 
     private static Trip CompleteDraft(ShipmentId shipment)
     {

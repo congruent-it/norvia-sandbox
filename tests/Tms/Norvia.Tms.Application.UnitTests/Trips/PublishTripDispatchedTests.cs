@@ -120,6 +120,8 @@ public sealed class PublishTripDispatchedTests
         {
             var order = Samples.AcceptedOrder(sequence: sequence);
             var shipment = Samples.Planned(order, CarriedBy.OwnFleet, sequence: sequence);
+            shipment.Release(order, new IdempotencyKey($"r{sequence}"), new CorrelationId("corr-release"), Samples.Now);
+            shipment.ClearDomainEvents();
             shipments.Add(shipment);
             onTrip.Add(new DispatchedShipment(shipment, order.Details));
             trip.AddShipment(shipment.Id);

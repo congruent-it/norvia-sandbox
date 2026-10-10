@@ -52,14 +52,6 @@ public sealed class DispatchTripHandler(
 
         var ids = onTrip.Select(item => item.Shipment.Id).ToList();
         var tracked = (await shipments.ListAsync(new ShipmentsToDispatchSpec(ids), cancellationToken)).ToDictionary(shipment => shipment.Id);
-        foreach (var shipment in tracked.Values)
-        {
-            if (!shipment.Dispatch())
-            {
-                throw new InvalidOperationException($"Shipment {shipment.Number} passed the Trip rules but wasn't dispatched.");
-            }
-        }
-
         var correlationId = new CorrelationId(command.CorrelationId);
         trip.Dispatch(correlationId, time.GetUtcNow(), vehicle, driver, [.. onTrip.Select(item => new DispatchedShipment(tracked[item.Shipment.Id], item.Details))]);
 

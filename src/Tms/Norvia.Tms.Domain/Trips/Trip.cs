@@ -201,8 +201,8 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
     }
 
     /// <summary>
-    /// Sends the complete Draft to its Driver as version 1 and raises <see cref="TripDispatchedEvent"/>. The caller checks <see cref="EnsureDraft"/>,
-    /// <see cref="MissingParts"/> and the Trip rules first, as for <see cref="Pick"/>, and has dispatched the Shipments.
+    /// Sends the complete Draft to its Driver as version 1: every one of its Shipments becomes Dispatched, and <see cref="TripDispatchedEvent"/> is
+    /// raised. The caller checks <see cref="EnsureDraft"/>, <see cref="MissingParts"/> and the Trip rules first, as for <see cref="Pick"/>.
     /// </summary>
     public void Dispatch(CorrelationId correlationId, DateTimeOffset dispatchedAt, Vehicle vehicle, Driver driver, IReadOnlyList<DispatchedShipment> shipments)
     {
@@ -218,6 +218,14 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
         if (MissingParts() is { Count: > 0 } missing)
         {
             throw new InvalidOperationException($"Trip {Number} can't be dispatched without {string.Join(", ", missing)}.");
+        }
+
+        foreach (var shipment in shipments.Select(item => item.Shipment))
+        {
+            if (!HasShipment(shipment.Id) || !shipment.Dispatch())
+            {
+                throw new InvalidOperationException($"Shipment {shipment.Number} can't be dispatched on Trip {Number}.");
+            }
         }
 
         Status = TripStatus.Dispatched;

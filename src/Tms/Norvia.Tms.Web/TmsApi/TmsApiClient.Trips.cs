@@ -44,12 +44,13 @@ internal sealed partial class TmsApiClient
     }
 
     public Task<TripAnswer> DispatchTripAsync(string number, CancellationToken cancellationToken) =>
-        SendTripAsync("Dispatch Trip", HttpMethod.Post, $"/v1/trips/{Uri.EscapeDataString(number)}/dispatch", number, null, cancellationToken);
+        SendTripAsync("Dispatch Trip", HttpMethod.Post, $"/v1/trips/{Uri.EscapeDataString(number)}/dispatch", number, null, cancellationToken, Flows.TripDispatch);
 
     public Task<TripAnswer> DiscardDraftTripAsync(string number, CancellationToken cancellationToken) =>
         SendTripAsync("Discard Draft Trip", HttpMethod.Delete, $"/v1/trips/{Uri.EscapeDataString(number)}", number, null, cancellationToken);
 
-    private async Task<TripAnswer> SendTripAsync(string action, HttpMethod method, string path, string? tripNumber, object? body, CancellationToken cancellationToken)
+    // A dispatch has a flow and an answer of its own; every other action is the Planner building a Trip.
+    private async Task<TripAnswer> SendTripAsync(string action, HttpMethod method, string path, string? tripNumber, object? body, CancellationToken cancellationToken, string flow = Flows.TripPlanning)
     {
         using var span = activities.Source.StartActivity(action, ActivityKind.Internal);
         using var request = new HttpRequestMessage(method, new Uri(path, UriKind.Relative));
@@ -73,16 +74,16 @@ internal sealed partial class TmsApiClient
                     ?? throw new HttpRequestException("The TMS API answered a created Trip without a body.");
                 using (Track(Flows.TripPlanning, TrackingKeys.Succeeded, new() { TripNumber = created.Number }))
                 {
-                    LogTripEdited(action);
+                    LogTripActionDone(action);
                 }
 
                 return new TripAnswer.Created(created.Number, created.Warnings is { Count: > 0 } warnings ? warnings : null);
-            case HttpStatusCode.OK when method == HttpMethod.Post && path.EndsWith("/dispatch", StringComparison.Ordinal):
+            case HttpStatusCode.OK when flow == Flows.TripDispatch:
                 var dispatched = await response.Content.ReadFromJsonAsync<DispatchedTrip>(Json, cancellationToken)
                     ?? throw new HttpRequestException("The TMS API answered a dispatched Trip without a body.");
                 using (Track(Flows.TripDispatch, TrackingKeys.Succeeded, new() { TripNumber = tripNumber, CorrelationId = dispatched.CorrelationId }))
                 {
-                    LogTripEdited(action);
+                    LogTripActionDone(action);
                 }
 
                 return new TripAnswer.Dispatched(dispatched.Version, dispatched.CorrelationId);
@@ -91,21 +92,21 @@ internal sealed partial class TmsApiClient
                     ?? throw new HttpRequestException("The TMS API answered added Shipments without a body.");
                 using (Track(Flows.TripPlanning, TrackingKeys.Succeeded, new() { TripNumber = tripNumber }))
                 {
-                    LogTripEdited(action);
+                    LogTripActionDone(action);
                 }
 
                 return new TripAnswer.Added(added.Warnings ?? []);
             case HttpStatusCode.NoContent:
                 using (Track(Flows.TripPlanning, TrackingKeys.Succeeded, new() { TripNumber = tripNumber }))
                 {
-                    LogTripEdited(action);
+                    LogTripActionDone(action);
                 }
 
                 return new TripAnswer.Done();
             // A refused action: its problem's detail is the refusal's readable message, and its code says which rule.
             case HttpStatusCode.NotFound or HttpStatusCode.Conflict or HttpStatusCode.BadRequest:
                 var (problem, reason) = await ReadRefusalAsync(response, $"{action} was refused.", cancellationToken);
-                using (Track(path.EndsWith("/dispatch", StringComparison.Ordinal) ? Flows.TripDispatch : Flows.TripPlanning, TrackingKeys.Refused, new() { TripNumber = tripNumber, FailureCode = problem?.Code }))
+                using (Track(flow, TrackingKeys.Refused, new() { TripNumber = tripNumber, FailureCode = problem?.Code }))
                 {
                     LogTripRefused(action, problem?.Code ?? "unknown", reason);
                 }
@@ -117,7 +118,7 @@ internal sealed partial class TmsApiClient
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "{Action} done")]
-    private partial void LogTripEdited(string action);
+    private partial void LogTripActionDone(string action);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "{Action} refused with {Code}: {Reason}")]
     private partial void LogTripRefused(string action, string code, string reason);
