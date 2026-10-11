@@ -79,7 +79,7 @@ public static class TripEndpoints
             .WithDescription(
                 "In one transaction the Shipment's two Stops leave the Trip, the Shipment goes back to Planned (its Tracking status stays Scheduled) and exactly one ShipmentTakenOffTrip is written to the outbox for the Shipment events topic under a new correlation ID, "
                 + "returned in the answer and the X-Correlation-ID header. On a Dispatched Trip, also one that is In progress, this is an Amend too: the version goes up and a TripDispatched with the Shipments that remain, possibly none, is written under the same correlation ID. "
-                + "reason is required. Refused with ShipmentCollected (409) once the Shipment is Collected, ShipmentNotOnTrip (409), VehicleOrDriverInactive (409) for a sent Trip whose Vehicle or Driver has gone inactive, TripNotFound or ShipmentNotFound (404).");
+                + "reason is required. Not idempotent: sending it again after it succeeded is refused with ShipmentNotOnTrip, since the Shipment has left. Refused with ShipmentCollected (409) once the Shipment is Collected, ShipmentNotOnTrip (409), VehicleOrDriverInactive (409) for a sent Trip whose Vehicle or Driver has gone inactive, TripNotFound or ShipmentNotFound (404).");
 
         trips.MapPut("/{number}/stops", ReorderStopsAsync)
             .WithName("ReorderTripStops")

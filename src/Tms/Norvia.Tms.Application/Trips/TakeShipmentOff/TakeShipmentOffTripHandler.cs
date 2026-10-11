@@ -44,14 +44,8 @@ public sealed class TakeShipmentOffTripHandler(
 
         var onTrip = await tripShipments.OfAsync([.. trip.ShipmentIds.Where(id => id != shipment.Id)], cancellationToken);
         var correlationId = new CorrelationId(command.CorrelationId);
-        trip.TakeShipmentOff(
-            shipment,
-            command.Reason,
-            correlationId,
-            time.GetUtcNow(),
-            parties?.Vehicle,
-            parties?.Driver,
-            parties is null ? null : [.. onTrip.Select(item => new DispatchedShipment(item.Shipment, item.Details))]);
+        var next = parties is null ? null : new NextTripVersion(parties.Vehicle, parties.Driver, [.. onTrip.Select(item => new DispatchedShipment(item.Shipment, item.Details))]);
+        trip.TakeShipmentOff(shipment, command.Reason, correlationId, time.GetUtcNow(), next);
 
         // One save writes the Stops, the Shipment's status, the new version and the outbox messages together.
         await trips.SaveChangesAsync(cancellationToken);

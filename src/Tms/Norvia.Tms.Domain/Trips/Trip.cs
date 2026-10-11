@@ -302,23 +302,16 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
             return TripRefusal.ShipmentNotOnTrip(shipment.Number.Value, Number);
         }
 
-        return shipment.Status is ShipmentStatus.Released or ShipmentStatus.Dispatched ? null : TripRefusal.ShipmentCollected(shipment.Number.Value, Number);
+        return shipment.CanTakeOffTrip ? null : TripRefusal.ShipmentCollected(shipment.Number.Value, Number);
     }
 
     /// <summary>
     /// Takes the Shipment off the Trip: its two Stops leave the sequence, which closes up, the Shipment goes back to Planned, and
     /// <see cref="ShipmentTakenOffTripEvent"/> is raised. On a Dispatched or In progress Trip this is an Amend too: the version goes up and
     /// <see cref="TripDispatchedEvent"/> is raised with the Shipments that remain, possibly none, under the same correlation ID; a Draft has no
-    /// version to send, so the Vehicle, Driver and remaining Shipments are ignored. The caller checks <see cref="EnsureCanTakeOff"/> first.
+    /// version to send, so <paramref name="next"/> must be null for it and given otherwise. The caller checks <see cref="EnsureCanTakeOff"/> first.
     /// </summary>
-    public void TakeShipmentOff(
-        Shipment shipment,
-        string reason,
-        CorrelationId correlationId,
-        DateTimeOffset at,
-        Vehicle? vehicle = null,
-        Driver? driver = null,
-        IReadOnlyList<DispatchedShipment>? remaining = null)
+    public void TakeShipmentOff(Shipment shipment, string reason, CorrelationId correlationId, DateTimeOffset at, NextTripVersion? next = null)
     {
         ArgumentNullException.ThrowIfNull(shipment);
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
@@ -329,9 +322,9 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
         }
 
         var sent = Status != TripStatus.Draft;
-        if (sent && (vehicle is null || driver is null || remaining is null))
+        if (sent != (next is not null))
         {
-            throw new ArgumentException($"Trip {Number} is {Status}, so taking a Shipment off sends the next version, which needs the Vehicle, the Driver and the Shipments that remain.");
+            throw new ArgumentException($"Trip {Number} is {Status}, so " + (sent ? "taking a Shipment off sends the next version, which needs its contents." : "there is no next version to send."), nameof(next));
         }
 
         if (!shipment.TakeOffTrip())
@@ -347,7 +340,7 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
         {
             Version++;
             _deliveries.Add(TripVersionDelivery.Start(Version));
-            RegisterDomainEvent(new TripDispatchedEvent(this, correlationId, at, vehicle!, driver!, remaining!));
+            RegisterDomainEvent(new TripDispatchedEvent(this, correlationId, at, next!.Vehicle, next.Driver, next.Shipments));
         }
 
         RegisterDomainEvent(new ShipmentTakenOffTripEvent(this, shipment, sent ? Version : null, reason, correlationId, at));

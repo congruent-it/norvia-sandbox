@@ -180,6 +180,9 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
         return true;
     }
 
+    /// <summary>True for a Released or Dispatched Own fleet Shipment, which the Planner can still take off its Trip (P11): it isn't collected.</summary>
+    public bool CanTakeOffTrip => CarriedBy.IsOwnFleet && Status is ShipmentStatus.Released or ShipmentStatus.Dispatched;
+
     /// <summary>
     /// Sends an Own fleet Shipment back to Planned, because the Planner took it off its Trip before it was collected (P11), so it can be
     /// released again for another Trip or reassigned to a Carrier. Its Tracking status stays Scheduled. Raises no domain event of its own:
@@ -188,7 +191,7 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
     /// </summary>
     public bool TakeOffTrip()
     {
-        if (Status is not (ShipmentStatus.Released or ShipmentStatus.Dispatched) || !CarriedBy.IsOwnFleet)
+        if (!CanTakeOffTrip)
         {
             return false;
         }
