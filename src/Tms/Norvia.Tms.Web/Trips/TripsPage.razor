@@ -53,10 +53,13 @@
         <PropertyColumn Title="Load" Property="@(trip => TripText.Load(trip))" />
         <PropertyColumn Title="Delivery" Property="@(trip => TripText.Delivery(trip.LatestDelivery))" />
         <TemplateColumn Title="Actions">
-            @if (context.Status == TripStatus.Draft)
+            @if (context.Status.CanBeAmended())
             {
                 <FluentButton Appearance="Appearance.Outline" OnClick="@(() => { _changing = context; _notice = null; })"
                               aria-label="@($"Plan {context.Number}")">Plan</FluentButton>
+            }
+            @if (context.Status == TripStatus.Draft)
+            {
                 <FluentButton Appearance="Appearance.Outline" OnClick="@(() => DiscardAsync(context))"
                               aria-label="@($"Discard {context.Number}")">Discard</FluentButton>
             }

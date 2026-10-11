@@ -52,4 +52,7 @@ public sealed record TripRefusal(TripRefusalCode Code, string Message)
 
     public static TripRefusal VehicleOrDriverInactive(TripNumber number) =>
         new(TripRefusalCode.VehicleOrDriverInactive, $"The Vehicle or the Driver of Trip {number} is no longer active, so it can't be sent again as it is.");
+
+    public static TripRefusal TripUnderWay(TripNumber number) =>
+        new(TripRefusalCode.TripUnderWay, $"Trip {number} is in progress, so the only change allowed is taking off a Shipment that hasn't been collected.");
 }

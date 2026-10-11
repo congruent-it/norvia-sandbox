@@ -50,4 +50,7 @@ public enum TripRefusalCode
 
     /// <summary>The Trip's Vehicle or Driver is no longer active, so the Trip can't be sent to its Driver again as it is.</summary>
     VehicleOrDriverInactive,
+
+    /// <summary>The Trip is In progress (P12), so only an uncollected Shipment can be taken off it.</summary>
+    TripUnderWay,
 }

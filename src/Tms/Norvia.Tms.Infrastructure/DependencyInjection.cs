@@ -109,9 +109,10 @@ public static class DependencyInjection
         builder.Services.AddScoped<ITripNumbers, SqlTripNumbers>();
         builder.Services.AddScoped<TripPlanningChecks>();
         builder.Services.AddScoped<TripShipments>();
+        builder.Services.AddScoped<TripAmendments>();
         builder.Services.AddScoped<IPipelineBehavior<AddShipmentsToTripCommand, Result<AddShipmentsToTripResult>>, RetryTripThatLostARace<AddShipmentsToTripCommand, Result<AddShipmentsToTripResult>>>();
         builder.Services.AddScoped<IPipelineBehavior<CreateDraftTripCommand, Result<CreateDraftTripResult>>, RetryTripThatLostARace<CreateDraftTripCommand, Result<CreateDraftTripResult>>>();
-        builder.Services.AddScoped<IPipelineBehavior<ChangeDraftTripCommand, Result>, RetryTripThatLostARace<ChangeDraftTripCommand, Result>>();
+        builder.Services.AddScoped<IPipelineBehavior<ChangeTripCommand, Result>, RetryTripThatLostARace<ChangeTripCommand, Result>>();
         builder.Services.AddScoped<IPipelineBehavior<ReorderTripStopsCommand, Result>, RetryTripThatLostARace<ReorderTripStopsCommand, Result>>();
         builder.Services.AddScoped<IPipelineBehavior<SubmitTransportOrderCommand, Result<SubmitTransportOrderResult>>, RetrySubmissionThatLostARace>();
         builder.Services.AddSingleton<IShipperDirectory, SeedFileShipperDirectory>();

@@ -5,7 +5,7 @@ using Norvia.Tms.Domain.Trips;
 
 namespace Norvia.Tms.Application.Trips.AddShipments;
 
-public sealed class AddShipmentsToTripHandler(IRepository<Trip> trips, TripPlanningChecks checks, TripShipments shipments)
+public sealed class AddShipmentsToTripHandler(IRepository<Trip> trips, TripPlanningChecks checks, TripShipments shipments, TripAmendments amendments)
     : ICommandHandler<AddShipmentsToTripCommand, Result<AddShipmentsToTripResult>>
 {
     public async ValueTask<Result<AddShipmentsToTripResult>> Handle(AddShipmentsToTripCommand command, CancellationToken cancellationToken)
@@ -17,9 +17,9 @@ public sealed class AddShipmentsToTripHandler(IRepository<Trip> trips, TripPlann
             return TripRefused.Because<AddShipmentsToTripResult>(TripRefusal.TripNotFound(command.Number));
         }
 
-        if (trip.EnsureDraft() is { } notDraft)
+        if (trip.EnsureAmendable() is { } underWay)
         {
-            return TripRefused.Because<AddShipmentsToTripResult>(notDraft);
+            return TripRefused.Because<AddShipmentsToTripResult>(underWay);
         }
 
         var (found, notFound) = await shipments.FindAsync(command.ShipmentNumbers, cancellationToken);
@@ -34,10 +34,18 @@ public sealed class AddShipmentsToTripHandler(IRepository<Trip> trips, TripPlann
 
         if (added.Count > 0)
         {
+            var (parties, inactive) = amendments.Prepare(trip, trip.VehicleId, trip.DriverId);
+            if (inactive is not null)
+            {
+                return TripRefused.Because<AddShipmentsToTripResult>(inactive);
+            }
+
             foreach (var item in added)
             {
                 trip.AddShipment(item.Shipment.Id);
             }
+
+            await amendments.SendAsync(trip, parties, command.CorrelationId, cancellationToken);
 
             await trips.SaveChangesAsync(cancellationToken);
         }

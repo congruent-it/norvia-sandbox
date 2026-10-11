@@ -63,21 +63,23 @@ public static class TripEndpoints
         trips.MapPost("/{number}/shipments", AddShipmentsAsync)
             .WithName("AddShipmentsToTrip")
             .RequireAuthorization(policy => policy.RequireRole(TransportOrderEndpoints.ManageRole))
-            .WithSummary("Put Shipments on a Draft Trip: each adds its collection Stop and its delivery Stop at the end of the sequence.")
+            .WithSummary("Put Shipments on a Draft or Dispatched Trip: each adds its collection Stop and its delivery Stop at the end of the sequence.")
             .WithDescription(
                 "The Shipments go on together or not at all: the Trip is checked as it would become, and a refusal leaves it as it was. The load rules count the whole Trip as loaded at once. "
                 + "The problem's code names the first rule broken: ShipmentNotReleased, ShipmentOnAnotherTrip, CollectionDayMismatch, PayloadExceeded or PalletPlacesExceeded (409), "
-                + "ShipmentNotFound or TripNotFound (404), or TripNotDraft (409); failures lists every rule broken. A Shipment whose delivery window doesn't include the Trip's day is accepted, "
-                + "with a warning. A Shipment already on the Trip stays where it is, so sending the same call again changes nothing. Nothing is published.");
+                + "ShipmentNotFound or TripNotFound (404), or TripUnderWay (409) for a Trip that is In progress; failures lists every rule broken. A Shipment whose delivery window doesn't include the Trip's day is accepted, "
+                + "with a warning. A Shipment already on the Trip stays where it is, so sending the same call again changes nothing. A Draft publishes nothing. On a Dispatched Trip this is an Amend: in the same transaction the version goes up, "
+                + "the added Shipments become Dispatched, and exactly one TripDispatched with the whole Trip is written to the outbox under a new correlation ID, which the X-Correlation-ID response header returns.");
 
         trips.MapPut("/{number}/stops", ReorderStopsAsync)
             .WithName("ReorderTripStops")
             .RequireAuthorization(policy => policy.RequireRole(TransportOrderEndpoints.ManageRole))
-            .WithSummary("Put the Stops of a Draft Trip in order.")
+            .WithSummary("Put the Stops of a Draft or Dispatched Trip in order.")
             .WithDescription(
                 "stops names every Stop of the Trip once, as a Shipment number and Collection or Delivery, in the order the Driver visits them. Two Stops at the same address stay two Stops. "
                 + "A Shipment's delivery before its collection is refused with CollectionBeforeDelivery (409), and an order that leaves out a Stop, repeats one or names another is StopsNotTheTripsStops (409); "
-                + "a refusal leaves the order as it was. Also TripNotDraft (409) or TripNotFound (404). Sending the same order again changes nothing. Nothing is published.");
+                + "a refusal leaves the order as it was. Also TripUnderWay (409) for a Trip that is In progress, VehicleOrDriverInactive (409) for a Dispatched Trip whose Vehicle or Driver is no longer active, or TripNotFound (404). Sending the same order again changes nothing. "
+                + "A Draft publishes nothing. A new order on a Dispatched Trip is an Amend, which raises the version and writes one TripDispatched under a new correlation ID, returned in the X-Correlation-ID response header.");
 
         trips.MapPost("/{number}/dispatch", DispatchAsync)
             .WithName("DispatchTrip")
@@ -122,10 +124,11 @@ public static class TripEndpoints
         trips.MapPut("/{number}", ChangeDraftAsync)
             .WithName("ChangeDraftTrip")
             .RequireAuthorization(policy => policy.RequireRole(TransportOrderEndpoints.ManageRole))
-            .WithSummary("Pick the Vehicle, Driver, planned start and planned driving duration of a Draft Trip, or give them back by leaving them out.")
+            .WithSummary("Pick the Vehicle, Driver, planned start and planned driving duration of a Draft or Dispatched Trip. A Draft can give them back by leaving them out.")
             .WithDescription(
                 "What is given replaces what the Draft had. A change that breaks a rule is refused, leaving the Trip as it was, with a problem whose code says which: "
-                + "VehicleNotAvailable, DriverNotAvailable, LicenceNotHeld, DrivingHoursExceeded, OutsideShift or DayNotOpen (409), TripNotDraft (409) or TripNotFound (404).");
+                + "VehicleNotAvailable, DriverNotAvailable, LicenceNotHeld, DrivingHoursExceeded, OutsideShift or DayNotOpen (409), TripUnderWay (409) for a Trip that is In progress, or TripNotFound (404). "
+                + "A change to a Dispatched Trip is an Amend: all four must stay given (TripIncomplete, 409), and a change that alters something raises the version and writes one TripDispatched under a new correlation ID, returned in the X-Correlation-ID response header.");
 
         trips.MapDelete("/{number}", DiscardDraftAsync)
             .WithName("DiscardDraftTrip")
@@ -182,6 +185,7 @@ public static class TripEndpoints
     private static async Task<Results<Ok<AddShipmentsToTripResult>, ProblemHttpResult, ValidationProblem>> AddShipmentsAsync(
         string number,
         AddShipmentsRequest request,
+        HttpResponse response,
         IMediator mediator,
         CancellationToken cancellationToken)
     {
@@ -190,13 +194,14 @@ public static class TripEndpoints
             return TypedResults.ValidationProblem(new Dictionary<string, string[]> { [nameof(AddShipmentsRequest.ShipmentNumbers)] = ["Give the numbers of the Shipments to put on the Trip."] });
         }
 
-        var result = await mediator.Send(new AddShipmentsToTripCommand(number, request.ShipmentNumbers), cancellationToken);
+        var result = await mediator.Send(new AddShipmentsToTripCommand(number, request.ShipmentNumbers, AmendCorrelationId(response)), cancellationToken);
         return result.IsSuccess ? TypedResults.Ok(result.Value) : Refused(result.ValidationErrors, "The Shipments can't be put on the Trip.");
     }
 
     private static async Task<Results<NoContent, ProblemHttpResult, ValidationProblem>> ReorderStopsAsync(
         string number,
         ReorderStopsRequest request,
+        HttpResponse response,
         IMediator mediator,
         CancellationToken cancellationToken)
     {
@@ -205,13 +210,14 @@ public static class TripEndpoints
             return TypedResults.ValidationProblem(new Dictionary<string, string[]> { [nameof(ReorderStopsRequest.Stops)] = ["Give every Stop of the Trip as a Shipment number and Collection or Delivery."] });
         }
 
-        var result = await mediator.Send(new ReorderTripStopsCommand(number, stops), cancellationToken);
+        var result = await mediator.Send(new ReorderTripStopsCommand(number, stops, AmendCorrelationId(response)), cancellationToken);
         return result.IsSuccess ? TypedResults.NoContent() : Refused(result.ValidationErrors, "The Stops can't be put in that order.");
     }
 
     private static async Task<Results<NoContent, ProblemHttpResult, ValidationProblem>> ChangeDraftAsync(
         string number,
         ChangeTripRequest request,
+        HttpResponse response,
         IMediator mediator,
         CancellationToken cancellationToken)
     {
@@ -223,7 +229,7 @@ public static class TripEndpoints
         }
 
         var result = await mediator.Send(
-            new ChangeDraftTripCommand(number, VehicleOf(request.VehicleId), DriverOf(request.DriverId), request.PlannedStart, request.PlannedDrivingDuration), cancellationToken);
+            new ChangeTripCommand(number, VehicleOf(request.VehicleId), DriverOf(request.DriverId), request.PlannedStart, request.PlannedDrivingDuration, AmendCorrelationId(response)), cancellationToken);
         return result.IsSuccess ? TypedResults.NoContent() : Refused(result.ValidationErrors, "The Trip can't be changed.");
     }
 
@@ -273,6 +279,15 @@ public static class TripEndpoints
 
         var result = await retrier.RunAsync(mediator => mediator.Send(new ReportTripNotDeliveredCommand(number, tripVersion, correlationId, cause), cancellationToken).AsTask());
         return result.IsSuccess ? TypedResults.Ok(result.Value) : ReportRefused(result, correlationId);
+    }
+
+    // The change may be an Amend of a Dispatched Trip, which starts a Message trail in the TMS UI like a Dispatch does. The caller can't tell
+    // beforehand, so the correlation ID is always created and answered in a header; it matters when the Trip was Dispatched.
+    private static string AmendCorrelationId(HttpResponse response)
+    {
+        var correlationId = CorrelationId.New().Value;
+        response.Headers[TransportOrderEndpoints.CorrelationIdHeader] = correlationId;
+        return correlationId;
     }
 
     private static Dictionary<string, string[]> NotDeliveredErrors(string? correlationId, string? cause)

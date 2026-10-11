@@ -83,72 +83,64 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
     }
 
     /// <summary>
-    /// Gives the Draft this Vehicle and Driver, or none, which gives the previous ones back. The caller checks <see cref="EnsureDraft"/>
-    /// first, so a Dispatched Trip reaching here is a bug.
+    /// Gives the Trip this Vehicle and Driver, or none, which gives the previous ones back; true when that changed anything. The caller
+    /// checks <see cref="EnsureAmendable"/> first, so a Trip that is under way reaching here is a bug. On a Dispatched Trip the caller
+    /// follows a change with <see cref="Amend"/>.
     /// </summary>
-    public void Pick(VehicleId? vehicleId, DriverId? driverId)
+    public bool Pick(VehicleId? vehicleId, DriverId? driverId)
     {
-        if (EnsureDraft() is not null)
-        {
-            throw new InvalidOperationException($"Trip {Number} is Dispatched, so its Vehicle and Driver change only by Amend.");
-        }
-
+        ThrowIfUnderWay();
+        var changed = VehicleId != vehicleId || DriverId != driverId;
         VehicleId = vehicleId;
         DriverId = driverId;
+        return changed;
     }
 
     /// <summary>
-    /// Sets the planned start and driving duration of the Draft, or gives them back with null. The caller checks the Shift and the
-    /// Driving-hour budget first, as for <see cref="Pick"/>.
+    /// Sets the planned start and driving duration of the Trip, or gives them back with null; true when that changed anything. The
+    /// caller checks the Shift and the Driving-hour budget first, as for <see cref="Pick"/>.
     /// </summary>
-    public void Plan(TimeOnly? start, TimeSpan? drivingDuration)
+    public bool Plan(TimeOnly? start, TimeSpan? drivingDuration)
     {
-        if (EnsureDraft() is not null)
-        {
-            throw new InvalidOperationException($"Trip {Number} is Dispatched, so its planned start and duration change only by Amend.");
-        }
+        ThrowIfUnderWay();
 
         if (drivingDuration is { } duration && !IsPlannableDuration(duration))
         {
             throw new ArgumentOutOfRangeException(nameof(drivingDuration), duration, "A driving duration is more than nothing and at most a day.");
         }
 
+        var changed = PlannedStart != start || PlannedDrivingDuration != drivingDuration;
         PlannedStart = start;
         PlannedDrivingDuration = drivingDuration;
+        return changed;
     }
 
     /// <summary>
-    /// Puts the Shipment on the Draft: its collection Stop and then its delivery Stop go at the end of the sequence. A Shipment already
-    /// on the Trip stays where it is. The caller checks the rules first, as for <see cref="Pick"/>.
+    /// Puts the Shipment on the Trip: its collection Stop and then its delivery Stop go at the end of the sequence. A Shipment already
+    /// on the Trip stays where it is and the answer is false. The caller checks the rules first, as for <see cref="Pick"/>.
     /// </summary>
-    public void AddShipment(ShipmentId shipment)
+    public bool AddShipment(ShipmentId shipment)
     {
-        if (EnsureDraft() is not null)
-        {
-            throw new InvalidOperationException($"Trip {Number} is Dispatched, so its Shipments change only by Amend.");
-        }
-
+        ThrowIfUnderWay();
         if (HasShipment(shipment))
         {
-            return;
+            return false;
         }
 
         _stops.Add(new TripStop(shipment, StopKind.Collection, _stops.Count));
         _stops.Add(new TripStop(shipment, StopKind.Delivery, _stops.Count));
+        return true;
     }
 
     /// <summary>
-    /// Puts the Draft's Stops in this order. The order must name each Stop of the Trip once and no others, and every Shipment's collection must
+    /// Puts the Trip's Stops in this order. The order must name each Stop of the Trip once and no others, and every Shipment's collection must
     /// come before its delivery; otherwise the Trip is left as it was and the fault says why. Two Stops at the same address stay two Stops,
-    /// since a Stop is a Shipment's collection or delivery, not a place. The caller checks <see cref="EnsureDraft"/> first, as for <see cref="Pick"/>.
+    /// since a Stop is a Shipment's collection or delivery, not a place. The caller checks <see cref="EnsureAmendable"/> first, as for <see cref="Pick"/>.
     /// </summary>
     public StopOrderFault? ReorderStops(IReadOnlyList<(ShipmentId Shipment, StopKind Kind)> order)
     {
         ArgumentNullException.ThrowIfNull(order);
-        if (EnsureDraft() is not null)
-        {
-            throw new InvalidOperationException($"Trip {Number} is Dispatched, so its Stops change only by Amend.");
-        }
+        ThrowIfUnderWay();
 
         if (order.Count != _stops.Count || !_stops.Select(stop => (stop.ShipmentId, stop.Kind)).ToHashSet().SetEquals(order))
         {
@@ -246,6 +238,68 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
 
     /// <summary>Null when the Trip is a Draft, which can be changed or discarded; a Dispatched Trip is neither, and is never deleted.</summary>
     public TripRefusal? EnsureDraft() => Status == TripStatus.Draft ? null : TripRefusal.TripNotDraft(Number);
+
+    /// <summary>
+    /// Null when the Planner can change the Trip: a Draft, or a Dispatched Trip, which an Amend changes under the same rules. Once the Trip is In
+    /// progress (P12) nothing but taking off an uncollected Shipment is allowed, which is <see cref="TripRefusalCode.TripUnderWay"/> for the rest.
+    /// </summary>
+    public TripRefusal? EnsureAmendable() => Status == TripStatus.InProgress ? TripRefusal.TripUnderWay(Number) : null;
+
+    /// <summary>
+    /// The Driver started the Trip (P12). Only a Dispatched Trip can start. P12 owns when this happens; until it is built, nothing calls this
+    /// outside tests.
+    /// </summary>
+    public void MarkInProgress()
+    {
+        if (Status != TripStatus.Dispatched)
+        {
+            throw new InvalidOperationException($"Trip {Number} is {Status}, and only a Dispatched Trip can start.");
+        }
+
+        Status = TripStatus.InProgress;
+    }
+
+    /// <summary>
+    /// Sends the Dispatched Trip, changed by the Planner, as the next version: every Shipment on it becomes Dispatched (one added by this Amend
+    /// was Released), and <see cref="TripDispatchedEvent"/> is raised with the whole Trip under the Amend's own correlation ID. The caller makes
+    /// the change, checks the Trip rules and <see cref="EnsureAmendable"/> first, and calls this once for it.
+    /// </summary>
+    public void Amend(CorrelationId correlationId, DateTimeOffset amendedAt, Vehicle vehicle, Driver driver, IReadOnlyList<DispatchedShipment> shipments)
+    {
+        ArgumentNullException.ThrowIfNull(correlationId);
+        ArgumentNullException.ThrowIfNull(vehicle);
+        ArgumentNullException.ThrowIfNull(driver);
+        ArgumentNullException.ThrowIfNull(shipments);
+        if (Status != TripStatus.Dispatched)
+        {
+            throw new InvalidOperationException($"Trip {Number} is {Status}, and only a Dispatched Trip is amended.");
+        }
+
+        if (MissingParts() is { Count: > 0 } missing)
+        {
+            throw new InvalidOperationException($"Trip {Number} can't be amended to lack {string.Join(", ", missing)}.");
+        }
+
+        foreach (var shipment in shipments.Select(item => item.Shipment))
+        {
+            if (!HasShipment(shipment.Id) || (shipment.Status != ShipmentStatus.Dispatched && !shipment.Dispatch()))
+            {
+                throw new InvalidOperationException($"Shipment {shipment.Number} can't be dispatched on Trip {Number}.");
+            }
+        }
+
+        Version++;
+        _deliveries.Add(TripVersionDelivery.Start(Version));
+        RegisterDomainEvent(new TripDispatchedEvent(this, correlationId, amendedAt, vehicle, driver, shipments));
+    }
+
+    private void ThrowIfUnderWay()
+    {
+        if (EnsureAmendable() is { } refusal)
+        {
+            throw new InvalidOperationException(refusal.Message);
+        }
+    }
 
     /// <summary>
     /// The Trip dispatch Logic App reports the version as accepted by the Driver app. A report for a version that is no longer Sending is

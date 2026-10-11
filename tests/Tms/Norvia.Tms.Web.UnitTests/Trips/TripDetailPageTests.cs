@@ -153,10 +153,23 @@ public sealed class TripDetailPageTests : TmsWebContext
     }
 
     [Fact]
-    public void ADispatchedTripsStops_CantBeMoved()
+    public void ADispatchedTripsStops_CanBeMoved_AsAnAmend()
     {
         Queries.FindTripAsync("TR-0000001", Arg.Any<CancellationToken>())
             .Returns(new TripDetailView(Trip with { Status = TripStatus.Dispatched }, [Collect, Deliver], [], []));
+
+        var page = Render<TripDetailPage>(parameters => parameters.Add(detail => detail.Number, "TR-0000001"));
+
+        page.WaitForElements("[aria-label='Stops'] tbody tr");
+        page.FindAll("fluent-button[aria-label^='Move stop']").Should().NotBeEmpty();
+        page.Markup.Should().Contain("next version");
+    }
+
+    [Fact]
+    public void ATripUnderWaysStops_CantBeMoved()
+    {
+        Queries.FindTripAsync("TR-0000001", Arg.Any<CancellationToken>())
+            .Returns(new TripDetailView(Trip with { Status = TripStatus.InProgress }, [Collect, Deliver], [], []));
 
         var page = Render<TripDetailPage>(parameters => parameters.Add(detail => detail.Number, "TR-0000001"));
 

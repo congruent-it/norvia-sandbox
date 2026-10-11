@@ -205,12 +205,12 @@ public sealed class AddShipmentsToTripTests
     }
 
     [Fact]
-    public async Task Handle_ADispatchedTrip_IsRefusedWithTripNotDraft()
+    public async Task Handle_ATripUnderWay_IsRefusedWithTripUnderWay()
     {
         var trip = _fixture.Existing(Tuesday, Truck, null);
-        typeof(Trip).GetProperty(nameof(Trip.Status))!.SetValue(trip, TripStatus.Dispatched);
+        typeof(Trip).GetProperty(nameof(Trip.Status))!.SetValue(trip, TripStatus.InProgress);
 
-        Codes(await Add(trip, _fixture.ReleasedShipment(Tuesday))).Should().Equal(nameof(TripRefusalCode.TripNotDraft));
+        Codes(await Add(trip, _fixture.ReleasedShipment(Tuesday))).Should().Equal(nameof(TripRefusalCode.TripUnderWay));
     }
 
     [Fact]
@@ -219,8 +219,8 @@ public sealed class AddShipmentsToTripTests
         var trip = _fixture.Existing(Tuesday, Truck, null);
         await Add(trip, _fixture.ReleasedShipment(Tuesday, pallets: 2, weightKg: 3_000m));
 
-        var change = new ChangeDraftTripHandler(_fixture.Trips, _fixture.Checks, _fixture.TripShipments);
-        var result = await change.Handle(new ChangeDraftTripCommand(trip.Number.Value, Van, null), CancellationToken.None);
+        var change = new ChangeTripHandler(_fixture.Trips, _fixture.Checks, _fixture.TripShipments, _fixture.Amendments);
+        var result = await change.Handle(new ChangeTripCommand(trip.Number.Value, Van, null), CancellationToken.None);
 
         Codes(result).Should().Equal(nameof(TripAvailabilityCode.PayloadExceeded));
         trip.VehicleId.Should().Be(Truck);
@@ -258,7 +258,7 @@ public sealed class AddShipmentsToTripTests
         again.Value.Warnings.Should().Equal(first.Value.Warnings!).And.HaveCount(1);
     }
 
-    private AddShipmentsToTripHandler _handlerFor() => new(_fixture.Trips, _fixture.Checks, _fixture.TripShipments);
+    private AddShipmentsToTripHandler _handlerFor() => new(_fixture.Trips, _fixture.Checks, _fixture.TripShipments, _fixture.Amendments);
 
     private async Task<Result<AddShipmentsToTripResult>> Add(Trip trip, params Shipment[] shipments) =>
         await _handlerFor().Handle(new AddShipmentsToTripCommand(trip.Number.Value, [.. shipments.Select(shipment => shipment.Number.Value)]), CancellationToken.None);

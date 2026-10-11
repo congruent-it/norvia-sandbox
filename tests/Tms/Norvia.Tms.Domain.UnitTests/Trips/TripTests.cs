@@ -55,10 +55,10 @@ public sealed class TripTests
     }
 
     [Fact]
-    public void Plan_OnADispatchedTrip_IsABug()
+    public void Plan_OnATripUnderWay_IsABug()
     {
         var dispatched = Trip.CreateDraft(TripNumber.FromSequence(2), Day, null, null, new IdempotencyKey("k"));
-        typeof(Trip).GetProperty(nameof(Trip.Status))!.SetValue(dispatched, TripStatus.Dispatched);
+        typeof(Trip).GetProperty(nameof(Trip.Status))!.SetValue(dispatched, TripStatus.InProgress);
 
         dispatched.Invoking(trip => trip.Plan(new TimeOnly(7, 0), TimeSpan.FromHours(1))).Should().Throw<InvalidOperationException>();
     }
@@ -84,7 +84,78 @@ public sealed class TripTests
 
         draft.EnsureDraft().Should().BeNull();
         dispatched.EnsureDraft()!.Code.Should().Be(TripRefusalCode.TripNotDraft);
-        dispatched.Invoking(trip => trip.Pick(null, null)).Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void EnsureAmendable_AcceptsADraftAndADispatchedTrip_AndRefusesATripUnderWayWithTripUnderWay()
+    {
+        var trip = CompleteDraft(ShipmentId.New());
+        trip.EnsureAmendable().Should().BeNull();
+
+        trip.Dispatch(new CorrelationId("c"), DateTimeOffset.UtcNow, Truck, Joost, []);
+        trip.EnsureAmendable().Should().BeNull();
+
+        trip.MarkInProgress();
+        trip.EnsureAmendable()!.Code.Should().Be(TripRefusalCode.TripUnderWay);
+        trip.Invoking(t => t.Pick(null, null)).Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void MarkInProgress_OnADraft_IsABug() =>
+        Trip.CreateDraft(TripNumber.FromSequence(1), Day, null, null, new IdempotencyKey("k"))
+            .Invoking(t => t.MarkInProgress()).Should().Throw<InvalidOperationException>();
+
+    [Fact]
+    public void PickPlanAndAddShipment_AnswerWhetherTheyChangedTheTrip_AlsoOnADispatchedTrip()
+    {
+        var first = ReleasedOwnFleetShipment(1);
+        var trip = CompleteDraft(first.Id);
+        trip.Dispatch(new CorrelationId("c"), DateTimeOffset.UtcNow, Truck, Joost, [new DispatchedShipment(first, TransportOrderTests.SampleDetails())]);
+
+        trip.Pick(Truck.Id, Joost.Id).Should().BeFalse();
+        trip.Pick(Truck.Id, new DriverId("DRV-0002")).Should().BeTrue();
+        trip.Plan(new TimeOnly(7, 30), TimeSpan.FromHours(6)).Should().BeFalse();
+        trip.Plan(new TimeOnly(9, 30), TimeSpan.FromHours(4)).Should().BeTrue();
+        trip.AddShipment(first.Id).Should().BeFalse();
+        trip.AddShipment(ShipmentId.New()).Should().BeTrue();
+        trip.Stops.Should().HaveCount(4);
+    }
+
+    [Fact]
+    public void Amend_RaisesTheVersion_StartsItsDelivery_MakesTheAddedShipmentDispatched_AndRaisesOneTripDispatchedWithTheNewCorrelationId()
+    {
+        var first = ReleasedOwnFleetShipment(1);
+        var added = ReleasedOwnFleetShipment(2);
+        var trip = CompleteDraft(first.Id);
+        trip.Dispatch(new CorrelationId("c1"), DateTimeOffset.UtcNow, Truck, Joost, [new DispatchedShipment(first, TransportOrderTests.SampleDetails())]);
+        trip.ClearDomainEvents();
+        trip.AddShipment(added.Id);
+        var at = new DateTimeOffset(2026, 10, 12, 10, 0, 0, TimeSpan.Zero);
+
+        trip.Amend(new CorrelationId("c2"), at, Truck, Joost, [new DispatchedShipment(first, TransportOrderTests.SampleDetails()), new DispatchedShipment(added, TransportOrderTests.SampleDetails())]);
+
+        trip.Version.Should().Be(2);
+        trip.Status.Should().Be(TripStatus.Dispatched);
+        trip.Deliveries.Select(delivery => (delivery.Version, delivery.State)).Should().Equal((1, TripDeliveryState.Sending), (2, TripDeliveryState.Sending));
+        added.Status.Should().Be(ShipmentStatus.Dispatched);
+        var raised = trip.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<TripDispatchedEvent>().Subject;
+        raised.Trip.Version.Should().Be(2);
+        raised.CorrelationId.Value.Should().Be("c2");
+        raised.DispatchedAt.Should().Be(at);
+        raised.Shipments.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void Amend_ADraftOrATripLackingAPart_IsABug()
+    {
+        var draft = CompleteDraft(ShipmentId.New());
+        draft.Invoking(t => t.Amend(new CorrelationId("c"), DateTimeOffset.UtcNow, Truck, Joost, [])).Should().Throw<InvalidOperationException>();
+
+        var trip = CompleteDraft(ShipmentId.New());
+        trip.Dispatch(new CorrelationId("c"), DateTimeOffset.UtcNow, Truck, Joost, []);
+        trip.Plan(null, null);
+        trip.Invoking(t => t.Amend(new CorrelationId("c2"), DateTimeOffset.UtcNow, Truck, Joost, [])).Should().Throw<InvalidOperationException>();
+        trip.Version.Should().Be(1);
     }
 
     [Theory]
@@ -127,10 +198,10 @@ public sealed class TripTests
     }
 
     [Fact]
-    public void AddShipment_OnADispatchedTrip_IsABug()
+    public void AddShipment_OnATripUnderWay_IsABug()
     {
         var dispatched = Trip.CreateDraft(TripNumber.FromSequence(2), Day, null, null, new IdempotencyKey("k"));
-        typeof(Trip).GetProperty(nameof(Trip.Status))!.SetValue(dispatched, TripStatus.Dispatched);
+        typeof(Trip).GetProperty(nameof(Trip.Status))!.SetValue(dispatched, TripStatus.InProgress);
 
         dispatched.Invoking(trip => trip.AddShipment(ShipmentId.New())).Should().Throw<InvalidOperationException>();
     }
@@ -204,10 +275,10 @@ public sealed class TripTests
     }
 
     [Fact]
-    public void ReorderStops_OnADispatchedTrip_IsABug()
+    public void ReorderStops_OnATripUnderWay_IsABug()
     {
         var (trip, first, second) = TripWithTwoShipments();
-        typeof(Trip).GetProperty(nameof(Trip.Status))!.SetValue(trip, TripStatus.Dispatched);
+        typeof(Trip).GetProperty(nameof(Trip.Status))!.SetValue(trip, TripStatus.InProgress);
 
         trip.Invoking(t => t.ReorderStops([(first, StopKind.Collection), (first, StopKind.Delivery), (second, StopKind.Collection), (second, StopKind.Delivery)]))
             .Should().Throw<InvalidOperationException>();
