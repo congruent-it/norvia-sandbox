@@ -293,6 +293,59 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
         RegisterDomainEvent(new TripDispatchedEvent(this, correlationId, amendedAt, vehicle, driver, shipments));
     }
 
+    /// <summary>Null when the Shipment can be taken off this Trip: it is on it and not collected yet, however far the Trip has got.</summary>
+    public TripRefusal? EnsureCanTakeOff(Shipment shipment)
+    {
+        ArgumentNullException.ThrowIfNull(shipment);
+        if (!HasShipment(shipment.Id))
+        {
+            return TripRefusal.ShipmentNotOnTrip(shipment.Number.Value, Number);
+        }
+
+        return shipment.CanTakeOffTrip ? null : TripRefusal.ShipmentCollected(shipment.Number.Value, Number);
+    }
+
+    /// <summary>
+    /// Takes the Shipment off the Trip: its two Stops leave the sequence, which closes up, the Shipment goes back to Planned, and
+    /// <see cref="ShipmentTakenOffTripEvent"/> is raised. On a Dispatched or In progress Trip this is an Amend too: the version goes up and
+    /// <see cref="TripDispatchedEvent"/> is raised with the Shipments that remain, possibly none, under the same correlation ID; a Draft has no
+    /// version to send, so <paramref name="next"/> must be null for it and given otherwise. The caller checks <see cref="EnsureCanTakeOff"/> first.
+    /// </summary>
+    public void TakeShipmentOff(Shipment shipment, string reason, CorrelationId correlationId, DateTimeOffset at, NextTripVersion? next = null)
+    {
+        ArgumentNullException.ThrowIfNull(shipment);
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+        ArgumentNullException.ThrowIfNull(correlationId);
+        if (EnsureCanTakeOff(shipment) is { } refusal)
+        {
+            throw new InvalidOperationException(refusal.Message);
+        }
+
+        var sent = Status != TripStatus.Draft;
+        if (sent != (next is not null))
+        {
+            throw new ArgumentException($"Trip {Number} is {Status}, so " + (sent ? "taking a Shipment off sends the next version, which needs its contents." : "there is no next version to send."), nameof(next));
+        }
+
+        if (!shipment.TakeOffTrip())
+        {
+            throw new InvalidOperationException($"Shipment {shipment.Number} can't go back to Planned.");
+        }
+
+        var kept = Stops.Where(stop => stop.ShipmentId != shipment.Id).Select((stop, position) => stop with { Position = position }).ToList();
+        _stops.Clear();
+        _stops.AddRange(kept);
+
+        if (sent)
+        {
+            Version++;
+            _deliveries.Add(TripVersionDelivery.Start(Version));
+            RegisterDomainEvent(new TripDispatchedEvent(this, correlationId, at, next!.Vehicle, next.Driver, next.Shipments));
+        }
+
+        RegisterDomainEvent(new ShipmentTakenOffTripEvent(this, shipment, sent ? Version : null, reason, correlationId, at));
+    }
+
     private void ThrowIfUnderWay()
     {
         if (EnsureAmendable() is { } refusal)

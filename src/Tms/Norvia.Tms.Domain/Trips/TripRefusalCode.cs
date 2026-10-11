@@ -53,4 +53,10 @@ public enum TripRefusalCode
 
     /// <summary>The Trip is In progress (P12), so only an uncollected Shipment can be taken off it.</summary>
     TripUnderWay,
+
+    /// <summary>The Shipment is not on that Trip.</summary>
+    ShipmentNotOnTrip,
+
+    /// <summary>The Shipment is Collected already, so it can't be taken off its Trip any more.</summary>
+    ShipmentCollected,
 }

@@ -1,0 +1,12 @@
+{
+  "eventId": "0197a0c2-5b1e-7c3a-9d4e-2f6b8a1c3e61",
+  "eventType": "ShipmentTakenOffTrip",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-13T09:05:00+00:00",
+  "correlationId": "0197a0c2-5b1e-7c3a-9d4e-2f6b8a1c3e52",
+  "shipmentNumber": "SH-0000012",
+  "transportOrderNumber": "TO-0000012",
+  "tripNumber": "TR-0000008",
+  "version": 2,
+  "reason": "The Consignee can't take the goods until next week."
+}

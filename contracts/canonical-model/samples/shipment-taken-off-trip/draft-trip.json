@@ -1,0 +1,12 @@
+{
+  "eventId": "0197a0c2-5b1e-7c3a-9d4e-2f6b8a1c3e62",
+  "eventType": "ShipmentTakenOffTrip",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-13T09:07:00+00:00",
+  "correlationId": "0197a0c2-5b1e-7c3a-9d4e-2f6b8a1c3e63",
+  "shipmentNumber": "SH-0000013",
+  "transportOrderNumber": "TO-0000013",
+  "tripNumber": "TR-0000009",
+  "version": null,
+  "reason": "Moved to a Carrier."
+}

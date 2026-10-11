@@ -136,6 +136,10 @@ _Avoid_: release (that is for a Shipment), send, publish
 The Planner changing a Dispatched Trip, which sends its Driver a new version of the whole Trip. Once the Trip is under way, the only change allowed is taking off a Shipment that hasn't been collected.
 _Avoid_: re-dispatch, update, recall
 
+**Take off (a Shipment from a Trip)**:
+The Planner removing an uncollected Shipment's two Stops from its Trip, which puts the Shipment back to Planned so it can be re-planned in P3, and publishes `ShipmentTakenOffTrip`. On a Dispatched Trip it is also an Amend.
+_Avoid_: unassign, remove, unplan
+
 **Start Trip**:
 The Driver beginning a Dispatched Trip in the Driver app on its day, which makes it In progress. From then on the Planner can only take off a Shipment that isn't collected.
 _Avoid_: begin, check in

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/shipment-taken-off-trip.v1.schema.json",
+  "title": "ShipmentTakenOffTrip",
+  "description": "The Planner took an Own fleet Shipment off its Trip before it was collected (Canonical Model event, version 1). Its two Stops left the Trip and the Shipment is Planned again in the same transaction, so it can be re-planned in P3 onto another Trip or to a Carrier, for example to resolve a P7 Exception. Its Tracking status stays Scheduled. On a Dispatched Trip this is an Amend too: the new version is given, and the TripDispatched with that version carries the same correlation ID. Published on the Shipment events topic, under the correlation ID of the Planner's action.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "shipmentNumber", "transportOrderNumber", "tripNumber", "version", "reason"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "const": "ShipmentTakenOffTrip" },
+    "eventVersion": { "const": 1 },
+    "occurredAt": { "description": "When the Planner took the Shipment off the Trip.", "type": "string", "format": "date-time" },
+    "correlationId": { "description": "The correlation ID of the Planner's action, which starts a Message trail in the TMS UI. The Trip's new version shares it.", "type": "string", "minLength": 1 },
+    "shipmentNumber": { "description": "The Shipment taken off.", "type": "string", "pattern": "^SH-[0-9]{7}$" },
+    "transportOrderNumber": { "description": "The Transport Order the Shipment carries out.", "type": "string", "pattern": "^TO-[0-9]{7}$" },
+    "tripNumber": { "description": "The Trip the Shipment was taken off.", "type": "string", "pattern": "^TR-[0-9]{7}$" },
+    "version": { "description": "The Trip's new version when the Trip was Dispatched (or In progress); null when it was a Draft, which has no version to send.", "type": ["integer", "null"], "minimum": 2 },
+    "reason": { "description": "Why the Planner took the Shipment off, in their words.", "type": "string", "minLength": 1 }
+  }
+}
