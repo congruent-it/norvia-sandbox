@@ -229,7 +229,7 @@ public static class TripEndpoints
         }
 
         var result = await mediator.Send(
-            new ChangeDraftTripCommand(number, VehicleOf(request.VehicleId), DriverOf(request.DriverId), request.PlannedStart, request.PlannedDrivingDuration, AmendCorrelationId(response)), cancellationToken);
+            new ChangeTripCommand(number, VehicleOf(request.VehicleId), DriverOf(request.DriverId), request.PlannedStart, request.PlannedDrivingDuration, AmendCorrelationId(response)), cancellationToken);
         return result.IsSuccess ? TypedResults.NoContent() : Refused(result.ValidationErrors, "The Trip can't be changed.");
     }
 

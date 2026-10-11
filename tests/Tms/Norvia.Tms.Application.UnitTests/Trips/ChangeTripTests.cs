@@ -7,7 +7,7 @@ using static Norvia.Tms.Application.UnitTests.Fleet.Planning.PlanningEditsFixtur
 
 namespace Norvia.Tms.Application.UnitTests.Trips;
 
-public sealed class ChangeDraftTripTests
+public sealed class ChangeTripTests
 {
     private readonly TripsFixture _fixture = new();
 
@@ -96,6 +96,6 @@ public sealed class ChangeDraftTripTests
     private static string[] Codes(Result result) => [.. result.ValidationErrors.Select(error => error.ErrorCode)];
 
     private async Task<Result> Handle(string number, VehicleId? vehicle, DriverId? driver) =>
-        await new ChangeDraftTripHandler(_fixture.Trips, _fixture.Checks, _fixture.TripShipments, _fixture.Amendments)
-            .Handle(new ChangeDraftTripCommand(number, vehicle, driver), CancellationToken.None);
+        await new ChangeTripHandler(_fixture.Trips, _fixture.Checks, _fixture.TripShipments, _fixture.Amendments)
+            .Handle(new ChangeTripCommand(number, vehicle, driver), CancellationToken.None);
 }

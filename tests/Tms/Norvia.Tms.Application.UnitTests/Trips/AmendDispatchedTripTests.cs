@@ -169,14 +169,21 @@ public sealed class AmendDispatchedTripTests
     }
 
     [Fact]
-    public async Task WhenTheDriverIsNoLongerActive_ReorderingIsRefusedWithVehicleOrDriverInactive_AndNothingChanges()
+    public async Task WhenTheDriverIsNoLongerActive_ANewOrderIsRefusedWithVehicleOrDriverInactive_AndNothingChanges_ButTheSameOrderIsNotAnAmend()
     {
         var trip = await _fixture.DispatchedAsync();
-        var shipment = _fixture.StoredShipments.Single();
+        var first = _fixture.StoredShipments.Single();
+        var second = _fixture.ReleasedShipment(Tuesday);
+        await Add(trip, "corr-add", second);
+        trip.ClearDomainEvents();
         _fixture.Planning.Drivers.ListActive().Returns([]);
 
-        Codes(await Reorder(trip, "corr-reorder", (shipment, StopKind.Collection), (shipment, StopKind.Delivery))).Should().Equal(nameof(TripRefusalCode.VehicleOrDriverInactive));
-        trip.Version.Should().Be(1);
+        Codes(await Reorder(trip, "corr-reorder", (second, StopKind.Collection), (first, StopKind.Collection), (first, StopKind.Delivery), (second, StopKind.Delivery)))
+            .Should().Equal(nameof(TripRefusalCode.VehicleOrDriverInactive));
+        (await Reorder(trip, "corr-same", (first, StopKind.Collection), (first, StopKind.Delivery), (second, StopKind.Collection), (second, StopKind.Delivery))).IsSuccess.Should().BeTrue();
+
+        trip.Version.Should().Be(2);
+        trip.DomainEvents.Should().BeEmpty();
     }
 
     [Fact]
@@ -193,8 +200,8 @@ public sealed class AmendDispatchedTripTests
     private static string[] Codes(IResult result) => [.. result.ValidationErrors.Select(error => error.ErrorCode)];
 
     private async Task<Result> Change(Trip trip, VehicleId? vehicle, DriverId? driver, TimeOnly? start, TimeSpan? duration, string correlationId) =>
-        await new ChangeDraftTripHandler(_fixture.Trips, _fixture.Checks, _fixture.TripShipments, _fixture.Amendments)
-            .Handle(new ChangeDraftTripCommand(trip.Number.Value, vehicle, driver, start, duration, correlationId), CancellationToken.None);
+        await new ChangeTripHandler(_fixture.Trips, _fixture.Checks, _fixture.TripShipments, _fixture.Amendments)
+            .Handle(new ChangeTripCommand(trip.Number.Value, vehicle, driver, start, duration, correlationId), CancellationToken.None);
 
     private async Task<Result<AddShipmentsToTripResult>> Add(Trip trip, string correlationId, params Shipment[] shipments) =>
         await new AddShipmentsToTripHandler(_fixture.Trips, _fixture.Checks, _fixture.TripShipments, _fixture.Amendments)

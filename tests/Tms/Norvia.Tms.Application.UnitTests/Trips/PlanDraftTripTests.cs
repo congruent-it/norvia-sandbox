@@ -183,6 +183,6 @@ public sealed class PlanDraftTripTests
     private static string[] Codes<T>(Result<T> result) => [.. result.ValidationErrors.Select(error => error.ErrorCode)];
 
     private async Task<Result> Change(Trip trip, VehicleId? vehicle, DriverId? driver, TimeOnly? start, TimeSpan? duration) =>
-        await new ChangeDraftTripHandler(_fixture.Trips, _fixture.Checks, _fixture.TripShipments, _fixture.Amendments)
-            .Handle(new ChangeDraftTripCommand(trip.Number.Value, vehicle, driver, start, duration), CancellationToken.None);
+        await new ChangeTripHandler(_fixture.Trips, _fixture.Checks, _fixture.TripShipments, _fixture.Amendments)
+            .Handle(new ChangeTripCommand(trip.Number.Value, vehicle, driver, start, duration), CancellationToken.None);
 }

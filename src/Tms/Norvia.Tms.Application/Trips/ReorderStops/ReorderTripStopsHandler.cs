@@ -1,7 +1,6 @@
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Mediator;
-using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Domain.Trips;
 
 namespace Norvia.Tms.Application.Trips.ReorderStops;
@@ -22,12 +21,6 @@ public sealed class ReorderTripStopsHandler(IRepository<Trip> trips, TripShipmen
             return TripRefused.Because(underWay);
         }
 
-        var parties = trip.Status == TripStatus.Dispatched ? amendments.PartiesOf(trip.VehicleId, trip.DriverId) : null;
-        if (trip.Status == TripStatus.Dispatched && parties is null)
-        {
-            return TripRefused.Because(TripRefusal.VehicleOrDriverInactive(trip.Number));
-        }
-
         var onTrip = await shipments.OfAsync([.. trip.ShipmentIds], cancellationToken);
         var idOf = onTrip.ToDictionary(item => item.Shipment.Number.Value, item => item.Shipment.Id, StringComparer.Ordinal);
         if (command.Stops.Any(stop => !idOf.ContainsKey(stop.ShipmentNumber)))
@@ -35,8 +28,16 @@ public sealed class ReorderTripStopsHandler(IRepository<Trip> trips, TripShipmen
             return TripRefused.Because(TripRefusal.StopsNotTheTripsStops(trip.Number));
         }
 
-        var before = trip.Stops;
-        if (trip.ReorderStops([.. command.Stops.Select(stop => (idOf[stop.ShipmentNumber], stop.Kind))]) is { } fault)
+        // The same order again changes nothing, so it needs no Vehicle or Driver; a new one is an Amend of a Dispatched Trip and needs both.
+        var requested = command.Stops.Select(stop => (idOf[stop.ShipmentNumber], stop.Kind)).ToList();
+        var changes = !requested.SequenceEqual(trip.Stops.Select(stop => (stop.ShipmentId, stop.Kind)));
+        var (parties, inactive) = changes ? amendments.Prepare(trip, trip.VehicleId, trip.DriverId) : (null, null);
+        if (inactive is not null)
+        {
+            return TripRefused.Because(inactive);
+        }
+
+        if (trip.ReorderStops(requested) is { } fault)
         {
             var number = onTrip.FirstOrDefault(item => item.Shipment.Id == fault.Shipment)?.Shipment.Number.Value ?? string.Empty;
             return TripRefused.Because(fault.Code == TripRefusalCode.CollectionBeforeDelivery
@@ -44,10 +45,7 @@ public sealed class ReorderTripStopsHandler(IRepository<Trip> trips, TripShipmen
                 : TripRefusal.StopsNotTheTripsStops(trip.Number));
         }
 
-        if (parties is not null && !before.SequenceEqual(trip.Stops))
-        {
-            await amendments.SendAsync(trip, parties, new CorrelationId(command.CorrelationId ?? CorrelationId.New().Value), cancellationToken);
-        }
+        await amendments.SendAsync(trip, parties, command.CorrelationId, cancellationToken);
 
         await trips.SaveChangesAsync(cancellationToken);
         return Result.Success();

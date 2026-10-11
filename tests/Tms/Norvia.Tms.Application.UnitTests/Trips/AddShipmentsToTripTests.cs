@@ -219,8 +219,8 @@ public sealed class AddShipmentsToTripTests
         var trip = _fixture.Existing(Tuesday, Truck, null);
         await Add(trip, _fixture.ReleasedShipment(Tuesday, pallets: 2, weightKg: 3_000m));
 
-        var change = new ChangeDraftTripHandler(_fixture.Trips, _fixture.Checks, _fixture.TripShipments, _fixture.Amendments);
-        var result = await change.Handle(new ChangeDraftTripCommand(trip.Number.Value, Van, null), CancellationToken.None);
+        var change = new ChangeTripHandler(_fixture.Trips, _fixture.Checks, _fixture.TripShipments, _fixture.Amendments);
+        var result = await change.Handle(new ChangeTripCommand(trip.Number.Value, Van, null), CancellationToken.None);
 
         Codes(result).Should().Equal(nameof(TripAvailabilityCode.PayloadExceeded));
         trip.VehicleId.Should().Be(Truck);

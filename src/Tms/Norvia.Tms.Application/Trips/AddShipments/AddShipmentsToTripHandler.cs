@@ -1,7 +1,6 @@
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Mediator;
-using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Domain.Trips;
 
 namespace Norvia.Tms.Application.Trips.AddShipments;
@@ -35,10 +34,10 @@ public sealed class AddShipmentsToTripHandler(IRepository<Trip> trips, TripPlann
 
         if (added.Count > 0)
         {
-            var parties = trip.Status == TripStatus.Dispatched ? amendments.PartiesOf(trip.VehicleId, trip.DriverId) : null;
-            if (trip.Status == TripStatus.Dispatched && parties is null)
+            var (parties, inactive) = amendments.Prepare(trip, trip.VehicleId, trip.DriverId);
+            if (inactive is not null)
             {
-                return TripRefused.Because<AddShipmentsToTripResult>(TripRefusal.VehicleOrDriverInactive(trip.Number));
+                return TripRefused.Because<AddShipmentsToTripResult>(inactive);
             }
 
             foreach (var item in added)
@@ -46,10 +45,7 @@ public sealed class AddShipmentsToTripHandler(IRepository<Trip> trips, TripPlann
                 trip.AddShipment(item.Shipment.Id);
             }
 
-            if (parties is not null)
-            {
-                await amendments.SendAsync(trip, parties, new CorrelationId(command.CorrelationId ?? CorrelationId.New().Value), cancellationToken);
-            }
+            await amendments.SendAsync(trip, parties, command.CorrelationId, cancellationToken);
 
             await trips.SaveChangesAsync(cancellationToken);
         }

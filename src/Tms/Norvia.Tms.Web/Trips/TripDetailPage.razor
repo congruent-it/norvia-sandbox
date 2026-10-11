@@ -113,11 +113,11 @@
     else
     {
         <h2>Stops</h2>
-        @if (trip.Status is TripStatus.Draft or TripStatus.Dispatched)
+        @if (trip.Status.CanBeAmended())
         {
             <p class="mb-2">Drag a Stop to where it should go, or use its arrows.@(trip.Status == TripStatus.Dispatched ? " A new order goes to the Driver as the next version." : "")</p>
         }
-        <TripStopsTable Stops="detail.Stops" Reorderable="@(trip.Status is TripStatus.Draft or TripStatus.Dispatched)" Disabled="_working" OnReorder="ReorderAsync" />
+        <TripStopsTable Stops="detail.Stops" Reorderable="@(trip.Status.CanBeAmended())" Disabled="_working" OnReorder="ReorderAsync" />
     }
 </LiveListStates>
 

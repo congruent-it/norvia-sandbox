@@ -145,7 +145,7 @@
     // The Draft and Dispatched Trips of the day the selected Shipments collect on; none while they collect on different days.
     private IEnumerable<TripView> TripsOnSelectedDay(IReadOnlyList<ShipmentToPutOnTripSummary> shipments) =>
         SelectedDay(SelectedIn(shipments)) is { } day
-            ? (_trips.Items ?? []).Where(trip => trip.Status is TripStatus.Draft or TripStatus.Dispatched && trip.Day == day)
+            ? (_trips.Items ?? []).Where(trip => trip.Status.CanBeAmended() && trip.Day == day)
             : [];
 
     private static DateOnly? SelectedDay(List<ShipmentToPutOnTripSummary> selected) =>

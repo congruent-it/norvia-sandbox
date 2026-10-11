@@ -53,7 +53,7 @@
         <PropertyColumn Title="Load" Property="@(trip => TripText.Load(trip))" />
         <PropertyColumn Title="Delivery" Property="@(trip => TripText.Delivery(trip.LatestDelivery))" />
         <TemplateColumn Title="Actions">
-            @if (context.Status is TripStatus.Draft or TripStatus.Dispatched)
+            @if (context.Status.CanBeAmended())
             {
                 <FluentButton Appearance="Appearance.Outline" OnClick="@(() => { _changing = context; _notice = null; })"
                               aria-label="@($"Plan {context.Number}")">Plan</FluentButton>
