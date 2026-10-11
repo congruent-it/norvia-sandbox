@@ -181,6 +181,23 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
     }
 
     /// <summary>
+    /// Sends an Own fleet Shipment back to Planned, because the Planner took it off its Trip before it was collected (P11), so it can be
+    /// released again for another Trip or reassigned to a Carrier. Its Tracking status stays Scheduled. Raises no domain event of its own:
+    /// the Trip raises <c>ShipmentTakenOffTrip</c>. Returns false, changing nothing, for a Shipment that isn't a Released or Dispatched
+    /// Own fleet one, which includes one that is Collected already.
+    /// </summary>
+    public bool TakeOffTrip()
+    {
+        if (Status is not (ShipmentStatus.Released or ShipmentStatus.Dispatched) || !CarriedBy.IsOwnFleet)
+        {
+            return false;
+        }
+
+        Status = ShipmentStatus.Planned;
+        return true;
+    }
+
+    /// <summary>
     /// Sends a Released Shipment back to Planned, because its Carrier booking ended without confirmation (P4): rejected,
     /// not delivered or withdrawn. Raises no domain event of its own: the Carrier booking's own event already says so.
     /// Returns false, changing nothing, for a Shipment that isn't Released.

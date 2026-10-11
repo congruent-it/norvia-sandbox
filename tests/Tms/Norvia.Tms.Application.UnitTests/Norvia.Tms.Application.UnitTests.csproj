@@ -19,6 +19,7 @@
     <EmbeddedResource Include="..\..\..\contracts\canonical-model\*.schema.json" LogicalName="CanonicalModel/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\contracts\canonical-model\samples\trip-dispatched\*.json" LogicalName="CanonicalModel/samples/trip-dispatched/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\contracts\canonical-model\samples\trip-not-delivered\*.json" LogicalName="CanonicalModel/samples/trip-not-delivered/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\contracts\canonical-model\samples\shipment-taken-off-trip\*.json" LogicalName="CanonicalModel/samples/shipment-taken-off-trip/%(Filename)%(Extension)" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

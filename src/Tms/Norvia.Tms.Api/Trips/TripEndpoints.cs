@@ -17,6 +17,7 @@ using Norvia.Tms.Application.Trips.List;
 using Norvia.Tms.Application.Trips.ReorderStops;
 using Norvia.Tms.Application.Trips.ReportDelivery;
 using Norvia.Tms.Application.Trips.SendAgain;
+using Norvia.Tms.Application.Trips.TakeShipmentOff;
 using Norvia.Tms.Domain.Fleet;
 using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Domain.Trips;
@@ -70,6 +71,15 @@ public static class TripEndpoints
                 + "ShipmentNotFound or TripNotFound (404), or TripUnderWay (409) for a Trip that is In progress; failures lists every rule broken. A Shipment whose delivery window doesn't include the Trip's day is accepted, "
                 + "with a warning. A Shipment already on the Trip stays where it is, so sending the same call again changes nothing. A Draft publishes nothing. On a Dispatched Trip this is an Amend: in the same transaction the version goes up, "
                 + "the added Shipments become Dispatched, and exactly one TripDispatched with the whole Trip is written to the outbox under a new correlation ID, which the X-Correlation-ID response header returns.");
+
+        trips.MapPost("/{number}/shipments/{shipmentNumber}/take-off", TakeShipmentOffAsync)
+            .WithName("TakeShipmentOffTrip")
+            .RequireAuthorization(policy => policy.RequireRole(TransportOrderEndpoints.ManageRole))
+            .WithSummary("Take a Shipment off its Trip until it is Collected, with a reason; it goes back to Planned.")
+            .WithDescription(
+                "In one transaction the Shipment's two Stops leave the Trip, the Shipment goes back to Planned (its Tracking status stays Scheduled) and exactly one ShipmentTakenOffTrip is written to the outbox for the Shipment events topic under a new correlation ID, "
+                + "returned in the answer and the X-Correlation-ID header. On a Dispatched Trip, also one that is In progress, this is an Amend too: the version goes up and a TripDispatched with the Shipments that remain, possibly none, is written under the same correlation ID. "
+                + "reason is required. Refused with ShipmentCollected (409) once the Shipment is Collected, ShipmentNotOnTrip (409), VehicleOrDriverInactive (409) for a sent Trip whose Vehicle or Driver has gone inactive, TripNotFound or ShipmentNotFound (404).");
 
         trips.MapPut("/{number}/stops", ReorderStopsAsync)
             .WithName("ReorderTripStops")
@@ -196,6 +206,24 @@ public static class TripEndpoints
 
         var result = await mediator.Send(new AddShipmentsToTripCommand(number, request.ShipmentNumbers, AmendCorrelationId(response)), cancellationToken);
         return result.IsSuccess ? TypedResults.Ok(result.Value) : Refused(result.ValidationErrors, "The Shipments can't be put on the Trip.");
+    }
+
+    private static async Task<Results<Ok<TakeShipmentOffTripResult>, ProblemHttpResult, ValidationProblem>> TakeShipmentOffAsync(
+        string number,
+        string shipmentNumber,
+        TakeShipmentOffRequest request,
+        HttpResponse response,
+        IMediator mediator,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.Reason))
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { [nameof(TakeShipmentOffRequest.Reason)] = ["Taking a Shipment off a Trip needs a reason."] });
+        }
+
+        // Like a Dispatch, the action starts in the TMS UI, so the TMS starts its Message trail.
+        var result = await mediator.Send(new TakeShipmentOffTripCommand(number, shipmentNumber, request.Reason.Trim(), AmendCorrelationId(response)), cancellationToken);
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : Refused(result.ValidationErrors, "The Shipment can't be taken off the Trip.");
     }
 
     private static async Task<Results<NoContent, ProblemHttpResult, ValidationProblem>> ReorderStopsAsync(

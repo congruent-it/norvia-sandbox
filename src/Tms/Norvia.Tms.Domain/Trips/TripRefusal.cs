@@ -55,4 +55,10 @@ public sealed record TripRefusal(TripRefusalCode Code, string Message)
 
     public static TripRefusal TripUnderWay(TripNumber number) =>
         new(TripRefusalCode.TripUnderWay, $"Trip {number} is in progress, so the only change allowed is taking off a Shipment that hasn't been collected.");
+
+    public static TripRefusal ShipmentNotOnTrip(string number, TripNumber trip) =>
+        new(TripRefusalCode.ShipmentNotOnTrip, $"Shipment {number} is not on Trip {trip}.");
+
+    public static TripRefusal ShipmentCollected(string number, TripNumber trip) =>
+        new(TripRefusalCode.ShipmentCollected, $"Shipment {number} is collected already, so it can't be taken off Trip {trip}. A failed delivery goes through P7.");
 }

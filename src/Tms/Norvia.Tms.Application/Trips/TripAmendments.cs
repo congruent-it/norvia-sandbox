@@ -20,13 +20,13 @@ public sealed class TripAmendments(
     TimeProvider time)
 {
     /// <summary>
-    /// For a Dispatched Trip that would have this Vehicle and Driver: the <see cref="TripParties"/> it goes out with, or a refusal when either is
+    /// For a Dispatched Trip (or one In progress, which only taking a Shipment off can change) that would have this Vehicle and Driver: the <see cref="TripParties"/> it goes out with, or a refusal when either is
     /// missing or no longer active. For a Draft, neither: it has no version to send. Called before anything changes, so a refusal leaves the Trip as it was.
     /// </summary>
     public (TripParties? Parties, TripRefusal? Refusal) Prepare(Trip trip, VehicleId? vehicleId, DriverId? driverId)
     {
         ArgumentNullException.ThrowIfNull(trip);
-        if (trip.Status != TripStatus.Dispatched)
+        if (trip.Status == TripStatus.Draft)
         {
             return (null, null);
         }
