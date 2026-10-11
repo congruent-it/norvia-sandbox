@@ -42,6 +42,7 @@ internal sealed class TripsFixture
         Shipments = InMemoryRepository.Over(StoredShipments);
         TransportOrders = InMemoryRepository.Over(StoredOrders);
         TripShipments = new TripShipments(Shipments.AsRead(), TransportOrders.AsRead());
+        Amendments = new TripAmendments(Shipments, TripShipments, Planning.Vehicles, Planning.Drivers, Planning.Time);
     }
 
     public List<Shipment> StoredShipments { get; } = [];
@@ -53,6 +54,8 @@ internal sealed class TripsFixture
     public IRepository<TransportOrder> TransportOrders { get; }
 
     public TripShipments TripShipments { get; }
+
+    public TripAmendments Amendments { get; }
 
     /// <summary>What the infrastructure reports: the planned driving of every stored Trip.</summary>
     public IPlannedDrivingHours PlannedDriving { get; } = Substitute.For<IPlannedDrivingHours>();

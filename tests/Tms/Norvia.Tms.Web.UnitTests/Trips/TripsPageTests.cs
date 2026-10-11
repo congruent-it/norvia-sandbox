@@ -26,7 +26,7 @@ public sealed class TripsPageTests : TmsWebContext
     }
 
     [Fact]
-    public void ListsTheTripsWithStatusVehicleAndDriver_AndOffersActionsOnlyOnDrafts()
+    public void ListsTheTripsWithStatusVehicleAndDriver_AndOffersDiscardOnlyOnDrafts()
     {
         var page = Render<TripsPage>();
 
@@ -35,7 +35,7 @@ public sealed class TripsPageTests : TmsWebContext
         rows[0].TextContent.Should().Contain("TR-0000001").And.Contain("Draft").And.Contain("—");
         rows[1].TextContent.Should().Contain("VN-101-A").And.Contain("Anouk de Vries");
         rows[2].TextContent.Should().Contain("Dispatched");
-        rows[2].QuerySelectorAll("fluent-button").Should().BeEmpty("a Dispatched Trip is never discarded or picked for");
+        rows[2].QuerySelectorAll("fluent-button").Select(button => button.GetAttribute("aria-label")).Should().ContainSingle().Which.Should().StartWith("Plan", "a Dispatched Trip is amended but never discarded");
     }
 
     [Theory]

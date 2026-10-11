@@ -1,11 +1,12 @@
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Mediator;
+using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Domain.Trips;
 
 namespace Norvia.Tms.Application.Trips.AddShipments;
 
-public sealed class AddShipmentsToTripHandler(IRepository<Trip> trips, TripPlanningChecks checks, TripShipments shipments)
+public sealed class AddShipmentsToTripHandler(IRepository<Trip> trips, TripPlanningChecks checks, TripShipments shipments, TripAmendments amendments)
     : ICommandHandler<AddShipmentsToTripCommand, Result<AddShipmentsToTripResult>>
 {
     public async ValueTask<Result<AddShipmentsToTripResult>> Handle(AddShipmentsToTripCommand command, CancellationToken cancellationToken)
@@ -17,9 +18,9 @@ public sealed class AddShipmentsToTripHandler(IRepository<Trip> trips, TripPlann
             return TripRefused.Because<AddShipmentsToTripResult>(TripRefusal.TripNotFound(command.Number));
         }
 
-        if (trip.EnsureDraft() is { } notDraft)
+        if (trip.EnsureAmendable() is { } underWay)
         {
-            return TripRefused.Because<AddShipmentsToTripResult>(notDraft);
+            return TripRefused.Because<AddShipmentsToTripResult>(underWay);
         }
 
         var (found, notFound) = await shipments.FindAsync(command.ShipmentNumbers, cancellationToken);
@@ -34,9 +35,20 @@ public sealed class AddShipmentsToTripHandler(IRepository<Trip> trips, TripPlann
 
         if (added.Count > 0)
         {
+            var parties = trip.Status == TripStatus.Dispatched ? amendments.PartiesOf(trip.VehicleId, trip.DriverId) : null;
+            if (trip.Status == TripStatus.Dispatched && parties is null)
+            {
+                return TripRefused.Because<AddShipmentsToTripResult>(TripRefusal.VehicleOrDriverInactive(trip.Number));
+            }
+
             foreach (var item in added)
             {
                 trip.AddShipment(item.Shipment.Id);
+            }
+
+            if (parties is not null)
+            {
+                await amendments.SendAsync(trip, parties, new CorrelationId(command.CorrelationId ?? CorrelationId.New().Value), cancellationToken);
             }
 
             await trips.SaveChangesAsync(cancellationToken);

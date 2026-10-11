@@ -47,7 +47,7 @@
             Create Trip (@SelectedIn(shipments).Count)
         </FluentButton>
         <FluentSelect TOption="string" Label="Add to Trip" aria-label="Add to Trip" @bind-Value="_addTo" Width="16rem">
-            <FluentOption TOption="string" Value="">Choose a Draft Trip</FluentOption>
+            <FluentOption TOption="string" Value="">Choose a Trip</FluentOption>
             @foreach (var trip in TripsOnSelectedDay(shipments))
             {
                 <FluentOption TOption="string" Value="@trip.Number">@($"{trip.Number} · {TripText.Load(trip)}")</FluentOption>
@@ -142,10 +142,10 @@
 
     private bool CanAct(IReadOnlyList<ShipmentToPutOnTripSummary> shipments) => !_working && SelectedIn(shipments).Count > 0;
 
-    // The Draft Trips of the day the selected Shipments collect on; none while they collect on different days.
+    // The Draft and Dispatched Trips of the day the selected Shipments collect on; none while they collect on different days.
     private IEnumerable<TripView> TripsOnSelectedDay(IReadOnlyList<ShipmentToPutOnTripSummary> shipments) =>
         SelectedDay(SelectedIn(shipments)) is { } day
-            ? (_trips.Items ?? []).Where(trip => trip.Status == TripStatus.Draft && trip.Day == day)
+            ? (_trips.Items ?? []).Where(trip => trip.Status is TripStatus.Draft or TripStatus.Dispatched && trip.Day == day)
             : [];
 
     private static DateOnly? SelectedDay(List<ShipmentToPutOnTripSummary> selected) =>

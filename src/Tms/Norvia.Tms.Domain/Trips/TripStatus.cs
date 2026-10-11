@@ -5,6 +5,9 @@ public enum TripStatus
     /// <summary>Being built. The Planner can change anything or discard it, and it still holds its Vehicle and Driver.</summary>
     Draft = 1,
 
-    /// <summary>Sent to its Driver. It is never deleted.</summary>
+    /// <summary>Sent to its Driver. It is never deleted, and the Planner changes it by Amend.</summary>
     Dispatched,
+
+    /// <summary>The Driver started it (P12). Only an uncollected Shipment can be taken off.</summary>
+    InProgress,
 }

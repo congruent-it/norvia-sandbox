@@ -57,6 +57,10 @@ internal sealed partial class TmsApiClient
     public Task<TripAnswer> DiscardDraftTripAsync(string number, CancellationToken cancellationToken) =>
         SendTripAsync("Discard Draft Trip", HttpMethod.Delete, $"/v1/trips/{Uri.EscapeDataString(number)}", number, null, cancellationToken);
 
+    // The API answers a change to a Trip with the correlation ID of the Message trail an Amend of a Dispatched Trip starts; a Draft's edits carry one nobody continues.
+    private static string? AmendCorrelationId(HttpResponseMessage response) =>
+        response.Headers.TryGetValues("X-Correlation-ID", out var values) ? values.FirstOrDefault() : null;
+
     // A dispatch has a flow and an answer of its own; every other action is the Planner building a Trip.
     private async Task<TripAnswer> SendTripAsync(string action, HttpMethod method, string path, string? tripNumber, object? body, CancellationToken cancellationToken, string flow = Flows.TripPlanning)
     {
@@ -98,14 +102,14 @@ internal sealed partial class TmsApiClient
             case HttpStatusCode.OK:
                 var added = await response.Content.ReadFromJsonAsync<AddedShipments>(Json, cancellationToken)
                     ?? throw new HttpRequestException("The TMS API answered added Shipments without a body.");
-                using (Track(Flows.TripPlanning, TrackingKeys.Succeeded, new() { TripNumber = tripNumber }))
+                using (Track(Flows.TripPlanning, TrackingKeys.Succeeded, new() { TripNumber = tripNumber, CorrelationId = AmendCorrelationId(response) }))
                 {
                     LogTripActionDone(action);
                 }
 
                 return new TripAnswer.Added(added.Warnings ?? []);
             case HttpStatusCode.NoContent:
-                using (Track(Flows.TripPlanning, TrackingKeys.Succeeded, new() { TripNumber = tripNumber }))
+                using (Track(Flows.TripPlanning, TrackingKeys.Succeeded, new() { TripNumber = tripNumber, CorrelationId = AmendCorrelationId(response) }))
                 {
                     LogTripActionDone(action);
                 }

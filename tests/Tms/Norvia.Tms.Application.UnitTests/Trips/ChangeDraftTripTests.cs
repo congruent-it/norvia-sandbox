@@ -62,12 +62,13 @@ public sealed class ChangeDraftTripTests
     }
 
     [Fact]
-    public async Task Handle_ADispatchedTrip_IsRefusedWithTripNotDraft()
+    public async Task Handle_ATripUnderWay_IsRefusedWithTripUnderWay()
     {
-        var trip = _fixture.Existing(TripsFixture.Tuesday, null, null);
-        typeof(Trip).GetProperty(nameof(Trip.Status))!.SetValue(trip, TripStatus.Dispatched);
+        var trip = await _fixture.DispatchedAsync();
+        trip.MarkInProgress();
 
-        Codes(await Handle(trip.Number.Value, Van, Anouk)).Should().Equal(nameof(TripRefusalCode.TripNotDraft));
+        Codes(await Handle(trip.Number.Value, Van, Joost)).Should().Equal(nameof(TripRefusalCode.TripUnderWay));
+        trip.DriverId.Should().Be(Anouk);
     }
 
     [Fact]
@@ -95,6 +96,6 @@ public sealed class ChangeDraftTripTests
     private static string[] Codes(Result result) => [.. result.ValidationErrors.Select(error => error.ErrorCode)];
 
     private async Task<Result> Handle(string number, VehicleId? vehicle, DriverId? driver) =>
-        await new ChangeDraftTripHandler(_fixture.Trips, _fixture.Checks, _fixture.TripShipments)
+        await new ChangeDraftTripHandler(_fixture.Trips, _fixture.Checks, _fixture.TripShipments, _fixture.Amendments)
             .Handle(new ChangeDraftTripCommand(number, vehicle, driver), CancellationToken.None);
 }

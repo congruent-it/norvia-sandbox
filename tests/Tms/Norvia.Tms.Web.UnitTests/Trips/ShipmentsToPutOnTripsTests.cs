@@ -124,14 +124,14 @@ public sealed class ShipmentsToPutOnTripsTests : TmsWebContext
     }
 
     [Fact]
-    public void AddToTrip_OffersOnlyTheDraftsOfTheSelectedShipmentsDay_AndSendsTheSelectedShipments()
+    public void AddToTrip_OffersTheDraftAndDispatchedTripsOfTheSelectedShipmentsDay_AndSendsTheSelectedShipments()
     {
         Commands.AddShipmentsToTripAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>()).Returns(new TripAnswer.Added([]));
         var page = Render<ShipmentsToPutOnTrips>();
         SelectAll(page, "SH-0000001", "SH-0000002");
 
         page.WaitForAssertion(() => Group(page).QuerySelectorAll("fluent-option").Select(option => option.TextContent.Trim()).Should().Equal(
-            "Choose a Draft Trip", "TR-0000001 · 0 kg · 0 pallets"));
+            "Choose a Trip", "TR-0000001 · 0 kg · 0 pallets", "TR-0000002 · 0 kg · 0 pallets"));
         Group(page).QuerySelector("fluent-select")!.Change("TR-0000001");
         AddButton(page).Click();
 
@@ -147,7 +147,7 @@ public sealed class ShipmentsToPutOnTripsTests : TmsWebContext
             .Returns(new TripAnswer.Refused("The Trip's 2,900 kg is more than the Vehicle's 1,200 kg payload."));
         var page = Render<ShipmentsToPutOnTrips>();
         SelectAll(page, "SH-0000001");
-        page.WaitForAssertion(() => Group(page).QuerySelectorAll("fluent-option").Should().HaveCount(2));
+        page.WaitForAssertion(() => Group(page).QuerySelectorAll("fluent-option").Should().HaveCount(3));
         Group(page).QuerySelector("fluent-select")!.Change("TR-0000001");
 
         AddButton(page).Click();

@@ -60,7 +60,7 @@ public sealed class ReorderTripStopsTests
     public async Task Handle_AnOrderThatLeavesAStopOutOrNamesAnUnknownShipment_IsRefusedWithStopsNotTheTripsStops()
     {
         var (trip, first, _) = await TripWithTwoShipmentsAsync();
-        var handler = new ReorderTripStopsHandler(_fixture.Trips, _fixture.TripShipments);
+        var handler = new ReorderTripStopsHandler(_fixture.Trips, _fixture.TripShipments, _fixture.Amendments);
 
         var short_ = await Reorder(trip, (first, StopKind.Collection), (first, StopKind.Delivery));
         var unknown = await handler.Handle(
@@ -73,32 +73,32 @@ public sealed class ReorderTripStopsTests
     [Fact]
     public async Task Handle_AnUnknownTrip_IsRefusedWithTripNotFound()
     {
-        var result = await new ReorderTripStopsHandler(_fixture.Trips, _fixture.TripShipments)
+        var result = await new ReorderTripStopsHandler(_fixture.Trips, _fixture.TripShipments, _fixture.Amendments)
             .Handle(new ReorderTripStopsCommand("TR-0009999", []), CancellationToken.None);
 
         Codes(result).Should().Equal(nameof(TripRefusalCode.TripNotFound));
     }
 
     [Fact]
-    public async Task Handle_ADispatchedTrip_IsRefusedWithTripNotDraft()
+    public async Task Handle_ATripUnderWay_IsRefusedWithTripUnderWay()
     {
         var (trip, first, _) = await TripWithTwoShipmentsAsync();
-        typeof(Trip).GetProperty(nameof(Trip.Status))!.SetValue(trip, TripStatus.Dispatched);
+        typeof(Trip).GetProperty(nameof(Trip.Status))!.SetValue(trip, TripStatus.InProgress);
 
-        Codes(await Reorder(trip, (first, StopKind.Collection), (first, StopKind.Delivery))).Should().Equal(nameof(TripRefusalCode.TripNotDraft));
+        Codes(await Reorder(trip, (first, StopKind.Collection), (first, StopKind.Delivery))).Should().Equal(nameof(TripRefusalCode.TripUnderWay));
     }
 
     private async Task<(Trip Trip, Shipment First, Shipment Second)> TripWithTwoShipmentsAsync()
     {
         var trip = _fixture.Existing(Tuesday, Truck, null);
         var (first, second) = (_fixture.ReleasedShipment(Tuesday), _fixture.ReleasedShipment(Tuesday));
-        var add = new AddShipmentsToTripHandler(_fixture.Trips, _fixture.Checks, _fixture.TripShipments);
+        var add = new AddShipmentsToTripHandler(_fixture.Trips, _fixture.Checks, _fixture.TripShipments, _fixture.Amendments);
         (await add.Handle(new AddShipmentsToTripCommand(trip.Number.Value, [first.Number.Value, second.Number.Value]), CancellationToken.None)).IsSuccess.Should().BeTrue();
         return (trip, first, second);
     }
 
     private async Task<Result> Reorder(Trip trip, params (Shipment Shipment, StopKind Kind)[] order) =>
-        await new ReorderTripStopsHandler(_fixture.Trips, _fixture.TripShipments).Handle(
+        await new ReorderTripStopsHandler(_fixture.Trips, _fixture.TripShipments, _fixture.Amendments).Handle(
             new ReorderTripStopsCommand(trip.Number.Value, [.. order.Select(stop => new StopReference(stop.Shipment.Number.Value, stop.Kind))]), CancellationToken.None);
 
     private static IEnumerable<string> Codes(Result result) => result.ValidationErrors.Select(error => error.ErrorCode);

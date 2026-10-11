@@ -55,7 +55,7 @@
     [Parameter, EditorRequired]
     public IReadOnlyList<TripStopView> Stops { get; set; } = [];
 
-    /// <summary>True for a Draft, whose Stops the Planner can drag into order; a Dispatched Trip's can't be moved.</summary>
+    /// <summary>True for a Draft or a Dispatched Trip, whose Stops the Planner can drag into order; a Trip that is In progress can't be moved.</summary>
     [Parameter]
     public bool Reorderable { get; set; }
 
