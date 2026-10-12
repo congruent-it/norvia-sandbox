@@ -28,9 +28,7 @@ public sealed class EndTripHandler(IRepository<Trip> trips, IRepository<Shipment
 
         var onTrip = await shipments.ListAsync(new ShipmentsToDispatchSpec([.. trip.ShipmentIds]), cancellationToken);
         var correlationId = new CorrelationId(command.CorrelationId);
-        trip.End(correlationId, time.GetUtcNow(), outcomes, onTrip);
-
-        var completed = trip.DomainEvents.OfType<TripCompletedEvent>().Single();
+        var groups = trip.End(correlationId, time.GetUtcNow(), outcomes, onTrip);
 
         // One save writes the status, the Stops, the Shipments and TripCompleted's outbox message together.
         await trips.SaveChangesAsync(cancellationToken);
@@ -38,9 +36,9 @@ public sealed class EndTripHandler(IRepository<Trip> trips, IRepository<Shipment
             trip.Number.Value,
             trip.Version,
             correlationId.Value,
-            Numbers(completed.Delivered),
-            Numbers(completed.NotDelivered),
-            Numbers(completed.NotCollected));
+            Numbers(groups.Delivered),
+            Numbers(groups.NotDelivered),
+            Numbers(groups.NotCollected));
     }
 
     private static string[] Numbers(IReadOnlyList<ShipmentNumber> numbers) => [.. numbers.Select(number => number.Value)];

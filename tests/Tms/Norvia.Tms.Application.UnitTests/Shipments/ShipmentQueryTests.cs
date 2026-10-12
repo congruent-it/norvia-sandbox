@@ -49,7 +49,8 @@ public sealed class ShipmentQueryTests
             "corr-planning",
             Samples.Now.AddHours(2),
             [new ShipmentAssignmentView(new CarriedByView(AssignedTo.Carrier, new CarrierView("CAR-0001", "Van Dijk Transport")), "corr-planning", Samples.Now.AddHours(2))],
-            []));
+            [],
+            false));
     }
 
     [Fact]

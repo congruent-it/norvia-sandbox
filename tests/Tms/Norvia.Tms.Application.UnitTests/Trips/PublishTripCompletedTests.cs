@@ -112,7 +112,5 @@ public sealed class PublishTripCompletedTests
             trip.DriverId!,
             new CorrelationId("corr-end"),
             new DateTimeOffset(2026, 10, 14, 16, 0, 0, TimeSpan.Zero),
-            [ShipmentNumber.FromSequence(1)],
-            [ShipmentNumber.FromSequence(2)],
-            [ShipmentNumber.FromSequence(3)]);
+            new TripShipmentGroups([ShipmentNumber.FromSequence(1)], [ShipmentNumber.FromSequence(2)], [ShipmentNumber.FromSequence(3)]));
 }

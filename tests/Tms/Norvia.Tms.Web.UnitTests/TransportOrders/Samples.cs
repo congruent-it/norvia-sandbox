@@ -59,7 +59,8 @@ internal static class Samples
             new ShipmentAssignmentView(new CarriedByView(AssignedTo.Carrier, VanDijk), "corr-planning", new DateTimeOffset(2026, 9, 24, 9, 45, 0, TimeSpan.Zero)),
             new ShipmentAssignmentView(new CarriedByView(AssignedTo.Carrier, Kessler), "corr-reassignment", new DateTimeOffset(2026, 9, 24, 10, 0, 0, TimeSpan.Zero)),
         ],
-        carrierBookings ?? []);
+        carrierBookings ?? [],
+        false);
 
     // Collection 06:00–10:00 and delivery 12:00–16:00 on 26 September 2026 in Rotterdam (UTC+2).
     public static TransportOrderView View(string number = "TO-0000042") => new(

@@ -310,11 +310,11 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
 
     /// <summary>
     /// The Driver ended the Trip (P12): it is Completed, at the same version, and <see cref="TripCompletedEvent"/> is raised with the
-    /// Shipments delivered, not delivered and not collected. An uncollected Shipment goes back to Planned and a collected one that wasn't
+    /// Shipments delivered, not delivered and not collected, which are returned too. An uncollected Shipment goes back to Planned and a collected one that wasn't
     /// delivered is flagged Awaiting re-delivery, keeping its status. Both leave the Trip, which keeps only the Stops of the delivered ones, and
     /// no <c>ShipmentTakenOffTrip</c> is raised. <paramref name="shipments"/> are the tracked Shipments on the Trip. The caller checks <see cref="EnsureCanEnd"/> first.
     /// </summary>
-    public void End(CorrelationId correlationId, DateTimeOffset endedAt, StopOutcomes outcomes, IReadOnlyList<Shipment> shipments)
+    public TripShipmentGroups End(CorrelationId correlationId, DateTimeOffset endedAt, StopOutcomes outcomes, IReadOnlyList<Shipment> shipments)
     {
         ArgumentNullException.ThrowIfNull(correlationId);
         ArgumentNullException.ThrowIfNull(outcomes);
@@ -353,7 +353,9 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
         _stops.AddRange(kept);
 
         Status = TripStatus.Completed;
-        RegisterDomainEvent(new TripCompletedEvent(this, driver, correlationId, endedAt, delivered, notDelivered, notCollected));
+        var groups = new TripShipmentGroups(delivered, notDelivered, notCollected);
+        RegisterDomainEvent(new TripCompletedEvent(this, driver, correlationId, endedAt, groups));
+        return groups;
     }
 
     /// <summary>

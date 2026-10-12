@@ -57,6 +57,18 @@ public sealed class CheckLateDeliveriesHandlerTests
     }
 
     [Fact]
+    public async Task Handle_AShipmentAwaitingRedelivery_StillGetsALateDeliveryException()
+    {
+        var shipment = OnItsWay();
+        typeof(Shipment).GetProperty(nameof(Shipment.AwaitingRedelivery))!.SetValue(shipment, true);
+        _time.Advance(TimeSpan.FromMinutes(1));
+
+        await Handler(TimeSpan.Zero).Handle(new CheckLateDeliveriesCommand(), CancellationToken.None);
+
+        await _exceptions.Received(1).AddAsync(Arg.Is<ExceptionCase>(opened => opened.Type == ExceptionType.LateDelivery && opened.ShipmentId == shipment.Id), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Handle_AfterTheOrdersWindowButBeforeTheAgreedOne_OpensNothing()
     {
         var shipment = OnItsWay(booked: true);

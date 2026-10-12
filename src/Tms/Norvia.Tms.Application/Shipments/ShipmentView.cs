@@ -23,7 +23,7 @@ public sealed record ShipmentView(
     DateTimeOffset PlannedAt,
     IReadOnlyList<ShipmentAssignmentView> Assignments,
     IReadOnlyList<CarrierBookingView> CarrierBookings,
-    bool AwaitingRedelivery = false)
+    bool AwaitingRedelivery)
 {
     public static ShipmentView Of(
         Shipment shipment, IReadOnlyList<CarrierBooking> carrierBookings, IShipperDirectory shippers, ICarrierDirectory carriers)
