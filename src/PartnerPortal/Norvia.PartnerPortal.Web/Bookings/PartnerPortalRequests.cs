@@ -16,6 +16,8 @@ using Norvia.PartnerPortal.Application.CarrierShipments.TrackingSettings;
 using Norvia.PartnerPortal.Application.DriverAppFault;
 using Norvia.PartnerPortal.Application.DriverAppFault.GetCurrent;
 using Norvia.PartnerPortal.Application.DriverAppFault.Switch;
+using Norvia.PartnerPortal.Application.DriverSignIns;
+using Norvia.PartnerPortal.Application.DriverSignIns.List;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Application.Personas.List;
 using Norvia.PartnerPortal.Application.ShipperNotifications;
@@ -42,6 +44,9 @@ internal sealed class PartnerPortalRequests(IServiceScopeFactory scopes) : IPart
 
     public Task<DriverAppFaultView> SetDriverAppFaultAsync(bool unavailable, CancellationToken cancellationToken) =>
         SendAsync(new SetDriverAppFaultCommand(unavailable), cancellationToken);
+
+    public Task<DriverSignInsView> ListDriverSignInsAsync(CancellationToken cancellationToken) =>
+        SendAsync(new ListDriverSignInsQuery(), cancellationToken);
 
     public Task<IReadOnlyList<PersonaView>> ListPersonasAsync(CancellationToken cancellationToken) =>
         SendAsync(new ListPersonasQuery(), cancellationToken);

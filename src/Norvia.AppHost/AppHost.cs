@@ -86,7 +86,8 @@ var driverAppApi = builder.AddProject<Projects.Norvia_DriverApp_Api>("driver-app
 // The Partner portal's presenter panel switches the Driver app's "unavailable" fault through its API (P11).
 partnerPortal.WithEnvironment("DriverApp__Address", driverAppApi.GetEndpoint("http"));
 
-// The Driver's screens: sign in by picking a seeded Driver, then a read-only list of that Driver's Trips.
+// The Driver's screens: sign in as a seeded Driver, then a read-only list of that Driver's Trips. Locally a stand-in plays
+// Entra ID's sign-in (ADR 0037); in Azure Easy Auth signs Drivers in.
 var driverAppWeb = builder.AddProject<Projects.Norvia_DriverApp_Web>("driver-app-web")
     .WithReference(driverAppDatabase).WaitForCompletion(driverAppMigrations)
     .WithHttpHealthCheck("/health")
@@ -196,6 +197,14 @@ if (builder.ExecutionContext.IsPublishMode)
         .WithAzureUserAssignedIdentity(driverAppIdentity)
         .WithEnvironment("DriverEndpoint__ApiKey", driverAppSecrets.Resource.GetSecret("driver-app-endpoint-key"));
 
+    // Drivers sign in to the Driver app with Entra ID. Easy Auth passes the Driver's token on, and the Driver ID is the app role
+    // in it (ADR 0037). The presenter panel shows the Driver test users the estate made.
+    driverAppWeb.WithExternalHttpEndpoints()
+        .PublishAsAzureContainerApp((infrastructure, app) =>
+            infrastructure.Add(EntraSignIn.For(infrastructure, app, estate.DriverAppRegistrationClientId, estate.EntraIssuer)));
+    partnerPortal.WithEnvironment("DriverSignIns__Domain", estate.DriverSignInDomain)
+        .WithEnvironment("DriverSignIns__Password", estate.DriverSignInPassword);
+
     // Each Carrier Persona's booking endpoint asks its caller, the P4 booking Logic App, for the credential the estate
     // keeps in the same vault as carrier-endpoint-key-<Carrier ID>.
     foreach (var carrier in personas.Where(persona => !persona.IsShipper))
@@ -253,6 +262,9 @@ else
             "The Integration console has an estate's workspace but not its retention: set Parameters:estate-integration-retention-days " +
             "to the estate's integrationRetentionDays (AZURE_ESTATE_INTEGRATION_RETENTION_DAYS in azd env get-values).");
     }
+
+    // Locally there is no Entra ID either, so the Driver app's sign-in page stands in for it and lists the seeded Drivers (ADR 0037).
+    driverAppWeb.WithEnvironment("LocalSignIn__Enabled", "true");
 
     integrationConsole
         .WithEnvironment("LocalOperator__Name", $"{Environment.UserName} (local)")

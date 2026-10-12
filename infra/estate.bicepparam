@@ -24,3 +24,6 @@ param demoUiRedirectUris = readEnvironmentVariable('ESTATE_DEMO_UI_REDIRECT_URIS
 
 // The postdeploy hook stores the Integration console's sign-in callback once Aspire has deployed it.
 param integrationConsoleRedirectUris = readEnvironmentVariable('ESTATE_INTEGRATION_CONSOLE_REDIRECT_URIS', '')
+
+// The postdeploy hook stores the Driver app's sign-in callback once Aspire has deployed it.
+param driverAppRedirectUris = readEnvironmentVariable('ESTATE_DRIVER_APP_REDIRECT_URIS', '')

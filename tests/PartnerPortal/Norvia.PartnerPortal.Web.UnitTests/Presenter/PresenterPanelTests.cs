@@ -1,4 +1,5 @@
 using Norvia.PartnerPortal.Application.DriverAppFault;
+using Norvia.PartnerPortal.Application.DriverSignIns;
 using Norvia.PartnerPortal.Web.Presenter;
 
 namespace Norvia.PartnerPortal.Web.UnitTests.Presenter;
@@ -77,6 +78,46 @@ public sealed class PresenterPanelTests : PortalWebContext
         panel.Find("fluent-button").Click();
 
         panel.Find("[role=alert]").TextContent.Should().Contain("couldn't be switched");
+        panel.Find("fluent-button").TextContent.Trim().Should().Be("Make the Driver app unavailable");
+    }
+
+    [Fact]
+    public void Render_WithEntraTestUsers_ListsEachDriversUserName_AndThePassword()
+    {
+        Current(unavailable: false);
+        Portal.ListDriverSignInsAsync(Arg.Any<CancellationToken>()).Returns(new DriverSignInsView(
+            "s3cret",
+            [new DriverSignInView("DRV-0001", "Anouk de Vries", "drv-0001@norvia.example"), new DriverSignInView("DRV-0002", "Joost Bakker", "drv-0002@norvia.example")]));
+
+        var panel = Render<PresenterPanel>();
+
+        var signIn = panel.Find("[aria-label='Driver sign-in']");
+        signIn.QuerySelectorAll("tbody tr").Select(row => row.TextContent).Should().Equal(
+            "Anouk de VriesDRV-0001drv-0001@norvia.example", "Joost BakkerDRV-0002drv-0002@norvia.example");
+        signIn.TextContent.Should().Contain("s3cret");
+    }
+
+    [Fact]
+    public void Render_WithoutEntraTestUsers_SaysTheDriverAppsSignInPageStandsIn_AndListsTheDrivers()
+    {
+        Current(unavailable: false);
+        Portal.ListDriverSignInsAsync(Arg.Any<CancellationToken>()).Returns(new DriverSignInsView(null, [new DriverSignInView("DRV-0001", "Anouk de Vries", null)]));
+
+        var signIn = Render<PresenterPanel>().Find("[aria-label='Driver sign-in']");
+
+        signIn.TextContent.Should().Contain("stands in").And.Contain("Anouk de Vries (DRV-0001)");
+        signIn.QuerySelector("table").Should().BeNull();
+    }
+
+    [Fact]
+    public void Render_WhenTheSignInDetailsCantBeLoaded_SaysSo_AndTheFaultStillWorks()
+    {
+        Current(unavailable: false);
+        Portal.ListDriverSignInsAsync(Arg.Any<CancellationToken>()).Returns<DriverSignInsView>(_ => throw new InvalidDataException());
+
+        var panel = Render<PresenterPanel>();
+
+        panel.Find("[aria-label='Driver sign-in'] [role=alert]").TextContent.Should().Contain("sign-in details couldn't be loaded");
         panel.Find("fluent-button").TextContent.Trim().Should().Be("Make the Driver app unavailable");
     }
 }

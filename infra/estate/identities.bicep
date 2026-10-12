@@ -14,6 +14,9 @@ param demoUiRedirectUris string
 @description('Easy Auth\'s sign-in callback on the Integration console, empty before the console is first deployed.')
 param integrationConsoleRedirectUris string
 
+@description('Easy Auth\'s sign-in callback on the Driver app, empty before the Driver app is first deployed.')
+param driverAppRedirectUris string
+
 var intakeRole = 'TransportOrders.Intake'
 var intakeRoleId = guid('norvia-tms-api', environmentName, intakeRole)
 var manageRole = 'TransportOrders.Manage'
@@ -56,6 +59,9 @@ var consoleReadRole = 'IntegrationConsole.Read'
 var consoleReadRoleId = guid('norvia-integration-console', environmentName, consoleReadRole)
 var consoleResubmitRole = 'IntegrationConsole.Resubmit'
 var consoleResubmitRoleId = guid('norvia-integration-console', environmentName, consoleResubmitRole)
+
+// Every active Driver the seed file names is one app role of the Driver app's registration, with the Driver ID as its value.
+var drivers = filter(loadJsonContent('../../seed/norvia.seed.json').drivers, driver => driver.active)
 
 // Every Persona the Partner portal plays is its own client app registration (ADR 0005). The seed file names them.
 var personas = loadJsonContent('../../seed/norvia.seed.json').personas
@@ -658,6 +664,41 @@ resource consoleResubmitRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = if 
   principalId: presenterPrincipalId
 }
 
+// What Easy Auth signs Drivers in to in front of the Driver app (ADR 0037). The Driver ID is the user's app role: each
+// seeded Driver is one role, with their Driver ID as its value, and infra/create-driver-test-users.sh makes a test user
+// for each and assigns it. The Driver app takes the Driver ID from that role in the token, never from the request.
+resource driverApp 'Microsoft.Graph/applications@v1.0' = {
+  uniqueName: 'norvia-driver-app-${environmentName}'
+  displayName: 'Norvia Driver app (${environmentName})'
+  signInAudience: 'AzureADMyOrg'
+  web: {
+    // The postdeploy hook adds it once Aspire has deployed the Driver app.
+    redirectUris: filter(split(driverAppRedirectUris, ','), uri => !empty(uri))
+    implicitGrantSettings: {
+      // Without a client secret Easy Auth asks for an ID token only, which carries the Driver's app role.
+      enableIdTokenIssuance: true
+    }
+  }
+  appRoles: [
+    for driver in drivers: {
+      id: guid('norvia-driver-app', environmentName, driver.id)
+      value: driver.id
+      displayName: 'Drive as ${driver.name}'
+      description: 'Sign in to the Driver app as Driver ${driver.id}, ${driver.name}, and see their Trips.'
+      allowedMemberTypes: [
+        'User'
+      ]
+      isEnabled: true
+    }
+  ]
+}
+
+resource driverAppPrincipal 'Microsoft.Graph/servicePrincipals@v1.0' = {
+  appId: driverApp.appId
+  // Entra signs in only the users assigned one of the Driver roles, so a stranger never reaches the Driver app.
+  appRoleAssignmentRequired: true
+}
+
 // The console's own identity, which it reads the estate as, never with the operator's token (ADR 0017). Aspire deploys
 // the console; the estate owns the identity because the estate grants it what it may read.
 resource integrationConsoleIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
@@ -721,6 +762,7 @@ output answerTriggerClientId string = answerTrigger.appId
 output answerTriggerAudience string = answerTrigger.identifierUris[0]
 output demoUisClientId string = demoUis.appId
 output integrationConsoleClientId string = integrationConsole.appId
+output driverAppRegistrationClientId string = driverApp.appId
 output integrationConsoleIdentityName string = integrationConsoleIdentity.name
 output integrationConsolePrincipalId string = integrationConsoleIdentity.properties.principalId
 output tripDispatchIdentityId string = tripDispatchIdentity.id

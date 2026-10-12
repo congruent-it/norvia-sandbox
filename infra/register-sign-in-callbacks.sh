@@ -1,6 +1,6 @@
 #!/bin/sh
 # azd postdeploy hook: lets Entra send a user back to the app they signed in to at its Easy Auth: the presenter to the
-# demo UIs (ADR 0024), an Integration operator to the Integration console (ADR 0026). The estate can't do this itself:
+# demo UIs (ADR 0024), an Integration operator to the Integration console (ADR 0026), a Driver to the Driver app (ADR 0037). The estate can't do this itself:
 # it is deployed before the apps, whose addresses it doesn't know yet. The container apps whose Easy Auth signs in to an
 # app registration are the ones the AppHost put behind it.
 set -eu
@@ -47,3 +47,5 @@ register "${AZURE_ESTATE_DEMO_UIS_CLIENT_ID:?Deploy the estate first: azd hooks 
   "the demo UIs" ESTATE_DEMO_UI_REDIRECT_URIS
 register "${AZURE_ESTATE_INTEGRATION_CONSOLE_CLIENT_ID:?Deploy the estate first: azd hooks run preprovision}" \
   "the Integration console" ESTATE_INTEGRATION_CONSOLE_REDIRECT_URIS
+register "${AZURE_ESTATE_DRIVER_APP_REGISTRATION_CLIENT_ID:?Deploy the estate first: azd hooks run preprovision}" \
+  "the Driver app" ESTATE_DRIVER_APP_REDIRECT_URIS

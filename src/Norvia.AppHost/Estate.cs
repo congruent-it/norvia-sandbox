@@ -81,6 +81,18 @@ public sealed class Estate(IDistributedApplicationBuilder builder)
     /// </summary>
     public IResourceBuilder<ParameterResource> IntegrationConsoleClientId { get; } = builder.AddParameter("estate-integration-console-client-id");
 
+    /// <summary>
+    /// The Driver app's app registration, which Easy Auth signs Drivers in to. Each seeded Driver's ID is one of its app
+    /// roles, and the role in a Driver's token is their Driver ID (ADR 0037).
+    /// </summary>
+    public IResourceBuilder<ParameterResource> DriverAppRegistrationClientId { get; } = builder.AddParameter("estate-driver-app-registration-client-id");
+
+    /// <summary>The domain of the Entra test users the seeded Drivers sign in as, which the presenter panel shows.</summary>
+    public IResourceBuilder<ParameterResource> DriverSignInDomain { get; } = builder.AddParameter("estate-driver-sign-in-domain");
+
+    /// <summary>The password of the Drivers' Entra test users, which the presenter panel shows. A demo credential for demo users that hold nothing else.</summary>
+    public IResourceBuilder<ParameterResource> DriverSignInPassword { get; } = builder.AddParameter("estate-driver-sign-in-password", secret: true);
+
     /// <summary>The Integration console's managed identity, which it reads the estate as (ADR 0017).</summary>
     public IResourceBuilder<ParameterResource> IntegrationConsoleIdentity { get; } = builder.AddParameter("estate-integration-console-identity-name");
 }

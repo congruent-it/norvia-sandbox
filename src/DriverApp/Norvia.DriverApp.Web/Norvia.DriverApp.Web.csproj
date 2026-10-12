@@ -4,6 +4,9 @@
     <PackageReference Include="Microsoft.FluentUI.AspNetCore.Components" />
   </ItemGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="Norvia.DriverApp.Web.IntegrationTests" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\..\Norvia.ServiceDefaults\Norvia.ServiceDefaults.csproj" />
     <ProjectReference Include="..\Norvia.DriverApp.Application\Norvia.DriverApp.Application.csproj" />
     <ProjectReference Include="..\Norvia.DriverApp.Infrastructure\Norvia.DriverApp.Infrastructure.csproj" />

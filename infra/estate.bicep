@@ -29,6 +29,10 @@ param demoUiRedirectUris string = ''
 postdeploy hook stores it, so the console's app registration keeps it when the estate is deployed again.''')
 param integrationConsoleRedirectUris string = ''
 
+@description('''Easy Auth's sign-in callback on the Driver app, empty before the Driver app is first deployed. azd's postdeploy
+hook stores it, so the Driver app's app registration keeps it when the estate is deployed again.''')
+param driverAppRedirectUris string = ''
+
 @description('''The TMS API's address, empty before the apps are first deployed. azd's postdeploy hook stores it, so the intake,
 Carrier-answer, Shipper notification, Carrier cancellation, Trip dispatch, Carrier-tracking and Carrier Proof of delivery Logic Apps keep it when the estate is deployed again.''')
 param tmsBaseUrl string = ''
@@ -92,6 +96,7 @@ module identities 'estate/identities.bicep' = {
     presenterPrincipalId: presenterPrincipalId
     demoUiRedirectUris: demoUiRedirectUris
     integrationConsoleRedirectUris: integrationConsoleRedirectUris
+    driverAppRedirectUris: driverAppRedirectUris
   }
 }
 
@@ -351,4 +356,5 @@ output ESTATE_PARTNER_PORTAL_IDENTITY_NAME string = identities.outputs.partnerPo
 output ESTATE_PARTNER_PORTAL_KEY_VAULT string = partnerApi.outputs.partnerPortalKeyVaultName
 output ESTATE_DEMO_UIS_CLIENT_ID string = identities.outputs.demoUisClientId
 output ESTATE_INTEGRATION_CONSOLE_CLIENT_ID string = identities.outputs.integrationConsoleClientId
+output ESTATE_DRIVER_APP_REGISTRATION_CLIENT_ID string = identities.outputs.driverAppRegistrationClientId
 output ESTATE_INTEGRATION_CONSOLE_IDENTITY_NAME string = identities.outputs.integrationConsoleIdentityName

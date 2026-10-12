@@ -9,9 +9,11 @@ using Microsoft.Extensions.Options;
 using Norvia.PartnerPortal.Application;
 using Norvia.PartnerPortal.Application.Bookings;
 using Norvia.PartnerPortal.Application.DriverAppFault;
+using Norvia.PartnerPortal.Application.DriverSignIns;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Infrastructure.Data;
 using Norvia.PartnerPortal.Infrastructure.DriverApp;
+using Norvia.PartnerPortal.Infrastructure.DriverSignIns;
 using Norvia.PartnerPortal.Infrastructure.PartnerApi;
 using Norvia.PartnerPortal.Infrastructure.Personas;
 using Polly;
@@ -36,6 +38,8 @@ public static class DependencyInjection
             .Validate(options => File.Exists(options.Path), "The seed file doesn't exist.")
             .ValidateOnStart();
         builder.Services.AddSingleton<IPersonaDirectory, SeedFilePersonaDirectory>();
+        builder.Services.AddOptions<DriverSignInOptions>().BindConfiguration(DriverSignInOptions.SectionName);
+        builder.Services.AddSingleton<IDriverSignInDirectory, SeedFileDriverSignInDirectory>();
 
         builder.AddNorviaPartnerApi();
         builder.AddDriverAppSettings();
