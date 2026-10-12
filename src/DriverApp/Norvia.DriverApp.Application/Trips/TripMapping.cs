@@ -43,7 +43,14 @@ internal static class TripMapping
             ReportKind.StartTrip => ReportKindDto.StartTrip,
             _ => throw new ArgumentOutOfRangeException(nameof(row), row.Kind, "A kind of report with no view."),
         },
-        (ReportStateDto)row.State,
+        row.State switch
+        {
+            ReportState.Sending => ReportStateDto.Sending,
+            ReportState.Recorded => ReportStateDto.Recorded,
+            ReportState.Refused => ReportStateDto.Refused,
+            ReportState.NotRecorded => ReportStateDto.NotRecorded,
+            _ => throw new ArgumentOutOfRangeException(nameof(row), row.State, "A state of a report with no view."),
+        },
         row.FailureCode,
         row.Message,
         row.EventTime);

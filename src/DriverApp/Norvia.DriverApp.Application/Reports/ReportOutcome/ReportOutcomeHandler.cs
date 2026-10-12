@@ -51,6 +51,16 @@ public sealed class ReportOutcomeHandler(IRepository<DriverReport> reports, Time
     private static List<ValidationError> Validate(ReportOutcomeCommand command)
     {
         var errors = new List<ValidationError>();
+        if (string.IsNullOrWhiteSpace(command.TripNumber))
+        {
+            errors.Add(new("tripNumber", "Is required."));
+        }
+
+        if (string.IsNullOrWhiteSpace(command.CorrelationId))
+        {
+            errors.Add(new("correlationId", "Is required."));
+        }
+
         if (command.Outcome == ReportOutcomeKind.Refused && string.IsNullOrWhiteSpace(command.FailureCode))
         {
             errors.Add(new("failureCode", "A refusal needs the TMS's failure code."));

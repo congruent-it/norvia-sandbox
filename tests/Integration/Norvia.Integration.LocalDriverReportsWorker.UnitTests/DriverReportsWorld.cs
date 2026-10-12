@@ -73,7 +73,7 @@ internal sealed class DriverReportsWorld
     {
         var run = Flow.RunAsync(
             message,
-            settlement =>
+            (settlement, _) =>
             {
                 Settled.Add((settlement, DriverApp.Requests.Count));
                 return Task.CompletedTask;

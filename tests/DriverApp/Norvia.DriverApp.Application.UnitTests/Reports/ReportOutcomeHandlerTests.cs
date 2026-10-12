@@ -91,6 +91,15 @@ public sealed class ReportOutcomeHandlerTests
     }
 
     [Fact]
+    public async Task ABlankTripNumberOrCorrelationId_IsInvalid()
+    {
+        var result = await new ReportOutcomeHandler(_world.ReportRepository, _world.Time)
+            .Handle(new ReportOutcomeCommand(_sending.Id.Value, " ", "", ReportOutcomeKind.Recorded, null, null), CancellationToken.None);
+
+        result.ValidationErrors.Select(error => error.Identifier).Should().BeEquivalentTo("tripNumber", "correlationId");
+    }
+
+    [Fact]
     public async Task AMessageLongerThanTheDriverCanRead_IsShortened()
     {
         await Tell(ReportOutcomeKind.NotRecorded, "TmsUnavailable", new string('x', 5000));

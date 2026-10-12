@@ -55,10 +55,10 @@ internal sealed partial class DriverReportsConsumer(
         var flow = scope.ServiceProvider.GetRequiredService<DriverReportsFlow>();
         var outcome = await flow.RunAsync(
             args.Message.Body.ToString(),
-            settlement => settlement switch
+            (settlement, cancellationToken) => settlement switch
             {
-                Settlement.DeadLetter deadLetter => args.DeadLetterMessageAsync(args.Message, deadLetter.Reason, deadLetter.Description, args.CancellationToken),
-                _ => args.CompleteMessageAsync(args.Message, args.CancellationToken),
+                Settlement.DeadLetter deadLetter => args.DeadLetterMessageAsync(args.Message, deadLetter.Reason, deadLetter.Description, cancellationToken),
+                _ => args.CompleteMessageAsync(args.Message, cancellationToken),
             },
             args.CancellationToken);
 

@@ -31,22 +31,6 @@ public static class ReportOutcomeEndpoints
 
     private static async Task<IResult> ReportAsync(ReportOutcomeRequest request, IMediator mediator, CancellationToken cancellationToken)
     {
-        var errors = new Dictionary<string, string[]>();
-        if (string.IsNullOrWhiteSpace(request.TripNumber))
-        {
-            errors[nameof(ReportOutcomeRequest.TripNumber)] = ["Is required."];
-        }
-
-        if (string.IsNullOrWhiteSpace(request.CorrelationId))
-        {
-            errors[nameof(ReportOutcomeRequest.CorrelationId)] = ["Is required."];
-        }
-
-        if (errors.Count > 0)
-        {
-            return Results.ValidationProblem(errors);
-        }
-
         var result = await mediator.Send(request.ToCommand(), cancellationToken);
         return result.Status switch
         {

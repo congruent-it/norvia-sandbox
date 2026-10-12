@@ -35,7 +35,7 @@ internal sealed partial class DriverReportsFlow(
     /// <summary>The longest message the Driver app takes in an outcome report.</summary>
     private const int MaximumMessageLength = 1000;
 
-    public async Task<DriverReportsRunOutcome> RunAsync(string message, Func<Settlement, Task> settle, CancellationToken cancellationToken)
+    public async Task<DriverReportsRunOutcome> RunAsync(string message, Func<Settlement, CancellationToken, Task> settle, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(settle);
 
@@ -43,7 +43,7 @@ internal sealed partial class DriverReportsFlow(
         {
             using var unreadable = logger.BeginScope(TrackingKeys.OutcomeOf(TrackingKeys.DeadLettered, DriverReportsFailureCodes.Unreadable));
             LogUnreadable();
-            await settle(new Settlement.DeadLetter(DriverReportsFailureCodes.Unreadable, UnreadableDescription));
+            await settle(new Settlement.DeadLetter(DriverReportsFailureCodes.Unreadable, UnreadableDescription), cancellationToken);
             return DriverReportsRunOutcome.Unreadable;
         }
 
@@ -56,7 +56,7 @@ internal sealed partial class DriverReportsFlow(
             settlement is Settlement.DeadLetter deadLettered ? TrackingKeys.DeadLettered : TrackingKeys.Succeeded, (settlement as Settlement.DeadLetter)?.Reason)))
         {
             LogSettled(outcome.Outcome, answer.StatusCode);
-            await settle(settlement);
+            await settle(settlement, cancellationToken);
         }
 
         // The message is settled first, as the workflow does: a run that fails to report the outcome isn't redelivered, and the report stays Sending.

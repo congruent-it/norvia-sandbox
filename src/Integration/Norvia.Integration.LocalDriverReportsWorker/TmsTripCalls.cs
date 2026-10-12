@@ -55,8 +55,8 @@ internal sealed record TmsAnswer(int StatusCode, string? Code, string Message)
         var message = string.IsNullOrWhiteSpace(body) ? reasonPhrase ?? string.Empty : body;
         if (!HttpStatus.IsSuccess(statusCode) && !HttpStatus.IsTransient(statusCode) && TryParse(body) is { } problem)
         {
-            code = Text(problem, "code");
-            message = Text(problem, "detail") ?? Text(problem, "title") ?? "The TMS refused the report.";
+            code = JsonFields.Text(problem, "code");
+            message = JsonFields.Text(problem, "detail") ?? JsonFields.Text(problem, "title") ?? "The TMS refused the report.";
         }
 
         return new(statusCode, code, message);
@@ -73,7 +73,4 @@ internal sealed record TmsAnswer(int StatusCode, string? Code, string Message)
             return null;
         }
     }
-
-    private static string? Text(JsonObject node, string name) =>
-        node[name] is JsonValue value && value.TryGetValue<string>(out var text) && !string.IsNullOrWhiteSpace(text) ? text : null;
 }

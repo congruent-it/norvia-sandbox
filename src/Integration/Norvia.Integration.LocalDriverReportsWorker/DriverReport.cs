@@ -33,15 +33,12 @@ internal sealed record DriverReport(string EventId, string CorrelationId, string
         }
 
         return parsed is not null
-            && Text(parsed, "eventType") == TripStartReported
-            && Text(parsed, "eventId") is { } eventId && Guid.TryParse(eventId, out _)
-            && Text(parsed, "correlationId") is { } correlationId
-            && Text(parsed, "tripNumber") is { } tripNumber
-            && Text(parsed, "driverId") is { } driverId
+            && JsonFields.Text(parsed, "eventType") == TripStartReported
+            && JsonFields.Text(parsed, "eventId") is { } eventId && Guid.TryParse(eventId, out _)
+            && JsonFields.Text(parsed, "correlationId") is { } correlationId
+            && JsonFields.Text(parsed, "tripNumber") is { } tripNumber
+            && JsonFields.Text(parsed, "driverId") is { } driverId
                 ? new(eventId, correlationId, tripNumber, driverId)
                 : null;
     }
-
-    private static string? Text(JsonObject node, string name) =>
-        node[name] is JsonValue value && value.TryGetValue<string>(out var text) && !string.IsNullOrWhiteSpace(text) ? text : null;
 }
