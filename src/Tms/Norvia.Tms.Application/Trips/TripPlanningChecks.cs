@@ -62,8 +62,8 @@ public sealed class TripPlanningChecks(IReadRepository<Trip> trips, IReadReposit
         {
             var number = item.Shipment.Number.Value;
             // A Shipment Awaiting re-delivery (P12) is accepted although it is Collected, and it collects no more, so no collection day applies.
-            var redelivery = item.Shipment is { AwaitingRedelivery: true, CarriedBy.IsOwnFleet: true };
-            if (!redelivery && item.Shipment is not { Status: ShipmentStatus.Released, CarriedBy.IsOwnFleet: true })
+            var redelivery = item.Shipment.AwaitingRedelivery;
+            if (!item.Shipment.CanBePutOnTrip)
             {
                 refusals.Add(TripRefusal.ShipmentNotReleased(number, item.Shipment.CarriedBy.IsOwnFleet ? $"it is {item.Shipment.Status}, not Released" : "it is carried by a Carrier, not the Own fleet"));
             }

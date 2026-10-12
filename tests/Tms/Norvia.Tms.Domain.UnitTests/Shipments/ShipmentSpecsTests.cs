@@ -80,14 +80,14 @@ public sealed class ShipmentSpecsTests
     }
 
     [Fact]
-    public void ReleasedOwnFleetShipmentsSpec_FindsTheReleasedOwnFleetShipments_InTheOrderTheyWerePlanned()
+    public void ShipmentsToPutOnTripsSpec_FindsTheReleasedOwnFleetShipments_InTheOrderTheyWerePlanned()
     {
         var planned = Planned(1, 1);
         var later = Released(2, 2, CarriedBy.OwnFleet, minutes: 5);
         var earlier = Released(3, 3, CarriedBy.OwnFleet, minutes: 1);
         var carrier = Released(4, 4, CarriedBy.Carrier(new Norvia.Tms.Domain.Carriers.CarrierId("CAR-0001")), minutes: 2, bookingNumber: Norvia.Tms.Domain.CarrierBookings.CarrierBookingNumber.FromSequence(1));
 
-        var found = new ReleasedOwnFleetShipmentsSpec().Evaluate([planned, later, carrier, earlier]);
+        var found = new ShipmentsToPutOnTripsSpec().Evaluate([planned, later, carrier, earlier]);
 
         found.Select(shipment => shipment.Number).Should().Equal(earlier.Number, later.Number);
     }

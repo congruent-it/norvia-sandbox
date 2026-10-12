@@ -178,7 +178,7 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
     /// </summary>
     public bool Dispatch()
     {
-        if (AwaitingRedelivery)
+        if (AwaitingRedelivery && CarriedBy.IsOwnFleet)
         {
             AwaitingRedelivery = false;
             return true;
@@ -192,6 +192,9 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
         Status = ShipmentStatus.Dispatched;
         return true;
     }
+
+    /// <summary>True for an Own fleet Shipment the Planner can put on a Trip (P11): a Released one, or one Awaiting re-delivery (P12), which collects no more.</summary>
+    public bool CanBePutOnTrip => CarriedBy.IsOwnFleet && (Status == ShipmentStatus.Released || AwaitingRedelivery);
 
     /// <summary>True for a Released or Dispatched Own fleet Shipment, which the Planner can still take off its Trip (P11): it isn't collected.</summary>
     public bool CanTakeOffTrip => CarriedBy.IsOwnFleet && Status is ShipmentStatus.Released or ShipmentStatus.Dispatched;

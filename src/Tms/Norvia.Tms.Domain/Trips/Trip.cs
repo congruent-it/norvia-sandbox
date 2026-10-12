@@ -137,6 +137,13 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
         return true;
     }
 
+    /// <summary>Puts the Shipment on the Trip as <see cref="AddShipment(ShipmentId, bool)"/> does, as a Re-delivery when it is Awaiting re-delivery (P12).</summary>
+    public bool AddShipment(Shipment shipment)
+    {
+        ArgumentNullException.ThrowIfNull(shipment);
+        return AddShipment(shipment.Id, shipment.AwaitingRedelivery);
+    }
+
     /// <summary>True when the Shipment is on the Trip with only its delivery Stop: a Re-delivery (P12).</summary>
     public bool IsRedelivery(ShipmentId shipment) =>
         _stops.Any(stop => stop.ShipmentId == shipment) && !_stops.Any(stop => stop.ShipmentId == shipment && stop.Kind == StopKind.Collection);
@@ -390,7 +397,7 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
 
         foreach (var shipment in shipments.Select(item => item.Shipment))
         {
-            if (!HasShipment(shipment.Id) || (!IsDispatchedOn(shipment) && !shipment.Dispatch()))
+            if (!HasShipment(shipment.Id) || (!WasSentInAnEarlierVersion(shipment) && !shipment.Dispatch()))
             {
                 throw new InvalidOperationException($"Shipment {shipment.Number} can't be dispatched on Trip {Number}.");
             }
@@ -402,8 +409,12 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
     }
 
     // Dispatched already by an earlier version: Dispatched, or a Re-delivery whose flag an earlier version cleared.
-    private bool IsDispatchedOn(Shipment shipment) =>
+    private bool WasSentInAnEarlierVersion(Shipment shipment) =>
         shipment.Status == ShipmentStatus.Dispatched || (IsRedelivery(shipment.Id) && !shipment.AwaitingRedelivery);
+
+    // A Re-delivery can't go back to Planned, because its goods are collected: it is Awaiting re-delivery again (a no-op while the flag is still set).
+    private bool ReleaseFromTrip(Shipment shipment) =>
+        IsRedelivery(shipment.Id) ? shipment.AwaitingRedelivery || shipment.AwaitRedelivery() : shipment.TakeOffTrip();
 
     private bool CanTakeOffRedelivery(Shipment shipment) =>
         IsRedelivery(shipment.Id) && shipment.CarriedBy.IsOwnFleet && shipment.Status is ShipmentStatus.Collected or ShipmentStatus.InTransit;
@@ -421,7 +432,7 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
     }
 
     /// <summary>
-    /// Takes the Shipment off the Trip: its two Stops leave the sequence, which closes up, the Shipment goes back to Planned, and
+    /// Takes the Shipment off the Trip: its Stops leave the sequence, which closes up, the Shipment goes back to Planned (a Re-delivery (P12) stays Collected and is Awaiting re-delivery again), and
     /// <see cref="ShipmentTakenOffTripEvent"/> is raised. On a Dispatched or In progress Trip this is an Amend too: the version goes up and
     /// <see cref="TripDispatchedEvent"/> is raised with the Shipments that remain, possibly none, under the same correlation ID; a Draft has no
     /// version to send, so <paramref name="next"/> must be null for it and given otherwise. The caller checks <see cref="EnsureCanTakeOff"/> first.
@@ -442,8 +453,7 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
             throw new ArgumentException($"Trip {Number} is {Status}, so " + (sent ? "taking a Shipment off sends the next version, which needs its contents." : "there is no next version to send."), nameof(next));
         }
 
-        // A Re-delivery can't go back to Planned, because its goods are collected: it is Awaiting re-delivery again.
-        if (IsRedelivery(shipment.Id) ? !(shipment.AwaitingRedelivery || shipment.AwaitRedelivery()) : !shipment.TakeOffTrip())
+        if (!ReleaseFromTrip(shipment))
         {
             throw new InvalidOperationException($"Shipment {shipment.Number} can't leave Trip {Number}.");
         }

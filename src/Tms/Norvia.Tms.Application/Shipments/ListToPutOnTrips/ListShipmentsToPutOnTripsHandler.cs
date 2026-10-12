@@ -19,7 +19,7 @@ public sealed class ListShipmentsToPutOnTripsHandler(
     {
         ArgumentNullException.ThrowIfNull(query);
 
-        var released = await shipments.ListAsync(new ReleasedOwnFleetShipmentsSpec(), cancellationToken);
+        var released = await shipments.ListAsync(new ShipmentsToPutOnTripsSpec(), cancellationToken);
         if (released.Count == 0)
         {
             return [];
