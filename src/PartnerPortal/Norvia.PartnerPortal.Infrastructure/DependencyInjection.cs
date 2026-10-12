@@ -8,8 +8,10 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Norvia.PartnerPortal.Application;
 using Norvia.PartnerPortal.Application.Bookings;
+using Norvia.PartnerPortal.Application.DriverAppFault;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Infrastructure.Data;
+using Norvia.PartnerPortal.Infrastructure.DriverApp;
 using Norvia.PartnerPortal.Infrastructure.PartnerApi;
 using Norvia.PartnerPortal.Infrastructure.Personas;
 using Polly;
@@ -36,6 +38,7 @@ public static class DependencyInjection
         builder.Services.AddSingleton<IPersonaDirectory, SeedFilePersonaDirectory>();
 
         builder.AddNorviaPartnerApi();
+        builder.AddDriverAppSettings();
 
         return builder;
     }
@@ -123,5 +126,15 @@ public static class DependencyInjection
             .AddResilienceHandler("norvia-partner-api", (pipeline, context) =>
                 pipeline.AddTimeout(context.ServiceProvider.GetRequiredService<IOptions<PartnerApiOptions>>().Value.Timeout));
 #pragma warning restore EXTEXP0001
+    }
+
+    /// <summary>The Driver app's API, which the presenter panel's "Driver app unavailable" fault switches.</summary>
+    private static void AddDriverAppSettings(this IHostApplicationBuilder builder)
+    {
+        builder.Services.AddOptions<DriverAppOptions>().BindConfiguration(DriverAppOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        builder.Services.AddHttpClient<IDriverAppSettings, DriverAppSettingsClient>((services, http) =>
+            http.BaseAddress = services.GetRequiredService<IOptions<DriverAppOptions>>().Value.Address);
     }
 }

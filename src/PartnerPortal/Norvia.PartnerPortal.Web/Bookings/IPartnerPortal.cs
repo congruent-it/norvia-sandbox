@@ -6,6 +6,7 @@ using Norvia.PartnerPortal.Application.CarrierShipments;
 using Norvia.PartnerPortal.Application.CarrierShipments.Send;
 using Norvia.PartnerPortal.Application.CarrierShipments.SendProofOfDelivery;
 using Norvia.PartnerPortal.Application.CarrierShipments.TrackingSettings;
+using Norvia.PartnerPortal.Application.DriverAppFault;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Application.ShipperNotifications;
 using Norvia.PartnerPortal.Application.ShipperTracking;
@@ -91,4 +92,10 @@ public interface IPartnerPortal
     /// <summary>A file of the Transport Order's current Proof of delivery, as Norvia streams it.</summary>
     Task<TrackingAnswer<ShipperProofFileContent>> DownloadProofOfDeliveryFileAsync(
         PersonaId personaId, string transportOrderNumber, Guid fileId, CancellationToken cancellationToken);
+
+    /// <summary>Whether the presenter panel's "Driver app unavailable" fault is on.</summary>
+    Task<DriverAppFaultView> GetDriverAppFaultAsync(CancellationToken cancellationToken);
+
+    /// <summary>Switches the "Driver app unavailable" fault on or off, and returns how it now stands.</summary>
+    Task<DriverAppFaultView> SetDriverAppFaultAsync(bool unavailable, CancellationToken cancellationToken);
 }

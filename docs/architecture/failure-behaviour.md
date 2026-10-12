@@ -94,7 +94,7 @@ Flows `shipper-notification` and `carrier-cancellation`. Both complete their mes
 | **Logic App** `carrier-cancellation`, `Send_to_the_Carrier` | Retried as above | The send's own hop is `Failed` with `CarrierUnavailable` or `CarrierRefused`, as for a booking. The cancellation or withdrawal is reported not delivered: the Carrier booking is flagged **Carrier not told** and the Planner phones the Carrier. `CarrierCancellationNotDelivered` is published | None built. Planned: failed runs | View the run | *Planned*: no alert on failed runs; presenter-panel fault: a Carrier's cancellation endpoint is down |
 | **Logic App** `carrier-cancellation`, report to the TMS | Retried as above | `TmsUnavailable` or `TmsCallRefused`, outcome `Failed` | As above | View the run | As above |
 | **Subscription** `trip-dispatch` (P11) | Default 10 deliveries | Unreadable: `TripDispatchUnreadable`. Otherwise `MaxDeliveryCountExceeded` | None built. Planned: the dead-letter queue | Resubmit to this subscription only, *planned* | *Planned*: none |
-| **Logic App** `trip-dispatch`, `Send_to_the_Driver_app` | Retried as above: exponential, 3 retries from 5 s up to 20 s, on a timeout, 408, 429 and 5xx | The send's own hop is `Failed` with `DriverAppUnavailable` or `DriverAppRefused`. The version is reported **Not delivered** with the technical cause and the TMS publishes `TripNotDelivered`. The Planner sends it again once the Driver app is back | None built. Planned: failed runs | View the run | *Planned*: no alert on failed runs; presenter-panel fault: the Driver app is unavailable |
+| **Logic App** `trip-dispatch`, `Send_to_the_Driver_app` | Retried as above: exponential, 3 retries from 5 s up to 20 s, on a timeout, 408, 429 and 5xx | The send's own hop is `Failed` with `DriverAppUnavailable` or `DriverAppRefused`. The version is reported **Not delivered** with the technical cause and the TMS publishes `TripNotDelivered`. The Planner sends it again once the Driver app is back | None built. Planned: failed runs | View the run | presenter-panel fault: the Driver app is unavailable (`/presenter` in the Partner portal). *Planned*: no alert on failed runs |
 | **Logic App** `trip-dispatch`, report to the TMS | Retried as above | `TmsUnavailable` or `TmsCallRefused`, outcome `Failed`. The version stays Sending | As above | View the run | As above |
 | **TMS outbox** (`Exception*`, `Shipper*`, `Carrier*`) | As [the outbox](#the-tms-outbox) | As [the outbox](#the-tms-outbox) | None built | As P1 | *Planned*: the Late delivery check switched off |
 
@@ -122,7 +122,7 @@ P9 to P12 and the ERP's E1 and E2 are designed in their process docs and not bui
 |---|---|
 | [P9](../processes/tms/p9-freight-settlement.md) | No alert on the dead-letter queue of the `billing` subscription |
 | [P10](../processes/tms/p10-fleet-capacity-planning.md) | None named yet |
-| [P11](../processes/tms/p11-trip-dispatch.md) | No alert on failed Trip dispatch runs; the Driver app unavailable (a presenter-panel fault) |
+| [P11](../processes/tms/p11-trip-dispatch.md) | No alert on failed Trip dispatch runs |
 | [P12](../processes/tms/p12-trip-execution.md) | No report back to the Driver app; no alert on failed Driver reports runs or their dead-letter queue; no lifecycle rule on the transit container |
 | [E1](../processes/erp/e1-invoicing.md) | No alert on failed Shipper invoice runs or on the `billing` dead-letter queue |
 | [E2](../processes/erp/e2-carrier-invoice-matching.md) | No alert on the dead-letter queue of the `carrier-cost` subscription |

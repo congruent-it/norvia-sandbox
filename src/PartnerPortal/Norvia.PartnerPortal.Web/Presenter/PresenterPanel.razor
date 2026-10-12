@@ -1,0 +1,93 @@
+@page "/presenter"
+@* The presenter's faults: switches that make a hop of the demo fail, so the failure can be found. Not part of any Persona. *@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject IPartnerPortal Portal
+@inject ILogger<PresenterPanel> Logger
+
+<PageTitle>Presenter panel · Partner portal</PageTitle>
+
+<h1>Presenter panel</h1>
+
+<div role="group" aria-label="Driver app unavailable" class="mb-8 max-w-3xl border border-border p-6">
+    <h2 class="mt-0">Driver app unavailable</h2>
+    <p class="mt-0 text-sm">
+        While the Driver app is unavailable it refuses every Trip the Trip dispatch Logic App sends, with a 503. The Planner
+        then sees the Trip as Not delivered, and the Logic App's run fails. Switch it off and send the Trip again.
+    </p>
+    @if (_loadFailed)
+    {
+        <div role="alert">
+            <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+                The Driver app couldn't be reached. Reload the page to try again.
+            </FluentMessageBar>
+        </div>
+    }
+    else if (_fault is null)
+    {
+        <div role="status">Loading the fault…</div>
+    }
+    else
+    {
+        <p role="status">
+            @if (_fault.Unavailable)
+            {
+                <strong>The Driver app is unavailable.</strong>
+            }
+            else
+            {
+                <span>The Driver app is available.</span>
+            }
+        </p>
+        <FluentButton Appearance="Appearance.Accent" Disabled="_saving" OnClick="SwitchAsync">
+            @(_fault.Unavailable ? "Make the Driver app available" : "Make the Driver app unavailable")
+        </FluentButton>
+        @if (_saveFailed)
+        {
+            <div role="alert" class="mt-4">
+                <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+                    The fault couldn't be switched. Try again.
+                </FluentMessageBar>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private DriverAppFaultView? _fault;
+    private bool _loadFailed;
+    private bool _saving;
+    private bool _saveFailed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _fault = await Portal.GetDriverAppFaultAsync(CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            PageLog.DriverAppFaultLoadFailed(Logger, exception);
+            _loadFailed = true;
+        }
+    }
+
+    private async Task SwitchAsync()
+    {
+        var unavailable = !_fault!.Unavailable;
+        _saving = true;
+        _saveFailed = false;
+        try
+        {
+            _fault = await Portal.SetDriverAppFaultAsync(unavailable, CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            PageLog.DriverAppFaultSaveFailed(Logger, exception, unavailable);
+            _saveFailed = true;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}
