@@ -19,6 +19,12 @@ public sealed class StartTripHandler(IRepository<Trip> trips, PlanningHorizonRul
             return TripRefused.Because<StartTripResult>(TripRefusal.TripNotFound(command.Number));
         }
 
+        // The Logic App retries a Start whose answer it never got. It is a repeat only for the Trip's own Driver, who is the one that started it.
+        if (command.DriverAppEventId is { } eventId && trip.DriverId == new DriverId(command.DriverId) && trip.WasStartedBy(eventId))
+        {
+            return new StartTripResult(trip.Number.Value, trip.Version, command.CorrelationId, Repeat: true);
+        }
+
         var now = time.GetUtcNow();
         if (trip.EnsureCanStart(new DriverId(command.DriverId), horizon.Today(now)) is { } refusal)
         {
@@ -26,7 +32,7 @@ public sealed class StartTripHandler(IRepository<Trip> trips, PlanningHorizonRul
         }
 
         var correlationId = new CorrelationId(command.CorrelationId);
-        trip.Start(correlationId, now);
+        trip.Start(correlationId, now, command.DriverAppEventId);
 
         // One save writes the status and TripStarted's outbox message together.
         await trips.SaveChangesAsync(cancellationToken);

@@ -146,6 +146,7 @@ public static class TripEndpoints
             .WithSummary("Start a Dispatched Trip on its day: the Driver reports it from the Driver app.")
             .WithDescription(
                 "driverId is the Driver ID from the Driver's token, which the Driver reports Logic App passes on, and the X-Correlation-ID is the Driver's action trail. "
+                + "driverAppEventId, when it is sent, is the ID of the Driver app event: a Start that repeats the event that started the Trip is answered 200 with repeat true, and changes and publishes nothing. "
                 + "In one transaction the Trip becomes In progress, at the same version, and exactly one TripStarted (Trip number, version, Driver ID, start time) is written to the outbox for the Trip events topic under that correlation ID. "
                 + "From then on the only change the Planner can make is taking off a Shipment that isn't collected: every other change is TripUnderWay (409). "
                 + "Refused with TripNotFound (404) for an unknown Trip, or one whose Driver is not the Driver from the token, TripNotDispatched (409) for a Draft or a Trip that is In progress already, and NotTripDay (409) when today is not the Trip's day in Norvia's time.");
@@ -357,7 +358,7 @@ public static class TripEndpoints
             return TypedResults.ValidationProblem(errors);
         }
 
-        var result = await retrier.RunAsync(mediator => mediator.Send(new StartTripCommand(number, driverId, correlationId), cancellationToken).AsTask());
+        var result = await retrier.RunAsync(mediator => mediator.Send(new StartTripCommand(number, driverId, correlationId, string.IsNullOrWhiteSpace(request.DriverAppEventId) ? null : request.DriverAppEventId), cancellationToken).AsTask());
         return result.IsSuccess
             ? TypedResults.Ok(result.Value)
             : RefusalProblem.Of<TripRefusalCode, StartTripResult>(
