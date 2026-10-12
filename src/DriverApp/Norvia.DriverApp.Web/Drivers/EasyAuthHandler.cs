@@ -32,6 +32,9 @@ internal sealed class EasyAuthHandler(IOptionsMonitor<AuthenticationSchemeOption
     private const string EntraName = "name";
     private const string EntraUsername = "preferred_username";
 
+    /// <summary>Whether this user was signed in by Easy Auth with Entra ID, so signs out at Easy Auth's endpoint.</summary>
+    public static bool SignedInWithEntra(ClaimsPrincipal user) => user.Identity?.AuthenticationType == EntraAuthenticationType;
+
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
         if (!Request.Headers.TryGetValue(ClientPrincipalHeader, out var header) || string.IsNullOrEmpty(header))

@@ -1,6 +1,8 @@
 @page "/"
+@using System.Security.Claims
 @using Norvia.DriverApp.Application.Trips.GetForDriver
 @using Norvia.DriverApp.Web.Drivers
+@using Norvia.DriverApp.Web.Trips
 @inject Mediator.IMediator Mediator
 @inject ILogger<Trips> Logger
 
@@ -11,12 +13,12 @@
     @if (_signedInWithEntra)
     {
         @* Easy Auth's endpoint, which signs the browser out of the Driver app and Entra ID. *@
-        <a href="@EasyAuthHandler.SignOutPath">Not you? Sign out</a>
+        <FluentAnchor Href="@EasyAuthHandler.SignOutPath" Appearance="Appearance.Hypertext">Not you? Sign out</FluentAnchor>
     }
     else
     {
         <form method="post" action="@DriverSignIn.StandInSignOutPath">
-            <button type="submit" class="link-button">Not you? Sign out</button>
+            <FluentButton Type="ButtonType.Submit" Appearance="Appearance.Lightweight">Not you? Sign out</FluentButton>
         </form>
     }
 </div>
@@ -34,11 +36,11 @@ else if (_trips.Count == 0)
     <p role="status">No Trips have been sent to you yet.</p>
 }
 
-@foreach (var day in _trips.GroupBy(trip => trip.Day).OrderBy(day => day.Key))
+@foreach (var day in TripsByDay.Of(_trips))
 {
     <section aria-label="@TripText.Day(day.Key)">
         <h2>@TripText.Day(day.Key)</h2>
-        @foreach (var trip in day.OrderBy(trip => trip.PlannedStart).ThenBy(trip => trip.TripNumber, StringComparer.Ordinal))
+        @foreach (var trip in day)
         {
             <TripCard Trip="trip" />
         }
@@ -56,11 +58,11 @@ else if (_trips.Count == 0)
 
     protected override async Task OnInitializedAsync()
     {
-        // The Driver ID comes from the token, never from the request (ADR 0005). The route already required it.
-        var user = HttpContext!.User;
-        var driverId = user.FindFirst(DriverClaims.DriverId)!.Value;
+        // The Driver ID comes from the token, never from the request (ADR 0005). The route's policy admits only a user with one.
+        var user = HttpContext?.User ?? throw new InvalidOperationException("My Trips renders only for a request.");
+        var driverId = user.FindFirstValue(DriverClaims.DriverId) ?? throw new InvalidOperationException("The policy admits only a Driver ID.");
         _name = user.Identity?.Name ?? driverId;
-        _signedInWithEntra = DriverSignIn.SignedInWithEntra(user);
+        _signedInWithEntra = EasyAuthHandler.SignedInWithEntra(user);
 
         try
         {

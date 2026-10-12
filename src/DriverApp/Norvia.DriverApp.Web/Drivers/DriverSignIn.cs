@@ -79,7 +79,11 @@ public static class DriverSignIn
             return app;
         }
 
-        app.MapGet(StandInSignInPath, async (IMediator mediator, string? returnUrl, CancellationToken cancellationToken) =>
+        // The stand-in is a Development-only stand-in for Entra's own sign-in page, so it is plain HTML rather than a Blazor page
+        // that would exist in Azure too, and its posts carry no antiforgery token, which Entra's page has none of either.
+        var standIn = app.MapGroup(string.Empty).AllowAnonymous().DisableAntiforgery();
+
+        standIn.MapGet(StandInSignInPath, async (IMediator mediator, string? returnUrl, CancellationToken cancellationToken) =>
         {
             var drivers = await mediator.Send(new ListDriversQuery(), cancellationToken);
             var page = new StringBuilder("<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\" />")
@@ -97,10 +101,9 @@ public static class DriverSignIn
 
             page.Append("</form></main></body></html>");
             return Results.Content(page.ToString(), "text/html", Encoding.UTF8);
-        }).AllowAnonymous();
+        });
 
-        // No antiforgery token: the stand-in is a Development-only stand-in for Entra's own sign-in page, which has none of ours.
-        app.MapPost(StandInSignInPath, async ([FromForm] string driver, [FromForm] string? returnUrl, HttpContext context, IMediator mediator, CancellationToken cancellationToken) =>
+        standIn.MapPost(StandInSignInPath, async ([FromForm] string driver, [FromForm] string? returnUrl, HttpContext context, IMediator mediator, CancellationToken cancellationToken) =>
         {
             var drivers = await mediator.Send(new ListDriversQuery(), cancellationToken);
             if (drivers.FirstOrDefault(known => known.Id == driver) is not { } chosen)
@@ -112,19 +115,21 @@ public static class DriverSignIn
             var identity = new ClaimsIdentity(
                 [new Claim(ClaimTypes.Name, chosen.Name), new Claim(DriverClaims.DriverId, chosen.Id)], StandInAuthenticationType);
             await context.SignInAsync(StandInAuthenticationType, new ClaimsPrincipal(identity));
-            return Results.LocalRedirect(string.IsNullOrEmpty(returnUrl) || !Uri.IsWellFormedUriString(returnUrl, UriKind.Relative) || returnUrl.StartsWith("//", StringComparison.Ordinal) ? "/" : returnUrl);
-        }).AllowAnonymous().DisableAntiforgery();
+            return Results.LocalRedirect(LocalOrHome(returnUrl));
+        });
 
-        app.MapPost(StandInSignOutPath, async (HttpContext context) =>
+        standIn.MapPost(StandInSignOutPath, async (HttpContext context) =>
         {
             await context.SignOutAsync(StandInAuthenticationType);
             return Results.Redirect(StandInSignInPath);
-        }).AllowAnonymous().DisableAntiforgery();
+        });
 
         return app;
     }
 
-    /// <summary>Where a signed-in Driver signs out: Easy Auth's endpoint in Azure, nothing to follow locally (a form posts to the stand-in).</summary>
-    public static bool SignedInWithEntra(ClaimsPrincipal user) =>
-        user.Identity?.AuthenticationType == EasyAuthHandler.EntraAuthenticationType;
+    /// <summary>Where to go after signing in: back to where the browser was, if that is a path on this app, else home.</summary>
+    private static string LocalOrHome(string? returnUrl) =>
+        string.IsNullOrEmpty(returnUrl) || !Uri.IsWellFormedUriString(returnUrl, UriKind.Relative) || returnUrl.StartsWith("//", StringComparison.Ordinal)
+            ? "/"
+            : returnUrl;
 }
