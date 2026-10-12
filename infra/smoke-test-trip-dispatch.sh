@@ -243,6 +243,8 @@ cat <<EOF
   3. Wait for the Trip to show Not delivered (the Logic App retries for about a minute first).
 EOF
 pause
+curl -fsS "$driver_app/v1/settings/unavailable" | jq -e '.unavailable == true' >/dev/null \
+  || fail "the Driver app is available; switch the fault on in the presenter panel before dispatching Trip $scenario2"
 trips=$(read_trips)
 trip=$(trip_of "$trips" "$scenario2")
 jq -e 'type == "object" and (.httpStatus | not)' <<<"$trip" >/dev/null \
@@ -250,11 +252,11 @@ jq -e 'type == "object" and (.httpStatus | not)' <<<"$trip" >/dev/null \
 jq -e '.status == "Dispatched" and (.versions | length >= 1) and .versions[-1].state == "NotDelivered" and (.versions[-1].cause | length > 0)' \
   <<<"$trip" >/dev/null \
   || fail "Trip $scenario2's latest version isn't Not delivered with a cause: $trip"
-version2=$(jq -r '.versions[-1].version' <<<"$trip")
+sent_version=$(jq -r '.versions[-1].version' <<<"$trip")
 driver2=$(jq -r '.driverId' <<<"$trip")
 [ -z "$(driver_app_version "$driver2" "$scenario2")" ] \
   || fail "the Driver app holds Trip $scenario2 although it was unavailable"
-pass "Trip $scenario2 version $version2 is Not delivered ($(jq -r '.versions[-1].cause' <<<"$trip")) and the Driver app doesn't hold it"
+pass "Trip $scenario2 version $sent_version is Not delivered ($(jq -r '.versions[-1].cause' <<<"$trip")) and the Driver app doesn't hold it"
 [ -n "$(until_found has_send_failure "$scenario2" DriverAppUnavailable)" ] \
   || fail "no failed send with DriverAppUnavailable for Trip $scenario2 reached Application Insights after 10 minutes"
 pass "the Trip dispatch Logic App's send for Trip $scenario2 failed with DriverAppUnavailable"
@@ -262,19 +264,19 @@ echo
 echo "Open the failed run of the $logic_app Logic App in the Integration console: $console/?key=$scenario2"
 cat <<EOF
   4. Switch the fault off in the presenter panel ($portal/presenter).
-  5. On Trip $scenario2's detail send version $version2 again, and wait for it to show Delivered to Driver app.
+  5. On Trip $scenario2's detail send version $sent_version again, and wait for it to show Delivered to Driver app.
 EOF
 pause
 trips=$(read_trips)
 trip=$(trip_of "$trips" "$scenario2")
-jq -e --argjson version "$version2" '(.versions | length) == $version and .versions[-1].version == $version and .versions[-1].state == "Delivered"' \
+jq -e --argjson version "$sent_version" '(.versions | length) == $version and .versions[-1].version == $version and .versions[-1].state == "Delivered"' \
   <<<"$trip" >/dev/null \
-  || fail "Trip $scenario2's version $version2 isn't Delivered to Driver app after sending it again: $trip"
-[ "$(driver_app_version "$driver2" "$scenario2")" = "$version2" ] \
-  || fail "the Driver app doesn't hold version $version2 of Trip $scenario2 for Driver $driver2"
+  || fail "Trip $scenario2's version $sent_version isn't Delivered to Driver app after sending it again: $trip"
+[ "$(driver_app_version "$driver2" "$scenario2")" = "$sent_version" ] \
+  || fail "the Driver app doesn't hold version $sent_version of Trip $scenario2 for Driver $driver2"
 curl -fsS "$driver_app/v1/settings/unavailable" | jq -e '.unavailable == false' >/dev/null \
   || fail "the Driver app is still unavailable; switch the fault off in the presenter panel"
-pass "version $version2 of Trip $scenario2 was sent again and is Delivered to Driver app, with the fault off"
+pass "version $sent_version of Trip $scenario2 was sent again and is Delivered to Driver app, with the fault off"
 
 # 4. The whole path, by correlation ID and by Trip number.
 echo

@@ -212,7 +212,7 @@ After a deployment, and not in CI, the presenter checks Trip dispatch on the dep
 
 **Scenario 1: build, dispatch and amend.**
 
-1. In the TMS UI, as the Planner, select the two seeded Shipments that fit a van and create a Trip for the demo's day. Add the sixth, the one too heavy for the van: it is refused with `PayloadExceeded`.
+1. In the TMS UI, as the Planner, select the two seeded Shipments that fit a van and create a Trip for the demo's day. Add the sixth, the one too heavy for the van, as the script says: it is refused with `PayloadExceeded`.
 2. Pick the van, a Driver, a planned start and a driving duration, and dispatch the Trip. Open the Driver app, pick that Driver, and see the Trip.
 3. Take a Shipment off the Trip. The Driver app shows version 2.
 
