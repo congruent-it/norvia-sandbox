@@ -11,7 +11,8 @@ namespace Norvia.Tms.Application.TrackingEvents.Record;
 /// </summary>
 /// <param name="OccurredAt">When the TMS recorded the event.</param>
 /// <param name="CarrierId">The Carrier that reported the event.</param>
-/// <param name="CarrierBookingReference">The Carrier's own reference for the booking, which matched the event to the Shipment.</param>
+/// <param name="CarrierBookingReference">The Carrier's own reference for the booking, which matched the event to the Shipment; null for an Own fleet event.</param>
+/// <param name="TripNumber">The Trip the Driver reported the event on (P12); null for a Carrier's event.</param>
 /// <param name="EventTime">When it happened, with the offset of where.</param>
 public abstract record ShipmentProgressV1(
     Guid EventId,
@@ -21,6 +22,7 @@ public abstract record ShipmentProgressV1(
     string TransportOrderNumber,
     string? CarrierId,
     string? CarrierBookingReference,
+    string? TripNumber,
     DateTimeOffset EventTime,
     TrackingLocationV1 Location,
     DateTimeOffset? Eta)
@@ -31,7 +33,7 @@ public abstract record ShipmentProgressV1(
     protected override string TopicName => Topics.ShipmentEvents;
 
     /// <summary>Makes the event from the Shipment a Tracking event moved, taking what the event said.</summary>
-    protected static TEvent From<TEvent>(Shipment shipment, TrackingEvent trackingEvent, Func<Guid, DateTimeOffset, string, string, string, string?, string?, DateTimeOffset, TrackingLocationV1, DateTimeOffset?, TEvent> create)
+    protected static TEvent From<TEvent>(Shipment shipment, TrackingEvent trackingEvent, Func<Guid, DateTimeOffset, string, string, string, string?, string?, string?, DateTimeOffset, TrackingLocationV1, DateTimeOffset?, TEvent> create)
     {
         ArgumentNullException.ThrowIfNull(shipment);
         ArgumentNullException.ThrowIfNull(trackingEvent);
@@ -44,6 +46,7 @@ public abstract record ShipmentProgressV1(
             shipment.TransportOrderNumber.Value,
             trackingEvent.Source.CarrierId?.Value,
             trackingEvent.CarrierBookingReference,
+            trackingEvent.TripNumber?.Value,
             trackingEvent.EventTime,
             new TrackingLocationV1(trackingEvent.Location.Place, trackingEvent.Location.Postcode, trackingEvent.Location.CountryCode),
             trackingEvent.Eta);
@@ -53,13 +56,18 @@ public abstract record ShipmentProgressV1(
     {
         var properties = new List<KeyValuePair<string, object>>
         {
-            new(TrackingKeys.Flow, Flows.CarrierTracking),
+            new(TrackingKeys.Flow, TripNumber is null ? Flows.CarrierTracking : Flows.TripExecution),
             new(TrackingKeys.TransportOrderNumber, TransportOrderNumber),
             new(TrackingKeys.ShipmentNumber, ShipmentNumber),
         };
         if (CarrierId is not null)
         {
             properties.Add(new(TrackingKeys.PartyId, CarrierId));
+        }
+
+        if (TripNumber is not null)
+        {
+            properties.Add(new(TrackingKeys.TripNumber, TripNumber));
         }
 
         return properties;

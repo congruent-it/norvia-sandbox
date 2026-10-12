@@ -1,11 +1,13 @@
 using Ardalis.SharedKernel;
+using Norvia.Tms.Domain.Fleet;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TransportOrders;
+using Norvia.Tms.Domain.Trips;
 
 namespace Norvia.Tms.Domain.TrackingEvents;
 
 /// <summary>
-/// One report from a Carrier (or, later, a Driver) that something happened to a Shipment, at a given time and place (P5).
+/// One report from a Carrier or a Driver (P12) that something happened to a Shipment, at a given time and place (P5).
 /// The TMS keeps every one it accepts, as a log on the Shipment, apart from what it concluded from it: whether the event
 /// moved the Shipment's status is <see cref="MovedShipment"/>. The TMS owns it. It is made only by a Shipment taking an
 /// event in (<see cref="Shipment.Record"/>), and never changed or deleted.
@@ -52,6 +54,15 @@ public sealed class TrackingEvent : EntityBase<TrackingEventId>, IAggregateRoot
     /// <summary>The Carrier's own reference for the booking the event was matched by; null for an Own fleet event.</summary>
     public string? CarrierBookingReference { get; private set; }
 
+    /// <summary>The Trip an Own fleet event (P12) was reported on, in place of a Carrier booking reference; null for a Carrier's.</summary>
+    public TripNumber? TripNumber { get; private set; }
+
+    /// <summary>The Driver who reported an Own fleet event, from the Driver's token; null for a Carrier's.</summary>
+    public DriverId? DriverId { get; private set; }
+
+    /// <summary>The version of the Trip the Driver app held when it reported, kept for tracing only; null for a Carrier's event.</summary>
+    public int? TripVersion { get; private set; }
+
     public TrackingEventType Type { get; private set; }
 
     /// <summary>When it happened, with the offset of where it happened.</summary>
@@ -95,6 +106,9 @@ public sealed class TrackingEvent : EntityBase<TrackingEventId>, IAggregateRoot
             receivedAt)
         {
             Location = report.Location,
+            TripNumber = report.OwnFleet?.TripNumber,
+            DriverId = report.OwnFleet?.DriverId,
+            TripVersion = report.OwnFleet?.TripVersion,
         };
     }
 

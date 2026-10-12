@@ -110,6 +110,7 @@ public static class DependencyInjection
         builder.Services.AddScoped<TripPlanningChecks>();
         builder.Services.AddScoped<TripNeedsCheck>();
         builder.Services.AddScoped<TripShipments>();
+        builder.Services.AddScoped<TripOutcomes>();
         builder.Services.AddScoped<TripAmendments>();
         builder.Services.AddScoped<IPipelineBehavior<AddShipmentsToTripCommand, Result<AddShipmentsToTripResult>>, RetryTripThatLostARace<AddShipmentsToTripCommand, Result<AddShipmentsToTripResult>>>();
         builder.Services.AddScoped<IPipelineBehavior<CreateDraftTripCommand, Result<CreateDraftTripResult>>, RetryTripThatLostARace<CreateDraftTripCommand, Result<CreateDraftTripResult>>>();

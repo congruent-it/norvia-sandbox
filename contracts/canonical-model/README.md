@@ -19,7 +19,7 @@ Norvia's own message format ([GLOSSARY.md](../../GLOSSARY.md#integration)): one 
 | [carrier-booking-rejected.v1](carrier-booking-rejected.v1.schema.json) | Event: a Carrier rejected a Requested Carrier booking with a reason, sending the Shipment back to Planned |
 | [carrier-booking-not-delivered.v1](carrier-booking-not-delivered.v1.schema.json) | Event: a Carrier booking request never reached the Carrier, with the technical cause, sending the Shipment back to Planned |
 | [carrier-booking-withdrawn.v1](carrier-booking-withdrawn.v1.schema.json) | Event: the Planner withdrew a Requested Carrier booking before the Carrier answered, sending the Shipment back to Planned |
-| [tracking-event.v1](tracking-event.v1.schema.json) | Command: a Tracking event a Carrier (or later Own fleet) reported for a Shipment, as the Carrier-tracking Logic App sends it to the TMS Tracking event API's record operation, naming its source |
+| [tracking-event.v1](tracking-event.v1.schema.json) | Command: a Tracking event a Carrier or Own fleet (a Driver, P12) reported for a Shipment, as the Carrier-tracking or Driver reports Logic App sends it to the TMS Tracking event API's record operation, naming its source |
 | [proof-of-delivery.v1](proof-of-delivery.v1.schema.json) | Command: a Proof of delivery's metadata, as the Carrier Proof of delivery Logic App sends it in the `metadata` part of its multipart call to the TMS Proof of delivery API, naming its source and describing its files; the files travel in the `files` parts |
 | [shipment-collected.v1](shipment-collected.v1.schema.json) | Event: a Tracking event moved a Booked Shipment to Collected |
 | [shipment-in-transit.v1](shipment-in-transit.v1.schema.json) | Event: a Tracking event moved a Shipment to In transit |

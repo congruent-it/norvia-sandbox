@@ -5,7 +5,7 @@ namespace Norvia.Tms.Application.Trips.GetByNumber;
 
 internal static class StopText
 {
-    public static TripStopView ViewOf(TripStop stop, ShipmentOnTrip item)
+    public static TripStopView ViewOf(TripStop stop, ShipmentOnTrip item, StopOutcome outcome)
     {
         var details = item.Details;
         var isCollection = stop.Kind == StopKind.Collection;
@@ -19,7 +19,10 @@ internal static class StopText
             isCollection ? null : details.Delivery?.Consignee?.Name,
             window?.Earliest,
             window?.Latest,
-            GoodsOf(details));
+            GoodsOf(details),
+            outcome.Kind,
+            outcome.At,
+            outcome.Remark);
     }
 
     /// <summary>The street, then the postcode and city: "Oudegracht 112, 3511 AW Utrecht".</summary>

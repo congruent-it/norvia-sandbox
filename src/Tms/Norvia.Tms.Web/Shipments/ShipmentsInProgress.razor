@@ -22,7 +22,7 @@
         <TemplateColumn Title="Shipment">
             <a href="/shipments/@context.ShipmentNumber">@context.ShipmentNumber</a>
         </TemplateColumn>
-        <PropertyColumn Title="Carrier" Property="@(shipment => PlanningText.CarriedBy(shipment.CarriedBy))" />
+        <PropertyColumn Title="Carrier" Property="@(shipment => TrackingText.CarriedBy(shipment))" />
         <PropertyColumn Title="Status" Property="@(shipment => TrackingText.Status(shipment.Status))" />
         <PropertyColumn Title="Last Tracking event" Property="@(shipment => TrackingText.Last(shipment.LastTrackingEvent))" />
         <PropertyColumn Title="ETA" Property="@(shipment => NorviaTime.Format(shipment.Eta))" />

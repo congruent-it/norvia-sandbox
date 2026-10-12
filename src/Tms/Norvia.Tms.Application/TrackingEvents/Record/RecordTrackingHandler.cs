@@ -1,5 +1,6 @@
 using Ardalis.Result;
 using Ardalis.SharedKernel;
+using Ardalis.Specification;
 using Mediator;
 using Norvia.Tms.Application.Billing;
 using Norvia.Tms.Application.Exceptions;
@@ -8,6 +9,7 @@ using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.TransportOrders;
+using Norvia.Tms.Domain.Trips;
 
 namespace Norvia.Tms.Application.TrackingEvents.Record;
 
@@ -16,6 +18,7 @@ public sealed class RecordTrackingHandler(
     IRepository<CarrierBooking> carrierBookings,
     IRepository<Shipment> shipments,
     IReadRepository<TransportOrder> transportOrders,
+    IReadRepository<Trip> trips,
     ExceptionCauses exceptionCauses,
     BillingCheck billing,
     TrackingEventRules rules,
@@ -28,7 +31,11 @@ public sealed class RecordTrackingHandler(
 
         var report = command.Report;
 
-        // Own fleet reports through P12, which finds its Shipment by Trip, not by a Carrier booking reference.
+        if (report.OwnFleet is { } ownFleet)
+        {
+            return await HandleOwnFleetAsync(command, ownFleet, cancellationToken);
+        }
+
         if (report.Source.CarrierId is not { } carrierId)
         {
             return TrackingEventRefused.Because<RecordTrackingResult>(TrackingEventRules.ShipmentNotFound(report.CarrierBookingReference ?? report.CarrierBookingNumber ?? string.Empty));
@@ -63,8 +70,43 @@ public sealed class RecordTrackingHandler(
             return TrackingEventRefused.Because<RecordTrackingResult>(refusal);
         }
 
-        var correlationId = new CorrelationId(command.CorrelationId);
-        var trackingEvent = shipment.Record(report with { CarrierBookingReference = booking.CarrierBookingReference }, correlationId, now);
+        return await RecordAsync(shipment, report with { CarrierBookingReference = booking.CarrierBookingReference }, booking, new CorrelationId(command.CorrelationId), now, cancellationToken);
+    }
+
+    // A Driver's report (P12) finds its Shipment by Trip, not by a Carrier booking reference, and the Trip's rules decide it. The Driver app
+    // event ID is checked first: a repeat is answered as before, whatever has happened on the Trip since.
+    private async Task<Result<RecordTrackingResult>> HandleOwnFleetAsync(RecordTrackingCommand command, OwnFleetReport own, CancellationToken cancellationToken)
+    {
+        var report = command.Report;
+
+        if (await trackingEvents.SingleOrDefaultAsync(new TrackingEventBySourceEventIdSpec(report.Source, report.EventId), cancellationToken) is { } recorded)
+        {
+            var repeated = await shipments.SingleOrDefaultAsync(new ShipmentToChangeSpec(recorded.ShipmentNumber), cancellationToken)
+                ?? throw new InvalidOperationException($"Tracking event {recorded.SourceEventId} names Shipment {recorded.ShipmentNumber}, which the TMS doesn't have.");
+            return RecordTrackingResult.From(repeated, recorded, repeat: true);
+        }
+
+        var trip = await trips.FirstOrDefaultAsync(new TripByNumberSpec(own.TripNumber), cancellationToken);
+        var shipment = await shipments.SingleOrDefaultAsync(new ShipmentToChangeSpec(own.ShipmentNumber), cancellationToken);
+        var outcomes = StopOutcomes.From(trip is null ? [] : await trackingEvents.ListAsync(new TrackingEventsOfTripSpec([own.TripNumber]), cancellationToken));
+
+        var now = time.GetUtcNow();
+        if (rules.CheckOwnFleetReport(trip, shipment, report, outcomes, now) is { } refusal)
+        {
+            return TrackingEventRefused.Because<RecordTrackingResult>(refusal);
+        }
+
+        // The rules refuse a report whose Shipment is missing, so a Shipment is there.
+        return await RecordAsync(shipment ?? throw new InvalidOperationException($"Shipment {own.ShipmentNumber} passed the Driver report rules but is missing."), report, booking: null, new CorrelationId(command.CorrelationId), now, cancellationToken);
+    }
+
+    // The part a Carrier's and a Driver's report share: the Shipment takes the event in, an exception opens or clears its Exception, and the
+    // move, the Exception and the Transport Order becoming Billable save with the event, and the events they raise go to the outbox, in one
+    // transaction.
+    private async Task<Result<RecordTrackingResult>> RecordAsync(
+        Shipment shipment, TrackingReport report, CarrierBooking? booking, CorrelationId correlationId, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var trackingEvent = shipment.Record(report, correlationId, now);
 
         var cause = ExceptionCause.From(trackingEvent, now);
         if (cause is not null)
@@ -83,15 +125,16 @@ public sealed class RecordTrackingHandler(
 
         if (trackingEvent is { Type: TrackingEventType.Delivered, MovedShipment: true })
         {
-            // The Carrier has earned the Carrier cost of the Confirmed Carrier booking that carried the Shipment (P9).
-            shipment.IncurCarrierCost(booking, trackingEvent);
+            if (booking is not null)
+            {
+                // The Carrier has earned the Carrier cost of the Confirmed Carrier booking that carried the Shipment (P9).
+                shipment.IncurCarrierCost(booking, trackingEvent);
+            }
 
             // The Shipment moving to Delivered can also complete its Transport Order's conditions to be Billable (P9).
             await billing.CheckAsync(shipment, new BillingChange(correlationId, now, DeliveredAt: trackingEvent.EventTime, ExceptionOpened: cause is not null), cancellationToken);
         }
 
-        // The tracked Shipment's move, the Exception the event opened and the Transport Order becoming Billable save with the
-        // event, and the events they raise go to the outbox, in one transaction.
         await trackingEvents.AddAsync(trackingEvent, cancellationToken);
         await trackingEvents.SaveChangesAsync(cancellationToken);
         return RecordTrackingResult.From(shipment, trackingEvent, repeat: false);

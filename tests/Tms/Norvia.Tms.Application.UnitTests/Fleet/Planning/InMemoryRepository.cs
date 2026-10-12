@@ -16,6 +16,8 @@ internal static class InMemoryRepository
         repository.ListAsync(Arg.Any<CancellationToken>()).Returns(_ => stored.ToList());
         repository.FirstOrDefaultAsync(Arg.Any<ISpecification<T>>(), Arg.Any<CancellationToken>())
             .Returns(call => call.Arg<ISpecification<T>>().Evaluate(stored).FirstOrDefault());
+        repository.SingleOrDefaultAsync(Arg.Any<ISingleResultSpecification<T>>(), Arg.Any<CancellationToken>())
+            .Returns(call => call.Arg<ISingleResultSpecification<T>>().Evaluate(stored).SingleOrDefault());
         repository.AddAsync(Arg.Any<T>(), Arg.Any<CancellationToken>())
             .Returns(call =>
             {

@@ -10,6 +10,7 @@ namespace Norvia.Tms.Domain.TrackingEvents;
 /// <param name="CarrierBookingReference">The Carrier's own reference for the booking the event is about; null for an Own fleet event.</param>
 /// <param name="CarrierBookingNumber">The TMS's own number for the Carrier booking, which finds the Shipment only when the reference doesn't.</param>
 /// <param name="EventTime">When it happened, with the offset of where.</param>
+/// <param name="OwnFleet">For an Own fleet report (P12), the Trip, Driver and Shipment it is about in place of a Carrier booking; null for a Carrier's.</param>
 public sealed record TrackingReport(
     TrackingSource Source,
     string EventId,
@@ -19,4 +20,5 @@ public sealed record TrackingReport(
     DateTimeOffset EventTime,
     TrackingLocation Location,
     DateTimeOffset? Eta,
-    string? Remark);
+    string? Remark,
+    OwnFleetReport? OwnFleet = null);

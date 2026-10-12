@@ -23,4 +23,19 @@ public enum TrackingEventRefusalCode
 
     /// <summary>The event lacks a field the Canonical Model requires. A client error.</summary>
     MissingRequiredField,
+
+    /// <summary>An Own fleet report (P12): no Trip with that number is the reporting Driver's.</summary>
+    TripNotFound,
+
+    /// <summary>An Own fleet report (P12): the Trip isn't In progress, so it was never started or it is over.</summary>
+    TripNotUnderWay,
+
+    /// <summary>An Own fleet report (P12): the Shipment isn't on the Trip's latest version, even when the report names an older one.</summary>
+    ShipmentNotOnTrip,
+
+    /// <summary>An Own fleet report (P12): the Stop has its outcome already, which is final on its Trip. Report damage is exempt.</summary>
+    StopAlreadyCompleted,
+
+    /// <summary>An Own fleet report (P12): a delivery Stop waits until its collection Stop is Collected.</summary>
+    CollectionBeforeDelivery,
 }

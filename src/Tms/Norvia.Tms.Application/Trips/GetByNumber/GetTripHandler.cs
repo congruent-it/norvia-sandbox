@@ -12,7 +12,8 @@ public sealed class GetTripHandler(
     TripPlanningChecks checks,
     IVehicleDirectory vehicles,
     IDriverDirectory drivers,
-    TripNeedsCheck needsCheck) : IQueryHandler<GetTripQuery, Result<TripDetailView>>
+    TripNeedsCheck needsCheck,
+    TripOutcomes tripOutcomes) : IQueryHandler<GetTripQuery, Result<TripDetailView>>
 {
     public async ValueTask<Result<TripDetailView>> Handle(GetTripQuery query, CancellationToken cancellationToken)
     {
@@ -27,10 +28,11 @@ public sealed class GetTripHandler(
         var byId = onTrip.ToDictionary(item => item.Shipment.Id);
         var check = await checks.CheckAsync(trip.Day, trip.VehicleId, trip.DriverId, trip.PlannedStart, trip.PlannedDrivingDuration, trip, onTrip, [], cancellationToken);
 
-        var view = TripViews.Of(trip, onTrip, vehicles.ListActive().ToDictionary(vehicle => vehicle.Id), drivers.ListActive().ToDictionary(driver => driver.Id, driver => driver.Name), await needsCheck.OfAsync(trip, cancellationToken));
+        var outcomes = (await tripOutcomes.OfAsync([trip.Number], cancellationToken)).GetValueOrDefault(trip.Number);
+        var view = TripViews.Of(trip, onTrip, vehicles.ListActive().ToDictionary(vehicle => vehicle.Id), drivers.ListActive().ToDictionary(driver => driver.Id, driver => driver.Name), await needsCheck.OfAsync(trip, cancellationToken), outcomes);
         return new TripDetailView(
             view,
-            [.. trip.Stops.Where(stop => byId.ContainsKey(stop.ShipmentId)).Select(stop => StopText.ViewOf(stop, byId[stop.ShipmentId]))],
+            [.. trip.Stops.Where(stop => byId.ContainsKey(stop.ShipmentId)).Select(stop => StopText.ViewOf(stop, byId[stop.ShipmentId], outcomes?.Of(stop.ShipmentId, stop.Kind) ?? StopOutcome.Open))],
             [
                 .. check.Failures.Select(failure => new TripRuleFailureView(failure.Code.ToString(), failure.Message)),
                 .. check.Refusals.Select(refusal => new TripRuleFailureView(refusal.Code.ToString(), refusal.Message)),

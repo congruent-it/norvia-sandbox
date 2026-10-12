@@ -137,14 +137,14 @@ public sealed class TrackingEventRecordTests(ControlledClockTmsFixture tms) : IC
     }
 
     [Fact]
-    public async Task Record_FromOwnFleet_IsRefused_WithShipmentNotFound_UntilP12FindsItsShipmentByTrip()
+    public async Task Record_FromOwnFleetWithACarrierBookingReferenceAndNoTrip_IsABadRequest_AndMovesNothing()
     {
         var (shipmentNumber, reference) = await tms.BookedShipmentAsync(_cancellationToken);
 
         var problem = await tms.RecordRefusedAsync(
-            Collected(reference, _now.AddMinutes(-1), source: new JsonObject { ["type"] = "OwnFleet" }), HttpStatusCode.NotFound, _cancellationToken);
+            Collected(reference, _now.AddMinutes(-1), source: new JsonObject { ["type"] = "OwnFleet", ["driverId"] = "DRV-0001" }), HttpStatusCode.BadRequest, _cancellationToken);
 
-        problem["code"]!.GetValue<string>().Should().Be("ShipmentNotFound");
+        problem["code"]!.GetValue<string>().Should().Be("MissingRequiredField");
         (await tms.GetShipmentAsync(shipmentNumber, _cancellationToken))["status"]!.GetValue<string>().Should().Be("Booked");
     }
 
@@ -331,7 +331,12 @@ public sealed class TrackingEventRecordTests(ControlledClockTmsFixture tms) : IC
         var results = CanonicalModelSchemas.ValidateTrackingEvent(Collected("VDT-1", _now.AddMinutes(-1), eta: _now.AddDays(1)));
 
         results.IsValid.Should().BeTrue(CanonicalModelSchemas.Errors(results));
-        CanonicalModelSchemas.ValidateTrackingEvent(Collected("VDT-1", _now, source: new JsonObject { ["type"] = "OwnFleet" })).IsValid.Should().BeTrue();
+        var ownFleet = Collected("VDT-1", _now, source: new JsonObject { ["type"] = "OwnFleet", ["driverId"] = "DRV-0001" });
+        ownFleet.Remove("carrierBookingReference");
+        ownFleet["tripNumber"] = "TR-0000042";
+        ownFleet["shipmentNumber"] = "SH-0000042";
+        ownFleet["tripVersion"] = 1;
+        CanonicalModelSchemas.ValidateTrackingEvent(ownFleet).IsValid.Should().BeTrue();
     }
 
     [Fact]

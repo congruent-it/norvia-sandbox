@@ -165,13 +165,13 @@ public sealed class CarrierCostIncurredTests(TmsFixture tms)
     }
 
     [Fact]
-    public async Task OwnFleetDeliveredEvent_NeverPublishesCarrierCostIncurred()
+    public async Task OwnFleetDeliveredEventNamingACarrierBooking_IsRefused_AndNeverPublishesCarrierCostIncurred()
     {
         var (shipmentNumber, _, reference) = await tms.BookedShipmentWithNumberAsync(_cancellationToken);
 
         await tms.RecordRefusedAsync(
-            TrackingEventCalls.Event("Delivered", reference, DateTimeOffset.UtcNow.AddMinutes(-1), source: new JsonObject { ["type"] = "OwnFleet" }),
-            HttpStatusCode.NotFound,
+            TrackingEventCalls.Event("Delivered", reference, DateTimeOffset.UtcNow.AddMinutes(-1), source: new JsonObject { ["type"] = "OwnFleet", ["driverId"] = "DRV-0001" }),
+            HttpStatusCode.BadRequest,
             _cancellationToken);
 
         await ExpectNoCarrierCostAsync(shipmentNumber, "Booked");

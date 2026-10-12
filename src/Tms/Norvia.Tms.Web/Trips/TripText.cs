@@ -2,6 +2,7 @@ using System.Globalization;
 using Norvia.Tms.Application.Trips;
 using Norvia.Tms.Application.Trips.GetByNumber;
 using Norvia.Tms.Domain.Trips;
+using Norvia.Tms.Web.TransportOrders;
 
 namespace Norvia.Tms.Web.Trips;
 
@@ -45,6 +46,31 @@ public static class TripText
             (false, true) => "Needs a Vehicle",
             _ => "—",
         };
+
+    /// <summary>How many Stops the Trip visits, and once the Driver has started it how many of them have an outcome: "6" or "2 of 6 done".</summary>
+    public static string Stops(TripView trip)
+    {
+        ArgumentNullException.ThrowIfNull(trip);
+        return trip.Status >= TripStatus.InProgress ? string.Create(CultureInfo.InvariantCulture, $"{trip.StopsDone} of {trip.StopCount} done") : trip.StopCount.ToString(CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>A Stop's outcome as the Driver reported it, with when it happened and their remark: "Delivery failed · 12 Oct 14:05 · Nobody home".</summary>
+    public static string Outcome(TripStopView stop)
+    {
+        ArgumentNullException.ThrowIfNull(stop);
+        if (stop.Outcome == StopOutcomeKind.Open)
+        {
+            return "Open";
+        }
+
+        var name = stop.Outcome switch
+        {
+            StopOutcomeKind.CollectionFailed => "Collection failed",
+            StopOutcomeKind.DeliveryFailed => "Delivery failed",
+            var other => other.ToString(),
+        };
+        return string.Join(" · ", new[] { name, stop.OutcomeAt is null ? null : NorviaTime.Format(stop.OutcomeAt), stop.OutcomeRemark }.Where(part => !string.IsNullOrWhiteSpace(part)));
+    }
 
     public static string Kind(StopKind kind) => kind == StopKind.Collection ? "Collect" : "Deliver";
 

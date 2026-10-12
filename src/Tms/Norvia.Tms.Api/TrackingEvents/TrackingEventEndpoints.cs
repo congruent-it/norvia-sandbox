@@ -8,15 +8,18 @@ using Norvia.Tms.Api.TransportOrders;
 using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.TrackingEvents.Record;
 using Norvia.Tms.Domain.Carriers;
+using Norvia.Tms.Domain.Fleet;
+using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TrackingEvents;
+using Norvia.Tms.Domain.Trips;
 
 namespace Norvia.Tms.Api.TrackingEvents;
 
 public static class TrackingEventEndpoints
 {
     /// <summary>
-    /// The app role of the callers that record Tracking events: the Carrier-tracking Logic App's managed identity, and later
-    /// P12's Driver reports Logic App's.
+    /// The app role of the callers that record Tracking events: the Carrier-tracking Logic App's managed identity, and P12's
+    /// Driver reports Logic App's.
     /// </summary>
     public const string RecordRole = "TrackingEvents.Record";
 
@@ -30,17 +33,23 @@ public static class TrackingEventEndpoints
             .WithName("RecordTrackingEvent")
             .RequireAuthorization(policy => policy.RequireRole(RecordRole))
             .WithMetadata(new TrackedFlow(Flows.CarrierTracking))
-            .WithSummary("Record a Tracking event a Carrier reported for a Shipment.")
+            .WithSummary("Record a Tracking event a Carrier or a Driver reported for a Shipment.")
             .WithDescription(
                 "Takes only the Canonical Model. The event names its source: a Carrier ID (from API Management, never from the Carrier's payload) "
-                + "or Own fleet. The Shipment is the one on that Carrier's Confirmed Carrier booking with the Carrier booking reference. The TMS "
+                + "or Own fleet with the Driver ID (from the Driver's token, which the Driver reports Logic App passes on, never from the Driver app's payload). "
+                + "A Carrier's Shipment is the one on that Carrier's Confirmed Carrier booking with the Carrier booking reference. An Own fleet event names its Trip, "
+                + "the Shipment on it and the version of the Trip the Driver app held (kept for tracing only) in place of a booking reference, and the X-Correlation-ID is the Driver's action trail. "
+                + "A Driver reports Collected, CollectionFailed, Delivered, DeliveryFailed and Damaged. Collected and Delivered move the Shipment Dispatched, Collected, Delivered; "
+                + "CollectionFailed, DeliveryFailed and Damaged change no status and open the matching Exception (P7). Collected and Collection failed are the outcomes of the Shipment's collection Stop and "
+                + "Delivered and Delivery failed of its delivery Stop, each final on its Trip; Damaged is no outcome. The TMS "
                 + "stores the event with the correlation ID and the source's event ID. The Shipment's status only moves forward, and steps "
                 + "can be skipped: Collected moves it to Collected, Departed, Arrived and OutForDelivery to InTransit, Delivered to Delivered, "
                 + "publishing ShipmentCollected, ShipmentInTransit or ShipmentDelivered (only the one for the status landed on) in the same "
                 + "transaction. A late event, or one after Delivered, is stored and moves and publishes nothing. CollectionFailed, DeliveryFailed and Damaged are exceptions: stored, never moving the status, and published as ShipmentExceptionReported with the exception type and remark. The Carrier booking number finds the Shipment when no booking reference is given or it doesn't match. An event sent "
                 + "again under the same event ID is answered as before, flagged as a repeat, without recording or publishing anything. An event is "
                 + "refused, changing and publishing nothing, with a problem whose code says why: ShipmentNotFound (404), ShipmentNotInTransport "
-                + "(409), EventTimeInTheFuture, UnknownEventType or MissingRequiredField (400); and 400 for an input that isn't the Canonical Model.");
+                + "(409), EventTimeInTheFuture, UnknownEventType or MissingRequiredField (400); and for an Own fleet event TripNotFound (404, also for another Driver's Trip), "
+                + "TripNotUnderWay, ShipmentNotOnTrip (checked against the Trip's latest version, even when the event names an older one), StopAlreadyCompleted (Damaged is exempt) or CollectionBeforeDelivery (409); and 400 for an input that isn't the Canonical Model.");
 
         return app;
     }
@@ -103,6 +112,7 @@ public static class TrackingEventEndpoints
         }
 
         TrackingSource? source = null;
+        OwnFleetReport? ownFleet = null;
         if (trackingEvent.Source is not { } sourceRequest)
         {
             found.Add(Missing("A Tracking event needs its source."));
@@ -117,6 +127,16 @@ public static class TrackingEventEndpoints
             {
                 source = TrackingSource.Carrier(new CarrierId(sourceRequest.CarrierId));
             }
+
+            if (sourceRequest.DriverId is not null || trackingEvent.TripNumber is not null || trackingEvent.ShipmentNumber is not null || trackingEvent.TripVersion is not null)
+            {
+                found.Add(Missing("A Carrier event names no Driver, Trip or Shipment."));
+            }
+
+            if (string.IsNullOrWhiteSpace(trackingEvent.CarrierBookingReference) && string.IsNullOrWhiteSpace(trackingEvent.CarrierBookingNumber))
+            {
+                found.Add(Missing("A Tracking event needs the Carrier's own booking reference, or else the Carrier booking number."));
+            }
         }
         else if (sourceRequest.CarrierId is not null)
         {
@@ -125,11 +145,7 @@ public static class TrackingEventEndpoints
         else
         {
             source = TrackingSource.OwnFleet;
-        }
-
-        if (string.IsNullOrWhiteSpace(trackingEvent.CarrierBookingReference) && string.IsNullOrWhiteSpace(trackingEvent.CarrierBookingNumber))
-        {
-            found.Add(Missing("A Tracking event needs the Carrier's own booking reference, or else the Carrier booking number."));
+            ownFleet = ReadOwnFleet(trackingEvent, sourceRequest, found);
         }
 
         TrackingEventType? type = null;
@@ -165,7 +181,8 @@ public static class TrackingEventEndpoints
             place = new TrackingLocation(location.Place, location.Postcode, location.CountryCode);
         }
 
-        if (found.Count > 0 || trackingEvent.EventId is not { } eventId || source is null || type is not { } knownType || trackingEvent.EventTime is not { } eventTime || place is null)
+        var ownFleetMissing = source is { IsOwnFleet: true } && ownFleet is null;
+        if (found.Count > 0 || ownFleetMissing || trackingEvent.EventId is not { } eventId || source is null || type is not { } knownType || trackingEvent.EventTime is not { } eventTime || place is null)
         {
             return false;
         }
@@ -179,8 +196,43 @@ public static class TrackingEventEndpoints
             eventTime,
             place,
             trackingEvent.Eta,
-            trackingEvent.Remark);
+            trackingEvent.Remark,
+            ownFleet);
         return true;
+    }
+
+    // An Own fleet event is about a Trip, a Shipment on it and a Driver, and names no Carrier booking.
+    private static OwnFleetReport? ReadOwnFleet(TrackingEventRequest trackingEvent, TrackingSourceRequest source, List<ReadProblem> found)
+    {
+        var before = found.Count;
+        if (!TripNumber.TryParse(trackingEvent.TripNumber, out var tripNumber))
+        {
+            found.Add(Missing("An Own fleet event needs the number of its Trip, such as TR-0000042."));
+        }
+
+        if (!ShipmentNumber.TryParse(trackingEvent.ShipmentNumber, out var shipmentNumber))
+        {
+            found.Add(Missing("An Own fleet event needs the number of its Shipment, such as SH-0000042."));
+        }
+
+        if (trackingEvent.TripVersion is not >= 0)
+        {
+            found.Add(Missing("An Own fleet event needs the version of the Trip the Driver app held."));
+        }
+
+        if (string.IsNullOrWhiteSpace(source.DriverId))
+        {
+            found.Add(Missing("An Own fleet source needs the Driver ID from the Driver's token."));
+        }
+
+        if (trackingEvent.CarrierBookingReference is not null || trackingEvent.CarrierBookingNumber is not null)
+        {
+            found.Add(Missing("An Own fleet event names no Carrier booking."));
+        }
+
+        return found.Count > before || tripNumber is null || shipmentNumber is null || source.DriverId is not { } driverId || trackingEvent.TripVersion is not { } version
+            ? null
+            : new OwnFleetReport(tripNumber, new DriverId(driverId), shipmentNumber, version);
     }
 
     /// <summary>One thing wrong with an event the TMS can't read, with the stable code of its kind.</summary>
@@ -188,8 +240,8 @@ public static class TrackingEventEndpoints
 
     private static int StatusCodeOf(TrackingEventRefusalCode code) => code switch
     {
-        TrackingEventRefusalCode.ShipmentNotFound => StatusCodes.Status404NotFound,
+        TrackingEventRefusalCode.ShipmentNotFound or TrackingEventRefusalCode.TripNotFound => StatusCodes.Status404NotFound,
         TrackingEventRefusalCode.EventTimeInTheFuture or TrackingEventRefusalCode.UnknownEventType or TrackingEventRefusalCode.MissingRequiredField => StatusCodes.Status400BadRequest,
-        _ => StatusCodes.Status409Conflict, // ShipmentNotInTransport
+        _ => StatusCodes.Status409Conflict, // ShipmentNotInTransport, and the Trip rules of an Own fleet event
     };
 }

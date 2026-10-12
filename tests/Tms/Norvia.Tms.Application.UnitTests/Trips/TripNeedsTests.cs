@@ -101,9 +101,9 @@ public sealed class TripNeedsTests
         await new RecordAbsenceHandler(_fixture.Planning.Absences, _fixture.Planning.Days, _fixture.Planning.Drivers, _fixture.Planning.Horizon, _fixture.Planning.Time)
             .Handle(new RecordAbsenceCommand(Anouk, Day, Day, AbsenceReason.Sickness, null), CancellationToken.None);
 
-        var listed = await new ListTripsHandler(_fixture.Trips.AsRead(), _fixture.TripShipments, _fixture.Planning.Vehicles, _fixture.Planning.Drivers, _fixture.NeedsCheck)
+        var listed = await new ListTripsHandler(_fixture.Trips.AsRead(), _fixture.TripShipments, _fixture.Planning.Vehicles, _fixture.Planning.Drivers, _fixture.NeedsCheck, _fixture.Outcomes)
             .Handle(new ListTripsQuery(), CancellationToken.None);
-        var detail = await new GetTripHandler(_fixture.Trips.AsRead(), _fixture.TripShipments, _fixture.Checks, _fixture.Planning.Vehicles, _fixture.Planning.Drivers, _fixture.NeedsCheck)
+        var detail = await new GetTripHandler(_fixture.Trips.AsRead(), _fixture.TripShipments, _fixture.Checks, _fixture.Planning.Vehicles, _fixture.Planning.Drivers, _fixture.NeedsCheck, _fixture.Outcomes)
             .Handle(new GetTripQuery(trip.Number.Value), CancellationToken.None);
 
         listed.Single().Should().Match<TripView>(view => view.NeedsDriver && !view.NeedsVehicle);

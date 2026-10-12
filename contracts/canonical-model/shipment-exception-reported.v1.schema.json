@@ -67,6 +67,14 @@
       ],
       "minLength": 1
     },
+    "tripNumber": {
+      "description": "The Trip the Driver reported the event on (P12); null for a Carrier's event.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^TR-[0-9]{7}$"
+    },
     "eventTime": {
       "description": "When it happened, with the offset of where.",
       "type": "string",

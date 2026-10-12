@@ -14,6 +14,7 @@ namespace Norvia.Tms.Application.Shipments.ListInProgress;
 /// the Shipment's status is still the Tracking events' to move.
 /// </param>
 /// <param name="HasOpenException">Whether the Shipment has an open Exception (P7), which the Planner works from the list of Open Exceptions.</param>
+/// <param name="TripNumber">The Trip an Own fleet Shipment is on (P12), shown where a Carrier's Shipment shows its Carrier; null for a Carrier's.</param>
 /// <param name="IsStale">Whether its next expected Tracking event is late. Only a flag for the Planner; Stale Shipments are listed first.</param>
 public sealed record ShipmentInProgressSummary(
     string ShipmentNumber,
@@ -23,4 +24,5 @@ public sealed record ShipmentInProgressSummary(
     DateTimeOffset? Eta,
     bool IsStale,
     bool HasProofOfDelivery,
-    bool HasOpenException);
+    bool HasOpenException,
+    string? TripNumber = null);

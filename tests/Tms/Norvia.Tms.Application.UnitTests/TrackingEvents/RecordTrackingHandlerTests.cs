@@ -13,6 +13,7 @@ using Norvia.Tms.Domain.ProofsOfDelivery;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.TransportOrders;
+using Norvia.Tms.Domain.Trips;
 using NSubstitute;
 
 namespace Norvia.Tms.Application.UnitTests.TrackingEvents;
@@ -28,6 +29,7 @@ public sealed class RecordTrackingHandlerTests
     private readonly IRepository<CarrierBooking> _carrierBookings = Substitute.For<IRepository<CarrierBooking>>();
     private readonly IRepository<Shipment> _shipments = Substitute.For<IRepository<Shipment>>();
     private readonly IReadRepository<TransportOrder> _transportOrders = Substitute.For<IReadRepository<TransportOrder>>();
+    private readonly IReadRepository<Trip> _trips = Substitute.For<IReadRepository<Trip>>();
     private readonly IRepository<ExceptionCase> _exceptions = Substitute.For<IRepository<ExceptionCase>>();
     private readonly IReadRepository<ExceptionCase> _openExceptions = Substitute.For<IReadRepository<ExceptionCase>>();
     private readonly IExceptionNumbers _exceptionNumbers = Substitute.For<IExceptionNumbers>();
@@ -39,7 +41,7 @@ public sealed class RecordTrackingHandlerTests
     public RecordTrackingHandlerTests()
     {
         _exceptionNumbers.NextAsync(Arg.Any<CancellationToken>()).Returns(ExceptionNumber.FromSequence(9));
-        _handler = new RecordTrackingHandler(_trackingEvents, _carrierBookings, _shipments, _transportOrders, new ExceptionCauses(_exceptions, _exceptionNumbers), new BillingCheck(_transportOrders, Substitute.For<IReadRepository<Shipment>>(), _deliveredEvents, _proofsOfDelivery, _openExceptions), new TrackingEventRules(TimeSpan.FromMinutes(5)), _time);
+        _handler = new RecordTrackingHandler(_trackingEvents, _carrierBookings, _shipments, _transportOrders, _trips, new ExceptionCauses(_exceptions, _exceptionNumbers), new BillingCheck(_transportOrders, Substitute.For<IReadRepository<Shipment>>(), _deliveredEvents, _proofsOfDelivery, _openExceptions), new TrackingEventRules(TimeSpan.FromMinutes(5)), _time);
     }
 
     [Fact]
@@ -501,7 +503,7 @@ public sealed class RecordTrackingHandlerTests
     }
 
     [Fact]
-    public async Task Handle_OwnFleet_IsRefused_WithShipmentNotFound_UntilP12FindsItsShipmentByTrip()
+    public async Task Handle_OwnFleetWithoutATrip_IsRefused_WithShipmentNotFound()
     {
         BookedShipment();
 

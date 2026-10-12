@@ -49,7 +49,7 @@
         <PropertyColumn Title="Driver" Property="@(trip => trip.DriverName ?? "—")" />
         <PropertyColumn Title="Start" Property="@(trip => TripTimes.StartOrDash(trip.PlannedStart))" />
         <PropertyColumn Title="Driving" Property="@(trip => TripTimes.DurationOrDash(trip.PlannedDrivingDuration))" />
-        <PropertyColumn Title="Stops" Property="@(trip => trip.StopCount)" />
+        <PropertyColumn Title="Stops" Property="@(trip => TripText.Stops(trip))" />
         <PropertyColumn Title="Load" Property="@(trip => TripText.Load(trip))" />
         <PropertyColumn Title="Flag" Property="@(trip => TripText.Flags(trip))" />
         <PropertyColumn Title="Delivery" Property="@(trip => TripText.Delivery(trip.LatestDelivery))" />

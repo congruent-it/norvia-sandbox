@@ -11,6 +11,10 @@
             <th scope="col">Place</th>
             <th scope="col">Window</th>
             <th scope="col">Goods</th>
+            @if (ShowOutcomes)
+            {
+                <th scope="col">Outcome</th>
+            }
             @if (Reorderable)
             {
                 <th scope="col">Order</th>
@@ -35,6 +39,10 @@
                 <td>@TripText.Place(stop)</td>
                 <td>@NorviaTime.FormatWindow(stop.WindowEarliest, stop.WindowLatest)</td>
                 <td>@stop.Goods</td>
+                @if (ShowOutcomes)
+                {
+                    <td>@TripText.Outcome(stop)</td>
+                }
                 @if (Reorderable)
                 {
                     <td>
@@ -58,6 +66,10 @@
     /// <summary>True for a Draft or a Dispatched Trip, whose Stops the Planner can drag into order; a Trip that is In progress can't be moved.</summary>
     [Parameter]
     public bool Reorderable { get; set; }
+
+    /// <summary>True once the Driver has started the Trip, so each Stop shows the outcome they reported (P12).</summary>
+    [Parameter]
+    public bool ShowOutcomes { get; set; }
 
     /// <summary>True while the TMS is answering an earlier move, so a second one doesn't start from an order that is about to change.</summary>
     [Parameter]
