@@ -2,6 +2,7 @@ using Norvia.Tms.Application.Trips;
 using Norvia.Tms.Application.Trips.GetByNumber;
 using Norvia.Tms.Application.UnitTests.Fleet.Planning;
 using Norvia.Tms.Domain.Fleet;
+using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.Trips;
 using static Norvia.Tms.Application.UnitTests.Fleet.Planning.PlanningEditsFixture;
 
@@ -66,6 +67,23 @@ public sealed class GetTripTests
     }
 
     [Fact]
+    public async Task Handle_ATripUnderWay_ShowsEachStopsOutcomeWithItsTimeAndRemark_AndHowManyStopsAreDone()
+    {
+        var trip = await _fixture.DispatchedAsync();
+        trip.Start(new Norvia.Tms.Domain.TransportOrders.CorrelationId("corr-start"), _fixture.Planning.Time.GetUtcNow());
+        var collectedAt = new DateTimeOffset(2026, 10, 13, 9, 30, 0, TimeSpan.FromHours(2));
+        _fixture.Reported(trip, TrackingEventType.Collected, collectedAt, "Dock 4");
+        _fixture.Reported(trip, TrackingEventType.Damaged, collectedAt.AddHours(1), "Crushed pallet");
+
+        var result = await Get(trip);
+
+        result.Value.Stops.Select(stop => (stop.Kind, stop.Outcome, stop.OutcomeAt, stop.OutcomeRemark)).Should().Equal(
+            (StopKind.Collection, StopOutcomeKind.Collected, (DateTimeOffset?)collectedAt, "Dock 4"),
+            (StopKind.Delivery, StopOutcomeKind.Open, null, null));
+        result.Value.Trip.StopsDone.Should().Be(1);
+    }
+
+    [Fact]
     public async Task Handle_ADraft_HasNoVersions()
     {
         var result = await Get(_fixture.Existing(Tuesday, Van, null));
@@ -77,13 +95,13 @@ public sealed class GetTripTests
     [Fact]
     public async Task Handle_AnUnknownTrip_IsRefusedWithTripNotFound()
     {
-        var result = await new GetTripHandler(_fixture.Trips.AsRead(), _fixture.TripShipments, _fixture.Checks, _fixture.Planning.Vehicles, _fixture.Planning.Drivers, _fixture.NeedsCheck)
+        var result = await new GetTripHandler(_fixture.Trips.AsRead(), _fixture.TripShipments, _fixture.Checks, _fixture.Planning.Vehicles, _fixture.Planning.Drivers, _fixture.NeedsCheck, _fixture.Outcomes)
             .Handle(new GetTripQuery("TR-0009999"), CancellationToken.None);
 
         result.ValidationErrors.Should().ContainSingle().Which.ErrorCode.Should().Be(nameof(TripRefusalCode.TripNotFound));
     }
 
     private async Task<Ardalis.Result.Result<TripDetailView>> Get(Trip trip) =>
-        await new GetTripHandler(_fixture.Trips.AsRead(), _fixture.TripShipments, _fixture.Checks, _fixture.Planning.Vehicles, _fixture.Planning.Drivers, _fixture.NeedsCheck)
+        await new GetTripHandler(_fixture.Trips.AsRead(), _fixture.TripShipments, _fixture.Checks, _fixture.Planning.Vehicles, _fixture.Planning.Drivers, _fixture.NeedsCheck, _fixture.Outcomes)
             .Handle(new GetTripQuery(trip.Number.Value), CancellationToken.None);
 }

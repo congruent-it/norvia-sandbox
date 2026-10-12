@@ -3,6 +3,7 @@ using Norvia.Tms.Domain.Trips;
 namespace Norvia.Tms.Application.Trips;
 
 /// <param name="StopCount">How many Stops the Trip visits: two for each Shipment on it.</param>
+/// <param name="StopsDone">How many of them have an outcome, as the Driver reported it (P12).</param>
 /// <param name="LoadWeightKg">The total weight of the Trip's Shipments, which count as loaded at once.</param>
 /// <param name="LoadPalletPlaces">The pallets of the Trip's Shipments.</param>
 /// <param name="PayloadKg">The Vehicle's payload; null while the Trip has no (active) Vehicle.</param>
@@ -27,4 +28,5 @@ public sealed record TripView(
     int? VehiclePalletPlaces = null,
     TripDeliveryState? LatestDelivery = null,
     bool NeedsDriver = false,
-    bool NeedsVehicle = false);
+    bool NeedsVehicle = false,
+    int StopsDone = 0);

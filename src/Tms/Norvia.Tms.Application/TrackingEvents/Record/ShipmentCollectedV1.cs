@@ -14,14 +14,15 @@ public sealed record ShipmentCollectedV1(
     string TransportOrderNumber,
     string? CarrierId,
     string? CarrierBookingReference,
+    string? TripNumber,
     DateTimeOffset EventTime,
     TrackingLocationV1 Location,
     DateTimeOffset? Eta)
-    : ShipmentProgressV1(EventId, OccurredAt, CorrelationId, ShipmentNumber, TransportOrderNumber, CarrierId, CarrierBookingReference, EventTime, Location, Eta)
+    : ShipmentProgressV1(EventId, OccurredAt, CorrelationId, ShipmentNumber, TransportOrderNumber, CarrierId, CarrierBookingReference, TripNumber, EventTime, Location, Eta)
 {
     public override string EventType => "ShipmentCollected";
 
     public static ShipmentCollectedV1 From(ShipmentCollectedEvent collected) =>
-        From(collected.Shipment, collected.TrackingEvent, static (id, at, correlationId, shipment, order, carrier, reference, time, location, eta) =>
-            new ShipmentCollectedV1(id, at, correlationId, shipment, order, carrier, reference, time, location, eta));
+        From(collected.Shipment, collected.TrackingEvent, static (id, at, correlationId, shipment, order, carrier, reference, tripNumber, time, location, eta) =>
+            new ShipmentCollectedV1(id, at, correlationId, shipment, order, carrier, reference, tripNumber, time, location, eta));
 }

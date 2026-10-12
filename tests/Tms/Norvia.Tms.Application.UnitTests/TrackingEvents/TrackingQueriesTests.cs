@@ -18,6 +18,7 @@ using Norvia.Tms.Domain.ShipperNotifications;
 using Norvia.Tms.Domain.Shippers;
 using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.TransportOrders;
+using Norvia.Tms.Domain.Trips;
 using NSubstitute;
 
 namespace Norvia.Tms.Application.UnitTests.TrackingEvents;
@@ -30,6 +31,7 @@ public sealed class TrackingQueriesTests
 
     private readonly IReadRepository<Shipment> _shipments = Substitute.For<IReadRepository<Shipment>>();
     private readonly IReadRepository<TrackingEvent> _events = Substitute.For<IReadRepository<TrackingEvent>>();
+    private readonly IReadRepository<Trip> _trips = Substitute.For<IReadRepository<Trip>>();
     private readonly IReadRepository<TransportOrder> _orders = Substitute.For<IReadRepository<TransportOrder>>();
     private readonly IReadRepository<ProofOfDelivery> _proofsOfDelivery = Substitute.For<IReadRepository<ProofOfDelivery>>();
     private readonly IReadRepository<ExceptionCase> _exceptions = Substitute.For<IReadRepository<ExceptionCase>>();
@@ -49,6 +51,7 @@ public sealed class TrackingQueriesTests
         _proofsOfDelivery.ListAsync(Arg.Any<ProofsOfDeliveryForShipmentSpec>(), Arg.Any<CancellationToken>()).Returns([]);
         _carriers.Find(VanDijk).Returns(new Carrier(VanDijk, "Van Dijk Transport", true));
         _events.ListAsync(Arg.Any<TrackingEventsForShipmentsSpec>(), Arg.Any<CancellationToken>()).Returns([]);
+        _trips.ListAsync(Arg.Any<TripsOfShipmentsSpec>(), Arg.Any<CancellationToken>()).Returns([]);
         _orders.FirstOrDefaultAsync(Arg.Any<TransportOrderByIdSpec>(), Arg.Any<CancellationToken>()).Returns(call => _allOrders.FirstOrDefault(order => order.Id == call.Arg<TransportOrderByIdSpec>().Id));
         _orders.ListAsync(Arg.Any<TransportOrdersByNumbersSpec>(), Arg.Any<CancellationToken>()).Returns(_ => _allOrders);
     }
@@ -73,6 +76,27 @@ public sealed class TrackingQueriesTests
 
         listed.Should().ContainSingle().Which.Should().Be(new ShipmentInProgressSummary(
             "SH-0000012", new CarriedByView(AssignedTo.Carrier, new CarrierView("CAR-0001", "Van Dijk Transport")), ShipmentStatus.Booked, null, Latest, false, false, false));
+    }
+
+    [Fact]
+    public async Task ListInProgress_AnOwnFleetShipment_ShowsOwnFleetAndTheNumberOfItsTrip()
+    {
+        var order = TransportOrder.Accept(
+            new ShipperId("SHP-0001"), TransportOrderDetailsSample(), TransportOrderNumber.FromSequence(8), IntakeChannel.ShipperApi, new CorrelationId("corr-1"), Samples.Now);
+        _allOrders.Add(order);
+        var shipment = order.Plan(ShipmentNumber.FromSequence(13), CarriedBy.OwnFleet, new IdempotencyKey("key-1"), new CorrelationId("corr-planning"), Samples.Now.AddHours(2))!;
+        shipment.Release(order, new IdempotencyKey("key-rel"), new CorrelationId("corr-rel"), Samples.Now.AddHours(3));
+        shipment.Dispatch();
+        var trip = Trip.CreateDraft(TripNumber.FromSequence(42), new DateOnly(2026, 9, 25), null, null, new IdempotencyKey("k"));
+        trip.AddShipment(shipment.Id);
+        _shipments.ListAsync(Arg.Any<ShipmentsInProgressSpec>(), Arg.Any<CancellationToken>()).Returns([shipment]);
+        _trips.ListAsync(Arg.Any<TripsOfShipmentsSpec>(), Arg.Any<CancellationToken>()).Returns([trip]);
+
+        var listed = await InProgressHandler().Handle(new ListShipmentsInProgressQuery(), CancellationToken.None);
+
+        var summary = listed.Should().ContainSingle().Subject;
+        summary.CarriedBy.AssignedTo.Should().Be(AssignedTo.OwnFleet);
+        summary.TripNumber.Should().Be("TR-0000042");
     }
 
     [Fact]
@@ -389,7 +413,7 @@ public sealed class TrackingQueriesTests
         result.Status.Should().Be(ResultStatus.NotFound);
     }
 
-    private ListShipmentsInProgressHandler InProgressHandler() => new(_shipments, _events, _orders, _proofsOfDelivery, _exceptions, _carriers, new ShipmentStaleRules(TimeSpan.FromHours(2), TimeSpan.FromHours(24), TimeSpan.FromHours(2)), _time);
+    private ListShipmentsInProgressHandler InProgressHandler() => new(_shipments, _events, _orders, _proofsOfDelivery, _exceptions, _trips, _carriers, new ShipmentStaleRules(TimeSpan.FromHours(2), TimeSpan.FromHours(24), TimeSpan.FromHours(2)), _time);
 
     private GetTrackingTimelineHandler TimelineHandler() => new(_shipments, _events, _proofsOfDelivery, _exceptions, _notifications, _carrierBookings, _orders, _carriers);
 

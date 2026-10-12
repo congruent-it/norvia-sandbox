@@ -7,6 +7,7 @@ using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Fleet;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.Shippers;
+using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Domain.Trips;
 using NSubstitute;
@@ -43,6 +44,7 @@ internal sealed class TripsFixture
         Shipments = InMemoryRepository.Over(StoredShipments);
         TransportOrders = InMemoryRepository.Over(StoredOrders);
         TripShipments = new TripShipments(Shipments.AsRead(), TransportOrders.AsRead());
+        Outcomes = new TripOutcomes(InMemoryRepository.Over(StoredTrackingEvents).AsRead());
         Amendments = new TripAmendments(Shipments, TripShipments, Planning.Vehicles, Planning.Drivers, Planning.Time);
     }
 
@@ -53,6 +55,11 @@ internal sealed class TripsFixture
     public IRepository<Shipment> Shipments { get; }
 
     public IRepository<TransportOrder> TransportOrders { get; }
+
+    /// <summary>The Tracking events the Drivers reported on the Trips (P12), from which the Stops' outcomes are read.</summary>
+    public List<TrackingEvent> StoredTrackingEvents { get; } = [];
+
+    public TripOutcomes Outcomes { get; }
 
     public TripShipments TripShipments { get; }
 
@@ -72,6 +79,16 @@ internal sealed class TripsFixture
     public TripPlanningChecks Checks { get; }
 
     public TripNeedsCheck NeedsCheck { get; }
+
+    /// <summary>The Driver reports <paramref name="type"/> for the Trip's only Shipment, which the Trip keeps as a Tracking event from Own fleet (P12).</summary>
+    public void Reported(Trip trip, TrackingEventType type, DateTimeOffset at, string? remark = null)
+    {
+        var shipment = StoredShipments.Single(candidate => trip.HasShipment(candidate.Id));
+        var report = new TrackingReport(
+            TrackingSource.OwnFleet, Guid.NewGuid().ToString(), null, null, type, at, new TrackingLocation("Utrecht", "3511 AW", "NL"), null, remark,
+            new OwnFleetReport(trip.Number, trip.DriverId!, shipment.Number, trip.Version));
+        StoredTrackingEvents.Add(shipment.Record(report, new CorrelationId("corr-driver"), at));
+    }
 
     public Trip Existing(DateOnly day, VehicleId? vehicle, DriverId? driver)
     {

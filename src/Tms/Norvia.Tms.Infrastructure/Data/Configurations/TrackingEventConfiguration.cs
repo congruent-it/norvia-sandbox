@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Norvia.Tms.Domain.Carriers;
+using Norvia.Tms.Domain.Fleet;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.TransportOrders;
+using Norvia.Tms.Domain.Trips;
 
 namespace Norvia.Tms.Infrastructure.Data.Configurations;
 
@@ -47,6 +49,16 @@ internal sealed class TrackingEventConfiguration : IEntityTypeConfiguration<Trac
         // A source's own event ID is unique, so an event sent twice is one event, even when both calls race.
         builder.HasIndex(trackingEvent => new { trackingEvent.Source, trackingEvent.SourceEventId }).IsUnique();
         builder.Property(trackingEvent => trackingEvent.CarrierBookingReference).HasMaxLength(50);
+
+        // An Own fleet event (P12) names its Trip and Driver in place of a Carrier booking; a Trip's Stop outcomes are read from them.
+        builder.Property(trackingEvent => trackingEvent.TripNumber)
+            .HasConversion(number => number!.Value, value => TripNumber.Parse(value))
+            .HasMaxLength(10);
+        builder.HasIndex(trackingEvent => trackingEvent.TripNumber);
+        builder.Property(trackingEvent => trackingEvent.DriverId)
+            .HasConversion(id => id!.Value, value => new DriverId(value))
+            .HasMaxLength(50);
+        builder.Property(trackingEvent => trackingEvent.TripVersion);
 
         builder.Property(trackingEvent => trackingEvent.Type).HasConversion<string>().HasMaxLength(30);
         builder.Property(trackingEvent => trackingEvent.EventTime).IsRequired();

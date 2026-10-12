@@ -18,19 +18,20 @@ public sealed record ShipmentExceptionReportedV1(
     string TransportOrderNumber,
     string? CarrierId,
     string? CarrierBookingReference,
+    string? TripNumber,
     DateTimeOffset EventTime,
     TrackingLocationV1 Location,
     DateTimeOffset? Eta,
     string ExceptionType,
     string? Remark)
-    : ShipmentProgressV1(EventId, OccurredAt, CorrelationId, ShipmentNumber, TransportOrderNumber, CarrierId, CarrierBookingReference, EventTime, Location, Eta)
+    : ShipmentProgressV1(EventId, OccurredAt, CorrelationId, ShipmentNumber, TransportOrderNumber, CarrierId, CarrierBookingReference, TripNumber, EventTime, Location, Eta)
 {
     public override string EventType => "ShipmentExceptionReported";
 
     public static ShipmentExceptionReportedV1 From(ShipmentExceptionReportedEvent reported)
     {
         var trackingEvent = reported.TrackingEvent;
-        return From(reported.Shipment, trackingEvent, (id, at, correlationId, shipment, order, carrier, reference, time, location, eta) =>
-            new ShipmentExceptionReportedV1(id, at, correlationId, shipment, order, carrier, reference, time, location, eta, trackingEvent.Type.ToString(), trackingEvent.Remark));
+        return From(reported.Shipment, trackingEvent, (id, at, correlationId, shipment, order, carrier, reference, tripNumber, time, location, eta) =>
+            new ShipmentExceptionReportedV1(id, at, correlationId, shipment, order, carrier, reference, tripNumber, time, location, eta, trackingEvent.Type.ToString(), trackingEvent.Remark));
     }
 }

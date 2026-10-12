@@ -30,4 +30,12 @@ public static class TrackingText
     public static string Last(LastTrackingEventView? last) => last is null
         ? NoneYet
         : $"{Type(last.Type)}, {NorviaTime.Format(last.EventTime)}, {Place(last.Place, last.Postcode, last.CountryCode)}";
+
+    /// <summary>Who carries a Shipment in progress, and for Own fleet its Trip: "Own fleet · TR-0000042".</summary>
+    public static string CarriedBy(ShipmentInProgressSummary shipment)
+    {
+        ArgumentNullException.ThrowIfNull(shipment);
+        var carriedBy = TransportOrders.PlanningText.CarriedBy(shipment.CarriedBy);
+        return shipment.TripNumber is null ? carriedBy : $"{carriedBy} · {shipment.TripNumber}";
+    }
 }

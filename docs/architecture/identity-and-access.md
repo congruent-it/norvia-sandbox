@@ -52,7 +52,7 @@ The TMS validates the token and the role; the Shipper or Carrier a call is for c
 | `ShipperNotifications.Report` | `shipper-notification` | Report a Shipper notification as sent or not delivered | [P7](../processes/tms/p7-exception-handling.md) |
 | `Trips.ReportDelivery` | `trip-dispatch` | Report a Trip version as delivered to the Driver app or not delivered | [P11](../processes/tms/p11-trip-dispatch.md#tms-api) |
 | `Trips.Start` | None yet: the P12 Driver reports Logic App will hold it | Start a Dispatched Trip for its Driver on the Trip's day | [P12](../processes/tms/p12-trip-execution.md#tms-api) |
-| `TrackingEvents.Record` | `tracking` | Record a Tracking event | [P5](../processes/tms/p5-shipment-tracking.md) |
+| `TrackingEvents.Record` | `tracking`. The P12 Driver reports Logic App will hold it too | Record a Tracking event, a Carrier's or a Driver's Stop report | [P5](../processes/tms/p5-shipment-tracking.md) |
 | `ProofsOfDelivery.Record` | `proof-of-delivery` | Record a Proof of delivery with its files | [P6](../processes/tms/p6-proof-of-delivery.md) |
 | `ShipperTracking.Read` | `apim` | List, get and find a Shipper's Transport Orders, and read a current Proof of delivery file. The TMS trusts the Shipper ID header only from this caller | [P8](../processes/tms/p8-shipper-visibility.md) |
 

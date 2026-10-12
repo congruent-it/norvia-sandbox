@@ -14,14 +14,15 @@ public sealed record ShipmentInTransitV1(
     string TransportOrderNumber,
     string? CarrierId,
     string? CarrierBookingReference,
+    string? TripNumber,
     DateTimeOffset EventTime,
     TrackingLocationV1 Location,
     DateTimeOffset? Eta)
-    : ShipmentProgressV1(EventId, OccurredAt, CorrelationId, ShipmentNumber, TransportOrderNumber, CarrierId, CarrierBookingReference, EventTime, Location, Eta)
+    : ShipmentProgressV1(EventId, OccurredAt, CorrelationId, ShipmentNumber, TransportOrderNumber, CarrierId, CarrierBookingReference, TripNumber, EventTime, Location, Eta)
 {
     public override string EventType => "ShipmentInTransit";
 
     public static ShipmentInTransitV1 From(ShipmentInTransitEvent inTransit) =>
-        From(inTransit.Shipment, inTransit.TrackingEvent, static (id, at, correlationId, shipment, order, carrier, reference, time, location, eta) =>
-            new ShipmentInTransitV1(id, at, correlationId, shipment, order, carrier, reference, time, location, eta));
+        From(inTransit.Shipment, inTransit.TrackingEvent, static (id, at, correlationId, shipment, order, carrier, reference, tripNumber, time, location, eta) =>
+            new ShipmentInTransitV1(id, at, correlationId, shipment, order, carrier, reference, tripNumber, time, location, eta));
 }

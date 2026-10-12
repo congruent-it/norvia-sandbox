@@ -7,11 +7,12 @@ using Norvia.Tms.Domain.Shipments;
 namespace Norvia.Tms.Application.TrackingEvents.Record;
 
 /// <summary>
-/// Traces a Carrier's Tracking event on its own Message trail (coding guidelines §7): the event's <c>correlationId</c>
+/// Traces a Carrier's or a Driver's Tracking event on its own Message trail (coding guidelines §7): the event's <c>correlationId</c>
 /// and <c>partyId</c> from the Carrier that reported it, and for its outcome <c>shipmentNumber</c> and <c>outcome</c>,
 /// in the logging scope and on the request's trace. An event the TMS refuses records Refused with its
 /// <c>failureCode</c>. A repeat's outcome is traced on the trail of the event it repeats. The API's request scope
-/// carries <c>flow</c>.
+/// carries <c>flow</c>, which a Driver's report (P12) changes to <c>trip-execution</c> with its <c>tripNumber</c> and the Driver app event ID
+/// as the <c>sourceMessageId</c>.
 /// </summary>
 public sealed partial class TrackTrackingEventInLoggingScope(ILogger<TrackTrackingEventInLoggingScope> logger)
     : IPipelineBehavior<RecordTrackingCommand, Result<RecordTrackingResult>>
@@ -28,6 +29,14 @@ public sealed partial class TrackTrackingEventInLoggingScope(ILogger<TrackTracki
         if (message.Report.Source.CarrierId is { } carrierId)
         {
             call[TrackingKeys.PartyId] = carrierId.Value;
+        }
+
+        if (message.Report.OwnFleet is { } own)
+        {
+            call[TrackingKeys.Flow] = Flows.TripExecution;
+            call[TrackingKeys.TripNumber] = own.TripNumber.Value;
+            call[TrackingKeys.ShipmentNumber] = own.ShipmentNumber.Value;
+            call[TrackingKeys.SourceMessageId] = message.Report.EventId;
         }
 
         using var trail = logger.Track(call);

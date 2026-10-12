@@ -677,6 +677,10 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
 
+                    b.Property<string>("DriverId")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
                     b.Property<DateTimeOffset?>("Eta")
                         .HasColumnType("datetimeoffset");
 
@@ -712,6 +716,13 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<string>("TripNumber")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<int?>("TripVersion")
+                        .HasColumnType("int");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -743,6 +754,8 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ShipmentId");
+
+                    b.HasIndex("TripNumber");
 
                     b.HasIndex("Source", "SourceEventId")
                         .IsUnique();

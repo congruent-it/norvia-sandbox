@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://norvia.example/canonical-model/tracking-event.v1.schema.json",
   "title": "TrackingEvent",
-  "description": "One report that something happened to a Shipment, as the Carrier-tracking Logic App sends it to the TMS Tracking event API's record operation (Canonical Model command, version 1). The correlation ID, which API Management creates for the event, is in X-Correlation-ID. The event names its source: a Carrier ID, which comes from API Management's token check (ADR 0005) and never from the Carrier's own payload, or Own fleet. The exception types (CollectionFailed, DeliveryFailed, Damaged) never change the Shipment's status.",
+  "description": "One report that something happened to a Shipment, as the Carrier-tracking Logic App sends it to the TMS Tracking event API's record operation (Canonical Model command, version 1). The correlation ID, which API Management creates for the event, is in X-Correlation-ID. The event names its source: a Carrier ID, which comes from API Management's token check (ADR 0005) and never from the Carrier's own payload, or Own fleet with the Driver ID, which the Driver reports Logic App takes from the Driver's token and never from the Driver app's payload. An Own fleet event (P12) names its Trip, the Shipment on it and the Trip version the Driver app held in place of a Carrier booking. The exception types (CollectionFailed, DeliveryFailed, Damaged) never change the Shipment's status.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -45,11 +45,18 @@
           "type": "object",
           "additionalProperties": false,
           "required": [
-            "type"
+            "type",
+            "driverId"
           ],
           "properties": {
             "type": {
               "const": "OwnFleet"
+            },
+            "driverId": {
+              "description": "The Driver who reported the event, from the Driver's token.",
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
             }
           }
         }
@@ -65,6 +72,21 @@
       "description": "The TMS's own Carrier booking number, such as CB-0000042. Used only when the booking reference isn't given or doesn't match.",
       "type": "string",
       "pattern": "\\S"
+    },
+    "tripNumber": {
+      "description": "An Own fleet event's Trip, such as TR-0000042, in place of a Carrier booking (P12).",
+      "type": "string",
+      "pattern": "^TR-[0-9]{7}$"
+    },
+    "shipmentNumber": {
+      "description": "An Own fleet event's Shipment on that Trip, such as SH-0000042.",
+      "type": "string",
+      "pattern": "^SH-[0-9]{7}$"
+    },
+    "tripVersion": {
+      "description": "The version of the Trip the Driver app held when it reported. Kept for tracing only: the Shipment only has to be on the Trip's latest version.",
+      "type": "integer",
+      "minimum": 0
     },
     "type": {
       "enum": [
@@ -130,6 +152,13 @@
     {
       "required": [
         "carrierBookingNumber"
+      ]
+    },
+    {
+      "required": [
+        "tripNumber",
+        "shipmentNumber",
+        "tripVersion"
       ]
     }
   ]
