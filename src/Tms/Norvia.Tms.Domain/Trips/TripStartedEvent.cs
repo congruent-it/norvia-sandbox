@@ -9,6 +9,11 @@ public sealed class TripStartedEvent(Trip trip, DriverId driverId, CorrelationId
 {
     public Trip Trip { get; } = trip;
 
+    public TripNumber TripNumber { get; } = trip.Number;
+
+    /// <summary>The Trip's version when it started. Starting doesn't change it.</summary>
+    public int Version { get; } = trip.Version;
+
     public DriverId DriverId { get; } = driverId;
 
     public CorrelationId CorrelationId { get; } = correlationId;

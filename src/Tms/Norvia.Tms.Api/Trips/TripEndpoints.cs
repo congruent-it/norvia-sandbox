@@ -299,7 +299,7 @@ public static class TripEndpoints
     {
         if (string.IsNullOrWhiteSpace(correlationId))
         {
-            return TypedResults.ValidationProblem(CorrelationIdMissing());
+            return TypedResults.ValidationProblem(CorrelationIdMissing("Reporting a Trip's delivery"));
         }
 
         var result = await retrier.RunAsync(mediator => mediator.Send(new ReportTripDeliveredCommand(number, tripVersion, correlationId), cancellationToken).AsTask());
@@ -360,7 +360,7 @@ public static class TripEndpoints
 
     private static Dictionary<string, string[]> NotDeliveredErrors(string? correlationId, string? cause)
     {
-        var errors = string.IsNullOrWhiteSpace(correlationId) ? CorrelationIdMissing() : [];
+        var errors = string.IsNullOrWhiteSpace(correlationId) ? CorrelationIdMissing("Reporting a Trip's delivery") : [];
         if (string.IsNullOrWhiteSpace(cause))
         {
             errors[nameof(TripNotDeliveredRequest.Cause)] = ["A not-delivered report needs the technical cause."];
@@ -369,7 +369,7 @@ public static class TripEndpoints
         return errors;
     }
 
-    private static Dictionary<string, string[]> CorrelationIdMissing(string action = "Reporting a Trip's delivery") =>
+    private static Dictionary<string, string[]> CorrelationIdMissing(string action) =>
         new() { [TransportOrderEndpoints.CorrelationIdHeader] = [$"{action} needs an {TransportOrderEndpoints.CorrelationIdHeader}."] };
 
     private static ProblemHttpResult ReportRefused(Ardalis.Result.Result<TripDeliveryReportResult> result, string correlationId) =>

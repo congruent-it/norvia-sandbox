@@ -33,8 +33,8 @@ public sealed record TripStartedV1(
             Guid.CreateVersion7(),
             started.StartedAt,
             started.CorrelationId.Value,
-            started.Trip.Number.Value,
-            started.Trip.Version,
+            started.TripNumber.Value,
+            started.Version,
             started.DriverId.Value,
             started.StartedAt);
     }
