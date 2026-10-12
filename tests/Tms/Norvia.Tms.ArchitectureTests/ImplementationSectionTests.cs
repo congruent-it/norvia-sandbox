@@ -18,6 +18,7 @@ public sealed partial class ImplementationSectionTests
         "docs/processes/tms/p3-transport-planning.md",
         "docs/processes/tms/p9-freight-settlement.md",
         "docs/processes/tms/p11-trip-dispatch.md",
+        "docs/processes/tms/p12-trip-execution.md",
     };
 
     [Theory]

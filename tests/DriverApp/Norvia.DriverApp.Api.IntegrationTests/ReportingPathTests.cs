@@ -1,0 +1,303 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
+using Json.Schema;
+
+namespace Norvia.DriverApp.Api.IntegrationTests;
+
+/// <summary>
+/// The Driver app's end of the reporting path (P12, ADR 0016) against its real database, outbox and Service Bus: the Driver presses Start Trip and the Driver app
+/// publishes exactly one <c>TripStartReported</c> carrying the Driver ID from the token; the Driver reports Logic App tells it what became of the report, and
+/// only the identity holding the outcome role may. The tests play the Logic App themselves.
+/// </summary>
+[Collection("Driver app")]
+public sealed partial class ReportingPathTests(DriverAppFixture driverApp)
+{
+    private static readonly CancellationToken Ct = TestContext.Current.CancellationToken;
+
+    // The outbox looks for a message to publish every second; this is long enough for a second message to show up if one wrongly were published.
+    private static readonly TimeSpan OutboxSettleTime = TimeSpan.FromSeconds(3);
+
+    private const string Anouk = "DRV-0001";
+    private const string Joost = "DRV-0002";
+
+    [Fact]
+    public async Task PressingStartTrip_PublishesExactlyOneTripStartReported_WithTheDriverIdFromTheToken_AndTheTripScreenShowsSending()
+    {
+        const string trip = "TR-3000001";
+        await ReceiveTripAsync(trip, Anouk);
+        using var browser = await SignedInAsync(Anouk);
+
+        using var started = await StartAsync(browser, trip);
+        var message = await driverApp.FirstPublishedForAsync(trip, Ct);
+        await Task.Delay(OutboxSettleTime, Ct);
+
+        started.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        driverApp.PublishedFor(trip).Should().ContainSingle("exactly one event is published for one press of Start Trip");
+        var body = JsonNode.Parse(message.Body.ToString())!;
+        Validate("trip-start-reported.v1.schema.json", body).IsValid.Should().BeTrue(message.Body.ToString());
+        body["eventType"]!.GetValue<string>().Should().Be("TripStartReported");
+        body["tripNumber"]!.GetValue<string>().Should().Be(trip);
+        body["driverId"]!.GetValue<string>().Should().Be(Anouk, "the Driver ID comes from the Driver's token");
+        message.MessageId.Should().Be(body["eventId"]!.GetValue<string>());
+        message.SessionId.Should().Be(trip, "one Trip's reports are read in order, in a session of the Trip");
+        message.CorrelationId.Should().Be(body["correlationId"]!.GetValue<string>());
+        message.ApplicationProperties.Should().Contain(new Dictionary<string, object>
+        {
+            ["eventType"] = "TripStartReported",
+            ["flow"] = "trip-execution",
+            ["tripNumber"] = trip,
+            ["partyId"] = Anouk,
+            ["correlationId"] = body["correlationId"]!.GetValue<string>(),
+            ["sourceMessageId"] = body["eventId"]!.GetValue<string>(),
+        });
+        var page = await PageAsync(browser);
+        TripCardOf(page, trip).Should().Contain("Sending");
+    }
+
+    [Fact]
+    public async Task PressingStartTripTwice_PublishesOnlyOnce()
+    {
+        const string trip = "TR-3000002";
+        await ReceiveTripAsync(trip, Anouk);
+        using var browser = await SignedInAsync(Anouk);
+
+        using var first = await StartAsync(browser, trip);
+        using var second = await StartAsync(browser, trip);
+        await driverApp.FirstPublishedForAsync(trip, Ct);
+        await Task.Delay(OutboxSettleTime, Ct);
+
+        first.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        second.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        driverApp.PublishedFor(trip).Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task StartingATripOfAnotherDriver_IsNotFound_AndPublishesNothing()
+    {
+        const string trip = "TR-3000003";
+        await ReceiveTripAsync(trip, Anouk);
+        using var joost = await SignedInAsync(Joost);
+
+        using var started = await StartAsync(joost, trip);
+        await Task.Delay(OutboxSettleTime, Ct);
+
+        started.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        driverApp.PublishedFor(trip).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ARecordedOutcome_MakesTheReportRecordedAndTheTripInProgress_AndAnotherOutcomeIsIgnored()
+    {
+        const string trip = "TR-3000004";
+        await ReceiveTripAsync(trip, Anouk);
+        using var browser = await SignedInAsync(Anouk);
+        await StartAsync(browser, trip);
+        var sent = JsonNode.Parse((await driverApp.FirstPublishedForAsync(trip, Ct)).Body.ToString())!;
+
+        using var recorded = await ReportOutcomeAsync(Outcome(sent, "Recorded"));
+        using var later = await ReportOutcomeAsync(Outcome(sent, "Refused", "NotTripDay", "Too late to matter."));
+
+        recorded.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Json(recorded))["result"]!.GetValue<string>().Should().Be("Applied");
+        (await Json(later))["result"]!.GetValue<string>().Should().Be("Ignored");
+        var card = TripCardOf(await PageAsync(browser), trip);
+        card.Should().Contain("Recorded").And.Contain("In progress").And.NotContain("Sending").And.NotContain("NotTripDay");
+    }
+
+    [Fact]
+    public async Task ARefusedOutcome_ShowsTheTmsCodeAndMessage_OnTheTripScreen()
+    {
+        const string trip = "TR-3000005";
+        await ReceiveTripAsync(trip, Anouk);
+        using var browser = await SignedInAsync(Anouk);
+        await StartAsync(browser, trip);
+        var sent = JsonNode.Parse((await driverApp.FirstPublishedForAsync(trip, Ct)).Body.ToString())!;
+
+        using var refused = await ReportOutcomeAsync(Outcome(sent, "Refused", "NotTripDay", "Trip TR-3000005 is for another day."));
+
+        refused.StatusCode.Should().Be(HttpStatusCode.OK);
+        var card = TripCardOf(await PageAsync(browser), trip);
+        card.Should().Contain("Refused").And.Contain("NotTripDay").And.Contain("Trip TR-3000005 is for another day.").And.NotContain("Sending");
+    }
+
+    [Fact]
+    public async Task ANotRecordedOutcome_ShowsNotRecorded_WithTheCause()
+    {
+        const string trip = "TR-3000006";
+        await ReceiveTripAsync(trip, Anouk);
+        using var browser = await SignedInAsync(Anouk);
+        await StartAsync(browser, trip);
+        var sent = JsonNode.Parse((await driverApp.FirstPublishedForAsync(trip, Ct)).Body.ToString())!;
+
+        using var lost = await ReportOutcomeAsync(Outcome(sent, "NotRecorded", "TmsUnavailable", "The TMS answered 503 (4 attempts)."));
+
+        lost.StatusCode.Should().Be(HttpStatusCode.OK);
+        TripCardOf(await PageAsync(browser), trip).Should().Contain("Not recorded").And.Contain("The TMS answered 503 (4 attempts).");
+    }
+
+    [Fact]
+    public async Task WithoutAnOutcome_TheReportStaysSending()
+    {
+        const string trip = "TR-3000007";
+        await ReceiveTripAsync(trip, Anouk);
+        using var browser = await SignedInAsync(Anouk);
+        await StartAsync(browser, trip);
+        await driverApp.FirstPublishedForAsync(trip, Ct);
+
+        TripCardOf(await PageAsync(browser), trip).Should().Contain("Sending");
+    }
+
+    [Fact]
+    public async Task TheOutcomeEndpoint_RefusesACallerWithoutTheOutcomeRole_AndChangesNothing()
+    {
+        const string trip = "TR-3000008";
+        await ReceiveTripAsync(trip, Anouk);
+        using var browser = await SignedInAsync(Anouk);
+        await StartAsync(browser, trip);
+        var outcome = Outcome(JsonNode.Parse((await driverApp.FirstPublishedForAsync(trip, Ct)).Body.ToString())!, "Recorded");
+
+        using var anonymous = driverApp.DriverReportsClient(token: null);
+        using var otherRole = driverApp.DriverReportsClient(driverApp.IssueToken(["Trips.Start"]));
+        using var otherAudience = driverApp.DriverReportsClient(driverApp.IssueToken([DriverAppFixture.ReportOutcomeRole], audience: "api://norvia-tms"));
+        using var otherKey = driverApp.DriverReportsClient(driverApp.IssueToken([DriverAppFixture.ReportOutcomeRole], signingKey: new string('a', 64)));
+        using var withKeyOnly = driverApp.DriverReportsClient(token: null);
+        withKeyOnly.DefaultRequestHeaders.Add("X-Api-Key", DriverAppFixture.EndpointKey);
+
+        (await anonymous.PostAsJsonAsync("/v1/report-outcomes", outcome, Ct)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await otherRole.PostAsJsonAsync("/v1/report-outcomes", outcome, Ct)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await otherAudience.PostAsJsonAsync("/v1/report-outcomes", outcome, Ct)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await otherKey.PostAsJsonAsync("/v1/report-outcomes", outcome, Ct)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await withKeyOnly.PostAsJsonAsync("/v1/report-outcomes", outcome, Ct)).StatusCode.Should().Be(HttpStatusCode.Unauthorized, "the Trip endpoint's credential is not an identity");
+        TripCardOf(await PageAsync(browser), trip).Should().Contain("Sending");
+    }
+
+    [Fact]
+    public async Task AnOutcomeForAnUnknownReport_OrForAnotherTripsReport_IsNotFound()
+    {
+        const string trip = "TR-3000009";
+        await ReceiveTripAsync(trip, Anouk);
+        using var browser = await SignedInAsync(Anouk);
+        await StartAsync(browser, trip);
+        var sent = JsonNode.Parse((await driverApp.FirstPublishedForAsync(trip, Ct)).Body.ToString())!;
+
+        var unknown = Outcome(sent, "Recorded");
+        unknown["driverAppEventId"] = Guid.NewGuid().ToString();
+        var otherTrip = Outcome(sent, "Recorded");
+        otherTrip["tripNumber"] = "TR-3999999";
+
+        using var unknownAnswer = await ReportOutcomeAsync(unknown);
+        using var otherTripAnswer = await ReportOutcomeAsync(otherTrip);
+
+        unknownAnswer.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await Json(unknownAnswer))["code"]!.GetValue<string>().Should().Be("ReportNotFound");
+        otherTripAnswer.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        TripCardOf(await PageAsync(browser), trip).Should().Contain("Sending");
+    }
+
+    [Fact]
+    public async Task AnOutcomeThatIsNotWellFormed_IsABadRequest_AndChangesNothing()
+    {
+        const string trip = "TR-3000010";
+        await ReceiveTripAsync(trip, Anouk);
+        using var browser = await SignedInAsync(Anouk);
+        await StartAsync(browser, trip);
+        var sent = JsonNode.Parse((await driverApp.FirstPublishedForAsync(trip, Ct)).Body.ToString())!;
+
+        using var withoutCode = await ReportOutcomeAsync(Outcome(sent, "Refused", message: "No code."));
+        using var withoutMessage = await ReportOutcomeAsync(Outcome(sent, "Refused", "NotTripDay"));
+        var lost = Outcome(sent, "Lost");
+        using var unknownOutcome = await ReportOutcomeAsync(lost);
+        var blank = Outcome(sent, "Recorded");
+        blank["correlationId"] = " ";
+        using var blankCorrelation = await ReportOutcomeAsync(blank);
+
+        foreach (var response in new[] { withoutCode, withoutMessage, unknownOutcome, blankCorrelation })
+        {
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        }
+
+        TripCardOf(await PageAsync(browser), trip).Should().Contain("Sending");
+    }
+
+    private async Task ReceiveTripAsync(string trip, string driverId)
+    {
+        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Amsterdam")).DateTime);
+        using var response = await driverApp.DriverApp.PostAsync(
+            "/v1/trips",
+            new StringContent(await DriverAppFixture.SampleAsync("two-shipments", trip, version: 1, driverId, sample => sample["day"] = $"{today:yyyy-MM-dd}"), System.Text.Encoding.UTF8, "application/json"),
+            Ct);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    private async Task<HttpClient> SignedInAsync(string driverId)
+    {
+        var browser = driverApp.NewBrowser();
+        using var signedIn = await browser.PostAsync("/local/sign-in", new FormUrlEncodedContent([new("driver", driverId)]), Ct);
+        signedIn.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        return browser;
+    }
+
+    private static async Task<string> PageAsync(HttpClient browser, string path = "/")
+    {
+        using var response = await browser.GetAsync(path, Ct);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        return await response.Content.ReadAsStringAsync(Ct);
+    }
+
+    /// <summary>Presses Start Trip as the browser would: with an antiforgery token, which the demo settings page always carries.</summary>
+    private static async Task<HttpResponseMessage> StartAsync(HttpClient browser, string trip)
+    {
+        var token = AntiforgeryToken().Match(await PageAsync(browser, "/settings")) is { Success: true } match
+            ? WebUtility.HtmlDecode(match.Groups[1].Value)
+            : throw new InvalidOperationException("The settings page has no form with an antiforgery token.");
+        return await browser.PostAsync($"/trips/{trip}/start", new FormUrlEncodedContent([new("__RequestVerificationToken", token)]), Ct);
+    }
+
+    private Task<HttpResponseMessage> ReportOutcomeAsync(JsonObject outcome) => driverApp.DriverReports.PostAsJsonAsync("/v1/report-outcomes", outcome, Ct);
+
+    /// <summary>The outcome the Driver reports Logic App reports for the event the Driver app published, in the Canonical Model's shape.</summary>
+    private static JsonObject Outcome(JsonNode sent, string outcome, string? failureCode = null, string? message = null)
+    {
+        var report = new JsonObject
+        {
+            ["driverAppEventId"] = sent["eventId"]!.GetValue<string>(),
+            ["tripNumber"] = sent["tripNumber"]!.GetValue<string>(),
+            ["correlationId"] = sent["correlationId"]!.GetValue<string>(),
+            ["outcome"] = outcome,
+        };
+        if (failureCode is not null)
+        {
+            report["failureCode"] = failureCode;
+        }
+
+        if (message is not null)
+        {
+            report["message"] = message;
+        }
+
+        return report;
+    }
+
+    private static async Task<JsonNode> Json(HttpResponseMessage response) => JsonNode.Parse(await response.Content.ReadAsStringAsync(Ct))!;
+
+    /// <summary>The card of one Trip on My Trips, so a test reads that Trip's text and not another's.</summary>
+    private static string TripCardOf(string page, string trip)
+    {
+        var start = page.IndexOf($"aria-label=\"Trip {trip}\"", StringComparison.Ordinal);
+        start.Should().BeGreaterThan(-1, $"My Trips shows Trip {trip}");
+        var next = page.IndexOf("aria-label=\"Trip TR-", start + 1, StringComparison.Ordinal);
+        return page[start..(next < 0 ? page.Length : next)];
+    }
+
+    private static EvaluationResults Validate(string schemaFile, JsonNode body)
+    {
+        var schema = JsonSchema.FromFile(Path.Combine(AppContext.BaseDirectory, "Contracts", schemaFile));
+        return schema.Evaluate(JsonSerializer.SerializeToElement(body), new EvaluationOptions { OutputFormat = OutputFormat.List, RequireFormatValidation = true });
+    }
+
+    [GeneratedRegex("name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"", RegexOptions.None, matchTimeoutMilliseconds: 1000)]
+    private static partial Regex AntiforgeryToken();
+}

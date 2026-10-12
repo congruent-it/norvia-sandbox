@@ -203,6 +203,51 @@ public sealed class AppHostModelTests
     }
 
     [Fact]
+    public async Task Locally_ADriverReportsWorker_PlaysTheDriverReportsLogicApp_OnASubscriptionWithSessions_AsTheIdentityHoldingTheStartAndOutcomeRoles()
+    {
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(TestContext.Current.CancellationToken);
+
+        var worker = await EnvironmentOfAsync(builder, "driver-reports-worker");
+        var driverApp = await EnvironmentOfAsync(builder, "driver-app-api");
+
+        worker.Should().Contain("DriverReports__TmsTokens__ClientId", "norvia-local-driver-reports-logic-app")
+            .And.Contain("DriverReports__TmsTokens__Audience", "api://norvia-tms")
+            .And.Contain("DriverReports__DriverApp__Tokens__ClientId", "norvia-local-driver-reports-logic-app")
+            .And.Contain("DriverReports__DriverApp__Tokens__Audience", "api://norvia-driver-app")
+            .And.Contain("DriverReports__DriverApp__BaseAddress", "{driver-app-api.bindings.http.url}")
+            .And.ContainKey("DriverReports__TmsTokens__SigningKey")
+            .And.ContainKey("DriverReports__DriverApp__Tokens__SigningKey");
+        driverApp.Should().Contain("Authentication__Schemes__Bearer__ValidAudiences__0", "api://norvia-driver-app")
+            .And.Contain("Authentication__Schemes__Bearer__ValidIssuer", "https://norvia.local/tokens")
+            .And.ContainKey("Authentication__Schemes__Bearer__SigningKeys__0__Value");
+        driverApp["Authentication__Schemes__Bearer__SigningKeys__0__Value"].Should().Be(
+            worker["DriverReports__DriverApp__Tokens__SigningKey"], "the Driver app trusts the key the worker signs its outcome reports with");
+
+        var topic = builder.Resources.OfType<AzureServiceBusTopicResource>().Single(t => t.TopicName == "driver-app-events");
+        var subscription = builder.Resources.OfType<AzureServiceBusSubscriptionResource>().Should()
+            .ContainSingle(subscription => subscription.Parent == topic && subscription.SubscriptionName == "driver-reports").Subject;
+        subscription.RequiresSession.Should().BeTrue("one Trip's reports are read one at a time and in order (ADR 0016)");
+        builder.Resources.OfType<AzureServiceBusSubscriptionResource>().Where(s => s.Parent == topic).Should().ContainSingle("the Driver reports Logic App is the only consumer");
+        Resource(builder, "driver-reports-worker").Annotations.OfType<WaitAnnotation>().Should().Contain(wait => wait.Resource.Name == "driver-app-api");
+        Resource(builder, "driver-app-api").Annotations.OfType<WaitAnnotation>().Should().Contain(wait => wait.Resource.Name == "messaging", "its outbox publishes to Service Bus");
+    }
+
+    [Fact]
+    public async Task InAzure_TheDriverAppsOutcomeEndpoint_TrustsEntra_ForTheDriverAppApisAppRegistration_AndItsOutboxMaySendToServiceBus()
+    {
+        await using var builder = await CreateForAzureAsync();
+
+        var driverApp = await EnvironmentOfAsync(builder, "driver-app-api");
+
+        driverApp.Should().Contain("Authentication__Schemes__Bearer__ValidAudiences__0", "{estate-driver-app-api-client-id.value}")
+            .And.Contain("Authentication__Schemes__Bearer__Authority", "{estate-entra-issuer.value}")
+            .And.NotContainKey("Authentication__Schemes__Bearer__SigningKeys__0__Value");
+        Resource(builder, "driver-app-api").Annotations.OfType<Aspire.Hosting.Azure.RoleAssignmentAnnotation>()
+            .Should().ContainSingle(role => role.Target is AzureServiceBusResource).Which.Roles.Select(r => r.Name).Should().Equal("AzureServiceBusDataSender");
+        builder.Resources.Should().NotContain(resource => resource.Name == "driver-reports-worker", "the Logic App is in the estate");
+    }
+
+    [Fact]
     public async Task Locally_AProofOfDeliveryWorker_PlaysTheCarrierProofOfDeliveryLogicApp_AsTheIdentityHoldingTheRecordRole_AndTheQueueAndTheInboundContainerAreThere()
     {
         await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(TestContext.Current.CancellationToken);
@@ -368,7 +413,7 @@ public sealed class AppHostModelTests
     {
         await using var builder = await CreateForAzureAsync();
 
-        builder.Resources.Should().NotContain(resource => new[] { "partner-api", "trip-dispatch-worker", "tracking-worker", "proof-of-delivery-worker" }.Contains(resource.Name));
+        builder.Resources.Should().NotContain(resource => new[] { "partner-api", "trip-dispatch-worker", "driver-reports-worker", "tracking-worker", "proof-of-delivery-worker" }.Contains(resource.Name));
     }
 
     [Fact]
