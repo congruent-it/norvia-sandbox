@@ -33,6 +33,7 @@ using Norvia.Tms.Application.TrackingEvents.Record;
 using Norvia.Tms.Application.TransportOrders.Assign;
 using Norvia.Tms.Application.TransportOrders.Rate;
 using Norvia.Tms.Application.TransportOrders.Submit;
+using Norvia.Tms.Application.Trips.Complete;
 using Norvia.Tms.Application.Trips.ReportDelivery;
 using Norvia.Tms.Application.Trips.Start;
 using Norvia.Tms.Domain.TransportOrders;
@@ -85,6 +86,7 @@ builder.Services
     .AddScoped<IPipelineBehavior<ReportTripNotDeliveredCommand, Result<TripDeliveryReportResult>>,
         TrackTripDeliveryReportInLoggingScope<ReportTripNotDeliveredCommand>>();
 builder.Services.AddScoped<IPipelineBehavior<StartTripCommand, Result<StartTripResult>>, TrackTripStartInLoggingScope>();
+builder.Services.AddScoped<IPipelineBehavior<EndTripCommand, Result<EndTripResult>>, TrackTripEndInLoggingScope>();
 builder.AddTmsInfrastructure();
 builder.AddTmsProofOfDeliveryStorage();
 builder.AddTmsOutboxPublisher();

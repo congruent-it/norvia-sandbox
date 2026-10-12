@@ -40,6 +40,31 @@ public sealed class StopOutcomes
         return trip.Stops.Count(stop => !Of(stop.ShipmentId, stop.Kind).IsOpen);
     }
 
+    /// <summary>
+    /// The Stops of the Trip that still wait for an outcome. The delivery Stop of a Shipment whose collection failed waits for none: the
+    /// Driver never had the goods, so it can't be attempted.
+    /// </summary>
+    public IReadOnlyList<TripStop> OpenStopsOf(Trip trip)
+    {
+        ArgumentNullException.ThrowIfNull(trip);
+        return
+        [
+            .. trip.Stops.Where(stop => Of(stop.ShipmentId, stop.Kind).IsOpen
+                && !(stop.Kind == StopKind.Delivery && Of(stop.ShipmentId, StopKind.Collection).Kind == StopOutcomeKind.CollectionFailed)),
+        ];
+    }
+
+    /// <summary>What became of the Shipment on the Trip, once every Stop has its outcome.</summary>
+    public ShipmentTripResult ResultOf(ShipmentId shipment)
+    {
+        if (Of(shipment, StopKind.Collection).Kind == StopOutcomeKind.CollectionFailed)
+        {
+            return ShipmentTripResult.NotCollected;
+        }
+
+        return Of(shipment, StopKind.Delivery).Kind == StopOutcomeKind.Delivered ? ShipmentTripResult.Delivered : ShipmentTripResult.NotDelivered;
+    }
+
     /// <summary>The Stop a Tracking event type completes, or null for a type that is no outcome.</summary>
     public static StopKind? StopOf(TrackingEventType type) => Classify(type)?.Stop;
 

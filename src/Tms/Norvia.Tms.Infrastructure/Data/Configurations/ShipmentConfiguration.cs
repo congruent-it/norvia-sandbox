@@ -68,6 +68,9 @@ internal sealed class ShipmentConfiguration : IEntityTypeConfiguration<Shipment>
             .HasDefaultValueSql("N'[]'")
             .IsRequired();
 
+        // A flag, not a status (P12): set when the Driver ends a Trip without delivering a collected Shipment.
+        builder.Property(shipment => shipment.AwaitingRedelivery).HasDefaultValue(false);
+
         builder.Property(shipment => shipment.CorrelationId)
             .HasConversion(id => id.Value, value => new CorrelationId(value))
             .HasMaxLength(128)

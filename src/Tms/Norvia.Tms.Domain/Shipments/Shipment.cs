@@ -62,6 +62,12 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
     /// <summary>The delivery windows the Planner agreed after collection (P7), in the order they were set: the last one counts.</summary>
     public IReadOnlyList<AgreedDeliveryWindow> AgreedDeliveryWindows { get; private set; } = [];
 
+    /// <summary>
+    /// A flag, not a status (P12): the Driver collected the Shipment but couldn't deliver it, so it is still on Norvia's Vehicle until a later Trip
+    /// delivers it. The Shipment keeps its status. P5's Stale rule is suspended while the flag is set.
+    /// </summary>
+    public bool AwaitingRedelivery { get; private set; }
+
     /// <summary>The Planner's release that handed the Shipment over; null while it is Planned and never released.</summary>
     public ShipmentRelease? LastRelease { get; private set; }
 
@@ -197,6 +203,22 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
         }
 
         Status = ShipmentStatus.Planned;
+        return true;
+    }
+
+    /// <summary>
+    /// Flags a Collected Own fleet Shipment as Awaiting re-delivery, because the Driver ended its Trip without delivering it (P12). The status
+    /// stays as it is, and no domain event is raised: <c>TripCompleted</c> lists the Shipment. Returns false, changing nothing, for a Shipment that
+    /// isn't a Collected or In transit Own fleet one.
+    /// </summary>
+    public bool AwaitRedelivery()
+    {
+        if (!CarriedBy.IsOwnFleet || Status is not (ShipmentStatus.Collected or ShipmentStatus.InTransit))
+        {
+            return false;
+        }
+
+        AwaitingRedelivery = true;
         return true;
     }
 

@@ -498,6 +498,11 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool>("AwaitingRedelivery")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
                     b.Property<string>("CorrelationId")
                         .IsRequired()
                         .HasMaxLength(128)

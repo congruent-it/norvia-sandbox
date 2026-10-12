@@ -46,6 +46,15 @@ public sealed record TripRefusal(TripRefusalCode Code, string Message)
     public static TripRefusal NotTripDay(TripNumber number, DateOnly tripDay, DateOnly today) =>
         new(TripRefusalCode.NotTripDay, Invariant($"Trip {number} is for {tripDay:yyyy-MM-dd}, and today is {today:yyyy-MM-dd}."));
 
+    public static TripRefusal TripNotUnderWay(TripNumber number, TripStatus status) =>
+        new(TripRefusalCode.TripNotUnderWay, $"Trip {number} is {status}, not In progress.");
+
+    public static TripRefusal StopsOpen(TripNumber number, int open) =>
+        new(TripRefusalCode.StopsOpen, Invariant($"Trip {number} can't end while {open} of its Stops have no outcome."));
+
+    public static TripRefusal TripCompleted(TripNumber number) =>
+        new(TripRefusalCode.TripCompleted, $"Trip {number} is completed, so it can't be changed.");
+
     public static TripRefusal TripVersionNotFound(TripNumber number, int version) =>
         new(TripRefusalCode.TripVersionNotFound, Invariant($"Trip {number} has no version {version}."));
 

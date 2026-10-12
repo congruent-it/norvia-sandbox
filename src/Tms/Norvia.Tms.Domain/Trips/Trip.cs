@@ -243,7 +243,12 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
     /// Null when the Planner can change the Trip: a Draft, or a Dispatched Trip, which an Amend changes under the same rules. Once the Trip is In
     /// progress (P12) nothing but taking off an uncollected Shipment is allowed, which is <see cref="TripRefusalCode.TripUnderWay"/> for the rest.
     /// </summary>
-    public TripRefusal? EnsureAmendable() => Status == TripStatus.InProgress ? TripRefusal.TripUnderWay(Number) : null;
+    public TripRefusal? EnsureAmendable() => Status switch
+    {
+        TripStatus.InProgress => TripRefusal.TripUnderWay(Number),
+        TripStatus.Completed => TripRefusal.TripCompleted(Number),
+        _ => null,
+    };
 
     /// <summary>
     /// Null when the Driver can start the Trip (P12): it is theirs, it is Dispatched and it is its day. A Trip that is another Driver's is
@@ -280,6 +285,75 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
 
         Status = TripStatus.InProgress;
         RegisterDomainEvent(new TripStartedEvent(this, driver, correlationId, startedAt));
+    }
+
+    /// <summary>
+    /// Null when the Driver can end the Trip (P12): it is theirs, it is In progress and every Stop has an outcome. A Trip that is another
+    /// Driver's is <see cref="TripRefusalCode.TripNotFound"/>, as for <see cref="EnsureCanStart"/>.
+    /// </summary>
+    public TripRefusal? EnsureCanEnd(DriverId driver, StopOutcomes outcomes)
+    {
+        ArgumentNullException.ThrowIfNull(driver);
+        ArgumentNullException.ThrowIfNull(outcomes);
+        if (DriverId != driver)
+        {
+            return TripRefusal.TripNotFound(Number.Value);
+        }
+
+        if (Status != TripStatus.InProgress)
+        {
+            return TripRefusal.TripNotUnderWay(Number, Status);
+        }
+
+        return outcomes.OpenStopsOf(this) is { Count: > 0 } open ? TripRefusal.StopsOpen(Number, open.Count) : null;
+    }
+
+    /// <summary>
+    /// The Driver ended the Trip (P12): it is Completed, at the same version, and <see cref="TripCompletedEvent"/> is raised with the
+    /// Shipments delivered, not delivered and not collected. An uncollected Shipment goes back to Planned and a collected one that wasn't
+    /// delivered is flagged Awaiting re-delivery, keeping its status. Both leave the Trip, which keeps only the Stops of the delivered ones, and
+    /// no <c>ShipmentTakenOffTrip</c> is raised. <paramref name="shipments"/> are the tracked Shipments on the Trip. The caller checks <see cref="EnsureCanEnd"/> first.
+    /// </summary>
+    public void End(CorrelationId correlationId, DateTimeOffset endedAt, StopOutcomes outcomes, IReadOnlyList<Shipment> shipments)
+    {
+        ArgumentNullException.ThrowIfNull(correlationId);
+        ArgumentNullException.ThrowIfNull(outcomes);
+        ArgumentNullException.ThrowIfNull(shipments);
+        if (Status != TripStatus.InProgress || DriverId is not { } driver || outcomes.OpenStopsOf(this).Count > 0)
+        {
+            throw new InvalidOperationException($"Trip {Number} is {Status}, and only an In progress Trip with an outcome for every Stop ends.");
+        }
+
+        List<ShipmentNumber> delivered = [], notDelivered = [], notCollected = [];
+        foreach (var id in ShipmentIds)
+        {
+            var shipment = shipments.FirstOrDefault(candidate => candidate.Id == id)
+                ?? throw new ArgumentException($"Trip {Number} carries a Shipment that isn't among the ones given.", nameof(shipments));
+            switch (outcomes.ResultOf(id))
+            {
+                case ShipmentTripResult.Delivered:
+                    delivered.Add(shipment.Number);
+                    break;
+                case ShipmentTripResult.NotCollected when shipment.TakeOffTrip():
+                    notCollected.Add(shipment.Number);
+                    break;
+                case ShipmentTripResult.NotDelivered when shipment.AwaitRedelivery():
+                    notDelivered.Add(shipment.Number);
+                    break;
+                default:
+                    throw new InvalidOperationException($"Shipment {shipment.Number} can't leave Trip {Number} as {outcomes.ResultOf(id)}.");
+            }
+        }
+
+        var kept = Stops
+            .Where(stop => outcomes.ResultOf(stop.ShipmentId) == ShipmentTripResult.Delivered)
+            .Select((stop, position) => stop with { Position = position })
+            .ToList();
+        _stops.Clear();
+        _stops.AddRange(kept);
+
+        Status = TripStatus.Completed;
+        RegisterDomainEvent(new TripCompletedEvent(this, driver, correlationId, endedAt, delivered, notDelivered, notCollected));
     }
 
     /// <summary>

@@ -62,7 +62,7 @@ public sealed class ListShipmentsInProgressHandler(
     {
         var deliveryWindow = shipment.DeliveryWindowOf(details);
         var last = events.MaxBy(trackingEvent => trackingEvent.ReceivedAt);
-        var isStale = staleRules.IsStale(shipment.Status, details?.Collection?.Window?.Latest, deliveryWindow?.Latest, last?.ReceivedAt, now);
+        var isStale = staleRules.IsStale(shipment.Status, details?.Collection?.Window?.Latest, deliveryWindow?.Latest, last?.ReceivedAt, now, shipment.AwaitingRedelivery);
         return new(
             shipment.Number.Value,
             CarriedByView.Of(shipment.CarriedBy, carriers),
