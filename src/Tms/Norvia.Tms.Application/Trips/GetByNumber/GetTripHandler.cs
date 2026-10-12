@@ -32,7 +32,7 @@ public sealed class GetTripHandler(
         var view = TripViews.Of(trip, onTrip, vehicles.ListActive().ToDictionary(vehicle => vehicle.Id), drivers.ListActive().ToDictionary(driver => driver.Id, driver => driver.Name), await needsCheck.OfAsync(trip, cancellationToken), outcomes);
         return new TripDetailView(
             view,
-            [.. trip.Stops.Where(stop => byId.ContainsKey(stop.ShipmentId)).Select(stop => StopText.ViewOf(stop, byId[stop.ShipmentId], outcomes?.Of(stop.ShipmentId, stop.Kind)))],
+            [.. trip.Stops.Where(stop => byId.ContainsKey(stop.ShipmentId)).Select(stop => StopText.ViewOf(stop, byId[stop.ShipmentId], outcomes?.Of(stop.ShipmentId, stop.Kind) ?? StopOutcome.Open))],
             [
                 .. check.Failures.Select(failure => new TripRuleFailureView(failure.Code.ToString(), failure.Message)),
                 .. check.Refusals.Select(refusal => new TripRuleFailureView(refusal.Code.ToString(), refusal.Message)),

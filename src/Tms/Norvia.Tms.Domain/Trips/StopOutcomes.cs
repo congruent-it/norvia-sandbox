@@ -21,7 +21,7 @@ public sealed class StopOutcomes
         var outcomes = new Dictionary<(ShipmentId, StopKind), StopOutcome>();
         foreach (var trackingEvent in tripEvents.OrderBy(trackingEvent => trackingEvent.ReceivedAt))
         {
-            if (StopOf(trackingEvent.Type) is { } stop && OutcomeKindOf(trackingEvent.Type) is { } kind)
+            if (Classify(trackingEvent.Type) is var (stop, kind))
             {
                 outcomes.TryAdd((trackingEvent.ShipmentId, stop), new StopOutcome(kind, trackingEvent.EventTime, trackingEvent.Remark));
             }
@@ -33,20 +33,22 @@ public sealed class StopOutcomes
     public StopOutcome Of(ShipmentId shipment, StopKind kind) =>
         _outcomes.GetValueOrDefault((shipment, kind), StopOutcome.Open);
 
-    /// <summary>The Stop a Tracking event type completes, or null for a type that is no outcome.</summary>
-    public static StopKind? StopOf(TrackingEventType type) => type switch
+    /// <summary>How many of the Trip's Stops have an outcome.</summary>
+    public int CountDone(Trip trip)
     {
-        TrackingEventType.Collected or TrackingEventType.CollectionFailed => StopKind.Collection,
-        TrackingEventType.Delivered or TrackingEventType.DeliveryFailed => StopKind.Delivery,
-        _ => null,
-    };
+        ArgumentNullException.ThrowIfNull(trip);
+        return trip.Stops.Count(stop => !Of(stop.ShipmentId, stop.Kind).IsOpen);
+    }
 
-    private static StopOutcomeKind? OutcomeKindOf(TrackingEventType type) => type switch
+    /// <summary>The Stop a Tracking event type completes, or null for a type that is no outcome.</summary>
+    public static StopKind? StopOf(TrackingEventType type) => Classify(type)?.Stop;
+
+    private static (StopKind Stop, StopOutcomeKind Kind)? Classify(TrackingEventType type) => type switch
     {
-        TrackingEventType.Collected => StopOutcomeKind.Collected,
-        TrackingEventType.CollectionFailed => StopOutcomeKind.CollectionFailed,
-        TrackingEventType.Delivered => StopOutcomeKind.Delivered,
-        TrackingEventType.DeliveryFailed => StopOutcomeKind.DeliveryFailed,
+        TrackingEventType.Collected => (StopKind.Collection, StopOutcomeKind.Collected),
+        TrackingEventType.CollectionFailed => (StopKind.Collection, StopOutcomeKind.CollectionFailed),
+        TrackingEventType.Delivered => (StopKind.Delivery, StopOutcomeKind.Delivered),
+        TrackingEventType.DeliveryFailed => (StopKind.Delivery, StopOutcomeKind.DeliveryFailed),
         _ => null,
     };
 }

@@ -18,7 +18,7 @@ public sealed class TripOutcomes(IReadRepository<TrackingEvent> trackingEvents)
 
         var recorded = await trackingEvents.ListAsync(new TrackingEventsOfTripSpec(trips), cancellationToken);
         return recorded
-            .GroupBy(trackingEvent => trackingEvent.TripNumber!)
+            .GroupBy(trackingEvent => trackingEvent.TripNumber ?? throw new InvalidOperationException("The specification selects the events of Trips."))
             .ToDictionary(group => group.Key, group => StopOutcomes.From(group));
     }
 }

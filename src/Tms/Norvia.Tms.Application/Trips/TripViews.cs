@@ -31,6 +31,6 @@ internal static class TripViews
             trip.LatestDelivery?.State,
             needs.Driver,
             needs.Vehicle,
-            outcomes is null ? 0 : trip.Stops.Count(stop => !outcomes.Of(stop.ShipmentId, stop.Kind).IsOpen));
+            outcomes?.CountDone(trip) ?? 0);
     }
 }

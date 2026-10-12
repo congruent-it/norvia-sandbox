@@ -31,9 +31,9 @@ public sealed class RecordTrackingHandler(
 
         var report = command.Report;
 
-        if (report.OwnFleet is not null)
+        if (report.OwnFleet is { } ownFleet)
         {
-            return await HandleOwnFleetAsync(command, cancellationToken);
+            return await HandleOwnFleetAsync(command, ownFleet, cancellationToken);
         }
 
         if (report.Source.CarrierId is not { } carrierId)
@@ -75,10 +75,9 @@ public sealed class RecordTrackingHandler(
 
     // A Driver's report (P12) finds its Shipment by Trip, not by a Carrier booking reference, and the Trip's rules decide it. The Driver app
     // event ID is checked first: a repeat is answered as before, whatever has happened on the Trip since.
-    private async Task<Result<RecordTrackingResult>> HandleOwnFleetAsync(RecordTrackingCommand command, CancellationToken cancellationToken)
+    private async Task<Result<RecordTrackingResult>> HandleOwnFleetAsync(RecordTrackingCommand command, OwnFleetReport own, CancellationToken cancellationToken)
     {
         var report = command.Report;
-        var own = report.OwnFleet!;
 
         if (await trackingEvents.SingleOrDefaultAsync(new TrackingEventBySourceEventIdSpec(report.Source, report.EventId), cancellationToken) is { } recorded)
         {
@@ -89,7 +88,7 @@ public sealed class RecordTrackingHandler(
 
         var trip = await trips.FirstOrDefaultAsync(new TripByNumberSpec(own.TripNumber), cancellationToken);
         var shipment = await shipments.SingleOrDefaultAsync(new ShipmentToChangeSpec(own.ShipmentNumber), cancellationToken);
-        var outcomes = StopOutcomes.From(trip is null ? [] : await trackingEvents.ListAsync(new TrackingEventsOfTripSpec(own.TripNumber), cancellationToken));
+        var outcomes = StopOutcomes.From(trip is null ? [] : await trackingEvents.ListAsync(new TrackingEventsOfTripSpec([own.TripNumber]), cancellationToken));
 
         var now = time.GetUtcNow();
         if (rules.CheckOwnFleetReport(trip, shipment, report, outcomes, now) is { } refusal)
@@ -97,7 +96,8 @@ public sealed class RecordTrackingHandler(
             return TrackingEventRefused.Because<RecordTrackingResult>(refusal);
         }
 
-        return await RecordAsync(shipment!, report, booking: null, new CorrelationId(command.CorrelationId), now, cancellationToken);
+        // The rules refuse a report whose Shipment is missing, so a Shipment is there.
+        return await RecordAsync(shipment ?? throw new InvalidOperationException($"Shipment {own.ShipmentNumber} passed the Driver report rules but is missing."), report, booking: null, new CorrelationId(command.CorrelationId), now, cancellationToken);
     }
 
     // The part a Carrier's and a Driver's report share: the Shipment takes the event in, an exception opens or clears its Exception, and the

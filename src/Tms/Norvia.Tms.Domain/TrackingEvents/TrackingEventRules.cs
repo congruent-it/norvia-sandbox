@@ -8,6 +8,10 @@ namespace Norvia.Tms.Domain.TrackingEvents;
 /// <param name="ClockSkew">How far in the future an event time may be, to allow for the reporter's clock running ahead.</param>
 public sealed record TrackingEventRules(TimeSpan ClockSkew)
 {
+    // The Driver app has no planned times per Stop and reads no GPS, so it sends no Departed, Arrived or Out for delivery (P12).
+    private static readonly TrackingEventType[] OwnFleetTypes =
+        [TrackingEventType.Collected, TrackingEventType.CollectionFailed, TrackingEventType.Delivered, TrackingEventType.DeliveryFailed, TrackingEventType.Damaged];
+
     public static TrackingEventRefusal ShipmentNotFound(string carrierBookingReference) =>
         new(TrackingEventRefusalCode.ShipmentNotFound, Invariant($"No Confirmed Carrier booking of this Carrier has the booking reference {carrierBookingReference}."));
 
@@ -60,21 +64,17 @@ public sealed record TrackingEventRules(TimeSpan ClockSkew)
 
         if (StopOutcomes.StopOf(report.Type) is { } stop)
         {
-            if (stop == StopKind.Delivery && outcomes.Of(shipment.Id, StopKind.Collection).Kind != StopOutcomeKind.Collected)
-            {
-                return new(TrackingEventRefusalCode.CollectionBeforeDelivery, Invariant($"Shipment {shipment.Number} can't be delivered before it is collected."));
-            }
-
             if (!outcomes.Of(shipment.Id, stop).IsOpen)
             {
                 return new(TrackingEventRefusalCode.StopAlreadyCompleted, Invariant($"The {stop} Stop of Shipment {shipment.Number} on Trip {trip.Number} has its outcome already."));
+            }
+
+            if (stop == StopKind.Delivery && outcomes.Of(shipment.Id, StopKind.Collection).Kind != StopOutcomeKind.Collected)
+            {
+                return new(TrackingEventRefusalCode.CollectionBeforeDelivery, Invariant($"Shipment {shipment.Number} can't be delivered before it is collected."));
             }
         }
 
         return CheckEventTime(report.EventTime, now);
     }
-
-    // The Driver app has no planned times per Stop and reads no GPS, so it sends no Departed, Arrived or Out for delivery (P12).
-    private static readonly TrackingEventType[] OwnFleetTypes =
-        [TrackingEventType.Collected, TrackingEventType.CollectionFailed, TrackingEventType.Delivered, TrackingEventType.DeliveryFailed, TrackingEventType.Damaged];
 }
