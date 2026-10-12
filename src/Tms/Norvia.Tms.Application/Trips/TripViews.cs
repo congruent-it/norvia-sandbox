@@ -9,7 +9,7 @@ internal static class TripViews
     /// A Trip for the Planner. A Draft may hold a Vehicle or Driver that has since gone inactive: it is still named, by its ID, and has
     /// no capacity to compare the load with.
     /// </summary>
-    public static TripView Of(Trip trip, IReadOnlyList<ShipmentOnTrip> shipments, IReadOnlyDictionary<VehicleId, Vehicle> vehicles, IReadOnlyDictionary<DriverId, string> drivers)
+    public static TripView Of(Trip trip, IReadOnlyList<ShipmentOnTrip> shipments, IReadOnlyDictionary<VehicleId, Vehicle> vehicles, IReadOnlyDictionary<DriverId, string> drivers, TripNeeds needs = default)
     {
         var load = LoadCheck.Sum(shipments.Select(shipment => shipment.Load));
         var vehicle = trip.VehicleId is { } id ? vehicles.GetValueOrDefault(id) : null;
@@ -28,6 +28,8 @@ internal static class TripViews
             load.PalletPlaces,
             vehicle?.PayloadKg,
             vehicle?.PalletPlaces,
-            trip.LatestDelivery?.State);
+            trip.LatestDelivery?.State,
+            needs.Driver,
+            needs.Vehicle);
     }
 }

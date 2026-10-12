@@ -17,7 +17,7 @@ public sealed class ListTripsTests
         _fixture.Existing(TripsFixture.Tuesday, Van, Anouk);
         _fixture.Existing(Monday.AddDays(-1), null, null);
 
-        var trips = await new ListTripsHandler(_fixture.Trips.AsRead(), _fixture.TripShipments, _fixture.Planning.Vehicles, _fixture.Planning.Drivers)
+        var trips = await new ListTripsHandler(_fixture.Trips.AsRead(), _fixture.TripShipments, _fixture.Planning.Vehicles, _fixture.Planning.Drivers, _fixture.NeedsCheck)
             .Handle(new ListTripsQuery(), CancellationToken.None);
 
         trips.Select(trip => trip.Day).Should().Equal(Monday.AddDays(-1), TripsFixture.Tuesday, TripsFixture.Tuesday.AddDays(1));
@@ -34,7 +34,7 @@ public sealed class ListTripsTests
         trip.AddShipment(_fixture.ReleasedShipment(TripsFixture.Tuesday, pallets: 1, weightKg: 250m).Id);
         _fixture.Existing(TripsFixture.Tuesday.AddDays(1), null, null);
 
-        var trips = await new ListTripsHandler(_fixture.Trips.AsRead(), _fixture.TripShipments, _fixture.Planning.Vehicles, _fixture.Planning.Drivers)
+        var trips = await new ListTripsHandler(_fixture.Trips.AsRead(), _fixture.TripShipments, _fixture.Planning.Vehicles, _fixture.Planning.Drivers, _fixture.NeedsCheck)
             .Handle(new ListTripsQuery(), CancellationToken.None);
 
         trips[0].Should().Match<TripView>(view => view.StopCount == 4 && view.LoadWeightKg == 650m && view.LoadPalletPlaces == 3 && view.PayloadKg == 1200 && view.VehiclePalletPlaces == 4);
@@ -47,12 +47,12 @@ public sealed class ListTripsTests
         var dispatched = await _fixture.DispatchedAsync();
         _fixture.Existing(TripsFixture.Tuesday.AddDays(1), null, null);
 
-        var trips = await new ListTripsHandler(_fixture.Trips.AsRead(), _fixture.TripShipments, _fixture.Planning.Vehicles, _fixture.Planning.Drivers)
+        var trips = await new ListTripsHandler(_fixture.Trips.AsRead(), _fixture.TripShipments, _fixture.Planning.Vehicles, _fixture.Planning.Drivers, _fixture.NeedsCheck)
             .Handle(new ListTripsQuery(), CancellationToken.None);
 
         trips.Single(trip => trip.Number == dispatched.Number.Value).LatestDelivery.Should().Be(TripDeliveryState.Sending);
         dispatched.ReportDelivered(1, _fixture.Planning.Time.GetUtcNow());
-        (await new ListTripsHandler(_fixture.Trips.AsRead(), _fixture.TripShipments, _fixture.Planning.Vehicles, _fixture.Planning.Drivers)
+        (await new ListTripsHandler(_fixture.Trips.AsRead(), _fixture.TripShipments, _fixture.Planning.Vehicles, _fixture.Planning.Drivers, _fixture.NeedsCheck)
             .Handle(new ListTripsQuery(), CancellationToken.None)).Single(trip => trip.Number == dispatched.Number.Value).LatestDelivery.Should().Be(TripDeliveryState.Delivered);
         trips.Single(trip => trip.Status == TripStatus.Draft).LatestDelivery.Should().BeNull();
     }

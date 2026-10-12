@@ -64,7 +64,7 @@ A Driver's Roster is their standard weekly working pattern: for each weekday, ei
 
 The Planner can edit a single open day's Shift, for example to start early. The day is then marked as edited by hand.
 
-When the Planner changes a Roster, the TMS rewrites every open day that isn't edited by hand and has no Absence. Days edited by hand keep their Shift. A day that already has a Trip also keeps its Shift. If the new Roster no longer covers that day, the Trip is flagged, as in [When availability changes under a Trip](#when-availability-changes-under-a-trip).
+When the Planner changes a Roster, the TMS rewrites every open day that isn't edited by hand and has no Absence. Days edited by hand keep their Shift. If the new Roster no longer covers a day that has a Trip, the Shift goes and the Trip is flagged, as in [When availability changes under a Trip](#when-availability-changes-under-a-trip).
 
 ### Absences and Off the road days
 
@@ -210,7 +210,6 @@ Designed in this document and not built yet:
 | Gap | Where it stands |
 |---|---|
 | Trips, and so everything that draws on availability | P11 is not built. P11 applies `TripAvailabilityRules` to Draft Trips, and [TripPlannedDrivingHours.cs](../../../src/Tms/Norvia.Tms.Infrastructure/Fleet/TripPlannedDrivingHours.cs) reports their planned driving, so a Draft uses up Driving hours. Dispatched Trips, Shipments and the load come with later P11 slices |
-| The *Needs a Driver* and *Needs a Vehicle* flags on a Trip | Recording an Absence or an Off the road day is accepted, but with no Trips there is nothing to flag ([When availability changes under a Trip](#when-availability-changes-under-a-trip)) |
 | Part-day Absences, tachograph data, breaks and rest periods, estimating driving hours, more than one Trip per Vehicle per day | Left out on purpose ([Deferred](#deferred)) |
 | The ERP and master-data sync | Vehicles and Drivers come from the seed file for now |
 | As-found toggles and presenter-panel faults for P10 | None added. No Bicep parameter switches anything broken in capacity planning, and [Failure behaviour](../../architecture/failure-behaviour.md#planned-processes) names none yet |

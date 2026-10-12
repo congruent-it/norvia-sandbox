@@ -2,7 +2,11 @@ using Ardalis.SharedKernel;
 using Ardalis.Specification;
 using Norvia.Tms.Application.Fleet;
 using Norvia.Tms.Application.Fleet.Planning;
+using Microsoft.Extensions.Time.Testing;
+using Norvia.Tms.Application.Fleet.Availability;
 using Norvia.Tms.Application.Fleet.Planning.ListOpenDays;
+using Norvia.Tms.Application.Trips;
+using Norvia.Tms.Domain.Trips;
 using Norvia.Tms.Application.UnitTests.TransportOrders;
 using Norvia.Tms.Domain.Fleet;
 using Norvia.Tms.Domain.Shipments;
@@ -43,6 +47,25 @@ public sealed class ListOpenPlanningDaysTests
         day.AvailableVehicles.Should().Be(2);
         day.Shifts.Select(shift => shift.DriverName).Should().Equal("Anouk de Vries", "Joost Bakker");
         day.Shifts[0].Should().Be(new ShiftView("DRV-0001", "Anouk de Vries", new TimeOnly(6, 0), new TimeOnly(14, 0), false));
+    }
+
+    [Fact]
+    public async Task Handle_ATripWhoseDriverHasNoShift_IsListedOnItsDayAsFlagged_AndATripThatIsFineIsNot()
+    {
+        var anouk = new DriverId("DRV-0001");
+        var joost = new DriverId("DRV-0002");
+        var truck = new VehicleId("VEH-0001");
+        var day = PlanningDay.Open(Monday, [WeekdayRoster(joost)], [truck]);
+        var idempotency = () => new IdempotencyKey(Guid.NewGuid().ToString());
+        var flagged = Trip.CreateDraft(TripNumber.FromSequence(1), Monday, truck, anouk, idempotency());
+        var tuesday = PlanningDay.Open(Monday.AddDays(1), [WeekdayRoster(joost)], [truck]);
+        var fine = Trip.CreateDraft(TripNumber.FromSequence(2), Monday.AddDays(1), null, joost, idempotency());
+
+        var listed = await Handler([day, tuesday], [Driver(anouk, LicenceCategory.C), Driver(joost, LicenceCategory.C)], [Vehicle("VEH-0001", VehicleType.RigidTruck, 10000, 18)], [], [], [fine, flagged])
+            .Handle(new ListOpenPlanningDaysQuery(), CancellationToken.None);
+
+        listed[0].FlaggedTrips.Should().Equal(new FlaggedTripView("TR-0000001", NeedsDriver: true, NeedsVehicle: false));
+        listed[1].FlaggedTrips.Should().BeEmpty();
     }
 
     [Fact]
@@ -124,18 +147,22 @@ public sealed class ListOpenPlanningDaysTests
         Handler([day], drivers, vehicles, orders, shipments);
 
     private static ListOpenPlanningDaysHandler Handler(
-        List<PlanningDay> stored, Driver[] drivers, Vehicle[] vehicles, List<TransportOrder> orders, List<Shipment> shipments)
+        List<PlanningDay> stored, Driver[] drivers, Vehicle[] vehicles, List<TransportOrder> orders, List<Shipment> shipments, List<Trip>? trips = null)
     {
         var directory = Substitute.For<IDriverDirectory>();
         directory.ListActive().Returns(drivers);
         var fleet = Substitute.For<IVehicleDirectory>();
         fleet.ListActive().Returns(vehicles);
-        return Handler(Repository(stored), directory, fleet, orders, shipments);
+        return Handler(Repository(stored), directory, fleet, orders, shipments, trips);
     }
 
     private static ListOpenPlanningDaysHandler Handler(
-        IReadRepository<PlanningDay> days, IDriverDirectory drivers, IVehicleDirectory vehicles, List<TransportOrder> orders, List<Shipment> shipments) =>
-        new(days, LoadChecks.LoadsOver(shipments, orders, drivers, vehicles), drivers, vehicles);
+        IReadRepository<PlanningDay> days, IDriverDirectory drivers, IVehicleDirectory vehicles, List<TransportOrder> orders, List<Shipment> shipments, List<Trip>? trips = null)
+    {
+        var time = new FakeTimeProvider(new DateTimeOffset(2026, 10, 12, 9, 0, 0, TimeSpan.FromHours(2)));
+        var rules = new TripAvailabilityRules(days, vehicles, drivers, Substitute.For<IPlannedDrivingHours>(), DrivingHourLimits.Default, new PlanningHorizonRules(14, TimeZoneInfo.FindSystemTimeZoneById("Europe/Amsterdam")), time);
+        return new(days, LoadChecks.LoadsOver(shipments, orders, drivers, vehicles), drivers, vehicles, Repository(trips ?? []), new TripNeedsCheck(rules));
+    }
 
     private static IReadRepository<T> Repository<T>(List<T> stored)
         where T : class, IAggregateRoot
@@ -143,6 +170,8 @@ public sealed class ListOpenPlanningDaysTests
         var repository = Substitute.For<IReadRepository<T>>();
         repository.ListAsync(Arg.Any<ISpecification<T>>(), Arg.Any<CancellationToken>())
             .Returns(call => call.Arg<ISpecification<T>>().Evaluate(stored).ToList());
+        repository.FirstOrDefaultAsync(Arg.Any<ISpecification<T>>(), Arg.Any<CancellationToken>())
+            .Returns(call => call.Arg<ISpecification<T>>().Evaluate(stored).FirstOrDefault());
         return repository;
     }
 
