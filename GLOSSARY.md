@@ -387,6 +387,10 @@ _Avoid_: login, impersonation, role switcher (that is for Norvia's own users)
 The person who runs a demo of the sandbox: they play Norvia's users through the Role switcher and its partners through the Persona switcher. Not a party of Norvia's; in Azure, the one person the demo UIs let in.
 _Avoid_: user, admin, operator (that is the Integration operator)
 
+**Presenter panel**:
+The page of the Partner portal (`/presenter`) where the presenter switches the demo's faults, such as *Driver app unavailable*, which makes the Driver app refuse every Trip version so the Planner sees Not delivered. It is for faults only: a Carrier Persona's modes are set on its own page.
+_Avoid_: admin page, control panel
+
 **Demo UIs**:
 The TMS UI and the Partner portal, the two UIs a presenter shows side by side. They have no login; in Azure an Entra sign-in in front of them, the gate, admits only the presenter (ADR 0024). The gate is not a login in the domain's sense: the apps don't know who passed it.
 _Avoid_: frontends, portals, login (for the gate)

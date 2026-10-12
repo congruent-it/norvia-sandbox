@@ -40,11 +40,8 @@ internal sealed class PartnerPortalRequests(IServiceScopeFactory scopes) : IPart
     public Task<DriverAppFaultView> GetDriverAppFaultAsync(CancellationToken cancellationToken) =>
         SendAsync(new GetDriverAppFaultQuery(), cancellationToken);
 
-    public async Task<DriverAppFaultView> SetDriverAppFaultAsync(bool unavailable, CancellationToken cancellationToken)
-    {
-        await using var scope = scopes.CreateAsyncScope();
-        return await scope.ServiceProvider.GetRequiredService<IMediator>().Send(new SetDriverAppFaultCommand(unavailable), cancellationToken);
-    }
+    public Task<DriverAppFaultView> SetDriverAppFaultAsync(bool unavailable, CancellationToken cancellationToken) =>
+        SendAsync(new SetDriverAppFaultCommand(unavailable), cancellationToken);
 
     public Task<IReadOnlyList<PersonaView>> ListPersonasAsync(CancellationToken cancellationToken) =>
         SendAsync(new ListPersonasQuery(), cancellationToken);
@@ -140,6 +137,12 @@ internal sealed class PartnerPortalRequests(IServiceScopeFactory scopes) : IPart
     {
         await using var scope = scopes.CreateAsyncScope();
         return await scope.ServiceProvider.GetRequiredService<IMediator>().Send(query, cancellationToken);
+    }
+
+    private async Task<TResponse> SendAsync<TResponse>(ICommand<TResponse> command, CancellationToken cancellationToken)
+    {
+        await using var scope = scopes.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<IMediator>().Send(command, cancellationToken);
     }
 
     private static T? FoundOrNull<T>(Result<T> result)

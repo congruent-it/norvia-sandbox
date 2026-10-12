@@ -177,7 +177,7 @@ has_send_failure() { send_failure_codes "$1" | grep -qx "$2" && echo yes || true
 # Application Insights: the roles whose rows carry a value.
 roles_with() {
   logs "union AppRequests, AppTraces, AppDependencies
-| where tostring(Properties) contains '$1' or Message contains '$1' or Name contains '$1'
+| where tostring(Properties.correlationId) == '$1' or OperationId == '$1'
 | summarize by AppRoleName" | jq -r '.[][0]'
 }
 found() {
@@ -283,6 +283,7 @@ echo
 for trip_number in "$scenario1" "$scenario2"; do
   ids=$(until_found logic_app_correlation_ids "$trip_number")
   [ -n "$ids" ] || fail "no correlation ID of Trip $trip_number reached Application Insights after 10 minutes"
+  found "Trip $trip_number, by its number," "$trip_number" "$logic_app" tms-api
   while read -r id; do
     found "Trip $trip_number, by correlation ID $id," "$id" tms-api "$logic_app" driver-app-api
   done <<<"$ids"
