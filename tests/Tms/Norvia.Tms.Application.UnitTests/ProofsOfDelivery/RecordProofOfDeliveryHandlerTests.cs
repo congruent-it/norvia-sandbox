@@ -13,6 +13,7 @@ using Norvia.Tms.Domain.ProofsOfDelivery;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.TransportOrders;
+using Norvia.Tms.Domain.Trips;
 using NSubstitute;
 using static Norvia.Tms.Application.UnitTests.ProofsOfDelivery.ProofsOfDeliverySamples;
 
@@ -39,7 +40,7 @@ public sealed class RecordProofOfDeliveryHandlerTests
     {
         _exceptionNumbers.NextAsync(Arg.Any<CancellationToken>()).Returns(ExceptionNumber.FromSequence(9));
         _trackingEvents.ListAsync(Arg.Any<DeliveredTrackingEventsForShipmentsSpec>(), Arg.Any<CancellationToken>()).Returns([]);
-        _handler = new RecordProofOfDeliveryHandler(_proofsOfDelivery, _carrierBookings, _shipments, _files, new ExceptionCauses(_exceptions, _exceptionNumbers), new BillingCheck(_orders, Substitute.For<IReadRepository<Shipment>>(), _trackingEvents, _currentProofs, _openExceptions), new ProofOfDeliveryRules(TimeSpan.FromMinutes(5)), _time);
+        _handler = new RecordProofOfDeliveryHandler(_proofsOfDelivery, _carrierBookings, _shipments, Substitute.For<IReadRepository<Trip>>(), Substitute.For<IReadRepository<TrackingEvent>>(), _files, new ExceptionCauses(_exceptions, _exceptionNumbers), new BillingCheck(_orders, Substitute.For<IReadRepository<Shipment>>(), _trackingEvents, _currentProofs, _openExceptions), new ProofOfDeliveryRules(TimeSpan.FromMinutes(5)), _time);
     }
 
     [Fact]

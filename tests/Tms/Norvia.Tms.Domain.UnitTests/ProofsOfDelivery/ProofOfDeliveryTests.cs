@@ -1,10 +1,12 @@
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Carriers;
+using Norvia.Tms.Domain.Fleet;
 using Norvia.Tms.Domain.ProofsOfDelivery;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.Shippers;
 using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.TransportOrders;
+using Norvia.Tms.Domain.Trips;
 using Norvia.Tms.Domain.UnitTests.TransportOrders;
 
 namespace Norvia.Tms.Domain.UnitTests.ProofsOfDelivery;
@@ -82,6 +84,33 @@ public sealed class ProofOfDeliveryTests
         proofOfDelivery.IsRepeatOf(Report()).Should().BeTrue();
         proofOfDelivery.IsRepeatOf(Report() with { DocumentId = "doc-other" }).Should().BeFalse();
         proofOfDelivery.IsRepeatOf(Report() with { Source = ProofOfDeliverySource.OwnFleet }).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Record_FromOwnFleet_KeepsItsTripDriverAndTripVersion_InPlaceOfACarrierBookingReference()
+    {
+        var shipment = BookedShipment();
+        var report = Report() with
+        {
+            Source = ProofOfDeliverySource.OwnFleet,
+            CarrierBookingReference = null,
+            OwnFleet = new OwnFleetReport(TripNumber.FromSequence(7), new DriverId("DRV-0001"), shipment.Number, 3),
+        };
+
+        var proofOfDelivery = ProofOfDelivery.Record(shipment, report, new CorrelationId("corr-pod"), ReceivedAt);
+
+        proofOfDelivery.CarrierBookingReference.Should().BeNull();
+        proofOfDelivery.TripNumber.Should().Be(TripNumber.FromSequence(7));
+        proofOfDelivery.DriverId.Should().Be(new DriverId("DRV-0001"));
+        proofOfDelivery.TripVersion.Should().Be(3);
+    }
+
+    [Fact]
+    public void Record_FromACarrier_WithoutItsBookingReference_IsABug()
+    {
+        var act = () => ProofOfDelivery.Record(BookedShipment(), Report() with { CarrierBookingReference = null }, new CorrelationId("corr-pod"), ReceivedAt);
+
+        act.Should().Throw<ArgumentException>();
     }
 
     [Fact]

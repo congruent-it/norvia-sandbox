@@ -68,6 +68,14 @@
       ],
       "minLength": 1
     },
+    "tripNumber": {
+      "description": "The Trip the Driver reported the Proof of delivery on (P12); null for a Carrier's.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^TR-[0-9]{7}$"
+    },
     "receivedBy": {
       "description": "The name of the person who signed.",
       "type": "string",

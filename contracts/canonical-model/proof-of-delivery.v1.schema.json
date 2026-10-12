@@ -2,13 +2,12 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://norvia.example/canonical-model/proof-of-delivery.v1.schema.json",
   "title": "ProofOfDelivery",
-  "description": "A Proof of delivery's metadata, as the Carrier Proof of delivery Logic App sends it in the 'metadata' part of its multipart call to the TMS Proof of delivery API's record operation, with the files in the 'files' parts (Canonical Model command, version 1). The correlation ID, which API Management creates, is in X-Correlation-ID. The Proof of delivery names its source: a Carrier ID, which comes from API Management's token check (ADR 0005) and never from the Carrier's own payload, or Own fleet. 'files' describes the files parts, in order; it carries no content.",
+  "description": "A Proof of delivery's metadata, as the Carrier Proof of delivery Logic App sends it in the 'metadata' part of its multipart call to the TMS Proof of delivery API's record operation, with the files in the 'files' parts (Canonical Model command, version 1). The correlation ID, which API Management creates, is in X-Correlation-ID. The Proof of delivery names its source: a Carrier ID, which comes from API Management's token check (ADR 0005) and never from the Carrier's own payload, or Own fleet with the Driver ID, which the Driver reports Logic App takes from the Driver's token and never from the Driver app's payload. An Own fleet Proof of delivery (P12) names its Trip, the Shipment on it and the Trip version the Driver app held in place of a Carrier booking. 'files' describes the files parts, in order; it carries no content.",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "documentId",
     "source",
-    "carrierBookingReference",
     "receivedBy",
     "deliveryTime",
     "location",
@@ -48,18 +47,25 @@
           "type": "object",
           "additionalProperties": false,
           "required": [
-            "type"
+            "type",
+            "driverId"
           ],
           "properties": {
             "type": {
               "const": "OwnFleet"
+            },
+            "driverId": {
+              "description": "The Driver who reported the Proof of delivery, from the Driver's token.",
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
             }
           }
         }
       ]
     },
     "carrierBookingReference": {
-      "description": "The Carrier's own reference for its booking. With the Carrier, it finds the Shipment.",
+      "description": "A Carrier's own reference for its booking. With the Carrier, it finds the Shipment.",
       "type": "string",
       "minLength": 1,
       "pattern": "\\S"
@@ -68,6 +74,21 @@
       "description": "The TMS's own Carrier booking number, such as CB-0000042. Used only when the booking reference doesn't match.",
       "type": "string",
       "pattern": "^CB-[0-9]{7}$"
+    },
+    "tripNumber": {
+      "description": "An Own fleet Proof of delivery's Trip, such as TR-0000042, in place of a Carrier booking (P12).",
+      "type": "string",
+      "pattern": "^TR-[0-9]{7}$"
+    },
+    "shipmentNumber": {
+      "description": "An Own fleet Proof of delivery's Shipment on that Trip, such as SH-0000042.",
+      "type": "string",
+      "pattern": "^SH-[0-9]{7}$"
+    },
+    "tripVersion": {
+      "description": "The version of the Trip the Driver app held when it reported. Kept for tracing only: the Shipment only has to be on the Trip's latest version.",
+      "type": "integer",
+      "minimum": 0
     },
     "receivedBy": {
       "description": "The name of the person who signed.",
@@ -147,19 +168,90 @@
       }
     }
   },
-  "if": {
-    "properties": {
-      "condition": {
-        "const": "Reservations"
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "condition": {
+            "const": "Reservations"
+          }
+        },
+        "required": [
+          "condition"
+        ]
+      },
+      "then": {
+        "required": [
+          "remark"
+        ]
       }
     },
-    "required": [
-      "condition"
-    ]
-  },
-  "then": {
-    "required": [
-      "remark"
-    ]
-  }
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "source": {
+              "properties": {
+                "type": {
+                  "const": "Carrier"
+                }
+              }
+            }
+          },
+          "required": [
+            "carrierBookingReference"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "tripNumber"
+                ]
+              },
+              {
+                "required": [
+                  "shipmentNumber"
+                ]
+              },
+              {
+                "required": [
+                  "tripVersion"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "source": {
+              "properties": {
+                "type": {
+                  "const": "OwnFleet"
+                }
+              }
+            }
+          },
+          "required": [
+            "tripNumber",
+            "shipmentNumber",
+            "tripVersion"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "carrierBookingReference"
+                ]
+              },
+              {
+                "required": [
+                  "carrierBookingNumber"
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
 }

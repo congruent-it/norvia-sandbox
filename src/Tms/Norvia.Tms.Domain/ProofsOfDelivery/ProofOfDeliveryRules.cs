@@ -1,4 +1,5 @@
 using Norvia.Tms.Domain.Shipments;
+using Norvia.Tms.Domain.Trips;
 using static System.FormattableString;
 
 namespace Norvia.Tms.Domain.ProofsOfDelivery;
@@ -20,6 +21,41 @@ public sealed record ProofOfDeliveryRules(TimeSpan ClockSkew)
         return shipment.Status >= ShipmentStatus.Booked
             ? null
             : new(ProofOfDeliveryRefusalCode.ShipmentNotInTransport, Invariant($"Shipment {shipment.Number} is {shipment.Status}, not Booked or later."));
+    }
+
+    /// <summary>
+    /// The refusal for an Own fleet Proof of delivery (P12) that breaks a Driver report rule, or null when it breaks none. <paramref name="trip"/> is
+    /// the Trip the report names and <paramref name="shipment"/> the Shipment it names, each null when there is none. The Driver comes from the
+    /// token, so a Trip that is another Driver's is no Trip found. The rules are checked in this order, and a report is only about the Shipment
+    /// being on the Trip's latest version, whatever version the report named.
+    /// </summary>
+    public ProofOfDeliveryRefusal? CheckOwnFleetReport(Trip? trip, Shipment? shipment, ProofOfDeliveryReport report, StopOutcomes outcomes, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+        ArgumentNullException.ThrowIfNull(outcomes);
+        var own = report.OwnFleet ?? throw new ArgumentException("An Own fleet report names its Trip.", nameof(report));
+
+        if (trip is null || trip.DriverId != own.DriverId)
+        {
+            return new(ProofOfDeliveryRefusalCode.TripNotFound, Invariant($"Driver {own.DriverId} has no Trip {own.TripNumber}."));
+        }
+
+        if (trip.Status != TripStatus.InProgress)
+        {
+            return new(ProofOfDeliveryRefusalCode.TripNotUnderWay, Invariant($"Trip {trip.Number} is {trip.Status}, not In progress."));
+        }
+
+        if (shipment is null || !trip.HasShipment(shipment.Id))
+        {
+            return new(ProofOfDeliveryRefusalCode.ShipmentNotOnTrip, Invariant($"Shipment {own.ShipmentNumber} is not on Trip {trip.Number}, whose latest version is {trip.Version}."));
+        }
+
+        if (outcomes.Of(shipment.Id, StopKind.Collection).Kind != StopOutcomeKind.Collected)
+        {
+            return new(ProofOfDeliveryRefusalCode.CollectionBeforeDelivery, Invariant($"Shipment {shipment.Number} can't be delivered before it is collected."));
+        }
+
+        return CheckDeliveryTime(report.DeliveryTime, now);
     }
 
     /// <summary>The refusal for a delivery time later than now plus the clock skew, or null when it isn't.</summary>

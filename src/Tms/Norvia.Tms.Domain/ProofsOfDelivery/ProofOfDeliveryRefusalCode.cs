@@ -20,4 +20,16 @@ public enum ProofOfDeliveryRefusalCode
 
     /// <summary>The files aren't 1 to 5, each 10 MB or less and a PDF, JPEG or PNG by their content.</summary>
     FileNotAccepted,
+
+    /// <summary>An Own fleet Proof of delivery (P12): no Trip with that number is the reporting Driver's.</summary>
+    TripNotFound,
+
+    /// <summary>An Own fleet Proof of delivery (P12): the Trip isn't In progress, so it was never started or it is over.</summary>
+    TripNotUnderWay,
+
+    /// <summary>An Own fleet Proof of delivery (P12): the Shipment isn't on the Trip's latest version, even when the report names an older one.</summary>
+    ShipmentNotOnTrip,
+
+    /// <summary>An Own fleet Proof of delivery (P12): the Shipment's collection Stop isn't Collected yet.</summary>
+    CollectionBeforeDelivery,
 }

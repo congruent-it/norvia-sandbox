@@ -80,6 +80,7 @@ internal static class CanonicalModelSchemas
 
     private static readonly Lazy<JsonSchema> ShipmentExceptionReportedSchema = new(() => Load("shipment-exception-reported.v1.schema.json"));
 
+    private static readonly Lazy<JsonSchema> ProofOfDeliverySchema = new(() => Load("proof-of-delivery.v1.schema.json"));
     private static readonly Lazy<JsonSchema> ProofOfDeliveryReceivedSchema = new(() => Load("proof-of-delivery-received.v1.schema.json"));
 
     private static readonly Lazy<JsonSchema> ExceptionOpenedSchema = new(() => Load("exception-opened.v1.schema.json"));
@@ -117,6 +118,8 @@ internal static class CanonicalModelSchemas
     public static EvaluationResults ValidateExceptionOpened(JsonNode body) => Validate(ExceptionOpenedSchema.Value, body);
 
     public static EvaluationResults ValidateExceptionResolved(JsonNode body) => Validate(ExceptionResolvedSchema.Value, body);
+
+    public static EvaluationResults ValidateProofOfDelivery(JsonNode body) => Validate(ProofOfDeliverySchema.Value, body);
 
     public static EvaluationResults ValidateProofOfDeliveryReceived(JsonNode body) => Validate(ProofOfDeliveryReceivedSchema.Value, body);
 

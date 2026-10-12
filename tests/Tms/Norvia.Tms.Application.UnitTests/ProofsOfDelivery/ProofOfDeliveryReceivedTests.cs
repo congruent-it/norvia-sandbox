@@ -1,8 +1,11 @@
 using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.ProofsOfDelivery.Record;
+using Norvia.Tms.Domain.Fleet;
 using Norvia.Tms.Domain.ProofsOfDelivery;
 using Norvia.Tms.Domain.Shipments;
+using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.TransportOrders;
+using Norvia.Tms.Domain.Trips;
 using NSubstitute;
 using static Norvia.Tms.Application.UnitTests.ProofsOfDelivery.ProofsOfDeliverySamples;
 
@@ -55,6 +58,25 @@ public sealed class ProofOfDeliveryReceivedTests
             ["eventVersion"] = 1,
             ["correlationId"] = "corr-pod",
         });
+    }
+
+    [Fact]
+    public void ProofOfDeliveryReceived_FromOwnFleet_CarriesItsTrip_TracksItUnderTripExecution_AndFiltersOnOwnFleet()
+    {
+        var shipment = ShipmentCarriedTo(ShipmentStatus.Delivered);
+        var report = Report(ProofOfDeliverySource.OwnFleet, reference: null!) with
+        {
+            CarrierBookingReference = null,
+            OwnFleet = new OwnFleetReport(TripNumber.FromSequence(7), new DriverId("DRV-0001"), shipment.Number, 2),
+        };
+        var proofOfDelivery = ProofOfDelivery.Record(shipment, report, new CorrelationId("corr-pod"), ReceivedAt);
+
+        var published = ProofOfDeliveryReceivedV1.From((ProofOfDeliveryReceivedEvent)proofOfDelivery.DomainEvents.Single());
+
+        published.TripNumber.Should().Be("TR-0000007");
+        published.CarrierId.Should().BeNull();
+        published.CarrierBookingReference.Should().BeNull();
+        published.ApplicationProperties.Should().Contain("flow", "trip-execution").And.Contain("tripNumber", "TR-0000007").And.Contain("assignedTo", "OwnFleet");
     }
 
     private static ProofOfDeliveryReceivedEvent Received()

@@ -11,6 +11,9 @@ namespace Norvia.Tms.Api.ProofsOfDelivery;
 /// <param name="Source">Who sent it. The Carrier comes from API Management's token check (ADR 0005), never from the Carrier's own payload.</param>
 /// <param name="CarrierBookingReference">The Carrier's own reference for its booking, which with the Carrier finds the Shipment.</param>
 /// <param name="CarrierBookingNumber">The TMS's own Carrier booking number, used only when the reference doesn't match.</param>
+/// <param name="TripNumber">An Own fleet Proof of delivery's Trip, in place of the Carrier booking reference (P12).</param>
+/// <param name="ShipmentNumber">An Own fleet Proof of delivery's Shipment on that Trip.</param>
+/// <param name="TripVersion">The version of the Trip the Driver app held, kept for tracing only.</param>
 /// <param name="ReceivedBy">The name of the person who signed.</param>
 /// <param name="DeliveryTime">When the goods were delivered, with the offset of where.</param>
 /// <param name="Files">What the canonical metadata says of its <c>files</c> parts, in order. The parts themselves are what the TMS stores and checks.</param>
@@ -24,6 +27,9 @@ public sealed record ProofOfDeliveryRequest(
     ProofOfDeliverySourceRequest? Source = null,
     string? CarrierBookingReference = null,
     string? CarrierBookingNumber = null,
+    string? TripNumber = null,
+    string? ShipmentNumber = null,
+    int? TripVersion = null,
     string? ReceivedBy = null,
     DateTimeOffset? DeliveryTime = null,
     ProofOfDeliveryLocationRequest? Location = null,
@@ -31,8 +37,9 @@ public sealed record ProofOfDeliveryRequest(
     string? Remark = null,
     IReadOnlyList<ProofOfDeliveryFileRequest>? Files = null);
 
-/// <summary>Who sent a Proof of delivery: a Carrier, with its ID, or Own fleet, with none.</summary>
-public sealed record ProofOfDeliverySourceRequest([property: JsonRequired] ProofOfDeliverySourceType Type, string? CarrierId = null);
+/// <summary>Who sent a Proof of delivery: a Carrier, with its ID, or Own fleet, with the Driver's ID.</summary>
+/// <param name="DriverId">For Own fleet, the Driver ID from the Driver's token, which the Driver reports Logic App passes on (ADR 0005), never the Driver app's own.</param>
+public sealed record ProofOfDeliverySourceRequest([property: JsonRequired] ProofOfDeliverySourceType Type, string? CarrierId = null, string? DriverId = null);
 
 public enum ProofOfDeliverySourceType
 {
