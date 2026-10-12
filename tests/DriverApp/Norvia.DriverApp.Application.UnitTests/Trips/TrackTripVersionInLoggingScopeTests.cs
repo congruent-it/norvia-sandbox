@@ -1,9 +1,9 @@
 using Ardalis.Result;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Testing;
-using Norvia.DriverApp.Application.UnitTests.Reports;
 using Norvia.DriverApp.Application.Trips;
 using Norvia.DriverApp.Application.Trips.Receive;
+using Norvia.DriverApp.Application.UnitTests.Reports;
 
 namespace Norvia.DriverApp.Application.UnitTests.Trips;
 

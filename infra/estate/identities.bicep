@@ -33,6 +33,8 @@ var tripStartRole = 'Trips.Start'
 var tripStartRoleId = guid('norvia-tms-api', environmentName, tripStartRole)
 var tripEndRole = 'Trips.End'
 var tripEndRoleId = guid('norvia-tms-api', environmentName, tripEndRole)
+var driverReportOutcomeRole = 'DriverReports.ReportOutcome'
+var driverReportOutcomeRoleId = guid('norvia-driver-app-api', environmentName, driverReportOutcomeRole)
 var recordRole = 'TrackingEvents.Record'
 var recordRoleId = guid('norvia-tms-api', environmentName, recordRole)
 var recordProofRole = 'ProofsOfDelivery.Record'
@@ -141,7 +143,7 @@ resource tmsApi 'Microsoft.Graph/applications@v1.0' = {
       id: tripStartRoleId
       value: tripStartRole
       displayName: 'Start a Trip'
-      description: 'Start a Dispatched Trip for its Driver on the Trip\'s day (P12). Only the P12 Driver reports Logic App will hold it, once it is built.'
+      description: 'Start a Dispatched Trip for its Driver on the Trip\'s day (P12). Only the P12 Driver reports Logic App holds it.'
       allowedMemberTypes: [
         'Application'
       ]
@@ -274,6 +276,58 @@ resource driverAppIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@202
   name: 'id-driver-app-${uniqueString(resourceGroup().id)}'
   location: location
   tags: tags
+}
+
+// The P12 Driver reports Logic App's identity, which it runs as. It is the one principal holding the Trip start role (and, as they are built,
+// the Trip end, Tracking event and Proof of delivery record roles), so nothing a Driver reports reaches the TMS without passing the
+// integration layer, and the one principal holding the Driver app's outcome role.
+resource driverReportsIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
+  name: 'id-driver-reports-${uniqueString(resourceGroup().id)}'
+  location: location
+  tags: tags
+}
+
+resource driverReportsStartRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: tmsApiPrincipal.id
+  appRoleId: tripStartRoleId
+  principalId: driverReportsIdentity.properties.principalId
+}
+
+// The Driver app API's registration, which is the audience of the Driver reports Logic App's token for the Driver app's outcome endpoint
+// (ADR 0005). Entra issues one only to a principal granted the role.
+resource driverAppApi 'Microsoft.Graph/applications@v1.0' = {
+  uniqueName: 'norvia-driver-app-api-${environmentName}'
+  displayName: 'Norvia Driver app API (${environmentName})'
+  signInAudience: 'AzureADMyOrg'
+  identifierUris: [
+    'api://${tenant().tenantId}/norvia-driver-app-api-${environmentName}'
+  ]
+  api: {
+    requestedAccessTokenVersion: 2
+  }
+  appRoles: [
+    {
+      id: driverReportOutcomeRoleId
+      value: driverReportOutcomeRole
+      displayName: 'Report the outcome of a Driver report'
+      description: 'Tell the Driver app whether the TMS recorded a report of a Driver, refused it, or was never reached (P12). Only the P12 Driver reports Logic App holds it.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
+  ]
+}
+
+resource driverAppApiPrincipal 'Microsoft.Graph/servicePrincipals@v1.0' = {
+  appId: driverAppApi.appId
+  appRoleAssignmentRequired: true
+}
+
+resource driverReportsOutcomeRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: driverAppApiPrincipal.id
+  appRoleId: driverReportOutcomeRoleId
+  principalId: driverReportsIdentity.properties.principalId
 }
 
 // The Carrier-answer Logic App's identity, which it runs as. It is the one principal holding the answer role, so nothing
@@ -772,3 +826,8 @@ output tripDispatchClientId string = tripDispatchIdentity.properties.clientId
 output driverAppIdentityName string = driverAppIdentity.name
 output driverAppPrincipalId string = driverAppIdentity.properties.principalId
 output driverAppClientId string = driverAppIdentity.properties.clientId
+output driverReportsIdentityId string = driverReportsIdentity.id
+output driverReportsIdentityName string = driverReportsIdentity.name
+output driverReportsPrincipalId string = driverReportsIdentity.properties.principalId
+output driverReportsClientId string = driverReportsIdentity.properties.clientId
+output driverAppApiClientId string = driverAppApi.appId
