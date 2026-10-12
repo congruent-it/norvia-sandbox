@@ -155,6 +155,21 @@ public sealed class TrackingQueriesTests
     }
 
     [Fact]
+    public async Task ListInProgress_AShipmentAwaitingRedelivery_IsNotStale_HoweverQuietItIs()
+    {
+        var shipment = Booked(sequence: 12);
+        _shipments.ListAsync(Arg.Any<ShipmentsInProgressSpec>(), Arg.Any<CancellationToken>()).Returns([shipment]);
+        var departed = Report(shipment, TrackingEventType.Departed, "a", Samples.Now, Samples.Now, null);
+        _events.ListAsync(Arg.Any<TrackingEventsForShipmentsSpec>(), Arg.Any<CancellationToken>()).Returns([departed]);
+        _time.SetUtcNow(Samples.Now.AddDays(5));
+        (await InProgressHandler().Handle(new ListShipmentsInProgressQuery(), CancellationToken.None)).Single().IsStale.Should().BeTrue();
+
+        typeof(Shipment).GetProperty(nameof(Shipment.AwaitingRedelivery))!.SetValue(shipment, true);
+
+        (await InProgressHandler().Handle(new ListShipmentsInProgressQuery(), CancellationToken.None)).Single().IsStale.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task ListInProgress_NotDeliveredTheThresholdAfterTheDeliveryWindow_IsStale()
     {
         var shipment = Booked(sequence: 12);

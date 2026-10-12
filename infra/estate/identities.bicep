@@ -28,6 +28,8 @@ var tripReportDeliveryRole = 'Trips.ReportDelivery'
 var tripReportDeliveryRoleId = guid('norvia-tms-api', environmentName, tripReportDeliveryRole)
 var tripStartRole = 'Trips.Start'
 var tripStartRoleId = guid('norvia-tms-api', environmentName, tripStartRole)
+var tripEndRole = 'Trips.End'
+var tripEndRoleId = guid('norvia-tms-api', environmentName, tripEndRole)
 var recordRole = 'TrackingEvents.Record'
 var recordRoleId = guid('norvia-tms-api', environmentName, recordRole)
 var recordProofRole = 'ProofsOfDelivery.Record'
@@ -134,6 +136,16 @@ resource tmsApi 'Microsoft.Graph/applications@v1.0' = {
       value: tripStartRole
       displayName: 'Start a Trip'
       description: 'Start a Dispatched Trip for its Driver on the Trip\'s day (P12). Only the P12 Driver reports Logic App will hold it, once it is built.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
+    {
+      id: tripEndRoleId
+      value: tripEndRole
+      displayName: 'End a Trip'
+      description: 'End an In progress Trip for its Driver once every Stop has an outcome (P12). Only the P12 Driver reports Logic App will hold it, once it is built.'
       allowedMemberTypes: [
         'Application'
       ]

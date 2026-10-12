@@ -1,0 +1,14 @@
+{
+  "eventId": "0198e7c0-0000-7000-8000-0000000000c1",
+  "eventType": "TripCompleted",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-13T15:40:00+00:00",
+  "correlationId": "8b7e2c14-5a9d-4e61-b3f0-2d94c1a7e850",
+  "tripNumber": "TR-0000012",
+  "version": 1,
+  "driverId": "DRV-0002",
+  "endedAt": "2026-10-13T15:40:00+00:00",
+  "deliveredShipments": ["SH-0000031", "SH-0000032"],
+  "notDeliveredShipments": [],
+  "notCollectedShipments": []
+}

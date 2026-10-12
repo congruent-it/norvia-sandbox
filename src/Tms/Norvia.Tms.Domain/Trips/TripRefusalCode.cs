@@ -62,4 +62,13 @@ public enum TripRefusalCode
 
     /// <summary>The Driver starts the Trip on another day than the Trip's (P12).</summary>
     NotTripDay,
+
+    /// <summary>The Driver reports on a Trip that is not In progress (P12): not started yet, or ended already.</summary>
+    TripNotUnderWay,
+
+    /// <summary>The Driver ends a Trip while a Stop has no outcome yet (P12).</summary>
+    StopsOpen,
+
+    /// <summary>The Trip is Completed (P12), so the Planner can't change it any more.</summary>
+    TripCompleted,
 }

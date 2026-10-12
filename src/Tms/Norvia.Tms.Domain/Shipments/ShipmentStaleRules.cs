@@ -8,7 +8,7 @@ public sealed class ShipmentStaleRules(TimeSpan collectionGrace, TimeSpan silenc
     /// collected the collection grace after its collection window's latest time; a Collected or In transit one with no Tracking event
     /// for the silence limit; any one not Delivered the delivery grace after its delivery window's latest time. It is
     /// worked out from the Shipment and its events each time, so it clears once a Tracking event makes its rule untrue.
-    /// Stale is only a flag: nothing acts on it.
+    /// Stale is only a flag: nothing acts on it. A Shipment Awaiting re-delivery (P12) is never Stale: Late delivery (P7) covers the wait.
     /// </summary>
     /// <param name="collectionWindowLatest">The Transport Order's collection window's latest time, if it has one.</param>
     /// <param name="deliveryWindowLatest">The Transport Order's delivery window's latest time, if it has one.</param>
@@ -18,9 +18,10 @@ public sealed class ShipmentStaleRules(TimeSpan collectionGrace, TimeSpan silenc
         DateTimeOffset? collectionWindowLatest,
         DateTimeOffset? deliveryWindowLatest,
         DateTimeOffset? lastEventReceivedAt,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        bool awaitingRedelivery = false)
     {
-        if (status is not (ShipmentStatus.Booked or ShipmentStatus.Dispatched or ShipmentStatus.Collected or ShipmentStatus.InTransit))
+        if (awaitingRedelivery || status is not (ShipmentStatus.Booked or ShipmentStatus.Dispatched or ShipmentStatus.Collected or ShipmentStatus.InTransit))
         {
             return false;
         }

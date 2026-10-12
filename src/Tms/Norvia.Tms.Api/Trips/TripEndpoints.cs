@@ -9,6 +9,7 @@ using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.Trips;
 using Norvia.Tms.Application.Trips.AddShipments;
 using Norvia.Tms.Application.Trips.Change;
+using Norvia.Tms.Application.Trips.Complete;
 using Norvia.Tms.Application.Trips.Create;
 using Norvia.Tms.Application.Trips.Discard;
 using Norvia.Tms.Application.Trips.Dispatch;
@@ -32,6 +33,9 @@ public static class TripEndpoints
 
     /// <summary>The app role only the P12 Driver reports Logic App's managed identity holds, for starting a Trip.</summary>
     public const string StartRole = "Trips.Start";
+
+    /// <summary>The app role only the P12 Driver reports Logic App's managed identity holds, for ending a Trip.</summary>
+    public const string EndRole = "Trips.End";
 
     public static IEndpointRouteBuilder MapTrips(this IEndpointRouteBuilder app)
     {
@@ -145,6 +149,17 @@ public static class TripEndpoints
                 + "In one transaction the Trip becomes In progress, at the same version, and exactly one TripStarted (Trip number, version, Driver ID, start time) is written to the outbox for the Trip events topic under that correlation ID. "
                 + "From then on the only change the Planner can make is taking off a Shipment that isn't collected: every other change is TripUnderWay (409). "
                 + "Refused with TripNotFound (404) for an unknown Trip, or one whose Driver is not the Driver from the token, TripNotDispatched (409) for a Draft or a Trip that is In progress already, and NotTripDay (409) when today is not the Trip's day in Norvia's time.");
+
+        trips.MapPost("/{number}/end", EndAsync)
+            .WithName("EndTrip")
+            .RequireAuthorization(policy => policy.RequireRole(EndRole))
+            .WithMetadata(new TrackedFlow(Flows.TripExecution))
+            .WithSummary("End an In progress Trip once every Stop has an outcome: the Driver reports it from the Driver app.")
+            .WithDescription(
+                "driverId is the Driver ID from the Driver's token, which the Driver reports Logic App passes on, and the X-Correlation-ID is the Driver's action trail. "
+                + "In one transaction the Trip becomes Completed, at the same version, and exactly one TripCompleted (Trip number, version, Driver ID, end time and the Shipments delivered, not delivered and not collected) is written to the outbox for the Trip events topic under that correlation ID. "
+                + "A Shipment that wasn't collected is Planned again and one that was collected but not delivered is flagged Awaiting re-delivery, keeping its status; both leave the Trip, and no ShipmentTakenOffTrip is published. "
+                + "Refused with TripNotFound (404) for an unknown Trip, or one whose Driver is not the Driver from the token, TripNotUnderWay (409) for a Trip that isn't In progress, and StopsOpen (409) while a Stop has no outcome. A refusal changes nothing.");
 
         trips.MapPut("/{number}", ChangeDraftAsync)
             .WithName("ChangeDraftTrip")
@@ -347,6 +362,31 @@ public static class TripEndpoints
             ? TypedResults.Ok(result.Value)
             : RefusalProblem.Of<TripRefusalCode, StartTripResult>(
                 result, "The Trip can't be started.", correlationId, code => code == TripRefusalCode.TripNotFound ? StatusCodes.Status404NotFound : StatusCodes.Status409Conflict);
+    }
+
+    private static async Task<Results<Ok<EndTripResult>, ProblemHttpResult, ValidationProblem>> EndAsync(
+        string number,
+        [FromHeader(Name = TransportOrderEndpoints.CorrelationIdHeader)] string? correlationId,
+        EndTripRequest request,
+        IConflictRetrier retrier,
+        CancellationToken cancellationToken)
+    {
+        var errors = string.IsNullOrWhiteSpace(correlationId) ? CorrelationIdMissing("Ending a Trip") : [];
+        if (string.IsNullOrWhiteSpace(request.DriverId))
+        {
+            errors[nameof(EndTripRequest.DriverId)] = ["Ending a Trip needs the Driver ID from the Driver's token."];
+        }
+
+        if (errors.Count > 0 || correlationId is null || request.DriverId is not { } driverId)
+        {
+            return TypedResults.ValidationProblem(errors);
+        }
+
+        var result = await retrier.RunAsync(mediator => mediator.Send(new EndTripCommand(number, driverId, correlationId), cancellationToken).AsTask());
+        return result.IsSuccess
+            ? TypedResults.Ok(result.Value)
+            : RefusalProblem.Of<TripRefusalCode, EndTripResult>(
+                result, "The Trip can't be ended.", correlationId, code => code == TripRefusalCode.TripNotFound ? StatusCodes.Status404NotFound : StatusCodes.Status409Conflict);
     }
 
     // The change may be an Amend of a Dispatched Trip, which starts a Message trail in the TMS UI like a Dispatch does. The caller can't tell

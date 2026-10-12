@@ -102,4 +102,15 @@ public sealed class ShipmentStaleRulesTests
         _rules.IsStale(ShipmentStatus.Booked, Window, null, null, now).Should().BeTrue();
         _rules.IsStale(ShipmentStatus.Collected, Window, null, now, now).Should().BeFalse();
     }
+
+    [Theory]
+    [InlineData(ShipmentStatus.Collected)]
+    [InlineData(ShipmentStatus.InTransit)]
+    public void AwaitingRedelivery_IsNeverStale_ForSilenceOrForAPassedDeliveryWindow(ShipmentStatus status)
+    {
+        var now = Window.AddDays(10);
+
+        _rules.IsStale(status, null, Window, Window, now).Should().BeTrue();
+        _rules.IsStale(status, null, Window, Window, now, awaitingRedelivery: true).Should().BeFalse();
+    }
 }

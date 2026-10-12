@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/trip-completed.v1.schema.json",
+  "title": "TripCompleted",
+  "description": "The Driver ended an In progress Trip once every Stop had an outcome, so it is Completed (Canonical Model event, version 1). It lists the Shipments delivered, the Shipments collected but not delivered, which are Awaiting re-delivery now and keep their status, and the Shipments not collected, which are Planned again. The last two leave the Trip without ShipmentTakenOffTrip being published. Published on the Trip events topic, under the correlation ID of the Driver's End Trip action; the Trip number traces the Trip.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "eventType",
+    "eventVersion",
+    "occurredAt",
+    "correlationId",
+    "tripNumber",
+    "version",
+    "driverId",
+    "endedAt",
+    "deliveredShipments",
+    "notDeliveredShipments",
+    "notCollectedShipments"
+  ],
+  "$defs": {
+    "shipmentNumbers": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^SH-[0-9]{7}$"
+      }
+    }
+  },
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "eventType": {
+      "const": "TripCompleted"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "occurredAt": {
+      "description": "When the TMS recorded the end.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "correlationId": {
+      "description": "The correlation ID of the Driver's End Trip action.",
+      "type": "string",
+      "minLength": 1
+    },
+    "tripNumber": {
+      "description": "The Trip's number.",
+      "type": "string",
+      "pattern": "^TR-[0-9]{7}$"
+    },
+    "version": {
+      "description": "The Trip's version when it ended. Ending doesn't change it.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "driverId": {
+      "description": "The Driver who ended the Trip: the Trip's Driver.",
+      "type": "string",
+      "minLength": 1
+    },
+    "endedAt": {
+      "description": "When the Trip ended.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "deliveredShipments": {
+      "description": "The Shipments whose delivery Stop is Delivered.",
+      "$ref": "#/$defs/shipmentNumbers"
+    },
+    "notDeliveredShipments": {
+      "description": "The Shipments collected but not delivered. Each is Awaiting re-delivery now, off the Trip, and keeps its status.",
+      "$ref": "#/$defs/shipmentNumbers"
+    },
+    "notCollectedShipments": {
+      "description": "The Shipments whose collection failed. Each is Planned again, off the Trip.",
+      "$ref": "#/$defs/shipmentNumbers"
+    }
+  }
+}

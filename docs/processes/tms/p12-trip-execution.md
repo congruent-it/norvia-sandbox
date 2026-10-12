@@ -314,7 +314,18 @@ An Own fleet Proof of delivery at the TMS boundary: `POST /v1/proofs-of-delivery
 | Schemas and samples | [proof-of-delivery.v1.schema.json](../../../contracts/canonical-model/proof-of-delivery.v1.schema.json) with [samples/proof-of-delivery](../../../contracts/canonical-model/samples/proof-of-delivery), and the `tripNumber` of [proof-of-delivery-received.v1.schema.json](../../../contracts/canonical-model/proof-of-delivery-received.v1.schema.json) |
 | Boundary tests | [TripStopReportTests.cs](../../../tests/Tms/Norvia.Tms.Api.IntegrationTests/Trips/TripStopReportTests.cs) |
 
-Not built yet: the Driver app's actions, sign-in, the Driver reports Logic App, End Trip, `TripCompleted` and Re-delivery.
+End Trip at the TMS boundary: `POST /v1/trips/{number}/end` with the `driverId` from the Driver's token in the body and the Driver's `X-Correlation-ID`, role `Trips.End` (the Driver reports Logic App's, which is not built yet; the app role is defined in [identities.bicep](../../../infra/estate/identities.bicep) and no identity holds it). An In progress Trip whose Stops all have an outcome becomes Completed, at the same version, and in the same transaction exactly one `TripCompleted` is written to the outbox for the `trip-events` topic under that correlation ID, listing the Shipments delivered, not delivered and not collected. The delivery Stop of a Shipment whose collection failed needs no outcome, because a Driver can't attempt it (`CollectionBeforeDelivery`), so it doesn't keep the Trip open. In the same transaction an uncollected Shipment goes back to Planned and a collected one that wasn't delivered is flagged Awaiting re-delivery (`AwaitingRedelivery` on the Shipment, shown in the Shipment's `awaitingRedelivery`), keeping its status. Both leave the Trip, whose Stops keep only the delivered Shipments', and no `ShipmentTakenOffTrip` is published. P5's Stale rule is suspended while the flag is set (`ShipmentStaleRules.IsStale` takes it), and Late delivery (P7) works from the Shipment's status and delivery window, so it still applies. It is refused with `TripNotFound` (404, also when the Driver isn't the Trip's), `TripNotUnderWay` (409, a Dispatched Trip or one that has ended) or `StopsOpen` (409), and a refusal changes nothing. A Completed Trip can't be changed by the Planner (`TripCompleted`, 409). The Flow is `trip-execution`, logged as for Start Trip. Putting a Re-delivery on a later Trip is not built yet.
+
+| Part | Where |
+|---|---|
+| Rules and the status change | `Trip.EnsureCanEnd` and `Trip.End` in [Trip.cs](../../../src/Tms/Norvia.Tms.Domain/Trips/Trip.cs), raising [TripCompletedEvent.cs](../../../src/Tms/Norvia.Tms.Domain/Trips/TripCompletedEvent.cs); which Stops are open and what became of each Shipment in [StopOutcomes.cs](../../../src/Tms/Norvia.Tms.Domain/Trips/StopOutcomes.cs) |
+| The flag | `Shipment.AwaitRedelivery` and `AwaitingRedelivery` in [Shipment.cs](../../../src/Tms/Norvia.Tms.Domain/Shipments/Shipment.cs) (migration `ShipmentAwaitingRedelivery`), and [ShipmentStaleRules.cs](../../../src/Tms/Norvia.Tms.Domain/Shipments/ShipmentStaleRules.cs) |
+| Command, handler, `TripCompleted` | [Trips/Complete](../../../src/Tms/Norvia.Tms.Application/Trips/Complete) |
+| Endpoint | `EndAsync` in [TripEndpoints.cs](../../../src/Tms/Norvia.Tms.Api/Trips/TripEndpoints.cs) |
+| Schema and samples | [trip-completed.v1.schema.json](../../../contracts/canonical-model/trip-completed.v1.schema.json), [samples/trip-completed](../../../contracts/canonical-model/samples/trip-completed) |
+| Boundary tests | [TripEndTests.cs](../../../tests/Tms/Norvia.Tms.Api.IntegrationTests/Trips/TripEndTests.cs) |
+
+Not built yet: the Driver app's actions, sign-in, the Driver reports Logic App and Re-delivery on a later Trip.
 
 ## Deferred
 

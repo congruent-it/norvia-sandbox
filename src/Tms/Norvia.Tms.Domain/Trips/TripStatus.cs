@@ -10,4 +10,7 @@ public enum TripStatus
 
     /// <summary>The Driver started it (P12). Only an uncollected Shipment can be taken off.</summary>
     InProgress,
+
+    /// <summary>The Driver ended it (P12). Final: its Shipments are delivered, Awaiting re-delivery or Planned again.</summary>
+    Completed,
 }
