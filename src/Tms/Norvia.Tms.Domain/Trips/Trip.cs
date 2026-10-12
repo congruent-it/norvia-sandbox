@@ -117,9 +117,10 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
 
     /// <summary>
     /// Puts the Shipment on the Trip: its collection Stop and then its delivery Stop go at the end of the sequence. A Shipment already
-    /// on the Trip stays where it is and the answer is false. The caller checks the rules first, as for <see cref="Pick"/>.
+    /// on the Trip stays where it is and the answer is false. A <paramref name="redelivery"/> (P12) has only its delivery Stop, since its
+    /// collection is done. The caller checks the rules first, as for <see cref="Pick"/>.
     /// </summary>
-    public bool AddShipment(ShipmentId shipment)
+    public bool AddShipment(ShipmentId shipment, bool redelivery = false)
     {
         ThrowIfUnderWay();
         if (HasShipment(shipment))
@@ -127,10 +128,18 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
             return false;
         }
 
-        _stops.Add(new TripStop(shipment, StopKind.Collection, _stops.Count));
+        if (!redelivery)
+        {
+            _stops.Add(new TripStop(shipment, StopKind.Collection, _stops.Count));
+        }
+
         _stops.Add(new TripStop(shipment, StopKind.Delivery, _stops.Count));
         return true;
     }
+
+    /// <summary>True when the Shipment is on the Trip with only its delivery Stop: a Re-delivery (P12).</summary>
+    public bool IsRedelivery(ShipmentId shipment) =>
+        _stops.Any(stop => stop.ShipmentId == shipment) && !_stops.Any(stop => stop.ShipmentId == shipment && stop.Kind == StopKind.Collection);
 
     /// <summary>
     /// Puts the Trip's Stops in this order. The order must name each Stop of the Trip once and no others, and every Shipment's collection must
@@ -381,7 +390,7 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
 
         foreach (var shipment in shipments.Select(item => item.Shipment))
         {
-            if (!HasShipment(shipment.Id) || (shipment.Status != ShipmentStatus.Dispatched && !shipment.Dispatch()))
+            if (!HasShipment(shipment.Id) || (!IsDispatchedOn(shipment) && !shipment.Dispatch()))
             {
                 throw new InvalidOperationException($"Shipment {shipment.Number} can't be dispatched on Trip {Number}.");
             }
@@ -392,7 +401,14 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
         RegisterDomainEvent(new TripDispatchedEvent(this, correlationId, amendedAt, vehicle, driver, shipments));
     }
 
-    /// <summary>Null when the Shipment can be taken off this Trip: it is on it and not collected yet, however far the Trip has got.</summary>
+    // Dispatched already by an earlier version: Dispatched, or a Re-delivery whose flag an earlier version cleared.
+    private bool IsDispatchedOn(Shipment shipment) =>
+        shipment.Status == ShipmentStatus.Dispatched || (IsRedelivery(shipment.Id) && !shipment.AwaitingRedelivery);
+
+    private bool CanTakeOffRedelivery(Shipment shipment) =>
+        IsRedelivery(shipment.Id) && shipment.CarriedBy.IsOwnFleet && shipment.Status is ShipmentStatus.Collected or ShipmentStatus.InTransit;
+
+    /// <summary>Null when the Shipment can be taken off this Trip: it is on it and not collected yet, or a Re-delivery (P12) not delivered yet, however far the Trip has got.</summary>
     public TripRefusal? EnsureCanTakeOff(Shipment shipment)
     {
         ArgumentNullException.ThrowIfNull(shipment);
@@ -401,7 +417,7 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
             return TripRefusal.ShipmentNotOnTrip(shipment.Number.Value, Number);
         }
 
-        return shipment.CanTakeOffTrip ? null : TripRefusal.ShipmentCollected(shipment.Number.Value, Number);
+        return shipment.CanTakeOffTrip || CanTakeOffRedelivery(shipment) ? null : TripRefusal.ShipmentCollected(shipment.Number.Value, Number);
     }
 
     /// <summary>
@@ -426,9 +442,10 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
             throw new ArgumentException($"Trip {Number} is {Status}, so " + (sent ? "taking a Shipment off sends the next version, which needs its contents." : "there is no next version to send."), nameof(next));
         }
 
-        if (!shipment.TakeOffTrip())
+        // A Re-delivery can't go back to Planned, because its goods are collected: it is Awaiting re-delivery again.
+        if (IsRedelivery(shipment.Id) ? !(shipment.AwaitingRedelivery || shipment.AwaitRedelivery()) : !shipment.TakeOffTrip())
         {
-            throw new InvalidOperationException($"Shipment {shipment.Number} can't go back to Planned.");
+            throw new InvalidOperationException($"Shipment {shipment.Number} can't leave Trip {Number}.");
         }
 
         var kept = Stops.Where(stop => stop.ShipmentId != shipment.Id).Select((stop, position) => stop with { Position = position }).ToList();

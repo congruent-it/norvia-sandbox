@@ -140,6 +140,32 @@ public sealed class TakeShipmentOffTripTests
     }
 
     [Fact]
+    public async Task ARedeliveryOnADispatchedTrip_IsAwaitingRedeliveryAgain_StaysCollected_AndLosesItsDeliveryStop()
+    {
+        var trip = _fixture.Existing(Tuesday, Van, Anouk);
+        trip.Plan(new TimeOnly(9, 0), TimeSpan.FromHours(4));
+        var redelivery = _fixture.AwaitingRedeliveryShipment(Tuesday.AddDays(-1));
+        (await Add(trip, redelivery)).IsSuccess.Should().BeTrue();
+        var onTrip = await _fixture.TripShipments.OfAsync([redelivery.Id], CancellationToken.None);
+        trip.Dispatch(
+            new CorrelationId("corr-dispatch"),
+            _fixture.Planning.Time.GetUtcNow(),
+            _fixture.Planning.Vehicles.ListActive().Single(candidate => candidate.Id == Van),
+            _fixture.Planning.Drivers.ListActive().Single(candidate => candidate.Id == Anouk),
+            [.. onTrip.Select(item => new DispatchedShipment(item.Shipment, item.Details))]);
+        redelivery.AwaitingRedelivery.Should().BeFalse();
+        trip.ClearDomainEvents();
+
+        var result = await TakeOff(trip, redelivery, "Consignee closed", "corr-take-off");
+
+        result.IsSuccess.Should().BeTrue();
+        redelivery.AwaitingRedelivery.Should().BeTrue();
+        redelivery.Status.Should().Be(ShipmentStatus.Collected);
+        trip.Stops.Should().BeEmpty();
+        trip.DomainEvents.OfType<ShipmentTakenOffTripEvent>().Should().ContainSingle();
+    }
+
+    [Fact]
     public async Task ATakenOffShipment_CanBeReleasedAgain_AndPutOnATripAgain()
     {
         var trip = await _fixture.DispatchedAsync();

@@ -173,10 +173,17 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
 
     /// <summary>
     /// Marks a Released Own fleet Shipment as Dispatched, once its Trip is (P11). Raises no domain event of its own: TripDispatched lists the
-    /// Shipments. Returns false, changing nothing, for a Shipment that isn't a Released Own fleet one.
+    /// Shipments. A Shipment Awaiting re-delivery (P12) stays Collected and only loses the flag. Returns false, changing nothing, for any
+    /// other Shipment.
     /// </summary>
     public bool Dispatch()
     {
+        if (AwaitingRedelivery)
+        {
+            AwaitingRedelivery = false;
+            return true;
+        }
+
         if (Status != ShipmentStatus.Released || !CarriedBy.IsOwnFleet)
         {
             return false;

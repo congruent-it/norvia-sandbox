@@ -50,6 +50,17 @@ public sealed class ShipmentsToPutOnTripsTests : TmsWebContext
     }
 
     [Fact]
+    public void Render_ARedelivery_IsMarkedRedelivery()
+    {
+        Queries.ListShipmentsToPutOnTripsAsync(Arg.Any<DateOnly?>(), Arg.Any<CancellationToken>()).Returns([First, Shipment("SH-0000009", Wednesday, 1, 100m, redelivery: true)]);
+
+        var page = Render<ShipmentsToPutOnTrips>();
+
+        page.WaitForElement("tr:has(a[href='/shipments/SH-0000009'])").TextContent.Should().Contain("Re-delivery");
+        page.Find("tr:has(a[href='/shipments/SH-0000001'])").TextContent.Should().NotContain("Re-delivery");
+    }
+
+    [Fact]
     public void Render_WithNoShipments_SaysNoneAreWaiting()
     {
         Queries.ListShipmentsToPutOnTripsAsync(Arg.Any<DateOnly?>(), Arg.Any<CancellationToken>()).Returns([]);
@@ -155,7 +166,7 @@ public sealed class ShipmentsToPutOnTripsTests : TmsWebContext
         page.WaitForAssertion(() => page.Find("[role=alert]").TextContent.Should().Contain("Nothing was added to Trip TR-0000001: The Trip's 2,900 kg is more than the Vehicle's 1,200 kg payload."));
     }
 
-    private static ShipmentToPutOnTripSummary Shipment(string number, DateOnly day, int pallets, decimal weightKg) => new(
+    private static ShipmentToPutOnTripSummary Shipment(string number, DateOnly day, int pallets, decimal weightKg, bool redelivery = false) => new(
         number,
         "TO-0000001",
         new ShipperView("SHP-0001", "Brouwer Dranken"),
@@ -167,7 +178,8 @@ public sealed class ShipmentsToPutOnTripsTests : TmsWebContext
         new DateTimeOffset(day.ToDateTime(new TimeOnly(13, 0)), Cest),
         new DateTimeOffset(day.ToDateTime(new TimeOnly(17, 0)), Cest),
         weightKg,
-        pallets);
+        pallets,
+        redelivery);
 
     private static TripView Trip(string number, DateOnly day, TripStatus status) => new(number, day, status, null, null, null, null, null, null);
 

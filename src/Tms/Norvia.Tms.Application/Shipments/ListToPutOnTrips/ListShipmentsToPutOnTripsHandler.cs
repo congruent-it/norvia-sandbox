@@ -30,7 +30,7 @@ public sealed class ListShipmentsToPutOnTripsHandler(
         return
         [
             .. free
-                .Where(item => query.Day is not { } day || item.CollectionDay == day)
+                .Where(item => item.Shipment.AwaitingRedelivery || query.Day is not { } day || item.CollectionDay == day)
                 .OrderBy(item => item.Details.Collection?.Window?.Earliest ?? DateTimeOffset.MaxValue)
                 .ThenBy(item => item.Shipment.PlannedAt)
                 .Select(Summarize),
@@ -53,6 +53,7 @@ public sealed class ListShipmentsToPutOnTripsHandler(
             item.DeliveryWindow?.Earliest,
             item.DeliveryWindow?.Latest,
             load.WeightKg,
-            load.PalletPlaces);
+            load.PalletPlaces,
+            item.Shipment.AwaitingRedelivery);
     }
 }

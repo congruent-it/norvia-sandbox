@@ -2,7 +2,7 @@ using Norvia.Tms.Application.TransportOrders;
 
 namespace Norvia.Tms.Application.Shipments.ListToPutOnTrips;
 
-/// <summary>A Shipment in the Planner's list of Shipments to put on Trips: where and when it collects and delivers, and what it asks of a Vehicle.</summary>
+/// <summary>A Shipment in the Planner's list of Shipments to put on Trips: where and when it collects and delivers, and what it asks of a Vehicle. A <paramref name="Redelivery"/> (P12) is already collected and only needs its delivery.</summary>
 public sealed record ShipmentToPutOnTripSummary(
     string ShipmentNumber,
     string TransportOrderNumber,
@@ -15,4 +15,5 @@ public sealed record ShipmentToPutOnTripSummary(
     DateTimeOffset? DeliveryEarliest,
     DateTimeOffset? DeliveryLatest,
     decimal WeightKg,
-    int PalletPlaces);
+    int PalletPlaces,
+    bool Redelivery);

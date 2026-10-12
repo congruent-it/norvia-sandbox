@@ -42,7 +42,7 @@ public sealed class AddShipmentsToTripHandler(IRepository<Trip> trips, TripPlann
 
             foreach (var item in added)
             {
-                trip.AddShipment(item.Shipment.Id);
+                trip.AddShipment(item.Shipment.Id, item.Shipment.AwaitingRedelivery);
             }
 
             await amendments.SendAsync(trip, parties, command.CorrelationId, cancellationToken);
