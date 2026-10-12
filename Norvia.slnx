@@ -71,7 +71,9 @@
   </Folder>
   <Folder Name="/tests/DriverApp/">
     <Project Path="tests/DriverApp/Norvia.DriverApp.Api.IntegrationTests/Norvia.DriverApp.Api.IntegrationTests.csproj" />
+    <Project Path="tests/DriverApp/Norvia.DriverApp.Application.UnitTests/Norvia.DriverApp.Application.UnitTests.csproj" />
     <Project Path="tests/DriverApp/Norvia.DriverApp.ArchitectureTests/Norvia.DriverApp.ArchitectureTests.csproj" />
+    <Project Path="tests/DriverApp/Norvia.DriverApp.Domain.UnitTests/Norvia.DriverApp.Domain.UnitTests.csproj" />
     <Project Path="tests/DriverApp/Norvia.DriverApp.Web.IntegrationTests/Norvia.DriverApp.Web.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/tests/PartnerPortal/">

@@ -1,7 +1,11 @@
+using Norvia.DriverApp.Application.Reports;
+
 namespace Norvia.DriverApp.Application.Trips;
 
 /// <summary>The latest version of a Trip, as its Driver sees it.</summary>
-/// <param name="Status">The Trip's status in the Driver app. The Driver app holds only Dispatched Trips until the Driver can start one (P12).</param>
+/// <param name="Status">The Trip's status in the Driver app: Dispatched until the TMS has recorded the Driver's Start Trip, then In progress (P12).</param>
+/// <param name="CanStart">Whether to offer Start Trip: the Trip is Dispatched, it is its day in Norvia's time, and no Start Trip is waiting for an answer.</param>
+/// <param name="Reports">The Driver's reports on the Trip, oldest first, each with its state.</param>
 public sealed record DriverTripView(
     string TripNumber,
     int Version,
@@ -12,4 +16,6 @@ public sealed record DriverTripView(
     TimeOnly PlannedStart,
     TimeSpan PlannedDrivingDuration,
     TripVehicleDto Vehicle,
-    IReadOnlyList<StopDto> Stops);
+    IReadOnlyList<StopDto> Stops,
+    bool CanStart,
+    IReadOnlyList<TripReportView> Reports);

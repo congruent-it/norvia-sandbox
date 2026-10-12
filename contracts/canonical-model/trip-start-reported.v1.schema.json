@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/trip-start-reported.v1.schema.json",
+  "title": "TripStartReported",
+  "description": "The Driver pressed Start Trip on a Dispatched Trip in the Driver app (Canonical Model event, version 1, a Driver app event: P12). The Driver app reports and the TMS decides, so this says what the Driver did, not that the Trip is In progress. Published through the Driver app's outbox on the topic for Driver app events, with the Trip number as the Service Bus session ID so one Trip's reports are read one at a time and in order, under a new correlation ID for the Driver's action. The Driver reports Logic App is its only consumer: it calls the TMS Trip API's start operation and reports the outcome back to the Driver app.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "tripNumber", "version", "driverId"],
+  "properties": {
+    "eventId": { "description": "The Driver app event ID: it names the report to the Logic App, the TMS and the Driver app's outcome report, and the TMS recognises a repeat of it.", "type": "string", "format": "uuid" },
+    "eventType": { "const": "TripStartReported" },
+    "eventVersion": { "const": 1 },
+    "occurredAt": { "description": "When the Driver pressed Start Trip, with its offset.", "type": "string", "format": "date-time" },
+    "correlationId": { "description": "The new correlation ID of the Driver's action, which the Logic App uses on its call to the TMS and on its report back to the Driver app.", "type": "string", "minLength": 1 },
+    "tripNumber": { "description": "The Trip's number.", "type": "string", "pattern": "^TR-[0-9]{7}$" },
+    "version": { "description": "The version of the Trip the Driver app held. It is kept for tracing: a report records something that has already happened, so the TMS doesn't need it to be the latest.", "type": "integer", "minimum": 1 },
+    "driverId": { "description": "The Driver ID from the Driver's token, never from the request (ADR 0005, ADR 0037).", "type": "string", "minLength": 1 }
+  }
+}
