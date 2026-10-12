@@ -12,6 +12,7 @@ namespace Norvia.Tms.Application.ProofsOfDelivery.Record;
 /// <param name="OccurredAt">When the TMS recorded the Proof of delivery.</param>
 /// <param name="CarrierId">The Carrier that sent it; null for Own fleet.</param>
 /// <param name="CarrierBookingReference">The Carrier's own reference for the booking; null for Own fleet, which names its Trip instead (P12).</param>
+/// <param name="TripNumber">The Trip the Driver reported it on (P12); null for a Carrier's.</param>
 /// <param name="DeliveryTime">When the goods were delivered, with the offset of where.</param>
 /// <param name="Condition"><c>Clean</c> or <c>Reservations</c>.</param>
 /// <param name="ReplacesEarlier">Whether it replaced an earlier current Proof of delivery.</param>
@@ -23,6 +24,7 @@ public sealed record ProofOfDeliveryReceivedV1(
     string TransportOrderNumber,
     string? CarrierId,
     string? CarrierBookingReference,
+    string? TripNumber,
     string ReceivedBy,
     DateTimeOffset DeliveryTime,
     string Condition,
@@ -49,6 +51,7 @@ public sealed record ProofOfDeliveryReceivedV1(
             received.Shipment.TransportOrderNumber.Value,
             proofOfDelivery.Source.CarrierId?.Value,
             proofOfDelivery.CarrierBookingReference,
+            proofOfDelivery.TripNumber?.Value,
             proofOfDelivery.ReceivedBy,
             proofOfDelivery.DeliveryTime,
             proofOfDelivery.Condition.ToString(),
@@ -61,13 +64,18 @@ public sealed record ProofOfDeliveryReceivedV1(
     {
         var properties = new List<KeyValuePair<string, object>>
         {
-            new(TrackingKeys.Flow, Flows.CarrierProofOfDelivery),
+            new(TrackingKeys.Flow, TripNumber is null ? Flows.CarrierProofOfDelivery : Flows.TripExecution),
             new(TrackingKeys.TransportOrderNumber, TransportOrderNumber),
             new(TrackingKeys.ShipmentNumber, ShipmentNumber),
         };
         if (CarrierId is not null)
         {
             properties.Add(new(TrackingKeys.PartyId, CarrierId));
+        }
+
+        if (TripNumber is not null)
+        {
+            properties.Add(new(TrackingKeys.TripNumber, TripNumber));
         }
 
         return properties;

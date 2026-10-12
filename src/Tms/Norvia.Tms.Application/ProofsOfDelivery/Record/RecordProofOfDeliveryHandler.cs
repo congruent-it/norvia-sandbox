@@ -7,7 +7,9 @@ using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Domain.ProofsOfDelivery;
 using Norvia.Tms.Domain.Shipments;
+using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.TransportOrders;
+using Norvia.Tms.Domain.Trips;
 
 namespace Norvia.Tms.Application.ProofsOfDelivery.Record;
 
@@ -15,6 +17,8 @@ public sealed class RecordProofOfDeliveryHandler(
     IRepository<ProofOfDelivery> proofsOfDelivery,
     IRepository<CarrierBooking> carrierBookings,
     IRepository<Shipment> shipments,
+    IReadRepository<Trip> trips,
+    IReadRepository<TrackingEvent> trackingEvents,
     IProofOfDeliveryFiles files,
     ExceptionCauses exceptionCauses,
     BillingCheck billing,
@@ -32,13 +36,8 @@ public sealed class RecordProofOfDeliveryHandler(
             throw new ArgumentException("Every file of the report needs its content.", nameof(command));
         }
 
-        // Own fleet reports through P12, which finds its Shipment by Trip, not by a Carrier booking reference.
-        if (report.Source.CarrierId is not { } carrierId)
-        {
-            return ProofOfDeliveryRefused.Because<RecordProofOfDeliveryResult>(ProofOfDeliveryRules.ShipmentNotFound(report.CarrierBookingReference));
-        }
-
-        // A Carrier's retry of a document ID it already sent is harmless: it gets the original result and nothing is published.
+        // A retry of a document ID the source already sent is harmless: it gets the original result and nothing is published. This is
+        // checked first, whatever has happened on the Trip or the booking since.
         var original = await proofsOfDelivery.SingleOrDefaultAsync(new ProofOfDeliveryByDocumentIdSpec(report.Source, report.DocumentId), cancellationToken);
         if (original?.IsRepeatOf(report) is true)
         {
@@ -47,27 +46,21 @@ public sealed class RecordProofOfDeliveryHandler(
             return RecordProofOfDeliveryResult.RepeatOf(originalShipment, original);
         }
 
-        var booking = await carrierBookings.SingleOrDefaultAsync(
-            new ConfirmedCarrierBookingByReferenceSpec(carrierId, report.CarrierBookingReference), cancellationToken);
-        if (booking is null && report.CarrierBookingNumber is { } number)
-        {
-            booking = await carrierBookings.SingleOrDefaultAsync(new ConfirmedCarrierBookingByNumberSpec(carrierId, number), cancellationToken);
-        }
-
-        if (booking is null)
-        {
-            return ProofOfDeliveryRefused.Because<RecordProofOfDeliveryResult>(ProofOfDeliveryRules.ShipmentNotFound(report.CarrierBookingReference));
-        }
-
-        var shipment = await shipments.SingleOrDefaultAsync(new ShipmentByNumberSpec(booking.ShipmentNumber), cancellationToken)
-            ?? throw new InvalidOperationException($"Carrier booking {booking.Number} names Shipment {booking.ShipmentNumber}, which the TMS doesn't have.");
-
-        var refusal = ProofOfDeliveryRules.CheckShipment(shipment)
-            ?? rules.CheckDeliveryTime(report.DeliveryTime, time.GetUtcNow())
-            ?? ProofOfDeliveryRules.CheckFiles(report.Files, command.Files);
-        if (refusal is not null)
+        var now = time.GetUtcNow();
+        var found = report.OwnFleet is { } ownFleet
+            ? await FindByTripAsync(report, ownFleet, now, cancellationToken)
+            : await FindByBookingAsync(report, now, cancellationToken);
+        if (found.Refusal is { } refusal)
         {
             return ProofOfDeliveryRefused.Because<RecordProofOfDeliveryResult>(refusal);
+        }
+
+        // Without a refusal, a Shipment was found.
+        var shipment = found.Shipment ?? throw new InvalidOperationException($"Proof of delivery {report.DocumentId} found no Shipment and was not refused.");
+
+        if (ProofOfDeliveryRules.CheckFiles(report.Files, command.Files) is { } filesRefusal)
+        {
+            return ProofOfDeliveryRefused.Because<RecordProofOfDeliveryResult>(filesRefusal);
         }
 
         report = report with { Files = ProofOfDeliveryRules.Judged(report.Files, command.Files) };
@@ -83,7 +76,6 @@ public sealed class RecordProofOfDeliveryHandler(
         // outbox, are saved in one transaction.
         // A new document ID for a Shipment that already has a current Proof of delivery replaces it: the earlier one is kept, superseded.
         var replaced = await proofsOfDelivery.SingleOrDefaultAsync(new TrackedCurrentProofOfDeliverySpec(shipment.Id), cancellationToken);
-        var now = time.GetUtcNow();
         var correlationId = new CorrelationId(command.CorrelationId);
         var proofOfDelivery = ProofOfDelivery.Record(shipment, report, correlationId, now, replaced);
         var cause = ExceptionCause.From(proofOfDelivery, now);
@@ -105,5 +97,41 @@ public sealed class RecordProofOfDeliveryHandler(
         await proofsOfDelivery.AddAsync(proofOfDelivery, cancellationToken);
         await proofsOfDelivery.SaveChangesAsync(cancellationToken);
         return RecordProofOfDeliveryResult.From(shipment, proofOfDelivery);
+    }
+
+    // A Carrier's Proof of delivery finds its Shipment by the Carrier booking reference, or else the Carrier booking number.
+    private async Task<(Shipment? Shipment, ProofOfDeliveryRefusal? Refusal)> FindByBookingAsync(ProofOfDeliveryReport report, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        if (report.Source.CarrierId is not { } carrierId || report.CarrierBookingReference is not { } reference)
+        {
+            return (null, ProofOfDeliveryRules.ShipmentNotFound(report.CarrierBookingReference ?? string.Empty));
+        }
+
+        var booking = await carrierBookings.SingleOrDefaultAsync(new ConfirmedCarrierBookingByReferenceSpec(carrierId, reference), cancellationToken);
+        if (booking is null && report.CarrierBookingNumber is { } number)
+        {
+            booking = await carrierBookings.SingleOrDefaultAsync(new ConfirmedCarrierBookingByNumberSpec(carrierId, number), cancellationToken);
+        }
+
+        if (booking is null)
+        {
+            return (null, ProofOfDeliveryRules.ShipmentNotFound(reference));
+        }
+
+        var shipment = await shipments.SingleOrDefaultAsync(new ShipmentByNumberSpec(booking.ShipmentNumber), cancellationToken)
+            ?? throw new InvalidOperationException($"Carrier booking {booking.Number} names Shipment {booking.ShipmentNumber}, which the TMS doesn't have.");
+
+        return (shipment, ProofOfDeliveryRules.CheckShipment(shipment) ?? rules.CheckDeliveryTime(report.DeliveryTime, now));
+    }
+
+    // A Driver's Proof of delivery (P12) finds its Shipment by Trip, and the Trip's rules decide it.
+    private async Task<(Shipment? Shipment, ProofOfDeliveryRefusal? Refusal)> FindByTripAsync(
+        ProofOfDeliveryReport report, OwnFleetReport own, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var trip = await trips.FirstOrDefaultAsync(new TripByNumberSpec(own.TripNumber), cancellationToken);
+        var shipment = await shipments.SingleOrDefaultAsync(new ShipmentByNumberSpec(own.ShipmentNumber), cancellationToken);
+        var outcomes = StopOutcomes.From(trip is null ? [] : await trackingEvents.ListAsync(new TrackingEventsOfTripSpec([own.TripNumber]), cancellationToken));
+
+        return (shipment, rules.CheckOwnFleetReport(trip, shipment, report, outcomes, now));
     }
 }

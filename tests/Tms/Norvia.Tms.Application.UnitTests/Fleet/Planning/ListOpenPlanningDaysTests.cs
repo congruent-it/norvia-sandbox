@@ -1,16 +1,16 @@
 using Ardalis.SharedKernel;
 using Ardalis.Specification;
-using Norvia.Tms.Application.Fleet;
-using Norvia.Tms.Application.Fleet.Planning;
 using Microsoft.Extensions.Time.Testing;
+using Norvia.Tms.Application.Fleet;
 using Norvia.Tms.Application.Fleet.Availability;
+using Norvia.Tms.Application.Fleet.Planning;
 using Norvia.Tms.Application.Fleet.Planning.ListOpenDays;
 using Norvia.Tms.Application.Trips;
-using Norvia.Tms.Domain.Trips;
 using Norvia.Tms.Application.UnitTests.TransportOrders;
 using Norvia.Tms.Domain.Fleet;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TransportOrders;
+using Norvia.Tms.Domain.Trips;
 using NSubstitute;
 
 namespace Norvia.Tms.Application.UnitTests.Fleet.Planning;

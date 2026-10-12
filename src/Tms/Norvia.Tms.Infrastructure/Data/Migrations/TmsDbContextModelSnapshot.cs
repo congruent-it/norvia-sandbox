@@ -385,7 +385,6 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("CarrierBookingReference")
-                        .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
@@ -406,6 +405,10 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("DriverId")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<string>("Files")
                         .IsRequired()
@@ -439,6 +442,13 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)")
                         .HasColumnName("SourceId");
+
+                    b.Property<string>("TripNumber")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<int?>("TripVersion")
+                        .HasColumnType("int");
 
                     b.ComplexProperty(typeof(Dictionary<string, object>), "Location", "Norvia.Tms.Domain.ProofsOfDelivery.ProofOfDelivery.Location#TrackingLocation", b1 =>
                         {

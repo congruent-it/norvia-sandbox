@@ -106,7 +106,7 @@ public class TmsFixture : IAsyncLifetime
     /// <summary>The Driver reports Logic App, which starts a Trip for its Driver (P12).</summary>
     public HttpClient TripStart { get; private set; } = null!;
 
-    /// <summary>The same Driver reports Logic App as it records a Driver's Stop report as a Tracking event from Own fleet (P12).</summary>
+    /// <summary>The same Driver reports Logic App as it records a Driver's Stop report as a Tracking event, and a Proof of delivery, from Own fleet (P12).</summary>
     public HttpClient DriverReports { get; private set; } = null!;
 
     /// <summary>A client holding the record role, as the Carrier-tracking Logic App's managed identity will (P5, later ticket).</summary>
@@ -170,7 +170,7 @@ public class TmsFixture : IAsyncLifetime
         ShipperNotificationReport = CreateTmsClient(IssueToken([ShipperNotificationReportRole], clientId: "norvia-test-p7-shipper-notification-logic-app"));
         TripDeliveryReport = CreateTmsClient(IssueToken([TripDeliveryReportRole], clientId: "norvia-test-p11-trip-dispatch-logic-app"));
         TripStart = CreateTmsClient(IssueToken([TripStartRole], clientId: "norvia-test-p12-driver-reports-logic-app"));
-        DriverReports = CreateTmsClient(IssueToken([TripStartRole, TrackingRecordRole], clientId: "norvia-test-p12-driver-reports-logic-app"));
+        DriverReports = CreateTmsClient(IssueToken([TripStartRole, TrackingRecordRole, ProofOfDeliveryRecordRole], clientId: "norvia-test-p12-driver-reports-logic-app"));
         TrackingRecord = CreateTmsClient(IssueToken([TrackingRecordRole], clientId: "norvia-test-carrier-tracking-logic-app"));
 
         ShipperTracking = CreateTmsClient(IssueToken([ShipperTrackingReadRole], clientId: "norvia-test-apim"));

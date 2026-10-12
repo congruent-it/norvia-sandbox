@@ -1,7 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Nodes;
+using Norvia.Tms.Api.IntegrationTests.Billing;
 using Norvia.Tms.Api.IntegrationTests.Planning;
+using Norvia.Tms.Api.IntegrationTests.ProofsOfDelivery;
 using Norvia.Tms.Api.IntegrationTests.TrackingEvents;
 using Norvia.Tms.Api.IntegrationTests.TransportOrders;
 using static Norvia.Tms.Api.IntegrationTests.Capacity.CapacityCalls;
@@ -12,7 +14,8 @@ namespace Norvia.Tms.Api.IntegrationTests.Trips;
 /// A Driver's Stop reports (P12) at the TMS's boundary: the Driver reports Logic App records them as Tracking events from Own fleet
 /// under the role TrackingEvents.Record. Collected and Delivered move the Shipment Dispatched, Collected, Delivered and give the Stop its outcome,
 /// the failures and damage open their Exception and move nothing, the Driver report rules refuse the rest, and a repeated Driver app event ID
-/// publishes nothing. The clock is controlled, so each test sets the day it works on.
+/// publishes nothing. A Driver's Proof of delivery is recorded from Own fleet through the Proof of delivery API under the role ProofsOfDelivery.Record
+/// by the same Logic App, under the same Driver report rules, on the correlation ID of its Delivered event. The clock is controlled, so each test sets the day it works on.
 /// </summary>
 [Trait("AppHost", "Own4")]
 public sealed class TripStopReportTests(TripsTmsFixture tms) : IClassFixture<TripsTmsFixture>, IDisposable
@@ -242,6 +245,171 @@ public sealed class TripStopReportTests(TripsTmsFixture tms) : IClassFixture<Tri
 
         (await ShipmentStatusAsync(shipment)).Should().Be("Dispatched");
     }
+
+    [Fact]
+    public async Task ACleanProofOfDelivery_IsCurrent_AndMakesTheDeliveredShipmentsOrderBillable_OnTheTrailOfItsDeliveredEvent()
+    {
+        var (trip, day, shipment) = await StartedTripAsync(7400);
+        var now = ShortlyAfterMidnightOf(day);
+        var order = (await tms.GetShipmentAsync(shipment, _cancellationToken))["transportOrderNumber"]!.GetValue<string>();
+        var trail = TmsCalls.NewCorrelationId();
+        await tms.RecordedAsync(Report("Collected", trip, shipment, now.AddMinutes(-30)), _cancellationToken);
+        await tms.RecordedAsync(Report("Delivered", trip, shipment, now.AddMinutes(-10)), _cancellationToken, trail);
+        (await tms.BillingStateAsync(order, _cancellationToken)).Should().Be("NotYetBillable", "a delivery alone doesn't make an order Billable");
+        var metadata = ProofReport(trip, shipment, now.AddMinutes(-10));
+        var results = CanonicalModelSchemas.ValidateProofOfDelivery(metadata);
+        results.IsValid.Should().BeTrue(CanonicalModelSchemas.Errors(results));
+
+        var recorded = await tms.RecordedProofAsync(tms.DriverReports, metadata, [Signature()], _cancellationToken, trail);
+
+        recorded["shipmentNumber"]!.GetValue<string>().Should().Be(shipment);
+        recorded["shipmentStatus"]!.GetValue<string>().Should().Be("Delivered");
+        recorded["correlationId"]!.GetValue<string>().Should().Be(trail);
+        using var current = await tms.GetProofAsync(shipment, _cancellationToken);
+        current.StatusCode.Should().Be(HttpStatusCode.OK);
+        var proof = JsonNode.Parse(await current.Content.ReadAsStringAsync(_cancellationToken))!;
+        proof["source"]!.GetValue<string>().Should().Be("Own fleet");
+        proof["receivedBy"]!.GetValue<string>().Should().Be("A. de Vries");
+        proof["files"]!.AsArray().Should().ContainSingle();
+
+        var received = (await tms.PublishedAsync(trail, "ProofOfDeliveryReceived", _cancellationToken)).Should().ContainSingle().Subject;
+        received.ApplicationProperties["tripNumber"].Should().Be(trip);
+        var body = JsonNode.Parse(received.Body.ToString())!;
+        var receivedResults = CanonicalModelSchemas.ValidateProofOfDeliveryReceived(body);
+        receivedResults.IsValid.Should().BeTrue(CanonicalModelSchemas.Errors(receivedResults));
+        body["tripNumber"]!.GetValue<string>().Should().Be(trip);
+        body["carrierId"].Should().BeNull();
+        body["carrierBookingReference"].Should().BeNull();
+        await tms.WaitForBillableAsync(order, _cancellationToken);
+        (await tms.BillingStateAsync(order, _cancellationToken)).Should().Be("Billable");
+        tms.BillablePublished(order).Should().ContainSingle().Which.CorrelationId.Should().Be(trail);
+    }
+
+    [Fact]
+    public async Task AProofOfDeliveryWithReservations_OpensAReservationsException_AndLeavesTheOrderNotYetBillable()
+    {
+        var (trip, day, shipment) = await StartedTripAsync(7500);
+        var now = ShortlyAfterMidnightOf(day);
+        var order = (await tms.GetShipmentAsync(shipment, _cancellationToken))["transportOrderNumber"]!.GetValue<string>();
+        var trail = TmsCalls.NewCorrelationId();
+        await tms.RecordedAsync(Report("Collected", trip, shipment, now.AddMinutes(-30)), _cancellationToken);
+        await tms.RecordedAsync(Report("Delivered", trip, shipment, now.AddMinutes(-10)), _cancellationToken, trail);
+        var metadata = ProofReport(trip, shipment, now.AddMinutes(-10));
+        metadata["condition"] = "Reservations";
+        metadata["remark"] = "Two pallets wet";
+
+        await tms.RecordedProofAsync(tms.DriverReports, metadata, [Signature()], _cancellationToken, trail);
+
+        var opened = (await tms.PublishedAsync(trail, "ExceptionOpened", _cancellationToken)).Should().ContainSingle().Subject;
+        var openedBody = JsonNode.Parse(opened.Body.ToString())!;
+        var openedResults = CanonicalModelSchemas.ValidateExceptionOpened(openedBody);
+        openedResults.IsValid.Should().BeTrue(CanonicalModelSchemas.Errors(openedResults));
+        openedBody["exceptionType"]!.GetValue<string>().Should().Be("Reservations");
+        openedBody["shipmentNumber"]!.GetValue<string>().Should().Be(shipment);
+        await TmsFixture.SettleOutboxAsync(_cancellationToken);
+        tms.BillablePublished(order).Should().BeEmpty();
+        (await tms.BillingStateAsync(order, _cancellationToken)).Should().Be("NotYetBillable");
+    }
+
+    [Fact]
+    public async Task AProofOfDelivery_FollowsTheDriverReportRules_AndARepeatedDocumentIdPublishesNothing()
+    {
+        var (trip, day, shipment) = await StartedTripAsync(7600);
+        var now = ShortlyAfterMidnightOf(day);
+        var notStarted = await DispatchedTripAsync(7650);
+        tms.SetClock(ShortlyAfterMidnightOf(day));
+
+        await AssertProofRefusedAsync(ProofReport(trip, shipment, now.AddMinutes(-5)), HttpStatusCode.Conflict, "CollectionBeforeDelivery");
+        await tms.RecordedAsync(Report("Collected", trip, shipment, now.AddMinutes(-20)), _cancellationToken);
+        await AssertProofRefusedAsync(ProofReport(trip, shipment, now.AddMinutes(-5), driver: Anouk), HttpStatusCode.NotFound, "TripNotFound");
+        await AssertProofRefusedAsync(ProofReport("TR-9999999", shipment, now.AddMinutes(-5)), HttpStatusCode.NotFound, "TripNotFound");
+        await AssertProofRefusedAsync(ProofReport(notStarted.Trip, notStarted.Shipment, now.AddMinutes(-5)), HttpStatusCode.Conflict, "TripNotUnderWay");
+        await AssertProofRefusedAsync(ProofReport(trip, notStarted.Shipment, now.AddMinutes(-5)), HttpStatusCode.Conflict, "ShipmentNotOnTrip");
+        await AssertProofRefusedAsync(ProofReport(trip, shipment, now.AddHours(1)), HttpStatusCode.BadRequest, "DeliveryTimeInTheFuture");
+        using var none = await tms.GetProofAsync(shipment, _cancellationToken);
+        none.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        var (takenOffTrip, takenOffDay, takenOffShipment) = await StartedTripAsync(7620);
+        using var tookOff = await tms.TmsUi.PostAsJsonAsync(new Uri($"/v1/trips/{takenOffTrip}/shipments/{takenOffShipment}/take-off", UriKind.Relative), new { reason = "Customer cancelled" }, _cancellationToken);
+        tookOff.StatusCode.Should().Be(HttpStatusCode.OK, await tookOff.Content.ReadAsStringAsync(_cancellationToken));
+        await AssertProofRefusedAsync(ProofReport(takenOffTrip, takenOffShipment, ShortlyAfterMidnightOf(takenOffDay).AddMinutes(-5), version: 1), HttpStatusCode.Conflict, "ShipmentNotOnTrip");
+
+        var (otherTrip, otherDay, otherShipment) = await StartedTripAsync(7700);
+        var otherNow = ShortlyAfterMidnightOf(otherDay);
+        await tms.RecordedAsync(Report("Collected", otherTrip, otherShipment, otherNow.AddMinutes(-20)), _cancellationToken);
+        var metadata = ProofReport(otherTrip, otherShipment, otherNow.AddMinutes(-5));
+        var firstTrail = TmsCalls.NewCorrelationId();
+        var first = await tms.RecordedProofAsync(tms.DriverReports, metadata, [Signature()], _cancellationToken, firstTrail);
+        await tms.PublishedAsync(firstTrail, "ProofOfDeliveryReceived", _cancellationToken);
+
+        var secondTrail = TmsCalls.NewCorrelationId();
+        var repeat = await tms.RecordedProofAsync(tms.DriverReports, metadata, [Signature()], _cancellationToken, secondTrail);
+
+        repeat["isRepeat"]!.GetValue<bool>().Should().BeTrue();
+        repeat["proofOfDeliveryId"]!.GetValue<string>().Should().Be(first["proofOfDeliveryId"]!.GetValue<string>());
+        repeat["correlationId"]!.GetValue<string>().Should().Be(firstTrail);
+        await TmsFixture.SettleOutboxAsync(_cancellationToken);
+        tms.Published.Where(m => m.CorrelationId == secondTrail).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task AnOwnFleetProofOfDelivery_NeedsItsTripShipmentVersionAndDriver_NamesNoCarrierBooking_AndOnlyTheRecordRoleMayRecordIt()
+    {
+        var (trip, day, shipment) = await StartedTripAsync(7800);
+        var now = ShortlyAfterMidnightOf(day);
+        await tms.RecordedAsync(Report("Collected", trip, shipment, now.AddMinutes(-20)), _cancellationToken);
+        var valid = ProofReport(trip, shipment, now.AddMinutes(-5));
+
+        foreach (var (without, send) in new (string, Action<JsonObject>)[]
+        {
+            ("tripNumber", report => report.Remove("tripNumber")),
+            ("shipmentNumber", report => report.Remove("shipmentNumber")),
+            ("tripVersion", report => report.Remove("tripVersion")),
+            ("driverId", report => report["source"]!.AsObject().Remove("driverId")),
+        })
+        {
+            var broken = (JsonObject)valid.DeepClone();
+            broken["documentId"] = Guid.NewGuid().ToString();
+            send(broken);
+            var problem = await tms.RecordProofRefusedAsync(tms.DriverReports, broken, [Signature()], HttpStatusCode.BadRequest, _cancellationToken);
+            problem["code"]!.GetValue<string>().Should().Be("MissingRequiredField", $"without {without}");
+        }
+
+        var withBooking = (JsonObject)valid.DeepClone();
+        withBooking["carrierBookingReference"] = "VDT-1";
+        await tms.RecordProofRefusedAsync(tms.DriverReports, withBooking, [Signature()], HttpStatusCode.BadRequest, _cancellationToken);
+
+        foreach (var caller in new[] { tms.TmsUi, tms.Tms, tms.TripDeliveryReport, tms.TripStart, tms.TrackingRecord })
+        {
+            using var response = await tms.RecordProofAsync(caller, (JsonObject)valid.DeepClone(), [Signature()], _cancellationToken);
+            response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        }
+    }
+
+    private async Task AssertProofRefusedAsync(JsonObject metadata, HttpStatusCode status, string code)
+    {
+        var problem = await tms.RecordProofRefusedAsync(tms.DriverReports, metadata, [Signature()], status, _cancellationToken);
+        problem["code"]!.GetValue<string>().Should().Be(code);
+        problem["detail"]!.GetValue<string>().Should().NotBeNullOrWhiteSpace("the refusal has a readable message");
+    }
+
+    private static ProofOfDeliveryCalls.SentFile Signature() =>
+        new("signature.png", "image/png", [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, .. Guid.NewGuid().ToByteArray()]);
+
+    private static JsonObject ProofReport(string trip, string shipment, DateTimeOffset deliveryTime, string driver = Joost, int version = 1) =>
+        new()
+        {
+            ["documentId"] = Guid.NewGuid().ToString(),
+            ["source"] = new JsonObject { ["type"] = "OwnFleet", ["driverId"] = driver },
+            ["tripNumber"] = trip,
+            ["shipmentNumber"] = shipment,
+            ["tripVersion"] = version,
+            ["receivedBy"] = "A. de Vries",
+            ["deliveryTime"] = JsonValue.Create(deliveryTime),
+            ["location"] = new JsonObject { ["place"] = "Utrecht", ["postcode"] = "3511 AW", ["countryCode"] = "NL" },
+            ["condition"] = "Clean",
+            ["files"] = new JsonArray(new JsonObject { ["name"] = "signature.png", ["contentType"] = "image/png" }),
+        };
 
     private Task<HttpResponseMessage> RecordAsync(JsonObject report) => tms.RecordAsync(tms.DriverReports, report, _cancellationToken);
 

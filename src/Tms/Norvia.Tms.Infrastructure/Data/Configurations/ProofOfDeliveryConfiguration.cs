@@ -3,9 +3,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Norvia.Tms.Domain.Carriers;
+using Norvia.Tms.Domain.Fleet;
 using Norvia.Tms.Domain.ProofsOfDelivery;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TransportOrders;
+using Norvia.Tms.Domain.Trips;
 
 namespace Norvia.Tms.Infrastructure.Data.Configurations;
 
@@ -49,7 +51,16 @@ internal sealed class ProofOfDeliveryConfiguration : IEntityTypeConfiguration<Pr
         // A source's own document ID is unique, so a Proof of delivery sent twice is one, even when both calls race.
         builder.HasIndex(proofOfDelivery => new { proofOfDelivery.Source, proofOfDelivery.DocumentId }).IsUnique();
 
-        builder.Property(proofOfDelivery => proofOfDelivery.CarrierBookingReference).HasMaxLength(50).IsRequired();
+        builder.Property(proofOfDelivery => proofOfDelivery.CarrierBookingReference).HasMaxLength(50);
+
+        // An Own fleet Proof of delivery (P12) names its Trip and Driver in place of a Carrier booking reference.
+        builder.Property(proofOfDelivery => proofOfDelivery.TripNumber)
+            .HasConversion(number => number!.Value, value => TripNumber.Parse(value))
+            .HasMaxLength(10);
+        builder.Property(proofOfDelivery => proofOfDelivery.DriverId)
+            .HasConversion(id => id!.Value, value => new DriverId(value))
+            .HasMaxLength(50);
+        builder.Property(proofOfDelivery => proofOfDelivery.TripVersion);
         builder.Property(proofOfDelivery => proofOfDelivery.ReceivedBy).HasMaxLength(200).IsRequired();
         builder.Property(proofOfDelivery => proofOfDelivery.DeliveryTime).IsRequired();
 

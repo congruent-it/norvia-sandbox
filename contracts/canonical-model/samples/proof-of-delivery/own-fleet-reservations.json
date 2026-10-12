@@ -1,0 +1,13 @@
+{
+  "documentId": "0198e7c0-0000-7000-8000-0000000000c2",
+  "source": { "type": "OwnFleet", "driverId": "DRV-0002" },
+  "tripNumber": "TR-0000012",
+  "shipmentNumber": "SH-0000043",
+  "tripVersion": 0,
+  "receivedBy": "A. de Vries",
+  "deliveryTime": "2026-10-13T11:45:00+02:00",
+  "location": { "place": "Utrecht", "postcode": "3511 AW", "countryCode": "NL" },
+  "condition": "Reservations",
+  "remark": "Two pallets wet",
+  "files": [{ "name": "signature.png", "contentType": "image/png" }]
+}

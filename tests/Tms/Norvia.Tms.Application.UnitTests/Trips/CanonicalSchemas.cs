@@ -20,6 +20,17 @@ internal static class CanonicalSchemas
 
     private static readonly Lazy<JsonSchema> ShipmentTakenOffTripSchema = new(() => Load("shipment-taken-off-trip.v1.schema.json"));
 
+    private static readonly Lazy<JsonSchema> ProofOfDeliverySchema = new(() => Load("proof-of-delivery.v1.schema.json"));
+
+    public static IEnumerable<string> ProofOfDeliverySamples() =>
+        Assembly.GetExecutingAssembly().GetManifestResourceNames()
+            .Where(name => name.StartsWith("CanonicalModel/samples/proof-of-delivery/", StringComparison.Ordinal));
+
+    public static EvaluationResults ValidateProofOfDelivery(JsonNode body) =>
+        ProofOfDeliverySchema.Value.Evaluate(
+            JsonSerializer.SerializeToElement(body),
+            new EvaluationOptions { OutputFormat = OutputFormat.List, RequireFormatValidation = true });
+
     public static IEnumerable<string> ShipmentTakenOffTripSamples() =>
         Assembly.GetExecutingAssembly().GetManifestResourceNames()
             .Where(name => name.StartsWith("CanonicalModel/samples/shipment-taken-off-trip/", StringComparison.Ordinal));

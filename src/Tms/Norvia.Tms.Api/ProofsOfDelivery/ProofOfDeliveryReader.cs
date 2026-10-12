@@ -2,8 +2,11 @@ using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Carriers;
+using Norvia.Tms.Domain.Fleet;
 using Norvia.Tms.Domain.ProofsOfDelivery;
+using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TrackingEvents;
+using Norvia.Tms.Domain.Trips;
 
 namespace Norvia.Tms.Api.ProofsOfDelivery;
 
@@ -73,6 +76,7 @@ internal static class ProofOfDeliveryReader
         }
 
         ProofOfDeliverySource? source = null;
+        OwnFleetReport? ownFleet = null;
         if (metadata.Source is not { } sourceRequest)
         {
             found.Add(Missing("A Proof of delivery needs its source."));
@@ -87,6 +91,16 @@ internal static class ProofOfDeliveryReader
             {
                 source = ProofOfDeliverySource.Carrier(new CarrierId(sourceRequest.CarrierId));
             }
+
+            if (sourceRequest.DriverId is not null || metadata.TripNumber is not null || metadata.ShipmentNumber is not null || metadata.TripVersion is not null)
+            {
+                found.Add(Missing("A Carrier Proof of delivery names no Driver, Trip or Shipment."));
+            }
+
+            if (string.IsNullOrWhiteSpace(metadata.CarrierBookingReference))
+            {
+                found.Add(Missing("A Proof of delivery needs the Carrier's own booking reference."));
+            }
         }
         else if (sourceRequest.CarrierId is not null)
         {
@@ -95,11 +109,7 @@ internal static class ProofOfDeliveryReader
         else
         {
             source = ProofOfDeliverySource.OwnFleet;
-        }
-
-        if (string.IsNullOrWhiteSpace(metadata.CarrierBookingReference))
-        {
-            found.Add(Missing("A Proof of delivery needs the Carrier's own booking reference."));
+            ownFleet = ReadOwnFleet(metadata, sourceRequest, found);
         }
 
         if (string.IsNullOrWhiteSpace(metadata.ReceivedBy))
@@ -148,7 +158,7 @@ internal static class ProofOfDeliveryReader
         if (found.Count > 0
             || metadata.DocumentId is not { } documentId
             || source is null
-            || metadata.CarrierBookingReference is not { } reference
+            || (ownFleet is null && source.IsOwnFleet)
             || metadata.ReceivedBy is not { } receivedBy
             || metadata.DeliveryTime is not { } deliveryTime
             || place is null
@@ -157,8 +167,44 @@ internal static class ProofOfDeliveryReader
             return false;
         }
 
-        report = new ProofOfDeliveryReport(source, documentId, reference, receivedBy, deliveryTime, place, knownCondition, metadata.Remark, files, CarrierBookingNumber.TryParse(metadata.CarrierBookingNumber, out var number) ? number : null);
+        report = new ProofOfDeliveryReport(
+            source, documentId, metadata.CarrierBookingReference, receivedBy, deliveryTime, place, knownCondition, metadata.Remark, files,
+            CarrierBookingNumber.TryParse(metadata.CarrierBookingNumber, out var number) ? number : null, ownFleet);
         return true;
+    }
+
+    // An Own fleet Proof of delivery is about a Trip, a Shipment on it and a Driver, and names no Carrier booking.
+    private static OwnFleetReport? ReadOwnFleet(ProofOfDeliveryRequest metadata, ProofOfDeliverySourceRequest source, List<ReadProblem> found)
+    {
+        var before = found.Count;
+        if (!TripNumber.TryParse(metadata.TripNumber, out var tripNumber))
+        {
+            found.Add(Missing("An Own fleet Proof of delivery needs the number of its Trip, such as TR-0000042."));
+        }
+
+        if (!ShipmentNumber.TryParse(metadata.ShipmentNumber, out var shipmentNumber))
+        {
+            found.Add(Missing("An Own fleet Proof of delivery needs the number of its Shipment, such as SH-0000042."));
+        }
+
+        if (metadata.TripVersion is not >= 0)
+        {
+            found.Add(Missing("An Own fleet Proof of delivery needs the version of the Trip the Driver app held."));
+        }
+
+        if (string.IsNullOrWhiteSpace(source.DriverId))
+        {
+            found.Add(Missing("An Own fleet source needs the Driver ID from the Driver's token."));
+        }
+
+        if (metadata.CarrierBookingReference is not null || metadata.CarrierBookingNumber is not null)
+        {
+            found.Add(Missing("An Own fleet Proof of delivery names no Carrier booking."));
+        }
+
+        return found.Count > before || tripNumber is null || shipmentNumber is null || source.DriverId is not { } driverId || metadata.TripVersion is not { } version
+            ? null
+            : new OwnFleetReport(tripNumber, new DriverId(driverId), shipmentNumber, version);
     }
 
     /// <summary>One thing wrong with a Proof of delivery the TMS can't read, with the stable code of its kind.</summary>

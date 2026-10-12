@@ -1,4 +1,3 @@
-using Norvia.Tms.Application.UnitTests.Fleet.Planning;
 using Norvia.Tms.Application.Fleet.Planning.ChangeRoster;
 using Norvia.Tms.Application.Fleet.Planning.RecordAbsence;
 using Norvia.Tms.Application.Fleet.Planning.RecordOffTheRoad;
@@ -7,6 +6,7 @@ using Norvia.Tms.Application.Fleet.Planning.RemoveOffTheRoad;
 using Norvia.Tms.Application.Trips;
 using Norvia.Tms.Application.Trips.GetByNumber;
 using Norvia.Tms.Application.Trips.List;
+using Norvia.Tms.Application.UnitTests.Fleet.Planning;
 using Norvia.Tms.Domain.Fleet;
 using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Domain.Trips;

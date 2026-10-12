@@ -20,7 +20,7 @@ public static class ProofOfDeliveryEndpoints
 {
     /// <summary>
     /// The app role of the callers that record Proofs of delivery: the Carrier Proof of delivery Logic App's managed
-    /// identity, and later P12's Driver reports Logic App's.
+    /// identity, and P12's Driver reports Logic App's.
     /// </summary>
     public const string RecordRole = "ProofsOfDelivery.Record";
 
@@ -38,17 +38,22 @@ public static class ProofOfDeliveryEndpoints
             .RequireAuthorization(policy => policy.RequireRole(RecordRole))
             .WithMetadata(new TrackedFlow(Flows.CarrierProofOfDelivery))
             .Accepts<ProofOfDeliveryRequest>("multipart/form-data")
-            .WithSummary("Record a Proof of delivery a Carrier sent for a Shipment, with its files.")
+            .WithSummary("Record a Proof of delivery a Carrier or a Driver sent for a Shipment, with its files.")
             .WithDescription(
                 "Multipart: the canonical metadata as JSON in the 'metadata' part and each file in a 'files' part. The metadata names its "
-                + "source: a Carrier ID (from API Management, never from the Carrier's payload) or Own fleet. The Shipment is the one on that "
-                + "Carrier's Confirmed Carrier booking with the Carrier booking reference. The TMS keeps the files in its own storage, records "
+                + "source: a Carrier ID (from API Management, never from the Carrier's payload) or Own fleet with the Driver ID (from the Driver's token, "
+                + "which the Driver reports Logic App passes on, never from the Driver app's payload). A Carrier's Shipment is the one on that "
+                + "Carrier's Confirmed Carrier booking with the Carrier booking reference. An Own fleet Proof of delivery (P12) names its Trip, the Shipment on it "
+                + "and the version of the Trip the Driver app held (kept for tracing only) in place of a booking reference, and the X-Correlation-ID is the one "
+                + "of the Delivered Tracking event it belongs to. The TMS keeps the files in its own storage, records "
                 + "the Proof of delivery as the Shipment's current one with the correlation ID, and publishes ProofOfDeliveryReceived in the "
                 + "same transaction as the record. A document ID the source already recorded is a repeat: the answer is the original result with "
                 + "isRepeat set, and nothing is recorded or published. A new document ID for a Shipment with a current Proof of delivery makes the "
                 + "new one current and supersedes the earlier, with nothing merged; the event says it replaces an earlier one. It never changes the Shipment's status. A Proof of delivery is refused, changing and "
                 + "publishing nothing, with a problem whose code says why: ShipmentNotFound (404), ShipmentNotInTransport (409), "
-                + "MissingRequiredField (400), DeliveryTimeInTheFuture (400), FileNotAccepted (400); and 400 for an input that isn't the Canonical Model.");
+                + "MissingRequiredField (400), DeliveryTimeInTheFuture (400), FileNotAccepted (400); and for an Own fleet Proof of delivery TripNotFound (404, also for "
+                + "another Driver's Trip), TripNotUnderWay, ShipmentNotOnTrip (checked against the Trip's latest version, even when the report names an older one) or "
+                + "CollectionBeforeDelivery (409); and 400 for an input that isn't the Canonical Model.");
 
         proofsOfDelivery.MapGet("/shipments/{shipmentNumber}/proof-of-delivery", GetAsync)
             .RequireAuthorization()
@@ -155,8 +160,8 @@ public static class ProofOfDeliveryEndpoints
 
     private static int StatusCodeOf(ProofOfDeliveryRefusalCode code) => code switch
     {
-        ProofOfDeliveryRefusalCode.ShipmentNotFound => StatusCodes.Status404NotFound,
+        ProofOfDeliveryRefusalCode.ShipmentNotFound or ProofOfDeliveryRefusalCode.TripNotFound => StatusCodes.Status404NotFound,
         ProofOfDeliveryRefusalCode.MissingRequiredField or ProofOfDeliveryRefusalCode.DeliveryTimeInTheFuture or ProofOfDeliveryRefusalCode.FileNotAccepted => StatusCodes.Status400BadRequest,
-        _ => StatusCodes.Status409Conflict, // ShipmentNotInTransport
+        _ => StatusCodes.Status409Conflict, // ShipmentNotInTransport, and the Trip rules of an Own fleet Proof of delivery
     };
 }

@@ -56,6 +56,16 @@ internal static class ProofOfDeliveryCalls
         return await caller.SendAsync(request, cancellationToken);
     }
 
+    /// <summary>Records the Proof of delivery as the given caller does, which the TMS must accept, and returns what it answered.</summary>
+    public static async Task<JsonNode> RecordedProofAsync(
+        this TmsFixture tms, HttpClient caller, JsonObject metadata, IReadOnlyList<SentFile> files, CancellationToken cancellationToken, string? correlationId = null)
+    {
+        using var response = await tms.RecordProofAsync(caller, metadata, files, cancellationToken, correlationId);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, body);
+        return JsonNode.Parse(body)!;
+    }
+
     /// <summary>Records the Proof of delivery, which the TMS must accept, and returns what it answered.</summary>
     public static async Task<JsonNode> RecordedProofAsync(
         this TmsFixture tms, JsonObject metadata, IReadOnlyList<SentFile> files, CancellationToken cancellationToken, string? correlationId = null)
@@ -71,6 +81,16 @@ internal static class ProofOfDeliveryCalls
         this TmsFixture tms, JsonObject metadata, IReadOnlyList<SentFile> files, HttpStatusCode status, CancellationToken cancellationToken, string? correlationId = null)
     {
         using var response = await tms.RecordProofAsync(metadata, files, cancellationToken, correlationId);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        response.StatusCode.Should().Be(status, body);
+        return JsonNode.Parse(body)!;
+    }
+
+    /// <summary>Records the Proof of delivery as the given caller does, which the TMS must refuse with the status, and returns its problem.</summary>
+    public static async Task<JsonNode> RecordProofRefusedAsync(
+        this TmsFixture tms, HttpClient caller, JsonObject metadata, IReadOnlyList<SentFile> files, HttpStatusCode status, CancellationToken cancellationToken, string? correlationId = null)
+    {
+        using var response = await tms.RecordProofAsync(caller, metadata, files, cancellationToken, correlationId);
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         response.StatusCode.Should().Be(status, body);
         return JsonNode.Parse(body)!;

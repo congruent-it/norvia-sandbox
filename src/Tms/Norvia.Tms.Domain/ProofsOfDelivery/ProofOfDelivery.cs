@@ -1,7 +1,9 @@
 using Ardalis.SharedKernel;
+using Norvia.Tms.Domain.Fleet;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.TransportOrders;
+using Norvia.Tms.Domain.Trips;
 
 namespace Norvia.Tms.Domain.ProofsOfDelivery;
 
@@ -18,7 +20,7 @@ public sealed class ProofOfDelivery : EntityBase<ProofOfDeliveryId>, IAggregateR
         ShipmentNumber shipmentNumber,
         ProofOfDeliverySource source,
         string documentId,
-        string carrierBookingReference,
+        string? carrierBookingReference,
         string receivedBy,
         DateTimeOffset deliveryTime,
         DeliveryCondition condition,
@@ -51,8 +53,17 @@ public sealed class ProofOfDelivery : EntityBase<ProofOfDeliveryId>, IAggregateR
     /// <summary>The sender's own ID for the Proof of delivery, unique per source.</summary>
     public string DocumentId { get; private set; }
 
-    /// <summary>The Carrier's own reference for the booking the Proof of delivery was matched by.</summary>
-    public string CarrierBookingReference { get; private set; }
+    /// <summary>The Carrier's own reference for the booking the Proof of delivery was matched by; null for an Own fleet one.</summary>
+    public string? CarrierBookingReference { get; private set; }
+
+    /// <summary>The Trip an Own fleet Proof of delivery (P12) was reported on, in place of a Carrier booking reference; null for a Carrier's.</summary>
+    public TripNumber? TripNumber { get; private set; }
+
+    /// <summary>The Driver who reported an Own fleet Proof of delivery, from the Driver's token; null for a Carrier's.</summary>
+    public DriverId? DriverId { get; private set; }
+
+    /// <summary>The version of the Trip the Driver app held when it reported, kept for tracing only; null for a Carrier's.</summary>
+    public int? TripVersion { get; private set; }
 
     /// <summary>The name of the person who signed.</summary>
     public string ReceivedBy { get; private set; }
@@ -90,7 +101,11 @@ public sealed class ProofOfDelivery : EntityBase<ProofOfDeliveryId>, IAggregateR
         ArgumentNullException.ThrowIfNull(report.Source);
         ArgumentNullException.ThrowIfNull(report.Location);
         ArgumentException.ThrowIfNullOrWhiteSpace(report.DocumentId);
-        ArgumentException.ThrowIfNullOrWhiteSpace(report.CarrierBookingReference);
+        if (report.OwnFleet is null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(report.CarrierBookingReference);
+        }
+
         ArgumentException.ThrowIfNullOrWhiteSpace(report.ReceivedBy);
         if (report.Files.Count == 0)
         {
@@ -118,6 +133,9 @@ public sealed class ProofOfDelivery : EntityBase<ProofOfDeliveryId>, IAggregateR
             receivedAt)
         {
             Location = report.Location,
+            TripNumber = report.OwnFleet?.TripNumber,
+            DriverId = report.OwnFleet?.DriverId,
+            TripVersion = report.OwnFleet?.TripVersion,
         };
         replaces?.Supersede();
         proofOfDelivery.RegisterDomainEvent(new ProofOfDeliveryReceivedEvent(shipment, proofOfDelivery, replacesEarlier: replaces is not null));
