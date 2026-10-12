@@ -3,6 +3,7 @@
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inject IPartnerPortal Portal
 @inject ILogger<PresenterPanel> Logger
+@using Norvia.PartnerPortal.Application.DriverSignIns
 
 <PageTitle>Presenter panel · Partner portal</PageTitle>
 
@@ -52,7 +53,56 @@
     }
 </div>
 
+<div role="group" aria-label="Driver sign-in" class="mb-8 max-w-3xl border border-border p-6">
+    <h2 class="mt-0">Driver sign-in</h2>
+    @if (_signInsLoadFailed)
+    {
+        <div role="alert">
+            <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+                The Drivers' sign-in details couldn't be loaded. Reload the page to try again.
+            </FluentMessageBar>
+        </div>
+    }
+    else if (_signIns is null)
+    {
+        <div role="status">Loading the Drivers…</div>
+    }
+    else if (_signIns.Password is null)
+    {
+        <p class="mt-0 text-sm">
+            Locally the Driver app has no Entra ID. Its sign-in page stands in for it: open the Driver app and pick one of these Drivers.
+        </p>
+        <ul class="m-0 text-sm">
+            @foreach (var driver in _signIns.Drivers)
+            {
+                <li>@driver.Name (@driver.DriverId)</li>
+            }
+        </ul>
+    }
+    else
+    {
+        <p class="mt-0 text-sm">
+            Each seeded Driver signs in to the Driver app with their own Entra test user. The password is the same for all of them.
+        </p>
+        <table class="text-sm">
+            <caption class="sr-only">Entra test users of the seeded Drivers</caption>
+            <thead>
+                <tr><th scope="col" class="pr-4 text-left">Driver</th><th scope="col" class="pr-4 text-left">Driver ID</th><th scope="col" class="text-left">User name</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var driver in _signIns.Drivers)
+                {
+                    <tr><td class="pr-4">@driver.Name</td><td class="pr-4">@driver.DriverId</td><td>@driver.UserName</td></tr>
+                }
+            </tbody>
+        </table>
+        <p class="mb-0 text-sm">Password: <code>@_signIns.Password</code></p>
+    }
+</div>
+
 @code {
+    private DriverSignInsView? _signIns;
+    private bool _signInsLoadFailed;
     private DriverAppFaultView? _fault;
     private bool _loadFailed;
     private bool _saving;
@@ -60,6 +110,16 @@
 
     protected override async Task OnInitializedAsync()
     {
+        try
+        {
+            _signIns = await Portal.ListDriverSignInsAsync(CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            PageLog.DriverSignInsLoadFailed(Logger, exception);
+            _signInsLoadFailed = true;
+        }
+
         try
         {
             _fault = await Portal.GetDriverAppFaultAsync(CancellationToken.None);

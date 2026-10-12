@@ -3,7 +3,7 @@ using NetArchTest.Rules;
 using Norvia.DriverApp.Application.Trips.Receive;
 using Norvia.DriverApp.Domain.Trips;
 using Norvia.DriverApp.Infrastructure;
-using Norvia.DriverApp.Web.Sessions;
+using Norvia.DriverApp.Web.Drivers;
 
 namespace Norvia.DriverApp.ArchitectureTests;
 
@@ -28,7 +28,7 @@ public sealed class DependencyRuleTests
     private static readonly Assembly Application = typeof(ReceiveTripVersionCommand).Assembly;
     private static readonly Assembly Infrastructure = typeof(DependencyInjection).Assembly;
     private static readonly Assembly Api = typeof(Api.Trips.TripEndpoints).Assembly;
-    private static readonly Assembly Web = typeof(DriverSession).Assembly;
+    private static readonly Assembly Web = typeof(DriverSignIn).Assembly;
 
     [Fact]
     public void Domain_DependsOnNoOuterLayer()

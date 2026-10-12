@@ -191,9 +191,9 @@ The events are named *Reported* and *Captured*, not *Started* and *Completed*: t
 
 ## Sign-in
 
-The Driver app signs Drivers in with Entra ID, replacing P11's Driver picker. Each seeded Driver has an Entra test user with a claim that carries the Driver ID from the ERP. The Driver app shows only that Driver's Trips and puts the Driver ID from the token on every event. The TMS checks it against the Trip's Driver. This follows ADR 0005: identity comes from the token, not the payload.
+The Driver app signs Drivers in with Entra ID, replacing P11's Driver picker. Each seeded Driver has an Entra test user whose token carries the Driver ID from the ERP, as an app role ([ADR 0037](../../adr/0037-drivers-sign-in-to-the-driver-app-with-entra-and-the-driver-id-is-their-app-role.md)). The Driver app shows only that Driver's Trips and puts the Driver ID from the token on every event. The TMS checks it against the Trip's Driver. This follows ADR 0005: identity comes from the token, not the payload.
 
-The presenter panel holds the seeded users' sign-in details for demos.
+The presenter panel holds the seeded users' sign-in details for demos. Locally the Driver app's sign-in page stands in for Entra and lists the seeded Drivers.
 
 ## Driver app
 
@@ -327,7 +327,18 @@ End Trip at the TMS boundary: `POST /v1/trips/{number}/end` with the `driverId` 
 
 Re-delivery on a later Trip is built in P11's calls: Shipments to put on Trips lists a Shipment Awaiting re-delivery with `redelivery` true, a Trip takes it with only its delivery Stop and with `CollectionDayMismatch` not applying, Dispatch clears the flag (`Shipment.Dispatch`), and taking it off sets the flag again, leaving it Collected. The boundary tests are in `TripRedeliveryTests`.
 
-Not built yet: the Driver app's actions, sign-in and the Driver reports Logic App.
+Driver app sign-in ([ADR 0037](../../adr/0037-drivers-sign-in-to-the-driver-app-with-entra-and-the-driver-id-is-their-app-role.md)). In Azure the Driver app's screens are behind Easy Auth, signing in to the *Norvia Driver app* registration, whose app roles are the active seeded Drivers' IDs; `infra/create-driver-test-users.sh` makes a test user for each Driver and assigns the role, and the estate's `ESTATE_DRIVER_SIGN_IN_*` parameters give the presenter panel the domain and the shared password. The Driver app reads the user from `X-MS-CLIENT-PRINCIPAL`, turns the role into the `driverId` claim, and `GetDriverTripsQuery` takes the Driver ID from that claim only. Locally `LocalSignIn__Enabled` (set by the AppHost, refused outside Development) turns on a sign-in page that lists the seeded Drivers and signs one in with a cookie holding the same claim. My Trips shows the Driver's Trips by day, each with its status (a Trip the Driver app holds is Dispatched until the Driver can start it). The Driver ID doesn't yet go on events, since the Driver app has none.
+
+| Part | Where |
+|---|---|
+| Both ways of signing in, the policy | [Drivers](../../../src/DriverApp/Norvia.DriverApp.Web/Drivers): `DriverSignIn`, `EasyAuthHandler`, `DriverClaims` |
+| My Trips and the refusal | [Trips.razor](../../../src/DriverApp/Norvia.DriverApp.Web/Components/Pages/Trips.razor), [Refused.razor](../../../src/DriverApp/Norvia.DriverApp.Web/Components/Pages/Refused.razor) |
+| The app registration and its roles | `driverApp` in [identities.bicep](../../../infra/estate/identities.bicep), [create-driver-test-users.sh](../../../infra/create-driver-test-users.sh), [register-sign-in-callbacks.sh](../../../infra/register-sign-in-callbacks.sh) |
+| The Easy Auth gate and the AppHost's settings | [AppHost.cs](../../../src/Norvia.AppHost/AppHost.cs), [Estate.cs](../../../src/Norvia.AppHost/Estate.cs) |
+| The presenter panel | [PresenterPanel.razor](../../../src/PartnerPortal/Norvia.PartnerPortal.Web/Presenter/PresenterPanel.razor), [DriverSignIns](../../../src/PartnerPortal/Norvia.PartnerPortal.Application/DriverSignIns) |
+| Boundary tests | [SignInTests.cs](../../../tests/DriverApp/Norvia.DriverApp.Web.IntegrationTests/SignInTests.cs) |
+
+Not built yet: the Driver app's actions and the Driver reports Logic App.
 
 ## Deferred
 

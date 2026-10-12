@@ -4,6 +4,7 @@ using Microsoft.Extensions.Time.Testing;
 using Microsoft.FluentUI.AspNetCore.Components;
 using Norvia.PartnerPortal.Application.CarrierBookings.AnswerSettings;
 using Norvia.PartnerPortal.Application.CarrierShipments.TrackingSettings;
+using Norvia.PartnerPortal.Application.DriverSignIns;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
 using Norvia.PartnerPortal.Domain.Personas;
 using Norvia.PartnerPortal.Web.Bookings;
@@ -19,6 +20,7 @@ public abstract class PortalWebContext : BunitContext
         Services.AddFluentUIComponents();
         Services.AddSingleton(Portal);
         Services.AddSingleton<TimeProvider>(Time);
+        Portal.ListDriverSignInsAsync(Arg.Any<CancellationToken>()).Returns(new DriverSignInsView(null, []));
         Portal.ListPersonasAsync(Arg.Any<CancellationToken>()).Returns(Samples.Personas);
         Portal.GetCarrierAnswerSettingsAsync(Arg.Any<PersonaId>(), Arg.Any<CancellationToken>())
             .Returns(new CarrierAnswerSettingsView(CarrierAnswerMode.Manual, CarrierRejectionReason.NoCapacity, 5));

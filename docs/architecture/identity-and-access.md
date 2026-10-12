@@ -94,6 +94,7 @@ Users are assigned app roles on the enterprise application, not on an API. Entra
 | **Norvia demo UIs** | `DemoUis.Use` | Open the TMS UI and the Partner portal in Azure ([ADR 0024](../adr/0024-the-demo-uis-are-public-behind-an-entra-gate-for-the-presenter.md)). The apps read no roles and don't know who signed in | The presenter, who ran `azd up` |
 | **Norvia Integration console** | `IntegrationConsole.Read` | Search Message trails and open run details and message bodies. The console refuses a user without it ([ADR 0026](../adr/0026-the-integration-console-signs-operators-in-with-easy-auth-and-checks-their-app-role.md)) | The presenter, who plays the Integration operator |
 | | `IntegrationConsole.Resubmit` | Also resubmit and discard dead-lettered messages ([planned](../operations/integration-console.md#resubmit-and-discard)) | The presenter |
+| **Norvia Driver app** | One role per active seeded Driver, its value the Driver ID (`DRV-0001`) | Sign in to the Driver app as that Driver and see their Trips. The Driver app takes the Driver ID from this role and nowhere else ([ADR 0037](../adr/0037-drivers-sign-in-to-the-driver-app-with-entra-and-the-driver-id-is-their-app-role.md)) | The Driver's Entra test user, one per seeded Driver |
 
 Someone else presenting or operating needs the role assigned in Entra ID. The presenter also holds two Azure RBAC roles for looking behind the scenes, both optional (`presenterPrincipalId` empty for none): **Azure Service Bus Data Receiver** on the namespace, to read messages in the Service Bus Explorer, and **Storage Blob Data Reader** on the inbound container.
 
@@ -126,7 +127,7 @@ The scoping is the design: the booking Logic App cannot read a Persona's subscri
 
 ## Locally
 
-There is no Entra under Aspire. Every caller still asks for a token with its own client ID and roles, signed with one key, and the TMS API trusts that issuer. A role a caller gets locally is therefore no proof Entra grants it: the tables above are the truth. The Integration console signs the developer in as a local operator holding both console roles ([ADR 0026](../adr/0026-the-integration-console-signs-operators-in-with-easy-auth-and-checks-their-app-role.md)).
+There is no Entra under Aspire. Every caller still asks for a token with its own client ID and roles, signed with one key, and the TMS API trusts that issuer. A role a caller gets locally is therefore no proof Entra grants it: the tables above are the truth. The Integration console signs the developer in as a local operator holding both console roles ([ADR 0026](../adr/0026-the-integration-console-signs-operators-in-with-easy-auth-and-checks-their-app-role.md)). The Driver app's sign-in page lists the seeded Drivers and signs the chosen one in with the same Driver ID claim ([ADR 0037](../adr/0037-drivers-sign-in-to-the-driver-app-with-entra-and-the-driver-id-is-their-app-role.md)).
 
 ## Changing an identity
 

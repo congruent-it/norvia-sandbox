@@ -1,68 +1,78 @@
 @page "/"
+@using System.Security.Claims
 @using Norvia.DriverApp.Application.Trips.GetForDriver
-@using Norvia.DriverApp.Web.Sessions
+@using Norvia.DriverApp.Web.Drivers
+@using Norvia.DriverApp.Web.Trips
 @inject Mediator.IMediator Mediator
-@inject NavigationManager Navigation
 @inject ILogger<Trips> Logger
 
 <PageTitle>My Trips</PageTitle>
 
-@if (_driver is not null)
-{
-    <div class="trips-heading">
-        <h1>@_driver.Name</h1>
-        <form method="post" action="/sign-out">
-            <AntiforgeryToken />
-            <button type="submit" class="link-button">Not you? Sign out</button>
+<div class="trips-heading">
+    <h1>@_name</h1>
+    @if (_signedInWithEntra)
+    {
+        @* Easy Auth's endpoint, which signs the browser out of the Driver app and Entra ID. *@
+        <FluentAnchor Href="@EasyAuthHandler.SignOutPath" Appearance="Appearance.Hypertext">Not you? Sign out</FluentAnchor>
+    }
+    else
+    {
+        <form method="post" action="@DriverSignIn.StandInSignOutPath">
+            <FluentButton Type="ButtonType.Submit" Appearance="Appearance.Lightweight">Not you? Sign out</FluentButton>
         </form>
+    }
+</div>
+
+@if (_loadFailed)
+{
+    <div role="alert">
+        <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+            Your Trips couldn't be loaded. Reload the page to try again.
+        </FluentMessageBar>
     </div>
+}
+else if (_trips.Count == 0)
+{
+    <p role="status">No Trips have been sent to you yet.</p>
+}
 
-    @if (_loadFailed)
-    {
-        <div role="alert">
-            <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
-                Your Trips couldn't be loaded. Reload the page to try again.
-            </FluentMessageBar>
-        </div>
-    }
-    else if (_trips.Count == 0)
-    {
-        <p role="status">No Trips have been sent to you yet.</p>
-    }
-
-    @foreach (var trip in _trips)
-    {
-        <TripCard Trip="trip" />
-    }
+@foreach (var day in TripsByDay.Of(_trips))
+{
+    <section aria-label="@TripText.Day(day.Key)">
+        <h2>@TripText.Day(day.Key)</h2>
+        @foreach (var trip in day)
+        {
+            <TripCard Trip="trip" />
+        }
+    </section>
 }
 
 @code {
     [CascadingParameter]
     private HttpContext? HttpContext { get; set; }
 
-    private DriverView? _driver;
+    private string _name = "My Trips";
+    private bool _signedInWithEntra;
     private IReadOnlyList<DriverTripView> _trips = [];
     private bool _loadFailed;
 
     protected override async Task OnInitializedAsync()
     {
-        var drivers = await Mediator.Send(new Norvia.DriverApp.Application.Drivers.List.ListDriversQuery());
-        _driver = DriverSession.Current(HttpContext, drivers);
-        if (_driver is null)
-        {
-            Navigation.NavigateTo("/sign-in");
-            return;
-        }
+        // The Driver ID comes from the token, never from the request (ADR 0005). The route's policy admits only a user with one.
+        var user = HttpContext?.User ?? throw new InvalidOperationException("My Trips renders only for a request.");
+        var driverId = user.FindFirstValue(DriverClaims.DriverId) ?? throw new InvalidOperationException("The policy admits only a Driver ID.");
+        _name = user.Identity?.Name ?? driverId;
+        _signedInWithEntra = EasyAuthHandler.SignedInWithEntra(user);
 
         try
         {
-            _trips = await Mediator.Send(new GetDriverTripsQuery(_driver.Id));
+            _trips = await Mediator.Send(new GetDriverTripsQuery(driverId));
         }
 #pragma warning disable CA1031 // Whatever fails to load, the Driver gets a message rather than an error page.
         catch (Exception ex)
 #pragma warning restore CA1031
         {
-            Logger.LogError(ex, "The Trips of Driver {DriverId} couldn't be loaded", _driver.Id);
+            Logger.LogError(ex, "The Trips of Driver {DriverId} couldn't be loaded", driverId);
             _loadFailed = true;
         }
     }

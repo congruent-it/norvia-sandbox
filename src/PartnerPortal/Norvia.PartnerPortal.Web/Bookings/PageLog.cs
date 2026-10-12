@@ -51,6 +51,9 @@ internal static partial class PageLog
     [LoggerMessage(Level = LogLevel.Error, Message = "Reading the Driver app unavailable fault failed")]
     public static partial void DriverAppFaultLoadFailed(ILogger logger, Exception exception);
 
+    [LoggerMessage(Level = LogLevel.Error, Message = "Reading the Drivers' sign-in details failed")]
+    public static partial void DriverSignInsLoadFailed(ILogger logger, Exception exception);
+
     [LoggerMessage(Level = LogLevel.Error, Message = "Switching the Driver app unavailable fault to {Unavailable} failed")]
     public static partial void DriverAppFaultSaveFailed(ILogger logger, Exception exception, bool unavailable);
 }

@@ -5,6 +5,8 @@ namespace Norvia.DriverApp.Application.Trips;
 /// <summary>Maps between the DTOs the Application's callers use and the Domain's value objects, so no Domain type crosses the boundary outwards.</summary>
 internal static class TripMapping
 {
+    private const string DispatchedStatus = "Dispatched";
+
     public static TripStop ToDomain(this StopDto stop) => new(
         stop.Sequence,
         stop.Kind == StopKindDto.Collection ? StopKind.Collection : StopKind.Delivery,
@@ -34,6 +36,7 @@ internal static class TripMapping
     public static DriverTripView ToView(this DriverTripRow row) => new(
         row.TripNumber.Value,
         row.Version,
+        DispatchedStatus,
         row.DriverId.Value,
         row.Details.DriverName,
         row.Details.Day,

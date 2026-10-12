@@ -1,12 +1,11 @@
 @* One Trip with its Stops in order: what the Driver reads, never changes. *@
 <FluentCard Class="trip" role="region" aria-label="@($"Trip {Trip.TripNumber}")">
-    <h2>
+    <h3>
         @Trip.TripNumber
-        <FluentBadge Appearance="Appearance.Accent">Version @Trip.Version</FluentBadge>
-    </h2>
+        <FluentBadge Appearance="Appearance.Accent">@Trip.Status</FluentBadge>
+        <FluentBadge>Version @Trip.Version</FluentBadge>
+    </h3>
     <dl class="trip-facts">
-        <dt>Day</dt>
-        <dd>@TripText.Day(Trip.Day)</dd>
         <dt>Planned start</dt>
         <dd>@TripText.Time(Trip.PlannedStart)</dd>
         <dt>Driving</dt>

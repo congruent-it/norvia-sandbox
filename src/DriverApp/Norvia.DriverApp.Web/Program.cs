@@ -3,7 +3,8 @@ using Microsoft.FluentUI.AspNetCore.Components;
 using Norvia.DriverApp.Application.Trips.Receive;
 using Norvia.DriverApp.Infrastructure;
 using Norvia.DriverApp.Web.Components;
-using Norvia.DriverApp.Web.Sessions;
+using Norvia.DriverApp.Web.Drivers;
+using Norvia.DriverApp.Web.Settings;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,6 +14,7 @@ builder.AddServiceDefaults();
 // Services (ADR 0001): the Trip dispatch Logic App pushes Trips to its API, and nothing here calls the TMS.
 builder.AddDriverAppInfrastructure();
 builder.AddDriverAppSeedDrivers();
+builder.AddDriverSignIn();
 builder.Services.AddMediator(options =>
 {
     options.ServiceLifetime = ServiceLifetime.Scoped;
@@ -31,11 +33,15 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseStatusCodePagesWithReExecute("/not-found");
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
-app.MapRazorComponents<App>();
-app.MapSession();
+// Every screen is a Driver's own: it needs a token that carries a Driver ID (ADR 0005, ADR 0037).
+app.MapRazorComponents<App>().RequireAuthorization(DriverClaims.DriverPolicy);
+app.MapDriverSignInStandIn();
+app.MapSettings();
 app.MapDefaultEndpoints();
 
 await app.RunAsync();

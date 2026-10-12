@@ -155,7 +155,7 @@ P11 builds the smallest Driver app the demo needs. [P12](p12-trip-execution.md#d
 | In P11 | In P12 |
 |---|---|
 | An API that accepts a Trip version from the Trip dispatch Logic App and keeps the latest per Trip | Completing each Stop, and capturing a Proof of delivery, published as events (ADR 0016) |
-| Signing in by picking one of the seeded Drivers, as a Persona is picked in the Partner portal | Sign-in with Entra ID |
+| Signing in by picking one of the seeded Drivers, as a Persona is picked in the Partner portal | Sign-in with Entra ID (built in P12) |
 | A read-only list of that Driver's Trips, with their Stops in order | Starting and ending a Trip |
 
 The Driver app is its own application and reaches the TMS only through Azure Integration Services (ADR 0001). In P11 nothing flows back from it except the Logic App's delivery report.
@@ -213,7 +213,7 @@ After a deployment, and not in CI, the presenter checks Trip dispatch on the dep
 **Scenario 1: build, dispatch and amend.**
 
 1. In the TMS UI, as the Planner, select the two seeded Shipments that fit a van and create a Trip for the demo's day. Add the sixth, the one too heavy for the van, as the script says: it is refused with `PayloadExceeded`.
-2. Pick the van, a Driver, a planned start and a driving duration, and dispatch the Trip. Open the Driver app, pick that Driver, and see the Trip.
+2. Pick the van, a Driver, a planned start and a driving duration, and dispatch the Trip. Open the Driver app, sign in as that Driver (the stand-in locally lists them, Entra test users in Azure), and see the Trip.
 3. Take a Shipment off the Trip. The Driver app shows version 2.
 
 **Scenario 2: the Driver app unavailable.**
@@ -339,5 +339,5 @@ These were left out on purpose while designing P11, each with its reason.
 - **Load between Stops.** The whole Trip counts as loaded at once.
 - **Depots**, and collection and delivery runs through them. The Own fleet is one pool (P10).
 - **A separate dispatcher role.** The Planner does P11. The role can be added without changing the model.
-- **Real sign-in for the Driver app.** Picking a seeded Driver covers the demo. [P12](p12-trip-execution.md#sign-in) designs it.
+- **Real sign-in for the Driver app.** Built in [P12](p12-trip-execution.md#sign-in).
 - **As-found toggles** in the Bicep, for example no alert on the Trip dispatch Logic App's failed runs. They are added after the fixed state is built, as for P1 and P2.

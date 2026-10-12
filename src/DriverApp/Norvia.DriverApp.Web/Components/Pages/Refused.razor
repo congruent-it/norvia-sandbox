@@ -1,0 +1,23 @@
+@page "/refused"
+@attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
+
+<PageTitle>No Driver ID</PageTitle>
+
+<h1>Your account has no Driver ID</h1>
+<p>
+    You are signed in, but your account isn't one of Norvia's Drivers, so the Driver app has no Trips to show you.
+    Ask the presenter for the sign-in details of a Driver.
+</p>
+
+@code {
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (HttpContext is not null)
+        {
+            HttpContext.Response.StatusCode = StatusCodes.Status403Forbidden;
+        }
+    }
+}

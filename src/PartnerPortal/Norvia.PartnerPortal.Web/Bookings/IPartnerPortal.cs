@@ -7,6 +7,7 @@ using Norvia.PartnerPortal.Application.CarrierShipments.Send;
 using Norvia.PartnerPortal.Application.CarrierShipments.SendProofOfDelivery;
 using Norvia.PartnerPortal.Application.CarrierShipments.TrackingSettings;
 using Norvia.PartnerPortal.Application.DriverAppFault;
+using Norvia.PartnerPortal.Application.DriverSignIns;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Application.ShipperNotifications;
 using Norvia.PartnerPortal.Application.ShipperTracking;
@@ -98,4 +99,7 @@ public interface IPartnerPortal
 
     /// <summary>Switches the "Driver app unavailable" fault on or off, and returns how it now stands.</summary>
     Task<DriverAppFaultView> SetDriverAppFaultAsync(bool unavailable, CancellationToken cancellationToken);
+
+    /// <summary>The seeded Drivers' sign-in details to the Driver app, for the presenter panel.</summary>
+    Task<DriverSignInsView> ListDriverSignInsAsync(CancellationToken cancellationToken);
 }

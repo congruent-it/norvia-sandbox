@@ -464,6 +464,44 @@ public sealed class AppHostModelTests
     }
 
     [Fact]
+    public async Task InAzure_TheDriverAppsScreens_AreBehindAnEntraSignIn_ForTheDriverAppsAppRegistration()
+    {
+        await using var builder = await CreateForAzureAsync();
+
+        IsReachableFromOutsideTheContainerAppsEnvironment(builder, "driver-app-web").Should().BeTrue("the Driver's phone is outside the Container Apps environment");
+        var bicep = ContainerAppBicepOf(builder, "driver-app-web");
+        bicep.Should().Contain("Microsoft.App/containerApps/authConfigs@")
+            .And.Contain("unauthenticatedClientAction: 'RedirectToLoginPage'")
+            .And.Contain("clientId: estate_driver_app_registration_client_id")
+            .And.Contain("openIdIssuer: estate_entra_issuer")
+            .And.MatchRegex(@"excludedPaths: \[\s*'/health'\s*'/alive'\s*\]");
+        bicep.Should().NotContain("clientSecret", "Entra gives Easy Auth an ID token without a secret");
+        (await EnvironmentOfAsync(builder, "driver-app-web")).Keys.Should().NotContain(key => key.StartsWith("LocalSignIn__", StringComparison.Ordinal), "only Entra signs Drivers in in Azure");
+    }
+
+    [Fact]
+    public async Task InAzure_ThePartnerPortal_ShowsThePresenterTheDriversEntraTestUsers()
+    {
+        await using var builder = await CreateForAzureAsync();
+
+        var portal = await EnvironmentOfAsync(builder, "partner-portal-web");
+
+        portal.Should().Contain("DriverSignIns__Domain", "{estate-driver-sign-in-domain.value}")
+            .And.Contain("DriverSignIns__Password", "{estate-driver-sign-in-password.value}");
+    }
+
+    [Fact]
+    public async Task Locally_TheDriverApp_SignsDriversInWithAStandInForEntra()
+    {
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(TestContext.Current.CancellationToken);
+
+        (await EnvironmentOfAsync(builder, "driver-app-web")).Should().Contain("LocalSignIn__Enabled", "true");
+        Resource(builder, "driver-app-web").Annotations.Should().NotContain(annotation => annotation is AzureContainerAppCustomizationAnnotation);
+        builder.Resources.OfType<ParameterResource>().Should().NotContain(parameter => parameter.Name.StartsWith("estate-driver-", StringComparison.Ordinal) && parameter.Name != "estate-driver-app-identity-name" && parameter.Name != "estate-driver-app-key-vault");
+        (await EnvironmentOfAsync(builder, "partner-portal-web")).Keys.Should().NotContain(key => key.StartsWith("DriverSignIns__", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task InAzure_TheIntegrationConsole_SearchesTheEstatesWorkspace_AsItsOwnIdentity_WithinTheEstatesRetention()
     {
         await using var builder = await CreateForAzureAsync();

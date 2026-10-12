@@ -62,4 +62,7 @@ while IFS="$tab" read -r name json value; do
   azd env set "AZURE_$name" "$value"
   azd env config set "infra.parameters.$(echo "$name" | tr '[:upper:]' '[:lower:]')" "$json"
 done < "$work/outputs.env"
+
+# The seeded Drivers' Entra test users, whose domain and password the apps take as the Estate parameters azd asks for.
+./create-driver-test-users.sh "$(jq -r '.ESTATE_DRIVER_APP_REGISTRATION_CLIENT_ID.value' "$work/outputs.json")"
 touch "$deployed_in_this_run"
