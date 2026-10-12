@@ -38,8 +38,13 @@ public sealed record TripRefusal(TripRefusalCode Code, string Message)
     public static TripRefusal TripIncomplete(TripNumber trip, string part) =>
         new(TripRefusalCode.TripIncomplete, $"Trip {trip} can't be dispatched without {part}.");
 
-    public static TripRefusal TripNotDispatched(TripNumber number) =>
-        new(TripRefusalCode.TripNotDispatched, $"Trip {number} is a Draft, so no version of it has been sent.");
+    public static TripRefusal TripNotDispatched(TripNumber number, TripStatus status) =>
+        new(TripRefusalCode.TripNotDispatched, status == TripStatus.Draft
+            ? $"Trip {number} is a Draft, so no version of it has been sent."
+            : $"Trip {number} is {status}, not Dispatched.");
+
+    public static TripRefusal NotTripDay(TripNumber number, DateOnly tripDay, DateOnly today) =>
+        new(TripRefusalCode.NotTripDay, Invariant($"Trip {number} is for {tripDay:yyyy-MM-dd}, and today is {today:yyyy-MM-dd}."));
 
     public static TripRefusal TripVersionNotFound(TripNumber number, int version) =>
         new(TripRefusalCode.TripVersionNotFound, Invariant($"Trip {number} has no version {version}."));

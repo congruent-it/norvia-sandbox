@@ -16,6 +16,7 @@ using Norvia.Tms.Application.Trips.GetByNumber;
 using Norvia.Tms.Application.Trips.List;
 using Norvia.Tms.Application.Trips.ReorderStops;
 using Norvia.Tms.Application.Trips.ReportDelivery;
+using Norvia.Tms.Application.Trips.Start;
 using Norvia.Tms.Application.Trips.SendAgain;
 using Norvia.Tms.Application.Trips.TakeShipmentOff;
 using Norvia.Tms.Domain.Fleet;
@@ -28,6 +29,9 @@ public static class TripEndpoints
 {
     /// <summary>The app role only the P11 Trip dispatch Logic App's managed identity holds, for its delivered and not-delivered reports.</summary>
     public const string ReportDeliveryRole = "Trips.ReportDelivery";
+
+    /// <summary>The app role only the P12 Driver reports Logic App's managed identity holds, for starting a Trip.</summary>
+    public const string StartRole = "Trips.Start";
 
     public static IEndpointRouteBuilder MapTrips(this IEndpointRouteBuilder app)
     {
@@ -130,6 +134,17 @@ public static class TripEndpoints
                 "Sets the version's delivery state to Not delivered with the cause and, for the Trip's latest version, publishes TripNotDelivered in the same transaction. "
                 + "A report for a version older than the Trip's latest is stored against that version and publishes nothing. A report for a version that is no longer Sending is ignored and logged: it changes and publishes nothing. "
                 + "The X-Correlation-ID is the correlation ID of the Dispatch or send-again, which the TripDispatched event carried. TripNotFound or TripVersionNotFound (404, with that code).");
+
+        trips.MapPost("/{number}/start", StartAsync)
+            .WithName("StartTrip")
+            .RequireAuthorization(policy => policy.RequireRole(StartRole))
+            .WithMetadata(new TrackedFlow(Flows.TripExecution))
+            .WithSummary("Start a Dispatched Trip on its day: the Driver reports it from the Driver app.")
+            .WithDescription(
+                "driverId is the Driver ID from the Driver's token, which the Driver reports Logic App passes on, and the X-Correlation-ID is the Driver's action trail. "
+                + "In one transaction the Trip becomes In progress, at the same version, and exactly one TripStarted (Trip number, version, Driver ID, start time) is written to the outbox for the Trip events topic under that correlation ID. "
+                + "From then on the only change the Planner can make is taking off a Shipment that isn't collected: every other change is TripUnderWay (409). "
+                + "Refused with TripNotFound (404) for an unknown Trip, or one whose Driver is not the Driver from the token, TripNotDispatched (409) for a Draft or a Trip that is In progress already, and NotTripDay (409) when today is not the Trip's day in Norvia's time.");
 
         trips.MapPut("/{number}", ChangeDraftAsync)
             .WithName("ChangeDraftTrip")
@@ -309,6 +324,31 @@ public static class TripEndpoints
         return result.IsSuccess ? TypedResults.Ok(result.Value) : ReportRefused(result, correlationId);
     }
 
+    private static async Task<Results<Ok<StartTripResult>, ProblemHttpResult, ValidationProblem>> StartAsync(
+        string number,
+        [FromHeader(Name = TransportOrderEndpoints.CorrelationIdHeader)] string? correlationId,
+        StartTripRequest request,
+        IConflictRetrier retrier,
+        CancellationToken cancellationToken)
+    {
+        var errors = string.IsNullOrWhiteSpace(correlationId) ? CorrelationIdMissing("Starting a Trip") : [];
+        if (string.IsNullOrWhiteSpace(request.DriverId))
+        {
+            errors[nameof(StartTripRequest.DriverId)] = ["Starting a Trip needs the Driver ID from the Driver's token."];
+        }
+
+        if (errors.Count > 0 || correlationId is null || request.DriverId is not { } driverId)
+        {
+            return TypedResults.ValidationProblem(errors);
+        }
+
+        var result = await retrier.RunAsync(mediator => mediator.Send(new StartTripCommand(number, driverId, correlationId), cancellationToken).AsTask());
+        return result.IsSuccess
+            ? TypedResults.Ok(result.Value)
+            : RefusalProblem.Of<TripRefusalCode, StartTripResult>(
+                result, "The Trip can't be started.", correlationId, code => code == TripRefusalCode.TripNotFound ? StatusCodes.Status404NotFound : StatusCodes.Status409Conflict);
+    }
+
     // The change may be an Amend of a Dispatched Trip, which starts a Message trail in the TMS UI like a Dispatch does. The caller can't tell
     // beforehand, so the correlation ID is always created and answered in a header; it matters when the Trip was Dispatched.
     private static string AmendCorrelationId(HttpResponse response)
@@ -329,8 +369,8 @@ public static class TripEndpoints
         return errors;
     }
 
-    private static Dictionary<string, string[]> CorrelationIdMissing() =>
-        new() { [TransportOrderEndpoints.CorrelationIdHeader] = [$"Reporting a Trip's delivery needs an {TransportOrderEndpoints.CorrelationIdHeader}."] };
+    private static Dictionary<string, string[]> CorrelationIdMissing(string action = "Reporting a Trip's delivery") =>
+        new() { [TransportOrderEndpoints.CorrelationIdHeader] = [$"{action} needs an {TransportOrderEndpoints.CorrelationIdHeader}."] };
 
     private static ProblemHttpResult ReportRefused(Ardalis.Result.Result<TripDeliveryReportResult> result, string correlationId) =>
         RefusalProblem.Of<TripRefusalCode, TripDeliveryReportResult>(result, "The report can't be recorded.", correlationId, _ => StatusCodes.Status404NotFound);

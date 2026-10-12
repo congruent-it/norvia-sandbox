@@ -63,4 +63,10 @@ public static class Flows
     /// the Trip dispatch Logic App continues.
     /// </summary>
     public const string TripDispatch = "trip-dispatch";
+
+    /// <summary>
+    /// A Driver's work on a Dispatched Trip (P12): starting it, completing its Stops and ending it. It starts in the Driver app, whose
+    /// correlation ID for each action the Driver reports Logic App continues.
+    /// </summary>
+    public const string TripExecution = "trip-execution";
 }

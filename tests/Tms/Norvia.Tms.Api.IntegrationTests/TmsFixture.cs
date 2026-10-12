@@ -49,6 +49,9 @@ public class TmsFixture : IAsyncLifetime
 
     public const string TripDeliveryReportRole = "Trips.ReportDelivery";
 
+    /// <summary>The app role only the P12 Driver reports Logic App's managed identity holds, for starting a Trip.</summary>
+    public const string TripStartRole = "Trips.Start";
+
     /// <summary>The app role of the Carrier-tracking Logic App's managed identity, which records Tracking events (P5).</summary>
     public const string TrackingRecordRole = "TrackingEvents.Record";
 
@@ -99,6 +102,9 @@ public class TmsFixture : IAsyncLifetime
 
     /// <summary>The Trip dispatch Logic App, which reports a Trip version as delivered or not delivered.</summary>
     public HttpClient TripDeliveryReport { get; private set; } = null!;
+
+    /// <summary>The Driver reports Logic App, which starts a Trip for its Driver (P12).</summary>
+    public HttpClient TripStart { get; private set; } = null!;
 
     /// <summary>A client holding the record role, as the Carrier-tracking Logic App's managed identity will (P5, later ticket).</summary>
     public HttpClient TrackingRecord { get; private set; } = null!;
@@ -160,6 +166,7 @@ public class TmsFixture : IAsyncLifetime
         CarrierReport = CreateTmsClient(IssueToken([ReportRole], clientId: "norvia-test-p4-booking-logic-app"));
         ShipperNotificationReport = CreateTmsClient(IssueToken([ShipperNotificationReportRole], clientId: "norvia-test-p7-shipper-notification-logic-app"));
         TripDeliveryReport = CreateTmsClient(IssueToken([TripDeliveryReportRole], clientId: "norvia-test-p11-trip-dispatch-logic-app"));
+        TripStart = CreateTmsClient(IssueToken([TripStartRole], clientId: "norvia-test-p12-driver-reports-logic-app"));
         TrackingRecord = CreateTmsClient(IssueToken([TrackingRecordRole], clientId: "norvia-test-carrier-tracking-logic-app"));
 
         ShipperTracking = CreateTmsClient(IssueToken([ShipperTrackingReadRole], clientId: "norvia-test-apim"));
@@ -468,6 +475,7 @@ public class TmsFixture : IAsyncLifetime
         CarrierReport?.Dispose();
         ShipperNotificationReport?.Dispose();
         TripDeliveryReport?.Dispose();
+        TripStart?.Dispose();
         TrackingRecord?.Dispose();
         ShipperTracking?.Dispose();
         ProofOfDeliveryRecord?.Dispose();

@@ -275,7 +275,21 @@ The demo:
 
 ## Implementation
 
-Not built yet.
+For engineers and coding agents. It shows where the built part of P12 lives in the repository. It follows the [P11 section](p11-trip-dispatch.md#implementation).
+
+### Built so far
+
+Start Trip at the TMS boundary: `POST /v1/trips/{number}/start` with the `driverId` from the Driver's token in the body and the Driver's `X-Correlation-ID`, role `Trips.Start` (the Driver reports Logic App's, which is not built yet; the app role is defined in [identities.bicep](../../../infra/estate/identities.bicep) and no identity holds it). A Dispatched Trip on its day, in Norvia's time, becomes In progress at the same version, and in the same transaction exactly one `TripStarted` is written to the outbox for the `trip-events` topic under that correlation ID. It is refused with `TripNotFound` (404, also when the Driver isn't the Trip's), `TripNotDispatched` (409, a Draft or a Trip that is In progress already) or `NotTripDay` (409), and a refusal changes nothing. A second Start is `TripNotDispatched`, not a repeat; recognising a repeated Driver app event ID comes with the Logic App. From Start on, every Amend but [taking off an uncollected Shipment](p11-trip-dispatch.md#taking-a-shipment-off-a-trip) is refused with `TripUnderWay`. The Trips view and the Trip detail show the status. The Flow is `trip-execution`: the call logs `correlationId`, `flow`, `tripNumber` and the `outcome` with the `failureCode` of a refusal.
+
+| Part | Where |
+|---|---|
+| Rules and the status change | `Trip.EnsureCanStart` and `Trip.Start` in [Trip.cs](../../../src/Tms/Norvia.Tms.Domain/Trips/Trip.cs), raising `TripStartedEvent` |
+| Command, handler, `TripStarted` | [Trips/Start](../../../src/Tms/Norvia.Tms.Application/Trips/Start) |
+| Endpoint | `StartAsync` in [TripEndpoints.cs](../../../src/Tms/Norvia.Tms.Api/Trips/TripEndpoints.cs) |
+| Schema and samples | [trip-started.v1.schema.json](../../../contracts/canonical-model/trip-started.v1.schema.json), [samples/trip-started](../../../contracts/canonical-model/samples/trip-started) |
+| Boundary tests | [TripStartTests.cs](../../../tests/Tms/Norvia.Tms.Api.IntegrationTests/Trips/TripStartTests.cs), with the controllable clock of P10 |
+
+Not built yet: the Driver app's actions, sign-in, the Driver reports Logic App, the Stop reports, the Proof of delivery, End Trip, `TripCompleted` and Re-delivery.
 
 ## Deferred
 

@@ -95,15 +95,78 @@ public sealed class TripTests
         trip.Dispatch(new CorrelationId("c"), DateTimeOffset.UtcNow, Truck, Joost, []);
         trip.EnsureAmendable().Should().BeNull();
 
-        trip.MarkInProgress();
+        trip.Start(new CorrelationId("c"), DateTimeOffset.UtcNow);
         trip.EnsureAmendable()!.Code.Should().Be(TripRefusalCode.TripUnderWay);
         trip.Invoking(t => t.Pick(null, null)).Should().Throw<InvalidOperationException>();
     }
 
     [Fact]
-    public void MarkInProgress_OnADraft_IsABug() =>
-        Trip.CreateDraft(TripNumber.FromSequence(1), Day, null, null, new IdempotencyKey("k"))
-            .Invoking(t => t.MarkInProgress()).Should().Throw<InvalidOperationException>();
+    public void Start_ADispatchedTrip_IsInProgress_KeepsItsVersion_AndRaisesOneTripStarted()
+    {
+        var trip = CompleteDraft(ShipmentId.New());
+        trip.Dispatch(new CorrelationId("c"), DateTimeOffset.UtcNow, Truck, Joost, []);
+        trip.ClearDomainEvents();
+        var startedAt = new DateTimeOffset(2026, 10, 13, 8, 5, 0, TimeSpan.Zero);
+
+        trip.Start(new CorrelationId("start"), startedAt);
+
+        trip.Status.Should().Be(TripStatus.InProgress);
+        trip.Version.Should().Be(1);
+        var started = trip.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<TripStartedEvent>().Subject;
+        started.Trip.Should().BeSameAs(trip);
+        started.DriverId.Should().Be(Joost.Id);
+        started.StartedAt.Should().Be(startedAt);
+        started.CorrelationId.Should().Be(new CorrelationId("start"));
+    }
+
+    [Fact]
+    public void Start_ADraftOrATripUnderWay_IsABug()
+    {
+        var draft = CompleteDraft(ShipmentId.New());
+        draft.Invoking(t => t.Start(new CorrelationId("c"), DateTimeOffset.UtcNow)).Should().Throw<InvalidOperationException>();
+
+        draft.Dispatch(new CorrelationId("c"), DateTimeOffset.UtcNow, Truck, Joost, []);
+        draft.Start(new CorrelationId("c"), DateTimeOffset.UtcNow);
+        draft.Invoking(t => t.Start(new CorrelationId("c"), DateTimeOffset.UtcNow)).Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void EnsureCanStart_ADispatchedTripOfTheDriverOnItsDay_IsNull()
+    {
+        var trip = CompleteDraft(ShipmentId.New());
+        trip.Dispatch(new CorrelationId("c"), DateTimeOffset.UtcNow, Truck, Joost, []);
+
+        trip.EnsureCanStart(Joost.Id, trip.Day).Should().BeNull();
+    }
+
+    [Fact]
+    public void EnsureCanStart_AnotherDriver_IsTripNotFound_EvenWhenTheTripIsADraftOrOnAnotherDay()
+    {
+        var trip = CompleteDraft(ShipmentId.New());
+
+        trip.EnsureCanStart(new DriverId("DRV-0099"), trip.Day.AddDays(1))!.Code.Should().Be(TripRefusalCode.TripNotFound);
+    }
+
+    [Fact]
+    public void EnsureCanStart_ADraftOrATripUnderWay_IsTripNotDispatched()
+    {
+        var trip = CompleteDraft(ShipmentId.New());
+        trip.EnsureCanStart(Joost.Id, trip.Day)!.Code.Should().Be(TripRefusalCode.TripNotDispatched);
+
+        trip.Dispatch(new CorrelationId("c"), DateTimeOffset.UtcNow, Truck, Joost, []);
+        trip.Start(new CorrelationId("c"), DateTimeOffset.UtcNow);
+        trip.EnsureCanStart(Joost.Id, trip.Day)!.Code.Should().Be(TripRefusalCode.TripNotDispatched);
+    }
+
+    [Fact]
+    public void EnsureCanStart_AnotherDay_IsNotTripDay()
+    {
+        var trip = CompleteDraft(ShipmentId.New());
+        trip.Dispatch(new CorrelationId("c"), DateTimeOffset.UtcNow, Truck, Joost, []);
+
+        trip.EnsureCanStart(Joost.Id, trip.Day.AddDays(-1))!.Code.Should().Be(TripRefusalCode.NotTripDay);
+        trip.EnsureCanStart(Joost.Id, trip.Day.AddDays(1))!.Code.Should().Be(TripRefusalCode.NotTripDay);
+    }
 
     [Fact]
     public void PickPlanAndAddShipment_AnswerWhetherTheyChangedTheTrip_AlsoOnADispatchedTrip()

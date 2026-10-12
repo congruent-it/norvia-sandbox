@@ -16,6 +16,8 @@ internal static class CanonicalSchemas
 
     private static readonly Lazy<JsonSchema> TripNotDeliveredSchema = new(() => Load("trip-not-delivered.v1.schema.json"));
 
+    private static readonly Lazy<JsonSchema> TripStartedSchema = new(() => Load("trip-started.v1.schema.json"));
+
     private static readonly Lazy<JsonSchema> ShipmentTakenOffTripSchema = new(() => Load("shipment-taken-off-trip.v1.schema.json"));
 
     public static IEnumerable<string> ShipmentTakenOffTripSamples() =>
@@ -24,6 +26,15 @@ internal static class CanonicalSchemas
 
     public static EvaluationResults ValidateShipmentTakenOffTrip(JsonNode body) =>
         ShipmentTakenOffTripSchema.Value.Evaluate(
+            JsonSerializer.SerializeToElement(body),
+            new EvaluationOptions { OutputFormat = OutputFormat.List, RequireFormatValidation = true });
+
+    public static IEnumerable<string> TripStartedSamples() =>
+        Assembly.GetExecutingAssembly().GetManifestResourceNames()
+            .Where(name => name.StartsWith("CanonicalModel/samples/trip-started/", StringComparison.Ordinal));
+
+    public static EvaluationResults ValidateTripStarted(JsonNode body) =>
+        TripStartedSchema.Value.Evaluate(
             JsonSerializer.SerializeToElement(body),
             new EvaluationOptions { OutputFormat = OutputFormat.List, RequireFormatValidation = true });
 

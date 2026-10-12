@@ -10,8 +10,7 @@ namespace Norvia.Tms.Api.IntegrationTests.Trips;
 /// <summary>
 /// Amending a Dispatched Trip (P11) at the TMS's boundary: the Planner's edits work on a Dispatched Trip, each one that changes it raises the version
 /// and publishes exactly one TripDispatched with the whole Trip under a new correlation ID, an added Shipment becomes Dispatched, and a refused Amend
-/// leaves the Trip, its version and its Shipments as they were. TripUnderWay needs a Trip that is In progress, which only P12 can make, so the
-/// handlers' unit tests cover it with that state set up. Each test moves the clock to a stretch of days of its own.
+/// leaves the Trip, its version and its Shipments as they were. TripUnderWay, from Start on, is in TripStartTests. Each test moves the clock to a stretch of days of its own.
 /// </summary>
 [Trait("AppHost", "Own4")]
 public sealed class TripAmendTests(TripsTmsFixture tms) : IClassFixture<TripsTmsFixture>, IDisposable

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/trip-started.v1.schema.json",
+  "title": "TripStarted",
+  "description": "The Driver started a Dispatched Trip on its day, so it is In progress (Canonical Model event, version 1). From now on the Planner can change the Trip only by taking off a Shipment that isn't collected. Published on the Trip events topic, under the correlation ID of the Driver's Start Trip action; the Trip number traces the Trip.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "tripNumber", "version", "driverId", "startedAt"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "const": "TripStarted" },
+    "eventVersion": { "const": 1 },
+    "occurredAt": { "description": "When the TMS recorded the start.", "type": "string", "format": "date-time" },
+    "correlationId": { "description": "The correlation ID of the Driver's Start Trip action.", "type": "string", "minLength": 1 },
+    "tripNumber": { "description": "The Trip's number.", "type": "string", "pattern": "^TR-[0-9]{7}$" },
+    "version": { "description": "The Trip's version when it started. Starting doesn't change it.", "type": "integer", "minimum": 1 },
+    "driverId": { "description": "The Driver who started the Trip: the Trip's Driver.", "type": "string", "minLength": 1 },
+    "startedAt": { "description": "When the Trip started.", "type": "string", "format": "date-time" }
+  }
+}

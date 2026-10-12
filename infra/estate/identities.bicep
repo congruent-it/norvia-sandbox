@@ -26,6 +26,8 @@ var shipperNotificationReportRole = 'ShipperNotifications.Report'
 var shipperNotificationReportRoleId = guid('norvia-tms-api', environmentName, shipperNotificationReportRole)
 var tripReportDeliveryRole = 'Trips.ReportDelivery'
 var tripReportDeliveryRoleId = guid('norvia-tms-api', environmentName, tripReportDeliveryRole)
+var tripStartRole = 'Trips.Start'
+var tripStartRoleId = guid('norvia-tms-api', environmentName, tripStartRole)
 var recordRole = 'TrackingEvents.Record'
 var recordRoleId = guid('norvia-tms-api', environmentName, recordRole)
 var recordProofRole = 'ProofsOfDelivery.Record'
@@ -122,6 +124,16 @@ resource tmsApi 'Microsoft.Graph/applications@v1.0' = {
       value: shipperNotificationReportRole
       displayName: 'Report Shipper notifications'
       description: 'Report that a Shipper notification was acknowledged by the Shipper\'s endpoint, or never reached it (P7). Only the P7 Shipper notification Logic App holds it.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
+    {
+      id: tripStartRoleId
+      value: tripStartRole
+      displayName: 'Start a Trip'
+      description: 'Start a Dispatched Trip for its Driver on the Trip\'s day (P12). Only the P12 Driver reports Logic App will hold it, once it is built.'
       allowedMemberTypes: [
         'Application'
       ]
