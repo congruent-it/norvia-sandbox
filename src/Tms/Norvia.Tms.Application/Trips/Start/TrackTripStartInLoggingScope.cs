@@ -19,7 +19,13 @@ public sealed partial class TrackTripStartInLoggingScope(ILogger<TrackTripStartI
         ArgumentNullException.ThrowIfNull(message);
         ArgumentNullException.ThrowIfNull(next);
 
-        using var trail = logger.Track(new() { [TrackingKeys.CorrelationId] = message.CorrelationId, [TrackingKeys.TripNumber] = message.Number });
+        var keys = new Dictionary<string, object?> { [TrackingKeys.CorrelationId] = message.CorrelationId, [TrackingKeys.TripNumber] = message.Number };
+        if (message.DriverAppEventId is not null)
+        {
+            keys[TrackingKeys.SourceMessageId] = message.DriverAppEventId;
+        }
+
+        using var trail = logger.Track(keys);
         var result = await next(message, cancellationToken);
         if (result.IsSuccess)
         {

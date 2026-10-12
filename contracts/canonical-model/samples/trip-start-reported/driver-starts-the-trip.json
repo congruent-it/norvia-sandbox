@@ -1,0 +1,10 @@
+{
+  "eventId": "0198e7c0-0000-7000-8000-0000000000c1",
+  "eventType": "TripStartReported",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-13T08:05:12+02:00",
+  "correlationId": "0198e7c0-0000-7000-8000-0000000000c2",
+  "tripNumber": "TR-0000012",
+  "version": 2,
+  "driverId": "DRV-0002"
+}

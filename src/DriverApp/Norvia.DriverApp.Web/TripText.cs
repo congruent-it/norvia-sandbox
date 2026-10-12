@@ -1,4 +1,5 @@
 using System.Globalization;
+using Norvia.DriverApp.Application.Reports;
 using Norvia.DriverApp.Application.Trips;
 
 namespace Norvia.DriverApp.Web;
@@ -19,6 +20,21 @@ internal static class TripText
         "RigidTruck" => "rigid truck",
         "TractorWithTrailer" => "tractor with trailer",
         _ => type.ToLowerInvariant(),
+    };
+
+    public static string ReportAction(ReportKindDto kind) => kind switch
+    {
+        ReportKindDto.StartTrip => "Start Trip",
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "A kind of report the Driver app has no words for."),
+    };
+
+    public static string ReportState(ReportStateDto state) => state switch
+    {
+        ReportStateDto.Sending => "Sending",
+        ReportStateDto.Recorded => "Recorded",
+        ReportStateDto.Refused => "Refused",
+        ReportStateDto.NotRecorded => "Not recorded",
+        _ => throw new ArgumentOutOfRangeException(nameof(state), state, "A state of a report the Driver app has no words for."),
     };
 
     public static string StopAction(StopKindDto kind) => kind == StopKindDto.Collection ? "Collect" : "Deliver";

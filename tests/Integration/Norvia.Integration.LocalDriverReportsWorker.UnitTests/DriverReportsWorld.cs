@@ -1,0 +1,103 @@
+using System.Net;
+using System.Text;
+using System.Text.Json.Nodes;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
+
+namespace Norvia.Integration.LocalDriverReportsWorker.UnitTests;
+
+/// <summary>The flow with the TMS and the Driver app stood in for, and a clock the test moves.</summary>
+internal sealed class DriverReportsWorld
+{
+    public const string TripNumber = "TR-0000012";
+    public const string EventId = "0198e7c0-0000-7000-8000-0000000000c1";
+    public const string CorrelationId = "0198e7c0-0000-7000-8000-0000000000c2";
+    public const string Signing = "c2lnbmluZy1rZXktZm9yLXRoZS11bml0LXRlc3RzLXNpZ25pbmcta2V5LTEyMzQ1Njc4OTA=";
+
+    public DriverReportsWorld(int retryCount = 3)
+    {
+        Time = new FakeTimeProvider(new DateTimeOffset(2030, 10, 1, 8, 0, 0, TimeSpan.Zero));
+        Tms = new StubHttp(Time);
+        DriverApp = new StubHttp(Time);
+        Options = Microsoft.Extensions.Options.Options.Create(new DriverReportsWorkerOptions
+        {
+            TmsBaseAddress = new Uri("http://tms.test"),
+            TmsTokens = new() { Issuer = "issuer", Audience = "tms", ClientId = "driver-reports-worker", SigningKey = Signing },
+            DriverApp = new()
+            {
+                BaseAddress = new Uri("http://driver-app.test"),
+                Tokens = new() { Issuer = "issuer", Audience = "driver-app", ClientId = "driver-reports-worker", SigningKey = Signing },
+            },
+            Retry = new() { Count = retryCount, Interval = TimeSpan.FromSeconds(5), MaximumInterval = TimeSpan.FromSeconds(20) },
+        });
+
+        Flow = new DriverReportsFlow(
+            new TmsTripCalls(new HttpClient(Tms) { BaseAddress = Options.Value.TmsBaseAddress }, Options, Time),
+            new DriverAppOutcomes(new HttpClient(DriverApp) { BaseAddress = Options.Value.DriverApp.BaseAddress }, Options, Time),
+            Options, Time, NullLogger<DriverReportsFlow>.Instance);
+    }
+
+    public FakeTimeProvider Time { get; }
+
+    public StubHttp Tms { get; }
+
+    public StubHttp DriverApp { get; }
+
+    public IOptions<DriverReportsWorkerOptions> Options { get; }
+
+    public DriverReportsFlow Flow { get; }
+
+    /// <summary>How the run settled the message, and how many calls the Driver app had by then: the message is settled before the outcome is reported.</summary>
+    public List<(Settlement Settlement, int DriverAppCalls)> Settled { get; } = [];
+
+    public static string StartReported(string driverId = "DRV-0002") => $$"""
+        {
+          "eventId": "{{EventId}}",
+          "eventType": "TripStartReported",
+          "eventVersion": 1,
+          "occurredAt": "2030-10-03T08:05:12+02:00",
+          "correlationId": "{{CorrelationId}}",
+          "tripNumber": "{{TripNumber}}",
+          "version": 2,
+          "driverId": "{{driverId}}"
+        }
+        """;
+
+    public static string Problem(int status, string code, string detail) => $$"""
+        { "type": "about:blank", "title": "The Trip can't be started.", "status": {{status}}, "detail": "{{detail}}", "code": "{{code}}", "correlationId": "{{CorrelationId}}" }
+        """;
+
+    /// <summary>Runs the flow, moving the clock on whenever it waits to retry.</summary>
+    public async Task<DriverReportsRunOutcome> RunAsync(string message)
+    {
+        var run = Flow.RunAsync(
+            message,
+            (settlement, _) =>
+            {
+                Settled.Add((settlement, DriverApp.Requests.Count));
+                return Task.CompletedTask;
+            },
+            CancellationToken.None);
+        while (!run.IsCompleted)
+        {
+            Time.Advance(TimeSpan.FromSeconds(1));
+            await Task.Yield();
+        }
+
+        return await run;
+    }
+
+    public JsonObject OutcomeReported(int index = 0) => JsonNode.Parse(DriverApp.Requests[index].Body)!.AsObject();
+
+    /// <summary>The app role in the bearer token of a request.</summary>
+    public static string RoleOf(StubHttp.Request request)
+    {
+        var token = request.Headers["Authorization"]["Bearer ".Length..];
+        var payload = token.Split('.')[1].Replace('-', '+').Replace('_', '/');
+        payload = payload.PadRight(payload.Length + ((4 - (payload.Length % 4)) % 4), '=');
+        return JsonNode.Parse(Encoding.UTF8.GetString(Convert.FromBase64String(payload)))!["roles"]!.AsArray().Single()!.GetValue<string>();
+    }
+
+    public static StubHttp Answering(StubHttp http, HttpStatusCode status, string body = "") => http.Otherwise(status, body);
+}

@@ -17,6 +17,12 @@ param carrierCancellationPrincipalId string
 @description('The P11 Trip dispatch Logic App\'s identity, which receives from its own subscription and from nothing else.')
 param tripDispatchPrincipalId string
 
+@description('The P12 Driver reports Logic App\'s identity, which receives from its own subscription and from nothing else.')
+param driverReportsPrincipalId string
+
+@description('The Driver app\'s identity, which sends to the Driver app events topic and to nothing else.')
+param driverAppPrincipalId string
+
 @description('The Carrier-tracking Logic App\'s identity, which receives from the tracking queue and from nothing else.')
 param trackingPrincipalId string
 
@@ -102,6 +108,37 @@ resource tripDispatchFilter 'Microsoft.ServiceBus/namespaces/topics/subscription
     filterType: 'SqlFilter'
     sqlFilter: {
       sqlExpression: '(eventType = \'TripDispatched\' AND resubmitTo IS NULL) OR resubmitTo = \'trip-dispatch\''
+    }
+  }
+}
+
+// The topic for Driver app events (P12). The Driver app publishes what the Driver reports to it through its outbox, with the Trip number as the
+// session ID, and the Driver reports Logic App is the only consumer (ADR 0016).
+resource driverAppEvents 'Microsoft.ServiceBus/namespaces/topics@2024-01-01' = {
+  parent: serviceBus
+  name: 'driver-app-events'
+}
+
+// The Driver reports Logic App's subscription uses sessions, so one Trip's reports are read one at a time and in order. Its filter also routes
+// resubmits from the console, like every subscription's (coding guidelines §7). The AppHost's emulator gives the same subscription the same
+// condition (ResubmitAwareFilters).
+resource driverReports 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01' = {
+  parent: driverAppEvents
+  name: 'driver-reports'
+  properties: {
+    requiresSession: true
+    // Long enough for the Logic App's retries of one report, which hold the session.
+    lockDuration: 'PT5M'
+  }
+}
+
+resource driverReportsFilter 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
+  parent: driverReports
+  name: '$Default'
+  properties: {
+    filterType: 'SqlFilter'
+    sqlFilter: {
+      sqlExpression: '(eventType = \'TripStartReported\' AND resubmitTo IS NULL) OR resubmitTo = \'driver-reports\''
     }
   }
 }
@@ -237,6 +274,28 @@ resource tripDispatchReceivesItsMessages 'Microsoft.Authorization/roleAssignment
   properties: {
     principalId: tripDispatchPrincipalId
     roleDefinitionId: serviceBusDataReceiver
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Scoped to the subscription, so the Driver reports Logic App reads the Drivers' reports and no other message.
+resource driverReportsReceivesItsMessages 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(driverReports.id, driverReportsPrincipalId, serviceBusDataReceiver)
+  scope: driverReports
+  properties: {
+    principalId: driverReportsPrincipalId
+    roleDefinitionId: serviceBusDataReceiver
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Scoped to the topic, so the Driver app sends the Drivers' reports and nothing else. Aspire gives its API the same role (WithRoleAssignments).
+resource driverAppSendsItsEvents 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(driverAppEvents.id, driverAppPrincipalId, serviceBusDataSender)
+  scope: driverAppEvents
+  properties: {
+    principalId: driverAppPrincipalId
+    roleDefinitionId: serviceBusDataSender
     principalType: 'ServicePrincipal'
   }
 }

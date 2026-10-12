@@ -120,6 +120,30 @@ public sealed class TripTests
     }
 
     [Fact]
+    public void Start_WithADriverAppEventId_RemembersIt_SoThatRepeatedReportIsRecognised()
+    {
+        var trip = CompleteDraft(ShipmentId.New());
+        trip.Dispatch(new CorrelationId("c"), DateTimeOffset.UtcNow, Truck, Joost, []);
+
+        trip.WasStartedBy("event-1").Should().BeFalse("a Dispatched Trip hasn't been started by anyone");
+        trip.Start(new CorrelationId("start"), DateTimeOffset.UtcNow, "event-1");
+
+        trip.WasStartedBy("event-1").Should().BeTrue();
+        trip.WasStartedBy("event-2").Should().BeFalse();
+        trip.WasStartedBy("EVENT-1").Should().BeFalse("event IDs are compared as they are");
+    }
+
+    [Fact]
+    public void Start_WithoutADriverAppEventId_IsNeverARepeat()
+    {
+        var trip = CompleteDraft(ShipmentId.New());
+        trip.Dispatch(new CorrelationId("c"), DateTimeOffset.UtcNow, Truck, Joost, []);
+        trip.Start(new CorrelationId("start"), DateTimeOffset.UtcNow);
+
+        trip.WasStartedBy("anything").Should().BeFalse();
+    }
+
+    [Fact]
     public void Start_ADraftOrATripUnderWay_IsABug()
     {
         var draft = CompleteDraft(ShipmentId.New());

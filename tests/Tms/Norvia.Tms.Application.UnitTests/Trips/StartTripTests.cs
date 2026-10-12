@@ -82,9 +82,45 @@ public sealed class StartTripTests
         await _fixture.Trips.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
-    private async Task<Result<StartTripResult>> Start(string number, DriverId driver, string correlationId) =>
+    [Fact]
+    public async Task ARepeatedDriverAppEventId_SucceedsAsARepeat_RaisesNothing_AndSavesNothing()
+    {
+        var trip = await _fixture.DispatchedAsync();
+        _fixture.Planning.Time.SetUtcNow(new DateTimeOffset(2026, 10, 13, 6, 5, 0, TimeSpan.Zero));
+        (await Start(trip.Number.Value, PlanningEditsFixture.Anouk, "corr-start", "event-1")).Value.Repeat.Should().BeFalse();
+        trip.ClearDomainEvents();
+        _fixture.Trips.ClearReceivedCalls();
+
+        var repeat = await Start(trip.Number.Value, PlanningEditsFixture.Anouk, "corr-start", "event-1");
+
+        repeat.Value.Should().Be(new StartTripResult(trip.Number.Value, 1, "corr-start", Repeat: true));
+        trip.DomainEvents.Should().BeEmpty();
+        await _fixture.Trips.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ARepeatedDriverAppEventId_OfAnotherDriver_IsStillTripNotFound()
+    {
+        var trip = await _fixture.DispatchedAsync();
+        _fixture.Planning.Time.SetUtcNow(new DateTimeOffset(2026, 10, 13, 6, 5, 0, TimeSpan.Zero));
+        (await Start(trip.Number.Value, PlanningEditsFixture.Anouk, "corr-start", "event-1")).IsSuccess.Should().BeTrue();
+
+        Codes(await Start(trip.Number.Value, PlanningEditsFixture.Joost, "corr-start", "event-1")).Should().Equal(nameof(TripRefusalCode.TripNotFound));
+    }
+
+    [Fact]
+    public async Task AnotherDriverAppEventId_OnATripInProgress_IsStillTripNotDispatched()
+    {
+        var trip = await _fixture.DispatchedAsync();
+        _fixture.Planning.Time.SetUtcNow(new DateTimeOffset(2026, 10, 13, 6, 5, 0, TimeSpan.Zero));
+        (await Start(trip.Number.Value, PlanningEditsFixture.Anouk, "corr-start", "event-1")).IsSuccess.Should().BeTrue();
+
+        Codes(await Start(trip.Number.Value, PlanningEditsFixture.Anouk, "corr-other", "event-2")).Should().Equal(nameof(TripRefusalCode.TripNotDispatched));
+    }
+
+    private async Task<Result<StartTripResult>> Start(string number, DriverId driver, string correlationId, string? driverAppEventId = null) =>
         await new StartTripHandler(_fixture.Trips, _fixture.Planning.Horizon, _fixture.Planning.Time)
-            .Handle(new StartTripCommand(number, driver.Value, correlationId), CancellationToken.None);
+            .Handle(new StartTripCommand(number, driver.Value, correlationId, driverAppEventId), CancellationToken.None);
 
     private static IEnumerable<string> Codes(Result<StartTripResult> result) => result.ValidationErrors.Select(error => error.ErrorCode);
 }

@@ -140,6 +140,18 @@ _Avoid_: re-dispatch, update, recall
 The Planner removing an uncollected Shipment's two Stops from its Trip, which puts the Shipment back to Planned so it can be re-planned in P3, and publishes `ShipmentTakenOffTrip`. On a Dispatched Trip it is also an Amend.
 _Avoid_: unassign, remove, unplan
 
+**Driver report**:
+One thing a Driver did from the road and told the Driver app: so far, Start Trip. The Driver app keeps it with its state until the Driver reports Logic App says what became of it. Published as a Driver app event.
+_Avoid_: update, message
+
+**Driver app event**:
+An event the Driver app publishes for a Driver report, such as `TripStartReported`, with its own Driver app event ID. The Driver app reports and the TMS decides, so the name says what the Driver did, not what the TMS made of it.
+_Avoid_: Trip event (those are the TMS's)
+
+**Sending / Recorded / Refused / Not recorded**:
+The state of a Driver report as the Driver sees it. Sending: published, no answer yet. Recorded: the TMS accepted it. Refused: the TMS refused it, with its failure code and message. Not recorded: the Driver reports Logic App gave up after its retries.
+_Avoid_: pending, failed, error
+
 **Start Trip**:
 The Driver beginning a Dispatched Trip in the Driver app on its day, which makes it In progress. From then on the Planner can only take off a Shipment that isn't collected.
 _Avoid_: begin, check in

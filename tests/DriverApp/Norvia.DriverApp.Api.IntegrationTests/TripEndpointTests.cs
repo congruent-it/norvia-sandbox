@@ -6,6 +6,8 @@ using System.Text.Json.Nodes;
 
 namespace Norvia.DriverApp.Api.IntegrationTests;
 
+// Serial with the tests of the reporting path: the Driver app's "unavailable" fault is for the whole app.
+[Collection("Driver app")]
 public sealed class TripEndpointTests(DriverAppFixture driverApp)
 {
     private static readonly CancellationToken Ct = TestContext.Current.CancellationToken;

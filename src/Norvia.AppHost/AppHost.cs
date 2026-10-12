@@ -79,8 +79,11 @@ var driverAppMigrations = builder.AddProject<Projects.Norvia_DriverApp_Migration
     .WithReference(driverAppDatabase).WaitFor(driverAppDatabase)
     .PublishAsAzureContainerAppJob();
 
+// Its outbox publishes what the Driver reports to the topic for Driver app events (P12), and it takes the Driver reports Logic App's outcome reports.
 var driverAppApi = builder.AddProject<Projects.Norvia_DriverApp_Api>("driver-app-api")
     .WithReference(driverAppDatabase).WaitForCompletion(driverAppMigrations)
+    .WithReference(messaging).WaitFor(messaging)
+    .WithRoleAssignments(messaging, ServiceBusBuiltInRole.AzureServiceBusDataSender)
     .WithHttpHealthCheck("/health");
 
 // The Partner portal's presenter panel switches the Driver app's "unavailable" fault through its API (P11).
@@ -193,9 +196,13 @@ if (builder.ExecutionContext.IsPublishMode)
         .PublishAsExisting(estate.DriverAppIdentity, null);
     var driverAppSecrets = builder.AddAzureKeyVault("driver-app-secrets")
         .PublishAsExisting(estate.DriverAppKeyVault, null);
+    // Its outcome endpoint trusts Entra only, and only the Driver reports Logic App's managed identity may report (ADR 0005).
     driverAppApi.WithExternalHttpEndpoints()
         .WithAzureUserAssignedIdentity(driverAppIdentity)
-        .WithEnvironment("DriverEndpoint__ApiKey", driverAppSecrets.Resource.GetSecret("driver-app-endpoint-key"));
+        .WithEnvironment("DriverEndpoint__ApiKey", driverAppSecrets.Resource.GetSecret("driver-app-endpoint-key"))
+        .WithEnvironment("Authentication__Schemes__Bearer__Authority", estate.EntraIssuer)
+        .WithEnvironment("Authentication__Schemes__Bearer__ValidIssuer", estate.EntraIssuer)
+        .WithEnvironment("Authentication__Schemes__Bearer__ValidAudiences__0", estate.DriverAppApiClientId);
 
     // Drivers sign in to the Driver app with Entra ID. Easy Auth passes the Driver's token on, and the Driver ID is the app role
     // in it (ADR 0037). The presenter panel shows the Driver test users the estate made.
@@ -238,6 +245,11 @@ else
     var tripEvents = messaging.AddServiceBusTopic("trip-events");
     tripEvents.AddServiceBusSubscription("trip-events-monitoring", subscriptionName: "monitoring");
     tripEvents.AddServiceBusSubscription("trip-dispatch");
+    // The topic for Driver app events (P12). The Driver reports Logic App is the only consumer, with a subscription of its own that uses sessions
+    // keyed by Trip number, so one Trip's reports are read one at a time and in order: TripStartReported only (see ResubmitAwareFilters).
+    messaging.AddServiceBusTopic("driver-app-events")
+        .AddServiceBusSubscription("driver-reports")
+        .WithProperties(subscription => subscription.RequiresSession = true);
     // The tracking queue API Management puts a Carrier's tracking message on and the Carrier-tracking Logic App reads
     // (ADR 0008). A message the TMS refuses is dead-lettered; one it can't be given to is delivered again up to the
     // maximum delivery count, then dead-lettered by Service Bus itself. The estate Bicep sets the same count.
@@ -364,7 +376,10 @@ else
         new GenerateParameterDefault { MinLength = 32, Special = false },
         secret: true,
         persist: true);
-    driverAppApi.WithEnvironment("DriverEndpoint__ApiKey", driverEndpointKey);
+    driverAppApi.WithEnvironment("DriverEndpoint__ApiKey", driverEndpointKey)
+        .WithEnvironment("Authentication__Schemes__Bearer__ValidIssuer", LocalTokens.Issuer)
+        .WithEnvironment("Authentication__Schemes__Bearer__ValidAudiences__0", LocalTokens.DriverAppAudience)
+        .WithEnvironment("Authentication__Schemes__Bearer__SigningKeys__0__Issuer", LocalTokens.Issuer);
     var tripDispatchWorker = builder.AddProject<Projects.Norvia_Integration_LocalTripDispatchWorker>("trip-dispatch-worker")
         .WithReference(messaging).WaitFor(messaging)
         .WithReference(tmsApi).WaitFor(tmsApi)
@@ -375,6 +390,21 @@ else
         .WithEnvironment("TripDispatch__TmsTokens__ClientId", LocalTokens.TripDispatchLogicAppClientId)
         .WithEnvironment("TripDispatch__DriverApp__Address", ReferenceExpression.Create($"{driverAppApi.GetEndpoint("http")}/v1/trips"))
         .WithEnvironment("TripDispatch__DriverApp__ApiKey", driverEndpointKey);
+    // Locally a worker plays the P12 Driver reports Logic App as well. It reads the Driver app events subscription one Trip at a time, calls the
+    // TMS as the identity holding the Trip start role, and tells the Driver app what became of each report as the identity holding the outcome
+    // role.
+    var driverReportsWorker = builder.AddProject<Projects.Norvia_Integration_LocalDriverReportsWorker>("driver-reports-worker")
+        .WithReference(messaging).WaitFor(messaging)
+        .WithReference(tmsApi).WaitFor(tmsApi)
+        .WaitFor(driverAppApi)
+        .WithEnvironment("DriverReports__TmsBaseAddress", tmsApi.GetEndpoint("http"))
+        .WithEnvironment("DriverReports__TmsTokens__Issuer", LocalTokens.Issuer)
+        .WithEnvironment("DriverReports__TmsTokens__Audience", LocalTokens.TmsAudience)
+        .WithEnvironment("DriverReports__TmsTokens__ClientId", LocalTokens.DriverReportsLogicAppClientId)
+        .WithEnvironment("DriverReports__DriverApp__BaseAddress", driverAppApi.GetEndpoint("http"))
+        .WithEnvironment("DriverReports__DriverApp__Tokens__Issuer", LocalTokens.Issuer)
+        .WithEnvironment("DriverReports__DriverApp__Tokens__Audience", LocalTokens.DriverAppAudience)
+        .WithEnvironment("DriverReports__DriverApp__Tokens__ClientId", LocalTokens.DriverReportsLogicAppClientId);
     // Locally a worker plays the Carrier-tracking Logic App too (ADR 0031). It reads the tracking queue API Management's
     // stand-in fills and records each Tracking event with the TMS as the identity holding the record role.
     var trackingWorker = builder.AddProject<Projects.Norvia_Integration_LocalTrackingWorker>("tracking-worker")
@@ -456,6 +486,9 @@ else
         (shipperNotificationWorker.Resource, "ShipperNotification__TmsTokens__SigningKey"),
         (carrierCancellationWorker.Resource, "CarrierCancellation__TmsTokens__SigningKey"),
         (tripDispatchWorker.Resource, "TripDispatch__TmsTokens__SigningKey"),
+        (driverReportsWorker.Resource, "DriverReports__TmsTokens__SigningKey"),
+        (driverReportsWorker.Resource, "DriverReports__DriverApp__Tokens__SigningKey"),
+        (driverAppApi.Resource, "Authentication__Schemes__Bearer__SigningKeys__0__Value"),
         (trackingWorker.Resource, "Tracking__TmsTokens__SigningKey"),
         (proofOfDeliveryWorker.Resource, "ProofOfDelivery__TmsTokens__SigningKey"),
         (partnerPortal.Resource, "PartnerApi__LocalTokens__SigningKey"),

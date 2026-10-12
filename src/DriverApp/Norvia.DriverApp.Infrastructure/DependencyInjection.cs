@@ -3,17 +3,22 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Norvia.DriverApp.Application;
 using Norvia.DriverApp.Application.Drivers;
+using Norvia.DriverApp.Application.Events;
 using Norvia.DriverApp.Infrastructure.Data;
 using Norvia.DriverApp.Infrastructure.Drivers;
+using Norvia.DriverApp.Infrastructure.Outbox;
 
 namespace Norvia.DriverApp.Infrastructure;
 
 public static class DependencyInjection
 {
     public const string DatabaseConnectionName = "driver-app";
+    public const string MessagingConnectionName = "messaging";
 
     public static IHostApplicationBuilder AddDriverAppInfrastructure(this IHostApplicationBuilder builder)
     {
@@ -23,6 +28,22 @@ public static class DependencyInjection
         builder.Services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
         builder.Services.AddScoped(typeof(IReadRepository<>), typeof(EfRepository<>));
         builder.Services.AddScoped<IConflictRetrier, EfConflictRetrier>();
+
+        return builder;
+    }
+
+    /// <summary>
+    /// Sends committed outbox messages to Service Bus. Only the API runs it: the Driver's screens share the database, and a second publisher would
+    /// send the same message twice.
+    /// </summary>
+    public static IHostApplicationBuilder AddDriverAppOutboxPublisher(this IHostApplicationBuilder builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.AddAzureServiceBusClient(MessagingConnectionName);
+        builder.Services.AddOptions<OutboxOptions>().BindConfiguration(OutboxOptions.SectionName)
+            .ValidateDataAnnotations().ValidateOnStart();
+        builder.Services.AddHostedService<OutboxPublisher>();
 
         return builder;
     }
@@ -79,5 +100,8 @@ public static class DependencyInjection
         builder.Services.AddDbContext<DriverAppDbContext>(options =>
             options.UseSqlServer(WithTimeoutForAResume(builder.Configuration.GetConnectionString(DatabaseConnectionName))));
         builder.EnrichSqlServerDbContext<DriverAppDbContext>();
+        builder.Services.TryAddSingleton(TimeProvider.System);
+        builder.Services.AddScoped<OutboxBuffer>();
+        builder.Services.AddScoped<IDriverEventOutbox>(services => services.GetRequiredService<OutboxBuffer>());
     }
 }

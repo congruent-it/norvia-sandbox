@@ -35,6 +35,9 @@ public static class TrackingKeys
     /// <summary>The <see cref="Flow"/> of a Trip version sent to the Driver app, from the dispatch to the report to the TMS.</summary>
     public const string TripDispatch = "trip-dispatch";
 
+    /// <summary>The <see cref="Flow"/> of a Driver's action on a Trip (P12), from the Driver app's report to the TMS's answer.</summary>
+    public const string TripExecution = "trip-execution";
+
     /// <summary>The <see cref="Flow"/> of a Carrier's tracking message, from the edge to the TMS.</summary>
     public const string CarrierTracking = "carrier-tracking";
 

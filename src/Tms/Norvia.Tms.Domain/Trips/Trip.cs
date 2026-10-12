@@ -37,6 +37,9 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
     /// <summary>Whether the Driver app has each version, in version order. A Draft has none.</summary>
     public IReadOnlyList<TripVersionDelivery> Deliveries => _deliveries;
 
+    /// <summary>The Driver app event ID of the report that started the Trip (P12), which recognises a repeat of it; null before it started.</summary>
+    public string? StartedByEventId { get; private set; }
+
     /// <summary>Whether the Driver app has the Trip's latest version; null while the Trip is a Draft.</summary>
     public TripVersionDelivery? LatestDelivery => DeliveryOf(Version);
 
@@ -291,7 +294,7 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
     /// The Driver started the Trip (P12): it is In progress, at the same version, and <see cref="TripStartedEvent"/> is raised. The caller
     /// checks <see cref="EnsureCanStart"/> first.
     /// </summary>
-    public void Start(CorrelationId correlationId, DateTimeOffset startedAt)
+    public void Start(CorrelationId correlationId, DateTimeOffset startedAt, string? driverAppEventId = null)
     {
         ArgumentNullException.ThrowIfNull(correlationId);
         if (Status != TripStatus.Dispatched || DriverId is not { } driver)
@@ -300,7 +303,18 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
         }
 
         Status = TripStatus.InProgress;
+        StartedByEventId = driverAppEventId;
         RegisterDomainEvent(new TripStartedEvent(this, driver, correlationId, startedAt));
+    }
+
+    /// <summary>
+    /// Whether the Driver app event with this ID is the one that started the Trip, so a report that arrives again, as the Driver reports Logic
+    /// App retries it, is a repeat and changes nothing (P12). A Trip started without an event ID is never a repeat.
+    /// </summary>
+    public bool WasStartedBy(string driverAppEventId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(driverAppEventId);
+        return StartedByEventId == driverAppEventId;
     }
 
     /// <summary>

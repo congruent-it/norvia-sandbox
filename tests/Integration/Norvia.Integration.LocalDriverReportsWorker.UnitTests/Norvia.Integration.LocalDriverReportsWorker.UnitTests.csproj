@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <Include>[Norvia.Integration.LocalDriverReportsWorker]*</Include>
+    <!-- Program.cs is the composition root (coding guidelines §10). -->
+    <ExcludeByFile>**/Program.cs</ExcludeByFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="coverlet.msbuild" PrivateAssets="all" />
+    <PackageReference Include="JsonSchema.Net" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+    <PackageReference Include="xunit.v3.mtp-off" />
+  </ItemGroup>
+  <!-- Embedded, so the unit tests read the contracts without touching the file system (coding guidelines §10). -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\..\contracts\canonical-model\trip-start-reported.v1.schema.json" LogicalName="CanonicalModel/trip-start-reported.v1.schema.json" />
+    <EmbeddedResource Include="..\..\..\contracts\canonical-model\driver-report-outcome.v1.schema.json" LogicalName="CanonicalModel/driver-report-outcome.v1.schema.json" />
+    <EmbeddedResource Include="..\..\..\contracts\canonical-model\samples\trip-start-reported\*.json" LogicalName="CanonicalModel/samples/trip-start-reported/%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="Norvia.Integration.UnitTests" />
+    <Compile Include="..\Shared\StubHttp.cs" Link="StubHttp.cs" />
+    <Using Include="AwesomeAssertions" />
+    <ProjectReference Include="..\..\..\src\Integration\Norvia.Integration.LocalDriverReportsWorker\Norvia.Integration.LocalDriverReportsWorker.csproj" />
+  </ItemGroup>
+</Project>

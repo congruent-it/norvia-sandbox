@@ -87,6 +87,9 @@ public sealed class Estate(IDistributedApplicationBuilder builder)
     /// </summary>
     public IResourceBuilder<ParameterResource> DriverAppRegistrationClientId { get; } = builder.AddParameter("estate-driver-app-registration-client-id");
 
+    /// <summary>The Driver app API's app registration, which is the audience of the tokens its outcome endpoint accepts (ADR 0005).</summary>
+    public IResourceBuilder<ParameterResource> DriverAppApiClientId { get; } = builder.AddParameter("estate-driver-app-api-client-id");
+
     /// <summary>The domain of the Entra test users the seeded Drivers sign in as, which the presenter panel shows.</summary>
     public IResourceBuilder<ParameterResource> DriverSignInDomain { get; } = builder.AddParameter("estate-driver-sign-in-domain");
 

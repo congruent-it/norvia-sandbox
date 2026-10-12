@@ -1,0 +1,8 @@
+{
+  "driverAppEventId": "0198e7c0-0000-7000-8000-0000000000c3",
+  "tripNumber": "TR-0000012",
+  "correlationId": "0198e7c0-0000-7000-8000-0000000000c4",
+  "outcome": "Refused",
+  "failureCode": "NotTripDay",
+  "message": "Trip TR-0000012 is for Tuesday 13 October 2026, and today is Monday 12 October 2026."
+}

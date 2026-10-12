@@ -1,0 +1,25 @@
+@* One report of the Driver on a Trip, with what became of it. *@
+<li class="report" aria-label="@($"{TripText.ReportAction(Report.Kind)}: {TripText.ReportState(Report.State)}")">
+    <span class="report-title">
+        <strong>@TripText.ReportAction(Report.Kind)</strong>
+        <FluentBadge Appearance="@(Report.State == ReportStateDto.Recorded ? Appearance.Accent : Appearance.Neutral)">@TripText.ReportState(Report.State)</FluentBadge>
+    </span>
+    @if (Report.State is ReportStateDto.Refused or ReportStateDto.NotRecorded)
+    {
+        <div role="status">
+            <FluentMessageBar Intent="@(Report.State == ReportStateDto.Refused ? MessageIntent.Warning : MessageIntent.Error)" AllowDismiss="false">
+                @if (Report.FailureCode is { } failureCode)
+                {
+                    <strong>@failureCode</strong>
+                    <span>: </span>
+                }
+                @Report.Message
+            </FluentMessageBar>
+        </div>
+    }
+</li>
+
+@code {
+    [Parameter, EditorRequired]
+    public TripReportView Report { get; set; } = null!;
+}

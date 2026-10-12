@@ -136,6 +136,9 @@ jobs:
           - application: Partner portal
             directory: PartnerPortal
             kinds: UnitTests ArchitectureTests IntegrationTests UiTests
+          - application: Driver app
+            directory: DriverApp
+            kinds: UnitTests ArchitectureTests IntegrationTests
           - application: Integration console
             directory: IntegrationConsole
             kinds: UnitTests ArchitectureTests IntegrationTests UiTests

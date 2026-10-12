@@ -56,6 +56,31 @@ public sealed class TripStartTests(TripsTmsFixture tms) : IClassFixture<TripsTms
     }
 
     [Fact]
+    public async Task ARepeatedDriverAppEventId_IsAnsweredAsARepeat_AndPublishesNothingMore()
+    {
+        var (trip, day, _) = await DispatchedTripAsync(6050);
+        tms.SetClock(ShortlyAfterMidnightOf(day));
+        var correlationId = TmsCalls.NewCorrelationId();
+        var eventId = Guid.NewGuid().ToString();
+
+        using var first = await StartAsync(trip, Joost, correlationId, driverAppEventId: eventId);
+        using var again = await StartAsync(trip, Joost, correlationId, driverAppEventId: eventId);
+
+        first.StatusCode.Should().Be(HttpStatusCode.OK);
+        JsonNode.Parse(await first.Content.ReadAsStringAsync(_cancellationToken))!["repeat"]!.GetValue<bool>().Should().BeFalse();
+        var answer = JsonNode.Parse(await again.Content.ReadAsStringAsync(_cancellationToken))!;
+        again.StatusCode.Should().Be(HttpStatusCode.OK, answer.ToJsonString());
+        answer["repeat"]!.GetValue<bool>().Should().BeTrue();
+        answer["correlationId"]!.GetValue<string>().Should().Be(correlationId);
+        await TmsFixture.SettleOutboxAsync(_cancellationToken);
+        tms.Published.Count(m => m.Subject == "TripStarted" && m.ApplicationProperties.TryGetValue("tripNumber", out var number) && number.Equals(trip)).Should().Be(1);
+
+        // Another event for a Trip that is under way is still a refused Start, and another Driver's Trip is not theirs to repeat.
+        await AssertRefusedAsync(await StartAsync(trip, Joost, driverAppEventId: Guid.NewGuid().ToString()), HttpStatusCode.Conflict, "TripNotDispatched");
+        await AssertRefusedAsync(await StartAsync(trip, Anouk, correlationId, driverAppEventId: eventId), HttpStatusCode.NotFound, "TripNotFound");
+    }
+
+    [Fact]
     public async Task AnotherDay_IsNotTripDay()
     {
         var (trip, day, _) = await DispatchedTripAsync(6100);
@@ -140,11 +165,11 @@ public sealed class TripStartTests(TripsTmsFixture tms) : IClassFixture<TripsTms
         return (trip, day, shipment);
     }
 
-    private Task<HttpResponseMessage> StartAsync(string trip, string? driverId, string? correlationId = "", HttpClient? caller = null)
+    private Task<HttpResponseMessage> StartAsync(string trip, string? driverId, string? correlationId = "", HttpClient? caller = null, string? driverAppEventId = null)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"/v1/trips/{trip}/start", UriKind.Relative))
         {
-            Content = JsonContent.Create(new JsonObject { ["driverId"] = driverId }),
+            Content = JsonContent.Create(new JsonObject { ["driverId"] = driverId, ["driverAppEventId"] = driverAppEventId }),
         };
         if (correlationId is not null)
         {

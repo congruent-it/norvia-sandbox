@@ -1,0 +1,8 @@
+{
+  "driverAppEventId": "0198e7c0-0000-7000-8000-0000000000c5",
+  "tripNumber": "TR-0000012",
+  "correlationId": "0198e7c0-0000-7000-8000-0000000000c6",
+  "outcome": "NotRecorded",
+  "failureCode": "TmsUnavailable",
+  "message": "The TMS answered 503: Service Unavailable (4 attempts)."
+}
