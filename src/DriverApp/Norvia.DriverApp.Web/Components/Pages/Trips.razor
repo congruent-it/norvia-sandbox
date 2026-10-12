@@ -8,6 +8,14 @@
 
 <PageTitle>My Trips</PageTitle>
 
+@if (_sending)
+{
+    @* A report waits for the Driver reports Logic App's answer; the page is not interactive, so it looks again by itself. *@
+    <HeadContent>
+        <meta http-equiv="refresh" content="5" />
+    </HeadContent>
+}
+
 <div class="trips-heading">
     <h1>@_name</h1>
     @if (_signedInWithEntra)
@@ -55,6 +63,7 @@ else if (_trips.Count == 0)
     private bool _signedInWithEntra;
     private IReadOnlyList<DriverTripView> _trips = [];
     private bool _loadFailed;
+    private bool _sending;
 
     protected override async Task OnInitializedAsync()
     {
@@ -67,6 +76,7 @@ else if (_trips.Count == 0)
         try
         {
             _trips = await Mediator.Send(new GetDriverTripsQuery(driverId));
+            _sending = _trips.Any(trip => trip.Reports.Any(report => report.State == ReportStateDto.Sending));
         }
 #pragma warning disable CA1031 // Whatever fails to load, the Driver gets a message rather than an error page.
         catch (Exception ex)

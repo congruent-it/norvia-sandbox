@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using Norvia.DriverApp.Infrastructure.Outbox;
 
 namespace Norvia.DriverApp.Infrastructure.Data;
 
@@ -8,5 +9,5 @@ namespace Norvia.DriverApp.Infrastructure.Data;
 internal sealed class DriverAppDbContextDesignTimeFactory : IDesignTimeDbContextFactory<DriverAppDbContext>
 {
     public DriverAppDbContext CreateDbContext(string[] args) =>
-        new(new DbContextOptionsBuilder<DriverAppDbContext>().UseSqlServer("Server=design-time;Database=driver-app").Options);
+        new(new DbContextOptionsBuilder<DriverAppDbContext>().UseSqlServer("Server=design-time;Database=driver-app").Options, new OutboxBuffer(TimeProvider.System));
 }

@@ -1,9 +1,12 @@
+using Ardalis.Result;
 using Mediator;
 using Microsoft.FluentUI.AspNetCore.Components;
+using Norvia.DriverApp.Application.Reports.StartTrip;
 using Norvia.DriverApp.Application.Trips.Receive;
 using Norvia.DriverApp.Infrastructure;
 using Norvia.DriverApp.Web.Components;
 using Norvia.DriverApp.Web.Drivers;
+using Norvia.DriverApp.Web.Reports;
 using Norvia.DriverApp.Web.Settings;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,6 +18,7 @@ builder.AddServiceDefaults();
 builder.AddDriverAppInfrastructure();
 builder.AddDriverAppSeedDrivers();
 builder.AddDriverSignIn();
+builder.Services.AddScoped<IPipelineBehavior<StartTripCommand, Result<StartTripResult>>, TrackStartTripInLoggingScope>();
 builder.Services.AddMediator(options =>
 {
     options.ServiceLifetime = ServiceLifetime.Scoped;
@@ -42,6 +46,7 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>().RequireAuthorization(DriverClaims.DriverPolicy);
 app.MapDriverSignInStandIn();
 app.MapSettings();
+app.MapReports();
 app.MapDefaultEndpoints();
 
 await app.RunAsync();
