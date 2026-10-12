@@ -97,7 +97,7 @@ public sealed class TakeShipmentOffTripTests
         var trip = await _fixture.DispatchedAsync();
         var (first, second) = (_fixture.StoredShipments.Single(), _fixture.ReleasedShipment(Tuesday));
         await Add(trip, second);
-        trip.MarkInProgress();
+        trip.Start(new CorrelationId("corr-start"), DateTimeOffset.UtcNow);
         trip.ClearDomainEvents();
         Move(first, ShipmentStatus.Collected);
 

@@ -246,17 +246,40 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
     public TripRefusal? EnsureAmendable() => Status == TripStatus.InProgress ? TripRefusal.TripUnderWay(Number) : null;
 
     /// <summary>
-    /// The Driver started the Trip (P12). Only a Dispatched Trip can start. P12 owns when this happens; until it is built, nothing calls this
-    /// outside tests.
+    /// Null when the Driver can start the Trip (P12): it is theirs, it is Dispatched and it is its day. A Trip that is another Driver's is
+    /// <see cref="TripRefusalCode.TripNotFound"/>, as the Driver app shows a Driver only their own Trips. <paramref name="today"/> is the day
+    /// it is now where Norvia works.
     /// </summary>
-    public void MarkInProgress()
+    public TripRefusal? EnsureCanStart(DriverId driver, DateOnly today)
     {
+        ArgumentNullException.ThrowIfNull(driver);
+        if (DriverId != driver)
+        {
+            return TripRefusal.TripNotFound(Number.Value);
+        }
+
         if (Status != TripStatus.Dispatched)
+        {
+            return TripRefusal.TripNotDispatched(Number, Status);
+        }
+
+        return today == Day ? null : TripRefusal.NotTripDay(Number, Day, today);
+    }
+
+    /// <summary>
+    /// The Driver started the Trip (P12): it is In progress, at the same version, and <see cref="TripStartedEvent"/> is raised. The caller
+    /// checks <see cref="EnsureCanStart"/> first.
+    /// </summary>
+    public void Start(CorrelationId correlationId, DateTimeOffset startedAt)
+    {
+        ArgumentNullException.ThrowIfNull(correlationId);
+        if (Status != TripStatus.Dispatched || DriverId is not { } driver)
         {
             throw new InvalidOperationException($"Trip {Number} is {Status}, and only a Dispatched Trip can start.");
         }
 
         Status = TripStatus.InProgress;
+        RegisterDomainEvent(new TripStartedEvent(this, driver, correlationId, startedAt));
     }
 
     /// <summary>
@@ -396,7 +419,7 @@ public sealed class Trip : EntityBase<TripId>, IAggregateRoot
     {
         if (Status != TripStatus.Dispatched)
         {
-            return TripRefusal.TripNotDispatched(Number);
+            return TripRefusal.TripNotDispatched(Number, Status);
         }
 
         if (DeliveryOf(version) is not { } delivery)

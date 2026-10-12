@@ -36,7 +36,7 @@ public enum TripRefusalCode
     /// <summary>The Trip lacks a Vehicle, a Driver, a planned start, a planned driving duration or a Shipment, so it can't be dispatched.</summary>
     TripIncomplete,
 
-    /// <summary>The Trip is a Draft, so there is no version to send.</summary>
+    /// <summary>The Trip is not Dispatched: a Draft has no version to send, and one that is In progress can't start again.</summary>
     TripNotDispatched,
 
     /// <summary>The Trip never had that version.</summary>
@@ -59,4 +59,7 @@ public enum TripRefusalCode
 
     /// <summary>The Shipment is Collected already, so it can't be taken off its Trip any more.</summary>
     ShipmentCollected,
+
+    /// <summary>The Driver starts the Trip on another day than the Trip's (P12).</summary>
+    NotTripDay,
 }

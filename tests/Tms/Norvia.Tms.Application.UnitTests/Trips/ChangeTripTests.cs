@@ -1,6 +1,7 @@
 using Ardalis.Result;
 using Norvia.Tms.Application.Trips.Change;
 using Norvia.Tms.Domain.Fleet;
+using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Domain.Trips;
 using NSubstitute;
 using static Norvia.Tms.Application.UnitTests.Fleet.Planning.PlanningEditsFixture;
@@ -65,7 +66,7 @@ public sealed class ChangeTripTests
     public async Task Handle_ATripUnderWay_IsRefusedWithTripUnderWay()
     {
         var trip = await _fixture.DispatchedAsync();
-        trip.MarkInProgress();
+        trip.Start(new CorrelationId("corr-start"), DateTimeOffset.UtcNow);
 
         Codes(await Handle(trip.Number.Value, Van, Joost)).Should().Equal(nameof(TripRefusalCode.TripUnderWay));
         trip.DriverId.Should().Be(Anouk);

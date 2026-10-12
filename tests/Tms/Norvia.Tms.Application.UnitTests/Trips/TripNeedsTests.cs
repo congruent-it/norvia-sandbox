@@ -8,6 +8,7 @@ using Norvia.Tms.Application.Trips;
 using Norvia.Tms.Application.Trips.GetByNumber;
 using Norvia.Tms.Application.Trips.List;
 using Norvia.Tms.Domain.Fleet;
+using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Domain.Trips;
 using NSubstitute;
 using static Norvia.Tms.Application.UnitTests.Fleet.Planning.PlanningEditsFixture;
@@ -115,7 +116,7 @@ public sealed class TripNeedsTests
     public async Task ATripThatIsInProgress_IsNotFlagged()
     {
         var trip = await _fixture.DispatchedAsync();
-        trip.MarkInProgress();
+        trip.Start(new CorrelationId("corr-start"), DateTimeOffset.UtcNow);
         _fixture.Planning.Drivers.ListActive().Returns([]);
 
         (await _fixture.NeedsCheck.OfAsync(trip, CancellationToken.None)).Should().Be(TripNeeds.None);
