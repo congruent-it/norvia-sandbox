@@ -98,8 +98,26 @@ public sealed class TmsUiFixture : IAsyncLifetime
         TmsUi = _app.GetEndpoint("tms-web", "http");
         PartnerPortal = _app.GetEndpoint("partner-portal-web", "http");
 
+        // The TMS seeds the demo's Trip day in the background and tries again every 30 seconds if the first look fails, so it can
+        // be healthy before its Shipments are on the list. The Trip journeys build on them.
+        await WaitForDemoShipmentsAsync(startup.Token);
+
         _playwright = await Playwright.CreateAsync();
         Browser = await _playwright.Chromium.LaunchAsync();
+    }
+
+    private async Task WaitForDemoShipmentsAsync(CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            using var response = await Manage.GetAsync(new Uri("/v1/shipments/to-put-on-trips", UriKind.Relative), cancellationToken);
+            if (response.IsSuccessStatusCode && (await response.Content.ReadFromJsonAsync<JsonArray>(cancellationToken)) is { Count: > 0 })
+            {
+                return;
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+        }
     }
 
     /// <summary>Submits a Canonical Model booking to TMS intake, as the intake Logic App does, each on a trail of its own.</summary>
