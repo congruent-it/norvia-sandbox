@@ -110,6 +110,24 @@ public sealed class CapacityTabsTests : TmsWebContext
     }
 
     [Fact]
+    public void Render_DaysTab_LinksTheDaysFlaggedTripsToTheirDetail()
+    {
+        Queries.ListPlanningDaysAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new PlanningDayView(new DateOnly(2026, 10, 13), 6, [], new DayLoadView(0, 0, 0, 0, false))
+            {
+                FlaggedTrips = [new FlaggedTripView("TR-0000007", NeedsDriver: true, NeedsVehicle: false), new FlaggedTripView("TR-0000008", NeedsDriver: false, NeedsVehicle: true)],
+            },
+        ]);
+
+        var page = Render<DaysTab>();
+
+        page.WaitForAssertion(() => page.FindAll("tbody a").Select(link => (link.GetAttribute("href"), link.TextContent.Trim()))
+            .Should().Equal(("/trips/TR-0000007", "TR-0000007"), ("/trips/TR-0000008", "TR-0000008")));
+        page.Find("tbody").TextContent.Should().Contain("Needs a Driver").And.Contain("Needs a Vehicle");
+    }
+
+    [Fact]
     public void Render_DaysTab_ListsOneRowPerOpenDay_WithVehiclesAvailableAndTheDriversOnShift()
     {
         Queries.ListPlanningDaysAsync(Arg.Any<CancellationToken>()).Returns(
@@ -128,9 +146,9 @@ public sealed class CapacityTabsTests : TmsWebContext
 
         page.WaitForAssertion(() => page.FindAll("tbody tr").Select(row => row.QuerySelectorAll("td").Select(cell => cell.TextContent.Trim()).ToList())
             .Should().SatisfyRespectively(
-                first => first.Should().Equal("Mon 12 Oct", "6", "Anouk de Vries 06:00-14:30", "12,000 / 10,000 kg", "10 / 18", "Over capacity"),
-                second => second.Should().Equal("Sat 17 Oct", "5", string.Empty, "0 / 0 kg", "0 / 0", string.Empty),
-                third => third.Should().Equal("Tue 13 Oct", "6", "Anouk de Vries 05:00-13:00 (edited); Joost Bakker 07:00-15:30", "8,500 / 34,000 kg", "12 / 51", string.Empty)));
+                first => first.Should().Equal("Mon 12 Oct", "6", "Anouk de Vries 06:00-14:30", "12,000 / 10,000 kg", "10 / 18", "Over capacity", string.Empty),
+                second => second.Should().Equal("Sat 17 Oct", "5", string.Empty, "0 / 0 kg", "0 / 0", string.Empty, string.Empty),
+                third => third.Should().Equal("Tue 13 Oct", "6", "Anouk de Vries 05:00-13:00 (edited); Joost Bakker 07:00-15:30", "8,500 / 34,000 kg", "12 / 51", string.Empty, string.Empty)));
     }
 
     [Fact]

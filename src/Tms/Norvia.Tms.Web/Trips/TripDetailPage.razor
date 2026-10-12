@@ -23,6 +23,10 @@
     @{ var detail = details[0]; var trip = detail.Trip; }
     <dl aria-label="Trip" class="mb-4 grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1">
         <dt>Status</dt><dd>@trip.Status</dd>
+        @if (trip.NeedsDriver || trip.NeedsVehicle)
+        {
+            <dt>Flag</dt><dd>@TripText.Flags(trip)</dd>
+        }
         <dt>Day</dt><dd>@FleetText.Day(trip.Day)</dd>
         <dt>Vehicle</dt><dd>@(trip.VehicleRegistration ?? "—")</dd>
         <dt>Driver</dt><dd>@(trip.DriverName ?? "—")</dd>

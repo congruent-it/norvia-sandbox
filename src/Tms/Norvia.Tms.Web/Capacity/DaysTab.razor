@@ -3,6 +3,7 @@
 @using Microsoft.Extensions.Options
 @using Norvia.Tms.Application.Fleet.Planning
 @using Norvia.Tms.Web.TransportOrders
+@using Norvia.Tms.Web.Trips
 @implements IAsyncDisposable
 @inject ITransportOrderQueries Queries
 @inject TimeProvider Time
@@ -18,13 +19,19 @@
 <LiveListStates Items="_list.Items" LastReadFailed="_list.LastReadFailed" Name="Days"
                 Empty="There are no open days in the Planning horizon yet." Context="days">
     <FluentDataGrid Items="days.AsQueryable()" TGridItem="PlanningDayView" Class="flatly-table" aria-label="Open days"
-                    GridTemplateColumns="1fr 1fr 3fr 1.5fr 1.5fr 1fr" MultiLine="true">
+                    GridTemplateColumns="1fr 1fr 3fr 1.5fr 1.5fr 1fr 2fr" MultiLine="true">
         <PropertyColumn Title="Day" Property="@(day => FleetText.Day(day.Date))" />
         <PropertyColumn Title="Vehicles available" Property="@(day => day.AvailableVehicles)" />
         <PropertyColumn Title="Drivers on shift" Property="@(day => FleetText.DriversOnShift(day.Shifts))" />
         <PropertyColumn Title="Weight (demand / capacity)" Property="@(day => FleetText.WeightLoad(day.Load))" />
         <PropertyColumn Title="Pallet places (demand / capacity)" Property="@(day => FleetText.PalletLoad(day.Load))" />
         <PropertyColumn Title="Over capacity" Property="@(day => FleetText.OverCapacity(day.Load))" />
+        <TemplateColumn Title="Flagged Trips">
+            @foreach (var trip in context.FlaggedTrips)
+            {
+                <div><a href="/trips/@trip.Number">@trip.Number</a> · @TripText.Flags(trip.NeedsDriver, trip.NeedsVehicle)</div>
+            }
+        </TemplateColumn>
     </FluentDataGrid>
 </LiveListStates>
 

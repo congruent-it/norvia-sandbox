@@ -108,6 +108,7 @@ public static class DependencyInjection
         builder.Services.AddScoped<IExceptionNumbers, SqlExceptionNumbers>();
         builder.Services.AddScoped<ITripNumbers, SqlTripNumbers>();
         builder.Services.AddScoped<TripPlanningChecks>();
+        builder.Services.AddScoped<TripNeedsCheck>();
         builder.Services.AddScoped<TripShipments>();
         builder.Services.AddScoped<TripAmendments>();
         builder.Services.AddScoped<IPipelineBehavior<AddShipmentsToTripCommand, Result<AddShipmentsToTripResult>>, RetryTripThatLostARace<AddShipmentsToTripCommand, Result<AddShipmentsToTripResult>>>();

@@ -38,6 +38,7 @@ internal sealed class TripsFixture
             return Task.FromResult(planned);
         });
         var rules = new TripAvailabilityRules(Planning.Days.AsRead(), Planning.Vehicles, Planning.Drivers, plannedDriving, DrivingHourLimits.Default, Planning.Horizon, Planning.Time);
+        NeedsCheck = new TripNeedsCheck(rules);
         Checks = new TripPlanningChecks(Trips.AsRead(), Planning.Days.AsRead(), rules);
         Shipments = InMemoryRepository.Over(StoredShipments);
         TransportOrders = InMemoryRepository.Over(StoredOrders);
@@ -69,6 +70,8 @@ internal sealed class TripsFixture
     public ITripNumbers Numbers { get; } = Substitute.For<ITripNumbers>();
 
     public TripPlanningChecks Checks { get; }
+
+    public TripNeedsCheck NeedsCheck { get; }
 
     public Trip Existing(DateOnly day, VehicleId? vehicle, DriverId? driver)
     {

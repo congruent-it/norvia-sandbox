@@ -54,6 +54,20 @@ public sealed class TripsPageTests : TmsWebContext
     }
 
     [Fact]
+    public void ShowsWhichTripsNeedADriverOrAVehicle_AndNothingForTheOthers()
+    {
+        Queries.ListTripsAsync(Arg.Any<CancellationToken>()).Returns([Empty, Full with { NeedsDriver = true }, Sent with { NeedsDriver = true, NeedsVehicle = true }, Full with { Number = "TR-0000004", NeedsVehicle = true }]);
+
+        var page = Render<TripsPage>();
+
+        var rows = page.WaitForElements("tbody tr");
+        rows[0].TextContent.Should().NotContain("Needs a");
+        rows[1].TextContent.Should().Contain("Needs a Driver").And.NotContain("Needs a Vehicle");
+        rows[2].TextContent.Should().Contain("Needs a Driver").And.Contain("Needs a Vehicle");
+        rows[3].TextContent.Should().Contain("Needs a Vehicle").And.NotContain("Needs a Driver");
+    }
+
+    [Fact]
     public void ListsThePlannedStartAndDrivingTime_AndADashWhenThereIsNone()
     {
         var page = Render<TripsPage>();

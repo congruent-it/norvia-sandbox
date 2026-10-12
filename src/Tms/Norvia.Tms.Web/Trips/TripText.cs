@@ -30,6 +30,22 @@ public static class TripText
             _ => "—",
         };
 
+    /// <summary>The P10 flags of a Trip: "Needs a Driver", "Needs a Vehicle", both, or a dash.</summary>
+    public static string Flags(TripView trip)
+    {
+        ArgumentNullException.ThrowIfNull(trip);
+        return Flags(trip.NeedsDriver, trip.NeedsVehicle);
+    }
+
+    public static string Flags(bool needsDriver, bool needsVehicle) =>
+        (needsDriver, needsVehicle) switch
+        {
+            (true, true) => "Needs a Driver · Needs a Vehicle",
+            (true, false) => "Needs a Driver",
+            (false, true) => "Needs a Vehicle",
+            _ => "—",
+        };
+
     public static string Kind(StopKind kind) => kind == StopKind.Collection ? "Collect" : "Deliver";
 
     /// <summary>Where a Stop is, led by who receives the goods at a delivery: "Café De Zwaan, Oudegracht 112, 3511 AW Utrecht".</summary>

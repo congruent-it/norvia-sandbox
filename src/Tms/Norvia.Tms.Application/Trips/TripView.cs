@@ -7,6 +7,8 @@ namespace Norvia.Tms.Application.Trips;
 /// <param name="LoadPalletPlaces">The pallets of the Trip's Shipments.</param>
 /// <param name="PayloadKg">The Vehicle's payload; null while the Trip has no (active) Vehicle.</param>
 /// <param name="VehiclePalletPlaces">The Vehicle's pallet places; null while the Trip has no (active) Vehicle.</param>
+/// <param name="NeedsDriver">P10 took the Trip's Driver away (Absence, Roster change, or inactive); computed, and clear once the Driver is available again.</param>
+/// <param name="NeedsVehicle">P10 took the Trip's Vehicle away (Off the road, or inactive).</param>
 /// <param name="LatestDelivery">Whether the Driver app has the Trip's latest version; null while the Trip is a Draft.</param>
 public sealed record TripView(
     string Number,
@@ -23,4 +25,6 @@ public sealed record TripView(
     int LoadPalletPlaces = 0,
     int? PayloadKg = null,
     int? VehiclePalletPlaces = null,
-    TripDeliveryState? LatestDelivery = null);
+    TripDeliveryState? LatestDelivery = null,
+    bool NeedsDriver = false,
+    bool NeedsVehicle = false);

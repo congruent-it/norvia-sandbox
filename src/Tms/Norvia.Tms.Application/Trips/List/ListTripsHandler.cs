@@ -9,7 +9,8 @@ public sealed class ListTripsHandler(
     IReadRepository<Trip> trips,
     TripShipments shipments,
     IVehicleDirectory vehicles,
-    IDriverDirectory drivers) : IQueryHandler<ListTripsQuery, IReadOnlyList<TripView>>
+    IDriverDirectory drivers,
+    TripNeedsCheck needsCheck) : IQueryHandler<ListTripsQuery, IReadOnlyList<TripView>>
 {
     public async ValueTask<IReadOnlyList<TripView>> Handle(ListTripsQuery query, CancellationToken cancellationToken)
     {
@@ -18,6 +19,7 @@ public sealed class ListTripsHandler(
         var stored = await trips.ListAsync(new TripsInOrderSpec(), cancellationToken);
         var onTrips = (await shipments.OfAsync([.. stored.SelectMany(trip => trip.ShipmentIds).Distinct()], cancellationToken)).ToDictionary(item => item.Shipment.Id);
 
+        var needs = await needsCheck.OfAsync(stored, cancellationToken);
         var activeVehicles = vehicles.ListActive().ToDictionary(vehicle => vehicle.Id);
         var names = drivers.ListActive().ToDictionary(driver => driver.Id, driver => driver.Name);
         return
@@ -26,7 +28,8 @@ public sealed class ListTripsHandler(
                 trip,
                 [.. trip.ShipmentIds.Where(onTrips.ContainsKey).Select(id => onTrips[id])],
                 activeVehicles,
-                names)),
+                names,
+                needs[trip.Number.Value])),
         ];
     }
 }

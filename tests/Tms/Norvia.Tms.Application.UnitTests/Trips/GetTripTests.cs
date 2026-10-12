@@ -77,13 +77,13 @@ public sealed class GetTripTests
     [Fact]
     public async Task Handle_AnUnknownTrip_IsRefusedWithTripNotFound()
     {
-        var result = await new GetTripHandler(_fixture.Trips.AsRead(), _fixture.TripShipments, _fixture.Checks, _fixture.Planning.Vehicles, _fixture.Planning.Drivers)
+        var result = await new GetTripHandler(_fixture.Trips.AsRead(), _fixture.TripShipments, _fixture.Checks, _fixture.Planning.Vehicles, _fixture.Planning.Drivers, _fixture.NeedsCheck)
             .Handle(new GetTripQuery("TR-0009999"), CancellationToken.None);
 
         result.ValidationErrors.Should().ContainSingle().Which.ErrorCode.Should().Be(nameof(TripRefusalCode.TripNotFound));
     }
 
     private async Task<Ardalis.Result.Result<TripDetailView>> Get(Trip trip) =>
-        await new GetTripHandler(_fixture.Trips.AsRead(), _fixture.TripShipments, _fixture.Checks, _fixture.Planning.Vehicles, _fixture.Planning.Drivers)
+        await new GetTripHandler(_fixture.Trips.AsRead(), _fixture.TripShipments, _fixture.Checks, _fixture.Planning.Vehicles, _fixture.Planning.Drivers, _fixture.NeedsCheck)
             .Handle(new GetTripQuery(trip.Number.Value), CancellationToken.None);
 }
