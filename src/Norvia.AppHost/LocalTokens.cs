@@ -8,6 +8,7 @@ namespace Norvia.AppHost;
 /// The local Shipper notification worker's client ID stands in for the P7 Shipper notification Logic App's, the one holder of the Shipper notification report role.
 /// The local Carrier cancellation worker's client ID stands in for the P7 Carrier cancellation Logic App's, which holds the Carrier booking report role beside the booking worker.
 /// The local Trip dispatch worker's client ID stands in for the P11 Trip dispatch Logic App's, the one holder of the Trip delivery report role.
+/// The local Driver reports worker's client ID stands in for the P12 Driver reports Logic App's, the one holder of the Trip start role and the Driver app's outcome role.
 /// The local tracking worker's client ID stands in for the Carrier-tracking Logic App's, the one holder of the record role.
 /// The local Proof of delivery worker's client ID stands in for the Carrier Proof of delivery Logic App's, the one holder of the Proof of delivery record role.
 /// The local answer Logic App's client ID, which the stand-in Partner API signs its token with, is the one holder of the answer role.
@@ -25,6 +26,8 @@ public static class LocalTokens
     public const string ShipperNotificationLogicAppClientId = "norvia-local-shipper-notification-logic-app";
     public const string CarrierCancellationLogicAppClientId = "norvia-local-carrier-cancellation-logic-app";
     public const string TripDispatchLogicAppClientId = "norvia-local-trip-dispatch-logic-app";
+    public const string DriverReportsLogicAppClientId = "norvia-local-driver-reports-logic-app";
+    public const string DriverAppAudience = "api://norvia-driver-app";
     public const string AnswerLogicAppClientId = "norvia-local-answer-logic-app";
     public const string TrackingLogicAppClientId = "norvia-local-tracking-logic-app";
     public const string ProofOfDeliveryLogicAppClientId = "norvia-local-proof-of-delivery-logic-app";
