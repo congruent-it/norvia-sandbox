@@ -34,13 +34,3 @@ public sealed class DriverReportsWorkerOptions
     /// <summary>The bounded exponential retry policy, with the numbers of the workflow's <c>retryPolicy</c>.</summary>
     public RetryOptions Retry { get; set; } = new();
 }
-
-public sealed class DriverAppOptions
-{
-    [Required]
-    public Uri? BaseAddress { get; set; }
-
-    [Required]
-    [ValidateObjectMembers]
-    public LocalTokenOptions Tokens { get; set; } = new();
-}
