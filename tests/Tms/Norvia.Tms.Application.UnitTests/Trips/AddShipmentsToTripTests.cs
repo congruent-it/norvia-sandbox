@@ -40,6 +40,33 @@ public sealed class AddShipmentsToTripTests
     }
 
     [Fact]
+    public async Task Handle_AShipmentAwaitingRedelivery_IsAcceptedForAnotherDay_WithOnlyItsDeliveryStop()
+    {
+        var trip = _fixture.Existing(Tuesday.AddDays(2), Truck, null);
+        var redelivery = _fixture.AwaitingRedeliveryShipment(Tuesday);
+
+        var result = await Add(trip, redelivery);
+
+        result.IsSuccess.Should().BeTrue();
+        trip.Stops.Select(stop => (stop.ShipmentId, stop.Kind)).Should().Equal((redelivery.Id, StopKind.Delivery));
+        redelivery.AwaitingRedelivery.Should().BeTrue();
+        redelivery.Status.Should().Be(ShipmentStatus.Collected);
+    }
+
+    [Fact]
+    public async Task Handle_ARedeliveryTooHeavyForTheVehicle_IsStillRefusedWithPayloadExceeded()
+    {
+        var trip = _fixture.Existing(Tuesday, Van, null);
+        var heavy = _fixture.AwaitingRedeliveryShipment(Tuesday, pallets: 1, weightKg: 1_500m);
+
+        var result = await Add(trip, heavy);
+
+        Codes(result).Should().Equal(nameof(TripAvailabilityCode.PayloadExceeded));
+        trip.Stops.Should().BeEmpty();
+        heavy.AwaitingRedelivery.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Handle_ASecondAdd_PutsItsStopsAfterTheFirst()
     {
         var trip = _fixture.Existing(Tuesday, Truck, null);

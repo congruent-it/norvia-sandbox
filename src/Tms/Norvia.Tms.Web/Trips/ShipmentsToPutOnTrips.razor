@@ -67,6 +67,10 @@
         </TemplateColumn>
         <TemplateColumn Title="Shipment">
             <a href="/shipments/@context.ShipmentNumber">@context.ShipmentNumber</a>
+            @if (context.Redelivery)
+            {
+                <FluentBadge Appearance="Appearance.Lightweight">Re-delivery</FluentBadge>
+            }
         </TemplateColumn>
         <PropertyColumn Title="Shipper" Property="@(shipment => shipment.Shipper.Name ?? shipment.Shipper.Id)" />
         <PropertyColumn Title="Collect" Property="@(shipment => $"{shipment.CollectionPlace}, {NorviaTime.FormatWindow(shipment.CollectionEarliest, shipment.CollectionLatest)}")" />
@@ -148,8 +152,14 @@
             ? (_trips.Items ?? []).Where(trip => trip.Status.CanBeAmended() && trip.Day == day)
             : [];
 
-    private static DateOnly? SelectedDay(List<ShipmentToPutOnTripSummary> selected) =>
-        selected.Select(shipment => shipment.CollectionDay).Distinct().ToList() is [{ } day] ? day : null;
+    // A Re-delivery collects no more, so it follows the day of the others, or the day the list is filtered on when only Re-deliveries are selected.
+    private DateOnly? SelectedDay(List<ShipmentToPutOnTripSummary> selected) =>
+        selected.Where(shipment => !shipment.Redelivery).Select(shipment => shipment.CollectionDay).Distinct().ToList() switch
+        {
+            [] => FilterDay,
+            [var day] => day,
+            _ => null,
+        };
 
     private async Task CreateAsync()
     {

@@ -15,7 +15,7 @@ public sealed class TripPlanningChecks(IReadRepository<Trip> trips, IReadReposit
 {
     /// <param name="current">The Trip being changed, which isn't its own "other Trip", and whose planned driving the new duration replaces.</param>
     /// <param name="shipments">Every Shipment the Trip would have: the ones on it already and the ones being added.</param>
-    /// <param name="added">The Shipments being added, which must be Released, on no other Trip and collect on the Trip's day.</param>
+    /// <param name="added">The Shipments being added, which must be Released (or Awaiting re-delivery), on no other Trip and collect on the Trip's day (a Re-delivery collects no more).</param>
     public async Task<TripPlanningCheck> CheckAsync(
         DateOnly day,
         VehicleId? vehicle,
@@ -61,7 +61,9 @@ public sealed class TripPlanningChecks(IReadRepository<Trip> trips, IReadReposit
         foreach (var item in added)
         {
             var number = item.Shipment.Number.Value;
-            if (item.Shipment is not { Status: ShipmentStatus.Released, CarriedBy.IsOwnFleet: true })
+            // A Shipment Awaiting re-delivery (P12) is accepted although it is Collected, and it collects no more, so no collection day applies.
+            var redelivery = item.Shipment.AwaitingRedelivery;
+            if (!item.Shipment.CanBePutOnTrip)
             {
                 refusals.Add(TripRefusal.ShipmentNotReleased(number, item.Shipment.CarriedBy.IsOwnFleet ? $"it is {item.Shipment.Status}, not Released" : "it is carried by a Carrier, not the Own fleet"));
             }
@@ -71,7 +73,7 @@ public sealed class TripPlanningChecks(IReadRepository<Trip> trips, IReadReposit
                 refusals.Add(TripRefusal.ShipmentOnAnotherTrip(number, other.Number));
             }
 
-            if (item.CollectionDay != day)
+            if (!redelivery && item.CollectionDay != day)
             {
                 refusals.Add(TripRefusal.CollectionDayMismatch(number, item.CollectionDay, day));
             }

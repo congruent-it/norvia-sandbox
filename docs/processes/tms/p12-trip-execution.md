@@ -325,7 +325,9 @@ End Trip at the TMS boundary: `POST /v1/trips/{number}/end` with the `driverId` 
 | Schema and samples | [trip-completed.v1.schema.json](../../../contracts/canonical-model/trip-completed.v1.schema.json), [samples/trip-completed](../../../contracts/canonical-model/samples/trip-completed) |
 | Boundary tests | [TripEndTests.cs](../../../tests/Tms/Norvia.Tms.Api.IntegrationTests/Trips/TripEndTests.cs) |
 
-Not built yet: the Driver app's actions, sign-in, the Driver reports Logic App and Re-delivery on a later Trip.
+Re-delivery on a later Trip is built in P11's calls: Shipments to put on Trips lists a Shipment Awaiting re-delivery with `redelivery` true, a Trip takes it with only its delivery Stop and with `CollectionDayMismatch` not applying, Dispatch clears the flag (`Shipment.Dispatch`), and taking it off sets the flag again, leaving it Collected. The boundary tests are in `TripRedeliveryTests`.
+
+Not built yet: the Driver app's actions, sign-in and the Driver reports Logic App.
 
 ## Deferred
 

@@ -173,10 +173,17 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
 
     /// <summary>
     /// Marks a Released Own fleet Shipment as Dispatched, once its Trip is (P11). Raises no domain event of its own: TripDispatched lists the
-    /// Shipments. Returns false, changing nothing, for a Shipment that isn't a Released Own fleet one.
+    /// Shipments. A Shipment Awaiting re-delivery (P12) stays Collected and only loses the flag. Returns false, changing nothing, for any
+    /// other Shipment.
     /// </summary>
     public bool Dispatch()
     {
+        if (AwaitingRedelivery && CarriedBy.IsOwnFleet)
+        {
+            AwaitingRedelivery = false;
+            return true;
+        }
+
         if (Status != ShipmentStatus.Released || !CarriedBy.IsOwnFleet)
         {
             return false;
@@ -185,6 +192,9 @@ public sealed class Shipment : EntityBase<ShipmentId>, IAggregateRoot
         Status = ShipmentStatus.Dispatched;
         return true;
     }
+
+    /// <summary>True for an Own fleet Shipment the Planner can put on a Trip (P11): a Released one, or one Awaiting re-delivery (P12), which collects no more.</summary>
+    public bool CanBePutOnTrip => CarriedBy.IsOwnFleet && (Status == ShipmentStatus.Released || AwaitingRedelivery);
 
     /// <summary>True for a Released or Dispatched Own fleet Shipment, which the Planner can still take off its Trip (P11): it isn't collected.</summary>
     public bool CanTakeOffTrip => CarriedBy.IsOwnFleet && Status is ShipmentStatus.Released or ShipmentStatus.Dispatched;

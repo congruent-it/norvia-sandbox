@@ -44,6 +44,21 @@ public sealed class ListShipmentsToPutOnTripsTests
         list.Select(item => item.ShipmentNumber).Should().Equal(onDay.Number.Value);
     }
 
+    [Fact]
+    public async Task Handle_ListsAShipmentAwaitingRedelivery_MarkedRedelivery_OnEveryDayAndNotOnceItIsOnATrip()
+    {
+        var released = _fixture.ReleasedShipment(Tuesday.AddDays(1));
+        var redelivery = _fixture.AwaitingRedeliveryShipment(Tuesday);
+        var onTrip = _fixture.AwaitingRedeliveryShipment(Tuesday);
+        _fixture.Existing(Tuesday.AddDays(3), null, null).AddShipment(onTrip.Id, redelivery: true);
+
+        var all = await List(null);
+        var filtered = await List(Tuesday.AddDays(1));
+
+        all.Select(item => (item.ShipmentNumber, item.Redelivery)).Should().Equal((redelivery.Number.Value, true), (released.Number.Value, false));
+        filtered.Select(item => item.ShipmentNumber).Should().Equal(redelivery.Number.Value, released.Number.Value);
+    }
+
     private async Task<IReadOnlyList<ShipmentToPutOnTripSummary>> List(DateOnly? day) =>
         await new ListShipmentsToPutOnTripsHandler(_fixture.Shipments.AsRead(), _fixture.Trips.AsRead(), _fixture.TripShipments, _shippers)
             .Handle(new ListShipmentsToPutOnTripsQuery(day), CancellationToken.None);

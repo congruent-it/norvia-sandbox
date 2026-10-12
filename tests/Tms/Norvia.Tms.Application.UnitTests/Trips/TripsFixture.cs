@@ -142,6 +142,15 @@ internal sealed class TripsFixture
         return shipment;
     }
 
+    /// <summary>A Collected Own fleet Shipment whose Driver couldn't deliver it, so it is Awaiting re-delivery (P12); it collected on <paramref name="collectionDay"/>.</summary>
+    public Shipment AwaitingRedeliveryShipment(DateOnly collectionDay, int pallets = 2, decimal weightKg = 500m)
+    {
+        var shipment = ReleasedShipment(collectionDay, pallets, weightKg);
+        typeof(Shipment).GetProperty(nameof(Shipment.Status))!.SetValue(shipment, ShipmentStatus.Collected);
+        shipment.AwaitRedelivery().Should().BeTrue();
+        return shipment;
+    }
+
     private long _shipmentSequence;
 
     private static DateTimeOffset At(DateOnly day, int hour) =>

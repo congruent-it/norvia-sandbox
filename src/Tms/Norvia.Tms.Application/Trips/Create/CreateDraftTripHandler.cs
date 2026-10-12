@@ -33,7 +33,7 @@ public sealed class CreateDraftTripHandler(IRepository<Trip> trips, ITripNumbers
         trip.Plan(command.PlannedStart, command.PlannedDrivingDuration);
         foreach (var item in added)
         {
-            trip.AddShipment(item.Shipment.Id);
+            trip.AddShipment(item.Shipment);
         }
 
         await trips.AddAsync(trip, cancellationToken);
