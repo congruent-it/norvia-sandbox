@@ -83,6 +83,9 @@ var driverAppApi = builder.AddProject<Projects.Norvia_DriverApp_Api>("driver-app
     .WithReference(driverAppDatabase).WaitForCompletion(driverAppMigrations)
     .WithHttpHealthCheck("/health");
 
+// The Partner portal's presenter panel switches the Driver app's "unavailable" fault through its API (P11).
+partnerPortal.WithEnvironment("DriverApp__Address", driverAppApi.GetEndpoint("http"));
+
 // The Driver's screens: sign in by picking a seeded Driver, then a read-only list of that Driver's Trips.
 var driverAppWeb = builder.AddProject<Projects.Norvia_DriverApp_Web>("driver-app-web")
     .WithReference(driverAppDatabase).WaitForCompletion(driverAppMigrations)

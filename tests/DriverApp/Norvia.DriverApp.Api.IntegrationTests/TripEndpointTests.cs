@@ -189,6 +189,24 @@ public sealed class TripEndpointTests(DriverAppFixture driverApp)
         trip.GetProperty("version").GetInt32().Should().Be(6);
     }
 
+    [Fact]
+    public async Task TheUnavailableSetting_CanBeReadBack()
+    {
+        await SetUnavailableAsync(true);
+        try
+        {
+            var on = await driverApp.DriverApp.GetFromJsonAsync<JsonElement>("/v1/settings/unavailable", Ct);
+            on.GetProperty("unavailable").GetBoolean().Should().BeTrue();
+        }
+        finally
+        {
+            await SetUnavailableAsync(false);
+        }
+
+        var off = await driverApp.DriverApp.GetFromJsonAsync<JsonElement>("/v1/settings/unavailable", Ct);
+        off.GetProperty("unavailable").GetBoolean().Should().BeFalse();
+    }
+
     private async Task SetUnavailableAsync(bool unavailable)
     {
         var response = await driverApp.DriverApp.PutAsJsonAsync("/v1/settings/unavailable", new { unavailable }, Ct);
