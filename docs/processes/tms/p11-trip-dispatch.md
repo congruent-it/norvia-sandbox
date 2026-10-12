@@ -226,7 +226,7 @@ The script checks that the first Trip is Dispatched with versions 1 and 2 both D
 
 ## Implementation
 
-For engineers and coding agents. It shows where the built part of P11 lives in the repository, and what isn't built yet. It follows the [P10 section](p10-fleet-capacity-planning.md#implementation).
+For engineers and coding agents. It shows where the built part of P11 lives in the repository, the Hops a dispatch leaves on the Message trail, what plays each Azure piece on a developer's machine, and what is designed but not built. It follows the [P10 section](p10-fleet-capacity-planning.md#implementation).
 
 ### Built so far
 
@@ -255,6 +255,7 @@ sequenceDiagram
         participant call as tms-api: POST /v1/trips/TRIP-0000007/dispatch
         participant pub as tms-api: publish TripDispatched
         participant app as logic-trip-dispatch: Send_to_the_Driver_app
+        participant drv as driver-app: POST /v1/trips
         participant report as logic-trip-dispatch: Report_the_version_delivered
         participant rcall as tms-api: POST /v1/trips/TRIP-0000007/versions/1/report-delivered
     end
@@ -263,18 +264,19 @@ sequenceDiagram
     call-->>ui: 200, or 404, 409 or 422 and nothing changes
     call-)pub: outbox, within a second
     pub-)app: trip-events, subscription trip-dispatch
-    app->>app: POST the whole Trip to the Driver app, retried on a timeout, 408, 429 and 5xx
+    app->>drv: the whole Trip, retried on a timeout, 408, 429 and 5xx
+    drv-->>app: 2xx, the Trip version kept
     app->>report: delivered
     report->>rcall: X-Correlation-ID of the dispatch
-    rcall-)rcall: version Delivered to Driver app
+    rcall-->>report: 2xx, the version is Delivered to Driver app
 ```
 
-- When the Driver app doesn't take the Trip, the send Hop is `Failed` with `DriverAppUnavailable` or `DriverAppRefused`, and the Logic App calls `Report_the_version_not_delivered` instead. The TMS marks the version **Not delivered** and publishes `TripNotDelivered`, with the same correlation ID. The Planner's send again starts a new trail.
+- When the Driver app doesn't take the Trip, the `Send_to_the_Driver_app` Hop is `Failed` with `DriverAppUnavailable` or `DriverAppRefused`, and the Logic App calls `Report_the_version_not_delivered` instead. The TMS marks the version **Not delivered** and publishes `TripNotDelivered`, with the same correlation ID. The Planner's send again (`Send Trip again` in the TMS UI) starts a new trail.
 - A message the Logic App can't read is dead-lettered as `TripDispatchUnreadable` and the run fails; no send or report Hop appears.
 - If the TMS doesn't answer the report, the report Hop is `Failed` with `TmsUnavailable` or `TmsCallRefused` and the version stays Sending.
 - A refused action stops at the call. It has the outcome `Refused` and the failure code, and no publish Hop. A call that changes nothing publishes nothing.
 - The publish Hop appears only once the outbox has sent the message ([failure behaviour](../../architecture/failure-behaviour.md#the-tms-outbox)).
-- The Driver app logs its receipt under the same correlation ID, in its own Flow. The Message trail doesn't chain from it.
+- The Driver app logs its receipt under the same correlation ID and the same Flow `trip-dispatch`, so its Hop is on the trail too.
 
 ### Code map
 
@@ -307,7 +309,7 @@ Links go to files, not lines, so they stay true as the code moves.
 
 ### Locally
 
-The Trip dispatch Logic App is played by `LocalTripDispatchWorker`, which reads the same subscription and filter, sends the Trip to the Driver app's Trip endpoint with a generated `driver-app-endpoint-key` the AppHost gives it and the Driver app, and reports to the TMS API. API Management is not in the path of the TMS call. The Service Bus is the emulator and the Driver app's Key Vault is the key the AppHost generates. A change to the workflow's steps, retry policy or tracked properties is made in both. The full map is in [local-vs-azure.md](../../architecture/local-vs-azure.md).
+The [Local stand-in row](#code-map) says how the worker plays the Logic App. Besides that, API Management is not in the path of the TMS call, the Service Bus is the emulator, and the Driver app's Key Vault is the key the AppHost generates. The full map is in [local-vs-azure.md](../../architecture/local-vs-azure.md).
 
 ### Gaps
 
@@ -318,7 +320,7 @@ Designed in this document and not built yet:
 | The rest of the Driver app | The Trip endpoint and a read-only list of a Driver's Trips are built. Starting and ending a Trip, Stop reports and the Driver reports Logic App come with [P12](p12-trip-execution.md) |
 | `Trips.Start` and `Trips.End`, and a Trip going In progress | Not built, so every Dispatched Trip can still be Amended |
 | Alerts on failed runs of the Trip dispatch Logic App, and the dead-letter queue | None built ([Failure behaviour](../../architecture/failure-behaviour.md)) |
-| As-found toggles in the Bicep for P11 | None added. The one fault is the presenter-panel one, the Driver app unavailable. No Bicep parameter switches anything else broken in Trip dispatch |
+| As-found toggles in the Bicep for P11 | None added. The one fault is the presenter-panel one, the Driver app unavailable. No Bicep parameter switches anything else broken in Trip dispatch, and [Failure behaviour](../../architecture/failure-behaviour.md#planned-processes) names none yet |
 | Everything under [Deferred](#deferred) | Left out on purpose |
 
 ## Deferred
