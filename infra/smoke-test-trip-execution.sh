@@ -220,6 +220,13 @@ found() {
 pause() { read -r -p "Press Enter when done. " _; }
 
 echo "Trip execution: Trip $trip_number, Driver $driver_id"
+# The Trip must be for today, in Norvia's time: Start Trip is refused on any other day (NotTripDay). The seed puts it on the day the
+# TMS first started (the next Monday on a weekend), so a TMS seeded days ago, or at a weekend, needs a fresh TMS database first.
+trip=$(driver_trip)
+[ -n "$trip" ] || fail "the Driver app doesn't hold Trip $trip_number for Driver $driver_id: has the Trip dispatch Logic App delivered it, and is $driver_id the Trip's Driver?"
+today=$(TZ=Europe/Amsterdam date +%F)
+[ "$(jq -r '.day' <<<"$trip")" = "$today" ] \
+  || fail "Trip $trip_number is for $(jq -r '.day' <<<"$trip"), not today ($today), so Start Trip would be refused with NotTripDay; seed a fresh TMS database and run this on a weekday"
 cat <<EOF
 As the Driver in the Driver app ($driver_app_ui), signed in as the seeded Driver's Entra test user (the presenter panel
 has the sign-in details). Open the Trip of the day, with three Shipments, and:
@@ -264,11 +271,13 @@ for shipment in $delivered; do
   jq -e --arg s "$shipment" '.shipments[$s].billingState == "Billable"' <<<"$state" >/dev/null && billable=$((billable + 1))
   jq -e --arg s "$shipment" '.shipments[$s].openExceptions | index("Reservations")' <<<"$state" >/dev/null && reservations=$((reservations + 1))
 done
-[ "$billable" -eq 1 ] && [ "$reservations" -eq 1 ] \
-  || fail "exactly one Delivered Shipment should be Billable (the clean one) and one should have a Reservations Exception, found $billable and $reservations: $(jq -c '.shipments' <<<"$state")"
-pass "the two Delivered Shipments have their Proof of delivery on the timeline; one is Billable and the other has a Reservations Exception open"
+[ "$billable" -ge 1 ] && [ "$reservations" -eq 1 ] \
+  || fail "a Delivered Shipment should be Billable (the clean one) and exactly one should have a Reservations Exception, found $billable Billable and $reservations with Reservations: $(jq -c '.shipments' <<<"$state")"
+pass "the two Delivered Shipments have their Proof of delivery on the timeline; $billable Billable, and one has a Reservations Exception open"
 
-# 5. In order through the session: the Logic App recorded the reports in the order the Driver made them.
+# 5. In order through the session: the Logic App recorded the reports in the order the Driver made them. The session (keyed by Trip
+# number) is what makes that so, but it is seen only in its result: a report with no 'Recorded' row of the Logic App, or one
+# recorded out of turn, fails this check.
 expected=$(jq -r '.reports[].id | ascii_downcase' <<<"$trip") # oldest first
 actual=$(until_found recorded_order)
 [ -n "$actual" ] || fail "no recorded report of Trip $trip_number reached Application Insights after 10 minutes"

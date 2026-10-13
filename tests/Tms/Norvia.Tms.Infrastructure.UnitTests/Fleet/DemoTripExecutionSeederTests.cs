@@ -82,7 +82,7 @@ public sealed class DemoTripExecutionSeederTests : IAsyncDisposable
         draft.PlannedStart.Should().Be(new TimeOnly(9, 0));
         draft.PlannedDrivingDuration.Should().Be(TimeSpan.FromHours(3));
         draft.ShipmentNumbers.Should().Equal(shipments);
-        draft.IdempotencyKey.Value.Should().StartWith(DemoTripExecutionSeeder.TripKeyPrefix);
+        draft.IdempotencyKey.Value.Should().StartWith(DemoTrips.KeyPrefix);
         Received<DispatchTripCommand>().Should().ContainSingle().Which.Number.Should().Be("TR-0000001");
     }
 
@@ -111,7 +111,7 @@ public sealed class DemoTripExecutionSeederTests : IAsyncDisposable
     [Fact]
     public async Task StartAsync_WhenTheDemosTripIsStillADraft_DispatchesItAfterAllBookingsAreRepeated()
     {
-        _trips.ListAsync(Arg.Any<TripsInOrderSpec>(), Arg.Any<CancellationToken>()).Returns([ADraft(DemoTripExecutionSeeder.TripKeyPrefix + "20261005")]);
+        _trips.ListAsync(Arg.Any<TripsInOrderSpec>(), Arg.Any<CancellationToken>()).Returns([ADraft(DemoTrips.KeyPrefix + "20261005")]);
 
         await _seeder.StartAsync(_cancellationToken);
         await SeededAsync();
@@ -139,7 +139,7 @@ public sealed class DemoTripExecutionSeederTests : IAsyncDisposable
 
         await _seeder.StartAsync(_cancellationToken);
         (await LogAsync(log => log.Level == LogLevel.Warning)).Message.Should().Contain("trying again");
-        _time.Advance(DemoTripExecutionSeeder.RetryInterval);
+        _time.Advance(DemoSeeder.RetryInterval);
 
         await SeededAsync();
         Received<DispatchTripCommand>().Should().ContainSingle();

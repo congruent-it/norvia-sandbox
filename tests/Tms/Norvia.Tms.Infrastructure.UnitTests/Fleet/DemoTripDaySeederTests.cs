@@ -114,7 +114,7 @@ public sealed class DemoTripDaySeederTests : IAsyncDisposable
     [Fact]
     public async Task StartAsync_WhenOnlyTheTripOfP12sDemoExists_SeedsTheTripDay()
     {
-        _trips.ListAsync(Arg.Any<TripsInOrderSpec>(), Arg.Any<CancellationToken>()).Returns([ATrip(DemoTripExecutionSeeder.TripKeyPrefix + "20261005")]);
+        _trips.ListAsync(Arg.Any<TripsInOrderSpec>(), Arg.Any<CancellationToken>()).Returns([ATrip(DemoTrips.KeyPrefix + "20261005")]);
 
         await _seeder.StartAsync(_cancellationToken);
         await SeededAsync();
@@ -142,7 +142,7 @@ public sealed class DemoTripDaySeederTests : IAsyncDisposable
 
         await _seeder.StartAsync(_cancellationToken);
         (await LogAsync(log => log.Level == LogLevel.Warning)).Message.Should().Contain("trying again");
-        _time.Advance(DemoTripDaySeeder.RetryInterval);
+        _time.Advance(DemoSeeder.RetryInterval);
 
         await SeededAsync();
         Received<ReleaseShipmentCommand>().Should().HaveCount(_demo.TransportOrders.Count);
