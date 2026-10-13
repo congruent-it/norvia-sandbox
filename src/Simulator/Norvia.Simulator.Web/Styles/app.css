@@ -1,0 +1,164 @@
+/*
+ * The Simulator's stylesheet, built by Tailwind CSS into wwwroot/app.css (ADR 0025). It has the look of Bootswatch's Darkly
+ * theme, as the Integration console has it: Flatly's dark twin, with a charcoal page, a blue navbar, green links and Lato. Like
+ * the console it is a tool for the people behind the scenes, so it reads as another of Norvia's own. Tailwind's preflight
+ * resets the page instead of Fluent UI's reboot.css: the reboot isn't in a cascade layer, so it would win over every
+ * Tailwind utility.
+ */
+@import "tailwindcss";
+
+@source "../**/*.razor";
+
+/*
+ * Darkly's palette and type (Bootswatch 5, darkly/_variables.scss). Static, so every colour is emitted as a variable:
+ * the Fluent UI overrides below use some that no utility does.
+ */
+@theme static {
+    --color-primary: #375a7f;
+    --color-secondary: #444;
+    --color-success: #00bc8c;
+    --color-info: #3498db;
+    --color-warning: #f39c12;
+    --color-danger: #e74c3c;
+    --color-body: #222;
+    --color-surface: #303030;
+    --color-border: #444;
+    --color-muted: #888;
+    --font-sans: "Lato", -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --radius-darkly: 0.375rem;
+}
+
+@font-face {
+    font-family: "Lato";
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("fonts/lato-latin-400-normal.woff2") format("woff2");
+}
+
+@font-face {
+    font-family: "Lato";
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url("fonts/lato-latin-700-normal.woff2") format("woff2");
+}
+
+@layer base {
+    body {
+        /* Fluent UI's components read their font from this token, which Fluent's script sets on the root. */
+        --body-font: var(--font-sans);
+        margin: 0;
+        background-color: var(--color-body);
+        color: #fff;
+        font-family: var(--font-sans);
+        font-size: 0.9375rem;
+        line-height: 1.5;
+    }
+
+    h1,
+    h2 {
+        margin-top: 0;
+        font-weight: 700;
+        line-height: 1.2;
+        color: #fff;
+    }
+
+    h1 {
+        margin-bottom: 1.5rem;
+        font-size: 1.875rem;
+    }
+
+    h2 {
+        margin-bottom: 0.75rem;
+        font-size: 1.25rem;
+    }
+
+    p {
+        margin: 0 0 1rem;
+    }
+
+    a {
+        color: var(--color-success);
+        text-decoration: underline;
+    }
+
+    a:hover {
+        color: #009670;
+    }
+
+    code {
+        color: #e83e8c;
+        font-size: 0.875em;
+    }
+}
+
+/*
+ * Fluent UI's own component styles aren't in a cascade layer, so these overrides aren't either: a layered rule would
+ * always lose to them.
+ */
+
+/*
+ * Alerts as Darkly draws them: solid colour, white text. In dark mode Fluent scopes its own with an attribute
+ * (.fluent-messagebar.dark.intent-error[b-…], four classes' worth), so these add body and :not(.light) to outrank it.
+ */
+body .fluent-messagebar.intent-error:not(.light),
+body .fluent-messagebar.intent-warning:not(.light),
+body .fluent-messagebar.intent-info:not(.light) {
+    padding: 0.75rem 1rem;
+    border: none;
+    border-radius: var(--radius-darkly);
+    color: #fff;
+    font-family: var(--font-sans);
+    font-size: 0.9375rem;
+}
+
+body .fluent-messagebar.dark.intent-error:not(.light),
+body .fluent-messagebar.intent-error:not(.light) {
+    background-color: var(--color-danger);
+}
+
+body .fluent-messagebar.dark.intent-warning:not(.light),
+body .fluent-messagebar.intent-warning:not(.light) {
+    background-color: var(--color-warning);
+}
+
+body .fluent-messagebar.dark.intent-info:not(.light),
+body .fluent-messagebar.intent-info:not(.light) {
+    background-color: var(--color-info);
+}
+
+body .fluent-messagebar.intent-error:not(.light) svg,
+body .fluent-messagebar.intent-warning:not(.light) svg,
+body .fluent-messagebar.intent-info:not(.light) svg {
+    fill: #fff !important;
+}
+
+body .fluent-messagebar .fluent-messagebar-message {
+    color: inherit;
+    font-size: inherit;
+}
+
+/*
+ * Tailwind's preflight zeroes the padding of every element, the options' hosts included, which puts their text against
+ * the edge of the list and under the selected option's marker. This gives back Fluent's own inset.
+ */
+fluent-option {
+    padding-inline: 0.75rem;
+}
+
+#blazor-error-ui {
+    display: none;
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 1000;
+}
+
+/*
+ * Fluent UI's data grid clips a column's title with an ellipsis, so the title adds nothing to the column's width: a
+ * column of short values such as durations cuts off its own title. A header at least as wide as its title makes every
+ * max-content column fit it. It isn't in a layer, so it applies next to Fluent UI's scoped styles, which set no width.
+ */
+.col-title {
+    min-width: max-content;
+}

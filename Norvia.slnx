@@ -43,6 +43,13 @@
     <Project Path="src/PartnerPortal/Norvia.PartnerPortal.Migrations/Norvia.PartnerPortal.Migrations.csproj" />
     <Project Path="src/PartnerPortal/Norvia.PartnerPortal.Web/Norvia.PartnerPortal.Web.csproj" />
   </Folder>
+  <Folder Name="/src/Simulator/">
+    <Project Path="src/Simulator/Norvia.Simulator.Application/Norvia.Simulator.Application.csproj" />
+    <Project Path="src/Simulator/Norvia.Simulator.Domain/Norvia.Simulator.Domain.csproj" />
+    <Project Path="src/Simulator/Norvia.Simulator.Infrastructure/Norvia.Simulator.Infrastructure.csproj" />
+    <Project Path="src/Simulator/Norvia.Simulator.Migrations/Norvia.Simulator.Migrations.csproj" />
+    <Project Path="src/Simulator/Norvia.Simulator.Web/Norvia.Simulator.Web.csproj" />
+  </Folder>
   <Folder Name="/src/Tms/">
     <Project Path="src/Tms/Norvia.Tms.Api/Norvia.Tms.Api.csproj" />
     <Project Path="src/Tms/Norvia.Tms.Application/Norvia.Tms.Application.csproj" />
@@ -87,6 +94,13 @@
     <Project Path="tests/PartnerPortal/Norvia.PartnerPortal.Infrastructure.UnitTests/Norvia.PartnerPortal.Infrastructure.UnitTests.csproj" />
     <Project Path="tests/PartnerPortal/Norvia.PartnerPortal.Web.UiTests/Norvia.PartnerPortal.Web.UiTests.csproj" />
     <Project Path="tests/PartnerPortal/Norvia.PartnerPortal.Web.UnitTests/Norvia.PartnerPortal.Web.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/tests/Simulator/">
+    <Project Path="tests/Simulator/Norvia.Simulator.Application.UnitTests/Norvia.Simulator.Application.UnitTests.csproj" />
+    <Project Path="tests/Simulator/Norvia.Simulator.ArchitectureTests/Norvia.Simulator.ArchitectureTests.csproj" />
+    <Project Path="tests/Simulator/Norvia.Simulator.Domain.UnitTests/Norvia.Simulator.Domain.UnitTests.csproj" />
+    <Project Path="tests/Simulator/Norvia.Simulator.Infrastructure.UnitTests/Norvia.Simulator.Infrastructure.UnitTests.csproj" />
+    <Project Path="tests/Simulator/Norvia.Simulator.Web.UnitTests/Norvia.Simulator.Web.UnitTests.csproj" />
   </Folder>
   <Folder Name="/tests/Tms/">
     <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests/Norvia.Tms.Api.IntegrationTests.csproj" />

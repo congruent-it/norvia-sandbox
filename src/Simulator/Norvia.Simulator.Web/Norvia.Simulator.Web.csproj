@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <PackageReference Include="Mediator.SourceGenerator" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.FluentUI.AspNetCore.Components" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Norvia.ServiceDefaults\Norvia.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\Norvia.Simulator.Application\Norvia.Simulator.Application.csproj" />
+    <ProjectReference Include="..\Norvia.Simulator.Infrastructure\Norvia.Simulator.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Norvia.Simulator.Web.UnitTests" />
+  </ItemGroup>
+
+  <!--
+    The stylesheet is built with Tailwind CSS (ADR 0025), which needs Node.js. Tailwind and the Lato font come from npm;
+    the build installs them, writes wwwroot/app.css and copies the fonts next to it. Both are build output, not source.
+  -->
+  <ItemGroup>
+    <None Remove="node_modules/**" />
+    <Content Remove="node_modules/**;package.json;package-lock.json" />
+    <TailwindInput Include="Styles/**/*.css;**/*.razor" Exclude="node_modules/**;bin/**;obj/**" />
+    <LatoFont Include="node_modules/@fontsource/lato/files/lato-latin-400-normal.woff2;node_modules/@fontsource/lato/files/lato-latin-700-normal.woff2" />
+  </ItemGroup>
+
+  <Target Name="InstallStylesheetTools" Inputs="package.json;package-lock.json" Outputs="node_modules/.install-stamp">
+    <Exec Command="npm ci --no-audit --no-fund" />
+    <Touch Files="node_modules/.install-stamp" AlwaysCreate="true" />
+  </Target>
+
+  <Target Name="BuildStylesheet" DependsOnTargets="InstallStylesheetTools" Inputs="@(TailwindInput)" Outputs="wwwroot/app.css">
+    <Exec Command="npm run build:css" />
+  </Target>
+
+  <!-- Before the static web assets are collected, so a first build already serves the stylesheet and the fonts. -->
+  <Target Name="IncludeStylesheet" BeforeTargets="AssignTargetPaths;ResolveStaticWebAssetsConfiguration" DependsOnTargets="BuildStylesheet">
+    <Copy SourceFiles="@(LatoFont)" DestinationFolder="wwwroot/fonts" SkipUnchangedFiles="true" />
+    <ItemGroup>
+      <Content Remove="wwwroot/app.css;wwwroot/fonts/*.woff2" />
+      <Content Include="wwwroot/app.css;wwwroot/fonts/*.woff2" />
+    </ItemGroup>
+  </Target>
+</Project>

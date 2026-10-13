@@ -1,0 +1,176 @@
+@page "/"
+@* Interactive, not prerendered: the Presets fill the form, and the seed offered is random. *@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@attribute [Authorize(Policy = OperatorSignIn.RunPolicy)]
+@using Norvia.Simulator.Application.Configure
+@using Norvia.Simulator.Application.Runs
+@using Norvia.Simulator.Domain.Runs
+@inject ISimulatorRequests Requests
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<PageTitle>Configure · Simulator</PageTitle>
+
+<h1>Configure a run</h1>
+<p class="text-muted">
+    A run books for the estate's Shippers through the Norvia Partner API, as each Shipper's Persona, so every booking has a real
+    Message trail. Choose a Preset or set the numbers yourself, then preview the plan: the same seed always gives the same plan.
+</p>
+
+@if (_failed)
+{
+    <div role="alert">
+        <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+            The Simulator couldn't load its settings or runs. Try again in a moment; if it keeps failing, its database may not be reachable.
+        </FluentMessageBar>
+    </div>
+}
+else if (_view is null)
+{
+    <div role="status">
+        <FluentStack VerticalAlignment="VerticalAlignment.Center">
+            <FluentProgressRing />
+            <span>Loading…</span>
+        </FluentStack>
+    </div>
+}
+else
+{
+    @if (_active is { } active)
+    {
+        <div role="status" class="mb-4">
+            <FluentMessageBar Intent="MessageIntent.Info" AllowDismiss="false">
+                Run @active.Number is still sending. <a href="@PlanLinks.Run(active.Id)" class="text-white">Open it</a>. A second run can't start meanwhile.
+            </FluentMessageBar>
+        </div>
+    }
+
+    <EditForm Model="_form" OnValidSubmit="Preview" OnInvalidSubmit="StateHasChanged" FormName="run-settings" Context="editContext">
+        <DataAnnotationsValidator />
+        @if (editContext.GetValidationMessages().Any())
+        {
+            <div role="alert" class="mb-4">
+                <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
+                    @string.Join(" ", editContext.GetValidationMessages())
+                </FluentMessageBar>
+            </div>
+        }
+
+        <div aria-label="Run settings" role="group" class="mb-8 flex flex-wrap items-end gap-4">
+            <FluentSelect TOption="string" Label="Preset" @bind-Value="_form.Preset" @bind-Value:after="PresetChanged">
+                <FluentOption TOption="string" Value="@RunForm.CustomPreset">Custom</FluentOption>
+                @foreach (var preset in _view.Presets)
+                {
+                    <FluentOption TOption="string" Value="@preset.Name">@preset.Name</FluentOption>
+                }
+            </FluentSelect>
+            <FluentNumberField TValue="int" @bind-Value="_form.Orders" Label="Orders" Min="1" Max="@_view.Limits.MaxOrdersPerRun.ToString()" />
+            <FluentNumberField TValue="int" @bind-Value="_form.BadPercent" Label="Bad bookings (%)" Min="0" Max="100" />
+            <FluentNumberField TValue="int" @bind-Value="_form.TodayPercent" Label="Collected today (%)" Min="0" Max="100" />
+            <FluentSelect TOption="string" Label="Sending" @bind-Value="_form.Mode">
+                <FluentOption TOption="string" Value="@nameof(RunMode.Burst)">Burst, as fast as the estate accepts</FluentOption>
+                <FluentOption TOption="string" Value="@nameof(RunMode.Paced)">Paced, spread over a window</FluentOption>
+            </FluentSelect>
+            @if (_form.IsPaced)
+            {
+                <FluentNumberField TValue="int" @bind-Value="_form.WindowMinutes" Label="Window (minutes)" Min="1" Max="@SimulationSettings.MaxWindowMinutes.ToString()" />
+            }
+            <FluentNumberField TValue="int" @bind-Value="_form.Seed" Label="Seed" />
+            <FluentButton Type="ButtonType.Button" OnClick="NewSeed">New seed</FluentButton>
+            <FluentButton Type="ButtonType.Submit" Appearance="Appearance.Accent">Preview plan</FluentButton>
+        </div>
+    </EditForm>
+
+    <p class="text-muted">
+        At most @_view.Limits.MaxOrdersPerRun orders per run and @_view.Limits.MaxConcurrentRequests requests at once. The next run is number @_view.NextRunNumber:
+        its Shipper references are <code>SIM-@_view.NextRunNumber-1</code>, <code>SIM-@_view.NextRunNumber-2</code> and so on.
+    </p>
+
+    @if (_clearProblem is not null)
+    {
+        <div role="alert" class="mb-4">
+            <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">@_clearProblem</FluentMessageBar>
+        </div>
+    }
+
+    <h2>Runs</h2>
+    @if (_runs.Count == 0)
+    {
+        <p class="text-muted" role="status">No runs yet.</p>
+    }
+    else
+    {
+        <FluentDataGrid Items="_runs.AsQueryable()" TGridItem="RunSummary" aria-label="Runs">
+            <TemplateColumn Title="Run">
+                <a href="@PlanLinks.Run(context.Id)">Run @context.Number</a>
+            </TemplateColumn>
+            <PropertyColumn Title="Status" Property="@(run => SimulatorText.Of(run.Status))" />
+            <PropertyColumn Title="Started" Property="@(run => SimulatorText.DateAndTime(run.StartedAt))" />
+            <PropertyColumn Title="Sent" Property="@(run => $"{run.Sent} of {run.Planned}")" />
+            <PropertyColumn Title="Sending" Property="@(run => SimulatorText.Of(run.Mode, TimeSpan.Zero))" />
+            <PropertyColumn Title="Preset" Property="@(run => run.PresetName ?? "Custom")" />
+            <PropertyColumn Title="Seed" Property="@(run => run.Seed)" />
+        </FluentDataGrid>
+        <div class="mt-4">
+            <FluentButton OnClick="ClearHistory" Disabled="@(_active is not null)">Clear history</FluentButton>
+        </div>
+    }
+}
+
+@code {
+    private ConfigureView? _view;
+    private IReadOnlyList<RunSummary> _runs = [];
+    private RunSummary? _active;
+    private readonly RunForm _form = new();
+    private bool _failed;
+    private string? _clearProblem;
+    private readonly CancellationTokenSource _cancellation = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _view = await Requests.GetConfigureAsync(_cancellation.Token);
+            _form.Seed = _view.NewSeed;
+            _form.Limits = _view.Limits;
+            _form.Fill(_view.Presets[0]);
+            await LoadRunsAsync();
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _failed = true;
+        }
+    }
+
+    public void Dispose()
+    {
+        _cancellation.Cancel();
+        _cancellation.Dispose();
+    }
+
+    private async Task LoadRunsAsync()
+    {
+        _runs = await Requests.ListRunsAsync(_cancellation.Token);
+        _active = _runs.FirstOrDefault(run => run.IsActive);
+    }
+
+    private void PresetChanged()
+    {
+        if (Presets.Find(_form.Preset) is { } preset)
+        {
+            _form.Fill(preset);
+        }
+    }
+
+    // The application hands out seeds, so a seed never comes from chance in the page.
+    private async Task NewSeed() => _form.Seed = (await Requests.GetConfigureAsync(_cancellation.Token)).NewSeed;
+
+    private void Preview() => Navigation.NavigateTo(PlanLinks.Plan(_form.ToSettings()));
+
+    private async Task ClearHistory()
+    {
+        var result = await Requests.ClearHistoryAsync(_cancellation.Token);
+        _clearProblem = result.IsSuccess ? null : string.Join(" ", result.Errors);
+        await LoadRunsAsync();
+    }
+}

@@ -1,0 +1,9 @@
+@using System.Diagnostics.CodeAnalysis
+@attribute [ExcludeFromCodeCoverage(Justification = "Router wiring; it has no behaviour of its own.")]
+
+@* Pages render statically, so the authorization middleware refuses an operator before a page renders (OperatorSignIn). *@
+<Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+    <Found Context="routeData">
+        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)" />
+    </Found>
+</Router>

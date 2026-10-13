@@ -20,7 +20,7 @@ A feature issue covers the code and its unit and architecture tests (80% line co
 - **Integration tests issue**: `<Feature title>: integration tests`. The API, adapter and AppHost-level cases (Testcontainers, `Aspire.Hosting.Testing`, the Service Bus emulator, supporting maps and Partner portal boundaries).
 - **UI tests issue**: `<Feature title>: UI tests`. The Playwright journeys.
 
-Both are blocked by the feature issue. Open them when the feature issue is written, so the cases are chosen while the design is fresh, and move the feature's `Testing Decisions` cases to the issue they belong to. Post-deploy smoke runs stay with the issue that deploys. Create them with `gh issue create`, begin the body with `Part of #<parent>` (the feature's own parent, if it has one) and `Blocked by #<feature>`, and label them `needs-triage` or `ready-for-agent` like any issue. In the feature issue, replace the test criteria with `Integration tests: #<n>` and `UI tests: #<n>`.
+Both are blocked by the feature issue. Open them when the feature issue is written, so the cases are chosen while the design is fresh, and move the feature's `Testing Decisions` cases to the issue they belong to. Post-deploy smoke runs stay with the issue that deploys. Create them with `gh issue create`, make each a GitHub sub-issue of the feature issue (`gh api --method POST repos/<owner>/<repo>/issues/<feature>/sub_issues -F sub_issue_id=<database id>`) with a native `blocked_by` dependency on it (see Wayfinding operations), begin the body with `Blocked by #<feature>`, and label them `needs-triage` or `ready-for-agent` like any issue. In the feature issue, replace the test criteria with `Integration tests: #<n>` and `UI tests: #<n>`.
 
 ## Unblocking issues when you finish one
 

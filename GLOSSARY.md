@@ -375,6 +375,22 @@ _Avoid_: mobile app, handheld, scanner
 Norvia's own application for the Integration operator to find Message trails, see failed runs and dead-lettered messages, and resubmit or discard them. It reads what the integration layer already records and keeps nothing of its own.
 _Avoid_: admin portal, monitoring portal, dashboard
 
+**Simulator**:
+Norvia's own application that feeds the estate with representative orders, shipments and trips at a chosen volume, so demos and the other applications' lists have something real to show. It acts only through the estate's real doors (the Norvia Partner API as each Shipper's Persona, and later the TMS API and the Driver app API), never a database or Service Bus, so everything it makes has a Message trail. It keeps its own runs and logs.
+_Avoid_: seeder, data generator, load tester, fixture
+
+**Simulation run**:
+One go of the Simulator: a Simulation plan sent to the estate, either as fast as the estate accepts (burst) or spread over a window (paced). Only one run is active at a time, it can be cancelled but not resumed after a restart, and its log of what each actor did and how Norvia answered stays after a refresh. Its Shipper references are `SIM-<run>-<n>`.
+_Avoid_: job, batch, test run, scenario
+
+**Simulation plan**:
+What a Simulation run will send, made before anything is sent from the run's settings and a seed: the same ones always give the same plan. The Plan preview shows it per Shipper and booking.
+_Avoid_: script, schedule, dataset
+
+**Preset**:
+A named set of numbers that fills a Simulation run's settings, such as "Quiet Monday" or "Peak week": the order count, the share of bad bookings, the share collected today, and burst or paced.
+_Avoid_: profile, template, scenario
+
 **Partner portal**:
 The single application that plays every party outside Norvia (Shippers and Carriers) in demos, with one persona per party. It reaches Norvia only through API Management.
 _Avoid_: shipper portal, carrier portal, external app

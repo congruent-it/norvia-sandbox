@@ -13,3 +13,7 @@ The Integration console is styled the way the TMS UI is ([ADR 0018](0018-the-tms
 - Building the console needs Node.js, as the TMS UI does: the build runs `npm ci` and the Tailwind CLI (see `Norvia.IntegrationConsole.Web.csproj`). `wwwroot/app.css` and the Lato font files are build output.
 - Fluent UI's dark mode has its own scoped styles for message bars (`.fluent-messagebar.dark.intent-*`), so the console's overrides outrank those too.
 - This is a stated deviation from coding guidelines §9 for the Integration console, as for the TMS UI and the Partner portal.
+
+## Amendment: the Simulator
+
+The Simulator ([ADR 0039](0039-the-simulator-books-only-through-the-estates-real-doors.md)) is styled the same way, in Darkly's look, with the same Tailwind build and Fluent UI in dark mode: it is another tool for the people behind the scenes, not a party's or an employee's application. This is the same stated deviation from coding guidelines §9.
