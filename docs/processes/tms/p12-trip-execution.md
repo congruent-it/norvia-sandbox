@@ -346,7 +346,7 @@ sequenceDiagram
 ```
 
 - A Start Trip calls `POST /v1/trips/TRIP-0000007/start`, an End Trip `.../end`, and a Proof of delivery `POST /v1/proofs-of-delivery`, preceded by `Fetch_the_files` and followed on success by `Delete_the_files`.
-- When the TMS refuses the report (a client error), `Send_the_report_to_the_TMS` is `Refused` with the TMS's failure code, the Logic App dead-letters the message with that code and message (`Dead_letter_the_refused_report`) and calls `Report_refused`. No retry, and the next report in the session goes on.
+- When the TMS refuses the report (a client error), `Send_the_report_to_the_TMS` is `Failed` with `TmsCallRefused`, the Logic App dead-letters the message with the TMS's failure code and message (`Dead_letter_the_refused_report`, `DeadLettered`) and calls `Report_refused`, which tells the Driver app the report is Refused. No retry, and the next report in the session goes on.
 - When the TMS stays down after the retries, the Hop is `Failed` with `TmsUnavailable`, the message is dead-lettered as `TmsUnavailable` and the Logic App calls `Report_not_recorded`; the session moves on.
 - When a Proof of delivery's files are gone, `Fetch_the_files` fails, the message is dead-lettered as `ProofOfDeliveryFilesGone`, the run fails and the Driver app is told Not recorded. Nothing is sent to the TMS.
 - A message the Logic App can't read is dead-lettered as `DriverReportUnreadable` and the run fails; no send or report Hop appears.
