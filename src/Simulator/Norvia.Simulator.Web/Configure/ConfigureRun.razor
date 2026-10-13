@@ -1,0 +1,169 @@
+@page "/"
+@* Interactive, not prerendered: the Presets fill the form, and the seed offered is random. *@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@attribute [Authorize(Policy = OperatorSignIn.RunPolicy)]
+@using Norvia.Simulator.Application.Configure
+@using Norvia.Simulator.Application.Runs
+@using Norvia.Simulator.Domain.Runs
+@inject ISimulatorRequests Requests
+@inject NavigationManager Navigation
+
+<PageTitle>Configure · Simulator</PageTitle>
+
+<h1>Configure a run</h1>
+<p class="text-muted">
+    A run books for the estate's Shippers through the Norvia Partner API, as each Shipper's Persona, so every booking has a real
+    Message trail. Choose a Preset or set the numbers yourself, then preview the plan: the same seed always gives the same plan.
+</p>
+
+@if (_view is null)
+{
+    <div role="status">
+        <FluentStack VerticalAlignment="VerticalAlignment.Center">
+            <FluentProgressRing />
+            <span>Loading…</span>
+        </FluentStack>
+    </div>
+}
+else
+{
+    @if (_active is { } active)
+    {
+        <div role="status" class="mb-4">
+            <FluentMessageBar Intent="MessageIntent.Info" AllowDismiss="false">
+                Run @active.Number is still sending. <a href="@PlanLinks.Run(active.Id)" class="text-white">Open it</a>. A second run can't start meanwhile.
+            </FluentMessageBar>
+        </div>
+    }
+
+    @if (_problems.Count > 0)
+    {
+        <div role="alert" class="mb-4">
+            <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
+                @string.Join(" ", _problems)
+            </FluentMessageBar>
+        </div>
+    }
+
+    <form aria-label="Run settings" class="mb-8 flex flex-wrap items-end gap-4" @onsubmit="Preview">
+        <FluentSelect TOption="string" Label="Preset" Value="@_preset" ValueChanged="PresetChanged">
+            <FluentOption TOption="string" Value="@CustomPreset">Custom</FluentOption>
+            @foreach (var preset in _view.Presets)
+            {
+                <FluentOption TOption="string" Value="@preset.Name">@preset.Name</FluentOption>
+            }
+        </FluentSelect>
+        <FluentNumberField TValue="int" @bind-Value="_orders" Label="Orders" Min="1" Max="@_view.Limits.MaxOrdersPerRun.ToString()" />
+        <FluentNumberField TValue="int" @bind-Value="_bad" Label="Bad bookings (%)" Min="0" Max="100" />
+        <FluentNumberField TValue="int" @bind-Value="_today" Label="Collected today (%)" Min="0" Max="100" />
+        <FluentSelect TOption="string" Label="Sending" @bind-Value="_mode">
+            <FluentOption TOption="string" Value="@nameof(RunMode.Burst)">Burst, as fast as the estate accepts</FluentOption>
+            <FluentOption TOption="string" Value="@nameof(RunMode.Paced)">Paced, spread over a window</FluentOption>
+        </FluentSelect>
+        @if (_mode == nameof(RunMode.Paced))
+        {
+            <FluentNumberField TValue="int" @bind-Value="_window" Label="Window (minutes)" Min="1" Max="@SimulationSettings.MaxWindowMinutes.ToString()" />
+        }
+        <FluentNumberField TValue="int" @bind-Value="_seed" Label="Seed" />
+        <FluentButton Type="ButtonType.Button" OnClick="NewSeed">New seed</FluentButton>
+        <FluentButton Type="ButtonType.Submit" Appearance="Appearance.Accent">Preview plan</FluentButton>
+    </form>
+
+    <p class="text-muted">
+        At most @_view.Limits.MaxOrdersPerRun orders per run and @_view.Limits.MaxConcurrentRequests requests at once. The next run is number @_view.NextRunNumber:
+        its Shipper references are <code>SIM-@_view.NextRunNumber-1</code>, <code>SIM-@_view.NextRunNumber-2</code> and so on.
+    </p>
+
+    <h2>Runs</h2>
+    @if (_runs.Count == 0)
+    {
+        <p class="text-muted" role="status">No runs yet.</p>
+    }
+    else
+    {
+        <FluentDataGrid Items="_runs.AsQueryable()" TGridItem="RunSummary" aria-label="Runs">
+            <TemplateColumn Title="Run">
+                <a href="@PlanLinks.Run(context.Id)">Run @context.Number</a>
+            </TemplateColumn>
+            <PropertyColumn Title="Status" Property="@(run => SimulatorText.Of(run.Status))" />
+            <PropertyColumn Title="Started" Property="@(run => SimulatorText.DateAndTime(run.StartedAt))" />
+            <PropertyColumn Title="Sent" Property="@(run => $"{run.Sent} of {run.Planned}")" />
+            <PropertyColumn Title="Sending" Property="@(run => SimulatorText.Of(run.Mode, TimeSpan.Zero))" />
+            <PropertyColumn Title="Preset" Property="@(run => run.PresetName ?? "Custom")" />
+            <PropertyColumn Title="Seed" Property="@(run => run.Seed)" />
+        </FluentDataGrid>
+        <div class="mt-4">
+            <FluentButton OnClick="ClearHistory" Disabled="@(_active is not null)">Clear history</FluentButton>
+        </div>
+    }
+}
+
+@code {
+    private const string CustomPreset = "Custom";
+
+    private ConfigureView? _view;
+    private IReadOnlyList<RunSummary> _runs = [];
+    private RunSummary? _active;
+    private List<string> _problems = [];
+
+    private string _preset = CustomPreset;
+    private int _orders = 20;
+    private int _bad = 10;
+    private int _today = 30;
+    private int _seed;
+    private string _mode = nameof(RunMode.Burst);
+    private int _window = 10;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _view = await Requests.GetConfigureAsync(CancellationToken.None);
+        _seed = _view.NewSeed;
+        PresetChanged(_view.Presets[0].Name);
+        await LoadRunsAsync();
+    }
+
+    private async Task LoadRunsAsync()
+    {
+        _runs = await Requests.ListRunsAsync(CancellationToken.None);
+        _active = _runs.FirstOrDefault(run => run.IsActive);
+    }
+
+    private void PresetChanged(string name)
+    {
+        _preset = name;
+        if (Presets.Find(name) is not { } preset)
+        {
+            return;
+        }
+
+        _orders = preset.OrderCount;
+        _bad = preset.BadSharePercent;
+        _today = preset.CollectedTodayPercent;
+        _mode = preset.Mode.ToString();
+        _window = preset.Mode == RunMode.Paced ? (int)preset.Window.TotalMinutes : _window;
+    }
+
+    private void NewSeed() => _seed = Random.Shared.Next(1, 1_000_000);
+
+    private SimulationSettings Settings() => new(
+        _orders, _bad, _today, _seed, Enum.Parse<RunMode>(_mode),
+        _mode == nameof(RunMode.Paced) ? TimeSpan.FromMinutes(_window) : TimeSpan.Zero,
+        _preset == CustomPreset ? null : _preset);
+
+    private void Preview()
+    {
+        var settings = Settings();
+        _problems = [.. settings.Problems(_view!.Limits)];
+        if (_problems.Count == 0)
+        {
+            Navigation.NavigateTo(PlanLinks.Plan(settings));
+        }
+    }
+
+    private async Task ClearHistory()
+    {
+        var result = await Requests.ClearHistoryAsync(CancellationToken.None);
+        _problems = result.IsSuccess ? [] : [.. result.Errors];
+        await LoadRunsAsync();
+    }
+}

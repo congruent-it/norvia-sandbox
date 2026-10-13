@@ -142,6 +142,70 @@
           ]
         }
       ]
+    },
+    {
+      "$comment": "Tuincentrum Groenrijk's Rate Card, so the Simulator can book for it (a Shipper without one can only be Rated as NoRateCard): Lanes out of Utrecht, where its garden centres deliver from, into the Netherlands and Antwerp, priced with sandbox values.",
+      "id": "RC-0002",
+      "shipperId": "SHP-0003",
+      "versions": [
+        {
+          "version": 1,
+          "validFrom": "2026-01-01",
+          "validTo": null,
+          "zones": [
+            { "name": "Utrecht", "country": "NL", "postcodePrefixes": ["34", "35", "36", "37", "38", "39"] },
+            { "name": "Amsterdam", "country": "NL", "postcodePrefixes": ["10", "11", "12", "13", "14", "15"] },
+            { "name": "Rotterdam", "country": "NL", "postcodePrefixes": ["30", "31", "32"] },
+            { "name": "Antwerpen", "country": "BE", "postcodePrefixes": ["20", "21", "22", "23", "24", "25", "26", "27", "28", "29"] }
+          ],
+          "lanes": [
+            {
+              "origin": "Utrecht",
+              "destination": "Utrecht",
+              "minimumCharge": 55.00,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 9.50 },
+                { "upToKg": 1000, "pricePer100Kg": 8.20 },
+                { "upToKg": 2500, "pricePer100Kg": 6.90 },
+                { "upToKg": 24000, "pricePer100Kg": 4.80 }
+              ]
+            },
+            {
+              "origin": "Utrecht",
+              "destination": "Amsterdam",
+              "minimumCharge": 70.00,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 12.40 },
+                { "upToKg": 1000, "pricePer100Kg": 10.60 },
+                { "upToKg": 2500, "pricePer100Kg": 8.90 },
+                { "upToKg": 24000, "pricePer100Kg": 6.20 }
+              ]
+            },
+            {
+              "origin": "Utrecht",
+              "destination": "Rotterdam",
+              "minimumCharge": 65.00,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 11.80 },
+                { "upToKg": 1000, "pricePer100Kg": 10.20 },
+                { "upToKg": 2500, "pricePer100Kg": 8.60 },
+                { "upToKg": 24000, "pricePer100Kg": 5.90 }
+              ]
+            },
+            {
+              "origin": "Utrecht",
+              "destination": "Antwerpen",
+              "minimumCharge": 90.00,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 15.20 },
+                { "upToKg": 1000, "pricePer100Kg": 12.90 },
+                { "upToKg": 2500, "pricePer100Kg": 10.80 },
+                { "upToKg": 24000, "pricePer100Kg": 7.40 }
+              ]
+            }
+          ]
+        }
+      ]
     }
   ],
   "carrierRateCards": [

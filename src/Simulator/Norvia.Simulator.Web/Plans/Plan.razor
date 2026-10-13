@@ -1,0 +1,151 @@
+@page "/plan"
+@* Interactive, not prerendered: the preview is made once, for the operator who asked for it. *@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@attribute [Authorize(Policy = OperatorSignIn.RunPolicy)]
+@using Ardalis.Result
+@using Norvia.Simulator.Application.Plans.Preview
+@using Norvia.Simulator.Domain.Plans
+@using Norvia.Simulator.Domain.Runs
+@inject ISimulatorRequests Requests
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider Authentication
+
+<PageTitle>Plan preview · Simulator</PageTitle>
+
+<h1>Plan preview</h1>
+
+@if (_settings is null)
+{
+    <div role="alert">
+        <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
+            There are no settings to preview. <a href="/" class="text-white">Configure a run</a> first.
+        </FluentMessageBar>
+    </div>
+}
+else if (_problems.Count > 0)
+{
+    <div role="alert">
+        <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
+            @string.Join(" ", _problems) <a href="/" class="text-white">Back to Configure</a>
+        </FluentMessageBar>
+    </div>
+}
+else if (_preview is null)
+{
+    <div role="status">
+        <FluentStack VerticalAlignment="VerticalAlignment.Center">
+            <FluentProgressRing />
+            <span>Making the plan…</span>
+        </FluentStack>
+    </div>
+}
+else
+{
+    <p class="text-muted" role="status">
+        Run @_preview.RunNumber would send @_preview.Rows.Count bookings, @_preview.BadBookings of them bad, @SimulatorText.Of(_preview.Settings.Mode, _preview.Settings.Window).ToLowerInvariant(),
+        from seed @_preview.Settings.Seed. This is exactly what Start run sends.
+    </p>
+
+    @if (_startProblems.Count > 0)
+    {
+        <div role="alert" class="mb-4">
+            <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+                @string.Join(" ", _startProblems)
+            </FluentMessageBar>
+        </div>
+    }
+
+    <div class="mb-6 flex gap-4">
+        <FluentButton Appearance="Appearance.Accent" OnClick="Start" Disabled="@_starting">Start run</FluentButton>
+        <FluentButton OnClick="@(() => Navigation.NavigateTo("/"))">Back to Configure</FluentButton>
+    </div>
+
+    <h2>Per Shipper</h2>
+    <FluentDataGrid Items="_preview.PerShipper.AsQueryable()" TGridItem="ShipperShare" aria-label="Bookings per Shipper" class="mb-8">
+        <PropertyColumn Title="Shipper" Property="@(share => share.ShipperName)" />
+        <PropertyColumn Title="Bookings" Property="@(share => share.Bookings)" />
+        <PropertyColumn Title="Bad" Property="@(share => share.BadBookings)" />
+    </FluentDataGrid>
+
+    <h2>Bookings</h2>
+    <FluentDataGrid Items="_preview.Rows.AsQueryable()" TGridItem="PlanRow" Pagination="_pagination" aria-label="Planned bookings">
+        <PropertyColumn Title="#" Property="@(row => row.Step)" />
+        <PropertyColumn Title="Shipper reference" Property="@(row => row.Reference)" />
+        <PropertyColumn Title="Sent as" Property="@(row => row.Actor)" />
+        <PropertyColumn Title="Route" Property="@(row => row.Route)" />
+        <PropertyColumn Title="Collected" Property="@(row => row.DayOffset == 0 ? "today" : $"in {row.DayOffset} days")" />
+        <PropertyColumn Title="Weight (kg)" Property="@(row => row.WeightKg)" />
+        <PropertyColumn Title="Kind" Property="@(row => KindOf(row))" />
+        <PropertyColumn Title="Expected answer" Property="@(row => SimulatorText.Of(row.Expected))" />
+    </FluentDataGrid>
+    <FluentPaginator State="_pagination" />
+}
+
+@code {
+    private readonly PaginationState _pagination = new() { ItemsPerPage = 25 };
+
+    private SimulationSettings? _settings;
+    private PlanPreview? _preview;
+    private List<string> _problems = [];
+    private List<string> _startProblems = [];
+    private bool _starting;
+
+    [SupplyParameterFromQuery(Name = "orders")]
+    private int? Orders { get; set; }
+
+    [SupplyParameterFromQuery(Name = "bad")]
+    private int? Bad { get; set; }
+
+    [SupplyParameterFromQuery(Name = "today")]
+    private int? Today { get; set; }
+
+    [SupplyParameterFromQuery(Name = "seed")]
+    private int? Seed { get; set; }
+
+    [SupplyParameterFromQuery(Name = "mode")]
+    private string? Mode { get; set; }
+
+    [SupplyParameterFromQuery(Name = "window")]
+    private int? Window { get; set; }
+
+    [SupplyParameterFromQuery(Name = "preset")]
+    private string? Preset { get; set; }
+
+    private static string KindOf(PlanRow row) => row.Bad is { } bad ? SimulatorText.Of(bad) : "Good";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _settings = PlanLinks.Settings(Orders, Bad, Today, Seed, Mode, Window, Preset);
+        if (_settings is null)
+        {
+            return;
+        }
+
+        var result = await Requests.PreviewAsync(_settings, CancellationToken.None);
+        if (result.IsSuccess)
+        {
+            _preview = result.Value;
+            _problems = [];
+        }
+        else
+        {
+            _problems = [.. result.ValidationErrors.Select(error => error.ErrorMessage).Concat(result.Errors)];
+        }
+    }
+
+    private async Task Start()
+    {
+        _starting = true;
+        _startProblems = [];
+        var operatorName = (await Authentication.GetAuthenticationStateAsync()).User.Identity?.Name ?? "unknown";
+        var result = await Requests.StartAsync(_settings!, operatorName, CancellationToken.None);
+        if (result.IsSuccess)
+        {
+            Navigation.NavigateTo(PlanLinks.Run(result.Value.Id));
+            return;
+        }
+
+        _startProblems = [.. result.ValidationErrors.Select(error => error.ErrorMessage).Concat(result.Errors)];
+        _starting = false;
+    }
+}

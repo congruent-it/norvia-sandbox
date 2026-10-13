@@ -28,6 +28,8 @@ Locally there is no Azure subscription, no API Management, no Logic Apps runtime
 
 The **TMS API, TMS UI, Partner portal and Integration console** need no row: they run as projects locally and as Container Apps in Azure, built from the same code. Billing and Carrier cost are planned in [P9](../processes/tms/p9-freight-settlement.md) and have neither a Logic App nor a worker yet.
 
+The **Simulator** ([ADR 0039](../adr/0039-the-simulator-books-only-through-the-estates-real-doors.md)) runs only locally so far: the AppHost starts it with its own database, it signs the Personas' tokens itself as the Partner portal does, and it signs you in as a local operator. Its Azure slice (its own app registration and managed identity, Easy Auth, the Personas' subscription keys from Key Vault) is not built yet.
+
 ## Where the two can differ
 
 Each stand-in is a second implementation of the Azure piece it plays ([ADR 0031](../adr/0031-locally-a-stand-in-and-a-hosted-worker-play-the-carrier-tracking-path.md#consequences)). A change to a policy's checks, headers or application properties, or to a workflow's settling rules or tracked properties, has to be made on both sides. Tests keep them close, but they cannot run the Azure side: the Logic Apps' Service Bus operations and API Management's policies only run in a deployed estate, so the unit tests read the definitions and the stand-ins' tests check the same list. These are the places a difference can hide.

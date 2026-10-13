@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!--
+      Only the namespaces these tests unit test are gated: the Partner API client, the seed file world and the run executor. The
+      rest of Simulator Infrastructure is EF Core and SQL code, which the integration tests run against a real container
+      (coding guidelines §10).
+    -->
+    <Include>[Norvia.Simulator.Infrastructure]Norvia.Simulator.Infrastructure.PartnerApi.*,[Norvia.Simulator.Infrastructure]Norvia.Simulator.Infrastructure.World.*,[Norvia.Simulator.Infrastructure]Norvia.Simulator.Infrastructure.Execution.*</Include>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="coverlet.msbuild" PrivateAssets="all" />
+    <PackageReference Include="JsonSchema.Net" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.Testing" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+    <PackageReference Include="xunit.v3.mtp-off" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="AwesomeAssertions" />
+    <Using Include="NSubstitute" />
+    <ProjectReference Include="..\..\..\src\Simulator\Norvia.Simulator.Infrastructure\Norvia.Simulator.Infrastructure.csproj" />
+  </ItemGroup>
+  <!-- Embedded, so the unit tests read the contracts and the seed file without touching the file system (coding guidelines §10). -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\..\contracts\partner-api\booking.v1.schema.json" LogicalName="PartnerApi/booking.v1.schema.json" />
+    <EmbeddedResource Include="..\..\..\seed\norvia.seed.json" LogicalName="seed/norvia.seed.json" />
+  </ItemGroup>
+</Project>

@@ -29,6 +29,8 @@
     <ProjectReference Include="..\IntegrationConsole\Norvia.IntegrationConsole.Web\Norvia.IntegrationConsole.Web.csproj" />
     <ProjectReference Include="..\PartnerPortal\Norvia.PartnerPortal.Migrations\Norvia.PartnerPortal.Migrations.csproj" />
     <ProjectReference Include="..\PartnerPortal\Norvia.PartnerPortal.Web\Norvia.PartnerPortal.Web.csproj" />
+    <ProjectReference Include="..\Simulator\Norvia.Simulator.Migrations\Norvia.Simulator.Migrations.csproj" />
+    <ProjectReference Include="..\Simulator\Norvia.Simulator.Web\Norvia.Simulator.Web.csproj" />
     <ProjectReference Include="..\Tms\Norvia.Tms.Api\Norvia.Tms.Api.csproj" />
     <ProjectReference Include="..\Tms\Norvia.Tms.Migrations\Norvia.Tms.Migrations.csproj" />
     <ProjectReference Include="..\Tms\Norvia.Tms.Web\Norvia.Tms.Web.csproj" />

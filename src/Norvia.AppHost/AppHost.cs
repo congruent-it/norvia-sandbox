@@ -461,6 +461,29 @@ else
         partnerPortal.WithEnvironment($"ShipperEndpoint__ApiKeys__{persona.PartyId}", shipperApiKey);
     }
 
+    // The Simulator feeds the estate with representative orders, and only through its real doors (ADR 0001): so far the Partner API,
+    // as each Shipper's Persona. It has a database of its own for its runs and logs, and is on for a local run. Azure comes with its own slice.
+    var simulatorDatabase = sql.AddDatabase("simulator");
+    var simulatorMigrations = builder.AddProject<Projects.Norvia_Simulator_Migrations>("simulator-migrations")
+        .WithReference(simulatorDatabase).WaitFor(simulatorDatabase);
+    var simulator = builder.AddProject<Projects.Norvia_Simulator_Web>("simulator-web")
+        .WithReference(simulatorDatabase).WaitForCompletion(simulatorMigrations)
+        .WaitFor(partnerApi)
+        .WithHttpHealthCheck("/health")
+        .WithUrlForEndpoint("http", url => url.DisplayText = "Simulator")
+        .WithEnvironment("Seed__Path", seedFile)
+        .WithEnvironment("Simulator__Enabled", "true")
+        .WithEnvironment("Simulator__MaxOrdersPerRun", "500")
+        .WithEnvironment("Simulator__MaxConcurrentRequests", "4")
+        .WithEnvironment("IntegrationConsole__Address", integrationConsole.GetEndpoint("http"))
+        .WithEnvironment("LocalOperator__Name", $"{Environment.UserName} (local)")
+        .WithEnvironment("LocalOperator__Roles__0", "Simulator.Run")
+        .WithEnvironment("LocalOperator__Roles__1", "Simulator.Read")
+        .WithEnvironment("PartnerApi__BaseAddress", ReferenceExpression.Create($"{partnerApi.GetEndpoint("http")}/partner/v1"))
+        .WithEnvironment("PartnerApi__PersonaClientIds", string.Join(';', personas.Where(persona => persona.IsShipper).Select(persona => $"{persona.Id}={LocalTokens.PersonaClientId(persona.Id)}")))
+        .WithEnvironment("PartnerApi__LocalTokens__Issuer", LocalTokens.Issuer)
+        .WithEnvironment("PartnerApi__LocalTokens__Audience", LocalTokens.PartnerApiAudience);
+
     partnerPortal.WaitFor(partnerApi)
         .WithEnvironment("PartnerApi__BaseAddress", ReferenceExpression.Create($"{partnerApi.GetEndpoint("http")}/partner/v1"))
         .WithEnvironment("PartnerApi__PersonaClientIds", string.Join(';', personas.Select(persona => $"{persona.Id}={LocalTokens.PersonaClientId(persona.Id)}")))
@@ -476,6 +499,9 @@ else
             partnerApi.WithEnvironment($"PartnerApi__ShippersByClientId__{LocalTokens.PersonaClientId(persona.Id)}", persona.PartyId);
             partnerPortal.WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__0", LocalTokens.SubmitRole);
             partnerPortal.WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__1", LocalTokens.TrackingReadRole);
+            // The Simulator books as the Shipper Personas, with the submit role and the same subscription key.
+            simulator.WithEnvironment($"PartnerApi__SubscriptionKeys__{persona.Id}", subscriptionKey)
+                .WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__0", LocalTokens.SubmitRole);
         }
         else
         {
@@ -504,6 +530,7 @@ else
         (trackingWorker.Resource, "Tracking__TmsTokens__SigningKey"),
         (proofOfDeliveryWorker.Resource, "ProofOfDelivery__TmsTokens__SigningKey"),
         (partnerPortal.Resource, "PartnerApi__LocalTokens__SigningKey"),
+        (simulator.Resource, "PartnerApi__LocalTokens__SigningKey"),
     })
     {
         builder.CreateResourceBuilder(holder).WithEnvironment(async context =>
