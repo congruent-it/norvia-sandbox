@@ -1,9 +1,13 @@
 @* One report of the Driver on a Trip, with what became of it. *@
-<li class="report" aria-label="@($"{TripText.ReportAction(Report.Kind)}: {TripText.ReportState(Report.State)}")">
+<li class="report" aria-label="@($"{Label}: {TripText.ReportState(Report.State)}")">
     <span class="report-title">
-        <strong>@TripText.ReportAction(Report.Kind)</strong>
+        <strong>@Label</strong>
         <FluentBadge Appearance="@(Report.State == ReportStateDto.Recorded ? Appearance.Accent : Appearance.Neutral)">@TripText.ReportState(Report.State)</FluentBadge>
     </span>
+    @if (Report.Remark is { } remark)
+    {
+        <div class="muted">@remark</div>
+    }
     @if (Report.State is ReportStateDto.Refused or ReportStateDto.NotRecorded)
     {
         <div role="status">
@@ -22,4 +26,6 @@
 @code {
     [Parameter, EditorRequired]
     public TripReportView Report { get; set; } = null!;
+
+    private string Label => Report.ShipmentNumber is { } shipment ? $"{TripText.ReportAction(Report.Kind)} {shipment}" : TripText.ReportAction(Report.Kind);
 }

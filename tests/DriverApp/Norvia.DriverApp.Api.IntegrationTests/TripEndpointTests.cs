@@ -22,7 +22,7 @@ public sealed class TripEndpointTests(DriverAppFixture driverApp)
         var trip = trips.Should().ContainSingle().Subject;
         trip.GetProperty("tripNumber").GetString().Should().Be("TR-1000001");
         trip.GetProperty("version").GetInt32().Should().Be(1);
-        trip.GetProperty("stops").EnumerateArray().Select(stop => stop.GetProperty("sequence").GetInt32()).Should().Equal(1, 2);
+        trip.GetProperty("stops").EnumerateArray().Select(stop => stop.GetProperty("details").GetProperty("sequence").GetInt32()).Should().Equal(1, 2);
     }
 
     [Theory]

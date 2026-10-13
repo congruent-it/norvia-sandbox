@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Mediator;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Http.Features;
+using Norvia.DriverApp.Application.Reports.ReportStop;
 using Norvia.DriverApp.Application.Reports.StartTrip;
 using Norvia.DriverApp.Web.Drivers;
 
@@ -16,21 +17,62 @@ public static class ReportEndpoints
         // field, so nothing would act on the antiforgery middleware's verdict; the handler does.
         endpoints.MapPost("/trips/{tripNumber}/start", async (string tripNumber, HttpContext context, IMediator mediator, CancellationToken cancellationToken) =>
         {
-            if (context.Features.Get<IAntiforgeryValidationFeature>() is { IsValid: false })
+            if (Reject(context, out var driverId) is { } rejected)
             {
-                // With a body, so the status code pages don't re-execute the request as the Not Found page, which the antiforgery check would then fail again.
-                return Results.Problem("The form is out of date. Reload My Trips and try again.", statusCode: StatusCodes.Status400BadRequest, title: "Bad request");
-            }
-
-            if (context.User.FindFirstValue(DriverClaims.DriverId) is not { } driverId)
-            {
-                return Results.Forbid();
+                return rejected;
             }
 
             var started = await mediator.Send(new StartTripCommand(tripNumber, driverId), cancellationToken);
             return started.IsSuccess ? Results.Redirect("/") : Results.NotFound();
         }).RequireAuthorization(DriverClaims.DriverPolicy).WithMetadata(new RequireAntiforgeryTokenAttribute());
 
+        // Collected, Collection failed, Delivery failed or Report damage at a Stop. The form carries the remark and nothing else the Driver app trusts.
+        endpoints.MapPost("/trips/{tripNumber}/stops/{shipmentNumber}/{kind}/{action}", async (
+            string tripNumber, string shipmentNumber, string kind, string action, HttpContext context, IMediator mediator, CancellationToken cancellationToken) =>
+        {
+            if (Reject(context, out var driverId) is { } rejected)
+            {
+                return rejected;
+            }
+
+            if (!StopRoutes.TryParse(kind, out Application.Trips.StopKindDto stop) || !StopRoutes.TryParse(action, out Application.Reports.StopActionDto what))
+            {
+                return Results.NotFound();
+            }
+
+            var form = await context.Request.ReadFormAsync(cancellationToken);
+            var reported = await mediator.Send(new ReportStopCommand(tripNumber, driverId, shipmentNumber, stop, what, form["remark"].ToString()), cancellationToken);
+            var screen = StopRoutes.Screen(tripNumber, shipmentNumber, stop);
+            return reported.Status switch
+            {
+                Ardalis.Result.ResultStatus.Ok => Results.Redirect("/"),
+                Ardalis.Result.ResultStatus.NotFound => Results.NotFound(),
+                Ardalis.Result.ResultStatus.Invalid => Results.Redirect($"{screen}?problem={Uri.EscapeDataString(reported.ValidationErrors.First().Identifier)}"),
+
+                // The Stop screen says why the Stop is not available now.
+                _ => Results.Redirect(screen),
+            };
+        }).RequireAuthorization(DriverClaims.DriverPolicy).WithMetadata(new RequireAntiforgeryTokenAttribute());
+
         return endpoints;
+    }
+
+    /// <summary>The refusal of a post that is out of date or isn't a Driver's; null, with the Driver ID from the token, when it can go on.</summary>
+    private static IResult? Reject(HttpContext context, out string driverId)
+    {
+        driverId = string.Empty;
+        if (context.Features.Get<IAntiforgeryValidationFeature>() is { IsValid: false })
+        {
+            // With a body, so the status code pages don't re-execute the request as the Not Found page, which the antiforgery check would then fail again.
+            return Results.Problem("The form is out of date. Reload My Trips and try again.", statusCode: StatusCodes.Status400BadRequest, title: "Bad request");
+        }
+
+        if (context.User.FindFirstValue(DriverClaims.DriverId) is not { } found)
+        {
+            return Results.Forbid();
+        }
+
+        driverId = found;
+        return null;
     }
 }

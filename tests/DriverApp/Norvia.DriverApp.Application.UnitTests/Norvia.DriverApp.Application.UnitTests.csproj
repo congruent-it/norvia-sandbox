@@ -18,6 +18,7 @@
   <ItemGroup>
     <EmbeddedResource Include="..\..\..\contracts\canonical-model\*.schema.json" LogicalName="CanonicalModel/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\contracts\canonical-model\samples\trip-start-reported\*.json" LogicalName="CanonicalModel/samples/trip-start-reported/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\contracts\canonical-model\samples\stop-completed-reported\*.json" LogicalName="CanonicalModel/samples/stop-completed-reported/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\contracts\canonical-model\samples\driver-report-outcome\*.json" LogicalName="CanonicalModel/samples/driver-report-outcome/%(Filename)%(Extension)" />
   </ItemGroup>
   <ItemGroup>

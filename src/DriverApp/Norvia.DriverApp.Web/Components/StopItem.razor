@@ -1,23 +1,46 @@
-@* One Stop of a Trip, as the Driver reads it on the road. *@
+@using Norvia.DriverApp.Web.Reports
+@* One Stop of a Trip, as the Driver reads it on the road. It leads to the Stop screen, where the Driver reports on it. *@
 <li class="stop">
     <div class="stop-title">
-        <strong>@TripText.StopAction(Stop.Kind)</strong>
-        <span>@Stop.ShipmentNumber</span>
-        <span class="muted">@Stop.TransportOrderNumber</span>
+        <strong>@(Stop.Kind == StopKindDto.Collection ? "Collect" : "Deliver")</strong>
+        <a href="@StopRoutes.Screen(TripNumber, Stop.ShipmentNumber, Stop.Kind)">@Stop.ShipmentNumber</a>
+        @if (Stop.Details is { } details)
+        {
+            <span class="muted">@details.TransportOrderNumber</span>
+        }
+        <FluentBadge Appearance="@(Stop.Completed ? Appearance.Accent : Appearance.Neutral)">@TripText.StopStatus(Stop)</FluentBadge>
+        @if (Stop.Outcome is { State: not ReportStateDto.Recorded } outcome && !Stop.TakenOff)
+        {
+            <span class="muted">@TripText.ReportState(outcome.State)</span>
+        }
     </div>
-    <div>@TripText.Address(Stop.Address)</div>
-    @if (Stop.Consignee?.Name is { } consignee)
+    @if (Stop.TakenOff)
     {
-        <div>@consignee@(Stop.Consignee.Phone is { } phone ? $", {phone}" : "")</div>
+        <div role="status">
+            <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
+                @TripText.TakenOffByThePlanner. @(Stop.Outcome is { } was ? $"{TripText.ReportAction(was.Kind)}, {TripText.ReportState(was.State).ToLowerInvariant()}." : "")
+            </FluentMessageBar>
+        </div>
     }
-    <div class="muted">@TripText.Window(Stop.Window)</div>
-    @foreach (var line in Stop.GoodsLines)
+    else if (Stop.Details is { } stop)
     {
-        <div class="muted">@TripText.GoodsLine(line)</div>
+        <div>@TripText.Address(stop.Address)</div>
+        @if (stop.Consignee?.Name is { } consignee)
+        {
+            <div>@consignee@(stop.Consignee.Phone is { } phone ? $", {phone}" : "")</div>
+        }
+        <div class="muted">@TripText.Window(stop.Window)</div>
+        @foreach (var line in stop.GoodsLines)
+        {
+            <div class="muted">@TripText.GoodsLine(line)</div>
+        }
     }
 </li>
 
 @code {
     [Parameter, EditorRequired]
-    public StopDto Stop { get; set; } = null!;
+    public string TripNumber { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public StopView Stop { get; set; } = null!;
 }

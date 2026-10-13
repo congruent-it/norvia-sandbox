@@ -37,6 +37,70 @@ public sealed class DriverAppEventTests
         }
     }
 
+    private static readonly StopCompletedReportedV1 StopEvent = new(
+        Guid.Parse("0198e7c0-0000-7000-8000-0000000000d3"), new DateTimeOffset(2026, 10, 13, 11, 20, 45, TimeSpan.FromHours(2)), "0198e7c0-0000-7000-8000-0000000000d4", "TR-0000012", 2, "DRV-0002",
+        "SH-0000032", "Delivery", "DeliveryFailed", new StopLocationV1("Utrecht", "3511 AB", "NL"), "Dock closed, nobody at the warehouse");
+
+    [Fact]
+    public void AStopEvent_ValidatesAgainstTheSchema_AndLeavesOutARemarkTheDriverDidNotGive()
+    {
+        var withRemark = JsonNode.Parse(JsonSerializer.Serialize(StopEvent, StopEvent.GetType(), Web))!;
+        var collected = StopEvent with { Stop = "Collection", TrackingEventType = "Collected", Remark = null };
+        var withoutRemark = JsonNode.Parse(JsonSerializer.Serialize(collected, collected.GetType(), Web))!;
+
+        Schemas.Validate("stop-completed-reported.v1.schema.json", withRemark).IsValid.Should().BeTrue(Schemas.Errors(Schemas.Validate("stop-completed-reported.v1.schema.json", withRemark)));
+        Schemas.Validate("stop-completed-reported.v1.schema.json", withoutRemark).IsValid.Should().BeTrue(Schemas.Errors(Schemas.Validate("stop-completed-reported.v1.schema.json", withoutRemark)));
+        withRemark["eventType"]!.GetValue<string>().Should().Be("StopCompletedReported");
+        withRemark["trackingEventType"]!.GetValue<string>().Should().Be("DeliveryFailed");
+        withRemark["location"]!["countryCode"]!.GetValue<string>().Should().Be("NL");
+        withoutRemark.AsObject().ContainsKey("remark").Should().BeFalse("the schema allows no null remark");
+    }
+
+    [Fact]
+    public void TheStopSamples_ValidateAgainstTheSchema()
+    {
+        Schemas.Samples("stop-completed-reported").Should().HaveCountGreaterThanOrEqualTo(3);
+        foreach (var sample in Schemas.Samples("stop-completed-reported"))
+        {
+            var results = Schemas.Validate("stop-completed-reported.v1.schema.json", Schemas.ReadSample(sample));
+            results.IsValid.Should().BeTrue($"{sample}: {Schemas.Errors(results)}");
+        }
+    }
+
+    [Theory]
+    [InlineData("CollectionFailed", "Collection", false, false)]
+    [InlineData("CollectionFailed", "Collection", true, true)]
+    [InlineData("DeliveryFailed", "Delivery", false, false)]
+    [InlineData("Damaged", "Collection", false, false)]
+    [InlineData("Damaged", "Delivery", true, true)]
+    [InlineData("Collected", "Collection", false, true)]
+    [InlineData("Delivered", "Delivery", false, true)]
+    [InlineData("Collected", "Delivery", false, false)]
+    [InlineData("Delivered", "Collection", false, false)]
+    [InlineData("Lost", "Delivery", true, false)]
+    public void TheSchema_NeedsARemarkForAFailureOrDamage_AndTheTrackingEventOfThatKindOfStop(string type, string stop, bool remarkGiven, bool valid)
+    {
+        var body = JsonNode.Parse(JsonSerializer.Serialize(StopEvent with { TrackingEventType = type, Stop = stop, Remark = remarkGiven ? "A remark" : null }, Web))!;
+
+        Schemas.Validate("stop-completed-reported.v1.schema.json", body).IsValid.Should().Be(valid);
+    }
+
+    [Fact]
+    public void AStopEventsMessage_GoesInTheSessionOfItsTrip_AndCarriesTheKeysItKnows()
+    {
+        StopEvent.Topic.Should().Be("driver-app-events");
+        StopEvent.SessionId.Should().Be("TR-0000012");
+        StopEvent.ApplicationProperties.Should().Contain(new Dictionary<string, object>
+        {
+            ["eventType"] = "StopCompletedReported",
+            ["eventVersion"] = 1,
+            ["flow"] = "trip-execution",
+            ["partyId"] = "DRV-0002",
+            ["tripNumber"] = "TR-0000012",
+            ["sourceMessageId"] = "0198e7c0-0000-7000-8000-0000000000d3",
+        });
+    }
+
     [Fact]
     public void TheMessage_GoesToTheDriverAppEventsTopic_InTheSessionOfItsTrip()
     {

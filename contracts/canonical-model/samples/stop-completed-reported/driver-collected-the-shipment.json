@@ -1,0 +1,14 @@
+{
+  "eventId": "0198e7c0-0000-7000-8000-0000000000d1",
+  "eventType": "StopCompletedReported",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-13T08:41:03+02:00",
+  "correlationId": "0198e7c0-0000-7000-8000-0000000000d2",
+  "tripNumber": "TR-0000012",
+  "version": 2,
+  "driverId": "DRV-0002",
+  "shipmentNumber": "SH-0000031",
+  "stop": "Collection",
+  "trackingEventType": "Collected",
+  "location": { "place": "Rotterdam", "postcode": "3011 AA", "countryCode": "NL" }
+}

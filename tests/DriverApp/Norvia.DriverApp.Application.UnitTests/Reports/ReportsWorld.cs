@@ -40,7 +40,7 @@ internal sealed class ReportsWorld
             {
                 var report = call.Arg<DriverReport>();
                 Reports.Add(report);
-                Saved.AddRange(Queued);
+                Saved.AddRange(Queued.Skip(Saved.Count));
                 return Task.FromResult(report);
             });
         ReadReportRepository.ListAsync(Arg.Any<ISpecification<DriverReport, DriverReportRow>>(), Arg.Any<CancellationToken>())
@@ -67,6 +67,33 @@ internal sealed class ReportsWorld
     public IReadRepository<DriverReport> ReadReportRepository { get; } = Substitute.For<IReadRepository<DriverReport>>();
 
     public IDriverEventOutbox Outbox { get; } = Substitute.For<IDriverEventOutbox>();
+
+    /// <summary>Today's Trip, as a new version with a collection and a delivery Stop for each Shipment, the Planner's way: both collections, then both deliveries.</summary>
+    public void GiveTodaysTripStops(params string[] shipments)
+    {
+        var trip = Trips.Single(trip => trip.Id == TripToday);
+        var address = new StopAddress("Waalhaven 1", "3087 BM", "Rotterdam", "NL");
+        List<TripStop> stops = [];
+        foreach (var kind in new[] { StopKind.Collection, StopKind.Delivery })
+        {
+            foreach (var shipment in shipments)
+            {
+                stops.Add(new TripStop(
+                    stops.Count + 1, kind, shipment, $"TO-{shipment[3..]}", "SHP-001", address, null, [new StopGoodsLine("Pallet", 2, 120, null)],
+                    kind == StopKind.Delivery ? new StopConsignee("Bakker BV", null, "010-1234567", null) : null));
+            }
+        }
+
+        trip.ReplaceWith(trip.Version + 1, Joost, trip.Details with { Stops = stops });
+    }
+
+    /// <summary>Today's Trip has been started and the TMS recorded it.</summary>
+    public void StartTodaysTrip()
+    {
+        var start = DriverReport.StartTrip(new ReportId(Guid.NewGuid()), TripToday, Joost, 2, Time.GetUtcNow(), "start-corr");
+        start.Record(Time.GetUtcNow());
+        Reports.Add(start);
+    }
 
     private static DriverTrip Trip(TripNumber number, int version, DriverId driver, DateOnly day) =>
         new(number, version, driver, new TripDetails(day, new TimeOnly(9, 0), TimeSpan.FromHours(4), new TripVehicle("VEH-0002", "NV-123-A", "RigidTruck"), "Joost Bakker", "corr", []));

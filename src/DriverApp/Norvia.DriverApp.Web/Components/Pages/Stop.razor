@@ -1,0 +1,179 @@
+@page "/trips/{TripNumber}/stops/{ShipmentNumber}/{KindSegment}"
+@using System.Security.Claims
+@using Norvia.DriverApp.Application.Trips.GetStop
+@using Norvia.DriverApp.Web.Drivers
+@using Norvia.DriverApp.Web.Reports
+@inject Mediator.IMediator Mediator
+@inject ILogger<Stop> Logger
+
+<PageTitle>@(_view is null ? "Stop" : $"{Heading} {ShipmentNumber}")</PageTitle>
+
+@if (_view is { Stop: var sending } && (sending.Reports.Any(report => report.State == ReportStateDto.Sending)))
+{
+    @* A report waits for the Driver reports Logic App's answer; the page is not interactive, so it looks again by itself. *@
+    <HeadContent>
+        <meta http-equiv="refresh" content="5" />
+    </HeadContent>
+}
+
+@if (_loadFailed)
+{
+    <div role="alert">
+        <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+            The Stop couldn't be loaded. Reload the page to try again.
+        </FluentMessageBar>
+    </div>
+}
+else if (_view is null)
+{
+    <p role="status">This Stop isn't on one of your Trips. <a href="/">Back to My Trips</a></p>
+}
+else
+{
+    var stop = _view.Stop;
+    <p><a href="/">&larr; My Trips</a></p>
+    <h1>
+        @Heading @stop.ShipmentNumber
+        <FluentBadge Appearance="@(stop.Completed ? Appearance.Accent : Appearance.Neutral)">@TripText.StopStatus(stop)</FluentBadge>
+    </h1>
+    <p class="muted">Trip @_view.TripNumber, version @_view.Version, @_view.Status</p>
+
+    @if (Problem is { Length: > 0 } problem)
+    {
+        <div role="alert">
+            <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">@TripText.Problem(problem)</FluentMessageBar>
+        </div>
+    }
+
+    @if (stop.TakenOff)
+    {
+        <div role="status">
+            <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
+                @TripText.TakenOffByThePlanner. The Planner took this Shipment off the Trip after you reported on it.
+            </FluentMessageBar>
+        </div>
+    }
+    else if (stop.Details is { } details)
+    {
+        <FluentCard Class="trip" role="region" aria-label="@($"Stop {stop.ShipmentNumber}")">
+            <dl class="trip-facts">
+                <dt>Shipment</dt>
+                <dd>@stop.ShipmentNumber (@details.TransportOrderNumber)</dd>
+                <dt>Shipper</dt>
+                <dd>@details.ShipperId</dd>
+                <dt>Address</dt>
+                <dd>@TripText.Address(details.Address)</dd>
+                <dt>Window</dt>
+                <dd>@TripText.Window(details.Window)</dd>
+                @if (stop.Kind == StopKindDto.Delivery)
+                {
+                    <dt>Consignee</dt>
+                    <dd>
+                        @(details.Consignee?.Name ?? "Unknown")
+                        @if (details.Consignee is { } consignee)
+                        {
+                            @(consignee.ContactName is { } contact ? $", {contact}" : "")
+                            @(consignee.Phone is { } phone ? $", {phone}" : "")
+                        }
+                    </dd>
+                }
+                <dt>Goods</dt>
+                <dd>
+                    @foreach (var line in details.GoodsLines)
+                    {
+                        <div>@TripText.GoodsLine(line)</div>
+                    }
+                </dd>
+            </dl>
+        </FluentCard>
+    }
+
+    @if (stop.Reports.Count > 0)
+    {
+        <ul class="reports" aria-label="@($"Reports on {stop.ShipmentNumber}")">
+            @foreach (var report in stop.Reports)
+            {
+                <ReportItem Report="report" />
+            }
+        </ul>
+    }
+
+    @if (!stop.TakenOff)
+    {
+        @if (stop.Completed)
+        {
+            <p role="status">This Stop is done.</p>
+        }
+        else if (stop.Blocked is { } blocked)
+        {
+            <div role="status">
+                <FluentMessageBar Intent="MessageIntent.Info" AllowDismiss="false">@blocked</FluentMessageBar>
+            </div>
+        }
+        else if (stop.CanComplete)
+        {
+            @if (stop.Kind == StopKindDto.Collection)
+            {
+                <form method="post" action="@StopRoutes.Post(_view.TripNumber, stop.ShipmentNumber, stop.Kind, StopActionDto.Collected)" aria-label="Collected">
+                    <AntiforgeryToken />
+                    <FluentButton Type="ButtonType.Submit" Appearance="Appearance.Accent">Collected</FluentButton>
+                </form>
+                <RemarkForm Action="@StopRoutes.Post(_view.TripNumber, stop.ShipmentNumber, stop.Kind, StopActionDto.CollectionFailed)" Label="Collection failed" />
+            }
+            else
+            {
+                <RemarkForm Action="@StopRoutes.Post(_view.TripNumber, stop.ShipmentNumber, stop.Kind, StopActionDto.DeliveryFailed)" Label="Delivery failed" />
+            }
+        }
+
+        @if (stop.CanReportDamage)
+        {
+            <RemarkForm Action="@StopRoutes.Post(_view.TripNumber, stop.ShipmentNumber, stop.Kind, StopActionDto.Damaged)" Label="Report damage" Lightweight="true" />
+        }
+    }
+}
+
+@code {
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    [Parameter]
+    public string TripNumber { get; set; } = string.Empty;
+
+    [Parameter]
+    public string ShipmentNumber { get; set; } = string.Empty;
+
+    [Parameter]
+    public string KindSegment { get; set; } = string.Empty;
+
+    [SupplyParameterFromQuery]
+    public string? Problem { get; set; }
+
+    private DriverStopView? _view;
+    private bool _loadFailed;
+
+    private string Heading => StopRoutes.TryParse(KindSegment, out StopKindDto kind) && kind == StopKindDto.Collection ? "Collect" : "Deliver";
+
+    protected override async Task OnInitializedAsync()
+    {
+        // The Driver ID comes from the token, never from the request (ADR 0005). The route's policy admits only a user with one.
+        var user = HttpContext?.User ?? throw new InvalidOperationException("The Stop screen renders only for a request.");
+        var driverId = user.FindFirstValue(DriverClaims.DriverId) ?? throw new InvalidOperationException("The policy admits only a Driver ID.");
+        if (!StopRoutes.TryParse(KindSegment, out StopKindDto kind))
+        {
+            return;
+        }
+
+        try
+        {
+            _view = await Mediator.Send(new GetDriverStopQuery(driverId, TripNumber, ShipmentNumber, kind));
+        }
+#pragma warning disable CA1031 // Whatever fails to load, the Driver gets a message rather than an error page.
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            Logger.LogError(ex, "The Stop {ShipmentNumber} of Trip {TripNumber} for Driver {DriverId} couldn't be loaded", ShipmentNumber, TripNumber, driverId);
+            _loadFailed = true;
+        }
+    }
+}

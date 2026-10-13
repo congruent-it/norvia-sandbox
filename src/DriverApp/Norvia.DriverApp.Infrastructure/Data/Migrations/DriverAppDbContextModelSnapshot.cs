@@ -57,10 +57,22 @@ namespace Norvia.DriverApp.Infrastructure.Data.Migrations
                     b.Property<DateTimeOffset?>("OutcomeAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("Remark")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("ShipmentNumber")
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
                     b.Property<string>("State")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Stop")
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
 
                     b.Property<string>("TripNumber")
                         .IsRequired()

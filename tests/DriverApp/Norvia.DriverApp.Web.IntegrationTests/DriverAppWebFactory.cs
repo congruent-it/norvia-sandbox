@@ -27,7 +27,7 @@ public sealed class DriverAppWebFactory(string environment, bool standIn) : WebA
     public List<DriverTrip> Trips { get; } =
     [
         Trip("TR-0000001", AnoukId, "Anouk de Vries", new DateOnly(2026, 10, 14)),
-        Trip("TR-0000002", AnoukId, "Anouk de Vries", new DateOnly(2026, 10, 13)),
+        Trip("TR-0000002", AnoukId, "Anouk de Vries", new DateOnly(2026, 10, 13), WithStops("SH-0000001", "SH-0000002")),
         Trip("TR-0000003", JoostId, "Joost Bakker", new DateOnly(2026, 10, 14)),
     ];
 
@@ -68,6 +68,8 @@ public sealed class DriverAppWebFactory(string environment, bool standIn) : WebA
             services.AddScoped(_ => reportReads);
 
             var reportWrites = Substitute.For<IRepository<DriverReport>>();
+            reportWrites.ListAsync(Arg.Any<ISpecification<DriverReport, DriverReportRow>>(), Arg.Any<CancellationToken>())
+                .Returns(call => call.Arg<ISpecification<DriverReport, DriverReportRow>>().Evaluate(Reports).ToList());
             reportWrites.FirstOrDefaultAsync(Arg.Any<ISpecification<DriverReport>>(), Arg.Any<CancellationToken>())
                 .Returns(call => call.Arg<ISpecification<DriverReport>>().Evaluate(Reports).FirstOrDefault());
             reportWrites.AddAsync(Arg.Any<DriverReport>(), Arg.Any<CancellationToken>()).Returns(call =>
@@ -88,7 +90,23 @@ public sealed class DriverAppWebFactory(string environment, bool standIn) : WebA
         });
     }
 
-    private static DriverTrip Trip(string number, string driverId, string driverName, DateOnly day) =>
+    /// <summary>Today's Trip of Anouk has been started and the TMS recorded it.</summary>
+    public void StartAnouksTrip()
+    {
+        var start = DriverReport.StartTrip(new ReportId(Guid.NewGuid()), new TripNumber("TR-0000002"), new DriverId(AnoukId), 1, Time.GetUtcNow(), "start-corr");
+        start.Record(Time.GetUtcNow());
+        Reports.Add(start);
+    }
+
+    /// <summary>A collection Stop for each Shipment, then a delivery Stop for each.</summary>
+    private static TripStop[] WithStops(params string[] shipments) =>
+    [
+        .. new[] { StopKind.Collection, StopKind.Delivery }.SelectMany(kind => shipments.Select(shipment => new TripStop(
+            0, kind, shipment, $"TO-{shipment[3..]}", "SHP-001", new StopAddress("Waalhaven 1", "3087 BM", "Rotterdam", "NL"), null,
+            [new StopGoodsLine("Pallet", 2, 120, null)], kind == StopKind.Delivery ? new StopConsignee("Bakker BV", null, "010-1234567", null) : null))),
+    ];
+
+    private static DriverTrip Trip(string number, string driverId, string driverName, DateOnly day, params TripStop[] stops) =>
         new(new TripNumber(number), 1, new DriverId(driverId),
-            new TripDetails(day, new TimeOnly(6, 0), TimeSpan.FromHours(5), new TripVehicle("VEH-0001", "NV-123-A", "RigidTruck"), driverName, "corr-1", []));
+            new TripDetails(day, new TimeOnly(6, 0), TimeSpan.FromHours(5), new TripVehicle("VEH-0001", "NV-123-A", "RigidTruck"), driverName, "corr-1", [.. stops.Select((stop, index) => stop with { Sequence = index + 1 })]));
 }

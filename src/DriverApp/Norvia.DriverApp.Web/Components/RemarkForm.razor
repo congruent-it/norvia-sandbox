@@ -1,0 +1,17 @@
+@* A report that needs the Driver's words: a failure, or damage. Plain form post. *@
+<form method="post" action="@Action" aria-label="@Label" class="remark-form">
+    <AntiforgeryToken />
+    <FluentTextArea Name="remark" Label="@($"{Label}: what happened?")" Required="true" MaxLength="500" Rows="3" />
+    <FluentButton Type="ButtonType.Submit" Appearance="@(Lightweight ? Appearance.Neutral : Appearance.Accent)">@Label</FluentButton>
+</form>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Action { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = null!;
+
+    [Parameter]
+    public bool Lightweight { get; set; }
+}

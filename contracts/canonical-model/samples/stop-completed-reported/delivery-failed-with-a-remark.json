@@ -1,0 +1,15 @@
+{
+  "eventId": "0198e7c0-0000-7000-8000-0000000000d3",
+  "eventType": "StopCompletedReported",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-13T11:20:45+02:00",
+  "correlationId": "0198e7c0-0000-7000-8000-0000000000d4",
+  "tripNumber": "TR-0000012",
+  "version": 2,
+  "driverId": "DRV-0002",
+  "shipmentNumber": "SH-0000032",
+  "stop": "Delivery",
+  "trackingEventType": "DeliveryFailed",
+  "location": { "place": "Utrecht", "postcode": "3511 AB", "countryCode": "NL" },
+  "remark": "Dock closed, nobody at the warehouse"
+}
