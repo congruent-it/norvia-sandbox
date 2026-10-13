@@ -26,7 +26,28 @@ public sealed class ReportSpecificationTests
             .Evaluate([late, early, other, elsewhere]).ToList();
 
         rows.Select(row => row.Id).Should().Equal(early.Id, other.Id, late.Id);
-        rows[2].Should().Be(new DriverReportRow(late.Id, ReportKind.StartTrip, new TripNumber("TR-0000001"), ReportState.Refused, "NotTripDay", "Wrong day.", Pressed.AddMinutes(10), Pressed.AddMinutes(11)));
+        rows[2].Should().Be(new DriverReportRow(
+            late.Id, ReportKind.StartTrip, new TripNumber("TR-0000001"), null, null, null, ReportState.Refused, "NotTripDay", "Wrong day.", Pressed.AddMinutes(10), Pressed.AddMinutes(11)));
+    }
+
+    private static DriverReport Stop(string trip, string shipment, StopKind stop, ReportKind kind, Action<DriverReport>? then = null)
+    {
+        var report = DriverReport.ReportStop(new ReportId(Guid.NewGuid()), kind, new StopRef(shipment, stop), new ReportOrigin(new TripNumber(trip), new DriverId("DRV-0002"), 1, Pressed, "corr"), "remark");
+        then?.Invoke(report);
+        return report;
+    }
+
+    [Fact]
+    public void ReportsOfTrips_ReadWhatAStopReportNamed()
+    {
+        var failed = Stop("TR-0000001", "SH-0000007", StopKind.Delivery, ReportKind.DeliveryFailed);
+
+        var row = new ReportsOfTripsSpecification([new TripNumber("TR-0000001")]).Evaluate([failed]).Single();
+
+        row.ShipmentNumber.Should().Be("SH-0000007");
+        row.Stop.Should().Be(StopKind.Delivery);
+        row.Remark.Should().Be("remark");
+        row.Kind.Should().Be(ReportKind.DeliveryFailed);
     }
 
     [Fact]

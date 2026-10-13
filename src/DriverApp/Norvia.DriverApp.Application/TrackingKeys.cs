@@ -6,6 +6,7 @@ public static class TrackingKeys
     public const string CorrelationId = "correlationId";
     public const string Flow = "flow";
     public const string TripNumber = "tripNumber";
+    public const string ShipmentNumber = "shipmentNumber";
     public const string PartyId = "partyId";
     public const string SourceMessageId = "sourceMessageId";
     public const string Outcome = "outcome";

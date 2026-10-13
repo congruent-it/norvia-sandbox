@@ -1,0 +1,15 @@
+{
+  "eventId": "0198e7c0-0000-7000-8000-0000000000d5",
+  "eventType": "StopCompletedReported",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-13T11:02:10+02:00",
+  "correlationId": "0198e7c0-0000-7000-8000-0000000000d6",
+  "tripNumber": "TR-0000012",
+  "version": 2,
+  "driverId": "DRV-0002",
+  "shipmentNumber": "SH-0000033",
+  "stop": "Delivery",
+  "trackingEventType": "Damaged",
+  "location": { "place": "Utrecht", "postcode": "3511 AB", "countryCode": "NL" },
+  "remark": "Two cartons crushed"
+}

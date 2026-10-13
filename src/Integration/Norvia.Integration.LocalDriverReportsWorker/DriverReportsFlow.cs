@@ -10,7 +10,7 @@ internal enum DriverReportsRunOutcome
     /// <summary>The TMS recorded or refused the report, or couldn't be reached, and the Driver app was told which.</summary>
     Done,
 
-    /// <summary>The message isn't a <c>TripStartReported</c> the TMS can be asked to record, so nothing was sent.</summary>
+    /// <summary>The message isn't a <c>TripStartReported</c> or a <c>StopCompletedReported</c> the TMS can be asked to record, so nothing was sent.</summary>
     Unreadable,
 
     /// <summary>The Driver app didn't take the outcome, so the report stays Sending there. The TMS has it anyway.</summary>
@@ -30,7 +30,7 @@ internal sealed partial class DriverReportsFlow(
     TimeProvider time,
     ILogger<DriverReportsFlow> logger)
 {
-    internal const string UnreadableDescription = "The message isn't a Trip start the Driver app reported, so nothing was sent to the TMS.";
+    internal const string UnreadableDescription = "The message isn't a Trip start or a Stop report the Driver app made, so nothing was sent to the TMS.";
 
     /// <summary>The longest message the Driver app takes in an outcome report.</summary>
     private const int MaximumMessageLength = 1000;
@@ -49,7 +49,7 @@ internal sealed partial class DriverReportsFlow(
 
         using var trail = logger.BeginScope(report.ContractKeys);
         var (answer, attempts) = await WithRetriesAsync(
-            () => tms.StartAsync(report, cancellationToken), result => result.StatusCode, DriverReportsFailureCodes.TmsUnavailable, cancellationToken);
+            () => tms.CallAsync(report, cancellationToken), result => result.StatusCode, DriverReportsFailureCodes.TmsUnavailable, cancellationToken);
 
         var (settlement, outcome) = Decide(report, answer, attempts);
         using (logger.BeginScope(TrackingKeys.OutcomeOf(
@@ -112,7 +112,7 @@ internal sealed partial class DriverReportsFlow(
         }
     }
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "The message isn't a Trip start the Driver app reported")]
+    [LoggerMessage(Level = LogLevel.Warning, Message = "The message isn't a Trip start or a Stop report the Driver app made")]
     private partial void LogUnreadable();
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "The call answered {StatusCode}; retry {Attempt} of {Count} in {Wait}")]

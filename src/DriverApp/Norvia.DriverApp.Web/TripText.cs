@@ -1,5 +1,6 @@
 using System.Globalization;
 using Norvia.DriverApp.Application.Reports;
+using Norvia.DriverApp.Application.Reports.ReportStop;
 using Norvia.DriverApp.Application.Trips;
 
 namespace Norvia.DriverApp.Web;
@@ -25,6 +26,10 @@ internal static class TripText
     public static string ReportAction(ReportKindDto kind) => kind switch
     {
         ReportKindDto.StartTrip => "Start Trip",
+        ReportKindDto.Collected => "Collected",
+        ReportKindDto.CollectionFailed => "Collection failed",
+        ReportKindDto.DeliveryFailed => "Delivery failed",
+        ReportKindDto.Damaged => "Damage reported",
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "A kind of report the Driver app has no words for."),
     };
 
@@ -38,6 +43,25 @@ internal static class TripText
     };
 
     public static string StopAction(StopKindDto kind) => kind == StopKindDto.Collection ? "Collect" : "Deliver";
+
+    /// <summary>What the Driver reads on a Stop of what became of their report on it.</summary>
+    public static string StopStatus(StopView stop) => stop switch
+    {
+        { TakenOff: true, Outcome: not { State: ReportStateDto.Refused } } => TakenOffByThePlanner,
+        { Outcome: null } => "Open",
+        { Outcome: { State: ReportStateDto.Refused } } => "Refused",
+        { Outcome: { State: ReportStateDto.NotRecorded } } => "Not recorded",
+        { Outcome: { } outcome } => ReportAction(outcome.Kind),
+    };
+
+    public const string TakenOffByThePlanner = "Taken off by the Planner, call the Planner";
+
+    public static string Problem(string? identifier) => identifier switch
+    {
+        "remark" => $"Say what happened: a remark is required, up to {ReportStopCommand.MaximumRemarkLength} characters.",
+        "address" => "This Stop has no complete address to report from. Call the Planner.",
+        _ => "That report couldn't be made.",
+    };
 
     public static string Address(StopAddressDto? address) =>
         address is null ? "No address" : string.Join(", ", new[] { address.Street, $"{address.Postcode} {address.City}".Trim(), address.Country }.Where(part => !string.IsNullOrWhiteSpace(part)));

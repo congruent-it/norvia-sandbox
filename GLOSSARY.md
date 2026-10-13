@@ -141,11 +141,11 @@ The Planner removing an uncollected Shipment's two Stops from its Trip, which pu
 _Avoid_: unassign, remove, unplan
 
 **Driver report**:
-One thing a Driver did from the road and told the Driver app: so far, Start Trip. The Driver app keeps it with its state until the Driver reports Logic App says what became of it. Published as a Driver app event.
+One thing a Driver did from the road and told the Driver app: Start Trip, or a report on a Stop (Collected, Collection failed, Delivery failed, Report damage). The Driver app keeps it with its state until the Driver reports Logic App says what became of it. Published as a Driver app event.
 _Avoid_: update, message
 
 **Driver app event**:
-An event the Driver app publishes for a Driver report, such as `TripStartReported`, with its own Driver app event ID. The Driver app reports and the TMS decides, so the name says what the Driver did, not what the TMS made of it.
+An event the Driver app publishes for a Driver report, such as `TripStartReported` or `StopCompletedReported`, with its own Driver app event ID. The Driver app reports and the TMS decides, so the name says what the Driver did, not what the TMS made of it.
 _Avoid_: Trip event (those are the TMS's)
 
 **Sending / Recorded / Refused / Not recorded**:

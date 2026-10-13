@@ -1,6 +1,7 @@
 using Ardalis.Result;
 using Mediator;
 using Microsoft.FluentUI.AspNetCore.Components;
+using Norvia.DriverApp.Application.Reports.ReportStop;
 using Norvia.DriverApp.Application.Reports.StartTrip;
 using Norvia.DriverApp.Application.Trips.Receive;
 using Norvia.DriverApp.Infrastructure;
@@ -19,6 +20,7 @@ builder.AddDriverAppInfrastructure();
 builder.AddDriverAppSeedDrivers();
 builder.AddDriverSignIn();
 builder.Services.AddScoped<IPipelineBehavior<StartTripCommand, Result<StartTripResult>>, TrackStartTripInLoggingScope>();
+builder.Services.AddScoped<IPipelineBehavior<ReportStopCommand, Result<ReportStopResult>>, TrackReportStopInLoggingScope>();
 builder.Services.AddMediator(options =>
 {
     options.ServiceLifetime = ServiceLifetime.Scoped;

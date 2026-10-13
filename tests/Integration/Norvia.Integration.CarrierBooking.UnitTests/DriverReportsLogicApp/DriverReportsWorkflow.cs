@@ -8,7 +8,9 @@ internal static class DriverReportsWorkflow
     public const string Flow = "trip-execution";
     public const string Tracking = "Track_the_report";
     public const string Check = "Check_the_report";
-    public const string Start = "Start_the_Trip_in_the_TMS";
+    public const string BuildTripStart = "Build_the_Trip_start";
+    public const string BuildTrackingEvent = "Build_the_Tracking_event";
+    public const string SendToTms = "Send_the_report_to_the_TMS";
     public const string Settle = "Settle_the_report_and_tell_the_Driver_app";
     public const string Complete = "Complete_the_message";
     public const string ReportRecorded = "Report_recorded";

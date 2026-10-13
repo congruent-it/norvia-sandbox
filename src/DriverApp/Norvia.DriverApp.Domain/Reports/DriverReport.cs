@@ -18,6 +18,15 @@ public sealed class DriverReport : EntityBase<ReportId>, IAggregateRoot
 
     public TripNumber TripNumber { get; private set; }
 
+    /// <summary>The Shipment a Stop report is about; null for a Start Trip.</summary>
+    public string? ShipmentNumber { get; private set; }
+
+    /// <summary>The Stop of that Shipment a Stop report is about; null for a Start Trip.</summary>
+    public StopKind? Stop { get; private set; }
+
+    /// <summary>What the Driver said about a Stop report: required for a failure or damage.</summary>
+    public string? Remark { get; private set; }
+
     /// <summary>The Driver ID from the Driver's token when they reported.</summary>
     public DriverId DriverId { get; private set; }
 
@@ -42,6 +51,11 @@ public sealed class DriverReport : EntityBase<ReportId>, IAggregateRoot
     /// <summary>A Start Trip the Driver can't send again: the TMS has it, or hasn't answered yet.</summary>
     public bool IsActiveStart => Kind == ReportKind.StartTrip && State is ReportState.Sending or ReportState.Recorded;
 
+    /// <summary>Whether the report completes a Stop (Collected, Collection failed, Delivery failed). Report damage doesn't.</summary>
+    public bool CompletesStop => CompletesAStop(Kind);
+
+    public static bool CompletesAStop(ReportKind kind) => kind is ReportKind.Collected or ReportKind.CollectionFailed or ReportKind.DeliveryFailed;
+
     public static DriverReport StartTrip(ReportId id, TripNumber tripNumber, DriverId driverId, int versionHeld, DateTimeOffset eventTime, string correlationId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(driverId.Value);
@@ -56,6 +70,45 @@ public sealed class DriverReport : EntityBase<ReportId>, IAggregateRoot
             VersionHeld = versionHeld,
             EventTime = eventTime,
             CorrelationId = correlationId,
+            State = ReportState.Sending,
+        };
+    }
+
+    /// <summary>The Driver completes a Stop with a Collected, Collection failed or Delivery failed, or reports damage at a Stop of any kind.</summary>
+    public static DriverReport ReportStop(ReportId id, ReportKind kind, StopRef stop, ReportOrigin origin, string? remark)
+    {
+        ArgumentNullException.ThrowIfNull(origin);
+        ArgumentException.ThrowIfNullOrWhiteSpace(stop.ShipmentNumber);
+        ArgumentException.ThrowIfNullOrWhiteSpace(origin.DriverId.Value);
+        ArgumentOutOfRangeException.ThrowIfLessThan(origin.VersionHeld, 1);
+        ArgumentException.ThrowIfNullOrWhiteSpace(origin.CorrelationId);
+        if (kind == ReportKind.StartTrip)
+        {
+            throw new ArgumentException("A Start Trip is not a Stop report.", nameof(kind));
+        }
+
+        if (!StopReportRules.Fits(kind, stop.Kind))
+        {
+            throw new ArgumentException($"{kind} is not reported on a {stop.Kind} Stop.", nameof(stop));
+        }
+
+        if (StopReportRules.NeedsRemark(kind))
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(remark);
+        }
+
+        return new DriverReport
+        {
+            Id = id,
+            Kind = kind,
+            TripNumber = origin.TripNumber,
+            ShipmentNumber = stop.ShipmentNumber,
+            Stop = stop.Kind,
+            DriverId = origin.DriverId,
+            VersionHeld = origin.VersionHeld,
+            EventTime = origin.EventTime,
+            CorrelationId = origin.CorrelationId,
+            Remark = string.IsNullOrWhiteSpace(remark) ? null : remark,
             State = ReportState.Sending,
         };
     }

@@ -25,7 +25,7 @@ internal static class TripMapping
 
     public static StopDto ToDto(this TripStop stop) => new(
         stop.Sequence,
-        stop.Kind == StopKind.Collection ? StopKindDto.Collection : StopKindDto.Delivery,
+        stop.Kind.ToDto(),
         stop.ShipmentNumber,
         stop.TransportOrderNumber,
         stop.ShipperId,
@@ -36,13 +36,11 @@ internal static class TripMapping
             line.DimensionsCm is { } size ? new StopDimensionsDto(size.Length, size.Width, size.Height) : null))],
         stop.Consignee is { } consignee ? new StopConsigneeDto(consignee.Name, consignee.ContactName, consignee.Phone, consignee.Email) : null);
 
+    public static StopKindDto ToDto(this StopKind kind) => kind == StopKind.Collection ? StopKindDto.Collection : StopKindDto.Delivery;
+
     public static TripReportView ToView(this DriverReportRow row) => new(
         row.Id.Value,
-        row.Kind switch
-        {
-            ReportKind.StartTrip => ReportKindDto.StartTrip,
-            _ => throw new ArgumentOutOfRangeException(nameof(row), row.Kind, "A kind of report with no view."),
-        },
+        row.Kind.ToDto(),
         row.State switch
         {
             ReportState.Sending => ReportStateDto.Sending,
@@ -53,12 +51,15 @@ internal static class TripMapping
         },
         row.FailureCode,
         row.Message,
-        row.EventTime);
+        row.EventTime,
+        row.ShipmentNumber,
+        row.Stop?.ToDto(),
+        row.Remark);
 
     public static DriverTripView ToView(this DriverTripRow row, IReadOnlyList<DriverReportRow> reports, DateOnly today)
     {
         // The TMS decides whether the Trip started; the Driver app shows it started once the TMS has said so.
-        var started = reports.Any(report => report.Kind == ReportKind.StartTrip && report.State == ReportState.Recorded);
+        var started = TripProgress.IsStarted(reports);
         var waiting = reports.Any(report => report.Kind == ReportKind.StartTrip && report.State == ReportState.Sending);
         return new DriverTripView(
             row.TripNumber.Value,
@@ -70,7 +71,7 @@ internal static class TripMapping
             row.Details.PlannedStart,
             row.Details.PlannedDrivingDuration,
             new TripVehicleDto(row.Details.Vehicle.VehicleId, row.Details.Vehicle.Registration, row.Details.Vehicle.VehicleType),
-            [.. row.Details.Stops.Select(stop => stop.ToDto())],
+            StopProgress.Of(row.Details, reports),
             !started && !waiting && row.Details.Day == today,
             [.. reports.Select(report => report.ToView())]);
     }

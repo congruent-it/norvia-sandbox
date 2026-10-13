@@ -222,6 +222,142 @@ public sealed partial class ReportingPathTests(DriverAppFixture driverApp)
         TripCardOf(await PageAsync(browser), trip).Should().Contain("Sending");
     }
 
+    private const string Collection = "SH-0000012";
+
+    [Fact]
+    public async Task ReportingCollected_PublishesExactlyOneStopCompletedReported_AfterTheStart_InTheTripsSession_WithTheDriverIdFromTheToken()
+    {
+        const string trip = "TR-3000011";
+        await ReceiveTripAsync(trip, Anouk);
+        using var browser = await SignedInAsync(Anouk);
+        await StartAsync(browser, trip);
+        var start = JsonNode.Parse((await driverApp.FirstPublishedForAsync(trip, Ct)).Body.ToString())!;
+        using var started = await ReportOutcomeAsync(Outcome(start, "Recorded"));
+
+        using var collected = await PostStopAsync(browser, trip, "collection", "collected");
+        await WaitForPublishedAsync(trip, 2);
+        await Task.Delay(OutboxSettleTime, Ct);
+
+        started.StatusCode.Should().Be(HttpStatusCode.OK);
+        collected.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        var published = driverApp.PublishedFor(trip);
+        published.Should().HaveCount(2, "the Start Trip, then exactly one Stop report");
+        var message = published[1];
+        var body = JsonNode.Parse(message.Body.ToString())!;
+        Validate("stop-completed-reported.v1.schema.json", body).IsValid.Should().BeTrue(message.Body.ToString());
+        body["eventType"]!.GetValue<string>().Should().Be("StopCompletedReported");
+        body["driverId"]!.GetValue<string>().Should().Be(Anouk, "the Driver ID comes from the Driver's token");
+        body["shipmentNumber"]!.GetValue<string>().Should().Be(Collection);
+        body["stop"]!.GetValue<string>().Should().Be("Collection");
+        body["trackingEventType"]!.GetValue<string>().Should().Be("Collected");
+        body["location"]!["place"]!.GetValue<string>().Should().Be("Rotterdam");
+        body["location"]!["countryCode"]!.GetValue<string>().Should().Be("NL");
+        body["correlationId"]!.GetValue<string>().Should().NotBe(start["correlationId"]!.GetValue<string>(), "each Driver action has a correlation ID of its own");
+        message.MessageId.Should().Be(body["eventId"]!.GetValue<string>());
+        message.SessionId.Should().Be(trip, "the Stop report is read in order after the Start, in the session of the Trip");
+        message.ApplicationProperties.Should().Contain(new Dictionary<string, object>
+        {
+            ["eventType"] = "StopCompletedReported",
+            ["flow"] = "trip-execution",
+            ["tripNumber"] = trip,
+            ["partyId"] = Anouk,
+            ["sourceMessageId"] = body["eventId"]!.GetValue<string>(),
+        });
+        TripCardOf(await PageAsync(browser), trip).Should().Contain($"Collected {Collection}").And.Contain("Sending");
+    }
+
+    [Fact]
+    public async Task ReportingTheSameStopTwice_PublishesOnlyOnce_AndADeliveryWaitsForItsCollectionBeingReported()
+    {
+        const string trip = "TR-3000012";
+        await ReceiveTripAsync(trip, Anouk);
+        using var browser = await SignedInAsync(Anouk);
+        await StartAsync(browser, trip);
+        var start = JsonNode.Parse((await driverApp.FirstPublishedForAsync(trip, Ct)).Body.ToString())!;
+        using var started = await ReportOutcomeAsync(Outcome(start, "Recorded"));
+
+        using var early = await PostStopAsync(browser, trip, "delivery", "delivery-failed", "Dock closed");
+        using var first = await PostStopAsync(browser, trip, "collection", "collected");
+        using var second = await PostStopAsync(browser, trip, "collection", "collected");
+        using var delivery = await PostStopAsync(browser, trip, "delivery", "delivery-failed", "Dock closed");
+        await WaitForPublishedAsync(trip, 3);
+        await Task.Delay(OutboxSettleTime, Ct);
+
+        early.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        first.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        second.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        delivery.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        var types = driverApp.PublishedFor(trip).Skip(1).Select(message => JsonNode.Parse(message.Body.ToString())!["trackingEventType"]!.GetValue<string>());
+        types.Should().Equal("Collected", "DeliveryFailed");
+    }
+
+    [Fact]
+    public async Task AStopOutcomeFromTheLogicApp_ShowsOnTheStop_AndARefusalShowsTheTmsCodeAndMessage()
+    {
+        const string trip = "TR-3000013";
+        await ReceiveTripAsync(trip, Anouk);
+        using var browser = await SignedInAsync(Anouk);
+        await StartAsync(browser, trip);
+        var start = JsonNode.Parse((await driverApp.FirstPublishedForAsync(trip, Ct)).Body.ToString())!;
+        using var started = await ReportOutcomeAsync(Outcome(start, "Recorded"));
+        using var collected = await PostStopAsync(browser, trip, "collection", "collected");
+        await WaitForPublishedAsync(trip, 2);
+        var sent = JsonNode.Parse(driverApp.PublishedFor(trip)[1].Body.ToString())!;
+
+        using var refused = await ReportOutcomeAsync(Outcome(sent, "Refused", "ShipmentNotOnTrip", $"Shipment {Collection} is not on Trip {trip}."));
+
+        refused.StatusCode.Should().Be(HttpStatusCode.OK);
+        var stop = await PageAsync(browser, $"/trips/{trip}/stops/{Collection}/collection");
+        stop.Should().Contain("Refused").And.Contain("ShipmentNotOnTrip").And.Contain($"Shipment {Collection} is not on Trip {trip}.").And.Contain("/collected", "a refused report can be sent again");
+    }
+
+    [Fact]
+    public async Task ANewTripVersionWithoutTheShipment_KeepsTheCompletedStop_MarkedTakenOffByThePlanner()
+    {
+        const string trip = "TR-3000014";
+        await ReceiveTripAsync(trip, Anouk);
+        using var browser = await SignedInAsync(Anouk);
+        await StartAsync(browser, trip);
+        var start = JsonNode.Parse((await driverApp.FirstPublishedForAsync(trip, Ct)).Body.ToString())!;
+        using var started = await ReportOutcomeAsync(Outcome(start, "Recorded"));
+        using var collected = await PostStopAsync(browser, trip, "collection", "collected");
+        await WaitForPublishedAsync(trip, 2);
+        var sent = JsonNode.Parse(driverApp.PublishedFor(trip)[1].Body.ToString())!;
+        using var recorded = await ReportOutcomeAsync(Outcome(sent, "Recorded"));
+
+        using var newVersion = await driverApp.DriverApp.PostAsync(
+            "/v1/trips", new StringContent(await DriverAppFixture.SampleAsync("without-stops", trip, version: 2, Anouk), System.Text.Encoding.UTF8, "application/json"), Ct);
+
+        newVersion.StatusCode.Should().Be(HttpStatusCode.OK);
+        var card = TripCardOf(await PageAsync(browser), trip);
+        card.Should().Contain("Version 2").And.Contain("Taken off by the Planner, call the Planner").And.Contain(Collection).And.Contain("Recorded");
+    }
+
+    private async Task WaitForPublishedAsync(string trip, int count)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(Ct);
+        timeout.CancelAfter(TimeSpan.FromSeconds(30));
+        while (driverApp.PublishedFor(trip).Count < count)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(250), timeout.Token);
+        }
+    }
+
+    /// <summary>Reports on the Stop of the Trip's only Shipment as the browser would, with an antiforgery token (the demo settings page always carries one).</summary>
+    private static async Task<HttpResponseMessage> PostStopAsync(HttpClient browser, string trip, string kind, string action, string? remark = null)
+    {
+        var token = AntiforgeryToken().Match(await PageAsync(browser, "/settings")) is { Success: true } match
+            ? WebUtility.HtmlDecode(match.Groups[1].Value)
+            : throw new InvalidOperationException("The settings page has no form with an antiforgery token.");
+        List<KeyValuePair<string, string>> form = [new("__RequestVerificationToken", token)];
+        if (remark is not null)
+        {
+            form.Add(new("remark", remark));
+        }
+
+        return await browser.PostAsync($"/trips/{trip}/stops/{Collection}/{kind}/{action}", new FormUrlEncodedContent(form), Ct);
+    }
+
     private async Task ReceiveTripAsync(string trip, string driverId)
     {
         var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Amsterdam")).DateTime);

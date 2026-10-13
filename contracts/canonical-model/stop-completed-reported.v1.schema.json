@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/stop-completed-reported.v1.schema.json",
+  "title": "StopCompletedReported",
+  "description": "The Driver reported on a Stop of a Trip in the Driver app (Canonical Model event, version 1, a Driver app event: P12): Collected, Collection failed, Delivered or Delivery failed, which complete the Stop, or Damaged, which can be reported on any Stop and doesn't complete it. The Driver app reports and the TMS decides, so this says what the Driver did, not what the Stop's outcome is. Published through the Driver app's outbox on the topic for Driver app events, with the Trip number as the Service Bus session ID so one Trip's reports are read one at a time and in order, under a new correlation ID for the Driver's action. The Driver reports Logic App is its only consumer: it calls the TMS Tracking event API's record operation with Own fleet as the source and the Driver ID from this event, and reports the outcome back to the Driver app. The location is the Stop's address: the Driver app doesn't read GPS.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "tripNumber", "version", "driverId", "shipmentNumber", "stop", "trackingEventType", "location"],
+  "properties": {
+    "eventId": { "description": "The Driver app event ID: it names the report to the Logic App, the TMS and the Driver app's outcome report, and the TMS recognises a repeat of it.", "type": "string", "format": "uuid" },
+    "eventType": { "const": "StopCompletedReported" },
+    "eventVersion": { "const": 1 },
+    "occurredAt": { "description": "When the Driver reported on the Stop, with its offset.", "type": "string", "format": "date-time" },
+    "correlationId": { "description": "The new correlation ID of the Driver's action, which the Logic App uses on its call to the TMS and on its report back to the Driver app.", "type": "string", "minLength": 1 },
+    "tripNumber": { "description": "The Trip's number.", "type": "string", "pattern": "^TR-[0-9]{7}$" },
+    "version": { "description": "The version of the Trip the Driver app held. It is kept for tracing: a report records something that has already happened, so the TMS needs the Shipment only to be on the Trip's latest version.", "type": "integer", "minimum": 1 },
+    "driverId": { "description": "The Driver ID from the Driver's token, never from the request (ADR 0005, ADR 0037).", "type": "string", "minLength": 1 },
+    "shipmentNumber": { "description": "The Shipment of the Stop.", "type": "string", "pattern": "^SH-[0-9]{7}$" },
+    "stop": { "description": "Which Stop of that Shipment on the Trip.", "enum": ["Collection", "Delivery"] },
+    "trackingEventType": {
+      "description": "The Tracking event (P5) the report records: Collected or CollectionFailed at a collection Stop, Delivered or DeliveryFailed at a delivery Stop, Damaged at either.",
+      "enum": ["Collected", "CollectionFailed", "Delivered", "DeliveryFailed", "Damaged"]
+    },
+    "location": {
+      "description": "Where it happened: the Stop's address.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["place", "postcode", "countryCode"],
+      "properties": {
+        "place": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "postcode": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "countryCode": { "description": "ISO 3166-1 alpha-2.", "type": "string", "pattern": "^[A-Z]{2}$" }
+      }
+    },
+    "remark": { "description": "What the Driver said. Required for Collection failed, Delivery failed and Damaged.", "type": "string", "minLength": 1, "maxLength": 500, "pattern": "\\S" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "trackingEventType": { "enum": ["Collected", "CollectionFailed"] } }, "required": ["trackingEventType"] },
+      "then": { "properties": { "stop": { "const": "Collection" } } }
+    },
+    {
+      "if": { "properties": { "trackingEventType": { "enum": ["Delivered", "DeliveryFailed"] } }, "required": ["trackingEventType"] },
+      "then": { "properties": { "stop": { "const": "Delivery" } } }
+    },
+    {
+      "if": { "properties": { "trackingEventType": { "enum": ["CollectionFailed", "DeliveryFailed", "Damaged"] } }, "required": ["trackingEventType"] },
+      "then": { "required": ["remark"] }
+    }
+  ]
+}

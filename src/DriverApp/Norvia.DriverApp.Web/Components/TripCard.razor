@@ -1,4 +1,4 @@
-@* One Trip with its Stops in order: what the Driver reads, never changes. *@
+@* One Trip with its Stops in order: what the Driver reads. The Driver reports on a Stop on its own screen. *@
 <FluentCard Class="trip" role="region" aria-label="@($"Trip {Trip.TripNumber}")">
     <h3>
         @Trip.TripNumber
@@ -43,9 +43,9 @@
     else
     {
         <ol class="stops">
-            @foreach (var stop in Trip.Stops.OrderBy(stop => stop.Sequence))
+            @foreach (var stop in Trip.Stops)
             {
-                <StopItem Stop="stop" />
+                <StopItem TripNumber="@Trip.TripNumber" Stop="stop" />
             }
         </ol>
     }
