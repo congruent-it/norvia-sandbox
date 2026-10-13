@@ -9,7 +9,7 @@ namespace Norvia.Simulator.Web.IntegrationTests;
 [Collection("Simulator runs")]
 public sealed class PlanTests(SimulatorFixture fixture)
 {
-    private static readonly CancellationToken Ct = TestContext.Current.CancellationToken;
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     [Fact]
     public async Task Preview_OfTheSameSeedTwice_IsTheSamePlan()
