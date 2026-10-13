@@ -56,7 +56,7 @@ internal sealed record ProofOfDeliveryForm(string? ReceivedBy, DeliveryCondition
 
         var bytes = new byte[(dataUrl.Length - PngDataUrlPrefix.Length) * 3 / 4 + 3];
         return Convert.TryFromBase64String(dataUrl[PngDataUrlPrefix.Length..], bytes, out var written) && written > 0
-            ? new ProofFile("image/png", bytes.AsMemory(0, written).ToArray())
+            ? new ProofFile(DriverApp.Domain.Reports.ProofOfDeliveryRules.PngContentType, bytes.AsMemory(0, written).ToArray())
             : null;
     }
 }
