@@ -264,6 +264,8 @@ The Driver app's own events (see [Driver app event format](#driver-app-event-for
 
 A Trip Dispatched for **today** for a seeded Driver, with three Shipments, delivered to the Driver app.
 
+The TMS seeds it when it first starts with no Trip of the Planner's, from the `demoTripExecution` part of the seed file: three Own fleet Transport Orders from Brouwer Dranken, collected today, assigned to Own fleet and Released, then put on a Trip for Bram Visser (`DRV-0003`) on the rigid truck `VEH-0003`, planned to start at 09:00 for three hours, and Dispatched. The Dispatch publishes `TripDispatched` as the Planner's does, so the Trip reaches the Driver app through the Trip dispatch Logic App. Dates are relative to the demo start: day 0 is today, and on a weekend the next Monday, because the Driver has a Shift only on weekdays and Start Trip is refused outside the Trip's day (`NotTripDay`). The Driver has an Entra test user like every seeded Driver (`infra/create-driver-test-users.sh`).
+
 The demo:
 
 1. The Driver signs in and starts the Trip. The Planner sees it go In progress.
@@ -272,6 +274,19 @@ The demo:
 4. The Driver reports the second as Delivery failed. P7 opens an Exception.
 5. The Driver delivers the third with reservations. P7 opens a Reservations Exception.
 6. The Driver ends the Trip. The second Shipment appears in *Shipments to put on Trips* as a Re-delivery.
+
+## Presenter smoke run
+
+After a deployment, and not in CI, the presenter runs the demo on the deployed estate. Do it after the presenter smoke run of Trip dispatch ([P11](p11-trip-dispatch.md#presenter-smoke-run)), once the Driver reports Logic App is deployed (`infra/deploy-driver-reports-logic-app.sh`) and the seeded Trip shows Delivered to Driver app. Open the Driver app and the TMS UI side by side. The seeded Trip is for the day the TMS first started, so run this on a weekday with a TMS database seeded that day; the script fails first if the Trip isn't for today. Find the seeded Trip in the TMS UI's Trips (today, with Bram Visser) and run `infra/smoke-test-trip-execution.sh <Trip number>` in a terminal: it tells the presenter what to do, reads the TMS, the Driver app and Application Insights, and prints `PASS` or `FAIL` per check, never a signature, a photo, a remark or a token.
+
+1. In the Driver app, sign in as the Driver's Entra test user (the presenter panel has the sign-in details) and start the Trip. The Planner sees it In progress.
+2. Collect all three Shipments.
+3. Deliver the first with a signature and a photo. The Planner sees it Delivered with its Proof of delivery on the timeline, and its Transport Order Billable.
+4. Report the second as Delivery failed. The Planner sees a Delivery failed Exception.
+5. Deliver the third with reservations. The Planner sees a Reservations Exception.
+6. End the Trip. The second Shipment is in *Shipments to put on Trips* as a Re-delivery.
+
+The script checks that the Trip is Completed in the TMS and in the Driver app, with every report Recorded; that the first Shipment is Delivered with its Proof of delivery and Billable, the second Collected and Awaiting re-delivery with an open Delivery failed Exception and listed as a Re-delivery, and the third Delivered with its Proof of delivery and an open Reservations Exception; that the Trip's reports were processed in order through the session (the Logic App recorded them in the order the Driver made them, read from the `trip-execution` rows by Driver app event ID); and that the whole path is findable in Application Insights: the Trip number finds the Logic App's and the TMS's rows, and every correlation ID the Logic App tracked for the Trip is found in the Driver app, the Logic App and the TMS. If a check fails, file the gap as its own issue against P12, rather than working around it in the run book.
 
 ## Implementation
 
@@ -326,6 +341,14 @@ End Trip at the TMS boundary: `POST /v1/trips/{number}/end` with the `driverId` 
 | Boundary tests | [TripEndTests.cs](../../../tests/Tms/Norvia.Tms.Api.IntegrationTests/Trips/TripEndTests.cs) |
 
 Re-delivery on a later Trip is built in P11's calls: Shipments to put on Trips lists a Shipment Awaiting re-delivery with `redelivery` true, a Trip takes it with only its delivery Stop and with `CollectionDayMismatch` not applying, Dispatch clears the flag (`Shipment.Dispatch`), and taking it off sets the flag again, leaving it Collected. The boundary tests are in `TripRedeliveryTests`.
+
+The demo is runnable end to end ([Demo seed](#demo-seed), [Presenter smoke run](#presenter-smoke-run)).
+
+| Part | Where |
+|---|---|
+| Demo seed | [DemoTripExecutionSeeder.cs](../../../src/Tms/Norvia.Tms.Infrastructure/Fleet/DemoTripExecutionSeeder.cs) reads the `demoTripExecution` part ([DemoTripExecution.cs](../../../src/Tms/Norvia.Tms.Infrastructure/Fleet/DemoTripExecution.cs)) of the seed file and goes through the Planner's commands. The two Trip seeders share [DemoSeeder.cs](../../../src/Tms/Norvia.Tms.Infrastructure/Fleet/DemoSeeder.cs) (retry until the database and the planning horizon are ready) and the booking steps in [DemoBookings.cs](../../../src/Tms/Norvia.Tms.Infrastructure/Fleet/DemoBookings.cs). The Trip-day seeder ignores this Trip when it decides whether the Planner has built one ([DemoTrips.cs](../../../src/Tms/Norvia.Tms.Infrastructure/Fleet/DemoTrips.cs): the Trip's idempotency key starts with `demo-trip-execution-`) |
+| Presenter smoke run | [smoke-test-trip-execution.sh](../../../infra/smoke-test-trip-execution.sh), run after the [Trip dispatch](../../../infra/smoke-test-trip-dispatch.sh) one |
+| Tests | [DemoTripExecutionSeederTests.cs](../../../tests/Tms/Norvia.Tms.Infrastructure.UnitTests/Fleet/DemoTripExecutionSeederTests.cs), `TripExecution_…` in [DemoSeedTests.cs](../../../tests/Tms/Norvia.Tms.Api.IntegrationTests/DemoSeedTests.cs) |
 
 Driver app sign-in ([ADR 0037](../../adr/0037-drivers-sign-in-to-the-driver-app-with-entra-and-the-driver-id-is-their-app-role.md)). In Azure the Driver app's screens are behind Easy Auth, signing in to the *Norvia Driver app* registration, whose app roles are the active seeded Drivers' IDs; `infra/create-driver-test-users.sh` makes a test user for each Driver and assigns the role, and the estate's `ESTATE_DRIVER_SIGN_IN_*` parameters give the presenter panel the domain and the shared password. The Driver app reads the user from `X-MS-CLIENT-PRINCIPAL`, turns the role into the `driverId` claim, and `GetDriverTripsQuery` takes the Driver ID from that claim only. Locally `LocalSignIn__Enabled` (set by the AppHost, refused outside Development) turns on a sign-in page that lists the seeded Drivers and signs one in with a cookie holding the same claim. My Trips shows the Driver's Trips by day, each with its status (a Trip the Driver app holds is Dispatched until the Driver can start it). The Driver ID goes on every event the Driver app publishes, taken from that claim.
 

@@ -44,6 +44,7 @@ public sealed class DemoTripDaySeederTests : IAsyncDisposable
         _demo = _seed.TripDay!;
         _loggerFactory = LoggerFactory.Create(logging => logging.AddProvider(_logs));
         _services = new ServiceCollection().AddSingleton(_mediator).AddSingleton(_trips).BuildServiceProvider();
+        _trips.ListAsync(Arg.Any<TripsInOrderSpec>(), Arg.Any<CancellationToken>()).Returns([]);
         _mediator.Send(Arg.Any<SubmitTransportOrderCommand>(), Arg.Any<CancellationToken>())
             .Returns(_ => Result.Success(new SubmitTransportOrderResult(Guid.NewGuid(), TransportOrderStatus.Accepted, $"TO-{++_numbers:D7}", [])));
         _mediator.Send(Arg.Any<AssignTransportOrderCommand>(), Arg.Any<CancellationToken>())
@@ -102,12 +103,23 @@ public sealed class DemoTripDaySeederTests : IAsyncDisposable
     [Fact]
     public async Task StartAsync_WhenATripExists_SeedsNothing()
     {
-        _trips.AnyAsync(Arg.Any<TripsInOrderSpec>(), Arg.Any<CancellationToken>()).Returns(true);
+        _trips.ListAsync(Arg.Any<TripsInOrderSpec>(), Arg.Any<CancellationToken>()).Returns([ATrip("planner-key")]);
 
         await _seeder.StartAsync(_cancellationToken);
         await LogAsync(log => log.Message.Contains("already holds", StringComparison.Ordinal));
 
         _mediator.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task StartAsync_WhenOnlyTheTripOfP12sDemoExists_SeedsTheTripDay()
+    {
+        _trips.ListAsync(Arg.Any<TripsInOrderSpec>(), Arg.Any<CancellationToken>()).Returns([ATrip(DemoTrips.KeyPrefix + "20261005")]);
+
+        await _seeder.StartAsync(_cancellationToken);
+        await SeededAsync();
+
+        Received<ReleaseShipmentCommand>().Should().HaveCount(_demo.TransportOrders.Count);
     }
 
     [Fact]
@@ -125,12 +137,12 @@ public sealed class DemoTripDaySeederTests : IAsyncDisposable
     public async Task StartAsync_WhenTheDatabaseIsNotReady_TriesAgainAtTheNextLook()
     {
         var attempts = 0;
-        _trips.AnyAsync(Arg.Any<TripsInOrderSpec>(), Arg.Any<CancellationToken>())
-            .Returns(_ => ++attempts == 1 ? Task.FromException<bool>(new InvalidOperationException("database down")) : Task.FromResult(false));
+        _trips.ListAsync(Arg.Any<TripsInOrderSpec>(), Arg.Any<CancellationToken>())
+            .Returns(_ => ++attempts == 1 ? Task.FromException<List<Trip>>(new InvalidOperationException("database down")) : Task.FromResult<List<Trip>>([]));
 
         await _seeder.StartAsync(_cancellationToken);
         (await LogAsync(log => log.Level == LogLevel.Warning)).Message.Should().Contain("trying again");
-        _time.Advance(DemoTripDaySeeder.RetryInterval);
+        _time.Advance(DemoSeeder.RetryInterval);
 
         await SeededAsync();
         Received<ReleaseShipmentCommand>().Should().HaveCount(_demo.TransportOrders.Count);
@@ -168,6 +180,8 @@ public sealed class DemoTripDaySeederTests : IAsyncDisposable
         _loggerFactory.Dispose();
         _logs.Dispose();
     }
+
+    private static Trip ATrip(string key) => Trip.CreateDraft(TripNumber.FromSequence(1), new DateOnly(2026, 10, 5), null, null, new IdempotencyKey(key));
 
     private DemoTripDaySeeder SeederFor(DemoSeed seed) => new(
         _services.GetRequiredService<IServiceScopeFactory>(),

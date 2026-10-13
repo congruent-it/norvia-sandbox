@@ -162,6 +162,22 @@ public sealed class DemoSeedTests(TmsFixture tms)
         heavy.Kg.Should().BeLessThanOrEqualTo(truck["payloadKg"]!.GetValue<int>());
     }
 
+    [Fact]
+    public void TripExecution_IsForAnActiveDriverWithTheLicenceAndAVehicleThatTakesThreeShipments()
+    {
+        var execution = DemoSeed()["demoTripExecution"]!;
+        var driver = DemoSeed()["drivers"]!.AsArray().Single(d => d!["id"]!.GetValue<string>() == execution["driverId"]!.GetValue<string>())!;
+        var vehicle = DemoSeed()["vehicles"]!.AsArray().Single(v => v!["id"]!.GetValue<string>() == execution["vehicleId"]!.GetValue<string>())!;
+        var orders = execution["transportOrders"]!.AsArray();
+
+        driver["active"]!.GetValue<bool>().Should().BeTrue();
+        driver["licences"]!.AsArray().Select(licence => licence!.GetValue<string>()).Should().Contain("C", "a rigid truck needs category C");
+        vehicle["type"]!.GetValue<string>().Should().Be("RigidTruck");
+        orders.Should().HaveCount(3, "one delivered, one failed, one delivered with reservations");
+        orders.Sum(order => order!["pallets"]!.GetValue<int>()).Should().BeLessThanOrEqualTo(vehicle["palletPlaces"]!.GetValue<int>());
+        execution["firstDayFromStart"]!.GetValue<int>().Should().Be(0, "the Trip is Dispatched for today");
+    }
+
     private static List<SeedLane> LanesOf(string carrier) => LanesOf(CarrierRateCard(carrier));
 
     private static List<SeedLane> LanesOf(JsonNode card) =>
