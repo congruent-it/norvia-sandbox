@@ -64,6 +64,26 @@ internal sealed class DriverReportsWorld
         }
         """;
 
+    public const string StopEventId = "0198e7c0-0000-7000-8000-0000000000d1";
+    public const string StopCorrelationId = "0198e7c0-0000-7000-8000-0000000000d2";
+
+    public static string StopReported(string trackingEventType = "Collected", string stop = "Collection", string? remark = null, string driverId = "DRV-0002") => $$"""
+        {
+          "eventId": "{{StopEventId}}",
+          "eventType": "StopCompletedReported",
+          "eventVersion": 1,
+          "occurredAt": "2030-10-03T08:41:03+02:00",
+          "correlationId": "{{StopCorrelationId}}",
+          "tripNumber": "{{TripNumber}}",
+          "version": 3,
+          "driverId": "{{driverId}}",
+          "shipmentNumber": "SH-0000031",
+          "stop": "{{stop}}",
+          "trackingEventType": "{{trackingEventType}}",
+          "location": { "place": "Rotterdam", "postcode": "3011 AA", "countryCode": "NL" }{{(remark is null ? "" : $$""", "remark": "{{remark}}" """)}}
+        }
+        """;
+
     public static string Problem(int status, string code, string detail) => $$"""
         { "type": "about:blank", "title": "The Trip can't be started.", "status": {{status}}, "detail": "{{detail}}", "code": "{{code}}", "correlationId": "{{CorrelationId}}" }
         """;

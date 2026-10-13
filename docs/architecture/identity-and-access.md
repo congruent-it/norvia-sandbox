@@ -27,7 +27,7 @@ Both Logic App triggers sit behind Easy Auth, and the workflow's first step refu
 | `carrier-cancellation` | The Carrier cancellation Logic App (P7) | `CarrierBookings.Report` | Receives the `carrier-cancellation` subscription. Reads each Carrier's endpoint key |
 | `shipper-notification` | The Shipper notification Logic App (P7) | `ShipperNotifications.Report` | Receives the `shipper-notification` subscription. Reads each Shipper's endpoint key |
 | `trip-dispatch` | The Trip dispatch Logic App (P11) | `Trips.ReportDelivery` | Receives the `trip-dispatch` subscription. Reads the Driver app's endpoint key |
-| `driver-reports` | The Driver reports Logic App (P12) | `Trips.Start` on the TMS; `DriverReports.ReportOutcome` on the Driver app | Receives the `driver-reports` subscription |
+| `driver-reports` | The Driver reports Logic App (P12) | `Trips.Start` and `TrackingEvents.Record` on the TMS; `DriverReports.ReportOutcome` on the Driver app | Receives the `driver-reports` subscription |
 | `driver-app` | The Driver app's API (P11) | None: it reaches the TMS only through the integration layer | Reads the Driver app's endpoint key. Sends to the `driver-app-events` topic (P12) |
 | `tracking` | The Carrier-tracking Logic App (P5) | `TrackingEvents.Record` | Receives the `carrier-tracking` queue |
 | `proof-of-delivery` | The Carrier Proof of delivery Logic App (P6) | `ProofsOfDelivery.Record` | Receives the `carrier-proof-of-delivery` queue. Reads and deletes blobs in the inbound container |
@@ -38,7 +38,7 @@ Both Logic App triggers sit behind Easy Auth, and the workflow's first step refu
 
 Each Logic App also has a **host identity** (`id-<name>-host-…`) that only the Logic Apps runtime uses: it owns the Logic App's own storage account and reads the one Key Vault secret holding that account's connection string, which Logic Apps Standard still needs for its content share. Nothing else uses it. The identities are separate on purpose: a Logic App's role in the TMS API is never the same principal as the one that runs its runtime.
 
-Each role below is held by one principal, or by two where the process says so (`CarrierBookings.Report`, and `TrackingEvents.Record` and `ProofsOfDelivery.Record` once the Driver reports Logic App exists). That is the point of ADR 0005: nothing reaches the TMS without passing the integration layer, and a stolen identity can do one thing.
+Each role below is held by one principal, or by two where the process says so (`CarrierBookings.Report`, `TrackingEvents.Record` with the Driver reports Logic App, and `ProofsOfDelivery.Record` once that Logic App takes a Driver's Proof of delivery). That is the point of ADR 0005: nothing reaches the TMS without passing the integration layer, and a stolen identity can do one thing.
 
 ## TMS API roles
 
@@ -55,13 +55,13 @@ The TMS validates the token and the role; the Shipper or Carrier a call is for c
 | `DriverReports.ReportOutcome` (on the Driver app API) | `driver-reports` | Tell the Driver app whether the TMS recorded a Driver's report, refused it, or was never reached | [P12](../processes/tms/p12-trip-execution.md#driver-app) |
 | `Trips.Start` | `driver-reports` | Start a Dispatched Trip for its Driver on the Trip's day | [P12](../processes/tms/p12-trip-execution.md#tms-api) |
 | `Trips.End` | None yet: the P12 Driver reports Logic App will hold it once End Trip is on its path | End an In progress Trip for its Driver once every Stop has an outcome | [P12](../processes/tms/p12-trip-execution.md#tms-api) |
-| `TrackingEvents.Record` | `tracking`. The P12 Driver reports Logic App will hold it too | Record a Tracking event, a Carrier's or a Driver's Stop report | [P5](../processes/tms/p5-shipment-tracking.md) |
+| `TrackingEvents.Record` | `tracking` and `driver-reports` | Record a Tracking event, a Carrier's or a Driver's Stop report | [P5](../processes/tms/p5-shipment-tracking.md) |
 | `ProofsOfDelivery.Record` | `proof-of-delivery`. The P12 Driver reports Logic App will hold it too | Record a Proof of delivery with its files, a Carrier's or a Driver's | [P6](../processes/tms/p6-proof-of-delivery.md) |
 | `ShipperTracking.Read` | `apim` | List, get and find a Shipper's Transport Orders, and read a current Proof of delivery file. The TMS trusts the Shipper ID header only from this caller | [P8](../processes/tms/p8-shipper-visibility.md) |
 
 The TMS API's queries (Transport Orders, Shipments, Exceptions, Proof of delivery files) ask only for a valid token. Because Entra issues one only to a principal holding one of the roles above, in practice the callers are these identities. The TMS UI reads in process and uses the API to change things ([ADR 0028](../adr/0028-the-tms-ui-reads-in-process-and-changes-things-through-the-tms-api.md)).
 
-Planned and not yet in Entra: `Trips.Start`, `Trips.End`, with `TrackingEvents.Record` and `ProofsOfDelivery.Record`, for the Driver reports Logic App ([P12](../processes/tms/p12-trip-execution.md#tms-api)).
+Planned and not yet in Entra: `Trips.End` and `ProofsOfDelivery.Record` for the Driver reports Logic App ([P12](../processes/tms/p12-trip-execution.md#tms-api)).
 
 ## Partner API roles
 

@@ -18,6 +18,9 @@
   <!-- Embedded, so the unit tests read the contracts without touching the file system (coding guidelines §10). -->
   <ItemGroup>
     <EmbeddedResource Include="..\..\..\contracts\canonical-model\trip-start-reported.v1.schema.json" LogicalName="CanonicalModel/trip-start-reported.v1.schema.json" />
+    <EmbeddedResource Include="..\..\..\contracts\canonical-model\stop-completed-reported.v1.schema.json" LogicalName="CanonicalModel/stop-completed-reported.v1.schema.json" />
+    <EmbeddedResource Include="..\..\..\contracts\canonical-model\tracking-event.v1.schema.json" LogicalName="CanonicalModel/tracking-event.v1.schema.json" />
+    <EmbeddedResource Include="..\..\..\contracts\canonical-model\samples\stop-completed-reported\*.json" LogicalName="CanonicalModel/samples/stop-completed-reported/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\contracts\canonical-model\driver-report-outcome.v1.schema.json" LogicalName="CanonicalModel/driver-report-outcome.v1.schema.json" />
     <EmbeddedResource Include="..\..\..\contracts\canonical-model\samples\trip-start-reported\*.json" LogicalName="CanonicalModel/samples/trip-start-reported/%(Filename)%(Extension)" />
   </ItemGroup>

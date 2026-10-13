@@ -278,9 +278,9 @@ resource driverAppIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@202
   tags: tags
 }
 
-// The P12 Driver reports Logic App's identity, which it runs as. It is the one principal holding the Trip start role (and, as they are built,
-// the Trip end, Tracking event and Proof of delivery record roles), so nothing a Driver reports reaches the TMS without passing the
-// integration layer, and the one principal holding the Driver app's outcome role.
+// The P12 Driver reports Logic App's identity, which it runs as. It is the one principal holding the Trip start role and, with the Carrier-tracking
+// Logic App, the Tracking event record role (and, as they are built, the Trip end and Proof of delivery record roles), so nothing a Driver reports
+// reaches the TMS without passing the integration layer, and the one principal holding the Driver app's outcome role.
 resource driverReportsIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
   name: 'id-driver-reports-${uniqueString(resourceGroup().id)}'
   location: location
@@ -290,6 +290,14 @@ resource driverReportsIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities
 resource driverReportsStartRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
   resourceId: tmsApiPrincipal.id
   appRoleId: tripStartRoleId
+  principalId: driverReportsIdentity.properties.principalId
+}
+
+// The Tracking event record role, which the Carrier-tracking Logic App holds too: the Driver reports Logic App records a Driver's Stop report as a
+// Tracking event of Own fleet with it.
+resource driverReportsRecordRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: tmsApiPrincipal.id
+  appRoleId: recordRoleId
   principalId: driverReportsIdentity.properties.principalId
 }
 

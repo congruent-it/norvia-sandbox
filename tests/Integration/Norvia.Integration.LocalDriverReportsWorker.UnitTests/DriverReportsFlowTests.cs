@@ -11,6 +11,10 @@ namespace Norvia.Integration.LocalDriverReportsWorker.UnitTests;
 /// </summary>
 public sealed class DriverReportsFlowTests
 {
+    // A schema registers itself under its $id, so each is read once.
+    private static readonly Lazy<JsonSchema> TrackingEventSchema = new(() => JsonSchema.FromText(ReadResource("CanonicalModel/tracking-event.v1.schema.json")));
+    private static readonly Lazy<JsonSchema> StopReportedSchema = new(() => JsonSchema.FromText(ReadResource("CanonicalModel/stop-completed-reported.v1.schema.json")));
+
     private readonly DriverReportsWorld _world = new();
 
     [Fact]
@@ -235,6 +239,139 @@ public sealed class DriverReportsFlowTests
         var results = schema.Evaluate(JsonSerializer.SerializeToElement(JsonNode.Parse(DriverReportsWorld.StartReported())), new EvaluationOptions { OutputFormat = OutputFormat.List, RequireFormatValidation = true });
 
         results.IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ARecordedStopReport_IsPostedToTheTrackingEventApi_AsOwnFleet_WithTheDriverIdFromTheEvent_AndTheRecordRole()
+    {
+        var outcome = await _world.RunAsync(DriverReportsWorld.StopReported("CollectionFailed", remark: "Nobody at the dock"));
+
+        outcome.Should().Be(DriverReportsRunOutcome.Done);
+        var call = _world.Tms.Requests.Should().ContainSingle().Subject;
+        call.Uri.ToString().Should().Be("http://tms.test/v1/tracking-events");
+        call.Headers["X-Correlation-ID"].Should().Be(DriverReportsWorld.StopCorrelationId);
+        DriverReportsWorld.RoleOf(call).Should().Be("TrackingEvents.Record");
+        var body = JsonNode.Parse(call.Body)!;
+        body["eventId"]!.GetValue<string>().Should().Be(DriverReportsWorld.StopEventId, "the TMS recognises a repeat by the Driver app event ID");
+        body["source"]!["type"]!.GetValue<string>().Should().Be("OwnFleet");
+        body["source"]!["driverId"]!.GetValue<string>().Should().Be("DRV-0002", "the Driver ID is the one the Driver app took from the Driver's token");
+        body["tripNumber"]!.GetValue<string>().Should().Be("TR-0000012");
+        body["shipmentNumber"]!.GetValue<string>().Should().Be("SH-0000031");
+        body["tripVersion"]!.GetValue<int>().Should().Be(3);
+        body["type"]!.GetValue<string>().Should().Be("CollectionFailed");
+        body["eventTime"]!.GetValue<string>().Should().Be("2030-10-03T08:41:03+02:00");
+        body["location"]!["place"]!.GetValue<string>().Should().Be("Rotterdam");
+        body["location"]!["postcode"]!.GetValue<string>().Should().Be("3011 AA");
+        body["location"]!["countryCode"]!.GetValue<string>().Should().Be("NL");
+        body["remark"]!.GetValue<string>().Should().Be("Nobody at the dock");
+        _world.Settled.Should().ContainSingle().Which.Settlement.Should().Be(Settlement.Complete);
+        var reported = _world.OutcomeReported();
+        reported["outcome"]!.GetValue<string>().Should().Be("Recorded");
+        reported["driverAppEventId"]!.GetValue<string>().Should().Be(DriverReportsWorld.StopEventId);
+        reported["correlationId"]!.GetValue<string>().Should().Be(DriverReportsWorld.StopCorrelationId);
+    }
+
+    [Theory]
+    [InlineData("Collected", "Collection", null)]
+    [InlineData("DeliveryFailed", "Delivery", "Dock closed")]
+    [InlineData("Damaged", "Delivery", "Crushed carton")]
+    [InlineData("Delivered", "Delivery", null)]
+    public async Task TheTrackingEventTheFlowPosts_ValidatesAgainstTheCanonicalModel(string type, string stop, string? remark)
+    {
+        var schema = TrackingEventSchema.Value;
+
+        await _world.RunAsync(DriverReportsWorld.StopReported(type, stop, remark));
+
+        var body = JsonNode.Parse(_world.Tms.Requests.Single().Body)!;
+        schema.Evaluate(JsonSerializer.SerializeToElement(body), new EvaluationOptions { OutputFormat = OutputFormat.List, RequireFormatValidation = true }).IsValid.Should().BeTrue(body.ToJsonString());
+        (body as JsonObject)!.ContainsKey("remark").Should().Be(remark is not null, "a remark the Driver didn't give is left out");
+    }
+
+    [Fact]
+    public async Task AStopReportTheTmsRefuses_IsNotRetried_DeadLettersTheMessageWithTheTmsCode_AndIsReportedRefused()
+    {
+        _world.Tms.Otherwise(HttpStatusCode.Conflict, DriverReportsWorld.Problem(409, "CollectionBeforeDelivery", "SH-0000031's collection is not done."));
+
+        var outcome = await _world.RunAsync(DriverReportsWorld.StopReported("DeliveryFailed", "Delivery", "Closed"));
+
+        outcome.Should().Be(DriverReportsRunOutcome.Done);
+        _world.Tms.Requests.Should().ContainSingle();
+        _world.Settled.Should().ContainSingle().Which.Settlement.Should().Be(new Settlement.DeadLetter("CollectionBeforeDelivery", "SH-0000031's collection is not done."));
+        var reported = _world.OutcomeReported();
+        reported["outcome"]!.GetValue<string>().Should().Be("Refused");
+        reported["failureCode"]!.GetValue<string>().Should().Be("CollectionBeforeDelivery");
+    }
+
+    [Fact]
+    public async Task AStopReportWhileTheTmsIsUnavailable_IsRetried_ThenDeadLettered_AndReportedNotRecorded()
+    {
+        _world.Tms.Otherwise(HttpStatusCode.ServiceUnavailable, "Service Unavailable");
+
+        await _world.RunAsync(DriverReportsWorld.StopReported());
+
+        _world.Tms.Requests.Should().HaveCount(4);
+        _world.Tms.Requests.Should().OnlyContain(request => request.Uri.AbsolutePath == "/v1/tracking-events");
+        _world.Settled.Single().Settlement.Should().BeOfType<Settlement.DeadLetter>().Which.Reason.Should().Be("TmsUnavailable");
+        _world.OutcomeReported()["outcome"]!.GetValue<string>().Should().Be("NotRecorded");
+    }
+
+    [Fact]
+    public async Task AStopReportTheTmsRecognisesAsARepeat_IsRecordedAsAny()
+    {
+        _world.Tms.Otherwise(HttpStatusCode.OK, """{ "repeat": true }""");
+
+        await _world.RunAsync(DriverReportsWorld.StopReported());
+
+        _world.Settled.Single().Settlement.Should().Be(Settlement.Complete);
+        _world.OutcomeReported()["outcome"]!.GetValue<string>().Should().Be("Recorded");
+    }
+
+    [Theory]
+    [InlineData("""{ "eventId": "0198e7c0-0000-7000-8000-0000000000d1", "eventType": "StopCompletedReported", "correlationId": "c", "tripNumber": "TR-0000012", "driverId": "DRV-0002", "version": 3, "stop": "Collection", "trackingEventType": "Collected", "location": { "place": "Rotterdam", "postcode": "3011 AA", "countryCode": "NL" } }""")]
+    [InlineData("""{ "eventId": "0198e7c0-0000-7000-8000-0000000000d1", "eventType": "StopCompletedReported", "correlationId": "c", "tripNumber": "TR-0000012", "driverId": "DRV-0002", "version": 3, "shipmentNumber": "SH-0000031", "stop": "Collection", "location": { "place": "Rotterdam", "postcode": "3011 AA", "countryCode": "NL" } }""")]
+    [InlineData("""{ "eventId": "0198e7c0-0000-7000-8000-0000000000d1", "eventType": "StopCompletedReported", "correlationId": "c", "tripNumber": "TR-0000012", "driverId": "DRV-0002", "version": 3, "shipmentNumber": "SH-0000031", "stop": "Collection", "trackingEventType": "Collected" }""")]
+    [InlineData("""{ "eventId": "0198e7c0-0000-7000-8000-0000000000d1", "eventType": "StopCompletedReported", "correlationId": "c", "tripNumber": "TR-0000012", "driverId": "DRV-0002", "shipmentNumber": "SH-0000031", "stop": "Collection", "trackingEventType": "Collected", "location": { "place": "Rotterdam", "postcode": "3011 AA", "countryCode": "NL" } }""")]
+    [InlineData("""{ "eventId": "0198e7c0-0000-7000-8000-0000000000d1", "eventType": "StopCompletedReported", "correlationId": "c", "tripNumber": "TR-0000012", "driverId": "DRV-0002", "version": 3, "shipmentNumber": "SH-0000031", "stop": "Collection", "trackingEventType": "Collected", "location": { "place": "Rotterdam", "postcode": "3011 AA" } }""")]
+    public async Task AStopReportMissingWhatTheTmsNeeds_IsDeadLetteredAsUnreadable_AndNothingIsCalled(string message)
+    {
+        var outcome = await _world.RunAsync(message);
+
+        outcome.Should().Be(DriverReportsRunOutcome.Unreadable);
+        _world.Settled.Should().ContainSingle().Which.Settlement.Should().BeOfType<Settlement.DeadLetter>().Which.Reason.Should().Be("DriverReportUnreadable");
+        _world.Tms.Requests.Should().BeEmpty();
+        _world.DriverApp.Requests.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TheStopEventsTheDriverAppPublishes_AreTheOnesTheFlowReads()
+    {
+        var schema = StopReportedSchema.Value;
+        var options = new EvaluationOptions { OutputFormat = OutputFormat.List, RequireFormatValidation = true };
+
+        schema.Evaluate(JsonSerializer.SerializeToElement(JsonNode.Parse(DriverReportsWorld.StopReported())), options).IsValid.Should().BeTrue();
+        schema.Evaluate(JsonSerializer.SerializeToElement(JsonNode.Parse(DriverReportsWorld.StopReported("DeliveryFailed", "Delivery", "Closed"))), options).IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task EveryStopSampleOfTheContract_IsRead_AndBecomesAValidTrackingEventOfOwnFleet()
+    {
+        var samples = typeof(DriverReportsFlowTests).Assembly.GetManifestResourceNames().Where(name => name.StartsWith("CanonicalModel/samples/stop-completed-reported/", StringComparison.Ordinal)).ToList();
+        samples.Should().HaveCountGreaterThanOrEqualTo(3);
+
+        foreach (var sample in samples)
+        {
+            var world = new DriverReportsWorld();
+            var sent = ReadResource(sample);
+
+            var outcome = await world.RunAsync(sent);
+
+            outcome.Should().Be(DriverReportsRunOutcome.Done, sample);
+            var body = JsonNode.Parse(world.Tms.Requests.Single().Body)!;
+            TrackingEventSchema.Value.Evaluate(JsonSerializer.SerializeToElement(body), new EvaluationOptions { OutputFormat = OutputFormat.List, RequireFormatValidation = true })
+                .IsValid.Should().BeTrue($"{sample}: {body.ToJsonString()}");
+            body["type"]!.GetValue<string>().Should().Be(JsonNode.Parse(sent)!["trackingEventType"]!.GetValue<string>());
+            body["source"]!["driverId"]!.GetValue<string>().Should().Be(JsonNode.Parse(sent)!["driverId"]!.GetValue<string>());
+        }
     }
 
     private static string ReadResource(string name)

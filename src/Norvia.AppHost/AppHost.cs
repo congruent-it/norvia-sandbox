@@ -246,7 +246,7 @@ else
     tripEvents.AddServiceBusSubscription("trip-events-monitoring", subscriptionName: "monitoring");
     tripEvents.AddServiceBusSubscription("trip-dispatch");
     // The topic for Driver app events (P12). The Driver reports Logic App is the only consumer, with a subscription of its own that uses sessions
-    // keyed by Trip number, so one Trip's reports are read one at a time and in order: TripStartReported only (see ResubmitAwareFilters).
+    // keyed by Trip number, so one Trip's reports are read one at a time and in order: TripStartReported and StopCompletedReported only (see ResubmitAwareFilters).
     messaging.AddServiceBusTopic("driver-app-events")
         .AddServiceBusSubscription("driver-reports")
         .WithProperties(subscription => subscription.RequiresSession = true);
