@@ -44,14 +44,14 @@ internal sealed record DemoConsignee(string Name, string ContactName, string Pho
 
 internal sealed record DemoTransportOrder(string ShipperReference, DemoDelivery Delivery, int Pallets, decimal WeightKgPerPallet);
 
-/// <summary>What the seed file holds for the demo's Over capacity day and Trip day: nothing for a part it doesn't have.</summary>
-internal sealed record DemoSeed(DemoOverCapacityDay? OverCapacityDay, DemoTripDay? TripDay = null)
+/// <summary>What the seed file holds for the demo's Over capacity day, Trip day and Trip execution: nothing for a part it doesn't have.</summary>
+internal sealed record DemoSeed(DemoOverCapacityDay? OverCapacityDay, DemoTripDay? TripDay = null, DemoTripExecution? TripExecution = null)
 {
     public static DemoSeed Read(IOptions<SeedOptions> options)
     {
         var file = SeedFileReader.Read<SeedFile>(options);
-        return new(file.DemoOverCapacityDay, file.DemoTripDay);
+        return new(file.DemoOverCapacityDay, file.DemoTripDay, file.DemoTripExecution);
     }
 
-    private sealed record SeedFile(DemoOverCapacityDay? DemoOverCapacityDay, DemoTripDay? DemoTripDay);
+    private sealed record SeedFile(DemoOverCapacityDay? DemoOverCapacityDay, DemoTripDay? DemoTripDay, DemoTripExecution? DemoTripExecution);
 }

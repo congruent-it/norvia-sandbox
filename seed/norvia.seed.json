@@ -715,6 +715,48 @@
       }
     ]
   },
+  "demoTripExecution": {
+    "$comment": "The Trip of P12's demo. The day is the first weekday on or after 'firstDayFromStart' days after the TMS first starts with no Trips (0 is today; on a weekend the next Monday, so the Driver has a Shift): three Own fleet Transport Orders from the Shipper are collected that day, assigned to Own fleet and Released, and put on a Trip for the Driver and Vehicle, which is Dispatched and so delivered to the Driver app. The demo delivers the first Shipment with a Proof of delivery, fails the second and delivers the third with reservations. Left out, the TMS seeds none of it.",
+    "firstDayFromStart": 0,
+    "shipperId": "SHP-0001",
+    "driverId": "DRV-0003",
+    "vehicleId": "VEH-0003",
+    "plannedStart": "09:00",
+    "plannedDrivingMinutes": 180,
+    "collection": {
+      "street": "Waalhaven Oostzijde 88", "postcode": "3087 BM", "city": "Rotterdam", "country": "NL",
+      "earliest": "08:00", "latest": "12:00"
+    },
+    "transportOrders": [
+      {
+        "shipperReference": "DEMO-EXEC-1",
+        "delivery": {
+          "street": "Oudegracht 112", "postcode": "3511 AW", "city": "Utrecht", "country": "NL",
+          "consignee": { "name": "Café De Zwaan", "contactName": "Sanne de Vries", "phone": "+31 30 555 0142" }
+        },
+        "pallets": 4,
+        "weightKgPerPallet": 400
+      },
+      {
+        "shipperReference": "DEMO-EXEC-2",
+        "delivery": {
+          "street": "Noorderlaan 120", "postcode": "2030", "city": "Antwerpen", "country": "BE",
+          "consignee": { "name": "Drankenhandel De Schelde BV", "contactName": "Pieter Janssens", "phone": "+32 3 555 0117" }
+        },
+        "pallets": 3,
+        "weightKgPerPallet": 400
+      },
+      {
+        "shipperReference": "DEMO-EXEC-3",
+        "delivery": {
+          "street": "Oudegracht 112", "postcode": "3511 AW", "city": "Utrecht", "country": "NL",
+          "consignee": { "name": "Café De Zwaan", "contactName": "Sanne de Vries", "phone": "+31 30 555 0142" }
+        },
+        "pallets": 3,
+        "weightKgPerPallet": 300
+      }
+    ]
+  },
   "personas": [
     {
       "$comment": "A Shipper Persona's tracking screen asks Norvia again every few seconds while it is open (P8). 'shipper.trackingPollSeconds' sets that per Persona; one without it polls every 5 seconds.",

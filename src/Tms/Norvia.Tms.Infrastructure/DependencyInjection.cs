@@ -177,6 +177,7 @@ public static class DependencyInjection
         builder.Services.AddSingleton(services => DemoSeed.Read(services.GetRequiredService<IOptions<SeedOptions>>()));
         builder.Services.AddHostedService<DemoOverCapacityDaySeeder>();
         builder.Services.AddHostedService<DemoTripDaySeeder>();
+        builder.Services.AddHostedService<DemoTripExecutionSeeder>();
 
         return builder;
     }

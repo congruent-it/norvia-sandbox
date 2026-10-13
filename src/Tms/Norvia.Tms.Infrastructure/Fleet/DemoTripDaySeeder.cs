@@ -16,7 +16,7 @@ namespace Norvia.Tms.Infrastructure.Fleet;
 /// <summary>
 /// Seeds the demo's day of Shipments to put on Trips (P11) when the TMS first starts: it books the day's Own fleet Transport Orders, assigns
 /// them to Own fleet and releases their Shipments, through the same commands as the Planner and the Partner API. A TMS that already holds
-/// a Trip seeds nothing, and a run that fails part-way is tried again, as booking, assigning and releasing the same orders again changes
+/// a Trip the Planner built seeds nothing (the Trip of P12's demo is not one), and a run that fails part-way is tried again, as booking, assigning and releasing the same orders again changes
 /// nothing. The day is kept off the Over capacity day (P10), which would otherwise be the same day when the weekend gets in the way. It retries
 /// every <see cref="RetryInterval"/> until the database takes it, as the TMS may start before its migrations are applied.
 /// </summary>
@@ -57,7 +57,7 @@ internal sealed partial class DemoTripDaySeeder(
         await using var scope = scopes.CreateAsyncScope();
         var services = scope.ServiceProvider;
 
-        if (await services.GetRequiredService<IReadRepository<Trip>>().AnyAsync(new TripsInOrderSpec(), cancellationToken))
+        if ((await services.GetRequiredService<IReadRepository<Trip>>().ListAsync(new TripsInOrderSpec(), cancellationToken)).Any(trip => !DemoTripExecutionSeeder.IsDemoTrip(trip)))
         {
             LogAlreadySeeded();
             return;
