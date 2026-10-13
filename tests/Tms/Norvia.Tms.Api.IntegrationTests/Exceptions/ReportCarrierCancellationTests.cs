@@ -98,7 +98,8 @@ public sealed class ReportCarrierCancellationTests(TmsFixture tms) : IClassFixtu
     public async Task Reports_ForABookingAlreadyTold_AreIgnored_AndPublishNothing()
     {
         var (carrierBookingNumber, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
-        await tms.WithdrawnAsync(carrierBookingNumber, _cancellationToken);
+        var withdrawn = await tms.WithdrawnAsync(carrierBookingNumber, _cancellationToken);
+        await tms.PublishedAsync(withdrawn["correlationId"]!.GetValue<string>(), "CarrierBookingWithdrawn", _cancellationToken); // The withdrawal's event is out before the count.
         using var told = await tms.ReportCancellationToldAsync(carrierBookingNumber, _cancellationToken);
         told.StatusCode.Should().Be(HttpStatusCode.OK);
         var before = tms.Published.Count(m => NamesCarrierBooking(m, carrierBookingNumber));
@@ -119,7 +120,8 @@ public sealed class ReportCarrierCancellationTests(TmsFixture tms) : IClassFixtu
     public async Task NotDelivered_ARepeatReport_IsIgnored_AndPublishesNothingAgain()
     {
         var (carrierBookingNumber, _) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
-        await tms.WithdrawnAsync(carrierBookingNumber, _cancellationToken);
+        var withdrawn = await tms.WithdrawnAsync(carrierBookingNumber, _cancellationToken);
+        await tms.PublishedAsync(withdrawn["correlationId"]!.GetValue<string>(), "CarrierBookingWithdrawn", _cancellationToken); // The withdrawal's event is out before the count.
         using var first = await tms.ReportCancellationNotDeliveredAsync(carrierBookingNumber, _cancellationToken);
         first.StatusCode.Should().Be(HttpStatusCode.OK);
         var before = tms.Published.Count(m => NamesCarrierBooking(m, carrierBookingNumber));
