@@ -15,7 +15,8 @@ var seedFile = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..
 // rather than pausing, as the free offer would by default: a paused database fails the migrations and the demo until
 // the month ends.
 // Locally DbGate runs beside it, to inspect the databases (it is part of the local run only).
-var sql = builder.AddAzureSqlServer("sql").RunAsContainer(container => container.WithDbGate())
+// SQL Server takes the memory the machine has unless told otherwise, and a test run starts several AppHosts, so the container is held to 1 GB.
+var sql = builder.AddAzureSqlServer("sql").RunAsContainer(container => container.WithDbGate().WithEnvironment("MSSQL_MEMORY_LIMIT_MB", "1024"))
     .ConfigureInfrastructure(infrastructure =>
     {
         foreach (var database in infrastructure.GetProvisionableResources().OfType<SqlDatabase>())

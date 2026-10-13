@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -594,9 +595,13 @@ public sealed partial class ReportingPathTests(DriverAppFixture driverApp)
 
     private static string DecodeToken(string value) => WebUtility.HtmlDecode(value);
 
+    // Loading a schema registers it by its id in a registry shared by the whole process, which refuses a second registration. Tests run in
+    // parallel, so each schema is loaded once.
+    private static readonly ConcurrentDictionary<string, Lazy<JsonSchema>> Schemas = new();
+
     private static EvaluationResults Validate(string schemaFile, JsonNode body)
     {
-        var schema = JsonSchema.FromFile(Path.Combine(AppContext.BaseDirectory, "Contracts", schemaFile));
+        var schema = Schemas.GetOrAdd(schemaFile, file => new Lazy<JsonSchema>(() => JsonSchema.FromFile(Path.Combine(AppContext.BaseDirectory, "Contracts", file)))).Value;
         return schema.Evaluate(JsonSerializer.SerializeToElement(body), new EvaluationOptions { OutputFormat = OutputFormat.List, RequireFormatValidation = true });
     }
 
