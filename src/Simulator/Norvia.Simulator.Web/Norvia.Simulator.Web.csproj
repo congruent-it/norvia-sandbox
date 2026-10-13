@@ -9,6 +9,7 @@
     <ProjectReference Include="..\Norvia.Simulator.Infrastructure\Norvia.Simulator.Infrastructure.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="Norvia.Simulator.Web.IntegrationTests" />
     <InternalsVisibleTo Include="Norvia.Simulator.Web.UnitTests" />
   </ItemGroup>
 
