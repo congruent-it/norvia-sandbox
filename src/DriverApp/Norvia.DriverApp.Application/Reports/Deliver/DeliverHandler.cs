@@ -42,7 +42,7 @@ public sealed class DeliverHandler(
         }
 
         var condition = command.Condition is { } given ? (DeliveryCondition?)(given == DeliveryConditionDto.Reservations ? DeliveryCondition.Reservations : DeliveryCondition.Clean) : null;
-        var reservations = condition == DeliveryCondition.Reservations ? command.Remark?.Trim() : null;
+        var reservations = ProofOfDeliveryRules.ReservationsRemark(condition, command.Remark);
         switch (StopReportRules.Decide(status, ReportKind.Delivered, reservations))
         {
             case StopReportDecision.Invalid invalid:
@@ -72,6 +72,7 @@ public sealed class DeliverHandler(
 
         // The Driver app's own ID for the Proof of delivery is the ID of its report, which is unique and names the files in the container.
         var documentId = delivered.ProofOfDelivery.Id.Value.ToString();
+        // The form was checked above, so the signature, the name and the condition are there.
         var files = await StoreFilesAsync(documentId, command, cancellationToken);
         var location = new StopLocationV1(details.Address!.City!, details.Address.Postcode!, details.Address.Country!);
 
@@ -89,8 +90,8 @@ public sealed class DeliverHandler(
     private async Task<IReadOnlyList<ProofOfDeliveryFileV1>> StoreFilesAsync(string documentId, DeliverCommand command, CancellationToken cancellationToken)
     {
         var files = new List<ProofOfDeliveryFileV1>();
-        var given = new List<(string Name, ProofFile File)> { ("signature.png", command.Signature!) };
-        given.AddRange(command.Photos.Select((photo, index) => ($"photo-{index + 1}{(photo.ContentType == ProofOfDeliveryRules.PngContentType ? ".png" : ".jpg")}", photo)));
+        var given = new List<(string Name, ProofFile File)> { (ProofOfDeliveryRules.SignatureName, command.Signature!) };
+        given.AddRange(command.Photos.Select((photo, index) => (ProofOfDeliveryRules.PhotoName(index + 1, photo.ContentType), photo)));
 
         foreach (var (name, file) in given)
         {

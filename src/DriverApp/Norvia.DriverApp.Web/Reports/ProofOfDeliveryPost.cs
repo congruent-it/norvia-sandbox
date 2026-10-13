@@ -7,7 +7,7 @@ namespace Norvia.DriverApp.Web.Reports;
 /// What the Proof of delivery form posts, read into what the Deliver command takes. The signature is drawn on a canvas and posted as a PNG data URL; the photos are
 /// files. The form carries no Driver ID: it comes from the token (ADR 0005).
 /// </summary>
-internal sealed record ProofOfDeliveryForm(string? ReceivedBy, DeliveryConditionDto? Condition, string? Remark, ProofFile? Signature, IReadOnlyList<ProofFile> Photos)
+internal sealed record ProofOfDeliveryPost(string? ReceivedBy, DeliveryConditionDto? Condition, string? Remark, ProofFile? Signature, IReadOnlyList<ProofFile> Photos)
 {
     /// <summary>The signature and the most photos at the most each can be, with room for the fields.</summary>
     public const long MaximumRequestBytes = (DeliverCommand.MaximumPhotos + 1) * DeliverCommand.MaximumFileBytes + (1024 * 1024);
@@ -15,7 +15,7 @@ internal sealed record ProofOfDeliveryForm(string? ReceivedBy, DeliveryCondition
     private const string PngDataUrlPrefix = "data:image/png;base64,";
 
     /// <returns>The form, or null when a file is over the limit, which is not read.</returns>
-    public static async Task<ProofOfDeliveryForm?> ReadAsync(IFormCollection form, CancellationToken cancellationToken)
+    public static async Task<ProofOfDeliveryPost?> ReadAsync(IFormCollection form, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(form);
 
@@ -33,7 +33,7 @@ internal sealed record ProofOfDeliveryForm(string? ReceivedBy, DeliveryCondition
             photos.Add(new ProofFile(file.ContentType, content.ToArray()));
         }
 
-        return new ProofOfDeliveryForm(
+        return new ProofOfDeliveryPost(
             form["receivedBy"].ToString(),
             form["condition"].ToString().ToLower(CultureInfo.InvariantCulture) switch
             {

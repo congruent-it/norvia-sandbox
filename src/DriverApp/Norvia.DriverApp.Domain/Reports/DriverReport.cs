@@ -78,10 +78,6 @@ public sealed class DriverReport : EntityBase<ReportId>, IAggregateRoot
     public static DriverReport ReportStop(ReportId id, ReportKind kind, StopRef stop, ReportOrigin origin, string? remark)
     {
         ArgumentNullException.ThrowIfNull(origin);
-        ArgumentException.ThrowIfNullOrWhiteSpace(stop.ShipmentNumber);
-        ArgumentException.ThrowIfNullOrWhiteSpace(origin.DriverId.Value);
-        ArgumentOutOfRangeException.ThrowIfLessThan(origin.VersionHeld, 1);
-        ArgumentException.ThrowIfNullOrWhiteSpace(origin.CorrelationId);
         if (kind is ReportKind.StartTrip or ReportKind.Delivered or ReportKind.ProofOfDelivery)
         {
             throw new ArgumentException($"{kind} is not a report on a Stop made on its own.", nameof(kind));
@@ -97,20 +93,7 @@ public sealed class DriverReport : EntityBase<ReportId>, IAggregateRoot
             ArgumentException.ThrowIfNullOrWhiteSpace(remark);
         }
 
-        return new DriverReport
-        {
-            Id = id,
-            Kind = kind,
-            TripNumber = origin.TripNumber,
-            ShipmentNumber = stop.ShipmentNumber,
-            Stop = stop.Kind,
-            DriverId = origin.DriverId,
-            VersionHeld = origin.VersionHeld,
-            EventTime = origin.EventTime,
-            CorrelationId = origin.CorrelationId,
-            Remark = string.IsNullOrWhiteSpace(remark) ? null : remark,
-            State = ReportState.Sending,
-        };
+        return Of(id, kind, stop, origin, remark);
     }
 
     /// <summary>

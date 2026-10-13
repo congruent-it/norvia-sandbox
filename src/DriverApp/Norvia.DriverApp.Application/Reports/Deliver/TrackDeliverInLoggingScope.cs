@@ -39,9 +39,9 @@ public sealed partial class TrackDeliverInLoggingScope(ILogger<TrackDeliverInLog
         {
             var code = result.Status switch
             {
-                ResultStatus.NotFound => "StopNotFound",
-                ResultStatus.Invalid => "ProofOfDeliveryInvalid",
-                _ => "StopNotAvailable",
+                ResultStatus.NotFound => TrackingFailureCodes.StopNotFound,
+                ResultStatus.Invalid => TrackingFailureCodes.ProofOfDeliveryInvalid,
+                _ => TrackingFailureCodes.StopNotAvailable,
             };
             using var refused = logger.Track(new() { [TrackingKeys.Outcome] = TrackingKeys.Refused, [TrackingKeys.FailureCode] = code });
             LogRefused(logger, message.ShipmentNumber, message.TripNumber, code);

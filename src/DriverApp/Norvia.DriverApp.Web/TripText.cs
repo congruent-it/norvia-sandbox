@@ -1,5 +1,6 @@
 using System.Globalization;
 using Norvia.DriverApp.Application.Reports;
+using Norvia.DriverApp.Application.Reports.Deliver;
 using Norvia.DriverApp.Application.Reports.ReportStop;
 using Norvia.DriverApp.Application.Trips;
 
@@ -61,10 +62,10 @@ internal static class TripText
     public static string Problem(string? identifier) => identifier switch
     {
         "remark" => $"Say what happened: a remark is required, up to {ReportStopCommand.MaximumRemarkLength} characters, and with reservations the remark says which.",
-        "receivedBy" => "Say who received the goods, up to 200 characters.",
+        "receivedBy" => $"Say who received the goods, up to {DeliverCommand.MaximumReceivedByLength} characters.",
         "condition" => "Say whether the goods were received clean or with reservations.",
         "signature" => "The Consignee has to sign: draw the signature before you deliver.",
-        "photos" => "Photos are at most 4 JPEG or PNG files of at most 10 MB each.",
+        "photos" => $"Photos are at most {DeliverCommand.MaximumPhotos} JPEG or PNG files of at most {DeliverCommand.MaximumFileBytes / (1024 * 1024)} MB each.",
         "address" => "This Stop has no complete address to report from. Call the Planner.",
         _ => "That report couldn't be made.",
     };

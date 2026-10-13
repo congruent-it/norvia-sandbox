@@ -10,7 +10,7 @@ public static class ProofOfDeliveryRules
     public const int MaximumPhotos = 4;
 
     /// <summary>P6's limit for one file.</summary>
-    public const long MaximumFileBytes = 10 * 1024 * 1024;
+    public const long MaximumFileBytes = MaximumFileMegabytes * 1024 * 1024;
 
     /// <summary>The longest name the TMS keeps of the person who signed.</summary>
     public const int MaximumReceivedByLength = 200;
@@ -18,6 +18,17 @@ public static class ProofOfDeliveryRules
     public const string PngContentType = "image/png";
 
     public const string JpegContentType = "image/jpeg";
+
+    public const string SignatureName = "signature.png";
+
+    private const int MaximumFileMegabytes = 10;
+
+    /// <summary>What the Driver says of the reservations: only with reservations, and trimmed. A remark on a clean delivery is not kept.</summary>
+    public static string? ReservationsRemark(DeliveryCondition? condition, string? remark) =>
+        condition == DeliveryCondition.Reservations ? remark?.Trim() : null;
+
+    /// <summary>The name a photo gets in the Proof of delivery, by its place in the form and what it is: the device's own file name is never used.</summary>
+    public static string PhotoName(int number, string contentType) => $"photo-{number}{(contentType == PngContentType ? ".png" : ".jpg")}";
 
     public static IReadOnlyList<StopReportProblem> Check(ProofOfDeliveryForm form)
     {
@@ -53,7 +64,7 @@ public static class ProofOfDeliveryRules
         }
         else if (form.Signature.ContentType != PngContentType || form.Signature.SizeBytes > MaximumFileBytes)
         {
-            problems.Add(new("signature", "The signature must be a PNG of at most 10 MB."));
+            problems.Add(new("signature", $"The signature must be a PNG of at most {MaximumFileMegabytes} MB."));
         }
 
         if (form.Photos.Count > MaximumPhotos)
@@ -62,7 +73,7 @@ public static class ProofOfDeliveryRules
         }
         else if (form.Photos.Any(photo => photo.ContentType is not (JpegContentType or PngContentType) || photo.SizeBytes == 0 || photo.SizeBytes > MaximumFileBytes))
         {
-            problems.Add(new("photos", "A photo must be a JPEG or a PNG of at most 10 MB."));
+            problems.Add(new("photos", $"A photo must be a JPEG or a PNG of at most {MaximumFileMegabytes} MB."));
         }
 
         return problems;

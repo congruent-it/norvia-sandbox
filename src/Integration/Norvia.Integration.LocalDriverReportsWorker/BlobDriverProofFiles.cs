@@ -4,21 +4,6 @@ using Microsoft.Extensions.Options;
 
 namespace Norvia.Integration.LocalDriverReportsWorker;
 
-/// <summary>A file of a Proof of delivery as the event names it: the claim check of ADR 0009.</summary>
-internal sealed record ProofFileReference(string Name, string ContentType, string BlobReference);
-
-/// <summary>A file fetched from the transit container, ready to be a part of the TMS's multipart call.</summary>
-internal sealed record FetchedProofFile(string Name, string ContentType, byte[] Content);
-
-/// <summary>The Driver app's transit container for the files of a Proof of delivery, as the Driver reports Logic App reaches it: fetch the files, delete them once the TMS accepted.</summary>
-internal interface IDriverProofFiles
-{
-    /// <returns>The files in the order the event names them, or null when any of them is gone.</returns>
-    Task<IReadOnlyList<FetchedProofFile>?> FetchAsync(IReadOnlyList<ProofFileReference> files, CancellationToken cancellationToken);
-
-    Task DeleteAsync(IReadOnlyList<ProofFileReference> files, CancellationToken cancellationToken);
-}
-
 /// <summary>The transit container on Azurite, or on a storage account when the worker is pointed at one.</summary>
 internal sealed partial class BlobDriverProofFiles(BlobServiceClient blobService, IOptions<DriverReportsWorkerOptions> options, ILogger<BlobDriverProofFiles> logger) : IDriverProofFiles
 {
