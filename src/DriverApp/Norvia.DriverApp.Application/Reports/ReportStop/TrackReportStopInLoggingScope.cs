@@ -23,6 +23,7 @@ public sealed partial class TrackReportStopInLoggingScope(ILogger<TrackReportSto
         {
             [TrackingKeys.Flow] = Flows.TripExecution,
             [TrackingKeys.TripNumber] = message.TripNumber,
+            [TrackingKeys.ShipmentNumber] = message.ShipmentNumber,
             [TrackingKeys.PartyId] = message.DriverId,
         });
         var result = await next(message, cancellationToken);

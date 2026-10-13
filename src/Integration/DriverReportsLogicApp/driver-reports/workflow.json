@@ -44,6 +44,7 @@
           "flow": "trip-execution",
           "partyId": "@action()?['inputs']?['partyId']",
           "tripNumber": "@action()?['inputs']?['tripNumber']",
+          "shipmentNumber": "@action()?['inputs']?['shipmentNumber']",
           "sourceMessageId": "@action()?['inputs']?['sourceMessageId']"
         }
       },
@@ -122,6 +123,7 @@
               "flow": "trip-execution",
               "partyId": "@outputs('Track_the_report')?['partyId']",
               "tripNumber": "@outputs('Track_the_report')?['tripNumber']",
+              "shipmentNumber": "@outputs('Track_the_report')?['shipmentNumber']",
               "sourceMessageId": "@outputs('Track_the_report')?['sourceMessageId']",
               "outcome": "@if(and(greaterOrEquals(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
               "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 500)), 'TmsUnavailable', 'TmsCallRefused'))"
@@ -189,6 +191,7 @@
                   "flow": "trip-execution",
                   "partyId": "@outputs('Track_the_report')?['partyId']",
                   "tripNumber": "@outputs('Track_the_report')?['tripNumber']",
+                  "shipmentNumber": "@outputs('Track_the_report')?['shipmentNumber']",
                   "sourceMessageId": "@outputs('Track_the_report')?['sourceMessageId']",
                   "outcome": "@if(and(greaterOrEquals(coalesce(actions('Report_recorded')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_recorded')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
                   "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Report_recorded')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_recorded')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Report_recorded')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Report_recorded')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Report_recorded')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Report_recorded')?['outputs']?['statusCode'], 0), 500)), 'DriverAppUnavailable', 'DriverAppRefused'))"
@@ -227,6 +230,7 @@
                         "flow": "trip-execution",
                         "partyId": "@outputs('Track_the_report')?['partyId']",
                         "tripNumber": "@outputs('Track_the_report')?['tripNumber']",
+                        "shipmentNumber": "@outputs('Track_the_report')?['shipmentNumber']",
                         "sourceMessageId": "@outputs('Track_the_report')?['sourceMessageId']",
                         "outcome": "DeadLettered",
                         "failureCode": "TmsUnavailable"
@@ -272,6 +276,7 @@
                         "flow": "trip-execution",
                         "partyId": "@outputs('Track_the_report')?['partyId']",
                         "tripNumber": "@outputs('Track_the_report')?['tripNumber']",
+                        "shipmentNumber": "@outputs('Track_the_report')?['shipmentNumber']",
                         "sourceMessageId": "@outputs('Track_the_report')?['sourceMessageId']",
                         "outcome": "@if(and(greaterOrEquals(coalesce(actions('Report_not_recorded')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_not_recorded')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
                         "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Report_not_recorded')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_not_recorded')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Report_not_recorded')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Report_not_recorded')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Report_not_recorded')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Report_not_recorded')?['outputs']?['statusCode'], 0), 500)), 'DriverAppUnavailable', 'DriverAppRefused'))"
@@ -301,6 +306,7 @@
                           "flow": "trip-execution",
                           "partyId": "@outputs('Track_the_report')?['partyId']",
                           "tripNumber": "@outputs('Track_the_report')?['tripNumber']",
+                          "shipmentNumber": "@outputs('Track_the_report')?['shipmentNumber']",
                           "sourceMessageId": "@outputs('Track_the_report')?['sourceMessageId']",
                           "outcome": "DeadLettered",
                           "failureCode": "@coalesce(outputs('Send_the_report_to_the_TMS')?['body']?['code'], 'TmsCallRefused')"
@@ -346,6 +352,7 @@
                           "flow": "trip-execution",
                           "partyId": "@outputs('Track_the_report')?['partyId']",
                           "tripNumber": "@outputs('Track_the_report')?['tripNumber']",
+                          "shipmentNumber": "@outputs('Track_the_report')?['shipmentNumber']",
                           "sourceMessageId": "@outputs('Track_the_report')?['sourceMessageId']",
                           "outcome": "@if(and(greaterOrEquals(coalesce(actions('Report_refused')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_refused')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
                           "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Report_refused')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_refused')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Report_refused')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Report_refused')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Report_refused')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Report_refused')?['outputs']?['statusCode'], 0), 500)), 'DriverAppUnavailable', 'DriverAppRefused'))"
@@ -389,6 +396,7 @@
                 "flow": "trip-execution",
                 "partyId": "@outputs('Track_the_report')?['partyId']",
                 "tripNumber": "@outputs('Track_the_report')?['tripNumber']",
+                "shipmentNumber": "@outputs('Track_the_report')?['shipmentNumber']",
                 "sourceMessageId": "@outputs('Track_the_report')?['sourceMessageId']",
                 "outcome": "DeadLettered",
                 "failureCode": "DriverReportUnreadable"

@@ -23,6 +23,7 @@ internal sealed record DriverReport(string EventId, string CorrelationId, string
         [TrackingKeys.PartyId] = DriverId,
         [TrackingKeys.TripNumber] = TripNumber,
         [TrackingKeys.SourceMessageId] = EventId,
+        ["shipmentNumber"] = Stop?.ShipmentNumber,
     };
 
     /// <summary>The report the message holds, or null when it isn't one the TMS can be asked to record.</summary>
