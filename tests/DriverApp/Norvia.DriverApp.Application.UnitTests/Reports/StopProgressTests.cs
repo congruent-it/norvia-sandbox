@@ -24,7 +24,7 @@ public sealed class StopProgressTests
     private DriverReport Report(ReportKind kind, StopKind stop, string shipment, ReportState state = ReportState.Recorded, int minutes = 1)
     {
         var at = _world.Time.GetUtcNow().AddMinutes(minutes);
-        var report = DriverReport.ReportStop(new ReportId(Guid.NewGuid()), kind, ReportsWorld.TripToday, shipment, stop, ReportsWorld.Joost, 3, at, "corr", kind == ReportKind.Collected ? null : "A remark");
+        var report = DriverReport.ReportStop(new ReportId(Guid.NewGuid()), kind, new StopRef(shipment, stop), new ReportOrigin(ReportsWorld.TripToday, ReportsWorld.Joost, 3, at, "corr"), kind == ReportKind.Collected ? null : "A remark");
         _ = state switch
         {
             ReportState.Recorded => report.Record(at),

@@ -10,7 +10,7 @@ public sealed class StopReportTests
 
     private static DriverReport Report(ReportKind kind, StopKind stop, string? remark = null) =>
         DriverReport.ReportStop(
-            new ReportId(Guid.NewGuid()), kind, new TripNumber("TR-0000012"), "SH-0000007", stop, new DriverId("DRV-0002"), 2, Pressed, "corr-1", remark);
+            new ReportId(Guid.NewGuid()), kind, new StopRef("SH-0000007", stop), new ReportOrigin(new TripNumber("TR-0000012"), new DriverId("DRV-0002"), 2, Pressed, "corr-1"), remark);
 
     [Fact]
     public void AStopReport_IsSending_AndKeepsTheShipmentTheStopAndTheRemark()
@@ -35,11 +35,11 @@ public sealed class StopReportTests
     [InlineData(ReportKind.Damaged, StopKind.Collection, false)]
     [InlineData(ReportKind.Damaged, StopKind.Delivery, false)]
     public void OnlyTheReportsThatCompleteAStop_GiveItAnOutcome(ReportKind kind, StopKind stop, bool givesAnOutcome) =>
-        Report(kind, stop, "remark").GivesStopAnOutcome.Should().Be(givesAnOutcome);
+        Report(kind, stop, "remark").CompletesStop.Should().Be(givesAnOutcome);
 
     [Fact]
     public void AStartTrip_GivesNoStopAnOutcome() =>
-        DriverReport.StartTrip(new ReportId(Guid.NewGuid()), new TripNumber("TR-0000012"), new DriverId("DRV-0002"), 1, Pressed, "c").GivesStopAnOutcome.Should().BeFalse();
+        DriverReport.StartTrip(new ReportId(Guid.NewGuid()), new TripNumber("TR-0000012"), new DriverId("DRV-0002"), 1, Pressed, "c").CompletesStop.Should().BeFalse();
 
     [Theory]
     [InlineData(ReportKind.CollectionFailed, StopKind.Collection)]
@@ -79,7 +79,7 @@ public sealed class StopReportTests
     public void AStopReport_WithoutAShipment_IsABug()
     {
         Action noShipment = () => DriverReport.ReportStop(
-            new ReportId(Guid.NewGuid()), ReportKind.Collected, new TripNumber("TR-0000012"), " ", StopKind.Collection, new DriverId("DRV-0002"), 2, Pressed, "c", null);
+            new ReportId(Guid.NewGuid()), ReportKind.Collected, new StopRef(" ", StopKind.Collection), new ReportOrigin(new TripNumber("TR-0000012"), new DriverId("DRV-0002"), 2, Pressed, "c"), null);
 
         noShipment.Should().Throw<ArgumentException>();
     }

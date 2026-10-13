@@ -5,6 +5,7 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Norvia.DriverApp.Web.IntegrationTests" />
+    <InternalsVisibleTo Include="Norvia.DriverApp.Web.UnitTests" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Norvia.ServiceDefaults\Norvia.ServiceDefaults.csproj" />

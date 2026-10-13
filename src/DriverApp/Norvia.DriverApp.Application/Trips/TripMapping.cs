@@ -40,15 +40,7 @@ internal static class TripMapping
 
     public static TripReportView ToView(this DriverReportRow row) => new(
         row.Id.Value,
-        row.Kind switch
-        {
-            ReportKind.StartTrip => ReportKindDto.StartTrip,
-            ReportKind.Collected => ReportKindDto.Collected,
-            ReportKind.CollectionFailed => ReportKindDto.CollectionFailed,
-            ReportKind.DeliveryFailed => ReportKindDto.DeliveryFailed,
-            ReportKind.Damaged => ReportKindDto.Damaged,
-            _ => throw new ArgumentOutOfRangeException(nameof(row), row.Kind, "A kind of report with no view."),
-        },
+        row.Kind.ToDto(),
         row.State switch
         {
             ReportState.Sending => ReportStateDto.Sending,
@@ -67,7 +59,7 @@ internal static class TripMapping
     public static DriverTripView ToView(this DriverTripRow row, IReadOnlyList<DriverReportRow> reports, DateOnly today)
     {
         // The TMS decides whether the Trip started; the Driver app shows it started once the TMS has said so.
-        var started = StopProgress.IsStarted(reports);
+        var started = TripProgress.IsStarted(reports);
         var waiting = reports.Any(report => report.Kind == ReportKind.StartTrip && report.State == ReportState.Sending);
         return new DriverTripView(
             row.TripNumber.Value,

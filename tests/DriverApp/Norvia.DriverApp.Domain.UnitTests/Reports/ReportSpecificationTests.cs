@@ -32,7 +32,7 @@ public sealed class ReportSpecificationTests
 
     private static DriverReport Stop(string trip, string shipment, StopKind stop, ReportKind kind, Action<DriverReport>? then = null)
     {
-        var report = DriverReport.ReportStop(new ReportId(Guid.NewGuid()), kind, new TripNumber(trip), shipment, stop, new DriverId("DRV-0002"), 1, Pressed, "corr", "remark");
+        var report = DriverReport.ReportStop(new ReportId(Guid.NewGuid()), kind, new StopRef(shipment, stop), new ReportOrigin(new TripNumber(trip), new DriverId("DRV-0002"), 1, Pressed, "corr"), "remark");
         then?.Invoke(report);
         return report;
     }

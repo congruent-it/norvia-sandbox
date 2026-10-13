@@ -29,7 +29,7 @@ public sealed class ReportStopHandlerTests
     private DriverReport Seed(ReportKind kind, StopKind stop, string shipment = "SH-0000001", ReportState state = ReportState.Recorded)
     {
         var report = DriverReport.ReportStop(
-            new ReportId(Guid.NewGuid()), kind, ReportsWorld.TripToday, shipment, stop, ReportsWorld.Joost, 3, _world.Time.GetUtcNow(), "corr", kind == ReportKind.Collected ? null : "remark");
+            new ReportId(Guid.NewGuid()), kind, new StopRef(shipment, stop), new ReportOrigin(ReportsWorld.TripToday, ReportsWorld.Joost, 3, _world.Time.GetUtcNow(), "corr"), kind == ReportKind.Collected ? null : "remark");
         _ = state switch
         {
             ReportState.Recorded => report.Record(_world.Time.GetUtcNow()),

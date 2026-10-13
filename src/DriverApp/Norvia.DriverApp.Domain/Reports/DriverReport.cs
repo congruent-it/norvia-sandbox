@@ -52,9 +52,9 @@ public sealed class DriverReport : EntityBase<ReportId>, IAggregateRoot
     public bool IsActiveStart => Kind == ReportKind.StartTrip && State is ReportState.Sending or ReportState.Recorded;
 
     /// <summary>Whether the report completes a Stop (Collected, Collection failed, Delivery failed). Report damage doesn't.</summary>
-    public bool GivesStopAnOutcome => GivesAStopAnOutcome(Kind);
+    public bool CompletesStop => CompletesAStop(Kind);
 
-    public static bool GivesAStopAnOutcome(ReportKind kind) => kind is ReportKind.Collected or ReportKind.CollectionFailed or ReportKind.DeliveryFailed;
+    public static bool CompletesAStop(ReportKind kind) => kind is ReportKind.Collected or ReportKind.CollectionFailed or ReportKind.DeliveryFailed;
 
     public static DriverReport StartTrip(ReportId id, TripNumber tripNumber, DriverId driverId, int versionHeld, DateTimeOffset eventTime, string correlationId)
     {
@@ -75,30 +75,24 @@ public sealed class DriverReport : EntityBase<ReportId>, IAggregateRoot
     }
 
     /// <summary>The Driver completes a Stop with a Collected, Collection failed or Delivery failed, or reports damage at a Stop of any kind.</summary>
-    public static DriverReport ReportStop(
-        ReportId id, ReportKind kind, TripNumber tripNumber, string shipmentNumber, StopKind stop, DriverId driverId, int versionHeld, DateTimeOffset eventTime, string correlationId, string? remark)
+    public static DriverReport ReportStop(ReportId id, ReportKind kind, StopRef stop, ReportOrigin origin, string? remark)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(shipmentNumber);
-        ArgumentException.ThrowIfNullOrWhiteSpace(driverId.Value);
-        ArgumentOutOfRangeException.ThrowIfLessThan(versionHeld, 1);
-        ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
+        ArgumentNullException.ThrowIfNull(origin);
+        ArgumentException.ThrowIfNullOrWhiteSpace(stop.ShipmentNumber);
+        ArgumentException.ThrowIfNullOrWhiteSpace(origin.DriverId.Value);
+        ArgumentOutOfRangeException.ThrowIfLessThan(origin.VersionHeld, 1);
+        ArgumentException.ThrowIfNullOrWhiteSpace(origin.CorrelationId);
         if (kind == ReportKind.StartTrip)
         {
             throw new ArgumentException("A Start Trip is not a Stop report.", nameof(kind));
         }
 
-        var fits = kind switch
+        if (!StopReportRules.Fits(kind, stop.Kind))
         {
-            ReportKind.Collected or ReportKind.CollectionFailed => stop == StopKind.Collection,
-            ReportKind.DeliveryFailed => stop == StopKind.Delivery,
-            _ => true,
-        };
-        if (!fits)
-        {
-            throw new ArgumentException($"{kind} is not reported on a {stop} Stop.", nameof(stop));
+            throw new ArgumentException($"{kind} is not reported on a {stop.Kind} Stop.", nameof(stop));
         }
 
-        if (kind != ReportKind.Collected)
+        if (StopReportRules.NeedsRemark(kind))
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(remark);
         }
@@ -107,13 +101,13 @@ public sealed class DriverReport : EntityBase<ReportId>, IAggregateRoot
         {
             Id = id,
             Kind = kind,
-            TripNumber = tripNumber,
-            ShipmentNumber = shipmentNumber,
-            Stop = stop,
-            DriverId = driverId,
-            VersionHeld = versionHeld,
-            EventTime = eventTime,
-            CorrelationId = correlationId,
+            TripNumber = origin.TripNumber,
+            ShipmentNumber = stop.ShipmentNumber,
+            Stop = stop.Kind,
+            DriverId = origin.DriverId,
+            VersionHeld = origin.VersionHeld,
+            EventTime = origin.EventTime,
+            CorrelationId = origin.CorrelationId,
             Remark = string.IsNullOrWhiteSpace(remark) ? null : remark,
             State = ReportState.Sending,
         };

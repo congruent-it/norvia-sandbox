@@ -19,5 +19,5 @@ public sealed record DriverReportRow(
     DateTimeOffset? OutcomeAt)
 {
     /// <summary>Whether the report completes a Stop, whatever became of it.</summary>
-    public bool GivesStopAnOutcome => DriverReport.GivesAStopAnOutcome(Kind);
+    public bool CompletesStop => DriverReport.CompletesAStop(Kind);
 }

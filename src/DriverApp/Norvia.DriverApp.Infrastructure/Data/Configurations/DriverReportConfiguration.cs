@@ -11,7 +11,7 @@ internal sealed class DriverReportConfiguration : IEntityTypeConfiguration<Drive
     {
         builder.ToTable("DriverReports");
         builder.Ignore(report => report.IsActiveStart);
-        builder.Ignore(report => report.GivesStopAnOutcome);
+        builder.Ignore(report => report.CompletesStop);
 
         // The key is the Driver app event ID, which names the report to the Logic App and the TMS.
         builder.HasKey(report => report.Id);
@@ -22,7 +22,7 @@ internal sealed class DriverReportConfiguration : IEntityTypeConfiguration<Drive
         builder.Property(report => report.TripNumber).HasMaxLength(16).HasConversion(number => number.Value, value => new TripNumber(value));
         builder.Property(report => report.ShipmentNumber).HasMaxLength(16);
         builder.Property(report => report.Stop).HasConversion<string>().HasMaxLength(16);
-        builder.Property(report => report.Remark).HasMaxLength(500);
+        builder.Property(report => report.Remark).HasMaxLength(StopReportRules.MaximumRemarkLength);
         builder.Property(report => report.DriverId).HasMaxLength(32).HasConversion(id => id.Value, value => new DriverId(value));
         builder.Property(report => report.CorrelationId).HasMaxLength(128);
         builder.Property(report => report.State).HasConversion<string>().HasMaxLength(20);

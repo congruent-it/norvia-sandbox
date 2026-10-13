@@ -1,7 +1,8 @@
+@using Norvia.DriverApp.Application.Reports.ReportStop
 @* A report that needs the Driver's words: a failure, or damage. Plain form post. *@
 <form method="post" action="@Action" aria-label="@Label" class="remark-form">
     <AntiforgeryToken />
-    <FluentTextArea Name="remark" Label="@($"{Label}: what happened?")" Required="true" MaxLength="500" Rows="3" />
+    <FluentTextArea Name="remark" Label="@($"{Label}: what happened?")" Required="true" MaxLength="@ReportStopCommand.MaximumRemarkLength" Rows="3" />
     <FluentButton Type="ButtonType.Submit" Appearance="@(Lightweight ? Appearance.Neutral : Appearance.Accent)">@Label</FluentButton>
 </form>
 

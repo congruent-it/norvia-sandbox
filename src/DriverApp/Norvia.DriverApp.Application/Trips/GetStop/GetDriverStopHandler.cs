@@ -26,6 +26,6 @@ public sealed class GetDriverStopHandler(IReadRepository<DriverTrip> trips, IRea
             return null;
         }
 
-        return new DriverStopView(trip.Id.Value, trip.Version, StopProgress.IsStarted(held) ? TripMapping.InProgressStatus : TripMapping.DispatchedStatus, trip.Details.Day, found);
+        return new DriverStopView(trip.Id.Value, trip.Version, TripProgress.IsStarted(held) ? TripMapping.InProgressStatus : TripMapping.DispatchedStatus, trip.Details.Day, found);
     }
 }

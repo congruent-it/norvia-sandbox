@@ -1,5 +1,6 @@
 using System.Globalization;
 using Norvia.DriverApp.Application.Reports;
+using Norvia.DriverApp.Application.Reports.ReportStop;
 using Norvia.DriverApp.Application.Trips;
 
 namespace Norvia.DriverApp.Web;
@@ -57,7 +58,7 @@ internal static class TripText
 
     public static string Problem(string? identifier) => identifier switch
     {
-        "remark" => "Say what happened: a remark is required, up to 500 characters.",
+        "remark" => $"Say what happened: a remark is required, up to {ReportStopCommand.MaximumRemarkLength} characters.",
         "address" => "This Stop has no complete address to report from. Call the Planner.",
         _ => "That report couldn't be made.",
     };
