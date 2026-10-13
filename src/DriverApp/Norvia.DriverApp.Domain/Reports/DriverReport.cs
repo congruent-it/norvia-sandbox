@@ -18,10 +18,10 @@ public sealed class DriverReport : EntityBase<ReportId>, IAggregateRoot
 
     public TripNumber TripNumber { get; private set; }
 
-    /// <summary>The Shipment a Stop report is about; null for a Start Trip.</summary>
+    /// <summary>The Shipment a Stop report is about; null for a Start Trip or an End Trip.</summary>
     public string? ShipmentNumber { get; private set; }
 
-    /// <summary>The Stop of that Shipment a Stop report is about; null for a Start Trip.</summary>
+    /// <summary>The Stop of that Shipment a Stop report is about; null for a Start Trip or an End Trip.</summary>
     public StopKind? Stop { get; private set; }
 
     /// <summary>What the Driver said about a Stop report: required for a failure or damage.</summary>
@@ -56,7 +56,14 @@ public sealed class DriverReport : EntityBase<ReportId>, IAggregateRoot
 
     public static bool CompletesAStop(ReportKind kind) => kind is ReportKind.Collected or ReportKind.CollectionFailed or ReportKind.Delivered or ReportKind.DeliveryFailed;
 
-    public static DriverReport StartTrip(ReportId id, TripNumber tripNumber, DriverId driverId, int versionHeld, DateTimeOffset eventTime, string correlationId)
+    public static DriverReport StartTrip(ReportId id, TripNumber tripNumber, DriverId driverId, int versionHeld, DateTimeOffset eventTime, string correlationId) =>
+        OfTrip(id, ReportKind.StartTrip, tripNumber, driverId, versionHeld, eventTime, correlationId);
+
+    /// <summary>The Driver ends the Trip once every Stop has an outcome. The TMS decides all the same.</summary>
+    public static DriverReport EndTrip(ReportId id, TripNumber tripNumber, DriverId driverId, int versionHeld, DateTimeOffset eventTime, string correlationId) =>
+        OfTrip(id, ReportKind.EndTrip, tripNumber, driverId, versionHeld, eventTime, correlationId);
+
+    private static DriverReport OfTrip(ReportId id, ReportKind kind, TripNumber tripNumber, DriverId driverId, int versionHeld, DateTimeOffset eventTime, string correlationId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(driverId.Value);
         ArgumentOutOfRangeException.ThrowIfLessThan(versionHeld, 1);
@@ -64,7 +71,7 @@ public sealed class DriverReport : EntityBase<ReportId>, IAggregateRoot
         return new DriverReport
         {
             Id = id,
-            Kind = ReportKind.StartTrip,
+            Kind = kind,
             TripNumber = tripNumber,
             DriverId = driverId,
             VersionHeld = versionHeld,
@@ -78,7 +85,7 @@ public sealed class DriverReport : EntityBase<ReportId>, IAggregateRoot
     public static DriverReport ReportStop(ReportId id, ReportKind kind, StopRef stop, ReportOrigin origin, string? remark)
     {
         ArgumentNullException.ThrowIfNull(origin);
-        if (kind is ReportKind.StartTrip or ReportKind.Delivered or ReportKind.ProofOfDelivery)
+        if (kind is ReportKind.StartTrip or ReportKind.EndTrip or ReportKind.Delivered or ReportKind.ProofOfDelivery)
         {
             throw new ArgumentException($"{kind} is not a report on a Stop made on its own.", nameof(kind));
         }

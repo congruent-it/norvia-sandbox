@@ -9,6 +9,7 @@ internal static class DriverReportsWorkflow
     public const string Tracking = "Track_the_report";
     public const string Check = "Check_the_report";
     public const string BuildTripStart = "Build_the_Trip_start";
+    public const string BuildTripEnd = "Build_the_Trip_end";
     public const string BuildTrackingEvent = "Build_the_Tracking_event";
     public const string InitializeFileParts = "Initialize_the_file_parts";
     public const string FetchFiles = "Fetch_the_files";

@@ -1,4 +1,5 @@
 using Norvia.DriverApp.Application.Reports;
+using Norvia.DriverApp.Application.Reports.EndTrip;
 using Norvia.DriverApp.Domain.Reports;
 using Norvia.DriverApp.Domain.Trips;
 
@@ -9,6 +10,7 @@ internal static class TripMapping
 {
     public const string DispatchedStatus = "Dispatched";
     public const string InProgressStatus = "In progress";
+    public const string CompletedStatus = "Completed";
 
     public static TripStop ToDomain(this StopDto stop) => new(
         stop.Sequence,
@@ -56,15 +58,25 @@ internal static class TripMapping
         row.Stop?.ToDto(),
         row.Remark);
 
+    /// <summary>Whether End Trip is offered on a Trip that is In progress, and if not, what the Driver is told: an End Trip waiting for an answer is shown as a report instead.</summary>
+    private static (bool CanEnd, string? Unavailable) EndOf(TripDetails details, IReadOnlyList<DriverReportRow> reports) => TripEndRules.Decide(details, reports) switch
+    {
+        TripEndDecision.Accept => (true, null),
+        TripEndDecision.StopsOpen => (false, EndTripHandler.StopsOpenText),
+        _ => (false, null),
+    };
+
     public static DriverTripView ToView(this DriverTripRow row, IReadOnlyList<DriverReportRow> reports, DateOnly today)
     {
         // The TMS decides whether the Trip started; the Driver app shows it started once the TMS has said so.
         var started = TripProgress.IsStarted(reports);
         var waiting = reports.Any(report => report.Kind == ReportKind.StartTrip && report.State == ReportState.Sending);
+        var ended = TripProgress.IsEnded(reports);
+        var (canEnd, endUnavailable) = started && !ended ? EndOf(row.Details, reports) : (false, null);
         return new DriverTripView(
             row.TripNumber.Value,
             row.Version,
-            started ? InProgressStatus : DispatchedStatus,
+            ended ? CompletedStatus : started ? InProgressStatus : DispatchedStatus,
             row.DriverId.Value,
             row.Details.DriverName,
             row.Details.Day,
@@ -73,6 +85,8 @@ internal static class TripMapping
             new TripVehicleDto(row.Details.Vehicle.VehicleId, row.Details.Vehicle.Registration, row.Details.Vehicle.VehicleType),
             StopProgress.Of(row.Details, reports),
             !started && !waiting && row.Details.Day == today,
+            canEnd,
+            endUnavailable,
             [.. reports.Select(report => report.ToView())]);
     }
 }

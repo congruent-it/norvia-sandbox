@@ -10,7 +10,7 @@ internal enum DriverReportsRunOutcome
     /// <summary>The TMS recorded or refused the report, or couldn't be reached, and the Driver app was told which.</summary>
     Done,
 
-    /// <summary>The message isn't a <c>TripStartReported</c> or a <c>StopCompletedReported</c> the TMS can be asked to record, so nothing was sent.</summary>
+    /// <summary>The message isn't a <c>TripStartReported</c>, a <c>TripEndReported</c>, a <c>StopCompletedReported</c> or a <c>ProofOfDeliveryCaptured</c> the TMS can be asked to record, so nothing was sent.</summary>
     Unreadable,
 
     /// <summary>The Driver app didn't take the outcome, so the report stays Sending there. The TMS has it anyway.</summary>
@@ -35,7 +35,7 @@ internal sealed partial class DriverReportsFlow(
     TimeProvider time,
     ILogger<DriverReportsFlow> logger)
 {
-    internal const string UnreadableDescription = "The message isn't a Trip start, a Stop report or a Proof of delivery the Driver app made, so nothing was sent to the TMS.";
+    internal const string UnreadableDescription = "The message isn't a Trip start, a Trip end, a Stop report or a Proof of delivery the Driver app made, so nothing was sent to the TMS.";
 
     /// <summary>The longest message the Driver app takes in an outcome report.</summary>
     private const int MaximumMessageLength = 1000;
@@ -151,7 +151,7 @@ internal sealed partial class DriverReportsFlow(
         }
     }
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "The message isn't a Trip start or a Stop report the Driver app made")]
+    [LoggerMessage(Level = LogLevel.Warning, Message = "The message isn't a Trip start, a Trip end, a Stop report or a Proof of delivery the Driver app made")]
     private partial void LogUnreadable();
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "The files of the Proof of delivery are gone from the transit container")]

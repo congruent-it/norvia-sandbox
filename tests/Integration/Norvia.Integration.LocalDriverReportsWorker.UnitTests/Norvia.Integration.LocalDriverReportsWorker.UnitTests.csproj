@@ -18,6 +18,7 @@
   <!-- Embedded, so the unit tests read the contracts without touching the file system (coding guidelines §10). -->
   <ItemGroup>
     <EmbeddedResource Include="..\..\..\contracts\canonical-model\trip-start-reported.v1.schema.json" LogicalName="CanonicalModel/trip-start-reported.v1.schema.json" />
+    <EmbeddedResource Include="..\..\..\contracts\canonical-model\trip-end-reported.v1.schema.json" LogicalName="CanonicalModel/trip-end-reported.v1.schema.json" />
     <EmbeddedResource Include="..\..\..\contracts\canonical-model\stop-completed-reported.v1.schema.json" LogicalName="CanonicalModel/stop-completed-reported.v1.schema.json" />
     <EmbeddedResource Include="..\..\..\contracts\canonical-model\proof-of-delivery-captured.v1.schema.json" LogicalName="CanonicalModel/proof-of-delivery-captured.v1.schema.json" />
     <EmbeddedResource Include="..\..\..\contracts\canonical-model\proof-of-delivery.v1.schema.json" LogicalName="CanonicalModel/proof-of-delivery.v1.schema.json" />
@@ -25,6 +26,7 @@
     <EmbeddedResource Include="..\..\..\contracts\canonical-model\samples\stop-completed-reported\*.json" LogicalName="CanonicalModel/samples/stop-completed-reported/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\contracts\canonical-model\samples\proof-of-delivery-captured\*.json" LogicalName="CanonicalModel/samples/proof-of-delivery-captured/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\contracts\canonical-model\driver-report-outcome.v1.schema.json" LogicalName="CanonicalModel/driver-report-outcome.v1.schema.json" />
+    <EmbeddedResource Include="..\..\..\contracts\canonical-model\samples\trip-end-reported\*.json" LogicalName="CanonicalModel/samples/trip-end-reported/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\contracts\canonical-model\samples\trip-start-reported\*.json" LogicalName="CanonicalModel/samples/trip-start-reported/%(Filename)%(Extension)" />
   </ItemGroup>
   <ItemGroup>

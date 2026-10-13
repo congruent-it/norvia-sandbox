@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Norvia.DriverApp.Application.Reports.Deliver;
+using Norvia.DriverApp.Application.Reports.EndTrip;
 using Norvia.DriverApp.Application.Reports.ReportStop;
 using Norvia.DriverApp.Application.Reports.StartTrip;
 using Norvia.DriverApp.Web.Drivers;
@@ -26,6 +27,18 @@ public static class ReportEndpoints
 
             var started = await mediator.Send(new StartTripCommand(tripNumber, driverId), cancellationToken);
             return started.IsSuccess ? Results.Redirect("/") : Results.NotFound();
+        }).RequireAuthorization(DriverClaims.DriverPolicy).WithMetadata(new RequireAntiforgeryTokenAttribute());
+
+        // End Trip: like Start Trip, the form carries only which Trip. A Trip that can't be ended now is shown on the Trip screen, which says why.
+        endpoints.MapPost("/trips/{tripNumber}/end", async (string tripNumber, HttpContext context, IMediator mediator, CancellationToken cancellationToken) =>
+        {
+            if (Reject(context, out var driverId) is { } rejected)
+            {
+                return rejected;
+            }
+
+            var ended = await mediator.Send(new EndTripCommand(tripNumber, driverId), cancellationToken);
+            return ended.Status == Ardalis.Result.ResultStatus.NotFound ? Results.NotFound() : Results.Redirect("/");
         }).RequireAuthorization(DriverClaims.DriverPolicy).WithMetadata(new RequireAntiforgeryTokenAttribute());
 
         // Deliver: the Proof of delivery form, with a signature and photos. Its own route, as the form carries files and fields the other reports don't.

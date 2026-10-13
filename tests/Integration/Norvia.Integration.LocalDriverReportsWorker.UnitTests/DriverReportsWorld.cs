@@ -68,6 +68,22 @@ internal sealed class DriverReportsWorld
         }
         """;
 
+    public const string EndEventId = "0198e7c0-0000-7000-8000-0000000000f1";
+    public const string EndCorrelationId = "0198e7c0-0000-7000-8000-0000000000f2";
+
+    public static string EndReported(string driverId = "DRV-0002") => $$"""
+        {
+          "eventId": "{{EndEventId}}",
+          "eventType": "TripEndReported",
+          "eventVersion": 1,
+          "occurredAt": "2030-10-03T16:42:05+02:00",
+          "correlationId": "{{EndCorrelationId}}",
+          "tripNumber": "{{TripNumber}}",
+          "version": 3,
+          "driverId": "{{driverId}}"
+        }
+        """;
+
     public const string StopEventId = "0198e7c0-0000-7000-8000-0000000000d1";
     public const string StopCorrelationId = "0198e7c0-0000-7000-8000-0000000000d2";
 

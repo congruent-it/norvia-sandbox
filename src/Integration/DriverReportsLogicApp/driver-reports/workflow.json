@@ -75,7 +75,7 @@
         "type": "If",
         "expression": {
           "equals": [
-            "@and(equals(actions('Track_the_report')?['status'], 'Succeeded'), not(empty(outputs('Track_the_report')?['correlationId'])), not(empty(outputs('Track_the_report')?['tripNumber'])), not(empty(outputs('Track_the_report')?['partyId'])), not(empty(outputs('Track_the_report')?['sourceMessageId'])), or(equals(outputs('Track_the_report')?['eventType'], 'TripStartReported'), and(equals(outputs('Track_the_report')?['eventType'], 'StopCompletedReported'), not(empty(outputs('Track_the_report')?['shipmentNumber'])), not(empty(outputs('Track_the_report')?['trackingEventType'])), not(empty(outputs('Track_the_report')?['version'])), not(empty(outputs('Track_the_report')?['occurredAt'])), not(empty(outputs('Track_the_report')?['location']?['place'])), not(empty(outputs('Track_the_report')?['location']?['postcode'])), not(empty(outputs('Track_the_report')?['location']?['countryCode']))), and(equals(outputs('Track_the_report')?['eventType'], 'ProofOfDeliveryCaptured'), not(empty(outputs('Track_the_report')?['shipmentNumber'])), not(empty(outputs('Track_the_report')?['version'])), not(empty(outputs('Track_the_report')?['documentId'])), not(empty(outputs('Track_the_report')?['receivedBy'])), not(empty(outputs('Track_the_report')?['deliveryTime'])), not(empty(outputs('Track_the_report')?['condition'])), not(empty(outputs('Track_the_report')?['location']?['place'])), not(empty(outputs('Track_the_report')?['location']?['postcode'])), not(empty(outputs('Track_the_report')?['location']?['countryCode'])), greater(length(coalesce(outputs('Track_the_report')?['files'], json('[]'))), 0))))",
+            "@and(equals(actions('Track_the_report')?['status'], 'Succeeded'), not(empty(outputs('Track_the_report')?['correlationId'])), not(empty(outputs('Track_the_report')?['tripNumber'])), not(empty(outputs('Track_the_report')?['partyId'])), not(empty(outputs('Track_the_report')?['sourceMessageId'])), or(equals(outputs('Track_the_report')?['eventType'], 'TripStartReported'), equals(outputs('Track_the_report')?['eventType'], 'TripEndReported'), and(equals(outputs('Track_the_report')?['eventType'], 'StopCompletedReported'), not(empty(outputs('Track_the_report')?['shipmentNumber'])), not(empty(outputs('Track_the_report')?['trackingEventType'])), not(empty(outputs('Track_the_report')?['version'])), not(empty(outputs('Track_the_report')?['occurredAt'])), not(empty(outputs('Track_the_report')?['location']?['place'])), not(empty(outputs('Track_the_report')?['location']?['postcode'])), not(empty(outputs('Track_the_report')?['location']?['countryCode']))), and(equals(outputs('Track_the_report')?['eventType'], 'ProofOfDeliveryCaptured'), not(empty(outputs('Track_the_report')?['shipmentNumber'])), not(empty(outputs('Track_the_report')?['version'])), not(empty(outputs('Track_the_report')?['documentId'])), not(empty(outputs('Track_the_report')?['receivedBy'])), not(empty(outputs('Track_the_report')?['deliveryTime'])), not(empty(outputs('Track_the_report')?['condition'])), not(empty(outputs('Track_the_report')?['location']?['place'])), not(empty(outputs('Track_the_report')?['location']?['postcode'])), not(empty(outputs('Track_the_report')?['location']?['countryCode'])), greater(length(coalesce(outputs('Track_the_report')?['files'], json('[]'))), 0))))",
             true
           ]
         },
@@ -87,6 +87,17 @@
               "driverAppEventId": "@outputs('Track_the_report')?['sourceMessageId']"
             },
             "runAfter": {}
+          },
+          "Build_the_Trip_end": {
+            "type": "Compose",
+            "inputs": {
+              "driverId": "@outputs('Track_the_report')?['partyId']"
+            },
+            "runAfter": {
+              "Build_the_Trip_start": [
+                "Succeeded"
+              ]
+            }
           },
           "Build_the_Tracking_event": {
             "type": "Compose",
@@ -108,7 +119,7 @@
               }
             },
             "runAfter": {
-              "Build_the_Trip_start": [
+              "Build_the_Trip_end": [
                 "Succeeded"
               ]
             }
@@ -314,7 +325,7 @@
             "type": "Http",
             "inputs": {
               "method": "POST",
-              "uri": "@{parameters('tmsBaseUrl')}/v1/@{if(equals(outputs('Track_the_report')?['eventType'], 'ProofOfDeliveryCaptured'), 'proofs-of-delivery', if(equals(outputs('Track_the_report')?['eventType'], 'StopCompletedReported'), 'tracking-events', concat('trips/', outputs('Track_the_report')?['tripNumber'], '/start')))}",
+              "uri": "@{parameters('tmsBaseUrl')}/v1/@{if(equals(outputs('Track_the_report')?['eventType'], 'ProofOfDeliveryCaptured'), 'proofs-of-delivery', if(equals(outputs('Track_the_report')?['eventType'], 'StopCompletedReported'), 'tracking-events', if(equals(outputs('Track_the_report')?['eventType'], 'TripEndReported'), concat('trips/', outputs('Track_the_report')?['tripNumber'], '/end'), concat('trips/', outputs('Track_the_report')?['tripNumber'], '/start'))))}",
               "headers": {
                 "X-Correlation-ID": "@{outputs('Track_the_report')?['correlationId']}"
               },
@@ -330,7 +341,7 @@
                 "minimumInterval": "PT5S",
                 "maximumInterval": "PT20S"
               },
-              "body": "@if(equals(outputs('Track_the_report')?['eventType'], 'ProofOfDeliveryCaptured'), outputs('Build_the_Proof_of_delivery_multipart'), if(equals(outputs('Track_the_report')?['eventType'], 'StopCompletedReported'), if(empty(outputs('Track_the_report')?['remark']), outputs('Build_the_Tracking_event'), addProperty(outputs('Build_the_Tracking_event'), 'remark', outputs('Track_the_report')?['remark'])), outputs('Build_the_Trip_start')))"
+              "body": "@if(equals(outputs('Track_the_report')?['eventType'], 'ProofOfDeliveryCaptured'), outputs('Build_the_Proof_of_delivery_multipart'), if(equals(outputs('Track_the_report')?['eventType'], 'StopCompletedReported'), if(empty(outputs('Track_the_report')?['remark']), outputs('Build_the_Tracking_event'), addProperty(outputs('Build_the_Tracking_event'), 'remark', outputs('Track_the_report')?['remark'])), if(equals(outputs('Track_the_report')?['eventType'], 'TripEndReported'), outputs('Build_the_Trip_end'), outputs('Build_the_Trip_start'))))"
             },
             "runAfter": {
               "Build_the_Proof_of_delivery_multipart": [
@@ -638,7 +649,7 @@
                   "messageId": "@triggerBody()?['messageId']",
                   "lockToken": "@triggerBody()?['lockToken']",
                   "deadLetterReason": "DriverReportUnreadable",
-                  "deadLetterErrorDescription": "The message isn't a Trip start, a Stop report or a Proof of delivery the Driver app made, so nothing was sent to the TMS."
+                  "deadLetterErrorDescription": "The message isn't a Trip start, a Trip end, a Stop report or a Proof of delivery the Driver app made, so nothing was sent to the TMS."
                 }
               },
               "runAfter": {},
@@ -659,7 +670,7 @@
                 "runStatus": "Failed",
                 "runError": {
                   "code": "DriverReportUnreadable",
-                  "message": "The message isn't a Trip start, a Stop report or a Proof of delivery the Driver app made, so it was dead-lettered."
+                  "message": "The message isn't a Trip start, a Trip end, a Stop report or a Proof of delivery the Driver app made, so it was dead-lettered."
                 }
               },
               "runAfter": {

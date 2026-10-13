@@ -14,12 +14,14 @@ internal sealed record ProofOfDeliveryReport(
     int TripVersion, string ShipmentNumber, string DocumentId, string ReceivedBy, string DeliveryTime, string Place, string Postcode, string CountryCode, string Condition, string? Remark,
     IReadOnlyList<ProofFileReference> Files);
 
-/// <summary>What a <c>TripStartReported</c>, a <c>StopCompletedReported</c> or a <c>ProofOfDeliveryCaptured</c> names, and the tracking contract's keys it gives the trail.</summary>
-/// <param name="Stop">What the TMS's Tracking event needs when the report is a Stop report; null for a Start Trip.</param>
+/// <summary>What a <c>TripStartReported</c>, a <c>TripEndReported</c>, a <c>StopCompletedReported</c> or a <c>ProofOfDeliveryCaptured</c> names, and the tracking contract's keys it gives the trail.</summary>
+/// <param name="Stop">What the TMS's Tracking event needs when the report is a Stop report; null for a Start Trip or an End Trip.</param>
 /// <param name="Proof">What the TMS's Proof of delivery needs when the report is a Proof of delivery; null otherwise.</param>
-internal sealed record DriverReport(string EventId, string CorrelationId, string TripNumber, string DriverId, StopReport? Stop, ProofOfDeliveryReport? Proof = null)
+/// <param name="EndsTrip">Whether the report is an End Trip: with no Stop and no Proof, a report is a Start Trip unless it is this.</param>
+internal sealed record DriverReport(string EventId, string CorrelationId, string TripNumber, string DriverId, StopReport? Stop, ProofOfDeliveryReport? Proof = null, bool EndsTrip = false)
 {
     private const string TripStartReported = "TripStartReported";
+    private const string TripEndReported = "TripEndReported";
     private const string StopCompletedReported = "StopCompletedReported";
     private const string ProofOfDeliveryCaptured = "ProofOfDeliveryCaptured";
 
@@ -58,6 +60,7 @@ internal sealed record DriverReport(string EventId, string CorrelationId, string
         return JsonFields.Text(parsed, "eventType") switch
         {
             TripStartReported => new(eventId, correlationId, tripNumber, driverId, null),
+            TripEndReported => new(eventId, correlationId, tripNumber, driverId, null, EndsTrip: true),
             StopCompletedReported => ReadStop(parsed) is { } stop ? new(eventId, correlationId, tripNumber, driverId, stop) : null,
             ProofOfDeliveryCaptured => ReadProof(parsed) is { } proof ? new(eventId, correlationId, tripNumber, driverId, null, proof) : null,
             _ => null,

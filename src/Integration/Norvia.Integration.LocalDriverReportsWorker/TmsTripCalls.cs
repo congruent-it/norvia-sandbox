@@ -11,20 +11,21 @@ using Norvia.Integration.LocalSupport;
 namespace Norvia.Integration.LocalDriverReportsWorker;
 
 /// <summary>
-/// Calls the TMS for a Driver's report as the Driver reports Logic App does: the Trip API's start operation for a Start Trip, the Tracking event API's record
+/// Calls the TMS for a Driver's report as the Driver reports Logic App does: the Trip API's start or end operation for a Start Trip or an End Trip, the Tracking event API's record
 /// operation for a Stop report. The Driver ID comes from the event, which the Driver app took from the Driver's token; the event's ID lets the TMS recognise a
 /// retry; the action's correlation ID and a token of the identity holding the role go with it. It doesn't retry: the flow does, under the workflow's policy.
 /// </summary>
 internal sealed class TmsTripCalls(HttpClient http, IOptions<DriverReportsWorkerOptions> options, TimeProvider time)
 {
     private const string StartRole = "Trips.Start";
+    private const string EndRole = "Trips.End";
     private const string RecordTrackingEventRole = "TrackingEvents.Record";
     private const string RecordProofOfDeliveryRole = "ProofsOfDelivery.Record";
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull };
 
     /// <summary>
-    /// Asks the TMS to do what the report says: start the Trip, record the Stop report as a Tracking event of Own fleet, or record the Proof of delivery with the
+    /// Asks the TMS to do what the report says: start or end the Trip, record the Stop report as a Tracking event of Own fleet, or record the Proof of delivery with the
     /// files <paramref name="files"/> as P6's multipart call.
     /// </summary>
     public Task<TmsAnswer> CallAsync(DriverReport report, IReadOnlyList<FetchedProofFile> files, CancellationToken cancellationToken)
@@ -36,6 +37,7 @@ internal sealed class TmsTripCalls(HttpClient http, IOptions<DriverReportsWorker
         {
             { Proof: { } proof } => SendAsync(report, "/v1/proofs-of-delivery", RecordProofOfDeliveryRole, () => MultipartOf(report, proof, files), cancellationToken),
             { Stop: { } stop } => SendAsync(report, "/v1/tracking-events", RecordTrackingEventRole, () => JsonContent.Create(TrackingEventOf(report, stop), options: Json), cancellationToken),
+            { EndsTrip: true } => EndAsync(report, cancellationToken),
             _ => StartAsync(report, cancellationToken),
         };
     }
@@ -78,6 +80,9 @@ internal sealed class TmsTripCalls(HttpClient http, IOptions<DriverReportsWorker
         SendAsync(
             report, $"/v1/trips/{Uri.EscapeDataString(report.TripNumber)}/start", StartRole,
             () => JsonContent.Create(new { driverId = report.DriverId, driverAppEventId = report.EventId }, options: Json), cancellationToken);
+
+    private Task<TmsAnswer> EndAsync(DriverReport report, CancellationToken cancellationToken) =>
+        SendAsync(report, $"/v1/trips/{Uri.EscapeDataString(report.TripNumber)}/end", EndRole, () => JsonContent.Create(new { driverId = report.DriverId }, options: Json), cancellationToken);
 
     /// <summary>The Canonical Model's Tracking event of Own fleet: the Driver ID is the source, and the Trip, the Shipment and the version replace a Carrier booking.</summary>
     private static object TrackingEventOf(DriverReport report, StopReport stop) => new

@@ -153,7 +153,7 @@ resource tmsApi 'Microsoft.Graph/applications@v1.0' = {
       id: tripEndRoleId
       value: tripEndRole
       displayName: 'End a Trip'
-      description: 'End an In progress Trip for its Driver once every Stop has an outcome (P12). Only the P12 Driver reports Logic App will hold it, once it is built.'
+      description: 'End an In progress Trip for its Driver once every Stop has an outcome (P12). Only the P12 Driver reports Logic App holds it.'
       allowedMemberTypes: [
         'Application'
       ]
@@ -278,8 +278,8 @@ resource driverAppIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@202
   tags: tags
 }
 
-// The P12 Driver reports Logic App's identity, which it runs as. It is the one principal holding the Trip start role and, with the Carrier-tracking
-// Logic App, the Tracking event record role (and, as they are built, the Trip end and Proof of delivery record roles), so nothing a Driver reports
+// The P12 Driver reports Logic App's identity, which it runs as. It is the one principal holding the Trip start and Trip end roles and, with the Carrier-tracking
+// Logic App, the Tracking event record role (and, as it is built, the Proof of delivery record role), so nothing a Driver reports
 // reaches the TMS without passing the integration layer, and the one principal holding the Driver app's outcome role.
 resource driverReportsIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
   name: 'id-driver-reports-${uniqueString(resourceGroup().id)}'
@@ -290,6 +290,12 @@ resource driverReportsIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities
 resource driverReportsStartRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
   resourceId: tmsApiPrincipal.id
   appRoleId: tripStartRoleId
+  principalId: driverReportsIdentity.properties.principalId
+}
+
+resource driverReportsEndRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: tmsApiPrincipal.id
+  appRoleId: tripEndRoleId
   principalId: driverReportsIdentity.properties.principalId
 }
 
