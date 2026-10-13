@@ -38,8 +38,9 @@ public sealed partial class TrackEndTripInLoggingScope(ILogger<TrackEndTripInLog
         else
         {
             var code = result.Status == ResultStatus.NotFound ? TrackingFailureCodes.TripNotFound
-                : result.Errors.Contains(EndTripHandler.NotStartedText) ? TrackingFailureCodes.TripNotUnderWay
-                : TrackingFailureCodes.StopsOpen;
+                : result.Errors.Contains(EndTripTexts.NotStarted) ? TrackingFailureCodes.TripNotUnderWay
+                : result.Errors.Contains(EndTripTexts.StopsOpen) ? TrackingFailureCodes.StopsOpen
+                : TrackingFailureCodes.StopNotAvailable;
             using var refused = logger.Track(new() { [TrackingKeys.Outcome] = TrackingKeys.Refused, [TrackingKeys.FailureCode] = code });
             LogRefused(logger, message.TripNumber, code);
         }

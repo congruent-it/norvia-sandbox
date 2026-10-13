@@ -18,9 +18,6 @@ public sealed class EndTripHandler(
     IDriverEventOutbox outbox,
     TimeProvider time) : ICommandHandler<EndTripCommand, Result<EndTripResult>>
 {
-    public const string NotStartedText = "Start the Trip first.";
-    public const string StopsOpenText = "Give every Stop an outcome first.";
-
     public async ValueTask<Result<EndTripResult>> Handle(EndTripCommand command, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -40,9 +37,9 @@ public sealed class EndTripHandler(
             case TripEndDecision.Repeat repeat:
                 return new EndTripResult(repeat.ReportId.Value, AlreadyReported: true);
             case TripEndDecision.NotStarted:
-                return Result.Conflict(NotStartedText);
+                return Result.Conflict(EndTripTexts.NotStarted);
             case TripEndDecision.StopsOpen:
-                return Result.Conflict(StopsOpenText);
+                return Result.Conflict(EndTripTexts.StopsOpen);
         }
 
         var now = time.GetUtcNow();

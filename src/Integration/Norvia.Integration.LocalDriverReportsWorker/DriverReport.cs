@@ -25,6 +25,15 @@ internal sealed record DriverReport(string EventId, string CorrelationId, string
     private const string StopCompletedReported = "StopCompletedReported";
     private const string ProofOfDeliveryCaptured = "ProofOfDeliveryCaptured";
 
+    /// <summary>What the report asks of the TMS.</summary>
+    public DriverReportKind Kind => this switch
+    {
+        { Proof: not null } => DriverReportKind.ProofOfDelivery,
+        { Stop: not null } => DriverReportKind.Stop,
+        { EndsTrip: true } => DriverReportKind.TripEnd,
+        _ => DriverReportKind.TripStart,
+    };
+
     public Dictionary<string, object?> ContractKeys => new()
     {
         [TrackingKeys.CorrelationId] = CorrelationId,

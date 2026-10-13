@@ -57,13 +57,13 @@ public sealed class DriverReport : EntityBase<ReportId>, IAggregateRoot
     public static bool CompletesAStop(ReportKind kind) => kind is ReportKind.Collected or ReportKind.CollectionFailed or ReportKind.Delivered or ReportKind.DeliveryFailed;
 
     public static DriverReport StartTrip(ReportId id, TripNumber tripNumber, DriverId driverId, int versionHeld, DateTimeOffset eventTime, string correlationId) =>
-        OfTrip(id, ReportKind.StartTrip, tripNumber, driverId, versionHeld, eventTime, correlationId);
+        TripLevel(id, ReportKind.StartTrip, tripNumber, driverId, versionHeld, eventTime, correlationId);
 
     /// <summary>The Driver ends the Trip once every Stop has an outcome. The TMS decides all the same.</summary>
     public static DriverReport EndTrip(ReportId id, TripNumber tripNumber, DriverId driverId, int versionHeld, DateTimeOffset eventTime, string correlationId) =>
-        OfTrip(id, ReportKind.EndTrip, tripNumber, driverId, versionHeld, eventTime, correlationId);
+        TripLevel(id, ReportKind.EndTrip, tripNumber, driverId, versionHeld, eventTime, correlationId);
 
-    private static DriverReport OfTrip(ReportId id, ReportKind kind, TripNumber tripNumber, DriverId driverId, int versionHeld, DateTimeOffset eventTime, string correlationId)
+    private static DriverReport TripLevel(ReportId id, ReportKind kind, TripNumber tripNumber, DriverId driverId, int versionHeld, DateTimeOffset eventTime, string correlationId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(driverId.Value);
         ArgumentOutOfRangeException.ThrowIfLessThan(versionHeld, 1);

@@ -85,8 +85,8 @@ public sealed class TrackingInLoggingScopeTests : IDisposable
         Result<EndTripResult> refused = reason switch
         {
             "NotFound" => Result.NotFound(),
-            "NotStarted" => Result.Conflict(EndTripHandler.NotStartedText),
-            _ => Result.Conflict(EndTripHandler.StopsOpenText),
+            "NotStarted" => Result.Conflict("Start the Trip first."),
+            _ => Result.Conflict("Give every Stop an outcome first."),
         };
 
         await behaviour.Handle(new EndTripCommand("TR-0000012", "DRV-0002"), (_, _) => ValueTask.FromResult(refused), CancellationToken.None);

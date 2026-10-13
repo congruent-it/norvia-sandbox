@@ -62,7 +62,7 @@ internal static class TripMapping
     private static (bool CanEnd, string? Unavailable) EndOf(TripDetails details, IReadOnlyList<DriverReportRow> reports) => TripEndRules.Decide(details, reports) switch
     {
         TripEndDecision.Accept => (true, null),
-        TripEndDecision.StopsOpen => (false, EndTripHandler.StopsOpenText),
+        TripEndDecision.StopsOpen => (false, EndTripTexts.StopsOpen),
         _ => (false, null),
     };
 

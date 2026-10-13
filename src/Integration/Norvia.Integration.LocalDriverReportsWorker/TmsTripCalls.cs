@@ -33,11 +33,11 @@ internal sealed class TmsTripCalls(HttpClient http, IOptions<DriverReportsWorker
         ArgumentNullException.ThrowIfNull(report);
         ArgumentNullException.ThrowIfNull(files);
 
-        return report switch
+        return report.Kind switch
         {
-            { Proof: { } proof } => SendAsync(report, "/v1/proofs-of-delivery", RecordProofOfDeliveryRole, () => MultipartOf(report, proof, files), cancellationToken),
-            { Stop: { } stop } => SendAsync(report, "/v1/tracking-events", RecordTrackingEventRole, () => JsonContent.Create(TrackingEventOf(report, stop), options: Json), cancellationToken),
-            { EndsTrip: true } => EndAsync(report, cancellationToken),
+            DriverReportKind.ProofOfDelivery => SendAsync(report, "/v1/proofs-of-delivery", RecordProofOfDeliveryRole, () => MultipartOf(report, report.Proof!, files), cancellationToken),
+            DriverReportKind.Stop => SendAsync(report, "/v1/tracking-events", RecordTrackingEventRole, () => JsonContent.Create(TrackingEventOf(report, report.Stop!), options: Json), cancellationToken),
+            DriverReportKind.TripEnd => EndAsync(report, cancellationToken),
             _ => StartAsync(report, cancellationToken),
         };
     }
