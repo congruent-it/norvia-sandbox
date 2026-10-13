@@ -237,7 +237,8 @@ A key that doesn't apply is left out, never sent empty.
 
 - Every change goes through a pull request with at least one review.
 - A PR is mergeable only when the build has no warnings, `dotnet format --verify-no-changes` passes, all tests pass and the coverage gate is met.
-- Tests are part of the change, not a follow-up. Bug fixes start with a failing test that reproduces the bug.
+- Unit and architecture tests are part of the change, not a follow-up. Bug fixes start with a failing test that reproduces the bug.
+- Integration tests and UI tests are not: each is built in an issue of its own, linked to the feature issue it covers (see [Splitting work into issues](agents/issue-tracker.md#splitting-work-into-issues)). A feature issue does not list them in its acceptance criteria; it names the issues that will.
 - A decision that is hard to reverse, surprising, or the result of a real trade-off gets an ADR in [docs/adr/](adr/).
 - A PR that adds or changes an event, a subscription, a Flow, a Logic App, an app role or a local stand-in updates the matching page in [docs/architecture/](architecture/README.md) and the process's Implementation section in the same PR.
 - Keep PRs small and focused on one issue.

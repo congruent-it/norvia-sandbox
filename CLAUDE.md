@@ -4,7 +4,7 @@
 
 ### Issue tracker
 
-Issues and specs live in GitHub Issues for congruent-it/norvia-sandbox, managed with the `gh` CLI. See `docs/agents/issue-tracker.md`.
+Issues and specs live in GitHub Issues for congruent-it/norvia-sandbox, managed with the `gh` CLI. See `docs/agents/issue-tracker.md`. Integration tests and UI tests are written in issues of their own, separate from the feature issue (see "Splitting work into issues" there).
 
 ### Triage labels
 

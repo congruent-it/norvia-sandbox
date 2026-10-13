@@ -13,6 +13,26 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 
 Infer the repo from `git remote -v`; `gh` does this automatically when run inside a clone.
 
+## Splitting work into issues
+
+A feature issue covers the code and its unit and architecture tests (80% line coverage, `docs/coding-guidelines.md` §10). Integration tests and UI tests are never part of it. Each gets an issue of its own, so a slow or flaky suite never blocks a feature and each can be picked up by itself:
+
+- **Integration tests issue**: `<Feature title>: integration tests`. The API, adapter and AppHost-level cases (Testcontainers, `Aspire.Hosting.Testing`, the Service Bus emulator, supporting maps and Partner portal boundaries).
+- **UI tests issue**: `<Feature title>: UI tests`. The Playwright journeys.
+
+Both are blocked by the feature issue. Open them when the feature issue is written, so the cases are chosen while the design is fresh, and move the feature's `Testing Decisions` cases to the issue they belong to. Post-deploy smoke runs stay with the issue that deploys. Create them with `gh issue create`, begin the body with `Part of #<parent>` (the feature's own parent, if it has one) and `Blocked by #<feature>`, and label them `needs-triage` or `ready-for-agent` like any issue. In the feature issue, replace the test criteria with `Integration tests: #<n>` and `UI tests: #<n>`.
+
+## Unblocking issues when you finish one
+
+When an issue is done (its PR is merged and you close it), unblock the issues that were waiting on it, in the same step:
+
+1. **Find the dependents.** Native dependencies: `gh api repos/<owner>/<repo>/issues/<n>/dependencies/blocking --jq '.[] | {number, title, state}'`. Body lines: `gh issue list --state open --search '"Blocked by #<n>" in:body' --json number,title,body`. Check both; older issues use only the line.
+2. **Clear the edge.** Remove `#<n>` from the dependent's `Blocked by:` line, and delete the line when no blocker is left (`gh issue edit <dep> --body ...`). GitHub's native `blocked_by` count already ignores closed blockers, so that edge needs no change; remove it only if it is stale (`gh api --method DELETE repos/<owner>/<repo>/issues/<dep>/dependencies/blocked_by/<blocker-db-id>`).
+3. **Check what is left.** If the dependent still has an open blocker, leave it and say which. If none is left, it is unblocked: confirm it still carries its triage label (`ready-for-agent` or `ready-for-human`), and add it if the issue was written as waiting for this one.
+4. **Say so on the dependent.** `gh issue comment <dep> --body "Unblocked: #<n> is done."`, with the PR link.
+
+Close the finished issue first, then unblock, and list the issues you unblocked in your final message. Do not start the unblocked issue unless asked.
+
 ## Pull requests as a triage surface
 
 **PRs as a request surface: no.** _(Set to `yes` if this repo treats external PRs as feature requests; `/triage` reads this flag.)_
