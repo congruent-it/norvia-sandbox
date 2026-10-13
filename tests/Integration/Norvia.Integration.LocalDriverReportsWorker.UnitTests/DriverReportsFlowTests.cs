@@ -242,6 +242,61 @@ public sealed class DriverReportsFlowTests
     }
 
     [Fact]
+    public async Task ARecordedEndTrip_IsPostedToTheTripApisEndOperation_WithTheDriverIdFromTheEvent_AndTheEndRole_ThenReportedRecorded()
+    {
+        var outcome = await _world.RunAsync(DriverReportsWorld.EndReported());
+
+        outcome.Should().Be(DriverReportsRunOutcome.Done);
+        var call = _world.Tms.Requests.Should().ContainSingle().Subject;
+        call.Uri.ToString().Should().Be("http://tms.test/v1/trips/TR-0000012/end");
+        call.Headers["X-Correlation-ID"].Should().Be(DriverReportsWorld.EndCorrelationId);
+        DriverReportsWorld.RoleOf(call).Should().Be("Trips.End");
+        JsonNode.Parse(call.Body)!["driverId"]!.GetValue<string>().Should().Be("DRV-0002", "the Driver ID is the one the Driver app took from the Driver's token");
+        _world.Settled.Should().ContainSingle().Which.Settlement.Should().Be(Settlement.Complete);
+        var reported = _world.OutcomeReported();
+        reported["outcome"]!.GetValue<string>().Should().Be("Recorded");
+        reported["driverAppEventId"]!.GetValue<string>().Should().Be(DriverReportsWorld.EndEventId);
+        reported["correlationId"]!.GetValue<string>().Should().Be(DriverReportsWorld.EndCorrelationId);
+    }
+
+    [Fact]
+    public async Task AnEndTripTheTmsRefusesWithStopsOpen_IsNotRetried_DeadLettersTheMessage_AndIsReportedRefused()
+    {
+        _world.Tms.Otherwise(HttpStatusCode.Conflict, DriverReportsWorld.Problem(409, "StopsOpen", "Trip TR-0000012 still has open Stops."));
+
+        var outcome = await _world.RunAsync(DriverReportsWorld.EndReported());
+
+        outcome.Should().Be(DriverReportsRunOutcome.Done);
+        _world.Tms.Requests.Should().ContainSingle();
+        _world.Settled.Should().ContainSingle().Which.Settlement.Should().Be(new Settlement.DeadLetter("StopsOpen", "Trip TR-0000012 still has open Stops."));
+        var reported = _world.OutcomeReported();
+        reported["outcome"]!.GetValue<string>().Should().Be("Refused");
+        reported["failureCode"]!.GetValue<string>().Should().Be("StopsOpen");
+    }
+
+    [Fact]
+    public async Task AnEndTripWhileTheTmsIsUnavailable_IsRetried_ThenDeadLettered_AndReportedNotRecorded()
+    {
+        _world.Tms.Otherwise(HttpStatusCode.ServiceUnavailable, "");
+
+        await _world.RunAsync(DriverReportsWorld.EndReported());
+
+        _world.Tms.Requests.Should().HaveCount(4, "the call and its three retries");
+        _world.Settled.Should().ContainSingle().Which.Settlement.Should().BeOfType<Settlement.DeadLetter>().Which.Reason.Should().Be("TmsUnavailable");
+        _world.OutcomeReported()["outcome"]!.GetValue<string>().Should().Be("NotRecorded");
+    }
+
+    [Fact]
+    public void TheEndEventTheDriverAppPublishes_IsTheOneTheFlowReads()
+    {
+        var schema = JsonSchema.FromText(ReadResource("CanonicalModel/trip-end-reported.v1.schema.json"));
+
+        var results = schema.Evaluate(JsonSerializer.SerializeToElement(JsonNode.Parse(DriverReportsWorld.EndReported())), new EvaluationOptions { OutputFormat = OutputFormat.List, RequireFormatValidation = true });
+
+        results.IsValid.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task ARecordedStopReport_IsPostedToTheTrackingEventApi_AsOwnFleet_WithTheDriverIdFromTheEvent_AndTheRecordRole()
     {
         var outcome = await _world.RunAsync(DriverReportsWorld.StopReported("CollectionFailed", remark: "Nobody at the dock"));

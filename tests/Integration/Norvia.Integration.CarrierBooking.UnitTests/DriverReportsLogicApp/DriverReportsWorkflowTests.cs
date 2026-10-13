@@ -76,7 +76,7 @@ public sealed class DriverReportsWorkflowTests
 
         Statuses(check, DriverReportsWorkflow.InitializeFileParts).Should().BeEquivalentTo("Succeeded", "Failed");
         var expression = check["expression"]!.ToJsonString();
-        expression.Should().Contain("TripStartReported").And.Contain("StopCompletedReported").And.Contain("ProofOfDeliveryCaptured").And.Contain("correlationId").And.Contain("tripNumber").And.Contain("partyId").And.Contain("sourceMessageId");
+        expression.Should().Contain("TripStartReported").And.Contain("TripEndReported").And.Contain("StopCompletedReported").And.Contain("ProofOfDeliveryCaptured").And.Contain("correlationId").And.Contain("tripNumber").And.Contain("partyId").And.Contain("sourceMessageId");
         expression.Should().Contain("shipmentNumber").And.Contain("trackingEventType").And.Contain("occurredAt").And.Contain("place").And.Contain("postcode").And.Contain("countryCode");
         expression.Should().NotContain("triggerBody");
     }
@@ -92,6 +92,7 @@ public sealed class DriverReportsWorkflowTests
         uri.Should().StartWith("@{parameters('tmsBaseUrl')}/v1/");
         uri.Should().Contain("equals(outputs('Track_the_report')?['eventType'], 'StopCompletedReported')").And.Contain("'tracking-events'");
         uri.Should().Contain("concat('trips/', outputs('Track_the_report')?['tripNumber'], '/start')");
+        uri.Should().Contain("equals(outputs('Track_the_report')?['eventType'], 'TripEndReported')").And.Contain("concat('trips/', outputs('Track_the_report')?['tripNumber'], '/end')");
         inputs["headers"]!["X-Correlation-ID"]!.GetValue<string>().Should().Be(CorrelationId);
         inputs["authentication"]!["type"]!.GetValue<string>().Should().Be("ManagedServiceIdentity");
         inputs["authentication"]!["identity"]!.GetValue<string>().Should().Be("@parameters('driverReportsIdentityId')");
@@ -110,7 +111,11 @@ public sealed class DriverReportsWorkflowTests
         start["runAfter"]!.AsObject().Should().BeEmpty();
         start["inputs"]!["driverId"]!.GetValue<string>().Should().Be("@outputs('Track_the_report')?['partyId']");
         start["inputs"]!["driverAppEventId"]!.GetValue<string>().Should().Be("@outputs('Track_the_report')?['sourceMessageId']");
-        Statuses(tracking, DriverReportsWorkflow.BuildTripStart).Should().Equal("Succeeded");
+        var end = DriverReportsWorkflow.Action(DriverReportsWorkflow.BuildTripEnd);
+        end["inputs"]!["driverId"]!.GetValue<string>().Should().Be("@outputs('Track_the_report')?['partyId']");
+        end["inputs"]!.AsObject().Count.Should().Be(1, "the TMS takes the Driver ID alone: the Trip is in the route");
+        Statuses(end, DriverReportsWorkflow.BuildTripStart).Should().Equal("Succeeded");
+        Statuses(tracking, DriverReportsWorkflow.BuildTripEnd).Should().Equal("Succeeded");
         var inputs = tracking["inputs"]!;
         inputs["eventId"]!.GetValue<string>().Should().Be("@outputs('Track_the_report')?['sourceMessageId']");
         inputs["source"]!["type"]!.GetValue<string>().Should().Be("OwnFleet");
@@ -125,7 +130,7 @@ public sealed class DriverReportsWorkflowTests
         inputs["location"]!["countryCode"]!.GetValue<string>().Should().Be("@outputs('Track_the_report')?['location']?['countryCode']");
         inputs.AsObject().ContainsKey("remark").Should().BeFalse("a remark the Driver didn't give is left out, not sent empty");
         body.Should().Contain("addProperty(outputs('Build_the_Tracking_event'), 'remark', outputs('Track_the_report')?['remark'])")
-            .And.Contain("empty(outputs('Track_the_report')?['remark'])").And.Contain("outputs('Build_the_Trip_start')");
+            .And.Contain("empty(outputs('Track_the_report')?['remark'])").And.Contain("outputs('Build_the_Trip_start')").And.Contain("outputs('Build_the_Trip_end')");
     }
 
     [Theory]
@@ -231,7 +236,7 @@ public sealed class DriverReportsWorkflowTests
         DriverReportsWorkflow.Action(DriverReportsWorkflow.Check)["else"]!["actions"]!.AsObject().Select(action => action.Key)
             .Should().Equal(DriverReportsWorkflow.DeadLetterUnreadable, DriverReportsWorkflow.FailTheRun);
         parameters["deadLetterReason"]!.GetValue<string>().Should().Be("DriverReportUnreadable");
-        parameters["deadLetterErrorDescription"]!.GetValue<string>().Should().Contain("Trip start, a Stop report or a Proof of delivery").And.Contain("nothing was sent to the TMS");
+        parameters["deadLetterErrorDescription"]!.GetValue<string>().Should().Contain("Trip start, a Trip end, a Stop report or a Proof of delivery").And.Contain("nothing was sent to the TMS");
         deadLetter["trackedProperties"]!["failureCode"]!.GetValue<string>().Should().Be("DriverReportUnreadable");
         DriverReportsWorkflow.Action(DriverReportsWorkflow.FailTheRun)["inputs"]!["runStatus"]!.GetValue<string>().Should().Be("Failed");
     }
@@ -261,8 +266,8 @@ public sealed class DriverReportsWorkflowTests
         var local = Contracts.Read("AppHost/ResubmitAwareFilters.cs");
         var localFilter = local.Split('\n').Single(line => line.Contains("[\"driver-reports\"]", StringComparison.Ordinal));
 
-        filter.Should().Contain("eventType = \\'TripStartReported\\' OR eventType = \\'StopCompletedReported\\' OR eventType = \\'ProofOfDeliveryCaptured\\'");
-        localFilter.Should().Contain("eventType = 'TripStartReported' OR eventType = 'StopCompletedReported' OR eventType = 'ProofOfDeliveryCaptured'");
+        filter.Should().Contain("eventType = \\'TripStartReported\\' OR eventType = \\'TripEndReported\\' OR eventType = \\'StopCompletedReported\\' OR eventType = \\'ProofOfDeliveryCaptured\\'");
+        localFilter.Should().Contain("eventType = 'TripStartReported' OR eventType = 'TripEndReported' OR eventType = 'StopCompletedReported' OR eventType = 'ProofOfDeliveryCaptured'");
     }
 
     [Fact]
@@ -274,6 +279,9 @@ public sealed class DriverReportsWorkflowTests
 
         grant.Should().Contain("resourceId: tmsApiPrincipal.id").And.Contain("appRoleId: recordRoleId").And.Contain("principalId: driverReportsIdentity.properties.principalId");
         identities.Should().Contain("resource driverReportsStartRoleGrant");
+        var end = identities[identities.IndexOf("resource driverReportsEndRoleGrant", StringComparison.Ordinal)..];
+        end = end[..end.IndexOf("\n}\n", StringComparison.Ordinal)];
+        end.Should().Contain("resourceId: tmsApiPrincipal.id").And.Contain("appRoleId: tripEndRoleId").And.Contain("principalId: driverReportsIdentity.properties.principalId");
     }
 
     [Fact]

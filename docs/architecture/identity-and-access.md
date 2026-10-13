@@ -27,7 +27,7 @@ Both Logic App triggers sit behind Easy Auth, and the workflow's first step refu
 | `carrier-cancellation` | The Carrier cancellation Logic App (P7) | `CarrierBookings.Report` | Receives the `carrier-cancellation` subscription. Reads each Carrier's endpoint key |
 | `shipper-notification` | The Shipper notification Logic App (P7) | `ShipperNotifications.Report` | Receives the `shipper-notification` subscription. Reads each Shipper's endpoint key |
 | `trip-dispatch` | The Trip dispatch Logic App (P11) | `Trips.ReportDelivery` | Receives the `trip-dispatch` subscription. Reads the Driver app's endpoint key |
-| `driver-reports` | The Driver reports Logic App (P12) | `Trips.Start`, `TrackingEvents.Record` and `ProofsOfDelivery.Record` on the TMS; `DriverReports.ReportOutcome` on the Driver app | Receives the `driver-reports` subscription. Reads and deletes files in the Driver app's transit container |
+| `driver-reports` | The Driver reports Logic App (P12) | `Trips.Start`, `Trips.End`, `TrackingEvents.Record` and `ProofsOfDelivery.Record` on the TMS; `DriverReports.ReportOutcome` on the Driver app | Receives the `driver-reports` subscription. Reads and deletes files in the Driver app's transit container |
 | `driver-app` | The Driver app (P11) | None: it reaches the TMS only through the integration layer | Reads the Driver app's endpoint key. Sends to the `driver-app-events` topic (P12). Its screens store Proof of delivery files in the Driver app's transit container |
 | `tracking` | The Carrier-tracking Logic App (P5) | `TrackingEvents.Record` | Receives the `carrier-tracking` queue |
 | `proof-of-delivery` | The Carrier Proof of delivery Logic App (P6) | `ProofsOfDelivery.Record` | Receives the `carrier-proof-of-delivery` queue. Reads and deletes blobs in the inbound container |
@@ -54,14 +54,12 @@ The TMS validates the token and the role; the Shipper or Carrier a call is for c
 | `Trips.ReportDelivery` | `trip-dispatch` | Report a Trip version as delivered to the Driver app or not delivered | [P11](../processes/tms/p11-trip-dispatch.md#tms-api) |
 | `DriverReports.ReportOutcome` (on the Driver app API) | `driver-reports` | Tell the Driver app whether the TMS recorded a Driver's report, refused it, or was never reached | [P12](../processes/tms/p12-trip-execution.md#driver-app) |
 | `Trips.Start` | `driver-reports` | Start a Dispatched Trip for its Driver on the Trip's day | [P12](../processes/tms/p12-trip-execution.md#tms-api) |
-| `Trips.End` | None yet: the P12 Driver reports Logic App will hold it once End Trip is on its path | End an In progress Trip for its Driver once every Stop has an outcome | [P12](../processes/tms/p12-trip-execution.md#tms-api) |
+| `Trips.End` | `driver-reports` | End an In progress Trip for its Driver once every Stop has an outcome | [P12](../processes/tms/p12-trip-execution.md#tms-api) |
 | `TrackingEvents.Record` | `tracking` and `driver-reports` | Record a Tracking event, a Carrier's or a Driver's Stop report | [P5](../processes/tms/p5-shipment-tracking.md) |
 | `ProofsOfDelivery.Record` | `proof-of-delivery` and `driver-reports` | Record a Proof of delivery with its files, a Carrier's or a Driver's | [P6](../processes/tms/p6-proof-of-delivery.md) |
 | `ShipperTracking.Read` | `apim` | List, get and find a Shipper's Transport Orders, and read a current Proof of delivery file. The TMS trusts the Shipper ID header only from this caller | [P8](../processes/tms/p8-shipper-visibility.md) |
 
 The TMS API's queries (Transport Orders, Shipments, Exceptions, Proof of delivery files) ask only for a valid token. Because Entra issues one only to a principal holding one of the roles above, in practice the callers are these identities. The TMS UI reads in process and uses the API to change things ([ADR 0028](../adr/0028-the-tms-ui-reads-in-process-and-changes-things-through-the-tms-api.md)).
-
-Planned and not yet held: `Trips.End` for the Driver reports Logic App ([P12](../processes/tms/p12-trip-execution.md#tms-api)).
 
 ## Partner API roles
 

@@ -21,7 +21,7 @@ public sealed class DriverReportsWorkerOptions
     [Required]
     public Uri? TmsBaseAddress { get; set; }
 
-    /// <summary>The Driver reports Logic App's token for the TMS, with the roles it needs there (<c>Trips.Start</c>, <c>TrackingEvents.Record</c> and <c>ProofsOfDelivery.Record</c>).</summary>
+    /// <summary>The Driver reports Logic App's token for the TMS, with the roles it needs there (<c>Trips.Start</c>, <c>Trips.End</c>, <c>TrackingEvents.Record</c> and <c>ProofsOfDelivery.Record</c>).</summary>
     [Required]
     [ValidateObjectMembers]
     public LocalTokenOptions TmsTokens { get; set; } = new();

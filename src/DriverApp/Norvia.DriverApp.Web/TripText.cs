@@ -33,6 +33,7 @@ internal static class TripText
         ReportKindDto.Damaged => "Damage reported",
         ReportKindDto.Delivered => "Delivered",
         ReportKindDto.ProofOfDelivery => "Proof of delivery",
+        ReportKindDto.EndTrip => "End Trip",
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "A kind of report the Driver app has no words for."),
     };
 

@@ -13,6 +13,10 @@ public static class TripProgress
     public static bool IsStarted(IEnumerable<DriverReportRow> reports) =>
         reports.Any(report => report.Kind == ReportKind.StartTrip && report.State == ReportState.Recorded);
 
+    /// <summary>The TMS has said the Trip ended.</summary>
+    public static bool IsEnded(IEnumerable<DriverReportRow> reports) =>
+        reports.Any(report => report.Kind == ReportKind.EndTrip && report.State == ReportState.Recorded);
+
     public static IReadOnlyList<StopStatus> Of(TripDetails details, IReadOnlyList<DriverReportRow> reports)
     {
         ArgumentNullException.ThrowIfNull(details);

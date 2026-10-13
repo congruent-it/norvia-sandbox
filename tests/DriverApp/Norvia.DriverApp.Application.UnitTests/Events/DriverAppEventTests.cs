@@ -37,6 +37,38 @@ public sealed class DriverAppEventTests
         }
     }
 
+    private static readonly TripEndReportedV1 EndEvent = new(
+        Guid.Parse("0198e7c0-0000-7000-8000-0000000000e1"), new DateTimeOffset(2026, 10, 13, 16, 42, 5, TimeSpan.FromHours(2)), "0198e7c0-0000-7000-8000-0000000000e2", "TR-0000012", 3, "DRV-0002");
+
+    [Fact]
+    public void AnEndEvent_ValidatesAgainstTheSchema_AndSoDoesItsSample()
+    {
+        var body = JsonNode.Parse(JsonSerializer.Serialize(EndEvent, EndEvent.GetType(), Web))!;
+
+        var results = Schemas.Validate("trip-end-reported.v1.schema.json", body);
+
+        results.IsValid.Should().BeTrue(Schemas.Errors(results));
+        body["eventType"]!.GetValue<string>().Should().Be("TripEndReported");
+        foreach (var sample in Schemas.Samples("trip-end-reported"))
+        {
+            var sampled = Schemas.Validate("trip-end-reported.v1.schema.json", Schemas.ReadSample(sample));
+            sampled.IsValid.Should().BeTrue($"{sample}: {Schemas.Errors(sampled)}");
+        }
+    }
+
+    [Fact]
+    public void AnEndEvent_ShipsWithTheTripAsItsSessionAndTheKeysOfTheTrail()
+    {
+        EndEvent.SessionId.Should().Be("TR-0000012");
+        EndEvent.ApplicationProperties.Should().Contain(new Dictionary<string, object>
+        {
+            ["eventType"] = "TripEndReported",
+            ["partyId"] = "DRV-0002",
+            ["tripNumber"] = "TR-0000012",
+            ["flow"] = "trip-execution",
+        });
+    }
+
     private static readonly StopCompletedReportedV1 StopEvent = new(
         Guid.Parse("0198e7c0-0000-7000-8000-0000000000d3"), new DateTimeOffset(2026, 10, 13, 11, 20, 45, TimeSpan.FromHours(2)), "0198e7c0-0000-7000-8000-0000000000d4", "TR-0000012", 2, "DRV-0002",
         "SH-0000032", "Delivery", "DeliveryFailed", new StopLocationV1("Utrecht", "3511 AB", "NL"), "Dock closed, nobody at the warehouse");

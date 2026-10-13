@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Diagnostics;
 using Norvia.DriverApp.Api.Reports;
 using Norvia.DriverApp.Api.Settings;
 using Norvia.DriverApp.Api.Trips;
+using Norvia.DriverApp.Application.Reports.EndTrip;
 using Norvia.DriverApp.Application.Reports.ReportOutcome;
 using Norvia.DriverApp.Application.Reports.StartTrip;
 using Norvia.DriverApp.Application.Trips.Receive;
@@ -48,6 +49,7 @@ builder.Services.AddOptions<DriverEndpointOptions>().BindConfiguration(DriverEnd
     .ValidateOnStart();
 builder.Services.AddScoped<IPipelineBehavior<ReceiveTripVersionCommand, Result<TripVersionOutcome>>, TrackTripVersionInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<StartTripCommand, Result<StartTripResult>>, TrackStartTripInLoggingScope>();
+builder.Services.AddScoped<IPipelineBehavior<EndTripCommand, Result<EndTripResult>>, TrackEndTripInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<ReportOutcomeCommand, Result<ReportOutcomeResult>>, TrackReportOutcomeInLoggingScope>();
 builder.Services.AddMediator(options =>
 {

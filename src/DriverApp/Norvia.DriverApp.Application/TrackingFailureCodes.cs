@@ -6,5 +6,8 @@ internal static class TrackingFailureCodes
     public const string StopNotFound = "StopNotFound";
     public const string StopReportInvalid = "StopReportInvalid";
     public const string ProofOfDeliveryInvalid = "ProofOfDeliveryInvalid";
+    public const string TripNotFound = "TripNotFound";
+    public const string TripNotUnderWay = "TripNotUnderWay";
+    public const string StopsOpen = "StopsOpen";
     public const string StopNotAvailable = "StopNotAvailable";
 }

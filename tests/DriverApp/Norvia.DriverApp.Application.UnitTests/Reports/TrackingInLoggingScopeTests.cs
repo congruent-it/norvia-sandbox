@@ -1,9 +1,10 @@
 using Ardalis.Result;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Testing;
-using Norvia.DriverApp.Application.Reports.Deliver;
-using Norvia.DriverApp.Application.Reports.ReportOutcome;
 using Norvia.DriverApp.Application.Reports;
+using Norvia.DriverApp.Application.Reports.Deliver;
+using Norvia.DriverApp.Application.Reports.EndTrip;
+using Norvia.DriverApp.Application.Reports.ReportOutcome;
 using Norvia.DriverApp.Application.Reports.ReportStop;
 using Norvia.DriverApp.Application.Reports.StartTrip;
 using Norvia.DriverApp.Application.Trips;
@@ -54,6 +55,46 @@ public sealed class TrackingInLoggingScopeTests : IDisposable
         {
             ["outcome"] = "Refused",
             ["failureCode"] = "TripNotFound",
+        });
+    }
+
+    [Fact]
+    public async Task AnEndTrip_IsLoggedWithTheFlowTheTripTheDriverAndTheEventId_AsSucceeded()
+    {
+        var behaviour = new TrackEndTripInLoggingScope(_loggerFactory.CreateLogger<TrackEndTripInLoggingScope>());
+
+        await behaviour.Handle(new EndTripCommand("TR-0000012", "DRV-0002"), (_, _) => ValueTask.FromResult<Result<EndTripResult>>(new EndTripResult(EventId, false)), CancellationToken.None);
+
+        ScopeKeys.Of(_logs.Collector.GetSnapshot().Should().ContainSingle().Subject).Should().Contain(new Dictionary<string, object?>
+        {
+            ["flow"] = "trip-execution",
+            ["tripNumber"] = "TR-0000012",
+            ["partyId"] = "DRV-0002",
+            ["sourceMessageId"] = EventId.ToString(),
+            ["outcome"] = "Succeeded",
+        });
+    }
+
+    [Theory]
+    [InlineData("NotFound", "TripNotFound")]
+    [InlineData("NotStarted", "TripNotUnderWay")]
+    [InlineData("StopsOpen", "StopsOpen")]
+    public async Task AnEndTripTheDriverAppDoesNotTake_IsLoggedAsRefusedWithTheReason(string reason, string failureCode)
+    {
+        var behaviour = new TrackEndTripInLoggingScope(_loggerFactory.CreateLogger<TrackEndTripInLoggingScope>());
+        Result<EndTripResult> refused = reason switch
+        {
+            "NotFound" => Result.NotFound(),
+            "NotStarted" => Result.Conflict("Start the Trip first."),
+            _ => Result.Conflict("Give every Stop an outcome first."),
+        };
+
+        await behaviour.Handle(new EndTripCommand("TR-0000012", "DRV-0002"), (_, _) => ValueTask.FromResult(refused), CancellationToken.None);
+
+        ScopeKeys.Of(_logs.Collector.GetSnapshot().Should().ContainSingle().Subject).Should().Contain(new Dictionary<string, object?>
+        {
+            ["outcome"] = "Refused",
+            ["failureCode"] = failureCode,
         });
     }
 

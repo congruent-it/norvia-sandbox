@@ -22,6 +22,21 @@
         </form>
     }
 
+    @if (Trip.CanEnd)
+    {
+        <form method="post" action="@($"/trips/{Uri.EscapeDataString(Trip.TripNumber)}/end")" aria-label="@($"End Trip {Trip.TripNumber}")">
+            <AntiforgeryToken />
+            <FluentButton Type="ButtonType.Submit" Appearance="Appearance.Accent">End Trip</FluentButton>
+        </form>
+    }
+    else if (Trip.EndUnavailable is { } unavailable)
+    {
+        <div>
+            <FluentButton Type="ButtonType.Button" Disabled="true" aria-label="@($"End Trip {Trip.TripNumber} is unavailable")">End Trip</FluentButton>
+            <span class="muted">@unavailable</span>
+        </div>
+    }
+
     @if (Trip.Reports.Count > 0)
     {
         <ul class="reports" aria-label="@($"Reports on Trip {Trip.TripNumber}")">

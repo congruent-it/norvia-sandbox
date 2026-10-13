@@ -78,6 +78,56 @@ public sealed class GetDriverTripsHandlerTests
     }
 
     [Fact]
+    public async Task WhileAStopIsOpen_EndTripIsUnavailable_AndSaysWhy()
+    {
+        _world.GiveTodaysTripStops("SH-0000001");
+        _world.StartTodaysTrip();
+
+        var trip = (await TripsOf("DRV-0002")).Single(trip => trip.TripNumber == "TR-0000012");
+
+        trip.CanEnd.Should().BeFalse();
+        trip.EndUnavailable.Should().Be("Give every Stop an outcome first.");
+    }
+
+    [Fact]
+    public async Task BeforeTheStart_EndTripIsNeitherOfferedNorExplained()
+    {
+        var trip = (await TripsOf("DRV-0002")).Single(trip => trip.TripNumber == "TR-0000012");
+
+        trip.CanEnd.Should().BeFalse();
+        trip.EndUnavailable.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task OnceEveryStopHasAnOutcome_EndTripIsOffered_UntilTheEndIsSendingOrRecorded_AndTheRecordedEndMakesTheTripCompleted()
+    {
+        _world.GiveTodaysTripStops("SH-0000001");
+        _world.StartTodaysTrip();
+        foreach (var (kind, stop) in new[] { (ReportKind.Collected, StopKind.Collection), (ReportKind.DeliveryFailed, StopKind.Delivery) })
+        {
+            var report = DriverReport.ReportStop(
+                new ReportId(Guid.NewGuid()), kind, new StopRef("SH-0000001", stop), new ReportOrigin(ReportsWorld.TripToday, ReportsWorld.Joost, 3, _world.Time.GetUtcNow(), "corr"), "Closed");
+            report.Record(_world.Time.GetUtcNow());
+            _world.Reports.Add(report);
+        }
+
+        var before = (await TripsOf("DRV-0002")).Single(trip => trip.TripNumber == "TR-0000012");
+        var end = DriverReport.EndTrip(new ReportId(Guid.NewGuid()), ReportsWorld.TripToday, ReportsWorld.Joost, 3, _world.Time.GetUtcNow(), "end-corr");
+        _world.Reports.Add(end);
+        var sending = (await TripsOf("DRV-0002")).Single(trip => trip.TripNumber == "TR-0000012");
+        end.Record(_world.Time.GetUtcNow());
+        var recorded = (await TripsOf("DRV-0002")).Single(trip => trip.TripNumber == "TR-0000012");
+
+        before.CanEnd.Should().BeTrue();
+        before.EndUnavailable.Should().BeNull();
+        sending.CanEnd.Should().BeFalse();
+        sending.Status.Should().Be("In progress");
+        sending.Reports[^1].Kind.Should().Be(ReportKindDto.EndTrip);
+        recorded.Status.Should().Be("Completed");
+        recorded.CanEnd.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task ARefusedStart_ShowsItsCodeAndMessage_AndCanBeSentAgain()
     {
         Report().Refuse("NotTripDay", "Trip TR-0000012 is for another day.", _world.Time.GetUtcNow());

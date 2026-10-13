@@ -37,7 +37,7 @@ public sealed partial class TrackStartTripInLoggingScope(ILogger<TrackStartTripI
         }
         else
         {
-            using var refused = logger.Track(new() { [TrackingKeys.Outcome] = TrackingKeys.Refused, [TrackingKeys.FailureCode] = "TripNotFound" });
+            using var refused = logger.Track(new() { [TrackingKeys.Outcome] = TrackingKeys.Refused, [TrackingKeys.FailureCode] = TrackingFailureCodes.TripNotFound });
             LogRefused(logger, message.TripNumber);
         }
 

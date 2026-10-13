@@ -292,6 +292,75 @@ public sealed partial class ReportingPathTests(DriverAppFixture driverApp)
     }
 
     [Fact]
+    public async Task EndingTheTrip_PublishesExactlyOneTripEndReported_OnlyOnceEveryStopHasAnOutcome_InTheTripsSession_WithTheDriverIdFromTheToken()
+    {
+        const string trip = "TR-3000014";
+        await ReceiveTripAsync(trip, Anouk);
+        using var browser = await SignedInAsync(Anouk);
+        await StartAsync(browser, trip);
+        var start = JsonNode.Parse((await driverApp.FirstPublishedForAsync(trip, Ct)).Body.ToString())!;
+        using var started = await ReportOutcomeAsync(Outcome(start, "Recorded"));
+        using var collected = await PostStopAsync(browser, trip, "collection", "collected");
+
+        using var tooEarly = await EndAsync(browser, trip);
+        using var delivery = await PostStopAsync(browser, trip, "delivery", "delivery-failed", "Dock closed");
+        using var ended = await EndAsync(browser, trip);
+        using var again = await EndAsync(browser, trip);
+        await WaitForPublishedAsync(trip, 4);
+        await Task.Delay(OutboxSettleTime, Ct);
+
+        tooEarly.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        ended.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        again.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        var published = driverApp.PublishedFor(trip);
+        published.Should().HaveCount(4, "the Start Trip, the Collected, the Delivery failed, then exactly one End Trip: the first press had a Stop open");
+        var message = published[3];
+        var body = JsonNode.Parse(message.Body.ToString())!;
+        Validate("trip-end-reported.v1.schema.json", body).IsValid.Should().BeTrue(message.Body.ToString());
+        body["eventType"]!.GetValue<string>().Should().Be("TripEndReported");
+        body["tripNumber"]!.GetValue<string>().Should().Be(trip);
+        body["driverId"]!.GetValue<string>().Should().Be(Anouk, "the Driver ID comes from the Driver's token");
+        message.SessionId.Should().Be(trip, "the End Trip is read in order after the last Stop report, in the session of the Trip");
+        message.ApplicationProperties.Should().Contain(new Dictionary<string, object>
+        {
+            ["eventType"] = "TripEndReported",
+            ["flow"] = "trip-execution",
+            ["tripNumber"] = trip,
+            ["partyId"] = Anouk,
+            ["sourceMessageId"] = body["eventId"]!.GetValue<string>(),
+        });
+        TripCardOf(await PageAsync(browser), trip).Should().Contain("End Trip").And.Contain("Sending");
+    }
+
+    [Fact]
+    public async Task ARecordedEndOutcome_MakesTheTripCompleted_AndARefusalShowsStopsOpen()
+    {
+        const string trip = "TR-3000015";
+        await ReceiveTripAsync(trip, Anouk);
+        using var browser = await SignedInAsync(Anouk);
+        await StartAsync(browser, trip);
+        var start = JsonNode.Parse((await driverApp.FirstPublishedForAsync(trip, Ct)).Body.ToString())!;
+        using var started = await ReportOutcomeAsync(Outcome(start, "Recorded"));
+        using var collected = await PostStopAsync(browser, trip, "collection", "collected");
+        using var delivery = await PostStopAsync(browser, trip, "delivery", "delivery-failed", "Dock closed");
+        using var first = await EndAsync(browser, trip);
+        await WaitForPublishedAsync(trip, 4);
+        var end = JsonNode.Parse(driverApp.PublishedFor(trip)[3].Body.ToString())!;
+
+        using var refused = await ReportOutcomeAsync(Outcome(end, "Refused", "StopsOpen", $"Trip {trip} still has open Stops."));
+        var afterRefusal = TripCardOf(await PageAsync(browser), trip);
+        using var second = await EndAsync(browser, trip);
+        await WaitForPublishedAsync(trip, 5);
+        var again = JsonNode.Parse(driverApp.PublishedFor(trip)[4].Body.ToString())!;
+        using var recorded = await ReportOutcomeAsync(Outcome(again, "Recorded"));
+
+        refused.StatusCode.Should().Be(HttpStatusCode.OK);
+        recorded.StatusCode.Should().Be(HttpStatusCode.OK);
+        afterRefusal.Should().Contain("Refused").And.Contain("StopsOpen");
+        TripCardOf(await PageAsync(browser), trip).Should().Contain("Completed");
+    }
+
+    [Fact]
     public async Task AStopOutcomeFromTheLogicApp_ShowsOnTheStop_AndARefusalShowsTheTmsCodeAndMessage()
     {
         const string trip = "TR-3000013";
@@ -457,6 +526,15 @@ public sealed partial class ReportingPathTests(DriverAppFixture driverApp)
             ? WebUtility.HtmlDecode(match.Groups[1].Value)
             : throw new InvalidOperationException("The settings page has no form with an antiforgery token.");
         return await browser.PostAsync($"/trips/{trip}/start", new FormUrlEncodedContent([new("__RequestVerificationToken", token)]), Ct);
+    }
+
+    /// <summary>Presses End Trip as the browser would: with an antiforgery token, which the demo settings page always carries.</summary>
+    private static async Task<HttpResponseMessage> EndAsync(HttpClient browser, string trip)
+    {
+        var token = AntiforgeryToken().Match(await PageAsync(browser, "/settings")) is { Success: true } match
+            ? WebUtility.HtmlDecode(match.Groups[1].Value)
+            : throw new InvalidOperationException("The settings page has no form with an antiforgery token.");
+        return await browser.PostAsync($"/trips/{trip}/end", new FormUrlEncodedContent([new("__RequestVerificationToken", token)]), Ct);
     }
 
     private Task<HttpResponseMessage> ReportOutcomeAsync(JsonObject outcome) => driverApp.DriverReports.PostAsJsonAsync("/v1/report-outcomes", outcome, Ct);
