@@ -221,6 +221,8 @@ A key that doesn't apply is left out, never sent empty.
 
 - API integration tests run the real application with `WebApplicationFactory` or `Aspire.Hosting.Testing`, against a real database in a container (Testcontainers), not the EF in-memory provider.
 - Outbound dependencies outside the application (Service Bus, other APIs) are replaced at the edge, and tests assert on the events the application would publish.
+- Every test project or class whose fixture starts an AppHost costs about 6 GB. Run those projects one at a time (`dotnet test <project>`, as CI does), never `dotnet test Norvia.slnx`, and keep a project's xUnit parallelism (`xunit.runner.json`) low enough that few AppHosts run at once: xUnit's default is one test collection per core.
+- A test that counts what was published (`before`/`after`) first waits for the events its own set-up published, as `PublishedAsync` does, so a late event is not counted as one the test caused.
 
 ### UI tests
 
