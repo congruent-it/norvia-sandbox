@@ -114,6 +114,7 @@ else
             }
             else
             {
+                <DeliverForm Action="@StopRoutes.PostDeliver(_view.TripNumber, stop.ShipmentNumber)" />
                 <RemarkForm Action="@StopRoutes.Post(_view.TripNumber, stop.ShipmentNumber, stop.Kind, StopActionDto.DeliveryFailed)" Label="Delivery failed" />
             }
         }

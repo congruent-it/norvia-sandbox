@@ -40,9 +40,9 @@ public sealed partial class TrackReportStopInLoggingScope(ILogger<TrackReportSto
         {
             var code = result.Status switch
             {
-                ResultStatus.NotFound => "StopNotFound",
-                ResultStatus.Invalid => "StopReportInvalid",
-                _ => "StopNotAvailable",
+                ResultStatus.NotFound => TrackingFailureCodes.StopNotFound,
+                ResultStatus.Invalid => TrackingFailureCodes.StopReportInvalid,
+                _ => TrackingFailureCodes.StopNotAvailable,
             };
             using var refused = logger.Track(new() { [TrackingKeys.Outcome] = TrackingKeys.Refused, [TrackingKeys.FailureCode] = code });
             LogRefused(logger, message.Action, message.ShipmentNumber, message.TripNumber, code);

@@ -199,6 +199,7 @@ if (builder.ExecutionContext.IsPublishMode)
     // Its outcome endpoint trusts Entra only, and only the Driver reports Logic App's managed identity may report (ADR 0005).
     driverAppApi.WithExternalHttpEndpoints()
         .WithAzureUserAssignedIdentity(driverAppIdentity)
+        .WithEnvironment("ConnectionStrings__driver-app-blobs", estate.DriverAppBlobEndpoint)
         .WithEnvironment("DriverEndpoint__ApiKey", driverAppSecrets.Resource.GetSecret("driver-app-endpoint-key"))
         .WithEnvironment("Authentication__Schemes__Bearer__Authority", estate.EntraIssuer)
         .WithEnvironment("Authentication__Schemes__Bearer__ValidIssuer", estate.EntraIssuer)
@@ -206,7 +207,11 @@ if (builder.ExecutionContext.IsPublishMode)
 
     // Drivers sign in to the Driver app with Entra ID. Easy Auth passes the Driver's token on, and the Driver ID is the app role
     // in it (ADR 0037). The presenter panel shows the Driver test users the estate made.
+    // The Driver's screens store the files of a Proof of delivery in the estate's transit container (ADR 0009), as the identity the estate lets
+    // write there. The connection is the container's storage account, reached with that identity.
     driverAppWeb.WithExternalHttpEndpoints()
+        .WithAzureUserAssignedIdentity(driverAppIdentity)
+        .WithEnvironment("ConnectionStrings__driver-app-blobs", estate.DriverAppBlobEndpoint)
         .PublishAsAzureContainerApp((infrastructure, app) =>
             infrastructure.Add(EntraSignIn.For(infrastructure, app, estate.DriverAppRegistrationClientId, estate.EntraIssuer)));
     partnerPortal.WithEnvironment("DriverSignIns__Domain", estate.DriverSignInDomain)
@@ -277,6 +282,11 @@ else
 
     // Locally there is no Entra ID either, so the Driver app's sign-in page stands in for it and lists the seeded Drivers (ADR 0037).
     driverAppWeb.WithEnvironment("LocalSignIn__Enabled", "true");
+
+    // Locally the Driver app's transit container is on Azurite, in the storage account the TMS's container is in. Its screens store the files; its API has the
+    // same connection because its mediator holds the Deliver handler too.
+    driverAppWeb.WithReference(blobs, "driver-app-blobs").WaitFor(blobs);
+    driverAppApi.WithReference(blobs, "driver-app-blobs").WaitFor(blobs);
 
     integrationConsole
         .WithEnvironment("LocalOperator__Name", $"{Environment.UserName} (local)")
@@ -397,6 +407,7 @@ else
         .WithReference(messaging).WaitFor(messaging)
         .WithReference(tmsApi).WaitFor(tmsApi)
         .WaitFor(driverAppApi)
+        .WithReference(blobs, "driver-app-blobs").WaitFor(blobs)
         .WithEnvironment("DriverReports__TmsBaseAddress", tmsApi.GetEndpoint("http"))
         .WithEnvironment("DriverReports__TmsTokens__Issuer", LocalTokens.Issuer)
         .WithEnvironment("DriverReports__TmsTokens__Audience", LocalTokens.TmsAudience)

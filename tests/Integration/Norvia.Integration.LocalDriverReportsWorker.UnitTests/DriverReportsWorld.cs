@@ -34,6 +34,7 @@ internal sealed class DriverReportsWorld
 
         Flow = new DriverReportsFlow(
             new TmsTripCalls(new HttpClient(Tms) { BaseAddress = Options.Value.TmsBaseAddress }, Options, Time),
+            ProofFiles,
             new DriverAppOutcomes(new HttpClient(DriverApp) { BaseAddress = Options.Value.DriverApp.BaseAddress }, Options, Time),
             Options, Time, NullLogger<DriverReportsFlow>.Instance);
     }
@@ -43,6 +44,9 @@ internal sealed class DriverReportsWorld
     public StubHttp Tms { get; }
 
     public StubHttp DriverApp { get; }
+
+    /// <summary>The Driver app's transit container: the files it holds, by blob reference, and what the flow deleted.</summary>
+    public FakeProofFiles ProofFiles { get; } = new();
 
     public IOptions<DriverReportsWorkerOptions> Options { get; }
 
@@ -84,6 +88,34 @@ internal sealed class DriverReportsWorld
         }
         """;
 
+    public const string ProofEventId = "0198e7c0-0000-7000-8000-0000000000e2";
+    public const string ProofCorrelationId = "0198e7c0-0000-7000-8000-0000000000e3";
+
+    public static string[] ProofBlobs { get; } = [$"{ProofEventId}/signature.png", $"{ProofEventId}/photo-1.jpg"];
+
+    public static string ProofCaptured(string condition = "Clean", string? remark = null, string driverId = "DRV-0002") => $$"""
+        {
+          "eventId": "{{ProofEventId}}",
+          "eventType": "ProofOfDeliveryCaptured",
+          "eventVersion": 1,
+          "occurredAt": "2030-10-03T10:12:30+02:00",
+          "correlationId": "{{ProofCorrelationId}}",
+          "tripNumber": "{{TripNumber}}",
+          "version": 3,
+          "driverId": "{{driverId}}",
+          "shipmentNumber": "SH-0000031",
+          "documentId": "{{ProofEventId}}",
+          "receivedBy": "J. Bakker",
+          "deliveryTime": "2030-10-03T10:12:30+02:00",
+          "location": { "place": "Utrecht", "postcode": "3511 AB", "countryCode": "NL" },
+          "condition": "{{condition}}"{{(remark is null ? "" : $$""", "remark": "{{remark}}" """)}},
+          "files": [
+            { "name": "signature.png", "contentType": "image/png", "blobReference": "{{ProofBlobs[0]}}" },
+            { "name": "photo-1.jpg", "contentType": "image/jpeg", "blobReference": "{{ProofBlobs[1]}}" }
+          ]
+        }
+        """;
+
     public static string Problem(int status, string code, string detail) => $$"""
         { "type": "about:blank", "title": "The Trip can't be started.", "status": {{status}}, "detail": "{{detail}}", "code": "{{code}}", "correlationId": "{{CorrelationId}}" }
         """;
@@ -120,4 +152,27 @@ internal sealed class DriverReportsWorld
     }
 
     public static StubHttp Answering(StubHttp http, HttpStatusCode status, string body = "") => http.Otherwise(status, body);
+}
+
+/// <summary>The transit container, stood in for: the files it holds by blob reference, and what was deleted from it.</summary>
+internal sealed class FakeProofFiles : IDriverProofFiles
+{
+    public Dictionary<string, byte[]> Held { get; } = new()
+    {
+        [DriverReportsWorld.ProofBlobs[0]] = [0x89, 0x50, 0x4E, 0x47, 1],
+        [DriverReportsWorld.ProofBlobs[1]] = [0xFF, 0xD8, 0xFF, 2],
+    };
+
+    public List<string> Deleted { get; } = [];
+
+    public Task<IReadOnlyList<FetchedProofFile>?> FetchAsync(IReadOnlyList<ProofFileReference> files, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<FetchedProofFile>?>(files.All(file => Held.ContainsKey(file.BlobReference))
+            ? [.. files.Select(file => new FetchedProofFile(file.Name, file.ContentType, Held[file.BlobReference]))]
+            : null);
+
+    public Task DeleteAsync(IReadOnlyList<ProofFileReference> files, CancellationToken cancellationToken)
+    {
+        Deleted.AddRange(files.Select(file => file.BlobReference));
+        return Task.CompletedTask;
+    }
 }

@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using Norvia.DriverApp.Application.Events;
+using Norvia.DriverApp.Application.Reports.Deliver;
 using Norvia.DriverApp.Domain.Reports;
 using Norvia.DriverApp.Domain.Trips;
 using NSubstitute;
@@ -40,6 +41,9 @@ public sealed class DriverAppWebFactory(string environment, bool standIn) : WebA
     /// <summary>What was queued when a report was saved: the outbox messages saved in the same transaction as their report.</summary>
     public List<DriverAppEvent> Saved { get; } = [];
 
+    /// <summary>The files the Driver app put in the transit container, by blob name, with their content type.</summary>
+    public Dictionary<string, (string ContentType, byte[] Content)> TransitFiles { get; } = [];
+
     /// <summary>Tuesday 13 October 2026, 08:05 in Norvia's time: the day of Anouk's Trip TR-0000002.</summary>
     public FakeTimeProvider Time { get; } = new(new DateTimeOffset(2026, 10, 13, 6, 5, 0, TimeSpan.Zero));
 
@@ -48,6 +52,7 @@ public sealed class DriverAppWebFactory(string environment, bool standIn) : WebA
         builder.UseEnvironment(environment);
         builder.UseSetting("Seed:Path", SeedFile);
         builder.UseSetting("ConnectionStrings:driver-app", "Server=unused;Database=unused");
+        builder.UseSetting("ConnectionStrings:driver-app-blobs", "UseDevelopmentStorage=true");
         if (standIn)
         {
             builder.UseSetting("LocalSignIn:Enabled", "true");
@@ -80,7 +85,23 @@ public sealed class DriverAppWebFactory(string environment, bool standIn) : WebA
                 Queued.Clear();
                 return report;
             });
+            reportWrites.AddRangeAsync(Arg.Any<IEnumerable<DriverReport>>(), Arg.Any<CancellationToken>()).Returns(call =>
+            {
+                var added = call.Arg<IEnumerable<DriverReport>>().ToList();
+                Reports.AddRange(added);
+                Saved.AddRange(Queued);
+                Queued.Clear();
+                return added;
+            });
             services.AddScoped(_ => reportWrites);
+
+            var transit = Substitute.For<IProofOfDeliveryTransit>();
+            transit.StoreAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<ReadOnlyMemory<byte>>(), Arg.Any<CancellationToken>()).Returns(call =>
+            {
+                TransitFiles[call.ArgAt<string>(0)] = (call.ArgAt<string>(1), call.ArgAt<ReadOnlyMemory<byte>>(2).ToArray());
+                return Task.FromResult(call.ArgAt<string>(0));
+            });
+            services.AddSingleton(transit);
 
             var outbox = Substitute.For<IDriverEventOutbox>();
             outbox.When(queue => queue.Add(Arg.Any<DriverAppEvent>())).Do(call => Queued.Add(call.Arg<DriverAppEvent>()));
@@ -96,6 +117,18 @@ public sealed class DriverAppWebFactory(string environment, bool standIn) : WebA
         var start = DriverReport.StartTrip(new ReportId(Guid.NewGuid()), new TripNumber("TR-0000002"), new DriverId(AnoukId), 1, Time.GetUtcNow(), "start-corr");
         start.Record(Time.GetUtcNow());
         Reports.Add(start);
+    }
+
+    /// <summary>Anouk has collected both Shipments of today's Trip, and the TMS recorded it, so the deliveries are open.</summary>
+    public void CollectAnouksShipments()
+    {
+        foreach (var shipment in new[] { "SH-0000001", "SH-0000002" })
+        {
+            var collected = DriverReport.ReportStop(
+                new ReportId(Guid.NewGuid()), ReportKind.Collected, new StopRef(shipment, StopKind.Collection), new ReportOrigin(new TripNumber("TR-0000002"), new DriverId(AnoukId), 1, Time.GetUtcNow(), "collect-corr"), null);
+            collected.Record(Time.GetUtcNow());
+            Reports.Add(collected);
+        }
     }
 
     /// <summary>A collection Stop for each Shipment, then a delivery Stop for each.</summary>

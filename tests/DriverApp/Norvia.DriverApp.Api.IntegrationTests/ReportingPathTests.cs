@@ -333,6 +333,73 @@ public sealed partial class ReportingPathTests(DriverAppFixture driverApp)
         card.Should().Contain("Version 2").And.Contain("Taken off by the Planner, call the Planner").And.Contain(Collection).And.Contain("Recorded");
     }
 
+    [Fact]
+    public async Task Delivering_PublishesTheDeliveredAndTheProofOfDeliveryUnderOneCorrelationId_AndStoresTheFilesInTheTransitContainer()
+    {
+        const string trip = "TR-3000015";
+        await ReceiveTripAsync(trip, Anouk);
+        using var browser = await SignedInAsync(Anouk);
+        await StartAsync(browser, trip);
+        var start = JsonNode.Parse((await driverApp.FirstPublishedForAsync(trip, Ct)).Body.ToString())!;
+        using var started = await ReportOutcomeAsync(Outcome(start, "Recorded"));
+        using var collected = await PostStopAsync(browser, trip, "collection", "collected");
+
+        using var delivered = await DeliverAsync(browser, trip);
+        await WaitForPublishedAsync(trip, 4);
+        await Task.Delay(OutboxSettleTime, Ct);
+
+        delivered.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        var published = driverApp.PublishedFor(trip);
+        published.Should().HaveCount(4, "the Start Trip, the Collected, then exactly one Delivered and one Proof of delivery");
+        var stop = JsonNode.Parse(published[2].Body.ToString())!;
+        var proof = JsonNode.Parse(published[3].Body.ToString())!;
+        Validate("stop-completed-reported.v1.schema.json", stop).IsValid.Should().BeTrue(published[2].Body.ToString());
+        Validate("proof-of-delivery-captured.v1.schema.json", proof).IsValid.Should().BeTrue(published[3].Body.ToString());
+        stop["trackingEventType"]!.GetValue<string>().Should().Be("Delivered");
+        proof["eventType"]!.GetValue<string>().Should().Be("ProofOfDeliveryCaptured");
+        proof["correlationId"]!.GetValue<string>().Should().Be(stop["correlationId"]!.GetValue<string>(), "the Delivered and its Proof of delivery are one Driver action");
+        published[3].CorrelationId.Should().Be(stop["correlationId"]!.GetValue<string>());
+        published[3].SessionId.Should().Be(trip, "the Proof of delivery is read in order after the Delivered, in the session of the Trip");
+        published[3].ApplicationProperties.Should().Contain(new Dictionary<string, object>
+        {
+            ["eventType"] = "ProofOfDeliveryCaptured",
+            ["flow"] = "trip-execution",
+            ["tripNumber"] = trip,
+            ["partyId"] = Anouk,
+            ["sourceMessageId"] = proof["eventId"]!.GetValue<string>(),
+        });
+        proof["driverId"]!.GetValue<string>().Should().Be(Anouk, "the Driver ID comes from the Driver's token");
+        proof["files"]!.AsArray().Select(file => file!["name"]!.GetValue<string>()).Should().Equal("signature.png", "photo-1.jpg");
+        var documentId = proof["documentId"]!.GetValue<string>();
+        (await driverApp.TransitBlobsAsync(documentId, Ct)).Should().BeEquivalentTo(proof["files"]!.AsArray().Select(file => file!["blobReference"]!.GetValue<string>()));
+        var card = TripCardOf(await PageAsync(browser), trip);
+        card.Should().Contain($"Delivered {Collection}").And.Contain("Proof of delivery").And.Contain("Sending");
+    }
+
+    [Fact]
+    public async Task AProofOfDeliveryTheTmsRefused_ShowsRefusedOnTheStop_WhileTheDeliveredStaysRecorded()
+    {
+        const string trip = "TR-3000016";
+        await ReceiveTripAsync(trip, Anouk);
+        using var browser = await SignedInAsync(Anouk);
+        await StartAsync(browser, trip);
+        var start = JsonNode.Parse((await driverApp.FirstPublishedForAsync(trip, Ct)).Body.ToString())!;
+        using var started = await ReportOutcomeAsync(Outcome(start, "Recorded"));
+        using var collected = await PostStopAsync(browser, trip, "collection", "collected");
+        using var delivered = await DeliverAsync(browser, trip);
+        await WaitForPublishedAsync(trip, 4);
+        var stop = JsonNode.Parse(driverApp.PublishedFor(trip)[2].Body.ToString())!;
+        var proof = JsonNode.Parse(driverApp.PublishedFor(trip)[3].Body.ToString())!;
+
+        using var recorded = await ReportOutcomeAsync(Outcome(stop, "Recorded"));
+        using var refused = await ReportOutcomeAsync(Outcome(proof, "Refused", "FileNotAccepted", "File photo-1.jpg isn't a PDF, JPEG or PNG."));
+
+        recorded.StatusCode.Should().Be(HttpStatusCode.OK);
+        refused.StatusCode.Should().Be(HttpStatusCode.OK);
+        var page = await PageAsync(browser, $"/trips/{trip}/stops/{Collection}/delivery");
+        page.Should().Contain("This Stop is done.").And.Contain("FileNotAccepted").And.Contain("File photo-1.jpg isn&#x27;t a PDF, JPEG or PNG.");
+    }
+
     private async Task WaitForPublishedAsync(string trip, int count)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(Ct);
@@ -427,6 +494,27 @@ public sealed partial class ReportingPathTests(DriverAppFixture driverApp)
         var next = page.IndexOf("aria-label=\"Trip TR-", start + 1, StringComparison.Ordinal);
         return page[start..(next < 0 ? page.Length : next)];
     }
+
+    /// <summary>Delivers the Trip's only Shipment as the browser would: the Proof of delivery form with a drawn signature and a photo, and an antiforgery token.</summary>
+    private static async Task<HttpResponseMessage> DeliverAsync(HttpClient browser, string trip)
+    {
+        var token = AntiforgeryToken().Match(await PageAsync(browser, "/settings")) is { Success: true } match
+            ? DecodeToken(match.Groups[1].Value)
+            : throw new InvalidOperationException("The settings page has no form with an antiforgery token.");
+        using var form = new MultipartFormDataContent
+        {
+            { new StringContent(token), "__RequestVerificationToken" },
+            { new StringContent("J. Bakker"), "receivedBy" },
+            { new StringContent("clean"), "condition" },
+            { new StringContent("data:image/png;base64," + Convert.ToBase64String([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3])), "signature" },
+        };
+        var photo = new ByteArrayContent([0xFF, 0xD8, 0xFF, 0xE0, 4, 5, 6]);
+        photo.Headers.ContentType = new("image/jpeg");
+        form.Add(photo, "photos", "camera.jpg");
+        return await browser.PostAsync($"/trips/{trip}/stops/{Collection}/delivery/deliver", form, Ct);
+    }
+
+    private static string DecodeToken(string value) => WebUtility.HtmlDecode(value);
 
     private static EvaluationResults Validate(string schemaFile, JsonNode body)
     {

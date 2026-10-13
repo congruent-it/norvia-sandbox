@@ -48,3 +48,10 @@ h3 { font-size: 1.125rem; margin: 0 0 0.5rem; display: flex; flex-wrap: wrap; al
 
 .stop-title a { color: var(--accent); }
 .remark-form { display: grid; gap: 0.5rem; margin: 1rem 0; }
+
+.deliver-form { display: grid; gap: 0.75rem; margin: 1rem 0; padding: 1rem; background: #fff; border: 1px solid var(--rule); border-radius: 0.5rem; }
+.deliver-form label { display: grid; gap: 0.25rem; }
+.deliver-form fieldset { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; border: 0; padding: 0; margin: 0; }
+.deliver-form fieldset label { display: flex; align-items: center; gap: 0.5rem; }
+.signature { display: grid; gap: 0.25rem; justify-items: start; }
+.signature canvas { width: 100%; max-width: 30rem; aspect-ratio: 5 / 2; background: #fff; border: 1px dashed var(--muted); border-radius: 0.5rem; touch-action: none; }

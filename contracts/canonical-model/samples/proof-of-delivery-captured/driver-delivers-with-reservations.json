@@ -1,0 +1,22 @@
+{
+  "eventId": "0198e7c0-0000-7000-8000-0000000000e5",
+  "eventType": "ProofOfDeliveryCaptured",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-13T14:40:05+02:00",
+  "correlationId": "0198e7c0-0000-7000-8000-0000000000e6",
+  "tripNumber": "TR-0000012",
+  "version": 2,
+  "driverId": "DRV-0002",
+  "shipmentNumber": "SH-0000033",
+  "documentId": "0198e7c0-0000-7000-8000-0000000000e5",
+  "receivedBy": "A. de Vries",
+  "deliveryTime": "2026-10-13T14:40:05+02:00",
+  "location": { "place": "Utrecht", "postcode": "3511 AB", "countryCode": "NL" },
+  "condition": "Reservations",
+  "remark": "Two cartons crushed",
+  "files": [
+    { "name": "signature.png", "contentType": "image/png", "blobReference": "0198e7c0-0000-7000-8000-0000000000e5/signature.png" },
+    { "name": "photo-1.jpg", "contentType": "image/jpeg", "blobReference": "0198e7c0-0000-7000-8000-0000000000e5/photo-1.jpg" },
+    { "name": "photo-2.png", "contentType": "image/png", "blobReference": "0198e7c0-0000-7000-8000-0000000000e5/photo-2.png" }
+  ]
+}

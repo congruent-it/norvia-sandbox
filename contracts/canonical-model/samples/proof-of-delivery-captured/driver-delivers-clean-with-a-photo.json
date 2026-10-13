@@ -1,0 +1,20 @@
+{
+  "eventId": "0198e7c0-0000-7000-8000-0000000000e2",
+  "eventType": "ProofOfDeliveryCaptured",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-13T10:12:30+02:00",
+  "correlationId": "0198e7c0-0000-7000-8000-0000000000e3",
+  "tripNumber": "TR-0000012",
+  "version": 2,
+  "driverId": "DRV-0002",
+  "shipmentNumber": "SH-0000031",
+  "documentId": "0198e7c0-0000-7000-8000-0000000000e2",
+  "receivedBy": "J. Bakker",
+  "deliveryTime": "2026-10-13T10:12:30+02:00",
+  "location": { "place": "Utrecht", "postcode": "3511 AB", "countryCode": "NL" },
+  "condition": "Clean",
+  "files": [
+    { "name": "signature.png", "contentType": "image/png", "blobReference": "0198e7c0-0000-7000-8000-0000000000e2/signature.png" },
+    { "name": "photo-1.jpg", "contentType": "image/jpeg", "blobReference": "0198e7c0-0000-7000-8000-0000000000e2/photo-1.jpg" }
+  ]
+}

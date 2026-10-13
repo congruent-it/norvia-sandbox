@@ -12,6 +12,9 @@ internal static class StopRoutes
     public static string Post(string tripNumber, string shipmentNumber, StopKindDto kind, StopActionDto action) =>
         $"{Screen(tripNumber, shipmentNumber, kind)}/{Segment(action)}";
 
+    /// <summary>The post of the Proof of delivery form, which has a route of its own: it carries files.</summary>
+    public static string PostDeliver(string tripNumber, string shipmentNumber) => $"{Screen(tripNumber, shipmentNumber, StopKindDto.Delivery)}/deliver";
+
     public static string Segment(StopKindDto kind) => kind == StopKindDto.Collection ? "collection" : "delivery";
 
     public static string Segment(StopActionDto action) => action switch

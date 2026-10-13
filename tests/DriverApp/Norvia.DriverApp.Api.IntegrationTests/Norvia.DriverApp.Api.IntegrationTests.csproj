@@ -3,6 +3,7 @@
     <OutputType>Exe</OutputType>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Aspire.Azure.Storage.Blobs" />
     <PackageReference Include="Aspire.Hosting.Testing" />
     <PackageReference Include="AwesomeAssertions" />
     <PackageReference Include="Azure.Messaging.ServiceBus" />
@@ -22,6 +23,7 @@
     <None Include="..\..\..\contracts\canonical-model\samples\trip-dispatched\*.json" Link="Samples\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\..\contracts\canonical-model\trip-start-reported.v1.schema.json" Link="Contracts\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\..\contracts\canonical-model\stop-completed-reported.v1.schema.json" Link="Contracts\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\..\contracts\canonical-model\proof-of-delivery-captured.v1.schema.json" Link="Contracts\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\..\contracts\canonical-model\driver-report-outcome.v1.schema.json" Link="Contracts\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

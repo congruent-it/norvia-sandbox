@@ -6,6 +6,8 @@ var builder = Host.CreateApplicationBuilder(args);
 
 builder.AddServiceDefaults();
 builder.AddAzureServiceBusClient("messaging");
+builder.AddAzureBlobServiceClient("driver-app-blobs");
+builder.Services.AddSingleton<IDriverProofFiles, BlobDriverProofFiles>();
 
 builder.Services.AddOptions<DriverReportsWorkerOptions>().BindConfiguration(DriverReportsWorkerOptions.SectionName)
     .ValidateDataAnnotations()

@@ -1,6 +1,7 @@
 using Ardalis.Result;
 using Mediator;
 using Microsoft.FluentUI.AspNetCore.Components;
+using Norvia.DriverApp.Application.Reports.Deliver;
 using Norvia.DriverApp.Application.Reports.ReportStop;
 using Norvia.DriverApp.Application.Reports.StartTrip;
 using Norvia.DriverApp.Application.Trips.Receive;
@@ -18,9 +19,11 @@ builder.AddServiceDefaults();
 // Services (ADR 0001): the Trip dispatch Logic App pushes Trips to its API, and nothing here calls the TMS.
 builder.AddDriverAppInfrastructure();
 builder.AddDriverAppSeedDrivers();
+builder.AddDriverAppProofOfDeliveryTransit();
 builder.AddDriverSignIn();
 builder.Services.AddScoped<IPipelineBehavior<StartTripCommand, Result<StartTripResult>>, TrackStartTripInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<ReportStopCommand, Result<ReportStopResult>>, TrackReportStopInLoggingScope>();
+builder.Services.AddScoped<IPipelineBehavior<DeliverCommand, Result<DeliverResult>>, TrackDeliverInLoggingScope>();
 builder.Services.AddMediator(options =>
 {
     options.ServiceLifetime = ServiceLifetime.Scoped;

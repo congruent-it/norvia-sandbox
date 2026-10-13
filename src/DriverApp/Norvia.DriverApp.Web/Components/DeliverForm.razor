@@ -1,0 +1,42 @@
+@using Norvia.DriverApp.Application.Reports.Deliver
+@* The Proof of delivery form (P12, P6): who received, clean or with reservations, a signature drawn on screen and up to four photos. Plain form post. *@
+<form method="post" action="@Action" enctype="multipart/form-data" aria-label="Proof of delivery" class="deliver-form">
+    <AntiforgeryToken />
+    <h2>Proof of delivery</h2>
+
+    <label>
+        Received by
+        <input type="text" name="receivedBy" required maxlength="@DeliverCommand.MaximumReceivedByLength" autocomplete="off" />
+    </label>
+
+    <fieldset>
+        <legend>Condition</legend>
+        <label><input type="radio" name="condition" value="clean" checked /> Clean</label>
+        <label><input type="radio" name="condition" value="reservations" /> With reservations</label>
+    </fieldset>
+
+    <label>
+        Remark (required with reservations)
+        <textarea name="remark" rows="3" maxlength="@DeliverCommand.MaximumRemarkLength"></textarea>
+    </label>
+
+    <div class="signature">
+        <span id="signature-label">Signature</span>
+        <canvas data-signature width="600" height="240" role="img" aria-labelledby="signature-label"></canvas>
+        <input type="hidden" name="signature" data-signature-field />
+        <button type="button" class="link-button" data-signature-clear>Clear signature</button>
+        <noscript><span class="muted">Drawing a signature needs JavaScript.</span></noscript>
+    </div>
+
+    <label>
+        Photos (up to @DeliverCommand.MaximumPhotos, JPEG or PNG)
+        <input type="file" name="photos" accept="image/jpeg,image/png" multiple />
+    </label>
+
+    <FluentButton Type="ButtonType.Submit" Appearance="Appearance.Accent">Deliver</FluentButton>
+</form>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Action { get; set; } = null!;
+}

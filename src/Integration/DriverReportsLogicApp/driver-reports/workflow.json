@@ -36,7 +36,12 @@
           "stop": "@json(base64ToString(triggerBody()?['contentData']))?['stop']",
           "trackingEventType": "@json(base64ToString(triggerBody()?['contentData']))?['trackingEventType']",
           "location": "@json(base64ToString(triggerBody()?['contentData']))?['location']",
-          "remark": "@json(base64ToString(triggerBody()?['contentData']))?['remark']"
+          "remark": "@json(base64ToString(triggerBody()?['contentData']))?['remark']",
+          "documentId": "@json(base64ToString(triggerBody()?['contentData']))?['documentId']",
+          "receivedBy": "@json(base64ToString(triggerBody()?['contentData']))?['receivedBy']",
+          "deliveryTime": "@json(base64ToString(triggerBody()?['contentData']))?['deliveryTime']",
+          "condition": "@json(base64ToString(triggerBody()?['contentData']))?['condition']",
+          "files": "@json(base64ToString(triggerBody()?['contentData']))?['files']"
         },
         "runAfter": {},
         "trackedProperties": {
@@ -48,11 +53,29 @@
           "sourceMessageId": "@action()?['inputs']?['sourceMessageId']"
         }
       },
+      "Initialize_the_file_parts": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "fileParts",
+              "type": "array",
+              "value": []
+            }
+          ]
+        },
+        "runAfter": {
+          "Track_the_report": [
+            "Succeeded",
+            "Failed"
+          ]
+        }
+      },
       "Check_the_report": {
         "type": "If",
         "expression": {
           "equals": [
-            "@and(equals(actions('Track_the_report')?['status'], 'Succeeded'), not(empty(outputs('Track_the_report')?['correlationId'])), not(empty(outputs('Track_the_report')?['tripNumber'])), not(empty(outputs('Track_the_report')?['partyId'])), not(empty(outputs('Track_the_report')?['sourceMessageId'])), or(equals(outputs('Track_the_report')?['eventType'], 'TripStartReported'), and(equals(outputs('Track_the_report')?['eventType'], 'StopCompletedReported'), not(empty(outputs('Track_the_report')?['shipmentNumber'])), not(empty(outputs('Track_the_report')?['trackingEventType'])), not(empty(outputs('Track_the_report')?['version'])), not(empty(outputs('Track_the_report')?['occurredAt'])), not(empty(outputs('Track_the_report')?['location']?['place'])), not(empty(outputs('Track_the_report')?['location']?['postcode'])), not(empty(outputs('Track_the_report')?['location']?['countryCode'])))))",
+            "@and(equals(actions('Track_the_report')?['status'], 'Succeeded'), not(empty(outputs('Track_the_report')?['correlationId'])), not(empty(outputs('Track_the_report')?['tripNumber'])), not(empty(outputs('Track_the_report')?['partyId'])), not(empty(outputs('Track_the_report')?['sourceMessageId'])), or(equals(outputs('Track_the_report')?['eventType'], 'TripStartReported'), and(equals(outputs('Track_the_report')?['eventType'], 'StopCompletedReported'), not(empty(outputs('Track_the_report')?['shipmentNumber'])), not(empty(outputs('Track_the_report')?['trackingEventType'])), not(empty(outputs('Track_the_report')?['version'])), not(empty(outputs('Track_the_report')?['occurredAt'])), not(empty(outputs('Track_the_report')?['location']?['place'])), not(empty(outputs('Track_the_report')?['location']?['postcode'])), not(empty(outputs('Track_the_report')?['location']?['countryCode']))), and(equals(outputs('Track_the_report')?['eventType'], 'ProofOfDeliveryCaptured'), not(empty(outputs('Track_the_report')?['shipmentNumber'])), not(empty(outputs('Track_the_report')?['version'])), not(empty(outputs('Track_the_report')?['documentId'])), not(empty(outputs('Track_the_report')?['receivedBy'])), not(empty(outputs('Track_the_report')?['deliveryTime'])), not(empty(outputs('Track_the_report')?['condition'])), not(empty(outputs('Track_the_report')?['location']?['place'])), not(empty(outputs('Track_the_report')?['location']?['postcode'])), not(empty(outputs('Track_the_report')?['location']?['countryCode'])), greater(length(coalesce(outputs('Track_the_report')?['files'], json('[]'))), 0))))",
             true
           ]
         },
@@ -90,13 +113,209 @@
               ]
             }
           },
+          "Fetch_the_files": {
+            "type": "Foreach",
+            "foreach": "@coalesce(outputs('Track_the_report')?['files'], json('[]'))",
+            "actions": {
+              "Read_the_file": {
+                "type": "ServiceProvider",
+                "inputs": {
+                  "parameters": {
+                    "containerName": "@parameters('driverProofsContainer')",
+                    "blobName": "@{items('Fetch_the_files')?['blobReference']}"
+                  },
+                  "serviceProviderConfiguration": {
+                    "connectionName": "AzureBlob",
+                    "operationId": "readBlob",
+                    "serviceProviderId": "/serviceProviders/AzureBlob"
+                  }
+                },
+                "runAfter": {}
+              },
+              "Append_the_file_part": {
+                "type": "AppendToArrayVariable",
+                "inputs": {
+                  "name": "fileParts",
+                  "value": {
+                    "headers": {
+                      "Content-Disposition": "form-data; name=\"files\"; filename=\"@{items('Fetch_the_files')?['name']}\"",
+                      "Content-Type": "@{items('Fetch_the_files')?['contentType']}"
+                    },
+                    "body": "@outputs('Read_the_file')?['content']"
+                  }
+                },
+                "runAfter": {
+                  "Read_the_file": [
+                    "Succeeded"
+                  ]
+                }
+              }
+            },
+            "runAfter": {
+              "Build_the_Tracking_event": [
+                "Succeeded"
+              ]
+            },
+            "runtimeConfiguration": {
+              "concurrency": {
+                "repetitions": 1
+              }
+            }
+          },
+          "Select_the_file_descriptions": {
+            "type": "Select",
+            "inputs": {
+              "from": "@coalesce(outputs('Track_the_report')?['files'], json('[]'))",
+              "select": {
+                "name": "@item()?['name']",
+                "contentType": "@item()?['contentType']"
+              }
+            },
+            "runAfter": {
+              "Fetch_the_files": [
+                "Succeeded"
+              ]
+            }
+          },
+          "Build_the_Proof_of_delivery": {
+            "type": "Compose",
+            "inputs": {
+              "documentId": "@outputs('Track_the_report')?['documentId']",
+              "source": {
+                "type": "OwnFleet",
+                "driverId": "@outputs('Track_the_report')?['partyId']"
+              },
+              "tripNumber": "@outputs('Track_the_report')?['tripNumber']",
+              "shipmentNumber": "@outputs('Track_the_report')?['shipmentNumber']",
+              "tripVersion": "@outputs('Track_the_report')?['version']",
+              "receivedBy": "@outputs('Track_the_report')?['receivedBy']",
+              "deliveryTime": "@outputs('Track_the_report')?['deliveryTime']",
+              "location": {
+                "place": "@outputs('Track_the_report')?['location']?['place']",
+                "postcode": "@outputs('Track_the_report')?['location']?['postcode']",
+                "countryCode": "@outputs('Track_the_report')?['location']?['countryCode']"
+              },
+              "condition": "@outputs('Track_the_report')?['condition']",
+              "files": "@body('Select_the_file_descriptions')"
+            },
+            "runAfter": {
+              "Select_the_file_descriptions": [
+                "Succeeded"
+              ]
+            }
+          },
+          "Build_the_Proof_of_delivery_multipart": {
+            "type": "Compose",
+            "inputs": {
+              "$content-type": "multipart/form-data",
+              "$multipart": "@union(createArray(createObject('headers', createObject('Content-Disposition', 'form-data; name=\"metadata\"'), 'body', if(empty(outputs('Track_the_report')?['remark']), outputs('Build_the_Proof_of_delivery'), addProperty(outputs('Build_the_Proof_of_delivery'), 'remark', outputs('Track_the_report')?['remark'])))), variables('fileParts'))"
+            },
+            "runAfter": {
+              "Build_the_Proof_of_delivery": [
+                "Succeeded"
+              ]
+            }
+          },
+          "Dead_letter_the_report_whose_files_are_gone": {
+            "type": "ServiceProvider",
+            "inputs": {
+              "serviceProviderConfiguration": {
+                "connectionName": "serviceBus",
+                "operationId": "deadLetterMessageInSession",
+                "serviceProviderId": "/serviceProviders/serviceBus"
+              },
+              "parameters": {
+                "messageId": "@triggerBody()?['messageId']",
+                "lockToken": "@triggerBody()?['lockToken']",
+                "deadLetterReason": "ProofOfDeliveryFilesGone",
+                "deadLetterErrorDescription": "The Proof of delivery's files could not be read from the Driver app's transit container, so nothing was sent to the TMS."
+              }
+            },
+            "runAfter": {
+              "Fetch_the_files": [
+                "Failed",
+                "TimedOut"
+              ]
+            },
+            "trackedProperties": {
+              "correlationId": "@outputs('Track_the_report')?['correlationId']",
+              "flow": "trip-execution",
+              "partyId": "@outputs('Track_the_report')?['partyId']",
+              "tripNumber": "@outputs('Track_the_report')?['tripNumber']",
+              "shipmentNumber": "@outputs('Track_the_report')?['shipmentNumber']",
+              "sourceMessageId": "@outputs('Track_the_report')?['sourceMessageId']",
+              "outcome": "DeadLettered",
+              "failureCode": "ProofOfDeliveryFilesGone"
+            }
+          },
+          "Report_the_files_are_gone": {
+            "type": "Http",
+            "inputs": {
+              "method": "POST",
+              "uri": "@{parameters('driverAppBaseUrl')}/v1/report-outcomes",
+              "headers": {
+                "Content-Type": "application/json",
+                "X-Correlation-ID": "@{outputs('Track_the_report')?['correlationId']}"
+              },
+              "authentication": {
+                "type": "ManagedServiceIdentity",
+                "identity": "@parameters('driverReportsIdentityId')",
+                "audience": "@parameters('driverAppAudience')"
+              },
+              "retryPolicy": {
+                "type": "exponential",
+                "count": 3,
+                "interval": "PT5S",
+                "minimumInterval": "PT5S",
+                "maximumInterval": "PT20S"
+              },
+              "body": {
+                "driverAppEventId": "@outputs('Track_the_report')?['sourceMessageId']",
+                "tripNumber": "@outputs('Track_the_report')?['tripNumber']",
+                "correlationId": "@outputs('Track_the_report')?['correlationId']",
+                "outcome": "NotRecorded",
+                "failureCode": "ProofOfDeliveryFilesGone",
+                "message": "The Proof of delivery's files could not be read from the Driver app's transit container, so nothing was sent to the TMS."
+              }
+            },
+            "runAfter": {
+              "Dead_letter_the_report_whose_files_are_gone": [
+                "Succeeded"
+              ]
+            },
+            "trackedProperties": {
+              "correlationId": "@outputs('Track_the_report')?['correlationId']",
+              "flow": "trip-execution",
+              "partyId": "@outputs('Track_the_report')?['partyId']",
+              "tripNumber": "@outputs('Track_the_report')?['tripNumber']",
+              "shipmentNumber": "@outputs('Track_the_report')?['shipmentNumber']",
+              "sourceMessageId": "@outputs('Track_the_report')?['sourceMessageId']",
+              "outcome": "@if(and(greaterOrEquals(coalesce(actions('Report_the_files_are_gone')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_files_are_gone')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
+              "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Report_the_files_are_gone')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_files_are_gone')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Report_the_files_are_gone')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Report_the_files_are_gone')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Report_the_files_are_gone')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Report_the_files_are_gone')?['outputs']?['statusCode'], 0), 500)), 'DriverAppUnavailable', 'DriverAppRefused'))"
+            }
+          },
+          "Fail_the_run_on_the_files_that_are_gone": {
+            "type": "Terminate",
+            "inputs": {
+              "runStatus": "Failed",
+              "runError": {
+                "code": "ProofOfDeliveryFilesGone",
+                "message": "The Proof of delivery's files could not be read from the Driver app's transit container, so nothing was sent to the TMS. The message was dead-lettered and the Driver app told it was not recorded."
+              }
+            },
+            "runAfter": {
+              "Report_the_files_are_gone": [
+                "Succeeded",
+                "Failed"
+              ]
+            }
+          },
           "Send_the_report_to_the_TMS": {
             "type": "Http",
             "inputs": {
               "method": "POST",
-              "uri": "@{parameters('tmsBaseUrl')}/v1/@{if(equals(outputs('Track_the_report')?['eventType'], 'StopCompletedReported'), 'tracking-events', concat('trips/', outputs('Track_the_report')?['tripNumber'], '/start'))}",
+              "uri": "@{parameters('tmsBaseUrl')}/v1/@{if(equals(outputs('Track_the_report')?['eventType'], 'ProofOfDeliveryCaptured'), 'proofs-of-delivery', if(equals(outputs('Track_the_report')?['eventType'], 'StopCompletedReported'), 'tracking-events', concat('trips/', outputs('Track_the_report')?['tripNumber'], '/start')))}",
               "headers": {
-                "Content-Type": "application/json",
                 "X-Correlation-ID": "@{outputs('Track_the_report')?['correlationId']}"
               },
               "authentication": {
@@ -111,10 +330,10 @@
                 "minimumInterval": "PT5S",
                 "maximumInterval": "PT20S"
               },
-              "body": "@if(equals(outputs('Track_the_report')?['eventType'], 'StopCompletedReported'), if(empty(outputs('Track_the_report')?['remark']), outputs('Build_the_Tracking_event'), addProperty(outputs('Build_the_Tracking_event'), 'remark', outputs('Track_the_report')?['remark'])), outputs('Build_the_Trip_start'))"
+              "body": "@if(equals(outputs('Track_the_report')?['eventType'], 'ProofOfDeliveryCaptured'), outputs('Build_the_Proof_of_delivery_multipart'), if(equals(outputs('Track_the_report')?['eventType'], 'StopCompletedReported'), if(empty(outputs('Track_the_report')?['remark']), outputs('Build_the_Tracking_event'), addProperty(outputs('Build_the_Tracking_event'), 'remark', outputs('Track_the_report')?['remark'])), outputs('Build_the_Trip_start')))"
             },
             "runAfter": {
-              "Build_the_Tracking_event": [
+              "Build_the_Proof_of_delivery_multipart": [
                 "Succeeded"
               ]
             },
@@ -195,6 +414,38 @@
                   "sourceMessageId": "@outputs('Track_the_report')?['sourceMessageId']",
                   "outcome": "@if(and(greaterOrEquals(coalesce(actions('Report_recorded')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_recorded')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
                   "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Report_recorded')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_recorded')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Report_recorded')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Report_recorded')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Report_recorded')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Report_recorded')?['outputs']?['statusCode'], 0), 500)), 'DriverAppUnavailable', 'DriverAppRefused'))"
+                }
+              },
+              "Delete_the_files": {
+                "type": "Foreach",
+                "foreach": "@coalesce(outputs('Track_the_report')?['files'], json('[]'))",
+                "actions": {
+                  "Delete_the_file": {
+                    "type": "ServiceProvider",
+                    "inputs": {
+                      "parameters": {
+                        "containerName": "@parameters('driverProofsContainer')",
+                        "blobName": "@{items('Delete_the_files')?['blobReference']}"
+                      },
+                      "serviceProviderConfiguration": {
+                        "connectionName": "AzureBlob",
+                        "operationId": "deleteBlob",
+                        "serviceProviderId": "/serviceProviders/AzureBlob"
+                      }
+                    },
+                    "runAfter": {}
+                  }
+                },
+                "runAfter": {
+                  "Report_recorded": [
+                    "Succeeded",
+                    "Failed"
+                  ]
+                },
+                "runtimeConfiguration": {
+                  "concurrency": {
+                    "repetitions": 1
+                  }
                 }
               }
             },
@@ -387,7 +638,7 @@
                   "messageId": "@triggerBody()?['messageId']",
                   "lockToken": "@triggerBody()?['lockToken']",
                   "deadLetterReason": "DriverReportUnreadable",
-                  "deadLetterErrorDescription": "The message isn't a Trip start or a Stop report the Driver app made, so nothing was sent to the TMS."
+                  "deadLetterErrorDescription": "The message isn't a Trip start, a Stop report or a Proof of delivery the Driver app made, so nothing was sent to the TMS."
                 }
               },
               "runAfter": {},
@@ -408,7 +659,7 @@
                 "runStatus": "Failed",
                 "runError": {
                   "code": "DriverReportUnreadable",
-                  "message": "The message isn't a Trip start or a Stop report the Driver app made, so it was dead-lettered."
+                  "message": "The message isn't a Trip start, a Stop report or a Proof of delivery the Driver app made, so it was dead-lettered."
                 }
               },
               "runAfter": {
@@ -421,7 +672,7 @@
           }
         },
         "runAfter": {
-          "Track_the_report": [
+          "Initialize_the_file_parts": [
             "Succeeded",
             "Failed"
           ]

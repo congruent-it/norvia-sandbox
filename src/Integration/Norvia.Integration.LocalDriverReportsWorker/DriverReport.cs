@@ -9,12 +9,19 @@ namespace Norvia.Integration.LocalDriverReportsWorker;
 /// <summary>What a Stop report names for the TMS's Tracking event: the Shipment, the Tracking event type, where and what the Driver said.</summary>
 internal sealed record StopReport(int TripVersion, string OccurredAt, string ShipmentNumber, string TrackingEventType, string Place, string Postcode, string CountryCode, string? Remark);
 
-/// <summary>What a <c>TripStartReported</c> or a <c>StopCompletedReported</c> names, and the tracking contract's keys it gives the trail.</summary>
+/// <summary>What a <c>ProofOfDeliveryCaptured</c> names for the TMS's Proof of delivery: the metadata of P6's multipart call, and where the files wait.</summary>
+internal sealed record ProofOfDeliveryReport(
+    int TripVersion, string ShipmentNumber, string DocumentId, string ReceivedBy, string DeliveryTime, string Place, string Postcode, string CountryCode, string Condition, string? Remark,
+    IReadOnlyList<ProofFileReference> Files);
+
+/// <summary>What a <c>TripStartReported</c>, a <c>StopCompletedReported</c> or a <c>ProofOfDeliveryCaptured</c> names, and the tracking contract's keys it gives the trail.</summary>
 /// <param name="Stop">What the TMS's Tracking event needs when the report is a Stop report; null for a Start Trip.</param>
-internal sealed record DriverReport(string EventId, string CorrelationId, string TripNumber, string DriverId, StopReport? Stop)
+/// <param name="Proof">What the TMS's Proof of delivery needs when the report is a Proof of delivery; null otherwise.</param>
+internal sealed record DriverReport(string EventId, string CorrelationId, string TripNumber, string DriverId, StopReport? Stop, ProofOfDeliveryReport? Proof = null)
 {
     private const string TripStartReported = "TripStartReported";
     private const string StopCompletedReported = "StopCompletedReported";
+    private const string ProofOfDeliveryCaptured = "ProofOfDeliveryCaptured";
 
     public Dictionary<string, object?> ContractKeys => new()
     {
@@ -23,7 +30,7 @@ internal sealed record DriverReport(string EventId, string CorrelationId, string
         [TrackingKeys.PartyId] = DriverId,
         [TrackingKeys.TripNumber] = TripNumber,
         [TrackingKeys.SourceMessageId] = EventId,
-        ["shipmentNumber"] = Stop?.ShipmentNumber,
+        ["shipmentNumber"] = Stop?.ShipmentNumber ?? Proof?.ShipmentNumber,
     };
 
     /// <summary>The report the message holds, or null when it isn't one the TMS can be asked to record.</summary>
@@ -52,8 +59,44 @@ internal sealed record DriverReport(string EventId, string CorrelationId, string
         {
             TripStartReported => new(eventId, correlationId, tripNumber, driverId, null),
             StopCompletedReported => ReadStop(parsed) is { } stop ? new(eventId, correlationId, tripNumber, driverId, stop) : null,
+            ProofOfDeliveryCaptured => ReadProof(parsed) is { } proof ? new(eventId, correlationId, tripNumber, driverId, null, proof) : null,
             _ => null,
         };
+    }
+
+    private static ProofOfDeliveryReport? ReadProof(JsonObject parsed)
+    {
+        var location = parsed["location"] as JsonObject;
+        if (parsed["version"] is not JsonValue version || !version.TryGetValue<int>(out var held) || held < 1
+            || JsonFields.Text(parsed, "shipmentNumber") is not { } shipmentNumber
+            || JsonFields.Text(parsed, "documentId") is not { } documentId
+            || JsonFields.Text(parsed, "receivedBy") is not { } receivedBy
+            || JsonFields.Text(parsed, "deliveryTime") is not { } deliveryTime || !DateTimeOffset.TryParse(deliveryTime, CultureInfo.InvariantCulture, out _)
+            || JsonFields.Text(parsed, "condition") is not { } condition
+            || location is null
+            || JsonFields.Text(location, "place") is not { } place
+            || JsonFields.Text(location, "postcode") is not { } postcode
+            || JsonFields.Text(location, "countryCode") is not { } countryCode
+            || parsed["files"] is not JsonArray { Count: > 0 } fileNodes)
+        {
+            return null;
+        }
+
+        var files = new List<ProofFileReference>();
+        foreach (var node in fileNodes)
+        {
+            if (node is not JsonObject file
+                || JsonFields.Text(file, "name") is not { } name
+                || JsonFields.Text(file, "contentType") is not { } contentType
+                || JsonFields.Text(file, "blobReference") is not { } blobReference)
+            {
+                return null;
+            }
+
+            files.Add(new ProofFileReference(name, contentType, blobReference));
+        }
+
+        return new ProofOfDeliveryReport(held, shipmentNumber, documentId, receivedBy, deliveryTime, place, postcode, countryCode, condition, JsonFields.Text(parsed, "remark"), files);
     }
 
     private static StopReport? ReadStop(JsonObject parsed)

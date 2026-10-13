@@ -138,7 +138,7 @@ resource driverReportsFilter 'Microsoft.ServiceBus/namespaces/topics/subscriptio
   properties: {
     filterType: 'SqlFilter'
     sqlFilter: {
-      sqlExpression: '((eventType = \'TripStartReported\' OR eventType = \'StopCompletedReported\') AND resubmitTo IS NULL) OR resubmitTo = \'driver-reports\''
+      sqlExpression: '((eventType = \'TripStartReported\' OR eventType = \'StopCompletedReported\' OR eventType = \'ProofOfDeliveryCaptured\') AND resubmitTo IS NULL) OR resubmitTo = \'driver-reports\''
     }
   }
 }

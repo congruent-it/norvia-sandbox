@@ -525,6 +525,28 @@ public sealed class AppHostModelTests
     }
 
     [Fact]
+    public async Task Locally_TheDriverApp_AndTheDriverReportsWorker_ShareTheTransitContainerOnAzurite()
+    {
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(TestContext.Current.CancellationToken);
+
+        (await EnvironmentOfAsync(builder, "driver-app-web")).Keys.Should().Contain("ConnectionStrings__driver-app-blobs");
+        (await EnvironmentOfAsync(builder, "driver-reports-worker")).Keys.Should().Contain("ConnectionStrings__driver-app-blobs");
+        (await EnvironmentOfAsync(builder, "driver-app-api")).Keys.Should().Contain("ConnectionStrings__driver-app-blobs", "its mediator holds the Deliver handler, which needs the port");
+        Resource(builder, "driver-app-web").Annotations.OfType<WaitAnnotation>().Should().Contain(wait => wait.Resource.Name == "blobs");
+    }
+
+    [Fact]
+    public async Task InAzure_TheDriverAppsScreens_StoreTheFilesInTheEstatesTransitContainer_AsTheIdentityTheEstateLetsWriteThere()
+    {
+        await using var builder = await CreateForAzureAsync();
+
+        (await EnvironmentOfAsync(builder, "driver-app-web")).Should().Contain("ConnectionStrings__driver-app-blobs", "{estate-driver-app-blob-endpoint.value}");
+        (await EnvironmentOfAsync(builder, "driver-app-api")).Should().Contain("ConnectionStrings__driver-app-blobs", "{estate-driver-app-blob-endpoint.value}");
+        Resource(builder, "driver-app-web").Annotations.OfType<AppIdentityAnnotation>()
+            .Should().ContainSingle().Which.IdentityResource.Should().BeOfType<AzureUserAssignedIdentityResource>().Which.Name.Should().Be("driver-app-identity");
+    }
+
+    [Fact]
     public async Task InAzure_ThePartnerPortal_ShowsThePresenterTheDriversEntraTestUsers()
     {
         await using var builder = await CreateForAzureAsync();
@@ -542,7 +564,7 @@ public sealed class AppHostModelTests
 
         (await EnvironmentOfAsync(builder, "driver-app-web")).Should().Contain("LocalSignIn__Enabled", "true");
         Resource(builder, "driver-app-web").Annotations.Should().NotContain(annotation => annotation is AzureContainerAppCustomizationAnnotation);
-        builder.Resources.OfType<ParameterResource>().Should().NotContain(parameter => parameter.Name.StartsWith("estate-driver-", StringComparison.Ordinal) && parameter.Name != "estate-driver-app-identity-name" && parameter.Name != "estate-driver-app-key-vault");
+        builder.Resources.OfType<ParameterResource>().Should().NotContain(parameter => parameter.Name.StartsWith("estate-driver-", StringComparison.Ordinal) && parameter.Name != "estate-driver-app-identity-name" && parameter.Name != "estate-driver-app-key-vault" && parameter.Name != "estate-driver-app-blob-endpoint");
         (await EnvironmentOfAsync(builder, "partner-portal-web")).Keys.Should().NotContain(key => key.StartsWith("DriverSignIns__", StringComparison.Ordinal));
     }
 

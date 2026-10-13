@@ -69,13 +69,43 @@ public sealed class StopScreenTests : BunitContext
     }
 
     [Fact]
-    public void ADeliveryStop_ShowsTheConsignee_AndOffersDeliveryFailedAndDamage()
+    public void ADeliveryStop_ShowsTheConsignee_AndOffersDeliverDeliveryFailedAndDamage()
     {
         var page = Render(View(StopKindDto.Delivery), "delivery");
 
         page.Markup.Should().Contain("Deliver SH-0000001").And.Contain("Consignee").And.Contain("Bakker BV").And.Contain("010-1234567");
         page.FindAll("form").Select(form => form.GetAttribute("action")).Should().Equal(
-            "/trips/TR-0000012/stops/SH-0000001/delivery/delivery-failed", "/trips/TR-0000012/stops/SH-0000001/delivery/damaged");
+            "/trips/TR-0000012/stops/SH-0000001/delivery/deliver", "/trips/TR-0000012/stops/SH-0000001/delivery/delivery-failed", "/trips/TR-0000012/stops/SH-0000001/delivery/damaged");
+    }
+
+    [Fact]
+    public void TheProofOfDeliveryForm_AsksForWhoReceivedTheCondition_ARemark_ASignatureDrawnOnScreenAndUpToFourPhotos()
+    {
+        var page = Render(View(StopKindDto.Delivery), "delivery");
+
+        var form = page.FindAll("form").Single(form => form.GetAttribute("action")!.EndsWith("/delivery/deliver", StringComparison.Ordinal));
+        form.GetAttribute("enctype").Should().Be("multipart/form-data");
+        form.QuerySelector("input[name=receivedBy]")!.HasAttribute("required").Should().BeTrue();
+        form.QuerySelectorAll("input[name=condition]").Select(input => input.GetAttribute("value")).Should().Equal("clean", "reservations");
+        form.QuerySelector("input[name=condition][value=clean]")!.HasAttribute("checked").Should().BeTrue("goods are clean unless the Driver says otherwise");
+        form.QuerySelector("textarea[name=remark]")!.GetAttribute("maxlength").Should().Be("500");
+        form.QuerySelector("canvas[data-signature]").Should().NotBeNull();
+        form.QuerySelector("input[type=hidden][name=signature]").Should().NotBeNull();
+        var photos = form.QuerySelector("input[type=file][name=photos]")!;
+        photos.GetAttribute("accept").Should().Be("image/jpeg,image/png");
+        photos.HasAttribute("multiple").Should().BeTrue();
+        form.QuerySelector("fluent-button[type=submit]")!.TextContent.Should().Contain("Deliver");
+    }
+
+    [Theory]
+    [InlineData("receivedBy", "who received the goods")]
+    [InlineData("condition", "clean or with reservations")]
+    [InlineData("signature", "has to sign")]
+    [InlineData("photos", "at most 4")]
+    [InlineData("remark", "with reservations")]
+    public void AProblemWithTheProofOfDeliveryForm_IsSaidInTheDriversWords(string problem, string words)
+    {
+        TripText.Problem(problem).Should().Contain(words);
     }
 
     [Fact]

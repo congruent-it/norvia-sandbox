@@ -9,6 +9,8 @@ public enum ReportKindDto
     CollectionFailed,
     DeliveryFailed,
     Damaged,
+    Delivered,
+    ProofOfDelivery,
 }
 
 /// <summary>What the Driver sees of a report (P12, ADR 0016).</summary>
