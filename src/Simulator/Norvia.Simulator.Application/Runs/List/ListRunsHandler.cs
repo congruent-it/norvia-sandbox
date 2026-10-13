@@ -10,16 +10,13 @@ public sealed class ListRunsHandler(IReadRepository<SimulationRun> runs, IReadRe
 {
     public async ValueTask<IReadOnlyList<RunSummary>> Handle(ListRunsQuery query, CancellationToken cancellationToken)
     {
-        var all = await runs.ListAsync(new RunsNewestFirstSpec(), cancellationToken);
-        var summaries = new List<RunSummary>(all.Count);
-        foreach (var run in all)
+        var rows = await runs.ListAsync(new RunSummariesSpec(), cancellationToken);
+        var summaries = new List<RunSummary>(rows.Count);
+        foreach (var row in rows)
         {
-            summaries.Add(RunSummary.From(run, await SentAsync(log, run.Id, cancellationToken)));
+            summaries.Add(RunSummary.From(row, await log.CountAsync(new BookingLinesOfRunSpec(new SimulationRunId(row.Id)), cancellationToken)));
         }
 
         return summaries;
     }
-
-    internal static async Task<int> SentAsync(IReadRepository<LogEntry> log, SimulationRunId runId, CancellationToken cancellationToken) =>
-        await log.CountAsync(new BookingLinesOfRunSpec(runId), cancellationToken);
 }

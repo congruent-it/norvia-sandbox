@@ -12,6 +12,10 @@ public sealed record SimulationSettings(
 {
     public const int MaxWindowMinutes = 240;
 
+    /// <summary>How long apart <paramref name="bookingCount"/> bookings go out: none in a burst, evenly over the window when paced.</summary>
+    public TimeSpan Spacing(int bookingCount) =>
+        Mode == RunMode.Paced && bookingCount > 0 ? Window / bookingCount : TimeSpan.Zero;
+
     /// <summary>Everything wrong with these settings or the limits they break; empty when the run may go ahead.</summary>
     public IReadOnlyList<string> Problems(SimulationLimits limits)
     {

@@ -10,7 +10,7 @@ public sealed class GetConfigureHandler(IReadRepository<RunSequence> sequences, 
 {
     public async ValueTask<ConfigureView> Handle(GetConfigureQuery query, CancellationToken cancellationToken)
     {
-        var next = (await sequences.FirstOrDefaultAsync(new RunSequenceSpec(), cancellationToken))?.Next ?? 1;
+        var next = RunSequence.NextNumber(await sequences.FirstOrDefaultAsync(new RunSequenceSpec(), cancellationToken));
         return new ConfigureView(Presets.All, limits, seeds.NewSeed(), next);
     }
 }

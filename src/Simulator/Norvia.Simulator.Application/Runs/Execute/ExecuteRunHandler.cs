@@ -52,7 +52,7 @@ public sealed class ExecuteRunHandler(
     {
         var bookings = run.Plan.Bookings;
         var concurrency = Math.Max(1, limits.MaxConcurrentRequests);
-        var spacing = run.Settings.Mode == RunMode.Paced && bookings.Count > 0 ? run.Settings.Window / bookings.Count : TimeSpan.Zero;
+        var spacing = run.Settings.Spacing(bookings.Count);
         var began = time.GetUtcNow();
         using var slots = new SemaphoreSlim(concurrency);
         var inFlight = new List<Task>(bookings.Count);

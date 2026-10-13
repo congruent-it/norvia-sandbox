@@ -4,7 +4,7 @@ using Norvia.Simulator.Domain.Runs;
 namespace Norvia.Simulator.Domain.Log;
 
 /// <summary>A run's log lines in the order they happened, narrowed by the filter.</summary>
-public sealed class LogEntriesOfRunSpec : Specification<LogEntry>
+public sealed class LogEntriesOfRunSpec : Specification<LogEntry, LogLine>
 {
     public LogEntriesOfRunSpec(SimulationRunId runId, LogFilter filter)
     {
@@ -32,6 +32,10 @@ public sealed class LogEntriesOfRunSpec : Specification<LogEntry>
                 || (entry.TransportOrderNumber != null && entry.TransportOrderNumber.Contains(text)));
         }
 
-        Query.OrderBy(entry => entry.Sequence).AsNoTracking();
+        Query.OrderBy(entry => entry.Sequence)
+            .AsNoTracking()
+            .Select(entry => new LogLine(
+                entry.Sequence, entry.At, entry.Actor, entry.Action, entry.Outcome,
+                entry.CorrelationId, entry.ShipperReference, entry.TransportOrderNumber, entry.Detail));
     }
 }

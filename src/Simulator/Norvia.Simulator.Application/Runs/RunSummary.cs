@@ -19,5 +19,9 @@ public sealed record RunSummary(
 
     internal static RunSummary From(SimulationRun run, int sent) => new(
         run.Id.Value, run.Number, run.Status, run.StartedAt, run.FinishedAt, run.StartedBy,
-        run.Settings.Seed, run.Settings.PresetName, run.Settings.Mode, run.Plan.Bookings.Count, sent);
+        run.Seed, run.PresetName, run.Mode, run.PlannedCount, sent);
+
+    internal static RunSummary From(RunListRow row, int sent) => new(
+        row.Id, row.Number, row.Status, row.StartedAt, row.FinishedAt, row.StartedBy,
+        row.Seed, row.PresetName, row.Mode, row.PlannedCount, sent);
 }

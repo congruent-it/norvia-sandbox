@@ -14,6 +14,10 @@ public sealed class SimulationRun : EntityBase<SimulationRunId>, IAggregateRoot
         Id = id;
         Number = number;
         Plan = plan;
+        Seed = plan.Settings.Seed;
+        PresetName = plan.Settings.PresetName;
+        Mode = plan.Settings.Mode;
+        PlannedCount = plan.Bookings.Count;
         StartedAt = startedAt;
         StartedBy = startedBy;
         Status = SimulationRunStatus.Running;
@@ -25,6 +29,15 @@ public sealed class SimulationRun : EntityBase<SimulationRunId>, IAggregateRoot
     public SimulationSettings Settings => Plan.Settings;
 
     public SimulationPlan Plan { get; private set; }
+
+    // Kept beside the plan, which is one JSON document, so the list of runs reads these without loading every plan.
+    public int Seed { get; private set; }
+
+    public string? PresetName { get; private set; }
+
+    public RunMode Mode { get; private set; }
+
+    public int PlannedCount { get; private set; }
 
     public SimulationRunStatus Status { get; private set; }
 

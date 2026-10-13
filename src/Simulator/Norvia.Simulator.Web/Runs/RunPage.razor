@@ -70,24 +70,24 @@ else
         }
     </AuthorizeView>
 
-    <form role="search" aria-label="Filter the log" class="mb-6 flex flex-wrap items-end gap-4" @onsubmit="ApplyFilter">
-        <FluentSelect TOption="string" Label="Actor" @bind-Value="_actor" @bind-Value:after="ApplyFilter">
+    <EditForm Model="_filter" OnSubmit="ApplyFilter" role="search" aria-label="Filter the log" class="mb-6 flex flex-wrap items-end gap-4">
+        <FluentSelect TOption="string" Label="Actor" @bind-Value="_filter.Actor" @bind-Value:after="ApplyFilter">
             <FluentOption TOption="string" Value="">All actors</FluentOption>
             @foreach (var actor in _run.Actors)
             {
                 <FluentOption TOption="string" Value="@actor">@actor</FluentOption>
             }
         </FluentSelect>
-        <FluentSelect TOption="string" Label="Outcome" @bind-Value="_outcome" @bind-Value:after="ApplyFilter">
+        <FluentSelect TOption="string" Label="Outcome" @bind-Value="_filter.Outcome" @bind-Value:after="ApplyFilter">
             <FluentOption TOption="string" Value="">All outcomes</FluentOption>
             @foreach (var outcome in Enum.GetValues<LogOutcome>())
             {
                 <FluentOption TOption="string" Value="@outcome.ToString()">@SimulatorText.Of(outcome)</FluentOption>
             }
         </FluentSelect>
-        <FluentTextField @bind-Value="_text" Label="Correlation ID, reference or order number" Class="min-w-80 grow" />
+        <FluentTextField @bind-Value="_filter.Text" Label="Correlation ID, reference or order number" Class="min-w-80 grow" />
         <FluentButton Type="ButtonType.Submit" Appearance="Appearance.Accent">Filter</FluentButton>
-    </form>
+    </EditForm>
 
     @if (_log.Count == 0)
     {
@@ -131,9 +131,7 @@ else
     private bool _failed;
     private readonly CancellationTokenSource _cancellation = new();
     private string? _problem;
-    private string _actor = "";
-    private string _outcome = "";
-    private string _text = "";
+    private readonly LogFilterForm _filter = new();
     private ITimer? _poll;
 
     [Parameter]
@@ -185,9 +183,9 @@ else
     }
 
     private LogFilter Filter() => new(
-        string.IsNullOrEmpty(_actor) ? null : _actor,
-        Enum.TryParse<LogOutcome>(_outcome, out var outcome) ? outcome : null,
-        _text);
+        string.IsNullOrEmpty(_filter.Actor) ? null : _filter.Actor,
+        Enum.TryParse<LogOutcome>(_filter.Outcome, out var outcome) ? outcome : null,
+        _filter.Text);
 
     private async Task ApplyFilter() => _log = await Requests.ListLogAsync(new SimulationRunId(Id), Filter(), _cancellation.Token);
 

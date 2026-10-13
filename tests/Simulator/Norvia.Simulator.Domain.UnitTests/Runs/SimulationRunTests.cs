@@ -112,4 +112,45 @@ public sealed class SimulationRunTests
         sequence.Take().Should().Be(2);
         sequence.Next.Should().Be(3);
     }
+
+    [Fact]
+    public void Start_KeepsTheListColumnsBesideThePlan()
+    {
+        var run = Started();
+
+        (run.Seed, run.PresetName, run.Mode, run.PlannedCount).Should().Be((7, null, RunMode.Burst, 5));
+    }
+
+    [Fact]
+    public void RunSummariesSpec_ReadsTheListColumnsNewestFirst()
+    {
+        var older = Started();
+        var settings = TestWorld.Settings(orders: 1, badShare: 0);
+        var newer = SimulationRun.Start(5, settings, BookingPlanGenerator.Generate(settings, TestWorld.Benelux, 5), Now.AddHours(1), "ngruson");
+
+        var rows = new RunSummariesSpec().Evaluate([older, newer]).ToList();
+
+        rows.Select(row => row.Number).Should().Equal(5, 4);
+        rows[1].Should().Be(new RunListRow(older.Id.Value, 4, SimulationRunStatus.Running, Now, null, "ngruson", 7, null, RunMode.Burst, 5));
+    }
+
+    [Fact]
+    public void RunSequence_NextNumber_IsOneBeforeAnyRunIsNumbered()
+    {
+        RunSequence.NextNumber(null).Should().Be(1);
+        var sequence = RunSequence.Create();
+        sequence.Take();
+        RunSequence.NextNumber(sequence).Should().Be(2);
+    }
+
+    [Theory]
+    [InlineData(RunMode.Burst, 10, 4, 0)]
+    [InlineData(RunMode.Paced, 8, 4, 120)]
+    [InlineData(RunMode.Paced, 8, 0, 0)]
+    public void Spacing_ABurstHasNone_APacedRunSpreadsTheWindowEvenly(RunMode mode, int windowMinutes, int bookings, int seconds)
+    {
+        var settings = new SimulationSettings(bookings, 0, 0, 1, mode, TimeSpan.FromMinutes(windowMinutes));
+
+        settings.Spacing(bookings).Should().Be(TimeSpan.FromSeconds(seconds));
+    }
 }

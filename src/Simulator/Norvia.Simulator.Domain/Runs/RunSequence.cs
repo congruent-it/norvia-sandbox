@@ -20,5 +20,8 @@ public sealed class RunSequence : EntityBase<int>, IAggregateRoot
 
     public static RunSequence Create() => new();
 
+    /// <summary>The number the next run gets, whether or not any run has been numbered yet.</summary>
+    public static int NextNumber(RunSequence? sequence) => sequence?.Next ?? 1;
+
     public int Take() => ++Last;
 }

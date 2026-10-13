@@ -33,6 +33,8 @@ internal sealed class SimulationRunConfiguration : IEntityTypeConfiguration<Simu
         // One active run at a time, whatever starts them: a second start fails here even if both passed the check.
         builder.HasIndex(run => run.Status).IsUnique().HasFilter("[Status] = 'Running'").HasDatabaseName("IX_SimulationRuns_OneActive");
         builder.Property(run => run.Status).HasConversion<string>().HasMaxLength(20);
+        builder.Property(run => run.PresetName).HasMaxLength(100);
+        builder.Property(run => run.Mode).HasConversion<string>().HasMaxLength(20);
         builder.Property(run => run.StartedBy).HasMaxLength(200).IsRequired();
 
         // The plan is kept whole, as one JSON document: it's only ever read back as a whole (the preview matches what is sent).

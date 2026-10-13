@@ -9,7 +9,6 @@ public sealed class ListLogHandler(IReadRepository<LogEntry> log) : IQueryHandle
     public async ValueTask<IReadOnlyList<LogLine>> Handle(ListLogQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
-        var entries = await log.ListAsync(new LogEntriesOfRunSpec(query.RunId, query.Filter), cancellationToken);
-        return [.. entries.Select(LogLine.From)];
+        return await log.ListAsync(new LogEntriesOfRunSpec(query.RunId, query.Filter), cancellationToken);
     }
 }

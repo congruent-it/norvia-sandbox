@@ -92,4 +92,12 @@ public sealed class LogEntryTests
         new LogFilter(Text: " ").IsEmpty.Should().BeTrue();
         new LogFilter(Actor: "x").IsEmpty.Should().BeFalse();
     }
+
+    [Fact]
+    public void BookingOutcomesOfRunSpec_IsTheAnswersOfThatRunsBookingsAndNoNotes()
+    {
+        var all = Entries.Append(LogEntry.Note(Run, 4, Now, "done"));
+
+        new BookingOutcomesOfRunSpec(Run).Evaluate(all).Should().Equal(LogOutcome.Accepted, LogOutcome.Rejected, LogOutcome.AlreadyBooked);
+    }
 }

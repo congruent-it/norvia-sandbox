@@ -19,12 +19,12 @@ public sealed class GetRunHandler(IReadRepository<SimulationRun> runs, IReadRepo
             return Result.NotFound($"There is no run {query.RunId.Value}.");
         }
 
-        var lines = await log.ListAsync(new BookingLinesOfRunSpec(query.RunId), cancellationToken);
-        var outcomes = lines.GroupBy(line => line.Outcome)
+        var answers = await log.ListAsync(new BookingOutcomesOfRunSpec(query.RunId), cancellationToken);
+        var outcomes = answers.GroupBy(outcome => outcome)
             .Select(group => new OutcomeCount(group.Key, group.Count()))
             .OrderBy(count => count.Outcome)
             .ToList();
         var actors = run.Plan.Bookings.Select(booking => booking.PersonaName).Distinct().Order(StringComparer.Ordinal).ToList();
-        return new RunDetail(RunSummary.From(run, lines.Count), outcomes, actors);
+        return new RunDetail(RunSummary.From(run, answers.Count), outcomes, actors);
     }
 }

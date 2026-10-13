@@ -106,7 +106,8 @@ public sealed class RunQueriesAndCommandsTests
     {
         var run = TestData.Run();
         var reads = Substitute.For<IReadRepository<SimulationRun>>();
-        reads.ListAsync(Arg.Any<ISpecification<SimulationRun>>(), Arg.Any<CancellationToken>()).Returns([run]);
+        reads.ListAsync(Arg.Any<ISpecification<SimulationRun, RunListRow>>(), Arg.Any<CancellationToken>())
+            .Returns([new RunListRow(run.Id.Value, run.Number, run.Status, run.StartedAt, run.FinishedAt, run.StartedBy, run.Seed, run.PresetName, run.Mode, run.PlannedCount)]);
         var lines = Substitute.For<IReadRepository<LogEntry>>();
         lines.CountAsync(Arg.Any<ISpecification<LogEntry>>(), Arg.Any<CancellationToken>()).Returns(4);
 
@@ -126,12 +127,8 @@ public sealed class RunQueriesAndCommandsTests
         var reads = Substitute.For<IReadRepository<SimulationRun>>();
         reads.FirstOrDefaultAsync(Arg.Any<ISpecification<SimulationRun>>(), Arg.Any<CancellationToken>()).Returns(run);
         var lines = Substitute.For<IReadRepository<LogEntry>>();
-        lines.ListAsync(Arg.Any<ISpecification<LogEntry>>(), Arg.Any<CancellationToken>()).Returns(
-        [
-            LogEntry.Booking(run.Id, 2, TestData.Now, "A", "Send booking", LogOutcome.Accepted, "c1", "SIM-1-1", "TO-1", null),
-            LogEntry.Booking(run.Id, 3, TestData.Now, "A", "Send booking", LogOutcome.Accepted, "c2", "SIM-1-2", "TO-2", null),
-            LogEntry.Booking(run.Id, 4, TestData.Now, "B", "Send booking", LogOutcome.Rejected, "c3", "SIM-1-3", null, null),
-        ]);
+        lines.ListAsync(Arg.Any<ISpecification<LogEntry, LogOutcome>>(), Arg.Any<CancellationToken>())
+            .Returns([LogOutcome.Accepted, LogOutcome.Accepted, LogOutcome.Rejected]);
 
         var result = await new GetRunHandler(reads, lines).Handle(new GetRunQuery(run.Id), CancellationToken.None);
 
@@ -154,8 +151,8 @@ public sealed class RunQueriesAndCommandsTests
     {
         var run = TestData.Run();
         var lines = Substitute.For<IReadRepository<LogEntry>>();
-        lines.ListAsync(Arg.Any<ISpecification<LogEntry>>(), Arg.Any<CancellationToken>()).Returns(
-            [LogEntry.Booking(run.Id, 2, TestData.Now, "Brouwer Dranken", "Send booking", LogOutcome.Accepted, "c1", "SIM-1-1", "TO-1", "Good booking")]);
+        lines.ListAsync(Arg.Any<ISpecification<LogEntry, LogLine>>(), Arg.Any<CancellationToken>())
+            .Returns([new LogLine(2, TestData.Now, "Brouwer Dranken", "Send booking", LogOutcome.Accepted, "c1", "SIM-1-1", "TO-1", "Good booking")]);
 
         var log = await new ListLogHandler(lines).Handle(new ListLogQuery(run.Id, new LogFilter()), CancellationToken.None);
 
