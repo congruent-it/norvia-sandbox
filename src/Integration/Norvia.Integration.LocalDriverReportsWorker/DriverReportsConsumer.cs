@@ -62,6 +62,12 @@ internal sealed partial class DriverReportsConsumer(
             },
             args.CancellationToken);
 
+        if (outcome == DriverReportsRunOutcome.FilesGone)
+        {
+            // The workflow's run fails: the message is dead-lettered and the Driver app was told the report wasn't recorded.
+            LogFilesGone(args.Message.SessionId);
+        }
+
         if (outcome == DriverReportsRunOutcome.OutcomeNotReported)
         {
             // The workflow's run fails and the report stays Sending in the Driver app; the TMS has it anyway. The message is settled, so it isn't redelivered.
@@ -71,6 +77,9 @@ internal sealed partial class DriverReportsConsumer(
 
     [LoggerMessage(Level = LogLevel.Error, Message = "The Driver reports run for Trip {TripNumber} couldn't tell the Driver app the outcome; the report stays Sending")]
     private partial void LogRunFailed(string tripNumber);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "The Driver reports run for Trip {TripNumber} found the files of a Proof of delivery gone from the transit container; the message was dead-lettered")]
+    private partial void LogFilesGone(string tripNumber);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "The Driver reports subscription's processor failed in {ErrorSource}")]
     private partial void LogProcessorFailed(Exception exception, ServiceBusErrorSource errorSource);

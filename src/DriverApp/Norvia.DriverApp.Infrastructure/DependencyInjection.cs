@@ -9,9 +9,11 @@ using Microsoft.Extensions.Options;
 using Norvia.DriverApp.Application;
 using Norvia.DriverApp.Application.Drivers;
 using Norvia.DriverApp.Application.Events;
+using Norvia.DriverApp.Application.Reports.Deliver;
 using Norvia.DriverApp.Infrastructure.Data;
 using Norvia.DriverApp.Infrastructure.Drivers;
 using Norvia.DriverApp.Infrastructure.Outbox;
+using Norvia.DriverApp.Infrastructure.ProofsOfDelivery;
 
 namespace Norvia.DriverApp.Infrastructure;
 
@@ -19,6 +21,7 @@ public static class DependencyInjection
 {
     public const string DatabaseConnectionName = "driver-app";
     public const string MessagingConnectionName = "messaging";
+    public const string BlobStorageConnectionName = "driver-app-blobs";
 
     public static IHostApplicationBuilder AddDriverAppInfrastructure(this IHostApplicationBuilder builder)
     {
@@ -45,6 +48,16 @@ public static class DependencyInjection
             .ValidateDataAnnotations().ValidateOnStart();
         builder.Services.AddHostedService<OutboxPublisher>();
 
+        return builder;
+    }
+
+    /// <summary>The transit container for the files of a Proof of delivery (P12). Only the screens, where the Driver gives the files, need it.</summary>
+    public static IHostApplicationBuilder AddDriverAppProofOfDeliveryTransit(this IHostApplicationBuilder builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.AddAzureBlobServiceClient(BlobStorageConnectionName);
+        builder.Services.AddSingleton<IProofOfDeliveryTransit, AzureBlobProofOfDeliveryTransit>();
         return builder;
     }
 

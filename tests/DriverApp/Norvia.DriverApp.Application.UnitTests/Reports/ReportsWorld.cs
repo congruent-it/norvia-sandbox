@@ -43,6 +43,14 @@ internal sealed class ReportsWorld
                 Saved.AddRange(Queued.Skip(Saved.Count));
                 return Task.FromResult(report);
             });
+        ReportRepository.AddRangeAsync(Arg.Any<IEnumerable<DriverReport>>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                var added = call.Arg<IEnumerable<DriverReport>>().ToList();
+                Reports.AddRange(added);
+                Saved.AddRange(Queued.Skip(Saved.Count));
+                return Task.FromResult<IEnumerable<DriverReport>>(added);
+            });
         ReadReportRepository.ListAsync(Arg.Any<ISpecification<DriverReport, DriverReportRow>>(), Arg.Any<CancellationToken>())
             .Returns(call => Task.FromResult(call.Arg<ISpecification<DriverReport, DriverReportRow>>().Evaluate(Reports).ToList()));
         Outbox.When(outbox => outbox.Add(Arg.Any<DriverAppEvent>())).Do(call => Queued.Add(call.Arg<DriverAppEvent>()));

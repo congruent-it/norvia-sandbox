@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -18,16 +19,65 @@ internal sealed class TmsTripCalls(HttpClient http, IOptions<DriverReportsWorker
 {
     private const string StartRole = "Trips.Start";
     private const string RecordTrackingEventRole = "TrackingEvents.Record";
+    private const string RecordProofOfDeliveryRole = "ProofsOfDelivery.Record";
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull };
 
-    /// <summary>Asks the TMS to do what the report says: start the Trip, or record the Stop report as a Tracking event of Own fleet.</summary>
-    public Task<TmsAnswer> CallAsync(DriverReport report, CancellationToken cancellationToken) =>
-        report.Stop is { } stop ? SendAsync(report, "/v1/tracking-events", RecordTrackingEventRole, TrackingEventOf(report, stop), cancellationToken) : StartAsync(report, cancellationToken);
+    /// <summary>
+    /// Asks the TMS to do what the report says: start the Trip, record the Stop report as a Tracking event of Own fleet, or record the Proof of delivery with the
+    /// files <paramref name="files"/> as P6's multipart call.
+    /// </summary>
+    public Task<TmsAnswer> CallAsync(DriverReport report, IReadOnlyList<FetchedProofFile> files, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+        ArgumentNullException.ThrowIfNull(files);
+
+        return report switch
+        {
+            { Proof: { } proof } => SendAsync(report, "/v1/proofs-of-delivery", RecordProofOfDeliveryRole, () => MultipartOf(report, proof, files), cancellationToken),
+            { Stop: { } stop } => SendAsync(report, "/v1/tracking-events", RecordTrackingEventRole, () => JsonContent.Create(TrackingEventOf(report, stop), options: Json), cancellationToken),
+            _ => StartAsync(report, cancellationToken),
+        };
+    }
+
+    /// <summary>The Canonical Model's Proof of delivery of Own fleet as the <c>metadata</c> part, and each file as a <c>files</c> part in the order the metadata describes them.</summary>
+    private static MultipartFormDataContent MultipartOf(DriverReport report, ProofOfDeliveryReport proof, IReadOnlyList<FetchedProofFile> files)
+    {
+        var metadata = new JsonObject
+        {
+            ["documentId"] = proof.DocumentId,
+            ["source"] = new JsonObject { ["type"] = "OwnFleet", ["driverId"] = report.DriverId },
+            ["tripNumber"] = report.TripNumber,
+            ["shipmentNumber"] = proof.ShipmentNumber,
+            ["tripVersion"] = proof.TripVersion,
+            ["receivedBy"] = proof.ReceivedBy,
+            ["deliveryTime"] = proof.DeliveryTime,
+            ["location"] = new JsonObject { ["place"] = proof.Place, ["postcode"] = proof.Postcode, ["countryCode"] = proof.CountryCode },
+            ["condition"] = proof.Condition,
+        };
+        if (!string.IsNullOrWhiteSpace(proof.Remark))
+        {
+            metadata["remark"] = proof.Remark;
+        }
+
+        metadata["files"] = new JsonArray([.. files.Select(file => (JsonNode)new JsonObject { ["name"] = file.Name, ["contentType"] = file.ContentType })]);
+
+        var form = new MultipartFormDataContent();
+        form.Add(new StringContent(metadata.ToJsonString(), Encoding.UTF8, "application/json"), "metadata");
+        foreach (var file in files)
+        {
+            var part = new ByteArrayContent(file.Content);
+            part.Headers.ContentType = MediaTypeHeaderValue.Parse(file.ContentType);
+            form.Add(part, "files", file.Name);
+        }
+
+        return form;
+    }
 
     private Task<TmsAnswer> StartAsync(DriverReport report, CancellationToken cancellationToken) =>
         SendAsync(
-            report, $"/v1/trips/{Uri.EscapeDataString(report.TripNumber)}/start", StartRole, new { driverId = report.DriverId, driverAppEventId = report.EventId }, cancellationToken);
+            report, $"/v1/trips/{Uri.EscapeDataString(report.TripNumber)}/start", StartRole,
+            () => JsonContent.Create(new { driverId = report.DriverId, driverAppEventId = report.EventId }, options: Json), cancellationToken);
 
     /// <summary>The Canonical Model's Tracking event of Own fleet: the Driver ID is the source, and the Trip, the Shipment and the version replace a Carrier booking.</summary>
     private static object TrackingEventOf(DriverReport report, StopReport stop) => new
@@ -43,13 +93,13 @@ internal sealed class TmsTripCalls(HttpClient http, IOptions<DriverReportsWorker
         remark = stop.Remark,
     };
 
-    private async Task<TmsAnswer> SendAsync(DriverReport report, string path, string role, object body, CancellationToken cancellationToken)
+    private async Task<TmsAnswer> SendAsync(DriverReport report, string path, string role, Func<HttpContent> body, CancellationToken cancellationToken)
     {
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(path, UriKind.Relative))
             {
-                Content = JsonContent.Create(body, options: Json),
+                Content = body(),
             };
             request.Headers.Add("X-Correlation-ID", report.CorrelationId);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", TmsTokens.Create(options.Value.TmsTokens, time, options.Value.TmsTokens.ClientId!, role));

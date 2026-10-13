@@ -30,6 +30,8 @@ internal static class TripText
         ReportKindDto.CollectionFailed => "Collection failed",
         ReportKindDto.DeliveryFailed => "Delivery failed",
         ReportKindDto.Damaged => "Damage reported",
+        ReportKindDto.Delivered => "Delivered",
+        ReportKindDto.ProofOfDelivery => "Proof of delivery",
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "A kind of report the Driver app has no words for."),
     };
 
@@ -58,7 +60,11 @@ internal static class TripText
 
     public static string Problem(string? identifier) => identifier switch
     {
-        "remark" => $"Say what happened: a remark is required, up to {ReportStopCommand.MaximumRemarkLength} characters.",
+        "remark" => $"Say what happened: a remark is required, up to {ReportStopCommand.MaximumRemarkLength} characters, and with reservations the remark says which.",
+        "receivedBy" => "Say who received the goods, up to 200 characters.",
+        "condition" => "Say whether the goods were received clean or with reservations.",
+        "signature" => "The Consignee has to sign: draw the signature before you deliver.",
+        "photos" => "Photos are at most 4 JPEG or PNG files of at most 10 MB each.",
         "address" => "This Stop has no complete address to report from. Call the Planner.",
         _ => "That report couldn't be made.",
     };

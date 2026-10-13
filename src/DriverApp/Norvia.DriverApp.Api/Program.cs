@@ -17,6 +17,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.AddDriverAppInfrastructure();
 builder.AddDriverAppSeedDrivers();
+// The API stores no file, but its mediator holds every handler of the Application, so it has the port the Deliver handler needs.
+builder.AddDriverAppProofOfDeliveryTransit();
 builder.AddDriverAppOutboxPublisher();
 
 // The outcome endpoint takes the Driver reports Logic App's token. Issuer, audience and keys come from Authentication:Schemes:Bearer: Entra in

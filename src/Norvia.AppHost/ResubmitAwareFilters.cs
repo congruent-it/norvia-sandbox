@@ -18,7 +18,7 @@ internal static class ResubmitAwareFilters
         ["shipper-notification"] = "eventType = 'ShipperNotificationRequested'",
         ["carrier-cancellation"] = "eventType = 'CarrierBookingCancelled' OR eventType = 'CarrierBookingWithdrawn'",
         ["trip-dispatch"] = "eventType = 'TripDispatched'",
-        ["driver-reports"] = "eventType = 'TripStartReported' OR eventType = 'StopCompletedReported'",
+        ["driver-reports"] = "eventType = 'TripStartReported' OR eventType = 'StopCompletedReported' OR eventType = 'ProofOfDeliveryCaptured'",
     };
 
     public static void Apply(JsonNode configuration)

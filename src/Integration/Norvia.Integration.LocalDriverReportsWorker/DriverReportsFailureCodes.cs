@@ -7,6 +7,7 @@ namespace Norvia.Integration.LocalDriverReportsWorker;
 internal static class DriverReportsFailureCodes
 {
     public const string Unreadable = "DriverReportUnreadable";
+    public const string ProofOfDeliveryFilesGone = "ProofOfDeliveryFilesGone";
     public const string TmsUnavailable = "TmsUnavailable";
     public const string TmsCallRefused = "TmsCallRefused";
     public const string DriverAppUnavailable = "DriverAppUnavailable";

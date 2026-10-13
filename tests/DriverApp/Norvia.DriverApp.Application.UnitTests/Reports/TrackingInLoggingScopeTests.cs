@@ -1,6 +1,7 @@
 using Ardalis.Result;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Testing;
+using Norvia.DriverApp.Application.Reports.Deliver;
 using Norvia.DriverApp.Application.Reports.ReportOutcome;
 using Norvia.DriverApp.Application.Reports;
 using Norvia.DriverApp.Application.Reports.ReportStop;
@@ -53,6 +54,49 @@ public sealed class TrackingInLoggingScopeTests : IDisposable
         {
             ["outcome"] = "Refused",
             ["failureCode"] = "TripNotFound",
+        });
+    }
+
+    private static DeliverCommand Delivery() => new("TR-0000012", "DRV-0002", "SH-0000001", "J. Bakker", DeliveryConditionDto.Clean, null, new ProofFile("image/png", new byte[] { 1 }), []);
+
+    [Fact]
+    public async Task ADeliver_IsLoggedWithTheFlowTheTripTheShipmentTheDriverAndTheEventId_AsSucceeded()
+    {
+        var behaviour = new TrackDeliverInLoggingScope(_loggerFactory.CreateLogger<TrackDeliverInLoggingScope>());
+
+        await behaviour.Handle(Delivery(), (_, _) => ValueTask.FromResult<Result<DeliverResult>>(new DeliverResult(EventId, false)), CancellationToken.None);
+
+        ScopeKeys.Of(_logs.Collector.GetSnapshot().Should().ContainSingle().Subject).Should().Contain(new Dictionary<string, object?>
+        {
+            ["flow"] = "trip-execution",
+            ["tripNumber"] = "TR-0000012",
+            ["shipmentNumber"] = "SH-0000001",
+            ["partyId"] = "DRV-0002",
+            ["sourceMessageId"] = EventId.ToString(),
+            ["outcome"] = "Succeeded",
+        });
+    }
+
+    [Theory]
+    [InlineData(ResultStatus.NotFound, "StopNotFound")]
+    [InlineData(ResultStatus.Invalid, "ProofOfDeliveryInvalid")]
+    [InlineData(ResultStatus.Conflict, "StopNotAvailable")]
+    public async Task ADeliverTheDriverAppDoesNotTake_IsLoggedAsRefused_WithTheReasonAsFailureCode(ResultStatus status, string code)
+    {
+        var behaviour = new TrackDeliverInLoggingScope(_loggerFactory.CreateLogger<TrackDeliverInLoggingScope>());
+        Result<DeliverResult> refused = status switch
+        {
+            ResultStatus.NotFound => Result.NotFound(),
+            ResultStatus.Invalid => Result.Invalid(new ValidationError("signature", "A signature is required.")),
+            _ => Result.Conflict("No."),
+        };
+
+        await behaviour.Handle(Delivery(), (_, _) => ValueTask.FromResult(refused), CancellationToken.None);
+
+        ScopeKeys.Of(_logs.Collector.GetSnapshot().Should().ContainSingle().Subject).Should().Contain(new Dictionary<string, object?>
+        {
+            ["outcome"] = "Refused",
+            ["failureCode"] = code,
         });
     }
 

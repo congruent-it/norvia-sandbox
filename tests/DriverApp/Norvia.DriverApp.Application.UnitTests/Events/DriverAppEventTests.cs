@@ -85,6 +85,72 @@ public sealed class DriverAppEventTests
         Schemas.Validate("stop-completed-reported.v1.schema.json", body).IsValid.Should().Be(valid);
     }
 
+    private static readonly ProofOfDeliveryCapturedV1 Captured = new(
+        Guid.Parse("0198e7c0-0000-7000-8000-0000000000e2"), new DateTimeOffset(2026, 10, 13, 10, 12, 30, TimeSpan.FromHours(2)), "0198e7c0-0000-7000-8000-0000000000e3", "TR-0000012", 2, "DRV-0002",
+        "SH-0000031", "0198e7c0-0000-7000-8000-0000000000e2", "J. Bakker", new DateTimeOffset(2026, 10, 13, 10, 12, 30, TimeSpan.FromHours(2)), new StopLocationV1("Utrecht", "3511 AB", "NL"),
+        "Clean", null,
+        [new ProofOfDeliveryFileV1("signature.png", "image/png", "0198e7c0-0000-7000-8000-0000000000e2/signature.png")]);
+
+    [Fact]
+    public void AProofOfDeliveryCaptured_ValidatesAgainstTheSchema_CarriesBlobReferencesAndNoFiles_AndLeavesOutARemarkTheDriverDidNotGive()
+    {
+        var clean = JsonNode.Parse(JsonSerializer.Serialize(Captured, Captured.GetType(), Web))!;
+        var withReservations = Captured with { Condition = "Reservations", Remark = "Two cartons crushed" };
+        var reservations = JsonNode.Parse(JsonSerializer.Serialize(withReservations, withReservations.GetType(), Web))!;
+
+        Schemas.Validate("proof-of-delivery-captured.v1.schema.json", clean).IsValid.Should().BeTrue(Schemas.Errors(Schemas.Validate("proof-of-delivery-captured.v1.schema.json", clean)));
+        Schemas.Validate("proof-of-delivery-captured.v1.schema.json", reservations).IsValid.Should().BeTrue();
+        clean["eventType"]!.GetValue<string>().Should().Be("ProofOfDeliveryCaptured");
+        clean["condition"]!.GetValue<string>().Should().Be("Clean");
+        clean["files"]![0]!["blobReference"]!.GetValue<string>().Should().Be("0198e7c0-0000-7000-8000-0000000000e2/signature.png");
+        clean.AsObject().ContainsKey("remark").Should().BeFalse("the schema allows no null remark");
+        clean.AsObject().Select(property => property.Key).Should().NotContain(["topic", "sessionId", "applicationProperties"]);
+    }
+
+    [Fact]
+    public void TheProofOfDeliveryCapturedSchema_NeedsARemarkWithReservations_AndOneToFiveFiles()
+    {
+        var file = Captured.Files[0];
+        var cases = new (ProofOfDeliveryCapturedV1 Event, bool Valid)[]
+        {
+            (Captured with { Condition = "Reservations" }, false),
+            (Captured with { Condition = "Reservations", Remark = "Crushed" }, true),
+            (Captured with { Files = [] }, false),
+            (Captured with { Files = [file, file, file, file, file] }, true),
+            (Captured with { Files = [file, file, file, file, file, file] }, false),
+            (Captured with { Condition = "Damaged" }, false),
+        };
+
+        foreach (var (candidate, valid) in cases)
+        {
+            var body = JsonNode.Parse(JsonSerializer.Serialize(candidate, candidate.GetType(), Web))!;
+            Schemas.Validate("proof-of-delivery-captured.v1.schema.json", body).IsValid.Should().Be(valid, JsonSerializer.Serialize(candidate, Web));
+        }
+    }
+
+    [Fact]
+    public void TheProofOfDeliveryCapturedSamples_ValidateAgainstTheSchema()
+    {
+        Schemas.Samples("proof-of-delivery-captured").Should().HaveCountGreaterThanOrEqualTo(2);
+        foreach (var sample in Schemas.Samples("proof-of-delivery-captured"))
+        {
+            var results = Schemas.Validate("proof-of-delivery-captured.v1.schema.json", Schemas.ReadSample(sample));
+            results.IsValid.Should().BeTrue($"{sample}: {Schemas.Errors(results)}");
+        }
+    }
+
+    [Fact]
+    public void AProofOfDeliveryCaptured_GoesInTheSessionOfItsTrip_SharingItsCorrelationIdWithTheDelivered()
+    {
+        Captured.Topic.Should().Be("driver-app-events");
+        Captured.SessionId.Should().Be("TR-0000012");
+        Captured.ApplicationProperties.Should().Contain("eventType", "ProofOfDeliveryCaptured").And.Contain("correlationId", "0198e7c0-0000-7000-8000-0000000000e3");
+        foreach (var sample in Schemas.Samples("stop-completed-reported").Where(sample => sample.Contains("delivered", StringComparison.Ordinal)))
+        {
+            Schemas.ReadSample(sample)["correlationId"]!.GetValue<string>().Should().Be(Captured.CorrelationId);
+        }
+    }
+
     [Fact]
     public void AStopEventsMessage_GoesInTheSessionOfItsTrip_AndCarriesTheKeysItKnows()
     {

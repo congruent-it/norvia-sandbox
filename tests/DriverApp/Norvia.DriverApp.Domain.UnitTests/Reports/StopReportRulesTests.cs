@@ -166,4 +166,40 @@ public sealed class StopReportRulesTests
 
         TripProgress.Of(details, _rows).Select(status => status.Stop).Should().Equal(Collect, Deliver);
     }
+    [Fact]
+    public void ADeliveredIsReportedOnADeliveryStopOnly_AndNeedsNoRemark()
+    {
+        StopReportRules.Fits(ReportKind.Delivered, StopKind.Delivery).Should().BeTrue();
+        StopReportRules.Fits(ReportKind.Delivered, StopKind.Collection).Should().BeFalse();
+        StopReportRules.Fits(ReportKind.ProofOfDelivery, StopKind.Delivery).Should().BeTrue();
+        StopReportRules.NeedsRemark(ReportKind.Delivered).Should().BeFalse("only reservations need one, which the Proof of delivery's rules ask for");
+    }
+
+    [Fact]
+    public void ADeliveredCompletesTheStop_WhileAProofOfDeliveryDoesNot_AndADeliveredAgainIsARepeat()
+    {
+        Row(ReportKind.StartTrip);
+        Row(ReportKind.Collected, StopKind.Collection, "SH-0000001");
+        var delivered = Row(ReportKind.Delivered, StopKind.Delivery, "SH-0000001", ReportState.Sending, minutes: 5);
+        Row(ReportKind.ProofOfDelivery, StopKind.Delivery, "SH-0000001", ReportState.Sending, minutes: 5);
+
+        var status = Status(_trip, Deliver);
+
+        status.Completed.Should().BeTrue();
+        status.Outcome!.Kind.Should().Be(ReportKind.Delivered);
+        status.Reports.Select(report => report.Kind).Should().Equal(ReportKind.Delivered, ReportKind.ProofOfDelivery);
+        StopReportRules.Decide(status, ReportKind.Delivered, null).Should().Be(new StopReportDecision.Repeat(delivered.Id));
+        StopReportRules.Decide(status, ReportKind.DeliveryFailed, "Closed").Should().Be(new StopReportDecision.AlreadyCompleted());
+    }
+
+    [Fact]
+    public void AProofOfDeliveryTheTmsRefused_LeavesTheStopDelivered()
+    {
+        Row(ReportKind.StartTrip);
+        Row(ReportKind.Collected, StopKind.Collection, "SH-0000001");
+        Row(ReportKind.Delivered, StopKind.Delivery, "SH-0000001");
+        Row(ReportKind.ProofOfDelivery, StopKind.Delivery, "SH-0000001", ReportState.Refused);
+
+        Status(_trip, Deliver).Completed.Should().BeTrue();
+    }
 }

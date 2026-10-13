@@ -21,6 +21,8 @@ internal static class ReportKindMapping
         ReportKind.CollectionFailed => ReportKindDto.CollectionFailed,
         ReportKind.DeliveryFailed => ReportKindDto.DeliveryFailed,
         ReportKind.Damaged => ReportKindDto.Damaged,
+        ReportKind.Delivered => ReportKindDto.Delivered,
+        ReportKind.ProofOfDelivery => ReportKindDto.ProofOfDelivery,
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "A kind of report with no view."),
     };
 

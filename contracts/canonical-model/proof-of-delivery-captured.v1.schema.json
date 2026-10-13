@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/proof-of-delivery-captured.v1.schema.json",
+  "title": "ProofOfDeliveryCaptured",
+  "description": "The Driver confirmed the Proof of delivery form at a delivery Stop in the Driver app (Canonical Model event, version 1, a Driver app event: P12). The files are too large for Service Bus, so the event carries their blob references and not the files: the claim check of ADR 0009. The files wait in the Driver app's transit container until the Driver reports Logic App has fetched them, made P6's multipart call to the TMS Proof of delivery API's record operation with Own fleet as the source and the Driver ID from this event, and, once the TMS accepted the Proof of delivery, deleted them. It is published through the Driver app's outbox on the topic for Driver app events, with the Trip number as the Service Bus session ID, and shares its correlation ID with the StopCompletedReported (Delivered) of the same Deliver. The Driver app reports and the TMS decides, so this says what the Driver captured, not that the Shipment is Delivered.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "tripNumber", "version", "driverId", "shipmentNumber", "documentId", "receivedBy", "deliveryTime", "location", "condition", "files"],
+  "properties": {
+    "eventId": { "description": "The Driver app event ID: it names the report to the Logic App, the TMS and the Driver app's outcome report.", "type": "string", "format": "uuid" },
+    "eventType": { "const": "ProofOfDeliveryCaptured" },
+    "eventVersion": { "const": 1 },
+    "occurredAt": { "description": "When the Driver confirmed the form, with its offset.", "type": "string", "format": "date-time" },
+    "correlationId": { "description": "The correlation ID of the Driver's Deliver, shared with its StopCompletedReported. The Logic App uses it on its call to the TMS and on its report back to the Driver app.", "type": "string", "minLength": 1 },
+    "tripNumber": { "description": "The Trip's number.", "type": "string", "pattern": "^TR-[0-9]{7}$" },
+    "version": { "description": "The version of the Trip the Driver app held. It is kept for tracing: the TMS needs the Shipment only to be on the Trip's latest version.", "type": "integer", "minimum": 1 },
+    "driverId": { "description": "The Driver ID from the Driver's token, never from the request (ADR 0005, ADR 0037).", "type": "string", "minLength": 1 },
+    "shipmentNumber": { "description": "The Shipment delivered.", "type": "string", "pattern": "^SH-[0-9]{7}$" },
+    "documentId": { "description": "The Driver app's unique ID for the Proof of delivery: sent again, the TMS recognises it as a repeat.", "type": "string", "minLength": 1, "pattern": "\\S" },
+    "receivedBy": { "description": "The name of the person who signed.", "type": "string", "minLength": 1, "maxLength": 200, "pattern": "\\S" },
+    "deliveryTime": { "description": "When the Driver confirmed the form, with its offset. The place is the Stop's address.", "type": "string", "format": "date-time" },
+    "location": {
+      "description": "Where the goods were delivered: the Stop's address. The Driver app doesn't read GPS.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["place", "postcode", "countryCode"],
+      "properties": {
+        "place": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "postcode": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "countryCode": { "description": "ISO 3166-1 alpha-2.", "type": "string", "pattern": "^[A-Z]{2}$" }
+      }
+    },
+    "condition": { "description": "Whether the Consignee took the goods clean or with reservations.", "enum": ["Clean", "Reservations"] },
+    "remark": { "description": "What the Driver says of the reservations. Required with Reservations, and left out otherwise.", "type": "string", "minLength": 1, "maxLength": 500, "pattern": "\\S" },
+    "files": {
+      "description": "The signature first, then 0 to 4 photos: 1 to 5 files, each described by its name, the content type the device gave it and the blob reference. The TMS judges each by its content.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "contentType", "blobReference"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "pattern": "\\S" },
+          "contentType": { "type": "string", "minLength": 1, "pattern": "\\S" },
+          "blobReference": { "description": "The blob's name in the Driver app's transit container.", "type": "string", "minLength": 1, "pattern": "\\S" }
+        }
+      }
+    }
+  },
+  "if": { "properties": { "condition": { "const": "Reservations" } }, "required": ["condition"] },
+  "then": { "required": ["remark"] }
+}

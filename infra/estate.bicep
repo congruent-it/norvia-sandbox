@@ -203,7 +203,9 @@ module driverApp 'estate/driver-app.bicep' = {
     location: location
     tags: tags
     endpointKeySeed: carrierEndpointKeySeed
+    integrationRetentionDays: integrationRetentionDays
     driverAppPrincipalId: identities.outputs.driverAppPrincipalId
+    driverReportsPrincipalId: identities.outputs.driverReportsPrincipalId
     tripDispatchPrincipalId: identities.outputs.tripDispatchPrincipalId
   }
 }
@@ -238,6 +240,8 @@ module driverReportsLogicApp 'estate/driver-reports-logic-app.bicep' = {
     tmsBaseUrl: tmsBaseUrl
     driverAppBaseUrl: driverAppBaseUrl
     driverAppApiClientId: identities.outputs.driverAppApiClientId
+    driverProofsContainerName: driverApp.outputs.containerName
+    driverProofsBlobEndpoint: driverApp.outputs.blobEndpoint
     applicationInsightsName: monitoring.outputs.applicationInsightsName
     serviceBusName: messaging.outputs.namespaceName
     planName: intakeLogicApp.outputs.planName
@@ -352,6 +356,7 @@ output ESTATE_DRIVER_APP_API_CLIENT_ID string = identities.outputs.driverAppApiC
 output ESTATE_DRIVER_APP_IDENTITY_NAME string = identities.outputs.driverAppIdentityName
 output ESTATE_DRIVER_APP_CLIENT_ID string = identities.outputs.driverAppClientId
 output ESTATE_DRIVER_APP_KEY_VAULT string = driverApp.outputs.keyVaultName
+output ESTATE_DRIVER_APP_BLOB_ENDPOINT string = driverApp.outputs.blobEndpoint
 output ESTATE_TMS_UI_IDENTITY_NAME string = identities.outputs.tmsUiIdentityName
 output ESTATE_TMS_UI_CLIENT_ID string = identities.outputs.tmsUiClientId
 output ESTATE_INTAKE_LOGIC_APP string = intakeLogicApp.outputs.logicAppName

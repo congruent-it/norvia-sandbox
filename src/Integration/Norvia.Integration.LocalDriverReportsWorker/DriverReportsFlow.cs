@@ -15,22 +15,27 @@ internal enum DriverReportsRunOutcome
 
     /// <summary>The Driver app didn't take the outcome, so the report stays Sending there. The TMS has it anyway.</summary>
     OutcomeNotReported,
+
+    /// <summary>The files of a Proof of delivery are gone from the transit container, so nothing was sent to the TMS: the message was dead-lettered and the report is Not recorded.</summary>
+    FilesGone,
 }
 
 /// <summary>
-/// The P12 Driver reports Logic App's steps, played locally (ADR 0016): call the TMS for the Driver's report under the bounded exponential retry policy,
+/// The P12 Driver reports Logic App's steps, played locally (ADR 0016): for a Proof of delivery fetch its files from the Driver app's transit container (ADR 0009),
+/// call the TMS for the Driver's report under the bounded exponential retry policy,
 /// settle the message (completed when the TMS recorded it, dead-lettered with the failure code and message when it refused or couldn't be reached), then
-/// tell the Driver app whether the report was Recorded, Refused or Not recorded. A report that fails for good is dead-lettered so the Trip's session can
+/// tell the Driver app whether the report was Recorded, Refused or Not recorded, and delete the files of a Proof of delivery the TMS accepted. A report that fails for good is dead-lettered so the Trip's session can
 /// move on to the next report.
 /// </summary>
 internal sealed partial class DriverReportsFlow(
     TmsTripCalls tms,
+    IDriverProofFiles proofFiles,
     DriverAppOutcomes driverApp,
     IOptions<DriverReportsWorkerOptions> options,
     TimeProvider time,
     ILogger<DriverReportsFlow> logger)
 {
-    internal const string UnreadableDescription = "The message isn't a Trip start or a Stop report the Driver app made, so nothing was sent to the TMS.";
+    internal const string UnreadableDescription = "The message isn't a Trip start, a Stop report or a Proof of delivery the Driver app made, so nothing was sent to the TMS.";
 
     /// <summary>The longest message the Driver app takes in an outcome report.</summary>
     private const int MaximumMessageLength = 1000;
@@ -48,8 +53,19 @@ internal sealed partial class DriverReportsFlow(
         }
 
         using var trail = logger.BeginScope(report.ContractKeys);
+        IReadOnlyList<FetchedProofFile> files = [];
+        if (report.Proof is { } proof)
+        {
+            if (await proofFiles.FetchAsync(proof.Files, cancellationToken) is not { } fetched)
+            {
+                return await GiveUpOnGoneFilesAsync(report, settle, cancellationToken);
+            }
+
+            files = fetched;
+        }
+
         var (answer, attempts) = await WithRetriesAsync(
-            () => tms.CallAsync(report, cancellationToken), result => result.StatusCode, DriverReportsFailureCodes.TmsUnavailable, cancellationToken);
+            () => tms.CallAsync(report, files, cancellationToken), result => result.StatusCode, DriverReportsFailureCodes.TmsUnavailable, cancellationToken);
 
         var (settlement, outcome) = Decide(report, answer, attempts);
         using (logger.BeginScope(TrackingKeys.OutcomeOf(
@@ -69,7 +85,30 @@ internal sealed partial class DriverReportsFlow(
             LogOutcomeReported(outcome.Outcome, status);
         }
 
+        // Only a Proof of delivery the TMS accepted is deleted; a refused one stays for investigation, until the container's lifecycle rule deletes it.
+        if (report.Proof is { } accepted && answer.Succeeded)
+        {
+            await proofFiles.DeleteAsync(accepted.Files, cancellationToken);
+        }
+
         return reported ? DriverReportsRunOutcome.Done : DriverReportsRunOutcome.OutcomeNotReported;
+    }
+
+    /// <summary>The files are gone: the message is dead-lettered and the Driver app is told the report wasn't recorded, and the run fails, as the workflow's does.</summary>
+    private async Task<DriverReportsRunOutcome> GiveUpOnGoneFilesAsync(DriverReport report, Func<Settlement, CancellationToken, Task> settle, CancellationToken cancellationToken)
+    {
+        const string description = "The Proof of delivery's files could not be read from the Driver app's transit container, so nothing was sent to the TMS.";
+        using (logger.BeginScope(TrackingKeys.OutcomeOf(TrackingKeys.DeadLettered, DriverReportsFailureCodes.ProofOfDeliveryFilesGone)))
+        {
+            LogFilesGone();
+            await settle(new Settlement.DeadLetter(DriverReportsFailureCodes.ProofOfDeliveryFilesGone, description), cancellationToken);
+        }
+
+        // Whether the Driver app took the outcome doesn't change what the run is: it fails either way.
+        _ = await WithRetriesAsync(
+            () => driverApp.ReportAsync(report, OutcomeReport.For(report, ReportOutcome.NotRecorded, DriverReportsFailureCodes.ProofOfDeliveryFilesGone, description), cancellationToken),
+            code => code, DriverReportsFailureCodes.DriverAppUnavailable, cancellationToken);
+        return DriverReportsRunOutcome.FilesGone;
     }
 
     private static (Settlement Settlement, OutcomeReport Outcome) Decide(DriverReport report, TmsAnswer answer, int attempts)
@@ -114,6 +153,9 @@ internal sealed partial class DriverReportsFlow(
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "The message isn't a Trip start or a Stop report the Driver app made")]
     private partial void LogUnreadable();
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "The files of the Proof of delivery are gone from the transit container")]
+    private partial void LogFilesGone();
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "The call answered {StatusCode}; retry {Attempt} of {Count} in {Wait}")]
     private partial void LogRetrying(int statusCode, int attempt, int count, TimeSpan wait);

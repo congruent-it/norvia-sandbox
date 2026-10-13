@@ -69,6 +69,9 @@ public sealed class Estate(IDistributedApplicationBuilder builder)
     /// <summary>The Key Vault that holds the Driver app's Trip endpoint credential as <c>driver-app-endpoint-key</c>.</summary>
     public IResourceBuilder<ParameterResource> DriverAppKeyVault { get; } = builder.AddParameter("estate-driver-app-key-vault");
 
+    /// <summary>The address of the blob service of the Driver app's transit container for the files of a Proof of delivery (P12), which its screens store them in.</summary>
+    public IResourceBuilder<ParameterResource> DriverAppBlobEndpoint { get; } = builder.AddParameter("estate-driver-app-blob-endpoint");
+
     /// <summary>
     /// The demo UIs' app registration, which Easy Auth signs the presenter in to in front of the TMS UI and the Partner
     /// portal (ADR 0024). Only the users assigned to it get a token.

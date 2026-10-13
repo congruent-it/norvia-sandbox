@@ -12,6 +12,19 @@
       "serviceProvider": {
         "id": "/serviceProviders/serviceBus"
       }
+    },
+    "AzureBlob": {
+      "displayName": "Driver app transit container",
+      "parameterValues": {
+        "blobStorageEndpoint": "@appsetting('DRIVER_PROOFS_BLOB_ENDPOINT')",
+        "authProvider": {
+          "Type": "ManagedServiceIdentity",
+          "Identity": "@appsetting('DRIVER_REPORTS_IDENTITY_ID')"
+        }
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/AzureBlob"
+      }
     }
   },
   "managedApiConnections": {}

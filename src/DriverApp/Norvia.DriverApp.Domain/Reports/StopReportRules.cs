@@ -12,17 +12,20 @@ public static class StopReportRules
     /// <summary>The longest remark the TMS keeps of a Tracking event.</summary>
     public const int MaximumRemarkLength = 500;
 
-    /// <summary>Collected and Collection failed are reported on a collection Stop, Delivery failed on a delivery Stop, and damage on either.</summary>
+    /// <summary>Collected and Collection failed are reported on a collection Stop, Delivered (with its Proof of delivery) and Delivery failed on a delivery Stop, and damage on either.</summary>
     public static bool Fits(ReportKind kind, StopKind stop) => kind switch
     {
         ReportKind.Collected or ReportKind.CollectionFailed => stop == StopKind.Collection,
-        ReportKind.DeliveryFailed => stop == StopKind.Delivery,
+        ReportKind.Delivered or ReportKind.ProofOfDelivery or ReportKind.DeliveryFailed => stop == StopKind.Delivery,
         ReportKind.Damaged => true,
         _ => false,
     };
 
-    /// <summary>Everything but a plain Collected needs the Driver's words.</summary>
-    public static bool NeedsRemark(ReportKind kind) => kind is not (ReportKind.Collected or ReportKind.StartTrip);
+    /// <summary>
+    /// Everything but a plain Collected needs the Driver's words, and a Delivered says them only with reservations, which the Proof of delivery's own rules
+    /// ask for (<see cref="ProofOfDeliveryRules"/>).
+    /// </summary>
+    public static bool NeedsRemark(ReportKind kind) => kind is not (ReportKind.Collected or ReportKind.StartTrip or ReportKind.Delivered or ReportKind.ProofOfDelivery);
 
     public static StopReportDecision Decide(StopStatus status, ReportKind kind, string? remark)
     {

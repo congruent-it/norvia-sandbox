@@ -301,6 +301,14 @@ resource driverReportsRecordRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' =
   principalId: driverReportsIdentity.properties.principalId
 }
 
+// The Proof of delivery record role, which the Carrier Proof of delivery Logic App holds too: the Driver reports Logic App records a Driver's Proof of delivery
+// as one of Own fleet with it, in the multipart call that P6 defines.
+resource driverReportsRecordProofRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: tmsApiPrincipal.id
+  appRoleId: recordProofRoleId
+  principalId: driverReportsIdentity.properties.principalId
+}
+
 // The Driver app API's registration, which is the audience of the Driver reports Logic App's token for the Driver app's outcome endpoint
 // (ADR 0005). Entra issues one only to a principal granted the role.
 resource driverAppApi 'Microsoft.Graph/applications@v1.0' = {

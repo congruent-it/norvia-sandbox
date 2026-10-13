@@ -18,5 +18,9 @@
   "driverAppAudience": {
     "type": "String",
     "value": "@appsetting('DRIVER_APP_API_CLIENT_ID')"
+  },
+  "driverProofsContainer": {
+    "type": "String",
+    "value": "@appsetting('DRIVER_PROOFS_CONTAINER')"
   }
 }

@@ -1,5 +1,5 @@
 // The P12 Driver reports Logic App: a Logic Apps Standard app that reads the Drivers' reports from its own subscription (sessions keyed by Trip
-// number), calls the TMS for each as the Driver reports identity, settles the message, and tells the Driver app what became of the report. Its
+// number), calls the TMS for each as the Driver reports identity (for a Proof of delivery, after fetching its files from the Driver app's transit container), settles the message, and tells the Driver app what became of the report. Its
 // workflow is deployed by azd's postdeploy hook (infra/deploy-driver-reports-logic-app.sh), because the app needs the addresses of the TMS and
 // the Driver app, which exist only after Aspire deploys them. It needs no secret: it calls both as its managed identity.
 //
@@ -24,6 +24,10 @@ param driverAppBaseUrl string
 
 @description('The Driver app API app registration, the audience of the tokens the Logic App gets for the Driver app\'s outcome endpoint.')
 param driverAppApiClientId string
+
+@description('The Driver app\'s transit container for the files of a Proof of delivery, and the address of its storage account\'s blob service.')
+param driverProofsContainerName string
+param driverProofsBlobEndpoint string
 
 param applicationInsightsName string
 
@@ -187,6 +191,8 @@ resource logicApp 'Microsoft.Web/sites@2024-11-01' = {
         { name: 'DRIVER_APP_BASE_URL', value: driverAppBaseUrl }
         { name: 'DRIVER_APP_API_CLIENT_ID', value: driverAppApiClientId }
         { name: 'DRIVER_REPORTS_IDENTITY_ID', value: driverReportsIdentity.id }
+        { name: 'DRIVER_PROOFS_CONTAINER', value: driverProofsContainerName }
+        { name: 'DRIVER_PROOFS_BLOB_ENDPOINT', value: driverProofsBlobEndpoint }
         { name: 'SERVICE_BUS_NAMESPACE', value: '${serviceBus.name}.servicebus.windows.net' }
       ]
     }

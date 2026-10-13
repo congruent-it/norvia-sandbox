@@ -14,6 +14,7 @@ public sealed class DriverReportsWorkflowTests
     private static readonly string[] CalledActions =
     [
         DriverReportsWorkflow.SendToTms, DriverReportsWorkflow.ReportRecorded, DriverReportsWorkflow.ReportNotRecorded, DriverReportsWorkflow.ReportRefused,
+        DriverReportsWorkflow.ReportFilesGone,
     ];
 
     private static string[] Statuses(JsonObject action, string after) =>
@@ -49,7 +50,8 @@ public sealed class DriverReportsWorkflowTests
         var inputs = DriverReportsWorkflow.Action(DriverReportsWorkflow.Tracking)["inputs"]!.AsObject();
 
         inputs.Select(input => input.Key).Should().BeEquivalentTo(
-            "correlationId", "partyId", "tripNumber", "eventType", "sourceMessageId", "occurredAt", "version", "shipmentNumber", "stop", "trackingEventType", "location", "remark");
+            "correlationId", "partyId", "tripNumber", "eventType", "sourceMessageId", "occurredAt", "version", "shipmentNumber", "stop", "trackingEventType", "location", "remark",
+            "documentId", "receivedBy", "deliveryTime", "condition", "files");
         inputs.Select(input => input.Value!.GetValue<string>()).Should().OnlyContain(
             expression => expression.StartsWith("@json(base64ToString(triggerBody()?['contentData']))?['", StringComparison.Ordinal) && !expression.Contains("@{", StringComparison.Ordinal));
         inputs["partyId"]!.GetValue<string>().Should().EndWith("?['driverId']");
@@ -72,9 +74,9 @@ public sealed class DriverReportsWorkflowTests
     {
         var check = DriverReportsWorkflow.Action(DriverReportsWorkflow.Check);
 
-        Statuses(check, DriverReportsWorkflow.Tracking).Should().BeEquivalentTo("Succeeded", "Failed");
+        Statuses(check, DriverReportsWorkflow.InitializeFileParts).Should().BeEquivalentTo("Succeeded", "Failed");
         var expression = check["expression"]!.ToJsonString();
-        expression.Should().Contain("TripStartReported").And.Contain("StopCompletedReported").And.Contain("correlationId").And.Contain("tripNumber").And.Contain("partyId").And.Contain("sourceMessageId");
+        expression.Should().Contain("TripStartReported").And.Contain("StopCompletedReported").And.Contain("ProofOfDeliveryCaptured").And.Contain("correlationId").And.Contain("tripNumber").And.Contain("partyId").And.Contain("sourceMessageId");
         expression.Should().Contain("shipmentNumber").And.Contain("trackingEventType").And.Contain("occurredAt").And.Contain("place").And.Contain("postcode").And.Contain("countryCode");
         expression.Should().NotContain("triggerBody");
     }
@@ -94,7 +96,8 @@ public sealed class DriverReportsWorkflowTests
         inputs["authentication"]!["type"]!.GetValue<string>().Should().Be("ManagedServiceIdentity");
         inputs["authentication"]!["identity"]!.GetValue<string>().Should().Be("@parameters('driverReportsIdentityId')");
         inputs["authentication"]!["audience"]!.GetValue<string>().Should().Be("@parameters('tmsAudience')");
-        Statuses(send, DriverReportsWorkflow.BuildTrackingEvent).Should().Equal("Succeeded");
+        uri.Should().Contain("'proofs-of-delivery'");
+        Statuses(send, DriverReportsWorkflow.BuildMultipart).Should().Equal("Succeeded");
     }
 
     [Fact]
@@ -130,6 +133,7 @@ public sealed class DriverReportsWorkflowTests
     [InlineData(DriverReportsWorkflow.ReportRecorded)]
     [InlineData(DriverReportsWorkflow.ReportNotRecorded)]
     [InlineData(DriverReportsWorkflow.ReportRefused)]
+    [InlineData(DriverReportsWorkflow.ReportFilesGone)]
     public void Calls_RetryWithTheBoundedExponentialPolicy_AndCarryTheCorrelationId(string name)
     {
         var inputs = DriverReportsWorkflow.Action(name)["inputs"]!;
@@ -144,7 +148,7 @@ public sealed class DriverReportsWorkflowTests
     }
 
     [Fact]
-    public void Calls_AreTheTmsAndTheThreeOutcomeReports() =>
+    public void Calls_AreTheTmsAndTheOutcomeReports() =>
         DriverReportsWorkflow.Operations().Where(operation => operation.Operation["type"]!.GetValue<string>() == "Http").Select(operation => operation.Name)
             .Should().BeEquivalentTo(CalledActions);
 
@@ -186,7 +190,7 @@ public sealed class DriverReportsWorkflowTests
 
         Statuses(settle, DriverReportsWorkflow.SendToTms).Should().BeEquivalentTo("Succeeded", "Failed", "TimedOut");
         settle["expression"]!.ToJsonString().Should().Contain("greaterOrEquals").And.Contain("200").And.Contain("less").And.Contain("300");
-        settle["actions"]!.AsObject().Select(action => action.Key).Should().Equal(DriverReportsWorkflow.Complete, DriverReportsWorkflow.ReportRecorded);
+        settle["actions"]!.AsObject().Select(action => action.Key).Should().Equal(DriverReportsWorkflow.Complete, DriverReportsWorkflow.ReportRecorded, DriverReportsWorkflow.DeleteFiles);
         DriverReportsWorkflow.Action(DriverReportsWorkflow.Complete)["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("completeMessageInSession");
         Statuses(DriverReportsWorkflow.Action(DriverReportsWorkflow.ReportRecorded), DriverReportsWorkflow.Complete).Should().Equal("Succeeded");
     }
@@ -227,7 +231,7 @@ public sealed class DriverReportsWorkflowTests
         DriverReportsWorkflow.Action(DriverReportsWorkflow.Check)["else"]!["actions"]!.AsObject().Select(action => action.Key)
             .Should().Equal(DriverReportsWorkflow.DeadLetterUnreadable, DriverReportsWorkflow.FailTheRun);
         parameters["deadLetterReason"]!.GetValue<string>().Should().Be("DriverReportUnreadable");
-        parameters["deadLetterErrorDescription"]!.GetValue<string>().Should().Contain("Trip start or a Stop report").And.Contain("nothing was sent to the TMS");
+        parameters["deadLetterErrorDescription"]!.GetValue<string>().Should().Contain("Trip start, a Stop report or a Proof of delivery").And.Contain("nothing was sent to the TMS");
         deadLetter["trackedProperties"]!["failureCode"]!.GetValue<string>().Should().Be("DriverReportUnreadable");
         DriverReportsWorkflow.Action(DriverReportsWorkflow.FailTheRun)["inputs"]!["runStatus"]!.GetValue<string>().Should().Be("Failed");
     }
@@ -257,8 +261,8 @@ public sealed class DriverReportsWorkflowTests
         var local = Contracts.Read("AppHost/ResubmitAwareFilters.cs");
         var localFilter = local.Split('\n').Single(line => line.Contains("[\"driver-reports\"]", StringComparison.Ordinal));
 
-        filter.Should().Contain("eventType = \\'TripStartReported\\' OR eventType = \\'StopCompletedReported\\'");
-        localFilter.Should().Contain("eventType = 'TripStartReported' OR eventType = 'StopCompletedReported'");
+        filter.Should().Contain("eventType = \\'TripStartReported\\' OR eventType = \\'StopCompletedReported\\' OR eventType = \\'ProofOfDeliveryCaptured\\'");
+        localFilter.Should().Contain("eventType = 'TripStartReported' OR eventType = 'StopCompletedReported' OR eventType = 'ProofOfDeliveryCaptured'");
     }
 
     [Fact]
@@ -273,6 +277,91 @@ public sealed class DriverReportsWorkflowTests
     }
 
     [Fact]
+    public void TheDriverReportsIdentity_HoldsTheProofOfDeliveryRecordRole_ForItsProofsOfDelivery()
+    {
+        var identities = Contracts.Read("Estate/identities.bicep");
+        var grant = identities[identities.IndexOf("resource driverReportsRecordProofRoleGrant", StringComparison.Ordinal)..];
+        grant = grant[..grant.IndexOf("\n}\n", StringComparison.Ordinal)];
+
+        grant.Should().Contain("resourceId: tmsApiPrincipal.id").And.Contain("appRoleId: recordProofRoleId").And.Contain("principalId: driverReportsIdentity.properties.principalId");
+    }
+
+    [Fact]
+    public void AProofOfDelivery_IsFetchedFileByFileInOrder_BeforeItsMultipartCall_AndTheFilesAreAppendedAsParts()
+    {
+        var fetch = DriverReportsWorkflow.Action(DriverReportsWorkflow.FetchFiles);
+        var read = DriverReportsWorkflow.Action(DriverReportsWorkflow.ReadFile)["inputs"]!;
+        var append = DriverReportsWorkflow.Action(DriverReportsWorkflow.AppendFilePart)["inputs"]!;
+
+        DriverReportsWorkflow.Action(DriverReportsWorkflow.InitializeFileParts)["type"]!.GetValue<string>().Should().Be("InitializeVariable");
+        Statuses(DriverReportsWorkflow.Action(DriverReportsWorkflow.InitializeFileParts), DriverReportsWorkflow.Tracking).Should().BeEquivalentTo("Succeeded", "Failed");
+        fetch["foreach"]!.GetValue<string>().Should().Contain("['files']");
+        fetch["runtimeConfiguration"]!["concurrency"]!["repetitions"]!.GetValue<int>().Should().Be(1, "the parts keep the order of the files");
+        Statuses(fetch, DriverReportsWorkflow.BuildTrackingEvent).Should().Equal("Succeeded");
+        read["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("readBlob");
+        read["serviceProviderConfiguration"]!["connectionName"]!.GetValue<string>().Should().Be("AzureBlob");
+        read["parameters"]!["containerName"]!.GetValue<string>().Should().Be("@parameters('driverProofsContainer')");
+        read["parameters"]!["blobName"]!.GetValue<string>().Should().Contain("['blobReference']");
+        append["name"]!.GetValue<string>().Should().Be("fileParts");
+        append["value"]!["headers"]!["Content-Disposition"]!.GetValue<string>().Should().Contain("name=\"files\"").And.Contain("['name']");
+        append["value"]!["body"]!.GetValue<string>().Should().Contain("Read_the_file");
+    }
+
+    [Fact]
+    public void TheMultipartCall_HasTheMetadataOfOwnFleetThenTheFiles_AndLeavesOutARemarkTheDriverDidNotGive()
+    {
+        var metadata = DriverReportsWorkflow.Action(DriverReportsWorkflow.BuildProofOfDelivery)["inputs"]!;
+        var multipart = DriverReportsWorkflow.Action(DriverReportsWorkflow.BuildMultipart)["inputs"]!;
+        var body = DriverReportsWorkflow.Action(DriverReportsWorkflow.SendToTms)["inputs"]!["body"]!.GetValue<string>();
+
+        metadata["source"]!["type"]!.GetValue<string>().Should().Be("OwnFleet");
+        metadata["source"]!["driverId"]!.GetValue<string>().Should().Be("@outputs('Track_the_report')?['partyId']");
+        metadata["documentId"]!.GetValue<string>().Should().Be("@outputs('Track_the_report')?['documentId']");
+        metadata["tripNumber"]!.GetValue<string>().Should().Be("@outputs('Track_the_report')?['tripNumber']");
+        metadata["shipmentNumber"]!.GetValue<string>().Should().Be("@outputs('Track_the_report')?['shipmentNumber']");
+        metadata["tripVersion"]!.GetValue<string>().Should().Be("@outputs('Track_the_report')?['version']");
+        metadata["condition"]!.GetValue<string>().Should().Be("@outputs('Track_the_report')?['condition']");
+        metadata["files"]!.GetValue<string>().Should().Be("@body('Select_the_file_descriptions')");
+        metadata.AsObject().ContainsKey("remark").Should().BeFalse();
+        multipart["$content-type"]!.GetValue<string>().Should().Be("multipart/form-data");
+        multipart["$multipart"]!.GetValue<string>().Should().Contain("name=\"metadata\"").And.Contain("addProperty(outputs('Build_the_Proof_of_delivery')").And.Contain("variables('fileParts')");
+        body.Should().Contain("ProofOfDeliveryCaptured").And.Contain("outputs('Build_the_Proof_of_delivery_multipart')");
+        DriverReportsWorkflow.Action(DriverReportsWorkflow.SendToTms)["inputs"]!["headers"]!.AsObject().ContainsKey("Content-Type")
+            .Should().BeFalse("a multipart body brings its own content type with its boundary");
+    }
+
+    [Fact]
+    public void FilesThatAreGone_FailTheRun_AfterTheMessageIsDeadLetteredAndTheDriverAppToldItWasNotRecorded()
+    {
+        var deadLetter = DriverReportsWorkflow.Action(DriverReportsWorkflow.DeadLetterFilesGone);
+        var report = DriverReportsWorkflow.Action(DriverReportsWorkflow.ReportFilesGone);
+
+        Statuses(deadLetter, DriverReportsWorkflow.FetchFiles).Should().BeEquivalentTo("Failed", "TimedOut");
+        deadLetter["inputs"]!["parameters"]!["deadLetterReason"]!.GetValue<string>().Should().Be("ProofOfDeliveryFilesGone");
+        deadLetter["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("deadLetterMessageInSession");
+        deadLetter["trackedProperties"]!["outcome"]!.GetValue<string>().Should().Be("DeadLettered");
+        Statuses(report, DriverReportsWorkflow.DeadLetterFilesGone).Should().Equal("Succeeded");
+        report["inputs"]!["body"]!["outcome"]!.GetValue<string>().Should().Be("NotRecorded");
+        report["inputs"]!["body"]!["failureCode"]!.GetValue<string>().Should().Be("ProofOfDeliveryFilesGone");
+        report["inputs"]!["body"]!["driverAppEventId"]!.GetValue<string>().Should().Be("@outputs('Track_the_report')?['sourceMessageId']");
+        DriverReportsWorkflow.Action(DriverReportsWorkflow.FailTheRunOnFilesGone)["inputs"]!["runStatus"]!.GetValue<string>().Should().Be("Failed");
+        Statuses(DriverReportsWorkflow.Action(DriverReportsWorkflow.SendToTms), DriverReportsWorkflow.BuildMultipart).Should().Equal("Succeeded");
+    }
+
+    [Fact]
+    public void TheFiles_AreDeletedOnlyOnceTheTmsAcceptedTheProofOfDelivery_AfterTheDriverAppIsTold()
+    {
+        var delete = DriverReportsWorkflow.Action(DriverReportsWorkflow.DeleteFiles);
+        var inputs = DriverReportsWorkflow.Action(DriverReportsWorkflow.DeleteFile)["inputs"]!;
+
+        DriverReportsWorkflow.Action(DriverReportsWorkflow.Settle)["actions"]!.AsObject().ContainsKey(DriverReportsWorkflow.DeleteFiles).Should().BeTrue("only the accepted branch deletes");
+        Statuses(delete, DriverReportsWorkflow.ReportRecorded).Should().BeEquivalentTo("Succeeded", "Failed");
+        inputs["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("deleteBlob");
+        inputs["parameters"]!["containerName"]!.GetValue<string>().Should().Be("@parameters('driverProofsContainer')");
+        inputs["parameters"]!["blobName"]!.GetValue<string>().Should().Contain("['blobReference']");
+    }
+
+    [Fact]
     public void Workflow_IsStateful_BecauseTheRunHistoryIsTheIntegrationOperatorsTrail() =>
         DriverReportsWorkflow.Kind.Should().Be("Stateful");
 
@@ -281,7 +370,7 @@ public sealed class DriverReportsWorkflowTests
     {
         var parameters = DriverReportsWorkflow.ParametersFile;
 
-        parameters.Select(parameter => parameter.Key).Should().BeEquivalentTo("tmsBaseUrl", "tmsAudience", "driverReportsIdentityId", "driverAppBaseUrl", "driverAppAudience");
+        parameters.Select(parameter => parameter.Key).Should().BeEquivalentTo("tmsBaseUrl", "tmsAudience", "driverReportsIdentityId", "driverAppBaseUrl", "driverAppAudience", "driverProofsContainer");
         parameters.Select(parameter => parameter.Value!["value"]!.GetValue<string>()).Should().OnlyContain(value => value.StartsWith("@appsetting('", StringComparison.Ordinal));
     }
 
@@ -290,11 +379,15 @@ public sealed class DriverReportsWorkflowTests
     {
         var connections = DriverReportsWorkflow.ConnectionsFile["serviceProviderConnections"]!.AsObject();
 
-        connections.Select(connection => connection.Key).Should().Equal("serviceBus");
+        connections.Select(connection => connection.Key).Should().Equal("serviceBus", "AzureBlob");
         var authProvider = connections["serviceBus"]!["parameterValues"]!["authProvider"]!;
         authProvider["Type"]!.GetValue<string>().Should().Be("ManagedServiceIdentity");
         authProvider["Identity"]!.GetValue<string>().Should().Be("@appsetting('DRIVER_REPORTS_IDENTITY_ID')");
         connections["serviceBus"]!["parameterValues"]!["fullyQualifiedNamespace"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_NAMESPACE')");
+        var blob = connections["AzureBlob"]!["parameterValues"]!;
+        blob["authProvider"]!["Type"]!.GetValue<string>().Should().Be("ManagedServiceIdentity");
+        blob["authProvider"]!["Identity"]!.GetValue<string>().Should().Be("@appsetting('DRIVER_REPORTS_IDENTITY_ID')");
+        blob["blobStorageEndpoint"]!.GetValue<string>().Should().Be("@appsetting('DRIVER_PROOFS_BLOB_ENDPOINT')");
     }
 
     [Fact]

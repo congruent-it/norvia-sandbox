@@ -21,7 +21,7 @@ public sealed class DriverReportsWorkerOptions
     [Required]
     public Uri? TmsBaseAddress { get; set; }
 
-    /// <summary>The Driver reports Logic App's token for the TMS, with the roles it needs there (<c>Trips.Start</c>).</summary>
+    /// <summary>The Driver reports Logic App's token for the TMS, with the roles it needs there (<c>Trips.Start</c>, <c>TrackingEvents.Record</c> and <c>ProofsOfDelivery.Record</c>).</summary>
     [Required]
     [ValidateObjectMembers]
     public LocalTokenOptions TmsTokens { get; set; } = new();
@@ -30,6 +30,10 @@ public sealed class DriverReportsWorkerOptions
     [Required]
     [ValidateObjectMembers]
     public DriverAppOptions DriverApp { get; set; } = new();
+
+    /// <summary>The Driver app's transit container for the files of a Proof of delivery, which the Driver reports Logic App fetches them from and deletes them from.</summary>
+    [Required]
+    public string ProofsContainer { get; set; } = "driver-proofs-of-delivery";
 
     /// <summary>The bounded exponential retry policy, with the numbers of the workflow's <c>retryPolicy</c>.</summary>
     public RetryOptions Retry { get; set; } = new();

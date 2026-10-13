@@ -6,6 +6,7 @@ using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Azure;
 using Aspire.Hosting.Testing;
 using Azure.Messaging.ServiceBus;
+using Azure.Storage.Blobs;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
@@ -28,19 +29,21 @@ public sealed class DriverAppFixture : IAsyncLifetime
     /// <summary>The app role only the P12 Driver reports Logic App's managed identity holds on the Driver app.</summary>
     public const string ReportOutcomeRole = "DriverReports.ReportOutcome";
 
-    // What the Driver app's tests don't call only costs startup time and memory. The tests play the Driver reports Logic App themselves, so no worker may
+    // What the Driver app's tests don't call only costs startup time and memory. The storage emulator stays: the Driver app's screens store the files of a
+    // Proof of delivery in it. The tests play the Driver reports Logic App themselves, so no worker may
     // read the Driver app events or report an outcome.
     private static readonly string[] Unneeded =
     [
         "dbgate", "tms", "tms-migrations", "tms-api", "tms-web", "partner-portal", "partner-portal-migrations", "partner-portal-web",
         "integration-console-web", "partner-api", "booking-worker", "shipper-notification-worker", "carrier-cancellation-worker",
-        "trip-dispatch-worker", "driver-reports-worker", "tracking-worker", "proof-of-delivery-worker", "storage", "blobs",
+        "trip-dispatch-worker", "driver-reports-worker", "tracking-worker", "proof-of-delivery-worker",
     ];
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
     private readonly string _tokenSigningKey = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
     private readonly ConcurrentQueue<ServiceBusReceivedMessage> _published = new();
     private DistributedApplication? _app;
     private ServiceBusClient? _serviceBus;
+    private BlobServiceClient? _blobs;
     private ServiceBusProcessor? _processor;
 
     /// <summary>The credential the Driver app's Trip endpoint asks of the Trip dispatch Logic App; Key Vault holds it in Azure.</summary>
@@ -79,6 +82,7 @@ public sealed class DriverAppFixture : IAsyncLifetime
         Anonymous = _app.CreateHttpClient("driver-app-api");
         DriverReports = DriverReportsClient(IssueToken([ReportOutcomeRole]));
 
+        _blobs = new BlobServiceClient(await _app.GetConnectionStringAsync("blobs", startup.Token));
         _serviceBus = new ServiceBusClient(await _app.GetConnectionStringAsync("messaging", startup.Token));
         _processor = _serviceBus.CreateProcessor(DriverAppEventsTopic, TestSubscription);
         _processor.ProcessMessageAsync += args =>
@@ -109,6 +113,18 @@ public sealed class DriverAppFixture : IAsyncLifetime
         {
             await _app.DisposeAsync();
         }
+    }
+
+    /// <summary>The names of the blobs in the Driver app's transit container whose names start with the prefix.</summary>
+    public async Task<IReadOnlyList<string>> TransitBlobsAsync(string prefix, CancellationToken cancellationToken)
+    {
+        var names = new List<string>();
+        await foreach (var blob in _blobs!.GetBlobContainerClient("driver-proofs-of-delivery").GetBlobsAsync(Azure.Storage.Blobs.Models.BlobTraits.None, Azure.Storage.Blobs.Models.BlobStates.None, prefix, cancellationToken))
+        {
+            names.Add(blob.Name);
+        }
+
+        return names;
     }
 
     /// <summary>The messages the Driver app published for the Trip, oldest first.</summary>

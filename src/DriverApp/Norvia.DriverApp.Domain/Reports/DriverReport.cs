@@ -51,10 +51,10 @@ public sealed class DriverReport : EntityBase<ReportId>, IAggregateRoot
     /// <summary>A Start Trip the Driver can't send again: the TMS has it, or hasn't answered yet.</summary>
     public bool IsActiveStart => Kind == ReportKind.StartTrip && State is ReportState.Sending or ReportState.Recorded;
 
-    /// <summary>Whether the report completes a Stop (Collected, Collection failed, Delivery failed). Report damage doesn't.</summary>
+    /// <summary>Whether the report completes a Stop (Collected, Collection failed, Delivered, Delivery failed). Report damage and a Proof of delivery don't.</summary>
     public bool CompletesStop => CompletesAStop(Kind);
 
-    public static bool CompletesAStop(ReportKind kind) => kind is ReportKind.Collected or ReportKind.CollectionFailed or ReportKind.DeliveryFailed;
+    public static bool CompletesAStop(ReportKind kind) => kind is ReportKind.Collected or ReportKind.CollectionFailed or ReportKind.Delivered or ReportKind.DeliveryFailed;
 
     public static DriverReport StartTrip(ReportId id, TripNumber tripNumber, DriverId driverId, int versionHeld, DateTimeOffset eventTime, string correlationId)
     {
@@ -82,9 +82,9 @@ public sealed class DriverReport : EntityBase<ReportId>, IAggregateRoot
         ArgumentException.ThrowIfNullOrWhiteSpace(origin.DriverId.Value);
         ArgumentOutOfRangeException.ThrowIfLessThan(origin.VersionHeld, 1);
         ArgumentException.ThrowIfNullOrWhiteSpace(origin.CorrelationId);
-        if (kind == ReportKind.StartTrip)
+        if (kind is ReportKind.StartTrip or ReportKind.Delivered or ReportKind.ProofOfDelivery)
         {
-            throw new ArgumentException("A Start Trip is not a Stop report.", nameof(kind));
+            throw new ArgumentException($"{kind} is not a report on a Stop made on its own.", nameof(kind));
         }
 
         if (!StopReportRules.Fits(kind, stop.Kind))
@@ -97,6 +97,43 @@ public sealed class DriverReport : EntityBase<ReportId>, IAggregateRoot
             ArgumentException.ThrowIfNullOrWhiteSpace(remark);
         }
 
+        return new DriverReport
+        {
+            Id = id,
+            Kind = kind,
+            TripNumber = origin.TripNumber,
+            ShipmentNumber = stop.ShipmentNumber,
+            Stop = stop.Kind,
+            DriverId = origin.DriverId,
+            VersionHeld = origin.VersionHeld,
+            EventTime = origin.EventTime,
+            CorrelationId = origin.CorrelationId,
+            Remark = string.IsNullOrWhiteSpace(remark) ? null : remark,
+            State = ReportState.Sending,
+        };
+    }
+
+    /// <summary>
+    /// The Driver delivers a Stop with a Proof of delivery: two reports to two TMS operations (P5 and P6 keep the Tracking event and the Proof of delivery
+    /// apart) that share the Driver's action, so one correlation ID. The remark is the Driver's reservations, and only with reservations.
+    /// </summary>
+    public static DeliveredReports Deliver(ReportId deliveredId, ReportId proofOfDeliveryId, StopRef stop, ReportOrigin origin, string? reservations)
+    {
+        ArgumentNullException.ThrowIfNull(origin);
+        if (stop.Kind != StopKind.Delivery)
+        {
+            throw new ArgumentException("Only a delivery Stop is delivered.", nameof(stop));
+        }
+
+        return new(Of(deliveredId, ReportKind.Delivered, stop, origin, reservations), Of(proofOfDeliveryId, ReportKind.ProofOfDelivery, stop, origin, reservations));
+    }
+
+    private static DriverReport Of(ReportId id, ReportKind kind, StopRef stop, ReportOrigin origin, string? remark)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(stop.ShipmentNumber);
+        ArgumentException.ThrowIfNullOrWhiteSpace(origin.DriverId.Value);
+        ArgumentOutOfRangeException.ThrowIfLessThan(origin.VersionHeld, 1);
+        ArgumentException.ThrowIfNullOrWhiteSpace(origin.CorrelationId);
         return new DriverReport
         {
             Id = id,

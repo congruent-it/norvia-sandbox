@@ -2,6 +2,8 @@ using System.Security.Claims;
 using Mediator;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Mvc;
+using Norvia.DriverApp.Application.Reports.Deliver;
 using Norvia.DriverApp.Application.Reports.ReportStop;
 using Norvia.DriverApp.Application.Reports.StartTrip;
 using Norvia.DriverApp.Web.Drivers;
@@ -25,6 +27,33 @@ public static class ReportEndpoints
             var started = await mediator.Send(new StartTripCommand(tripNumber, driverId), cancellationToken);
             return started.IsSuccess ? Results.Redirect("/") : Results.NotFound();
         }).RequireAuthorization(DriverClaims.DriverPolicy).WithMetadata(new RequireAntiforgeryTokenAttribute());
+
+        // Deliver: the Proof of delivery form, with a signature and photos. Its own route, as the form carries files and fields the other reports don't.
+        endpoints.MapPost("/trips/{tripNumber}/stops/{shipmentNumber}/delivery/deliver", async (
+            string tripNumber, string shipmentNumber, HttpContext context, IMediator mediator, CancellationToken cancellationToken) =>
+        {
+            if (Reject(context, out var driverId) is { } rejected)
+            {
+                return rejected;
+            }
+
+            var screen = StopRoutes.Screen(tripNumber, shipmentNumber, Application.Trips.StopKindDto.Delivery);
+            var form = await context.Request.ReadFormAsync(cancellationToken);
+            if (await ProofOfDeliveryForm.ReadAsync(form, cancellationToken) is not { } proof)
+            {
+                // A file over the limit is not read: the Driver app would only refuse it.
+                return Results.Redirect($"{screen}?problem=photos");
+            }
+
+            var delivered = await mediator.Send(new DeliverCommand(tripNumber, driverId, shipmentNumber, proof.ReceivedBy, proof.Condition, proof.Remark, proof.Signature, proof.Photos), cancellationToken);
+            return delivered.Status switch
+            {
+                Ardalis.Result.ResultStatus.Ok => Results.Redirect("/"),
+                Ardalis.Result.ResultStatus.NotFound => Results.NotFound(),
+                Ardalis.Result.ResultStatus.Invalid => Results.Redirect($"{screen}?problem={Uri.EscapeDataString(delivered.ValidationErrors.First().Identifier)}"),
+                _ => Results.Redirect(screen),
+            };
+        }).RequireAuthorization(DriverClaims.DriverPolicy).WithMetadata(new RequireAntiforgeryTokenAttribute(), new RequestSizeLimitAttribute(ProofOfDeliveryForm.MaximumRequestBytes), new RequestFormLimitsAttribute { MultipartBodyLengthLimit = ProofOfDeliveryForm.MaximumRequestBytes });
 
         // Collected, Collection failed, Delivery failed or Report damage at a Stop. The form carries the remark and nothing else the Driver app trusts.
         endpoints.MapPost("/trips/{tripNumber}/stops/{shipmentNumber}/{kind}/{action}", async (

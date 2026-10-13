@@ -1,0 +1,14 @@
+{
+  "eventId": "0198e7c0-0000-7000-8000-0000000000e1",
+  "eventType": "StopCompletedReported",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-13T10:12:30+02:00",
+  "correlationId": "0198e7c0-0000-7000-8000-0000000000e3",
+  "tripNumber": "TR-0000012",
+  "version": 2,
+  "driverId": "DRV-0002",
+  "shipmentNumber": "SH-0000031",
+  "stop": "Delivery",
+  "trackingEventType": "Delivered",
+  "location": { "place": "Utrecht", "postcode": "3511 AB", "countryCode": "NL" }
+}
