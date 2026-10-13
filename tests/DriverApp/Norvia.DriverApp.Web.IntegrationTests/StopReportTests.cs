@@ -88,7 +88,7 @@ public sealed partial class StopReportTests
         app.Reports.Single(report => report.Kind == ReportKind.Collected).State.Should().Be(ReportState.Sending);
         var delivery = await GetAsync(client, Delivery);
         delivery.Should().Contain(Delivery + "/delivery-failed").And.NotContain("Collect the Shipment first.");
-        (await GetAsync(client, Collection)).Should().Contain("This Stop is done.").And.Contain("Sending").And.Contain("http-equiv=\"refresh\"");
+        (await GetAsync(client, Collection)).Should().Contain("This Stop is done.").And.Contain("Sending").And.NotContain("http-equiv=\"refresh\"", "the page must not reload under a Driver typing a remark").And.Contain("reload the page");
         (await GetAsync(client, "/")).Should().Contain("Collected SH-0000001");
     }
 
@@ -234,7 +234,8 @@ public sealed partial class StopReportTests
         var stopScreen = await GetAsync(client, Collection);
 
         refused.Should().Contain("Refused").And.Contain("ShipmentNotOnTrip").And.Contain("SH-0000001 is no longer on TR-0000002.");
-        taken.Should().Contain("Taken off by the Planner, call the Planner").And.Contain("SH-0000001").And.Contain("Version 2");
+        taken.Should().Contain("Taken off by the Planner, call the Planner").And.Contain("SH-0000001").And.Contain("Version 2").And.Contain("ShipmentNotOnTrip");
+        taken.Should().Contain(">Refused<", "a report the TMS refused as ShipmentNotOnTrip shows as Refused, also once the Stop is taken off");
         stopScreen.Should().Contain("Taken off by the Planner, call the Planner").And.NotContain("Waalhaven");
     }
 

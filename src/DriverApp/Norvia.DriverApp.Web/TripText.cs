@@ -46,7 +46,7 @@ internal static class TripText
     /// <summary>What the Driver reads on a Stop of what became of their report on it.</summary>
     public static string StopStatus(StopView stop) => stop switch
     {
-        { TakenOff: true } => TakenOffByThePlanner,
+        { TakenOff: true, Outcome: not { State: ReportStateDto.Refused } } => TakenOffByThePlanner,
         { Outcome: null } => "Open",
         { Outcome: { State: ReportStateDto.Refused } } => "Refused",
         { Outcome: { State: ReportStateDto.NotRecorded } } => "Not recorded",

@@ -2,7 +2,7 @@
 @* One Stop of a Trip, as the Driver reads it on the road. It leads to the Stop screen, where the Driver reports on it. *@
 <li class="stop">
     <div class="stop-title">
-        <strong>@(Stop.Kind == StopKindDto.Collection ? "Collect" : "Deliver")</strong>
+        <strong>@TripText.StopAction(Stop.Kind)</strong>
         <a href="@StopRoutes.Screen(TripNumber, Stop.ShipmentNumber, Stop.Kind)">@Stop.ShipmentNumber</a>
         @if (Stop.Details is { } details)
         {

@@ -6,15 +6,7 @@
 @inject Mediator.IMediator Mediator
 @inject ILogger<Stop> Logger
 
-<PageTitle>@(_view is null ? "Stop" : $"{Heading} {ShipmentNumber}")</PageTitle>
-
-@if (_view is { Stop: var sending } && (sending.Reports.Any(report => report.State == ReportStateDto.Sending)))
-{
-    @* A report waits for the Driver reports Logic App's answer; the page is not interactive, so it looks again by itself. *@
-    <HeadContent>
-        <meta http-equiv="refresh" content="5" />
-    </HeadContent>
-}
+<PageTitle>@(_view is null ? "Stop" : $"{TripText.StopAction(_view.Stop.Kind)} {ShipmentNumber}")</PageTitle>
 
 @if (_loadFailed)
 {
@@ -33,7 +25,7 @@ else
     var stop = _view.Stop;
     <p><a href="/">&larr; My Trips</a></p>
     <h1>
-        @Heading @stop.ShipmentNumber
+        @TripText.StopAction(stop.Kind) @stop.ShipmentNumber
         <FluentBadge Appearance="@(stop.Completed ? Appearance.Accent : Appearance.Neutral)">@TripText.StopStatus(stop)</FluentBadge>
     </h1>
     <p class="muted">Trip @_view.TripNumber, version @_view.Version, @_view.Status</p>
@@ -102,7 +94,7 @@ else
     {
         @if (stop.Completed)
         {
-            <p role="status">This Stop is done.</p>
+            <p role="status">This Stop is done.@(stop.Outcome is { State: ReportStateDto.Sending } ? " The TMS hasn't answered yet: reload the page to see the answer." : "")</p>
         }
         else if (stop.Blocked is { } blocked)
         {
@@ -151,8 +143,6 @@ else
 
     private DriverStopView? _view;
     private bool _loadFailed;
-
-    private string Heading => StopRoutes.TryParse(KindSegment, out StopKindDto kind) && kind == StopKindDto.Collection ? "Collect" : "Deliver";
 
     protected override async Task OnInitializedAsync()
     {
