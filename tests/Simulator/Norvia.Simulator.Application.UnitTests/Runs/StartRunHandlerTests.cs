@@ -111,4 +111,16 @@ public sealed class StartRunHandlerTests
         await _runs.DidNotReceive().AddAsync(Arg.Any<SimulationRun>(), Arg.Any<CancellationToken>());
         await _sequences.DidNotReceive().AddAsync(Arg.Any<RunSequence>(), Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task Handle_NoShipperWithALane_IsInvalidAndKeepsNothing()
+    {
+        _world.Load().Returns(new Norvia.Simulator.Domain.Worlds.SimulationWorld([]));
+
+        var result = await Handler().Handle(new StartRunCommand(TestData.Settings(), "ngruson"), CancellationToken.None);
+
+        result.Status.Should().Be(ResultStatus.Invalid);
+        _execution.DidNotReceive().Start(Arg.Any<SimulationRunId>());
+        await _sequences.DidNotReceive().AddAsync(Arg.Any<RunSequence>(), Arg.Any<CancellationToken>());
+    }
 }

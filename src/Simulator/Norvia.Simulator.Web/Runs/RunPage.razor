@@ -16,7 +16,15 @@
 
 <PageTitle>Run @_run?.Run.Number · Simulator</PageTitle>
 
-@if (_notFound)
+@if (_failed)
+{
+    <div role="alert">
+        <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+            The run couldn't be read. Try again in a moment; if it keeps failing, the Simulator's database may not be reachable.
+        </FluentMessageBar>
+    </div>
+}
+else if (_notFound)
 {
     <h1>No such run</h1>
     <p>There is no run with this address. It may have been cleared with the history. <a href="/">Go to Configure</a>.</p>
@@ -120,6 +128,8 @@ else
     private RunDetail? _run;
     private IReadOnlyList<LogLine> _log = [];
     private bool _notFound;
+    private bool _failed;
+    private readonly CancellationTokenSource _cancellation = new();
     private string? _problem;
     private string _actor = "";
     private string _outcome = "";
@@ -153,16 +163,25 @@ else
 
     private async Task RefreshAsync()
     {
-        var runId = new SimulationRunId(Id);
-        var run = await Requests.GetRunAsync(runId, CancellationToken.None);
-        if (!run.IsSuccess)
+        try
         {
-            _notFound = true;
-            return;
-        }
+            var runId = new SimulationRunId(Id);
+            var run = await Requests.GetRunAsync(runId, _cancellation.Token);
+            if (!run.IsSuccess)
+            {
+                _notFound = true;
+                return;
+            }
 
-        _run = run.Value;
-        _log = await Requests.ListLogAsync(runId, Filter(), CancellationToken.None);
+            _run = run.Value;
+            _log = await Requests.ListLogAsync(runId, Filter(), _cancellation.Token);
+            _failed = false;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // Polling goes on: the next refresh may reach the database again.
+            _failed = true;
+        }
     }
 
     private LogFilter Filter() => new(
@@ -170,11 +189,11 @@ else
         Enum.TryParse<LogOutcome>(_outcome, out var outcome) ? outcome : null,
         _text);
 
-    private async Task ApplyFilter() => _log = await Requests.ListLogAsync(new SimulationRunId(Id), Filter(), CancellationToken.None);
+    private async Task ApplyFilter() => _log = await Requests.ListLogAsync(new SimulationRunId(Id), Filter(), _cancellation.Token);
 
     private async Task Cancel()
     {
-        var result = await Requests.CancelAsync(new SimulationRunId(Id), CancellationToken.None);
+        var result = await Requests.CancelAsync(new SimulationRunId(Id), _cancellation.Token);
         _problem = result.IsSuccess ? null : string.Join(" ", result.Errors);
         await RefreshAsync();
     }
@@ -189,5 +208,10 @@ else
         _ => "text-muted",
     };
 
-    public void Dispose() => _poll?.Dispose();
+    public void Dispose()
+    {
+        _poll?.Dispose();
+        _cancellation.Cancel();
+        _cancellation.Dispose();
+    }
 }

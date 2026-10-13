@@ -9,6 +9,7 @@
 @inject ISimulatorRequests Requests
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider Authentication
+@implements IDisposable
 
 <PageTitle>Plan preview · Simulator</PageTitle>
 
@@ -19,6 +20,14 @@
     <div role="alert">
         <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
             There are no settings to preview. <a href="/" class="text-white">Configure a run</a> first.
+        </FluentMessageBar>
+    </div>
+}
+else if (_failed)
+{
+    <div role="alert">
+        <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+            The plan couldn't be made. Try again in a moment; if it keeps failing, its database may not be reachable.
         </FluentMessageBar>
     </div>
 }
@@ -89,6 +98,8 @@ else
     private List<string> _problems = [];
     private List<string> _startProblems = [];
     private bool _starting;
+    private bool _failed;
+    private readonly CancellationTokenSource _cancellation = new();
 
     [SupplyParameterFromQuery(Name = "orders")]
     private int? Orders { get; set; }
@@ -121,7 +132,17 @@ else
             return;
         }
 
-        var result = await Requests.PreviewAsync(_settings, CancellationToken.None);
+        Result<PlanPreview> result;
+        try
+        {
+            result = await Requests.PreviewAsync(_settings, _cancellation.Token);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _failed = true;
+            return;
+        }
+
         if (result.IsSuccess)
         {
             _preview = result.Value;
@@ -138,7 +159,7 @@ else
         _starting = true;
         _startProblems = [];
         var operatorName = (await Authentication.GetAuthenticationStateAsync()).User.Identity?.Name ?? "unknown";
-        var result = await Requests.StartAsync(_settings!, operatorName, CancellationToken.None);
+        var result = await Requests.StartAsync(_settings!, operatorName, _cancellation.Token);
         if (result.IsSuccess)
         {
             Navigation.NavigateTo(PlanLinks.Run(result.Value.Id));
@@ -147,5 +168,11 @@ else
 
         _startProblems = [.. result.ValidationErrors.Select(error => error.ErrorMessage).Concat(result.Errors)];
         _starting = false;
+    }
+
+    public void Dispose()
+    {
+        _cancellation.Cancel();
+        _cancellation.Dispose();
     }
 }

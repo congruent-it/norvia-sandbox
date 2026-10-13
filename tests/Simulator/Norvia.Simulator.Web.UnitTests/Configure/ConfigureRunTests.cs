@@ -84,13 +84,26 @@ public sealed class ConfigureRunTests : SimulatorWebContext
     }
 
     [Fact]
-    public void NewSeed_OffersAnotherSeed()
+    public void NewSeed_OffersTheSeedTheApplicationGives()
     {
+        Requests.GetConfigureAsync(Arg.Any<CancellationToken>()).Returns(
+            Task.FromResult(new ConfigureView(Presets.All, TestData.Limits, 777, 5)),
+            Task.FromResult(new ConfigureView(Presets.All, TestData.Limits, 888, 5)));
         var page = Render<ConfigureRun>();
 
         page.Find("fluent-button:contains('New seed')").Click();
 
-        Field(page, "Seed").GetAttribute("value").Should().NotBe("777");
+        Field(page, "Seed").GetAttribute("value").Should().Be("888");
+    }
+
+    [Fact]
+    public void Render_TheDatabaseUnreachable_SaysSoInsteadOfLoadingForever()
+    {
+        Requests.GetConfigureAsync(Arg.Any<CancellationToken>()).Returns<ConfigureView>(_ => throw new InvalidOperationException("down"));
+
+        var page = Render<ConfigureRun>();
+
+        page.Find("[role=alert]").TextContent.Should().Contain("couldn't load");
     }
 
     [Fact]

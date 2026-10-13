@@ -7,6 +7,7 @@
 @using Norvia.Simulator.Domain.Runs
 @inject ISimulatorRequests Requests
 @inject NavigationManager Navigation
+@implements IDisposable
 
 <PageTitle>Configure · Simulator</PageTitle>
 
@@ -16,7 +17,15 @@
     Message trail. Choose a Preset or set the numbers yourself, then preview the plan: the same seed always gives the same plan.
 </p>
 
-@if (_view is null)
+@if (_failed)
+{
+    <div role="alert">
+        <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+            The Simulator couldn't load its settings or runs. Try again in a moment; if it keeps failing, its database may not be reachable.
+        </FluentMessageBar>
+    </div>
+}
+else if (_view is null)
 {
     <div role="status">
         <FluentStack VerticalAlignment="VerticalAlignment.Center">
@@ -105,6 +114,8 @@ else
     private IReadOnlyList<RunSummary> _runs = [];
     private RunSummary? _active;
     private List<string> _problems = [];
+    private bool _failed;
+    private readonly CancellationTokenSource _cancellation = new();
 
     private string _preset = CustomPreset;
     private int _orders = 20;
@@ -116,15 +127,28 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        _view = await Requests.GetConfigureAsync(CancellationToken.None);
-        _seed = _view.NewSeed;
-        PresetChanged(_view.Presets[0].Name);
-        await LoadRunsAsync();
+        try
+        {
+            _view = await Requests.GetConfigureAsync(_cancellation.Token);
+            _seed = _view.NewSeed;
+            PresetChanged(_view.Presets[0].Name);
+            await LoadRunsAsync();
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _failed = true;
+        }
+    }
+
+    public void Dispose()
+    {
+        _cancellation.Cancel();
+        _cancellation.Dispose();
     }
 
     private async Task LoadRunsAsync()
     {
-        _runs = await Requests.ListRunsAsync(CancellationToken.None);
+        _runs = await Requests.ListRunsAsync(_cancellation.Token);
         _active = _runs.FirstOrDefault(run => run.IsActive);
     }
 
@@ -143,7 +167,8 @@ else
         _window = preset.Mode == RunMode.Paced ? (int)preset.Window.TotalMinutes : _window;
     }
 
-    private void NewSeed() => _seed = Random.Shared.Next(1, 1_000_000);
+    // The application hands out seeds, so a seed never comes from chance in the page.
+    private async Task NewSeed() => _seed = (await Requests.GetConfigureAsync(_cancellation.Token)).NewSeed;
 
     private SimulationSettings Settings() => new(
         _orders, _bad, _today, _seed, Enum.Parse<RunMode>(_mode),
@@ -162,7 +187,7 @@ else
 
     private async Task ClearHistory()
     {
-        var result = await Requests.ClearHistoryAsync(CancellationToken.None);
+        var result = await Requests.ClearHistoryAsync(_cancellation.Token);
         _problems = result.IsSuccess ? [] : [.. result.Errors];
         await LoadRunsAsync();
     }

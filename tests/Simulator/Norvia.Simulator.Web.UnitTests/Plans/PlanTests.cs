@@ -86,6 +86,15 @@ public sealed class PlanTests : SimulatorWebContext
     }
 
     [Fact]
+    public void Render_ThePlanCantBeMade_SaysSo()
+    {
+        Requests.PreviewAsync(Arg.Any<SimulationSettings>(), Arg.Any<CancellationToken>())
+            .Returns<Result<PlanPreview>>(_ => throw new InvalidOperationException("down"));
+
+        RenderAt(Address).Find("[role=alert]").TextContent.Should().Contain("couldn't be made");
+    }
+
+    [Fact]
     public void StartRun_StartsTheSamePlanAsTheOperator_AndOpensTheRun()
     {
         Requests.PreviewAsync(Arg.Any<SimulationSettings>(), Arg.Any<CancellationToken>()).Returns(Preview());

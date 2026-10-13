@@ -114,16 +114,22 @@ public sealed class ExecuteRunHandlerTests
         var run = Active(TestData.Settings(orders: 12));
         var inFlight = 0;
         var highest = 0;
+        var release = new TaskCompletionSource();
         _api.SendBookingAsync(Arg.Any<PlannedBooking>(), Arg.Any<CancellationToken>()).Returns(async _ =>
         {
             var now = Interlocked.Increment(ref inFlight);
             InterlockedMax(ref highest, now);
-            await Task.Delay(15, TestContext.Current.CancellationToken);
+            await release.Task;
             Interlocked.Decrement(ref inFlight);
             return new BookingAnswer(LogOutcome.Accepted, "c", "TO-1", null);
         });
 
-        await Handler(concurrency: 2).Handle(new ExecuteRunCommand(run.Id, CancellationToken.None), CancellationToken.None);
+        var handling = Handler(concurrency: 2).Handle(new ExecuteRunCommand(run.Id, CancellationToken.None), CancellationToken.None).AsTask();
+        await WaitUntilAsync(() => Volatile.Read(ref inFlight) == 2);
+        await Task.Yield();
+        Volatile.Read(ref inFlight).Should().Be(2, "a third request waits for a free slot");
+        release.SetResult();
+        await handling;
 
         highest.Should().Be(2);
         _lines.Count(line => line.Outcome == LogOutcome.Accepted).Should().Be(12);
@@ -137,7 +143,11 @@ public sealed class ExecuteRunHandlerTests
         var handling = Task.Run(() => Handler().Handle(new ExecuteRunCommand(run.Id, CancellationToken.None), CancellationToken.None).AsTask());
 
         await WaitUntilAsync(() => SentCount() == 1);
-        await Task.Delay(30, TestContext.Current.CancellationToken);
+        for (var turn = 0; turn < 50; turn++)
+        {
+            await Task.Yield();
+        }
+
         SentCount().Should().Be(1, "the second booking is due two minutes in");
         for (var expected = 2; expected <= 4; expected++)
         {
@@ -188,7 +198,7 @@ public sealed class ExecuteRunHandlerTests
                 throw new TimeoutException("The condition never held.");
             }
 
-            await Task.Delay(5, TestContext.Current.CancellationToken);
+            await Task.Yield();
         }
     }
 

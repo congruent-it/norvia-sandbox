@@ -102,6 +102,11 @@ namespace Norvia.Simulator.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<DateTimeOffset>("StartedAt")
                         .HasColumnType("datetimeoffset");
 
@@ -121,6 +126,11 @@ namespace Norvia.Simulator.Infrastructure.Data.Migrations
                         .IsUnique();
 
                     b.HasIndex("StartedAt");
+
+                    b.HasIndex("Status")
+                        .IsUnique()
+                        .HasDatabaseName("IX_SimulationRuns_OneActive")
+                        .HasFilter("[Status] = 'Running'");
 
                     b.ToTable("SimulationRuns", (string)null);
                 });

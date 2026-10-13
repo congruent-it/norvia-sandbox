@@ -64,4 +64,15 @@ public sealed class PreviewPlanHandlerTests
 
         result.Value.Rows.Should().OnlyContain(row => row.Route.Contains('→', StringComparison.Ordinal) && row.WeightKg > 0);
     }
+
+    [Fact]
+    public async Task Handle_NoShipperWithALane_IsInvalidNotAnException()
+    {
+        _world.Load().Returns(new Norvia.Simulator.Domain.Worlds.SimulationWorld([]));
+
+        var result = await Handler().Handle(new PreviewPlanQuery(TestData.Settings()), CancellationToken.None);
+
+        result.Status.Should().Be(ResultStatus.Invalid);
+        result.ValidationErrors.Single().ErrorMessage.Should().Contain("Rate Card");
+    }
 }

@@ -26,6 +26,12 @@ internal sealed class SimulationRunConfiguration : IEntityTypeConfiguration<Simu
 
         builder.HasIndex(run => run.Number).IsUnique();
         builder.HasIndex(run => run.StartedAt);
+
+        // Cancel, complete and abandon can all change a run, so a stale write fails instead of undoing another's.
+        builder.Property<byte[]>("RowVersion").IsRowVersion();
+
+        // One active run at a time, whatever starts them: a second start fails here even if both passed the check.
+        builder.HasIndex(run => run.Status).IsUnique().HasFilter("[Status] = 'Running'").HasDatabaseName("IX_SimulationRuns_OneActive");
         builder.Property(run => run.Status).HasConversion<string>().HasMaxLength(20);
         builder.Property(run => run.StartedBy).HasMaxLength(200).IsRequired();
 

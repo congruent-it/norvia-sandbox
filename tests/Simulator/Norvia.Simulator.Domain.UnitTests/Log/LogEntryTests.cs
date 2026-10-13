@@ -92,10 +92,4 @@ public sealed class LogEntryTests
         new LogFilter(Text: " ").IsEmpty.Should().BeTrue();
         new LogFilter(Actor: "x").IsEmpty.Should().BeFalse();
     }
-
-    [Fact]
-    public void LogEntriesAfterSpec_SelectsLinesPastASequence()
-    {
-        new LogEntriesOfRunSpec(Run, new LogFilter(), afterSequence: 1).Evaluate(Entries).Select(line => line.Sequence).Should().Equal(2, 3);
-    }
 }

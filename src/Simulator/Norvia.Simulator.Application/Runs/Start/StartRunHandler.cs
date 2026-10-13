@@ -28,6 +28,11 @@ public sealed class StartRunHandler(
             return Result.Invalid([.. problems.Select(problem => new ValidationError(problem))]);
         }
 
+        if (!world.Load().Shippers.Any(shipper => shipper.Lanes.Count > 0))
+        {
+            return Result.Invalid(new ValidationError("No Shipper has a Rate Card with a Lane to book for."));
+        }
+
         if (await runs.AnyAsync(new ActiveRunSpec(), cancellationToken))
         {
             return Result.Conflict("A run is already active. Cancel it or wait for it to finish.");

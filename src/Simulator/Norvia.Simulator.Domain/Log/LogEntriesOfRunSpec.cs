@@ -3,14 +3,14 @@ using Norvia.Simulator.Domain.Runs;
 
 namespace Norvia.Simulator.Domain.Log;
 
-/// <summary>A run's log lines in the order they happened, narrowed by the filter and, when polling, to those after a line already shown.</summary>
+/// <summary>A run's log lines in the order they happened, narrowed by the filter.</summary>
 public sealed class LogEntriesOfRunSpec : Specification<LogEntry>
 {
-    public LogEntriesOfRunSpec(SimulationRunId runId, LogFilter filter, int afterSequence = 0)
+    public LogEntriesOfRunSpec(SimulationRunId runId, LogFilter filter)
     {
         ArgumentNullException.ThrowIfNull(filter);
 
-        Query.Where(entry => entry.RunId == runId && entry.Sequence > afterSequence);
+        Query.Where(entry => entry.RunId == runId);
         if (!string.IsNullOrWhiteSpace(filter.Actor))
         {
             var actor = filter.Actor.Trim();

@@ -32,7 +32,7 @@ public sealed class RunExecutorTests
                 throw new TimeoutException("The condition never held.");
             }
 
-            await Task.Delay(5, TestContext.Current.CancellationToken);
+            await Task.Yield();
         }
     }
 

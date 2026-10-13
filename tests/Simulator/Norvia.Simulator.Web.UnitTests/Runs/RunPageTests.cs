@@ -100,6 +100,15 @@ public sealed class RunPageTests : SimulatorWebContext
     }
 
     [Fact]
+    public void Render_TheRunCantBeRead_SaysSo()
+    {
+        Requests.GetRunAsync(Arg.Any<SimulationRunId>(), Arg.Any<CancellationToken>())
+            .Returns<Result<Norvia.Simulator.Application.Runs.Open.RunDetail>>(_ => throw new InvalidOperationException("down"));
+
+        RenderRun().Find("[role=alert]").TextContent.Should().Contain("couldn't be read");
+    }
+
+    [Fact]
     public void Render_ALogWithNoMatchingLines_SaysSo()
     {
         Requests.ListLogAsync(Arg.Any<SimulationRunId>(), Arg.Any<LogFilter>(), Arg.Any<CancellationToken>()).Returns([]);
