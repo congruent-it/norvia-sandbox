@@ -38,15 +38,15 @@ public sealed partial class PlannerJourneyTests(SimulatorUiFixture simulator) : 
         var log = Page.GetByRole(AriaRole.Table, new() { Name = "Log lines" });
         var assignments = log.GetByRole(AriaRole.Row).Filter(new() { HasText = "Assign Transport Order" });
         await Expect(assignments).ToHaveCountAsync(Orders);
-        await Expect(assignments.Filter(new() { HasText = "Planned" })).ToHaveCountAsync(Orders);
+        await Expect(assignments.Filter(new() { Has = Page.Locator("[data-outcome=Planned]") })).ToHaveCountAsync(Orders);
 
         var assignment = assignments.First;
-        await Expect(assignment).ToContainTextAsync(TransportOrder());
-        await Expect(assignment).ToContainTextAsync(Shipment());
+        await Expect(assignment).ToContainTextAsync(TransportOrderNumber());
+        await Expect(assignment).ToContainTextAsync(ShipmentNumber());
 
         var trail = assignment.GetByRole(AriaRole.Link, new() { NameRegex = TrailLink() });
         await Expect(trail).ToHaveAttributeAsync("href", ConsoleSearch());
-        var correlationId = (await trail.GetAttributeAsync("href"))!.Split("key=")[1].Split('&')[0];
+        var correlationId = ConsoleSearch().Match((await trail.GetAttributeAsync("href"))!).Groups["key"].Value;
 
         var console = await Page.Context.RunAndWaitForPageAsync(() => trail.ClickAsync());
         await Expect(console).ToHaveURLAsync(new Regex($"key={Regex.Escape(correlationId)}"));
@@ -54,12 +54,12 @@ public sealed partial class PlannerJourneyTests(SimulatorUiFixture simulator) : 
 
     // The Transport Order and Shipment numbers are the TMS's, so the test checks their shape, not their values.
     [GeneratedRegex(@"TO-\d{7}")]
-    private static partial Regex TransportOrder();
+    private static partial Regex TransportOrderNumber();
 
     [GeneratedRegex(@"SH-\d{7}")]
-    private static partial Regex Shipment();
+    private static partial Regex ShipmentNumber();
 
-    [GeneratedRegex(@"/\?key=[0-9a-fA-F-]{32,}&within=all$")]
+    [GeneratedRegex(@"/\?key=(?<key>[0-9a-fA-F-]{32,})&within=all$")]
     private static partial Regex ConsoleSearch();
 
     [GeneratedRegex("Open the Message trail of .* in the Integration console")]
