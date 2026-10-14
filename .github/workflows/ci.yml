@@ -141,7 +141,7 @@ jobs:
             kinds: UnitTests ArchitectureTests IntegrationTests
           - application: Simulator
             directory: Simulator
-            kinds: UnitTests ArchitectureTests IntegrationTests
+            kinds: UnitTests ArchitectureTests IntegrationTests UiTests
           - application: Integration console
             directory: IntegrationConsole
             kinds: UnitTests ArchitectureTests IntegrationTests UiTests
