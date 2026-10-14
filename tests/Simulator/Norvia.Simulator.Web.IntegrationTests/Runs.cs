@@ -23,6 +23,11 @@ internal static class Runs
     public static SimulationSettings Burst(int orders, int badSharePercent, int seed) =>
         new(orders, badSharePercent, CollectedTodayPercent: 30, seed, RunMode.Burst, TimeSpan.Zero);
 
+    /// <summary>A run of good bookings whose Planner assigns, sends to Own fleet and reassigns the given shares of the orders.</summary>
+    public static SimulationSettings Planned(int orders, int seed, int assignedPercent, int ownFleetPercent, int reassignPercent, int badSharePercent = 0) =>
+        new(orders, badSharePercent, CollectedTodayPercent: 30, seed, RunMode.Burst, TimeSpan.Zero,
+            AssignedPercent: assignedPercent, OwnFleetPercent: ownFleetPercent, ReassignPercent: reassignPercent);
+
     /// <summary>A run that sends its first booking at once and the next a minute later.</summary>
     public static SimulationSettings Paced(int orders, int seed) =>
         new(orders, BadSharePercent: 0, CollectedTodayPercent: 30, seed, RunMode.Paced, TimeSpan.FromMinutes(orders));
@@ -55,7 +60,10 @@ internal static class Runs
         await simulator.ListLogAsync(new SimulationRunId(runId), new LogFilter(), cancellationToken);
 
     /// <summary>The lines in which a Persona sent a booking, as opposed to the Simulator's own notes.</summary>
-    public static bool IsBooking(LogLine line) => line.Outcome != LogOutcome.Info;
+    public static bool IsBooking(LogLine line) => LogOutcomes.Booking.Contains(line.Outcome);
+
+    /// <summary>The lines in which the Planner called the TMS API.</summary>
+    public static bool IsPlanning(LogLine line) => LogOutcomes.Planning.Contains(line.Outcome);
 
     private static async Task<T> EventuallyAsync<T>(Func<Task<T?>> attempt, CancellationToken cancellationToken)
         where T : class

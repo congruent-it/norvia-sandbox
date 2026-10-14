@@ -26,7 +26,8 @@ public sealed class RunTests(SimulatorFixture fixture)
         finished.Status.Should().Be(SimulationRunStatus.Completed);
         finished.Sent.Should().Be(16);
         preview.BadBookings.Should().Be(4);
-        var accepted = await fixture.ShipperReferencesAsync("Accepted", Ct);
+        // The Planner plans most of the accepted orders, which then no longer have the status Accepted.
+        var acceptedOrPlanned = (await fixture.ShipperReferencesAsync("Accepted", Ct)).Concat(await fixture.ShipperReferencesAsync("Planned", Ct)).ToList();
         var rejected = await fixture.ShipperReferencesAsync("Rejected", Ct);
         foreach (var row in preview.Rows)
         {
@@ -36,7 +37,7 @@ public sealed class RunTests(SimulatorFixture fixture)
             }
             else
             {
-                accepted.Should().ContainSingle(reference => reference == row.Reference, $"{row.Reference} is expected to be a Transport Order, once");
+                acceptedOrPlanned.Should().ContainSingle(reference => reference == row.Reference, $"{row.Reference} is expected to be a Transport Order, once");
             }
         }
     }
