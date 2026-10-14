@@ -37,6 +37,7 @@ public sealed class DriverAppFixture : IAsyncLifetime
         "dbgate", "tms", "tms-migrations", "tms-api", "tms-web", "partner-portal", "partner-portal-migrations", "partner-portal-web",
         "integration-console-web", "partner-api", "booking-worker", "shipper-notification-worker", "carrier-cancellation-worker",
         "trip-dispatch-worker", "driver-reports-worker", "tracking-worker", "proof-of-delivery-worker",
+        "simulator", "simulator-migrations", "simulator-web",
     ];
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
     private readonly string _tokenSigningKey = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
