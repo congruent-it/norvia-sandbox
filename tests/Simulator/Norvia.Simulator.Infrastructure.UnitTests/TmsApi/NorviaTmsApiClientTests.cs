@@ -149,7 +149,7 @@ public sealed class NorviaTmsApiClientTests : IDisposable
     public void TrackingKeysOf_ARefusal_NamesTheFailureCode_AndLeavesOutWhatItDoesNotKnow()
     {
         var keys = NorviaTmsApiClient.TrackingKeysOf(
-            new Application.Ports.PlannerAnswer(LogOutcome.PlanningRefused, null, null, "TransportOrderAlreadyPlanned (409)"), "TO-1", shipmentNumber: null);
+            new Application.Ports.PlannerAnswer(LogOutcome.PlanningRefused, null, null, "TransportOrderAlreadyPlanned (409)", "TransportOrderAlreadyPlanned"), "TO-1", shipmentNumber: null);
 
         keys.Should().BeEquivalentTo(new Dictionary<string, object?>
         {

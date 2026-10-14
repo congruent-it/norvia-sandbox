@@ -34,6 +34,7 @@ public sealed class PlannerAnswersTests
 
         answer.Outcome.Should().Be(LogOutcome.PlanningRefused);
         answer.Detail.Should().Be($"{code} ({status})");
+        answer.FailureCode.Should().Be(code);
         answer.CorrelationId.Should().Be("refused-1");
         answer.ShipmentNumber.Should().BeNull();
     }
@@ -64,7 +65,7 @@ public sealed class PlannerAnswersTests
     {
         var answer = PlannerAnswers.Reassigned(409, """{"code":"AssignmentUnchanged","correlationId":"re-2"}""", null, "SH-1");
 
-        answer.Should().Be(new Application.Ports.PlannerAnswer(LogOutcome.PlanningRefused, "re-2", "SH-1", "AssignmentUnchanged (409)"));
+        answer.Should().Be(new Application.Ports.PlannerAnswer(LogOutcome.PlanningRefused, "re-2", "SH-1", "AssignmentUnchanged (409)", "AssignmentUnchanged"));
     }
 
     [Fact]

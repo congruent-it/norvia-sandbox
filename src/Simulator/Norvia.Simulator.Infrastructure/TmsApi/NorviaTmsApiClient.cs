@@ -123,8 +123,7 @@ internal sealed partial class NorviaTmsApiClient(
                 break;
             case LogOutcome.PlanningRefused:
                 keys["outcome"] = "Refused";
-                // The detail is "<code> (<status>)".
-                keys["failureCode"] = answer.Detail?.Split(' ')[0];
+                keys["failureCode"] = answer.FailureCode;
                 break;
             default:
                 keys["outcome"] = "Failed";

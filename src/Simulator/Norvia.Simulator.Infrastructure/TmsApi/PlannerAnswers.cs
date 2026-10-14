@@ -55,7 +55,7 @@ internal static class PlannerAnswers
         // A refusal names its rule by a stable code. Never its message, which may quote what was booked.
         if (statusCode is >= 400 and < 500 && Text(json, "code") is { } code)
         {
-            return new PlannerAnswer(LogOutcome.PlanningRefused, correlationId, shipmentNumber, $"{code} ({statusCode})");
+            return new PlannerAnswer(LogOutcome.PlanningRefused, correlationId, shipmentNumber, $"{code} ({statusCode})", code);
         }
 
         return new PlannerAnswer(LogOutcome.PlanningNotReceived, correlationId, shipmentNumber, $"The TMS API answered {statusCode} without an answer to the call.");

@@ -1,3 +1,4 @@
+using Norvia.Simulator.Domain.Plans;
 using Norvia.Simulator.Domain.Worlds;
 
 namespace Norvia.Simulator.Domain.Planner;
@@ -9,6 +10,32 @@ namespace Norvia.Simulator.Domain.Planner;
 /// </summary>
 public sealed record PlannerChoice(int Step, PlannerIntent Intent, int CarrierPick, bool Reassign, int ReassignPick)
 {
+    /// <summary>
+    /// Who gets the order: Own fleet where the order fits the day's room (which it then takes from the ledger), a Carrier otherwise.
+    /// With no active Carrier to turn to, Own fleet: the TMS only warns about load there.
+    /// </summary>
+    public PlannerDecision Decide(PlannedBooking booking, DateOnly day, IReadOnlyList<SimulatedCarrier> activeCarriers, FleetLedger ledger)
+    {
+        ArgumentNullException.ThrowIfNull(booking);
+        ArgumentNullException.ThrowIfNull(ledger);
+
+        if (Intent == PlannerIntent.OwnFleetIfItFits)
+        {
+            if (ledger.TryReserve(day, booking.TotalWeightKg, booking.PalletPlaces))
+            {
+                return new PlannerDecision(Assignee.OwnFleet, ReservedOwnFleet: true, "Own fleet has room that day");
+            }
+
+            return Carrier(activeCarriers) is { } carrier
+                ? new PlannerDecision(carrier, ReservedOwnFleet: false, $"Own fleet has no room that day: {carrier.Name}")
+                : new PlannerDecision(Assignee.OwnFleet, ReservedOwnFleet: false, "Own fleet has no room that day, and there is no Carrier to turn to");
+        }
+
+        return Carrier(activeCarriers) is { } chosen
+            ? new PlannerDecision(chosen, ReservedOwnFleet: false, $"To {chosen.Name}")
+            : new PlannerDecision(Assignee.OwnFleet, ReservedOwnFleet: false, "There is no Carrier to turn to");
+    }
+
     /// <summary>The Carrier this choice assigns to, or null when there is none to assign to.</summary>
     public Assignee? Carrier(IReadOnlyList<SimulatedCarrier> activeCarriers)
     {

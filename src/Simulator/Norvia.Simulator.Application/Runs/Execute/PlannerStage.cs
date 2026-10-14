@@ -53,7 +53,8 @@ internal sealed class PlannerStage(ITmsApi tms, TimeProvider time)
     {
         var booking = order.Booking;
         var day = DateOnly.FromDateTime(booking.Slot.Resolve(time.GetUtcNow()).From);
-        var (assignee, reserved, intent) = Choose(choice, booking, day, carriers, ledger);
+        var decision = choice.Decide(booking, day, carriers, ledger);
+        var (assignee, reserved, intent) = (decision.Assignee, decision.ReservedOwnFleet, decision.Reason);
 
         var assigned = await tms.AssignAsync(order.TransportOrderNumber, assignee, $"SIM-{run.Number}-{booking.Step}-assign", cancellationToken);
         await writer.PlanningAsync(time.GetUtcNow(), "Assign Transport Order", booking, order.TransportOrderNumber, assigned, intent, cancellationToken);
@@ -89,26 +90,5 @@ internal sealed class PlannerStage(ITmsApi tms, TimeProvider time)
         {
             ledger.TryReserve(day, booking.TotalWeightKg, booking.PalletPlaces);
         }
-    }
-
-    // Own fleet where the order fits, a Carrier otherwise. With no active Carrier to turn to, Own fleet: the TMS only warns there.
-    private static (Assignee Assignee, bool Reserved, string Intent) Choose(
-        PlannerChoice choice, PlannedBooking booking, DateOnly day, IReadOnlyList<SimulatedCarrier> carriers, FleetLedger ledger)
-    {
-        if (choice.Intent == PlannerIntent.OwnFleetIfItFits)
-        {
-            if (ledger.TryReserve(day, booking.TotalWeightKg, booking.PalletPlaces))
-            {
-                return (Assignee.OwnFleet, true, "Own fleet has room that day");
-            }
-
-            return choice.Carrier(carriers) is { } carrier
-                ? (carrier, false, $"Own fleet has no room that day: {carrier.Name}")
-                : (Assignee.OwnFleet, false, "Own fleet has no room that day, and there is no Carrier to turn to");
-        }
-
-        return choice.Carrier(carriers) is { } chosen
-            ? (chosen, false, $"To {chosen.Name}")
-            : (Assignee.OwnFleet, false, "There is no Carrier to turn to");
     }
 }
