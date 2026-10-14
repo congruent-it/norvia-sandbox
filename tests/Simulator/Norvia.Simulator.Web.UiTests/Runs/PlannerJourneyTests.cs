@@ -15,6 +15,7 @@ public sealed partial class PlannerJourneyTests(SimulatorUiFixture simulator) : 
     {
         // A seed of this test's own, so its plan and its Shipper references are its own.
         var seed = Random.Shared.Next(1_000, int.MaxValue);
+        TestContext.Current.SendDiagnosticMessage($"Seed {seed}");
         await Page.GotoAsync("/");
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Level = 1 })).ToHaveTextAsync("Configure a run");
 
@@ -33,7 +34,7 @@ public sealed partial class PlannerJourneyTests(SimulatorUiFixture simulator) : 
         await Page.GetByRole(AriaRole.Button, new() { Name = "Start run" }).ClickAsync();
 
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Level = 1 })).ToContainTextAsync("Run ");
-        await Expect(Page.GetByRole(AriaRole.Status).First).ToContainTextAsync($"{Orders} of {Orders} Transport Orders planned");
+        await Expect(Page.GetByRole(AriaRole.Status).Filter(new() { HasText = "bookings sent" })).ToContainTextAsync($"{Orders} of {Orders} Transport Orders planned");
 
         var log = Page.GetByRole(AriaRole.Table, new() { Name = "Log lines" });
         var assignments = log.GetByRole(AriaRole.Row).Filter(new() { HasText = "Assign Transport Order" });
@@ -44,12 +45,15 @@ public sealed partial class PlannerJourneyTests(SimulatorUiFixture simulator) : 
         await Expect(assignment).ToContainTextAsync(TransportOrderNumber());
         await Expect(assignment).ToContainTextAsync(ShipmentNumber());
 
-        var trail = assignment.GetByRole(AriaRole.Link, new() { NameRegex = TrailLink() });
-        await Expect(trail).ToHaveAttributeAsync("href", ConsoleSearch());
-        var correlationId = ConsoleSearch().Match((await trail.GetAttributeAsync("href"))!).Groups["key"].Value;
+        var trail = assignment.GetByRole(AriaRole.Link, new() { NameRegex = TrailLinks.Name() });
+        await Expect(trail).ToHaveAttributeAsync("href", TrailLinks.ConsoleSearch());
+        var correlationId = TrailLinks.ConsoleSearch().Match((await trail.GetAttributeAsync("href"))!).Groups["key"].Value;
 
         var console = await Page.Context.RunAndWaitForPageAsync(() => trail.ClickAsync());
         await Expect(console).ToHaveURLAsync(new Regex($"key={Regex.Escape(correlationId)}"));
+        await Expect(console.GetByRole(AriaRole.Heading, new() { Level = 1 })).ToHaveTextAsync("Search Message trails");
+        // The local estate has no telemetry for the console to search, so the trail itself is not asserted here: the console opens on this ID.
+        await Expect(console.GetByLabel("Correlation ID or business key")).ToHaveValueAsync(correlationId);
     }
 
     // The Transport Order and Shipment numbers are the TMS's, so the test checks their shape, not their values.
@@ -58,10 +62,4 @@ public sealed partial class PlannerJourneyTests(SimulatorUiFixture simulator) : 
 
     [GeneratedRegex(@"SH-\d{7}")]
     private static partial Regex ShipmentNumber();
-
-    [GeneratedRegex(@"/\?key=(?<key>[0-9a-fA-F-]{32,})&within=all$")]
-    private static partial Regex ConsoleSearch();
-
-    [GeneratedRegex("Open the Message trail of .* in the Integration console")]
-    private static partial Regex TrailLink();
 }
