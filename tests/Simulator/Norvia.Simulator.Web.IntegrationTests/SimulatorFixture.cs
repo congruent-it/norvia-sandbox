@@ -36,12 +36,13 @@ public sealed class SimulatorFixture : IAsyncLifetime
     ];
 
     private static readonly string[] SimulatorSettings =
-        ["ConnectionStrings__", "Seed__", "Simulator__", "PartnerApi__", "IntegrationConsole__", "LocalOperator__"];
+        ["ConnectionStrings__", "Seed__", "Simulator__", "PartnerApi__", "TmsApi__", "IntegrationConsole__", "LocalOperator__"];
 
     private static readonly string[] IntakeRoles = ["TransportOrders.Intake"];
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
     private readonly string _tokenSigningKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
     private readonly List<SimulatorHost> _hosts = [];
+    private readonly List<string> _seedCopies = [];
     private DistributedApplication? _app;
     private Dictionary<string, string> _settings = [];
 
@@ -92,6 +93,11 @@ public sealed class SimulatorFixture : IAsyncLifetime
             await host.DisposeAsync();
         }
 
+        foreach (var copy in _seedCopies)
+        {
+            File.Delete(copy);
+        }
+
         Tms?.Dispose();
         if (_app is not null)
         {
@@ -108,6 +114,39 @@ public sealed class SimulatorFixture : IAsyncLifetime
         var host = new SimulatorHost(_settings);
         _hosts.Add(host);
         return host;
+    }
+
+    /// <summary>
+    /// A Simulator whose seed file lists the given Carriers as the only active ones, so the Planner can be sent to a Carrier the TMS knows as
+    /// inactive. Everything else is the seed file's.
+    /// </summary>
+    public SimulatorHost StartSimulatorWithActiveCarriers(params string[] carrierIds)
+    {
+        var seed = JsonNode.Parse(File.ReadAllText(_settings["Seed:Path"]))!.AsObject();
+        foreach (var carrier in seed["carriers"]!.AsArray().OfType<JsonObject>())
+        {
+            carrier["active"] = carrierIds.Contains(carrier["id"]!.GetValue<string>());
+        }
+
+        var copy = Path.Combine(Path.GetTempPath(), $"norvia-seed-{Guid.NewGuid():N}.json");
+        File.WriteAllText(copy, seed.ToJsonString());
+        _seedCopies.Add(copy);
+        var host = new SimulatorHost(new Dictionary<string, string>(_settings) { ["Seed:Path"] = copy });
+        _hosts.Add(host);
+        return host;
+    }
+
+    /// <summary>A Shipment as the TMS API reads it out, or null when the TMS has none by that number.</summary>
+    public async Task<JsonObject?> ShipmentAsync(string shipmentNumber, CancellationToken cancellationToken)
+    {
+        using var response = await Tms.GetAsync(new Uri($"/v1/shipments/{Uri.EscapeDataString(shipmentNumber)}", UriKind.Relative), cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return JsonNode.Parse(await response.Content.ReadAsStringAsync(cancellationToken))!.AsObject();
     }
 
     /// <summary>The Shipper references of the Transport Orders and Rejected bookings the TMS holds with the status.</summary>
