@@ -1,4 +1,5 @@
 using Norvia.Simulator.Domain.Log;
+using Norvia.Simulator.Domain.Planner;
 using Norvia.Simulator.Domain.Plans;
 using Norvia.Simulator.Domain.Runs;
 
@@ -13,6 +14,24 @@ public sealed class SimulatorTextTests
         Enum.GetValues<SimulationRunStatus>().Select(SimulatorText.Of).Should().OnlyContain(text => !string.IsNullOrWhiteSpace(text));
         Enum.GetValues<BadBookingKind>().Select(SimulatorText.Of).Should().OnlyContain(text => !string.IsNullOrWhiteSpace(text));
         Enum.GetValues<ExpectedAnswer>().Select(SimulatorText.Of).Should().OnlyContain(text => !string.IsNullOrWhiteSpace(text));
+    }
+
+    [Theory]
+    [InlineData(null, false, "Not assigned")]
+    [InlineData(PlannerIntent.Carrier, false, "A Carrier")]
+    [InlineData(PlannerIntent.OwnFleetIfItFits, false, "Own fleet if it fits, else a Carrier")]
+    [InlineData(PlannerIntent.Carrier, true, "A Carrier, then reassigned")]
+    public void Of_WhatThePlannerMeansToDo_SaysSo(PlannerIntent? intent, bool reassign, string expected)
+    {
+        SimulatorText.Of(intent, reassign).Should().Be(expected);
+    }
+
+    [Fact]
+    public void Of_AnUnknownIntent_Throws()
+    {
+        var wording = () => SimulatorText.Of((PlannerIntent)99, reassign: false);
+
+        wording.Should().Throw<ArgumentOutOfRangeException>();
     }
 
     [Fact]

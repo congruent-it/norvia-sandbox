@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Norvia.Simulator.Application.Plans.Preview;
+using Norvia.Simulator.Domain.Planner;
 using Norvia.Simulator.Domain.Plans;
 using Norvia.Simulator.Domain.Runs;
 using Norvia.Simulator.Web.Operators;
@@ -12,18 +13,19 @@ namespace Norvia.Simulator.Web.UnitTests.Plans;
 
 public sealed class PlanTests : SimulatorWebContext
 {
-    private const string Address = "/plan?orders=3&bad=34&today=30&seed=77&mode=Paced&window=10&preset=Busy%20day";
+    private const string Address = "/plan?orders=3&bad=34&today=30&seed=77&mode=Paced&window=10&assigned=60&ownfleet=40&reassign=20&preset=Busy%20day";
 
-    private static readonly SimulationSettings Settings = new(3, 34, 30, 77, RunMode.Paced, TimeSpan.FromMinutes(10), "Busy day");
+    private static readonly SimulationSettings Settings = new(3, 34, 30, 77, RunMode.Paced, TimeSpan.FromMinutes(10), "Busy day", 60, 40, 20);
 
     private static PlanPreview Preview() => new(
         5, Settings,
         [new ShipperShare("SHP-0001", "Brouwer Dranken", 2, 1), new ShipperShare("SHP-0003", "Tuincentrum Groenrijk", 1, 0)],
         [
-            new PlanRow(1, "Brouwer Dranken", "Brouwer Dranken", "SIM-5-1", "Rotterdam → Antwerpen", 0, 420m, null, ExpectedAnswer.Accepted),
+            new PlanRow(1, "Brouwer Dranken", "Brouwer Dranken", "SIM-5-1", "Rotterdam → Antwerpen", 0, 420m, null, ExpectedAnswer.Accepted, PlannerIntent.OwnFleetIfItFits, Reassign: true),
             new PlanRow(2, "Brouwer Dranken", "Brouwer Dranken", "SIM-5-2", "Rotterdam → Germany", 3, 120m, BadBookingKind.NoLane, ExpectedAnswer.Accepted),
-            new PlanRow(3, "Tuincentrum Groenrijk", "Tuincentrum Groenrijk", "SIM-5-3", "Utrecht → Utrecht", 1, 60m, null, ExpectedAnswer.Accepted),
-        ]);
+            new PlanRow(3, "Tuincentrum Groenrijk", "Tuincentrum Groenrijk", "SIM-5-3", "Utrecht → Utrecht", 1, 60m, null, ExpectedAnswer.Accepted, PlannerIntent.Carrier),
+        ],
+        new PlannerPreview(Orders: 3, Assigned: 2, TryOwnFleet: 1, Carrier: 1, Reassigned: 1));
 
     private IRenderedComponent<Plan> RenderAt(string address)
     {
@@ -139,7 +141,7 @@ public sealed class PlanTests : SimulatorWebContext
         var link = PlanLinks.Plan(Settings);
 
         link.Should().Be(Address);
-        PlanLinks.Settings(3, 34, 30, 77, "Paced", 10, "Busy day").Should().Be(Settings);
+        PlanLinks.Settings(3, 34, 30, 77, "Paced", 10, "Busy day", 60, 40, 20).Should().Be(Settings);
     }
 
     [Theory]
@@ -157,6 +159,36 @@ public sealed class PlanTests : SimulatorWebContext
     [Fact]
     public void PlanLinks_ACustomRun_NamesNoPreset()
     {
-        PlanLinks.Plan(Settings with { PresetName = null, Mode = RunMode.Burst, Window = TimeSpan.Zero }).Should().Be("/plan?orders=3&bad=34&today=30&seed=77&mode=Burst&window=0");
+        PlanLinks.Plan(Settings with { PresetName = null, Mode = RunMode.Burst, Window = TimeSpan.Zero }).Should().Be("/plan?orders=3&bad=34&today=30&seed=77&mode=Burst&window=0&assigned=60&ownfleet=40&reassign=20");
+    }
+
+    [Fact]
+    public void PlanLinks_AnAddressFromBeforeThePlanner_GetsTheDefaultShares()
+    {
+        var settings = PlanLinks.Settings(3, 34, 30, 77, "Burst", window: null, preset: null);
+
+        (settings!.AssignedPercent, settings.OwnFleetPercent, settings.ReassignPercent)
+            .Should().Be((SimulationSettings.DefaultAssignedPercent, SimulationSettings.DefaultOwnFleetPercent, SimulationSettings.DefaultReassignPercent));
+    }
+
+    [Fact]
+    public void Render_ThePlan_ShowsTheAssignmentStageOfTheFunnel()
+    {
+        Requests.PreviewAsync(Arg.Any<SimulationSettings>(), Arg.Any<CancellationToken>()).Returns(Preview());
+
+        var page = RenderAt(Address);
+
+        page.Find("[data-testid=planner-funnel]").TextContent.Should()
+            .Contain("assigns 2 of the 3 orders").And.Contain("(60%)").And.Contain("1 to Own fleet where it fits, 1 to a Carrier").And.Contain("reassigns 1 (20%)");
+    }
+
+    [Fact]
+    public void Render_ThePlan_ShowsWhatThePlannerMeansToDoPerBooking()
+    {
+        Requests.PreviewAsync(Arg.Any<SimulationSettings>(), Arg.Any<CancellationToken>()).Returns(Preview());
+
+        var bookings = RenderAt(Address).FindAll("table")[1].TextContent;
+
+        bookings.Should().Contain("Own fleet if it fits, else a Carrier, then reassigned").And.Contain("A Carrier").And.Contain("Not assigned");
     }
 }

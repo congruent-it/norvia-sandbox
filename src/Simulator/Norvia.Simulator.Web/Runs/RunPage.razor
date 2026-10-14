@@ -44,7 +44,7 @@ else
     <h1>Run @run.Number</h1>
     <p role="status" class="mb-2">
         <strong data-status="@run.Status">@SimulatorText.Of(run.Status)</strong>:
-        @run.Sent of @run.Planned bookings sent, @SimulatorText.Of(run.Mode, TimeSpan.Zero).ToLowerInvariant(), seed @run.Seed.
+        @run.Sent of @run.Planned bookings sent@(run.ToAssign > 0 ? $", {run.Assigned} of {run.ToAssign} Transport Orders planned" : ""), @SimulatorText.Of(run.Mode, TimeSpan.Zero).ToLowerInvariant(), seed @run.Seed.
         Started @SimulatorText.DateAndTime(run.StartedAt) by @run.StartedBy@(run.FinishedAt is { } done ? $", finished {SimulatorText.DateAndTime(done)}" : "").
     </p>
     <p class="text-muted">
@@ -85,7 +85,7 @@ else
                 <FluentOption TOption="string" Value="@outcome.ToString()">@SimulatorText.Of(outcome)</FluentOption>
             }
         </FluentSelect>
-        <FluentTextField @bind-Value="_filter.Text" Label="Correlation ID, reference or order number" Class="min-w-80 grow" />
+        <FluentTextField @bind-Value="_filter.Text" Label="Correlation ID, reference, order or Shipment number" Class="min-w-80 grow" />
         <FluentButton Type="ButtonType.Submit" Appearance="Appearance.Accent">Filter</FluentButton>
     </EditForm>
 
@@ -116,6 +116,7 @@ else
                 </TemplateColumn>
                 <PropertyColumn Title="Shipper reference" Property="@(line => line.ShipperReference)" />
                 <PropertyColumn Title="Transport Order" Property="@(line => line.TransportOrderNumber)" />
+                <PropertyColumn Title="Shipment" Property="@(line => line.ShipmentNumber)" />
                 <PropertyColumn Title="Detail" Property="@(line => line.Detail)" />
             </FluentDataGrid>
         </div>
@@ -200,9 +201,9 @@ else
 
     private static string OutcomeClass(LogOutcome outcome) => outcome switch
     {
-        LogOutcome.Rejected or LogOutcome.Refused or LogOutcome.NotReceived => "font-bold text-danger",
+        LogOutcome.Rejected or LogOutcome.Refused or LogOutcome.NotReceived or LogOutcome.PlanningRefused or LogOutcome.PlanningNotReceived => "font-bold text-danger",
         LogOutcome.AlreadyBooked => "text-warning",
-        LogOutcome.Accepted => "text-success",
+        LogOutcome.Accepted or LogOutcome.Planned or LogOutcome.Reassigned => "text-success",
         _ => "text-muted",
     };
 

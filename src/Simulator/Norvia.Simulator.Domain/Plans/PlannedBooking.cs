@@ -31,4 +31,7 @@ public sealed record PlannedBooking(
     };
 
     public decimal TotalWeightKg => Goods.Sum(line => line.WeightKg);
+
+    /// <summary>What the order asks of the Own fleet's pallet places: the quantity of its pallet lines, as the TMS's load check counts it (P10).</summary>
+    public int PalletPlaces => Goods.Where(line => line.Package == PackageKind.Pallet).Sum(line => line.Quantity);
 }

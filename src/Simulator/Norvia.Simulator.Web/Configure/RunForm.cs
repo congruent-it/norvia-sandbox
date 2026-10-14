@@ -22,6 +22,15 @@ public sealed class RunForm : IValidatableObject
     [Range(0, 100, ErrorMessage = "The share collected today is a percentage from 0 to 100.")]
     public int TodayPercent { get; set; } = 30;
 
+    [Range(0, 100, ErrorMessage = "The share of orders the Planner assigns is a percentage from 0 to 100.")]
+    public int AssignedPercent { get; set; } = SimulationSettings.DefaultAssignedPercent;
+
+    [Range(0, 100, ErrorMessage = "The share of assignments to Own fleet is a percentage from 0 to 100.")]
+    public int OwnFleetPercent { get; set; } = SimulationSettings.DefaultOwnFleetPercent;
+
+    [Range(0, 100, ErrorMessage = "The share of assignments the Planner reassigns is a percentage from 0 to 100.")]
+    public int ReassignPercent { get; set; } = SimulationSettings.DefaultReassignPercent;
+
     public string Mode { get; set; } = nameof(RunMode.Burst);
 
     [Range(1, SimulationSettings.MaxWindowMinutes, ErrorMessage = "A paced run is spread over 1 to 240 minutes.")]
@@ -36,7 +45,8 @@ public sealed class RunForm : IValidatableObject
     public SimulationSettings ToSettings() => new(
         Orders, BadPercent, TodayPercent, Seed, Enum.Parse<RunMode>(Mode),
         IsPaced ? TimeSpan.FromMinutes(WindowMinutes) : TimeSpan.Zero,
-        Preset == CustomPreset ? null : Preset);
+        Preset == CustomPreset ? null : Preset,
+        AssignedPercent, OwnFleetPercent, ReassignPercent);
 
     public void Fill(Preset preset)
     {
@@ -45,6 +55,9 @@ public sealed class RunForm : IValidatableObject
         Orders = preset.OrderCount;
         BadPercent = preset.BadSharePercent;
         TodayPercent = preset.CollectedTodayPercent;
+        AssignedPercent = preset.AssignedPercent;
+        OwnFleetPercent = preset.OwnFleetPercent;
+        ReassignPercent = preset.ReassignPercent;
         Mode = preset.Mode.ToString();
         WindowMinutes = preset.Mode == RunMode.Paced ? (int)preset.Window.TotalMinutes : WindowMinutes;
     }

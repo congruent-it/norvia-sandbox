@@ -35,6 +35,29 @@ public sealed class PreviewPlanHandlerTests
     }
 
     [Fact]
+    public async Task Handle_PlannerShares_ShowTheAssignmentStageOfTheFunnel()
+    {
+        var settings = TestData.Settings(orders: 20, bad: 0, assigned: 50, ownFleet: 40, reassign: 20);
+
+        var result = await Handler().Handle(new PreviewPlanQuery(settings), CancellationToken.None);
+
+        result.Value.Planner.Should().Be(new PlannerPreview(Orders: 20, Assigned: 10, TryOwnFleet: 4, Carrier: 6, Reassigned: 2));
+        result.Value.Rows.Count(row => row.Planner is not null).Should().Be(10);
+        result.Value.Rows.Count(row => row.Reassign).Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Handle_BadBookingsNorviaWillNotAccept_AreNotOrdersToAssign()
+    {
+        var settings = TestData.Settings(orders: 20, bad: 100, assigned: 100);
+
+        var result = await Handler().Handle(new PreviewPlanQuery(settings), CancellationToken.None);
+
+        result.Value.Planner.Orders.Should().Be(result.Value.Rows.Count(row => row.Expected == ExpectedAnswer.Accepted));
+        result.Value.Planner.Assigned.Should().Be(result.Value.Planner.Orders);
+    }
+
+    [Fact]
     public async Task Handle_ARunAlreadyDone_NumbersThePlanAfterIt()
     {
         var sequence = RunSequence.Create();

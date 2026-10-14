@@ -1,8 +1,9 @@
+using Norvia.Simulator.Domain.Planner;
 using Norvia.Simulator.Domain.Plans;
 
 namespace Norvia.Simulator.Application.Plans.Preview;
 
-/// <summary>One booking of a plan as the preview shows it: what is sent, never who receives it.</summary>
+/// <summary>One booking of a plan as the preview shows it: what is sent, never who receives it, and what the Planner means to do with its order.</summary>
 public sealed record PlanRow(
     int Step,
     string Actor,
@@ -12,4 +13,6 @@ public sealed record PlanRow(
     int DayOffset,
     decimal WeightKg,
     BadBookingKind? Bad,
-    ExpectedAnswer Expected);
+    ExpectedAnswer Expected,
+    PlannerIntent? Planner = null,
+    bool Reassign = false);

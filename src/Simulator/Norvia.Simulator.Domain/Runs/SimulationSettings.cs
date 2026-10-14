@@ -8,8 +8,15 @@ public sealed record SimulationSettings(
     int Seed,
     RunMode Mode,
     TimeSpan Window,
-    string? PresetName = null)
+    string? PresetName = null,
+    int AssignedPercent = SimulationSettings.DefaultAssignedPercent,
+    int OwnFleetPercent = SimulationSettings.DefaultOwnFleetPercent,
+    int ReassignPercent = SimulationSettings.DefaultReassignPercent)
 {
+    public const int DefaultAssignedPercent = 80;
+    public const int DefaultOwnFleetPercent = 50;
+    public const int DefaultReassignPercent = 5;
+
     public const int MaxWindowMinutes = 240;
 
     /// <summary>How long apart <paramref name="bookingCount"/> bookings go out: none in a burst, evenly over the window when paced.</summary>
@@ -39,6 +46,21 @@ public sealed record SimulationSettings(
         if (CollectedTodayPercent is < 0 or > 100)
         {
             problems.Add("The share of orders collected today is a percentage from 0 to 100.");
+        }
+
+        if (AssignedPercent is < 0 or > 100)
+        {
+            problems.Add("The share of orders the Planner assigns is a percentage from 0 to 100.");
+        }
+
+        if (OwnFleetPercent is < 0 or > 100)
+        {
+            problems.Add("The share of assignments to Own fleet is a percentage from 0 to 100.");
+        }
+
+        if (ReassignPercent is < 0 or > 100)
+        {
+            problems.Add("The share of assignments the Planner reassigns is a percentage from 0 to 100.");
         }
 
         if (Mode == RunMode.Paced && (Window <= TimeSpan.Zero || Window > TimeSpan.FromMinutes(MaxWindowMinutes)))

@@ -127,14 +127,34 @@ public sealed class RunQueriesAndCommandsTests
         var reads = Substitute.For<IReadRepository<SimulationRun>>();
         reads.FirstOrDefaultAsync(Arg.Any<ISpecification<SimulationRun>>(), Arg.Any<CancellationToken>()).Returns(run);
         var lines = Substitute.For<IReadRepository<LogEntry>>();
-        lines.ListAsync(Arg.Any<ISpecification<LogEntry, LogOutcome>>(), Arg.Any<CancellationToken>())
+        lines.ListAsync(Arg.Any<BookingOutcomesOfRunSpec>(), Arg.Any<CancellationToken>())
             .Returns([LogOutcome.Accepted, LogOutcome.Accepted, LogOutcome.Rejected]);
+        lines.ListAsync(Arg.Any<PlanningOutcomesOfRunSpec>(), Arg.Any<CancellationToken>()).Returns([]);
 
         var result = await new GetRunHandler(reads, lines).Handle(new GetRunQuery(run.Id), CancellationToken.None);
 
         result.Value.Run.Sent.Should().Be(3);
+        result.Value.Run.Assigned.Should().Be(0);
         result.Value.Outcomes.Should().BeEquivalentTo([new OutcomeCount(LogOutcome.Accepted, 2), new OutcomeCount(LogOutcome.Rejected, 1)]);
         result.Value.Actors.Should().BeEquivalentTo(run.Plan.Bookings.Select(booking => booking.PersonaName).Distinct());
+    }
+
+    [Fact]
+    public async Task Open_ARunWithAPlanner_CountsWhatThePlannerPlannedAndNamesThePlanner()
+    {
+        var run = TestData.Run(TestData.Settings(orders: 10, assigned: 100));
+        var reads = Substitute.For<IReadRepository<SimulationRun>>();
+        reads.FirstOrDefaultAsync(Arg.Any<ISpecification<SimulationRun>>(), Arg.Any<CancellationToken>()).Returns(run);
+        var lines = Substitute.For<IReadRepository<LogEntry>>();
+        lines.ListAsync(Arg.Any<BookingOutcomesOfRunSpec>(), Arg.Any<CancellationToken>()).Returns([LogOutcome.Accepted, LogOutcome.Accepted]);
+        lines.ListAsync(Arg.Any<PlanningOutcomesOfRunSpec>(), Arg.Any<CancellationToken>())
+            .Returns([LogOutcome.Planned, LogOutcome.Reassigned, LogOutcome.Planned, LogOutcome.PlanningRefused]);
+
+        var result = await new GetRunHandler(reads, lines).Handle(new GetRunQuery(run.Id), CancellationToken.None);
+
+        (result.Value.Run.Sent, result.Value.Run.Assigned, result.Value.Run.ToAssign).Should().Be((2, 2, run.Plan.Choices.Count));
+        result.Value.Outcomes.Should().Contain(new OutcomeCount(LogOutcome.Planned, 2)).And.Contain(new OutcomeCount(LogOutcome.PlanningRefused, 1));
+        result.Value.Actors.Should().Contain("Planner");
     }
 
     [Fact]
@@ -152,10 +172,10 @@ public sealed class RunQueriesAndCommandsTests
         var run = TestData.Run();
         var lines = Substitute.For<IReadRepository<LogEntry>>();
         lines.ListAsync(Arg.Any<ISpecification<LogEntry, LogLine>>(), Arg.Any<CancellationToken>())
-            .Returns([new LogLine(2, TestData.Now, "Brouwer Dranken", "Send booking", LogOutcome.Accepted, "c1", "SIM-1-1", "TO-1", "Good booking")]);
+            .Returns([new LogLine(2, TestData.Now, "Brouwer Dranken", "Send booking", LogOutcome.Accepted, "c1", "SIM-1-1", "TO-1", null, "Good booking")]);
 
         var log = await new ListLogHandler(lines).Handle(new ListLogQuery(run.Id, new LogFilter()), CancellationToken.None);
 
-        log.Should().ContainSingle().Which.Should().Be(new LogLine(2, TestData.Now, "Brouwer Dranken", "Send booking", LogOutcome.Accepted, "c1", "SIM-1-1", "TO-1", "Good booking"));
+        log.Should().ContainSingle().Which.Should().Be(new LogLine(2, TestData.Now, "Brouwer Dranken", "Send booking", LogOutcome.Accepted, "c1", "SIM-1-1", "TO-1", null, "Good booking"));
     }
 }

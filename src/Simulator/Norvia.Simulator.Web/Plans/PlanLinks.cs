@@ -15,20 +15,26 @@ public static class PlanLinks
 
         var query = string.Create(
             CultureInfo.InvariantCulture,
-            $"orders={settings.OrderCount}&bad={settings.BadSharePercent}&today={settings.CollectedTodayPercent}&seed={settings.Seed}&mode={settings.Mode}&window={(int)settings.Window.TotalMinutes}");
+            $"orders={settings.OrderCount}&bad={settings.BadSharePercent}&today={settings.CollectedTodayPercent}&seed={settings.Seed}&mode={settings.Mode}&window={(int)settings.Window.TotalMinutes}"
+            + $"&assigned={settings.AssignedPercent}&ownfleet={settings.OwnFleetPercent}&reassign={settings.ReassignPercent}");
         return settings.PresetName is { } preset ? $"/plan?{query}&preset={Uri.EscapeDataString(preset)}" : $"/plan?{query}";
     }
 
     public static string Run(Guid runId) => $"/runs/{runId}";
 
-    /// <summary>The settings in the address, or null when it doesn't hold a full set.</summary>
-    public static SimulationSettings? Settings(int? orders, int? bad, int? today, int? seed, string? mode, int? window, string? preset)
+    /// <summary>The settings in the address, or null when it doesn't hold a full set. A link made before the Planner existed has no Planner shares, and gets the defaults.</summary>
+    public static SimulationSettings? Settings(
+        int? orders, int? bad, int? today, int? seed, string? mode, int? window, string? preset,
+        int? assigned = null, int? ownFleet = null, int? reassign = null)
     {
         if (orders is null || bad is null || today is null || seed is null || !Enum.TryParse<RunMode>(mode, out var runMode))
         {
             return null;
         }
 
-        return new SimulationSettings(orders.Value, bad.Value, today.Value, seed.Value, runMode, TimeSpan.FromMinutes(window ?? 0), preset);
+        return new SimulationSettings(orders.Value, bad.Value, today.Value, seed.Value, runMode, TimeSpan.FromMinutes(window ?? 0), preset,
+            assigned ?? SimulationSettings.DefaultAssignedPercent,
+            ownFleet ?? SimulationSettings.DefaultOwnFleetPercent,
+            reassign ?? SimulationSettings.DefaultReassignPercent);
     }
 }

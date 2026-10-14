@@ -7,7 +7,8 @@ namespace Norvia.Simulator.Infrastructure.World;
 
 /// <summary>
 /// The Shippers the Simulator books for, loaded once from the seed file, the one source of master data (ADR 0002): each
-/// active Shipper that has a Persona and a Rate Card, with the Zones and Lanes of its latest Rate Card version.
+/// active Shipper that has a Persona and a Rate Card, with the Zones and Lanes of its latest Rate Card version, and the Carriers
+/// the Planner can assign to.
 /// </summary>
 internal sealed class SeedFileWorldSource : IWorldSource
 {
@@ -25,7 +26,9 @@ internal sealed class SeedFileWorldSource : IWorldSource
         using (seedFile)
         {
             var seed = JsonSerializer.Deserialize<SeedFile>(seedFile, SeedJson) ?? throw new InvalidDataException("The seed file is empty.");
-            _world = new SimulationWorld([.. seed.Shippers.Where(shipper => shipper.Active).Select(shipper => ToShipper(shipper, seed)).OfType<SimulatedShipper>()]);
+            _world = new SimulationWorld(
+                [.. seed.Shippers.Where(shipper => shipper.Active).Select(shipper => ToShipper(shipper, seed)).OfType<SimulatedShipper>()],
+                [.. (seed.Carriers ?? []).Select(carrier => new SimulatedCarrier(carrier.Id, carrier.Name, carrier.Active))]);
         }
     }
 
@@ -46,7 +49,9 @@ internal sealed class SeedFileWorldSource : IWorldSource
             [.. version.Lanes.Select(lane => new RateLane(lane.Origin, lane.Destination))]);
     }
 
-    private sealed record SeedFile(IReadOnlyList<SeedShipper> Shippers, IReadOnlyList<SeedPersona> Personas, IReadOnlyList<SeedRateCard>? RateCards);
+    private sealed record SeedFile(IReadOnlyList<SeedShipper> Shippers, IReadOnlyList<SeedPersona> Personas, IReadOnlyList<SeedRateCard>? RateCards, IReadOnlyList<SeedCarrier>? Carriers);
+
+    private sealed record SeedCarrier(string Id, string Name, bool Active);
 
     private sealed record SeedShipper(string Id, string Name, bool Active);
 

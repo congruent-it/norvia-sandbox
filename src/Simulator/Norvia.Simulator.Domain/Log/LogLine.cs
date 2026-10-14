@@ -10,4 +10,5 @@ public sealed record LogLine(
     string? CorrelationId,
     string? ShipperReference,
     string? TransportOrderNumber,
+    string? ShipmentNumber,
     string? Detail);

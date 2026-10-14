@@ -1,3 +1,4 @@
+using Norvia.Simulator.Domain.Planner;
 using Norvia.Simulator.Domain.Runs;
 using Norvia.Simulator.Domain.Worlds;
 
@@ -42,7 +43,7 @@ public static class BookingPlanGenerator
                 : Good(step, runNumber, slot, random.Pick(shippers), random));
         }
 
-        return new SimulationPlan(runNumber, settings, bookings);
+        return new SimulationPlan(runNumber, settings, bookings) { Choices = PlannerChoices.For(settings, bookings) };
     }
 
     // Exactly the share asked for, at positions the seed picks.

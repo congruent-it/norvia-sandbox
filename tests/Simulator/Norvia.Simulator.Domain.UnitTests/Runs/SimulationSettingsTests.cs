@@ -21,6 +21,20 @@ public sealed class SimulationSettingsTests
         Settings(orders: 101).Problems(Limits).Should().ContainSingle().Which.Should().Contain("at most 100");
     }
 
+    [Theory]
+    [InlineData(-1, 50, 5, "assigns")]
+    [InlineData(101, 50, 5, "assigns")]
+    [InlineData(80, -1, 5, "Own fleet")]
+    [InlineData(80, 101, 5, "Own fleet")]
+    [InlineData(80, 50, -1, "reassigns")]
+    [InlineData(80, 50, 101, "reassigns")]
+    public void Problems_APlannerShareOutOfRange_IsNamed(int assigned, int ownFleet, int reassign, string named)
+    {
+        var settings = new SimulationSettings(10, 10, 30, 1, RunMode.Burst, TimeSpan.Zero, null, assigned, ownFleet, reassign);
+
+        settings.Problems(Limits).Should().ContainSingle().Which.Should().Contain(named).And.Contain("0 to 100");
+    }
+
     [Fact]
     public void Problems_AnOrderCountOfTheCap_IsAllowed()
     {

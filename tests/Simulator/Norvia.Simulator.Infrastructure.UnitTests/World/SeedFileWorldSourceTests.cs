@@ -38,6 +38,24 @@ public sealed class SeedFileWorldSourceTests
     }
 
     [Fact]
+    public void Load_TheDemoSeed_HasTheCarriersThePlannerCanAssignTo()
+    {
+        var world = FromDemoSeed().Load();
+
+        world.ActiveCarriers.Select(carrier => carrier.Id).Should().Contain(["CAR-0001", "CAR-0002"]);
+        world.ActiveCarriers.Should().OnlyContain(carrier => carrier.Active);
+        world.Carriers.Should().Contain(carrier => !carrier.Active, "the seed's inactive Carrier is there, and never chosen");
+    }
+
+    [Fact]
+    public void Load_ASeedWithoutCarriers_HasNone()
+    {
+        var seed = """{"shippers":[],"personas":[]}""";
+
+        new SeedFileWorldSource(new MemoryStream(Encoding.UTF8.GetBytes(seed))).Load().ActiveCarriers.Should().BeEmpty();
+    }
+
+    [Fact]
     public void Load_AnInactiveShipper_IsLeftOut()
     {
         var seed = """

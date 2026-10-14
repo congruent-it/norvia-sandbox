@@ -24,6 +24,9 @@ public sealed class RunFormTests
     [InlineData(nameof(RunForm.BadPercent), 101)]
     [InlineData(nameof(RunForm.TodayPercent), -1)]
     [InlineData(nameof(RunForm.WindowMinutes), 241)]
+    [InlineData(nameof(RunForm.AssignedPercent), 101)]
+    [InlineData(nameof(RunForm.OwnFleetPercent), -1)]
+    [InlineData(nameof(RunForm.ReassignPercent), 101)]
     public void Validate_AFieldOutOfRange_IsNamedByItsField(string field, int value)
     {
         var form = new RunForm { Limits = TestData.Limits };
@@ -50,6 +53,16 @@ public sealed class RunFormTests
 
         form.ToSettings().Window.Should().Be(TimeSpan.Zero);
         form.ToSettings().PresetName.Should().BeNull();
+    }
+
+    [Fact]
+    public void ToSettings_CarriesThePlannersShares()
+    {
+        var form = new RunForm { AssignedPercent = 70, OwnFleetPercent = 30, ReassignPercent = 10 };
+
+        var settings = form.ToSettings();
+
+        (settings.AssignedPercent, settings.OwnFleetPercent, settings.ReassignPercent).Should().Be((70, 30, 10));
     }
 
     [Fact]

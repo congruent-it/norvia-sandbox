@@ -54,6 +54,11 @@ else
         Run @_preview.RunNumber would send @_preview.Rows.Count bookings, @_preview.BadBookings of them bad, @SimulatorText.Of(_preview.Settings.Mode, _preview.Settings.Window).ToLowerInvariant(),
         from seed @_preview.Settings.Seed. This is exactly what Start run sends.
     </p>
+    <p class="text-muted" data-testid="planner-funnel">
+        Then the Planner assigns @_preview.Planner.Assigned of the @_preview.Planner.Orders orders Norvia is expected to accept
+        (@_preview.Settings.AssignedPercent%): @_preview.Planner.TryOwnFleet to Own fleet where it fits, @_preview.Planner.Carrier to a Carrier.
+        It reassigns @_preview.Planner.Reassigned (@_preview.Settings.ReassignPercent%).
+    </p>
 
     @if (_startProblems.Count > 0)
     {
@@ -86,6 +91,7 @@ else
         <PropertyColumn Title="Weight (kg)" Property="@(row => row.WeightKg)" />
         <PropertyColumn Title="Kind" Property="@(row => KindOf(row))" />
         <PropertyColumn Title="Expected answer" Property="@(row => SimulatorText.Of(row.Expected))" />
+        <PropertyColumn Title="Planner" Property="@(row => SimulatorText.Of(row.Planner, row.Reassign))" />
     </FluentDataGrid>
     <FluentPaginator State="_pagination" />
 }
@@ -122,11 +128,20 @@ else
     [SupplyParameterFromQuery(Name = "preset")]
     private string? Preset { get; set; }
 
+    [SupplyParameterFromQuery(Name = "assigned")]
+    private int? Assigned { get; set; }
+
+    [SupplyParameterFromQuery(Name = "ownfleet")]
+    private int? OwnFleet { get; set; }
+
+    [SupplyParameterFromQuery(Name = "reassign")]
+    private int? Reassign { get; set; }
+
     private static string KindOf(PlanRow row) => row.Bad is { } bad ? SimulatorText.Of(bad) : "Good";
 
     protected override async Task OnParametersSetAsync()
     {
-        _settings = PlanLinks.Settings(Orders, Bad, Today, Seed, Mode, Window, Preset);
+        _settings = PlanLinks.Settings(Orders, Bad, Today, Seed, Mode, Window, Preset, Assigned, OwnFleet, Reassign);
         if (_settings is null)
         {
             return;

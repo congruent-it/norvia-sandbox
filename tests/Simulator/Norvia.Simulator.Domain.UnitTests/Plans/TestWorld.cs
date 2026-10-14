@@ -21,6 +21,14 @@ internal static class TestWorld
             [new RateLane("Utrecht", "Amsterdam"), new RateLane("Utrecht", "Utrecht")]),
     ]);
 
-    public static SimulationSettings Settings(int orders = 40, int badShare = 25, int seed = 7, int today = 30) =>
-        new(orders, badShare, today, seed, RunMode.Burst, TimeSpan.Zero);
+    public static IReadOnlyList<SimulatedCarrier> Carriers { get; } =
+    [
+        new SimulatedCarrier("CAR-0002", "Kessler Spedition", true),
+        new SimulatedCarrier("CAR-0001", "Van Dijk Transport", true),
+        new SimulatedCarrier("CAR-0004", "Closed Haulage", false),
+    ];
+
+    public static SimulationSettings Settings(
+        int orders = 40, int badShare = 25, int seed = 7, int today = 30, int assigned = 80, int ownFleet = 50, int reassign = 10) =>
+        new(orders, badShare, today, seed, RunMode.Burst, TimeSpan.Zero, null, assigned, ownFleet, reassign);
 }
