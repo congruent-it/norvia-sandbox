@@ -53,7 +53,7 @@ internal static class PlannerAnswers
         }
 
         // A refusal names its rule by a stable code. Never its message, which may quote what was booked.
-        if (statusCode is 404 or 409 or 422 && Text(json, "code") is { } code)
+        if (statusCode is >= 400 and < 500 && Text(json, "code") is { } code)
         {
             return new PlannerAnswer(LogOutcome.PlanningRefused, correlationId, shipmentNumber, $"{code} ({statusCode})");
         }

@@ -75,9 +75,19 @@ internal sealed class PlannerStage(ITmsApi tms, TimeProvider time)
         var target = choice.ReassignTarget(assignee, carriers);
         var reassigned = await tms.ReassignAsync(assigned.ShipmentNumber, target, $"SIM-{run.Number}-{booking.Step}-reassign", cancellationToken);
         await writer.PlanningAsync(time.GetUtcNow(), "Reassign Shipment", booking, order.TransportOrderNumber, reassigned, $"To {target.Name}", cancellationToken);
-        if (reassigned.Outcome == LogOutcome.Reassigned && reserved && !target.IsOwnFleet)
+        if (reassigned.Outcome != LogOutcome.Reassigned)
+        {
+            return;
+        }
+
+        // The tally follows the order: off Own fleet gives its room back, onto it takes room (the TMS only warns when there is none).
+        if (reserved && !target.IsOwnFleet)
         {
             ledger.Release(day, booking.TotalWeightKg, booking.PalletPlaces);
+        }
+        else if (!assignee.IsOwnFleet && target.IsOwnFleet)
+        {
+            ledger.TryReserve(day, booking.TotalWeightKg, booking.PalletPlaces);
         }
     }
 

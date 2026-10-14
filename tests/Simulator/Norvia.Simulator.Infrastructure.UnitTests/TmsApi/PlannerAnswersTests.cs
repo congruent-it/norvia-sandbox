@@ -27,6 +27,7 @@ public sealed class PlannerAnswersTests
     [InlineData(409, "TransportOrderNotAccepted")]
     [InlineData(422, "InactiveCarrier")]
     [InlineData(422, "UnknownCarrier")]
+    [InlineData(400, "ValidationFailed")]
     public void Assigned_ARefusal_GivesItsCodeAndTheTrailItWasRefusedOn_NeverItsMessage(int status, string code)
     {
         var answer = PlannerAnswers.Assigned(status, $$"""{"code":"{{code}}","detail":"Brouwer's Transport Order can't be assigned.","correlationId":"refused-1"}""", null);
