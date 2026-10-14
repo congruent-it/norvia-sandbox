@@ -28,7 +28,7 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
     private DistributedApplication? _app;
     private IPlaywright? _playwright;
 
-    public Uri Simulator { get; private set; } = null!;
+    public Uri Address { get; private set; } = null!;
 
     public IBrowser Browser { get; private set; } = null!;
 
@@ -59,7 +59,7 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
             await _app.ResourceNotifications.WaitForResourceHealthyAsync(resource, startup.Token);
         }
 
-        Simulator = _app.GetEndpoint("simulator-web", "http");
+        Address = _app.GetEndpoint("simulator-web", "http");
 
         _playwright = await Playwright.CreateAsync();
         Browser = await _playwright.Chromium.LaunchAsync();

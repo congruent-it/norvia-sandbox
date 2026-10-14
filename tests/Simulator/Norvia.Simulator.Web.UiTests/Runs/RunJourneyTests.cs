@@ -42,7 +42,13 @@ public sealed partial class RunJourneyTests(SimulatorUiFixture simulator) : Brow
 
         var bookings = log.GetByRole(AriaRole.Row).Filter(new() { HasText = "Send booking" });
         await Expect(bookings).ToHaveCountAsync(Orders);
-        await Expect(bookings.GetByRole(AriaRole.Link, new() { NameRegex = TrailLink() })).ToHaveCountAsync(Orders);
+        var trails = bookings.GetByRole(AriaRole.Link, new() { NameRegex = TrailLink() });
+        await Expect(trails).ToHaveCountAsync(Orders);
+        await Expect(trails.First).ToHaveAttributeAsync("href", ConsoleSearch());
+
+        await Page.ReloadAsync();
+
+        await Expect(Page.GetByRole(AriaRole.Table, new() { Name = "Log lines" }).GetByRole(AriaRole.Row).Filter(new() { HasText = "Send booking" })).ToHaveCountAsync(Orders);
     }
 
     private static async Task<string[]> ReferencesAsync(ILocator grid)
@@ -52,6 +58,9 @@ public sealed partial class RunJourneyTests(SimulatorUiFixture simulator) : Brow
         var text = await rows.AllInnerTextsAsync();
         return [.. text.Select(row => SimReference().Match(row).Value)];
     }
+
+    [GeneratedRegex(@"/\?key=[0-9a-fA-F-]{32,}&within=all$")]
+    private static partial Regex ConsoleSearch();
 
     [GeneratedRegex("Open the Message trail of .* in the Integration console")]
     private static partial Regex TrailLink();

@@ -15,4 +15,7 @@
     <Using Include="AwesomeAssertions" />
     <ProjectReference Include="..\..\..\src\Norvia.AppHost\Norvia.AppHost.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

@@ -21,7 +21,7 @@ public abstract class BrowserPage(SimulatorUiFixture simulator) : IAsyncLifetime
     {
         _context = await simulator.Browser.NewContextAsync(new BrowserNewContextOptions
         {
-            BaseURL = simulator.Simulator.ToString(),
+            BaseURL = simulator.Address.ToString(),
             RecordVideoDir = _videoDirectory,
         });
         await _context.Tracing.StartAsync(new TracingStartOptions { Screenshots = true, Snapshots = true, Sources = true });
