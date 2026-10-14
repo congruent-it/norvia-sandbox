@@ -8,9 +8,12 @@ public sealed record Preset(
     int BadSharePercent,
     int CollectedTodayPercent,
     RunMode Mode,
-    TimeSpan Window)
+    TimeSpan Window,
+    int AssignedPercent = SimulationSettings.DefaultAssignedPercent,
+    int OwnFleetPercent = SimulationSettings.DefaultOwnFleetPercent,
+    int ReassignPercent = SimulationSettings.DefaultReassignPercent)
 {
     /// <summary>The settings this Preset fills in, with the seed the presenter chose.</summary>
     public SimulationSettings ToSettings(int seed) =>
-        new(OrderCount, BadSharePercent, CollectedTodayPercent, seed, Mode, Window, Name);
+        new(OrderCount, BadSharePercent, CollectedTodayPercent, seed, Mode, Window, Name, AssignedPercent, OwnFleetPercent, ReassignPercent);
 }

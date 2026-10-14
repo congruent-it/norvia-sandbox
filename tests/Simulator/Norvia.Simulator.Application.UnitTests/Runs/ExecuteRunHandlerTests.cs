@@ -15,18 +15,21 @@ public sealed class ExecuteRunHandlerTests
     private readonly IRepository<SimulationRun> _runs = Substitute.For<IRepository<SimulationRun>>();
     private readonly IRepository<LogEntry> _log = Substitute.For<IRepository<LogEntry>>();
     private readonly IPartnerApi _api = Substitute.For<IPartnerApi>();
+    private readonly ITmsApi _tms = Substitute.For<ITmsApi>();
+    private readonly IWorldSource _world = Substitute.For<IWorldSource>();
     private readonly FakeTimeProvider _time = new(TestData.Now);
     private readonly List<LogEntry> _lines = [];
 
     public ExecuteRunHandlerTests()
     {
+        _world.Load().Returns(TestData.World);
         _log.AddAsync(Arg.Do<LogEntry>(line => { lock (_lines) { _lines.Add(line); } }), Arg.Any<CancellationToken>()).Returns(call => call.Arg<LogEntry>());
         _api.SendBookingAsync(Arg.Any<PlannedBooking>(), Arg.Any<CancellationToken>())
             .Returns(call => new BookingAnswer(LogOutcome.Accepted, $"corr-{call.Arg<PlannedBooking>().Step}", $"TO-{call.Arg<PlannedBooking>().Step:0000000}", null));
     }
 
     private ExecuteRunHandler Handler(int concurrency = 3) =>
-        new(_runs, _log, _api, new SimulationLimits(50, concurrency), _time);
+        new(_runs, _log, _api, _tms, _world, new SimulationLimits(50, concurrency), _time);
 
     private SimulationRun Active(SimulationSettings settings)
     {

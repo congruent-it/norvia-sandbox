@@ -59,6 +59,10 @@ namespace Norvia.Simulator.Infrastructure.Data.Migrations
                     b.Property<int>("Sequence")
                         .HasColumnType("int");
 
+                    b.Property<string>("ShipmentNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
                     b.Property<string>("ShipperReference")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");

@@ -20,11 +20,17 @@ public sealed class GetRunHandler(IReadRepository<SimulationRun> runs, IReadRepo
         }
 
         var answers = await log.ListAsync(new BookingOutcomesOfRunSpec(query.RunId), cancellationToken);
-        var outcomes = answers.GroupBy(outcome => outcome)
+        var planning = await log.ListAsync(new PlanningOutcomesOfRunSpec(query.RunId), cancellationToken);
+        var outcomes = answers.Concat(planning).GroupBy(outcome => outcome)
             .Select(group => new OutcomeCount(group.Key, group.Count()))
             .OrderBy(count => count.Outcome)
             .ToList();
         var actors = run.Plan.Bookings.Select(booking => booking.PersonaName).Distinct().Order(StringComparer.Ordinal).ToList();
-        return new RunDetail(RunSummary.From(run, answers.Count), outcomes, actors);
+        if (run.Plan.Choices.Count > 0)
+        {
+            actors.Add(LogEntry.PlannerActor);
+        }
+
+        return new RunDetail(RunSummary.From(run, answers.Count, planning.Count(outcome => outcome == LogOutcome.Planned)), outcomes, actors);
     }
 }

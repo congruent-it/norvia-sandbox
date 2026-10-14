@@ -461,14 +461,15 @@ else
         partnerPortal.WithEnvironment($"ShipperEndpoint__ApiKeys__{persona.PartyId}", shipperApiKey);
     }
 
-    // The Simulator feeds the estate with representative orders, and only through its real doors (ADR 0001): so far the Partner API,
-    // as each Shipper's Persona. It has a database of its own for its runs and logs, and is on for a local run. Azure comes with its own slice.
+    // The Simulator feeds the estate with representative orders, and only through its real doors (ADR 0001): the Partner API, as
+    // each Shipper's Persona, and the TMS API, as the Planner. It has a database of its own for its runs and logs, and is on for a local run. Azure comes with its own slice.
     var simulatorDatabase = sql.AddDatabase("simulator");
     var simulatorMigrations = builder.AddProject<Projects.Norvia_Simulator_Migrations>("simulator-migrations")
         .WithReference(simulatorDatabase).WaitFor(simulatorDatabase);
     var simulator = builder.AddProject<Projects.Norvia_Simulator_Web>("simulator-web")
         .WithReference(simulatorDatabase).WaitForCompletion(simulatorMigrations)
         .WaitFor(partnerApi)
+        .WithReference(tmsApi).WaitFor(tmsApi)
         .WithHttpHealthCheck("/health")
         .WithUrlForEndpoint("http", url => url.DisplayText = "Simulator")
         .WithEnvironment("Seed__Path", seedFile)
@@ -482,7 +483,12 @@ else
         .WithEnvironment("PartnerApi__BaseAddress", ReferenceExpression.Create($"{partnerApi.GetEndpoint("http")}/partner/v1"))
         .WithEnvironment("PartnerApi__PersonaClientIds", string.Join(';', personas.Where(persona => persona.IsShipper).Select(persona => $"{persona.Id}={LocalTokens.PersonaClientId(persona.Id)}")))
         .WithEnvironment("PartnerApi__LocalTokens__Issuer", LocalTokens.Issuer)
-        .WithEnvironment("PartnerApi__LocalTokens__Audience", LocalTokens.PartnerApiAudience);
+        .WithEnvironment("PartnerApi__LocalTokens__Audience", LocalTokens.PartnerApiAudience)
+        // The Planner signs its own token for the TMS API, as the TMS UI does: its client ID and the manage role.
+        .WithEnvironment("TmsApi__BaseAddress", tmsApi.GetEndpoint("http"))
+        .WithEnvironment("TmsApi__LocalTokens__Issuer", LocalTokens.Issuer)
+        .WithEnvironment("TmsApi__LocalTokens__Audience", LocalTokens.TmsAudience)
+        .WithEnvironment("TmsApi__LocalTokens__ClientId", LocalTokens.SimulatorClientId);
 
     partnerPortal.WaitFor(partnerApi)
         .WithEnvironment("PartnerApi__BaseAddress", ReferenceExpression.Create($"{partnerApi.GetEndpoint("http")}/partner/v1"))
@@ -531,6 +537,7 @@ else
         (proofOfDeliveryWorker.Resource, "ProofOfDelivery__TmsTokens__SigningKey"),
         (partnerPortal.Resource, "PartnerApi__LocalTokens__SigningKey"),
         (simulator.Resource, "PartnerApi__LocalTokens__SigningKey"),
+        (simulator.Resource, "TmsApi__LocalTokens__SigningKey"),
     })
     {
         builder.CreateResourceBuilder(holder).WithEnvironment(async context =>

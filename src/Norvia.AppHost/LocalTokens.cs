@@ -33,6 +33,7 @@ public static class LocalTokens
     public const string ProofOfDeliveryLogicAppClientId = "norvia-local-proof-of-delivery-logic-app";
     public const string ApiManagementClientId = "norvia-local-api-management";
     public const string TmsUiClientId = "norvia-local-tms-ui";
+    public const string SimulatorClientId = "norvia-local-simulator";
     public const string PartnerApiAudience = "api://norvia-partner-api";
 
     /// <summary>The app role a Shipper Persona holds on the Norvia Partner API, as the estate grants it in Entra.</summary>

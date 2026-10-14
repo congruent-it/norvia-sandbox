@@ -20,10 +20,17 @@ internal static class TestData
             "SHP-0003", "Tuincentrum Groenrijk", "tuincentrum-groenrijk", "Tuincentrum Groenrijk",
             [new RateZone("Utrecht", "NL", ["34", "35"])],
             [new RateLane("Utrecht", "Utrecht")]),
+    ],
+    [
+        new SimulatedCarrier("CAR-0001", "Van Dijk Transport", true),
+        new SimulatedCarrier("CAR-0002", "Kessler Spedition", true),
+        new SimulatedCarrier("CAR-0004", "Closed Haulage", false),
     ]);
 
-    public static SimulationSettings Settings(int orders = 6, int bad = 0, int seed = 11, RunMode mode = RunMode.Burst, int windowMinutes = 0) =>
-        new(orders, bad, 30, seed, mode, TimeSpan.FromMinutes(windowMinutes));
+    public static SimulationSettings Settings(
+        int orders = 6, int bad = 0, int seed = 11, RunMode mode = RunMode.Burst, int windowMinutes = 0,
+        int assigned = 0, int ownFleet = 50, int reassign = 0) =>
+        new(orders, bad, 30, seed, mode, TimeSpan.FromMinutes(windowMinutes), null, assigned, ownFleet, reassign);
 
     public static SimulationRun Run(SimulationSettings? settings = null, int number = 1)
     {

@@ -10,6 +10,7 @@ using Norvia.Simulator.Domain.Runs;
 using Norvia.Simulator.Infrastructure.Data;
 using Norvia.Simulator.Infrastructure.Execution;
 using Norvia.Simulator.Infrastructure.PartnerApi;
+using Norvia.Simulator.Infrastructure.TmsApi;
 using Norvia.Simulator.Infrastructure.World;
 using Polly;
 
@@ -42,7 +43,9 @@ public static class DependencyInjection
         builder.Services.AddSingleton<IWorldSource, SeedFileWorldSource>();
         builder.Services.AddSingleton<ISeedSource, RandomSeedSource>();
 
+        builder.Services.AddSingleton(_ => new SimulatorActivities(builder.Environment.ApplicationName));
         builder.AddNorviaPartnerApi();
+        builder.AddNorviaTmsApi();
 
         builder.Services.AddSingleton<RunExecutor>();
         builder.Services.AddSingleton<IRunExecution>(services => services.GetRequiredService<RunExecutor>());
@@ -88,7 +91,6 @@ public static class DependencyInjection
         builder.Services.AddSingleton<IValidateOptions<PartnerApiOptions>, EveryPersonaCanCall>();
 
         builder.Services.AddSingleton<IPersonaTokens, LocalPersonaTokens>();
-        builder.Services.AddSingleton(_ => new SimulatorActivities(builder.Environment.ApplicationName));
 
         // Removing the default handler is still marked for evaluation, and is the one way to replace it for a single client.
 #pragma warning disable EXTEXP0001
@@ -105,5 +107,21 @@ public static class DependencyInjection
             .AddResilienceHandler("norvia-partner-api", (pipeline, context) =>
                 pipeline.AddTimeout(context.ServiceProvider.GetRequiredService<IOptions<PartnerApiOptions>>().Value.Timeout));
 #pragma warning restore EXTEXP0001
+    }
+
+    /// <summary>The TMS API client, as the Planner calls it. Locally the Simulator signs its own token, as the TMS UI does.</summary>
+    private static void AddNorviaTmsApi(this IHostApplicationBuilder builder)
+    {
+        builder.Services.AddOptions<TmsApiOptions>().BindConfiguration(TmsApiOptions.SectionName)
+            .ValidateDataAnnotations()
+            // Data annotations don't look inside the nested options.
+            .Validate(options => options.LocalTokens is not null && IsValid(options.LocalTokens), "TmsApi:LocalTokens needs an Issuer, an Audience, a ClientId and a SigningKey.")
+            .ValidateOnStart();
+
+        builder.Services.AddSingleton<ITmsTokens, LocalTmsTokens>();
+
+        // The standard resilience handler stays: each call repeats its own idempotency key, so a retry is answered as before.
+        builder.Services.AddHttpClient<ITmsApi, NorviaTmsApiClient>((services, http) =>
+            http.BaseAddress = services.GetRequiredService<IOptions<TmsApiOptions>>().Value.BaseAddress);
     }
 }

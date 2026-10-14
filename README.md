@@ -36,7 +36,7 @@ The estate can also run *as found*, reproducing the problems a health check woul
 | **Driver app** | Nothing. Drivers receive Trips and report Stops through it |
 | **Partner portal** | Nothing at Norvia. It plays every outside Shipper and Carrier as a Persona |
 | **Integration console** | Nothing. It reads the estate's telemetry |
-| **Simulator** | Its own runs and logs. It feeds the estate with representative orders through its real doors |
+| **Simulator** | Its own runs and logs. It feeds the estate with representative orders and plans them as the Planner, through its real doors |
 
 Every concept has one system of record ([ADR 0002](docs/adr/0002-one-system-of-record-per-concept.md)). Until the ERP's master-data sync exists, a shared seed file supplies master data to both the ERP and the TMS.
 

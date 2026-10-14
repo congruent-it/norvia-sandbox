@@ -11,12 +11,15 @@ public sealed class LogEntry : EntityBase<LogEntryId>, IAggregateRoot
 {
     public const string SimulatorActor = "Simulator";
 
+    /// <summary>Who plans the Transport Orders a run books: the simulated Planner.</summary>
+    public const string PlannerActor = "Planner";
+
     /// <summary>What the database keeps of a line's detail.</summary>
     public const int MaxDetailLength = 500;
 
     private LogEntry(
         SimulationRunId runId, int sequence, DateTimeOffset at, string actor, string action, LogOutcome outcome,
-        string? correlationId, string? shipperReference, string? transportOrderNumber, string? detail)
+        string? correlationId, string? shipperReference, string? transportOrderNumber, string? shipmentNumber, string? detail)
     {
         Id = LogEntryId.New();
         RunId = runId;
@@ -28,6 +31,7 @@ public sealed class LogEntry : EntityBase<LogEntryId>, IAggregateRoot
         CorrelationId = correlationId;
         ShipperReference = shipperReference;
         TransportOrderNumber = transportOrderNumber;
+        ShipmentNumber = shipmentNumber;
         Detail = detail is { Length: > MaxDetailLength } ? detail[..MaxDetailLength] : detail;
     }
 
@@ -52,14 +56,23 @@ public sealed class LogEntry : EntityBase<LogEntryId>, IAggregateRoot
 
     public string? TransportOrderNumber { get; private set; }
 
+    /// <summary>The Shipment the Planner's assignment planned, when the line is about one.</summary>
+    public string? ShipmentNumber { get; private set; }
+
     /// <summary>What the plan intended and what Norvia said, such as the codes of a rejection.</summary>
     public string? Detail { get; private set; }
 
     public static LogEntry Booking(
         SimulationRunId runId, int sequence, DateTimeOffset at, string actor, string action, LogOutcome outcome,
         string? correlationId, string? shipperReference, string? transportOrderNumber, string? detail) =>
-        new(runId, sequence, at, actor, action, outcome, correlationId, shipperReference, transportOrderNumber, detail);
+        new(runId, sequence, at, actor, action, outcome, correlationId, shipperReference, transportOrderNumber, null, detail);
+
+    /// <summary>A call the Planner made to the TMS API: its answer's correlation ID and the keys it names.</summary>
+    public static LogEntry Planning(
+        SimulationRunId runId, int sequence, DateTimeOffset at, string action, LogOutcome outcome,
+        string? correlationId, string? shipperReference, string? transportOrderNumber, string? shipmentNumber, string? detail) =>
+        new(runId, sequence, at, PlannerActor, action, outcome, correlationId, shipperReference, transportOrderNumber, shipmentNumber, detail);
 
     public static LogEntry Note(SimulationRunId runId, int sequence, DateTimeOffset at, string text) =>
-        new(runId, sequence, at, SimulatorActor, text, LogOutcome.Info, null, null, null, null);
+        new(runId, sequence, at, SimulatorActor, text, LogOutcome.Info, null, null, null, null, null);
 }

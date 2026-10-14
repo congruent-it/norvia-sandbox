@@ -16,9 +16,11 @@ public sealed class RunPageTests : SimulatorWebContext
 
     private static readonly LogLine[] Lines =
     [
-        new(1, TestData.Now, "Simulator", "Run 4 started: 10 bookings, seed 77", LogOutcome.Info, null, null, null, null),
-        new(2, TestData.Now.AddSeconds(1), "Brouwer Dranken", "Send booking", LogOutcome.Accepted, "corr-1", "SIM-4-1", "TO-0000001", "Good booking"),
-        new(3, TestData.Now.AddSeconds(2), "Tuincentrum Groenrijk", "Send booking", LogOutcome.Rejected, "corr 2/x", "SIM-4-2", null, "Bad booking (InvalidContent). Norvia: ConsigneeNameMissing"),
+        new(1, TestData.Now, "Simulator", "Run 4 started: 10 bookings, seed 77", LogOutcome.Info, null, null, null, null, null),
+        new(2, TestData.Now.AddSeconds(1), "Brouwer Dranken", "Send booking", LogOutcome.Accepted, "corr-1", "SIM-4-1", "TO-0000001", null, "Good booking"),
+        new(3, TestData.Now.AddSeconds(2), "Tuincentrum Groenrijk", "Send booking", LogOutcome.Rejected, "corr 2/x", "SIM-4-2", null, null, "Bad booking (InvalidContent). Norvia: ConsigneeNameMissing"),
+        new(4, TestData.Now.AddSeconds(3), "Planner", "Assign Transport Order", LogOutcome.Planned, "plan-1", "SIM-4-1", "TO-0000001", "SH-0000001", "Own fleet has room that day"),
+        new(5, TestData.Now.AddSeconds(4), "Planner", "Assign Transport Order", LogOutcome.PlanningRefused, "plan-2", "SIM-4-3", "TO-0000003", null, "TransportOrderAlreadyPlanned (409)"),
     ];
 
     public RunPageTests()
@@ -38,6 +40,25 @@ public sealed class RunPageTests : SimulatorWebContext
     {
         var id = page.FindAll("label").Single(candidate => candidate.TextContent.Trim() == label).GetAttribute("for");
         return page.Find($"#{id}");
+    }
+
+    [Fact]
+    public void Render_ARunWithAPlanner_ShowsHowManyOrdersItPlanned()
+    {
+        GivenRun(TestData.Summary() with { Assigned = 2, ToAssign = 6 });
+
+        RenderRun().Markup.Should().Contain("2 of 6 Transport Orders planned");
+    }
+
+    [Fact]
+    public void Render_ThePlannersLines_CarryTheShipmentNumberAndTheirTrailOpensInTheConsole()
+    {
+        var page = RenderRun();
+
+        var planned = page.FindAll("tbody tr").Single(row => row.TextContent.Contains("Own fleet has room that day", StringComparison.Ordinal));
+        planned.TextContent.Should().Contain("Planner").And.Contain("Assign Transport Order").And.Contain("Planned").And.Contain("SH-0000001").And.Contain("TO-0000001");
+        planned.QuerySelector("a")!.GetAttribute("href").Should().Contain("plan-1");
+        page.Markup.Should().Contain("TransportOrderAlreadyPlanned (409)").And.Contain("Planning refused");
     }
 
     [Fact]
@@ -66,7 +87,7 @@ public sealed class RunPageTests : SimulatorWebContext
         var log = page.Find("[role=log]");
         log.TextContent.Should().Contain("12:00:01").And.Contain("Brouwer Dranken").And.Contain("Send booking").And.Contain("SIM-4-1").And.Contain("TO-0000001")
             .And.Contain("corr-1").And.Contain("Norvia: ConsigneeNameMissing");
-        log.QuerySelectorAll("[data-outcome]").Select(span => span.TextContent.Trim()).Should().Equal("Info", "Accepted", "Rejected");
+        log.QuerySelectorAll("[data-outcome]").Select(span => span.TextContent.Trim()).Should().Equal("Info", "Accepted", "Rejected", "Planned", "Planning refused");
     }
 
     [Fact]
@@ -191,7 +212,7 @@ public sealed class RunPageTests : SimulatorWebContext
     {
         var page = RenderRun();
 
-        Field(page, "Correlation ID, reference or order number").Change("SIM-4-2");
+        Field(page, "Correlation ID, reference, order or Shipment number").Change("SIM-4-2");
         page.Find("form[aria-label='Filter the log']").Submit();
 
         Requests.Received().ListLogAsync(new SimulationRunId(RunId), new LogFilter(Actor: null, Outcome: null, Text: "SIM-4-2"), Arg.Any<CancellationToken>());

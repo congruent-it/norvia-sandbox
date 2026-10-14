@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Mediator;
@@ -10,12 +11,15 @@ namespace Norvia.Simulator.Application.Runs.Execute;
 
 /// <summary>
 /// Sends each planned booking as its Shipper's Persona, as fast as the concurrency cap allows (Burst) or spread over the
-/// window (Paced), and logs how Norvia answered each. Real paths stamp real time: nothing is backdated.
+/// window (Paced), and logs how Norvia answered each. Real paths stamp real time: nothing is backdated. Once the bookings are in,
+/// the simulated Planner assigns the Transport Orders Norvia accepted.
 /// </summary>
 public sealed class ExecuteRunHandler(
     IRepository<SimulationRun> runs,
     IRepository<LogEntry> log,
     IPartnerApi partnerApi,
+    ITmsApi tmsApi,
+    IWorldSource world,
     SimulationLimits limits,
     TimeProvider time)
     : ICommandHandler<ExecuteRunCommand, Result>
@@ -33,8 +37,10 @@ public sealed class ExecuteRunHandler(
             return Result.NotFound($"There is no active run {command.RunId.Value}.");
         }
 
-        using var writer = new LogWriter(log, run.Id, FirstSequenceAfterStart);
-        var stopped = await SendAllAsync(run, writer, command.StopSending, cancellationToken);
+        using var writer = new RunLogWriter(log, run.Id, FirstSequenceAfterStart);
+        var accepted = new ConcurrentBag<AcceptedOrder>();
+        var stopped = await SendAllAsync(run, writer, accepted, command.StopSending, cancellationToken);
+        stopped = stopped || await new PlannerStage(tmsApi, time).RunAsync(run, [.. accepted], world.Load(), writer, command.StopSending, cancellationToken);
 
         if (stopped)
         {
@@ -44,11 +50,12 @@ public sealed class ExecuteRunHandler(
 
         run.Complete(time.GetUtcNow());
         await runs.UpdateAsync(run, cancellationToken);
-        await writer.NoteAsync(time.GetUtcNow(), $"Run {run.Number} finished: {run.Plan.Bookings.Count} bookings sent", cancellationToken);
+        await writer.NoteAsync(time.GetUtcNow(), Finished(run), cancellationToken);
         return Result.Success();
     }
 
-    private async Task<bool> SendAllAsync(SimulationRun run, LogWriter writer, CancellationToken stopSending, CancellationToken cancellationToken)
+    private async Task<bool> SendAllAsync(
+        SimulationRun run, RunLogWriter writer, ConcurrentBag<AcceptedOrder> accepted, CancellationToken stopSending, CancellationToken cancellationToken)
     {
         var bookings = run.Plan.Bookings;
         var concurrency = Math.Max(1, limits.MaxConcurrentRequests);
@@ -68,7 +75,7 @@ public sealed class ExecuteRunHandler(
                 }
 
                 await slots.WaitAsync(stopSending);
-                inFlight.Add(SendAsync(bookings[index], writer, slots, cancellationToken));
+                inFlight.Add(SendAsync(bookings[index], writer, accepted, slots, cancellationToken));
             }
         }
         catch (OperationCanceledException) when (stopSending.IsCancellationRequested)
@@ -80,52 +87,28 @@ public sealed class ExecuteRunHandler(
         return stopSending.IsCancellationRequested;
     }
 
-    private async Task SendAsync(PlannedBooking booking, LogWriter writer, SemaphoreSlim slots, CancellationToken cancellationToken)
+    private static string Finished(SimulationRun run)
+    {
+        var sent = $"Run {run.Number} finished: {run.Plan.Bookings.Count} bookings sent";
+        return run.Plan.Choices.Count == 0 ? sent : $"{sent}, {run.Plan.Choices.Count} Transport Orders for the Planner";
+    }
+
+    private async Task SendAsync(
+        PlannedBooking booking, RunLogWriter writer, ConcurrentBag<AcceptedOrder> accepted, SemaphoreSlim slots, CancellationToken cancellationToken)
     {
         try
         {
             var answer = await partnerApi.SendBookingAsync(booking, cancellationToken);
             await writer.BookingAsync(time.GetUtcNow(), booking, answer, cancellationToken);
+            // Only an Accepted answer is a new Transport Order to assign: a repeat names the one that was assigned (or not) already.
+            if (answer is { Outcome: LogOutcome.Accepted, TransportOrderNumber: { } number })
+            {
+                accepted.Add(new AcceptedOrder(booking, number));
+            }
         }
         finally
         {
             slots.Release();
-        }
-    }
-
-    /// <summary>One writer per run: the repository's context takes one write at a time, and the lines are numbered as they land.</summary>
-    private sealed class LogWriter(IRepository<LogEntry> log, SimulationRunId runId, int next) : IDisposable
-    {
-        private readonly SemaphoreSlim _one = new(1);
-
-        public void Dispose() => _one.Dispose();
-
-        public Task BookingAsync(DateTimeOffset at, PlannedBooking booking, BookingAnswer answer, CancellationToken cancellationToken) =>
-            AddAsync(sequence => LogEntry.Booking(
-                runId, sequence, at, booking.PersonaName, "Send booking", answer.Outcome, answer.CorrelationId,
-                booking.Reference, answer.TransportOrderNumber, Detail(booking, answer)),
-                cancellationToken);
-
-        public Task NoteAsync(DateTimeOffset at, string text, CancellationToken cancellationToken) =>
-            AddAsync(sequence => LogEntry.Note(runId, sequence, at, text), cancellationToken);
-
-        private async Task AddAsync(Func<int, LogEntry> entry, CancellationToken cancellationToken)
-        {
-            await _one.WaitAsync(cancellationToken);
-            try
-            {
-                await log.AddAsync(entry(next++), cancellationToken);
-            }
-            finally
-            {
-                _one.Release();
-            }
-        }
-
-        private static string Detail(PlannedBooking booking, BookingAnswer answer)
-        {
-            var intent = booking.Bad is { } bad ? $"Bad booking ({bad}), expected {booking.Expected}" : "Good booking";
-            return answer.Detail is { } said ? $"{intent}. Norvia: {said}" : intent;
         }
     }
 }
