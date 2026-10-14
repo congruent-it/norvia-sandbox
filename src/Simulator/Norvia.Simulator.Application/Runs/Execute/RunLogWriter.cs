@@ -23,7 +23,7 @@ internal sealed class RunLogWriter(IRepository<LogEntry> log, SimulationRunId ru
         DateTimeOffset at, string action, PlannedBooking booking, string transportOrderNumber, PlannerAnswer answer, string? intent,
         CancellationToken cancellationToken) =>
         AddAsync(sequence => LogEntry.Planning(
-            runId, sequence, at, LogEntry.PlannerActor, action, answer.Outcome, answer.CorrelationId,
+            runId, sequence, at, action, answer.Outcome, answer.CorrelationId,
             booking.Reference, transportOrderNumber, answer.ShipmentNumber, PlanningDetail(intent, answer)),
             cancellationToken);
 

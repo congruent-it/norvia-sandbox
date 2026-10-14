@@ -12,7 +12,7 @@ public sealed class FleetLedgerTests
     [Fact]
     public void TryReserve_WithinTheRoomLeft_TakesIt()
     {
-        Ledger().TryReserve(Today, 800, 8).Should().BeTrue();
+        Ledger().TryReserve(Today, new FleetLoad(800, 8)).Should().BeTrue();
     }
 
     [Fact]
@@ -20,52 +20,52 @@ public sealed class FleetLedgerTests
     {
         var ledger = Ledger();
 
-        ledger.TryReserve(Today, 801, 1).Should().BeFalse();
-        ledger.TryReserve(Today, 800, 8).Should().BeTrue("the failed reservation took nothing");
+        ledger.TryReserve(Today, new FleetLoad(801, 1)).Should().BeFalse();
+        ledger.TryReserve(Today, new FleetLoad(800, 8)).Should().BeTrue("the failed reservation took nothing");
     }
 
     [Fact]
     public void TryReserve_TooManyPalletPlaces_TakesNothing()
     {
-        Ledger().TryReserve(Today, 10, 9).Should().BeFalse();
+        Ledger().TryReserve(Today, new FleetLoad(10, 9)).Should().BeFalse();
     }
 
     [Fact]
     public void TryReserve_WhatIsReserved_IsNotThereForTheNextOrder()
     {
         var ledger = Ledger();
-        ledger.TryReserve(Today, 500, 4).Should().BeTrue();
+        ledger.TryReserve(Today, new FleetLoad(500, 4)).Should().BeTrue();
 
-        ledger.TryReserve(Today, 400, 1).Should().BeFalse();
+        ledger.TryReserve(Today, new FleetLoad(400, 1)).Should().BeFalse();
     }
 
     [Fact]
     public void TryReserve_ADayTheTmsDidNotReport_HasNoRoom()
     {
-        Ledger().TryReserve(Today.AddDays(30), 1, 0).Should().BeFalse();
+        Ledger().TryReserve(Today.AddDays(30), new FleetLoad(1, 0)).Should().BeFalse();
     }
 
     [Fact]
     public void TryReserve_AnOverbookedDay_HasNoRoom()
     {
-        Ledger(capacityKg: 100, demandKg: 500).TryReserve(Today, 1, 0).Should().BeFalse();
+        Ledger(capacityKg: 100, demandKg: 500).TryReserve(Today, new FleetLoad(1, 0)).Should().BeFalse();
     }
 
     [Fact]
     public void Release_GivesTheRoomBack()
     {
         var ledger = Ledger();
-        ledger.TryReserve(Today, 800, 8).Should().BeTrue();
+        ledger.TryReserve(Today, new FleetLoad(800, 8)).Should().BeTrue();
 
-        ledger.Release(Today, 800, 8);
+        ledger.Release(Today, new FleetLoad(800, 8));
 
-        ledger.TryReserve(Today, 800, 8).Should().BeTrue();
+        ledger.TryReserve(Today, new FleetLoad(800, 8)).Should().BeTrue();
     }
 
     [Fact]
     public void Release_ADayTheTmsDidNotReport_ChangesNothing()
     {
-        var act = () => Ledger().Release(Today.AddDays(30), 1, 0);
+        var act = () => Ledger().Release(Today.AddDays(30), new FleetLoad(1, 0));
 
         act.Should().NotThrow();
     }

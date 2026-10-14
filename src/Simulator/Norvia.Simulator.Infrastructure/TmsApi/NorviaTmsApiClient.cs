@@ -58,7 +58,7 @@ internal sealed partial class NorviaTmsApiClient(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(transportOrderNumber);
         return SendAsync(
-            "Assign Transport Order", $"/v1/transport-orders/{Uri.EscapeDataString(transportOrderNumber)}/assign", assignee, idempotencyKey,
+            PlannerActions.Assign, $"/v1/transport-orders/{Uri.EscapeDataString(transportOrderNumber)}/assign", assignee, idempotencyKey,
             (status, body, correlation) => PlannerAnswers.Assigned(status, body, correlation), transportOrderNumber, shipmentNumber: null, cancellationToken);
     }
 
@@ -66,7 +66,7 @@ internal sealed partial class NorviaTmsApiClient(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(shipmentNumber);
         return SendAsync(
-            "Reassign Shipment", $"/v1/shipments/{Uri.EscapeDataString(shipmentNumber)}/reassign", assignee, idempotencyKey,
+            PlannerActions.Reassign, $"/v1/shipments/{Uri.EscapeDataString(shipmentNumber)}/reassign", assignee, idempotencyKey,
             (status, body, correlation) => PlannerAnswers.Reassigned(status, body, correlation, shipmentNumber), transportOrderNumber: null, shipmentNumber, cancellationToken);
     }
 

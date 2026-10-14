@@ -5,10 +5,10 @@ namespace Norvia.Simulator.Domain.Planner;
 
 /// <summary>
 /// What the Planner means to do with the Transport Order a booking becomes, made with the plan so the same seed gives the
-/// same choices. The picks are numbers, not Carriers: they index the active Carriers when the Planner acts, so the choice holds
+/// same choices. The draws are numbers, not Carriers: each is reduced to an index into the active Carriers when the Planner acts, so the choice holds
 /// whichever Carriers the seed file has.
 /// </summary>
-public sealed record PlannerChoice(int Step, PlannerIntent Intent, int CarrierPick, bool Reassign, int ReassignPick)
+public sealed record PlannerChoice(int Step, PlannerIntent Intent, int CarrierDraw, bool Reassign, int ReassignDraw)
 {
     /// <summary>
     /// Who gets the order: Own fleet where the order fits the day's room (which it then takes from the ledger), a Carrier otherwise.
@@ -21,7 +21,7 @@ public sealed record PlannerChoice(int Step, PlannerIntent Intent, int CarrierPi
 
         if (Intent == PlannerIntent.OwnFleetIfItFits)
         {
-            if (ledger.TryReserve(day, booking.TotalWeightKg, booking.PalletPlaces))
+            if (ledger.TryReserve(day, booking.Load))
             {
                 return new PlannerDecision(Assignee.OwnFleet, ReservedOwnFleet: true, "Own fleet has room that day");
             }
@@ -40,7 +40,7 @@ public sealed record PlannerChoice(int Step, PlannerIntent Intent, int CarrierPi
     public Assignee? Carrier(IReadOnlyList<SimulatedCarrier> activeCarriers)
     {
         ArgumentNullException.ThrowIfNull(activeCarriers);
-        return activeCarriers.Count == 0 ? null : Assignee.Of(activeCarriers[CarrierPick % activeCarriers.Count]);
+        return activeCarriers.Count == 0 ? null : Assignee.Of(activeCarriers[CarrierDraw % activeCarriers.Count]);
     }
 
     /// <summary>
@@ -53,6 +53,6 @@ public sealed record PlannerChoice(int Step, PlannerIntent Intent, int CarrierPi
         ArgumentNullException.ThrowIfNull(activeCarriers);
 
         var others = activeCarriers.Where(carrier => carrier.Id != current.CarrierId).ToList();
-        return others.Count == 0 ? Assignee.OwnFleet : Assignee.Of(others[ReassignPick % others.Count]);
+        return others.Count == 0 ? Assignee.OwnFleet : Assignee.Of(others[ReassignDraw % others.Count]);
     }
 }

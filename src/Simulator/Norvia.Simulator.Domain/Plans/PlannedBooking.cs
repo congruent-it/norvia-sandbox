@@ -1,3 +1,5 @@
+using Norvia.Simulator.Domain.Planner;
+
 namespace Norvia.Simulator.Domain.Plans;
 
 /// <summary>
@@ -29,6 +31,8 @@ public sealed record PlannedBooking(
         BadBookingKind.ConflictingReference or BadBookingKind.InvalidContent => ExpectedAnswer.Rejected,
         _ => ExpectedAnswer.Accepted,
     };
+
+    public FleetLoad Load => new(TotalWeightKg, PalletPlaces);
 
     public decimal TotalWeightKg => Goods.Sum(line => line.WeightKg);
 

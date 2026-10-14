@@ -10,23 +10,23 @@ public sealed class FleetLedger(IEnumerable<FleetDay> days)
         .ToDictionary(day => day.Date, day => (day.CapacityKg - day.DemandKg, day.CapacityPalletPlaces - day.DemandPalletPlaces));
 
     /// <summary>Takes the room for an order on a day, and says whether there was any. Nothing is taken when it doesn't fit.</summary>
-    public bool TryReserve(DateOnly day, decimal weightKg, int palletPlaces)
+    public bool TryReserve(DateOnly day, FleetLoad load)
     {
-        if (!_room.TryGetValue(day, out var room) || weightKg > room.Kg || palletPlaces > room.PalletPlaces)
+        if (!_room.TryGetValue(day, out var room) || load.WeightKg > room.Kg || load.PalletPlaces > room.PalletPlaces)
         {
             return false;
         }
 
-        _room[day] = (room.Kg - weightKg, room.PalletPlaces - palletPlaces);
+        _room[day] = (room.Kg - load.WeightKg, room.PalletPlaces - load.PalletPlaces);
         return true;
     }
 
     /// <summary>Gives the room back, when the order wasn't assigned after all or moved to a Carrier.</summary>
-    public void Release(DateOnly day, decimal weightKg, int palletPlaces)
+    public void Release(DateOnly day, FleetLoad load)
     {
         if (_room.TryGetValue(day, out var room))
         {
-            _room[day] = (room.Kg + weightKg, room.PalletPlaces + palletPlaces);
+            _room[day] = (room.Kg + load.WeightKg, room.PalletPlaces + load.PalletPlaces);
         }
     }
 }

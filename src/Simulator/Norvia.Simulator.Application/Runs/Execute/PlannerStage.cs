@@ -56,13 +56,13 @@ internal sealed class PlannerStage(ITmsApi tms, TimeProvider time)
         var decision = choice.Decide(booking, day, carriers, ledger);
         var (assignee, reserved, intent) = (decision.Assignee, decision.ReservedOwnFleet, decision.Reason);
 
-        var assigned = await tms.AssignAsync(order.TransportOrderNumber, assignee, $"SIM-{run.Number}-{booking.Step}-assign", cancellationToken);
-        await writer.PlanningAsync(time.GetUtcNow(), "Assign Transport Order", booking, order.TransportOrderNumber, assigned, intent, cancellationToken);
+        var assigned = await tms.AssignAsync(order.TransportOrderNumber, assignee, PlannerActions.AssignmentKey(run.Number, booking.Step), cancellationToken);
+        await writer.PlanningAsync(time.GetUtcNow(), PlannerActions.Assign, booking, order.TransportOrderNumber, assigned, intent, cancellationToken);
         if (assigned.Outcome != LogOutcome.Planned || assigned.ShipmentNumber is null)
         {
             if (reserved)
             {
-                ledger.Release(day, booking.TotalWeightKg, booking.PalletPlaces);
+                ledger.Release(day, booking.Load);
             }
 
             return;
@@ -74,8 +74,8 @@ internal sealed class PlannerStage(ITmsApi tms, TimeProvider time)
         }
 
         var target = choice.ReassignTarget(assignee, carriers);
-        var reassigned = await tms.ReassignAsync(assigned.ShipmentNumber, target, $"SIM-{run.Number}-{booking.Step}-reassign", cancellationToken);
-        await writer.PlanningAsync(time.GetUtcNow(), "Reassign Shipment", booking, order.TransportOrderNumber, reassigned, $"To {target.Name}", cancellationToken);
+        var reassigned = await tms.ReassignAsync(assigned.ShipmentNumber, target, PlannerActions.ReassignmentKey(run.Number, booking.Step), cancellationToken);
+        await writer.PlanningAsync(time.GetUtcNow(), PlannerActions.Reassign, booking, order.TransportOrderNumber, reassigned, $"To {target.Name}", cancellationToken);
         if (reassigned.Outcome != LogOutcome.Reassigned)
         {
             return;
@@ -84,11 +84,11 @@ internal sealed class PlannerStage(ITmsApi tms, TimeProvider time)
         // The tally follows the order: off Own fleet gives its room back, onto it takes room (the TMS only warns when there is none).
         if (reserved && !target.IsOwnFleet)
         {
-            ledger.Release(day, booking.TotalWeightKg, booking.PalletPlaces);
+            ledger.Release(day, booking.Load);
         }
         else if (!assignee.IsOwnFleet && target.IsOwnFleet)
         {
-            ledger.TryReserve(day, booking.TotalWeightKg, booking.PalletPlaces);
+            ledger.TryReserve(day, booking.Load);
         }
     }
 }

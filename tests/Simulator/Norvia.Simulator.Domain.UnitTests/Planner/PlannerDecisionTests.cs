@@ -54,7 +54,7 @@ public sealed class PlannerDecisionTests
         var decision = Choice(PlannerIntent.Carrier).Decide(Booking, Day, [VanDijk], ledger);
 
         decision.Should().Be(new PlannerDecision(Assignee.Of(VanDijk), false, "To Van Dijk Transport"));
-        ledger.TryReserve(Day, 100_000, 0).Should().BeTrue("nothing was taken");
+        ledger.TryReserve(Day, new FleetLoad(100_000, 0)).Should().BeTrue("nothing was taken");
     }
 
     [Fact]

@@ -69,9 +69,9 @@ public sealed class LogEntry : EntityBase<LogEntryId>, IAggregateRoot
 
     /// <summary>A call the Planner made to the TMS API: its answer's correlation ID and the keys it names.</summary>
     public static LogEntry Planning(
-        SimulationRunId runId, int sequence, DateTimeOffset at, string actor, string action, LogOutcome outcome,
+        SimulationRunId runId, int sequence, DateTimeOffset at, string action, LogOutcome outcome,
         string? correlationId, string? shipperReference, string? transportOrderNumber, string? shipmentNumber, string? detail) =>
-        new(runId, sequence, at, actor, action, outcome, correlationId, shipperReference, transportOrderNumber, shipmentNumber, detail);
+        new(runId, sequence, at, PlannerActor, action, outcome, correlationId, shipperReference, transportOrderNumber, shipmentNumber, detail);
 
     public static LogEntry Note(SimulationRunId runId, int sequence, DateTimeOffset at, string text) =>
         new(runId, sequence, at, SimulatorActor, text, LogOutcome.Info, null, null, null, null, null);
