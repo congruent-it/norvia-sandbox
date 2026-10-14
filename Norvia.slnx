@@ -102,6 +102,7 @@
     <Project Path="tests/Simulator/Norvia.Simulator.Infrastructure.UnitTests/Norvia.Simulator.Infrastructure.UnitTests.csproj" />
     <Project Path="tests/Simulator/Norvia.Simulator.Web.IntegrationTests/Norvia.Simulator.Web.IntegrationTests.csproj" />
     <Project Path="tests/Simulator/Norvia.Simulator.Web.UnitTests/Norvia.Simulator.Web.UnitTests.csproj" />
+    <Project Path="tests/Simulator/Norvia.Simulator.Web.UiTests/Norvia.Simulator.Web.UiTests.csproj" />
   </Folder>
   <Folder Name="/tests/Tms/">
     <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests/Norvia.Tms.Api.IntegrationTests.csproj" />
