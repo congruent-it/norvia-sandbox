@@ -129,7 +129,7 @@ public sealed class PlannerTests(SimulatorFixture fixture)
     [Fact]
     public async Task ARefusalByTheTms_IsLoggedWithItsCodeAndCorrelationId_AndTheRunGoesOn()
     {
-        await using var simulator = fixture.StartSimulatorWithActiveCarriers(InactiveCarrier);
+        await using var simulator = await fixture.StartSimulatorWithActiveCarriersAsync(Ct, InactiveCarrier);
         var settings = Runs.Planned(orders: 6, Runs.NextSeed(), assignedPercent: 100, ownFleetPercent: 0, reassignPercent: 0);
 
         var (_, run, log) = await RunAsync(simulator, settings);
@@ -142,9 +142,37 @@ public sealed class PlannerTests(SimulatorFixture fixture)
             && !string.IsNullOrWhiteSpace(line.CorrelationId)
             && line.TransportOrderNumber != null
             && line.ShipmentNumber == null
-            && line.Detail != null && line.Detail.Contains("InactiveCarrier", StringComparison.Ordinal));
+            && line.Detail != null && line.Detail.EndsWith("TMS: InactiveCarrier (422)", StringComparison.Ordinal));
         refused.Select(line => line.CorrelationId).Should().OnlyHaveUniqueItems();
         log.Where(line => line.Outcome == LogOutcome.Planned).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ACallThatDoesNotReachTheTms_IsLoggedAsNotReceived_AndTheRunGoesOn()
+    {
+        await using var simulator = fixture.StartSimulatorWithoutTms();
+        var settings = Runs.Planned(orders: 4, Runs.NextSeed(), assignedPercent: 100, ownFleetPercent: 50, reassignPercent: 0);
+
+        var (_, run, log) = await RunAsync(simulator, settings);
+
+        run.Status.Should().Be(SimulationRunStatus.Completed);
+        run.Assigned.Should().Be(0);
+        log.Where(line => line.Outcome == LogOutcome.PlanningNotReceived).Should().HaveCount(4)
+            .And.OnlyContain(line => line.Action == PlannerActions.Assign && line.TransportOrderNumber != null && line.ShipmentNumber == null);
+    }
+
+    [Fact]
+    public async Task ThePlannersLines_AreFoundByTheirCorrelationIdAndByTheirTransportOrderNumber()
+    {
+        var settings = Runs.Planned(orders: 6, Runs.NextSeed(), assignedPercent: 100, ownFleetPercent: 0, reassignPercent: 0);
+        var (_, run, log) = await RunAsync(fixture.Simulator, settings);
+        var wanted = log.First(line => line.Outcome == LogOutcome.Planned);
+
+        var byCorrelationId = await fixture.Simulator.Requests.ListLogAsync(new SimulationRunId(run.Id), new LogFilter(Text: wanted.CorrelationId), Ct);
+        var byOrder = await fixture.Simulator.Requests.ListLogAsync(new SimulationRunId(run.Id), new LogFilter(Text: wanted.TransportOrderNumber), Ct);
+
+        byCorrelationId.Should().ContainSingle().Which.ShipmentNumber.Should().Be(wanted.ShipmentNumber);
+        byOrder.Select(line => line.Outcome).Should().BeEquivalentTo([LogOutcome.Accepted, LogOutcome.Planned]);
     }
 
     [Fact]
@@ -188,9 +216,10 @@ public sealed class PlannerTests(SimulatorFixture fixture)
     public async Task AnotherSeed_MakesOtherPlannerChoices()
     {
         var seed = Runs.NextSeed();
+        static SimulationSettings Planned(int seed) => Runs.Planned(40, seed, assignedPercent: 75, ownFleetPercent: 0, reassignPercent: 30);
 
-        var (_, _, first) = await RunAsync(fixture.Simulator, Runs.Planned(24, seed, assignedPercent: 75, ownFleetPercent: 0, reassignPercent: 30));
-        var (_, _, second) = await RunAsync(fixture.Simulator, Runs.Planned(24, seed + 1, assignedPercent: 75, ownFleetPercent: 0, reassignPercent: 30));
+        var (_, _, first) = await RunAsync(fixture.Simulator, Planned(seed));
+        var (_, _, second) = await RunAsync(fixture.Simulator, Planned(seed + 1));
 
         Choices(second).Should().NotEqual(Choices(first));
     }

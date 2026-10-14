@@ -1,5 +1,6 @@
 extern alias SimulatorWeb;
 
+using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
@@ -120,18 +121,26 @@ public sealed class SimulatorFixture : IAsyncLifetime
     /// A Simulator whose seed file lists the given Carriers as the only active ones, so the Planner can be sent to a Carrier the TMS knows as
     /// inactive. Everything else is the seed file's.
     /// </summary>
-    public SimulatorHost StartSimulatorWithActiveCarriers(params string[] carrierIds)
+    public async Task<SimulatorHost> StartSimulatorWithActiveCarriersAsync(CancellationToken cancellationToken, params string[] carrierIds)
     {
-        var seed = JsonNode.Parse(File.ReadAllText(_settings["Seed:Path"]))!.AsObject();
+        var seed = JsonNode.Parse(await File.ReadAllTextAsync(_settings["Seed:Path"], cancellationToken))!.AsObject();
         foreach (var carrier in seed["carriers"]!.AsArray().OfType<JsonObject>())
         {
             carrier["active"] = carrierIds.Contains(carrier["id"]!.GetValue<string>());
         }
 
         var copy = Path.Combine(Path.GetTempPath(), $"norvia-seed-{Guid.NewGuid():N}.json");
-        File.WriteAllText(copy, seed.ToJsonString());
         _seedCopies.Add(copy);
+        await File.WriteAllTextAsync(copy, seed.ToJsonString(), cancellationToken);
         var host = new SimulatorHost(new Dictionary<string, string>(_settings) { ["Seed:Path"] = copy });
+        _hosts.Add(host);
+        return host;
+    }
+
+    /// <summary>A Simulator whose TMS API address leads nowhere, so none of the Planner's calls reach the TMS.</summary>
+    public SimulatorHost StartSimulatorWithoutTms()
+    {
+        var host = new SimulatorHost(new Dictionary<string, string>(_settings) { ["TmsApi:BaseAddress"] = "http://127.0.0.1:1" });
         _hosts.Add(host);
         return host;
     }
@@ -140,7 +149,7 @@ public sealed class SimulatorFixture : IAsyncLifetime
     public async Task<JsonObject?> ShipmentAsync(string shipmentNumber, CancellationToken cancellationToken)
     {
         using var response = await Tms.GetAsync(new Uri($"/v1/shipments/{Uri.EscapeDataString(shipmentNumber)}", UriKind.Relative), cancellationToken);
-        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return null;
         }
