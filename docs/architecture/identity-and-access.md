@@ -128,6 +128,25 @@ Azure RBAC, scoped as narrowly as the resource allows, so an identity sees its o
 
 The scoping is the design: the booking Logic App cannot read a Persona's subscription key or a Shipper's credential, API Management cannot read the queue it sends to, and the Integration console cannot change a Logic App. The Integration console calls Azure as its own identity and never with the operator's token ([ADR 0017](../adr/0017-the-integration-console-reads-the-estates-telemetry-and-stores-nothing.md)).
 
+## Agents (planned)
+
+Each Agent ([ADR 0040](../adr/0040-agents-read-the-estate-through-api-management-have-no-write-tools-and-their-own-identity.md)) is its own Entra agent identity and holds only the read role of the narrow view it calls. None of these is built yet. An Agent that writes Carrier-facing or Shipper-facing text is a separate identity with a single tool. No Agent holds an Azure role: reads of Azure itself go through an application's read-only API, which runs as the application's own identity.
+
+| Agent identity | Calls | Holds |
+|---|---|---|
+| Integration operations agent | The Integration console's agent API, through API Management MCP | `IntegrationConsole.Agent.Read` |
+| Estate health-check agent | The health-check app's agent API | `HealthCheck.Agent.Read`. The health-check app's own managed identity holds Reader on the estate's resource group, never the Agent |
+| Customer service agent | The TMS agent view for Customer service | `TransportOrders.CustomerServiceAgent.Read` |
+| Customer service reply agent | One tool, the Shipper view | A role of its own, only for that tool |
+| Planner agent | The TMS agent view for the Planner | `TransportOrders.PlannerAgent.Read` |
+| Planner notification agent | Two tools, the notification template and the Shipper view | A role of its own, only for those tools |
+| Carrier invoice matching agent | The ERP agent view for Finance | `CarrierInvoices.FinanceAgent.Read` |
+| Finance rejection reason agent | One tool, the Carrier-visible line facts | A role of its own, only for that tool |
+| Intake agent | Nothing: it has no tools | None |
+| Simulator personas agent | Nothing: it has no tools | None |
+
+People get roles for the Agents' screens too, planned with the Agents: `HealthCheck.Run` and `HealthCheck.Read` for the Estate health check, and `TransportOrders.Draft` on the Norvia Partner API for Shipper Personas that use the Intake agent's booking drafts. A runtime fault switch needs `Demo.Fault` (#377).
+
 ## Locally
 
 There is no Entra under Aspire. Every caller still asks for a token with its own client ID and roles, signed with one key, and the TMS API trusts that issuer. A role a caller gets locally is therefore no proof Entra grants it: the tables above are the truth. The Integration console signs the developer in as a local operator holding both console roles ([ADR 0026](../adr/0026-the-integration-console-signs-operators-in-with-easy-auth-and-checks-their-app-role.md)). The Driver app's sign-in page lists the seeded Drivers and signs the chosen one in with the same Driver ID claim ([ADR 0037](../adr/0037-drivers-sign-in-to-the-driver-app-with-entra-and-the-driver-id-is-their-app-role.md)).
