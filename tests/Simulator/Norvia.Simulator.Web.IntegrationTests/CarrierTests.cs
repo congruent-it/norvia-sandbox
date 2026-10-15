@@ -86,7 +86,6 @@ public sealed class CarrierTests(SimulatorFixture fixture)
         log.Count(line => line.Outcome == LogOutcome.NoAnswer).Should().Be(4);
         preview.Carriers.Counts.Should().BeEquivalentTo(new CarrierFunnelCounts(20, 16, 8, 4, 4, 0, 0, 0, 0, 0));
 
-        var bookings = new Dictionary<LogOutcome, List<string>>();
         foreach (var line in log.Where(line => line.Outcome is LogOutcome.Confirmed or LogOutcome.Declined or LogOutcome.NoAnswer))
         {
             var shipment = (await fixture.ShipmentAsync(line.ShipmentNumber!, Ct))!;
@@ -101,9 +100,6 @@ public sealed class CarrierTests(SimulatorFixture fixture)
             {
                 booking["reasonCode"]!.GetValue<string>().Should().Be("NoCapacity");
             }
-
-            bookings.TryAdd(line.Outcome, []);
-            bookings[line.Outcome].Add(line.ShipmentNumber!);
         }
 
         var notReleased = log.Where(line => line.Outcome == LogOutcome.Planned).Select(line => line.ShipmentNumber!)
