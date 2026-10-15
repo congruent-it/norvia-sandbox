@@ -130,7 +130,7 @@ The scoping is the design: the booking Logic App cannot read a Persona's subscri
 
 ## Agents (planned)
 
-Each Agent ([ADR 0040](../adr/0040-agents-read-the-estate-through-api-management-have-no-write-tools-and-their-own-identity.md)) is its own Entra agent identity and holds only the read role of the narrow view it calls. None of these is built yet. An Agent that writes Carrier-facing or Shipper-facing text is a separate identity with a single tool. No Agent holds an Azure role: reads of Azure itself go through an application's read-only API, which runs as the application's own identity.
+Each Agent ([ADR 0040](../adr/0040-agents-read-the-estate-through-api-management-have-no-write-tools-and-their-own-identity.md)) is its own Entra agent identity once it is published, and holds only the read role of the narrow view it calls. Foundry creates the identity on publish and gives a new one on every publish, so a script assigns the role after each publish. The project's shared identity, which unpublished agents use, holds no roles. None of these is built yet. An Agent that writes Carrier-facing or Shipper-facing text is a separate identity with a single tool. No Agent holds an Azure role: reads of Azure itself go through an application's read-only API, which runs as the application's own identity.
 
 | Agent identity | Calls | Holds |
 |---|---|---|
