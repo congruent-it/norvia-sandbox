@@ -102,7 +102,7 @@ public sealed class ExecuteRunHandler(
     {
         var sent = $"Run {run.Number} finished: {run.Plan.Bookings.Count} bookings sent";
         var planned = run.Plan.Choices.Count == 0 ? sent : $"{sent}, {run.Plan.Choices.Count} Transport Orders for the Planner";
-        return carrier.Released == 0 ? planned : $"{planned}, {carrier.Released} released, {carrier.Confirmed} confirmed, {carrier.Delivered} delivered";
+        return carrier.Released == 0 ? planned : $"{planned}, {carrier.Released} released, {carrier.Confirmed} confirmed, {carrier.Delivered} reported delivered";
     }
 
     private async Task SendAsync(

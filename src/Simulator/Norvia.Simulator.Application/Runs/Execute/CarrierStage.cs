@@ -45,9 +45,9 @@ internal sealed class CarrierStage(IPartnerApi partner, ITmsApi tms, TimeProvide
                 return tally.Result(stopped: true);
             }
 
-            if (await FollowAsync(run, shipments[index], journeys[index], tally, writer, cancellationToken) is { } opens)
+            if (await FollowAsync(run, shipments[index], journeys[index], tally, writer, cancellationToken) is { } expectedException)
             {
-                expected.Add(opens);
+                expected.Add(expectedException);
             }
         }
 
@@ -78,7 +78,7 @@ internal sealed class CarrierStage(IPartnerApi partner, ITmsApi tms, TimeProvide
         var booking = shipment.Booking;
         var release = await tms.ReleaseAsync(shipment.ShipmentNumber, PlannerActions.ReleaseKey(run.Number, booking.Step), cancellationToken);
         await writer.PlanningAsync(time.GetUtcNow(), PlannerActions.Release, booking, shipment.TransportOrderNumber, release, release.CarrierBookingNumber, cancellationToken);
-        if (release is not { Outcome: LogOutcome.Released, CarrierBookingNumber: { } number })
+        if (release is not { Outcome: LogOutcome.Released, CarrierBookingNumber: { } carrierBookingNumber })
         {
             return null;
         }
@@ -87,28 +87,28 @@ internal sealed class CarrierStage(IPartnerApi partner, ITmsApi tms, TimeProvide
         var reference = CarrierReferences.BookingReference(shipment.Carrier, run.Number, booking.Step);
         if (journey.Answer == CarrierAnswerKind.NoAnswer)
         {
-            await writer.SilenceAsync(time.GetUtcNow(), shipment, CarrierActions.Answer, number, cancellationToken);
+            await writer.SilenceAsync(time.GetUtcNow(), shipment, CarrierActions.Answer, carrierBookingNumber, cancellationToken);
             return null;
         }
 
         var answer = await partner.AnswerBookingAsync(
             shipment.Carrier,
             journey.Answer == CarrierAnswerKind.Confirm
-                ? new CarrierAnswerRequest(number, Confirm: true, reference, PlannedCollection: null, DeclineReason: null)
-                : new CarrierAnswerRequest(number, Confirm: false, BookingReference: null, PlannedCollection: null, DeclineReason),
+                ? new CarrierAnswerRequest(carrierBookingNumber, Confirm: true, reference, PlannedCollection: null, DeclineReason: null)
+                : new CarrierAnswerRequest(carrierBookingNumber, Confirm: false, BookingReference: null, PlannedCollection: null, DeclineReason),
             cancellationToken);
-        await writer.CarrierAsync(time.GetUtcNow(), shipment, CarrierActions.Answer, answer, number, cancellationToken);
+        await writer.CarrierAsync(time.GetUtcNow(), shipment, CarrierActions.Answer, answer, carrierBookingNumber, cancellationToken);
         if (answer.Outcome != LogOutcome.Confirmed)
         {
             return null;
         }
 
         tally.Confirmed++;
-        return await ReportAsync(run, shipment, journey, number, reference, tally, writer, cancellationToken);
+        return await ReportAsync(run, shipment, journey, carrierBookingNumber, reference, tally, writer, cancellationToken);
     }
 
     private async Task<ExpectedException?> ReportAsync(
-        SimulationRun run, PlannedShipment shipment, CarrierJourney journey, string number, string reference, Tally tally, RunLogWriter writer,
+        SimulationRun run, PlannedShipment shipment, CarrierJourney journey, string carrierBookingNumber, string reference, Tally tally, RunLogWriter writer,
         CancellationToken cancellationToken)
     {
         var events = journey.Events;
@@ -117,8 +117,8 @@ internal sealed class CarrierStage(IPartnerApi partner, ITmsApi tms, TimeProvide
         {
             var carrierEvent = events[position];
             var tracking = new CarrierTrackingRequest(
-                reference, number, CarrierReferences.EventId(shipment.Carrier, run.Number, shipment.Booking.Step, carrierEvent), carrierEvent,
-                now - (BetweenEvents * (events.Count - 1 - position)), PlaceOf(shipment.Booking, carrierEvent), RemarkOf(carrierEvent));
+                reference, carrierBookingNumber, CarrierReferences.EventId(shipment.Carrier, run.Number, shipment.Booking.Step, carrierEvent), carrierEvent,
+                now - (BetweenEvents * (events.Count - 1 - position)), carrierEvent.HappensAtPickup() ? shipment.Booking.Pickup : shipment.Booking.Delivery, carrierEvent.Remark());
             var sent = await partner.SendTrackingAsync(shipment.Carrier, tracking, cancellationToken);
             await writer.CarrierAsync(time.GetUtcNow(), shipment, CarrierActions.Track, sent, $"{CarrierReferences.StatusCode(carrierEvent)} ({carrierEvent})", cancellationToken);
             if (sent.Outcome != LogOutcome.TrackingSent)
@@ -136,7 +136,7 @@ internal sealed class CarrierStage(IPartnerApi partner, ITmsApi tms, TimeProvide
         {
             var reservations = journey.Exception == CarrierExceptionKind.Reservations;
             var proof = new CarrierProofRequest(
-                reference, number, CarrierReferences.DocumentId(shipment.Carrier, run.Number, shipment.Booking.Step), Receiver, now,
+                reference, carrierBookingNumber, CarrierReferences.DocumentId(shipment.Carrier, run.Number, shipment.Booking.Step), Receiver, now,
                 shipment.Booking.Delivery, reservations, reservations ? ReservationsRemark : null);
             var sent = await partner.SendProofOfDeliveryAsync(shipment.Carrier, proof, cancellationToken);
             await writer.CarrierAsync(time.GetUtcNow(), shipment, CarrierActions.ProveDelivery, sent, reservations ? "With reservations" : "Clean", cancellationToken);
@@ -149,27 +149,12 @@ internal sealed class CarrierStage(IPartnerApi partner, ITmsApi tms, TimeProvide
         return journey.Exception is { } kind ? new ExpectedException(shipment, kind, journey.Cancel) : null;
     }
 
-    // Where each event happens: the collection address for what happens at the pick-up, the delivery address for the rest.
-    private static PlannedAddress PlaceOf(PlannedBooking booking, CarrierEvent carrierEvent) => carrierEvent switch
-    {
-        CarrierEvent.Collected or CarrierEvent.Departed or CarrierEvent.CollectionFailed or CarrierEvent.Damaged => booking.Pickup,
-        _ => booking.Delivery,
-    };
-
-    private static string? RemarkOf(CarrierEvent carrierEvent) => carrierEvent switch
-    {
-        CarrierEvent.CollectionFailed => "Nobody at the collection address",
-        CarrierEvent.DeliveryFailed => "Nobody at the delivery address",
-        CarrierEvent.Damaged => "A pallet was damaged on the way",
-        _ => null,
-    };
-
     // Norvia processes tracking after it accepts it, so the Exceptions show up a little later: the Planner asks a few times.
     private async Task<bool> HandleExceptionsAsync(
         SimulationRun run, List<ExpectedException> expected, RunLogWriter writer, CancellationToken stopSending, CancellationToken cancellationToken)
     {
         var pending = expected;
-        for (var attempt = 1; pending.Count > 0 && attempt <= Math.Max(1, pacing.ExceptionPollAttempts); attempt++)
+        for (var attempt = 1; pending.Count > 0 && attempt <= pacing.ExceptionPollAttempts; attempt++)
         {
             if (attempt > 1 && pacing.ExceptionPollInterval > TimeSpan.Zero && await StoppedWhileWaitingAsync(stopSending))
             {

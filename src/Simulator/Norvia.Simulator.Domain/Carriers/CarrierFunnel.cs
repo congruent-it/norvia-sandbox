@@ -22,7 +22,7 @@ public static class CarrierFunnel
 
         var released = Pick(random, all, shares.ReleasePercent);
         var confirmed = Pick(random, released, shares.ConfirmPercent);
-        var declined = Pick(random, released.Except(confirmed).ToList(), shares.DeclinePercent, ofAtMost: released.Count);
+        var declined = Pick(random, released.Except(confirmed).ToList(), shares.DeclinePercent, ofCount: released.Count);
         var tracked = Pick(random, confirmed, shares.TrackedPercent);
 
         var exceptions = Exceptions(random, tracked, shares.ExceptionPercent);
@@ -76,9 +76,9 @@ public static class CarrierFunnel
     }
 
     // Exactly the percentage of the items, picked by the seed, in their own order.
-    private static List<int> Pick(SeededRandom random, List<int> items, int percent, int? ofAtMost = null)
+    private static List<int> Pick(SeededRandom random, List<int> items, int percent, int? ofCount = null)
     {
-        var wanted = (int)Math.Round((ofAtMost ?? items.Count) * percent / 100.0, MidpointRounding.AwayFromZero);
+        var wanted = (int)Math.Round((ofCount ?? items.Count) * percent / 100.0, MidpointRounding.AwayFromZero);
         var chosen = random.Shuffled(items.Count).Take(Math.Min(wanted, items.Count)).ToHashSet();
         return [.. items.Where((_, position) => chosen.Contains(position))];
     }
@@ -96,6 +96,6 @@ public static class CarrierFunnel
     private static List<int> WithFirst(SeededRandom random, List<int> musts, List<int> others, int percent, int ofCount)
     {
         var wanted = (int)Math.Round(ofCount * percent / 100.0, MidpointRounding.AwayFromZero);
-        return [.. musts, .. Pick(random, others, 100, ofAtMost: Math.Max(0, wanted - musts.Count))];
+        return [.. musts, .. Pick(random, others, 100, ofCount: Math.Max(0, wanted - musts.Count))];
     }
 }

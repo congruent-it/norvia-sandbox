@@ -384,6 +384,6 @@ public sealed class CarrierStageTests
         var run = await RunAsync(Everything with { ReleasePercent = 50 }, orders: 6);
 
         run.Status.Should().Be(SimulationRunStatus.Completed);
-        _lines.Last().Action.Should().Contain("3 released").And.Contain("3 confirmed").And.Contain("3 delivered");
+        _lines.Last().Action.Should().Contain("3 released").And.Contain("3 confirmed").And.Contain("3 reported delivered");
     }
 }
