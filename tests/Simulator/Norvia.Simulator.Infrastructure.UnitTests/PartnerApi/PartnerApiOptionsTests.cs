@@ -57,4 +57,35 @@ public sealed class PartnerApiOptionsTests
 
         new EveryPersonaCanCall(world).Validate(null, Options).Succeeded.Should().BeTrue();
     }
+
+    [Fact]
+    public void EveryPersonaCanCall_ACarrierThePlannerAssignsToWithoutAKey_FailsStartup()
+    {
+        var world = Substitute.For<IWorldSource>();
+        world.Load().Returns(TestPlans.World with
+        {
+            Carriers = [new Domain.Worlds.SimulatedCarrier("CAR-0001", "Van Dijk Transport", true, "van-dijk-transport", "Van Dijk Transport", "VDT")],
+        });
+
+        var result = new EveryPersonaCanCall(world).Validate(null, Options);
+
+        result.Failed.Should().BeTrue();
+        result.Failures.Should().ContainSingle().Which.Should().Contain("van-dijk-transport");
+    }
+
+    [Fact]
+    public void EveryPersonaCanCall_AnInactiveCarrierOrOneWithoutAPersona_NeedsNoKey()
+    {
+        var world = Substitute.For<IWorldSource>();
+        world.Load().Returns(TestPlans.World with
+        {
+            Carriers =
+            [
+                new Domain.Worlds.SimulatedCarrier("CAR-0004", "Closed Haulage", false, "closed-haulage", "Closed Haulage", "CLO"),
+                new Domain.Worlds.SimulatedCarrier("CAR-0009", "Nobody", true),
+            ],
+        });
+
+        new EveryPersonaCanCall(world).Validate(null, Options).Succeeded.Should().BeTrue();
+    }
 }

@@ -1,9 +1,14 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Norvia.Simulator.Domain.Carriers;
 using Norvia.Simulator.Domain.Runs;
 
 namespace Norvia.Simulator.Domain.UnitTests.Runs;
 
 public sealed class SimulationSettingsTests
 {
+    private static readonly JsonSerializerOptions PlanJson = new(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter() } };
+
     private static readonly SimulationLimits Limits = new(MaxOrdersPerRun: 100, MaxConcurrentRequests: 4);
 
     private static SimulationSettings Settings(int orders = 10, int bad = 10, int today = 30, RunMode mode = RunMode.Burst, int windowMinutes = 0) =>
@@ -33,6 +38,31 @@ public sealed class SimulationSettingsTests
         var settings = new SimulationSettings(10, 10, 30, 1, RunMode.Burst, TimeSpan.Zero, null, assigned, ownFleet, reassign);
 
         settings.Problems(Limits).Should().ContainSingle().Which.Should().Contain(named).And.Contain("0 to 100");
+    }
+
+    [Fact]
+    public void Problems_CarrierSharesOutOfRange_AreNamed()
+    {
+        var settings = Settings() with { Carriers = new CarrierShares(ReleasePercent: 101, CancelPercent: -1) };
+
+        settings.Problems(Limits).Should().HaveCount(2).And.Contain(problem => problem.Contains("releases")).And.Contain(problem => problem.Contains("cancels"));
+    }
+
+    [Fact]
+    public void Problems_MoreConfirmedAndDeclinedThanReleased_IsRefused()
+    {
+        var settings = Settings() with { Carriers = new CarrierShares(ConfirmPercent: 70, DeclinePercent: 40) };
+
+        settings.Problems(Limits).Should().ContainSingle().Which.Should().Contain("confirm and decline more than all");
+    }
+
+    [Fact]
+    public void Carriers_ASettingsDocumentFromBeforeTheCarrierStage_ReadsWithTheDefaultShares()
+    {
+        var older = JsonSerializer.Deserialize<SimulationSettings>(
+            """{"orderCount":10,"badSharePercent":10,"collectedTodayPercent":30,"seed":1,"mode":"Burst","window":"00:00:00"}""", PlanJson);
+
+        older!.Carriers.Should().Be(new CarrierShares());
     }
 
     [Fact]

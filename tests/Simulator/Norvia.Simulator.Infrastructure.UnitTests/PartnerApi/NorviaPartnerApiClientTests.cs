@@ -5,8 +5,10 @@ using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using Norvia.Simulator.Application.Ports;
+using Norvia.Simulator.Domain.Carriers;
 using Norvia.Simulator.Domain.Log;
 using Norvia.Simulator.Domain.Plans;
+using Norvia.Simulator.Domain.Worlds;
 using Norvia.Simulator.Infrastructure.PartnerApi;
 
 namespace Norvia.Simulator.Infrastructure.UnitTests.PartnerApi;
@@ -26,11 +28,12 @@ public sealed class NorviaPartnerApiClientTests : IDisposable
     {
         _http = new HttpClient(_partnerApi) { BaseAddress = new Uri("https://apim.example/partner/v1/") };
         _tokens.GetTokenAsync("brouwer-dranken", Arg.Any<CancellationToken>()).Returns("brouwer-token");
+        _tokens.GetTokenAsync("van-dijk-transport", Arg.Any<CancellationToken>()).Returns("van-dijk-token");
         var options = Options.Create(new PartnerApiOptions
         {
             BaseAddress = _http.BaseAddress,
-            PersonaClientIds = "brouwer-dranken=client-1",
-            SubscriptionKeys = new() { ["brouwer-dranken"] = "brouwer-key" },
+            PersonaClientIds = "brouwer-dranken=client-1;van-dijk-transport=client-2",
+            SubscriptionKeys = new() { ["brouwer-dranken"] = "brouwer-key", ["van-dijk-transport"] = "van-dijk-key" },
         });
         _client = new NorviaPartnerApiClient(_http, _tokens, options, _activities, new FakeTimeProvider(new DateTimeOffset(2026, 10, 13, 7, 30, 0, TimeSpan.Zero)), _logger);
         _listener = new ActivityListener
@@ -165,5 +168,99 @@ public sealed class NorviaPartnerApiClientTests : IDisposable
         var act = () => NorviaPartnerApiClient.TrackingKeysOf(TestPlans.Good(), new BookingAnswer(LogOutcome.Info, null, null, null));
 
         act.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    private static readonly SimulatedCarrier VanDijk = new("CAR-0001", "Van Dijk Transport", true, "van-dijk-transport", "Van Dijk Transport", "VDT");
+    private static readonly DateTimeOffset At = new(2026, 10, 13, 7, 30, 0, TimeSpan.Zero);
+    private static readonly PlannedAddress Rotterdam = new("Coolsingel 1", "3011 AD", "Rotterdam", "NL");
+
+    [Fact]
+    public async Task AnswerBooking_PostsToCarrierAnswers_AsTheCarriersPersona()
+    {
+        _partnerApi.Answer(HttpStatusCode.OK, """{"result":"RECORDED","messageId":"m-1","carrierBookingNumber":"CB-0000042","decision":"CONFIRMED","repeated":false}""");
+
+        var answer = await _client.AnswerBookingAsync(VanDijk, new CarrierAnswerRequest("CB-0000042", true, "VDT-SIM1-3", null, null), CancellationToken.None);
+
+        _partnerApi.Request!.RequestUri.Should().Be(new Uri("https://apim.example/partner/v1/carrier-answers"));
+        _partnerApi.Request.Headers.GetValues("Ocp-Apim-Subscription-Key").Should().Equal("van-dijk-key");
+        _partnerApi.Request.Headers.Authorization!.Parameter.Should().Be("van-dijk-token");
+        _partnerApi.RequestContentLength.Should().BeGreaterThan(0);
+        JsonNode.Parse(_partnerApi.RequestBody!)!["decision"]!.GetValue<string>().Should().Be("CONFIRMED");
+        answer.Outcome.Should().Be(LogOutcome.Confirmed);
+        answer.CorrelationId.Should().Be("m-1");
+    }
+
+    [Fact]
+    public async Task SendTracking_PostsToCarrierTracking_AndNorviaAcceptsItForLater()
+    {
+        _partnerApi.Answer(HttpStatusCode.Accepted, """{"messageId":"m-2"}""", "m-2");
+
+        var answer = await _client.SendTrackingAsync(VanDijk, new CarrierTrackingRequest("VDT-SIM1-3", "CB-0000042", "E-1", CarrierEvent.Collected, At, Rotterdam, null), CancellationToken.None);
+
+        _partnerApi.Request!.RequestUri.Should().Be(new Uri("https://apim.example/partner/v1/carrier-tracking"));
+        _partnerApi.Request.Headers.Authorization!.Parameter.Should().Be("van-dijk-token");
+        JsonNode.Parse(_partnerApi.RequestBody!)!["statusCode"]!.GetValue<string>().Should().Be("PU");
+        answer.Should().Be(new CarrierCallAnswer(LogOutcome.TrackingSent, "m-2", null));
+    }
+
+    [Fact]
+    public async Task SendProofOfDelivery_PostsToCarrierProofsOfDelivery()
+    {
+        _partnerApi.Answer(HttpStatusCode.Accepted, """{"messageId":"m-3"}""");
+
+        var answer = await _client.SendProofOfDeliveryAsync(VanDijk, new CarrierProofRequest("VDT-SIM1-3", "CB-0000042", "D-1", "Someone", At, Rotterdam, false, null), CancellationToken.None);
+
+        _partnerApi.Request!.RequestUri.Should().Be(new Uri("https://apim.example/partner/v1/carrier-proofs-of-delivery"));
+        answer.Outcome.Should().Be(LogOutcome.ProofOfDeliverySent);
+    }
+
+    [Fact]
+    public async Task ACarrierCall_NorviaUnreachable_IsNotReceived()
+    {
+        _partnerApi.Fail(new HttpRequestException("down"));
+
+        var answer = await _client.SendTrackingAsync(VanDijk, new CarrierTrackingRequest("R", "CB-0000042", "E-1", CarrierEvent.Arrived, At, Rotterdam, null), CancellationToken.None);
+
+        answer.Outcome.Should().Be(LogOutcome.CarrierNotReceived);
+        answer.CorrelationId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ACarrierCall_ACarrierWithoutAPersona_IsRefusedBeforeAnythingIsSent()
+    {
+        var act = () => _client.SendTrackingAsync(new SimulatedCarrier("CAR-0009", "Nobody", true), new CarrierTrackingRequest("R", "CB-0000042", "E-1", CarrierEvent.Arrived, At, Rotterdam, null), CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*CAR-0009*");
+    }
+
+    [Fact]
+    public async Task ACarrierCall_IsSentInASpanNamedForWhatItDoes_AndLoggedWithTheKeysTheSimulatorKnows()
+    {
+        _partnerApi.Answer(HttpStatusCode.Accepted, """{"messageId":"m-4"}""");
+
+        await _client.SendProofOfDeliveryAsync(VanDijk, new CarrierProofRequest("R", "CB-0000042", "D-1", "Someone", At, Rotterdam, false, null), CancellationToken.None);
+
+        _spans.Should().ContainSingle().Which.OperationName.Should().Be("Send Proof of delivery");
+        var keys = _logger.LatestRecord.Scopes.OfType<IEnumerable<KeyValuePair<string, object?>>>().SelectMany(scope => scope).ToDictionary(pair => pair.Key, pair => pair.Value);
+        keys["flow"].Should().Be("carrier-proof-of-delivery");
+        keys["partyId"].Should().Be("CAR-0001");
+        keys["carrierBookingNumber"].Should().Be("CB-0000042");
+        keys["outcome"].Should().Be("Succeeded");
+        keys["correlationId"].Should().Be("m-4");
+    }
+
+    [Theory]
+    [InlineData(LogOutcome.Confirmed, "Succeeded", null)]
+    [InlineData(LogOutcome.Declined, "Succeeded", null)]
+    [InlineData(LogOutcome.TrackingSent, "Succeeded", null)]
+    [InlineData(LogOutcome.CarrierRefused, "Refused", null)]
+    [InlineData(LogOutcome.CarrierNotReceived, "Failed", "CarrierCallNotReceived")]
+    public void CarrierTrackingKeysOf_FollowsTheOutcome(LogOutcome outcome, string expected, string? failureCode)
+    {
+        var keys = NorviaPartnerApiClient.CarrierTrackingKeysOf("carrier-answer", "CAR-0001", "CB-0000042", new CarrierCallAnswer(outcome, null, null));
+
+        keys["outcome"].Should().Be(expected);
+        keys.GetValueOrDefault("failureCode").Should().Be(failureCode);
+        keys.Should().NotContainKey("correlationId", "a key that doesn't apply is left out");
     }
 }

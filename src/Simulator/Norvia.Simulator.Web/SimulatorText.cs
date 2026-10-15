@@ -22,6 +22,17 @@ public static class SimulatorText
         LogOutcome.Reassigned => "Reassigned",
         LogOutcome.PlanningRefused => "Planning refused",
         LogOutcome.PlanningNotReceived => "Planning not received",
+        LogOutcome.Released => "Released",
+        LogOutcome.BookingCancelled => "Booking cancelled",
+        LogOutcome.ExceptionResolved => "Exception resolved",
+        LogOutcome.ExceptionFound => "Exception found",
+        LogOutcome.Confirmed => "Confirmed",
+        LogOutcome.Declined => "Declined",
+        LogOutcome.NoAnswer => "No answer",
+        LogOutcome.TrackingSent => "Tracking sent",
+        LogOutcome.ProofOfDeliverySent => "Proof of delivery sent",
+        LogOutcome.CarrierRefused => "Carrier refused",
+        LogOutcome.CarrierNotReceived => "Carrier not received",
         _ => throw new ArgumentOutOfRangeException(nameof(outcome), outcome, "Every outcome has a wording."),
     };
 

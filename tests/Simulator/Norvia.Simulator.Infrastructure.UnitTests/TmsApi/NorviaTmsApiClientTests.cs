@@ -210,4 +210,103 @@ public sealed class NorviaTmsApiClientTests : IDisposable
 
         (await _client.GetOwnFleetDaysAsync(CancellationToken.None)).Should().BeNull();
     }
+
+    [Fact]
+    public async Task Release_PostsToTheShipmentAsThePlanner_UnderItsKeyAndWithNoBody()
+    {
+        _tms.Answer(HttpStatusCode.OK, """{"shipmentNumber":"SH-1","carrierBookingNumber":"CB-0000042","correlationId":"rel-1"}""");
+
+        var answer = await _client.ReleaseAsync("SH-0000007", "SIM-3-7-release", CancellationToken.None);
+
+        _tms.Request!.Method.Should().Be(HttpMethod.Post);
+        _tms.Request.RequestUri.Should().Be(new Uri("https://tms.example/v1/shipments/SH-0000007/release"));
+        _tms.Request.Headers.Authorization!.Parameter.Should().Be("planner-token");
+        _tms.Request.Headers.GetValues("Idempotency-Key").Should().Equal("SIM-3-7-release");
+        answer.Outcome.Should().Be(LogOutcome.Released);
+        answer.CarrierBookingNumber.Should().Be("CB-0000042");
+        answer.CorrelationId.Should().Be("rel-1");
+    }
+
+    [Fact]
+    public async Task Release_IsSentInASpanNamedLikeTheTmsUis_AndLoggedWithTheKeysTheSimulatorKnows()
+    {
+        _tms.Answer(HttpStatusCode.OK, """{"shipmentNumber":"SH-0000007","carrierBookingNumber":"CB-0000042","correlationId":"rel-1"}""");
+
+        await _client.ReleaseAsync("SH-0000007", "key", CancellationToken.None);
+
+        _spans.Should().ContainSingle().Which.OperationName.Should().Be("Release Shipment");
+        var keys = _logger.LatestRecord.Scopes.OfType<IEnumerable<KeyValuePair<string, object?>>>().SelectMany(scope => scope).ToDictionary(pair => pair.Key, pair => pair.Value);
+        keys["flow"].Should().Be("transport-planning");
+        keys["outcome"].Should().Be("Succeeded");
+        keys["correlationId"].Should().Be("rel-1");
+        keys["shipmentNumber"].Should().Be("SH-0000007");
+    }
+
+    [Fact]
+    public async Task Release_TheTmsUnreachable_IsNotReceived()
+    {
+        _tms.Fail(new HttpRequestException("down"));
+
+        (await _client.ReleaseAsync("SH-1", "key", CancellationToken.None)).Outcome.Should().Be(LogOutcome.PlanningNotReceived);
+    }
+
+    [Fact]
+    public async Task GetOpenExceptions_ReadsTheListAsThePlanner()
+    {
+        _tms.Answer(HttpStatusCode.OK, """[{"exceptionNumber":"EXC-1","shipmentNumber":"SH-1","type":"Damaged"}]""");
+
+        var open = await _client.GetOpenExceptionsAsync(CancellationToken.None);
+
+        _tms.Request!.RequestUri.Should().Be(new Uri("https://tms.example/v1/exceptions/open"));
+        _tms.Request.Headers.Authorization!.Parameter.Should().Be("planner-token");
+        open.Should().ContainSingle().Which.ExceptionNumber.Should().Be("EXC-1");
+    }
+
+    [Fact]
+    public async Task GetOpenExceptions_TheTmsRefusesOrIsUnreachable_IsUnknown()
+    {
+        _tms.Answer(HttpStatusCode.InternalServerError, "{}");
+        (await _client.GetOpenExceptionsAsync(CancellationToken.None)).Should().BeNull();
+
+        _tms.Fail(new HttpRequestException("down"));
+        (await _client.GetOpenExceptionsAsync(CancellationToken.None)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task CancelCarrierBooking_PostsTheReasonUnderItsKey()
+    {
+        _tms.Answer(HttpStatusCode.OK, """{"exceptionNumber":"EXC-1","shipmentNumber":"SH-1","carrierBookingNumber":"CB-1","correlationId":"can-1"}""");
+
+        var answer = await _client.CancelCarrierBookingAsync("EXC-0000001", "Won't collect", "SIM-3-7-cancel", CancellationToken.None);
+
+        _tms.Request!.RequestUri.Should().Be(new Uri("https://tms.example/v1/exceptions/EXC-0000001/cancel-carrier-booking"));
+        _tms.Request.Headers.GetValues("Idempotency-Key").Should().Equal("SIM-3-7-cancel");
+        JsonNode.Parse(_tms.RequestBody!)!["reason"]!.GetValue<string>().Should().Be("Won't collect");
+        answer.Outcome.Should().Be(LogOutcome.BookingCancelled);
+        _spans.Should().ContainSingle().Which.OperationName.Should().Be("Cancel Carrier booking");
+    }
+
+    [Fact]
+    public async Task ResolveReplanned_PostsTheOutcomeAndTheRemark()
+    {
+        _tms.Answer(HttpStatusCode.OK, """{"exceptionNumber":"EXC-1","shipmentNumber":"SH-1","status":"Resolved","outcome":"Replanned","correlationId":"res-1"}""");
+
+        var answer = await _client.ResolveReplannedAsync("EXC-0000001", "Replanned", CancellationToken.None);
+
+        _tms.Request!.RequestUri.Should().Be(new Uri("https://tms.example/v1/exceptions/EXC-0000001/resolve"));
+        var sent = JsonNode.Parse(_tms.RequestBody!)!;
+        sent["outcome"]!.GetValue<string>().Should().Be("Replanned");
+        sent["remark"]!.GetValue<string>().Should().Be("Replanned");
+        answer.Outcome.Should().Be(LogOutcome.ExceptionResolved);
+        _spans.Should().ContainSingle().Which.OperationName.Should().Be("Resolve Exception");
+    }
+
+    [Fact]
+    public void TrackingKeysOf_ExceptionHandling_IsItsOwnFlow()
+    {
+        var keys = NorviaTmsApiClient.TrackingKeysOf(new Application.Ports.PlannerAnswer(LogOutcome.BookingCancelled, "c", "SH-1", null), null, null, "exception-handling");
+
+        keys["flow"].Should().Be("exception-handling");
+        keys["outcome"].Should().Be("Succeeded");
+    }
 }

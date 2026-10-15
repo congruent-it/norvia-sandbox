@@ -102,4 +102,85 @@ public sealed class PlannerAnswersTests
     {
         PlannerAnswers.Days("[]").Should().BeEmpty();
     }
+
+    [Fact]
+    public void Released_ACarrierShipment_GivesItsCarrierBookingNumberAndTheTrailOfTheRelease()
+    {
+        var answer = PlannerAnswers.Released(200, """{"shipmentNumber":"SH-0000007","transportOrderNumber":"TO-1","status":"Released","carrierBookingNumber":"CB-0000042","correlationId":"rel-1"}""", "header-1");
+
+        answer.Should().Be(new Application.Ports.PlannerAnswer(LogOutcome.Released, "rel-1", "SH-0000007", null, CarrierBookingNumber: "CB-0000042"));
+    }
+
+    [Fact]
+    public void Released_AnOwnFleetShipment_HasNoCarrierBooking()
+    {
+        PlannerAnswers.Released(200, """{"shipmentNumber":"SH-1","correlationId":"rel-2"}""", null).CarrierBookingNumber.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(409, "ShipmentNotPlanned")]
+    [InlineData(422, "NoRateCard")]
+    [InlineData(422, "NoMatchingLane")]
+    public void Released_ARefusal_GivesItsCode(int status, string code)
+    {
+        var answer = PlannerAnswers.Released(status, $$"""{"code":"{{code}}","detail":"x","correlationId":"refused-2"}""", null);
+
+        answer.Outcome.Should().Be(LogOutcome.PlanningRefused);
+        answer.FailureCode.Should().Be(code);
+        answer.Detail.Should().Be($"{code} ({status})");
+    }
+
+    [Fact]
+    public void Cancelled_ACancelledCarrierBooking_GivesTheShipmentAndTheTrail()
+    {
+        var answer = PlannerAnswers.Cancelled(200, """{"exceptionNumber":"EXC-1","shipmentNumber":"SH-0000007","carrierBookingNumber":"CB-0000042","correlationId":"can-1"}""", null);
+
+        answer.Should().Be(new Application.Ports.PlannerAnswer(LogOutcome.BookingCancelled, "can-1", "SH-0000007", null, CarrierBookingNumber: "CB-0000042"));
+    }
+
+    [Theory]
+    [InlineData(409, "ShipmentAlreadyCollected")]
+    [InlineData(409, "NoConfirmedCarrierBooking")]
+    [InlineData(404, "ExceptionNotFound")]
+    public void Cancelled_ARefusal_GivesItsCode(int status, string code)
+    {
+        PlannerAnswers.Cancelled(status, $$"""{"code":"{{code}}","correlationId":"c"}""", null).FailureCode.Should().Be(code);
+    }
+
+    [Fact]
+    public void Resolved_AResolvedException_GivesTheShipmentAndTheTrail()
+    {
+        var answer = PlannerAnswers.Resolved(200, """{"exceptionNumber":"EXC-1","shipmentNumber":"SH-0000007","status":"Resolved","outcome":"Replanned","correlationId":"res-1"}""", null);
+
+        answer.Should().Be(new Application.Ports.PlannerAnswer(LogOutcome.ExceptionResolved, "res-1", "SH-0000007", null));
+    }
+
+    [Fact]
+    public void Resolved_NotOpen_IsRefusedWithItsCode()
+    {
+        var answer = PlannerAnswers.Resolved(409, """{"code":"ExceptionNotOpen","correlationId":"res-2"}""", null);
+
+        answer.Outcome.Should().Be(LogOutcome.PlanningRefused);
+        answer.FailureCode.Should().Be("ExceptionNotOpen");
+    }
+
+    [Fact]
+    public void OpenExceptions_TheList_GivesEachNumberShipmentAndType()
+    {
+        var list = PlannerAnswers.OpenExceptions("""
+            [{"exceptionNumber":"EXC-1","shipmentNumber":"SH-1","type":"CollectionFailed","canCancelCarrierBooking":true},
+             {"exceptionNumber":"EXC-2","shipmentNumber":"SH-2","type":"Reservations"}]
+            """);
+
+        list.Should().Equal(new Application.Ports.OpenExceptionSummary("EXC-1", "SH-1", "CollectionFailed"), new Application.Ports.OpenExceptionSummary("EXC-2", "SH-2", "Reservations"));
+    }
+
+    [Theory]
+    [InlineData("not json")]
+    [InlineData("""{"title":"not a list"}""")]
+    [InlineData("""[{"exceptionNumber":"EXC-1"}]""")]
+    public void OpenExceptions_SomethingElse_IsUnknown(string body)
+    {
+        PlannerAnswers.OpenExceptions(body).Should().BeNull();
+    }
 }

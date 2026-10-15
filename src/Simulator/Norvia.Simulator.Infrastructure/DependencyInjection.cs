@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Norvia.Simulator.Application.Ports;
+using Norvia.Simulator.Application.Runs.Execute;
 using Norvia.Simulator.Domain.Runs;
 using Norvia.Simulator.Infrastructure.Data;
 using Norvia.Simulator.Infrastructure.Execution;
@@ -34,6 +35,12 @@ public static class DependencyInjection
         {
             var options = services.GetRequiredService<IOptions<SimulatorOptions>>().Value;
             return new SimulationLimits(options.MaxOrdersPerRun, options.MaxConcurrentRequests);
+        });
+
+        builder.Services.AddSingleton(services =>
+        {
+            var options = services.GetRequiredService<IOptions<SimulatorOptions>>().Value;
+            return new CarrierPacing(TimeSpan.FromSeconds(options.ExceptionPollSeconds), options.ExceptionPollAttempts);
         });
 
         builder.Services.AddOptions<SeedOptions>().BindConfiguration(SeedOptions.SectionName)

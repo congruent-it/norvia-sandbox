@@ -27,8 +27,8 @@ Every active Carrier has a Partner portal Persona that receives its booking requ
 
 | Answer mode | Behaviour | Default for |
 |---|---|---|
-| Manual | The presenter confirms or rejects each request by hand | Van Dijk Transport |
-| Auto-confirm | The Persona confirms each request after a delay | Kessler Spedition, PakketPunt Express |
+| Manual | The presenter confirms or rejects each request by hand | Every Carrier Persona |
+| Auto-confirm | The Persona confirms each request after a delay | — (the seed leaves every Persona on Manual, because the [Simulator](../../operations/simulator.md) plays the Carriers; set it on the Carrier page when a demo wants it) |
 | Auto-reject | The Persona rejects each request after a delay, with a chosen reason code | — |
 
 The delay is a Partner portal setting per Persona, a few seconds by default, so a demo can show the answer arriving. Automatic answers go through exactly the same path as manual ones (step 5 in [Steps](#steps)). An auto-confirmed booking gets a generated Carrier booking reference in a pattern per Carrier, for example `VDT-240917-0042`.
@@ -194,7 +194,7 @@ After a deployment, and not in CI, the presenter checks Carrier booking end to e
 
    It prints `PASS` or `FAIL` per check, never a body, and ends with the pages to open below.
 9. **Follow it.** In the Integration console, search for the Shipment number, then for each Carrier booking number. A booking's search shows its release (`tms-api: POST /v1/shipments/<Shipment number>/release`, `tms-api: publish ShipmentReleased`, the P4 booking Logic App's run, and the `report-sent` call to the TMS) and, as a trail of its own, its answer (API Management, the Carrier-answer Logic App's run, `tms-api: POST /v1/carrier-bookings/<Carrier booking number>/answer` and `tms-api: publish CarrierBookingRejected` or `CarrierBookingConfirmed`). Application Insights holds the same rows: query `union AppRequests, AppTraces, AppDependencies` by the Shipment number or a Carrier booking number in `Properties.shipmentNumber` or `Properties.carrierBookingNumber`.
-10. **Restore Kessler Spedition.** In the Partner portal, set its *Mode* back to *Auto-confirm*, so the next run and the other demos find it as seeded.
+10. **Restore Kessler Spedition.** In the Partner portal, set its *Mode* back to *Manual*, so the next run, the Simulator and the other demos find it as seeded.
 
 If a check fails, file the gap as its own issue against P4, rather than working around it in the run book.
 
@@ -304,7 +304,7 @@ Three differences matter for P4:
 - The retry of the Carrier and TMS calls is the Logic App's policy in Azure and the worker's bounded exponential policy locally, so the numbers are chosen separately.
 - The edge's checks on an answer and the policy's are two implementations kept close by tests. Entra enforces the `CarrierBookings.Respond` role in Azure. Locally the Partner portal signs each Persona's token itself with that role.
 
-To see P4 locally, book from the Partner portal as a Shipper, assign and release in the TMS UI, then answer from a Carrier Persona's inbox, or leave the Persona on Auto-confirm. The steps of the [presenter smoke run](#presenter-smoke-run) work the same way, apart from the script, which needs a deployed estate.
+To see P4 locally, book from the Partner portal as a Shipper, assign and release in the TMS UI, then answer from a Carrier Persona's inbox, or set the Persona to Auto-confirm. The steps of the [presenter smoke run](#presenter-smoke-run) work the same way, apart from the script, which needs a deployed estate.
 
 ### Gaps
 

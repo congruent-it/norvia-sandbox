@@ -26,7 +26,11 @@ internal static class Runs
     /// <summary>A run of good bookings whose Planner assigns, sends to Own fleet and reassigns the given shares of the orders.</summary>
     public static SimulationSettings Planned(int orders, int seed, int assignedPercent, int ownFleetPercent, int reassignPercent, int badSharePercent = 0) =>
         new(orders, badSharePercent, CollectedTodayPercent: 30, seed, RunMode.Burst, TimeSpan.Zero,
-            AssignedPercent: assignedPercent, OwnFleetPercent: ownFleetPercent, ReassignPercent: reassignPercent);
+            AssignedPercent: assignedPercent, OwnFleetPercent: ownFleetPercent, ReassignPercent: reassignPercent)
+        {
+            // These runs test the Planner: the Shipments stay Planned, and the Carrier stage has its own tests (#354).
+            Carriers = new Norvia.Simulator.Domain.Carriers.CarrierShares(ReleasePercent: 0),
+        };
 
     /// <summary>A run that sends its first booking at once and the next a minute later.</summary>
     public static SimulationSettings Paced(int orders, int seed) =>

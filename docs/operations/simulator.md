@@ -5,13 +5,13 @@ The Simulator feeds the estate with representative orders, shipments and trips a
 | | |
 |---|---|
 | **Used by** | The presenter, who plays the Simulator operator |
-| **Does** | Sends a Simulation plan to the estate. So far: Shipper bookings to the Norvia Partner API, then the Planner's assignments to the TMS API |
+| **Does** | Sends a Simulation plan to the estate. So far: Shipper bookings to the Norvia Partner API, the Planner's assignments and releases to the TMS API, then the Carriers' answers, tracking and Proofs of delivery to the Partner API, and the Planner's cancellations and resolutions of the Exceptions that follow |
 | **Owns** | Its runs, their plans and the log of every step, in its own database (`simulator`) |
-| **Reaches Norvia through** | The Norvia Partner API, as each Shipper's Persona, and the TMS API, as the Planner. Never a database or Service Bus |
+| **Reaches Norvia through** | The Norvia Partner API, as each Shipper's and each Carrier's Persona, and the TMS API, as the Planner. Never a database or Service Bus |
 
 ## Scope
 
-The Simulator is built in slices. So far it covers **Shipper bookings** and **Planner assignment**, the first two stages of the funnel. Carrier answers, tracking and Proofs of delivery, Trips and Drivers, and Azure come after them.
+The Simulator is built in slices. So far it covers **Shipper bookings**, **Planner assignment** and the **Carriers**: release, answers, tracking, Proofs of delivery, cancellations and Exceptions. Trips and Drivers, and Azure come after them.
 
 ## Switching it on
 
@@ -23,17 +23,17 @@ Locally there is no Easy Auth, so the AppHost signs you in as a local operator h
 
 ### Configure
 
-- A Preset ("Quiet Monday", "Busy day", "Peak week") fills the numbers, which can be changed: the number of orders, the share of **bad bookings**, the share **collected today**, the Planner's shares (**assigned by the Planner**, **to Own fleet where it fits**, **reassigned**), burst or paced (with the window in minutes), and the **seed** (random by default, editable).
+- A Preset ("Quiet Monday", "Busy day", "Peak week") fills the numbers, which can be changed: the number of orders, the share of **bad bookings**, the share **collected today**, the Planner's shares (**assigned by the Planner**, **to Own fleet where it fits**, **reassigned**), the Carriers' shares (see [What the Carriers do](#what-the-carriers-do)), burst or paced (with the window in minutes), and the **seed** (random by default, editable).
 - It says the caps and the number the next run gets. A plan over a cap is refused here and again in the preview and when the run starts.
 - It lists the runs, newest first, and has **Clear history**, which removes the finished runs and their logs. It doesn't touch what they sent, and the run numbers keep counting, so a Shipper reference is never used twice.
 
 ### Plan preview
 
-What the settings would send, per Shipper and per booking: its Shipper reference, the Persona it is sent as, the Lane, when it is collected, its weight, whether it is good or bad, what Norvia is expected to answer and what the Planner means to do with its order. Above the tables, the assignment stage of the funnel: how many of the orders Norvia is expected to accept the Planner assigns (the percentage), how many it means to try Own fleet for and how many go to a Carrier, and how many it reassigns. It is made from the same seed, so **Start run** sends exactly what it shows. It never shows a Consignee.
+What the settings would send, per Shipper and per booking: its Shipper reference, the Persona it is sent as, the Lane, when it is collected, its weight, whether it is good or bad, what Norvia is expected to answer and what the Planner means to do with its order. Above the tables, the assignment stage of the funnel: how many of the orders Norvia is expected to accept the Planner assigns (the percentage), how many it means to try Own fleet for and how many go to a Carrier, and how many it reassigns. Then the Carrier stage, for the Shipments meant for a Carrier: how many are released, confirmed, declined and left unanswered, tracked, hit an Exception, delivered, come with a Proof of delivery, and how many failed collections the Planner cancels. These are the most a run can reach: an order meant for Own fleet where it fits goes to a Carrier only when the day is full, and what the estate refuses is known only when the run goes. It is made from the same seed, so **Start run** sends exactly what it shows. It never shows a Consignee.
 
 ### Run
 
-The live log of the run, filterable by actor, outcome and a text (a correlation ID, a Shipper reference or a Transport Order number). Each line has the time, actor, action, outcome, the correlation ID Norvia answered with, the Shipper reference, the Transport Order number and, for the Planner's lines, the Shipment number. The filter's text finds any of those. A line's correlation ID can be copied, and **Message trail** opens it in the Integration console's search. The log is read from the database, so it survives a refresh and a second viewer sees the same.
+The live log of the run, filterable by actor, outcome and a text (a correlation ID, a Shipper reference or a Transport Order number). Each line has the time, actor, action, outcome, the correlation ID Norvia answered with, the Shipper reference, the Transport Order number and, for the Planner's and the Carriers' lines, the Shipment number. The filter's text finds any of those. The actor of a Carrier's line is its Persona (Van Dijk Transport, ...). A line's correlation ID can be copied, and **Message trail** opens it in the Integration console's search. The log is read from the database, so it survives a refresh and a second viewer sees the same.
 
 Only one run is active at a time: a second cannot start while one is. **Cancel run** stops sending; the bookings in flight land and are logged. A run is not resumed after a restart: the Simulator fails a run it finds still running when it starts.
 
@@ -57,13 +57,27 @@ Once every booking is in, the simulated Planner assigns the Transport Orders Nor
 - **One at a time, in plan order.** So the same seed and the same TMS state give the same choices. The run is cancelled between orders; the call in flight lands and is logged.
 - **Refusals are outcomes.** A TMS refusal (`TransportOrderAlreadyPlanned`, `InactiveCarrier`, ...) is logged as *Planning refused*, with its code and the correlation ID the TMS traced it on, and the run goes on. A call that doesn't reach the TMS is *Planning not received*. The log keeps the code, never the TMS's message.
 - **Retries are safe.** Each call goes under an idempotency key of its own (`SIM-<run>-<n>-assign`, `-reassign`) that every retry of it repeats, so the TMS answers a retry as before.
-- **Release is the Planner's other step**, and the Simulator doesn't take it yet: the Shipments stay Planned, on the *Shipments to release* list.
 
 Each call is sent in a span named like the TMS UI's, `Assign Transport Order` or `Reassign Shipment`, and its answer is logged with the tracking keys the Simulator knows (`flow` `transport-planning`, `correlationId`, `transportOrderNumber`, `shipmentNumber`, `outcome`, `failureCode`).
+
+## What the Carriers do
+
+Once the Planner has assigned, the Shipments that went to a Carrier follow the Carrier funnel. The Planner releases them through the TMS API (`Release Shipment`, under a key of its own, `SIM-<run>-<n>-release`), and each Carrier then plays its part through the Partner API, as its Persona, with the token and subscription key the Partner portal gets for it. Locally the Simulator signs the token itself, holding the Carrier app roles (`CarrierBookings.Respond`, `Tracking.Submit`, `ProofsOfDelivery.Submit`). A Carrier is a Carrier of the seed file that has a Persona; one without is noted in the log and its Shipments are left Planned.
+
+- **Every step is a share of the step before it, and exact**: for a number of Shipments the seed picks which ones, as it does for the bad bookings, so the same seed and the same TMS state give the same journeys. Release: of the Shipments assigned to a Carrier. Confirm and decline: of the released (the rest give **no answer**, and the booking stays Requested). Tracked: of the confirmed. Exception: of the tracked. Delivered: of the tracked that didn't fail. Proof of delivery: of the delivered. Cancel: of the failed collections. A Proof of delivery with reservations always comes with a delivery and a Proof of delivery, so with the delivered or Proof of delivery share at 0 those Exceptions still deliver, and they count towards the share.
+- **Answers.** A Carrier confirms with a booking reference of its own (the Persona's prefix, `VDT-SIM<run>-<n>`), or declines with `NO_CAPACITY`. It answers the Carrier booking number the release returned. A silent Carrier leaves a *No answer* line and nothing else.
+- **Tracking, in order.** A tracked Shipment reports `PU`, `DEP`, `ARR`, `OFD` and `POD` (Delivered), a minute apart and the last one now, because Norvia refuses a time in the future. One that isn't delivered stops at one of the first four. Norvia accepts each message at once and processes it later (ADR 0008).
+- **Proof of delivery by claim check** (ADR 0009) for the delivered share: a small PDF, clean, or with reservations and a remark when the Shipment is one of the Exceptions.
+- **Exceptions** come from the tracking and Proofs of delivery themselves, in an even mix chosen by the seed: a failed collection (`NPU`, the Shipment stays Booked), a failed delivery (`NDL`), damage on the way (`DMG`, the Shipment goes on) and a Proof of delivery with reservations. Norvia opens each Exception a little later, so after the last Shipment the Planner asks the TMS for the Open Exceptions (every `Simulator:ExceptionPollSeconds`, up to `Simulator:ExceptionPollAttempts` times) and logs *Exception found* for each. An Exception that doesn't open in time is noted.
+- **Cancellations.** For the configured share of the failed collections the Planner cancels the Confirmed Carrier booking from the Exception (ADR 0010) and resolves it as Replanned: the Shipment is back on *Shipments to release*, Cancelled by Norvia. The other Exceptions stay open for the Planner to handle in the TMS UI.
+- **Refusals are outcomes.** What Norvia refuses (`BOOKING_NOT_OPEN`, `ShipmentAlreadyCollected`, ...) is logged with its code, never its text, and that Shipment's journey ends there; the run goes on. A call that doesn't reach Norvia is *Carrier not received*.
+- **The Carriers' Personas are on Manual in the seed.** The Partner portal answers a Persona's requests by itself only when the Persona is set to Auto-confirm, and an automatic answer a few seconds after the Simulator's would answer the bookings it left unanswered on purpose. Keep them on Manual while the Simulator runs. The portal's inbox shows the requests the Simulator answers as still open: the Simulator answers through the Partner API, not the portal.
+
+A Carrier's calls are sent in spans named for what they do (`Answer Carrier booking`, `Send tracking`, `Send Proof of delivery`) and logged with the tracking keys the Simulator knows (`flow` `carrier-answer`, `carrier-tracking` or `carrier-proof-of-delivery`, `partyId`, `carrierBookingNumber`, `correlationId`, `outcome`).
 
 ## Presenter smoke run
 
 1. Run the AppHost and open `simulator-web`.
 2. Choose *Quiet Monday* and **Preview plan**: 20 bookings, 1 of them bad, and the Planner assigning most of the orders Norvia is expected to accept.
-3. **Start run**. Watch the log fill: each line names a correlation ID. When the bookings are in, the Planner's lines follow: *Assign Transport Order*, with the Shipment number.
-4. Open a line's **Message trail**: the Integration console finds the trail, with the Partner API call, the intake and the TMS call; for a Planner line, the TMS API call and the `ShipmentPlanned` it published. Search the TMS UI's Transport Orders for `SIM-1-`: the assigned ones have left *Transport Orders waiting for planning* and are on *Shipments to release*, carried by Own fleet or a Carrier.
+3. **Start run**. Watch the log fill: each line names a correlation ID. When the bookings are in, the Planner's lines follow: *Assign Transport Order*, with the Shipment number. Then, one Shipment at a time, *Release Shipment* and the Carrier's *Answer Carrier booking*, *Send tracking* and *Send Proof of delivery*, and last the *Exception found* lines and the Planner's cancellations.
+4. Open a line's **Message trail**: the Integration console finds the trail, with the Partner API call, the intake and the TMS call; for a Planner line, the TMS API call and the `ShipmentPlanned` it published; for a Carrier's line, the Partner API call and, behind it, the Carrier-answer Logic App or the tracking or Proof of delivery path. Search the TMS UI's Transport Orders for `SIM-1-`: the Carriers' Shipments are Booked, In transit or Delivered, a few with Proofs of delivery, and the Open Exceptions list shows the failures. The Shipper's tracking screen in the Partner portal (P8) shows the same Shipments.

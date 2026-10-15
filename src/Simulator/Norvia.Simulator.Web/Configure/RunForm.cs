@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Norvia.Simulator.Domain.Carriers;
 using Norvia.Simulator.Domain.Runs;
 
 namespace Norvia.Simulator.Web.Configure;
@@ -31,6 +32,30 @@ public sealed class RunForm : IValidatableObject
     [Range(0, 100, ErrorMessage = "The share of assignments the Planner reassigns is a percentage from 0 to 100.")]
     public int ReassignPercent { get; set; } = SimulationSettings.DefaultReassignPercent;
 
+    [Range(0, 100, ErrorMessage = "The share of Shipments the Planner releases is a percentage from 0 to 100.")]
+    public int ReleasePercent { get; set; } = CarrierShares.DefaultReleasePercent;
+
+    [Range(0, 100, ErrorMessage = "The share of released Shipments the Carriers confirm is a percentage from 0 to 100.")]
+    public int ConfirmPercent { get; set; } = CarrierShares.DefaultConfirmPercent;
+
+    [Range(0, 100, ErrorMessage = "The share of released Shipments the Carriers decline is a percentage from 0 to 100.")]
+    public int DeclinePercent { get; set; } = CarrierShares.DefaultDeclinePercent;
+
+    [Range(0, 100, ErrorMessage = "The share of confirmed Shipments the Carriers track is a percentage from 0 to 100.")]
+    public int TrackedPercent { get; set; } = CarrierShares.DefaultTrackedPercent;
+
+    [Range(0, 100, ErrorMessage = "The share of tracked Shipments that hit an Exception is a percentage from 0 to 100.")]
+    public int ExceptionPercent { get; set; } = CarrierShares.DefaultExceptionPercent;
+
+    [Range(0, 100, ErrorMessage = "The share of tracked Shipments that are delivered is a percentage from 0 to 100.")]
+    public int DeliveredPercent { get; set; } = CarrierShares.DefaultDeliveredPercent;
+
+    [Range(0, 100, ErrorMessage = "The share of delivered Shipments with a Proof of delivery is a percentage from 0 to 100.")]
+    public int ProofOfDeliveryPercent { get; set; } = CarrierShares.DefaultProofOfDeliveryPercent;
+
+    [Range(0, 100, ErrorMessage = "The share of failed collections the Planner cancels is a percentage from 0 to 100.")]
+    public int CancelPercent { get; set; } = CarrierShares.DefaultCancelPercent;
+
     public string Mode { get; set; } = nameof(RunMode.Burst);
 
     [Range(1, SimulationSettings.MaxWindowMinutes, ErrorMessage = "A paced run is spread over 1 to 240 minutes.")]
@@ -46,7 +71,11 @@ public sealed class RunForm : IValidatableObject
         Orders, BadPercent, TodayPercent, Seed, Enum.Parse<RunMode>(Mode),
         IsPaced ? TimeSpan.FromMinutes(WindowMinutes) : TimeSpan.Zero,
         Preset == CustomPreset ? null : Preset,
-        AssignedPercent, OwnFleetPercent, ReassignPercent);
+        AssignedPercent, OwnFleetPercent, ReassignPercent)
+    {
+        Carriers = new CarrierShares(
+            ReleasePercent, ConfirmPercent, DeclinePercent, TrackedPercent, ExceptionPercent, DeliveredPercent, ProofOfDeliveryPercent, CancelPercent),
+    };
 
     public void Fill(Preset preset)
     {
@@ -58,6 +87,15 @@ public sealed class RunForm : IValidatableObject
         AssignedPercent = preset.AssignedPercent;
         OwnFleetPercent = preset.OwnFleetPercent;
         ReassignPercent = preset.ReassignPercent;
+        var carriers = preset.Carriers ?? new CarrierShares();
+        ReleasePercent = carriers.ReleasePercent;
+        ConfirmPercent = carriers.ConfirmPercent;
+        DeclinePercent = carriers.DeclinePercent;
+        TrackedPercent = carriers.TrackedPercent;
+        ExceptionPercent = carriers.ExceptionPercent;
+        DeliveredPercent = carriers.DeliveredPercent;
+        ProofOfDeliveryPercent = carriers.ProofOfDeliveryPercent;
+        CancelPercent = carriers.CancelPercent;
         Mode = preset.Mode.ToString();
         WindowMinutes = preset.Mode == RunMode.Paced ? (int)preset.Window.TotalMinutes : WindowMinutes;
     }

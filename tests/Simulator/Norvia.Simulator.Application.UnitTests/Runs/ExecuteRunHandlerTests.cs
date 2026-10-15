@@ -29,7 +29,7 @@ public sealed class ExecuteRunHandlerTests
     }
 
     private ExecuteRunHandler Handler(int concurrency = 3) =>
-        new(_runs, _log, _api, _tms, _world, new SimulationLimits(50, concurrency), _time);
+        new(_runs, _log, _api, _tms, _world, new SimulationLimits(50, concurrency), _time, new CarrierPacing(TimeSpan.Zero, 1));
 
     private SimulationRun Active(SimulationSettings settings)
     {

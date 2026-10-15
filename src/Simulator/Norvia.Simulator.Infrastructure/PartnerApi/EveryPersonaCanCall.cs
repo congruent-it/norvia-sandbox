@@ -3,19 +3,22 @@ using Norvia.Simulator.Application.Ports;
 
 namespace Norvia.Simulator.Infrastructure.PartnerApi;
 
-/// <summary>Fails at startup when a Persona the Simulator books as has no client ID or subscription key to call Norvia with.</summary>
+/// <summary>Fails at startup when a Persona the Simulator books or plays a Carrier as has no client ID or subscription key to call Norvia with.</summary>
 internal sealed class EveryPersonaCanCall(IWorldSource world) : IValidateOptions<PartnerApiOptions>
 {
     public ValidateOptionsResult Validate(string? name, PartnerApiOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
         var failures = new List<string>();
-        foreach (var shipper in world.Load().Shippers)
+        var loaded = world.Load();
+        var personaIds = loaded.Shippers.Select(shipper => shipper.PersonaId)
+            .Concat((loaded.Carriers ?? []).Where(carrier => carrier.Active && carrier.HasPersona).Select(carrier => carrier.PersonaId!));
+        foreach (var personaId in personaIds)
         {
             try
             {
-                options.ClientIdOf(shipper.PersonaId);
-                options.SubscriptionKeyOf(shipper.PersonaId);
+                options.ClientIdOf(personaId);
+                options.SubscriptionKeyOf(personaId);
             }
             catch (InvalidOperationException missing)
             {

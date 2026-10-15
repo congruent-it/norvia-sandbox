@@ -24,7 +24,21 @@ internal sealed class RunLogWriter(IRepository<LogEntry> log, SimulationRunId ru
         CancellationToken cancellationToken) =>
         AddAsync(sequence => LogEntry.Planning(
             runId, sequence, at, action, answer.Outcome, answer.CorrelationId,
-            booking.Reference, transportOrderNumber, answer.ShipmentNumber, PlanningDetail(intent, answer)),
+            booking.Reference, transportOrderNumber, answer.ShipmentNumber, Detail(intent, answer.Detail, "TMS")),
+            cancellationToken);
+
+    /// <summary>A call a Carrier made as its Persona on one of the Shipments it carries.</summary>
+    public Task CarrierAsync(DateTimeOffset at, PlannedShipment shipment, string action, CarrierCallAnswer answer, string? detail, CancellationToken cancellationToken) =>
+        AddAsync(sequence => LogEntry.Carrier(
+            runId, sequence, at, ActorOf(shipment), action, answer.Outcome, answer.CorrelationId,
+            shipment.Booking.Reference, shipment.TransportOrderNumber, shipment.ShipmentNumber, Detail(detail, answer.Detail, "Norvia")),
+            cancellationToken);
+
+    /// <summary>A Carrier that was asked and said nothing: no call, so no correlation ID.</summary>
+    public Task SilenceAsync(DateTimeOffset at, PlannedShipment shipment, string action, string? detail, CancellationToken cancellationToken) =>
+        AddAsync(sequence => LogEntry.Carrier(
+            runId, sequence, at, ActorOf(shipment), action, LogOutcome.NoAnswer, null,
+            shipment.Booking.Reference, shipment.TransportOrderNumber, shipment.ShipmentNumber, detail),
             cancellationToken);
 
     public Task NoteAsync(DateTimeOffset at, string text, CancellationToken cancellationToken) =>
@@ -43,17 +57,21 @@ internal sealed class RunLogWriter(IRepository<LogEntry> log, SimulationRunId ru
         }
     }
 
+    private static string ActorOf(PlannedShipment shipment) => shipment.Carrier.PersonaName ?? shipment.Carrier.Name;
+
+    // What the actor meant, then what the system on the other side said.
+    private static string? Detail(string? meant, string? said, string system) => (meant, said) switch
+    {
+        (null, null) => null,
+        (null, { } reply) => $"{system}: {reply}",
+        ({ } intent, null) => intent,
+        ({ } intent, { } reply) => $"{intent}. {system}: {reply}",
+    };
+
     private static string BookingDetail(PlannedBooking booking, BookingAnswer answer)
     {
         var intent = booking.Bad is { } bad ? $"Bad booking ({bad}), expected {booking.Expected}" : "Good booking";
         return answer.Detail is { } said ? $"{intent}. Norvia: {said}" : intent;
     }
 
-    private static string? PlanningDetail(string? intent, PlannerAnswer answer) => (intent, answer.Detail) switch
-    {
-        (null, null) => null,
-        (null, { } said) => $"TMS: {said}",
-        ({ } meant, null) => meant,
-        ({ } meant, { } said) => $"{meant}. TMS: {said}",
-    };
 }

@@ -1,3 +1,5 @@
+using Norvia.Simulator.Domain.Carriers;
+
 namespace Norvia.Simulator.Domain.Runs;
 
 /// <summary>What the presenter configures for a run. The same settings and the same seed always give the same Simulation plan.</summary>
@@ -13,6 +15,9 @@ public sealed record SimulationSettings(
     int OwnFleetPercent = SimulationSettings.DefaultOwnFleetPercent,
     int ReassignPercent = SimulationSettings.DefaultReassignPercent)
 {
+    /// <summary>The Carrier stage of the funnel: what becomes of the Shipments assigned to a Carrier. A plan made before it existed has the defaults.</summary>
+    public CarrierShares Carriers { get; init; } = new();
+
     public const int DefaultAssignedPercent = 80;
     public const int DefaultOwnFleetPercent = 50;
     public const int DefaultReassignPercent = 5;
@@ -68,6 +73,7 @@ public sealed record SimulationSettings(
             problems.Add($"A paced run is spread over 1 to {MaxWindowMinutes} minutes.");
         }
 
+        problems.AddRange(Carriers.Problems());
         return problems;
     }
 }

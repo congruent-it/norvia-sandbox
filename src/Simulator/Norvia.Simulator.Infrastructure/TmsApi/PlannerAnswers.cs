@@ -16,6 +16,12 @@ internal static class PlannerAnswers
 
     public static PlannerAnswer Reassigned(int statusCode, string body, string? correlationHeader, string shipmentNumber) => Read(statusCode, body, correlationHeader, LogOutcome.Reassigned, shipmentNumber, [200]);
 
+    public static PlannerAnswer Released(int statusCode, string body, string? correlationHeader) => Read(statusCode, body, correlationHeader, LogOutcome.Released, shipmentNumber: null, [200]);
+
+    public static PlannerAnswer Cancelled(int statusCode, string body, string? correlationHeader) => Read(statusCode, body, correlationHeader, LogOutcome.BookingCancelled, shipmentNumber: null, [200]);
+
+    public static PlannerAnswer Resolved(int statusCode, string body, string? correlationHeader) => Read(statusCode, body, correlationHeader, LogOutcome.ExceptionResolved, shipmentNumber: null, [200]);
+
     public static PlannerAnswer NotReceived(string detail) => new(LogOutcome.PlanningNotReceived, null, null, detail);
 
     public static IReadOnlyList<FleetDay>? Days(string body)
@@ -42,6 +48,28 @@ internal static class PlannerAnswers
         return result;
     }
 
+    /// <summary>The Open Exceptions of the TMS's list, or null when the answer isn't a list the Planner can read.</summary>
+    public static IReadOnlyList<OpenExceptionSummary>? OpenExceptions(string body)
+    {
+        if (Parse(body) is not JsonArray exceptions)
+        {
+            return null;
+        }
+
+        var result = new List<OpenExceptionSummary>(exceptions.Count);
+        foreach (var exception in exceptions.OfType<JsonObject>())
+        {
+            if (Text(exception, "exceptionNumber") is not { } number || Text(exception, "shipmentNumber") is not { } shipment || Text(exception, "type") is not { } type)
+            {
+                return null;
+            }
+
+            result.Add(new OpenExceptionSummary(number, shipment, type));
+        }
+
+        return result;
+    }
+
     private static PlannerAnswer Read(int statusCode, string body, string? correlationHeader, LogOutcome success, string? shipmentNumber, int[] successStatuses)
     {
         var json = Parse(body) as JsonObject;
@@ -49,7 +77,7 @@ internal static class PlannerAnswers
 
         if (successStatuses.Contains(statusCode) && json is not null)
         {
-            return new PlannerAnswer(success, correlationId, shipmentNumber ?? Text(json, "shipmentNumber"), null);
+            return new PlannerAnswer(success, correlationId, shipmentNumber ?? Text(json, "shipmentNumber"), null, CarrierBookingNumber: Text(json, "carrierBookingNumber"));
         }
 
         // A refusal names its rule by a stable code. Never its message, which may quote what was booked.

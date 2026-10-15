@@ -29,6 +29,9 @@
   <!-- Embedded, so the unit tests read the contracts and the seed file without touching the file system (coding guidelines §10). -->
   <ItemGroup>
     <EmbeddedResource Include="..\..\..\contracts\partner-api\booking.v1.schema.json" LogicalName="PartnerApi/booking.v1.schema.json" />
+    <EmbeddedResource Include="..\..\..\contracts\partner-api\carrier-answer.v1.schema.json" LogicalName="PartnerApi/carrier-answer.v1.schema.json" />
+    <EmbeddedResource Include="..\..\..\contracts\partner-api\carrier-tracking.v1.schema.json" LogicalName="PartnerApi/carrier-tracking.v1.schema.json" />
+    <EmbeddedResource Include="..\..\..\contracts\partner-api\carrier-proof-of-delivery.v1.schema.json" LogicalName="PartnerApi/carrier-proof-of-delivery.v1.schema.json" />
     <EmbeddedResource Include="..\..\..\seed\norvia.seed.json" LogicalName="seed/norvia.seed.json" />
   </ItemGroup>
 </Project>

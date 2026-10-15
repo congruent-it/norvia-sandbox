@@ -35,6 +35,30 @@ public sealed class PreviewPlanHandlerTests
     }
 
     [Fact]
+    public async Task Handle_CarrierShares_ShowTheCarrierStageOfTheFunnelForTheShipmentsMeantForACarrier()
+    {
+        var settings = TestData.Settings(
+            orders: 20, bad: 0, assigned: 100, ownFleet: 0,
+            carriers: new Norvia.Simulator.Domain.Carriers.CarrierShares(ReleasePercent: 50, ConfirmPercent: 80, DeclinePercent: 10, TrackedPercent: 100, ExceptionPercent: 0, DeliveredPercent: 50, ProofOfDeliveryPercent: 100));
+
+        var result = await Handler().Handle(new PreviewPlanQuery(settings), CancellationToken.None);
+
+        var counts = result.Value.Carriers.Counts;
+        result.Value.Carriers.Shipments.Should().Be(20);
+        (counts.Released, counts.Confirmed, counts.Declined, counts.NoAnswer, counts.Delivered, counts.ProofsOfDelivery).Should().Be((10, 8, 1, 1, 4, 4));
+    }
+
+    [Fact]
+    public async Task Handle_OrdersMeantForOwnFleetFirst_AreNotCountedForTheCarriers()
+    {
+        var settings = TestData.Settings(orders: 20, bad: 0, assigned: 100, ownFleet: 25);
+
+        var result = await Handler().Handle(new PreviewPlanQuery(settings), CancellationToken.None);
+
+        result.Value.Carriers.Shipments.Should().Be(15);
+    }
+
+    [Fact]
     public async Task Handle_PlannerShares_ShowTheAssignmentStageOfTheFunnel()
     {
         var settings = TestData.Settings(orders: 20, bad: 0, assigned: 50, ownFleet: 40, reassign: 20);

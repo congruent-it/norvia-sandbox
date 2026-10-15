@@ -107,6 +107,21 @@ public sealed class ConfigureRunTests : SimulatorWebContext
     }
 
     [Fact]
+    public void Render_HasAFieldForEachShareOfTheCarrierStage()
+    {
+        var page = Render<ConfigureRun>();
+
+        foreach (var label in new[]
+        {
+            "Released by the Planner (%)", "Confirmed by the Carrier (%)", "Declined by the Carrier (%)", "Tracked (%)", "Exceptions on the way (%)",
+            "Delivered (%)", "With a Proof of delivery (%)", "Failed collections cancelled (%)",
+        })
+        {
+            Field(page, label).Should().NotBeNull(label);
+        }
+    }
+
+    [Fact]
     public void Preview_GoesToThePlanPreviewWithTheSettingsInTheAddress()
     {
         var page = Render<ConfigureRun>();
@@ -114,7 +129,7 @@ public sealed class ConfigureRunTests : SimulatorWebContext
 
         page.Find("form").Submit();
 
-        Address.Should().EndWith("/plan?orders=30&bad=5&today=30&seed=777&mode=Burst&window=0&assigned=90&ownfleet=60&reassign=5&preset=Quiet%20Monday");
+        Address.Should().EndWith("/plan?orders=30&bad=5&today=30&seed=777&mode=Burst&window=0&assigned=90&ownfleet=60&reassign=5&release=100&confirm=80&decline=10&tracked=90&exception=10&delivered=80&pod=90&cancel=50&preset=Quiet%20Monday");
     }
 
     [Fact]
