@@ -29,11 +29,11 @@ namespace Norvia.Simulator.Web.IntegrationTests;
 public sealed class SimulatorFixture : IAsyncLifetime
 {
     // What the booking path doesn't use only costs startup time and memory. The Integration console stays: the Simulator's settings point at it.
+    // So do the tracking and Proof of delivery workers: the Carriers' tracking and Proofs of delivery only reach the TMS through them.
     private static readonly string[] Unneeded =
     [
         "dbgate", "tms-web", "partner-portal", "partner-portal-migrations", "partner-portal-web", "driver-app-migrations", "driver-app-api", "driver-app-web",
         "booking-worker", "shipper-notification-worker", "carrier-cancellation-worker", "trip-dispatch-worker", "driver-reports-worker",
-        "tracking-worker", "proof-of-delivery-worker",
     ];
 
     private static readonly string[] SimulatorSettings =
@@ -121,12 +121,16 @@ public sealed class SimulatorFixture : IAsyncLifetime
     /// A Simulator whose seed file lists the given Carriers as the only active ones, so the Planner can be sent to a Carrier the TMS knows as
     /// inactive. Everything else is the seed file's.
     /// </summary>
-    public async Task<SimulatorHost> StartSimulatorWithActiveCarriersAsync(CancellationToken cancellationToken, params string[] carrierIds)
+    public Task<SimulatorHost> StartSimulatorWithActiveCarriersAsync(CancellationToken cancellationToken, params string[] carrierIds) =>
+        StartSimulatorWithSeedAsync(cancellationToken, SeedEdits.OnlyCarriers(carrierIds));
+
+    /// <summary>A Simulator whose seed file is changed by the given edits, and is the seed file in everything else.</summary>
+    public async Task<SimulatorHost> StartSimulatorWithSeedAsync(CancellationToken cancellationToken, params Action<JsonObject>[] edits)
     {
         var seed = JsonNode.Parse(await File.ReadAllTextAsync(_settings["Seed:Path"], cancellationToken))!.AsObject();
-        foreach (var carrier in seed["carriers"]!.AsArray().OfType<JsonObject>())
+        foreach (var edit in edits)
         {
-            carrier["active"] = carrierIds.Contains(carrier["id"]!.GetValue<string>());
+            edit(seed);
         }
 
         var copy = Path.Combine(Path.GetTempPath(), $"norvia-seed-{Guid.NewGuid():N}.json");
@@ -156,6 +160,27 @@ public sealed class SimulatorFixture : IAsyncLifetime
 
         response.EnsureSuccessStatusCode();
         return JsonNode.Parse(await response.Content.ReadAsStringAsync(cancellationToken))!.AsObject();
+    }
+
+    /// <summary>What the TMS made of a Shipment's journey: Tracking events, Proofs of delivery, Exceptions and Carrier bookings. Null when the TMS has no such Shipment.</summary>
+    public async Task<JsonObject?> TimelineAsync(string shipmentNumber, CancellationToken cancellationToken)
+    {
+        using var response = await Tms.GetAsync(new Uri($"/v1/shipments/{Uri.EscapeDataString(shipmentNumber)}/tracking-events", UriKind.Relative), cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return JsonNode.Parse(await response.Content.ReadAsStringAsync(cancellationToken))!.AsObject();
+    }
+
+    /// <summary>The Exceptions the TMS has open now.</summary>
+    public async Task<JsonArray> OpenExceptionsAsync(CancellationToken cancellationToken)
+    {
+        using var response = await Tms.GetAsync(new Uri("/v1/exceptions/open", UriKind.Relative), cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return JsonNode.Parse(await response.Content.ReadAsStringAsync(cancellationToken))!.AsArray();
     }
 
     /// <summary>The Shipper references of the Transport Orders and Rejected bookings the TMS holds with the status.</summary>
