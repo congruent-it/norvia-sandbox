@@ -134,6 +134,17 @@ P9 to P12 and the ERP's E1 and E2 are designed in their process docs and not bui
 
 The Integration console's own candidates are Logic Apps without tracked properties, and Application Insights retention shorter than run history ([integration-console.md](../operations/integration-console.md#deferred)).
 
+## Agents (planned)
+
+Agents ([ADR 0040](../adr/0040-agents-read-the-estate-through-api-management-have-no-write-tools-and-their-own-identity.md)) are designed and not built, so this table is planned. An Agent is never on a critical path: when a hop below fails, the host UI says "Assistant unavailable" and everything else works. There is a short timeout and no automatic retry.
+
+| Hop | Retry | `failureCode` | Alert | Console | Toggle |
+|---|---|---|---|---|---|
+| **Foundry** (the model and the Agent loop) | None | `AgentUnavailable`, outcome `Failed`. The host application's Agent run span is marked `Failed`. A reply that does not match the expected schema is `AgentUnavailable` too | *Planned*: none | The failed run on the host's trail | *Planned*: no content filter or prompt shield, an unlimited model quota |
+| **APIM** MCP server (a tool call) | None | `AgentToolRefused` (`Refused`): no token, the wrong role, a rate limit (429) or a tool the Agent's definition does not list | *Planned*: none | The tool-call hop, tagged with the Agent's identity and the tool name | *Planned*: an Agent identity with a role wider than read, no per-Agent cap or rate limit |
+| **Agent view** (the application's narrow read API) | As the application's own read API | The application's own failure codes. A 5xx is `AgentToolRefused` to the Agent, which says it could not read | None | The application's hop on the trail | *Planned*: none |
+| **Host application**, the Agent run | None | `AgentUnavailable` when the port times out. No dead letter, no queue | None | The Agent run span | *Planned*: `Agents:Enabled` on in a public Demo UI, no cost tag |
+
 ## Keeping it true
 
 [FailureBehaviourTests](../../tests/Tms/Norvia.Tms.ArchitectureTests/FailureBehaviourTests.cs) fails when the estate declares something this page doesn't name:

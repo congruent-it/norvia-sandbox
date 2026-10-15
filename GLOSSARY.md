@@ -440,3 +440,17 @@ _Avoid_: integration, interface, pipeline, workflow (that is one Logic App's def
 **Hop**:
 One thing the integration layer did on a Message trail: an API Management call, a Logic App run, an application call or a published event, with its flow, time, duration and outcome. A hop that started others caused them; where it started more than one, the trail fans out.
 _Avoid_: step (that is an action inside a Logic App run), span, event
+
+## Agents
+
+**Agent**:
+A Microsoft Foundry agent that reads the estate through API Management's MCP door and answers a person. It has its own Entra agent identity holding only read roles and no write tool, so it never changes anything: the person decides and acts (ADR 0040).
+_Avoid_: bot, copilot, AI, assistant
+
+**Agent run**:
+One question put to an Agent, with its tool calls and its answer, identified by a run ID. It is a span in the host application, and its tool calls are hops on a Message trail tagged with the Agent's identity and the tool name.
+_Avoid_: chat, session, conversation (that is Foundry's own record of a run)
+
+**Suggestion**:
+What an Agent proposes a person do, shown in the host application's UI: a cause or reasoning, the evidence it cites, a suggested action and a confidence. It is not stored, and acting on it is the person's own command, whose trace names the Agent and the run ID.
+_Avoid_: recommendation, proposal, agent action
