@@ -33,6 +33,36 @@ public sealed class LogEntryTests
     }
 
     [Fact]
+    public void Carrier_RecordsWhichCarrierActedOnWhichShipmentAndWhatCameBack()
+    {
+        var entry = LogEntry.Carrier(Run, 4, Now, "Van Dijk Transport", "Answer Carrier booking", LogOutcome.Confirmed, "corr-9", "SIM-1-3", "TO-0000003", "SHP-0000003", "CB-0000042");
+
+        entry.Actor.Should().Be("Van Dijk Transport");
+        entry.Action.Should().Be("Answer Carrier booking");
+        entry.Outcome.Should().Be(LogOutcome.Confirmed);
+        entry.CorrelationId.Should().Be("corr-9");
+        entry.ShipperReference.Should().Be("SIM-1-3");
+        entry.TransportOrderNumber.Should().Be("TO-0000003");
+        entry.ShipmentNumber.Should().Be("SHP-0000003");
+        entry.Detail.Should().Be("CB-0000042");
+    }
+
+    [Fact]
+    public void Outcomes_EachStageOfTheFunnel_HasItsOwn()
+    {
+        LogOutcomes.Planning.Should().Contain([LogOutcome.Released, LogOutcome.BookingCancelled, LogOutcome.ExceptionResolved]);
+        LogOutcomes.Carrier.Should().BeEquivalentTo(
+            [LogOutcome.Confirmed, LogOutcome.Declined, LogOutcome.NoAnswer, LogOutcome.TrackingSent, LogOutcome.ProofOfDeliverySent, LogOutcome.CarrierRefused, LogOutcome.CarrierNotReceived]);
+        LogOutcomes.Booking.Concat(LogOutcomes.Planning).Concat(LogOutcomes.Carrier).Should().OnlyHaveUniqueItems();
+    }
+
+    [Fact]
+    public void Outcomes_TheNamesFitTheDatabasesColumn()
+    {
+        Enum.GetNames<LogOutcome>().Should().OnlyContain(name => name.Length <= 20);
+    }
+
+    [Fact]
     public void Booking_ADetailLongerThanTheDatabaseKeeps_IsCutShort()
     {
         var entry = LogEntry.Booking(Run, 1, Now, "A", "Send booking", LogOutcome.Rejected, null, null, null, new string('x', 900));

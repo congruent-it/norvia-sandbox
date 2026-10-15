@@ -48,6 +48,26 @@ public sealed class SeedFileWorldSourceTests
     }
 
     [Fact]
+    public void Load_TheDemoSeed_GivesEachActiveCarrierItsPersonaAndBookingReferencePrefix()
+    {
+        var carriers = FromDemoSeed().Load().ActiveCarriers;
+
+        var vanDijk = carriers.Single(carrier => carrier.Id == "CAR-0001");
+        vanDijk.PersonaId.Should().Be("van-dijk-transport");
+        vanDijk.PersonaName.Should().Be("Van Dijk Transport");
+        vanDijk.BookingReferencePrefix.Should().Be("VDT");
+        carriers.Should().OnlyContain(carrier => carrier.HasPersona, "a Carrier the Planner assigns to must be able to answer, track and deliver");
+    }
+
+    [Fact]
+    public void Load_ACarrierWithoutAPersona_HasNone()
+    {
+        var seed = """{"shippers":[],"personas":[],"carriers":[{"id":"CAR-0009","name":"Nobody","active":true}]}""";
+
+        new SeedFileWorldSource(new MemoryStream(Encoding.UTF8.GetBytes(seed))).Load().ActiveCarriers.Should().ContainSingle().Which.HasPersona.Should().BeFalse();
+    }
+
+    [Fact]
     public void Load_ASeedWithoutCarriers_HasNone()
     {
         var seed = """{"shippers":[],"personas":[]}""";

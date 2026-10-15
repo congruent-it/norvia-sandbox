@@ -40,8 +40,8 @@ public sealed class SeedFilePersonaDirectoryTests
 
     [Theory]
     [InlineData("van-dijk-transport", "VDT", CarrierAnswerMode.Manual)]
-    [InlineData("kessler-spedition", "KES", CarrierAnswerMode.AutoConfirm)]
-    [InlineData("pakketpunt-express", "PKT", CarrierAnswerMode.AutoConfirm)]
+    [InlineData("kessler-spedition", "KES", CarrierAnswerMode.Manual)]
+    [InlineData("pakketpunt-express", "PKT", CarrierAnswerMode.Manual)]
     public void Find_ACarrierPersona_HasItsReferencePrefix_AndDefaultAnswerMode(string persona, string prefix, CarrierAnswerMode mode)
     {
         var carrier = TheSeedFile().Find(new PersonaId(persona))!.Carrier!;
@@ -53,8 +53,8 @@ public sealed class SeedFilePersonaDirectoryTests
 
     [Theory]
     [InlineData("van-dijk-transport", TrackingMode.Manual)]
-    [InlineData("kessler-spedition", TrackingMode.AutoProgress)]
-    [InlineData("pakketpunt-express", TrackingMode.AutoProgress)]
+    [InlineData("kessler-spedition", TrackingMode.Manual)]
+    [InlineData("pakketpunt-express", TrackingMode.Manual)]
     public void Find_ACarrierPersona_HasItsDefaultTrackingMode_WithADelayOfAFewSeconds(string persona, TrackingMode mode)
     {
         var tracking = TheSeedFile().Find(new PersonaId(persona))!.Carrier!.DefaultTrackingPolicy;

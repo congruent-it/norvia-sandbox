@@ -13,8 +13,9 @@
 
 <h1>Configure a run</h1>
 <p class="text-muted">
-    A run books for the estate's Shippers through the Norvia Partner API, as each Shipper's Persona, and then plans what Norvia
-    accepted through the TMS API, as the Planner, so every booking and every assignment has a real Message trail. Choose a Preset or
+    A run books for the estate's Shippers through the Norvia Partner API, as each Shipper's Persona, plans what Norvia
+    accepted through the TMS API, as the Planner, and then has the Carriers answer, track and deliver what went to them, as their
+    Personas, so every booking, assignment and Carrier message has a real Message trail. Choose a Preset or
     set the numbers yourself, then preview the plan: the same seed always gives the same plan.
 </p>
 
@@ -71,6 +72,14 @@ else
             <FluentNumberField TValue="int" @bind-Value="_form.AssignedPercent" Label="Assigned by the Planner (%)" Min="0" Max="100" />
             <FluentNumberField TValue="int" @bind-Value="_form.OwnFleetPercent" Label="To Own fleet where it fits (%)" Min="0" Max="100" />
             <FluentNumberField TValue="int" @bind-Value="_form.ReassignPercent" Label="Reassigned (%)" Min="0" Max="100" />
+            <FluentNumberField TValue="int" @bind-Value="_form.ReleasePercent" Label="Released by the Planner (%)" Min="0" Max="100" />
+            <FluentNumberField TValue="int" @bind-Value="_form.ConfirmPercent" Label="Confirmed by the Carrier (%)" Min="0" Max="100" />
+            <FluentNumberField TValue="int" @bind-Value="_form.DeclinePercent" Label="Declined by the Carrier (%)" Min="0" Max="100" />
+            <FluentNumberField TValue="int" @bind-Value="_form.TrackedPercent" Label="Tracked (%)" Min="0" Max="100" />
+            <FluentNumberField TValue="int" @bind-Value="_form.ExceptionPercent" Label="Exceptions on the way (%)" Min="0" Max="100" />
+            <FluentNumberField TValue="int" @bind-Value="_form.DeliveredPercent" Label="Delivered (%)" Min="0" Max="100" />
+            <FluentNumberField TValue="int" @bind-Value="_form.ProofOfDeliveryPercent" Label="With a Proof of delivery (%)" Min="0" Max="100" />
+            <FluentNumberField TValue="int" @bind-Value="_form.CancelPercent" Label="Failed collections cancelled (%)" Min="0" Max="100" />
             <FluentSelect TOption="string" Label="Sending" @bind-Value="_form.Mode">
                 <FluentOption TOption="string" Value="@nameof(RunMode.Burst)">Burst, as fast as the estate accepts</FluentOption>
                 <FluentOption TOption="string" Value="@nameof(RunMode.Paced)">Paced, spread over a window</FluentOption>

@@ -26,4 +26,37 @@ public enum LogOutcome
 
     /// <summary>The Planner's call didn't reach the TMS, or its answer couldn't be read.</summary>
     PlanningNotReceived,
+
+    /// <summary>The Planner released a Planned Shipment, handing it to its Carrier, which created its Carrier booking.</summary>
+    Released,
+
+    /// <summary>The Planner cancelled the Confirmed Carrier booking of the Shipment of an open Exception.</summary>
+    BookingCancelled,
+
+    /// <summary>The Planner resolved an Exception.</summary>
+    ExceptionResolved,
+
+    /// <summary>The Planner found the Exception a tracking event opened.</summary>
+    ExceptionFound,
+
+    /// <summary>A Carrier confirmed its Carrier booking.</summary>
+    Confirmed,
+
+    /// <summary>A Carrier declined its Carrier booking.</summary>
+    Declined,
+
+    /// <summary>A Carrier was asked and gave no answer: its Carrier booking stays Requested.</summary>
+    NoAnswer,
+
+    /// <summary>Norvia accepted a Carrier's tracking message.</summary>
+    TrackingSent,
+
+    /// <summary>Norvia accepted a Carrier's Proof of delivery.</summary>
+    ProofOfDeliverySent,
+
+    /// <summary>Norvia refused a Carrier's answer, tracking message or Proof of delivery, with a code that says which rule it broke.</summary>
+    CarrierRefused,
+
+    /// <summary>A Carrier's call didn't reach Norvia, or its answer couldn't be read.</summary>
+    CarrierNotReceived,
 }

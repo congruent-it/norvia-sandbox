@@ -201,9 +201,9 @@ else
 
     private static string OutcomeClass(LogOutcome outcome) => outcome switch
     {
-        LogOutcome.Rejected or LogOutcome.Refused or LogOutcome.NotReceived or LogOutcome.PlanningRefused or LogOutcome.PlanningNotReceived => "font-bold text-danger",
-        LogOutcome.AlreadyBooked => "text-warning",
-        LogOutcome.Accepted or LogOutcome.Planned or LogOutcome.Reassigned => "text-success",
+        LogOutcome.Rejected or LogOutcome.Refused or LogOutcome.NotReceived or LogOutcome.PlanningRefused or LogOutcome.PlanningNotReceived or LogOutcome.CarrierRefused or LogOutcome.CarrierNotReceived => "font-bold text-danger",
+        LogOutcome.AlreadyBooked or LogOutcome.Declined or LogOutcome.NoAnswer or LogOutcome.ExceptionFound => "text-warning",
+        LogOutcome.Accepted or LogOutcome.Planned or LogOutcome.Reassigned or LogOutcome.Released or LogOutcome.Confirmed or LogOutcome.TrackingSent or LogOutcome.ProofOfDeliverySent or LogOutcome.BookingCancelled or LogOutcome.ExceptionResolved => "text-success",
         _ => "text-muted",
     };
 

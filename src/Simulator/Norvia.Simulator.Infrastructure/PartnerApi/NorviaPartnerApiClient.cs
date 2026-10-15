@@ -1,11 +1,14 @@
 using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Norvia.Simulator.Application.Ports;
+using Norvia.Simulator.Domain.Carriers;
 using Norvia.Simulator.Domain.Log;
 using Norvia.Simulator.Domain.Plans;
+using Norvia.Simulator.Domain.Worlds;
 
 namespace Norvia.Simulator.Infrastructure.PartnerApi;
 
@@ -13,7 +16,8 @@ namespace Norvia.Simulator.Infrastructure.PartnerApi;
 /// Books through the Norvia Partner API as the Shipper's Persona: its subscription key names the product, its token says
 /// which party it is (ADR 0005). A booking never names the party. Each is sent in a span of its own, named
 /// <c>Send booking</c> like the Partner portal's, which is the Simulator's hop on the Message trail; once the answer is in it
-/// is logged with the tracking keys it knows (coding guidelines §7).
+/// is logged with the tracking keys it knows (coding guidelines §7). A Carrier answers, tracks and proves delivery the same way, as
+/// its own Persona, each call in a span named for what it does (<see cref="CarrierActions"/>).
 /// </summary>
 internal sealed partial class NorviaPartnerApiClient(
     HttpClient http,
@@ -60,6 +64,97 @@ internal sealed partial class NorviaPartnerApiClient(
         return answer;
     }
 
+    public Task<CarrierCallAnswer> AnswerBookingAsync(SimulatedCarrier carrier, CarrierAnswerRequest answer, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(answer);
+        return SendCarrierAsync(
+            carrier, CarrierActions.Answer, "carrier-answers", "carrier-answer", () => CarrierFormats.Answer(answer), answer.CarrierBookingNumber,
+            (status, body, correlation) => CarrierAnswers.Answered(status, body, correlation), cancellationToken);
+    }
+
+    public Task<CarrierCallAnswer> SendTrackingAsync(SimulatedCarrier carrier, CarrierTrackingRequest tracking, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(tracking);
+        return SendCarrierAsync(
+            carrier, CarrierActions.Track, "carrier-tracking", "carrier-tracking", () => CarrierFormats.Tracking(tracking), tracking.CarrierBookingNumber,
+            (status, body, correlation) => CarrierAnswers.Accepted(status, body, correlation, LogOutcome.TrackingSent), cancellationToken);
+    }
+
+    public Task<CarrierCallAnswer> SendProofOfDeliveryAsync(SimulatedCarrier carrier, CarrierProofRequest proof, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(proof);
+        return SendCarrierAsync(
+            carrier, CarrierActions.ProveDelivery, "carrier-proofs-of-delivery", "carrier-proof-of-delivery", () => CarrierFormats.Proof(proof), proof.CarrierBookingNumber,
+            (status, body, correlation) => CarrierAnswers.Accepted(status, body, correlation, LogOutcome.ProofOfDeliverySent), cancellationToken);
+    }
+
+    private async Task<CarrierCallAnswer> SendCarrierAsync(
+        SimulatedCarrier carrier, string action, string path, string flow, Func<JsonObject> format, string carrierBookingNumber,
+        Func<int, string, string?, CarrierCallAnswer> read, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(carrier);
+        var personaId = carrier.PersonaId ?? throw new InvalidOperationException($"Carrier {carrier.Id} has no Persona to call Norvia as.");
+
+        using var span = activities.Source.StartActivity(action, ActivityKind.Internal);
+        CarrierCallAnswer answer;
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(path, UriKind.Relative)) { Content = JsonContent.Create(format()) };
+            // Buffered, so it goes out with its length, as a booking does.
+            await request.Content.LoadIntoBufferAsync(cancellationToken);
+            request.Headers.Add("Ocp-Apim-Subscription-Key", options.Value.SubscriptionKeyOf(personaId));
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await tokens.GetTokenAsync(personaId, cancellationToken));
+
+            using var response = await http.SendAsync(request, cancellationToken);
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            answer = read((int)response.StatusCode, body, CorrelationIdOf(response));
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Unreachable, too slow, or no token to call with: nothing reached Norvia.
+            LogCarrierNotSent(exception, action, personaId);
+            answer = CarrierAnswers.NotReceived("The call didn't reach the Norvia Partner API.");
+        }
+
+        using (logger.BeginScope(CarrierTrackingKeysOf(flow, carrier.Id, carrierBookingNumber, answer)))
+        {
+            LogCarrierAnswered(action, personaId, answer.Outcome);
+        }
+
+        return answer;
+    }
+
+    /// <summary>
+    /// The tracking contract's keys the Simulator knows of a Carrier's call (coding guidelines §7), so its trace joins Norvia's
+    /// Message trail. A key that doesn't apply is left out, never sent empty.
+    /// </summary>
+    internal static Dictionary<string, object?> CarrierTrackingKeysOf(string flow, string carrierId, string carrierBookingNumber, CarrierCallAnswer answer)
+    {
+        ArgumentNullException.ThrowIfNull(answer);
+
+        var keys = new Dictionary<string, object?> { ["flow"] = flow, ["partyId"] = carrierId, ["carrierBookingNumber"] = carrierBookingNumber };
+        switch (answer.Outcome)
+        {
+            case LogOutcome.Confirmed or LogOutcome.Declined or LogOutcome.TrackingSent or LogOutcome.ProofOfDeliverySent:
+                keys["outcome"] = "Succeeded";
+                break;
+            case LogOutcome.CarrierRefused:
+                keys["outcome"] = "Refused";
+                break;
+            default:
+                keys["outcome"] = "Failed";
+                keys["failureCode"] = "CarrierCallNotReceived";
+                break;
+        }
+
+        if (answer.CorrelationId is { } correlationId)
+        {
+            keys["correlationId"] = correlationId;
+        }
+
+        return keys;
+    }
+
     /// <summary>
     /// The tracking contract's keys the Simulator knows (coding guidelines §7), so its trace joins Norvia's Message trail.
     /// Never what was booked: that holds the Consignee's personal data.
@@ -96,6 +191,12 @@ internal sealed partial class NorviaPartnerApiClient(
 
     private static string? CorrelationIdOf(HttpResponseMessage response) =>
         response.Headers.TryGetValues("X-Correlation-ID", out var values) ? values.FirstOrDefault() : null;
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "{Action} by Persona {PersonaId} didn't reach the Norvia Partner API")]
+    private partial void LogCarrierNotSent(Exception exception, string action, string personaId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Norvia answered {Action} by Persona {PersonaId}: {Outcome}")]
+    private partial void LogCarrierAnswered(string action, string personaId, LogOutcome outcome);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "A booking by Persona {PersonaId} didn't reach the Norvia Partner API")]
     private partial void LogNotSent(Exception exception, string personaId);

@@ -376,7 +376,7 @@ Norvia's own application for the Integration operator to find Message trails, se
 _Avoid_: admin portal, monitoring portal, dashboard
 
 **Simulator**:
-Norvia's own application that feeds the estate with representative orders, shipments and trips at a chosen volume, so demos and the other applications' lists have something real to show. It acts only through the estate's real doors (the Norvia Partner API as each Shipper's Persona, the TMS API as the Planner, and later the Driver app API), never a database or Service Bus, so everything it makes has a Message trail. It keeps its own runs and logs.
+Norvia's own application that feeds the estate with representative orders, shipments and trips at a chosen volume, so demos and the other applications' lists have something real to show. It acts only through the estate's real doors (the Norvia Partner API as each Shipper's and each Carrier's Persona, the TMS API as the Planner, and later the Driver app API), never a database or Service Bus, so everything it makes has a Message trail. It keeps its own runs and logs.
 _Avoid_: seeder, data generator, load tester, fixture
 
 **Simulation run**:
@@ -384,7 +384,7 @@ One go of the Simulator: a Simulation plan sent to the estate, either as fast as
 _Avoid_: job, batch, test run, scenario
 
 **Simulation plan**:
-What a Simulation run will send, made before anything is sent from the run's settings and a seed: the same ones always give the same plan. It holds the bookings and what the Planner means to do with the Transport Orders they become. The Plan preview shows it per Shipper and booking.
+What a Simulation run will send, made before anything is sent from the run's settings and a seed: the same ones always give the same plan. It holds the bookings and what the Planner means to do with the Transport Orders they become. What the Carriers then do with the Shipments that went to them is worked out when they have, from the same seed and the settings' Carrier shares. The Plan preview shows it per Shipper and booking.
 _Avoid_: script, schedule, dataset
 
 **Preset**:

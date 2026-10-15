@@ -8,7 +8,7 @@ namespace Norvia.Simulator.Infrastructure.World;
 /// <summary>
 /// The Shippers the Simulator books for, loaded once from the seed file, the one source of master data (ADR 0002): each
 /// active Shipper that has a Persona and a Rate Card, with the Zones and Lanes of its latest Rate Card version, and the Carriers
-/// the Planner can assign to.
+/// the Planner can assign to, each with the Persona it answers, tracks and delivers as.
 /// </summary>
 internal sealed class SeedFileWorldSource : IWorldSource
 {
@@ -28,11 +28,20 @@ internal sealed class SeedFileWorldSource : IWorldSource
             var seed = JsonSerializer.Deserialize<SeedFile>(seedFile, SeedJson) ?? throw new InvalidDataException("The seed file is empty.");
             _world = new SimulationWorld(
                 [.. seed.Shippers.Where(shipper => shipper.Active).Select(shipper => ToShipper(shipper, seed)).OfType<SimulatedShipper>()],
-                [.. (seed.Carriers ?? []).Select(carrier => new SimulatedCarrier(carrier.Id, carrier.Name, carrier.Active))]);
+                [.. (seed.Carriers ?? []).Select(carrier => ToCarrier(carrier, seed))]);
         }
     }
 
     public SimulationWorld Load() => _world;
+
+    // The Carrier plays its part as its Persona, whose booking reference prefix starts the references it confirms with.
+    private static SimulatedCarrier ToCarrier(SeedCarrier carrier, SeedFile seed)
+    {
+        var persona = seed.Personas.FirstOrDefault(candidate => candidate.Party.Type == "Carrier" && candidate.Party.Id == carrier.Id);
+        return persona?.Carrier?.BookingReferencePrefix is { } prefix
+            ? new SimulatedCarrier(carrier.Id, carrier.Name, carrier.Active, persona.Id, persona.DisplayName, prefix)
+            : new SimulatedCarrier(carrier.Id, carrier.Name, carrier.Active);
+    }
 
     private static SimulatedShipper? ToShipper(SeedShipper shipper, SeedFile seed)
     {
@@ -55,7 +64,9 @@ internal sealed class SeedFileWorldSource : IWorldSource
 
     private sealed record SeedShipper(string Id, string Name, bool Active);
 
-    private sealed record SeedPersona(string Id, string DisplayName, SeedParty Party);
+    private sealed record SeedPersona(string Id, string DisplayName, SeedParty Party, SeedCarrierPersona? Carrier = null);
+
+    private sealed record SeedCarrierPersona(string? BookingReferencePrefix);
 
     private sealed record SeedParty(string Type, string Id);
 

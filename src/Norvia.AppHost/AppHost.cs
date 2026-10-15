@@ -462,7 +462,7 @@ else
     }
 
     // The Simulator feeds the estate with representative orders, and only through its real doors (ADR 0001): the Partner API, as
-    // each Shipper's Persona, and the TMS API, as the Planner. It has a database of its own for its runs and logs, and is on for a local run. Azure comes with its own slice.
+    // each Shipper's and Carrier's Persona, and the TMS API, as the Planner. It has a database of its own for its runs and logs, and is on for a local run. Azure comes with its own slice.
     var simulatorDatabase = sql.AddDatabase("simulator");
     var simulatorMigrations = builder.AddProject<Projects.Norvia_Simulator_Migrations>("simulator-migrations")
         .WithReference(simulatorDatabase).WaitFor(simulatorDatabase);
@@ -481,7 +481,8 @@ else
         .WithEnvironment("LocalOperator__Roles__0", "Simulator.Run")
         .WithEnvironment("LocalOperator__Roles__1", "Simulator.Read")
         .WithEnvironment("PartnerApi__BaseAddress", ReferenceExpression.Create($"{partnerApi.GetEndpoint("http")}/partner/v1"))
-        .WithEnvironment("PartnerApi__PersonaClientIds", string.Join(';', personas.Where(persona => persona.IsShipper).Select(persona => $"{persona.Id}={LocalTokens.PersonaClientId(persona.Id)}")))
+        // Every Persona: the Shippers book, and the Carriers answer, track and deliver.
+        .WithEnvironment("PartnerApi__PersonaClientIds", string.Join(';', personas.Select(persona => $"{persona.Id}={LocalTokens.PersonaClientId(persona.Id)}")))
         .WithEnvironment("PartnerApi__LocalTokens__Issuer", LocalTokens.Issuer)
         .WithEnvironment("PartnerApi__LocalTokens__Audience", LocalTokens.PartnerApiAudience)
         // The Planner signs its own token for the TMS API, as the TMS UI does: its client ID and the manage role.
@@ -516,6 +517,11 @@ else
             partnerPortal.WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__0", LocalTokens.RespondRole);
             partnerPortal.WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__1", LocalTokens.TrackingSubmitRole);
             partnerPortal.WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__2", LocalTokens.ProofsOfDeliverySubmitRole);
+            // The Simulator plays each Carrier as its Persona: it answers the booking, tracks the Shipment and proves the delivery, with the same subscription key.
+            simulator.WithEnvironment($"PartnerApi__SubscriptionKeys__{persona.Id}", subscriptionKey)
+                .WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__0", LocalTokens.RespondRole)
+                .WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__1", LocalTokens.TrackingSubmitRole)
+                .WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__2", LocalTokens.ProofsOfDeliverySubmitRole);
         }
     }
 

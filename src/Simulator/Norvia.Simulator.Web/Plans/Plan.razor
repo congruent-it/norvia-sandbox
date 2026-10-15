@@ -60,6 +60,14 @@ else
         It reassigns @_preview.Planner.Reassigned (@_preview.Settings.ReassignPercent%).
     </p>
 
+    <p class="text-muted" data-testid="carrier-funnel">
+        Of the @_preview.Carriers.Shipments Shipments meant for a Carrier, the Planner releases @_preview.Carriers.Counts.Released (@_preview.Settings.Carriers.ReleasePercent%).
+        The Carriers confirm @_preview.Carriers.Counts.Confirmed, decline @_preview.Carriers.Counts.Declined and leave @_preview.Carriers.Counts.NoAnswer unanswered.
+        They track @_preview.Carriers.Counts.Tracked, @_preview.Carriers.Counts.Exceptions of which hit an Exception, and deliver @_preview.Carriers.Counts.Delivered,
+        @_preview.Carriers.Counts.ProofsOfDelivery with a Proof of delivery. The Planner cancels @_preview.Carriers.Counts.Cancelled failed collections.
+        These are the most a run can reach: what goes to Own fleet, and what the estate refuses, is known only when it runs.
+    </p>
+
     @if (_startProblems.Count > 0)
     {
         <div role="alert" class="mb-4">
@@ -137,11 +145,37 @@ else
     [SupplyParameterFromQuery(Name = "reassign")]
     private int? Reassign { get; set; }
 
+    [SupplyParameterFromQuery(Name = "release")]
+    private int? Release { get; set; }
+
+    [SupplyParameterFromQuery(Name = "confirm")]
+    private int? Confirm { get; set; }
+
+    [SupplyParameterFromQuery(Name = "decline")]
+    private int? Decline { get; set; }
+
+    [SupplyParameterFromQuery(Name = "tracked")]
+    private int? Tracked { get; set; }
+
+    [SupplyParameterFromQuery(Name = "exception")]
+    private int? ExceptionShare { get; set; }
+
+    [SupplyParameterFromQuery(Name = "delivered")]
+    private int? Delivered { get; set; }
+
+    [SupplyParameterFromQuery(Name = "pod")]
+    private int? ProofOfDelivery { get; set; }
+
+    [SupplyParameterFromQuery(Name = "cancel")]
+    private int? CancelShare { get; set; }
+
     private static string KindOf(PlanRow row) => row.Bad is { } bad ? SimulatorText.Of(bad) : "Good";
 
     protected override async Task OnParametersSetAsync()
     {
-        _settings = PlanLinks.Settings(Orders, Bad, Today, Seed, Mode, Window, Preset, Assigned, OwnFleet, Reassign);
+        _settings = PlanLinks.Settings(
+            Orders, Bad, Today, Seed, Mode, Window, Preset, Assigned, OwnFleet, Reassign,
+            Release, Confirm, Decline, Tracked, ExceptionShare, Delivered, ProofOfDelivery, CancelShare);
         if (_settings is null)
         {
             return;

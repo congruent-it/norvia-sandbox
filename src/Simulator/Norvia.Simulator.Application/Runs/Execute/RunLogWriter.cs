@@ -27,6 +27,20 @@ internal sealed class RunLogWriter(IRepository<LogEntry> log, SimulationRunId ru
             booking.Reference, transportOrderNumber, answer.ShipmentNumber, PlanningDetail(intent, answer)),
             cancellationToken);
 
+    /// <summary>A call a Carrier made as its Persona on one of the Shipments it carries.</summary>
+    public Task CarrierAsync(DateTimeOffset at, PlannedShipment shipment, string action, CarrierCallAnswer answer, string? detail, CancellationToken cancellationToken) =>
+        AddAsync(sequence => LogEntry.Carrier(
+            runId, sequence, at, ActorOf(shipment), action, answer.Outcome, answer.CorrelationId,
+            shipment.Booking.Reference, shipment.TransportOrderNumber, shipment.ShipmentNumber, CarrierDetail(detail, answer)),
+            cancellationToken);
+
+    /// <summary>A Carrier that was asked and said nothing: no call, so no correlation ID.</summary>
+    public Task SilenceAsync(DateTimeOffset at, PlannedShipment shipment, string action, string? detail, CancellationToken cancellationToken) =>
+        AddAsync(sequence => LogEntry.Carrier(
+            runId, sequence, at, ActorOf(shipment), action, LogOutcome.NoAnswer, null,
+            shipment.Booking.Reference, shipment.TransportOrderNumber, shipment.ShipmentNumber, detail),
+            cancellationToken);
+
     public Task NoteAsync(DateTimeOffset at, string text, CancellationToken cancellationToken) =>
         AddAsync(sequence => LogEntry.Note(runId, sequence, at, text), cancellationToken);
 
@@ -42,6 +56,16 @@ internal sealed class RunLogWriter(IRepository<LogEntry> log, SimulationRunId ru
             _one.Release();
         }
     }
+
+    private static string ActorOf(PlannedShipment shipment) => shipment.Carrier.PersonaName ?? shipment.Carrier.Name;
+
+    private static string? CarrierDetail(string? detail, CarrierCallAnswer answer) => (detail, answer.Detail) switch
+    {
+        (null, null) => null,
+        (null, { } said) => $"Norvia: {said}",
+        ({ } meant, null) => meant,
+        ({ } meant, { } said) => $"{meant}. Norvia: {said}",
+    };
 
     private static string BookingDetail(PlannedBooking booking, BookingAnswer answer)
     {

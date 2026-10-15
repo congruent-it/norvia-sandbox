@@ -17,4 +17,12 @@ public sealed class SimulatorOptions
     /// <summary>The cap on requests in flight to the Partner API.</summary>
     [Range(1, 64)]
     public int MaxConcurrentRequests { get; set; } = 8;
+
+    /// <summary>How long the Planner waits between asking the TMS for the Exceptions the Carriers' tracking opens: Norvia processes tracking after it accepts it.</summary>
+    [Range(0, 60)]
+    public int ExceptionPollSeconds { get; set; } = 3;
+
+    /// <summary>How many times the Planner asks for them before it notes that an Exception didn't open.</summary>
+    [Range(1, 100)]
+    public int ExceptionPollAttempts { get; set; } = 10;
 }

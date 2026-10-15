@@ -21,7 +21,8 @@ public sealed class ExecuteRunHandler(
     ITmsApi tmsApi,
     IWorldSource world,
     SimulationLimits limits,
-    TimeProvider time)
+    TimeProvider time,
+    CarrierPacing pacing)
     : ICommandHandler<ExecuteRunCommand, Result>
 {
     // The run's first line, "Run started", is sequence 1.
@@ -40,7 +41,17 @@ public sealed class ExecuteRunHandler(
         using var writer = new RunLogWriter(log, run.Id, FirstSequenceAfterStart);
         var accepted = new ConcurrentBag<AcceptedOrder>();
         var stopped = await SendAllAsync(run, writer, accepted, command.StopSending, cancellationToken);
-        stopped = stopped || await new PlannerStage(tmsApi, time).RunAsync(run, [.. accepted], world.Load(), writer, command.StopSending, cancellationToken);
+        var carrier = CarrierResult.None;
+        if (!stopped)
+        {
+            var planned = await new PlannerStage(tmsApi, time).RunAsync(run, [.. accepted], world.Load(), writer, command.StopSending, cancellationToken);
+            stopped = planned.Stopped;
+            if (!stopped)
+            {
+                carrier = await new CarrierStage(partnerApi, tmsApi, time, pacing).RunAsync(run, planned.CarrierShipments, writer, command.StopSending, cancellationToken);
+                stopped = carrier.Stopped;
+            }
+        }
 
         if (stopped)
         {
@@ -50,7 +61,7 @@ public sealed class ExecuteRunHandler(
 
         run.Complete(time.GetUtcNow());
         await runs.UpdateAsync(run, cancellationToken);
-        await writer.NoteAsync(time.GetUtcNow(), Finished(run), cancellationToken);
+        await writer.NoteAsync(time.GetUtcNow(), Finished(run, carrier), cancellationToken);
         return Result.Success();
     }
 
@@ -87,10 +98,11 @@ public sealed class ExecuteRunHandler(
         return stopSending.IsCancellationRequested;
     }
 
-    private static string Finished(SimulationRun run)
+    private static string Finished(SimulationRun run, CarrierResult carrier)
     {
         var sent = $"Run {run.Number} finished: {run.Plan.Bookings.Count} bookings sent";
-        return run.Plan.Choices.Count == 0 ? sent : $"{sent}, {run.Plan.Choices.Count} Transport Orders for the Planner";
+        var planned = run.Plan.Choices.Count == 0 ? sent : $"{sent}, {run.Plan.Choices.Count} Transport Orders for the Planner";
+        return carrier.Released == 0 ? planned : $"{planned}, {carrier.Released} released, {carrier.Confirmed} confirmed, {carrier.Delivered} delivered";
     }
 
     private async Task SendAsync(

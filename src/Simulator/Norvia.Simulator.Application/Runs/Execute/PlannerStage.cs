@@ -15,15 +15,15 @@ namespace Norvia.Simulator.Application.Runs.Execute;
 /// </summary>
 internal sealed class PlannerStage(ITmsApi tms, TimeProvider time)
 {
-    /// <summary>Plans the accepted orders the plan chose. True when the run was cancelled before it finished.</summary>
-    public async Task<bool> RunAsync(
+    /// <summary>Plans the accepted orders the plan chose. Says whether the run was cancelled before it finished, and which Shipments went to a Carrier.</summary>
+    public async Task<PlannerResult> RunAsync(
         SimulationRun run, IReadOnlyList<AcceptedOrder> accepted, SimulationWorld world, RunLogWriter writer, CancellationToken stopSending, CancellationToken cancellationToken)
     {
         var choices = run.Plan.Choices.ToDictionary(choice => choice.Step);
         var orders = accepted.Where(order => choices.ContainsKey(order.Booking.Step)).OrderBy(order => order.Booking.Step).ToList();
         if (orders.Count == 0)
         {
-            return false;
+            return new PlannerResult(false, []);
         }
 
         var carriers = world.ActiveCarriers;
@@ -34,20 +34,25 @@ internal sealed class PlannerStage(ITmsApi tms, TimeProvider time)
         }
 
         var ledger = new FleetLedger(days ?? []);
+        var onCarriers = new List<PlannedShipment>();
         foreach (var order in orders)
         {
             if (stopSending.IsCancellationRequested)
             {
-                return true;
+                return new PlannerResult(true, onCarriers);
             }
 
-            await PlanAsync(run, order, choices[order.Booking.Step], carriers, ledger, writer, cancellationToken);
+            if (await PlanAsync(run, order, choices[order.Booking.Step], carriers, ledger, writer, cancellationToken) is { } shipment)
+            {
+                onCarriers.Add(shipment);
+            }
         }
 
-        return false;
+        return new PlannerResult(false, onCarriers);
     }
 
-    private async Task PlanAsync(
+    // The Shipment the order ended up as, when a Carrier carries it.
+    private async Task<PlannedShipment?> PlanAsync(
         SimulationRun run, AcceptedOrder order, PlannerChoice choice, IReadOnlyList<SimulatedCarrier> carriers, FleetLedger ledger, RunLogWriter writer,
         CancellationToken cancellationToken)
     {
@@ -65,12 +70,12 @@ internal sealed class PlannerStage(ITmsApi tms, TimeProvider time)
                 ledger.Release(day, booking.Load);
             }
 
-            return;
+            return null;
         }
 
         if (!choice.Reassign)
         {
-            return;
+            return OnCarrier(booking, order, assigned.ShipmentNumber, assignee, carriers);
         }
 
         var target = choice.ReassignTarget(assignee, carriers);
@@ -78,7 +83,7 @@ internal sealed class PlannerStage(ITmsApi tms, TimeProvider time)
         await writer.PlanningAsync(time.GetUtcNow(), PlannerActions.Reassign, booking, order.TransportOrderNumber, reassigned, $"To {target.Name}", cancellationToken);
         if (reassigned.Outcome != LogOutcome.Reassigned)
         {
-            return;
+            return OnCarrier(booking, order, assigned.ShipmentNumber, assignee, carriers);
         }
 
         // The tally follows the order: off Own fleet gives its room back, onto it takes room (the TMS only warns when there is none).
@@ -90,5 +95,13 @@ internal sealed class PlannerStage(ITmsApi tms, TimeProvider time)
         {
             ledger.TryReserve(day, booking.Load);
         }
+
+        return OnCarrier(booking, order, assigned.ShipmentNumber, target, carriers);
     }
+
+    private static PlannedShipment? OnCarrier(
+        PlannedBooking booking, AcceptedOrder order, string shipmentNumber, Assignee assignee, IReadOnlyList<SimulatedCarrier> carriers) =>
+        carriers.FirstOrDefault(carrier => carrier.Id == assignee.CarrierId) is { } carried
+            ? new PlannedShipment(booking, order.TransportOrderNumber, shipmentNumber, carried)
+            : null;
 }

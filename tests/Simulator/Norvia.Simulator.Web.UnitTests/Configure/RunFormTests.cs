@@ -27,6 +27,14 @@ public sealed class RunFormTests
     [InlineData(nameof(RunForm.AssignedPercent), 101)]
     [InlineData(nameof(RunForm.OwnFleetPercent), -1)]
     [InlineData(nameof(RunForm.ReassignPercent), 101)]
+    [InlineData(nameof(RunForm.ReleasePercent), 101)]
+    [InlineData(nameof(RunForm.ConfirmPercent), -1)]
+    [InlineData(nameof(RunForm.DeclinePercent), 101)]
+    [InlineData(nameof(RunForm.TrackedPercent), -1)]
+    [InlineData(nameof(RunForm.ExceptionPercent), 101)]
+    [InlineData(nameof(RunForm.DeliveredPercent), -1)]
+    [InlineData(nameof(RunForm.ProofOfDeliveryPercent), 101)]
+    [InlineData(nameof(RunForm.CancelPercent), -1)]
     public void Validate_AFieldOutOfRange_IsNamedByItsField(string field, int value)
     {
         var form = new RunForm { Limits = TestData.Limits };
@@ -63,6 +71,25 @@ public sealed class RunFormTests
         var settings = form.ToSettings();
 
         (settings.AssignedPercent, settings.OwnFleetPercent, settings.ReassignPercent).Should().Be((70, 30, 10));
+    }
+
+    [Fact]
+    public void ToSettings_CarriesTheCarriersShares()
+    {
+        var form = new RunForm
+        {
+            ReleasePercent = 80, ConfirmPercent = 60, DeclinePercent = 20, TrackedPercent = 85, ExceptionPercent = 20, DeliveredPercent = 70, ProofOfDeliveryPercent = 80, CancelPercent = 40,
+        };
+
+        form.ToSettings().Carriers.Should().Be(new Norvia.Simulator.Domain.Carriers.CarrierShares(80, 60, 20, 85, 20, 70, 80, 40));
+    }
+
+    [Fact]
+    public void Validate_MoreConfirmedAndDeclinedThanReleased_IsAProblemOfTheWholeForm()
+    {
+        var problem = Validate(new RunForm { ConfirmPercent = 70, DeclinePercent = 40, Limits = TestData.Limits }).Should().ContainSingle().Subject;
+
+        problem.ErrorMessage.Should().Contain("confirm and decline more than all");
     }
 
     [Fact]

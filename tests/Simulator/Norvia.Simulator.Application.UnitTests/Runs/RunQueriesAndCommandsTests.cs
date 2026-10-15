@@ -120,6 +120,47 @@ public sealed class RunQueriesAndCommandsTests
         summary.IsActive.Should().BeTrue();
     }
 
+    private static IWorldSource World()
+    {
+        var world = Substitute.For<IWorldSource>();
+        world.Load().Returns(TestData.World);
+        return world;
+    }
+
+    [Fact]
+    public async Task Open_ARunWithTheCarrierStage_CountsWhatTheCarriersDidAndNamesTheirPersonas()
+    {
+        var run = TestData.Run(TestData.Settings(orders: 10, assigned: 100, carriers: new Norvia.Simulator.Domain.Carriers.CarrierShares()));
+        var reads = Substitute.For<IReadRepository<SimulationRun>>();
+        reads.FirstOrDefaultAsync(Arg.Any<ISpecification<SimulationRun>>(), Arg.Any<CancellationToken>()).Returns(run);
+        var lines = Substitute.For<IReadRepository<LogEntry>>();
+        lines.ListAsync(Arg.Any<BookingOutcomesOfRunSpec>(), Arg.Any<CancellationToken>()).Returns([]);
+        lines.ListAsync(Arg.Any<PlanningOutcomesOfRunSpec>(), Arg.Any<CancellationToken>()).Returns([LogOutcome.Planned, LogOutcome.Released]);
+        lines.ListAsync(Arg.Any<CarrierOutcomesOfRunSpec>(), Arg.Any<CancellationToken>())
+            .Returns([LogOutcome.Confirmed, LogOutcome.Confirmed, LogOutcome.Declined, LogOutcome.NoAnswer]);
+
+        var result = await new GetRunHandler(reads, lines, World()).Handle(new GetRunQuery(run.Id), CancellationToken.None);
+
+        result.Value.Outcomes.Should().Contain(new OutcomeCount(LogOutcome.Confirmed, 2)).And.Contain(new OutcomeCount(LogOutcome.Declined, 1))
+            .And.Contain(new OutcomeCount(LogOutcome.NoAnswer, 1)).And.Contain(new OutcomeCount(LogOutcome.Released, 1));
+        result.Value.Actors.Should().Contain(["Planner", "Van Dijk Transport", "Kessler Spedition"]).And.NotContain("Closed Haulage");
+        result.Value.Run.Assigned.Should().Be(1, "only an assignment counts as planned");
+    }
+
+    [Fact]
+    public async Task Open_ARunWithoutTheCarrierStage_NamesNoCarrier()
+    {
+        var run = TestData.Run(TestData.Settings(orders: 10, assigned: 100));
+        var reads = Substitute.For<IReadRepository<SimulationRun>>();
+        reads.FirstOrDefaultAsync(Arg.Any<ISpecification<SimulationRun>>(), Arg.Any<CancellationToken>()).Returns(run);
+        var lines = Substitute.For<IReadRepository<LogEntry>>();
+        lines.ListAsync(Arg.Any<ISpecification<LogEntry, LogOutcome>>(), Arg.Any<CancellationToken>()).Returns([]);
+
+        var result = await new GetRunHandler(reads, lines, World()).Handle(new GetRunQuery(run.Id), CancellationToken.None);
+
+        result.Value.Actors.Should().NotContain("Van Dijk Transport");
+    }
+
     [Fact]
     public async Task Open_ARun_CountsTheAnswersAndNamesTheActors()
     {
@@ -130,8 +171,9 @@ public sealed class RunQueriesAndCommandsTests
         lines.ListAsync(Arg.Any<BookingOutcomesOfRunSpec>(), Arg.Any<CancellationToken>())
             .Returns([LogOutcome.Accepted, LogOutcome.Accepted, LogOutcome.Rejected]);
         lines.ListAsync(Arg.Any<PlanningOutcomesOfRunSpec>(), Arg.Any<CancellationToken>()).Returns([]);
+        lines.ListAsync(Arg.Any<CarrierOutcomesOfRunSpec>(), Arg.Any<CancellationToken>()).Returns([]);
 
-        var result = await new GetRunHandler(reads, lines).Handle(new GetRunQuery(run.Id), CancellationToken.None);
+        var result = await new GetRunHandler(reads, lines, World()).Handle(new GetRunQuery(run.Id), CancellationToken.None);
 
         result.Value.Run.Sent.Should().Be(3);
         result.Value.Run.Assigned.Should().Be(0);
@@ -149,8 +191,9 @@ public sealed class RunQueriesAndCommandsTests
         lines.ListAsync(Arg.Any<BookingOutcomesOfRunSpec>(), Arg.Any<CancellationToken>()).Returns([LogOutcome.Accepted, LogOutcome.Accepted]);
         lines.ListAsync(Arg.Any<PlanningOutcomesOfRunSpec>(), Arg.Any<CancellationToken>())
             .Returns([LogOutcome.Planned, LogOutcome.Reassigned, LogOutcome.Planned, LogOutcome.PlanningRefused]);
+        lines.ListAsync(Arg.Any<CarrierOutcomesOfRunSpec>(), Arg.Any<CancellationToken>()).Returns([]);
 
-        var result = await new GetRunHandler(reads, lines).Handle(new GetRunQuery(run.Id), CancellationToken.None);
+        var result = await new GetRunHandler(reads, lines, World()).Handle(new GetRunQuery(run.Id), CancellationToken.None);
 
         (result.Value.Run.Sent, result.Value.Run.Assigned, result.Value.Run.ToAssign).Should().Be((2, 2, run.Plan.Choices.Count));
         result.Value.Outcomes.Should().Contain(new OutcomeCount(LogOutcome.Planned, 2)).And.Contain(new OutcomeCount(LogOutcome.PlanningRefused, 1));
@@ -160,7 +203,7 @@ public sealed class RunQueriesAndCommandsTests
     [Fact]
     public async Task Open_NoSuchRun_IsNotFound()
     {
-        var result = await new GetRunHandler(Substitute.For<IReadRepository<SimulationRun>>(), Substitute.For<IReadRepository<LogEntry>>())
+        var result = await new GetRunHandler(Substitute.For<IReadRepository<SimulationRun>>(), Substitute.For<IReadRepository<LogEntry>>(), World())
             .Handle(new GetRunQuery(SimulationRunId.New()), CancellationToken.None);
 
         result.Status.Should().Be(ResultStatus.NotFound);

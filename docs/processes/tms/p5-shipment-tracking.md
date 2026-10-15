@@ -157,8 +157,8 @@ Next to its answer mode from P4, each Persona has a **tracking mode**, set on it
 
 | Tracking mode | Behaviour | Default for |
 |---|---|---|
-| Manual | The presenter sends each Tracking event by hand | Van Dijk Transport |
-| Auto-progress | After confirmation, the Persona sends `PU`, `DEP`, `OFD` and `POD` in turn, with a delay between each | Kessler Spedition, PakketPunt Express |
+| Manual | The presenter sends each Tracking event by hand | Every Carrier Persona |
+| Auto-progress | After confirmation, the Persona sends `PU`, `DEP`, `OFD` and `POD` in turn, with a delay between each | — (seeded on Manual, because the [Simulator](../../operations/simulator.md) plays the Carriers; set it on the Carrier page when a demo wants it) |
 
 The delay is a Partner portal setting per Persona, a few seconds by default. Automatic Tracking events go through exactly the same path as manual ones. The portal gives each Tracking event a unique event ID and a location from the Shipment's addresses.
 
@@ -205,7 +205,7 @@ Delivered doesn't wait for a Proof of delivery. [P6](p6-proof-of-delivery.md) at
 
 After a deployment, and not in CI, the presenter checks Shipment tracking end to end on the deployed estate, before the headline incident breaks it. Do it after the presenter smoke run of Carrier booking ([docs/processes/tms/p4-carrier-booking.md](p4-carrier-booking.md#presenter-smoke-run)), whose Booked Shipment it tracks. Open the TMS UI and the Integration console side by side.
 
-1. **Get a Booked Shipment.** Follow P4's run to step 7: Rotterdam to Düsseldorf as Brouwer Dranken, confirmed by Van Dijk Transport. Note the Transport Order number. In the TMS UI, the Shipment is in *Shipments in progress*, Booked, with no Tracking event yet. Then set Kessler Spedition back to *Auto-confirm*, as P4's last step says.
+1. **Get a Booked Shipment.** Follow P4's run to step 7: Rotterdam to Düsseldorf as Brouwer Dranken, confirmed by Van Dijk Transport. Note the Transport Order number. In the TMS UI, the Shipment is in *Shipments in progress*, Booked, with no Tracking event yet. Then set Kessler Spedition back to *Manual*, as P4's last step says.
 2. **Run the check.** Run `infra/smoke-test-shipment-tracking.sh <Transport Order number>`. It posts as Van Dijk Transport, through API Management, from a throwaway Container Apps job running as the Partner portal. It reads the TMS as the intake identity and Application Insights, which is usually 1 to 5 minutes behind. It checks that:
    - `PU`, `DEP` and `POD` each return `202 Accepted`, and the Shipment moves through Collected, In transit and Delivered, in the Planner's *Shipments in progress* until it is Delivered, with the three Tracking events on its timeline, each moving the status;
    - a Tracking event for a reference no Carrier booking has is accepted and lands on the `carrier-tracking` queue's dead-letter queue with `ShipmentNotFound`;

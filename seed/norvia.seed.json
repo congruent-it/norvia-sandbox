@@ -838,7 +838,7 @@
       "clientAppRegistration": "norvia-persona-tuincentrum-groenrijk"
     },
     {
-      "$comment": "A Carrier Persona answers by hand until the presenter changes its answer mode on its page. The prefix starts the booking references it confirms with.",
+      "$comment": "A Carrier Persona answers by hand until the presenter changes its answer mode on its page, and the Simulator plays it for the Shipments it carries (it answers, tracks and delivers as this Persona). The prefix starts the booking references it confirms with.",
       "id": "van-dijk-transport",
       "displayName": "Van Dijk Transport",
       "party": { "type": "Carrier", "id": "CAR-0001" },
@@ -846,19 +846,20 @@
       "carrier": { "bookingReferencePrefix": "VDT", "answer": { "mode": "Manual", "rejectionReason": "NoCapacity", "delaySeconds": 5 }, "tracking": { "mode": "Manual", "delaySeconds": 5 } }
     },
     {
-      "$comment": "Confirms every request after a few seconds, so a demo shows a booking answered without touching the portal (P4); it then sends its Tracking events by itself too (P5).",
+      "$comment": "Answers by hand like the others, because the Simulator plays this Carrier: an automatic answer five seconds after the Simulator's would answer a booking the Simulator left unanswered on purpose. Switch it to Auto-confirm and Auto-progress on its page to show a booking answered without touching the portal (P4) and its Tracking events sent by themselves (P5).",
       "id": "kessler-spedition",
       "displayName": "Kessler Spedition",
       "party": { "type": "Carrier", "id": "CAR-0002" },
       "clientAppRegistration": "norvia-persona-kessler-spedition",
-      "carrier": { "bookingReferencePrefix": "KES", "answer": { "mode": "AutoConfirm", "rejectionReason": "NoCapacity", "delaySeconds": 5 }, "tracking": { "mode": "AutoProgress", "delaySeconds": 5 } }
+      "carrier": { "bookingReferencePrefix": "KES", "answer": { "mode": "Manual", "rejectionReason": "NoCapacity", "delaySeconds": 5 }, "tracking": { "mode": "Manual", "delaySeconds": 5 } }
     },
     {
+      "$comment": "Answers by hand like Kessler Spedition, for the same reason: the Simulator plays this Carrier.",
       "id": "pakketpunt-express",
       "displayName": "PakketPunt Express",
       "party": { "type": "Carrier", "id": "CAR-0003" },
       "clientAppRegistration": "norvia-persona-pakketpunt-express",
-      "carrier": { "bookingReferencePrefix": "PKT", "answer": { "mode": "AutoConfirm", "rejectionReason": "NoCapacity", "delaySeconds": 5 }, "tracking": { "mode": "AutoProgress", "delaySeconds": 5 } }
+      "carrier": { "bookingReferencePrefix": "PKT", "answer": { "mode": "Manual", "rejectionReason": "NoCapacity", "delaySeconds": 5 }, "tracking": { "mode": "Manual", "delaySeconds": 5 } }
     }
   ]
 }

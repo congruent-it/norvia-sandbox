@@ -1,12 +1,13 @@
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Mediator;
+using Norvia.Simulator.Application.Ports;
 using Norvia.Simulator.Domain.Log;
 using Norvia.Simulator.Domain.Runs;
 
 namespace Norvia.Simulator.Application.Runs.Open;
 
-public sealed class GetRunHandler(IReadRepository<SimulationRun> runs, IReadRepository<LogEntry> log)
+public sealed class GetRunHandler(IReadRepository<SimulationRun> runs, IReadRepository<LogEntry> log, IWorldSource world)
     : IQueryHandler<GetRunQuery, Result<RunDetail>>
 {
     public async ValueTask<Result<RunDetail>> Handle(GetRunQuery query, CancellationToken cancellationToken)
@@ -21,7 +22,8 @@ public sealed class GetRunHandler(IReadRepository<SimulationRun> runs, IReadRepo
 
         var answers = await log.ListAsync(new BookingOutcomesOfRunSpec(query.RunId), cancellationToken);
         var planning = await log.ListAsync(new PlanningOutcomesOfRunSpec(query.RunId), cancellationToken);
-        var outcomes = answers.Concat(planning).GroupBy(outcome => outcome)
+        var carriers = await log.ListAsync(new CarrierOutcomesOfRunSpec(query.RunId), cancellationToken);
+        var outcomes = answers.Concat(planning).Concat(carriers).GroupBy(outcome => outcome)
             .Select(group => new OutcomeCount(group.Key, group.Count()))
             .OrderBy(count => count.Outcome)
             .ToList();
@@ -29,6 +31,11 @@ public sealed class GetRunHandler(IReadRepository<SimulationRun> runs, IReadRepo
         if (run.Plan.Choices.Count > 0)
         {
             actors.Add(LogEntry.PlannerActor);
+            if (run.Settings.Carriers.ReleasePercent > 0)
+            {
+                // The Carriers act as their Personas, once the Planner has released what went to them.
+                actors.AddRange(world.Load().ActiveCarriers.Where(carrier => carrier.HasPersona).Select(carrier => carrier.PersonaName!));
+            }
         }
 
         return new RunDetail(RunSummary.From(run, answers.Count, planning.Count(outcome => outcome == LogOutcome.Planned)), outcomes, actors);

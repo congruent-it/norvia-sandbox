@@ -1,3 +1,4 @@
+using Norvia.Simulator.Domain.Carriers;
 using Norvia.Simulator.Domain.Plans;
 using Norvia.Simulator.Domain.Runs;
 using Norvia.Simulator.Domain.Worlds;
@@ -22,15 +23,19 @@ internal static class TestData
             [new RateLane("Utrecht", "Utrecht")]),
     ],
     [
-        new SimulatedCarrier("CAR-0001", "Van Dijk Transport", true),
-        new SimulatedCarrier("CAR-0002", "Kessler Spedition", true),
+        new SimulatedCarrier("CAR-0001", "Van Dijk Transport", true, "van-dijk-transport", "Van Dijk Transport", "VDT"),
+        new SimulatedCarrier("CAR-0002", "Kessler Spedition", true, "kessler-spedition", "Kessler Spedition", "KES"),
         new SimulatedCarrier("CAR-0004", "Closed Haulage", false),
     ]);
 
     public static SimulationSettings Settings(
         int orders = 6, int bad = 0, int seed = 11, RunMode mode = RunMode.Burst, int windowMinutes = 0,
-        int assigned = 0, int ownFleet = 50, int reassign = 0) =>
-        new(orders, bad, 30, seed, mode, TimeSpan.FromMinutes(windowMinutes), null, assigned, ownFleet, reassign);
+        int assigned = 0, int ownFleet = 50, int reassign = 0, CarrierShares? carriers = null) =>
+        new(orders, bad, 30, seed, mode, TimeSpan.FromMinutes(windowMinutes), null, assigned, ownFleet, reassign)
+        {
+            // The Planner's tests don't go on to release what they assign, unless they ask for the Carrier stage.
+            Carriers = carriers ?? new CarrierShares(ReleasePercent: 0),
+        };
 
     public static SimulationRun Run(SimulationSettings? settings = null, int number = 1)
     {
