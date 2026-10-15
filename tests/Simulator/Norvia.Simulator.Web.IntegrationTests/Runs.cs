@@ -32,6 +32,17 @@ internal static class Runs
             Carriers = new Norvia.Simulator.Domain.Carriers.CarrierShares(ReleasePercent: 0),
         };
 
+    /// <summary>
+    /// A run of good bookings that the Planner assigns all to Carriers, whose Carrier stage has the given shares. The shares ask for nothing the
+    /// test does not name: no release, answer, tracking or delivery unless the test says so.
+    /// </summary>
+    public static SimulationSettings Carried(int orders, int seed, Norvia.Simulator.Domain.Carriers.CarrierShares carriers) =>
+        new(orders, BadSharePercent: 0, CollectedTodayPercent: 30, seed, RunMode.Burst, TimeSpan.Zero,
+            AssignedPercent: 100, OwnFleetPercent: 0, ReassignPercent: 0)
+        {
+            Carriers = carriers,
+        };
+
     /// <summary>A run that sends its first booking at once and the next a minute later.</summary>
     public static SimulationSettings Paced(int orders, int seed) =>
         new(orders, BadSharePercent: 0, CollectedTodayPercent: 30, seed, RunMode.Paced, TimeSpan.FromMinutes(orders));
@@ -66,8 +77,15 @@ internal static class Runs
     /// <summary>The lines in which a Persona sent a booking, as opposed to the Simulator's own notes.</summary>
     public static bool IsBooking(LogLine line) => LogOutcomes.Booking.Contains(line.Outcome);
 
+    /// <summary>The lines in which a Carrier called the Partner API.</summary>
+    public static bool IsCarrier(LogLine line) => LogOutcomes.Carrier.Contains(line.Outcome);
+
     /// <summary>The lines in which the Planner called the TMS API.</summary>
     public static bool IsPlanning(LogLine line) => LogOutcomes.Planning.Contains(line.Outcome);
+
+    /// <summary>Waits until the condition holds. The TMS processes what the Carriers send after it accepts it, so what it made of it shows a little later.</summary>
+    public static async Task WaitUntilAsync(Func<Task<bool>> condition, CancellationToken cancellationToken) =>
+        await EventuallyAsync(async () => await condition() ? new object() : null, cancellationToken);
 
     private static async Task<T> EventuallyAsync<T>(Func<Task<T?>> attempt, CancellationToken cancellationToken)
         where T : class
