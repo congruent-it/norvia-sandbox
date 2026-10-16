@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Norvia.Simulator.Application.Configure;
+using Norvia.Simulator.Application.Reset;
 using Norvia.Simulator.Application.Runs;
 using Norvia.Simulator.Domain.Runs;
 using Norvia.Simulator.Web.Configure;
@@ -17,7 +18,11 @@ public sealed class ConfigureRunTests : SimulatorWebContext
     {
         Requests.GetConfigureAsync(Arg.Any<CancellationToken>()).Returns(new ConfigureView(Presets.All, TestData.Limits, 777, 5));
         Requests.ListRunsAsync(Arg.Any<CancellationToken>()).Returns([]);
+        Requests.GetResetReadinessAsync(Arg.Any<CancellationToken>()).Returns(Ready);
     }
+
+    private static EstateResetReadiness Ready { get; } =
+        new(false, EstateApps.All.Select(app => new AppReadiness(app, Reachable: true, Enabled: true, BusySubscription: null)).ToList());
 
     private static AngleSharp.Dom.IElement Field(IRenderedComponent<ConfigureRun> page, string label)
     {
@@ -264,5 +269,122 @@ public sealed class ConfigureRunTests : SimulatorWebContext
         page.Find("fluent-button:contains('Clear history')").Click();
 
         page.Find("[role=alert]").TextContent.Should().Contain("A run is active.");
+    }
+
+    [Fact]
+    public void ResetEstate_WhenTheEstateIsQuiet_IsOffered()
+    {
+        var page = Render<ConfigureRun>();
+
+        page.Find("fluent-button:contains('Reset estate')").HasAttribute("disabled").Should().BeFalse();
+    }
+
+    [Fact]
+    public void ResetEstate_WhenItCannotBeTaken_IsDisabledWithTheReason()
+    {
+        Requests.GetResetReadinessAsync(Arg.Any<CancellationToken>()).Returns(
+            new EstateResetReadiness(false, [new AppReadiness(EstateApp.Tms, Reachable: true, Enabled: false, BusySubscription: null)]));
+        var page = Render<ConfigureRun>();
+
+        page.Find("fluent-button:contains('Reset estate')").HasAttribute("disabled").Should().BeTrue();
+        page.Markup.Should().Contain("The reset is switched off for the TMS.");
+    }
+
+    [Fact]
+    public void ResetEstate_ReadinessThatCannotBeRead_IsDisabledWithAReason()
+    {
+        Requests.GetResetReadinessAsync(Arg.Any<CancellationToken>()).Returns<Task<EstateResetReadiness>>(_ => throw new HttpRequestException());
+        var page = Render<ConfigureRun>();
+
+        page.Find("fluent-button:contains('Reset estate')").HasAttribute("disabled").Should().BeTrue();
+        page.Markup.Should().Contain("couldn't check whether the estate would take a reset");
+    }
+
+    [Fact]
+    public void ResetEstate_AsksForConfirmationFirst_SayingWhatGoesAndWhatStays()
+    {
+        var page = Render<ConfigureRun>();
+
+        page.Find("fluent-button:contains('Reset estate')").Click();
+
+        var dialog = page.Find("[role=alertdialog]");
+        dialog.TextContent.Should().Contain("every Transport Order").And.Contain("SIM-1-1").And.Contain("Shippers, Carriers, Drivers, Vehicles, Rate Cards and Personas stay");
+        Requests.DidNotReceive().ResetEstateAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void ResetEstate_KeepEverything_ResetsNothing()
+    {
+        var page = Render<ConfigureRun>();
+        page.Find("fluent-button:contains('Reset estate')").Click();
+
+        page.Find("fluent-button:contains('Keep everything')").Click();
+
+        page.FindAll("[role=alertdialog]").Should().BeEmpty();
+        Requests.DidNotReceive().ResetEstateAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void ResetEstate_Confirmed_ReportsWhatEachApplicationDeleted()
+    {
+        Requests.ResetEstateAsync(Arg.Any<CancellationToken>()).Returns(Result.Success(new EstateResetReport(
+            [
+                AppResetResult.Done(EstateApp.Tms, [new DeletedKind("Transport Orders", 12)]),
+                AppResetResult.Done(EstateApp.PartnerPortal, []),
+                AppResetResult.Done(EstateApp.DriverApp, [new DeletedKind("Trips", 2), new DeletedKind("Driver reports", 9)]),
+            ],
+            [new DeletedKind("Runs", 1)])));
+        var page = Render<ConfigureRun>();
+        page.Find("fluent-button:contains('Reset estate')").Click();
+
+        page.Find("fluent-button:contains('Delete everything and reset')").Click();
+
+        var result = page.Find("[aria-label='Reset result']").TextContent;
+        result.Should().Contain("The estate is a clean sheet.").And.Contain("TMS: deleted 12 Transport Orders.")
+            .And.Contain("Partner portal: nothing to delete.").And.Contain("Driver app: deleted 2 Trips, 9 Driver reports.").And.Contain("Simulator: deleted 1 Runs.");
+    }
+
+    [Fact]
+    public void ResetEstate_AnApplicationRefused_SaysWhichAndThatItCanBeRunAgain()
+    {
+        Requests.ResetEstateAsync(Arg.Any<CancellationToken>()).Returns(Result.Success(new EstateResetReport(
+            [
+                AppResetResult.Done(EstateApp.Tms, [new DeletedKind("Transport Orders", 12)]),
+                AppResetResult.Refused(EstateApp.PartnerPortal, "It answered 500."),
+                AppResetResult.Done(EstateApp.DriverApp, []),
+            ],
+            [])));
+        var page = Render<ConfigureRun>();
+        page.Find("fluent-button:contains('Reset estate')").Click();
+
+        page.Find("fluent-button:contains('Delete everything and reset')").Click();
+
+        var result = page.Find("[aria-label='Reset result']").TextContent;
+        result.Should().Contain("Not everything was reset").And.Contain("can be run again").And.Contain("Partner portal: refused. It answered 500.");
+        result.Should().NotContain("Simulator:");
+    }
+
+    [Fact]
+    public void ResetEstate_NotTried_ShowsWhy()
+    {
+        Requests.ResetEstateAsync(Arg.Any<CancellationToken>()).Returns(Result<EstateResetReport>.Conflict("The subscription trip-events/trip-dispatch holds unprocessed messages."));
+        var page = Render<ConfigureRun>();
+        page.Find("fluent-button:contains('Reset estate')").Click();
+
+        page.Find("fluent-button:contains('Delete everything and reset')").Click();
+
+        page.Find("[role=alert]").TextContent.Should().Contain("trip-events/trip-dispatch");
+    }
+
+    [Fact]
+    public void ResetEstate_TheSimulatorFails_SaysWhatWasKept()
+    {
+        Requests.ResetEstateAsync(Arg.Any<CancellationToken>()).Returns<Task<Result<EstateResetReport>>>(_ => throw new InvalidOperationException());
+        var page = Render<ConfigureRun>();
+        page.Find("fluent-button:contains('Reset estate')").Click();
+
+        page.Find("fluent-button:contains('Delete everything and reset')").Click();
+
+        page.Find("[role=alert]").TextContent.Should().Contain("What was deleted stays deleted");
     }
 }

@@ -300,6 +300,18 @@ resource driverAppSendsItsEvents 'Microsoft.Authorization/roleAssignments@2022-0
   }
 }
 
+// Scoped to the subscription: the Driver app peeks the Drivers' reports subscription, without taking a message from it, so the Simulator's Reset
+// estate can wait until the Driver reports Logic App has caught up (ADR 0039). The TMS API's own identity is Aspire's and gets receive rights there.
+resource driverAppPeeksItsEvents 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(driverReports.id, driverAppPrincipalId, serviceBusDataReceiver)
+  scope: driverReports
+  properties: {
+    principalId: driverAppPrincipalId
+    roleDefinitionId: serviceBusDataReceiver
+    principalType: 'ServicePrincipal'
+  }
+}
+
 // The queue API Management puts a Carrier's tracking message on and the Carrier-tracking Logic App reads (ADR 0008). A message
 // the TMS refuses is dead-lettered by the Logic App with the failure code; one that can't be recorded is delivered again, and
 // after the maximum delivery count Service Bus dead-letters it itself. The AppHost's emulator queue has the same count.

@@ -43,5 +43,26 @@ internal sealed class AzureBlobProofOfDeliveryFiles(BlobServiceClient blobServic
         }
     }
 
+    public async Task<int> DeleteAllAsync(CancellationToken cancellationToken)
+    {
+        var deleted = 0;
+        try
+        {
+            await foreach (var blob in _container.GetBlobsAsync(cancellationToken: cancellationToken))
+            {
+                if ((await _container.DeleteBlobIfExistsAsync(blob.Name, cancellationToken: cancellationToken)).Value)
+                {
+                    deleted++;
+                }
+            }
+        }
+        catch (RequestFailedException ex) when (ex.Status == 404)
+        {
+            // No container yet: no file was ever stored.
+        }
+
+        return deleted;
+    }
+
     private static string BlobNameOf(ShipmentNumber shipmentNumber, ProofOfDeliveryFile file) => $"{shipmentNumber.Value}/{file.Id:N}";
 }

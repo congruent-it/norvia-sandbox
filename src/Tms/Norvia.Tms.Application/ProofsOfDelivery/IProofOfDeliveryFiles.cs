@@ -13,4 +13,7 @@ public interface IProofOfDeliveryFiles
 
     /// <summary>Opens a stored file's content, or returns null when the storage has none.</summary>
     Task<Stream?> OpenReadAsync(ShipmentNumber shipmentNumber, ProofOfDeliveryFile file, CancellationToken cancellationToken);
+
+    /// <summary>Deletes every stored file, for a reset. Returns how many it deleted.</summary>
+    Task<int> DeleteAllAsync(CancellationToken cancellationToken);
 }

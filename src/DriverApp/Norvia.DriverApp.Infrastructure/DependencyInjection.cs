@@ -10,10 +10,12 @@ using Norvia.DriverApp.Application;
 using Norvia.DriverApp.Application.Drivers;
 using Norvia.DriverApp.Application.Events;
 using Norvia.DriverApp.Application.Reports.Deliver;
+using Norvia.DriverApp.Application.Reset;
 using Norvia.DriverApp.Infrastructure.Data;
 using Norvia.DriverApp.Infrastructure.Drivers;
 using Norvia.DriverApp.Infrastructure.Outbox;
 using Norvia.DriverApp.Infrastructure.ProofsOfDelivery;
+using Norvia.DriverApp.Infrastructure.Reset;
 
 namespace Norvia.DriverApp.Infrastructure;
 
@@ -47,6 +49,23 @@ public static class DependencyInjection
         builder.Services.AddOptions<OutboxOptions>().BindConfiguration(OutboxOptions.SectionName)
             .ValidateDataAnnotations().ValidateOnStart();
         builder.Services.AddHostedService<OutboxPublisher>();
+
+        return builder;
+    }
+
+    /// <summary>
+    /// The reset the Simulator's Reset estate calls (ADR 0039): guarded by the <c>Reset</c> setting, which is off by default, and by the topic
+    /// subscriptions it names being empty. Only the API has the Service Bus client to peek them with.
+    /// </summary>
+    public static IHostApplicationBuilder AddDriverAppReset(this IHostApplicationBuilder builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.Services.AddOptions<ResetOptions>().BindConfiguration(ResetOptions.SectionName)
+            .ValidateDataAnnotations().ValidateOnStart();
+        builder.Services.AddSingleton<IResetSwitch, ConfiguredResetSwitch>();
+        builder.Services.AddScoped<IQuietCheck, ServiceBusQuietCheck>();
+        builder.Services.AddScoped<ITransactionalData, SqlTransactionalData>();
 
         return builder;
     }

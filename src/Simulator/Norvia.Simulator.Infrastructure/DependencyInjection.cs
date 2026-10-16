@@ -13,6 +13,7 @@ using Norvia.Simulator.Infrastructure.DriverApi;
 using Norvia.Simulator.Infrastructure.Entra;
 using Norvia.Simulator.Infrastructure.Execution;
 using Norvia.Simulator.Infrastructure.PartnerApi;
+using Norvia.Simulator.Infrastructure.Reset;
 using Norvia.Simulator.Infrastructure.TmsApi;
 using Norvia.Simulator.Infrastructure.World;
 using Polly;
@@ -62,6 +63,8 @@ public static class DependencyInjection
         builder.AddNorviaPartnerApi();
         builder.AddNorviaTmsApi();
         builder.AddNorviaDriverApp();
+
+        builder.AddEstateReset();
 
         builder.Services.AddSingleton<RunExecutor>();
         builder.Services.AddSingleton<IRunExecution>(services => services.GetRequiredService<RunExecutor>());
@@ -149,6 +152,20 @@ public static class DependencyInjection
         // The standard resilience handler stays: the Driver app answers a report it has taken already as taken, so a retry changes nothing.
         builder.Services.AddHttpClient<IDriverApp, NorviaDriverAppClient>((services, http) =>
             http.BaseAddress = services.GetRequiredService<IOptions<DriverApiOptions>>().Value.BaseAddress);
+    }
+
+    /// <summary>
+    /// The client for the reset door each application owns. A reset can delete a lot, so it waits as long as the application takes, once: a reset repeated
+    /// by a retry would answer a second time with nothing left to delete.
+    /// </summary>
+    private static void AddEstateReset(this IHostApplicationBuilder builder)
+    {
+        builder.Services.AddOptions<PartnerPortalResetOptions>().BindConfiguration(PartnerPortalResetOptions.SectionName);
+#pragma warning disable EXTEXP0001
+        builder.Services.AddHttpClient<IEstateReset, NorviaEstateResetClient>(http => http.Timeout = Timeout.InfiniteTimeSpan)
+            .RemoveAllResilienceHandlers()
+            .AddResilienceHandler("norvia-estate-reset", pipeline => pipeline.AddTimeout(TimeSpan.FromMinutes(5)));
+#pragma warning restore EXTEXP0001
     }
 
     /// <summary>The TMS API client, as the Planner calls it. Locally the Simulator signs its own token, as the TMS UI does; in Azure it is the managed identity's (ADR 0042).</summary>

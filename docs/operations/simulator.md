@@ -17,7 +17,7 @@ The Simulator is built in slices. So far it covers **Shipper bookings**, **Plann
 
 It does nothing unless `Simulator:Enabled` is `true`; switched off it answers every request but its health checks with 404. The AppHost turns it on for a local run (`simulator-web` on the Aspire dashboard). Its guards are settings: `Simulator:MaxOrdersPerRun` (1,000 by default, 500 locally) and `Simulator:MaxConcurrentRequests` (8 by default, 4 locally).
 
-Locally there is no Easy Auth, so the AppHost signs you in as a local operator holding both app roles (`LocalOperator` settings), and the Simulator refuses those settings outside Development. The roles are `Simulator.Run` (configure, start, cancel, clear the history) and `Simulator.Read` (see runs and their logs). In Azure the presenter signs in with Entra (see [In Azure](#in-azure)).
+Locally there is no Easy Auth, so the AppHost signs you in as a local operator holding both app roles (`LocalOperator` settings), and the Simulator refuses those settings outside Development. The roles are `Simulator.Run` (configure, start, cancel, clear the history, reset the estate) and `Simulator.Read` (see runs and their logs). In Azure the presenter signs in with Entra (see [In Azure](#in-azure)).
 
 ## Screens
 
@@ -26,6 +26,7 @@ Locally there is no Easy Auth, so the AppHost signs you in as a local operator h
 - A Preset ("Quiet Monday", "Busy day", "Peak week") fills the numbers, which can be changed: the number of orders, the share of **bad bookings**, the share **collected today**, the Planner's shares (**assigned by the Planner**, **to Own fleet where it fits**, **reassigned**), the Carriers' shares (see [What the Carriers do](#what-the-carriers-do)), the share of the Own fleet's Shipments the Planner **puts on Trips** and what goes wrong on the road (see [What the Trips and Drivers do](#what-the-trips-and-drivers-do)), burst or paced (with the window in minutes), and the **seed** (random by default, editable).
 - It says the caps and the number the next run gets. A plan over a cap is refused here and again in the preview and when the run starts.
 - It lists the runs, newest first, and has **Clear history**, which removes the finished runs and their logs. It doesn't touch what they sent, and the run numbers keep counting, so a Shipper reference is never used twice.
+- **Reset estate** returns the whole estate to a clean sheet (see [Reset estate](#reset-estate)). Unlike Clear history it also deletes what the runs sent, and the next run is number 1 again.
 
 ### Plan preview
 
@@ -87,6 +88,26 @@ What stays with the Own fleet after the assignments goes on Trips ([P11](../proc
 - **Waiting.** The Logic Apps carry a Trip to the Driver app and a Driver's reports to the TMS, so a Driver asks every `Simulator:DriverPollSeconds`, up to `Simulator:DriverPollAttempts` times (2 s and 60 by default). A Trip that doesn't arrive, or whose start or end the TMS doesn't record in time, is noted and the Driver goes on to the next Trip.
 - **Refusals are outcomes.** What the Driver app refuses (`TripNotFound`, `ReportNotAvailable`, `ReportInvalid`, ...) is *Driver app refused*, with its code and never its text, and a call that doesn't reach it *Driver report not received*. A Trip with a Stop the Driver app refused can't be ended, which the log shows.
 - **Exceptions and Re-deliveries.** The TMS opens an Exception for each failure, damage and delivery with reservations a Driver reports, a little later, so after the Drivers the Planner asks the TMS for the Open Exceptions (every `Simulator:DriverPollSeconds`, up to `Simulator:DriverPollAttempts` times) and logs *Exception found* for each; one that doesn't open in time is noted. The Shipments whose delivery failed now wait for a Re-delivery, and the Planner puts them on a Trip of the first later day on which Drivers work (`Create Trip` and `Dispatch Trip` again, the Trip left Dispatched). A Shipment whose collection failed is Planned again; the Simulator doesn't plan it again, and the Planner can in the TMS UI.
+
+## Reset estate
+
+**Reset estate** on the Configure screen starts each demo from an empty estate. It asks for confirmation, which lists what goes and what stays, and then:
+
+1. checks quiet: no run is active, every application has its reset switched on, and the Service Bus subscriptions whose consumers write records back are empty. If not, the button is disabled and says why, and the same check is made again when you confirm;
+2. resets the TMS, the Partner portal and the Driver app, each through its own reset endpoint;
+3. clears the Simulator's own runs, log lines and run counter, last, so a failed application leaves the history to explain what happened.
+
+It deletes every Transport Order, Shipment, Trip, Exception, Carrier booking, Tracking event, Proof of delivery (and its file), Shipper notification and Message in the TMS whoever created it, the Planner's changes to Rosters, Absences and Off the road days, every booking and Carrier booking request in the Partner portal and the Personas' modes, and every Trip and Driver report in the Driver app. The Shippers, Carriers, Drivers, Vehicles, Rate Cards and Personas stay. The next run is number 1, with the Shipper references `SIM-1-1`, `SIM-1-2` and so on. The Integration console keeps nothing, so the Message trail of the records that are gone only ages out of telemetry.
+
+The screen reports what each application deleted, by kind, or which application refused and why. If one refused, the others are still reset and the Simulator's history is kept: run the reset again once the cause is gone.
+
+| Setting | Where | Meaning |
+|---|---|---|
+| `Reset:Enabled` | TMS API, Partner portal, Driver app API | Off unless the estate switches it on. On locally. |
+| `Reset:QuietSubscriptions` | TMS API, Driver app API | The subscriptions, each `topic/subscription`, that must hold no unprocessed message. Locally the TMS watches `shipment-events/carrier-booking`, `shipment-events/shipper-notification`, `shipment-events/carrier-cancellation` and `trip-events/trip-dispatch`; the Driver app `driver-app-events/driver-reports`. |
+| `ResetEndpoint:ApiKey` | Partner portal | The key its reset endpoint asks for. The Simulator holds it as `PartnerPortal:ResetApiKey`, with the portal's address in `PartnerPortal:BaseAddress`. |
+
+The TMS API and the Driver app API require the app role `Estate.Reset`, which locally the Simulator's token holds. If an application can't be reached, or the Simulator isn't set up to reach it, the button stays disabled and names it. In Azure the roles, the portal's key and the Service Bus rights are in the estate, but the setting is off. To allow a reset in an environment, run `azd env set ESTATE_RESET_ENABLED_SETTING true` and provision again; set it back to `false` to switch it off ([ADR 0039](../adr/0039-the-simulator-books-only-through-the-estates-real-doors.md#reset-estate)).
 
 ## In Azure
 

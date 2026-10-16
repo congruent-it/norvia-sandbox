@@ -49,7 +49,8 @@ var tmsMigrations = builder.AddProject<Projects.Norvia_Tms_Migrations>("tms-migr
 var tmsApi = builder.AddProject<Projects.Norvia_Tms_Api>("tms-api")
     .WithReference(tmsDatabase).WaitForCompletion(tmsMigrations)
     .WithReference(messaging).WaitFor(messaging)
-    .WithRoleAssignments(messaging, ServiceBusBuiltInRole.AzureServiceBusDataSender)
+    // Receiver as well, to peek the subscriptions a reset waits on (ADR 0039); the TMS never receives from them.
+    .WithRoleAssignments(messaging, ServiceBusBuiltInRole.AzureServiceBusDataSender, ServiceBusBuiltInRole.AzureServiceBusDataReceiver)
     .WithReference(blobs).WaitFor(blobs)
     .WithRoleAssignments(storage, StorageBuiltInRole.StorageBlobDataContributor)
     .WithHttpHealthCheck("/health");
@@ -135,6 +136,15 @@ tmsApi.WithEnvironment("Seed__DemoData", (!bool.TryParse(builder.Configuration["
 
 var personas = SeedPersona.ReadAll(seedFile);
 
+// The Simulator's Reset estate (ADR 0039) waits until the subscriptions whose consumers write records back are empty. The TMS and the Driver app
+// peek them; the Partner portal consumes nothing from Service Bus. The names are the estate's, the same locally and in Azure.
+tmsApi.WithEnvironment("Reset__QuietSubscriptions__0", "shipment-events/carrier-booking")
+    .WithEnvironment("Reset__QuietSubscriptions__1", "shipment-events/shipper-notification")
+    .WithEnvironment("Reset__QuietSubscriptions__2", "shipment-events/carrier-cancellation")
+    .WithEnvironment("Reset__QuietSubscriptions__3", "trip-events/trip-dispatch");
+driverAppApi.WithEnvironment("Reset__QuietSubscriptions__0", "driver-app-events/driver-reports");
+simulator.WithEnvironment("PartnerPortal__BaseAddress", partnerPortal.GetEndpoint("http"));
+
 if (builder.ExecutionContext.IsPublishMode)
 {
     var estate = new Estate(builder);
@@ -174,6 +184,8 @@ if (builder.ExecutionContext.IsPublishMode)
     // endpoint: the Logic Apps that call them are no browsers, and the endpoints ask them for the party's own credential.
     var personaEndpoints = personas.Select(persona => persona.EndpointPath)
         .Concat(personas.Select(persona => persona.CancellationPath).OfType<string>())
+        // The Simulator's Reset estate calls the portal's reset endpoint, which asks for the Simulator's key (ADR 0039).
+        .Append("/reset/v1")
         .ToList();
     foreach (var (demoUi, pathsOutsideTheGate) in new[] { (tmsWeb, []), (partnerPortal, personaEndpoints) })
     {
@@ -282,6 +294,13 @@ if (builder.ExecutionContext.IsPublishMode)
     {
         simulator.WithEnvironment($"PartnerApi__SubscriptionKeys__{persona.Id}", partnerPortalSecrets.Resource.GetSecret($"subscription-key-{persona.Id}"));
     }
+
+    // The estate switches the reset on (resetEnabled, off by default). The Partner portal and the Simulator share a key from the portal's vault.
+    tmsApi.WithEnvironment("Reset__Enabled", estate.ResetEnabled);
+    driverAppApi.WithEnvironment("Reset__Enabled", estate.ResetEnabled);
+    partnerPortal.WithEnvironment("Reset__Enabled", estate.ResetEnabled)
+        .WithEnvironment("ResetEndpoint__ApiKey", partnerPortalSecrets.Resource.GetSecret("reset-endpoint-key"));
+    simulator.WithEnvironment("PartnerPortal__ResetApiKey", partnerPortalSecrets.Resource.GetSecret("reset-endpoint-key"));
 }
 else
 {
@@ -512,6 +531,15 @@ else
             .WithEnvironment($"ShipperNotification__Shippers__{persona.PartyId}__ApiKey", shipperApiKey);
         partnerPortal.WithEnvironment($"ShipperEndpoint__ApiKeys__{persona.PartyId}", shipperApiKey);
     }
+
+    // Locally every application takes the Simulator's Reset estate (ADR 0039); in Azure the estate switches it on. The Partner portal's reset takes a key,
+    // as its other endpoints do, which the Simulator holds for the run.
+    var resetApiKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
+    tmsApi.WithEnvironment("Reset__Enabled", "true");
+    driverAppApi.WithEnvironment("Reset__Enabled", "true");
+    partnerPortal.WithEnvironment("Reset__Enabled", "true")
+        .WithEnvironment("ResetEndpoint__ApiKey", resetApiKey);
+    simulator.WithEnvironment("PartnerPortal__ResetApiKey", resetApiKey);
 
     // Locally the Simulator is on, signs the developer in as an operator holding both app roles, and signs every token it sends itself,
     // with the key the local stand-ins trust (ADR 0042). It waits for the stand-in that plays API Management.
