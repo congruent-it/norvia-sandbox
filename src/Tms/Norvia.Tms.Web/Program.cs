@@ -16,6 +16,7 @@ builder.AddServiceDefaults();
 // identity, and takes in nothing and publishes nothing: the TMS API does, and runs the outbox publisher (ADR 0028).
 builder.AddTmsInfrastructure();
 builder.AddTmsProofOfDeliveryStorage();
+builder.AddTmsResetUnavailable();
 builder.Services.AddMediator(options =>
 {
     options.ServiceLifetime = ServiceLifetime.Scoped;
