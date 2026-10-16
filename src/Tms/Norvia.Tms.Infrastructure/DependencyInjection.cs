@@ -232,6 +232,23 @@ public static class DependencyInjection
     }
 
     /// <summary>
+    /// The reset's services for a process that finds the reset handlers (the mediator scans the whole application assembly) but does not offer the reset, such as the TMS UI:
+    /// the switch stays off, and nothing in the process can peek a subscription.
+    /// </summary>
+    public static IHostApplicationBuilder AddTmsResetUnavailable(this IHostApplicationBuilder builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.Services.AddOptions<ResetOptions>().BindConfiguration(ResetOptions.SectionName)
+            .ValidateDataAnnotations().ValidateOnStart();
+        builder.Services.AddSingleton<IResetSwitch, ConfiguredResetSwitch>();
+        builder.Services.AddScoped<IQuietCheck, UnavailableQuietCheck>();
+        builder.Services.AddScoped<ITransactionalData, SqlTransactionalData>();
+
+        return builder;
+    }
+
+    /// <summary>
     /// Registers what applying the TMS's migrations needs, and nothing else: migrations change the schema, never an
     /// aggregate, so no domain event is dispatched.
     /// </summary>
