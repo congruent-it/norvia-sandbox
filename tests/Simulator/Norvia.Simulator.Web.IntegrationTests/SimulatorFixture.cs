@@ -30,11 +30,12 @@ public sealed class SimulatorFixture : IAsyncLifetime
 {
     // What the booking path doesn't use only costs startup time and memory. The Integration console stays: the Simulator's settings point at it.
     // So do the tracking and Proof of delivery workers: the Carriers' tracking and Proofs of delivery only reach the TMS through them. And the Driver app's API and
-    // migrations: the Simulator's settings point at the API, and the Drivers work the Trips through it.
+    // migrations, with the Trip dispatch and Driver reports workers: the Simulator's settings point at the API, the Trip dispatch worker carries each dispatched
+    // Trip to it and the Driver reports worker carries the Drivers' reports on to the TMS.
     private static readonly string[] Unneeded =
     [
         "dbgate", "tms-web", "partner-portal", "partner-portal-migrations", "partner-portal-web", "driver-app-web",
-        "booking-worker", "shipper-notification-worker", "carrier-cancellation-worker", "trip-dispatch-worker", "driver-reports-worker",
+        "booking-worker", "shipper-notification-worker", "carrier-cancellation-worker",
     ];
 
     private static readonly string[] SimulatorSettings =
@@ -167,6 +168,19 @@ public sealed class SimulatorFixture : IAsyncLifetime
     public async Task<JsonObject?> TimelineAsync(string shipmentNumber, CancellationToken cancellationToken)
     {
         using var response = await Tms.GetAsync(new Uri($"/v1/shipments/{Uri.EscapeDataString(shipmentNumber)}/tracking-events", UriKind.Relative), cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return JsonNode.Parse(await response.Content.ReadAsStringAsync(cancellationToken))!.AsObject();
+    }
+
+    /// <summary>A Trip as the TMS API reads it out, with its Stops, or null when the TMS has none by that number.</summary>
+    public async Task<JsonObject?> TripAsync(string tripNumber, CancellationToken cancellationToken)
+    {
+        using var response = await Tms.GetAsync(new Uri($"/v1/trips/{Uri.EscapeDataString(tripNumber)}", UriKind.Relative), cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return null;
