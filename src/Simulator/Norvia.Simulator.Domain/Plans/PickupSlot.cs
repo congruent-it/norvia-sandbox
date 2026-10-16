@@ -9,6 +9,9 @@ public sealed record PickupSlot(int DayOffset, int FromHour, int Hours)
     private const string Zone = "Europe/Amsterdam";
     private const int LastStartHour = 18;
 
+    /// <summary>Today, in Norvia's time: the day a Trip is started on.</summary>
+    public static DateOnly Today(DateTimeOffset now) => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, TimeZoneInfo.FindSystemTimeZoneById(Zone)).DateTime);
+
     /// <summary>The window at <paramref name="now"/>. Today's slot starts no earlier than the next full hour; when none is left it moves to tomorrow.</summary>
     public CollectionWindow Resolve(DateTimeOffset now)
     {

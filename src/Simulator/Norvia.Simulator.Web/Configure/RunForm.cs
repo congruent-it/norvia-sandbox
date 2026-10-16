@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Norvia.Simulator.Domain.Carriers;
+using Norvia.Simulator.Domain.Drivers;
 using Norvia.Simulator.Domain.Runs;
 
 namespace Norvia.Simulator.Web.Configure;
@@ -56,6 +57,21 @@ public sealed class RunForm : IValidatableObject
     [Range(0, 100, ErrorMessage = "The share of failed collections the Planner cancels is a percentage from 0 to 100.")]
     public int CancelPercent { get; set; } = CarrierShares.DefaultCancelPercent;
 
+    [Range(0, 100, ErrorMessage = "The share of Own fleet Shipments the Planner puts on Trips is a percentage from 0 to 100.")]
+    public int TripPercent { get; set; } = SimulationSettings.DefaultTripPercent;
+
+    [Range(0, 100, ErrorMessage = "The share of Shipments whose collection fails is a percentage from 0 to 100.")]
+    public int CollectionFailedPercent { get; set; } = DriverShares.DefaultCollectionFailedPercent;
+
+    [Range(0, 100, ErrorMessage = "The share of Shipments whose delivery fails is a percentage from 0 to 100.")]
+    public int DeliveryFailedPercent { get; set; } = DriverShares.DefaultDeliveryFailedPercent;
+
+    [Range(0, 100, ErrorMessage = "The share of Shipments the Driver reports damage on is a percentage from 0 to 100.")]
+    public int DamagedPercent { get; set; } = DriverShares.DefaultDamagedPercent;
+
+    [Range(0, 100, ErrorMessage = "The share of delivered Shipments with reservations is a percentage from 0 to 100.")]
+    public int ReservationsPercent { get; set; } = DriverShares.DefaultReservationsPercent;
+
     public string Mode { get; set; } = nameof(RunMode.Burst);
 
     [Range(1, SimulationSettings.MaxWindowMinutes, ErrorMessage = "A paced run is spread over 1 to 240 minutes.")]
@@ -73,8 +89,10 @@ public sealed class RunForm : IValidatableObject
         Preset == CustomPreset ? null : Preset,
         AssignedPercent, OwnFleetPercent, ReassignPercent)
     {
+        TripPercent = TripPercent,
         Carriers = new CarrierShares(
             ReleasePercent, ConfirmPercent, DeclinePercent, TrackedPercent, ExceptionPercent, DeliveredPercent, ProofOfDeliveryPercent, CancelPercent),
+        Drivers = new DriverShares(CollectionFailedPercent, DeliveryFailedPercent, DamagedPercent, ReservationsPercent),
     };
 
     public void Fill(Preset preset)
@@ -87,6 +105,7 @@ public sealed class RunForm : IValidatableObject
         AssignedPercent = preset.AssignedPercent;
         OwnFleetPercent = preset.OwnFleetPercent;
         ReassignPercent = preset.ReassignPercent;
+        TripPercent = SimulationSettings.DefaultTripPercent;
         var carriers = preset.Carriers ?? new CarrierShares();
         ReleasePercent = carriers.ReleasePercent;
         ConfirmPercent = carriers.ConfirmPercent;
@@ -96,6 +115,11 @@ public sealed class RunForm : IValidatableObject
         DeliveredPercent = carriers.DeliveredPercent;
         ProofOfDeliveryPercent = carriers.ProofOfDeliveryPercent;
         CancelPercent = carriers.CancelPercent;
+        var drivers = preset.Drivers ?? new DriverShares();
+        CollectionFailedPercent = drivers.CollectionFailedPercent;
+        DeliveryFailedPercent = drivers.DeliveryFailedPercent;
+        DamagedPercent = drivers.DamagedPercent;
+        ReservationsPercent = drivers.ReservationsPercent;
         Mode = preset.Mode.ToString();
         WindowMinutes = preset.Mode == RunMode.Paced ? (int)preset.Window.TotalMinutes : WindowMinutes;
     }

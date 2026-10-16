@@ -16,6 +16,7 @@ public sealed class ExecuteRunHandlerTests
     private readonly IRepository<LogEntry> _log = Substitute.For<IRepository<LogEntry>>();
     private readonly IPartnerApi _api = Substitute.For<IPartnerApi>();
     private readonly ITmsApi _tms = Substitute.For<ITmsApi>();
+    private readonly IDriverApp _drivers = Substitute.For<IDriverApp>();
     private readonly IWorldSource _world = Substitute.For<IWorldSource>();
     private readonly FakeTimeProvider _time = new(TestData.Now);
     private readonly List<LogEntry> _lines = [];
@@ -29,7 +30,7 @@ public sealed class ExecuteRunHandlerTests
     }
 
     private ExecuteRunHandler Handler(int concurrency = 3) =>
-        new(_runs, _log, _api, _tms, _world, new SimulationLimits(50, concurrency), _time, new CarrierPacing(TimeSpan.Zero, 1));
+        new(_runs, _log, _api, _tms, _world, new SimulationLimits(50, concurrency), _time, new CarrierPacing(TimeSpan.Zero, 1), _drivers, new DriverPacing(TimeSpan.Zero, 1));
 
     private SimulationRun Active(SimulationSettings settings)
     {

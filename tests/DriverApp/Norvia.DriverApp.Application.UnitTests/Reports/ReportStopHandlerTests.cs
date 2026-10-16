@@ -68,6 +68,7 @@ public sealed class ReportStopHandlerTests
         published.Remark.Should().BeNull();
         published.CorrelationId.Should().Be(report.CorrelationId).And.NotBeNullOrWhiteSpace();
         published.OccurredAt.Should().Be(report.EventTime);
+        result.Value.CorrelationId.Should().Be(report.CorrelationId, "the answer names the trail the report travels on");
     }
 
     [Theory]

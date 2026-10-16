@@ -84,7 +84,7 @@ public sealed class DeliverHandler(
             delivered.ProofOfDelivery.Id.Value, now, origin.CorrelationId, tripNumber.Value, trip.Version, driverId.Value, command.ShipmentNumber, documentId, form.ReceivedBy!, now, location,
             condition!.Value.ToString(), reservations, files));
         await reports.AddRangeAsync([delivered.Delivered, delivered.ProofOfDelivery], cancellationToken);
-        return new DeliverResult(delivered.Delivered.Id.Value, AlreadyReported: false);
+        return new DeliverResult(delivered.Delivered.Id.Value, AlreadyReported: false, origin.CorrelationId);
     }
 
     private async Task<IReadOnlyList<ProofOfDeliveryFileV1>> StoreFilesAsync(string documentId, DeliverCommand command, CancellationToken cancellationToken)

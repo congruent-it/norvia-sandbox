@@ -30,13 +30,14 @@ public sealed class LogEntriesOfRunSpec : Specification<LogEntry, LogLine>
                 (entry.CorrelationId != null && entry.CorrelationId.Contains(text))
                 || (entry.ShipperReference != null && entry.ShipperReference.Contains(text))
                 || (entry.TransportOrderNumber != null && entry.TransportOrderNumber.Contains(text))
-                || (entry.ShipmentNumber != null && entry.ShipmentNumber.Contains(text)));
+                || (entry.ShipmentNumber != null && entry.ShipmentNumber.Contains(text))
+                || (entry.TripNumber != null && entry.TripNumber.Contains(text)));
         }
 
         Query.OrderBy(entry => entry.Sequence)
             .AsNoTracking()
             .Select(entry => new LogLine(
                 entry.Sequence, entry.At, entry.Actor, entry.Action, entry.Outcome,
-                entry.CorrelationId, entry.ShipperReference, entry.TransportOrderNumber, entry.ShipmentNumber, entry.Detail));
+                entry.CorrelationId, entry.ShipperReference, entry.TransportOrderNumber, entry.ShipmentNumber, entry.Detail, entry.TripNumber));
     }
 }

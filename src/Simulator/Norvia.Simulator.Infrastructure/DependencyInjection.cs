@@ -9,6 +9,7 @@ using Norvia.Simulator.Application.Ports;
 using Norvia.Simulator.Application.Runs.Execute;
 using Norvia.Simulator.Domain.Runs;
 using Norvia.Simulator.Infrastructure.Data;
+using Norvia.Simulator.Infrastructure.DriverApi;
 using Norvia.Simulator.Infrastructure.Execution;
 using Norvia.Simulator.Infrastructure.PartnerApi;
 using Norvia.Simulator.Infrastructure.TmsApi;
@@ -43,6 +44,12 @@ public static class DependencyInjection
             return new CarrierPacing(TimeSpan.FromSeconds(options.ExceptionPollSeconds), options.ExceptionPollAttempts);
         });
 
+        builder.Services.AddSingleton(services =>
+        {
+            var options = services.GetRequiredService<IOptions<SimulatorOptions>>().Value;
+            return new DriverPacing(TimeSpan.FromSeconds(options.DriverPollSeconds), options.DriverPollAttempts);
+        });
+
         builder.Services.AddOptions<SeedOptions>().BindConfiguration(SeedOptions.SectionName)
             .ValidateDataAnnotations()
             .Validate(options => File.Exists(options.Path), "The seed file doesn't exist.")
@@ -53,6 +60,7 @@ public static class DependencyInjection
         builder.Services.AddSingleton(_ => new SimulatorActivities(builder.Environment.ApplicationName));
         builder.AddNorviaPartnerApi();
         builder.AddNorviaTmsApi();
+        builder.AddNorviaDriverApp();
 
         builder.Services.AddSingleton<RunExecutor>();
         builder.Services.AddSingleton<IRunExecution>(services => services.GetRequiredService<RunExecutor>());
@@ -114,6 +122,22 @@ public static class DependencyInjection
             .AddResilienceHandler("norvia-partner-api", (pipeline, context) =>
                 pipeline.AddTimeout(context.ServiceProvider.GetRequiredService<IOptions<PartnerApiOptions>>().Value.Timeout));
 #pragma warning restore EXTEXP0001
+    }
+
+    /// <summary>The Driver app API client, as a Driver calls it. Locally the Simulator signs each Driver's token itself.</summary>
+    private static void AddNorviaDriverApp(this IHostApplicationBuilder builder)
+    {
+        builder.Services.AddOptions<DriverApiOptions>().BindConfiguration(DriverApiOptions.SectionName)
+            .ValidateDataAnnotations()
+            // Data annotations don't look inside the nested options.
+            .Validate(options => options.LocalTokens is not null && IsValid(options.LocalTokens), "DriverApp:LocalTokens needs an Issuer, an Audience, a ClientId and a SigningKey.")
+            .ValidateOnStart();
+
+        builder.Services.AddSingleton<IDriverTokens, LocalDriverTokens>();
+
+        // The standard resilience handler stays: the Driver app answers a report it has taken already as taken, so a retry changes nothing.
+        builder.Services.AddHttpClient<IDriverApp, NorviaDriverAppClient>((services, http) =>
+            http.BaseAddress = services.GetRequiredService<IOptions<DriverApiOptions>>().Value.BaseAddress);
     }
 
     /// <summary>The TMS API client, as the Planner calls it. Locally the Simulator signs its own token, as the TMS UI does.</summary>

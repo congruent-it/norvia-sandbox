@@ -85,6 +85,38 @@ public sealed class RunFormTests
     }
 
     [Fact]
+    public void ToSettings_CarriesTheShareOfOwnFleetShipmentsPutOnTrips()
+    {
+        new RunForm { TripPercent = 40 }.ToSettings().TripPercent.Should().Be(40);
+    }
+
+    [Fact]
+    public void ToSettings_CarriesTheDriversShares()
+    {
+        var form = new RunForm { CollectionFailedPercent = 20, DeliveryFailedPercent = 25, DamagedPercent = 7, ReservationsPercent = 40 };
+
+        form.ToSettings().Drivers.Should().Be(new Norvia.Simulator.Domain.Drivers.DriverShares(20, 25, 7, 40));
+    }
+
+    [Fact]
+    public void Fill_APreset_FillsTheDriversShares()
+    {
+        var form = new RunForm();
+
+        form.Fill(Norvia.Simulator.Domain.Runs.Presets.Find("Peak week")!);
+
+        form.ToSettings().Drivers.Should().Be(new Norvia.Simulator.Domain.Drivers.DriverShares(15, 15, 10, 15));
+    }
+
+    [Fact]
+    public void Validate_MoreFailuresThanShipments_IsAProblemOfTheWholeForm()
+    {
+        var problem = Validate(new RunForm { CollectionFailedPercent = 60, DeliveryFailedPercent = 50, Limits = TestData.Limits }).Should().ContainSingle().Subject;
+
+        problem.ErrorMessage.Should().Contain("can't be more than all");
+    }
+
+    [Fact]
     public void Validate_MoreConfirmedAndDeclinedThanReleased_IsAProblemOfTheWholeForm()
     {
         var problem = Validate(new RunForm { ConfirmPercent = 70, DeclinePercent = 40, Limits = TestData.Limits }).Should().ContainSingle().Subject;

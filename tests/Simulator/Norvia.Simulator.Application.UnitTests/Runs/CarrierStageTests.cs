@@ -23,6 +23,7 @@ public sealed class CarrierStageTests
     private readonly IRepository<LogEntry> _log = Substitute.For<IRepository<LogEntry>>();
     private readonly IPartnerApi _api = Substitute.For<IPartnerApi>();
     private readonly ITmsApi _tms = Substitute.For<ITmsApi>();
+    private readonly IDriverApp _drivers = Substitute.For<IDriverApp>();
     private readonly IWorldSource _world = Substitute.For<IWorldSource>();
     private readonly FakeTimeProvider _time = new(TestData.Now);
     private readonly List<LogEntry> _lines = [];
@@ -83,7 +84,7 @@ public sealed class CarrierStageTests
 
     private static string ShipmentOf(string carrierBookingNumber) => $"SH-{carrierBookingNumber[3..]}";
 
-    private ExecuteRunHandler Handler(CarrierPacing? pacing = null) => new(_runs, _log, _api, _tms, _world, new SimulationLimits(50, 3), _time, pacing ?? new CarrierPacing(TimeSpan.Zero, 3));
+    private ExecuteRunHandler Handler(CarrierPacing? pacing = null) => new(_runs, _log, _api, _tms, _world, new SimulationLimits(50, 3), _time, pacing ?? new CarrierPacing(TimeSpan.Zero, 3), _drivers, new DriverPacing(TimeSpan.Zero, 1));
 
     private async Task<SimulationRun> RunAsync(CarrierShares shares, int orders = 6, int ownFleet = 0, CancellationTokenSource? stop = null)
     {
@@ -121,12 +122,12 @@ public sealed class CarrierStageTests
     }
 
     [Fact]
-    public async Task Handle_ShipmentsAssignedToOwnFleet_AreLeftForTheTrips()
+    public async Task Handle_ShipmentsAssignedToOwnFleet_AreLeftForTheTrips_AndNoCarrierActsOnThem()
     {
         await RunAsync(Everything, orders: 6, ownFleet: 100);
 
-        _releases.Should().BeEmpty();
         _answers.Should().BeEmpty();
+        _tracking.Should().BeEmpty();
     }
 
     [Fact]

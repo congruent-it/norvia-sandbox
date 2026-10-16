@@ -33,6 +33,12 @@ public static class SimulatorText
         LogOutcome.ProofOfDeliverySent => "Proof of delivery sent",
         LogOutcome.CarrierRefused => "Carrier refused",
         LogOutcome.CarrierNotReceived => "Carrier not received",
+        LogOutcome.TripBuilt => "Trip built",
+        LogOutcome.TripDispatched => "Trip dispatched",
+        LogOutcome.DriverReported => "Driver reported",
+        LogOutcome.DriverRefused => "Driver app refused",
+        LogOutcome.DriverNotReceived => "Driver report not received",
+        LogOutcome.TripCompleted => "Trip completed",
         _ => throw new ArgumentOutOfRangeException(nameof(outcome), outcome, "Every outcome has a wording."),
     };
 

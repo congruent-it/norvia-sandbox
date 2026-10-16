@@ -33,6 +33,34 @@ public sealed class LogEntryTests
     }
 
     [Fact]
+    public void Planning_ForATrip_RecordsTheTripNumber()
+    {
+        var entry = LogEntry.Planning(Run, 5, Now, "Create Trip", LogOutcome.TripBuilt, "corr-5", "SIM-1-4", "TO-0000004", "SH-0000004", "Draft", "TR-0000007");
+
+        entry.TripNumber.Should().Be("TR-0000007");
+        entry.Actor.Should().Be(LogEntry.PlannerActor);
+    }
+
+    [Fact]
+    public void Driver_RecordsWhichDriverActedOnWhichTripAndShipment_AndWhatCameBack()
+    {
+        var entry = LogEntry.Driver(Run, 6, Now, "Anouk de Vries", "Collected", LogOutcome.DriverReported, "corr-6", "SIM-1-4", "TO-0000004", "SH-0000004", "TR-0000007", null);
+
+        entry.Actor.Should().Be("Anouk de Vries");
+        entry.Action.Should().Be("Collected");
+        entry.Outcome.Should().Be(LogOutcome.DriverReported);
+        entry.TripNumber.Should().Be("TR-0000007");
+        entry.ShipmentNumber.Should().Be("SH-0000004");
+        entry.CorrelationId.Should().Be("corr-6");
+    }
+
+    [Fact]
+    public void ALineThatIsNotAboutATrip_HasNoTripNumber()
+    {
+        Booking(1, "Brouwer Dranken", LogOutcome.Accepted).TripNumber.Should().BeNull();
+    }
+
+    [Fact]
     public void Carrier_RecordsWhichCarrierActedOnWhichShipmentAndWhatCameBack()
     {
         var entry = LogEntry.Carrier(Run, 4, Now, "Van Dijk Transport", "Answer Carrier booking", LogOutcome.Confirmed, "corr-9", "SIM-1-3", "TO-0000003", "SHP-0000003", "CB-0000042");

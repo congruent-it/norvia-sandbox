@@ -1,4 +1,5 @@
 using Norvia.Simulator.Domain.Carriers;
+using Norvia.Simulator.Domain.Drivers;
 
 namespace Norvia.Simulator.Domain.Runs;
 
@@ -14,12 +15,14 @@ public sealed record Preset(
     int AssignedPercent = SimulationSettings.DefaultAssignedPercent,
     int OwnFleetPercent = SimulationSettings.DefaultOwnFleetPercent,
     int ReassignPercent = SimulationSettings.DefaultReassignPercent,
-    CarrierShares? Carriers = null)
+    CarrierShares? Carriers = null,
+    DriverShares? Drivers = null)
 {
     /// <summary>The settings this Preset fills in, with the seed the presenter chose.</summary>
     public SimulationSettings ToSettings(int seed) =>
         new(OrderCount, BadSharePercent, CollectedTodayPercent, seed, Mode, Window, Name, AssignedPercent, OwnFleetPercent, ReassignPercent)
         {
             Carriers = Carriers ?? new CarrierShares(),
+            Drivers = Drivers ?? new DriverShares(),
         };
 }

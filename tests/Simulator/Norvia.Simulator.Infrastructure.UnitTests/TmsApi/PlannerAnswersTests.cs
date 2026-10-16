@@ -83,8 +83,34 @@ public sealed class PlannerAnswersTests
             """);
 
         days.Should().HaveCount(2);
-        days![0].Should().Be(new Domain.Planner.FleetDay(new DateOnly(2026, 10, 14), 12000.5m, 30, 3000, 6));
+        days![0].Should().BeEquivalentTo(new Domain.Planner.FleetDay(new DateOnly(2026, 10, 14), 12000.5m, 30, 3000, 6));
         days[1].CapacityKg.Should().Be(0);
+    }
+
+    [Fact]
+    public void Days_TheDriversWhoWork_AreReadWithTheirShifts()
+    {
+        var days = PlannerAnswers.Days("""
+            [{"date":"2026-10-19","availableVehicles":6,"shifts":[
+                {"driverId":"DRV-0001","driverName":"Anouk de Vries","start":"06:00:00","end":"14:30:00","editedByHand":false},
+                {"driverId":"DRV-0003","driverName":"Bram Visser","start":"08:00:00","end":"16:30:00","editedByHand":true}],
+              "load":{"capacityKg":12000,"capacityPalletPlaces":30,"demandKg":0,"demandPalletPlaces":0,"over":false}}]
+            """);
+
+        days!.Single().Shifts.Should().Equal(
+            new Domain.Planner.DriverShift("DRV-0001", new TimeOnly(6, 0), new TimeOnly(14, 30)),
+            new Domain.Planner.DriverShift("DRV-0003", new TimeOnly(8, 0), new TimeOnly(16, 30)));
+    }
+
+    [Fact]
+    public void Days_AShiftItCannotRead_IsLeftOut_AndTheDayStaysKnown()
+    {
+        var days = PlannerAnswers.Days("""
+            [{"date":"2026-10-19","shifts":[{"driverId":"DRV-0001","start":"early","end":"14:30:00"},{"start":"06:00:00","end":"14:30:00"}],
+              "load":{"capacityKg":1,"capacityPalletPlaces":1,"demandKg":0,"demandPalletPlaces":0}}]
+            """);
+
+        days!.Single().Shifts.Should().BeEmpty();
     }
 
     [Theory]
@@ -182,5 +208,48 @@ public sealed class PlannerAnswersTests
     public void OpenExceptions_SomethingElse_IsUnknown(string body)
     {
         PlannerAnswers.OpenExceptions(body).Should().BeNull();
+    }
+
+    [Fact]
+    public void TripCreated_ADraftTrip_GivesItsNumber_AndNoTrailBecauseCreatingPublishesNothing()
+    {
+        var answer = PlannerAnswers.TripCreated(201, """{"number":"TR-0000012","warnings":[]}""", null);
+
+        answer.Should().Be(new Application.Ports.PlannerAnswer(LogOutcome.TripBuilt, null, null, null, TripNumber: "TR-0000012"));
+    }
+
+    [Fact]
+    public void TripCreated_ARefusal_GivesItsCode_NeverItsMessage()
+    {
+        var answer = PlannerAnswers.TripCreated(409, """{"code":"DrivingHoursExceeded","detail":"Anouk would drive 11 hours.","failures":[]}""", "refused-1");
+
+        answer.Outcome.Should().Be(LogOutcome.PlanningRefused);
+        answer.Detail.Should().Be("DrivingHoursExceeded (409)");
+        answer.FailureCode.Should().Be("DrivingHoursExceeded");
+        answer.TripNumber.Should().BeNull();
+    }
+
+    [Fact]
+    public void TripCreated_A200_IsNotACreation()
+    {
+        PlannerAnswers.TripCreated(200, """{"number":"TR-1"}""", null).Outcome.Should().Be(LogOutcome.PlanningNotReceived);
+    }
+
+    [Fact]
+    public void TripDispatched_GivesTheTrailOfTheDispatch_AndTheTripThatWasSent()
+    {
+        var answer = PlannerAnswers.TripDispatched(200, """{"number":"TR-0000012","version":1,"correlationId":"disp-1"}""", "header", "TR-0000012");
+
+        answer.Should().Be(new Application.Ports.PlannerAnswer(LogOutcome.TripDispatched, "disp-1", null, null, TripNumber: "TR-0000012"));
+    }
+
+    [Fact]
+    public void TripDispatched_ARefusal_KeepsTheTripItWasAskedFor_AndGivesItsCode()
+    {
+        var answer = PlannerAnswers.TripDispatched(409, """{"code":"TripIncomplete","detail":"x"}""", "refused-2", "TR-0000012");
+
+        answer.Outcome.Should().Be(LogOutcome.PlanningRefused);
+        answer.Detail.Should().Be("TripIncomplete (409)");
+        answer.CorrelationId.Should().Be("refused-2");
     }
 }

@@ -129,7 +129,7 @@ public sealed class ConfigureRunTests : SimulatorWebContext
 
         page.Find("form").Submit();
 
-        Address.Should().EndWith("/plan?orders=30&bad=5&today=30&seed=777&mode=Burst&window=0&assigned=90&ownfleet=60&reassign=5&release=100&confirm=80&decline=10&tracked=90&exception=10&delivered=80&pod=90&cancel=50&preset=Quiet%20Monday");
+        Address.Should().EndWith("/plan?orders=30&bad=5&today=30&seed=777&mode=Burst&window=0&assigned=90&ownfleet=60&reassign=5&trips=100&release=100&confirm=80&decline=10&tracked=90&exception=10&delivered=80&pod=90&cancel=50&collfail=10&delfail=10&damaged=5&reservations=10&preset=Quiet%20Monday");
     }
 
     [Fact]

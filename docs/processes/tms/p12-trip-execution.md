@@ -163,7 +163,7 @@ The Driver ID comes from the Driver's token, never from the Driver app's payload
 | The Shipment is on the Trip's latest version | Stop reports, Proofs of delivery | `ShipmentNotOnTrip` |
 | The Stop has no outcome yet. Report damage is exempt | Stop reports | `StopAlreadyCompleted` |
 | The Shipment's collection Stop is Collected, or the Shipment is a Re-delivery | Delivery Stop reports, Proofs of delivery | `CollectionBeforeDelivery` |
-| Every Stop has an outcome | End Trip | `StopsOpen` |
+| Every Stop has an outcome. The delivery Stop of a Shipment whose collection failed waits for none: the Driver never had the goods | End Trip | `StopsOpen` |
 | The event time isn't in the future, beyond a small clock-skew allowance | All | Client error |
 
 The version a report names is stored for tracing only. A report records something that has already happened, so it doesn't have to name the latest version. The Shipment only has to be on the latest version.
@@ -212,6 +212,7 @@ The Driver app gains:
 - an **outbox** that publishes its events to the topic for Driver app events, so a report is never lost between recording it and publishing it
 - a **transit container** for Proof of delivery files. The Driver reports Logic App deletes each file once the TMS has accepted its Proof of delivery, and a lifecycle rule deletes anything left after 90 days, the integration layer's retention (`integrationRetentionDays`)
 - an **outcome endpoint** that the Driver reports Logic App calls, role `DriverReports.ReportOutcome`
+- the **Driver's actions as an API** (`/v1/driver/trips`), for a caller that acts as the Driver without the screens, such as the [Simulator](../../operations/simulator.md): the Driver's Trips, Start Trip, End Trip, the Stop reports and Deliver, through the same commands as the screens. The Driver ID is the one app role of the caller's token, as on the screens, and a Driver sees only their own Trips
 
 It still reaches the TMS only through Azure Integration Services (ADR 0001).
 

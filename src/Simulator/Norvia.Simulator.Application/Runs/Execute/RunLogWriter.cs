@@ -3,6 +3,7 @@ using Norvia.Simulator.Application.Ports;
 using Norvia.Simulator.Domain.Log;
 using Norvia.Simulator.Domain.Plans;
 using Norvia.Simulator.Domain.Runs;
+using Norvia.Simulator.Domain.Worlds;
 
 namespace Norvia.Simulator.Application.Runs.Execute;
 
@@ -25,6 +26,22 @@ internal sealed class RunLogWriter(IRepository<LogEntry> log, SimulationRunId ru
         AddAsync(sequence => LogEntry.Planning(
             runId, sequence, at, action, answer.Outcome, answer.CorrelationId,
             booking.Reference, transportOrderNumber, answer.ShipmentNumber, Detail(intent, answer.Detail, "TMS")),
+            cancellationToken);
+
+    /// <summary>A call the Planner made on a Trip: it holds several Shipments, so the line names the Trip and not one of them.</summary>
+    public Task TripAsync(DateTimeOffset at, string action, PlannerAnswer answer, string? tripNumber, string? detail, CancellationToken cancellationToken) =>
+        AddAsync(sequence => LogEntry.Planning(
+            runId, sequence, at, action, answer.Outcome, answer.CorrelationId,
+            null, null, null, Detail(detail, answer.Detail, "TMS"), tripNumber),
+            cancellationToken);
+
+    /// <summary>A call a Driver made to the Driver app as themselves, on a Trip and often on one Shipment of it.</summary>
+    public Task DriverAsync(
+        DateTimeOffset at, SimulatedDriver driver, string tripNumber, OwnFleetShipment? shipment, string action, DriverCallAnswer answer, string? detail,
+        CancellationToken cancellationToken) =>
+        AddAsync(sequence => LogEntry.Driver(
+            runId, sequence, at, driver.Name, action, answer.Outcome, answer.CorrelationId,
+            shipment?.Booking.Reference, shipment?.TransportOrderNumber, shipment?.ShipmentNumber, tripNumber, Detail(detail, answer.Detail, "Driver app")),
             cancellationToken);
 
     /// <summary>A call a Carrier made as its Persona on one of the Shipments it carries.</summary>

@@ -21,15 +21,16 @@ internal static class Runs
     public static int NextSeed() => Interlocked.Increment(ref _seed);
 
     public static SimulationSettings Burst(int orders, int badSharePercent, int seed) =>
-        new(orders, badSharePercent, CollectedTodayPercent: 30, seed, RunMode.Burst, TimeSpan.Zero);
+        new(orders, badSharePercent, CollectedTodayPercent: 30, seed, RunMode.Burst, TimeSpan.Zero) { TripPercent = 0 };
 
     /// <summary>A run of good bookings whose Planner assigns, sends to Own fleet and reassigns the given shares of the orders.</summary>
     public static SimulationSettings Planned(int orders, int seed, int assignedPercent, int ownFleetPercent, int reassignPercent, int badSharePercent = 0) =>
         new(orders, badSharePercent, CollectedTodayPercent: 30, seed, RunMode.Burst, TimeSpan.Zero,
             AssignedPercent: assignedPercent, OwnFleetPercent: ownFleetPercent, ReassignPercent: reassignPercent)
         {
-            // These runs test the Planner: the Shipments stay Planned, and the Carrier stage has its own tests (#354).
+            // These runs test the Planner: the Shipments stay Planned, and the Carrier stage has its own tests (#354), the Trips and Drivers theirs (#356).
             Carriers = new Norvia.Simulator.Domain.Carriers.CarrierShares(ReleasePercent: 0),
+            TripPercent = 0,
         };
 
     /// <summary>
@@ -41,11 +42,12 @@ internal static class Runs
             AssignedPercent: 100, OwnFleetPercent: 0, ReassignPercent: 0)
         {
             Carriers = carriers,
+            TripPercent = 0,
         };
 
     /// <summary>A run that sends its first booking at once and the next a minute later.</summary>
     public static SimulationSettings Paced(int orders, int seed) =>
-        new(orders, BadSharePercent: 0, CollectedTodayPercent: 30, seed, RunMode.Paced, TimeSpan.FromMinutes(orders));
+        new(orders, BadSharePercent: 0, CollectedTodayPercent: 30, seed, RunMode.Paced, TimeSpan.FromMinutes(orders)) { TripPercent = 0 };
 
     public static async Task<RunSummary> StartAsync(this ISimulatorRequests simulator, SimulationSettings settings, CancellationToken cancellationToken)
     {

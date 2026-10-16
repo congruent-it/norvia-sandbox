@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Norvia.Simulator.Application.Ports;
 using Norvia.Simulator.Domain.Log;
 using Norvia.Simulator.Domain.Planner;
+using Norvia.Simulator.Domain.Trips;
 using Norvia.Simulator.Infrastructure.PartnerApi;
 
 namespace Norvia.Simulator.Infrastructure.TmsApi;
@@ -27,6 +28,7 @@ internal sealed partial class NorviaTmsApiClient(
 {
     private const string FlowName = "transport-planning";
     private const string ExceptionFlowName = "exception-handling";
+    private const string TripFlowName = "trip-dispatch";
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
     {
@@ -78,6 +80,25 @@ internal sealed partial class NorviaTmsApiClient(
         return SendAsync(
             PlannerActions.Release, $"/v1/shipments/{Uri.EscapeDataString(shipmentNumber)}/release", body: null, idempotencyKey,
             (status, responseBody, correlation) => PlannerAnswers.Released(status, responseBody, correlation), FlowName, transportOrderNumber: null, shipmentNumber, cancellationToken);
+    }
+
+    public Task<PlannerAnswer> CreateTripAsync(TripDraft draft, string idempotencyKey, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(draft);
+        return SendAsync(
+            TripActions.CreateTrip, "/v1/trips",
+            new NewTrip(draft.Day, draft.Vehicle.Id, draft.Driver.Id, draft.PlannedStart, draft.PlannedDrivingDuration, [.. draft.Shipments.Select(shipment => shipment.ShipmentNumber)]),
+            idempotencyKey, (status, body, correlation) => PlannerAnswers.TripCreated(status, body, correlation), TripFlowName, transportOrderNumber: null, shipmentNumber: null,
+            cancellationToken);
+    }
+
+    public Task<PlannerAnswer> DispatchTripAsync(string tripNumber, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tripNumber);
+        return SendAsync(
+            TripActions.DispatchTrip, $"/v1/trips/{Uri.EscapeDataString(tripNumber)}/dispatch", body: null, idempotencyKey: null,
+            (status, body, correlation) => PlannerAnswers.TripDispatched(status, body, correlation, tripNumber), TripFlowName, transportOrderNumber: null, shipmentNumber: null,
+            cancellationToken);
     }
 
     public async Task<IReadOnlyList<OpenExceptionSummary>?> GetOpenExceptionsAsync(CancellationToken cancellationToken)
@@ -179,7 +200,7 @@ internal sealed partial class NorviaTmsApiClient(
         var keys = new Dictionary<string, object?> { ["flow"] = flow };
         switch (answer.Outcome)
         {
-            case LogOutcome.Planned or LogOutcome.Reassigned or LogOutcome.Released or LogOutcome.BookingCancelled or LogOutcome.ExceptionResolved:
+            case LogOutcome.Planned or LogOutcome.Reassigned or LogOutcome.Released or LogOutcome.BookingCancelled or LogOutcome.ExceptionResolved or LogOutcome.TripBuilt or LogOutcome.TripDispatched:
                 keys["outcome"] = "Succeeded";
                 break;
             case LogOutcome.PlanningRefused:
@@ -197,6 +218,7 @@ internal sealed partial class NorviaTmsApiClient(
             ("correlationId", answer.CorrelationId),
             ("transportOrderNumber", transportOrderNumber),
             ("shipmentNumber", answer.ShipmentNumber ?? shipmentNumber),
+            ("tripNumber", answer.TripNumber),
         })
         {
             if (!string.IsNullOrWhiteSpace(value))
@@ -207,6 +229,9 @@ internal sealed partial class NorviaTmsApiClient(
 
         return keys;
     }
+
+    // What the Simulator asks the TMS API to create a Draft Trip from.
+    private sealed record NewTrip(DateOnly Day, string VehicleId, string DriverId, TimeOnly PlannedStart, TimeSpan PlannedDrivingDuration, IReadOnlyList<string> ShipmentNumbers);
 
     private enum AssignedTo
     {

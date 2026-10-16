@@ -52,6 +52,7 @@ public sealed class EndTripHandlerTests
         published.DriverId.Should().Be("DRV-0002");
         published.OccurredAt.Should().Be(report.EventTime);
         published.CorrelationId.Should().Be(report.CorrelationId).And.NotBeNullOrWhiteSpace();
+        result.Value.CorrelationId.Should().Be(report.CorrelationId, "the answer names the trail the report travels on");
     }
 
     [Fact]

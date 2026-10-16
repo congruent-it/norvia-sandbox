@@ -59,6 +59,33 @@ public sealed class PreviewPlanHandlerTests
     }
 
     [Fact]
+    public async Task Handle_DriverShares_ShowTheDriverStageOfTheFunnelForTheOwnFleetShipmentsCollectedToday()
+    {
+        var settings = TestData.Settings(orders: 20, bad: 0, assigned: 100, ownFleet: 100) with
+        {
+            Drivers = new Norvia.Simulator.Domain.Drivers.DriverShares(CollectionFailedPercent: 10, DeliveryFailedPercent: 10, DamagedPercent: 0, ReservationsPercent: 50),
+        };
+
+        var result = await Handler().Handle(new PreviewPlanQuery(settings), CancellationToken.None);
+
+        var todays = result.Value.Rows.Count(row => row.DayOffset == 0 && row.Planner == Norvia.Simulator.Domain.Planner.PlannerIntent.OwnFleetIfItFits);
+        result.Value.Drivers.Shipments.Should().Be(todays).And.BeGreaterThan(0);
+        result.Value.Drivers.Counts.Delivered.Should().Be(todays - result.Value.Drivers.Counts.CollectionsFailed - result.Value.Drivers.Counts.DeliveriesFailed);
+        result.Value.Drivers.Shares.Should().Be(settings.Drivers);
+    }
+
+    [Fact]
+    public async Task Handle_ATripShare_ScalesTheShipmentsTheDriversWork()
+    {
+        var all = TestData.Settings(orders: 20, bad: 0, assigned: 100, ownFleet: 100);
+
+        var full = await Handler().Handle(new PreviewPlanQuery(all), CancellationToken.None);
+        var half = await Handler().Handle(new PreviewPlanQuery(all with { TripPercent = 50 }), CancellationToken.None);
+
+        half.Value.Drivers.Shipments.Should().Be(full.Value.Drivers.Shipments * 50 / 100);
+    }
+
+    [Fact]
     public async Task Handle_PlannerShares_ShowTheAssignmentStageOfTheFunnel()
     {
         var settings = TestData.Settings(orders: 20, bad: 0, assigned: 50, ownFleet: 40, reassign: 20);

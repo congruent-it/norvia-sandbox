@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Norvia.Simulator.Application.Plans.Preview;
 using Norvia.Simulator.Domain.Carriers;
+using Norvia.Simulator.Domain.Drivers;
 using Norvia.Simulator.Domain.Planner;
 using Norvia.Simulator.Domain.Plans;
 using Norvia.Simulator.Domain.Runs;
@@ -14,7 +15,7 @@ namespace Norvia.Simulator.Web.UnitTests.Plans;
 
 public sealed class PlanTests : SimulatorWebContext
 {
-    private const string Address = "/plan?orders=3&bad=34&today=30&seed=77&mode=Paced&window=10&assigned=60&ownfleet=40&reassign=20&release=90&confirm=70&decline=15&tracked=90&exception=10&delivered=80&pod=85&cancel=50&preset=Busy%20day";
+    private const string Address = "/plan?orders=3&bad=34&today=30&seed=77&mode=Paced&window=10&assigned=60&ownfleet=40&reassign=20&trips=100&release=90&confirm=70&decline=15&tracked=90&exception=10&delivered=80&pod=85&cancel=50&collfail=10&delfail=10&damaged=5&reservations=10&preset=Busy%20day";
 
     private static readonly SimulationSettings Settings = new(3, 34, 30, 77, RunMode.Paced, TimeSpan.FromMinutes(10), "Busy day", 60, 40, 20);
 
@@ -27,7 +28,8 @@ public sealed class PlanTests : SimulatorWebContext
             new PlanRow(3, "Tuincentrum Groenrijk", "Tuincentrum Groenrijk", "SIM-5-3", "Utrecht → Utrecht", 1, 60m, null, ExpectedAnswer.Accepted, PlannerIntent.Carrier),
         ],
         new PlannerPreview(Orders: 3, Assigned: 2, TryOwnFleet: 1, Carrier: 1, Reassigned: 1),
-        new CarrierPreview(new CarrierShares(), CarrierFunnel.Count(CarrierFunnel.Plan(new CarrierShares(), 77, 20))));
+        new CarrierPreview(new CarrierShares(), CarrierFunnel.Count(CarrierFunnel.Plan(new CarrierShares(), 77, 20))),
+        new DriverPreview(new DriverShares(), DriverFunnel.Count(DriverFunnel.Plan(new DriverShares(), 77, 10))));
 
     private IRenderedComponent<Plan> RenderAt(string address)
     {
@@ -161,7 +163,7 @@ public sealed class PlanTests : SimulatorWebContext
     [Fact]
     public void PlanLinks_ACustomRun_NamesNoPreset()
     {
-        PlanLinks.Plan(Settings with { PresetName = null, Mode = RunMode.Burst, Window = TimeSpan.Zero }).Should().Be("/plan?orders=3&bad=34&today=30&seed=77&mode=Burst&window=0&assigned=60&ownfleet=40&reassign=20&release=90&confirm=70&decline=15&tracked=90&exception=10&delivered=80&pod=85&cancel=50");
+        PlanLinks.Plan(Settings with { PresetName = null, Mode = RunMode.Burst, Window = TimeSpan.Zero }).Should().Be("/plan?orders=3&bad=34&today=30&seed=77&mode=Burst&window=0&assigned=60&ownfleet=40&reassign=20&trips=100&release=90&confirm=70&decline=15&tracked=90&exception=10&delivered=80&pod=85&cancel=50&collfail=10&delfail=10&damaged=5&reservations=10");
     }
 
     [Fact]
@@ -204,6 +206,44 @@ public sealed class PlanTests : SimulatorWebContext
         page.Find("[data-testid=carrier-funnel]").TextContent.Should()
             .Contain("Of the 20 Shipments meant for a Carrier").And.Contain("releases 18 (90%)").And.Contain("confirm 13, decline 3 and leave 2 unanswered")
             .And.Contain("most a run can reach");
+    }
+
+    [Fact]
+    public void Render_ThePlan_ShowsTheDriverStageOfTheFunnel()
+    {
+        Requests.PreviewAsync(Arg.Any<SimulationSettings>(), Arg.Any<CancellationToken>()).Returns(Preview());
+
+        var page = RenderAt(Address);
+
+        page.Find("[data-testid=driver-funnel]").TextContent.Should()
+            .Contain("Of the 10 Shipments meant for Own fleet that collect today").And.Contain("Trips for later days stay Dispatched");
+    }
+
+    [Fact]
+    public void PlanLinks_DriverShares_RoundTripThroughTheAddress()
+    {
+        var settings = Settings with { Drivers = new DriverShares(20, 25, 7, 40) };
+
+        var link = PlanLinks.Plan(settings);
+
+        link.Should().Contain("collfail=20&delfail=25&damaged=7&reservations=40");
+        PlanLinks.Settings(3, 34, 30, 77, "Paced", 10, "Busy day", 60, 40, 20, collectionFailed: 20, deliveryFailed: 25, damaged: 7, reservations: 40).Should().Be(settings);
+    }
+
+    [Fact]
+    public void PlanLinks_TheTripShare_RoundTripsThroughTheAddress_AndAnOlderAddressPutsAllOnTrips()
+    {
+        var settings = Settings with { TripPercent = 35 };
+
+        PlanLinks.Plan(settings).Should().Contain("&trips=35&");
+        PlanLinks.Settings(3, 34, 30, 77, "Paced", 10, "Busy day", 60, 40, 20, trips: 35).Should().Be(settings);
+        PlanLinks.Settings(3, 34, 30, 77, "Burst", window: null, preset: null)!.TripPercent.Should().Be(100);
+    }
+
+    [Fact]
+    public void PlanLinks_AnAddressFromBeforeTheDriverStage_GetsTheDefaultDriverShares()
+    {
+        PlanLinks.Settings(3, 34, 30, 77, "Burst", window: null, preset: null)!.Drivers.Should().Be(new DriverShares());
     }
 
     [Fact]

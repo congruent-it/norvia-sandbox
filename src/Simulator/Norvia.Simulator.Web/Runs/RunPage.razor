@@ -117,6 +117,7 @@ else
                 <PropertyColumn Title="Shipper reference" Property="@(line => line.ShipperReference)" />
                 <PropertyColumn Title="Transport Order" Property="@(line => line.TransportOrderNumber)" />
                 <PropertyColumn Title="Shipment" Property="@(line => line.ShipmentNumber)" />
+                <PropertyColumn Title="Trip" Property="@(line => line.TripNumber)" />
                 <PropertyColumn Title="Detail" Property="@(line => line.Detail)" />
             </FluentDataGrid>
         </div>
@@ -201,9 +202,9 @@ else
 
     private static string OutcomeClass(LogOutcome outcome) => outcome switch
     {
-        LogOutcome.Rejected or LogOutcome.Refused or LogOutcome.NotReceived or LogOutcome.PlanningRefused or LogOutcome.PlanningNotReceived or LogOutcome.CarrierRefused or LogOutcome.CarrierNotReceived => "font-bold text-danger",
+        LogOutcome.Rejected or LogOutcome.Refused or LogOutcome.NotReceived or LogOutcome.PlanningRefused or LogOutcome.PlanningNotReceived or LogOutcome.CarrierRefused or LogOutcome.CarrierNotReceived or LogOutcome.DriverRefused or LogOutcome.DriverNotReceived => "font-bold text-danger",
         LogOutcome.AlreadyBooked or LogOutcome.Declined or LogOutcome.NoAnswer or LogOutcome.ExceptionFound => "text-warning",
-        LogOutcome.Accepted or LogOutcome.Planned or LogOutcome.Reassigned or LogOutcome.Released or LogOutcome.Confirmed or LogOutcome.TrackingSent or LogOutcome.ProofOfDeliverySent or LogOutcome.BookingCancelled or LogOutcome.ExceptionResolved => "text-success",
+        LogOutcome.Accepted or LogOutcome.Planned or LogOutcome.Reassigned or LogOutcome.Released or LogOutcome.Confirmed or LogOutcome.TrackingSent or LogOutcome.ProofOfDeliverySent or LogOutcome.BookingCancelled or LogOutcome.ExceptionResolved or LogOutcome.TripBuilt or LogOutcome.TripDispatched or LogOutcome.DriverReported or LogOutcome.TripCompleted => "text-success",
         _ => "text-muted",
     };
 

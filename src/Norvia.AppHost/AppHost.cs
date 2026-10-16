@@ -462,7 +462,7 @@ else
     }
 
     // The Simulator feeds the estate with representative orders, and only through its real doors (ADR 0001): the Partner API, as
-    // each Shipper's and Carrier's Persona, and the TMS API, as the Planner. It has a database of its own for its runs and logs, and is on for a local run. Azure comes with its own slice.
+    // each Shipper's and Carrier's Persona, the TMS API, as the Planner, and the Driver app API, as each Driver. It has a database of its own for its runs and logs, and is on for a local run. Azure comes with its own slice.
     var simulatorDatabase = sql.AddDatabase("simulator");
     var simulatorMigrations = builder.AddProject<Projects.Norvia_Simulator_Migrations>("simulator-migrations")
         .WithReference(simulatorDatabase).WaitFor(simulatorDatabase);
@@ -470,6 +470,7 @@ else
         .WithReference(simulatorDatabase).WaitForCompletion(simulatorMigrations)
         .WaitFor(partnerApi)
         .WithReference(tmsApi).WaitFor(tmsApi)
+        .WaitFor(driverAppApi)
         .WithHttpHealthCheck("/health")
         .WithUrlForEndpoint("http", url => url.DisplayText = "Simulator")
         .WithEnvironment("Seed__Path", seedFile)
@@ -489,7 +490,12 @@ else
         .WithEnvironment("TmsApi__BaseAddress", tmsApi.GetEndpoint("http"))
         .WithEnvironment("TmsApi__LocalTokens__Issuer", LocalTokens.Issuer)
         .WithEnvironment("TmsApi__LocalTokens__Audience", LocalTokens.TmsAudience)
-        .WithEnvironment("TmsApi__LocalTokens__ClientId", LocalTokens.SimulatorClientId);
+        .WithEnvironment("TmsApi__LocalTokens__ClientId", LocalTokens.SimulatorClientId)
+        // Each Driver works their Trips through the Driver app API with a token of their own, signed locally with the Driver ID as the one app role.
+        .WithEnvironment("DriverApp__BaseAddress", driverAppApi.GetEndpoint("http"))
+        .WithEnvironment("DriverApp__LocalTokens__Issuer", LocalTokens.Issuer)
+        .WithEnvironment("DriverApp__LocalTokens__Audience", LocalTokens.DriverAppAudience)
+        .WithEnvironment("DriverApp__LocalTokens__ClientId", LocalTokens.SimulatorClientId);
 
     partnerPortal.WaitFor(partnerApi)
         .WithEnvironment("PartnerApi__BaseAddress", ReferenceExpression.Create($"{partnerApi.GetEndpoint("http")}/partner/v1"))
@@ -544,6 +550,7 @@ else
         (partnerPortal.Resource, "PartnerApi__LocalTokens__SigningKey"),
         (simulator.Resource, "PartnerApi__LocalTokens__SigningKey"),
         (simulator.Resource, "TmsApi__LocalTokens__SigningKey"),
+        (simulator.Resource, "DriverApp__LocalTokens__SigningKey"),
     })
     {
         builder.CreateResourceBuilder(holder).WithEnvironment(async context =>

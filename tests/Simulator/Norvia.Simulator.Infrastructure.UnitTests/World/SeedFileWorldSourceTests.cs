@@ -38,6 +38,48 @@ public sealed class SeedFileWorldSourceTests
     }
 
     [Fact]
+    public void Load_TheDemoSeed_HasTheOwnFleetsVehiclesWithTheirCapacityAndKind()
+    {
+        var vehicles = FromDemoSeed().Load().OwnFleetVehicles;
+
+        vehicles.Select(vehicle => vehicle.Id).Should().Equal("VEH-0001", "VEH-0002", "VEH-0003", "VEH-0004", "VEH-0005", "VEH-0006");
+        vehicles.Single(vehicle => vehicle.Id == "VEH-0001").Should().Be(new Norvia.Simulator.Domain.Worlds.SimulatedVehicle("VEH-0001", "VN-101-A", Norvia.Simulator.Domain.Worlds.VehicleKind.Van, 1200, 4));
+        vehicles.Single(vehicle => vehicle.Id == "VEH-0006").LicenceNeeded.Should().Be(Norvia.Simulator.Domain.Worlds.LicenceCategory.CE);
+    }
+
+    [Fact]
+    public void Load_TheDemoSeed_HasTheOwnFleetsDriversWithTheirLicences()
+    {
+        var drivers = FromDemoSeed().Load().OwnFleetDrivers;
+
+        drivers.Should().HaveCount(7);
+        drivers.Single(driver => driver.Id == "DRV-0001").Should().BeEquivalentTo(
+            new Norvia.Simulator.Domain.Worlds.SimulatedDriver("DRV-0001", "Anouk de Vries", [Norvia.Simulator.Domain.Worlds.LicenceCategory.B, Norvia.Simulator.Domain.Worlds.LicenceCategory.C, Norvia.Simulator.Domain.Worlds.LicenceCategory.CE]));
+        drivers.Single(driver => driver.Id == "DRV-0006").Licences.Should().Equal(Norvia.Simulator.Domain.Worlds.LicenceCategory.B);
+    }
+
+    [Fact]
+    public void Load_InactiveVehiclesAndDriversAndKindsItDoesNotKnow_AreLeftOut()
+    {
+        var seed = """
+            {"shippers":[],"personas":[],
+             "vehicles":[
+               {"id":"V1","registration":"A","type":"Van","payloadKg":1000,"palletPlaces":4,"active":true},
+               {"id":"V2","registration":"B","type":"Van","payloadKg":1000,"palletPlaces":4,"active":false},
+               {"id":"V3","registration":"C","type":"Hovercraft","payloadKg":1000,"palletPlaces":4,"active":true}],
+             "drivers":[
+               {"id":"D1","name":"A","licences":["b"],"active":true},
+               {"id":"D2","name":"B","licences":["C"],"active":false}]}
+            """;
+
+        var world = new SeedFileWorldSource(new MemoryStream(Encoding.UTF8.GetBytes(seed))).Load();
+
+        world.OwnFleetVehicles.Select(vehicle => vehicle.Id).Should().Equal("V1");
+        world.OwnFleetDrivers.Select(driver => driver.Id).Should().Equal("D1");
+        world.OwnFleetDrivers.Single().Licences.Should().Equal(Norvia.Simulator.Domain.Worlds.LicenceCategory.B);
+    }
+
+    [Fact]
     public void Load_TheDemoSeed_HasTheCarriersThePlannerCanAssignTo()
     {
         var world = FromDemoSeed().Load();

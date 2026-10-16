@@ -29,15 +29,16 @@ namespace Norvia.Simulator.Web.IntegrationTests;
 public sealed class SimulatorFixture : IAsyncLifetime
 {
     // What the booking path doesn't use only costs startup time and memory. The Integration console stays: the Simulator's settings point at it.
-    // So do the tracking and Proof of delivery workers: the Carriers' tracking and Proofs of delivery only reach the TMS through them.
+    // So do the tracking and Proof of delivery workers: the Carriers' tracking and Proofs of delivery only reach the TMS through them. And the Driver app's API and
+    // migrations: the Simulator's settings point at the API, and the Drivers work the Trips through it.
     private static readonly string[] Unneeded =
     [
-        "dbgate", "tms-web", "partner-portal", "partner-portal-migrations", "partner-portal-web", "driver-app-migrations", "driver-app-api", "driver-app-web",
+        "dbgate", "tms-web", "partner-portal", "partner-portal-migrations", "partner-portal-web", "driver-app-web",
         "booking-worker", "shipper-notification-worker", "carrier-cancellation-worker", "trip-dispatch-worker", "driver-reports-worker",
     ];
 
     private static readonly string[] SimulatorSettings =
-        ["ConnectionStrings__", "Seed__", "Simulator__", "PartnerApi__", "TmsApi__", "IntegrationConsole__", "LocalOperator__"];
+        ["ConnectionStrings__", "Seed__", "Simulator__", "PartnerApi__", "TmsApi__", "DriverApp__", "IntegrationConsole__", "LocalOperator__"];
 
     private static readonly string[] IntakeRoles = ["TransportOrders.Intake"];
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
