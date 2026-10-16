@@ -1,0 +1,23 @@
+@* A number from the log: a link to its page in the TMS UI when its address is known, the plain number otherwise. *@
+@if (Number is not null)
+{
+    @if (Href is not null)
+    {
+        <a href="@Href" target="_blank" rel="noopener" aria-label="@($"Open {Kind} {Number} in the TMS")">@Number</a>
+    }
+    else
+    {
+        @Number
+    }
+}
+
+@code {
+    [Parameter]
+    public string? Number { get; set; }
+
+    [Parameter]
+    public string? Href { get; set; }
+
+    [Parameter, EditorRequired]
+    public string Kind { get; set; } = string.Empty;
+}

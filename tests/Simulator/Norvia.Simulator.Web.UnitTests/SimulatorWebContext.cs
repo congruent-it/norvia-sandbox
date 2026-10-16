@@ -16,6 +16,7 @@ public abstract class SimulatorWebContext : BunitContext
         Services.AddSingleton<TimeProvider>(Clock);
         Services.AddSingleton(Requests);
         Services.AddSingleton(new ConsoleLinks(new Uri("http://console.example:5000")));
+        Services.AddSingleton(new TmsLinks(new Uri("http://tms.example:5001")));
         Operator = AddAuthorization();
         Operator.SetAuthorized("Dev Eloper").SetRoles(OperatorRoles.Run, OperatorRoles.Read);
         Operator.SetPolicies(OperatorRoles.Run, OperatorRoles.Read);

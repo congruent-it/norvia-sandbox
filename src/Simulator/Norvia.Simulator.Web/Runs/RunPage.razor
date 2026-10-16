@@ -10,6 +10,7 @@
 @using Norvia.Simulator.Domain.Runs
 @inject ISimulatorRequests Requests
 @inject ConsoleLinks Console
+@inject TmsLinks Tms
 @inject TimeProvider Time
 @inject IJSRuntime Js
 @implements IDisposable
@@ -115,9 +116,15 @@ else
                     }
                 </TemplateColumn>
                 <PropertyColumn Title="Shipper reference" Property="@(line => line.ShipperReference)" />
-                <PropertyColumn Title="Transport Order" Property="@(line => line.TransportOrderNumber)" />
-                <PropertyColumn Title="Shipment" Property="@(line => line.ShipmentNumber)" />
-                <PropertyColumn Title="Trip" Property="@(line => line.TripNumber)" />
+                <TemplateColumn Title="Transport Order">
+                    <TmsLink Number="@context.TransportOrderNumber" Href="@(context.TransportOrderNumber is { } number ? Tms.TransportOrder(number) : null)" Kind="Transport Order" />
+                </TemplateColumn>
+                <TemplateColumn Title="Shipment">
+                    <TmsLink Number="@context.ShipmentNumber" Href="@(context.ShipmentNumber is { } number ? Tms.Shipment(number) : null)" Kind="Shipment" />
+                </TemplateColumn>
+                <TemplateColumn Title="Trip">
+                    <TmsLink Number="@context.TripNumber" Href="@(context.TripNumber is { } number ? Tms.Trip(number) : null)" Kind="Trip" />
+                </TemplateColumn>
                 <PropertyColumn Title="Detail" Property="@(line => line.Detail)" />
             </FluentDataGrid>
         </div>

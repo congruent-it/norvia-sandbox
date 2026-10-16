@@ -19,6 +19,7 @@ builder.Services.AddMediator(options =>
 });
 builder.Services.AddSingleton<ISimulatorRequests, SimulatorRequests>();
 builder.Services.AddSingleton(new ConsoleLinks(builder.Configuration.GetValue<Uri>("IntegrationConsole:Address")));
+builder.Services.AddSingleton(new TmsLinks(builder.Configuration.GetValue<Uri>("TmsWeb:Address")));
 
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddFluentUIComponents();

@@ -117,6 +117,7 @@ var simulator = builder.AddProject<Projects.Norvia_Simulator_Web>("simulator-web
     .WithHttpHealthCheck("/health")
     .WithUrlForEndpoint("http", url => url.DisplayText = "Simulator")
     .WithEnvironment("IntegrationConsole__Address", integrationConsole.GetEndpoint("http"))
+    .WithEnvironment("TmsWeb__Address", tmsWeb.GetEndpoint("http"))
     .WithEnvironment("TmsApi__BaseAddress", tmsApi.GetEndpoint("http"))
     .WithEnvironment("DriverApp__BaseAddress", driverAppApi.GetEndpoint("http"));
 
