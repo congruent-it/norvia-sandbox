@@ -13,8 +13,8 @@ namespace Norvia.Simulator.Web.UiTests;
 /// <summary>
 /// Runs the Norvia AppHost once for the whole test run, cut down to what a booking needs: SQL Server, the Service Bus emulator, the TMS and
 /// its migrations, the local Partner API, the tracking and Proof of delivery workers (the Carriers' tracking only reaches the TMS through them),
-/// the Integration console (the log's Message trail links point at it), the Partner portal (the Shipper's tracking view, which needs the Driver app API its settings point at) and the Simulator with
-/// its database. A headless Chromium drives the Simulator, which sends its bookings to the real Partner API.
+/// the Integration console (the log's Message trail links point at it), the Partner portal (the Shipper's tracking view, which needs the Driver app API its settings point at), the Trip dispatch and Driver reports workers (a dispatched Trip only reaches the Driver app
+/// through the first, and the Drivers' reports only reach the TMS through the second) and the Simulator with its database. A headless Chromium drives the Simulator, which sends its bookings to the real Partner API.
 /// </summary>
 public sealed class SimulatorUiFixture : IAsyncLifetime
 {
@@ -22,11 +22,15 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
     private static readonly string[] Unneeded =
     [
         "dbgate", "tms-web", "driver-app-web",
-        "booking-worker", "shipper-notification-worker", "carrier-cancellation-worker", "trip-dispatch-worker", "driver-reports-worker",
+        "booking-worker", "shipper-notification-worker", "carrier-cancellation-worker",
     ];
 
     // The seed's Carrier Rate Cards cover every Lane of this Shipper and none of the other's, which decides whether the TMS can price a release.
     private const string PricedShipper = "SHP-0001";
+
+    // The TMS gives a Vehicle and a Driver one Trip a day, so the Own fleet is one of each and only the Trips journey puts orders on it.
+    private const string OwnFleetVehicle = "VEH-0003";
+    private const string OwnFleetDriver = "DRV-0003";
 
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
 
@@ -61,9 +65,9 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
             builder.Resources.Remove(resource);
         }
 
-        // A copy of the seed in which only the priced Shipper is active, so every Shipment the Simulator books can be released to a Carrier.
+        // A copy of the seed in which only the priced Shipper, one Vehicle and one Driver are active, so every Shipment the Simulator books can be released to a Carrier.
         var simulator = builder.Resources.Single(resource => resource.Name == "simulator-web");
-        _seedCopy = await CopySeedWithOnlyAsync(PricedShipper, startup.Token);
+        _seedCopy = await CopySeedOfAsync(PricedShipper, OwnFleetVehicle, OwnFleetDriver, startup.Token);
         builder.CreateResourceBuilder((ProjectResource)simulator).WithEnvironment("Seed__Path", _seedCopy);
 
         _app = await builder.BuildAsync(startup.Token);
@@ -100,7 +104,7 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
         }
     }
 
-    private static async Task<string> CopySeedWithOnlyAsync(string shipperId, CancellationToken cancellationToken)
+    private static async Task<string> CopySeedOfAsync(string shipperId, string vehicleId, string driverId, CancellationToken cancellationToken)
     {
         var root = new DirectoryInfo(AppContext.BaseDirectory);
         while (root is not null && !File.Exists(Path.Combine(root.FullName, "seed", "norvia.seed.json")))
@@ -113,6 +117,16 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
         foreach (var shipper in seed["shippers"]!.AsArray().OfType<JsonObject>())
         {
             shipper["active"] = shipper["id"]!.GetValue<string>() == shipperId;
+        }
+
+        foreach (var vehicle in seed["vehicles"]!.AsArray().OfType<JsonObject>())
+        {
+            vehicle["active"] = vehicle["id"]!.GetValue<string>() == vehicleId;
+        }
+
+        foreach (var driver in seed["drivers"]!.AsArray().OfType<JsonObject>())
+        {
+            driver["active"] = driver["id"]!.GetValue<string>() == driverId;
         }
 
         var copy = Path.Combine(Path.GetTempPath(), $"norvia-seed-{Guid.NewGuid():N}.json");
