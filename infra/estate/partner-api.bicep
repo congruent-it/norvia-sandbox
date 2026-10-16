@@ -543,6 +543,16 @@ resource carrierEndpointKeys 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = [
   }
 ]
 
+// The Partner portal's reset endpoint asks the Simulator for a credential of its own (ADR 0039), derived like the Personas'. The portal and the
+// Simulator read it; both already read this vault.
+resource resetEndpointKey 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = {
+  parent: partnerPortalSecrets
+  name: 'reset-endpoint-key'
+  properties: {
+    value: replace('${guid(carrierEndpointKeySeed, 'reset', 'reset-endpoint-key')}${guid('reset', carrierEndpointKeySeed, 'reset-endpoint-key')}', '-', '')
+  }
+}
+
 // Every Shipper Persona has a notification endpoint in the Partner portal (P7), with a credential of its own named after the
 // Shipper's ID, derived like the Carriers'. The portal reads them; the Shipper notification Logic App gets the role to read
 // them below.

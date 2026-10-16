@@ -11,11 +11,13 @@ using Norvia.PartnerPortal.Application.Bookings;
 using Norvia.PartnerPortal.Application.DriverAppFault;
 using Norvia.PartnerPortal.Application.DriverSignIns;
 using Norvia.PartnerPortal.Application.Personas;
+using Norvia.PartnerPortal.Application.Reset;
 using Norvia.PartnerPortal.Infrastructure.Data;
 using Norvia.PartnerPortal.Infrastructure.DriverApp;
 using Norvia.PartnerPortal.Infrastructure.DriverSignIns;
 using Norvia.PartnerPortal.Infrastructure.PartnerApi;
 using Norvia.PartnerPortal.Infrastructure.Personas;
+using Norvia.PartnerPortal.Infrastructure.Reset;
 using Polly;
 
 namespace Norvia.PartnerPortal.Infrastructure;
@@ -43,6 +45,11 @@ public static class DependencyInjection
 
         builder.AddNorviaPartnerApi();
         builder.AddDriverAppSettings();
+
+        // The reset the Simulator's Reset estate calls (ADR 0039). Off unless the estate switches it on.
+        builder.Services.AddOptions<ResetOptions>().BindConfiguration(ResetOptions.SectionName).ValidateOnStart();
+        builder.Services.AddSingleton<IResetSwitch, ConfiguredResetSwitch>();
+        builder.Services.AddScoped<ITransactionalData, SqlTransactionalData>();
 
         return builder;
     }

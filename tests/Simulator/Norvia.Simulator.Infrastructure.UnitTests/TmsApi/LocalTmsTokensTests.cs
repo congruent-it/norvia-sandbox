@@ -20,7 +20,7 @@ public sealed class LocalTmsTokensTests
         _time);
 
     [Fact]
-    public async Task GetToken_IsSignedAsTheEstateWouldIssueItToTheSimulator_WithTheManageRole()
+    public async Task GetToken_IsSignedAsTheEstateWouldIssueItToTheSimulator_WithTheManageAndResetRoles()
     {
         var token = await Tokens().GetTokenAsync(CancellationToken.None);
 
@@ -34,7 +34,7 @@ public sealed class LocalTmsTokensTests
         validation.IsValid.Should().BeTrue();
         var jwt = (JsonWebToken)validation.SecurityToken;
         jwt.GetClaim("azp").Value.Should().Be("simulator");
-        jwt.GetPayloadValue<string[]>("roles").Should().Equal("TransportOrders.Manage");
+        jwt.GetPayloadValue<string[]>("roles").Should().Equal("TransportOrders.Manage", "Estate.Reset");
         jwt.ValidTo.Should().Be(_time.GetUtcNow().UtcDateTime.AddHours(1));
     }
 

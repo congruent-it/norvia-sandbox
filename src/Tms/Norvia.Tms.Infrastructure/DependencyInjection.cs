@@ -17,6 +17,7 @@ using Norvia.Tms.Application.Fleet.Planning;
 using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.ProofsOfDelivery;
 using Norvia.Tms.Application.RateCards;
+using Norvia.Tms.Application.Reset;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shippers;
 using Norvia.Tms.Application.TransportOrders;
@@ -44,6 +45,7 @@ using Norvia.Tms.Infrastructure.Outbox;
 using Norvia.Tms.Infrastructure.ProofsOfDelivery;
 using Norvia.Tms.Infrastructure.RateCards;
 using Norvia.Tms.Infrastructure.Rating;
+using Norvia.Tms.Infrastructure.Reset;
 using Norvia.Tms.Infrastructure.Seed;
 using Norvia.Tms.Infrastructure.Shipments;
 using Norvia.Tms.Infrastructure.Shippers;
@@ -208,6 +210,23 @@ public static class DependencyInjection
         builder.Services.AddOptions<OutboxOptions>().BindConfiguration(OutboxOptions.SectionName)
             .ValidateDataAnnotations().ValidateOnStart();
         builder.Services.AddHostedService<OutboxPublisher>();
+
+        return builder;
+    }
+
+    /// <summary>
+    /// The reset the Simulator's Reset estate calls (ADR 0039): guarded by the <c>Reset</c> setting, which is off by default, and by the topic
+    /// subscriptions it names being empty. Only the process that publishes to Service Bus has the client to peek them with.
+    /// </summary>
+    public static IHostApplicationBuilder AddTmsReset(this IHostApplicationBuilder builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.Services.AddOptions<ResetOptions>().BindConfiguration(ResetOptions.SectionName)
+            .ValidateDataAnnotations().ValidateOnStart();
+        builder.Services.AddSingleton<IResetSwitch, ConfiguredResetSwitch>();
+        builder.Services.AddScoped<IQuietCheck, ServiceBusQuietCheck>();
+        builder.Services.AddScoped<ITransactionalData, SqlTransactionalData>();
 
         return builder;
     }

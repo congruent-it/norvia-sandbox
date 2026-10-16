@@ -6,12 +6,15 @@ namespace Norvia.Simulator.Infrastructure.TmsApi;
 
 /// <summary>
 /// Locally there is no Entra, so the Simulator signs its token itself with the key the TMS trusts locally, as Entra would
-/// issue it to the Simulator's managed identity: its client ID in <c>azp</c>, and the manage role the estate grants it.
+/// issue it to the Simulator's managed identity: its client ID in <c>azp</c>, and the manage and reset roles the estate grants it.
 /// </summary>
 internal sealed class LocalTmsTokens(IOptions<TmsApiOptions> options, TimeProvider time) : ITmsTokens
 {
     /// <summary>The TMS API's app role for changing Transport Orders as Norvia's staff do: the Planner's assignment.</summary>
     public const string ManageRole = "TransportOrders.Manage";
+
+    /// <summary>The TMS API's app role for the reset door.</summary>
+    public const string ResetRole = "Estate.Reset";
 
     private static readonly TimeSpan Lifetime = TimeSpan.FromHours(1);
 
@@ -26,7 +29,7 @@ internal sealed class LocalTmsTokens(IOptions<TmsApiOptions> options, TimeProvid
             IssuedAt = now,
             NotBefore = now,
             Expires = now.Add(Lifetime),
-            Claims = new Dictionary<string, object> { ["azp"] = local.ClientId, ["roles"] = new[] { ManageRole } },
+            Claims = new Dictionary<string, object> { ["azp"] = local.ClientId, ["roles"] = new[] { ManageRole, ResetRole } },
             SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(Convert.FromBase64String(local.SigningKey)), SecurityAlgorithms.HmacSha256),
         }));
     }

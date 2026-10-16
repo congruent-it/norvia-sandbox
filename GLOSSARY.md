@@ -383,6 +383,10 @@ _Avoid_: seeder, data generator, load tester, fixture
 One go of the Simulator: a Simulation plan sent to the estate, either as fast as the estate accepts (burst) or spread over a window (paced). Only one run is active at a time, it can be cancelled but not resumed after a restart, and its log of what each actor did and how Norvia answered stays after a refresh. Its Shipper references are `SIM-<run>-<n>`.
 _Avoid_: job, batch, test run, scenario
 
+**Reset estate**:
+What the Simulator's button of that name does: it returns the whole estate to a clean sheet through each application's own reset endpoint (the TMS API, the Partner portal and the Driver app API), then clears the Simulator's own runs, logs and run counter. Every transactional record goes, whoever created it, and reference data stays; the next Simulation run is number 1. It is refused while a run is active, while an application has its reset switched off, or while a Service Bus subscription holds unprocessed messages. Unlike Clear history, which removes only the Simulator's own finished runs and their logs and leaves what they sent.
+_Avoid_: wipe, purge, reset the Simulator
+
 **Simulation plan**:
 What a Simulation run will send, made before anything is sent from the run's settings and a seed: the same ones always give the same plan. It holds the bookings and what the Planner means to do with the Transport Orders they become. What the Carriers then do with the Shipments that went to them is worked out when they have, from the same seed and the settings' Carrier shares. The Plan preview shows it per Shipper and booking.
 _Avoid_: script, schedule, dataset

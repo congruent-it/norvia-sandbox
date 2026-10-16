@@ -3,6 +3,7 @@
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @attribute [Authorize(Policy = OperatorSignIn.RunPolicy)]
 @using Norvia.Simulator.Application.Configure
+@using Norvia.Simulator.Application.Reset
 @using Norvia.Simulator.Application.Runs
 @using Norvia.Simulator.Domain.Runs
 @inject ISimulatorRequests Requests
@@ -174,6 +175,80 @@ else
             <FluentButton OnClick="ClearHistory" Disabled="@(_active is not null)">Clear history</FluentButton>
         </div>
     }
+
+    <h2>Reset estate</h2>
+    <p class="text-muted">
+        Clear history removes only the Simulator's own runs and logs. Reset estate returns the whole estate to a clean sheet, so the next demo starts from nothing:
+        what a run or a person created is deleted, whoever created it, in the TMS, the Partner portal, the Driver app and here.
+    </p>
+    @if (_resetReason is not null)
+    {
+        <p class="text-muted" role="status">@_resetReason</p>
+    }
+    <FluentButton OnClick="AskToReset" Disabled="@(_resetReason is not null || _resetting)">Reset estate</FluentButton>
+
+    @if (_confirmingReset)
+    {
+        <div role="alertdialog" aria-label="Confirm reset" class="my-4">
+            <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
+                <p>This deletes, and can't be undone:</p>
+                <ul class="list-disc pl-6">
+                    <li>In the TMS: every Transport Order, Shipment, Trip, Exception, Carrier booking, Tracking event, Proof of delivery and Message, and the Planner's changes to Rosters, Absences and Off the road days.</li>
+                    <li>In the Partner portal: every booking, Carrier booking request and notification, and the Personas' answer and tracking modes.</li>
+                    <li>In the Driver app: every Trip and Driver report.</li>
+                    <li>In the Simulator: every run and log line. The next run is number 1, with the Shipper references <code>SIM-1-1</code>, <code>SIM-1-2</code> and so on.</li>
+                </ul>
+                <p>The Shippers, Carriers, Drivers, Vehicles, Rate Cards and Personas stay.</p>
+            </FluentMessageBar>
+            <div class="mt-2 flex gap-2">
+                <FluentButton Appearance="Appearance.Accent" OnClick="ResetEstate">Delete everything and reset</FluentButton>
+                <FluentButton OnClick="KeepEverything">Keep everything</FluentButton>
+            </div>
+        </div>
+    }
+
+    @if (_resetting)
+    {
+        <div role="status" class="my-4">
+            <FluentStack VerticalAlignment="VerticalAlignment.Center">
+                <FluentProgressRing />
+                <span>Resetting the estate…</span>
+            </FluentStack>
+        </div>
+    }
+
+    @if (_resetProblem is not null)
+    {
+        <div role="alert" class="my-4">
+            <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">@_resetProblem</FluentMessageBar>
+        </div>
+    }
+
+    @if (_resetReport is { } report)
+    {
+        <div role="status" aria-label="Reset result" class="my-4">
+            <FluentMessageBar Intent="@(report.Complete ? MessageIntent.Success : MessageIntent.Warning)" AllowDismiss="false">
+                @if (report.Complete)
+                {
+                    <p>The estate is a clean sheet.</p>
+                }
+                else
+                {
+                    <p>Not everything was reset. What was deleted stays deleted, the Simulator's runs and logs were kept to show what happened, and the reset can be run again.</p>
+                }
+                <ul class="list-disc pl-6">
+                    @foreach (var app in report.Apps)
+                    {
+                        <li>@EstateApps.NameOf(app.App): @(app.Succeeded ? Deleted(app.Deleted) : $"refused. {app.Refusal}")</li>
+                    }
+                    @if (report.Complete)
+                    {
+                        <li>Simulator: @Deleted(report.Simulator)</li>
+                    }
+                </ul>
+            </FluentMessageBar>
+        </div>
+    }
 }
 
 @code {
@@ -183,6 +258,11 @@ else
     private readonly RunForm _form = new();
     private bool _failed;
     private string? _clearProblem;
+    private string? _resetReason;
+    private string? _resetProblem;
+    private EstateResetReport? _resetReport;
+    private bool _confirmingReset;
+    private bool _resetting;
     private readonly CancellationTokenSource _cancellation = new();
 
     protected override async Task OnInitializedAsync()
@@ -238,6 +318,19 @@ else
     {
         _runs = await Requests.ListRunsAsync(_cancellation.Token);
         _active = _runs.FirstOrDefault(run => run.IsActive);
+        await LoadResetReadinessAsync();
+    }
+
+    private async Task LoadResetReadinessAsync()
+    {
+        try
+        {
+            _resetReason = (await Requests.GetResetReadinessAsync(_cancellation.Token)).Reason;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _resetReason = "The Simulator couldn't check whether the estate would take a reset.";
+        }
     }
 
     private void PresetChanged()
@@ -259,4 +352,54 @@ else
         _clearProblem = result.IsSuccess ? null : string.Join(" ", result.Errors);
         await LoadRunsAsync();
     }
+
+    private void AskToReset()
+    {
+        _resetReport = null;
+        _resetProblem = null;
+        _confirmingReset = true;
+    }
+
+    private void KeepEverything() => _confirmingReset = false;
+
+    private async Task ResetEstate()
+    {
+        _confirmingReset = false;
+        _resetting = true;
+        _resetProblem = null;
+        _resetReport = null;
+        try
+        {
+            var result = await Requests.ResetEstateAsync(_cancellation.Token);
+            if (result.IsSuccess)
+            {
+                _resetReport = result.Value;
+            }
+            else
+            {
+                _resetProblem = string.Join(" ", result.Errors);
+            }
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _resetProblem = "The Simulator couldn't reset the estate. What was deleted stays deleted; try again in a moment.";
+        }
+        finally
+        {
+            _resetting = false;
+        }
+
+        try
+        {
+            _view = await Requests.GetConfigureAsync(_cancellation.Token);
+            await LoadRunsAsync();
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _failed = true;
+        }
+    }
+
+    private static string Deleted(IReadOnlyList<DeletedKind> deleted) =>
+        deleted.Count == 0 ? "nothing to delete." : "deleted " + string.Join(", ", deleted.Select(kind => $"{kind.Count} {kind.Kind}")) + ".";
 }

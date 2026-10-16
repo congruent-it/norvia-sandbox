@@ -63,6 +63,14 @@ while IFS="$tab" read -r name json value; do
   azd env config set "infra.parameters.$(echo "$name" | tr '[:upper:]' '[:lower:]')" "$json"
 done < "$work/outputs.env"
 
+# Whether the TMS API, the Partner portal and the Driver app API take the Simulator's Reset estate (Reset:Enabled), which deletes every transactional
+# record in them. Off unless the environment says so with ESTATE_RESET_ENABLED_SETTING=true. The Estate has 64 outputs, the most a template may have,
+# so the setting is handed to the apps here and not as an output.
+reset_enabled=$(printf '%s' "${ESTATE_RESET_ENABLED_SETTING:-false}" | tr '[:upper:]' '[:lower:]')
+[ "$reset_enabled" = "true" ] || reset_enabled=false
+azd env set AZURE_ESTATE_RESET_ENABLED "$reset_enabled"
+azd env config set infra.parameters.estate_reset_enabled "\"$reset_enabled\""
+
 # The seeded Drivers' Entra test users, whose domain and password the apps take as the Estate parameters azd asks for.
 ./create-driver-test-users.sh "$(jq -r '.ESTATE_DRIVER_APP_REGISTRATION_CLIENT_ID.value' "$work/outputs.json")"
 touch "$deployed_in_this_run"

@@ -33,6 +33,10 @@ internal sealed class EntraDriverTokens : IDriverTokens
         return token.Token;
     }
 
+    /// <summary>The Simulator's own managed identity holds the Driver app API's reset role, so its token for the API's scope is the reset's.</summary>
+    public async Task<string> GetResetTokenAsync(CancellationToken cancellationToken) =>
+        (await _simulatorIdentity.GetTokenAsync(new TokenRequestContext([_entra.Scope]), cancellationToken)).Token;
+
     private async Task<string> SimulatorIdentityTokenAsync(CancellationToken cancellationToken) =>
         (await _simulatorIdentity.GetTokenAsync(new TokenRequestContext([TokenExchangeScope]), cancellationToken)).Token;
 }

@@ -2,6 +2,7 @@ using Ardalis.Result;
 using Norvia.Simulator.Application.Configure;
 using Norvia.Simulator.Application.Log.List;
 using Norvia.Simulator.Application.Plans.Preview;
+using Norvia.Simulator.Application.Reset;
 using Norvia.Simulator.Application.Runs;
 using Norvia.Simulator.Application.Runs.Open;
 using Norvia.Simulator.Domain.Log;
@@ -21,6 +22,12 @@ public interface ISimulatorRequests
     Task<Result> CancelAsync(SimulationRunId runId, CancellationToken cancellationToken);
 
     Task<Result> ClearHistoryAsync(CancellationToken cancellationToken);
+
+    /// <summary>Whether the estate would take a reset now, and if not, why.</summary>
+    Task<EstateResetReadiness> GetResetReadinessAsync(CancellationToken cancellationToken);
+
+    /// <summary>Returns the estate to a clean sheet through each application's own door. A conflict says why it wasn't tried.</summary>
+    Task<Result<EstateResetReport>> ResetEstateAsync(CancellationToken cancellationToken);
 
     Task<IReadOnlyList<RunSummary>> ListRunsAsync(CancellationToken cancellationToken);
 

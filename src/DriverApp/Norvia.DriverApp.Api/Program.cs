@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics;
 using Norvia.DriverApp.Api.Actions;
 using Norvia.DriverApp.Api.Reports;
+using Norvia.DriverApp.Api.Reset;
 using Norvia.DriverApp.Api.Settings;
 using Norvia.DriverApp.Api.Trips;
 using Norvia.DriverApp.Application.Reports.Deliver;
@@ -24,6 +25,7 @@ builder.AddDriverAppSeedDrivers();
 // The API stores no file, but its mediator holds every handler of the Application, so it has the port the Deliver handler needs.
 builder.AddDriverAppProofOfDeliveryTransit();
 builder.AddDriverAppOutboxPublisher();
+builder.AddDriverAppReset();
 
 // The outcome endpoint takes the Driver reports Logic App's token. Issuer, audience and keys come from Authentication:Schemes:Bearer: Entra in
 // Azure, the AppHost's local key otherwise.
@@ -100,6 +102,7 @@ app.MapTrips();
 app.MapReportOutcomes();
 app.MapDriverActions();
 app.MapSettings();
+app.MapReset();
 
 await app.RunAsync();
 

@@ -9,6 +9,7 @@ using Norvia.Tms.Api.Capacity;
 using Norvia.Tms.Api.CarrierBookings;
 using Norvia.Tms.Api.Exceptions;
 using Norvia.Tms.Api.ProofsOfDelivery;
+using Norvia.Tms.Api.Reset;
 using Norvia.Tms.Api.Shipments;
 using Norvia.Tms.Api.ShipperNotifications;
 using Norvia.Tms.Api.ShipperTracking;
@@ -90,6 +91,7 @@ builder.Services.AddScoped<IPipelineBehavior<EndTripCommand, Result<EndTripResul
 builder.AddTmsInfrastructure();
 builder.AddTmsProofOfDeliveryStorage();
 builder.AddTmsOutboxPublisher();
+builder.AddTmsReset();
 builder.AddTmsRatingWorker();
 builder.AddTmsPlanningHorizonJob();
 
@@ -188,6 +190,7 @@ app.MapCapacity();
 app.MapTrips();
 app.MapShipperNotifications();
 app.MapShipperTracking();
+app.MapReset();
 
 await app.RunAsync();
 

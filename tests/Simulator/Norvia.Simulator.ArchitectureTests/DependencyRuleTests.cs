@@ -94,6 +94,15 @@ public sealed class DependencyRuleTests
             .ShouldNot().HaveDependencyOnAny("Azure.Messaging.ServiceBus", "Azure.Storage"));
     }
 
+    [Fact]
+    public void TheSimulator_ResetsTheEstateOnlyThroughItsDoors_NeverItsDatabasesOrServiceBus()
+    {
+        // The reset is each application's own door (ADR 0039): the Simulator's client sends HTTP and nothing else.
+        ShouldHold(Types.InAssembly(Infrastructure)
+            .That().ResideInNamespace("Norvia.Simulator.Infrastructure.Reset")
+            .ShouldNot().HaveDependencyOnAny("Microsoft.EntityFrameworkCore", "Microsoft.Data.SqlClient", "Azure.Messaging.ServiceBus", "Azure.Storage"));
+    }
+
     private static void ShouldHold(ConditionList rule)
     {
         var result = rule.GetResult();

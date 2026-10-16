@@ -11,6 +11,7 @@ using Norvia.PartnerPortal.Web.CarrierBookings;
 using Norvia.PartnerPortal.Web.CarrierShipments;
 using Norvia.PartnerPortal.Web.Components;
 using Norvia.PartnerPortal.Web.Personas;
+using Norvia.PartnerPortal.Web.Reset;
 using Norvia.PartnerPortal.Web.ShipperNotifications;
 using Norvia.PartnerPortal.Web.ShipperTracking;
 
@@ -39,6 +40,7 @@ builder.Services.AddHostedService(services => services.GetRequiredService<AutoPr
 // A Persona's endpoint without its credential would refuse every caller, so a missing one stops the portal at startup.
 builder.Services.AddOptions<CarrierEndpointOptions>().BindConfiguration(CarrierEndpointOptions.SectionName).ValidateOnStart();
 builder.Services.AddSingleton<IValidateOptions<CarrierEndpointOptions>, EveryCarrierHasACredential>();
+builder.Services.AddOptions<ResetEndpointOptions>().BindConfiguration(ResetEndpointOptions.SectionName);
 builder.Services.AddOptions<ShipperEndpointOptions>().BindConfiguration(ShipperEndpointOptions.SectionName).ValidateOnStart();
 builder.Services.AddSingleton<IValidateOptions<ShipperEndpointOptions>, EveryShipperHasACredential>();
 
@@ -62,6 +64,7 @@ app.MapCarrierBookingEndpoint();
 app.MapCarrierCancellationEndpoint();
 app.MapShipperNotificationEndpoint();
 app.MapProofOfDeliveryFileEndpoint();
+app.MapResetEndpoints();
 app.MapDefaultEndpoints();
 
 await app.RunAsync();

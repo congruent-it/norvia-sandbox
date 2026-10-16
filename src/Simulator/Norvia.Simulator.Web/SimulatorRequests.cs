@@ -3,6 +3,7 @@ using Mediator;
 using Norvia.Simulator.Application.Configure;
 using Norvia.Simulator.Application.Log.List;
 using Norvia.Simulator.Application.Plans.Preview;
+using Norvia.Simulator.Application.Reset;
 using Norvia.Simulator.Application.Runs;
 using Norvia.Simulator.Application.Runs.Cancel;
 using Norvia.Simulator.Application.Runs.ClearHistory;
@@ -34,6 +35,12 @@ internal sealed class SimulatorRequests(IServiceScopeFactory scopes) : ISimulato
 
     public Task<Result> ClearHistoryAsync(CancellationToken cancellationToken) =>
         SendAsync(mediator => mediator.Send(new ClearHistoryCommand(), cancellationToken));
+
+    public Task<EstateResetReadiness> GetResetReadinessAsync(CancellationToken cancellationToken) =>
+        SendAsync(mediator => mediator.Send(new GetResetReadinessQuery(), cancellationToken));
+
+    public Task<Result<EstateResetReport>> ResetEstateAsync(CancellationToken cancellationToken) =>
+        SendAsync(mediator => mediator.Send(new ResetEstateCommand(), cancellationToken));
 
     public Task<IReadOnlyList<RunSummary>> ListRunsAsync(CancellationToken cancellationToken) =>
         SendAsync(mediator => mediator.Send(new ListRunsQuery(), cancellationToken));

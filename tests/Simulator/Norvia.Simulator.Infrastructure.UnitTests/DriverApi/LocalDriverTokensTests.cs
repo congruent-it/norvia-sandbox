@@ -39,6 +39,16 @@ public sealed class LocalDriverTokensTests
     }
 
     [Fact]
+    public async Task GetResetToken_IsSignedAsTheSimulator_WithTheResetRole()
+    {
+        var token = await Tokens().GetResetTokenAsync(CancellationToken.None);
+
+        var jwt = new JsonWebTokenHandler().ReadJsonWebToken(token);
+        jwt.GetPayloadValue<string[]>("roles").Should().Equal("Estate.Reset");
+        jwt.GetClaim("azp").Value.Should().Be("simulator");
+    }
+
+    [Fact]
     public async Task GetToken_ForADifferentDriver_HoldsThatDriversRole()
     {
         var token = await Tokens().GetTokenAsync("DRV-0006", CancellationToken.None);

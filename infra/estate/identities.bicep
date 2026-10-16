@@ -24,6 +24,10 @@ var intakeRole = 'TransportOrders.Intake'
 var intakeRoleId = guid('norvia-tms-api', environmentName, intakeRole)
 var manageRole = 'TransportOrders.Manage'
 var manageRoleId = guid('norvia-tms-api', environmentName, manageRole)
+var tmsResetRole = 'Estate.Reset'
+var tmsResetRoleId = guid('norvia-tms-api', environmentName, tmsResetRole)
+var driverAppResetRole = 'Estate.Reset'
+var driverAppResetRoleId = guid('norvia-driver-app-api', environmentName, driverAppResetRole)
 var answerRole = 'CarrierBookings.Answer'
 var answerRoleId = guid('norvia-tms-api', environmentName, answerRole)
 var reportRole = 'CarrierBookings.Report'
@@ -111,6 +115,16 @@ resource tmsApi 'Microsoft.Graph/applications@v1.0' = {
       value: manageRole
       displayName: 'Manage Transport Orders'
       description: 'Change Transport Orders as Norvia\'s staff do in the TMS UI, such as re-rating one. Only the TMS UI holds it.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
+    {
+      id: tmsResetRoleId
+      value: tmsResetRole
+      displayName: 'Reset the estate'
+      description: 'Delete the TMS\'s transactional records, for the Simulator\'s Reset estate (ADR 0039). Only the Simulator holds it, and the TMS honours it only while its Reset setting is on.'
       allowedMemberTypes: [
         'Application'
       ]
@@ -356,6 +370,16 @@ resource driverAppApi 'Microsoft.Graph/applications@v1.0' = {
         value: driverReportOutcomeRole
         displayName: 'Report the outcome of a Driver report'
         description: 'Tell the Driver app whether the TMS recorded a report of a Driver, refused it, or was never reached (P12). Only the P12 Driver reports Logic App holds it.'
+        allowedMemberTypes: [
+          'Application'
+        ]
+        isEnabled: true
+      }
+      {
+        id: driverAppResetRoleId
+        value: driverAppResetRole
+        displayName: 'Reset the estate'
+        description: 'Delete the Driver app\'s Trips and reports, for the Simulator\'s Reset estate (ADR 0039). Only the Simulator holds it, and the Driver app honours it only while its Reset setting is on.'
         allowedMemberTypes: [
           'Application'
         ]
@@ -820,6 +844,20 @@ resource simulatorIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@202
 resource simulatorManageRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
   resourceId: tmsApiPrincipal.id
   appRoleId: manageRoleId
+  principalId: simulatorIdentity.properties.principalId
+}
+
+// The Simulator's Reset estate calls the reset door of the TMS API and of the Driver app API (ADR 0039). The roles do nothing until the
+// estate switches each application's Reset setting on.
+resource simulatorTmsResetRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: tmsApiPrincipal.id
+  appRoleId: tmsResetRoleId
+  principalId: simulatorIdentity.properties.principalId
+}
+
+resource simulatorDriverAppResetRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: driverAppApiPrincipal.id
+  appRoleId: driverAppResetRoleId
   principalId: simulatorIdentity.properties.principalId
 }
 

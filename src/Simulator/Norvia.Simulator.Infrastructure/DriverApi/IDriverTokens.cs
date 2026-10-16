@@ -4,4 +4,7 @@ namespace Norvia.Simulator.Infrastructure.DriverApi;
 internal interface IDriverTokens
 {
     Task<string> GetTokenAsync(string driverId, CancellationToken cancellationToken);
+
+    /// <summary>A token for the Simulator's own identity, holding the role of the Driver app API's reset door.</summary>
+    Task<string> GetResetTokenAsync(CancellationToken cancellationToken);
 }
