@@ -61,9 +61,10 @@ public sealed partial class RunJourneyTests(SimulatorUiFixture simulator) : Brow
         await Page.GetByLabel("Seed").FillAsync(seed.ToString(CultureInfo.InvariantCulture));
         await Page.GetByRole(AriaRole.Button, new() { Name = "Preview plan" }).ClickAsync();
         await Page.GetByRole(AriaRole.Button, new() { Name = "Start run" }).ClickAsync();
-        await Expect(Page.GetByRole(AriaRole.Status).First).ToContainTextAsync($"Completed: {Orders} of {Orders} bookings sent");
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Level = 1 })).ToContainTextAsync("Run ");
+        await Expect(Page.GetByRole(AriaRole.Status).First).ToContainTextAsync($"Completed: {Orders} of {Orders} bookings sent", new() { Timeout = 60_000 });
 
-        await Page.GetByText("Settings it was started with").ClickAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Settings it was started with" }).ClickAsync();
 
         var how = Page.GetByRole(AriaRole.Group, new() { Name = "Settings" }).GetByLabel("How it is sent");
         await Expect(how).ToContainTextAsync(seed.ToString(CultureInfo.InvariantCulture));

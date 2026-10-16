@@ -13,7 +13,7 @@ namespace Norvia.Simulator.Web.UiTests;
 /// <summary>
 /// Runs the Norvia AppHost once for the whole test run, cut down to what a booking needs: SQL Server, the Service Bus emulator, the TMS and
 /// its migrations, the local Partner API, the tracking and Proof of delivery workers (the Carriers' tracking only reaches the TMS through them),
-/// the Integration console (the log's Message trail links point at it), the Partner portal (the Shipper's tracking view, which needs the Driver app API its settings point at), the Trip dispatch and Driver reports workers (a dispatched Trip only reaches the Driver app
+/// the Integration console (the log's Message trail links point at it), the TMS UI (the log's Transport Order, Shipment and Trip links point at it, and the Simulator waits for its address), the Partner portal (the Shipper's tracking view, which needs the Driver app API its settings point at), the Trip dispatch and Driver reports workers (a dispatched Trip only reaches the Driver app
 /// through the first, and the Drivers' reports only reach the TMS through the second) and the Simulator with its database. A headless Chromium drives the Simulator, which sends its bookings to the real Partner API.
 /// </summary>
 public sealed class SimulatorUiFixture : IAsyncLifetime
@@ -21,7 +21,7 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
     // What the booking path doesn't use only costs startup time and memory.
     private static readonly string[] Unneeded =
     [
-        "dbgate", "tms-web", "driver-app-web",
+        "dbgate", "driver-app-web",
         "booking-worker", "shipper-notification-worker", "carrier-cancellation-worker",
     ];
 
