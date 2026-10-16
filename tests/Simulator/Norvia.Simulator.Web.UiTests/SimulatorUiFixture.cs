@@ -67,7 +67,7 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
 
         // A copy of the seed in which only the priced Shipper, one Vehicle and one Driver are active, so every Shipment the Simulator books can be released to a Carrier.
         var simulator = builder.Resources.Single(resource => resource.Name == "simulator-web");
-        _seedCopy = await CopySeedWithOnlyAsync(PricedShipper, startup.Token);
+        _seedCopy = await CopySeedOfAsync(PricedShipper, OwnFleetVehicle, OwnFleetDriver, startup.Token);
         builder.CreateResourceBuilder((ProjectResource)simulator).WithEnvironment("Seed__Path", _seedCopy);
 
         _app = await builder.BuildAsync(startup.Token);
@@ -104,7 +104,7 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
         }
     }
 
-    private static async Task<string> CopySeedWithOnlyAsync(string shipperId, CancellationToken cancellationToken)
+    private static async Task<string> CopySeedOfAsync(string shipperId, string vehicleId, string driverId, CancellationToken cancellationToken)
     {
         var root = new DirectoryInfo(AppContext.BaseDirectory);
         while (root is not null && !File.Exists(Path.Combine(root.FullName, "seed", "norvia.seed.json")))
@@ -121,12 +121,12 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
 
         foreach (var vehicle in seed["vehicles"]!.AsArray().OfType<JsonObject>())
         {
-            vehicle["active"] = vehicle["id"]!.GetValue<string>() == OwnFleetVehicle;
+            vehicle["active"] = vehicle["id"]!.GetValue<string>() == vehicleId;
         }
 
         foreach (var driver in seed["drivers"]!.AsArray().OfType<JsonObject>())
         {
-            driver["active"] = driver["id"]!.GetValue<string>() == OwnFleetDriver;
+            driver["active"] = driver["id"]!.GetValue<string>() == driverId;
         }
 
         var copy = Path.Combine(Path.GetTempPath(), $"norvia-seed-{Guid.NewGuid():N}.json");

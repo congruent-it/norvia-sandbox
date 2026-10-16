@@ -49,6 +49,8 @@ public sealed partial class TripJourneyTests(SimulatorUiFixture simulator) : Bro
 
         // The Trip's number is the TMS's, so the test checks its shape, and follows the Trip by it.
         var tripNumber = TripNumber().Match(await completed.InnerTextAsync()).Value;
+        // The Own fleet is one Vehicle and the TMS gives it one Trip a day, so every order collected today is on this one Trip.
+        await Expect(Rows(log, "TripBuilt")).ToHaveCountAsync(1);
         await Expect(Rows(log, "TripBuilt").Filter(new() { HasText = tripNumber })).ToHaveCountAsync(1);
         var dispatch = Rows(log, "TripDispatched").Filter(new() { HasText = tripNumber });
         await Expect(dispatch).ToHaveCountAsync(1);
@@ -66,7 +68,7 @@ public sealed partial class TripJourneyTests(SimulatorUiFixture simulator) : Bro
         await Expect(driverReports.Filter(new() { HasText = "Deliver" })).Not.ToHaveCountAsync(0);
         await Expect(Page.Locator("[data-outcome=DriverRefused]")).ToHaveCountAsync(0);
 
-        // The log lists the newest line first or last, so the order is read off the Driver's actions by their time and sequence in the run.
+        // The log may list its lines oldest or newest first, so the Trip's start and end are its two ends either way.
         var actions = (await driverReports.AllInnerTextsAsync()).Select(row => row.Contains("Start Trip", StringComparison.Ordinal) ? "Start" : row.Contains("End Trip", StringComparison.Ordinal) ? "End" : "Stop").ToList();
         (actions.First() == "Start" && actions.Last() == "End" || actions.First() == "End" && actions.Last() == "Start")
             .Should().BeTrue("the Driver starts the Trip, reports its Stops and ends it");
