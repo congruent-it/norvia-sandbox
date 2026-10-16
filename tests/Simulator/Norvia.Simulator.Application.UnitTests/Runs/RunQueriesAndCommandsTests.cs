@@ -200,6 +200,20 @@ public sealed class RunQueriesAndCommandsTests
     }
 
     [Fact]
+    public async Task Open_ARun_HoldsTheSettingsItsPlanWasMadeFrom()
+    {
+        var run = TestData.Run(TestData.Settings(orders: 10, assigned: 100));
+        var reads = Substitute.For<IReadRepository<SimulationRun>>();
+        reads.FirstOrDefaultAsync(Arg.Any<ISpecification<SimulationRun>>(), Arg.Any<CancellationToken>()).Returns(run);
+        var lines = Substitute.For<IReadRepository<LogEntry>>();
+        lines.ListAsync(Arg.Any<ISpecification<LogEntry, LogOutcome>>(), Arg.Any<CancellationToken>()).Returns([]);
+
+        var result = await new GetRunHandler(reads, lines, World()).Handle(new GetRunQuery(run.Id), CancellationToken.None);
+
+        result.Value.Settings.Should().Be(run.Plan.Settings);
+    }
+
+    [Fact]
     public async Task Open_ARun_CountsTheAnswersAndNamesTheActors()
     {
         var run = TestData.Run();

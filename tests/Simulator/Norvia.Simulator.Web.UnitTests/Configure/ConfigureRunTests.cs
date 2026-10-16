@@ -7,6 +7,7 @@ using Norvia.Simulator.Application.Runs;
 using Norvia.Simulator.Domain.Runs;
 using Norvia.Simulator.Web.Configure;
 using Norvia.Simulator.Web.Operators;
+using Norvia.Simulator.Web.Plans;
 
 namespace Norvia.Simulator.Web.UnitTests.Configure;
 
@@ -81,6 +82,57 @@ public sealed class ConfigureRunTests : SimulatorWebContext
         page.Find("fluent-select").Change("Custom");
 
         Field(page, "Orders").GetAttribute("value").Should().Be("20");
+    }
+
+    [Fact]
+    public void Render_WithTheSettingsOfARunInTheAddress_FillsTheFormWithThem()
+    {
+        Services.GetRequiredService<NavigationManager>().NavigateTo(PlanLinks.Configure(TestData.Settings(seed: 55, preset: "Busy day", mode: RunMode.Paced)));
+
+        var page = Render<ConfigureRun>();
+
+        Field(page, "Orders").GetAttribute("value").Should().Be("10");
+        Field(page, "Collected today (%)").GetAttribute("value").Should().Be("30");
+        Field(page, "Assigned by the Planner (%)").GetAttribute("value").Should().Be("70");
+        Field(page, "Confirmed by the Carrier (%)").GetAttribute("value").Should().Be("85");
+        Field(page, "Own fleet put on Trips (%)").GetAttribute("value").Should().Be("90");
+        Field(page, "Delivered with reservations (%)").GetAttribute("value").Should().Be("12");
+        Field(page, "Window (minutes)").GetAttribute("value").Should().Be("15");
+        Field(page, "Seed").GetAttribute("value").Should().Be("55");
+        page.Find("fluent-select").GetAttribute("current-value").Should().Be("Busy day");
+    }
+
+    [Fact]
+    public void Render_WithTheSettingsOfARunButNoSeed_OffersANewSeed()
+    {
+        Services.GetRequiredService<NavigationManager>().NavigateTo(PlanLinks.ConfigureWithNewSeed(TestData.Settings(seed: 55)));
+
+        var page = Render<ConfigureRun>();
+
+        Field(page, "Orders").GetAttribute("value").Should().Be("10");
+        Field(page, "Seed").GetAttribute("value").Should().Be("777");
+    }
+
+    [Fact]
+    public void Render_WithASettingsPresetThatNoLongerExists_ShowsTheRunAsCustom()
+    {
+        Services.GetRequiredService<NavigationManager>().NavigateTo(PlanLinks.Configure(TestData.Settings(preset: "Gone")));
+
+        var page = Render<ConfigureRun>();
+
+        page.Find("fluent-select").GetAttribute("current-value").Should().Be("Custom");
+        Field(page, "Orders").GetAttribute("value").Should().Be("10");
+    }
+
+    [Fact]
+    public void Navigate_ToTheSettingsOfARunWhileConfigureIsOpen_RefillsTheForm()
+    {
+        var page = Render<ConfigureRun>();
+
+        Services.GetRequiredService<NavigationManager>().NavigateTo(PlanLinks.Configure(TestData.Settings(seed: 55)));
+
+        page.WaitForAssertion(() => Field(page, "Orders").GetAttribute("value").Should().Be("10"));
+        Field(page, "Seed").GetAttribute("value").Should().Be("55");
     }
 
     [Fact]

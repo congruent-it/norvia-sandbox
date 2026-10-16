@@ -167,6 +167,30 @@ public sealed class PlanTests : SimulatorWebContext
     }
 
     [Fact]
+    public void PlanLinks_Configure_PutsTheSettingsOfARunInTheAddressOfTheConfigureScreen()
+    {
+        PlanLinks.Configure(Settings).Should().Be(Address.Replace("/plan?", "/?", StringComparison.Ordinal));
+        PlanLinks.ConfigureWithNewSeed(Settings).Should().NotContain("seed=").And.Contain("orders=3").And.Contain("preset=Busy%20day");
+    }
+
+    [Fact]
+    public void PlanLinks_Configure_RoundTripsThroughTheAddress_TakingTheGivenSeedWhenTheAddressHasNone()
+    {
+        var withSeed = new Uri("http://simulator.example" + PlanLinks.Configure(Settings));
+        var withoutSeed = new Uri("http://simulator.example" + PlanLinks.ConfigureWithNewSeed(Settings));
+
+        PlanLinks.ConfigureSettings(withSeed, newSeed: 999).Should().Be(Settings);
+        PlanLinks.ConfigureSettings(withoutSeed, newSeed: 999).Should().Be(Settings with { Seed = 999 });
+    }
+
+    [Fact]
+    public void PlanLinks_ConfigureSettings_AnAddressWithoutSettings_GivesNone()
+    {
+        PlanLinks.ConfigureSettings(new Uri("http://simulator.example/"), newSeed: 999).Should().BeNull();
+        PlanLinks.ConfigureSettings(new Uri("http://simulator.example/?orders=3&mode=Slow"), newSeed: 999).Should().BeNull();
+    }
+
+    [Fact]
     public void PlanLinks_AnAddressFromBeforeThePlanner_GetsTheDefaultShares()
     {
         var settings = PlanLinks.Settings(3, 34, 30, 77, "Burst", window: null, preset: null);

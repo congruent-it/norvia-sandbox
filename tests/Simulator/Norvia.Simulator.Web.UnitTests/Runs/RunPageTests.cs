@@ -6,6 +6,7 @@ using Norvia.Simulator.Application.Log.List;
 using Norvia.Simulator.Domain.Log;
 using Norvia.Simulator.Domain.Runs;
 using Norvia.Simulator.Web.Operators;
+using Norvia.Simulator.Web.Plans;
 using Norvia.Simulator.Web.Runs;
 
 namespace Norvia.Simulator.Web.UnitTests.Runs;
@@ -28,9 +29,9 @@ public sealed class RunPageTests : SimulatorWebContext
         GivenRun(TestData.Summary());
     }
 
-    private void GivenRun(Norvia.Simulator.Application.Runs.RunSummary summary)
+    private void GivenRun(Norvia.Simulator.Application.Runs.RunSummary summary, SimulationSettings? settings = null)
     {
-        Requests.GetRunAsync(Arg.Any<SimulationRunId>(), Arg.Any<CancellationToken>()).Returns(TestData.Detail(summary));
+        Requests.GetRunAsync(Arg.Any<SimulationRunId>(), Arg.Any<CancellationToken>()).Returns(TestData.Detail(summary, settings));
         Requests.ListLogAsync(Arg.Any<SimulationRunId>(), Arg.Any<LogFilter>(), Arg.Any<CancellationToken>()).Returns(Lines);
     }
 
@@ -79,6 +80,59 @@ public sealed class RunPageTests : SimulatorWebContext
         rows.Select(row => row.QuerySelector("[data-outcome]")!.TextContent.Trim()).Should().Equal("Trip dispatched", "Driver reported", "Driver app refused");
         rows[1].QuerySelector("a")!.GetAttribute("href").Should().Contain("drv-1");
         rows[2].QuerySelector("[data-outcome]")!.ClassList.Should().Contain("text-danger");
+    }
+
+    [Fact]
+    public void Render_ARun_ListsEverySettingItWasStartedWith_GroupedAsOnConfigure()
+    {
+        GivenRun(TestData.Summary(), TestData.Settings());
+
+        var settings = RenderRun().Find("[aria-label='Settings']");
+
+        var groups = settings.QuerySelectorAll("dl[aria-label]").ToDictionary(group => group.GetAttribute("aria-label")!, group => group.TextContent);
+        groups.Keys.Should().Equal("Shippers", "Planner", "Carriers", "Own fleet and Drivers", "How it is sent");
+        groups["Shippers"].Should().Contain("Orders").And.Contain("10").And.Contain("Bad bookings (%)").And.Contain("Collected today (%)").And.Contain("30");
+        groups["Planner"].Should().Contain("Assigned by the Planner (%)").And.Contain("70").And.Contain("To Own fleet where it fits (%)").And.Contain("40")
+            .And.Contain("Reassigned (%)").And.Contain("Released by the Planner (%)").And.Contain("60");
+        groups["Carriers"].Should().Contain("Confirmed by the Carrier (%)").And.Contain("85").And.Contain("Declined by the Carrier (%)").And.Contain("Tracked (%)")
+            .And.Contain("Exceptions on the way (%)").And.Contain("Delivered (%)").And.Contain("With a Proof of delivery (%)").And.Contain("65").And.Contain("Failed collections cancelled (%)");
+        groups["Own fleet and Drivers"].Should().Contain("Own fleet put on Trips (%)").And.Contain("90").And.Contain("Collections that fail (%)")
+            .And.Contain("Deliveries that fail (%)").And.Contain("Damage reported (%)").And.Contain("Delivered with reservations (%)").And.Contain("12");
+        groups["How it is sent"].Should().Contain("Burst").And.Contain("Seed").And.Contain("77").And.Contain("Preset").And.Contain("Quiet Monday");
+    }
+
+    [Fact]
+    public void Render_APacedCustomRun_ShowsItsWindowAndNoPreset()
+    {
+        GivenRun(TestData.Summary(), TestData.Settings(preset: null, mode: RunMode.Paced));
+
+        var sent = RenderRun().Find("dl[aria-label='How it is sent']").TextContent;
+
+        sent.Should().Contain("Paced").And.Contain("15 minutes").And.Contain("Custom");
+    }
+
+    [Fact]
+    public void Render_ARun_OffersToRunAgainWithTheSameSeedOrANewOneAndToPreviewItsPlan()
+    {
+        GivenRun(TestData.Summary(), TestData.Settings());
+
+        var page = RenderRun();
+
+        page.Find("fluent-anchor:contains('Run again')").GetAttribute("href").Should().Be(PlanLinks.Configure(TestData.Settings()));
+        page.Find("fluent-anchor:contains('Run again with a new seed')").GetAttribute("href").Should().Be(PlanLinks.ConfigureWithNewSeed(TestData.Settings()));
+        page.Find("fluent-anchor:contains('Preview its plan')").GetAttribute("href").Should().Be(PlanLinks.Plan(TestData.Settings()));
+    }
+
+    [Fact]
+    public void Render_RunAgain_NeedsTheRunRole()
+    {
+        GivenRun(TestData.Summary(), TestData.Settings());
+        Operator.SetRoles(Norvia.Simulator.Application.Operators.OperatorRoles.Read);
+        Operator.SetPolicies(Norvia.Simulator.Application.Operators.OperatorRoles.Read);
+
+        var page = RenderRun();
+
+        page.FindAll("fluent-anchor").Select(link => link.TextContent.Trim()).Should().NotContain(["Run again", "Run again with a new seed", "Preview its plan"]);
     }
 
     [Fact]

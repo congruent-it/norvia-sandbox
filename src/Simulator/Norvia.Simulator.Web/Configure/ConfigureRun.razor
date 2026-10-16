@@ -192,7 +192,12 @@ else
             _view = await Requests.GetConfigureAsync(_cancellation.Token);
             _form.Seed = _view.NewSeed;
             _form.Limits = _view.Limits;
-            _form.Fill(_view.Presets[0]);
+            if (!FillFromAddress())
+            {
+                _form.Fill(_view.Presets[0]);
+            }
+
+            Navigation.LocationChanged += OnLocationChanged;
             await LoadRunsAsync();
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -201,8 +206,30 @@ else
         }
     }
 
+    // "Run again" from a run's page: its settings, with its seed or a new one.
+    private bool FillFromAddress()
+    {
+        if (_view is null || PlanLinks.ConfigureSettings(new Uri(Navigation.Uri), _view.NewSeed) is not { } earlier)
+        {
+            return false;
+        }
+
+        _form.Fill(earlier, _view.Presets);
+        return true;
+    }
+
+    // An address with a run's settings opened while Configure is showing refills the form.
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        if (FillFromAddress())
+        {
+            _ = InvokeAsync(StateHasChanged);
+        }
+    }
+
     public void Dispose()
     {
+        Navigation.LocationChanged -= OnLocationChanged;
         _cancellation.Cancel();
         _cancellation.Dispose();
     }

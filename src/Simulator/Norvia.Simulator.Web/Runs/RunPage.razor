@@ -55,6 +55,32 @@ else
         }
     </p>
 
+    <div aria-label="Settings" role="group" class="mb-4">
+        <FluentAccordion>
+            <FluentAccordionItem Heading="Settings it was started with">
+                <div class="grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-4">
+                    @foreach (var group in SettingsSummary.Of(_run.Settings))
+                    {
+                        <dl aria-label="@group.Title">
+                            <dt class="font-bold">@group.Title</dt>
+                            @foreach (var (label, value) in group.Settings)
+                            {
+                                <dd class="flex justify-between gap-4"><span class="text-muted">@label</span><span>@value</span></dd>
+                            }
+                        </dl>
+                    }
+                </div>
+            </FluentAccordionItem>
+        </FluentAccordion>
+        <AuthorizeView Policy="@OperatorSignIn.RunPolicy">
+            <p class="mt-2 flex flex-wrap gap-4">
+                <FluentAnchor Href="@PlanLinks.Configure(_run.Settings)" Appearance="Appearance.Outline">Run again</FluentAnchor>
+                <FluentAnchor Href="@PlanLinks.ConfigureWithNewSeed(_run.Settings)" Appearance="Appearance.Outline">Run again with a new seed</FluentAnchor>
+                <FluentAnchor Href="@PlanLinks.Plan(_run.Settings)" Appearance="Appearance.Outline">Preview its plan</FluentAnchor>
+            </p>
+        </AuthorizeView>
+    </div>
+
     @if (_problem is not null)
     {
         <div role="alert" class="mb-4">
