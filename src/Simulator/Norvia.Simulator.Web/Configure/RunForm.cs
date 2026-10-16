@@ -124,6 +124,37 @@ public sealed class RunForm : IValidatableObject
         WindowMinutes = preset.Mode == RunMode.Paced ? (int)preset.Window.TotalMinutes : WindowMinutes;
     }
 
+    /// <summary>Fills the form with the settings of an earlier run. A Preset that is no longer offered shows as Custom.</summary>
+    public void Fill(SimulationSettings settings, IEnumerable<Preset> presets)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(presets);
+
+        Preset = presets.Any(preset => preset.Name == settings.PresetName) ? settings.PresetName! : CustomPreset;
+        Orders = settings.OrderCount;
+        BadPercent = settings.BadSharePercent;
+        TodayPercent = settings.CollectedTodayPercent;
+        AssignedPercent = settings.AssignedPercent;
+        OwnFleetPercent = settings.OwnFleetPercent;
+        ReassignPercent = settings.ReassignPercent;
+        TripPercent = settings.TripPercent;
+        ReleasePercent = settings.Carriers.ReleasePercent;
+        ConfirmPercent = settings.Carriers.ConfirmPercent;
+        DeclinePercent = settings.Carriers.DeclinePercent;
+        TrackedPercent = settings.Carriers.TrackedPercent;
+        ExceptionPercent = settings.Carriers.ExceptionPercent;
+        DeliveredPercent = settings.Carriers.DeliveredPercent;
+        ProofOfDeliveryPercent = settings.Carriers.ProofOfDeliveryPercent;
+        CancelPercent = settings.Carriers.CancelPercent;
+        CollectionFailedPercent = settings.Drivers.CollectionFailedPercent;
+        DeliveryFailedPercent = settings.Drivers.DeliveryFailedPercent;
+        DamagedPercent = settings.Drivers.DamagedPercent;
+        ReservationsPercent = settings.Drivers.ReservationsPercent;
+        Mode = settings.Mode.ToString();
+        WindowMinutes = settings.Mode == RunMode.Paced ? (int)settings.Window.TotalMinutes : WindowMinutes;
+        Seed = settings.Seed;
+    }
+
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext) =>
         Limits is null ? [] : ToSettings().Problems(Limits).Select(problem => new ValidationResult(problem));
 }

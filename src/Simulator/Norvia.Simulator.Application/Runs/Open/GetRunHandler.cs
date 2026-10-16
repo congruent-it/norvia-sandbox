@@ -44,6 +44,6 @@ public sealed class GetRunHandler(IReadRepository<SimulationRun> runs, IReadRepo
             }
         }
 
-        return new RunDetail(RunSummary.From(run, answers.Count, planning.Count(outcome => outcome == LogOutcome.Planned)), outcomes, actors);
+        return new RunDetail(RunSummary.From(run, answers.Count, planning.Count(outcome => outcome == LogOutcome.Planned)), outcomes, actors, run.Settings);
     }
 }

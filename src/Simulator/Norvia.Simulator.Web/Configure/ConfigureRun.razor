@@ -192,7 +192,16 @@ else
             _view = await Requests.GetConfigureAsync(_cancellation.Token);
             _form.Seed = _view.NewSeed;
             _form.Limits = _view.Limits;
-            _form.Fill(_view.Presets[0]);
+            if (PlanLinks.ConfigureSettings(new Uri(Navigation.Uri), _view.NewSeed) is { } earlier)
+            {
+                // "Run again" from a run's page: its settings, with its seed or a new one.
+                _form.Fill(earlier, _view.Presets);
+            }
+            else
+            {
+                _form.Fill(_view.Presets[0]);
+            }
+
             await LoadRunsAsync();
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
