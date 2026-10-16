@@ -10,7 +10,7 @@
   <ItemGroup Label="Aspire">
     <PackageVersion Include="Aspire.Hosting.Azure.AppContainers" Version="13.6.1" />
     <PackageVersion Include="Aspire.Hosting.Azure.KeyVault" Version="13.6.0" />
-    <PackageVersion Include="Aspire.Hosting.Azure.ApplicationInsights" Version="13.6.0" />
+    <PackageVersion Include="Aspire.Hosting.Azure.ApplicationInsights" Version="13.6.1" />
     <PackageVersion Include="Aspire.Hosting.Azure.ServiceBus" Version="13.6.0" />
     <PackageVersion Include="Aspire.Hosting.Azure.Sql" Version="13.6.0" />
     <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.6.0" />
