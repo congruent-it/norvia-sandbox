@@ -106,13 +106,17 @@
  */
 
 /* Tables as Flatly draws them: bold headers over a heavier rule, a light rule between rows, a hover tint. */
-.flatly-table.fluent-data-grid {
+.flatly-table.fluent-data-grid,
+table.flatly-table {
     width: 100%;
     border-collapse: collapse;
 }
 
 .flatly-table.fluent-data-grid th,
-.flatly-table.fluent-data-grid td {
+.flatly-table.fluent-data-grid td,
+table.flatly-table th,
+table.flatly-table td {
+    vertical-align: top;
     padding: 0.5rem 0.75rem;
     border-bottom: 1px solid var(--color-border);
     color: var(--color-primary);
@@ -120,7 +124,8 @@
     font-size: 0.9375rem;
 }
 
-.flatly-table.fluent-data-grid th {
+.flatly-table.fluent-data-grid th,
+table.flatly-table th {
     border-bottom: 2px solid var(--color-primary);
     font-weight: 700;
     text-align: left;
@@ -137,7 +142,8 @@
     white-space: normal;
 }
 
-.flatly-table.fluent-data-grid tbody tr:hover td {
+.flatly-table.fluent-data-grid tbody tr:hover td,
+table.flatly-table tbody tr:hover td {
     background-color: var(--color-light);
 }
 

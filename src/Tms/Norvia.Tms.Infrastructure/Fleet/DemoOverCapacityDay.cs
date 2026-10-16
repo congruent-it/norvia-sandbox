@@ -49,6 +49,11 @@ internal sealed record DemoSeed(DemoOverCapacityDay? OverCapacityDay, DemoTripDa
 {
     public static DemoSeed Read(IOptions<SeedOptions> options)
     {
+        if (!options.Value.DemoData)
+        {
+            return new(OverCapacityDay: null);
+        }
+
         var file = SeedFileReader.Read<SeedFile>(options);
         return new(file.DemoOverCapacityDay, file.DemoTripDay, file.DemoTripExecution);
     }
