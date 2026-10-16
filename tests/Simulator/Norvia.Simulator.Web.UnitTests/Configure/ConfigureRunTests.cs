@@ -87,7 +87,7 @@ public sealed class ConfigureRunTests : SimulatorWebContext
     [Fact]
     public void Render_WithTheSettingsOfARunInTheAddress_FillsTheFormWithThem()
     {
-        Services.GetRequiredService<NavigationManager>().NavigateTo(PlanLinks.Configure(TestData.Settings(seed: 55, preset: "Busy day", mode: RunMode.Paced), keepSeed: true));
+        Services.GetRequiredService<NavigationManager>().NavigateTo(PlanLinks.Configure(TestData.Settings(seed: 55, preset: "Busy day", mode: RunMode.Paced)));
 
         var page = Render<ConfigureRun>();
 
@@ -105,7 +105,7 @@ public sealed class ConfigureRunTests : SimulatorWebContext
     [Fact]
     public void Render_WithTheSettingsOfARunButNoSeed_OffersANewSeed()
     {
-        Services.GetRequiredService<NavigationManager>().NavigateTo(PlanLinks.Configure(TestData.Settings(seed: 55), keepSeed: false));
+        Services.GetRequiredService<NavigationManager>().NavigateTo(PlanLinks.ConfigureWithNewSeed(TestData.Settings(seed: 55)));
 
         var page = Render<ConfigureRun>();
 
@@ -116,12 +116,23 @@ public sealed class ConfigureRunTests : SimulatorWebContext
     [Fact]
     public void Render_WithASettingsPresetThatNoLongerExists_ShowsTheRunAsCustom()
     {
-        Services.GetRequiredService<NavigationManager>().NavigateTo(PlanLinks.Configure(TestData.Settings(preset: "Gone"), keepSeed: true));
+        Services.GetRequiredService<NavigationManager>().NavigateTo(PlanLinks.Configure(TestData.Settings(preset: "Gone")));
 
         var page = Render<ConfigureRun>();
 
         page.Find("fluent-select").GetAttribute("current-value").Should().Be("Custom");
         Field(page, "Orders").GetAttribute("value").Should().Be("10");
+    }
+
+    [Fact]
+    public void Navigate_ToTheSettingsOfARunWhileConfigureIsOpen_RefillsTheForm()
+    {
+        var page = Render<ConfigureRun>();
+
+        Services.GetRequiredService<NavigationManager>().NavigateTo(PlanLinks.Configure(TestData.Settings(seed: 55)));
+
+        page.WaitForAssertion(() => Field(page, "Orders").GetAttribute("value").Should().Be("10"));
+        Field(page, "Seed").GetAttribute("value").Should().Be("55");
     }
 
     [Fact]

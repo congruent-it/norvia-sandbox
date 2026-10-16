@@ -89,7 +89,7 @@ public sealed class RunPageTests : SimulatorWebContext
 
         var settings = RenderRun().Find("[aria-label='Settings']");
 
-        var groups = settings.QuerySelectorAll("[data-group]").ToDictionary(group => group.GetAttribute("data-group")!, group => group.TextContent);
+        var groups = settings.QuerySelectorAll("dl[aria-label]").ToDictionary(group => group.GetAttribute("aria-label")!, group => group.TextContent);
         groups.Keys.Should().Equal("Shippers", "Planner", "Carriers", "Own fleet and Drivers", "How it is sent");
         groups["Shippers"].Should().Contain("Orders").And.Contain("10").And.Contain("Bad bookings (%)").And.Contain("Collected today (%)").And.Contain("30");
         groups["Planner"].Should().Contain("Assigned by the Planner (%)").And.Contain("70").And.Contain("To Own fleet where it fits (%)").And.Contain("40")
@@ -106,7 +106,7 @@ public sealed class RunPageTests : SimulatorWebContext
     {
         GivenRun(TestData.Summary(), TestData.Settings(preset: null, mode: RunMode.Paced));
 
-        var sent = RenderRun().Find("[data-group='How it is sent']").TextContent;
+        var sent = RenderRun().Find("dl[aria-label='How it is sent']").TextContent;
 
         sent.Should().Contain("Paced").And.Contain("15 minutes").And.Contain("Custom");
     }
@@ -118,9 +118,9 @@ public sealed class RunPageTests : SimulatorWebContext
 
         var page = RenderRun();
 
-        page.Find("a:contains('Run again')").GetAttribute("href").Should().Be(PlanLinks.Configure(TestData.Settings(), keepSeed: true));
-        page.Find("a:contains('Run again with a new seed')").GetAttribute("href").Should().Be(PlanLinks.Configure(TestData.Settings(), keepSeed: false));
-        page.Find("a:contains('Preview its plan')").GetAttribute("href").Should().Be(PlanLinks.Plan(TestData.Settings()));
+        page.Find("fluent-anchor:contains('Run again')").GetAttribute("href").Should().Be(PlanLinks.Configure(TestData.Settings()));
+        page.Find("fluent-anchor:contains('Run again with a new seed')").GetAttribute("href").Should().Be(PlanLinks.ConfigureWithNewSeed(TestData.Settings()));
+        page.Find("fluent-anchor:contains('Preview its plan')").GetAttribute("href").Should().Be(PlanLinks.Plan(TestData.Settings()));
     }
 
     [Fact]
@@ -132,7 +132,7 @@ public sealed class RunPageTests : SimulatorWebContext
 
         var page = RenderRun();
 
-        page.FindAll("a").Select(link => link.TextContent.Trim()).Should().NotContain(["Run again", "Run again with a new seed", "Preview its plan"]);
+        page.FindAll("fluent-anchor").Select(link => link.TextContent.Trim()).Should().NotContain(["Run again", "Run again with a new seed", "Preview its plan"]);
     }
 
     [Fact]

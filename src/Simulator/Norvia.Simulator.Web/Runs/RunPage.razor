@@ -61,7 +61,7 @@ else
                 <div class="grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-4">
                     @foreach (var group in SettingsSummary.Of(_run.Settings))
                     {
-                        <dl data-group="@group.Title" aria-label="@group.Title">
+                        <dl aria-label="@group.Title">
                             <dt class="font-bold">@group.Title</dt>
                             @foreach (var (label, value) in group.Settings)
                             {
@@ -74,9 +74,9 @@ else
         </FluentAccordion>
         <AuthorizeView Policy="@OperatorSignIn.RunPolicy">
             <p class="mt-2 flex flex-wrap gap-4">
-                <a href="@PlanLinks.Configure(_run.Settings, keepSeed: true)">Run again</a>
-                <a href="@PlanLinks.Configure(_run.Settings, keepSeed: false)">Run again with a new seed</a>
-                <a href="@PlanLinks.Plan(_run.Settings)">Preview its plan</a>
+                <FluentAnchor Href="@PlanLinks.Configure(_run.Settings)" Appearance="Appearance.Outline">Run again</FluentAnchor>
+                <FluentAnchor Href="@PlanLinks.ConfigureWithNewSeed(_run.Settings)" Appearance="Appearance.Outline">Run again with a new seed</FluentAnchor>
+                <FluentAnchor Href="@PlanLinks.Plan(_run.Settings)" Appearance="Appearance.Outline">Preview its plan</FluentAnchor>
             </p>
         </AuthorizeView>
     </div>

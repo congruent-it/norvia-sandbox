@@ -169,15 +169,15 @@ public sealed class PlanTests : SimulatorWebContext
     [Fact]
     public void PlanLinks_Configure_PutsTheSettingsOfARunInTheAddressOfTheConfigureScreen()
     {
-        PlanLinks.Configure(Settings, keepSeed: true).Should().Be(Address.Replace("/plan?", "/?", StringComparison.Ordinal));
-        PlanLinks.Configure(Settings, keepSeed: false).Should().NotContain("seed=").And.Contain("orders=3").And.Contain("preset=Busy%20day");
+        PlanLinks.Configure(Settings).Should().Be(Address.Replace("/plan?", "/?", StringComparison.Ordinal));
+        PlanLinks.ConfigureWithNewSeed(Settings).Should().NotContain("seed=").And.Contain("orders=3").And.Contain("preset=Busy%20day");
     }
 
     [Fact]
     public void PlanLinks_Configure_RoundTripsThroughTheAddress_TakingTheGivenSeedWhenTheAddressHasNone()
     {
-        var withSeed = new Uri("http://simulator.example" + PlanLinks.Configure(Settings, keepSeed: true));
-        var withoutSeed = new Uri("http://simulator.example" + PlanLinks.Configure(Settings, keepSeed: false));
+        var withSeed = new Uri("http://simulator.example" + PlanLinks.Configure(Settings));
+        var withoutSeed = new Uri("http://simulator.example" + PlanLinks.ConfigureWithNewSeed(Settings));
 
         PlanLinks.ConfigureSettings(withSeed, newSeed: 999).Should().Be(Settings);
         PlanLinks.ConfigureSettings(withoutSeed, newSeed: 999).Should().Be(Settings with { Seed = 999 });

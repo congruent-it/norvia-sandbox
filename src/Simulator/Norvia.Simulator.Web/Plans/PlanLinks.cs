@@ -14,8 +14,11 @@ public static class PlanLinks
 {
     public static string Plan(SimulationSettings settings) => $"/plan?{Query(settings, keepSeed: true)}";
 
-    /// <summary>The Configure screen filled with <paramref name="settings"/>: with their seed, or with none so that Configure offers a new one.</summary>
-    public static string Configure(SimulationSettings settings, bool keepSeed) => $"/?{Query(settings, keepSeed)}";
+    /// <summary>The Configure screen filled with <paramref name="settings"/>, seed included.</summary>
+    public static string Configure(SimulationSettings settings) => $"/?{Query(settings, keepSeed: true)}";
+
+    /// <summary>The Configure screen filled with <paramref name="settings"/> but for the seed, which Configure offers anew.</summary>
+    public static string ConfigureWithNewSeed(SimulationSettings settings) => $"/?{Query(settings, keepSeed: false)}";
 
     private static string Query(SimulationSettings settings, bool keepSeed)
     {
