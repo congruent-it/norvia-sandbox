@@ -1,6 +1,8 @@
 extern alias SimulatorWeb;
 
 using Ardalis.Result;
+using Norvia.Simulator.Domain.Carriers;
+using Norvia.Simulator.Domain.Drivers;
 using Norvia.Simulator.Domain.Log;
 using Norvia.Simulator.Domain.Plans;
 using Norvia.Simulator.Domain.Runs;
@@ -60,6 +62,26 @@ public sealed class RunTests(SimulatorFixture fixture)
             .Should().BeEquivalentTo(preview.Rows.Select(row => (ShipperReference: (string?)row.Reference, row.Actor, Outcome: Expected(row.Expected))));
         bookings.Where(line => line.Outcome is LogOutcome.Accepted or LogOutcome.AlreadyBooked).Should().OnlyContain(line => line.TransportOrderNumber != null);
         bookings.Where(line => line.Outcome == LogOutcome.Rejected).Should().OnlyContain(line => line.TransportOrderNumber == null);
+    }
+
+    [Fact]
+    public async Task AFinishedRun_ReadsBackEverySettingItWasStartedWith_AsStoredInItsPlan()
+    {
+        var settings = Runs.Burst(orders: 6, badSharePercent: 17, Runs.NextSeed()) with
+        {
+            PresetName = "Quiet Monday",
+            AssignedPercent = 90,
+            OwnFleetPercent = 0,
+            ReassignPercent = 11,
+            Carriers = new CarrierShares(ReleasePercent: 0, ConfirmPercent: 61, DeclinePercent: 12, TrackedPercent: 73, ExceptionPercent: 14, DeliveredPercent: 85, ProofOfDeliveryPercent: 66, CancelPercent: 47),
+            Drivers = new DriverShares(CollectionFailedPercent: 7, DeliveryFailedPercent: 6, DamagedPercent: 5, ReservationsPercent: 4),
+        };
+
+        var run = await fixture.Simulator.Requests.StartAsync(settings, Ct);
+        await fixture.Simulator.Requests.FinishedAsync(run.Id, Ct);
+
+        var detail = (await fixture.Simulator.Requests.GetRunAsync(new SimulationRunId(run.Id), Ct)).Value;
+        detail.Settings.Should().Be(settings);
     }
 
     [Fact]

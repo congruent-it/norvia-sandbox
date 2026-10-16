@@ -51,6 +51,38 @@ public sealed partial class RunJourneyTests(SimulatorUiFixture simulator) : Brow
         await Expect(Page.GetByRole(AriaRole.Table, new() { Name = "Log lines" }).GetByRole(AriaRole.Row).Filter(new() { HasText = "Send booking" })).ToHaveCountAsync(Orders);
     }
 
+    [Fact]
+    public async Task AnOperatorOpensTheSettingsOfARun_RunsItAgainFromThem_AndPreviewsItsPlan()
+    {
+        var seed = Random.Shared.Next(1_000, int.MaxValue);
+        await Page.GotoAsync("/");
+        await Page.GetByLabel("Orders").FillAsync(Orders.ToString(CultureInfo.InvariantCulture));
+        await Page.GetByLabel("Bad bookings (%)").FillAsync("25");
+        await Page.GetByLabel("Seed").FillAsync(seed.ToString(CultureInfo.InvariantCulture));
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Preview plan" }).ClickAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Start run" }).ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Status).First).ToContainTextAsync($"Completed: {Orders} of {Orders} bookings sent");
+
+        await Page.GetByText("Settings it was started with").ClickAsync();
+
+        var how = Page.GetByRole(AriaRole.Group, new() { Name = "Settings" }).GetByLabel("How it is sent");
+        await Expect(how).ToContainTextAsync(seed.ToString(CultureInfo.InvariantCulture));
+        await Expect(Page.GetByLabel("Shippers").First).ToContainTextAsync("25%");
+
+        await Page.GetByRole(AriaRole.Link, new() { Name = "Run again", Exact = true }).ClickAsync();
+
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Level = 1 })).ToHaveTextAsync("Configure a run");
+        await Expect(Page.GetByLabel("Orders")).ToHaveValueAsync(Orders.ToString(CultureInfo.InvariantCulture));
+        await Expect(Page.GetByLabel("Bad bookings (%)")).ToHaveValueAsync("25");
+        await Expect(Page.GetByLabel("Seed")).ToHaveValueAsync(seed.ToString(CultureInfo.InvariantCulture));
+
+        await Page.GoBackAsync();
+        await Page.GetByRole(AriaRole.Link, new() { Name = "Preview its plan" }).ClickAsync();
+
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Level = 1 })).ToHaveTextAsync("Plan preview");
+        await Expect(Page.GetByRole(AriaRole.Status)).ToContainTextAsync($"would send {Orders} bookings, 2 of them bad");
+    }
+
     private static async Task<string[]> ReferencesAsync(ILocator grid)
     {
         var rows = grid.GetByRole(AriaRole.Row).Filter(new() { HasText = "SIM-" });
