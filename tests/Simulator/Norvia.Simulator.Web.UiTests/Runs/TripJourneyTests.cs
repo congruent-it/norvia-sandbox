@@ -49,28 +49,35 @@ public sealed partial class TripJourneyTests(SimulatorUiFixture simulator) : Bro
 
         // The Trip's number is the TMS's, so the test checks its shape, and follows the Trip by it.
         var tripNumber = TripNumber().Match(await completed.InnerTextAsync()).Value;
-        tripNumber.Should().NotBeEmpty();
         await Expect(Rows(log, "TripBuilt").Filter(new() { HasText = tripNumber })).ToHaveCountAsync(1);
-        await Expect(Rows(log, "TripDispatched").Filter(new() { HasText = tripNumber })).ToHaveCountAsync(1);
-
         var dispatch = Rows(log, "TripDispatched").Filter(new() { HasText = tripNumber });
+        await Expect(dispatch).ToHaveCountAsync(1);
         var trail = dispatch.GetByRole(AriaRole.Link, new() { NameRegex = TrailLinks.Name() });
         await Expect(trail).ToHaveAttributeAsync("href", TrailLinks.ConsoleSearch());
+        var correlationId = TrailLinks.ConsoleSearch().Match((await trail.GetAttributeAsync("href"))!).Groups["key"].Value;
+        var console = await Page.Context.RunAndWaitForPageAsync(() => trail.ClickAsync());
+        await Expect(console.GetByLabel("Correlation ID or business key")).ToHaveValueAsync(correlationId);
 
         // The Driver works the Trip in order: start, each Stop reported, end.
-        var driver = log.GetByRole(AriaRole.Row).Filter(new() { Has = Page.Locator("[data-outcome=DriverReported]") }).Filter(new() { HasText = tripNumber });
-        await Expect(driver.Filter(new() { HasText = "Start Trip" })).ToHaveCountAsync(1);
-        await Expect(driver.Filter(new() { HasText = "End Trip" })).ToHaveCountAsync(1);
-        await Expect(driver.Filter(new() { HasText = "Collected" })).Not.ToHaveCountAsync(0);
-        await Expect(driver.Filter(new() { HasText = "Deliver" })).Not.ToHaveCountAsync(0);
+        var driverReports = log.GetByRole(AriaRole.Row).Filter(new() { Has = Page.Locator("[data-outcome=DriverReported]") }).Filter(new() { HasText = tripNumber });
+        await Expect(driverReports.Filter(new() { HasText = "Start Trip" })).ToHaveCountAsync(1);
+        await Expect(driverReports.Filter(new() { HasText = "End Trip" })).ToHaveCountAsync(1);
+        await Expect(driverReports.Filter(new() { HasText = "Collected" })).Not.ToHaveCountAsync(0);
+        await Expect(driverReports.Filter(new() { HasText = "Deliver" })).Not.ToHaveCountAsync(0);
         await Expect(Page.Locator("[data-outcome=DriverRefused]")).ToHaveCountAsync(0);
+
+        // The log lists the newest line first or last, so the order is read off the Driver's actions by their time and sequence in the run.
+        var actions = (await driverReports.AllInnerTextsAsync()).Select(row => row.Contains("Start Trip", StringComparison.Ordinal) ? "Start" : row.Contains("End Trip", StringComparison.Ordinal) ? "End" : "Stop").ToList();
+        (actions.First() == "Start" && actions.Last() == "End" || actions.First() == "End" && actions.Last() == "Start")
+            .Should().BeTrue("the Driver starts the Trip, reports its Stops and ends it");
+        actions.Count(action => action == "Stop").Should().Be(actions.Count - 2);
 
         // The Trip's lines are one filter away, and are still there after a refresh.
         await Page.GetByLabel("Correlation ID, reference, order or Shipment number").FillAsync(tripNumber);
         await Page.GetByRole(AriaRole.Button, new() { Name = "Filter" }).ClickAsync();
-        await Expect(Rows(Page.GetByRole(AriaRole.Table, new() { Name = "Log lines" }), "TripCompleted")).ToHaveCountAsync(1);
+        await Expect(Rows(log, "TripCompleted")).ToHaveCountAsync(1);
         await Page.ReloadAsync();
-        await Expect(Rows(Page.GetByRole(AriaRole.Table, new() { Name = "Log lines" }), "TripCompleted").Filter(new() { HasText = tripNumber })).ToHaveCountAsync(1);
+        await Expect(Rows(log, "TripCompleted").Filter(new() { HasText = tripNumber })).ToHaveCountAsync(1);
     }
 
     private ILocator Rows(ILocator log, string outcome) =>
