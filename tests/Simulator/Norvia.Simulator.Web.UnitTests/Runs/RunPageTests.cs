@@ -121,6 +121,22 @@ public sealed class RunPageTests : SimulatorWebContext
     }
 
     [Fact]
+    public void Render_TheNumbersOfALine_LinkToTheirPagesInTheTmsUi()
+    {
+        Requests.ListLogAsync(Arg.Any<SimulationRunId>(), Arg.Any<LogFilter>(), Arg.Any<CancellationToken>()).Returns(
+        [
+            new LogLine(7, TestData.Now, "Anouk de Vries", "Collected", LogOutcome.DriverReported, "drv-1", "SIM-4-1", "TO-0000001", "SH-0000001", null, "TR-0000007"),
+        ]);
+
+        var page = RenderRun();
+
+        var links = page.FindAll("[role=log] a").Select(link => link.GetAttribute("href")).ToList();
+        links.Should().Contain("http://tms.example:5001/transport-orders/TO-0000001");
+        links.Should().Contain("http://tms.example:5001/shipments/SH-0000001");
+        links.Should().Contain("http://tms.example:5001/trips/TR-0000007");
+    }
+
+    [Fact]
     public void Copy_ACorrelationId_PutsItOnTheClipboard()
     {
         var page = RenderRun();

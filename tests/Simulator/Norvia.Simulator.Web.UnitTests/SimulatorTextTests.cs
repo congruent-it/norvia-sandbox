@@ -69,4 +69,24 @@ public sealed class SimulatorTextTests
     {
         new ConsoleLinks(null).Trail("corr").Should().BeNull();
     }
+
+    [Fact]
+    public void TmsLinks_ANumber_OpensItsPageInTheTmsUi()
+    {
+        var links = new TmsLinks(new Uri("https://tms.example/"));
+
+        links.TransportOrder("TO-0000014").Should().Be("https://tms.example/transport-orders/TO-0000014");
+        links.Shipment("SH-0000013").Should().Be("https://tms.example/shipments/SH-0000013");
+        links.Trip("TR-0000001").Should().Be("https://tms.example/trips/TR-0000001");
+    }
+
+    [Fact]
+    public void TmsLinks_WithoutAnAddress_HaveNoLink()
+    {
+        var links = new TmsLinks(null);
+
+        links.TransportOrder("TO-1").Should().BeNull();
+        links.Shipment("SH-1").Should().BeNull();
+        links.Trip("TR-1").Should().BeNull();
+    }
 }
