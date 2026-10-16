@@ -110,6 +110,10 @@ foreach (var readerOfTheSeedFile in new[] { tmsApi, tmsWeb, partnerPortal, drive
     readerOfTheSeedFile.WithEnvironment("Seed__Path", seedPath);
 }
 
+// The TMS books the demo's days on its first start unless AppHost:SeedDemoData is false (user secrets), so a run can start with
+// no Transport Orders and only the Simulator or a person creates them.
+tmsApi.WithEnvironment("Seed__DemoData", (!bool.TryParse(builder.Configuration["AppHost:SeedDemoData"], out var seedDemoData) || seedDemoData).ToString());
+
 var personas = SeedPersona.ReadAll(seedFile);
 
 if (builder.ExecutionContext.IsPublishMode)

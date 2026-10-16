@@ -59,44 +59,83 @@ else
             </div>
         }
 
-        <div aria-label="Run settings" role="group" class="mb-8 flex flex-wrap items-end gap-4">
-            <FluentSelect TOption="string" Label="Preset" @bind-Value="_form.Preset" @bind-Value:after="PresetChanged">
-                <FluentOption TOption="string" Value="@RunForm.CustomPreset">Custom</FluentOption>
-                @foreach (var preset in _view.Presets)
-                {
-                    <FluentOption TOption="string" Value="@preset.Name">@preset.Name</FluentOption>
-                }
-            </FluentSelect>
-            <FluentNumberField TValue="int" @bind-Value="_form.Orders" Label="Orders" Min="1" Max="@_view.Limits.MaxOrdersPerRun.ToString()" />
-            <FluentNumberField TValue="int" @bind-Value="_form.BadPercent" Label="Bad bookings (%)" Min="0" Max="100" />
-            <FluentNumberField TValue="int" @bind-Value="_form.TodayPercent" Label="Collected today (%)" Min="0" Max="100" />
-            <FluentNumberField TValue="int" @bind-Value="_form.AssignedPercent" Label="Assigned by the Planner (%)" Min="0" Max="100" />
-            <FluentNumberField TValue="int" @bind-Value="_form.OwnFleetPercent" Label="To Own fleet where it fits (%)" Min="0" Max="100" />
-            <FluentNumberField TValue="int" @bind-Value="_form.ReassignPercent" Label="Reassigned (%)" Min="0" Max="100" />
-            <FluentNumberField TValue="int" @bind-Value="_form.ReleasePercent" Label="Released by the Planner (%)" Min="0" Max="100" />
-            <FluentNumberField TValue="int" @bind-Value="_form.ConfirmPercent" Label="Confirmed by the Carrier (%)" Min="0" Max="100" />
-            <FluentNumberField TValue="int" @bind-Value="_form.DeclinePercent" Label="Declined by the Carrier (%)" Min="0" Max="100" />
-            <FluentNumberField TValue="int" @bind-Value="_form.TrackedPercent" Label="Tracked (%)" Min="0" Max="100" />
-            <FluentNumberField TValue="int" @bind-Value="_form.ExceptionPercent" Label="Exceptions on the way (%)" Min="0" Max="100" />
-            <FluentNumberField TValue="int" @bind-Value="_form.DeliveredPercent" Label="Delivered (%)" Min="0" Max="100" />
-            <FluentNumberField TValue="int" @bind-Value="_form.ProofOfDeliveryPercent" Label="With a Proof of delivery (%)" Min="0" Max="100" />
-            <FluentNumberField TValue="int" @bind-Value="_form.CancelPercent" Label="Failed collections cancelled (%)" Min="0" Max="100" />
+        <div aria-label="Run settings" role="group" class="mb-8">
+        <FluentAccordion ExpandMode="AccordionExpandMode.Multi">
+            <FluentAccordionItem Heading="Start from" Expanded="true">
+                <p class="text-muted mb-4 text-sm">A Preset fills every number below; change any of them and the run becomes Custom.</p>
+                <div class="grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-4 [&_fluent-number-field]:w-full [&_fluent-select]:w-full [&_fluent-select]:min-w-0">
+                <div class="flex flex-col gap-1">
+                    <FluentSelect TOption="string" Label="Preset" @bind-Value="_form.Preset" @bind-Value:after="PresetChanged">
+                        <FluentOption TOption="string" Value="@RunForm.CustomPreset">Custom</FluentOption>
+                        @foreach (var preset in _view.Presets)
+                        {
+                            <FluentOption TOption="string" Value="@preset.Name">@preset.Name</FluentOption>
+                        }
+                    </FluentSelect>
+                </div>
+                </div>
+            </FluentAccordionItem>
+            <FluentAccordionItem Heading="Shippers" Expanded="true">
+                <p class="text-muted mb-4 text-sm">What the Shippers book through the Partner API.</p>
+                <div class="grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-4 [&_fluent-number-field]:w-full [&_fluent-select]:w-full [&_fluent-select]:min-w-0">
+                <div class="flex flex-col gap-1"><FluentNumberField TValue="int" @bind-Value="_form.Orders" Label="Orders" Min="1" Max="@_view.Limits.MaxOrdersPerRun.ToString()" /></div>
+                <div class="flex flex-col gap-1"><FluentNumberField TValue="int" @bind-Value="_form.BadPercent" Label="Bad bookings (%)" Min="0" Max="100" /></div>
+                <div class="flex flex-col gap-1"><FluentNumberField TValue="int" @bind-Value="_form.TodayPercent" Label="Collected today (%)" Min="0" Max="100" /></div>
+                </div>
+            </FluentAccordionItem>
+            <FluentAccordionItem Heading="Planner" Expanded="true">
+                <p class="text-muted mb-4 text-sm">What the Planner does with the orders Norvia accepted, through the TMS API.</p>
+                <div class="grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-4 [&_fluent-number-field]:w-full [&_fluent-select]:w-full [&_fluent-select]:min-w-0">
+                <div class="flex flex-col gap-1"><FluentNumberField TValue="int" @bind-Value="_form.AssignedPercent" Label="Assigned by the Planner (%)" Min="0" Max="100" /></div>
+                <div class="flex flex-col gap-1"><FluentNumberField TValue="int" @bind-Value="_form.OwnFleetPercent" Label="To Own fleet where it fits (%)" Min="0" Max="100" /></div>
+                <div class="flex flex-col gap-1"><FluentNumberField TValue="int" @bind-Value="_form.ReassignPercent" Label="Reassigned (%)" Min="0" Max="100" /></div>
+                <div class="flex flex-col gap-1"><FluentNumberField TValue="int" @bind-Value="_form.ReleasePercent" Label="Released by the Planner (%)" Min="0" Max="100" /></div>
+                </div>
+            </FluentAccordionItem>
+            <FluentAccordionItem Heading="Carriers" Expanded="true">
+                <p class="text-muted mb-4 text-sm">Each step is a share of the step before it.</p>
+                <div class="grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-4 [&_fluent-number-field]:w-full [&_fluent-select]:w-full [&_fluent-select]:min-w-0">
+                <div class="flex flex-col gap-1"><FluentNumberField TValue="int" @bind-Value="_form.ConfirmPercent" Label="Confirmed by the Carrier (%)" Min="0" Max="100" /></div>
+                <div class="flex flex-col gap-1"><FluentNumberField TValue="int" @bind-Value="_form.DeclinePercent" Label="Declined by the Carrier (%)" Min="0" Max="100" /></div>
+                <div class="flex flex-col gap-1"><FluentNumberField TValue="int" @bind-Value="_form.TrackedPercent" Label="Tracked (%)" Min="0" Max="100" /></div>
+                <div class="flex flex-col gap-1"><FluentNumberField TValue="int" @bind-Value="_form.ExceptionPercent" Label="Exceptions on the way (%)" Min="0" Max="100" /></div>
+                <div class="flex flex-col gap-1"><FluentNumberField TValue="int" @bind-Value="_form.DeliveredPercent" Label="Delivered (%)" Min="0" Max="100" /></div>
+                <div class="flex flex-col gap-1"><FluentNumberField TValue="int" @bind-Value="_form.ProofOfDeliveryPercent" Label="With a Proof of delivery (%)" Min="0" Max="100" /></div>
+                <div class="flex flex-col gap-1"><FluentNumberField TValue="int" @bind-Value="_form.CancelPercent" Label="Failed collections cancelled (%)" Min="0" Max="100" /></div>
+                </div>
+            </FluentAccordionItem>
+            <FluentAccordionItem Heading="Own fleet and Drivers" Expanded="true">
+                <p class="text-muted mb-4 text-sm">The Trips the Planner builds and what the Drivers report on the day.</p>
+                <div class="grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-4 [&_fluent-number-field]:w-full [&_fluent-select]:w-full [&_fluent-select]:min-w-0">
+                <div class="flex flex-col gap-1"><FluentNumberField TValue="int" @bind-Value="_form.TripPercent" Label="Own fleet put on Trips (%)" Min="0" Max="100" /></div>
+                <div class="flex flex-col gap-1"><FluentNumberField TValue="int" @bind-Value="_form.CollectionFailedPercent" Label="Collections that fail (%)" Min="0" Max="100" /></div>
+                <div class="flex flex-col gap-1"><FluentNumberField TValue="int" @bind-Value="_form.DeliveryFailedPercent" Label="Deliveries that fail (%)" Min="0" Max="100" /></div>
+                <div class="flex flex-col gap-1"><FluentNumberField TValue="int" @bind-Value="_form.DamagedPercent" Label="Damage reported (%)" Min="0" Max="100" /></div>
+                <div class="flex flex-col gap-1"><FluentNumberField TValue="int" @bind-Value="_form.ReservationsPercent" Label="Delivered with reservations (%)" Min="0" Max="100" /></div>
+                </div>
+            </FluentAccordionItem>
+            <FluentAccordionItem Heading="How it is sent" Expanded="true">
+                <p class="text-muted mb-4 text-sm">How fast the plan goes out, and the seed that makes the same plan every time.</p>
+                <div class="grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] items-end gap-4 [&_fluent-number-field]:w-full [&_fluent-select]:w-full [&_fluent-select]:min-w-0">
+                    <div class="flex flex-col gap-1">
+                        <FluentSelect TOption="string" Label="Sending" @bind-Value="_form.Mode">
+                            <FluentOption TOption="string" Value="@nameof(RunMode.Burst)">Burst, as fast as the estate accepts</FluentOption>
+                            <FluentOption TOption="string" Value="@nameof(RunMode.Paced)">Paced, spread over a window</FluentOption>
+                        </FluentSelect>
+                    </div>
+                    @if (_form.IsPaced)
+                    {
+                        <div class="flex flex-col gap-1"><FluentNumberField TValue="int" @bind-Value="_form.WindowMinutes" Label="Window (minutes)" Min="1" Max="@SimulationSettings.MaxWindowMinutes.ToString()" /></div>
+                    }
+                    <div class="flex flex-col gap-1"><FluentNumberField TValue="int" @bind-Value="_form.Seed" Label="Seed" /></div>
+                    <div><FluentButton Type="ButtonType.Button" OnClick="NewSeed">New seed</FluentButton></div>
+                </div>
+            </FluentAccordionItem>
 
-            <FluentNumberField TValue="int" @bind-Value="_form.TripPercent" Label="Own fleet put on Trips (%)" Min="0" Max="100" />
-            <FluentNumberField TValue="int" @bind-Value="_form.CollectionFailedPercent" Label="Collections that fail (%)" Min="0" Max="100" />
-            <FluentNumberField TValue="int" @bind-Value="_form.DeliveryFailedPercent" Label="Deliveries that fail (%)" Min="0" Max="100" />
-            <FluentNumberField TValue="int" @bind-Value="_form.DamagedPercent" Label="Damage reported (%)" Min="0" Max="100" />
-            <FluentNumberField TValue="int" @bind-Value="_form.ReservationsPercent" Label="Delivered with reservations (%)" Min="0" Max="100" />
-            <FluentSelect TOption="string" Label="Sending" @bind-Value="_form.Mode">
-                <FluentOption TOption="string" Value="@nameof(RunMode.Burst)">Burst, as fast as the estate accepts</FluentOption>
-                <FluentOption TOption="string" Value="@nameof(RunMode.Paced)">Paced, spread over a window</FluentOption>
-            </FluentSelect>
-            @if (_form.IsPaced)
-            {
-                <FluentNumberField TValue="int" @bind-Value="_form.WindowMinutes" Label="Window (minutes)" Min="1" Max="@SimulationSettings.MaxWindowMinutes.ToString()" />
-            }
-            <FluentNumberField TValue="int" @bind-Value="_form.Seed" Label="Seed" />
-            <FluentButton Type="ButtonType.Button" OnClick="NewSeed">New seed</FluentButton>
+        </FluentAccordion>
+        </div>
+
+        <div class="sticky bottom-0 -mx-4 mb-4 border-t border-border bg-body px-4 py-3">
             <FluentButton Type="ButtonType.Submit" Appearance="Appearance.Accent">Preview plan</FluentButton>
         </div>
     </EditForm>

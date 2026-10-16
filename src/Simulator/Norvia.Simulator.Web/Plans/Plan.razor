@@ -89,14 +89,15 @@ else
     </div>
 
     <h2>Per Shipper</h2>
-    <FluentDataGrid Items="_preview.PerShipper.AsQueryable()" TGridItem="ShipperShare" aria-label="Bookings per Shipper" class="mb-8">
+    <FluentDataGrid Items="_preview.PerShipper.AsQueryable()" TGridItem="ShipperShare" GridTemplateColumns="minmax(14rem, 3fr) 1fr 1fr" aria-label="Bookings per Shipper">
         <PropertyColumn Title="Shipper" Property="@(share => share.ShipperName)" />
         <PropertyColumn Title="Bookings" Property="@(share => share.Bookings)" />
         <PropertyColumn Title="Bad" Property="@(share => share.BadBookings)" />
     </FluentDataGrid>
 
-    <h2>Bookings</h2>
-    <FluentDataGrid Items="_preview.Rows.AsQueryable()" TGridItem="PlanRow" Pagination="_pagination" aria-label="Planned bookings">
+    <h2 class="mt-10">Bookings</h2>
+    <div class="overflow-x-auto">
+    <FluentDataGrid Items="_preview.Rows.AsQueryable()" TGridItem="PlanRow" Pagination="_pagination" GridTemplateColumns="4rem 10rem minmax(14rem, 1.5fr) minmax(18rem, 1.5fr) 8rem 8rem 12rem 10rem minmax(22rem, 2fr)" aria-label="Planned bookings">
         <PropertyColumn Title="#" Property="@(row => row.Step)" />
         <PropertyColumn Title="Shipper reference" Property="@(row => row.Reference)" />
         <PropertyColumn Title="Sent as" Property="@(row => row.Actor)" />
@@ -107,6 +108,7 @@ else
         <PropertyColumn Title="Expected answer" Property="@(row => SimulatorText.Of(row.Expected))" />
         <PropertyColumn Title="Planner" Property="@(row => SimulatorText.Of(row.Planner, row.Reassign))" />
     </FluentDataGrid>
+    </div>
     <FluentPaginator State="_pagination" />
 }
 
