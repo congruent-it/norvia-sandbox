@@ -35,7 +35,7 @@ public sealed class TripTests(SimulatorFixture fixture)
         await using var simulator = await OwnFleetAsync("VEH-0003", "DRV-0003");
         var settings = Runs.Tripped(orders: 8, Runs.NextSeed(), collectedTodayPercent: 0, NothingWrong);
 
-        var (_, run, log) = await RunAsync(simulator, settings);
+        var (_, run, log) = await simulator.RunToEndAsync(settings, Ct, Runs.TripPatience);
 
         run.Status.Should().Be(SimulationRunStatus.Completed);
         var built = TripsBuilt(log);
@@ -60,12 +60,19 @@ public sealed class TripTests(SimulatorFixture fixture)
                 .Should().BeGreaterThan(TimeSpan.Zero).And.BeLessThanOrEqualTo(TimeSpan.FromHours(8));
             trip["loadWeightKg"]!.GetValue<decimal>().Should().BeLessThanOrEqualTo(trip["payloadKg"]!.GetValue<int>());
             trip["loadPalletPlaces"]!.GetValue<int>().Should().BeLessThanOrEqualTo(trip["vehiclePalletPlaces"]!.GetValue<int>());
+            var day = DateOnly.Parse(trip["day"]!.GetValue<string>(), CultureInfo.InvariantCulture);
+            TimeOnly.Parse(trip["plannedStart"]!.GetValue<string>(), CultureInfo.InvariantCulture)
+                .Should().Be(await fixture.ShiftStartAsync("DRV-0003", day.DayOfWeek, Ct), "the planned start is the start of the Driver's Shift");
             var stops = detail["stops"]!.AsArray();
             trip["stopCount"]!.GetValue<int>().Should().Be(stops.Count);
-            onTrips.AddRange(stops.Select(stop => stop!["shipmentNumber"]!.GetValue<string>()));
+            var shipments = stops.Select(stop => stop!["shipmentNumber"]!.GetValue<string>()).Distinct().ToList();
+            stops.Count.Should().Be(2 * shipments.Count, "each Shipment is a collection and a delivery");
+            line.Detail.Should().Contain($", {shipments.Count} {(shipments.Count == 1 ? "Shipment" : "Shipments")},", "the Create Trip line names how many Shipments the Trip carries");
+            shipments.Should().NotIntersectWith(onTrips, "a Shipment is on one Trip only");
+            onTrips.AddRange(shipments);
         }
 
-        onTrips = [.. onTrips.Distinct()];
+        await Runs.WaitUntilAsync(async () => await AllHaveStatusAsync(onTrips, "Dispatched"), Ct);
         var unplaced = log.Count(line => line.Outcome == LogOutcome.Info && line.Action.Contains("found no Vehicle and Driver left", StringComparison.Ordinal));
         onTrips.Count.Should().Be(released.Count - unplaced, "each released Shipment is on a Trip, or its lack of room is logged");
         onTrips.Should().BeSubsetOf(released);
@@ -73,13 +80,13 @@ public sealed class TripTests(SimulatorFixture fixture)
     }
 
     [Fact]
-    public async Task TheTripsOfToday_AreWorkedInOrderToCompleted_AndTheTripsOfLaterDaysStayDispatched()
+    public async Task TheTripsOfToday_AreWorkedInOrderToCompleted_WithReservationsInExactlyTheConfiguredShare_AndTheTripsOfLaterDaysStayDispatched()
     {
         Assert.SkipWhen(!WorksToday(), "No Driver has a Shift at the weekend, so no Trip can be for today.");
         await using var simulator = await OwnFleetAsync("VEH-0004", "DRV-0004");
-        var settings = Runs.Tripped(orders: 8, Runs.NextSeed(), collectedTodayPercent: 50, NothingWrong);
+        var settings = Runs.Tripped(orders: 8, Runs.NextSeed(), collectedTodayPercent: 50, new DriverShares(0, 0, 0, ReservationsPercent: 50));
 
-        var (_, run, log) = await RunAsync(simulator, settings);
+        var (_, run, log) = await simulator.RunToEndAsync(settings, Ct, Runs.TripPatience);
 
         run.Status.Should().Be(SimulationRunStatus.Completed);
         var today = Today();
@@ -87,6 +94,7 @@ public sealed class TripTests(SimulatorFixture fixture)
         var ofToday = built.Where(line => line.Detail!.StartsWith(today, StringComparison.Ordinal)).ToList();
         var later = built.Except(ofToday).ToList();
         ofToday.Should().NotBeEmpty("half of the orders are collected today");
+        later.Should().NotBeEmpty("and half on later days");
 
         foreach (var line in ofToday)
         {
@@ -111,6 +119,12 @@ public sealed class TripTests(SimulatorFixture fixture)
             await Runs.WaitUntilAsync(async () => await AllDeliveredAsync(shipments), Ct);
         }
 
+        var delivered = log.Where(line => line.Action == DriverActions.Deliver).ToList();
+        var expectedReservations = Share(delivered.Count, 50);
+        expectedReservations.Should().BeGreaterThan(0);
+        delivered.Count(line => line.Detail!.Contains("With reservations", StringComparison.Ordinal)).Should().Be(expectedReservations);
+        log.Count(line => line.Outcome == LogOutcome.ExceptionFound).Should().Be(expectedReservations, "each delivery with reservations opened an Exception");
+
         foreach (var line in later)
         {
             (await fixture.TripAsync(line.TripNumber!, Ct))!["trip"]!["status"]!.GetValue<string>().Should().Be("Dispatched");
@@ -126,24 +140,26 @@ public sealed class TripTests(SimulatorFixture fixture)
         var shares = new DriverShares(CollectionFailedPercent: 20, DeliveryFailedPercent: 40, DamagedPercent: 10, ReservationsPercent: 0);
         var settings = Runs.Tripped(orders: 10, seed: Runs.NextSeed(), collectedTodayPercent: 100, shares);
 
-        var (_, run, log) = await RunAsync(simulator, settings);
+        var (_, run, log) = await simulator.RunToEndAsync(settings, Ct, Runs.TripPatience);
 
         run.Status.Should().Be(SimulationRunStatus.Completed);
         var driver = log.Where(Runs.IsDriver).ToList();
         var ran = driver.Count(line => line.Action is DriverActions.Collected or DriverActions.CollectionFailed && line.Outcome == LogOutcome.DriverReported);
         ran.Should().BeGreaterThan(2, "the Own fleet's Vehicle carries some of the day's Shipments");
-        var journeys = DriverFunnel.Plan(shares, settings.Seed, ran);
-        var counts = DriverFunnel.Count(journeys);
-        counts.CollectionsFailed.Should().BeGreaterThan(0);
-        counts.DeliveriesFailed.Should().BeGreaterThan(0);
+        // Plain arithmetic, not the Simulator's own funnel: each share is of all the Shipments that ran, and a Shipment fails at most once, so deliveries fail only among those collected.
+        var collectionsFailed = Share(ran, 20);
+        var deliveriesFailed = Math.Min(Share(ran, 40), ran - collectionsFailed);
+        var damaged = Share(ran, 10);
+        collectionsFailed.Should().BeGreaterThan(0);
+        deliveriesFailed.Should().BeGreaterThan(0);
 
-        driver.Count(line => line.Action == DriverActions.CollectionFailed).Should().Be(counts.CollectionsFailed);
-        driver.Count(line => line.Action == DriverActions.DeliveryFailed).Should().Be(counts.DeliveriesFailed);
-        driver.Count(line => line.Action == DriverActions.ReportDamage).Should().Be(counts.Damaged);
-        driver.Count(line => line.Action == DriverActions.Deliver).Should().Be(counts.Delivered);
+        driver.Count(line => line.Action == DriverActions.CollectionFailed).Should().Be(collectionsFailed);
+        driver.Count(line => line.Action == DriverActions.DeliveryFailed).Should().Be(deliveriesFailed);
+        driver.Count(line => line.Action == DriverActions.ReportDamage).Should().Be(damaged);
+        driver.Count(line => line.Action == DriverActions.Deliver).Should().Be(ran - collectionsFailed - deliveriesFailed);
 
         var found = log.Where(line => line.Outcome == LogOutcome.ExceptionFound).ToList();
-        found.Should().HaveCount(counts.CollectionsFailed + counts.DeliveriesFailed + counts.Damaged, "every failure and every damage report opened an Exception");
+        found.Should().HaveCount(collectionsFailed + deliveriesFailed + damaged, "every failure and every damage report opened an Exception");
         log.Should().NotContain(line => line.Outcome == LogOutcome.Info && line.Action.Contains("didn't open in time", StringComparison.Ordinal));
         var open = (await fixture.OpenExceptionsAsync(Ct)).Select(exception => exception!["shipmentNumber"]!.GetValue<string>()).ToHashSet();
         open.Should().Contain(found.Select(line => line.ShipmentNumber!));
@@ -174,7 +190,7 @@ public sealed class TripTests(SimulatorFixture fixture)
             Ct, SeedEdits.OnlyShippers(Shipper), SeedEdits.OwnFleetOf("VEH-0006", "DRV-0006", "B", "C", "CE"));
         var settings = Runs.Tripped(orders: 4, Runs.NextSeed(), collectedTodayPercent: 0, NothingWrong);
 
-        var (_, run, log) = await RunAsync(simulator, settings);
+        var (_, run, log) = await simulator.RunToEndAsync(settings, Ct, Runs.TripPatience);
 
         run.Status.Should().Be(SimulationRunStatus.Completed);
         var refused = log.Where(line => line.Outcome == LogOutcome.PlanningRefused && line.Action == TripActions.CreateTrip).ToList();
@@ -191,6 +207,9 @@ public sealed class TripTests(SimulatorFixture fixture)
 
     private static List<LogLine> TripsBuilt(IReadOnlyList<LogLine> log) =>
         [.. log.Where(line => line.Outcome == LogOutcome.TripBuilt && line.Action == TripActions.CreateTrip).OrderBy(line => line.Sequence)];
+
+    // A share of a number of Shipments, rounded as the Simulator does: halves away from zero.
+    private static int Share(int of, int percent) => (int)Math.Round(of * percent / 100.0, MidpointRounding.AwayFromZero);
 
     private static string Today() => PickupSlot.Today(DateTimeOffset.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
@@ -213,13 +232,5 @@ public sealed class TripTests(SimulatorFixture fixture)
         }
 
         return true;
-    }
-
-    private static async Task<(PlanPreview Preview, RunSummary Run, IReadOnlyList<LogLine> Log)> RunAsync(SimulatorHost simulator, SimulationSettings settings)
-    {
-        var preview = (await simulator.Requests.PreviewAsync(settings, Ct)).Value;
-        var started = await simulator.Requests.StartAsync(settings, Ct);
-        var run = await simulator.Requests.FinishedAsync(started.Id, Ct);
-        return (preview, run, await simulator.Requests.LogAsync(run.Id, Ct));
     }
 }

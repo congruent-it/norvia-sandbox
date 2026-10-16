@@ -35,7 +35,7 @@ public sealed class CarrierTests(SimulatorFixture fixture)
         await using var simulator = await PricedSimulatorAsync();
         var settings = Runs.Carried(orders: 10, Runs.NextSeed(), Everything);
 
-        var (_, run, log) = await RunAsync(simulator, settings);
+        var (_, run, log) = await simulator.RunToEndAsync(settings, Ct);
 
         run.Status.Should().Be(SimulationRunStatus.Completed);
         var shipments = log.Where(line => line.Outcome == LogOutcome.Planned).Select(line => line.ShipmentNumber!).ToList();
@@ -78,7 +78,7 @@ public sealed class CarrierTests(SimulatorFixture fixture)
             DeliveredPercent: 0, ProofOfDeliveryPercent: 0, CancelPercent: 0);
         var settings = Runs.Carried(orders: 20, Runs.NextSeed(), shares);
 
-        var (preview, _, log) = await RunAsync(simulator, settings);
+        var (preview, _, log) = await simulator.RunToEndAsync(settings, Ct);
 
         log.Count(line => line.Outcome == LogOutcome.Released).Should().Be(16);
         log.Count(line => line.Outcome == LogOutcome.Confirmed).Should().Be(8);
@@ -122,7 +122,7 @@ public sealed class CarrierTests(SimulatorFixture fixture)
             DeliveredPercent: 50, ProofOfDeliveryPercent: 60, CancelPercent: 0);
         var settings = Runs.Carried(orders: 20, Runs.NextSeed(), shares);
 
-        var (preview, _, log) = await RunAsync(simulator, settings);
+        var (preview, _, log) = await simulator.RunToEndAsync(settings, Ct);
 
         preview.Carriers.Counts.Should().BeEquivalentTo(new CarrierFunnelCounts(20, 20, 20, 0, 0, 10, 0, 5, 3, 0));
         var tracked = log.Where(line => line.Outcome == LogOutcome.TrackingSent).GroupBy(line => line.ShipmentNumber!).ToDictionary(group => group.Key, group => group.Count());
@@ -170,7 +170,7 @@ public sealed class CarrierTests(SimulatorFixture fixture)
             DeliveredPercent: 100, ProofOfDeliveryPercent: 100, CancelPercent: 100);
         var settings = Runs.Carried(orders: 16, Runs.NextSeed(), shares);
 
-        var (preview, run, log) = await RunAsync(simulator, settings);
+        var (preview, run, log) = await simulator.RunToEndAsync(settings, Ct);
 
         run.Status.Should().Be(SimulationRunStatus.Completed);
         preview.Carriers.Counts.Exceptions.Should().Be(16);
@@ -199,7 +199,7 @@ public sealed class CarrierTests(SimulatorFixture fixture)
             DeliveredPercent: 100, ProofOfDeliveryPercent: 100, CancelPercent: 100);
         var settings = Runs.Carried(orders: 8, Runs.NextSeed(), shares);
 
-        var (_, _, log) = await RunAsync(simulator, settings);
+        var (_, _, log) = await simulator.RunToEndAsync(settings, Ct);
 
         var cancelled = log.Where(line => line.Outcome == LogOutcome.BookingCancelled).ToList();
         cancelled.Should().HaveCount(2);
@@ -217,7 +217,7 @@ public sealed class CarrierTests(SimulatorFixture fixture)
         await using var simulator = await fixture.StartSimulatorWithSeedAsync(Ct, SeedEdits.OnlyShippers(UnpricedShipper));
         var settings = Runs.Carried(orders: 6, Runs.NextSeed(), Everything);
 
-        var (_, run, log) = await RunAsync(simulator, settings);
+        var (_, run, log) = await simulator.RunToEndAsync(settings, Ct);
 
         run.Status.Should().Be(SimulationRunStatus.Completed);
         var refused = log.Where(line => line.Outcome == LogOutcome.PlanningRefused && line.Action == PlannerActions.Release).ToList();
@@ -237,7 +237,7 @@ public sealed class CarrierTests(SimulatorFixture fixture)
         await using var simulator = await fixture.StartSimulatorWithSeedAsync(Ct, SeedEdits.OnlyShippers(PricedShipper), SeedEdits.WithoutPersonasOf("CAR-0001"));
         var settings = Runs.Carried(orders: 12, Runs.NextSeed(), Everything);
 
-        var (_, run, log) = await RunAsync(simulator, settings);
+        var (_, run, log) = await simulator.RunToEndAsync(settings, Ct);
 
         run.Status.Should().Be(SimulationRunStatus.Completed);
         log.Should().Contain(line => line.Outcome == LogOutcome.Info && line.Action.Contains("Van Dijk Transport has no Persona", StringComparison.Ordinal));
@@ -264,7 +264,7 @@ public sealed class CarrierTests(SimulatorFixture fixture)
         await using var simulator = await PricedSimulatorAsync();
         var settings = Runs.Carried(orders: 6, Runs.NextSeed(), Everything);
 
-        var (_, run, log) = await RunAsync(simulator, settings);
+        var (_, run, log) = await simulator.RunToEndAsync(settings, Ct);
 
         var carrier = log.Where(Runs.IsCarrier).ToList();
         carrier.Should().NotBeEmpty();
@@ -298,8 +298,8 @@ public sealed class CarrierTests(SimulatorFixture fixture)
         await using var simulator = await PricedSimulatorAsync();
         var settings = Runs.Carried(orders: 20, Runs.NextSeed(), new CarrierShares());
 
-        var (_, _, first) = await RunAsync(simulator, settings);
-        var (_, _, second) = await RunAsync(simulator, settings);
+        var (_, _, first) = await simulator.RunToEndAsync(settings, Ct);
+        var (_, _, second) = await simulator.RunToEndAsync(settings, Ct);
 
         var firstJourneys = Journeys(first);
         firstJourneys.Should().NotBeEmpty();
@@ -312,8 +312,8 @@ public sealed class CarrierTests(SimulatorFixture fixture)
         await using var simulator = await PricedSimulatorAsync();
         var seed = Runs.NextSeed();
 
-        var (_, _, first) = await RunAsync(simulator, Runs.Carried(orders: 20, seed, new CarrierShares()));
-        var (_, _, second) = await RunAsync(simulator, Runs.Carried(orders: 20, seed + 1, new CarrierShares()));
+        var (_, _, first) = await simulator.RunToEndAsync(Runs.Carried(orders: 20, seed, new CarrierShares()), Ct);
+        var (_, _, second) = await simulator.RunToEndAsync(Runs.Carried(orders: 20, seed + 1, new CarrierShares()), Ct);
 
         Journeys(second).Should().NotEqual(Journeys(first));
     }
@@ -324,7 +324,7 @@ public sealed class CarrierTests(SimulatorFixture fixture)
         await using var simulator = await PricedSimulatorAsync();
         var settings = Runs.Carried(orders: 20, Runs.NextSeed(), new CarrierShares());
 
-        var (preview, _, log) = await RunAsync(simulator, settings);
+        var (preview, _, log) = await simulator.RunToEndAsync(settings, Ct);
 
         var counts = preview.Carriers.Counts;
         counts.Shipments.Should().Be(log.Count(line => line.Outcome == LogOutcome.Planned));
@@ -357,11 +357,4 @@ public sealed class CarrierTests(SimulatorFixture fixture)
         return true;
     }
 
-    private static async Task<(PlanPreview Preview, RunSummary Run, IReadOnlyList<LogLine> Log)> RunAsync(SimulatorHost simulator, SimulationSettings settings)
-    {
-        var preview = (await simulator.Requests.PreviewAsync(settings, Ct)).Value;
-        var started = await simulator.Requests.StartAsync(settings, Ct);
-        var run = await simulator.Requests.FinishedAsync(started.Id, Ct);
-        return (preview, run, await simulator.Requests.LogAsync(run.Id, Ct));
-    }
 }

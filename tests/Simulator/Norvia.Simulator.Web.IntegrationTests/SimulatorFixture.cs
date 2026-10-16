@@ -1,5 +1,6 @@
 extern alias SimulatorWeb;
 
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
@@ -175,6 +176,14 @@ public sealed class SimulatorFixture : IAsyncLifetime
 
         response.EnsureSuccessStatusCode();
         return JsonNode.Parse(await response.Content.ReadAsStringAsync(cancellationToken))!.AsObject();
+    }
+
+    /// <summary>When the Driver's Shift starts on the day of the week, as the seed file's roster has it.</summary>
+    public async Task<TimeOnly> ShiftStartAsync(string driverId, DayOfWeek day, CancellationToken cancellationToken)
+    {
+        var seed = JsonNode.Parse(await File.ReadAllTextAsync(_settings["Seed:Path"], cancellationToken))!.AsObject();
+        var driver = seed["drivers"]!.AsArray().Single(candidate => candidate!["id"]!.GetValue<string>() == driverId)!;
+        return TimeOnly.Parse(driver["roster"]![day.ToString()]!["start"]!.GetValue<string>(), CultureInfo.InvariantCulture);
     }
 
     /// <summary>A Trip as the TMS API reads it out, with its Stops, or null when the TMS has none by that number.</summary>

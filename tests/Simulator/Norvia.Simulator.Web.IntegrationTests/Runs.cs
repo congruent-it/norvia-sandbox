@@ -1,6 +1,7 @@
 extern alias SimulatorWeb;
 
 using Ardalis.Result;
+using Norvia.Simulator.Application.Plans.Preview;
 using Norvia.Simulator.Application.Runs;
 using Norvia.Simulator.Domain.Carriers;
 using Norvia.Simulator.Domain.Drivers;
@@ -14,8 +15,11 @@ namespace Norvia.Simulator.Web.IntegrationTests;
 /// <summary>What the tests do with the Simulator's runs, through the doors its pages use.</summary>
 internal static class Runs
 {
-    // A run with Trips waits for the Logic Apps' stand-ins to carry each Trip to the Driver app and each report to the TMS, so it takes longer than a run without.
-    private static readonly TimeSpan Patience = TimeSpan.FromSeconds(180);
+    private static readonly TimeSpan Patience = TimeSpan.FromSeconds(60);
+
+    /// <summary>A run with Trips waits for the Logic Apps' stand-ins to carry each Trip to the Driver app and each report to the TMS, so it takes longer than a run without.</summary>
+    public static readonly TimeSpan TripPatience = TimeSpan.FromSeconds(180);
+
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(100);
 
     private static int _seed = Environment.TickCount;
@@ -73,12 +77,22 @@ internal static class Runs
     }
 
     /// <summary>Waits until the run is no longer active.</summary>
-    public static Task<RunSummary> FinishedAsync(this ISimulatorRequests simulator, Guid runId, CancellationToken cancellationToken) =>
+    public static Task<RunSummary> FinishedAsync(this ISimulatorRequests simulator, Guid runId, CancellationToken cancellationToken, TimeSpan? patience = null) =>
         EventuallyAsync(async () =>
         {
             var run = (await simulator.GetRunAsync(new SimulationRunId(runId), cancellationToken)).Value.Run;
             return run.IsActive ? null : run;
-        }, cancellationToken);
+        }, cancellationToken, patience);
+
+    /// <summary>Previews the plan, runs it to its end and reads its log, as a page would.</summary>
+    public static async Task<(PlanPreview Preview, RunSummary Run, IReadOnlyList<LogLine> Log)> RunToEndAsync(
+        this SimulatorHost simulator, SimulationSettings settings, CancellationToken cancellationToken, TimeSpan? patience = null)
+    {
+        var preview = (await simulator.Requests.PreviewAsync(settings, cancellationToken)).Value;
+        var started = await simulator.Requests.StartAsync(settings, cancellationToken);
+        var run = await simulator.Requests.FinishedAsync(started.Id, cancellationToken, patience);
+        return (preview, run, await simulator.Requests.LogAsync(run.Id, cancellationToken));
+    }
 
     /// <summary>Waits until the run's log has a line that satisfies the predicate, and returns the log.</summary>
     public static Task<IReadOnlyList<LogLine>> LogWithAsync(
@@ -108,11 +122,11 @@ internal static class Runs
     public static async Task WaitUntilAsync(Func<Task<bool>> condition, CancellationToken cancellationToken) =>
         await EventuallyAsync(async () => await condition() ? new object() : null, cancellationToken);
 
-    private static async Task<T> EventuallyAsync<T>(Func<Task<T?>> attempt, CancellationToken cancellationToken)
+    private static async Task<T> EventuallyAsync<T>(Func<Task<T?>> attempt, CancellationToken cancellationToken, TimeSpan? patience = null)
         where T : class
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(Patience);
+        timeout.CancelAfter(patience ?? Patience);
         while (true)
         {
             if (await attempt() is { } found)
