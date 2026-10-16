@@ -32,28 +32,29 @@ internal sealed class DriverStage(IDriverApp app, TimeProvider time, DriverPacin
         var first = 0;
         var started = 0;
         var completed = 0;
+        var failures = new List<ExpectedFailure>();
         foreach (var trip in trips)
         {
             if (stopSending.IsCancellationRequested)
             {
-                return new DriverResult(true, started, completed);
+                return new DriverResult(true, started, completed, failures);
             }
 
-            var outcome = await WorkAsync(trip, [.. journeys.Skip(first).Take(trip.Shipments.Count)], writer, stopSending, cancellationToken);
+            var outcome = await WorkAsync(trip, [.. journeys.Skip(first).Take(trip.Shipments.Count)], failures, writer, stopSending, cancellationToken);
             first += trip.Shipments.Count;
             started += outcome.Started ? 1 : 0;
             completed += outcome.Completed ? 1 : 0;
             if (outcome.Stopped)
             {
-                return new DriverResult(true, started, completed);
+                return new DriverResult(true, started, completed, failures);
             }
         }
 
-        return new DriverResult(false, started, completed);
+        return new DriverResult(false, started, completed, failures);
     }
 
     private async Task<TripOutcome> WorkAsync(
-        RunningTrip trip, IReadOnlyList<DriverJourney> journeys, RunLogWriter writer, CancellationToken stopSending, CancellationToken cancellationToken)
+        RunningTrip trip, IReadOnlyList<DriverJourney> journeys, List<ExpectedFailure> failures, RunLogWriter writer, CancellationToken stopSending, CancellationToken cancellationToken)
     {
         var driver = trip.Driver;
         var reached = await WaitAsync(driver, trip.TripNumber, _ => true, stopSending, cancellationToken);
@@ -85,7 +86,7 @@ internal sealed class DriverStage(IDriverApp app, TimeProvider time, DriverPacin
         if (underWay.Snapshot is null)
         {
             await writer.NoteAsync(time.GetUtcNow(), $"The TMS didn't record the start of Trip {trip.TripNumber} in time: {driver.Name} doesn't work its Stops", cancellationToken);
-            return TripOutcome.Begun;
+            return TripOutcome.Underway;
         }
 
         for (var position = 0; position < trip.Shipments.Count; position++)
@@ -95,14 +96,14 @@ internal sealed class DriverStage(IDriverApp app, TimeProvider time, DriverPacin
                 return TripOutcome.Cancelled(started: true);
             }
 
-            await WorkShipmentAsync(trip, trip.Shipments[position], journeys[position], writer, cancellationToken);
+            await WorkShipmentAsync(trip, trip.Shipments[position], journeys[position], failures, writer, cancellationToken);
         }
 
         var end = await app.EndTripAsync(driver, trip.TripNumber, cancellationToken);
         await writer.DriverAsync(time.GetUtcNow(), driver, trip.TripNumber, null, DriverActions.EndTrip, end, null, cancellationToken);
         if (end.Outcome != LogOutcome.DriverReported)
         {
-            return TripOutcome.Begun;
+            return TripOutcome.Underway;
         }
 
         var ended = await WaitAsync(driver, trip.TripNumber, snapshot => snapshot.Status == DriverTripStatus.Completed, stopSending, cancellationToken);
@@ -114,7 +115,7 @@ internal sealed class DriverStage(IDriverApp app, TimeProvider time, DriverPacin
         if (ended.Snapshot is null)
         {
             await writer.NoteAsync(time.GetUtcNow(), $"The TMS didn't record the end of Trip {trip.TripNumber} in time", cancellationToken);
-            return TripOutcome.Begun;
+            return TripOutcome.Underway;
         }
 
         await writer.DriverAsync(
@@ -123,26 +124,32 @@ internal sealed class DriverStage(IDriverApp app, TimeProvider time, DriverPacin
         return TripOutcome.Done;
     }
 
-    private async Task WorkShipmentAsync(RunningTrip trip, OwnFleetShipment shipment, DriverJourney journey, RunLogWriter writer, CancellationToken cancellationToken)
+    private async Task WorkShipmentAsync(
+        RunningTrip trip, OwnFleetShipment shipment, DriverJourney journey, List<ExpectedFailure> failures, RunLogWriter writer, CancellationToken cancellationToken)
     {
         var driver = trip.Driver;
         var number = shipment.ShipmentNumber;
 
+        Task ReportAsync(string action, DriverCallAnswer answer, string? detail) =>
+            writer.DriverAsync(time.GetUtcNow(), driver, trip.TripNumber, shipment, action, answer, detail, cancellationToken);
+
         if (journey.Damaged)
         {
             var damage = await app.ReportDamageAsync(driver, trip.TripNumber, number, atDelivery: false, DamageRemark, cancellationToken);
-            await writer.DriverAsync(time.GetUtcNow(), driver, trip.TripNumber, shipment, DriverActions.ReportDamage, damage, "At the collection", cancellationToken);
+            await ReportAsync(DriverActions.ReportDamage, damage, "At the collection");
+            Expect(failures, shipment, damage, ExceptionKinds.Damaged);
         }
 
         if (journey.CollectionFailed)
         {
             var failed = await app.FailCollectionAsync(driver, trip.TripNumber, number, CollectionFailedRemark, cancellationToken);
-            await writer.DriverAsync(time.GetUtcNow(), driver, trip.TripNumber, shipment, DriverActions.CollectionFailed, failed, null, cancellationToken);
+            await ReportAsync(DriverActions.CollectionFailed, failed, null);
+            Expect(failures, shipment, failed, ExceptionKinds.CollectionFailed);
             return;
         }
 
         var collected = await app.CollectAsync(driver, trip.TripNumber, number, cancellationToken);
-        await writer.DriverAsync(time.GetUtcNow(), driver, trip.TripNumber, shipment, DriverActions.Collected, collected, null, cancellationToken);
+        await ReportAsync(DriverActions.Collected, collected, null);
         if (collected.Outcome != LogOutcome.DriverReported)
         {
             return;
@@ -151,13 +158,27 @@ internal sealed class DriverStage(IDriverApp app, TimeProvider time, DriverPacin
         if (journey.DeliveryFailed)
         {
             var failed = await app.FailDeliveryAsync(driver, trip.TripNumber, number, DeliveryFailedRemark, cancellationToken);
-            await writer.DriverAsync(time.GetUtcNow(), driver, trip.TripNumber, shipment, DriverActions.DeliveryFailed, failed, null, cancellationToken);
+            await ReportAsync(DriverActions.DeliveryFailed, failed, null);
+            Expect(failures, shipment, failed, ExceptionKinds.DeliveryFailed);
             return;
         }
 
         var delivered = await app.DeliverAsync(
             driver, trip.TripNumber, number, new DriverDelivery(Receiver, journey.Reservations, journey.Reservations ? ReservationsRemark : null), cancellationToken);
-        await writer.DriverAsync(time.GetUtcNow(), driver, trip.TripNumber, shipment, DriverActions.Deliver, delivered, journey.Reservations ? "With reservations" : "Clean", cancellationToken);
+        await ReportAsync(DriverActions.Deliver, delivered, journey.Reservations ? "With reservations" : "Clean");
+        if (journey.Reservations)
+        {
+            Expect(failures, shipment, delivered, ExceptionKinds.Reservations);
+        }
+    }
+
+    // The TMS opens an Exception for a report it records; the Planner looks for it later.
+    private static void Expect(List<ExpectedFailure> failures, OwnFleetShipment shipment, DriverCallAnswer answer, string kind)
+    {
+        if (answer.Outcome == LogOutcome.DriverReported)
+        {
+            failures.Add(new ExpectedFailure(shipment, kind));
+        }
     }
 
     // The estate is asked every interval, up to the attempts: the Driver app shows what the Logic Apps have done a little after it is done.
@@ -199,7 +220,7 @@ internal sealed class DriverStage(IDriverApp app, TimeProvider time, DriverPacin
     {
         public static TripOutcome NotStarted { get; } = new(false, false, false);
 
-        public static TripOutcome Begun { get; } = new(true, false, false);
+        public static TripOutcome Underway { get; } = new(true, false, false);
 
         public static TripOutcome Done { get; } = new(true, true, false);
 

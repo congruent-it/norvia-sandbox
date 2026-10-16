@@ -15,6 +15,8 @@ namespace Norvia.Simulator.Application.Runs.Execute;
 /// </summary>
 internal sealed class TripStage(ITmsApi tms, TimeProvider time)
 {
+    private readonly TripDispatcher dispatcher = new(tms, time);
+
     public async Task<TripResult> RunAsync(
         SimulationRun run, IReadOnlyList<OwnFleetShipment> ownFleet, SimulationWorld world, RunLogWriter writer, CancellationToken stopSending, CancellationToken cancellationToken)
     {
@@ -80,17 +82,9 @@ internal sealed class TripStage(ITmsApi tms, TimeProvider time)
                 }
 
                 var draft = build.Drafts[number];
-                var created = await tms.CreateTripAsync(draft, TripActions.CreationKey(run.Number, onDay.Key.DayNumber, number + 1), cancellationToken);
-                await writer.TripAsync(time.GetUtcNow(), TripActions.CreateTrip, created, created.TripNumber, Describe(draft), cancellationToken);
-                if (created is not { Outcome: LogOutcome.TripBuilt, TripNumber: { } tripNumber })
-                {
-                    continue;
-                }
-
-                built++;
-                var sent = await tms.DispatchTripAsync(tripNumber, cancellationToken);
-                await writer.TripAsync(time.GetUtcNow(), TripActions.DispatchTrip, sent, tripNumber, null, cancellationToken);
-                if (sent.Outcome != LogOutcome.TripDispatched)
+                var (tripNumber, wasDispatched) = await dispatcher.DispatchAsync(draft, TripActions.CreationKey(run.Number, onDay.Key.DayNumber, number + 1), writer, cancellationToken);
+                built += tripNumber is null ? 0 : 1;
+                if (!wasDispatched)
                 {
                     continue;
                 }
@@ -99,14 +93,11 @@ internal sealed class TripStage(ITmsApi tms, TimeProvider time)
                 if (draft.Day == today)
                 {
                     running.Add(new RunningTrip(
-                        tripNumber, draft.Driver, [.. draft.Shipments.Select(shipment => onDay.First(candidate => candidate.ShipmentNumber == shipment.ShipmentNumber))]));
+                        tripNumber!, draft.Driver, [.. draft.Shipments.Select(shipment => onDay.First(candidate => candidate.ShipmentNumber == shipment.ShipmentNumber))]));
                 }
             }
         }
 
         return new TripResult(false, built, dispatched, running);
     }
-
-    private static string Describe(TripDraft draft) =>
-        $"{draft.Day:yyyy-MM-dd}, {draft.Vehicle.Registration} with {draft.Driver.Name}, {draft.Shipments.Count} {(draft.Shipments.Count == 1 ? "Shipment" : "Shipments")}, start {draft.PlannedStart:HH:mm}, {draft.PlannedDrivingDuration.TotalMinutes:0} minutes driving";
 }

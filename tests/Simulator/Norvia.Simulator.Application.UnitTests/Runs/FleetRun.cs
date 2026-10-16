@@ -66,6 +66,7 @@ internal sealed class FleetRun
             Dispatched.Add(call.ArgAt<string>(0));
             return new PlannerAnswer(LogOutcome.TripDispatched, $"disp-{call.ArgAt<string>(0)}", null, null, TripNumber: call.ArgAt<string>(0));
         });
+        Tms.GetOpenExceptionsAsync(Arg.Any<CancellationToken>()).Returns(_ => Task.FromResult<IReadOnlyList<OpenExceptionSummary>?>(OpenExceptions()));
         Drivers.GetTripsAsync(Arg.Any<SimulatedDriver>(), Arg.Any<CancellationToken>())
             .Returns(call => Task.FromResult<IReadOnlyList<DriverTripSnapshot>?>([.. Created.Select(created => Snapshot(created.Number)).OfType<DriverTripSnapshot>()]));
         Drivers.StartTripAsync(Arg.Any<SimulatedDriver>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(call => Reported(DriverActions.StartTrip, call.Arg<SimulatedDriver>(), call.ArgAt<string>(1), null));
@@ -116,6 +117,22 @@ internal sealed class FleetRun
 
     /// <summary>The Shipments that were put on Trips, by Shipment number.</summary>
     public IEnumerable<string> OnTrips => Created.SelectMany(created => created.Draft.Shipments.Select(shipment => shipment.ShipmentNumber));
+
+    /// <summary>The Exceptions the TMS has opened so far: one for each failure or damage the Drivers reported. Reservations show as a Reservations Exception.</summary>
+    public Func<IReadOnlyList<OpenExceptionSummary>> OpenExceptionsNow { get; set; } = () => [];
+
+    private IReadOnlyList<OpenExceptionSummary> OpenExceptions()
+    {
+        lock (Calls)
+        {
+            return
+            [
+                .. Calls.Where(call => call.Shipment is not null && call.Action is DriverActions.CollectionFailed or DriverActions.DeliveryFailed or DriverActions.ReportDamage)
+                    .Select(call => new OpenExceptionSummary($"EXC-{call.Shipment![3..]}-{call.Action.Length}", call.Shipment!, call.Action == DriverActions.ReportDamage ? "Damaged" : call.Action == DriverActions.CollectionFailed ? "Collection failed" : "Delivery failed")),
+                .. OpenExceptionsNow(),
+            ];
+        }
+    }
 
     private Task<DriverCallAnswer> Reported(string action, SimulatedDriver driver, string trip, string? shipment)
     {

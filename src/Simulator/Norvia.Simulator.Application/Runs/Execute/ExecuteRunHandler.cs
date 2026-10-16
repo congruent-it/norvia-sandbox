@@ -47,6 +47,7 @@ public sealed class ExecuteRunHandler(
         var carrier = CarrierResult.None;
         var trips = TripResult.None;
         var drivers = DriverResult.None;
+        var followUp = FollowUpResult.None;
         if (!stopped)
         {
             var planned = await new PlannerStage(tmsApi, time).RunAsync(run, [.. accepted], world.Load(), writer, command.StopSending, cancellationToken);
@@ -68,6 +69,12 @@ public sealed class ExecuteRunHandler(
                 drivers = await new DriverStage(driverApp, time, driverPacing).RunAsync(run, trips.Running, writer, command.StopSending, cancellationToken);
                 stopped = drivers.Stopped;
             }
+
+            if (!stopped)
+            {
+                followUp = await new FollowUpStage(tmsApi, time, driverPacing).RunAsync(run, drivers.Failures, world.Load(), writer, command.StopSending, cancellationToken);
+                stopped = followUp.Stopped;
+            }
         }
 
         if (stopped)
@@ -78,7 +85,7 @@ public sealed class ExecuteRunHandler(
 
         run.Complete(time.GetUtcNow());
         await runs.UpdateAsync(run, cancellationToken);
-        await writer.NoteAsync(time.GetUtcNow(), Finished(run, carrier, trips, drivers), cancellationToken);
+        await writer.NoteAsync(time.GetUtcNow(), Finished(run, carrier, trips, drivers, followUp), cancellationToken);
         return Result.Success();
     }
 
@@ -115,12 +122,13 @@ public sealed class ExecuteRunHandler(
         return stopSending.IsCancellationRequested;
     }
 
-    private static string Finished(SimulationRun run, CarrierResult carrier, TripResult trips, DriverResult drivers)
+    private static string Finished(SimulationRun run, CarrierResult carrier, TripResult trips, DriverResult drivers, FollowUpResult followUp)
     {
         var sent = $"Run {run.Number} finished: {run.Plan.Bookings.Count} bookings sent";
         var planned = run.Plan.Choices.Count == 0 ? sent : $"{sent}, {run.Plan.Choices.Count} Transport Orders for the Planner";
         var carried = carrier.Released == 0 ? planned : $"{planned}, {carrier.Released} released, {carrier.Confirmed} confirmed, {carrier.Delivered} reported delivered";
-        return trips.Dispatched == 0 ? carried : $"{carried}, {trips.Dispatched} Trips dispatched, {drivers.Started} started and {drivers.Completed} completed by their Drivers";
+        var driven = trips.Dispatched == 0 ? carried : $"{carried}, {trips.Dispatched} Trips dispatched, {drivers.Started} started and {drivers.Completed} completed by their Drivers";
+        return followUp.Redeliveries == 0 ? driven : $"{driven}, {followUp.Redeliveries} Re-delivery Trips dispatched";
     }
 
     private async Task SendAsync(
