@@ -25,4 +25,12 @@ public sealed class SimulatorOptions
     /// <summary>How many times the Planner asks for them before it notes that an Exception didn't open.</summary>
     [Range(1, 100)]
     public int ExceptionPollAttempts { get; set; } = 10;
+
+    /// <summary>How long a Driver waits between asking the Driver app whether a Trip has arrived, or the TMS has recorded their report: the Logic Apps carry both.</summary>
+    [Range(0, 60)]
+    public int DriverPollSeconds { get; set; } = 2;
+
+    /// <summary>How many times a Driver asks before they note that the estate didn't catch up.</summary>
+    [Range(1, 300)]
+    public int DriverPollAttempts { get; set; } = 60;
 }

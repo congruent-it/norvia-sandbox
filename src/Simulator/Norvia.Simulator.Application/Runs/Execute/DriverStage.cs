@@ -1,0 +1,208 @@
+using Norvia.Simulator.Application.Ports;
+using Norvia.Simulator.Domain.Drivers;
+using Norvia.Simulator.Domain.Log;
+using Norvia.Simulator.Domain.Runs;
+using Norvia.Simulator.Domain.Worlds;
+
+namespace Norvia.Simulator.Application.Runs.Execute;
+
+/// <summary>
+/// The Drivers of the Trips for today, through the Driver app API only, each as themselves: they wait for the Trip to reach the Driver app, start it, collect
+/// and deliver every Shipment with a Proof of delivery or fail it, report damage and end the Trip. It follows the Driver funnel (<see cref="DriverFunnel"/>) in
+/// exactly the configured shares. One Trip at a time in dispatch order, and one Shipment at a time, so what happens depends on the seed and never on which answer
+/// came first. A report the Driver app refuses is logged and the Driver goes on; the Trip then can't end, which the log shows.
+/// </summary>
+internal sealed class DriverStage(IDriverApp app, TimeProvider time, DriverPacing pacing)
+{
+    private const string CollectionFailedRemark = "Nobody at the collection address";
+    private const string DeliveryFailedRemark = "The Consignee was closed";
+    private const string DamageRemark = "A pallet was damaged";
+    private const string ReservationsRemark = "One carton was dented";
+    private const string Receiver = "Simulated consignee";
+
+    public async Task<DriverResult> RunAsync(
+        SimulationRun run, IReadOnlyList<RunningTrip> trips, RunLogWriter writer, CancellationToken stopSending, CancellationToken cancellationToken)
+    {
+        if (trips.Count == 0)
+        {
+            return DriverResult.None;
+        }
+
+        var journeys = DriverFunnel.Plan(run.Settings.Drivers, run.Settings.Seed, trips.Sum(trip => trip.Shipments.Count));
+        var first = 0;
+        var started = 0;
+        var completed = 0;
+        foreach (var trip in trips)
+        {
+            if (stopSending.IsCancellationRequested)
+            {
+                return new DriverResult(true, started, completed);
+            }
+
+            var outcome = await WorkAsync(trip, [.. journeys.Skip(first).Take(trip.Shipments.Count)], writer, stopSending, cancellationToken);
+            first += trip.Shipments.Count;
+            started += outcome.Started ? 1 : 0;
+            completed += outcome.Completed ? 1 : 0;
+            if (outcome.Stopped)
+            {
+                return new DriverResult(true, started, completed);
+            }
+        }
+
+        return new DriverResult(false, started, completed);
+    }
+
+    private async Task<TripOutcome> WorkAsync(
+        RunningTrip trip, IReadOnlyList<DriverJourney> journeys, RunLogWriter writer, CancellationToken stopSending, CancellationToken cancellationToken)
+    {
+        var driver = trip.Driver;
+        var reached = await WaitAsync(driver, trip.TripNumber, _ => true, stopSending, cancellationToken);
+        if (reached.Stopped)
+        {
+            return TripOutcome.Cancelled(started: false);
+        }
+
+        if (reached.Snapshot is null)
+        {
+            await writer.NoteAsync(time.GetUtcNow(), $"Trip {trip.TripNumber} didn't reach the Driver app in time: {driver.Name} doesn't start it", cancellationToken);
+            return TripOutcome.NotStarted;
+        }
+
+        var start = await app.StartTripAsync(driver, trip.TripNumber, cancellationToken);
+        await writer.DriverAsync(time.GetUtcNow(), driver, trip.TripNumber, null, DriverActions.StartTrip, start, null, cancellationToken);
+        if (start.Outcome != LogOutcome.DriverReported)
+        {
+            return TripOutcome.NotStarted;
+        }
+
+        // The Driver app lets the Driver work the Stops once the TMS has recorded the start.
+        var underWay = await WaitAsync(driver, trip.TripNumber, snapshot => snapshot.Status != DriverTripStatus.Dispatched, stopSending, cancellationToken);
+        if (underWay.Stopped)
+        {
+            return TripOutcome.Cancelled(started: true);
+        }
+
+        if (underWay.Snapshot is null)
+        {
+            await writer.NoteAsync(time.GetUtcNow(), $"The TMS didn't record the start of Trip {trip.TripNumber} in time: {driver.Name} doesn't work its Stops", cancellationToken);
+            return TripOutcome.Begun;
+        }
+
+        for (var position = 0; position < trip.Shipments.Count; position++)
+        {
+            if (stopSending.IsCancellationRequested)
+            {
+                return TripOutcome.Cancelled(started: true);
+            }
+
+            await WorkShipmentAsync(trip, trip.Shipments[position], journeys[position], writer, cancellationToken);
+        }
+
+        var end = await app.EndTripAsync(driver, trip.TripNumber, cancellationToken);
+        await writer.DriverAsync(time.GetUtcNow(), driver, trip.TripNumber, null, DriverActions.EndTrip, end, null, cancellationToken);
+        if (end.Outcome != LogOutcome.DriverReported)
+        {
+            return TripOutcome.Begun;
+        }
+
+        var ended = await WaitAsync(driver, trip.TripNumber, snapshot => snapshot.Status == DriverTripStatus.Completed, stopSending, cancellationToken);
+        if (ended.Stopped)
+        {
+            return TripOutcome.Cancelled(started: true);
+        }
+
+        if (ended.Snapshot is null)
+        {
+            await writer.NoteAsync(time.GetUtcNow(), $"The TMS didn't record the end of Trip {trip.TripNumber} in time", cancellationToken);
+            return TripOutcome.Begun;
+        }
+
+        await writer.DriverAsync(
+            time.GetUtcNow(), driver, trip.TripNumber, null, DriverActions.EndTrip, new DriverCallAnswer(LogOutcome.TripCompleted, end.CorrelationId, null),
+            "The TMS recorded the Trip as Completed", cancellationToken);
+        return TripOutcome.Done;
+    }
+
+    private async Task WorkShipmentAsync(RunningTrip trip, OwnFleetShipment shipment, DriverJourney journey, RunLogWriter writer, CancellationToken cancellationToken)
+    {
+        var driver = trip.Driver;
+        var number = shipment.ShipmentNumber;
+
+        if (journey.Damaged)
+        {
+            var damage = await app.ReportDamageAsync(driver, trip.TripNumber, number, atDelivery: false, DamageRemark, cancellationToken);
+            await writer.DriverAsync(time.GetUtcNow(), driver, trip.TripNumber, shipment, DriverActions.ReportDamage, damage, "At the collection", cancellationToken);
+        }
+
+        if (journey.CollectionFailed)
+        {
+            var failed = await app.FailCollectionAsync(driver, trip.TripNumber, number, CollectionFailedRemark, cancellationToken);
+            await writer.DriverAsync(time.GetUtcNow(), driver, trip.TripNumber, shipment, DriverActions.CollectionFailed, failed, null, cancellationToken);
+            return;
+        }
+
+        var collected = await app.CollectAsync(driver, trip.TripNumber, number, cancellationToken);
+        await writer.DriverAsync(time.GetUtcNow(), driver, trip.TripNumber, shipment, DriverActions.Collected, collected, null, cancellationToken);
+        if (collected.Outcome != LogOutcome.DriverReported)
+        {
+            return;
+        }
+
+        if (journey.DeliveryFailed)
+        {
+            var failed = await app.FailDeliveryAsync(driver, trip.TripNumber, number, DeliveryFailedRemark, cancellationToken);
+            await writer.DriverAsync(time.GetUtcNow(), driver, trip.TripNumber, shipment, DriverActions.DeliveryFailed, failed, null, cancellationToken);
+            return;
+        }
+
+        var delivered = await app.DeliverAsync(
+            driver, trip.TripNumber, number, new DriverDelivery(Receiver, journey.Reservations, journey.Reservations ? ReservationsRemark : null), cancellationToken);
+        await writer.DriverAsync(time.GetUtcNow(), driver, trip.TripNumber, shipment, DriverActions.Deliver, delivered, journey.Reservations ? "With reservations" : "Clean", cancellationToken);
+    }
+
+    // The estate is asked every interval, up to the attempts: the Driver app shows what the Logic Apps have done a little after it is done.
+    private async Task<Waited> WaitAsync(
+        SimulatedDriver driver, string tripNumber, Func<DriverTripSnapshot, bool> reached, CancellationToken stopSending, CancellationToken cancellationToken)
+    {
+        for (var attempt = 1; attempt <= pacing.PollAttempts; attempt++)
+        {
+            if (attempt > 1 && pacing.PollInterval > TimeSpan.Zero)
+            {
+                try
+                {
+                    await Task.Delay(pacing.PollInterval, time, stopSending);
+                }
+                catch (OperationCanceledException) when (stopSending.IsCancellationRequested)
+                {
+                    return new Waited(null, Stopped: true);
+                }
+            }
+
+            if (stopSending.IsCancellationRequested)
+            {
+                return new Waited(null, Stopped: true);
+            }
+
+            var trips = await app.GetTripsAsync(driver, cancellationToken);
+            if (trips?.FirstOrDefault(trip => trip.TripNumber == tripNumber) is { } found && reached(found))
+            {
+                return new Waited(found, Stopped: false);
+            }
+        }
+
+        return new Waited(null, Stopped: false);
+    }
+
+    private sealed record Waited(DriverTripSnapshot? Snapshot, bool Stopped);
+
+    private sealed record TripOutcome(bool Started, bool Completed, bool Stopped)
+    {
+        public static TripOutcome NotStarted { get; } = new(false, false, false);
+
+        public static TripOutcome Begun { get; } = new(true, false, false);
+
+        public static TripOutcome Done { get; } = new(true, true, false);
+
+        public static TripOutcome Cancelled(bool started) => new(started, false, true);
+    }
+}

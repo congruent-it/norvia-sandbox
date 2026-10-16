@@ -62,6 +62,26 @@ public sealed class RunPageTests : SimulatorWebContext
     }
 
     [Fact]
+    public void Render_ATripAndADriversReports_CarryTheTripNumberAndTheirTrailsOpenInTheConsole()
+    {
+        Requests.ListLogAsync(Arg.Any<SimulationRunId>(), Arg.Any<LogFilter>(), Arg.Any<CancellationToken>()).Returns(
+        [
+            new LogLine(6, TestData.Now, "Planner", "Dispatch Trip", LogOutcome.TripDispatched, "disp-1", null, null, null, null, "TR-0000007"),
+            new LogLine(7, TestData.Now.AddSeconds(1), "Anouk de Vries", "Collected", LogOutcome.DriverReported, "drv-1", "SIM-4-1", "TO-0000001", "SH-0000001", null, "TR-0000007"),
+            new LogLine(8, TestData.Now.AddSeconds(2), "Anouk de Vries", "Deliver", LogOutcome.DriverRefused, "drv-2", "SIM-4-1", "TO-0000001", "SH-0000001", "StopNotAvailable (409)", "TR-0000007"),
+        ]);
+
+        var page = RenderRun();
+
+        page.FindAll("th").Select(header => header.TextContent.Trim()).Should().Contain("Trip");
+        var rows = page.FindAll("tbody tr");
+        rows.Should().OnlyContain(row => row.TextContent.Contains("TR-0000007", StringComparison.Ordinal));
+        rows.Select(row => row.QuerySelector("[data-outcome]")!.TextContent.Trim()).Should().Equal("Trip dispatched", "Driver reported", "Driver app refused");
+        rows[1].QuerySelector("a")!.GetAttribute("href").Should().Contain("drv-1");
+        rows[2].QuerySelector("[data-outcome]")!.ClassList.Should().Contain("text-danger");
+    }
+
+    [Fact]
     public void Authorize_SeeingARun_RequiresTheReadRole()
     {
         typeof(RunPage).GetCustomAttributes(typeof(AuthorizeAttribute), inherit: true)

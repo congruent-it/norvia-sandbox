@@ -28,11 +28,20 @@ internal sealed class SeedFileWorldSource : IWorldSource
             var seed = JsonSerializer.Deserialize<SeedFile>(seedFile, SeedJson) ?? throw new InvalidDataException("The seed file is empty.");
             _world = new SimulationWorld(
                 [.. seed.Shippers.Where(shipper => shipper.Active).Select(shipper => ToShipper(shipper, seed)).OfType<SimulatedShipper>()],
-                [.. (seed.Carriers ?? []).Select(carrier => ToCarrier(carrier, seed))]);
+                [.. (seed.Carriers ?? []).Select(carrier => ToCarrier(carrier, seed))],
+                [.. (seed.Vehicles ?? []).Where(vehicle => vehicle.Active).Select(ToVehicle).OfType<SimulatedVehicle>()],
+                [.. (seed.Drivers ?? []).Where(driver => driver.Active).Select(ToDriver)]);
         }
     }
 
     public SimulationWorld Load() => _world;
+
+    // An Own fleet Vehicle of a kind the Simulator doesn't know is left out: it can't tell which licence it needs.
+    private static SimulatedVehicle? ToVehicle(SeedVehicle vehicle) =>
+        Enum.TryParse<VehicleKind>(vehicle.Type, ignoreCase: true, out var kind) ? new SimulatedVehicle(vehicle.Id, vehicle.Registration, kind, vehicle.PayloadKg, vehicle.PalletPlaces) : null;
+
+    private static SimulatedDriver ToDriver(SeedDriver driver) =>
+        new(driver.Id, driver.Name, [.. driver.Licences.Select(licence => Enum.Parse<LicenceCategory>(licence, ignoreCase: true))]);
 
     // The Carrier plays its part as its Persona, whose booking reference prefix starts the references it confirms with.
     private static SimulatedCarrier ToCarrier(SeedCarrier carrier, SeedFile seed)
@@ -58,7 +67,12 @@ internal sealed class SeedFileWorldSource : IWorldSource
             [.. version.Lanes.Select(lane => new RateLane(lane.Origin, lane.Destination))]);
     }
 
-    private sealed record SeedFile(IReadOnlyList<SeedShipper> Shippers, IReadOnlyList<SeedPersona> Personas, IReadOnlyList<SeedRateCard>? RateCards, IReadOnlyList<SeedCarrier>? Carriers);
+    private sealed record SeedFile(IReadOnlyList<SeedShipper> Shippers, IReadOnlyList<SeedPersona> Personas, IReadOnlyList<SeedRateCard>? RateCards, IReadOnlyList<SeedCarrier>? Carriers,
+        IReadOnlyList<SeedVehicle>? Vehicles = null, IReadOnlyList<SeedDriver>? Drivers = null);
+
+    private sealed record SeedVehicle(string Id, string Registration, string Type, int PayloadKg, int PalletPlaces, bool Active);
+
+    private sealed record SeedDriver(string Id, string Name, IReadOnlyList<string> Licences, bool Active);
 
     private sealed record SeedCarrier(string Id, string Name, bool Active);
 

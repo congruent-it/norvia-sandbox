@@ -42,4 +42,14 @@ internal static class TestData
         settings ??= Settings();
         return SimulationRun.Start(number, settings, BookingPlanGenerator.Generate(settings, World, number), Now, "ngruson");
     }
+
+    public static readonly SimulatedVehicle Van = new("VEH-0001", "VN-101-A", VehicleKind.Van, 1200, 4);
+    public static readonly SimulatedVehicle Truck = new("VEH-0003", "RT-201-C", VehicleKind.RigidTruck, 10000, 18);
+    public static readonly SimulatedVehicle Tractor = new("VEH-0006", "TT-301-F", VehicleKind.TractorWithTrailer, 24000, 33);
+    public static readonly SimulatedDriver Anouk = new("DRV-0001", "Anouk de Vries", [LicenceCategory.B, LicenceCategory.C, LicenceCategory.CE]);
+    public static readonly SimulatedDriver Bram = new("DRV-0003", "Bram Visser", [LicenceCategory.B, LicenceCategory.C]);
+    public static readonly SimulatedDriver Sanne = new("DRV-0006", "Sanne Jansen", [LicenceCategory.B]);
+
+    /// <summary>The world with an Own fleet: three Vehicles and three Drivers, whose Shifts a test gives the days it needs.</summary>
+    public static readonly SimulationWorld FleetWorld = new(World.Shippers, World.ActiveCarriers, [Van, Truck, Tractor], [Anouk, Bram, Sanne]);
 }

@@ -82,6 +82,7 @@ public sealed class DeliverHandlerTests
         captured.DeliveryTime.Should().Be(_world.Time.GetUtcNow());
         captured.Location.Should().Be(stop.Location);
         captured.DocumentId.Should().Be(proof.Id.Value.ToString());
+        result.Value.CorrelationId.Should().Be(delivered.CorrelationId, "the answer names the trail the report travels on");
     }
 
     [Fact]

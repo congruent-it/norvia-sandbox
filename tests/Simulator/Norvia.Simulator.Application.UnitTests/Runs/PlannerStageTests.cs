@@ -17,6 +17,7 @@ public sealed class PlannerStageTests
     private readonly IRepository<LogEntry> _log = Substitute.For<IRepository<LogEntry>>();
     private readonly IPartnerApi _api = Substitute.For<IPartnerApi>();
     private readonly ITmsApi _tms = Substitute.For<ITmsApi>();
+    private readonly IDriverApp _drivers = Substitute.For<IDriverApp>();
     private readonly IWorldSource _world = Substitute.For<IWorldSource>();
     private readonly FakeTimeProvider _time = new(TestData.Now);
     private readonly List<LogEntry> _lines = [];
@@ -30,6 +31,9 @@ public sealed class PlannerStageTests
         _api.SendBookingAsync(Arg.Any<PlannedBooking>(), Arg.Any<CancellationToken>())
             .Returns(call => new BookingAnswer(LogOutcome.Accepted, $"corr-{call.Arg<PlannedBooking>().Step}", $"TO-{call.Arg<PlannedBooking>().Step:0000000}", null));
         _tms.GetOwnFleetDaysAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult<IReadOnlyList<FleetDay>?>(OpenWeek(capacityKg: 100_000, capacityPallets: 1_000)));
+        // These tests are about the stages before the Trips: whatever stays with the Own fleet is not released here.
+        _tms.ReleaseAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(call => new PlannerAnswer(LogOutcome.PlanningNotReceived, null, call.ArgAt<string>(0), "not released here"));
         _tms.AssignAsync(Arg.Any<string>(), Arg.Any<Assignee>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(call =>
         {
             _assignments.Add((call.ArgAt<string>(0), call.ArgAt<Assignee>(1), call.ArgAt<string>(2)));
@@ -47,7 +51,7 @@ public sealed class PlannerStageTests
         .. Enumerable.Range(0, 10).Select(offset => new FleetDay(DateOnly.FromDateTime(TestData.Now.UtcDateTime).AddDays(offset), capacityKg, capacityPallets, 0, 0)),
     ];
 
-    private ExecuteRunHandler Handler() => new(_runs, _log, _api, _tms, _world, new SimulationLimits(50, 3), _time, new CarrierPacing(TimeSpan.Zero, 1));
+    private ExecuteRunHandler Handler() => new(_runs, _log, _api, _tms, _world, new SimulationLimits(50, 3), _time, new CarrierPacing(TimeSpan.Zero, 1), _drivers, new DriverPacing(TimeSpan.Zero, 1));
 
     private async Task<SimulationRun> RunAsync(SimulationSettings settings)
     {

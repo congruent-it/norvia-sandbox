@@ -15,7 +15,8 @@
 <p class="text-muted">
     A run books for the estate's Shippers through the Norvia Partner API, as each Shipper's Persona, plans what Norvia
     accepted through the TMS API, as the Planner, and then has the Carriers answer, track and deliver what went to them, as their
-    Personas, so every booking, assignment and Carrier message has a real Message trail. Choose a Preset or
+    Personas. What stays with the Own fleet goes on Trips the Planner dispatches, and the Drivers work the Trips of today through the Driver app,
+    as themselves, so every booking, assignment, Carrier message and Driver report has a real Message trail. Choose a Preset or
     set the numbers yourself, then preview the plan: the same seed always gives the same plan.
 </p>
 
@@ -80,6 +81,12 @@ else
             <FluentNumberField TValue="int" @bind-Value="_form.DeliveredPercent" Label="Delivered (%)" Min="0" Max="100" />
             <FluentNumberField TValue="int" @bind-Value="_form.ProofOfDeliveryPercent" Label="With a Proof of delivery (%)" Min="0" Max="100" />
             <FluentNumberField TValue="int" @bind-Value="_form.CancelPercent" Label="Failed collections cancelled (%)" Min="0" Max="100" />
+
+            <FluentNumberField TValue="int" @bind-Value="_form.TripPercent" Label="Own fleet put on Trips (%)" Min="0" Max="100" />
+            <FluentNumberField TValue="int" @bind-Value="_form.CollectionFailedPercent" Label="Collections that fail (%)" Min="0" Max="100" />
+            <FluentNumberField TValue="int" @bind-Value="_form.DeliveryFailedPercent" Label="Deliveries that fail (%)" Min="0" Max="100" />
+            <FluentNumberField TValue="int" @bind-Value="_form.DamagedPercent" Label="Damage reported (%)" Min="0" Max="100" />
+            <FluentNumberField TValue="int" @bind-Value="_form.ReservationsPercent" Label="Delivered with reservations (%)" Min="0" Max="100" />
             <FluentSelect TOption="string" Label="Sending" @bind-Value="_form.Mode">
                 <FluentOption TOption="string" Value="@nameof(RunMode.Burst)">Burst, as fast as the estate accepts</FluentOption>
                 <FluentOption TOption="string" Value="@nameof(RunMode.Paced)">Paced, spread over a window</FluentOption>

@@ -5,5 +5,6 @@ namespace Norvia.Simulator.Application.Ports;
 /// <summary>
 /// The TMS's answer to one of the Planner's calls, as the log shows it. <see cref="Detail"/> holds a refusal's code, never the
 /// message the TMS words it with, which may quote what was booked. <see cref="FailureCode"/> is that code alone, for a refusal. <see cref="CarrierBookingNumber"/> is the Carrier booking a release created.
+/// <see cref="TripNumber"/> is the Trip a creation made or a dispatch sent.
 /// </summary>
-public sealed record PlannerAnswer(LogOutcome Outcome, string? CorrelationId, string? ShipmentNumber, string? Detail, string? FailureCode = null, string? CarrierBookingNumber = null);
+public sealed record PlannerAnswer(LogOutcome Outcome, string? CorrelationId, string? ShipmentNumber, string? Detail, string? FailureCode = null, string? CarrierBookingNumber = null, string? TripNumber = null);

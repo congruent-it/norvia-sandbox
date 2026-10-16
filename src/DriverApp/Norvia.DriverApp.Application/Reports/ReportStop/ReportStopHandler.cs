@@ -62,6 +62,6 @@ public sealed class ReportStopHandler(
             report.Id.Value, report.EventTime, report.CorrelationId, tripNumber.Value, report.VersionHeld, driverId.Value, command.ShipmentNumber,
             command.Stop.ToString(), kind.ToTrackingEventType(), new StopLocationV1(details.Address!.City!, details.Address.Postcode!, details.Address.Country!), report.Remark));
         await reports.AddAsync(report, cancellationToken);
-        return new ReportStopResult(report.Id.Value, AlreadyReported: false);
+        return new ReportStopResult(report.Id.Value, AlreadyReported: false, report.CorrelationId);
     }
 }

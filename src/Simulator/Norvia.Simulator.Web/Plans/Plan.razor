@@ -68,6 +68,12 @@ else
         These are the most a run can reach: what goes to Own fleet, and what the estate refuses, is known only when it runs.
     </p>
 
+    <p class="text-muted" data-testid="driver-funnel">
+        The Planner puts @_preview.Settings.TripPercent% of the Shipments that stay with the Own fleet on Trips and dispatches them. Of the @_preview.Drivers.Shipments Shipments meant for Own fleet that collect today,
+        the Drivers deliver @_preview.Drivers.Counts.Delivered (@_preview.Drivers.Counts.WithReservations with reservations), fail @_preview.Drivers.Counts.CollectionsFailed collections and
+        @_preview.Drivers.Counts.DeliveriesFailed deliveries, and report damage on @_preview.Drivers.Counts.Damaged. Trips for later days stay Dispatched.
+    </p>
+
     @if (_startProblems.Count > 0)
     {
         <div role="alert" class="mb-4">
@@ -169,13 +175,29 @@ else
     [SupplyParameterFromQuery(Name = "cancel")]
     private int? CancelShare { get; set; }
 
+    [SupplyParameterFromQuery(Name = "trips")]
+    private int? Trips { get; set; }
+
+    [SupplyParameterFromQuery(Name = "collfail")]
+    private int? CollectionFailed { get; set; }
+
+    [SupplyParameterFromQuery(Name = "delfail")]
+    private int? DeliveryFailed { get; set; }
+
+    [SupplyParameterFromQuery(Name = "damaged")]
+    private int? Damaged { get; set; }
+
+    [SupplyParameterFromQuery(Name = "reservations")]
+    private int? Reservations { get; set; }
+
     private static string KindOf(PlanRow row) => row.Bad is { } bad ? SimulatorText.Of(bad) : "Good";
 
     protected override async Task OnParametersSetAsync()
     {
         _settings = PlanLinks.Settings(
             Orders, Bad, Today, Seed, Mode, Window, Preset, Assigned, OwnFleet, Reassign,
-            Release, Confirm, Decline, Tracked, ExceptionShare, Delivered, ProofOfDelivery, CancelShare);
+            Release, Confirm, Decline, Tracked, ExceptionShare, Delivered, ProofOfDelivery, CancelShare,
+            CollectionFailed, DeliveryFailed, Damaged, Reservations, Trips);
         if (_settings is null)
         {
             return;

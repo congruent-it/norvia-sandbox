@@ -1,4 +1,5 @@
 using Norvia.Simulator.Domain.Carriers;
+using Norvia.Simulator.Domain.Drivers;
 
 namespace Norvia.Simulator.Domain.Runs;
 
@@ -18,6 +19,13 @@ public sealed record SimulationSettings(
     /// <summary>The Carrier stage of the funnel: what becomes of the Shipments assigned to a Carrier. A plan made before it existed has the defaults.</summary>
     public CarrierShares Carriers { get; init; } = new();
 
+    /// <summary>The Driver stage of the funnel: what goes wrong on the road for the Shipments on today's Trips. A plan made before it existed has the defaults.</summary>
+    public DriverShares Drivers { get; init; } = new();
+
+    /// <summary>The share of the Shipments that stay with the Own fleet that the Planner puts on Trips; the rest stay Planned. A plan made before the Trips existed has the default.</summary>
+    public int TripPercent { get; init; } = DefaultTripPercent;
+
+    public const int DefaultTripPercent = 100;
     public const int DefaultAssignedPercent = 80;
     public const int DefaultOwnFleetPercent = 50;
     public const int DefaultReassignPercent = 5;
@@ -68,12 +76,18 @@ public sealed record SimulationSettings(
             problems.Add("The share of assignments the Planner reassigns is a percentage from 0 to 100.");
         }
 
+        if (TripPercent is < 0 or > 100)
+        {
+            problems.Add("The share of Own fleet Shipments the Planner puts on Trips is a percentage from 0 to 100.");
+        }
+
         if (Mode == RunMode.Paced && (Window <= TimeSpan.Zero || Window > TimeSpan.FromMinutes(MaxWindowMinutes)))
         {
             problems.Add($"A paced run is spread over 1 to {MaxWindowMinutes} minutes.");
         }
 
         problems.AddRange(Carriers.Problems());
+        problems.AddRange(Drivers.Problems());
         return problems;
     }
 }

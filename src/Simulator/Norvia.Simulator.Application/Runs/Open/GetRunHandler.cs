@@ -23,7 +23,8 @@ public sealed class GetRunHandler(IReadRepository<SimulationRun> runs, IReadRepo
         var answers = await log.ListAsync(new BookingOutcomesOfRunSpec(query.RunId), cancellationToken);
         var planning = await log.ListAsync(new PlanningOutcomesOfRunSpec(query.RunId), cancellationToken);
         var carriers = await log.ListAsync(new CarrierOutcomesOfRunSpec(query.RunId), cancellationToken);
-        var outcomes = answers.Concat(planning).Concat(carriers).GroupBy(outcome => outcome)
+        var drivers = await log.ListAsync(new DriverOutcomesOfRunSpec(query.RunId), cancellationToken);
+        var outcomes = answers.Concat(planning).Concat(carriers).Concat(drivers).GroupBy(outcome => outcome)
             .Select(group => new OutcomeCount(group.Key, group.Count()))
             .OrderBy(count => count.Outcome)
             .ToList();
@@ -35,6 +36,11 @@ public sealed class GetRunHandler(IReadRepository<SimulationRun> runs, IReadRepo
             {
                 // The Carriers act as their Personas, once the Planner has released what went to them.
                 actors.AddRange(world.Load().ActiveCarriers.Where(carrier => carrier.HasPersona).Select(carrier => carrier.PersonaName!));
+            }
+            if (run.Settings.OwnFleetPercent > 0)
+            {
+                // The Drivers act as themselves, on the Trips for today.
+                actors.AddRange(world.Load().OwnFleetDrivers.Select(driver => driver.Name));
             }
         }
 

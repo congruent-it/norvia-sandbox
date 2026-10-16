@@ -29,6 +29,7 @@ internal sealed class LogEntryConfiguration : IEntityTypeConfiguration<LogEntry>
         builder.Property(entry => entry.ShipperReference).HasMaxLength(100);
         builder.Property(entry => entry.TransportOrderNumber).HasMaxLength(50);
         builder.Property(entry => entry.ShipmentNumber).HasMaxLength(50);
+        builder.Property(entry => entry.TripNumber).HasMaxLength(50);
         builder.Property(entry => entry.Detail).HasMaxLength(500);
     }
 }

@@ -48,6 +48,6 @@ public sealed class EndTripHandler(
         // Queued before the report is saved: the save writes the report and the outbox message together.
         outbox.Add(new TripEndReportedV1(report.Id.Value, report.EventTime, report.CorrelationId, tripNumber.Value, report.VersionHeld, driverId.Value));
         await reports.AddAsync(report, cancellationToken);
-        return new EndTripResult(report.Id.Value, AlreadyReported: false);
+        return new EndTripResult(report.Id.Value, AlreadyReported: false, report.CorrelationId);
     }
 }

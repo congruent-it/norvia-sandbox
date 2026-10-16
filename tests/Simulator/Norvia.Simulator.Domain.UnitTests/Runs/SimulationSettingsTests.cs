@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Norvia.Simulator.Domain.Carriers;
+using Norvia.Simulator.Domain.Drivers;
 using Norvia.Simulator.Domain.Runs;
 
 namespace Norvia.Simulator.Domain.UnitTests.Runs;
@@ -18,6 +19,38 @@ public sealed class SimulationSettingsTests
     public void Problems_SettingsWithinTheLimits_AreNone()
     {
         Settings().Problems(Limits).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Problems_DriverSharesOutOfRange_AreNamed()
+    {
+        (Settings() with { Drivers = new DriverShares(CollectionFailedPercent: 101) }).Problems(Limits).Should().ContainSingle().Which.Should().Contain("collection fails");
+    }
+
+    [Fact]
+    public void Drivers_ASettingsDocumentFromBeforeTheDriverStage_ReadsWithTheDefaultShares()
+    {
+        var older = JsonSerializer.Deserialize<SimulationSettings>(
+            """{"orderCount":10,"badSharePercent":10,"collectedTodayPercent":30,"seed":1,"mode":"Burst","window":"00:00:00"}""", PlanJson);
+
+        older!.Drivers.Should().Be(new DriverShares());
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(101)]
+    public void Problems_ATripShareOutOfRange_IsNamed(int percent)
+    {
+        (Settings() with { TripPercent = percent }).Problems(Limits).Should().ContainSingle().Which.Should().Contain("on Trips").And.Contain("0 to 100");
+    }
+
+    [Fact]
+    public void TripPercent_ASettingsDocumentFromBeforeTheTrips_ReadsWithAllOfThemOnTrips()
+    {
+        var older = JsonSerializer.Deserialize<SimulationSettings>(
+            """{"orderCount":10,"badSharePercent":10,"collectedTodayPercent":30,"seed":1,"mode":"Burst","window":"00:00:00"}""", PlanJson);
+
+        older!.TripPercent.Should().Be(100);
     }
 
     [Fact]

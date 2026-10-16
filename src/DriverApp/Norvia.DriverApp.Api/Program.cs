@@ -4,11 +4,14 @@ using Asp.Versioning;
 using Mediator;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics;
+using Norvia.DriverApp.Api.Actions;
 using Norvia.DriverApp.Api.Reports;
 using Norvia.DriverApp.Api.Settings;
 using Norvia.DriverApp.Api.Trips;
+using Norvia.DriverApp.Application.Reports.Deliver;
 using Norvia.DriverApp.Application.Reports.EndTrip;
 using Norvia.DriverApp.Application.Reports.ReportOutcome;
+using Norvia.DriverApp.Application.Reports.ReportStop;
 using Norvia.DriverApp.Application.Reports.StartTrip;
 using Norvia.DriverApp.Application.Trips.Receive;
 using Norvia.DriverApp.Infrastructure;
@@ -43,6 +46,7 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
         "Authentication:Schemes:Bearer must name the issuer and audience to trust, and an Authority or signing keys.")
     .ValidateOnStart();
 builder.Services.AddAuthorization();
+builder.Services.AddDriverActionPolicy();
 
 builder.Services.AddOptions<DriverEndpointOptions>().BindConfiguration(DriverEndpointOptions.SectionName)
     .ValidateDataAnnotations()
@@ -50,6 +54,8 @@ builder.Services.AddOptions<DriverEndpointOptions>().BindConfiguration(DriverEnd
 builder.Services.AddScoped<IPipelineBehavior<ReceiveTripVersionCommand, Result<TripVersionOutcome>>, TrackTripVersionInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<StartTripCommand, Result<StartTripResult>>, TrackStartTripInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<EndTripCommand, Result<EndTripResult>>, TrackEndTripInLoggingScope>();
+builder.Services.AddScoped<IPipelineBehavior<ReportStopCommand, Result<ReportStopResult>>, TrackReportStopInLoggingScope>();
+builder.Services.AddScoped<IPipelineBehavior<DeliverCommand, Result<DeliverResult>>, TrackDeliverInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<ReportOutcomeCommand, Result<ReportOutcomeResult>>, TrackReportOutcomeInLoggingScope>();
 builder.Services.AddMediator(options =>
 {
@@ -92,6 +98,7 @@ app.MapOpenApi().WithDocumentPerVersion();
 app.MapDefaultEndpoints();
 app.MapTrips();
 app.MapReportOutcomes();
+app.MapDriverActions();
 app.MapSettings();
 
 await app.RunAsync();

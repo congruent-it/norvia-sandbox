@@ -12,7 +12,8 @@ namespace Norvia.Simulator.Application.Runs.Execute;
 /// <summary>
 /// Sends each planned booking as its Shipper's Persona, as fast as the concurrency cap allows (Burst) or spread over the
 /// window (Paced), and logs how Norvia answered each. Real paths stamp real time: nothing is backdated. Once the bookings are in,
-/// the simulated Planner assigns the Transport Orders Norvia accepted.
+/// the simulated Planner assigns the Transport Orders Norvia accepted, the Carriers answer, track and deliver what went to them, and the Planner
+/// builds and dispatches Trips for what stayed with the Own fleet, which the Drivers work for the Trips of today.
 /// </summary>
 public sealed class ExecuteRunHandler(
     IRepository<SimulationRun> runs,
@@ -22,7 +23,9 @@ public sealed class ExecuteRunHandler(
     IWorldSource world,
     SimulationLimits limits,
     TimeProvider time,
-    CarrierPacing pacing)
+    CarrierPacing pacing,
+    IDriverApp driverApp,
+    DriverPacing driverPacing)
     : ICommandHandler<ExecuteRunCommand, Result>
 {
     // The run's first line, "Run started", is sequence 1.
@@ -42,6 +45,8 @@ public sealed class ExecuteRunHandler(
         var accepted = new ConcurrentBag<AcceptedOrder>();
         var stopped = await SendAllAsync(run, writer, accepted, command.StopSending, cancellationToken);
         var carrier = CarrierResult.None;
+        var trips = TripResult.None;
+        var drivers = DriverResult.None;
         if (!stopped)
         {
             var planned = await new PlannerStage(tmsApi, time).RunAsync(run, [.. accepted], world.Load(), writer, command.StopSending, cancellationToken);
@@ -50,6 +55,18 @@ public sealed class ExecuteRunHandler(
             {
                 carrier = await new CarrierStage(partnerApi, tmsApi, time, pacing).RunAsync(run, planned.CarrierShipments, writer, command.StopSending, cancellationToken);
                 stopped = carrier.Stopped;
+            }
+
+            if (!stopped)
+            {
+                trips = await new TripStage(tmsApi, time).RunAsync(run, planned.OwnFleet, world.Load(), writer, command.StopSending, cancellationToken);
+                stopped = trips.Stopped;
+            }
+
+            if (!stopped)
+            {
+                drivers = await new DriverStage(driverApp, time, driverPacing).RunAsync(run, trips.Running, writer, command.StopSending, cancellationToken);
+                stopped = drivers.Stopped;
             }
         }
 
@@ -61,7 +78,7 @@ public sealed class ExecuteRunHandler(
 
         run.Complete(time.GetUtcNow());
         await runs.UpdateAsync(run, cancellationToken);
-        await writer.NoteAsync(time.GetUtcNow(), Finished(run, carrier), cancellationToken);
+        await writer.NoteAsync(time.GetUtcNow(), Finished(run, carrier, trips, drivers), cancellationToken);
         return Result.Success();
     }
 
@@ -98,11 +115,12 @@ public sealed class ExecuteRunHandler(
         return stopSending.IsCancellationRequested;
     }
 
-    private static string Finished(SimulationRun run, CarrierResult carrier)
+    private static string Finished(SimulationRun run, CarrierResult carrier, TripResult trips, DriverResult drivers)
     {
         var sent = $"Run {run.Number} finished: {run.Plan.Bookings.Count} bookings sent";
         var planned = run.Plan.Choices.Count == 0 ? sent : $"{sent}, {run.Plan.Choices.Count} Transport Orders for the Planner";
-        return carrier.Released == 0 ? planned : $"{planned}, {carrier.Released} released, {carrier.Confirmed} confirmed, {carrier.Delivered} reported delivered";
+        var carried = carrier.Released == 0 ? planned : $"{planned}, {carrier.Released} released, {carrier.Confirmed} confirmed, {carrier.Delivered} reported delivered";
+        return trips.Dispatched == 0 ? carried : $"{carried}, {trips.Dispatched} Trips dispatched, {drivers.Started} started and {drivers.Completed} completed by their Drivers";
     }
 
     private async Task SendAsync(

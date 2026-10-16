@@ -11,4 +11,5 @@ public sealed record LogLine(
     string? ShipperReference,
     string? TransportOrderNumber,
     string? ShipmentNumber,
-    string? Detail);
+    string? Detail,
+    string? TripNumber = null);

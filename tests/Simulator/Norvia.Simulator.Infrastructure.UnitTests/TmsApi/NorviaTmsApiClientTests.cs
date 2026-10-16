@@ -117,6 +117,81 @@ public sealed class NorviaTmsApiClientTests : IDisposable
         _tms.Request.Should().BeNull();
     }
 
+    private static Domain.Trips.TripDraft Draft() => new(
+        new DateOnly(2026, 10, 19),
+        new Domain.Worlds.SimulatedVehicle("VEH-0001", "VN-101-A", Domain.Worlds.VehicleKind.Van, 1200, 4),
+        new Domain.Worlds.SimulatedDriver("DRV-0006", "Sanne Jansen", [Domain.Worlds.LicenceCategory.B]),
+        new TimeOnly(7, 30), TimeSpan.FromMinutes(165),
+        [new Domain.Trips.TripShipment("SH-0000001", new FleetLoad(400, 1), new DateTime(2026, 10, 19, 8, 0, 0)), new Domain.Trips.TripShipment("SH-0000002", new FleetLoad(300, 1), new DateTime(2026, 10, 19, 9, 0, 0))]);
+
+    [Fact]
+    public async Task CreateTrip_PostsTheDraftAsThePlanner_WithItsVehicleDriverStartAndShipments_UnderItsKey()
+    {
+        _tms.Answer(HttpStatusCode.Created, """{"number":"TR-0000012","warnings":[]}""");
+
+        var answer = await _client.CreateTripAsync(Draft(), "SIM-3-20745-1-trip", CancellationToken.None);
+
+        _tms.Request!.Method.Should().Be(HttpMethod.Post);
+        _tms.Request.RequestUri.Should().Be(new Uri("https://tms.example/v1/trips"));
+        _tms.Request.Headers.Authorization!.Parameter.Should().Be("planner-token");
+        _tms.Request.Headers.GetValues("Idempotency-Key").Should().Equal("SIM-3-20745-1-trip");
+        var sent = JsonNode.Parse(_tms.RequestBody!)!;
+        sent["day"]!.GetValue<string>().Should().Be("2026-10-19");
+        sent["vehicleId"]!.GetValue<string>().Should().Be("VEH-0001");
+        sent["driverId"]!.GetValue<string>().Should().Be("DRV-0006");
+        sent["plannedStart"]!.GetValue<string>().Should().Be("07:30:00");
+        sent["plannedDrivingDuration"]!.GetValue<string>().Should().Be("02:45:00");
+        sent["shipmentNumbers"]!.AsArray().Select(node => node!.GetValue<string>()).Should().Equal("SH-0000001", "SH-0000002");
+        answer.Should().Be(new Application.Ports.PlannerAnswer(LogOutcome.TripBuilt, null, null, null, TripNumber: "TR-0000012"));
+    }
+
+    [Fact]
+    public async Task CreateTrip_IsSentInASpanNamedLikeTheTmsUis_AndLoggedWithTheTripAndTheTripFlow()
+    {
+        _tms.Answer(HttpStatusCode.Created, """{"number":"TR-0000012"}""");
+
+        await _client.CreateTripAsync(Draft(), "key", CancellationToken.None);
+
+        _spans.Should().ContainSingle().Which.OperationName.Should().Be("Create Trip");
+        var scope = _logger.Collector.GetSnapshot().Single(record => record.Message.Contains("answered")).Scopes.Single() as IEnumerable<KeyValuePair<string, object?>>;
+        scope!.ToDictionary().Should().BeEquivalentTo(new Dictionary<string, object?> { ["flow"] = "trip-dispatch", ["outcome"] = "Succeeded", ["tripNumber"] = "TR-0000012" });
+    }
+
+    [Fact]
+    public async Task CreateTrip_ARefusal_IsAnOutcomeNotAnError()
+    {
+        _tms.Answer(HttpStatusCode.Conflict, """{"code":"OutsideShift","detail":"x"}""");
+
+        var answer = await _client.CreateTripAsync(Draft(), "key", CancellationToken.None);
+
+        answer.Outcome.Should().Be(LogOutcome.PlanningRefused);
+        answer.Detail.Should().Be("OutsideShift (409)");
+    }
+
+    [Fact]
+    public async Task DispatchTrip_PostsToTheTripsDispatch_AndGivesTheTrailOfTheDispatch()
+    {
+        _tms.Answer(HttpStatusCode.OK, """{"number":"TR-0000012","version":1,"correlationId":"disp-1"}""");
+
+        var answer = await _client.DispatchTripAsync("TR-0000012", CancellationToken.None);
+
+        _tms.Request!.Method.Should().Be(HttpMethod.Post);
+        _tms.Request.RequestUri.Should().Be(new Uri("https://tms.example/v1/trips/TR-0000012/dispatch"));
+        _tms.Request.Headers.Contains("Idempotency-Key").Should().BeFalse("a Dispatch is not retried by the TMS UI either");
+        answer.Should().Be(new Application.Ports.PlannerAnswer(LogOutcome.TripDispatched, "disp-1", null, null, TripNumber: "TR-0000012"));
+        _spans.Should().ContainSingle().Which.OperationName.Should().Be("Dispatch Trip");
+    }
+
+    [Fact]
+    public async Task DispatchTrip_TheTmsUnreachable_IsNotReceived()
+    {
+        _tms.Fail(new HttpRequestException("down"));
+
+        var answer = await _client.DispatchTripAsync("TR-0000012", CancellationToken.None);
+
+        answer.Outcome.Should().Be(LogOutcome.PlanningNotReceived);
+    }
+
     [Fact]
     public async Task Assign_IsSentInASpanNamedLikeTheTmsUis()
     {
@@ -192,7 +267,7 @@ public sealed class NorviaTmsApiClientTests : IDisposable
         _tms.Request!.Method.Should().Be(HttpMethod.Get);
         _tms.Request.RequestUri.Should().Be(new Uri("https://tms.example/v1/capacity/days"));
         _tms.Request.Headers.Authorization!.Parameter.Should().Be("planner-token");
-        days.Should().ContainSingle().Which.Should().Be(new FleetDay(new DateOnly(2026, 10, 14), 5000, 12, 0, 0));
+        days.Should().ContainSingle().Which.Should().BeEquivalentTo(new FleetDay(new DateOnly(2026, 10, 14), 5000, 12, 0, 0));
     }
 
     [Fact]

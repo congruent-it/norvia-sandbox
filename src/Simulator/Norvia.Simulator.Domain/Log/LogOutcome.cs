@@ -59,4 +59,22 @@ public enum LogOutcome
 
     /// <summary>A Carrier's call didn't reach Norvia, or its answer couldn't be read.</summary>
     CarrierNotReceived,
+
+    /// <summary>The Planner created a Draft Trip.</summary>
+    TripBuilt,
+
+    /// <summary>The Planner dispatched a Trip to its Driver.</summary>
+    TripDispatched,
+
+    /// <summary>The Driver app took a Driver's report; the TMS records it later and the Driver app tells the Driver what became of it.</summary>
+    DriverReported,
+
+    /// <summary>The Driver app refused a Driver's report, with a code that says which rule it broke.</summary>
+    DriverRefused,
+
+    /// <summary>A Driver's call didn't reach the Driver app, or its answer couldn't be read.</summary>
+    DriverNotReceived,
+
+    /// <summary>The TMS recorded the Driver's End Trip: the Trip is Completed.</summary>
+    TripCompleted,
 }

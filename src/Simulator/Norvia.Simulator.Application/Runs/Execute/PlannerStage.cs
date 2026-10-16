@@ -23,7 +23,7 @@ internal sealed class PlannerStage(ITmsApi tms, TimeProvider time)
         var orders = accepted.Where(order => choices.ContainsKey(order.Booking.Step)).OrderBy(order => order.Booking.Step).ToList();
         if (orders.Count == 0)
         {
-            return new PlannerResult(false, []);
+            return new PlannerResult(false, [], []);
         }
 
         var carriers = world.ActiveCarriers;
@@ -35,24 +35,31 @@ internal sealed class PlannerStage(ITmsApi tms, TimeProvider time)
 
         var ledger = new FleetLedger(days ?? []);
         var onCarriers = new List<PlannedShipment>();
+        var onOwnFleet = new List<OwnFleetShipment>();
         foreach (var order in orders)
         {
             if (stopSending.IsCancellationRequested)
             {
-                return new PlannerResult(true, onCarriers);
+                return new PlannerResult(true, onCarriers, onOwnFleet);
             }
 
-            if (await PlanAsync(run, order, choices[order.Booking.Step], carriers, ledger, writer, cancellationToken) is { } shipment)
+            var placed = await PlanAsync(run, order, choices[order.Booking.Step], carriers, ledger, writer, cancellationToken);
+            if (placed.Carrier is not null)
             {
-                onCarriers.Add(shipment);
+                onCarriers.Add(placed.Carrier);
+            }
+
+            if (placed.OwnFleet is not null)
+            {
+                onOwnFleet.Add(placed.OwnFleet);
             }
         }
 
-        return new PlannerResult(false, onCarriers);
+        return new PlannerResult(false, onCarriers, onOwnFleet);
     }
 
-    // The Shipment the order ended up as, when a Carrier carries it.
-    private async Task<PlannedShipment?> PlanAsync(
+    // The Shipment the order ended up as, and who carries it.
+    private async Task<Placement> PlanAsync(
         SimulationRun run, AcceptedOrder order, PlannerChoice choice, IReadOnlyList<SimulatedCarrier> carriers, FleetLedger ledger, RunLogWriter writer,
         CancellationToken cancellationToken)
     {
@@ -70,12 +77,12 @@ internal sealed class PlannerStage(ITmsApi tms, TimeProvider time)
                 ledger.Release(day, booking.Load);
             }
 
-            return null;
+            return Placement.None;
         }
 
         if (!choice.Reassign)
         {
-            return OnCarrier(booking, order, assigned.ShipmentNumber, assignee, carriers);
+            return Placed(booking, order, assigned.ShipmentNumber, assignee, carriers);
         }
 
         var target = choice.ReassignTarget(assignee, carriers);
@@ -83,7 +90,7 @@ internal sealed class PlannerStage(ITmsApi tms, TimeProvider time)
         await writer.PlanningAsync(time.GetUtcNow(), PlannerActions.Reassign, booking, order.TransportOrderNumber, reassigned, $"To {target.Name}", cancellationToken);
         if (reassigned.Outcome != LogOutcome.Reassigned)
         {
-            return OnCarrier(booking, order, assigned.ShipmentNumber, assignee, carriers);
+            return Placed(booking, order, assigned.ShipmentNumber, assignee, carriers);
         }
 
         // The tally follows the order: off Own fleet gives its room back, onto it takes room (the TMS only warns when there is none).
@@ -96,12 +103,24 @@ internal sealed class PlannerStage(ITmsApi tms, TimeProvider time)
             ledger.TryReserve(day, booking.Load);
         }
 
-        return OnCarrier(booking, order, assigned.ShipmentNumber, target, carriers);
+        return Placed(booking, order, assigned.ShipmentNumber, target, carriers);
     }
 
-    private static PlannedShipment? OnCarrier(
-        PlannedBooking booking, AcceptedOrder order, string shipmentNumber, Assignee assignee, IReadOnlyList<SimulatedCarrier> carriers) =>
-        carriers.FirstOrDefault(carrier => carrier.Id == assignee.CarrierId) is { } carried
-            ? new PlannedShipment(booking, order.TransportOrderNumber, shipmentNumber, carried)
-            : null;
+    private Placement Placed(PlannedBooking booking, AcceptedOrder order, string shipmentNumber, Assignee assignee, IReadOnlyList<SimulatedCarrier> carriers)
+    {
+        if (assignee.IsOwnFleet)
+        {
+            return new Placement(null, new OwnFleetShipment(booking, order.TransportOrderNumber, shipmentNumber, booking.Slot.Resolve(time.GetUtcNow()).From));
+        }
+
+        return carriers.FirstOrDefault(carrier => carrier.Id == assignee.CarrierId) is { } carried
+            ? new Placement(new PlannedShipment(booking, order.TransportOrderNumber, shipmentNumber, carried), null)
+            : Placement.None;
+    }
+
+    // Where a planned order ended up: on a Carrier, on the Own fleet, or nowhere the Simulator follows.
+    private sealed record Placement(PlannedShipment? Carrier, OwnFleetShipment? OwnFleet)
+    {
+        public static Placement None { get; } = new(null, null);
+    }
 }

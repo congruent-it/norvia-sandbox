@@ -1,4 +1,5 @@
 using Norvia.Simulator.Domain.Carriers;
+using Norvia.Simulator.Domain.Drivers;
 using Norvia.Simulator.Domain.Planner;
 using Norvia.Simulator.Domain.Plans;
 using Norvia.Simulator.Domain.Runs;
@@ -12,7 +13,8 @@ public sealed record PlanPreview(
     IReadOnlyList<ShipperShare> PerShipper,
     IReadOnlyList<PlanRow> Rows,
     PlannerPreview Planner,
-    CarrierPreview Carriers)
+    CarrierPreview Carriers,
+    DriverPreview Drivers)
 {
     public int BadBookings => Rows.Count(row => row.Bad is not null);
 
@@ -39,6 +41,12 @@ public sealed record PlanPreview(
                 plan.Choices.Count(choice => choice.Reassign)),
             new CarrierPreview(
                 plan.Settings.Carriers,
-                CarrierFunnel.Count(CarrierFunnel.Plan(plan.Settings.Carriers, plan.Settings.Seed, plan.Choices.Count(choice => choice.Intent == PlannerIntent.Carrier)))));
+                CarrierFunnel.Count(CarrierFunnel.Plan(plan.Settings.Carriers, plan.Settings.Seed, plan.Choices.Count(choice => choice.Intent == PlannerIntent.Carrier)))),
+            new DriverPreview(
+                plan.Settings.Drivers,
+                DriverFunnel.Count(DriverFunnel.Plan(
+                    plan.Settings.Drivers, plan.Settings.Seed,
+                    plan.Bookings.Count(booking => booking.Slot.DayOffset == 0 && choices.GetValueOrDefault(booking.Step)?.Intent == PlannerIntent.OwnFleetIfItFits)
+                        * plan.Settings.TripPercent / 100))));
     }
 }

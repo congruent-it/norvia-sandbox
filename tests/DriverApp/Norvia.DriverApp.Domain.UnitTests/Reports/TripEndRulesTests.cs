@@ -70,6 +70,27 @@ public sealed class TripEndRulesTests
         TripEndRules.Decide(_details, _rows).Should().Be(new TripEndDecision.Accept());
     }
 
+    [Theory]
+    [InlineData(ReportState.Sending)]
+    [InlineData(ReportState.Recorded)]
+    public void AShipmentWhoseCollectionFailed_NeedsNoOutcomeAtItsDeliveryStop_ForTheTripToBeEnded(ReportState failed)
+    {
+        // The TMS leaves the delivery Stop of a failed collection out of the Stops that wait for an outcome: the Driver never had the goods.
+        Row(ReportKind.StartTrip);
+        Row(ReportKind.CollectionFailed, failed, StopKind.Collection, "SH-0000001");
+
+        TripEndRules.Decide(_details, _rows).Should().Be(new TripEndDecision.Accept());
+    }
+
+    [Fact]
+    public void AShipmentWhoseCollectionFailureWasRefused_StillNeedsItsStops()
+    {
+        Row(ReportKind.StartTrip);
+        Row(ReportKind.CollectionFailed, ReportState.Refused, StopKind.Collection, "SH-0000001");
+
+        TripEndRules.Decide(_details, _rows).Should().Be(new TripEndDecision.StopsOpen());
+    }
+
     [Fact]
     public void ATripWhoseShipmentsWereAllTakenOff_CanBeEndedOnceStarted()
     {
