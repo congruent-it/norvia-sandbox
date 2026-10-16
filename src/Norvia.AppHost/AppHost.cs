@@ -102,10 +102,28 @@ var integrationConsole = builder.AddProject<Projects.Norvia_IntegrationConsole_W
     .WithHttpHealthCheck("/health")
     .WithUrlForEndpoint("http", url => url.DisplayText = "Integration console");
 
+// The Simulator feeds the estate with representative orders, and only through its real doors (ADR 0001): the Partner API, as
+// each Shipper's and Carrier's Persona, the TMS API, as the Planner, and the Driver app API, as each Driver. It has a database of
+// its own for its runs and logs, and its migrations are a deployment step too. Locally it is on and signs everything itself; in
+// Azure the estate switches it on, Easy Auth signs the presenter in and Entra issues every token (ADR 0042).
+var simulatorDatabase = sql.AddDatabase("simulator");
+var simulatorMigrations = builder.AddProject<Projects.Norvia_Simulator_Migrations>("simulator-migrations")
+    .WithReference(simulatorDatabase).WaitFor(simulatorDatabase)
+    .PublishAsAzureContainerAppJob();
+var simulator = builder.AddProject<Projects.Norvia_Simulator_Web>("simulator-web")
+    .WithReference(simulatorDatabase).WaitForCompletion(simulatorMigrations)
+    .WithReference(tmsApi).WaitFor(tmsApi)
+    .WaitFor(driverAppApi)
+    .WithHttpHealthCheck("/health")
+    .WithUrlForEndpoint("http", url => url.DisplayText = "Simulator")
+    .WithEnvironment("IntegrationConsole__Address", integrationConsole.GetEndpoint("http"))
+    .WithEnvironment("TmsApi__BaseAddress", tmsApi.GetEndpoint("http"))
+    .WithEnvironment("DriverApp__BaseAddress", driverAppApi.GetEndpoint("http"));
+
 // Locally the TMS and the Partner portal read the repo's seed file; in Azure the copy each image carries, next to the
 // app (the image's working directory).
 var seedPath = builder.ExecutionContext.IsPublishMode ? Path.Combine("seed", "norvia.seed.json") : seedFile;
-foreach (var readerOfTheSeedFile in new[] { tmsApi, tmsWeb, partnerPortal, driverAppApi, driverAppWeb })
+foreach (var readerOfTheSeedFile in new[] { tmsApi, tmsWeb, partnerPortal, driverAppApi, driverAppWeb, simulator })
 {
     readerOfTheSeedFile.WithEnvironment("Seed__Path", seedPath);
 }
@@ -124,7 +142,7 @@ if (builder.ExecutionContext.IsPublishMode)
     messaging.PublishAsExisting(estate.ServiceBusNamespace, null);
 
     var insights = builder.AddAzureApplicationInsights("insights").PublishAsExisting(estate.ApplicationInsights, null);
-    foreach (var project in new[] { tmsMigrations, tmsApi, tmsWeb, partnerPortalMigrations, partnerPortal, driverAppMigrations, driverAppApi, driverAppWeb, integrationConsole })
+    foreach (var project in new[] { tmsMigrations, tmsApi, tmsWeb, partnerPortalMigrations, partnerPortal, driverAppMigrations, driverAppApi, driverAppWeb, integrationConsole, simulatorMigrations, simulator })
     {
         project.WithReference(insights);
     }
@@ -229,6 +247,35 @@ if (builder.ExecutionContext.IsPublishMode)
     foreach (var shipper in personas.Where(persona => persona.IsShipper))
     {
         partnerPortal.WithEnvironment($"ShipperEndpoint__ApiKeys__{shipper.PartyId}", partnerPortalSecrets.Resource.GetSecret($"shipper-endpoint-key-{shipper.PartyId}"));
+    }
+
+    // The Simulator opens to the presenter's browser. Easy Auth signs them in to the Simulator's own app registration, whose app roles
+    // the Simulator checks (ADR 0042, as ADR 0026 for the Integration console). It then reaches the estate as its own identity: the
+    // Planner's token is the identity's, the Personas' and the Drivers' tokens are theirs, which trust it without a secret (ADR 0005),
+    // and the Personas' subscription keys come from the estate's Key Vault. The estate switches it on and sets its caps.
+    var simulatorIdentity = builder.AddAzureUserAssignedIdentity("simulator-identity")
+        .PublishAsExisting(estate.SimulatorIdentity, null);
+    simulator.WithExternalHttpEndpoints()
+        .WithAzureUserAssignedIdentity(simulatorIdentity)
+        .WithEnvironment("Simulator__Enabled", estate.SimulatorEnabled)
+        .WithEnvironment("Simulator__MaxOrdersPerRun", estate.SimulatorMaxOrdersPerRun)
+        .WithEnvironment("Simulator__MaxConcurrentRequests", estate.SimulatorMaxConcurrentRequests)
+        .WithEnvironment("PartnerApi__BaseAddress", estate.PartnerApiUrl)
+        .WithEnvironment("PartnerApi__PersonaClientIds", estate.PersonaClientIds)
+        .WithEnvironment("PartnerApi__Entra__TenantId", estate.EntraTenantId)
+        .WithEnvironment("PartnerApi__Entra__Scope", ReferenceExpression.Create($"{estate.PartnerApiClientId}/.default"))
+        .WithEnvironment("PartnerApi__Entra__ManagedIdentityClientId", estate.SimulatorClientId)
+        .WithEnvironment("TmsApi__Entra__Scope", ReferenceExpression.Create($"{estate.TmsApiClientId}/.default"))
+        .WithEnvironment("TmsApi__Entra__ManagedIdentityClientId", estate.SimulatorClientId)
+        .WithEnvironment("DriverApp__Entra__TenantId", estate.EntraTenantId)
+        .WithEnvironment("DriverApp__Entra__Scope", ReferenceExpression.Create($"{estate.DriverAppApiClientId}/.default"))
+        .WithEnvironment("DriverApp__Entra__ManagedIdentityClientId", estate.SimulatorClientId)
+        .WithEnvironment("DriverApp__Entra__DriverClientIds", estate.DriverClientIds)
+        .PublishAsAzureContainerApp((infrastructure, app) =>
+            infrastructure.Add(EntraSignIn.For(infrastructure, app, estate.SimulatorRegistrationClientId, estate.EntraIssuer)));
+    foreach (var persona in personas)
+    {
+        simulator.WithEnvironment($"PartnerApi__SubscriptionKeys__{persona.Id}", partnerPortalSecrets.Resource.GetSecret($"subscription-key-{persona.Id}"));
     }
 }
 else
@@ -461,23 +508,12 @@ else
         partnerPortal.WithEnvironment($"ShipperEndpoint__ApiKeys__{persona.PartyId}", shipperApiKey);
     }
 
-    // The Simulator feeds the estate with representative orders, and only through its real doors (ADR 0001): the Partner API, as
-    // each Shipper's and Carrier's Persona, the TMS API, as the Planner, and the Driver app API, as each Driver. It has a database of its own for its runs and logs, and is on for a local run. Azure comes with its own slice.
-    var simulatorDatabase = sql.AddDatabase("simulator");
-    var simulatorMigrations = builder.AddProject<Projects.Norvia_Simulator_Migrations>("simulator-migrations")
-        .WithReference(simulatorDatabase).WaitFor(simulatorDatabase);
-    var simulator = builder.AddProject<Projects.Norvia_Simulator_Web>("simulator-web")
-        .WithReference(simulatorDatabase).WaitForCompletion(simulatorMigrations)
-        .WaitFor(partnerApi)
-        .WithReference(tmsApi).WaitFor(tmsApi)
-        .WaitFor(driverAppApi)
-        .WithHttpHealthCheck("/health")
-        .WithUrlForEndpoint("http", url => url.DisplayText = "Simulator")
-        .WithEnvironment("Seed__Path", seedFile)
+    // Locally the Simulator is on, signs the developer in as an operator holding both app roles, and signs every token it sends itself,
+    // with the key the local stand-ins trust (ADR 0042). It waits for the stand-in that plays API Management.
+    simulator.WaitFor(partnerApi)
         .WithEnvironment("Simulator__Enabled", "true")
         .WithEnvironment("Simulator__MaxOrdersPerRun", "500")
         .WithEnvironment("Simulator__MaxConcurrentRequests", "4")
-        .WithEnvironment("IntegrationConsole__Address", integrationConsole.GetEndpoint("http"))
         .WithEnvironment("LocalOperator__Name", $"{Environment.UserName} (local)")
         .WithEnvironment("LocalOperator__Roles__0", "Simulator.Run")
         .WithEnvironment("LocalOperator__Roles__1", "Simulator.Read")
@@ -487,12 +523,10 @@ else
         .WithEnvironment("PartnerApi__LocalTokens__Issuer", LocalTokens.Issuer)
         .WithEnvironment("PartnerApi__LocalTokens__Audience", LocalTokens.PartnerApiAudience)
         // The Planner signs its own token for the TMS API, as the TMS UI does: its client ID and the manage role.
-        .WithEnvironment("TmsApi__BaseAddress", tmsApi.GetEndpoint("http"))
         .WithEnvironment("TmsApi__LocalTokens__Issuer", LocalTokens.Issuer)
         .WithEnvironment("TmsApi__LocalTokens__Audience", LocalTokens.TmsAudience)
         .WithEnvironment("TmsApi__LocalTokens__ClientId", LocalTokens.SimulatorClientId)
         // Each Driver works their Trips through the Driver app API with a token of their own, signed locally with the Driver ID as the one app role.
-        .WithEnvironment("DriverApp__BaseAddress", driverAppApi.GetEndpoint("http"))
         .WithEnvironment("DriverApp__LocalTokens__Issuer", LocalTokens.Issuer)
         .WithEnvironment("DriverApp__LocalTokens__Audience", LocalTokens.DriverAppAudience)
         .WithEnvironment("DriverApp__LocalTokens__ClientId", LocalTokens.SimulatorClientId);

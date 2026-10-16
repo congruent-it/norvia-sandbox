@@ -27,3 +27,11 @@ param integrationConsoleRedirectUris = readEnvironmentVariable('ESTATE_INTEGRATI
 
 // The postdeploy hook stores the Driver app's sign-in callback once Aspire has deployed it.
 param driverAppRedirectUris = readEnvironmentVariable('ESTATE_DRIVER_APP_REDIRECT_URIS', '')
+
+// The postdeploy hook stores the Simulator's sign-in callback once Aspire has deployed it.
+param simulatorRedirectUris = readEnvironmentVariable('ESTATE_SIMULATOR_REDIRECT_URIS', '')
+
+// The Simulator is on in a deployed estate unless the environment says otherwise, with caps lower than its own.
+param simulatorEnabled = toLower(readEnvironmentVariable('ESTATE_SIMULATOR_ENABLED_SETTING', 'true')) == 'true'
+param simulatorMaxOrdersPerRun = int(readEnvironmentVariable('ESTATE_SIMULATOR_MAX_ORDERS_PER_RUN_SETTING', '200'))
+param simulatorMaxConcurrentRequests = int(readEnvironmentVariable('ESTATE_SIMULATOR_MAX_CONCURRENT_REQUESTS_SETTING', '4'))

@@ -17,6 +17,9 @@ param integrationConsoleRedirectUris string
 @description('Easy Auth\'s sign-in callback on the Driver app, empty before the Driver app is first deployed.')
 param driverAppRedirectUris string
 
+@description('Easy Auth\'s sign-in callback on the Simulator, empty before the Simulator is first deployed.')
+param simulatorRedirectUris string = ''
+
 var intakeRole = 'TransportOrders.Intake'
 var intakeRoleId = guid('norvia-tms-api', environmentName, intakeRole)
 var manageRole = 'TransportOrders.Manage'
@@ -61,6 +64,10 @@ var consoleReadRole = 'IntegrationConsole.Read'
 var consoleReadRoleId = guid('norvia-integration-console', environmentName, consoleReadRole)
 var consoleResubmitRole = 'IntegrationConsole.Resubmit'
 var consoleResubmitRoleId = guid('norvia-integration-console', environmentName, consoleResubmitRole)
+var simulatorRunRole = 'Simulator.Run'
+var simulatorRunRoleId = guid('norvia-simulator', environmentName, simulatorRunRole)
+var simulatorReadRole = 'Simulator.Read'
+var simulatorReadRoleId = guid('norvia-simulator', environmentName, simulatorReadRole)
 
 // Every active Driver the seed file names is one app role of the Driver app's registration, with the Driver ID as its value.
 var drivers = filter(loadJsonContent('../../seed/norvia.seed.json').drivers, driver => driver.active)
@@ -315,6 +322,21 @@ resource driverReportsRecordProofRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1
   principalId: driverReportsIdentity.properties.principalId
 }
 
+// One role per active Driver, with the Driver ID as its value, as on the Driver app's registration (ADR 0037). A client app holding one of
+// them acts as that Driver through the Driver app API (ADR 0042): the Simulator's Drivers.
+var driverActAsRoles = [
+  for driver in drivers: {
+    id: guid('norvia-driver-app-api', environmentName, driver.id)
+    value: driver.id
+    displayName: 'Act as ${driver.name}'
+    description: 'Call the Driver app API as Driver ${driver.id}, ${driver.name}. Only that Driver\'s client app for the Simulator holds it.'
+    allowedMemberTypes: [
+      'Application'
+    ]
+    isEnabled: true
+  }
+]
+
 // The Driver app API's registration, which is the audience of the Driver reports Logic App's token for the Driver app's outcome endpoint
 // (ADR 0005). Entra issues one only to a principal granted the role.
 resource driverAppApi 'Microsoft.Graph/applications@v1.0' = {
@@ -327,18 +349,21 @@ resource driverAppApi 'Microsoft.Graph/applications@v1.0' = {
   api: {
     requestedAccessTokenVersion: 2
   }
-  appRoles: [
-    {
-      id: driverReportOutcomeRoleId
-      value: driverReportOutcomeRole
-      displayName: 'Report the outcome of a Driver report'
-      description: 'Tell the Driver app whether the TMS recorded a report of a Driver, refused it, or was never reached (P12). Only the P12 Driver reports Logic App holds it.'
-      allowedMemberTypes: [
-        'Application'
-      ]
-      isEnabled: true
-    }
-  ]
+  appRoles: concat(
+    [
+      {
+        id: driverReportOutcomeRoleId
+        value: driverReportOutcomeRole
+        displayName: 'Report the outcome of a Driver report'
+        description: 'Tell the Driver app whether the TMS recorded a report of a Driver, refused it, or was never reached (P12). Only the P12 Driver reports Logic App holds it.'
+        allowedMemberTypes: [
+          'Application'
+        ]
+        isEnabled: true
+      }
+    ],
+    driverActAsRoles
+  )
 }
 
 resource driverAppApiPrincipal 'Microsoft.Graph/servicePrincipals@v1.0' = {
@@ -783,32 +808,146 @@ resource integrationConsoleIdentity 'Microsoft.ManagedIdentity/userAssignedIdent
   tags: tags
 }
 
+// The Simulator's identity, which it runs as (ADR 0042). It holds the TMS API's manage role, as the TMS UI does, for the Planner's
+// actions, and every Persona's and Driver's client app below trusts it. Aspire deploys the Simulator; the estate owns the identity
+// because the estate grants it what it may do.
+resource simulatorIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
+  name: 'id-simulator-${uniqueString(resourceGroup().id)}'
+  location: location
+  tags: tags
+}
+
+resource simulatorManageRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: tmsApiPrincipal.id
+  appRoleId: manageRoleId
+  principalId: simulatorIdentity.properties.principalId
+}
+
+// The Simulator plays the Personas as the Partner portal does: each Persona's client app trusts its identity, without a client secret.
+resource personaTrustsTheSimulator 'Microsoft.Graph/applications/federatedIdentityCredentials@v1.0' = [
+  for (persona, i) in personas: {
+    name: '${personaApps[i].uniqueName}/simulator'
+    issuer: '${environment().authentication.loginEndpoint}${tenant().tenantId}/v2.0'
+    subject: simulatorIdentity.properties.principalId
+    audiences: [
+      'api://AzureADTokenExchange'
+    ]
+  }
+]
+
+// Each Driver the Simulator plays is a client app of its own, holding the Driver ID as its one app role on the Driver app API, so the
+// Driver app takes the Driver ID from the token as it does from a Driver's own sign-in (ADR 0037). No client secrets: the Simulator's
+// identity is what each one trusts.
+resource driverClientApps 'Microsoft.Graph/applications@v1.0' = [
+  for driver in drivers: {
+    uniqueName: 'norvia-driver-client-${toLower(driver.id)}-${environmentName}'
+    displayName: 'Norvia Driver ${driver.id} for the Simulator (${environmentName})'
+    signInAudience: 'AzureADMyOrg'
+  }
+]
+
+resource driverClientPrincipals 'Microsoft.Graph/servicePrincipals@v1.0' = [
+  for (driver, i) in drivers: {
+    appId: driverClientApps[i].appId
+  }
+]
+
+resource driverClientTrustsTheSimulator 'Microsoft.Graph/applications/federatedIdentityCredentials@v1.0' = [
+  for (driver, i) in drivers: {
+    name: '${driverClientApps[i].uniqueName}/simulator'
+    issuer: '${environment().authentication.loginEndpoint}${tenant().tenantId}/v2.0'
+    subject: simulatorIdentity.properties.principalId
+    audiences: [
+      'api://AzureADTokenExchange'
+    ]
+  }
+]
+
+resource driverClientRoleGrants 'Microsoft.Graph/appRoleAssignedTo@v1.0' = [
+  for (driver, i) in drivers: {
+    resourceId: driverAppApiPrincipal.id
+    appRoleId: guid('norvia-driver-app-api', environmentName, driver.id)
+    principalId: driverClientPrincipals[i].id
+  }
+]
+
+// What Easy Auth signs Simulator operators in to in front of the Simulator (ADR 0042, as ADR 0026 does for the Integration console).
+// The Simulator reads the operator's app roles and decides for itself what they may do.
+resource simulator 'Microsoft.Graph/applications@v1.0' = {
+  uniqueName: 'norvia-simulator-${environmentName}'
+  displayName: 'Norvia Simulator (${environmentName})'
+  signInAudience: 'AzureADMyOrg'
+  web: {
+    // The postdeploy hook adds it once Aspire has deployed the Simulator.
+    redirectUris: filter(split(simulatorRedirectUris, ','), uri => !empty(uri))
+    implicitGrantSettings: {
+      // Without a client secret Easy Auth asks for an ID token only, which carries the operator's app roles.
+      enableIdTokenIssuance: true
+    }
+  }
+  appRoles: [
+    {
+      id: simulatorRunRoleId
+      value: simulatorRunRole
+      displayName: 'Run the Simulator'
+      description: 'Configure, preview and start Simulation runs, cancel them and clear the history. A run sends orders, shipments and trips into the estate.'
+      allowedMemberTypes: [
+        'User'
+      ]
+      isEnabled: true
+    }
+    {
+      id: simulatorReadRoleId
+      value: simulatorReadRole
+      displayName: 'Read in the Simulator'
+      description: 'See the Simulator\'s runs and their logs.'
+      allowedMemberTypes: [
+        'User'
+      ]
+      isEnabled: true
+    }
+  ]
+}
+
+resource simulatorPrincipal 'Microsoft.Graph/servicePrincipals@v1.0' = {
+  appId: simulator.appId
+  // Entra signs in only users holding one of the Simulator's roles, so someone without one is refused by Entra before they reach it.
+  appRoleAssignmentRequired: true
+}
+
+// The presenter plays the Simulator operator in demos, so holds both roles.
+resource simulatorRunRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = if (!empty(presenterPrincipalId)) {
+  resourceId: simulatorPrincipal.id
+  appRoleId: simulatorRunRoleId
+  principalId: presenterPrincipalId
+}
+
+resource simulatorReadRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = if (!empty(presenterPrincipalId)) {
+  resourceId: simulatorPrincipal.id
+  appRoleId: simulatorReadRoleId
+  principalId: presenterPrincipalId
+}
+
 output entraIssuer string = '${environment().authentication.loginEndpoint}${tenant().tenantId}/v2.0'
 output entraTenantId string = tenant().tenantId
 output tmsApiClientId string = tmsApi.appId
 output intakeClientId string = intakeIdentity.properties.clientId
 output intakeIdentityId string = intakeIdentity.id
 output intakeIdentityName string = intakeIdentity.name
-output answerIdentityId string = answerIdentity.id
 output answerIdentityName string = answerIdentity.name
 output answerClientId string = answerIdentity.properties.clientId
-output trackingIdentityId string = trackingIdentity.id
 output trackingIdentityName string = trackingIdentity.name
 output trackingPrincipalId string = trackingIdentity.properties.principalId
 output trackingClientId string = trackingIdentity.properties.clientId
-output proofOfDeliveryIdentityId string = proofOfDeliveryIdentity.id
 output proofOfDeliveryIdentityName string = proofOfDeliveryIdentity.name
 output proofOfDeliveryPrincipalId string = proofOfDeliveryIdentity.properties.principalId
 output proofOfDeliveryClientId string = proofOfDeliveryIdentity.properties.clientId
-output bookingIdentityId string = bookingIdentity.id
 output bookingIdentityName string = bookingIdentity.name
 output bookingPrincipalId string = bookingIdentity.properties.principalId
 output bookingClientId string = bookingIdentity.properties.clientId
-output shipperNotificationIdentityId string = shipperNotificationIdentity.id
 output shipperNotificationIdentityName string = shipperNotificationIdentity.name
 output shipperNotificationPrincipalId string = shipperNotificationIdentity.properties.principalId
 output shipperNotificationClientId string = shipperNotificationIdentity.properties.clientId
-output carrierCancellationIdentityId string = carrierCancellationIdentity.id
 output carrierCancellationIdentityName string = carrierCancellationIdentity.name
 output carrierCancellationPrincipalId string = carrierCancellationIdentity.properties.principalId
 output carrierCancellationClientId string = carrierCancellationIdentity.properties.clientId
@@ -841,15 +980,18 @@ output integrationConsoleClientId string = integrationConsole.appId
 output driverAppRegistrationClientId string = driverApp.appId
 output integrationConsoleIdentityName string = integrationConsoleIdentity.name
 output integrationConsolePrincipalId string = integrationConsoleIdentity.properties.principalId
-output tripDispatchIdentityId string = tripDispatchIdentity.id
 output tripDispatchIdentityName string = tripDispatchIdentity.name
 output tripDispatchPrincipalId string = tripDispatchIdentity.properties.principalId
 output tripDispatchClientId string = tripDispatchIdentity.properties.clientId
 output driverAppIdentityName string = driverAppIdentity.name
 output driverAppPrincipalId string = driverAppIdentity.properties.principalId
 output driverAppClientId string = driverAppIdentity.properties.clientId
-output driverReportsIdentityId string = driverReportsIdentity.id
 output driverReportsIdentityName string = driverReportsIdentity.name
 output driverReportsPrincipalId string = driverReportsIdentity.properties.principalId
 output driverReportsClientId string = driverReportsIdentity.properties.clientId
 output driverAppApiClientId string = driverAppApi.appId
+output simulatorIdentityName string = simulatorIdentity.name
+output simulatorClientId string = simulatorIdentity.properties.clientId
+output simulatorPrincipalId string = simulatorIdentity.properties.principalId
+output simulatorRegistrationClientId string = simulator.appId
+output driverClientIds array = [for (driver, i) in drivers: '${driver.id}=${driverClientApps[i].appId}']

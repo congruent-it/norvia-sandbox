@@ -33,11 +33,92 @@ public sealed class OperatorSignInTests
     }
 
     [Fact]
-    public void AddOperatorSignIn_WithoutALocalOperator_RefusesUntilTheAzureSliceAddsEasyAuth()
+    public async Task Authenticate_BehindEasyAuth_SignsInTheOperatorWithTheirAppRoles()
     {
-        var starting = () => SignIn(Environments.Development);
+        await using var services = SignIn(Environments.Production);
+        var context = Request(services, ClientPrincipal.Of("Iris Operator", OperatorRoles.Run, OperatorRoles.Read));
 
-        starting.Should().Throw<InvalidOperationException>().WithMessage("*LocalOperator*");
+        var result = await context.AuthenticateAsync();
+
+        result.Succeeded.Should().BeTrue();
+        result.Principal!.Identity!.Name.Should().Be("Iris Operator");
+        result.Principal.IsInRole(OperatorRoles.Run).Should().BeTrue();
+        result.Principal.IsInRole(OperatorRoles.Read).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Authenticate_BehindEasyAuth_WithoutAName_NamesTheOperatorByTheirUsername()
+    {
+        await using var services = SignIn(Environments.Production);
+        var context = Request(services, ClientPrincipal.Encode(new
+        {
+            auth_typ = EasyAuthHandler.EntraAuthenticationType,
+            claims = new[] { new { typ = "preferred_username", val = "iris@norvia.example" } },
+        }));
+
+        var result = await context.AuthenticateAsync();
+
+        result.Principal!.Identity!.Name.Should().Be("iris@norvia.example");
+    }
+
+    [Fact]
+    public async Task Authenticate_BehindEasyAuth_WithoutTheHeader_SignsNobodyIn()
+    {
+        await using var services = SignIn(Environments.Production);
+
+        var result = await Request(services).AuthenticateAsync();
+
+        result.None.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("not base64!")]
+    [InlineData("bm90IGpzb24=")]
+    public async Task Authenticate_BehindEasyAuth_WithAHeaderThatIsNoClientPrincipal_Fails(string header)
+    {
+        await using var services = SignIn(Environments.Production);
+
+        var result = await Request(services, header).AuthenticateAsync();
+
+        result.Failure.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task Challenge_BehindEasyAuth_SendsTheBrowserToEntra_AndBackToWhereItWas()
+    {
+        await using var services = SignIn(Environments.Production);
+        var context = Request(services);
+        context.Request.Path = "/runs/1";
+        context.Request.QueryString = new QueryString("?q=SIM-1");
+
+        await context.ChallengeAsync();
+
+        context.Response.StatusCode.Should().Be(StatusCodes.Status302Found);
+        context.Response.Headers.Location.ToString().Should().Be("/.auth/login/aad?post_login_redirect_uri=%2Fruns%2F1%3Fq%3DSIM-1");
+    }
+
+    [Fact]
+    public async Task Authenticate_WithALocalOperator_DoesNotTrustAnEasyAuthHeader()
+    {
+        await using var services = SignIn(Environments.Development, LocalOperator("Dev Eloper", OperatorRoles.Read));
+        // Locally there is no Easy Auth in front, so a header like its own is not trusted.
+        var context = Request(services, ClientPrincipal.Of("Someone Else", OperatorRoles.Run));
+
+        var result = await context.AuthenticateAsync();
+
+        result.Principal!.Identity!.Name.Should().Be("Dev Eloper");
+        result.Principal.IsInRole(OperatorRoles.Run).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Forbid_BehindEasyAuth_TakesTheOperatorToTheRefusal()
+    {
+        await using var services = SignIn(Environments.Production);
+        var context = Request(services);
+
+        await context.ForbidAsync();
+
+        context.Response.Headers.Location.ToString().Should().Be("/refused");
     }
 
     [Fact]
@@ -82,5 +163,14 @@ public sealed class OperatorSignInTests
         return builder.Services.BuildServiceProvider();
     }
 
-    private static DefaultHttpContext Request(IServiceProvider services) => new() { RequestServices = services };
+    private static DefaultHttpContext Request(IServiceProvider services, string? clientPrincipal = null)
+    {
+        var context = new DefaultHttpContext { RequestServices = services };
+        if (clientPrincipal is not null)
+        {
+            context.Request.Headers[EasyAuthHandler.ClientPrincipalHeader] = clientPrincipal;
+        }
+
+        return context;
+    }
 }

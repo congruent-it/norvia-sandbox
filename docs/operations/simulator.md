@@ -11,13 +11,13 @@ The Simulator feeds the estate with representative orders, shipments and trips a
 
 ## Scope
 
-The Simulator is built in slices. So far it covers **Shipper bookings**, **Planner assignment**, the **Carriers**: release, answers, tracking, Proofs of delivery, cancellations and Exceptions, and **Trips and Drivers**: Trips for the Own fleet, dispatched, and worked by their Drivers on the day. Azure comes after them.
+The Simulator is built in slices. So far it covers **Shipper bookings**, **Planner assignment**, the **Carriers**: release, answers, tracking, Proofs of delivery, cancellations and Exceptions, and **Trips and Drivers**: Trips for the Own fleet, dispatched, and worked by their Drivers on the day. It runs locally under the AppHost and in Azure (see [In Azure](#in-azure)).
 
 ## Switching it on
 
 It does nothing unless `Simulator:Enabled` is `true`; switched off it answers every request but its health checks with 404. The AppHost turns it on for a local run (`simulator-web` on the Aspire dashboard). Its guards are settings: `Simulator:MaxOrdersPerRun` (1,000 by default, 500 locally) and `Simulator:MaxConcurrentRequests` (8 by default, 4 locally).
 
-Locally there is no Easy Auth, so the AppHost signs you in as a local operator holding both app roles (`LocalOperator` settings), and the Simulator refuses those settings outside Development. The roles are `Simulator.Run` (configure, start, cancel, clear the history) and `Simulator.Read` (see runs and their logs). Signing in with Entra comes with the Azure slice.
+Locally there is no Easy Auth, so the AppHost signs you in as a local operator holding both app roles (`LocalOperator` settings), and the Simulator refuses those settings outside Development. The roles are `Simulator.Run` (configure, start, cancel, clear the history) and `Simulator.Read` (see runs and their logs). In Azure the presenter signs in with Entra (see [In Azure](#in-azure)).
 
 ## Screens
 
@@ -88,7 +88,30 @@ What stays with the Own fleet after the assignments goes on Trips ([P11](../proc
 - **Refusals are outcomes.** What the Driver app refuses (`TripNotFound`, `ReportNotAvailable`, `ReportInvalid`, ...) is *Driver app refused*, with its code and never its text, and a call that doesn't reach it *Driver report not received*. A Trip with a Stop the Driver app refused can't be ended, which the log shows.
 - **Exceptions and Re-deliveries.** The TMS opens an Exception for each failure, damage and delivery with reservations a Driver reports, a little later, so after the Drivers the Planner asks the TMS for the Open Exceptions (every `Simulator:DriverPollSeconds`, up to `Simulator:DriverPollAttempts` times) and logs *Exception found* for each; one that doesn't open in time is noted. The Shipments whose delivery failed now wait for a Re-delivery, and the Planner puts them on a Trip of the first later day on which Drivers work (`Create Trip` and `Dispatch Trip` again, the Trip left Dispatched). A Shipment whose collection failed is Planned again; the Simulator doesn't plan it again, and the Planner can in the TMS UI.
 
-## Presenter smoke run
+## In Azure
+
+`azd up` deploys the Simulator as a Container App, `simulator-web`, with its database (`simulator`, migrated by the `simulator-migrations` job in the postdeploy hook). It is the same code as locally; only the sign-in and the tokens differ ([ADR 0042](../adr/0042-the-simulator-signs-in-with-easy-auth-reaches-the-estate-as-its-own-identity-and-plays-the-personas-and-drivers-through-entra-client-apps.md)).
+
+- **Signing in.** Container Apps' Easy Auth signs the presenter in to the *Norvia Simulator* app registration, which defines `Simulator.Run` and `Simulator.Read`. The estate assigns both to the presenter who ran `azd up`. Entra refuses anyone without a role before they reach the Simulator; a user with only `Simulator.Read` can see runs and is shown a page that says which role they lack on the screens that need `Simulator.Run`. To let someone else run it, assign them the role on *Norvia Simulator* in Entra ID (Enterprise applications). The callback Easy Auth uses is added by the postdeploy hook (`infra/register-sign-in-callbacks.sh`), so the first sign-in works once `azd up` has finished.
+- **Reaching the estate.** The Planner calls the TMS API as the Simulator's managed identity, which holds the TMS API's manage role. Each Shipper and Carrier is played through its Persona's client app, which trusts that identity, with the Persona's subscription key from the Partner portal's Key Vault; the Norvia Partner API is API Management. Each Driver is played through a client app of their own that holds the Driver ID as its one app role on the Driver app API. No secret is involved.
+- **Switched on, with caps.** The estate sets `Simulator:Enabled` (`simulatorEnabled`, on by default) and the caps: 200 orders a run (`simulatorMaxOrdersPerRun`) and 4 requests in flight (`simulatorMaxConcurrentRequests`), because API Management is on the Developer tier and the Logic Apps bill by action. To change them, set `ESTATE_SIMULATOR_ENABLED_SETTING`, `ESTATE_SIMULATOR_MAX_ORDERS_PER_RUN_SETTING` or `ESTATE_SIMULATOR_MAX_CONCURRENT_REQUESTS_SETTING` in the azd environment and run `azd provision`. Switched off, the Simulator answers every request but its health checks with 404.
+- **Refuses to start misconfigured.** The Simulator does not start with `LocalOperator` settings outside Development, nor with neither or both of `Entra` and `LocalTokens` configured for a token source.
+- **Trails.** The Simulator sends its traces to Application Insights like the other apps, so its calls are found in the Integration console by the correlation ID in the log.
+
+## Presenter smoke run in Azure
+
+Run the Simulator for 20 orders and check that the whole estate took part. You need the roles on *Norvia Simulator* (the presenter has them) and to be signed in to the Azure CLI as the presenter the estate was provisioned for.
+
+1. Open `simulator-web` (the address `azd show` prints, or `https://` and the container app's address) and sign in with Entra. A browser signed in as someone without the roles is refused by Entra.
+2. On **Configure**, read the number the next run gets. Choose *Quiet Monday*, set the **seed** to 349 and **Start run**. The log fills as it does locally; the bookings go through API Management and the intake Logic App, so a booking takes longer than locally. Wait until the run is *Completed*.
+3. Run `infra/smoke-test-simulator.sh <run number>` and press Enter when the script asks. It checks that:
+   - the Simulator answers its health check and sends a caller without a sign-in to Entra;
+   - the run's Transport Orders (`SIM-<run>-<n>`) are in the TMS, most of them Planned and the bad bookings Rejected;
+   - the Planner's Shipments are in the TMS, and a Trip carries a Stop for one of the run's Transport Orders;
+   - a booking's correlation ID is found in Application Insights in the Simulator, the intake Logic App and the TMS, and a Planner action's in the Simulator and the TMS.
+4. Open the Integration console links the script prints: a line's **Message trail** in the Simulator opens the same trail.
+
+## Presenter smoke run locally
 
 1. Run the AppHost and open `simulator-web`.
 2. Choose *Quiet Monday* and **Preview plan**: 20 bookings, 1 of them bad, and the Planner assigning most of the orders Norvia is expected to accept.

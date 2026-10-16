@@ -101,4 +101,27 @@ public sealed class Estate(IDistributedApplicationBuilder builder)
 
     /// <summary>The Integration console's managed identity, which it reads the estate as (ADR 0017).</summary>
     public IResourceBuilder<ParameterResource> IntegrationConsoleIdentity { get; } = builder.AddParameter("estate-integration-console-identity-name");
+
+    /// <summary>
+    /// The Simulator's managed identity, which it runs as (ADR 0042): it holds the TMS API's manage role, and every Persona's and
+    /// Driver's client app trusts it.
+    /// </summary>
+    public IResourceBuilder<ParameterResource> SimulatorIdentity { get; } = builder.AddParameter("estate-simulator-identity-name");
+
+    public IResourceBuilder<ParameterResource> SimulatorClientId { get; } = builder.AddParameter("estate-simulator-client-id");
+
+    /// <summary>The Simulator's app registration, which Easy Auth signs the presenter in to. Its app roles say what an operator may do (ADR 0042).</summary>
+    public IResourceBuilder<ParameterResource> SimulatorRegistrationClientId { get; } = builder.AddParameter("estate-simulator-registration-client-id");
+
+    /// <summary>Each seeded Driver's client app for the Simulator: <c>driverId=clientId</c> pairs separated by semicolons.</summary>
+    public IResourceBuilder<ParameterResource> DriverClientIds { get; } = builder.AddParameter("estate-driver-client-ids");
+
+    /// <summary>Whether the Simulator does anything (<c>Simulator:Enabled</c>): the estate decides.</summary>
+    public IResourceBuilder<ParameterResource> SimulatorEnabled { get; } = builder.AddParameter("estate-simulator-enabled");
+
+    /// <summary>The hard cap on the orders of a Simulation run (<c>Simulator:MaxOrdersPerRun</c>).</summary>
+    public IResourceBuilder<ParameterResource> SimulatorMaxOrdersPerRun { get; } = builder.AddParameter("estate-simulator-max-orders-per-run");
+
+    /// <summary>The cap on requests in flight to the estate (<c>Simulator:MaxConcurrentRequests</c>).</summary>
+    public IResourceBuilder<ParameterResource> SimulatorMaxConcurrentRequests { get; } = builder.AddParameter("estate-simulator-max-concurrent-requests");
 }
