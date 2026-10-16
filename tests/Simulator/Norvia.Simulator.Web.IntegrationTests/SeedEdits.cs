@@ -37,4 +37,26 @@ internal static class SeedEdits
             personas.Remove(persona);
         }
     };
+
+    /// <summary>
+    /// The Own fleet is only the given Vehicle and Driver, so a test shares no Vehicle or Driver with another test: the TMS gives each of them one Trip a day,
+    /// and what one test puts on a day is still there for the next. The Driver's licences are the seed file's unless the test gives others.
+    /// </summary>
+    public static Action<JsonObject> OwnFleetOf(string vehicleId, string driverId, params string[] licences) => seed =>
+    {
+        foreach (var vehicle in seed["vehicles"]!.AsArray().OfType<JsonObject>())
+        {
+            vehicle["active"] = vehicle["id"]!.GetValue<string>() == vehicleId;
+        }
+
+        foreach (var driver in seed["drivers"]!.AsArray().OfType<JsonObject>())
+        {
+            var chosen = driver["id"]!.GetValue<string>() == driverId;
+            driver["active"] = chosen;
+            if (chosen && licences.Length > 0)
+            {
+                driver["licences"] = new JsonArray([.. licences.Select(licence => JsonValue.Create(licence))]);
+            }
+        }
+    };
 }
