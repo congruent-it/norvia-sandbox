@@ -1,10 +1,12 @@
 using System.ComponentModel.DataAnnotations;
+using Norvia.Simulator.Infrastructure.Entra;
 
 namespace Norvia.Simulator.Infrastructure.PartnerApi;
 
 /// <summary>
-/// Where the Norvia Partner API is and how each Persona calls it: the local stand-in under Aspire (ADR 0023). In Azure the
-/// Persona tokens come from Entra and the keys from Key Vault, which the Azure slice adds.
+/// Where the Norvia Partner API is and how each Persona calls it. Locally the Simulator signs the Persona tokens itself
+/// (ADR 0023); in Azure they come from Entra and the subscription keys from Key Vault (ADR 0042). Exactly one of
+/// <see cref="Entra"/> and <see cref="LocalTokens"/> is configured.
 /// </summary>
 public sealed class PartnerApiOptions
 {
@@ -29,8 +31,10 @@ public sealed class PartnerApiOptions
     public Dictionary<string, string> SubscriptionKeys { get; set; } = [];
 
     /// <summary>Locally: the Simulator signs the Persona tokens itself, as Entra would (ADR 0023).</summary>
-    [Required]
     public LocalTokenOptions? LocalTokens { get; set; }
+
+    /// <summary>In Azure: each Persona's token comes from Entra, for the Persona's client app, which trusts the Simulator's managed identity (ADR 0042).</summary>
+    public EntraPersonaTokenOptions? Entra { get; set; }
 
     public string ClientIdOf(string personaId)
     {

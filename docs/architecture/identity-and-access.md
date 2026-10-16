@@ -2,7 +2,7 @@
 
 Who each identity is in Entra, which app roles it holds, which APIs it may call, and which Service Bus subscriptions, containers and secrets it may read. For engineers and coding agents working on the estate and for the technical audience of a demo. Azure is the estate [c4.md](c4.md) draws; what plays Entra locally is in [local-vs-azure.md](local-vs-azure.md#the-map). Terms are defined in [GLOSSARY.md](../../GLOSSARY.md).
 
-Everything is declared in [identities.bicep](../../infra/estate/identities.bicep) and the role assignments beside each resource in [infra/estate/](../../infra/estate/). No application holds a client secret: every caller is a managed identity, and the Persona client apps trust the Partner portal's managed identity through federated credentials ([ADR 0005](../adr/0005-partner-identity-comes-from-the-token.md)). There is no drift test for this page; the [coding guidelines §11](../coding-guidelines.md#11-workflow) rule that a PR changing an app role updates the matching architecture page keeps it current.
+Everything is declared in [identities.bicep](../../infra/estate/identities.bicep) and the role assignments beside each resource in [infra/estate/](../../infra/estate/). No application holds a client secret: every caller is a managed identity, and the Persona client apps trust the Partner portal's managed identity, and the Simulator's, through federated credentials ([ADR 0005](../adr/0005-partner-identity-comes-from-the-token.md), [ADR 0042](../adr/0042-the-simulator-signs-in-with-easy-auth-reaches-the-estate-as-its-own-identity-and-plays-the-personas-and-drivers-through-entra-client-apps.md)). There is no drift test for this page; the [coding guidelines §11](../coding-guidelines.md#11-workflow) rule that a PR changing an app role updates the matching architecture page keeps it current.
 
 ## The four API audiences
 
@@ -34,6 +34,7 @@ Both Logic App triggers sit behind Easy Auth, and the workflow's first step refu
 | `tms-ui` | The TMS UI | `TransportOrders.Manage` | |
 | `apim` | API Management | `ShipperTracking.Read` | Holds `TransportOrderIntake.Trigger` and `CarrierAnswer.Trigger`. Sends to the `carrier-tracking` and `carrier-proof-of-delivery` queues. Writes blobs in the inbound container. Publishes telemetry to Application Insights |
 | `partner-portal` | The Partner portal | | Reads the Persona subscription keys. Each Persona client app trusts it |
+| `simulator` | The Simulator | `TransportOrders.Manage` | Reads the Persona subscription keys. Each Persona client app and each Driver client app trusts it ([ADR 0042](../adr/0042-the-simulator-signs-in-with-easy-auth-reaches-the-estate-as-its-own-identity-and-plays-the-personas-and-drivers-through-entra-client-apps.md)) |
 | `integration-console` | The Integration console | | Reads the Log Analytics workspace. Reads the run history of all seven Logic Apps |
 
 Each Logic App also has a **host identity** (`id-<name>-host-…`) that only the Logic Apps runtime uses: it owns the Logic App's own storage account and reads the one Key Vault secret holding that account's connection string, which Logic Apps Standard still needs for its content share. Nothing else uses it. The identities are separate on purpose: a Logic App's role in the TMS API is never the same principal as the one that runs its runtime.
@@ -47,12 +48,13 @@ The TMS validates the token and the role; the Shipper or Carrier a call is for c
 | Role | Held by | Guards | Process |
 |---|---|---|---|
 | `TransportOrders.Intake` | `intake` | Submit a Transport Order | [P1](../processes/tms/p1-transport-order-intake.md) |
-| `TransportOrders.Manage` | `tms-ui` | What the Planner and Customer service change in the TMS UI: re-rate, assign, release a Shipment, reassign, release without Proof of delivery, withdraw a Carrier booking, and every action on an Exception | [P2](../processes/tms/p2-rating.md), [P3](../processes/tms/p3-transport-planning.md), [P7](../processes/tms/p7-exception-handling.md) |
+| `TransportOrders.Manage` | `tms-ui`, `simulator` | What the Planner and Customer service change in the TMS UI: re-rate, assign, release a Shipment, reassign, release without Proof of delivery, withdraw a Carrier booking, and every action on an Exception | [P2](../processes/tms/p2-rating.md), [P3](../processes/tms/p3-transport-planning.md), [P7](../processes/tms/p7-exception-handling.md) |
 | `CarrierBookings.Answer` | `answer` | Record a Carrier's confirmation or rejection | [P4](../processes/tms/p4-carrier-booking.md) |
 | `CarrierBookings.Report` | `booking`, `carrier-cancellation` | Report a Carrier booking's request, cancellation or withdrawal as sent or not delivered | [P4](../processes/tms/p4-carrier-booking.md), [P7](../processes/tms/p7-exception-handling.md) |
 | `ShipperNotifications.Report` | `shipper-notification` | Report a Shipper notification as sent or not delivered | [P7](../processes/tms/p7-exception-handling.md) |
 | `Trips.ReportDelivery` | `trip-dispatch` | Report a Trip version as delivered to the Driver app or not delivered | [P11](../processes/tms/p11-trip-dispatch.md#tms-api) |
 | `DriverReports.ReportOutcome` (on the Driver app API) | `driver-reports` | Tell the Driver app whether the TMS recorded a Driver's report, refused it, or was never reached | [P12](../processes/tms/p12-trip-execution.md#driver-app) |
+| One role per active Driver, its value the Driver ID (`DRV-0001`; on the Driver app API) | The Simulator's client app for that Driver, one each, which trusts `simulator` | Call the Driver app API's Driver actions (`/v1/driver/trips`) as that Driver. The API takes the Driver ID from the token's one role and nowhere else | [P12](../processes/tms/p12-trip-execution.md#driver-app), [ADR 0042](../adr/0042-the-simulator-signs-in-with-easy-auth-reaches-the-estate-as-its-own-identity-and-plays-the-personas-and-drivers-through-entra-client-apps.md) |
 | `Trips.Start` | `driver-reports` | Start a Dispatched Trip for its Driver on the Trip's day | [P12](../processes/tms/p12-trip-execution.md#tms-api) |
 | `Trips.End` | `driver-reports` | End an In progress Trip for its Driver once every Stop has an outcome | [P12](../processes/tms/p12-trip-execution.md#tms-api) |
 | `TrackingEvents.Record` | `tracking` and `driver-reports` | Record a Tracking event, a Carrier's or a Driver's Stop report | [P5](../processes/tms/p5-shipment-tracking.md) |
@@ -94,7 +96,9 @@ Users are assigned app roles on the enterprise application, not on an API. Entra
 | **Norvia demo UIs** | `DemoUis.Use` | Open the TMS UI and the Partner portal in Azure ([ADR 0024](../adr/0024-the-demo-uis-are-public-behind-an-entra-gate-for-the-presenter.md)). The apps read no roles and don't know who signed in | The presenter, who ran `azd up` |
 | **Norvia Integration console** | `IntegrationConsole.Read` | Search Message trails and open run details and message bodies. The console refuses a user without it ([ADR 0026](../adr/0026-the-integration-console-signs-operators-in-with-easy-auth-and-checks-their-app-role.md)) | The presenter, who plays the Integration operator |
 | | `IntegrationConsole.Resubmit` | Also resubmit and discard dead-lettered messages ([planned](../operations/integration-console.md#resubmit-and-discard)) | The presenter |
-| **Norvia Driver app** | One role per active seeded Driver, its value the Driver ID (`DRV-0001`) | Sign in to the Driver app as that Driver and see their Trips. The Driver app takes the Driver ID from this role and nowhere else ([ADR 0037](../adr/0037-drivers-sign-in-to-the-driver-app-with-entra-and-the-driver-id-is-their-app-role.md)), on its screens and on its API for the Driver's actions (`/v1/driver/trips`), where a caller that acts as the Driver, locally the Simulator, brings a token whose one app role is the Driver ID | The Driver's Entra test user, one per seeded Driver |
+| **Norvia Simulator** | `Simulator.Run` | Configure, preview and start Simulation runs, cancel them and clear the history. A run sends orders, Shipments and Trips into the estate ([ADR 0042](../adr/0042-the-simulator-signs-in-with-easy-auth-reaches-the-estate-as-its-own-identity-and-plays-the-personas-and-drivers-through-entra-client-apps.md)) | The presenter, who plays the Simulator operator |
+| | `Simulator.Read` | See runs and their logs | The presenter |
+| **Norvia Driver app** | One role per active seeded Driver, its value the Driver ID (`DRV-0001`) | Sign in to the Driver app as that Driver and see their Trips. The Driver app takes the Driver ID from this role and nowhere else ([ADR 0037](../adr/0037-drivers-sign-in-to-the-driver-app-with-entra-and-the-driver-id-is-their-app-role.md)), on its screens and on its API for the Driver's actions (`/v1/driver/trips`), where a caller that acts as the Driver, the Simulator, brings a token whose one app role is the Driver ID (in Azure from the Driver's client app for the Simulator, see the TMS API roles above) | The Driver's Entra test user, one per seeded Driver |
 
 Someone else presenting or operating needs the role assigned in Entra ID. The presenter also holds two Azure RBAC roles for looking behind the scenes, both optional (`presenterPrincipalId` empty for none): **Azure Service Bus Data Receiver** on the namespace, to read messages in the Service Bus Explorer, and **Storage Blob Data Reader** on the inbound container.
 
@@ -116,7 +120,7 @@ Azure RBAC, scoped as narrowly as the resource allows, so an identity sees its o
 | | | `proof-of-delivery` | Data Receiver |
 | Inbound container for Proof of delivery files | The container | `apim`, `proof-of-delivery` | Storage Blob Data Contributor |
 | Driver app's transit container for Proof of delivery files | The container | `driver-app`, `driver-reports` | Storage Blob Data Contributor |
-| Partner portal's Key Vault | The vault | `partner-portal` | Key Vault Secrets User |
+| Partner portal's Key Vault | The vault | `partner-portal`, `simulator` | Key Vault Secrets User |
 | Each Carrier endpoint key | The secret | `booking`, `carrier-cancellation` | Key Vault Secrets User |
 | Each Shipper endpoint key | The secret | `shipper-notification` | Key Vault Secrets User |
 | The Driver app's endpoint key (`driver-app-endpoint-key`, in the Driver app's Key Vault) | The secret | `driver-app`, `trip-dispatch` | Key Vault Secrets User |
@@ -149,7 +153,7 @@ People get roles for the Agents' screens too, planned with the Agents: `HealthCh
 
 ## Locally
 
-There is no Entra under Aspire. Every caller still asks for a token with its own client ID and roles, signed with one key, and the TMS API trusts that issuer. A role a caller gets locally is therefore no proof Entra grants it: the tables above are the truth. The Integration console signs the developer in as a local operator holding both console roles ([ADR 0026](../adr/0026-the-integration-console-signs-operators-in-with-easy-auth-and-checks-their-app-role.md)). The Driver app's sign-in page lists the seeded Drivers and signs the chosen one in with the same Driver ID claim ([ADR 0037](../adr/0037-drivers-sign-in-to-the-driver-app-with-entra-and-the-driver-id-is-their-app-role.md)).
+There is no Entra under Aspire. Every caller still asks for a token with its own client ID and roles, signed with one key, and the TMS API trusts that issuer. A role a caller gets locally is therefore no proof Entra grants it: the tables above are the truth. The Integration console and the Simulator sign the developer in as a local operator holding both of their roles ([ADR 0026](../adr/0026-the-integration-console-signs-operators-in-with-easy-auth-and-checks-their-app-role.md)). The Driver app's sign-in page lists the seeded Drivers and signs the chosen one in with the same Driver ID claim ([ADR 0037](../adr/0037-drivers-sign-in-to-the-driver-app-with-entra-and-the-driver-id-is-their-app-role.md)).
 
 ## Changing an identity
 

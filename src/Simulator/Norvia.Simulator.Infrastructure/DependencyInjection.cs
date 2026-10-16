@@ -10,6 +10,7 @@ using Norvia.Simulator.Application.Runs.Execute;
 using Norvia.Simulator.Domain.Runs;
 using Norvia.Simulator.Infrastructure.Data;
 using Norvia.Simulator.Infrastructure.DriverApi;
+using Norvia.Simulator.Infrastructure.Entra;
 using Norvia.Simulator.Infrastructure.Execution;
 using Norvia.Simulator.Infrastructure.PartnerApi;
 using Norvia.Simulator.Infrastructure.TmsApi;
@@ -95,17 +96,22 @@ public static class DependencyInjection
         builder.Services.AddSingleton(TimeProvider.System);
     }
 
-    /// <summary>The Norvia Partner API client, as the Personas call it. Locally the Simulator signs the Persona tokens itself (ADR 0023).</summary>
+    /// <summary>The Norvia Partner API client, as the Personas call it. Locally the Simulator signs the Persona tokens itself (ADR 0023); in Azure they come from Entra (ADR 0042).</summary>
     private static void AddNorviaPartnerApi(this IHostApplicationBuilder builder)
     {
         builder.Services.AddOptions<PartnerApiOptions>().BindConfiguration(PartnerApiOptions.SectionName)
             .ValidateDataAnnotations()
-            // Data annotations don't look inside the nested options.
-            .Validate(options => options.LocalTokens is not null && IsValid(options.LocalTokens), "PartnerApi:LocalTokens needs an Issuer, an Audience and a SigningKey.")
+            .Validate(options => (options.Entra is null) != (options.LocalTokens is null), "Configure either PartnerApi:Entra or PartnerApi:LocalTokens.")
+            // Data annotations don't look inside the nested options, so whichever is configured is checked here.
+            .Validate(options => options.Entra is null || IsValid(options.Entra), "PartnerApi:Entra needs a TenantId, a Scope and a ManagedIdentityClientId.")
+            .Validate(options => options.LocalTokens is null || IsValid(options.LocalTokens), "PartnerApi:LocalTokens needs an Issuer, an Audience and a SigningKey.")
             .ValidateOnStart();
         builder.Services.AddSingleton<IValidateOptions<PartnerApiOptions>, EveryPersonaCanCall>();
 
-        builder.Services.AddSingleton<IPersonaTokens, LocalPersonaTokens>();
+        builder.Services.AddSingleton<IPersonaTokens>(services =>
+            services.GetRequiredService<IOptions<PartnerApiOptions>>().Value.LocalTokens is null
+                ? ActivatorUtilities.CreateInstance<EntraPersonaTokens>(services)
+                : ActivatorUtilities.CreateInstance<LocalPersonaTokens>(services));
 
         // Removing the default handler is still marked for evaluation, and is the one way to replace it for a single client.
 #pragma warning disable EXTEXP0001
@@ -124,32 +130,42 @@ public static class DependencyInjection
 #pragma warning restore EXTEXP0001
     }
 
-    /// <summary>The Driver app API client, as a Driver calls it. Locally the Simulator signs each Driver's token itself.</summary>
+    /// <summary>The Driver app API client, as a Driver calls it. Locally the Simulator signs each Driver's token itself; in Azure it comes from Entra (ADR 0042).</summary>
     private static void AddNorviaDriverApp(this IHostApplicationBuilder builder)
     {
         builder.Services.AddOptions<DriverApiOptions>().BindConfiguration(DriverApiOptions.SectionName)
             .ValidateDataAnnotations()
-            // Data annotations don't look inside the nested options.
-            .Validate(options => options.LocalTokens is not null && IsValid(options.LocalTokens), "DriverApp:LocalTokens needs an Issuer, an Audience, a ClientId and a SigningKey.")
+            .Validate(options => (options.Entra is null) != (options.LocalTokens is null), "Configure either DriverApp:Entra or DriverApp:LocalTokens.")
+            // Data annotations don't look inside the nested options, so whichever is configured is checked here.
+            .Validate(options => options.Entra is null || IsValid(options.Entra), "DriverApp:Entra needs a TenantId, a Scope, a ManagedIdentityClientId and the DriverClientIds.")
+            .Validate(options => options.LocalTokens is null || IsValid(options.LocalTokens), "DriverApp:LocalTokens needs an Issuer, an Audience, a ClientId and a SigningKey.")
             .ValidateOnStart();
 
-        builder.Services.AddSingleton<IDriverTokens, LocalDriverTokens>();
+        builder.Services.AddSingleton<IDriverTokens>(services =>
+            services.GetRequiredService<IOptions<DriverApiOptions>>().Value.LocalTokens is null
+                ? ActivatorUtilities.CreateInstance<EntraDriverTokens>(services)
+                : ActivatorUtilities.CreateInstance<LocalDriverTokens>(services));
 
         // The standard resilience handler stays: the Driver app answers a report it has taken already as taken, so a retry changes nothing.
         builder.Services.AddHttpClient<IDriverApp, NorviaDriverAppClient>((services, http) =>
             http.BaseAddress = services.GetRequiredService<IOptions<DriverApiOptions>>().Value.BaseAddress);
     }
 
-    /// <summary>The TMS API client, as the Planner calls it. Locally the Simulator signs its own token, as the TMS UI does.</summary>
+    /// <summary>The TMS API client, as the Planner calls it. Locally the Simulator signs its own token, as the TMS UI does; in Azure it is the managed identity's (ADR 0042).</summary>
     private static void AddNorviaTmsApi(this IHostApplicationBuilder builder)
     {
         builder.Services.AddOptions<TmsApiOptions>().BindConfiguration(TmsApiOptions.SectionName)
             .ValidateDataAnnotations()
-            // Data annotations don't look inside the nested options.
-            .Validate(options => options.LocalTokens is not null && IsValid(options.LocalTokens), "TmsApi:LocalTokens needs an Issuer, an Audience, a ClientId and a SigningKey.")
+            .Validate(options => (options.Entra is null) != (options.LocalTokens is null), "Configure either TmsApi:Entra or TmsApi:LocalTokens.")
+            // Data annotations don't look inside the nested options, so whichever is configured is checked here.
+            .Validate(options => options.Entra is null || IsValid(options.Entra), "TmsApi:Entra needs a Scope and a ManagedIdentityClientId.")
+            .Validate(options => options.LocalTokens is null || IsValid(options.LocalTokens), "TmsApi:LocalTokens needs an Issuer, an Audience, a ClientId and a SigningKey.")
             .ValidateOnStart();
 
-        builder.Services.AddSingleton<ITmsTokens, LocalTmsTokens>();
+        builder.Services.AddSingleton<ITmsTokens>(services =>
+            services.GetRequiredService<IOptions<TmsApiOptions>>().Value.LocalTokens is null
+                ? ActivatorUtilities.CreateInstance<EntraTmsTokens>(services)
+                : ActivatorUtilities.CreateInstance<LocalTmsTokens>(services));
 
         // The standard resilience handler stays: each call repeats its own idempotency key, so a retry is answered as before.
         builder.Services.AddHttpClient<ITmsApi, NorviaTmsApiClient>((services, http) =>

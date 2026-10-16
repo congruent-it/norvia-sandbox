@@ -8,6 +8,10 @@
     <ProjectReference Include="..\Norvia.Simulator.Application\Norvia.Simulator.Application.csproj" />
     <ProjectReference Include="..\Norvia.Simulator.Infrastructure\Norvia.Simulator.Infrastructure.csproj" />
   </ItemGroup>
+  <!-- The Simulator reads its Shippers, Carriers, Drivers and Vehicles from the seed file, so the published image carries it (Seed:Path in Azure). -->
+  <ItemGroup>
+    <None Include="..\..\..\seed\norvia.seed.json" Link="seed\norvia.seed.json" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Norvia.Simulator.Web.IntegrationTests" />
     <InternalsVisibleTo Include="Norvia.Simulator.Web.UnitTests" />

@@ -49,6 +49,9 @@ param applicationInsightsName string
 @description('The Partner portal\'s identity, the one principal that may read the Personas\' subscription keys.')
 param partnerPortalPrincipalId string
 
+@description('The Simulator\'s identity, which reads the Personas\' subscription keys to book, answer, track and deliver as them (ADR 0042).')
+param simulatorPrincipalId string
+
 @description('The P4 booking Logic App\'s identity, which may read the Carrier endpoints\' credentials and nothing else in the vault.')
 param bookingPrincipalId string
 
@@ -494,8 +497,9 @@ resource personaSubscriptions 'Microsoft.ApiManagement/service/subscriptions@202
 ]
 
 // The Partner portal books as each Persona with its subscription key (ADR 0005), which it reads from here with its own
-// identity. It also reads the credential each Carrier Persona's booking endpoint asks of its caller. Nothing else may
-// read the subscription keys; the P4 booking Logic App reads only the Carrier endpoint credentials.
+// identity. It also reads the credential each Carrier Persona's booking endpoint asks of its caller. The Simulator plays the
+// same Personas, so it reads the subscription keys too (ADR 0042). Nothing else may read them; the P4 booking Logic App
+// reads only the Carrier endpoint credentials.
 resource partnerPortalSecrets 'Microsoft.KeyVault/vaults@2024-11-01' = {
   name: 'kv-portal-${resourceToken}'
   location: location
@@ -558,6 +562,17 @@ resource shipperEndpointKeys 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = [
 ]
 
 var keyVaultSecretsUser = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
+
+// The Simulator plays the Personas too (ADR 0042), so it reads their subscription keys with its own identity.
+resource simulatorReadsTheKeys 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(partnerPortalSecrets.id, simulatorPrincipalId, keyVaultSecretsUser)
+  scope: partnerPortalSecrets
+  properties: {
+    principalId: simulatorPrincipalId
+    roleDefinitionId: keyVaultSecretsUser
+    principalType: 'ServicePrincipal'
+  }
+}
 
 resource partnerPortalReadsTheKeys 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(partnerPortalSecrets.id, partnerPortalPrincipalId, keyVaultSecretsUser)

@@ -33,6 +33,25 @@ param integrationConsoleRedirectUris string = ''
 hook stores it, so the Driver app's app registration keeps it when the estate is deployed again.''')
 param driverAppRedirectUris string = ''
 
+@description('''Easy Auth's sign-in callback on the Simulator, empty before the Simulator is first deployed. azd's postdeploy hook stores
+it, so the Simulator's app registration keeps it when the estate is deployed again.''')
+param simulatorRedirectUris string = ''
+
+@description('''Whether the Simulator does anything (Simulator:Enabled). The estate decides: switch it off to make the deployed Simulator answer
+every request but its health checks with 404, without removing it. The Simulator sends orders into the estate, so it is a demo tool.''')
+param simulatorEnabled bool = true
+
+@description('''The most orders one Simulation run may send (Simulator:MaxOrdersPerRun). A deployed estate has API Management on the Developer tier
+(ADR 0021) and Logic Apps that bill by action, so the cap is lower than the Simulator's own 1,000.''')
+@minValue(1)
+@maxValue(1000)
+param simulatorMaxOrdersPerRun int = 200
+
+@description('The most requests a Simulation run has in flight to the estate at once (Simulator:MaxConcurrentRequests).')
+@minValue(1)
+@maxValue(16)
+param simulatorMaxConcurrentRequests int = 4
+
 @description('''The TMS API's address, empty before the apps are first deployed. azd's postdeploy hook stores it, so the intake,
 Carrier-answer, Shipper notification, Carrier cancellation, Trip dispatch, Carrier-tracking and Carrier Proof of delivery Logic Apps keep it when the estate is deployed again.''')
 param tmsBaseUrl string = ''
@@ -99,6 +118,7 @@ module identities 'estate/identities.bicep' = {
     demoUiRedirectUris: demoUiRedirectUris
     integrationConsoleRedirectUris: integrationConsoleRedirectUris
     driverAppRedirectUris: driverAppRedirectUris
+    simulatorRedirectUris: simulatorRedirectUris
   }
 }
 
@@ -321,6 +341,7 @@ module partnerApi 'estate/partner-api.bicep' = {
     inboundContainerName: inboundStorage.outputs.containerName
     applicationInsightsName: monitoring.outputs.applicationInsightsName
     partnerPortalPrincipalId: identities.outputs.partnerPortalPrincipalId
+    simulatorPrincipalId: identities.outputs.simulatorPrincipalId
     bookingPrincipalId: identities.outputs.bookingPrincipalId
     shipperNotificationPrincipalId: identities.outputs.shipperNotificationPrincipalId
     carrierCancellationPrincipalId: identities.outputs.carrierCancellationPrincipalId
@@ -388,3 +409,10 @@ output ESTATE_DEMO_UIS_CLIENT_ID string = identities.outputs.demoUisClientId
 output ESTATE_INTEGRATION_CONSOLE_CLIENT_ID string = identities.outputs.integrationConsoleClientId
 output ESTATE_DRIVER_APP_REGISTRATION_CLIENT_ID string = identities.outputs.driverAppRegistrationClientId
 output ESTATE_INTEGRATION_CONSOLE_IDENTITY_NAME string = identities.outputs.integrationConsoleIdentityName
+output ESTATE_SIMULATOR_IDENTITY_NAME string = identities.outputs.simulatorIdentityName
+output ESTATE_SIMULATOR_CLIENT_ID string = identities.outputs.simulatorClientId
+output ESTATE_SIMULATOR_REGISTRATION_CLIENT_ID string = identities.outputs.simulatorRegistrationClientId
+output ESTATE_DRIVER_CLIENT_IDS string = join(identities.outputs.driverClientIds, ';')
+output ESTATE_SIMULATOR_ENABLED string = string(simulatorEnabled)
+output ESTATE_SIMULATOR_MAX_ORDERS_PER_RUN string = string(simulatorMaxOrdersPerRun)
+output ESTATE_SIMULATOR_MAX_CONCURRENT_REQUESTS string = string(simulatorMaxConcurrentRequests)
