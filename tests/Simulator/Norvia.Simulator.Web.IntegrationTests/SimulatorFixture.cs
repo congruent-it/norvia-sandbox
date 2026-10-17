@@ -3,6 +3,7 @@ extern alias SimulatorWeb;
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
@@ -33,14 +34,12 @@ public sealed class SimulatorFixture : IAsyncLifetime
     // So do the tracking and Proof of delivery workers: the Carriers' tracking and Proofs of delivery only reach the TMS through them. And the Driver app's API and
     // migrations, with the Trip dispatch and Driver reports workers: the Simulator's settings point at the API, the Trip dispatch worker carries each dispatched
     // Trip to it and the Driver reports worker carries the Drivers' reports on to the TMS.
-    private static readonly string[] Unneeded =
-    [
-        "dbgate", "tms-web", "partner-portal", "partner-portal-migrations", "partner-portal-web", "driver-app-web",
-        "booking-worker", "shipper-notification-worker", "carrier-cancellation-worker",
-    ];
+    // The Partner portal and the workers that empty the Service Bus subscriptions the reset waits on stay too: the Simulator's reset resets the Partner portal, and
+    // waits for those subscriptions to be empty (ADR 0039).
+    private static readonly string[] Unneeded = ["dbgate", "tms-web", "driver-app-web"];
 
     private static readonly string[] SimulatorSettings =
-        ["ConnectionStrings__", "Seed__", "Simulator__", "PartnerApi__", "TmsApi__", "DriverApp__", "IntegrationConsole__", "LocalOperator__"];
+        ["ConnectionStrings__", "Seed__", "Simulator__", "PartnerApi__", "PartnerPortal__", "TmsApi__", "DriverApp__", "IntegrationConsole__", "LocalOperator__"];
 
     private static readonly string[] IntakeRoles = ["TransportOrders.Intake"];
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
@@ -77,6 +76,8 @@ public sealed class SimulatorFixture : IAsyncLifetime
         await _app.ResourceNotifications.WaitForResourceAsync("simulator-migrations", KnownResourceStates.Finished, startup.Token);
         await _app.ResourceNotifications.WaitForResourceHealthyAsync("tms-api", startup.Token);
         await _app.ResourceNotifications.WaitForResourceHealthyAsync("partner-api", startup.Token);
+        await _app.ResourceNotifications.WaitForResourceHealthyAsync("partner-portal-web", startup.Token);
+        await _app.ResourceNotifications.WaitForResourceHealthyAsync("driver-app-api", startup.Token);
 
         var configuration = await ExecutionConfigurationBuilder.Create(simulator)
             .WithEnvironmentVariablesConfig()
@@ -152,6 +153,93 @@ public sealed class SimulatorFixture : IAsyncLifetime
         return host;
     }
 
+    /// <summary>A Simulator whose TMS API is at the address, such as a stand-in that refuses the reset. Everything else is the AppHost's.</summary>
+    public SimulatorHost StartSimulatorWithTmsAt(Uri address)
+    {
+        var host = new SimulatorHost(new Dictionary<string, string>(_settings) { ["TmsApi:BaseAddress"] = address.ToString() });
+        _hosts.Add(host);
+        return host;
+    }
+
+    /// <summary>Stops one of the AppHost's resources, such as a worker that empties a Service Bus subscription, and waits until it has ended.</summary>
+    public Task StopAsync(string resourceName, CancellationToken cancellationToken) =>
+        ExecuteAsync(resourceName, KnownResourceCommands.StopCommand, state => KnownResourceStates.TerminalStates.Contains(state), cancellationToken);
+
+    /// <summary>Starts a resource that <see cref="StopAsync"/> stopped, and waits until it is healthy again.</summary>
+    public async Task StartAsync(string resourceName, CancellationToken cancellationToken)
+    {
+        await ExecuteAsync(resourceName, KnownResourceCommands.StartCommand, state => state == KnownResourceStates.Running, cancellationToken);
+        await _app!.ResourceNotifications.WaitForResourceHealthyAsync(resourceName, cancellationToken);
+    }
+
+    /// <summary>The connection string of the Service Bus emulator, for sending a message the way an application would.</summary>
+    public async Task<string> ServiceBusConnectionStringAsync(CancellationToken cancellationToken) =>
+        await _app!.GetConnectionStringAsync("messaging", cancellationToken) ?? throw new InvalidOperationException("The Service Bus emulator has no connection string.");
+
+    /// <summary>Takes in a booking as the intake Logic App does, outside any run: a Transport Order a person entered by hand. Returns its number.</summary>
+    public async Task<string> EnterTransportOrderAsync(string shipperReference, CancellationToken cancellationToken)
+    {
+        var collection = DateTimeOffset.UtcNow.Date.AddDays(2);
+        var booking = new JsonObject
+        {
+            ["shipperId"] = "SHP-0001",
+            ["shipperReference"] = shipperReference,
+            ["collection"] = new JsonObject
+            {
+                ["address"] = Address("Waalhaven Oostzijde 88", "3087 BM", "Rotterdam"),
+                ["window"] = Window(collection.AddHours(6), collection.AddHours(10)),
+            },
+            ["delivery"] = new JsonObject
+            {
+                ["address"] = Address("Oudegracht 112", "3511 AW", "Utrecht"),
+                ["consignee"] = new JsonObject { ["name"] = "Café De Zwaan", ["contactName"] = "Sanne de Vries", ["phone"] = "+31 30 555 0142", ["email"] = null },
+                ["window"] = Window(collection.AddHours(12), collection.AddHours(16)),
+            },
+            ["goodsLines"] = new JsonArray
+            {
+                new JsonObject { ["packageType"] = "pallet", ["quantity"] = 2, ["weightKg"] = 850.5, ["dimensionsCm"] = new JsonObject { ["length"] = 120, ["width"] = 80, ["height"] = 150 } },
+            },
+            ["instructions"] = "Entered by hand",
+        };
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("/v1/transport-orders", UriKind.Relative)) { Content = JsonContent.Create(booking) };
+        request.Headers.Add("X-Correlation-ID", Guid.NewGuid().ToString());
+        using var response = await Tms.SendAsync(request, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.Created, body);
+        return JsonNode.Parse(body)!["transportOrderNumber"]!.GetValue<string>();
+    }
+
+    /// <summary>The Trips the Driver app shows the Driver, read through its API as the Driver, with a token signed with the key the Driver app trusts.</summary>
+    public async Task<JsonArray> DriverTripsAsync(string driverId, CancellationToken cancellationToken)
+    {
+        using var driverApp = _app!.CreateHttpClient("driver-app-api");
+        var token = new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
+        {
+            Issuer = LocalTokens.Issuer,
+            Audience = LocalTokens.DriverAppAudience,
+            Expires = DateTime.UtcNow.AddHours(1),
+            Claims = new Dictionary<string, object> { ["azp"] = LocalTokens.SimulatorClientId, ["roles"] = new[] { driverId } },
+            SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_tokenSigningKey)), SecurityAlgorithms.HmacSha256),
+        });
+        driverApp.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        using var response = await driverApp.GetAsync(new Uri("/v1/driver/trips", UriKind.Relative), cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return JsonNode.Parse(await response.Content.ReadAsStringAsync(cancellationToken))!.AsArray();
+    }
+
+    /// <summary>A Transport Order as the TMS API reads it out, or null when the TMS has none by that number.</summary>
+    public async Task<JsonObject?> TransportOrderAsync(string number, CancellationToken cancellationToken)
+    {
+        using var response = await Tms.GetAsync(new Uri($"/v1/transport-orders/{Uri.EscapeDataString(number)}", UriKind.Relative), cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return JsonNode.Parse(await response.Content.ReadAsStringAsync(cancellationToken))!.AsObject();
+    }
+
     /// <summary>A Shipment as the TMS API reads it out, or null when the TMS has none by that number.</summary>
     public async Task<JsonObject?> ShipmentAsync(string shipmentNumber, CancellationToken cancellationToken)
     {
@@ -214,6 +302,20 @@ public sealed class SimulatorFixture : IAsyncLifetime
         response.EnsureSuccessStatusCode();
         var listed = JsonNode.Parse(await response.Content.ReadAsStringAsync(cancellationToken))!.AsArray();
         return [.. listed.Select(order => order!["shipperReference"]?.GetValue<string>()).OfType<string>()];
+    }
+
+    private static JsonObject Address(string street, string postcode, string city) =>
+        new() { ["street"] = street, ["postcode"] = postcode, ["city"] = city, ["country"] = "NL" };
+
+    private static JsonObject Window(DateTimeOffset earliest, DateTimeOffset latest) => new() { ["earliest"] = earliest.ToString("O"), ["latest"] = latest.ToString("O") };
+
+    private async Task ExecuteAsync(string resourceName, string command, Func<string?, bool> reached, CancellationToken cancellationToken)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromMinutes(2));
+        var result = await _app!.ResourceCommands.ExecuteCommandAsync(resourceName, command, timeout.Token);
+        result.Success.Should().BeTrue(result.Message);
+        await _app.ResourceNotifications.WaitForResourceAsync(resourceName, state => reached(state.Snapshot.State?.Text), timeout.Token);
     }
 
     /// <summary>A token for the TMS API as Entra issues it to a managed identity. The list needs any TMS token.</summary>

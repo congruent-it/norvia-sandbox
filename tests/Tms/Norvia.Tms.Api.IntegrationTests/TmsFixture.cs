@@ -32,7 +32,7 @@ public class TmsFixture : IAsyncLifetime
     public const string TransportOrderEventsTopic = "transport-order-events";
     public const string ShipmentEventsTopic = "shipment-events";
     public const string TripEventsTopic = "trip-events";
-    private const string TestSubscription = "tms-api-integration-tests";
+    public const string TestSubscription = "tms-api-integration-tests";
     public const string IntakeRole = "TransportOrders.Intake";
 
     /// <summary>The app role only the TMS UI's managed identity holds: Customer service's re-rate goes through it.</summary>
@@ -391,6 +391,10 @@ public class TmsFixture : IAsyncLifetime
 
         return _tmsLogs.First(match);
     }
+
+    /// <summary>The connection string the AppHost gives the named resource, such as <c>blobs</c> for the storage emulator.</summary>
+    public async Task<string> ConnectionStringAsync(string resourceName, CancellationToken cancellationToken) =>
+        await _app!.GetConnectionStringAsync(resourceName, cancellationToken) ?? throw new InvalidOperationException($"{resourceName} has no connection string.");
 
     /// <summary>Waits for one of the AppHost's resources to report healthy.</summary>
     public async Task WaitForHealthyAsync(string resourceName, CancellationToken cancellationToken) =>
