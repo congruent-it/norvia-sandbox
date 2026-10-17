@@ -33,6 +33,17 @@ public static class NorviaTime
     public static string Format(DateTimeOffset? moment) =>
         moment is { } value ? FormatLocal(ToRotterdam(value)) : NotGiven;
 
+    /// <summary>
+    /// A time for a narrow column, such as "17 Oct, 11:37": no weekday, and the year only when it isn't <paramref name="now"/>'s
+    /// year in Rotterdam.
+    /// </summary>
+    public static string FormatCompact(DateTimeOffset moment, DateTimeOffset now)
+    {
+        var local = ToRotterdam(moment);
+        var format = local.Year == ToRotterdam(now).Year ? "d MMM, HH:mm" : "d MMM yyyy, HH:mm";
+        return local.ToString(format, Culture);
+    }
+
     public static string FormatWindow(DateTimeOffset? earliest, DateTimeOffset? latest)
     {
         switch (earliest, latest)

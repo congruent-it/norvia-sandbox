@@ -35,11 +35,11 @@ public sealed class ShipmentsToReleaseTests : TmsWebContext
 
         var row = page.WaitForElement("tr:has(a[href='/shipments/SH-0000012'])");
         var cells = row.QuerySelectorAll("td").Select(cell => cell.TextContent.Trim()).ToList();
-        cells[1].Should().Be("SH-0000012");
-        cells[2].Should().Be("TO-0000042");
-        cells[3].Should().Be("Brouwer Dranken");
-        cells[4].Should().Be("Kessler Spedition");
-        cells[5].Should().Be("Thu 24 Sep 2026, 11:45");
+        System.Text.RegularExpressions.Regex.Replace(cells[1], @"\s+", " ").Should().Be("SH-0000012 TO-0000042");
+        row.QuerySelector("td:nth-child(2) a[href='/transport-orders/TO-0000042']").Should().NotBeNull();
+        cells[2].Should().Be("Brouwer Dranken");
+        cells[3].Should().Be("Kessler Spedition");
+        cells[4].Should().Be("24 Sep, 11:45");
     }
 
     [Fact]
@@ -59,9 +59,57 @@ public sealed class ShipmentsToReleaseTests : TmsWebContext
 
         page.WaitForAssertion(() =>
         {
-            CellsOf(page, "SH-0000012")[6].Should().Be("Rejected by Kessler Spedition: Fully booked until Friday.");
-            CellsOf(page, "SH-0000013")[6].Should().BeEmpty();
+            CellsOf(page, "SH-0000012")[5].Should().Be("Rejected by Kessler Spedition: Fully booked until Friday.");
+            CellsOf(page, "SH-0000013")[5].Should().BeEmpty();
         });
+    }
+
+    [Fact]
+    public void Render_AShipmentWithAPricingFailureAndALastCarrierBookingOutcome_ShowsBothInOneCell_PricingFailureFirst()
+    {
+        var shipment = PricingFailed("SH-0000012") with
+        {
+            LastCarrierBookingOutcome = new LastCarrierBookingOutcome(
+                CarrierBookingStatus.Rejected, Samples.Kessler, CarrierBookingRejectionReason.NoCapacity, "Fully booked until Friday."),
+        };
+        Queries.ListShipmentsToReleaseAsync(Arg.Any<CancellationToken>()).Returns([shipment]);
+
+        var page = Render<ShipmentsToRelease>();
+
+        page.WaitForAssertion(() => CellsOf(page, "SH-0000012")[5].Should().MatchRegex(
+            "^The Carrier Rate Card has no Lane.*Kessler Spedition\\.\\s*Rejected by Kessler Spedition: Fully booked until Friday\\.$"));
+    }
+
+    [Fact]
+    public void Render_AShipmentWithAndWithoutASpotPrice_PutsReassignInTheSameActionsCell()
+    {
+        Queries.ListShipmentsToReleaseAsync(Arg.Any<CancellationToken>()).Returns([PricingFailed("SH-0000012"), Samples.ToRelease("SH-0000013")]);
+
+        var page = Render<ShipmentsToRelease>();
+
+        page.WaitForAssertion(() =>
+        {
+            foreach (var number in (string[])["SH-0000012", "SH-0000013"])
+            {
+                var actions = page.Find($"tr:has(a[href='/shipments/{number}']) td:nth-child(7)");
+                actions.QuerySelector($"fluent-select[aria-label='Reassign {number} to']").Should().NotBeNull();
+                actions.QuerySelector($"fluent-button[aria-label='Reassign {number}']").Should().NotBeNull();
+            }
+
+            page.Find("tr:has(a[href='/shipments/SH-0000012']) td:nth-child(7)")
+                .QuerySelector("fluent-button[aria-label='Release SH-0000012 with Spot price']").Should().NotBeNull();
+        });
+    }
+
+    [Fact]
+    public void Render_WithNothingSelected_SaysWhyReleaseSelectedIsDisabled_UntilAShipmentIsSelected()
+    {
+        var page = RenderWith(Samples.ToRelease("SH-0000012"));
+        page.Markup.Should().Contain("Select one or more Shipments to release.");
+
+        Select(page, "SH-0000012");
+
+        page.Markup.Should().NotContain("Select one or more Shipments to release.");
     }
 
     [Fact]
@@ -372,12 +420,13 @@ public sealed class ShipmentsToReleaseTests : TmsWebContext
     }
 
     [Fact]
-    public void Render_AShipmentTheCarrierRateCardCantPrice_ShowsItsCodeOnItsRow_AndOffersASpotPrice()
+    public void Render_AShipmentTheCarrierRateCardCantPrice_ShowsWhyOnItsRow_AndOffersASpotPrice()
     {
         var page = RenderWith(PricingFailed("SH-0000012"), Samples.ToRelease("SH-0000013"));
 
-        CellsOf(page, "SH-0000012").Should().Contain("NoMatchingLane");
-        CellsOf(page, "SH-0000013").Should().NotContain("NoMatchingLane");
+        CellsOf(page, "SH-0000012")[5].Should().Be("The Carrier Rate Card has no Lane for this origin and destination. Carrier: Kessler Spedition.");
+        CellsOf(page, "SH-0000012").Should().NotContain(cell => cell.Contains("NoMatchingLane"));
+        CellsOf(page, "SH-0000013")[5].Should().BeEmpty();
         SpotPriceButton(page, "SH-0000012").Should().NotBeNull();
         page.FindAll("fluent-button[aria-label='Release SH-0000013 with Spot price']").Should().BeEmpty();
     }
@@ -394,7 +443,7 @@ public sealed class ShipmentsToReleaseTests : TmsWebContext
         Time.Advance(RefreshInterval);
 
         page.WaitForAssertion(() => page.FindAll("fluent-button[aria-label='Release SH-0000012 with Spot price']").Should().BeEmpty());
-        CellsOf(page, "SH-0000012").Should().NotContain("NoMatchingLane");
+        CellsOf(page, "SH-0000012")[5].Should().BeEmpty();
     }
 
     [Fact]

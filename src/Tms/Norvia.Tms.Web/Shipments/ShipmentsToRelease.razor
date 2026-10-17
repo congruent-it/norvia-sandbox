@@ -58,6 +58,10 @@
         <FluentButton Appearance="Appearance.Accent" OnClick="ReleaseAsync" Disabled="!CanRelease(shipments)">
             Release selected (@SelectedIn(shipments).Count)
         </FluentButton>
+        @if (SelectedIn(shipments).Count == 0)
+        {
+            <span>Select one or more Shipments to release.</span>
+        }
         @if (_carriersFailed)
         {
             <div role="alert">
@@ -77,61 +81,57 @@
 
     @* Planned first, as the query gives them: the Shipment planned first is released first. *@
     <FluentDataGrid Items="shipments.AsQueryable()" TGridItem="ShipmentToReleaseSummary" Class="flatly-table" aria-label="Shipments to release"
-                    GridTemplateColumns="auto minmax(8.5rem, 1fr) minmax(8.5rem, 1fr) 1.1fr 1.1fr 1fr 1.6fr minmax(8.5rem, 1.2fr) minmax(13rem, 1.4fr) minmax(7.5rem, auto) minmax(8.5rem, auto)" MultiLine="true">
+                    GridTemplateColumns="auto minmax(8rem, 0.9fr) minmax(9rem, 1fr) minmax(9rem, 1fr) 7.5rem minmax(14rem, 1.4fr) minmax(20rem, 1.6fr)" MultiLine="true">
         <TemplateColumn Title="Select">
             <FluentCheckbox Value="_selected.Contains(context.ShipmentNumber)"
                             ValueChanged="@((bool selected) => Select(context.ShipmentNumber, selected))"
                             aria-label="@($"Select {context.ShipmentNumber}")" />
         </TemplateColumn>
         <TemplateColumn Title="Shipment">
-            <a href="/shipments/@context.ShipmentNumber">@context.ShipmentNumber</a>
-        </TemplateColumn>
-        <TemplateColumn Title="Transport Order">
+            <a href="/shipments/@context.ShipmentNumber">@context.ShipmentNumber</a><br />
             <a href="/transport-orders/@context.TransportOrderNumber">@context.TransportOrderNumber</a>
         </TemplateColumn>
         <PropertyColumn Title="Shipper" Property="@(shipment => shipment.Shipper.Name ?? shipment.Shipper.Id)" />
         <PropertyColumn Title="Carried by" Property="@(shipment => PlanningText.CarriedBy(shipment.CarriedBy))" />
-        <PropertyColumn Title="Planned" Property="@(shipment => NorviaTime.Format(shipment.PlannedAt))" />
-        <TemplateColumn Title="Last Carrier booking">
-            @if (context.LastCarrierBookingOutcome is { } outcome)
-            {
-                @CarrierBookingText.LastOutcome(outcome)
-            }
-        </TemplateColumn>
-        <TemplateColumn Title="Pricing failure">
+        <PropertyColumn Title="Planned" Property="@(shipment => NorviaTime.FormatCompact(shipment.PlannedAt, Time.GetUtcNow()))" />
+        <TemplateColumn Title="Why it is here">
             @if (context.PricingFailure is { } pricingFailure)
             {
-                <strong title="@pricingFailure.Message">@pricingFailure.Code</strong>
+                <div><strong>@PricingFailureText.Of(pricingFailure, context.CarriedBy)</strong></div>
             }
-        </TemplateColumn>
-        <TemplateColumn Title="Reassign to">
-            <FluentSelect TOption="string" Value="@ReassignToOf(context.ShipmentNumber)"
-                          ValueChanged="@((string value) => SetReassignTo(context.ShipmentNumber, value))"
-                          aria-label="@($"Reassign {context.ShipmentNumber} to")" Width="100%">
-                <FluentOption TOption="string" Value="">Choose who carries it</FluentOption>
-                <FluentOption TOption="string" Value="@OwnFleetOption">@PlanningText.OwnFleet</FluentOption>
-                @foreach (var carrier in _carriers ?? [])
-                {
-                    <FluentOption TOption="string" Value="@carrier.Id">@PlanningText.Carrier(carrier)</FluentOption>
-                }
-            </FluentSelect>
-        </TemplateColumn>
-        <TemplateColumn Title="Action">
-            <FluentButton Appearance="Appearance.Outline" OnClick="() => ReassignAsync(context.ShipmentNumber)"
-                          Disabled="@(!CanReassign(context.ShipmentNumber))"
-                          aria-label="@($"Reassign {context.ShipmentNumber}")">
-                Reassign
-            </FluentButton>
-        </TemplateColumn>
-        <TemplateColumn Title="Spot price">
-            @* Only a Shipment its Carrier's Carrier Rate Card can't price, as the TMS says: a Spot price can't override a Carrier Rate Card that prices it (P9). *@
-            @if (context.PricingFailure is not null)
+            @if (context.LastCarrierBookingOutcome is { } outcome)
             {
-                <FluentButton Appearance="Appearance.Outline" OnClick="() => OpenSpotPrice(context.ShipmentNumber)"
-                              aria-label="@($"Release {context.ShipmentNumber} with Spot price")">
-                    Release with Spot price
-                </FluentButton>
+                <div>@CarrierBookingText.LastOutcome(outcome)</div>
             }
+        </TemplateColumn>
+        <TemplateColumn Title="Actions">
+            <div class="flex flex-col items-start gap-2">
+                <div class="flex items-center gap-2">
+                    <FluentSelect TOption="string" Value="@ReassignToOf(context.ShipmentNumber)"
+                                  ValueChanged="@((string value) => SetReassignTo(context.ShipmentNumber, value))"
+                                  aria-label="@($"Reassign {context.ShipmentNumber} to")" Width="11rem">
+                        <FluentOption TOption="string" Value="">Choose who carries it</FluentOption>
+                        <FluentOption TOption="string" Value="@OwnFleetOption">@PlanningText.OwnFleet</FluentOption>
+                        @foreach (var carrier in _carriers ?? [])
+                        {
+                            <FluentOption TOption="string" Value="@carrier.Id">@PlanningText.Carrier(carrier)</FluentOption>
+                        }
+                    </FluentSelect>
+                    <FluentButton Appearance="Appearance.Outline" OnClick="() => ReassignAsync(context.ShipmentNumber)"
+                                  Disabled="@(!CanReassign(context.ShipmentNumber))"
+                                  aria-label="@($"Reassign {context.ShipmentNumber}")">
+                        Reassign
+                    </FluentButton>
+                </div>
+                @* Only a Shipment its Carrier's Carrier Rate Card can't price, as the TMS says: a Spot price can't override a Carrier Rate Card that prices it (P9). *@
+                @if (context.PricingFailure is not null)
+                {
+                    <FluentButton Appearance="Appearance.Outline" OnClick="() => OpenSpotPrice(context.ShipmentNumber)"
+                                  aria-label="@($"Release {context.ShipmentNumber} with Spot price")">
+                        Release with Spot price
+                    </FluentButton>
+                }
+            </div>
         </TemplateColumn>
     </FluentDataGrid>
 
