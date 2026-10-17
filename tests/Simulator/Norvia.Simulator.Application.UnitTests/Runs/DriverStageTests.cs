@@ -132,9 +132,21 @@ public sealed class DriverStageTests
         await _fleet.RunAsync(FleetRun.Settings(drivers: new DriverShares(0, 0, 0, ReservationsPercent: 50)));
 
         await _fleet.Drivers.Received(FleetRun.Orders / 2).DeliverAsync(
-            Arg.Any<SimulatedDriver>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Is<DriverDelivery>(delivery => delivery.Reservations && delivery.Remark != null), Arg.Any<CancellationToken>());
+            Arg.Any<SimulatedDriver>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Is<DriverDelivery>(delivery => delivery.Reservations && delivery.Remark != null && delivery.Photos.Count == 1), Arg.Any<CancellationToken>());
         await _fleet.Drivers.Received(FleetRun.Orders - (FleetRun.Orders / 2)).DeliverAsync(
-            Arg.Any<SimulatedDriver>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Is<DriverDelivery>(delivery => !delivery.Reservations && delivery.Remark == null && delivery.ReceivedBy.Length > 0), Arg.Any<CancellationToken>());
+            Arg.Any<SimulatedDriver>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Is<DriverDelivery>(delivery => !delivery.Reservations && delivery.Remark == null && delivery.ReceivedBy.Length > 0 && delivery.Photos.Count == 0), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_EveryDelivery_CarriesItsOwnDrawnSignature_AndTheConsigneesContactAsReceiver()
+    {
+        await _fleet.RunAsync(FleetRun.Settings());
+
+        var deliveries = _fleet.Drivers.ReceivedCalls().Where(call => call.GetMethodInfo().Name == nameof(IDriverApp.DeliverAsync))
+            .Select(call => (DriverDelivery)call.GetArguments()[3]!).ToList();
+        deliveries.Should().HaveCount(FleetRun.Orders);
+        deliveries.Select(delivery => Convert.ToBase64String(delivery.Signature.Span)).Distinct().Should().HaveCount(FleetRun.Orders);
+        deliveries.Should().OnlyContain(delivery => delivery.Signature.Length > 100 && delivery.ReceivedBy.Length > 0);
     }
 
     [Fact]
