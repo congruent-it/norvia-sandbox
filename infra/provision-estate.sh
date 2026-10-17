@@ -34,6 +34,27 @@ if [ -z "${ESTATE_CARRIER_ENDPOINT_KEY_SEED:-}" ]; then
 fi
 export ESTATE_CARRIER_ENDPOINT_KEY_SEED
 
+# Tearing the estate down soft-deletes its Key Vaults, and their names (derived from the resource group, so the same every
+# time) stay taken until they are purged, which fails the next deployment with a ConflictError. A vault in deleted state
+# holds nothing the estate still uses, so those of this environment's resource group are purged first. A vault with purge
+# protection cannot be purged; it is reported and the deployment says so if it matters.
+rg_id="/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/rg-$AZURE_ENV_NAME/"
+az keyvault list-deleted --subscription "$AZURE_SUBSCRIPTION_ID" --resource-type vault \
+  --query "[].[name, properties.location, properties.vaultId, properties.purgeProtectionEnabled]" --output tsv 2>/dev/null |
+  while IFS="$(printf '\t')" read -r vault vault_location vault_id protected; do
+    case "$vault_id" in
+      "$rg_id"*) ;;
+      *) continue ;;
+    esac
+    if [ "$protected" = "True" ] || [ "$protected" = "true" ]; then
+      echo "Key Vault $vault is deleted with purge protection; it cannot be purged." >&2
+      continue
+    fi
+    echo "Purging the deleted Key Vault $vault..."
+    az keyvault purge --subscription "$AZURE_SUBSCRIPTION_ID" --name "$vault" --location "$vault_location" --output none ||
+      echo "Could not purge $vault." >&2
+  done
+
 # A new managed identity can take a minute to reach Microsoft Graph, which then refuses to grant it an app role.
 # Deploying again is safe, so a first attempt that fails is retried.
 for attempt in 1 2 3; do
@@ -72,5 +93,8 @@ azd env set AZURE_ESTATE_RESET_ENABLED "$reset_enabled"
 azd env config set infra.parameters.estate_reset_enabled "\"$reset_enabled\""
 
 # The seeded Drivers' Entra test users, whose domain and password the apps take as the Estate parameters azd asks for.
-./create-driver-test-users.sh "$(jq -r '.ESTATE_DRIVER_APP_REGISTRATION_CLIENT_ID.value' "$work/outputs.json")"
+# ARM returns an output's name with its first letter lowercased (estatE_...), so it is looked up in upper case.
+driver_app_registration_client_id=$(jq -r 'to_entries[] | select(.key | ascii_upcase == "ESTATE_DRIVER_APP_REGISTRATION_CLIENT_ID") | .value.value' "$work/outputs.json")
+: "${driver_app_registration_client_id:?The estate has no ESTATE_DRIVER_APP_REGISTRATION_CLIENT_ID output}"
+./create-driver-test-users.sh "$driver_app_registration_client_id"
 touch "$deployed_in_this_run"
