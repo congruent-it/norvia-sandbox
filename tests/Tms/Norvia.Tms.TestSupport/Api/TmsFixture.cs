@@ -14,9 +14,7 @@ using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Norvia.AppHost;
 
-[assembly: AssemblyFixture(typeof(Norvia.Tms.Api.IntegrationTests.TmsFixture))]
-
-namespace Norvia.Tms.Api.IntegrationTests;
+namespace Norvia.Tms.TestSupport;
 
 /// <summary>
 /// Runs the Norvia AppHost once for the whole test run (TMS, SQL and the Service Bus emulator) and records every

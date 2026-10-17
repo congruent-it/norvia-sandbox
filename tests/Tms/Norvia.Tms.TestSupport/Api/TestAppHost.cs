@@ -2,9 +2,9 @@ using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Testing;
 
-namespace Norvia.Tms.Api.IntegrationTests;
+namespace Norvia.Tms.TestSupport;
 
-internal static class TestAppHost
+public static class TestAppHost
 {
     // Each test run starts a whole AppHost of its own, and what the TMS API's tests don't call only costs startup time
     // and memory. The tests play the P4 booking Logic App themselves, with CarrierReport, so no worker may report on a

@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
-namespace Norvia.Tms.Api.IntegrationTests;
+namespace Norvia.Tms.TestSupport;
 
 /// <summary>One log the TMS wrote with the JSON console formatter, with the keys of every scope it was written in.</summary>
 /// <param name="Text">Every value in the log, unescaped, to search for what must never be logged.</param>

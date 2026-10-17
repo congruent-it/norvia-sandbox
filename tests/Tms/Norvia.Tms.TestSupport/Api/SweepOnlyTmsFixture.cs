@@ -1,4 +1,4 @@
-namespace Norvia.Tms.Api.IntegrationTests;
+namespace Norvia.Tms.TestSupport;
 
 /// <summary>
 /// A second TMS whose acceptances never trigger its rating worker, as if every trigger were missed, and whose worker

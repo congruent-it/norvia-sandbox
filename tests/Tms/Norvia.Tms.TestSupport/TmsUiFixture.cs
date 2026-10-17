@@ -11,9 +11,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.Playwright;
 using Norvia.AppHost;
 
-[assembly: AssemblyFixture(typeof(Norvia.Tms.Web.UiTests.TmsUiFixture))]
-
-namespace Norvia.Tms.Web.UiTests;
+namespace Norvia.Tms.TestSupport;
 
 /// <summary>
 /// Runs the Norvia AppHost once for the whole test run (TMS API, TMS UI, SQL and the Service Bus emulator) and a

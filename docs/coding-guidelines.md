@@ -40,7 +40,7 @@ Source code dependencies point inwards only. An inner layer never references an 
 
 ## 2. Solution structure
 
-- Test projects mirror the project they test: `<App>.Domain.UnitTests`, `<App>.Application.UnitTests`, `<App>.ArchitectureTests`, `<App>.Api.IntegrationTests`, `<App>.Web.UiTests`.
+- Test projects mirror the project they test: `<App>.Domain.UnitTests`, `<App>.Application.UnitTests`, `<App>.ArchitectureTests`, `<App>.Api.IntegrationTests`, `<App>.Web.UiTests`. A large integration or UI test project may be split per component with a `.<Component>` suffix (`<App>.Api.IntegrationTests.Billing`); the fixtures and helpers they share live in one `<App>.TestSupport` class library, which each test project references and registers its fixture from, rather than copying.
 - Applications **must not** reference each other's projects. They meet only through Azure Integration Services and the Canonical Model ([ADR 0001](adr/0001-realistic-applications-integrated-only-through-ais.md)).
 - Local orchestration goes through the Aspire AppHost; every service references the shared `ServiceDefaults` project ([ADR 0004](adr/0004-bicep-owns-the-estate-aspire-owns-the-apps.md)).
 - Package versions are managed centrally in `Directory.Packages.props`. Project files **must not** carry version numbers.

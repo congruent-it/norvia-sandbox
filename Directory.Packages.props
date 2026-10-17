@@ -84,5 +84,6 @@
     <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
     <!-- The VSTest flavour of xunit.v3, so coverlet.msbuild (coding guidelines §10) keeps working under dotnet test. -->
     <PackageVersion Include="xunit.v3.mtp-off" Version="4.0.1" />
+    <PackageVersion Include="xunit.v3.extensibility.core" Version="4.0.1" />
   </ItemGroup>
 </Project>

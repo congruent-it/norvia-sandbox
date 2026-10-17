@@ -15,9 +15,7 @@
     <Using Include="Xunit" />
     <Using Include="AwesomeAssertions" />
     <ProjectReference Include="..\..\..\src\Norvia.AppHost\Norvia.AppHost.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <!-- The same Canonical Model bookings the API integration tests submit. -->
-    <Compile Include="..\Norvia.Tms.Api.IntegrationTests\TransportOrders\Bookings.cs" Link="TransportOrders\Bookings.cs" />
+    <ProjectReference Include="..\Norvia.Tms.TestSupport\Norvia.Tms.TestSupport.csproj" />
+    <Using Include="Norvia.Tms.TestSupport" />
   </ItemGroup>
 </Project>
