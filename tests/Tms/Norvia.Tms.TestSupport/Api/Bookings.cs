@@ -1,9 +1,9 @@
 using System.Text.Json.Nodes;
 
-namespace Norvia.Tms.Api.IntegrationTests.TransportOrders;
+namespace Norvia.Tms.TestSupport;
 
 /// <summary>Canonical Model Transport Orders as the intake Logic App sends them.</summary>
-internal static class Bookings
+public static class Bookings
 {
     public static JsonObject Valid(string shipperReference)
     {

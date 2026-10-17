@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace Norvia.Tms.Api.IntegrationTests;
+namespace Norvia.Tms.TestSupport;
 
 /// <summary>
 /// A second TMS whose clock the test sets, as it runs as a process of its own: it reads "now" from a file the fixture

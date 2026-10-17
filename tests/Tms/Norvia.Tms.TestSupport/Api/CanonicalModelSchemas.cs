@@ -2,9 +2,9 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Json.Schema;
 
-namespace Norvia.Tms.Api.IntegrationTests.TransportOrders;
+namespace Norvia.Tms.TestSupport;
 
-internal static class CanonicalModelSchemas
+public static class CanonicalModelSchemas
 {
     // The events that carry a whole Transport Order refer to its schema, which the registry takes only once.
     private static readonly Lazy<JsonSchema> TransportOrderSchema = new(() => Load("transport-order.v1.schema.json"));

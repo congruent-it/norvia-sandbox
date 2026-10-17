@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
-namespace Norvia.Tms.Api.IntegrationTests;
+namespace Norvia.Tms.TestSupport;
 
 /// <summary>
 /// A TMS of its own whose seed a test can correct, as the ERP will correct a Rate Card. The TMS doesn't reload Rate

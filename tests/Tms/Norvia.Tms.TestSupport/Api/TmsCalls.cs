@@ -3,10 +3,10 @@ using System.Net.Http.Json;
 using System.Text.Json.Nodes;
 using Azure.Messaging.ServiceBus;
 
-namespace Norvia.Tms.Api.IntegrationTests.TransportOrders;
+namespace Norvia.Tms.TestSupport;
 
 /// <summary>What the rating tests do at the TMS's boundary: submit as an intake caller, read the query API, watch the topic.</summary>
-internal static class TmsCalls
+public static class TmsCalls
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
 

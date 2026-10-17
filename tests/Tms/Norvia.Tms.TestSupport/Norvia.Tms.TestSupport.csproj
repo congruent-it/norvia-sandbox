@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Fixtures and helpers the TMS integration and UI test projects share. Each test project registers the fixture it uses as its assembly fixture. -->
+  <ItemGroup>
+    <PackageReference Include="Aspire.Azure.Storage.Blobs" />
+    <PackageReference Include="Aspire.Hosting.Testing" />
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="Azure.Messaging.ServiceBus" />
+    <PackageReference Include="JsonSchema.Net" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+    <PackageReference Include="Microsoft.Playwright" />
+    <PackageReference Include="xunit.v3.extensibility.core" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="AwesomeAssertions" />
+    <ProjectReference Include="..\..\..\src\Norvia.AppHost\Norvia.AppHost.csproj" />
+    <ProjectReference Include="..\..\..\src\Tms\Norvia.Tms.Api\Norvia.Tms.Api.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\contracts\canonical-model\*.json" Link="CanonicalModel\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Seed\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

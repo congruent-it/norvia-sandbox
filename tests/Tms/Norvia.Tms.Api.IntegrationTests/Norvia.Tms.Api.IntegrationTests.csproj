@@ -18,13 +18,13 @@
     <Using Include="AwesomeAssertions" />
     <ProjectReference Include="..\..\..\src\Norvia.AppHost\Norvia.AppHost.csproj" />
     <ProjectReference Include="..\..\..\src\Tms\Norvia.Tms.Api\Norvia.Tms.Api.csproj" />
+    <ProjectReference Include="..\Norvia.Tms.TestSupport\Norvia.Tms.TestSupport.csproj" />
+    <Using Include="Norvia.Tms.TestSupport" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\contracts\canonical-model\*.json" Link="CanonicalModel\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <!-- Each test class with a fixture of its own starts an AppHost (SQL Server and the Service Bus emulator in Docker). xUnit runs
          one test collection per core, so a many-core machine started a few dozen at once, and containers failed to start. -->
     <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="Seed\*.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\..\seed\norvia.seed.json" Link="DemoSeed\norvia.seed.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

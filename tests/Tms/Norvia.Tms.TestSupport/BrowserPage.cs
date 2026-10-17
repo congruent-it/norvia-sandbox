@@ -3,10 +3,9 @@ using System.Net.Http.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Microsoft.Playwright;
-using Norvia.Tms.Api.IntegrationTests.TransportOrders;
 using static Microsoft.Playwright.Assertions;
 
-namespace Norvia.Tms.Web.UiTests;
+namespace Norvia.Tms.TestSupport;
 
 /// <summary>
 /// A fresh browser page per test, recording a trace and a video that are kept only when the test fails (coding
