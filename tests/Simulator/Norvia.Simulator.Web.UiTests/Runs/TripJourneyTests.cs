@@ -13,7 +13,7 @@ public sealed partial class TripJourneyTests(SimulatorUiFixture simulator) : Bro
     // The TMS carries the Trip to the Driver app and the Driver's reports to itself through workers, so the Trip completes a little after the run starts.
     private const float PatienceMilliseconds = 180_000;
 
-    [Fact]
+    [Fact(SkipUnless = nameof(CollectionHours.TodayIsStillOpen), SkipType = typeof(CollectionHours), Skip = CollectionHours.Reason)]
     public async Task AnOperatorRunsAPlanWithTrips_SeesTheTripBuiltDispatchedWorkedByItsDriverAndCompleted_InTheLog()
     {
         // A seed of this test's own, so its plan and its Shipper references are its own.

@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Api.TransportOrders;
+using Norvia.Tms.Application;
 using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.TrackingEvents.Record;
 using Norvia.Tms.Domain.Carriers;
@@ -57,7 +58,7 @@ public static class TrackingEventEndpoints
     private static async Task<Results<Ok<RecordTrackingResult>, ProblemHttpResult>> RecordAsync(
         [FromHeader(Name = TransportOrderEndpoints.CorrelationIdHeader)] string? correlationId,
         TrackingEventRequest trackingEvent,
-        IMediator mediator,
+        IConflictRetrier retrier,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(correlationId))
@@ -70,7 +71,8 @@ public static class TrackingEventEndpoints
             return Invalid(problems, correlationId);
         }
 
-        var result = await mediator.Send(new RecordTrackingCommand(report, correlationId), cancellationToken);
+        // A Carrier's events for one Shipment can arrive together, and the save of the one that loses the race is run once more.
+        var result = await retrier.RunAsync(mediator => mediator.Send(new RecordTrackingCommand(report, correlationId), cancellationToken).AsTask());
 
         return result.IsSuccess ? TypedResults.Ok(result.Value) : RefusalProblem.Of<TrackingEventRefusalCode, RecordTrackingResult>(result, "The Tracking event can't be recorded.", correlationId, StatusCodeOf);
     }

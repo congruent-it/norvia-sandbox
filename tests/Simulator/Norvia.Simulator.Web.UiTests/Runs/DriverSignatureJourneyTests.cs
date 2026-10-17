@@ -18,7 +18,7 @@ public sealed class DriverSignatureJourneyTests(SimulatorUiFixture simulator) : 
 
     private readonly SimulatorUiFixture _simulator = simulator;
 
-    [Fact]
+    [Fact(SkipUnless = nameof(CollectionHours.TodayIsStillOpen), SkipType = typeof(CollectionHours), Skip = CollectionHours.Reason)]
     public async Task ThePlanner_OpensTheTimelinesOfTwoDeliveredShipments_AndSeesTheirDifferentDrawnSignatures_AndAPhotoOnlyWhereThereWereReservations()
     {
         var seed = Random.Shared.Next(1_000, int.MaxValue);
