@@ -1,13 +1,20 @@
 @page "/transport-orders/{TransportOrderNumber}"
 @* Interactive like the list: Fluent UI's components don't survive static streaming rendering. *@
 @rendermode InteractiveServer
+@using Norvia.Tms.Application.TransportOrders.GetDetail
+@using Norvia.Tms.Application.Shipments
+@using Norvia.Tms.Domain.Shipments
+@using Norvia.Tms.Domain.Trips
+@using Norvia.Tms.Web.Capacity
+@using Norvia.Tms.Web.Shipments
+@using Norvia.Tms.Web.Trips
 @implements IDisposable
 @inject ITransportOrderQueries Queries
 @inject ILogger<TransportOrderDetail> Logger
 
 <PageTitle>@TransportOrderNumber · Norvia TMS</PageTitle>
 
-<p class="mb-2"><a href="/transport-orders">← Back to the Transport Orders waiting for planning</a></p>
+<p class="mb-2"><a href="/transport-orders/all">← Back to the Transport Orders</a> · <a href="/transport-orders">Waiting for planning</a></p>
 
 <h1>Transport Order @TransportOrderNumber</h1>
 
@@ -43,6 +50,59 @@ else
         </div>
     }
 
+    @* A Transport Order has one Shipment (ADR 0007) and a Shipment is on at most one Trip, so each is a card. *@
+    <div class="mb-4 grid gap-4 md:grid-cols-2">
+        <TransportOrderSection Heading="Shipment">
+            @if (_detail?.Shipment is { } shipment)
+            {
+                <dl class="detail-list">
+                    <dt>Shipment</dt>
+                    <dd><a href="/shipments/@shipment.ShipmentNumber">@shipment.ShipmentNumber</a></dd>
+                    <dt>Status</dt>
+                    <dd>@shipment.Status</dd>
+                    <dt>Carried by</dt>
+                    <dd>@PlanningText.CarriedBy(shipment.CarriedBy)</dd>
+                    @if (shipment.CarrierBooking is { } booking)
+                    {
+                        <dt>Carrier booking</dt>
+                        <dd>@booking.Status</dd>
+                    }
+                </dl>
+            }
+            else
+            {
+                <p>No Shipment yet: this Transport Order isn't planned. <a href="/transport-orders">Transport Orders waiting for planning</a></p>
+            }
+        </TransportOrderSection>
+
+        <TransportOrderSection Heading="Trip">
+            @if (_detail?.Trip is { } trip)
+            {
+                <dl class="detail-list">
+                    <dt>Trip</dt>
+                    <dd><a href="/trips/@trip.TripNumber">@trip.TripNumber</a></dd>
+                    <dt>Day</dt>
+                    <dd>@FleetText.Day(trip.Day)</dd>
+                    <dt>Status</dt>
+                    <dd>@trip.Status</dd>
+                </dl>
+                <TripStopsTable Stops="trip.Stops" ShowOutcomes="true" />
+            }
+            else if (_detail?.Shipment is { CarriedBy.AssignedTo: AssignedTo.OwnFleet })
+            {
+                <p>Not on a Trip yet. <a href="/trips/shipments">Shipments to put on Trips</a></p>
+            }
+            else if (_detail?.Shipment is not null)
+            {
+                <p>Not on a Trip: a Carrier carries this Shipment.</p>
+            }
+            else
+            {
+                <p>No Trip: there is no Shipment yet.</p>
+            }
+        </TransportOrderSection>
+    </div>
+
     <SubmittedTransportOrder Submitted="_transportOrder.TransportOrder">
         <Summary>
             <TransportOrderSection Heading="Transport Order">
@@ -72,7 +132,9 @@ else
     private bool _loaded;
     private bool _failed;
     private readonly CancellationTokenSource _closed = new();
-    private TransportOrderView? _transportOrder;
+    private TransportOrderDetailView? _detail;
+
+    private TransportOrderView? _transportOrder => _detail?.TransportOrder;
 
     [Parameter, EditorRequired]
     public string TransportOrderNumber { get; set; } = string.Empty;
@@ -80,10 +142,10 @@ else
     protected override async Task OnParametersSetAsync()
     {
         _loaded = _failed = false;
-        _transportOrder = null;
+        _detail = null;
         try
         {
-            _transportOrder = await Queries.FindAsync(TransportOrderNumber, _closed.Token);
+            _detail = await Queries.FindAsync(TransportOrderNumber, _closed.Token);
             _loaded = true;
         }
         catch (OperationCanceledException) when (_closed.IsCancellationRequested)

@@ -20,7 +20,7 @@ public sealed class MainLayoutTests : BunitContext
     {
         var layout = RenderAs("customer-service");
 
-        MainNavigation(layout).Should().Equal(("/rejected-bookings", "Rejected bookings"), ("/rating-exceptions", "Rating exceptions"), ("/not-yet-billable", "Not yet billable"));
+        MainNavigation(layout).Should().Equal(("/rejected-bookings", "Rejected bookings"), ("/transport-orders/all", "Transport Orders"), ("/rating-exceptions", "Rating exceptions"), ("/not-yet-billable", "Not yet billable"));
     }
 
     [Fact]
@@ -28,7 +28,7 @@ public sealed class MainLayoutTests : BunitContext
     {
         var layout = RenderAs("planner");
 
-        MainNavigation(layout).Should().Equal(("/transport-orders", "Waiting for planning"), ("/shipments/to-release", "Shipments to release"), ("/shipments/awaiting-answer", "Bookings awaiting an answer"), ("/shipments/in-progress", "Shipments in progress"), ("/shipments/delivered-without-proof-of-delivery", "Delivered without Proof of delivery"), ("/exceptions", "Open Exceptions"), ("/capacity", "Capacity"), ("/trips/shipments", "Shipments to put on Trips"), ("/trips", "Trips"));
+        MainNavigation(layout).Should().Equal(("/transport-orders", "Waiting for planning"), ("/transport-orders/all", "Transport Orders"), ("/shipments/to-release", "Shipments to release"), ("/shipments/awaiting-answer", "Bookings awaiting an answer"), ("/shipments/in-progress", "Shipments in progress"), ("/shipments/delivered-without-proof-of-delivery", "Delivered without Proof of delivery"), ("/exceptions", "Open Exceptions"), ("/capacity", "Capacity"), ("/trips/shipments", "Shipments to put on Trips"), ("/trips", "Trips"));
     }
 
     private IRenderedComponent<MainLayout> RenderAs(string role)

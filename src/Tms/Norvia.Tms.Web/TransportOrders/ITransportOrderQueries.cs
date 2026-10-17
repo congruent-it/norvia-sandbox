@@ -10,12 +10,15 @@ using Norvia.Tms.Application.Shipments.ListToPutOnTrips;
 using Norvia.Tms.Application.Shipments.ListToRelease;
 using Norvia.Tms.Application.TrackingEvents.Timeline;
 using Norvia.Tms.Application.TransportOrders;
+using Norvia.Tms.Application.TransportOrders.Browse;
+using Norvia.Tms.Application.TransportOrders.GetDetail;
 using Norvia.Tms.Application.TransportOrders.List;
 using Norvia.Tms.Application.TransportOrders.RatingExceptions;
 using Norvia.Tms.Application.TransportOrders.ToPlan;
 using Norvia.Tms.Application.Trips;
 using Norvia.Tms.Application.Trips.Choices;
 using Norvia.Tms.Application.Trips.GetByNumber;
+using Norvia.Tms.Domain.TransportOrders;
 
 namespace Norvia.Tms.Web.TransportOrders;
 
@@ -25,8 +28,17 @@ public interface ITransportOrderQueries
     /// <summary>The Transport Orders waiting for planning: Accepted and not yet Planned, the earliest collection first.</summary>
     Task<IReadOnlyList<TransportOrderToPlanSummary>> ListWaitingForPlanningAsync(CancellationToken cancellationToken);
 
-    /// <summary>The Transport Order with this number, or null when there is none.</summary>
-    Task<TransportOrderView?> FindAsync(string transportOrderNumber, CancellationToken cancellationToken);
+    /// <summary>
+    /// One page of every Accepted and Planned Transport Order, newest first. <paramref name="search"/> is a case-insensitive "contains" on the
+    /// Transport Order number, the Shipper reference and the Shipment number, and combines with the filters.
+    /// </summary>
+    Task<TransportOrderPage> ListTransportOrdersAsync(TransportOrderStatus? status, string? shipperId, string? search, int page, CancellationToken cancellationToken);
+
+    /// <summary>The Shippers the TMS knows, by name.</summary>
+    Task<IReadOnlyList<ShipperView>> ListShippersAsync(CancellationToken cancellationToken);
+
+    /// <summary>The Transport Order with this number, its Shipment and the Trip the Shipment is on, or null when there is no such Transport Order.</summary>
+    Task<TransportOrderDetailView?> FindAsync(string transportOrderNumber, CancellationToken cancellationToken);
 
     /// <summary>The Rejected bookings, which Customer service looks up when a Shipper calls about one.</summary>
     Task<IReadOnlyList<TransportOrderSummary>> ListRejectedAsync(CancellationToken cancellationToken);

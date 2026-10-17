@@ -33,6 +33,12 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
     /// <summary>Null for a Rejected booking: the TMS assigns numbers only on acceptance.</summary>
     public TransportOrderNumber? Number { get; private set; }
 
+    /// <summary>
+    /// <see cref="Number"/> as text. The database computes it from the number's column, so a search can match part of the number
+    /// in SQL, which it can't through the number's value conversion.
+    /// </summary>
+    public string? NumberText { get; private set; }
+
     public ShipperId ShipperId { get; private set; }
 
     /// <summary>
@@ -105,6 +111,9 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
     /// <summary>The number of the Transport Order's one Shipment, once it is Planned; null until then.</summary>
     public ShipmentNumber? ShipmentNumber { get; private set; }
 
+    /// <summary><see cref="ShipmentNumber"/> as text, computed by the database like <see cref="NumberText"/>.</summary>
+    public string? ShipmentNumberText { get; private set; }
+
     /// <summary>The key of the assignment that planned the Transport Order, so that assignment sent again is known as a repeat.</summary>
     public IdempotencyKey? PlanningKey { get; private set; }
 
@@ -130,6 +139,7 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
 
         Status = TransportOrderStatus.Planned;
         ShipmentNumber = shipmentNumber;
+        ShipmentNumberText = shipmentNumber.Value;
         PlanningKey = key;
         return Shipment.Plan(shipmentNumber, this, carriedBy, correlationId, plannedAt);
     }
@@ -285,6 +295,7 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
         var order = new TransportOrder(TransportOrderId.New(), shipperId, details, channel, correlationId, receivedAt)
         {
             Number = number,
+            NumberText = number.Value,
             Status = TransportOrderStatus.Accepted,
             ShipperReference = details.ShipperReference,
             BillingState = channel == IntakeChannel.Wms ? TransportOrders.BillingState.NotBilledSeparately : TransportOrders.BillingState.NotYetBillable,

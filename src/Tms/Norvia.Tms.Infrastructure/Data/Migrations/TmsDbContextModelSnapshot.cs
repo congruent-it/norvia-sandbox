@@ -823,6 +823,12 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");
 
+                    b.Property<string>("NumberText")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)")
+                        .HasComputedColumnSql("[Number]");
+
                     b.Property<string>("PlanningKey")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
@@ -869,6 +875,12 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                     b.Property<string>("ShipmentNumber")
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("ShipmentNumberText")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)")
+                        .HasComputedColumnSql("[ShipmentNumber]");
 
                     b.Property<string>("ShipperId")
                         .IsRequired()

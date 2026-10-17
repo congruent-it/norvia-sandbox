@@ -33,6 +33,11 @@ internal sealed class TransportOrderConfiguration : IEntityTypeConfiguration<Tra
             .HasMaxLength(10);
         builder.HasIndex(order => order.Number).IsUnique();
 
+        // The number as text, computed by the database, so the list's search can match part of it in SQL.
+        builder.Property(order => order.NumberText)
+            .HasMaxLength(10)
+            .HasComputedColumnSql("[Number]");
+
         builder.Property(order => order.ShipperId)
             .HasConversion(id => id.Value, value => new ShipperId(value))
             .HasMaxLength(50)
@@ -115,6 +120,9 @@ internal sealed class TransportOrderConfiguration : IEntityTypeConfiguration<Tra
         builder.Property(order => order.ShipmentNumber)
             .HasConversion(number => number!.Value, value => ShipmentNumber.Parse(value))
             .HasMaxLength(10);
+        builder.Property(order => order.ShipmentNumberText)
+            .HasMaxLength(10)
+            .HasComputedColumnSql("[ShipmentNumber]");
         builder.Property(order => order.PlanningKey)
             .HasConversion(key => key!.Value, value => new IdempotencyKey(value))
             .HasMaxLength(IdempotencyKey.MaxLength);

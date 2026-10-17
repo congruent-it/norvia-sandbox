@@ -20,9 +20,11 @@ using Norvia.Tms.Application.Shipments.ListAwaitingAnswer;
 using Norvia.Tms.Application.Shipments.ListInProgress;
 using Norvia.Tms.Application.Shipments.ListToPutOnTrips;
 using Norvia.Tms.Application.Shipments.ListToRelease;
+using Norvia.Tms.Application.Shippers.List;
 using Norvia.Tms.Application.TrackingEvents.Timeline;
 using Norvia.Tms.Application.TransportOrders;
-using Norvia.Tms.Application.TransportOrders.GetByNumber;
+using Norvia.Tms.Application.TransportOrders.Browse;
+using Norvia.Tms.Application.TransportOrders.GetDetail;
 using Norvia.Tms.Application.TransportOrders.GetRejectedBooking;
 using Norvia.Tms.Application.TransportOrders.List;
 using Norvia.Tms.Application.TransportOrders.RatingExceptions;
@@ -89,8 +91,15 @@ internal sealed class TransportOrderQueries(IServiceScopeFactory scopes) : ITran
     public Task<IReadOnlyList<OffTheRoadDayView>> ListOffTheRoadDaysAsync(CancellationToken cancellationToken) =>
         SendAsync(new ListOffTheRoadDaysQuery(), cancellationToken);
 
-    public async Task<TransportOrderView?> FindAsync(string transportOrderNumber, CancellationToken cancellationToken) =>
-        FoundOrNull(await SendAsync(new GetTransportOrderQuery(transportOrderNumber), cancellationToken), $"Transport Order {transportOrderNumber}");
+    public Task<TransportOrderPage> ListTransportOrdersAsync(
+        TransportOrderStatus? status, string? shipperId, string? search, int page, CancellationToken cancellationToken) =>
+        SendAsync(new ListAllTransportOrdersQuery(status, shipperId, search, page), cancellationToken);
+
+    public Task<IReadOnlyList<ShipperView>> ListShippersAsync(CancellationToken cancellationToken) =>
+        SendAsync(new ListShippersQuery(), cancellationToken);
+
+    public async Task<TransportOrderDetailView?> FindAsync(string transportOrderNumber, CancellationToken cancellationToken) =>
+        FoundOrNull(await SendAsync(new GetTransportOrderDetailQuery(transportOrderNumber), cancellationToken), $"Transport Order {transportOrderNumber}");
 
     public async Task<TransportOrderView?> FindRejectedAsync(Guid id, CancellationToken cancellationToken) =>
         FoundOrNull(await SendAsync(new GetRejectedBookingQuery(id), cancellationToken), $"Rejected booking {id}");

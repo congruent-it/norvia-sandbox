@@ -26,6 +26,8 @@ internal sealed class SeedFileShipperDirectory : IShipperDirectory
 
     public Shipper? Find(ShipperId id) => _shippers.GetValueOrDefault(id);
 
+    public IReadOnlyList<Shipper> List() => [.. _shippers.Values];
+
     private sealed record SeedFile(IReadOnlyList<SeedShipper> Shippers);
 
     private sealed record SeedShipper(string Id, string Name, bool Active);
