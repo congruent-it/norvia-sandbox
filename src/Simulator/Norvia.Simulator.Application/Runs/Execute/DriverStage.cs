@@ -18,7 +18,7 @@ internal sealed class DriverStage(IDriverApp app, TimeProvider time, DriverPacin
     private const string DeliveryFailedRemark = "The Consignee was closed";
     private const string DamageRemark = "A pallet was damaged";
     private const string ReservationsRemark = "One carton was dented";
-    private const string Receiver = "Simulated consignee";
+    private const string FallbackReceiver = "Simulated consignee";
 
     public async Task<DriverResult> RunAsync(
         SimulationRun run, IReadOnlyList<RunningTrip> trips, RunLogWriter writer, CancellationToken stopSending, CancellationToken cancellationToken)
@@ -40,7 +40,7 @@ internal sealed class DriverStage(IDriverApp app, TimeProvider time, DriverPacin
                 return new DriverResult(true, started, completed, failures);
             }
 
-            var outcome = await WorkAsync(trip, [.. journeys.Skip(first).Take(trip.Shipments.Count)], failures, writer, stopSending, cancellationToken);
+            var outcome = await WorkAsync(trip, [.. journeys.Skip(first).Take(trip.Shipments.Count)], run.Settings.Seed, failures, writer, stopSending, cancellationToken);
             first += trip.Shipments.Count;
             started += outcome.Started ? 1 : 0;
             completed += outcome.Completed ? 1 : 0;
@@ -54,7 +54,7 @@ internal sealed class DriverStage(IDriverApp app, TimeProvider time, DriverPacin
     }
 
     private async Task<TripOutcome> WorkAsync(
-        RunningTrip trip, IReadOnlyList<DriverJourney> journeys, List<ExpectedFailure> failures, RunLogWriter writer, CancellationToken stopSending, CancellationToken cancellationToken)
+        RunningTrip trip, IReadOnlyList<DriverJourney> journeys, int seed, List<ExpectedFailure> failures, RunLogWriter writer, CancellationToken stopSending, CancellationToken cancellationToken)
     {
         var driver = trip.Driver;
         var reached = await WaitAsync(driver, trip.TripNumber, _ => true, stopSending, cancellationToken);
@@ -96,7 +96,7 @@ internal sealed class DriverStage(IDriverApp app, TimeProvider time, DriverPacin
                 return TripOutcome.Cancelled(started: true);
             }
 
-            await WorkShipmentAsync(trip, trip.Shipments[position], journeys[position], failures, writer, cancellationToken);
+            await WorkShipmentAsync(trip, trip.Shipments[position], journeys[position], seed, failures, writer, cancellationToken);
         }
 
         var end = await app.EndTripAsync(driver, trip.TripNumber, cancellationToken);
@@ -125,7 +125,7 @@ internal sealed class DriverStage(IDriverApp app, TimeProvider time, DriverPacin
     }
 
     private async Task WorkShipmentAsync(
-        RunningTrip trip, OwnFleetShipment shipment, DriverJourney journey, List<ExpectedFailure> failures, RunLogWriter writer, CancellationToken cancellationToken)
+        RunningTrip trip, OwnFleetShipment shipment, DriverJourney journey, int seed, List<ExpectedFailure> failures, RunLogWriter writer, CancellationToken cancellationToken)
     {
         var driver = trip.Driver;
         var number = shipment.ShipmentNumber;
@@ -163,8 +163,12 @@ internal sealed class DriverStage(IDriverApp app, TimeProvider time, DriverPacin
             return;
         }
 
+        // The Consignee's contact receives the goods; the files are drawn from the seed and the Shipment number, so they differ per delivery and repeat per run.
+        var receiver = shipment.Booking.ConsigneeContact ?? shipment.Booking.ConsigneeName ?? FallbackReceiver;
+        var photos = journey.Reservations ? new[] { (ReadOnlyMemory<byte>)DeliveryFiles.Photo(seed, number) } : [];
         var delivered = await app.DeliverAsync(
-            driver, trip.TripNumber, number, new DriverDelivery(Receiver, journey.Reservations, journey.Reservations ? ReservationsRemark : null), cancellationToken);
+            driver, trip.TripNumber, number,
+            new DriverDelivery(receiver, journey.Reservations, journey.Reservations ? ReservationsRemark : null, DeliveryFiles.Signature(seed, number), photos), cancellationToken);
         await ReportAsync(DriverActions.Deliver, delivered, journey.Reservations ? "With reservations" : "Clean");
         if (journey.Reservations)
         {

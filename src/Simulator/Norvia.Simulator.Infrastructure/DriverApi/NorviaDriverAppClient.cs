@@ -22,9 +22,6 @@ internal sealed partial class NorviaDriverAppClient(HttpClient http, IDriverToke
 {
     private const string FlowName = "trip-execution";
 
-    // A 1x1 PNG: the signature the Driver draws on screen. The Driver app checks its type and size, and the TMS keeps it as the Proof of delivery's signature.
-    private static readonly byte[] Signature = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==");
-
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
     {
         Converters = { new JsonStringEnumConverter() },
@@ -78,7 +75,7 @@ internal sealed partial class NorviaDriverAppClient(HttpClient http, IDriverToke
         ArgumentNullException.ThrowIfNull(delivery);
         return SendAsync(
             driver, DriverActions.Deliver, tripNumber, shipmentNumber, StopPath(tripNumber, shipmentNumber, "delivery/deliver"),
-            new Delivery(delivery.ReceivedBy, delivery.Reservations ? "Reservations" : "Clean", delivery.Remark, new ProofFile("image/png", Signature), []), cancellationToken);
+            new Delivery(delivery.ReceivedBy, delivery.Reservations ? "Reservations" : "Clean", delivery.Remark, new ProofFile("image/png", delivery.Signature.ToArray()), [.. delivery.Photos.Select(photo => new ProofFile("image/png", photo.ToArray()))]), cancellationToken);
     }
 
     public Task<DriverCallAnswer> EndTripAsync(SimulatedDriver driver, string tripNumber, CancellationToken cancellationToken) =>

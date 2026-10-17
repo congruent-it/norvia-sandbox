@@ -128,11 +128,11 @@ public sealed class NorviaDriverAppClientTests : IDisposable
     [Theory]
     [InlineData(false, "Clean", null)]
     [InlineData(true, "Reservations", "One carton was dented")]
-    public async Task Deliver_SendsTheProofOfDeliveryForm_WithAPngSignatureAndNoPhotos(bool reservations, string condition, string? remark)
+    public async Task Deliver_SendsTheProofOfDeliveryForm_WithTheSignatureAndPhotosItIsGiven(bool reservations, string condition, string? remark)
     {
         Takes();
 
-        await _client.DeliverAsync(Sanne, "TR-1", "SH-0000002", new DriverDelivery("Simulated consignee", reservations, remark), CancellationToken.None);
+        await _client.DeliverAsync(Sanne, "TR-1", "SH-0000002", new DriverDelivery("Simulated consignee", reservations, remark, Png(1), reservations ? [Png(2)] : []), CancellationToken.None);
 
         _driverApp.Request!.RequestUri.Should().Be(new Uri("https://driver.example/v1/driver/trips/TR-1/stops/SH-0000002/delivery/deliver"));
         var sent = JsonNode.Parse(_driverApp.RequestBody!)!;
@@ -140,9 +140,11 @@ public sealed class NorviaDriverAppClientTests : IDisposable
         sent["condition"]!.GetValue<string>().Should().Be(condition);
         sent["remark"]?.GetValue<string>().Should().Be(remark);
         sent["signature"]!["contentType"]!.GetValue<string>().Should().Be("image/png");
-        Convert.FromBase64String(sent["signature"]!["content"]!.GetValue<string>()).Take(8).Should().Equal(0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A);
-        sent["photos"]!.AsArray().Should().BeEmpty();
+        Convert.FromBase64String(sent["signature"]!["content"]!.GetValue<string>()).Should().Equal(Png(1));
+        sent["photos"]!.AsArray().Select(photo => photo!["contentType"]!.GetValue<string>()).Should().HaveCount(reservations ? 1 : 0).And.OnlyContain(type => type == "image/png");
     }
+
+    private static byte[] Png(byte marker) => [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, marker];
 
     [Fact]
     public async Task ARefusal_IsAnOutcomeNotAnError()
