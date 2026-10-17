@@ -15,7 +15,7 @@ namespace Norvia.Simulator.Application.Runs.Execute;
 /// </summary>
 internal sealed class TripStage(ITmsApi tms, TimeProvider time)
 {
-    private readonly TripDispatcher dispatcher = new(tms, time);
+    private readonly TripDispatcher _dispatcher = new(tms, time);
 
     public async Task<TripResult> RunAsync(
         SimulationRun run, IReadOnlyList<OwnFleetShipment> ownFleet, SimulationWorld world, RunLogWriter writer, CancellationToken stopSending, CancellationToken cancellationToken)
@@ -82,7 +82,7 @@ internal sealed class TripStage(ITmsApi tms, TimeProvider time)
                 }
 
                 var draft = build.Drafts[number];
-                var (tripNumber, wasDispatched) = await dispatcher.DispatchAsync(draft, TripActions.CreationKey(run.Number, onDay.Key.DayNumber, number + 1), writer, cancellationToken);
+                var (tripNumber, wasDispatched) = await _dispatcher.DispatchAsync(draft, TripActions.CreationKey(run.Number, onDay.Key.DayNumber, number + 1), writer, cancellationToken);
                 built += tripNumber is null ? 0 : 1;
                 if (!wasDispatched)
                 {

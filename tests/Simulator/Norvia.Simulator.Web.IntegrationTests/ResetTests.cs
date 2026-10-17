@@ -6,8 +6,6 @@ using Norvia.Simulator.Application.Reset;
 using Norvia.Simulator.Domain.Carriers;
 using Norvia.Simulator.Domain.Runs;
 
-using SimulatorWeb::Norvia.Simulator.Web;
-
 namespace Norvia.Simulator.Web.IntegrationTests;
 
 /// <summary>
@@ -56,13 +54,16 @@ public sealed class ResetTests(SimulatorFixture fixture)
         (await fixture.OpenExceptionsAsync(Ct)).Should().BeEmpty();
         (await fixture.Simulator.Requests.ListRunsAsync(Ct)).Should().BeEmpty();
         var again = await ResetWhenQuietAsync(fixture.Simulator);
-        again.Apps.SelectMany(app => app.Deleted).Should().OnlyContain(kind => kind.Count == 0, "the Partner portal and the Driver app were emptied as well");
+        again.Apps.SelectMany(app => app.Deleted).Where(IsData).Should().OnlyContain(kind => kind.Count == 0, "the Partner portal and the Driver app were emptied as well");
 
         var next = Runs.Burst(orders: 3, badSharePercent: 0, Runs.NextSeed());
         var (_, run, log) = await fixture.Simulator.RunToEndAsync(next, Ct);
         run.Number.Should().Be(1);
         log.Where(Runs.IsBooking).Select(line => line.ShipperReference).Should().Contain("SIM-1-1");
     }
+
+    // The TMS deletes its open Planning days and opens them again from the seed file's Rosters, so it reports them deleted every time: they are no data.
+    private static bool IsData(DeletedKind kind) => kind.Kind != "Open Planning days";
 
     [Fact]
     public async Task AResetOnAnEmptyEstate_Succeeds_WithZeroCounts()
@@ -72,7 +73,7 @@ public sealed class ResetTests(SimulatorFixture fixture)
         var report = await ResetWhenQuietAsync(fixture.Simulator);
 
         report.Complete.Should().BeTrue();
-        report.Apps.SelectMany(app => app.Deleted).Should().OnlyContain(kind => kind.Count == 0);
+        report.Apps.SelectMany(app => app.Deleted).Where(IsData).Should().OnlyContain(kind => kind.Count == 0);
         report.Simulator.Should().OnlyContain(kind => kind.Count == 0);
     }
 
