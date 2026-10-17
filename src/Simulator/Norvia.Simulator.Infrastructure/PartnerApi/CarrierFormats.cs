@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text;
 using System.Text.Json.Nodes;
 using Norvia.Simulator.Application.Ports;
 using Norvia.Simulator.Domain.Carriers;
@@ -13,9 +12,6 @@ namespace Norvia.Simulator.Infrastructure.PartnerApi;
 /// </summary>
 internal static class CarrierFormats
 {
-    // A minimal PDF, as the contract's sample has it.
-    private static readonly string ProofContent = Convert.ToBase64String(Encoding.ASCII.GetBytes("%PDF-1.4\n%%EOF\n"));
-
     public static JsonObject Answer(CarrierAnswerRequest answer)
     {
         ArgumentNullException.ThrowIfNull(answer);
@@ -58,20 +54,21 @@ internal static class CarrierFormats
     {
         ArgumentNullException.ThrowIfNull(proof);
 
+        var deliveryTime = CarrierCountries.Local(proof.At, proof.Place.Country);
         var json = new JsonObject
         {
             ["bookingRef"] = proof.BookingReference,
             ["carrierBookingNumber"] = proof.CarrierBookingNumber,
             ["documentId"] = proof.DocumentId,
             ["receivedBy"] = proof.ReceivedBy,
-            ["deliveryTime"] = CarrierCountries.Local(proof.At, proof.Place.Country),
+            ["deliveryTime"] = deliveryTime,
             ["place"] = proof.Place.City,
             ["postcode"] = proof.Place.Postcode,
             ["country"] = CarrierCountries.Alpha3(proof.Place.Country),
             ["condition"] = proof.Reservations ? "RESERVATIONS" : "CLEAN",
         };
         Add(json, "remark", proof.Remark);
-        json["files"] = new JsonArray(new JsonObject { ["name"] = $"{proof.DocumentId}.pdf", ["contentType"] = "application/pdf", ["content"] = ProofContent });
+        json["files"] = new JsonArray(new JsonObject { ["name"] = $"{proof.DocumentId}.pdf", ["contentType"] = "application/pdf", ["content"] = Convert.ToBase64String(ProofOfDeliveryDocument.Create(proof, deliveryTime.Replace('T', ' ')[..16])) });
         return json;
     }
 

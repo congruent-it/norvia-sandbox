@@ -136,7 +136,7 @@ internal sealed class CarrierStage(IPartnerApi partner, ITmsApi tms, TimeProvide
         {
             var reservations = journey.Exception == CarrierExceptionKind.Reservations;
             var proof = new CarrierProofRequest(
-                reference, carrierBookingNumber, CarrierReferences.DocumentId(shipment.Carrier, run.Number, shipment.Booking.Step), Receiver, now,
+                shipment.Carrier.Name, shipment.ShipmentNumber, shipment.TransportOrderNumber, reference, carrierBookingNumber, CarrierReferences.DocumentId(shipment.Carrier, run.Number, shipment.Booking.Step), Receiver, now,
                 shipment.Booking.Delivery, reservations, reservations ? ReservationsRemark : null);
             var sent = await partner.SendProofOfDeliveryAsync(shipment.Carrier, proof, cancellationToken);
             await writer.CarrierAsync(time.GetUtcNow(), shipment, CarrierActions.ProveDelivery, sent, reservations ? "With reservations" : "Clean", cancellationToken);
