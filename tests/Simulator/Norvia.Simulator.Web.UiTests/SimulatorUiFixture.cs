@@ -1,10 +1,18 @@
+using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Testing;
+using Microsoft.IdentityModel.JsonWebTokens;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.Playwright;
 using Norvia.AppHost;
+using Norvia.Simulator.Domain.Plans;
 
 [assembly: AssemblyFixture(typeof(Norvia.Simulator.Web.UiTests.SimulatorUiFixture))]
 
@@ -15,8 +23,8 @@ namespace Norvia.Simulator.Web.UiTests;
 /// its migrations, the local Partner API, the tracking and Proof of delivery workers (the Carriers' tracking only reaches the TMS through them),
 /// the Integration console (the log's Message trail links point at it), the TMS UI (the log's Transport Order, Shipment and Trip links point at it, and the Simulator waits for its address), the Partner portal (the Shipper's tracking view, which needs the Driver app API its settings point at), the Trip dispatch and Driver reports workers (a dispatched Trip only reaches the Driver app
 /// through the first, and the Drivers' reports only reach the TMS through the second) and the Simulator with its database. A headless Chromium drives the Simulator, which sends its bookings to the real Partner API.
-/// Three more Simulators share its database and settings, each changed in one thing the reset journeys need: an operator who may only read, and two whose TMS API
-/// is a <see cref="ResetStub"/> that switches its reset off or refuses it.
+/// Four more Simulators share its database and settings, each changed in one thing a journey needs: an operator who may only read, two whose TMS API
+/// is a <see cref="ResetStub"/> that switches its reset off or refuses it, and one whose Own fleet is another Vehicle and Driver, so the signatures journey gets a Trip of its own on a day.
 /// </summary>
 public sealed class SimulatorUiFixture : IAsyncLifetime
 {
@@ -32,13 +40,20 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
     // The TMS gives a Vehicle and a Driver one Trip a day, so the Own fleet is one of each and only the Trips journey puts orders on it.
     private const string OwnFleetVehicle = "VEH-0003";
     private const string OwnFleetDriver = "DRV-0003";
+    private static readonly string[] ManageRoles = ["TransportOrders.Manage"];
+
+    private const string SignatureFleetVehicle = "VEH-0001";
+    private const string SignatureFleetDriver = "DRV-0001";
 
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
 
     private DistributedApplication? _app;
     private IPlaywright? _playwright;
     private string? _seedCopy;
+    private string? _signatureSeedCopy;
     private ResetStub? _stub;
+    private readonly string _tokenSigningKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+    private readonly Dictionary<string, JsonObject> _originalRosters = [];
 
     public Uri Address { get; private set; } = null!;
 
@@ -47,6 +62,9 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
 
     /// <summary>The TMS UI, where the Transport Orders a run booked are listed.</summary>
     public Uri TmsUi { get; private set; } = null!;
+
+    /// <summary>A Simulator whose Own fleet is not the first one's, so a Trip of its run is the Trip of another Vehicle and Driver.</summary>
+    public Uri SignatureFleet { get; private set; } = null!;
 
     /// <summary>A Simulator whose operator holds only the Read role.</summary>
     public Uri Viewer { get; private set; } = null!;
@@ -70,7 +88,7 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
         }
 
         var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(
-            [$"Parameters:{LocalTokens.SigningKeyParameter}={Convert.ToHexString(RandomNumberGenerator.GetBytes(32))}"],
+            [$"Parameters:{LocalTokens.SigningKeyParameter}={_tokenSigningKey}"],
             startup.Token);
         foreach (var resource in builder.Resources
             .Where(resource => Unneeded.Any(name => resource.Name == name || resource.Name == $"{name}-rebuilder"))
@@ -84,14 +102,16 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
         _seedCopy = await CopySeedOfAsync(PricedShipper, OwnFleetVehicle, OwnFleetDriver, startup.Token);
         builder.CreateResourceBuilder((ProjectResource)simulator).WithEnvironment("Seed__Path", _seedCopy);
 
+        _signatureSeedCopy = await CopySeedOfAsync(PricedShipper, SignatureFleetVehicle, SignatureFleetDriver, startup.Token);
         _stub = ResetStub.Start();
+        AddVariant(builder, simulator, "simulator-signatures", ("Seed__Path", _signatureSeedCopy));
         AddVariant(builder, simulator, "simulator-viewer", ("LocalOperator__Roles__0", "Simulator.Read"), ("LocalOperator__Roles__1", ""));
         AddVariant(builder, simulator, "simulator-reset-off", ("TmsApi__BaseAddress", _stub.SwitchedOff.ToString()));
         AddVariant(builder, simulator, "simulator-reset-refused", ("TmsApi__BaseAddress", _stub.Refusing.ToString()));
 
         _app = await builder.BuildAsync(startup.Token);
         await _app.StartAsync(startup.Token);
-        foreach (var resource in new[] { "tms-api", "partner-api", "partner-portal-web", "tms-web", "simulator-web", "simulator-viewer", "simulator-reset-off", "simulator-reset-refused" })
+        foreach (var resource in new[] { "tms-api", "partner-api", "partner-portal-web", "tms-web", "simulator-web", "simulator-signatures", "simulator-viewer", "simulator-reset-off", "simulator-reset-refused" })
         {
             await _app.ResourceNotifications.WaitForResourceHealthyAsync(resource, startup.Token);
         }
@@ -99,9 +119,16 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
         Address = _app.GetEndpoint("simulator-web", "http");
         PartnerPortal = _app.GetEndpoint("partner-portal-web", "http");
         TmsUi = _app.GetEndpoint("tms-web", "http");
+        SignatureFleet = _app.GetEndpoint("simulator-signatures", "http");
         Viewer = _app.GetEndpoint("simulator-viewer", "http");
         ResetSwitchedOff = _app.GetEndpoint("simulator-reset-off", "http");
         ResetRefused = _app.GetEndpoint("simulator-reset-refused", "http");
+
+        // The Drivers' rosters are Monday to Friday; at the weekend they work today by a change of Roster, as a Planner would make, so the Trip journeys run on any day.
+        foreach (var driver in new[] { OwnFleetDriver, SignatureFleetDriver })
+        {
+            await WorkTodayAsync(driver, startup.Token);
+        }
 
         _playwright = await Playwright.CreateAsync();
         Browser = await _playwright.Chromium.LaunchAsync();
@@ -109,6 +136,12 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
 
     public async ValueTask DisposeAsync()
     {
+        foreach (var (driver, roster) in _originalRosters)
+        {
+            using var manager = ManagerClient();
+            await ChangeRosterAsync(manager, driver, roster, CancellationToken.None);
+        }
+
         if (Browser is not null)
         {
             await Browser.DisposeAsync();
@@ -122,10 +155,56 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
         }
 
         _stub?.Dispose();
-        if (_seedCopy is not null)
+        foreach (var copy in new[] { _seedCopy, _signatureSeedCopy }.OfType<string>())
         {
-            File.Delete(_seedCopy);
+            File.Delete(copy);
         }
+    }
+
+    private HttpClient ManagerClient()
+    {
+        var client = _app!.CreateHttpClient("tms-api");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
+        {
+            Issuer = LocalTokens.Issuer,
+            Audience = LocalTokens.TmsAudience,
+            Expires = DateTime.UtcNow.AddHours(1),
+            Claims = new Dictionary<string, object> { ["azp"] = LocalTokens.IntakeLogicAppClientId, ["roles"] = ManageRoles },
+            SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_tokenSigningKey)), SecurityAlgorithms.HmacSha256),
+        }));
+        return client;
+    }
+
+    // On a weekend day the Driver gets the Shift of a Friday for today's weekday; disposing the fixture restores the Roster. On a weekday nothing changes.
+    private async Task WorkTodayAsync(string driverId, CancellationToken cancellationToken)
+    {
+        var today = PickupSlot.Today(DateTimeOffset.UtcNow).DayOfWeek;
+        if (today is not (DayOfWeek.Saturday or DayOfWeek.Sunday))
+        {
+            return;
+        }
+
+        using var manager = ManagerClient();
+        var listed = JsonNode.Parse(await manager.GetStringAsync(new Uri("/v1/capacity/rosters", UriKind.Relative), cancellationToken))!.AsArray();
+        var original = new JsonObject();
+        foreach (var day in listed.Single(candidate => candidate!["driverId"]!.GetValue<string>() == driverId)!["weekdays"]!.AsArray())
+        {
+            // The weekday is a name or a number, as the TMS API writes enums.
+            var weekday = day!["weekday"]!;
+            var name = weekday.GetValueKind() == JsonValueKind.String ? weekday.GetValue<string>() : ((DayOfWeek)weekday.GetValue<int>()).ToString();
+            original[name] = new JsonObject { ["start"] = day["start"]!.DeepClone(), ["end"] = day["end"]!.DeepClone() };
+        }
+
+        var worksToday = (JsonObject)original.DeepClone();
+        worksToday[today.ToString()] = (original[DayOfWeek.Friday.ToString()] ?? new JsonObject { ["start"] = "08:00:00", ["end"] = "16:00:00" }).DeepClone();
+        await ChangeRosterAsync(manager, driverId, worksToday, cancellationToken);
+        _originalRosters[driverId] = original;
+    }
+
+    private static async Task ChangeRosterAsync(HttpClient manager, string driverId, JsonObject weekdays, CancellationToken cancellationToken)
+    {
+        using var response = await manager.PutAsJsonAsync(new Uri($"/v1/capacity/rosters/{Uri.EscapeDataString(driverId)}", UriKind.Relative), new JsonObject { ["weekdays"] = weekdays.DeepClone() }, cancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync(cancellationToken));
     }
 
     // Another Simulator on the same database, with the same settings and waits as the first, and the given settings changed.
