@@ -33,6 +33,7 @@ public sealed class NorviaRoleTests
     {
         NorviaRole.CustomerService.Views.Select(view => (view.Path, view.Title)).Should().Equal(
             ("/rejected-bookings", "Rejected bookings"),
+            ("/transport-orders/all", "Transport Orders"),
             ("/rating-exceptions", "Rating exceptions"),
             ("/not-yet-billable", "Not yet billable"));
     }
@@ -42,6 +43,7 @@ public sealed class NorviaRoleTests
     {
         NorviaRole.Planner.Views.Select(view => (view.Path, view.Title)).Should().Equal(
             ("/transport-orders", "Waiting for planning"),
+            ("/transport-orders/all", "Transport Orders"),
             ("/shipments/to-release", "Shipments to release"),
             ("/shipments/awaiting-answer", "Bookings awaiting an answer"),
             ("/shipments/in-progress", "Shipments in progress"),

@@ -15,7 +15,9 @@ using Norvia.Tms.Application.Shipments.GetByNumber;
 using Norvia.Tms.Application.Shipments.ListInProgress;
 using Norvia.Tms.Application.TrackingEvents.Timeline;
 using Norvia.Tms.Application.TransportOrders;
-using Norvia.Tms.Application.TransportOrders.GetByNumber;
+using Norvia.Tms.Application.Shippers.List;
+using Norvia.Tms.Application.TransportOrders.Browse;
+using Norvia.Tms.Application.TransportOrders.GetDetail;
 using Norvia.Tms.Application.TransportOrders.GetRejectedBooking;
 using Norvia.Tms.Application.TransportOrders.List;
 using Norvia.Tms.Application.TransportOrders.ToPlan;
@@ -201,8 +203,8 @@ public sealed class TransportOrderQueriesTests : IDisposable
     [Fact]
     public async Task FindAsync_AKnownNumber_ReturnsTheTransportOrder()
     {
-        var view = Samples.View("TO-0000042");
-        _mediator.Send(new GetTransportOrderQuery("TO-0000042"), Arg.Any<CancellationToken>()).Returns(Result.Success(view));
+        var view = new TransportOrderDetailView(Samples.View("TO-0000042"), null, null);
+        _mediator.Send(new GetTransportOrderDetailQuery("TO-0000042"), Arg.Any<CancellationToken>()).Returns(Result.Success(view));
 
         var order = await _queries.FindAsync("TO-0000042", Xunit.TestContext.Current.CancellationToken);
 
@@ -212,7 +214,7 @@ public sealed class TransportOrderQueriesTests : IDisposable
     [Fact]
     public async Task FindAsync_AnUnknownNumber_ReturnsNull()
     {
-        _mediator.Send(new GetTransportOrderQuery("TO-0000999"), Arg.Any<CancellationToken>()).Returns(Result<TransportOrderView>.NotFound());
+        _mediator.Send(new GetTransportOrderDetailQuery("TO-0000999"), Arg.Any<CancellationToken>()).Returns(Result<TransportOrderDetailView>.NotFound());
 
         var order = await _queries.FindAsync("TO-0000999", Xunit.TestContext.Current.CancellationToken);
 
@@ -222,11 +224,33 @@ public sealed class TransportOrderQueriesTests : IDisposable
     [Fact]
     public async Task FindAsync_WhenTheQueryFails_ThrowsRatherThanSayingThereIsNone()
     {
-        _mediator.Send(new GetTransportOrderQuery("TO-0000042"), Arg.Any<CancellationToken>()).Returns(Result<TransportOrderView>.Error("The query failed."));
+        _mediator.Send(new GetTransportOrderDetailQuery("TO-0000042"), Arg.Any<CancellationToken>()).Returns(Result<TransportOrderDetailView>.Error("The query failed."));
 
         var find = () => _queries.FindAsync("TO-0000042", Xunit.TestContext.Current.CancellationToken);
 
         await find.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task ListTransportOrdersAsync_SendsTheFiltersTheSearchAndThePage()
+    {
+        var page = new TransportOrderPage([], 0, 2, ListAllTransportOrdersQuery.DefaultPageSize);
+        _mediator.Send(new ListAllTransportOrdersQuery(TransportOrderStatus.Planned, "SHP-0001", "bd-2026", 2), Arg.Any<CancellationToken>()).Returns(page);
+
+        var listed = await _queries.ListTransportOrdersAsync(TransportOrderStatus.Planned, "SHP-0001", "bd-2026", 2, Xunit.TestContext.Current.CancellationToken);
+
+        listed.Should().BeSameAs(page);
+    }
+
+    [Fact]
+    public async Task ListShippersAsync_ListsTheShippers()
+    {
+        IReadOnlyList<ShipperView> shippers = [Samples.BrouwerDranken];
+        _mediator.Send(new ListShippersQuery(), Arg.Any<CancellationToken>()).Returns(shippers);
+
+        var listed = await _queries.ListShippersAsync(Xunit.TestContext.Current.CancellationToken);
+
+        listed.Should().BeSameAs(shippers);
     }
 
     [Fact]

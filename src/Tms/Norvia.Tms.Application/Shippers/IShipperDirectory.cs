@@ -6,4 +6,7 @@ namespace Norvia.Tms.Application.Shippers;
 public interface IShipperDirectory
 {
     Shipper? Find(ShipperId id);
+
+    /// <summary>Every Shipper the TMS knows.</summary>
+    IReadOnlyList<Shipper> List();
 }

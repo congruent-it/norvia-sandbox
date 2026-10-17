@@ -1,5 +1,12 @@
 using AngleSharp.Dom;
+using Norvia.Tms.Application.CarrierBookings;
+using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.TransportOrders;
+using Norvia.Tms.Application.Trips.GetByNumber;
+using Norvia.Tms.Domain.CarrierBookings;
+using Norvia.Tms.Domain.Shipments;
+using Norvia.Tms.Domain.Trips;
+using Norvia.Tms.Application.TransportOrders.GetDetail;
 using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Web.TransportOrders;
 
@@ -10,7 +17,7 @@ public sealed class TransportOrderDetailTests : TmsWebContext
     [Fact]
     public void Render_AnAcceptedTransportOrder_ShowsEverythingTheShipperSubmitted()
     {
-        Queries.FindAsync("TO-0000042", Arg.Any<CancellationToken>()).Returns(Samples.View("TO-0000042"));
+        Queries.FindAsync("TO-0000042", Arg.Any<CancellationToken>()).Returns(Detail(Samples.View("TO-0000042")));
 
         var page = RenderDetail("TO-0000042");
 
@@ -45,7 +52,7 @@ public sealed class TransportOrderDetailTests : TmsWebContext
     public void Render_APlannedTransportOrder_ShowsItsShipmentLinkingToIt()
     {
         Queries.FindAsync("TO-0000042", Arg.Any<CancellationToken>())
-            .Returns(Samples.View("TO-0000042") with { Status = TransportOrderStatus.Planned, ShipmentNumber = "SH-0000012" });
+            .Returns(Detail(Samples.View("TO-0000042") with { Status = TransportOrderStatus.Planned, ShipmentNumber = "SH-0000012" }));
 
         var page = RenderDetail("TO-0000042");
 
@@ -60,7 +67,7 @@ public sealed class TransportOrderDetailTests : TmsWebContext
     [Fact]
     public void Render_ATransportOrderNotYetPlanned_ShowsNoShipment()
     {
-        Queries.FindAsync("TO-0000042", Arg.Any<CancellationToken>()).Returns(Samples.View("TO-0000042"));
+        Queries.FindAsync("TO-0000042", Arg.Any<CancellationToken>()).Returns(Detail(Samples.View("TO-0000042")));
 
         var page = RenderDetail("TO-0000042");
 
@@ -70,7 +77,7 @@ public sealed class TransportOrderDetailTests : TmsWebContext
     [Fact]
     public void Render_ATransportOrderNotYetRated_SaysSoWithoutAFreightCharge()
     {
-        Queries.FindAsync("TO-0000042", Arg.Any<CancellationToken>()).Returns(Samples.View("TO-0000042"));
+        Queries.FindAsync("TO-0000042", Arg.Any<CancellationToken>()).Returns(Detail(Samples.View("TO-0000042")));
 
         var page = RenderDetail("TO-0000042");
 
@@ -84,7 +91,7 @@ public sealed class TransportOrderDetailTests : TmsWebContext
     [Fact]
     public void Render_ARatedTransportOrder_ShowsItsFreightChargeByChargeLineWithTheTotalAndRateCardVersion()
     {
-        Queries.FindAsync("TO-0000042", Arg.Any<CancellationToken>()).Returns(Samples.RatedView("TO-0000042"));
+        Queries.FindAsync("TO-0000042", Arg.Any<CancellationToken>()).Returns(Detail(Samples.RatedView("TO-0000042")));
 
         var page = RenderDetail("TO-0000042");
 
@@ -100,7 +107,7 @@ public sealed class TransportOrderDetailTests : TmsWebContext
     [Fact]
     public void Render_ATransportOrderWhoseRatingFailed_ShowsWhyWithoutAFreightCharge()
     {
-        Queries.FindAsync("TO-0000042", Arg.Any<CancellationToken>()).Returns(Samples.RatingFailedView("TO-0000042"));
+        Queries.FindAsync("TO-0000042", Arg.Any<CancellationToken>()).Returns(Detail(Samples.RatingFailedView("TO-0000042")));
 
         var page = RenderDetail("TO-0000042");
 
@@ -116,7 +123,7 @@ public sealed class TransportOrderDetailTests : TmsWebContext
     public void Render_AFulfilmentTransportOrder_SaysItIsNotRatedSeparately()
     {
         Queries.FindAsync("TO-0000042", Arg.Any<CancellationToken>())
-            .Returns(Samples.View("TO-0000042") with { RatingResult = RatingResult.NotRatedSeparately });
+            .Returns(Detail(Samples.View("TO-0000042") with { RatingResult = RatingResult.NotRatedSeparately }));
 
         var page = RenderDetail("TO-0000042");
 
@@ -135,7 +142,7 @@ public sealed class TransportOrderDetailTests : TmsWebContext
                 Instructions = null,
             },
         };
-        Queries.FindAsync("TO-0000042", Arg.Any<CancellationToken>()).Returns(view);
+        Queries.FindAsync("TO-0000042", Arg.Any<CancellationToken>()).Returns(Detail(view));
 
         var page = RenderDetail("TO-0000042");
 
@@ -148,7 +155,7 @@ public sealed class TransportOrderDetailTests : TmsWebContext
     {
         var view = Samples.View("TO-0000042");
         Queries.FindAsync("TO-0000042", Arg.Any<CancellationToken>())
-            .Returns(view with { TransportOrder = view.TransportOrder with { GoodsLines = [] } });
+            .Returns(Detail(view with { TransportOrder = view.TransportOrder with { GoodsLines = [] } }));
 
         var page = RenderDetail("TO-0000042");
 
@@ -157,10 +164,93 @@ public sealed class TransportOrderDetailTests : TmsWebContext
     }
 
     [Fact]
+    public void Render_ATransportOrderNotYetPlanned_SaysThereIsNoShipmentYetAndLinksToThoseWaitingForPlanning()
+    {
+        Queries.FindAsync("TO-0000042", Arg.Any<CancellationToken>()).Returns(Detail(Samples.View("TO-0000042")));
+
+        var page = RenderDetail("TO-0000042");
+
+        page.WaitForAssertion(() => Section(page, "Shipment").TextContent.Should().Contain("No Shipment yet"));
+        Section(page, "Shipment").QuerySelector("a[href='/transport-orders']").Should().NotBeNull();
+        Section(page, "Trip").TextContent.Should().Contain("No Trip: there is no Shipment yet.");
+    }
+
+    [Fact]
+    public void Render_APlannedOwnFleetOrderOnNoTrip_ShowsTheShipmentCardAndSaysItIsOnNoTripLinkingToShipmentsToPutOnTrips()
+    {
+        Queries.FindAsync("TO-0000042", Arg.Any<CancellationToken>()).Returns(Detail(Samples.View("TO-0000042"), OwnFleetShipment(), null));
+
+        var page = RenderDetail("TO-0000042");
+
+        page.WaitForAssertion(() => Definitions(page, "Shipment").Should().Equal(new Dictionary<string, string>
+        {
+            ["Shipment"] = "SH-0000012",
+            ["Status"] = "Released",
+            ["Carried by"] = "Own fleet",
+        }));
+        Section(page, "Shipment").QuerySelector("a[href='/shipments/SH-0000012']").Should().NotBeNull();
+        Section(page, "Trip").TextContent.Should().Contain("Not on a Trip yet.");
+        Section(page, "Trip").QuerySelector("a[href='/trips/shipments']").Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Render_ACarrierShipment_ShowsWhoCarriesItNowAndItsCarrierBookingStatus()
+    {
+        var shipment = new TransportOrderShipmentView(
+            "SH-0000012", ShipmentStatus.Booked, new CarriedByView(AssignedTo.Carrier, Samples.Kessler), Booking(CarrierBookingStatus.Confirmed));
+        Queries.FindAsync("TO-0000042", Arg.Any<CancellationToken>()).Returns(Detail(Samples.View("TO-0000042"), shipment, null));
+
+        var page = RenderDetail("TO-0000042");
+
+        page.WaitForAssertion(() => Definitions(page, "Shipment").Should().Equal(new Dictionary<string, string>
+        {
+            ["Shipment"] = "SH-0000012",
+            ["Status"] = "Booked",
+            ["Carried by"] = "Kessler Spedition",
+            ["Carrier booking"] = "Confirmed",
+        }));
+        Section(page, "Trip").TextContent.Should().Contain("Not on a Trip: a Carrier carries this Shipment.");
+    }
+
+    [Fact]
+    public void Render_AShipmentOnATrip_ShowsTheTripAsALinkWithItsDayAndStatusAndThisOrdersStopsWithTheirOutcome()
+    {
+        var stops = new[]
+        {
+            new TripStopView(0, StopKind.Collection, "SH-0000012", "TO-0000042", "Waalhaven Oostzijde 88, 3087 BM Rotterdam", null, null, null, "2 pallet",
+                StopOutcomeKind.Collected, new DateTimeOffset(2026, 10, 13, 6, 30, 0, TimeSpan.Zero), "Dock 4"),
+            new TripStopView(1, StopKind.Delivery, "SH-0000012", "TO-0000042", "Oudegracht 112, 3511 AW Utrecht", "Café De Zwaan", null, null, "2 pallet"),
+        };
+        var trip = new TransportOrderTripView("TR-0000007", new DateOnly(2026, 10, 13), TripStatus.InProgress, stops);
+        Queries.FindAsync("TO-0000042", Arg.Any<CancellationToken>()).Returns(Detail(Samples.View("TO-0000042"), OwnFleetShipment(), trip));
+
+        var page = RenderDetail("TO-0000042");
+
+        page.WaitForAssertion(() => Definitions(page, "Trip").Should().Equal(new Dictionary<string, string>
+        {
+            ["Trip"] = "TR-0000007",
+            ["Day"] = "Tue 13 Oct",
+            ["Status"] = "InProgress",
+        }));
+        Section(page, "Trip").QuerySelector("a[href='/trips/TR-0000007']").Should().NotBeNull();
+        Rows(page, "Trip").Should().Equal(
+            "1 | Collect | SH-0000012 | Waalhaven Oostzijde 88, 3087 BM Rotterdam | Not given | 2 pallet | Collected · Tue 13 Oct 2026, 08:30 · Dock 4",
+            "2 | Deliver | SH-0000012 | Café De Zwaan, Oudegracht 112, 3511 AW Utrecht | Not given | 2 pallet | Open");
+    }
+
+    private static TransportOrderDetailView Detail(TransportOrderView view, TransportOrderShipmentView? shipment, TransportOrderTripView? trip) => new(view, shipment, trip);
+
+    private static TransportOrderShipmentView OwnFleetShipment() =>
+        new("SH-0000012", ShipmentStatus.Released, new CarriedByView(AssignedTo.OwnFleet, null), null);
+
+    private static CarrierBookingView Booking(CarrierBookingStatus status) => new(
+        "CB-0000003", Samples.Kessler, status, new DateTimeOffset(2026, 9, 24, 10, 0, 0, TimeSpan.Zero), null, null, null, null, null, null, null, null, null);
+
+    [Fact]
     public void Render_BeforeTheTransportOrderIsRead_ShowsLoading()
     {
         Queries.FindAsync("TO-0000042", Arg.Any<CancellationToken>())
-            .Returns(new TaskCompletionSource<TransportOrderView?>().Task);
+            .Returns(new TaskCompletionSource<TransportOrderDetailView?>().Task);
 
         var page = RenderDetail("TO-0000042");
 
@@ -170,7 +260,7 @@ public sealed class TransportOrderDetailTests : TmsWebContext
     [Fact]
     public void Render_AnUnknownNumber_SaysThereIsNoSuchTransportOrder()
     {
-        Queries.FindAsync("TO-0000999", Arg.Any<CancellationToken>()).Returns((TransportOrderView?)null);
+        Queries.FindAsync("TO-0000999", Arg.Any<CancellationToken>()).Returns((TransportOrderDetailView?)null);
 
         var page = RenderDetail("TO-0000999");
 
@@ -183,13 +273,15 @@ public sealed class TransportOrderDetailTests : TmsWebContext
     public void Render_WhenTheTransportOrderCantBeRead_ShowsAnError()
     {
         Queries.FindAsync("TO-0000042", Arg.Any<CancellationToken>())
-            .Returns<TransportOrderView?>(_ => throw new TimeoutException("The database didn't answer."));
+            .Returns<TransportOrderDetailView?>(_ => throw new TimeoutException("The database didn't answer."));
 
         var page = RenderDetail("TO-0000042");
 
         page.WaitForAssertion(() => page.Find("[role=alert]").TextContent.Should()
             .Contain("Transport Order TO-0000042 couldn't be loaded. Reload the page to try again."));
     }
+
+    private static TransportOrderDetailView Detail(TransportOrderView view) => new(view, null, null);
 
     private IRenderedComponent<TransportOrderDetail> RenderDetail(string number) =>
         Render<TransportOrderDetail>(parameters => parameters.Add(page => page.TransportOrderNumber, number));

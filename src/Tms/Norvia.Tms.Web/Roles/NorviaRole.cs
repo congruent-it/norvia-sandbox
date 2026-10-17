@@ -15,6 +15,7 @@ public sealed record NorviaRole(string Key, string Name, IReadOnlyList<RoleView>
     public static readonly NorviaRole Planner = new("planner", "Planner",
         [
             new("/transport-orders", "Waiting for planning"),
+            new("/transport-orders/all", "Transport Orders"),
             new("/shipments/to-release", "Shipments to release"),
             new("/shipments/awaiting-answer", "Bookings awaiting an answer"),
             new("/shipments/in-progress", "Shipments in progress"),
@@ -26,7 +27,7 @@ public sealed record NorviaRole(string Key, string Name, IReadOnlyList<RoleView>
         ]);
 
     public static readonly NorviaRole CustomerService = new("customer-service", "Customer service",
-        [new("/rejected-bookings", "Rejected bookings"), new("/rating-exceptions", "Rating exceptions"), new("/not-yet-billable", "Not yet billable")]);
+        [new("/rejected-bookings", "Rejected bookings"), new("/transport-orders/all", "Transport Orders"), new("/rating-exceptions", "Rating exceptions"), new("/not-yet-billable", "Not yet billable")]);
 
     /// <summary>Where the role opens: its first view.</summary>
     public string Home => Views[0].Path;
