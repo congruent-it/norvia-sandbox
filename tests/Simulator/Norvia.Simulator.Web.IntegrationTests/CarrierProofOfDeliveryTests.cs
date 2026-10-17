@@ -21,9 +21,9 @@ public sealed partial class CarrierProofOfDeliveryTests(SimulatorFixture fixture
     private const string PdfContentType = "application/pdf";
     private const string ReservationsRemark = "Two pallets short";
 
-    // The claim check holds a file well below this (ADR 0009); a one-page text PDF is a few hundred bytes.
     private static readonly byte[] PdfSignature = "%PDF-"u8.ToArray();
 
+    // The Partner API takes a body of up to 25 MB by claim check (ADR 0023); a one-page text PDF is a few hundred bytes, so this bound is far below it.
     private const long SmallPdfBytes = 4 * 1024;
 
     // Every step asked for in full, and half of the tracked Shipments hit an Exception, a quarter of those with reservations.
