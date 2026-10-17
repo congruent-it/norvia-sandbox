@@ -21,6 +21,7 @@ builder.AddServiceDefaults();
 builder.AddDriverAppInfrastructure();
 builder.AddDriverAppSeedDrivers();
 builder.AddDriverAppProofOfDeliveryTransit();
+builder.AddDriverAppResetUnavailable();
 builder.AddDriverSignIn();
 builder.Services.AddScoped<IPipelineBehavior<StartTripCommand, Result<StartTripResult>>, TrackStartTripInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<EndTripCommand, Result<EndTripResult>>, TrackEndTripInLoggingScope>();

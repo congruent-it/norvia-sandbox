@@ -70,6 +70,23 @@ public static class DependencyInjection
         return builder;
     }
 
+    /// <summary>
+    /// The reset's services for a process that finds the reset handlers (the mediator scans the whole application assembly) but does not offer the reset, such as the Driver
+    /// app's screens: the switch stays off, and nothing in the process can peek a subscription.
+    /// </summary>
+    public static IHostApplicationBuilder AddDriverAppResetUnavailable(this IHostApplicationBuilder builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.Services.AddOptions<ResetOptions>().BindConfiguration(ResetOptions.SectionName)
+            .ValidateDataAnnotations().ValidateOnStart();
+        builder.Services.AddSingleton<IResetSwitch, ConfiguredResetSwitch>();
+        builder.Services.AddScoped<IQuietCheck, UnavailableQuietCheck>();
+        builder.Services.AddScoped<ITransactionalData, SqlTransactionalData>();
+
+        return builder;
+    }
+
     /// <summary>The transit container for the files of a Proof of delivery (P12). Only the screens, where the Driver gives the files, need it.</summary>
     public static IHostApplicationBuilder AddDriverAppProofOfDeliveryTransit(this IHostApplicationBuilder builder)
     {
