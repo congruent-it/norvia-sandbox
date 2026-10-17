@@ -28,6 +28,24 @@ public abstract class BrowserPage(SimulatorUiFixture simulator) : IAsyncLifetime
         Page = await _context.NewPageAsync();
     }
 
+    // Only one run is active at a time across the Simulators, which share a database, so a run a test leaves going (it stops watching once it has seen what it needs, or fails halfway) would refuse the next test's start.
+    private async Task CancelRunAsync()
+    {
+        try
+        {
+            var cancel = Page.GetByRole(AriaRole.Button, new() { Name = "Cancel run" });
+            if (await cancel.CountAsync() > 0)
+            {
+                await cancel.ClickAsync(new() { Timeout = 5_000 });
+                await Assertions.Expect(cancel).ToHaveCountAsync(0, new() { Timeout = 30_000 });
+            }
+        }
+        catch (PlaywrightException)
+        {
+            // The page is gone or the run ended meanwhile: nothing left to cancel.
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
         GC.SuppressFinalize(this);
@@ -36,6 +54,7 @@ public abstract class BrowserPage(SimulatorUiFixture simulator) : IAsyncLifetime
             return;
         }
 
+        await CancelRunAsync();
         var failed = TestContext.Current.TestState?.Result == TestResult.Failed;
         var name = string.Concat((TestContext.Current.Test?.TestDisplayName ?? "test").Split(Path.GetInvalidFileNameChars()));
         await _context.Tracing.StopAsync(failed ? new TracingStopOptions { Path = Path.Combine(ArtifactsDirectory, $"{name}.trace.zip") } : new());

@@ -16,9 +16,6 @@ public sealed partial class TripJourneyTests(SimulatorUiFixture simulator) : Bro
     [Fact]
     public async Task AnOperatorRunsAPlanWithTrips_SeesTheTripBuiltDispatchedWorkedByItsDriverAndCompleted_InTheLog()
     {
-        // The Drivers' rosters are Monday to Friday, so there is no Shift, and so no Trip for today, at the weekend.
-        Assert.SkipWhen(DateTime.UtcNow.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday, "No Driver has a Shift at the weekend, so no Trip can be for today.");
-
         // A seed of this test's own, so its plan and its Shipper references are its own.
         var seed = Random.Shared.Next(1_000, int.MaxValue);
         TestContext.Current.SendDiagnosticMessage($"Seed {seed}");
