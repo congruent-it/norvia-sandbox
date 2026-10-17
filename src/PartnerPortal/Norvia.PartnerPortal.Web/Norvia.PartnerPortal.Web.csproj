@@ -18,6 +18,7 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Norvia.PartnerPortal.Web.UnitTests" />
+    <InternalsVisibleTo Include="Norvia.PartnerPortal.Web.IntegrationTests" />
   </ItemGroup>
 
   <!--

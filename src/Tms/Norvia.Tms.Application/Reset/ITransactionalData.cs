@@ -6,7 +6,7 @@ public interface ITransactionalData
     /// <summary>
     /// Deletes the Transport Orders and everything hanging off them, the Shipments, Trips, Exceptions, Carrier bookings, Tracking events,
     /// Proof of delivery records, Shipper notifications and outbox Messages, and the Planner's changes to the Rosters, Absences and Off the road
-    /// days, so the seed file's Rosters apply again. It restarts the number sequences.
+    /// days, so the seed file's Rosters apply again, and the open Planning days those changes shaped. It restarts the number sequences.
     /// </summary>
     Task<IReadOnlyList<DeletedKind>> ClearAsync(CancellationToken cancellationToken);
 }

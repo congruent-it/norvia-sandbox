@@ -21,13 +21,16 @@ namespace Norvia.DriverApp.Api.IntegrationTests;
 /// Service Bus emulator, where the Driver app publishes what the Driver reports. A subscription of the tests' own records every message the Driver app
 /// publishes to the topic for Driver app events. The fixture holds the key the Driver app trusts locally, so it issues tokens the way Entra would.
 /// </summary>
-public sealed class DriverAppFixture : IAsyncLifetime
+public class DriverAppFixture : IAsyncLifetime
 {
     public const string DriverAppEventsTopic = "driver-app-events";
-    private const string TestSubscription = "driver-app-api-integration-tests";
+    public const string TestSubscription = "driver-app-api-integration-tests";
 
     /// <summary>The app role only the P12 Driver reports Logic App's managed identity holds on the Driver app.</summary>
     public const string ReportOutcomeRole = "DriverReports.ReportOutcome";
+
+    /// <summary>The app role only the Simulator's identity holds on the Driver app API, for returning the estate to a clean sheet.</summary>
+    public const string ResetRole = "Estate.Reset";
 
     // What the Driver app's tests don't call only costs startup time and memory. The storage emulator stays: the Driver app's screens store the files of a
     // Proof of delivery in it. The tests play the Driver reports Logic App themselves, so no worker may
@@ -74,6 +77,15 @@ public sealed class DriverAppFixture : IAsyncLifetime
         var topic = builder.Resources.OfType<AzureServiceBusTopicResource>().Single(t => t.TopicName == DriverAppEventsTopic);
         builder.CreateResourceBuilder(topic).AddServiceBusSubscription($"{DriverAppEventsTopic}-{TestSubscription}", TestSubscription);
 
+        // The Simulator's reset waits for the subscription its Driver reports worker empties; the tests run without that worker, so the Driver app waits for
+        // the subscription of the tests' own, which they empty as fast as the Driver app publishes.
+        var driverAppApi = builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(resource => resource.Name == "driver-app-api"));
+        driverAppApi.WithEnvironment("Reset__QuietSubscriptions__0", $"{DriverAppEventsTopic}/{TestSubscription}");
+        foreach (var (name, value) in DriverAppApiSettings())
+        {
+            driverAppApi.WithEnvironment(name, value);
+        }
+
         _app = await builder.BuildAsync(startup.Token);
         await _app.StartAsync(startup.Token);
         await _app.ResourceNotifications.WaitForResourceHealthyAsync("driver-app-api", startup.Token);
@@ -95,8 +107,12 @@ public sealed class DriverAppFixture : IAsyncLifetime
         await _processor.StartProcessingAsync(startup.Token);
     }
 
+    /// <summary>What a fixture sets on the Driver app API on top of what the AppHost gives it, as environment variables.</summary>
+    protected virtual Dictionary<string, string> DriverAppApiSettings() => [];
+
     public async ValueTask DisposeAsync()
     {
+        GC.SuppressFinalize(this);
         if (_processor is not null)
         {
             await _processor.DisposeAsync();
