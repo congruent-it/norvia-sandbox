@@ -10,12 +10,11 @@ using System.Text.Json.Nodes;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Testing;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Norvia.AppHost;
+using Norvia.Simulator.Domain.Plans;
 using SimulatorWeb::Norvia.Simulator.Web;
 
 [assembly: AssemblyFixture(typeof(Norvia.Simulator.Web.IntegrationTests.SimulatorFixture))]
@@ -42,6 +41,7 @@ public sealed class SimulatorFixture : IAsyncLifetime
         ["ConnectionStrings__", "Seed__", "Simulator__", "PartnerApi__", "PartnerPortal__", "TmsApi__", "DriverApp__", "IntegrationConsole__", "LocalOperator__"];
 
     private static readonly string[] IntakeRoles = ["TransportOrders.Intake"];
+    private static readonly string[] ManageRoles = ["TransportOrders.Manage"];
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
     private readonly string _tokenSigningKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
     private readonly List<SimulatorHost> _hosts = [];
@@ -266,6 +266,83 @@ public sealed class SimulatorFixture : IAsyncLifetime
         return JsonNode.Parse(await response.Content.ReadAsStringAsync(cancellationToken))!.AsObject();
     }
 
+    /// <summary>A Shipment's current Proof of delivery as the TMS API reads it out, or null when it has none.</summary>
+    public async Task<JsonObject?> ProofOfDeliveryAsync(string shipmentNumber, CancellationToken cancellationToken)
+    {
+        using var response = await Tms.GetAsync(new Uri($"/v1/shipments/{Uri.EscapeDataString(shipmentNumber)}/proof-of-delivery", UriKind.Relative), cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return JsonNode.Parse(await response.Content.ReadAsStringAsync(cancellationToken))!.AsObject();
+    }
+
+    /// <summary>One file of a Shipment's Proof of delivery, read back through the TMS file endpoint: its content type and its bytes.</summary>
+    public async Task<(string? ContentType, byte[] Content)> ProofOfDeliveryFileAsync(string shipmentNumber, Guid fileId, CancellationToken cancellationToken)
+    {
+        using var response = await Tms.GetAsync(
+            new Uri($"/v1/shipments/{Uri.EscapeDataString(shipmentNumber)}/proof-of-delivery/files/{fileId}", UriKind.Relative), cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return (response.Content.Headers.ContentType?.MediaType, await response.Content.ReadAsByteArrayAsync(cancellationToken));
+    }
+
+    /// <summary>What an AppHost resource, such as the Driver app API or the TMS API, has logged so far.</summary>
+    public async Task<string> ResourceLogsAsync(string resourceName, CancellationToken cancellationToken)
+    {
+        var text = new StringBuilder();
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(30));
+        await foreach (var batch in _app!.Services.GetRequiredService<ResourceLoggerService>().GetAllAsync(resourceName).WithCancellation(timeout.Token))
+        {
+            foreach (var line in batch)
+            {
+                text.AppendLine(line.Content);
+            }
+        }
+
+        return text.ToString();
+    }
+
+    /// <summary>
+    /// Lets the Driver work today: the Drivers' rosters are Monday to Friday, so at the weekend the Driver has no Shift and the TMS can put no Trip on today. When
+    /// today is a weekend day, the Driver gets the Shift of a weekday for today's weekday, as a Planner would change the Roster; disposing restores the Roster.
+    /// On a weekday it changes nothing.
+    /// </summary>
+    public async Task<IAsyncDisposable> WorkTodayAsync(string driverId, CancellationToken cancellationToken)
+    {
+        var today = PickupSlot.Today(DateTimeOffset.UtcNow).DayOfWeek;
+        if (today is not (DayOfWeek.Saturday or DayOfWeek.Sunday))
+        {
+            return new Restore(() => Task.CompletedTask);
+        }
+
+        using var manager = _app!.CreateHttpClient("tms-api");
+        manager.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", IssueTmsToken(ManageRoles));
+        var listed = JsonNode.Parse(await manager.GetStringAsync(new Uri("/v1/capacity/rosters", UriKind.Relative), cancellationToken))!.AsArray();
+        var roster = listed.Single(candidate => candidate!["driverId"]!.GetValue<string>() == driverId)!["weekdays"]!.AsArray();
+        var original = new JsonObject();
+        foreach (var day in roster)
+        {
+            // The weekday is a name or a number, as the TMS API writes enums.
+            var weekday = day!["weekday"]!;
+            var name = weekday.GetValueKind() == System.Text.Json.JsonValueKind.String ? weekday.GetValue<string>() : ((DayOfWeek)weekday.GetValue<int>()).ToString();
+            original[name] = new JsonObject { ["start"] = day["start"]!.DeepClone(), ["end"] = day["end"]!.DeepClone() };
+        }
+
+        var shift = original[DayOfWeek.Friday.ToString()] ?? new JsonObject { ["start"] = "08:00:00", ["end"] = "16:00:00" };
+        var worksToday = (JsonObject)original.DeepClone();
+        worksToday[today.ToString()] = shift.DeepClone();
+        await ChangeRosterAsync(manager, driverId, worksToday, cancellationToken);
+        return new Restore(async () =>
+        {
+            using var again = _app!.CreateHttpClient("tms-api");
+            again.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", IssueTmsToken(ManageRoles));
+            await ChangeRosterAsync(again, driverId, original, CancellationToken.None);
+        });
+    }
+
     /// <summary>When the Driver's Shift starts on the day of the week, as the seed file's roster has it.</summary>
     public async Task<TimeOnly> ShiftStartAsync(string driverId, DayOfWeek day, CancellationToken cancellationToken)
     {
@@ -304,10 +381,21 @@ public sealed class SimulatorFixture : IAsyncLifetime
         return [.. listed.Select(order => order!["shipperReference"]?.GetValue<string>()).OfType<string>()];
     }
 
+    private static async Task ChangeRosterAsync(HttpClient manager, string driverId, JsonObject weekdays, CancellationToken cancellationToken)
+    {
+        using var response = await manager.PutAsJsonAsync(new Uri($"/v1/capacity/rosters/{Uri.EscapeDataString(driverId)}", UriKind.Relative), new JsonObject { ["weekdays"] = weekdays.DeepClone() }, cancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync(cancellationToken));
+    }
+
     private static JsonObject Address(string street, string postcode, string city) =>
         new() { ["street"] = street, ["postcode"] = postcode, ["city"] = city, ["country"] = "NL" };
 
     private static JsonObject Window(DateTimeOffset earliest, DateTimeOffset latest) => new() { ["earliest"] = earliest.ToString("O"), ["latest"] = latest.ToString("O") };
+
+    private sealed class Restore(Func<Task> restore) : IAsyncDisposable
+    {
+        public async ValueTask DisposeAsync() => await restore();
+    }
 
     private async Task ExecuteAsync(string resourceName, string command, Func<string?, bool> reached, CancellationToken cancellationToken)
     {
@@ -319,13 +407,13 @@ public sealed class SimulatorFixture : IAsyncLifetime
     }
 
     /// <summary>A token for the TMS API as Entra issues it to a managed identity. The list needs any TMS token.</summary>
-    private string IssueTmsToken() =>
+    private string IssueTmsToken(string[]? roles = null) =>
         new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
         {
             Issuer = LocalTokens.Issuer,
             Audience = LocalTokens.TmsAudience,
             Expires = DateTime.UtcNow.AddHours(1),
-            Claims = new Dictionary<string, object> { ["azp"] = LocalTokens.IntakeLogicAppClientId, ["roles"] = IntakeRoles },
+            Claims = new Dictionary<string, object> { ["azp"] = LocalTokens.IntakeLogicAppClientId, ["roles"] = roles ?? IntakeRoles },
             SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_tokenSigningKey)), SecurityAlgorithms.HmacSha256),
         });
 }

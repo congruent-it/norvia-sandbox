@@ -82,7 +82,7 @@ public sealed class TripTests(SimulatorFixture fixture)
     [Fact]
     public async Task TheTripsOfToday_AreWorkedInOrderToCompleted_WithReservationsInExactlyTheConfiguredShare_AndTheTripsOfLaterDaysStayDispatched()
     {
-        Assert.SkipWhen(!WorksToday(), "No Driver has a Shift at the weekend, so no Trip can be for today.");
+        await using var worksToday = await fixture.WorkTodayAsync("DRV-0004", Ct);
         await using var simulator = await OwnFleetAsync("VEH-0004", "DRV-0004");
         var settings = Runs.Tripped(orders: 8, Runs.NextSeed(), collectedTodayPercent: 50, new DriverShares(0, 0, 0, ReservationsPercent: 50));
 
@@ -135,7 +135,7 @@ public sealed class TripTests(SimulatorFixture fixture)
     [Fact]
     public async Task TheFailedStops_AreExactlyTheConfiguredShares_OpenExceptions_AndTheFailedDeliveriesGoOnARedeliveryTrip()
     {
-        Assert.SkipWhen(!WorksToday(), "No Driver has a Shift at the weekend, so no Trip can be for today.");
+        await using var worksToday = await fixture.WorkTodayAsync("DRV-0005", Ct);
         await using var simulator = await OwnFleetAsync("VEH-0005", "DRV-0005");
         var shares = new DriverShares(CollectionFailedPercent: 20, DeliveryFailedPercent: 40, DamagedPercent: 10, ReservationsPercent: 0);
         var settings = Runs.Tripped(orders: 10, seed: Runs.NextSeed(), collectedTodayPercent: 100, shares);
@@ -212,9 +212,6 @@ public sealed class TripTests(SimulatorFixture fixture)
     private static int Share(int of, int percent) => (int)Math.Round(of * percent / 100.0, MidpointRounding.AwayFromZero);
 
     private static string Today() => PickupSlot.Today(DateTimeOffset.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-
-    // The Drivers' rosters are Monday to Friday, so there is no Shift, and so no Trip, today at the weekend.
-    private static bool WorksToday() => PickupSlot.Today(DateTimeOffset.UtcNow).DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday);
 
     private async Task<SimulatorHost> OwnFleetAsync(string vehicleId, string driverId) =>
         await fixture.StartSimulatorWithSeedAsync(Ct, SeedEdits.OnlyShippers(Shipper), SeedEdits.OwnFleetOf(vehicleId, driverId));
