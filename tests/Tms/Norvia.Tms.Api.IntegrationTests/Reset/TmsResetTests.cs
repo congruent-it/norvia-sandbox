@@ -72,10 +72,10 @@ public sealed class TmsResetTests(ResetTmsFixture tms) : IClassFixture<ResetTmsF
         var seededWeekdays = WeekdaysOf(seededRosters, "DRV-0002");
         var days = await tms.ListOpenDaysAsync(_cancellationToken);
         var day = CapacityCalls.DateOf(days[3]);
-        // A day the changes below don't touch, to read the Vehicles back from.
-        var untouched = CapacityCalls.DateOf(days[4]);
-        var vehiclesBefore = days[4]["availableVehicles"]!.GetValue<int>();
+        var vehiclesBefore = days[3]["availableVehicles"]!.GetValue<int>();
+        var driversBefore = DriversOn(days[3]);
         vehiclesBefore.Should().BePositive("the seed has Vehicles");
+        driversBefore.Should().NotBeEmpty("the seed has Drivers with Shifts");
         using var absence = await tms.RecordPeriodAsync("/v1/capacity/absences", "DRV-0001", day, day, "Leave", _cancellationToken);
         using var offTheRoad = await tms.RecordPeriodAsync("/v1/capacity/off-the-road-days", "VEH-0001", day, day, "Repair", _cancellationToken);
         using var roster = await tms.ChangeRosterAsync("DRV-0002", [DayOfWeek.Monday], "09:00", "17:00", _cancellationToken);
@@ -88,8 +88,10 @@ public sealed class TmsResetTests(ResetTmsFixture tms) : IClassFixture<ResetTmsF
 
         (await tms.TmsUi.ListAsync("/v1/capacity/absences", _cancellationToken)).Should().BeEmpty();
         (await tms.TmsUi.ListAsync("/v1/capacity/off-the-road-days", _cancellationToken)).Should().BeEmpty();
-        var untouchedAfter = (await tms.ListOpenDaysAsync(_cancellationToken)).Single(open => CapacityCalls.DateOf(open) == untouched);
-        untouchedAfter["availableVehicles"]!.GetValue<int>().Should().Be(vehiclesBefore, "the Vehicles are reference data and stay");
+        // The day the Absence and the Off the road day shaped is opened again from the seed file's Rosters.
+        var dayAfter = (await tms.ListOpenDaysAsync(_cancellationToken)).Single(open => CapacityCalls.DateOf(open) == day);
+        dayAfter["availableVehicles"]!.GetValue<int>().Should().Be(vehiclesBefore, "the Vehicles are reference data and stay, with the Off the road day gone");
+        DriversOn(dayAfter).Should().BeEquivalentTo(driversBefore, "the Drivers stay, with their Absence and the Roster change gone");
         var rosters = await tms.TmsUi.ListAsync("/v1/capacity/rosters", _cancellationToken);
         WeekdaysOf(rosters, "DRV-0002").Should().Be(seededWeekdays);
         rosters.Select(item => item!["driverId"]!.GetValue<string>()).Should().Contain(["DRV-0001", "DRV-0002"]);
@@ -142,6 +144,9 @@ public sealed class TmsResetTests(ResetTmsFixture tms) : IClassFixture<ResetTmsF
 
         return names;
     }
+
+    private static List<string> DriversOn(System.Text.Json.Nodes.JsonObject day) =>
+        [.. day["shifts"]!.AsArray().Select(shift => shift!["driverName"]!.GetValue<string>())];
 
     private static int WeekdaysOf(System.Text.Json.Nodes.JsonArray rosters, string driverId) =>
         rosters.Single(roster => roster!["driverId"]!.GetValue<string>() == driverId)!["weekdays"]!.AsArray().Count;

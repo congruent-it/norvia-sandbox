@@ -27,7 +27,7 @@ public static class ResetEndpoints
             .WithName("ResetEstate")
             .WithSummary("Delete the TMS's transactional records and put the seed file's Rosters back in force.")
             .WithDescription(
-                "Deletes the Transport Orders and everything hanging off them (Shipments, Trips, Exceptions, Carrier bookings, Tracking events, Proof of delivery records and files, Shipper notifications and outbox Messages) and the Planner's changes to Rosters, Absences and Off the road days, and restarts the number sequences. "
+                "Deletes the Transport Orders and everything hanging off them (Shipments, Trips, Exceptions, Carrier bookings, Tracking events, Proof of delivery records and files, Shipper notifications and outbox Messages) and the Planner's changes to Rosters, Absences and Off the road days (the open Planning days they shaped are opened again from the seed file's Rosters), and restarts the number sequences. "
                 + "Rate Cards, Carriers, Vehicles, Drivers and Shippers are reference data and stay. Refused, deleting nothing, with a 403 problem (code ResetDisabled) while the setting is off, and a 409 problem (code SubscriptionBusy) naming the subscription while one holds unprocessed messages.");
 
         return app;

@@ -16,8 +16,8 @@ namespace Norvia.Tms.Infrastructure.Reset;
 
 /// <summary>
 /// Deletes the TMS's transactional records in one transaction, children before the rows they point at. The Rate Cards, Carriers, Vehicles, Drivers
-/// and Shippers are not in the database (they come from the seed file) and the Planning days are the calendar, so they stay; the Planner's changes to the
-/// Rosters, Absences and Off the road days go, which puts the seed file's back in force.
+/// and Shippers are not in the database (they come from the seed file) and the closed Planning days are the past, so they stay; the Planner's changes to the
+/// Rosters, Absences and Off the road days go, which puts the seed file's back in force, and so do the open Planning days they shaped, which the reset opens again.
 /// </summary>
 internal sealed class SqlTransactionalData(TmsDbContext dbContext) : ITransactionalData
 {
@@ -50,6 +50,8 @@ internal sealed class SqlTransactionalData(TmsDbContext dbContext) : ITransactio
                 await DeleteAsync<Absence>("Absences", cancellationToken),
                 await DeleteAsync<OffTheRoadDay>("Off the road days", cancellationToken),
                 await DeleteAsync<Roster>("Roster changes", cancellationToken),
+                // The open days carry the Shifts and Vehicles those changes made; closed days are the past and stay.
+                new("Open Planning days", await dbContext.Set<PlanningDay>().Where(day => day.Status == PlanningDayStatus.Open).ExecuteDeleteAsync(cancellationToken)),
             };
 
             foreach (var sequence in Sequences)
