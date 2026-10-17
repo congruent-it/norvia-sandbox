@@ -14,7 +14,7 @@ namespace Norvia.Simulator.Application.Runs.Execute;
 /// </summary>
 internal sealed class FollowUpStage(ITmsApi tms, TimeProvider time, DriverPacing pacing)
 {
-    private readonly TripDispatcher dispatcher = new(tms, time);
+    private readonly TripDispatcher _dispatcher = new(tms, time);
 
     public async Task<FollowUpResult> RunAsync(
         SimulationRun run, IReadOnlyList<ExpectedFailure> failures, SimulationWorld world, RunLogWriter writer, CancellationToken stopSending, CancellationToken cancellationToken)
@@ -121,7 +121,7 @@ internal sealed class FollowUpStage(ITmsApi tms, TimeProvider time, DriverPacing
         {
             // Apart from the Trips of the first pass, which used the day numbers' own sequence numbers.
             var key = TripActions.CreationKey(run.Number, day.Date.DayNumber, 100 + number + 1);
-            dispatched += (await dispatcher.DispatchAsync(build.Drafts[number], key, writer, cancellationToken)).Dispatched ? 1 : 0;
+            dispatched += (await _dispatcher.DispatchAsync(build.Drafts[number], key, writer, cancellationToken)).Dispatched ? 1 : 0;
         }
 
         return dispatched;

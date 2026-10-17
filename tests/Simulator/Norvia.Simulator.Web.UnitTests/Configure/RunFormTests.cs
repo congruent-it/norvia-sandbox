@@ -78,7 +78,14 @@ public sealed class RunFormTests
     {
         var form = new RunForm
         {
-            ReleasePercent = 80, ConfirmPercent = 60, DeclinePercent = 20, TrackedPercent = 85, ExceptionPercent = 20, DeliveredPercent = 70, ProofOfDeliveryPercent = 80, CancelPercent = 40,
+            ReleasePercent = 80,
+            ConfirmPercent = 60,
+            DeclinePercent = 20,
+            TrackedPercent = 85,
+            ExceptionPercent = 20,
+            DeliveredPercent = 70,
+            ProofOfDeliveryPercent = 80,
+            CancelPercent = 40,
         };
 
         form.ToSettings().Carriers.Should().Be(new Norvia.Simulator.Domain.Carriers.CarrierShares(80, 60, 20, 85, 20, 70, 80, 40));
