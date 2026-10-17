@@ -208,7 +208,7 @@ public sealed class NorviaPartnerApiClientTests : IDisposable
     {
         _partnerApi.Answer(HttpStatusCode.Accepted, """{"messageId":"m-3"}""");
 
-        var answer = await _client.SendProofOfDeliveryAsync(VanDijk, new CarrierProofRequest("VDT-SIM1-3", "CB-0000042", "D-1", "Someone", At, Rotterdam, false, null), CancellationToken.None);
+        var answer = await _client.SendProofOfDeliveryAsync(VanDijk, new CarrierProofRequest("Van Dijk Transport", "SHP-0001", "TO-0001", "VDT-SIM1-3", "CB-0000042", "D-1", "Someone", At, Rotterdam, false, null), CancellationToken.None);
 
         _partnerApi.Request!.RequestUri.Should().Be(new Uri("https://apim.example/partner/v1/carrier-proofs-of-delivery"));
         answer.Outcome.Should().Be(LogOutcome.ProofOfDeliverySent);
@@ -234,11 +234,25 @@ public sealed class NorviaPartnerApiClientTests : IDisposable
     }
 
     [Fact]
+    public async Task SendProofOfDelivery_LogsNothingOfTheDocument()
+    {
+        _partnerApi.Answer(HttpStatusCode.Accepted, """{"messageId":"m-5"}""");
+
+        await _client.SendProofOfDeliveryAsync(
+            VanDijk, new CarrierProofRequest("Van Dijk Transport", "SHP-0001", "TO-0001", "R", "CB-0000042", "D-1", "Someone Particular", At, Rotterdam, true, "Dented corner"), CancellationToken.None);
+
+        var logged = string.Join(
+            '\n',
+            _logger.Collector.GetSnapshot().Select(record => record.Message + string.Join(' ', record.Scopes.OfType<IEnumerable<KeyValuePair<string, object?>>>().SelectMany(scope => scope).Select(pair => pair.Value))));
+        logged.Should().NotContain("Someone Particular").And.NotContain("Dented corner").And.NotContain("Shipment").And.NotContain("%PDF");
+    }
+
+    [Fact]
     public async Task ACarrierCall_IsSentInASpanNamedForWhatItDoes_AndLoggedWithTheKeysTheSimulatorKnows()
     {
         _partnerApi.Answer(HttpStatusCode.Accepted, """{"messageId":"m-4"}""");
 
-        await _client.SendProofOfDeliveryAsync(VanDijk, new CarrierProofRequest("R", "CB-0000042", "D-1", "Someone", At, Rotterdam, false, null), CancellationToken.None);
+        await _client.SendProofOfDeliveryAsync(VanDijk, new CarrierProofRequest("Van Dijk Transport", "SHP-0001", "TO-0001", "R", "CB-0000042", "D-1", "Someone", At, Rotterdam, false, null), CancellationToken.None);
 
         _spans.Should().ContainSingle().Which.OperationName.Should().Be("Send Proof of delivery");
         var keys = _logger.LatestRecord.Scopes.OfType<IEnumerable<KeyValuePair<string, object?>>>().SelectMany(scope => scope).ToDictionary(pair => pair.Key, pair => pair.Value);

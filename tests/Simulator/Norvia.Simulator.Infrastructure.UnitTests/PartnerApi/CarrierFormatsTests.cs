@@ -1,3 +1,4 @@
+using System.Text;
 using Norvia.Simulator.Application.Ports;
 using Norvia.Simulator.Domain.Carriers;
 using Norvia.Simulator.Domain.Plans;
@@ -110,7 +111,7 @@ public sealed class CarrierFormatsTests
     [Fact]
     public void Proof_ACleanDelivery_KeepsToTheCarrierProofSchema()
     {
-        var json = CarrierFormats.Proof(new CarrierProofRequest("VDT-SIM1-3", "CB-0000042", "VDT-SIM1-3-POD", "Simulated consignee", At, Antwerp, false, null));
+        var json = CarrierFormats.Proof(new CarrierProofRequest("Van Dijk Transport", "SHP-0001", "TO-0001", "VDT-SIM1-3", "CB-0000042", "VDT-SIM1-3-POD", "Simulated consignee", At, Antwerp, false, null));
 
         Contracts.CarrierProofSchemaErrors(json).Should().BeEmpty();
         json["condition"]!.GetValue<string>().Should().Be("CLEAN");
@@ -123,7 +124,7 @@ public sealed class CarrierFormatsTests
     [Fact]
     public void Proof_WithReservations_NeedsAndKeepsItsRemark()
     {
-        var json = CarrierFormats.Proof(new CarrierProofRequest("R", "CB-0000042", "D", "Someone", At, Rotterdam, true, "Two pallets short"));
+        var json = CarrierFormats.Proof(new CarrierProofRequest("Van Dijk Transport", "SHP-0001", "TO-0001", "R", "CB-0000042", "D", "Someone", At, Rotterdam, true, "Two pallets short"));
 
         Contracts.CarrierProofSchemaErrors(json).Should().BeEmpty();
         json["condition"]!.GetValue<string>().Should().Be("RESERVATIONS");
@@ -133,10 +134,18 @@ public sealed class CarrierFormatsTests
     [Fact]
     public void Proof_TheFile_IsAPdfWhoseContentIsValidBase64()
     {
-        var file = CarrierFormats.Proof(new CarrierProofRequest("R", "CB-0000042", "D", "Someone", At, Rotterdam, false, null))["files"]![0]!;
+        var file = CarrierFormats.Proof(new CarrierProofRequest("Van Dijk Transport", "SHP-0001", "TO-0001", "R", "CB-0000042", "D", "Someone", At, Rotterdam, false, null))["files"]![0]!;
 
         file["contentType"]!.GetValue<string>().Should().Be("application/pdf");
         file["name"]!.GetValue<string>().Should().EndWith(".pdf");
         Convert.FromBase64String(file["content"]!.GetValue<string>()).Should().StartWith("%PDF"u8.ToArray());
+    }
+
+    [Fact]
+    public void Proof_TheFile_IsTheDeliveryReceiptOfThatProof()
+    {
+        var file = CarrierFormats.Proof(new CarrierProofRequest("Van Dijk Transport", "SHP-0001", "TO-0001", "VDT-SIM1-3", "CB-0000042", "D", "Someone", At, Rotterdam, false, null))["files"]![0]!;
+
+        Encoding.Latin1.GetString(Convert.FromBase64String(file["content"]!.GetValue<string>())).Should().Contain("Van Dijk Transport").And.Contain("2026-10-13 09:30");
     }
 }
