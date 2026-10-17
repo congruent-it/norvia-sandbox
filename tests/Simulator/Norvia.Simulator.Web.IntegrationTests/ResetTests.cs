@@ -151,7 +151,7 @@ public sealed class ResetTests(SimulatorFixture fixture)
         var tmsResult = report.Apps.Single(app => app.App == EstateApp.Tms);
         tmsResult.Succeeded.Should().BeFalse();
         tmsResult.Refusal.Should().Contain(ResetStub.RefusalDetail);
-        report.Apps.Where(app => app.App != EstateApp.Tms).Should().OnlyContain(app => app.Succeeded, "the other applications were told to reset all the same");
+        report.Apps.Where(app => app.App != EstateApp.Tms).Should().OnlyContain(app => app.Succeeded && app.Deleted.Count > 0, "the other applications were told to reset all the same, and their counts are reported");
         report.Simulator.Should().BeEmpty("the Simulator clears its own history only once every application has reset");
         (await simulator.Requests.ListRunsAsync(Ct)).Should().Contain(summary => summary.Id == run.Id);
 

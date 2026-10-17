@@ -18,7 +18,7 @@ public sealed class DriverAppResetTests(DriverAppFixture driverApp)
     public async Task AResetWithTheResetRole_DeletesTheTripsAndTheDriversReports_AndTheDriverCanBeSentATripAgain()
     {
         const string driverId = "DRV-5000001";
-        await driverApp.ReceiveTripAsync("TR-5000001", driverId, Ct);
+        await driverApp.SendTripForTodayAsync("TR-5000001", driverId, Ct);
         using var driver = driverApp.DriverReportsClient(driverApp.IssueToken([driverId]));
         using var started = await driver.PostAsync("/v1/driver/trips/TR-5000001/start", content: null, Ct);
         started.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -32,7 +32,7 @@ public sealed class DriverAppResetTests(DriverAppFixture driverApp)
         deleted["Driver reports"].Should().BePositive();
         deleted["Messages"].Should().BePositive();
         (await driver.GetFromJsonAsync<JsonArray>("/v1/driver/trips", Ct)).Should().BeEmpty();
-        await driverApp.ReceiveTripAsync("TR-5000002", driverId, Ct);
+        await driverApp.SendTripForTodayAsync("TR-5000002", driverId, Ct);
         (await driver.GetFromJsonAsync<JsonArray>("/v1/driver/trips", Ct))!.Select(trip => trip!["tripNumber"]!.GetValue<string>()).Should().Equal("TR-5000002");
     }
 
@@ -52,7 +52,7 @@ public sealed class DriverAppResetTests(DriverAppFixture driverApp)
     public async Task AResetWithoutTheResetRole_IsRefusedWith403_AndDeletesNothing()
     {
         const string driverId = "DRV-5000003";
-        await driverApp.ReceiveTripAsync("TR-5000003", driverId, Ct);
+        await driverApp.SendTripForTodayAsync("TR-5000003", driverId, Ct);
         using var driver = driverApp.DriverReportsClient(driverApp.IssueToken([driverId]));
         using var logicApp = driverApp.DriverReportsClient(driverApp.IssueToken([DriverAppFixture.ReportOutcomeRole]));
 

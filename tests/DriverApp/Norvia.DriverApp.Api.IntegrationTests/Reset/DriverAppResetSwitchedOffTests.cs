@@ -13,7 +13,7 @@ public sealed class DriverAppResetSwitchedOffTests(ResetOffDriverAppFixture driv
     public async Task AResetWithTheResetRole_IsRefusedWith403AndTheResetDisabledCode_AndDeletesNothing()
     {
         const string driverId = "DRV-5000004";
-        await driverApp.ReceiveTripAsync("TR-5000004", driverId, Ct);
+        await driverApp.SendTripForTodayAsync("TR-5000004", driverId, Ct);
         using var driver = driverApp.DriverReportsClient(driverApp.IssueToken([driverId]));
         using var simulator = driverApp.DriverReportsClient(driverApp.IssueToken([DriverAppFixture.ResetRole]));
 

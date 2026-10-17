@@ -10,7 +10,7 @@ internal static class DriverAppResetCalls
     private static readonly TimeSpan Patience = TimeSpan.FromSeconds(30);
 
     /// <summary>A Trip for the Driver today, sent to the Driver app as the Trip dispatch Logic App does.</summary>
-    public static async Task ReceiveTripAsync(this DriverAppFixture driverApp, string trip, string driverId, CancellationToken cancellationToken)
+    public static async Task SendTripForTodayAsync(this DriverAppFixture driverApp, string trip, string driverId, CancellationToken cancellationToken)
     {
         var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/Amsterdam")).DateTime);
         using var response = await driverApp.DriverApp.PostAsync(
