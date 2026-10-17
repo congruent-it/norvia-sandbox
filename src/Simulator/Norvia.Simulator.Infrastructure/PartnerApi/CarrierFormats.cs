@@ -68,9 +68,12 @@ internal static class CarrierFormats
             ["condition"] = proof.Reservations ? "RESERVATIONS" : "CLEAN",
         };
         Add(json, "remark", proof.Remark);
-        json["files"] = new JsonArray(new JsonObject { ["name"] = $"{proof.DocumentId}.pdf", ["contentType"] = "application/pdf", ["content"] = Convert.ToBase64String(ProofOfDeliveryDocument.Create(proof, deliveryTime.Replace('T', ' ')[..16])) });
+        json["files"] = new JsonArray(new JsonObject { ["name"] = $"{proof.DocumentId}.pdf", ["contentType"] = "application/pdf", ["content"] = ProofFile(proof) });
         return json;
     }
+
+    private static string ProofFile(CarrierProofRequest proof) =>
+        Convert.ToBase64String(ProofOfDeliveryDocument.Create(proof, CarrierCountries.LocalDateTime(proof.At, proof.Place.Country)));
 
     private static void Add(JsonObject json, string name, string? value)
     {

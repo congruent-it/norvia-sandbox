@@ -10,25 +10,32 @@ namespace Norvia.Simulator.Infrastructure.PartnerApi;
 /// </summary>
 internal static class ProofOfDeliveryDocument
 {
-    public static byte[] Create(CarrierProofRequest proof, string deliveryTime)
+    // A4 in points, Helvetica, text from the top left with a fixed line height.
+    private const int HeadingSize = 18;
+    private const int BodySize = 12;
+    private const int LineHeight = 18;
+    private const int LeftMargin = 56;
+    private const int FirstBaseline = 780;
+
+    public static byte[] Create(CarrierProofRequest proof, DateTime deliveryTime)
     {
         var lines = new List<(int Size, string Text)>
         {
-            (18, "Proof of delivery"),
-            (12, proof.CarrierName),
-            (12, $"Shipment: {proof.ShipmentNumber}"),
-            (12, $"Transport Order: {proof.TransportOrderNumber}"),
-            (12, $"Carrier booking reference: {proof.BookingReference}"),
-            (12, $"Delivered: {deliveryTime} at {proof.Place.City}"),
-            (12, $"Received by: {proof.ReceivedBy}"),
-            (12, $"Condition: {(proof.Reservations ? "Reservations" : "Clean")}"),
+            (HeadingSize, "Proof of delivery"),
+            (BodySize, proof.CarrierName),
+            (BodySize, $"Shipment: {proof.ShipmentNumber}"),
+            (BodySize, $"Transport Order: {proof.TransportOrderNumber}"),
+            (BodySize, $"Carrier booking reference: {proof.BookingReference}"),
+            (BodySize, $"Delivered: {deliveryTime.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)}"),
+            (BodySize, $"Received by: {proof.ReceivedBy}"),
+            (BodySize, $"Condition: {(proof.Reservations ? "Reservations" : "Clean")}"),
         };
         if (!string.IsNullOrWhiteSpace(proof.Remark))
         {
-            lines.Add((12, $"Remark: {proof.Remark.Trim()}"));
+            lines.Add((BodySize, $"Remark: {proof.Remark.Trim()}"));
         }
 
-        var content = new StringBuilder("BT\n/F1 12 Tf\n56 780 Td\n18 TL\n");
+        var content = new StringBuilder().Append(CultureInfo.InvariantCulture, $"BT\n{LeftMargin} {FirstBaseline} Td\n{LineHeight} TL\n");
         foreach (var (size, text) in lines)
         {
             content.Append(CultureInfo.InvariantCulture, $"/F1 {size} Tf\n({Escape(text)}) Tj\nT*\n");

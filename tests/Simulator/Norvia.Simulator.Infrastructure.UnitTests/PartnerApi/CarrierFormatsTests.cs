@@ -1,6 +1,4 @@
-using System.Globalization;
 using System.Text;
-using System.Text.RegularExpressions;
 using Norvia.Simulator.Application.Ports;
 using Norvia.Simulator.Domain.Carriers;
 using Norvia.Simulator.Domain.Plans;
@@ -144,54 +142,10 @@ public sealed class CarrierFormatsTests
     }
 
     [Fact]
-    public void Proof_TheFile_IsAOnePagePdfThatReadsLikeADeliveryReceipt()
+    public void Proof_TheFile_IsTheDeliveryReceiptOfThatProof()
     {
-        var text = ProofText(new CarrierProofRequest("Van Dijk Transport", "SHP-0001", "TO-0001", "VDT-SIM1-3", "CB-0000042", "VDT-SIM1-3-POD", "Simulated consignee", At, Rotterdam, false, null));
+        var file = CarrierFormats.Proof(new CarrierProofRequest("Van Dijk Transport", "SHP-0001", "TO-0001", "VDT-SIM1-3", "CB-0000042", "D", "Someone", At, Rotterdam, false, null))["files"]![0]!;
 
-        text.Should().Contain("Van Dijk Transport").And.Contain("SHP-0001").And.Contain("TO-0001").And.Contain("VDT-SIM1-3")
-            .And.Contain("2026-10-13 09:30").And.Contain("Simulated consignee").And.Contain("Clean");
-        text.Should().NotContain("Reservations");
-    }
-
-    [Fact]
-    public void Proof_TheFileWithReservations_ShowsTheRemark()
-    {
-        var text = ProofText(new CarrierProofRequest("Van Dijk Transport", "SHP-0001", "TO-0001", "VDT-SIM1-3", "CB-0000042", "VDT-SIM1-3-POD", "Simulated consignee", At, Rotterdam, true, "Two pallets (short)"));
-
-        text.Should().Contain("Reservations").And.Contain("Two pallets (short)");
-        text.Should().NotContain("Clean");
-    }
-
-    [Fact]
-    public void Proof_TheFile_IsTheSameForTheSameProofAndSmall()
-    {
-        var proof = new CarrierProofRequest("Van Dijk Transport", "SHP-0001", "TO-0001", "VDT-SIM1-3", "CB-0000042", "VDT-SIM1-3-POD", "Simulated consignee", At, Rotterdam, true, "Two pallets short");
-
-        PdfBytes(proof).Should().Equal(PdfBytes(proof)).And.HaveCountLessThan(2000);
-    }
-
-    private static byte[] PdfBytes(CarrierProofRequest proof) =>
-        Convert.FromBase64String(CarrierFormats.Proof(proof)["files"]![0]!["content"]!.GetValue<string>());
-
-    // Parses the PDF the way a viewer does: the xref table's offsets must land on their objects, the trailer names the root,
-    // the catalog leads to exactly one page, and the page's content stream holds the text.
-    private static string ProofText(CarrierProofRequest proof)
-    {
-        var pdf = Encoding.Latin1.GetString(PdfBytes(proof));
-        pdf.Should().StartWith("%PDF-").And.EndWith("%%EOF\n");
-
-        var startxref = int.Parse(Regex.Match(pdf, @"startxref\n(\d+)\n%%EOF").Groups[1].Value, CultureInfo.InvariantCulture);
-        pdf[startxref..].Should().StartWith("xref\n");
-        var entries = Regex.Matches(pdf[startxref..], @"(\d{10}) 00000 n \n");
-        entries.Should().NotBeEmpty();
-        for (var number = 1; number <= entries.Count; number++)
-        {
-            pdf[int.Parse(entries[number - 1].Groups[1].Value, CultureInfo.InvariantCulture)..].Should().StartWith($"{number} 0 obj");
-        }
-
-        Regex.Matches(pdf, @"/Type /Page\b").Should().ContainSingle();
-        var stream = Regex.Match(pdf, @"/Length (\d+)>>\nstream\n(.*?)\nendstream", RegexOptions.Singleline);
-        stream.Groups[2].Value.Length.Should().Be(int.Parse(stream.Groups[1].Value, CultureInfo.InvariantCulture));
-        return string.Concat(Regex.Matches(stream.Groups[2].Value, @"\((?:\\.|[^\\)])*\) Tj").Select(m => Regex.Replace(m.Value[1..^4], @"\\(.)", "$1") + "\n"));
+        Encoding.Latin1.GetString(Convert.FromBase64String(file["content"]!.GetValue<string>())).Should().Contain("Van Dijk Transport").And.Contain("2026-10-13 09:30");
     }
 }

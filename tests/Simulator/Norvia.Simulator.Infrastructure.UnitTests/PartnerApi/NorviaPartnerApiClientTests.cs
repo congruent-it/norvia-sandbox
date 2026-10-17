@@ -234,6 +234,20 @@ public sealed class NorviaPartnerApiClientTests : IDisposable
     }
 
     [Fact]
+    public async Task SendProofOfDelivery_LogsNothingOfTheDocument()
+    {
+        _partnerApi.Answer(HttpStatusCode.Accepted, """{"messageId":"m-5"}""");
+
+        await _client.SendProofOfDeliveryAsync(
+            VanDijk, new CarrierProofRequest("Van Dijk Transport", "SHP-0001", "TO-0001", "R", "CB-0000042", "D-1", "Someone Particular", At, Rotterdam, true, "Dented corner"), CancellationToken.None);
+
+        var logged = string.Join(
+            '\n',
+            _logger.Collector.GetSnapshot().Select(record => record.Message + string.Join(' ', record.Scopes.OfType<IEnumerable<KeyValuePair<string, object?>>>().SelectMany(scope => scope).Select(pair => pair.Value))));
+        logged.Should().NotContain("Someone Particular").And.NotContain("Dented corner").And.NotContain("Shipment").And.NotContain("%PDF");
+    }
+
+    [Fact]
     public async Task ACarrierCall_IsSentInASpanNamedForWhatItDoes_AndLoggedWithTheKeysTheSimulatorKnows()
     {
         _partnerApi.Answer(HttpStatusCode.Accepted, """{"messageId":"m-4"}""");
