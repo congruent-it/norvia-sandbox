@@ -1,0 +1,32 @@
+@using Norvia.Erp.Application.MasterData.RateCards
+
+@* A Rate Card or a Carrier Rate Card: its versions and, for each, the Lanes it prices. View only. *@
+@foreach (var card in Cards)
+{
+    <section aria-label="@card.Id" style="margin-bottom: 2rem;">
+        <h2>@card.Id · @PartyKind @card.PartyName (@card.PartyId)</h2>
+        @foreach (var version in card.Versions)
+        {
+            <h3>Version @version.Version</h3>
+            <p>
+                Valid from @version.ValidFrom.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)
+                @(version.ValidTo is { } validTo ? $"to {validTo.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)}" : "with no end date").
+                @version.ZoneCount Zones, @version.Lanes.Count Lanes.
+            </p>
+            <FluentDataGrid Items="version.Lanes.AsQueryable()" TGridItem="LaneView" aria-label="@($"Lanes of {card.Id} version {version.Version}")">
+                <PropertyColumn Title="From" Property="@(lane => lane.Origin)" />
+                <PropertyColumn Title="To" Property="@(lane => lane.Destination)" />
+                <PropertyColumn Title="Minimum charge (EUR)" Property="@(lane => lane.MinimumCharge)" Format="N2" />
+                <PropertyColumn Title="Weight Breaks" Property="@(lane => lane.WeightBreakCount)" />
+            </FluentDataGrid>
+        }
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<RateCardView> Cards { get; set; } = [];
+
+    [Parameter, EditorRequired]
+    public string PartyKind { get; set; } = "";
+}

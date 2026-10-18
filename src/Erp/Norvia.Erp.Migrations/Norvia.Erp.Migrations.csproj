@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+  <ItemGroup>
+    <ProjectReference Include="..\..\Norvia.ServiceDefaults\Norvia.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\Norvia.Erp.Infrastructure\Norvia.Erp.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

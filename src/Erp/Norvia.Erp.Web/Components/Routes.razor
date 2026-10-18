@@ -1,0 +1,9 @@
+@using System.Diagnostics.CodeAnalysis
+@attribute [ExcludeFromCodeCoverage(Justification = "Router wiring; it has no behaviour of its own.")]
+
+@* Pages render statically, so the authorization middleware refuses a user before a page renders (FinanceSignIn). *@
+<Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+    <Found Context="routeData">
+        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)" />
+    </Found>
+</Router>

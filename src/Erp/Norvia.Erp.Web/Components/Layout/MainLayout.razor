@@ -1,0 +1,40 @@
+@inherits LayoutComponentBase
+
+<FluentDesignTheme Mode="DesignThemeModes.Light" />
+
+<header>
+    <nav aria-label="Main" style="display: flex; flex-wrap: wrap; align-items: center; gap: 1.5rem; padding: 0.75rem 1.5rem;">
+        <strong>Norvia ERP</strong>
+        <FluentAnchor Href="/" Appearance="Appearance.Hypertext">Shippers</FluentAnchor>
+        <FluentAnchor Href="/carriers" Appearance="Appearance.Hypertext">Carriers</FluentAnchor>
+        <FluentAnchor Href="/rate-cards" Appearance="Appearance.Hypertext">Rate Cards</FluentAnchor>
+        <FluentAnchor Href="/carrier-rate-cards" Appearance="Appearance.Hypertext">Carrier Rate Cards</FluentAnchor>
+        @if (_userName is not null)
+        {
+            <span style="margin-left: auto;">@_userName</span>
+        }
+    </nav>
+</header>
+
+<main style="padding: 1.5rem;">
+    @Body
+</main>
+
+<div id="blazor-error-ui" data-nosnippet>
+    <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+        Something went wrong. <a href="">Reload</a>
+    </FluentMessageBar>
+</div>
+
+@code {
+    private string? _userName;
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationState { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var identity = AuthenticationState is null ? null : (await AuthenticationState).User.Identity;
+        _userName = identity is { IsAuthenticated: true } ? identity.Name : null;
+    }
+}

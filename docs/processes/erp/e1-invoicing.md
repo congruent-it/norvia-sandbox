@@ -130,7 +130,27 @@ Recording a billable line publishes nothing. The Invoice run is what the Shipper
 
 ## Implementation
 
-Not built yet.
+For engineers and coding agents. It shows where E1 lives in the repository. Only the first slice is built: the ERP application with its seed-loaded master data, read-only. Billable lines, the Invoice run, Shipper invoices, Credit notes, the ERP API and the Logic Apps are designed above and not built yet.
+
+### What is built
+
+| Piece | Where | Does |
+|---|---|---|
+| Domain | [src/Erp/Norvia.Erp.Domain](../../../src/Erp/Norvia.Erp.Domain/) | The aggregates `Shipper`, `Carrier`, `RateCard` and `CarrierRateCard`, with the IDs the TMS uses, and their specifications. A card keeps its versions, Zones and Lanes as the seed file has them; the ERP shows them and never rates with them |
+| Application | [src/Erp/Norvia.Erp.Application](../../../src/Erp/Norvia.Erp.Application/) | The queries behind the four lists, and `LoadMasterDataCommand`, which adds what the seed file has and reloads what is there already, so loading twice changes nothing |
+| Infrastructure | [src/Erp/Norvia.Erp.Infrastructure](../../../src/Erp/Norvia.Erp.Infrastructure/) | The ERP's own `ErpDbContext` and database (`erp`), the transactional outbox and its publisher, and the seed loader that runs as the ERP starts |
+| Migrations | [src/Erp/Norvia.Erp.Migrations](../../../src/Erp/Norvia.Erp.Migrations/) | A Container Apps job that applies the database's migrations; azd's postdeploy hook runs it |
+| ERP UI | [src/Erp/Norvia.Erp.Web](../../../src/Erp/Norvia.Erp.Web/) | Four lists, Shippers, Carriers, Rate Cards and Carrier Rate Cards, with no edit action. Built with Fluent UI components only |
+
+The seed loader reads `shippers`, `carriers`, `rateCards` and `carrierRateCards` from `seed/norvia.seed.json` (`Seed:Path`), as the TMS does. A broken seed stops the ERP as it starts. The outbox publishes nothing yet: the events are the slices after this one's.
+
+### Access
+
+Only a user with the `Finance` app role reaches the UI. In Azure Container Apps' Easy Auth signs Finance in to the ERP's app registration and Entra refuses a user without the role; the ERP checks the role as well. Locally the AppHost signs the developer in as a local user holding `Finance` (`LocalUser` settings, accepted only in Development). See [identity and access](../../architecture/identity-and-access.md).
+
+### Hosting
+
+Aspire hosts the ERP like the TMS ([ADR 0004](../../adr/0004-bicep-owns-the-estate-aspire-owns-the-apps.md)): the AppHost declares the `erp` database, the migrations job and `erp-web`. The estate Bicep owns the ERP's managed identity (`id-erp-…`), and its app registration with the `Finance` role. The ERP's identity has no role on another application; it only sends to Service Bus.
 
 ## Deferred
 

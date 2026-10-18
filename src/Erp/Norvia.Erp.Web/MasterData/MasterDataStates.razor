@@ -1,0 +1,38 @@
+@* Loading, empty and error states of a master data list, so every list handles them the same way. *@
+@if (Failed)
+{
+    <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+        The @Name couldn't be read. Try again in a moment.
+    </FluentMessageBar>
+}
+else if (!Loaded)
+{
+    <FluentProgressRing aria-label="@($"Loading the {Name}")" />
+}
+else if (Empty)
+{
+    <FluentMessageBar Intent="MessageIntent.Info" AllowDismiss="false">
+        There are no @Name yet. The ERP loads them from the seed file as it starts.
+    </FluentMessageBar>
+}
+else
+{
+    @ChildContent
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public string Name { get; set; } = "";
+
+    [Parameter]
+    public bool Loaded { get; set; }
+
+    [Parameter]
+    public bool Failed { get; set; }
+
+    [Parameter]
+    public bool Empty { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

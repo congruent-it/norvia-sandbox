@@ -29,6 +29,8 @@ var tmsDatabase = sql.AddDatabase("tms");
 var partnerPortalDatabase = sql.AddDatabase("partner-portal");
 // The Driver app's own records of the Trips it was sent. It never reads the TMS's database (ADR 0002).
 var driverAppDatabase = sql.AddDatabase("driver-app");
+// The ERP's own database: master data, and from the slices after this one billable lines, Shipper invoices and Credit notes (ADR 0002).
+var erpDatabase = sql.AddDatabase("erp");
 
 // The estate Bicep owns Service Bus in Azure (ADR 0004); locally the emulator stands in for it.
 var messaging = builder.AddAzureServiceBus("messaging");
@@ -98,6 +100,20 @@ var driverAppWeb = builder.AddProject<Projects.Norvia_DriverApp_Web>("driver-app
     .WithHttpHealthCheck("/health")
     .WithUrlForEndpoint("http", url => url.DisplayText = "Driver app");
 
+// The ERP is its own application, built and hosted like the TMS (ADR 0004), and meets the rest of the estate only through Service Bus (ADR 0001).
+// Its migrations are a deployment step too. It loads its master data from the seed file as it starts and its outbox publishes its events (ADR 0003).
+// Locally it signs the developer in as Finance; in Azure Easy Auth signs Finance in to the ERP's app registration.
+var erpMigrations = builder.AddProject<Projects.Norvia_Erp_Migrations>("erp-migrations")
+    .WithReference(erpDatabase).WaitFor(erpDatabase)
+    .PublishAsAzureContainerAppJob();
+
+var erpWeb = builder.AddProject<Projects.Norvia_Erp_Web>("erp-web")
+    .WithReference(erpDatabase).WaitForCompletion(erpMigrations)
+    .WithReference(messaging).WaitFor(messaging)
+    .WithRoleAssignments(messaging, ServiceBusBuiltInRole.AzureServiceBusDataSender)
+    .WithHttpHealthCheck("/health")
+    .WithUrlForEndpoint("http", url => url.DisplayText = "ERP");
+
 // The Integration console, for the Integration operator. It has no database: it reads what the estate records (ADR 0017).
 var integrationConsole = builder.AddProject<Projects.Norvia_IntegrationConsole_Web>("integration-console-web")
     .WithHttpHealthCheck("/health")
@@ -122,10 +138,10 @@ var simulator = builder.AddProject<Projects.Norvia_Simulator_Web>("simulator-web
     .WithEnvironment("TmsApi__BaseAddress", tmsApi.GetEndpoint("http"))
     .WithEnvironment("DriverApp__BaseAddress", driverAppApi.GetEndpoint("http"));
 
-// Locally the TMS and the Partner portal read the repo's seed file; in Azure the copy each image carries, next to the
+// Locally the TMS, the ERP and the Partner portal read the repo's seed file; in Azure the copy each image carries, next to the
 // app (the image's working directory).
 var seedPath = builder.ExecutionContext.IsPublishMode ? Path.Combine("seed", "norvia.seed.json") : seedFile;
-foreach (var readerOfTheSeedFile in new[] { tmsApi, tmsWeb, partnerPortal, driverAppApi, driverAppWeb, simulator })
+foreach (var readerOfTheSeedFile in new[] { tmsApi, tmsWeb, erpWeb, partnerPortal, driverAppApi, driverAppWeb, simulator })
 {
     readerOfTheSeedFile.WithEnvironment("Seed__Path", seedPath);
 }
@@ -157,7 +173,7 @@ if (builder.ExecutionContext.IsPublishMode)
     messaging.PublishAsExisting(estate.ServiceBusNamespace, null);
 
     var insights = builder.AddAzureApplicationInsights("insights").PublishAsExisting(estate.ApplicationInsights, null);
-    foreach (var project in new[] { tmsMigrations, tmsApi, tmsWeb, partnerPortalMigrations, partnerPortal, driverAppMigrations, driverAppApi, driverAppWeb, integrationConsole, simulatorMigrations, simulator })
+    foreach (var project in new[] { tmsMigrations, tmsApi, tmsWeb, partnerPortalMigrations, partnerPortal, driverAppMigrations, driverAppApi, driverAppWeb, erpMigrations, erpWeb, integrationConsole, simulatorMigrations, simulator })
     {
         project.WithReference(insights);
     }
@@ -265,6 +281,15 @@ if (builder.ExecutionContext.IsPublishMode)
     {
         partnerPortal.WithEnvironment($"ShipperEndpoint__ApiKeys__{shipper.PartyId}", partnerPortalSecrets.Resource.GetSecret($"shipper-endpoint-key-{shipper.PartyId}"));
     }
+
+    // The ERP opens to Finance's browser. Easy Auth signs them in to the ERP's own app registration, whose Finance app role the ERP checks,
+    // as ADR 0026 has the Integration console do. It runs as the managed identity the estate made for it, which sends to Service Bus.
+    var erpIdentity = builder.AddAzureUserAssignedIdentity("erp-identity")
+        .PublishAsExisting(estate.ErpIdentity, null);
+    erpWeb.WithExternalHttpEndpoints()
+        .WithAzureUserAssignedIdentity(erpIdentity)
+        .PublishAsAzureContainerApp((infrastructure, app) =>
+            infrastructure.Add(EntraSignIn.For(infrastructure, app, estate.ErpRegistrationClientId, estate.EntraIssuer)));
 
     // The Simulator opens to the presenter's browser. Easy Auth signs them in to the Simulator's own app registration, whose app roles
     // the Simulator checks (ADR 0042, as ADR 0026 for the Integration console). It then reaches the estate as its own identity: the
@@ -540,6 +565,10 @@ else
     partnerPortal.WithEnvironment("Reset__Enabled", "true")
         .WithEnvironment("ResetEndpoint__ApiKey", resetApiKey);
     simulator.WithEnvironment("PartnerPortal__ResetApiKey", resetApiKey);
+
+    // Locally there is no Easy Auth either: the ERP signs the developer in as Finance.
+    erpWeb.WithEnvironment("LocalUser__Name", $"{Environment.UserName} (local)")
+        .WithEnvironment("LocalUser__Roles__0", "Finance");
 
     // Locally the Simulator is on, signs the developer in as an operator holding both app roles, and signs every token it sends itself,
     // with the key the local stand-ins trust (ADR 0042). It waits for the stand-in that plays API Management.

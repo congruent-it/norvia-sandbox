@@ -32,7 +32,7 @@ The estate can also run *as found*, reproducing the problems a health check woul
 |---|---|
 | **TMS** | Transport Orders, Shipments, Trips, Carrier bookings, Own fleet availability |
 | **WMS** | Fulfilment Orders, Inventory |
-| **ERP** | Shipper, Carrier, Vehicle and Driver master data, Contracts, Rate Cards, invoicing |
+| **ERP** | Shipper, Carrier, Vehicle and Driver master data, Contracts, Rate Cards, invoicing. So far it loads and shows the Shippers, Carriers, Rate Cards and Carrier Rate Cards, read-only |
 | **Driver app** | Nothing. Drivers receive Trips and report Stops through it |
 | **Partner portal** | Nothing at Norvia. It plays every outside Shipper and Carrier as a Persona |
 | **Integration console** | Nothing. It reads the estate's telemetry |
@@ -66,7 +66,7 @@ Run the integration and UI tests one project at a time, as CI does, and not with
 
 | Where | What |
 |---|---|
-| [src/](src/) | The applications: the Aspire AppHost and ServiceDefaults, the TMS in Clean Architecture layers, with its Blazor UI in `Norvia.Tms.Web`, the Partner portal, the Integration console and the Simulator |
+| [src/](src/) | The applications: the Aspire AppHost and ServiceDefaults, the TMS in Clean Architecture layers, with its Blazor UI in `Norvia.Tms.Web`, the ERP, the Partner portal, the Integration console and the Simulator |
 | [tests/](tests/) | Tests per project, mirroring `src/` |
 | [contracts/canonical-model/](contracts/canonical-model/) | The Canonical Model as JSON Schemas |
 | [contracts/partner-api/](contracts/partner-api/README.md) | The Norvia Partner API's booking format and responses, with sample bookings and the Canonical Model Transport Order each maps to |
