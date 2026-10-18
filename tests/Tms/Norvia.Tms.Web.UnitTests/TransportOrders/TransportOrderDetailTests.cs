@@ -2,12 +2,12 @@ using AngleSharp.Dom;
 using Norvia.Tms.Application.CarrierBookings;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.TransportOrders;
+using Norvia.Tms.Application.TransportOrders.GetDetail;
 using Norvia.Tms.Application.Trips.GetByNumber;
 using Norvia.Tms.Domain.CarrierBookings;
 using Norvia.Tms.Domain.Shipments;
-using Norvia.Tms.Domain.Trips;
-using Norvia.Tms.Application.TransportOrders.GetDetail;
 using Norvia.Tms.Domain.TransportOrders;
+using Norvia.Tms.Domain.Trips;
 using Norvia.Tms.Web.TransportOrders;
 
 namespace Norvia.Tms.Web.UnitTests.TransportOrders;
