@@ -59,7 +59,7 @@ Needs the .NET 10 SDK, Docker, and Node.js 20 or later (the TMS UI's, the Partne
 ```bash
 dotnet run --project src/Norvia.AppHost      # TMS API and UI, Partner portal, Integration console, the local Partner API, migrations, SQL Server and the Service Bus emulator, with the Aspire dashboard
 for p in $(find tests -name '*.UnitTests.csproj' -o -name '*.ArchitectureTests.csproj' | sort); do dotnet test "$p"; done   # unit and architecture tests
-for p in $(find tests -name '*.IntegrationTests.csproj' -o -name '*.UiTests.csproj' | sort); do dotnet test "$p"; done        # integration and UI tests, one project at a time
+for p in $(find tests -name '*.IntegrationTests*.csproj' -o -name '*.UiTests*.csproj' | sort); do dotnet test "$p"; done        # integration and UI tests, one project at a time
 ```
 
 Run the integration and UI tests one project at a time, as CI does, and not with `dotnet test Norvia.slnx`: each of them starts AppHosts of its own (SQL Server and the Service Bus emulator in Docker, about 6 GB each), and the solution run starts those of several projects at once. On a 64 GB machine that ran out of memory, so containers failed to start, Chromium crashed and the desktop's out-of-memory daemon killed applications. Run one such project at a time, and one test session at a time.
