@@ -345,8 +345,10 @@ else
 {
     // The emulator won't start a topic without a subscription. Monitoring is the consumer P1 and P3 name for their events.
     messaging.RunAsEmulator(emulator => emulator.WithConfiguration(ResubmitAwareFilters.Apply));
-    messaging.AddServiceBusTopic("transport-order-events")
-        .AddServiceBusSubscription("monitoring");
+    var transportOrderEvents = messaging.AddServiceBusTopic("transport-order-events");
+    transportOrderEvents.AddServiceBusSubscription("monitoring");
+    // The E1 Billing Logic App's subscription: TransportOrderBillable only (see ResubmitAwareFilters).
+    transportOrderEvents.AddServiceBusSubscription("billing");
     // Resource names are unique across the AppHost, so this monitoring subscription's resource is named for its topic.
     var shipmentEvents = messaging.AddServiceBusTopic("shipment-events");
     shipmentEvents.AddServiceBusSubscription("shipment-events-monitoring", subscriptionName: "monitoring");
@@ -511,6 +513,15 @@ else
         .WithEnvironment("TripDispatch__TmsTokens__ClientId", LocalTokens.TripDispatchLogicAppClientId)
         .WithEnvironment("TripDispatch__DriverApp__Address", ReferenceExpression.Create($"{driverAppApi.GetEndpoint("http")}/v1/trips"))
         .WithEnvironment("TripDispatch__DriverApp__ApiKey", driverEndpointKey);
+    // Locally a worker plays the E1 Billing Logic App too. It reads the Billing subscription and records each Billable line with the ERP
+    // billing API as the identity holding the record role.
+    var billingWorker = builder.AddProject<Projects.Norvia_Integration_LocalBillingWorker>("billing-worker")
+        .WithReference(messaging).WaitFor(messaging)
+        .WithReference(erpApi).WaitFor(erpApi)
+        .WithEnvironment("Billing__ErpBaseAddress", erpApi.GetEndpoint("http"))
+        .WithEnvironment("Billing__ErpTokens__Issuer", LocalTokens.Issuer)
+        .WithEnvironment("Billing__ErpTokens__Audience", LocalTokens.ErpAudience)
+        .WithEnvironment("Billing__ErpTokens__ClientId", LocalTokens.BillingLogicAppClientId);
     // Locally a worker plays the P12 Driver reports Logic App as well. It reads the Driver app events subscription one Trip at a time, calls the
     // TMS as the identity holding the Trip start role, and tells the Driver app what became of each report as the identity holding the outcome
     // role.
@@ -664,6 +675,7 @@ else
         (shipperNotificationWorker.Resource, "ShipperNotification__TmsTokens__SigningKey"),
         (carrierCancellationWorker.Resource, "CarrierCancellation__TmsTokens__SigningKey"),
         (tripDispatchWorker.Resource, "TripDispatch__TmsTokens__SigningKey"),
+        (billingWorker.Resource, "Billing__ErpTokens__SigningKey"),
         (driverReportsWorker.Resource, "DriverReports__TmsTokens__SigningKey"),
         (driverReportsWorker.Resource, "DriverReports__DriverApp__Tokens__SigningKey"),
         (driverAppApi.Resource, "Authentication__Schemes__Bearer__SigningKeys__0__Value"),

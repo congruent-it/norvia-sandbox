@@ -20,6 +20,9 @@ param tripDispatchPrincipalId string
 @description('The P12 Driver reports Logic App\'s identity, which receives from its own subscription and from nothing else.')
 param driverReportsPrincipalId string
 
+@description('The E1 Billing Logic App\'s identity, which receives from its own subscription and from nothing else.')
+param billingPrincipalId string
+
 @description('The Driver app\'s identity, which sends to the Driver app events topic and to nothing else.')
 param driverAppPrincipalId string
 
@@ -139,6 +142,29 @@ resource driverReportsFilter 'Microsoft.ServiceBus/namespaces/topics/subscriptio
     filterType: 'SqlFilter'
     sqlFilter: {
       sqlExpression: '((eventType = \'TripStartReported\' OR eventType = \'TripEndReported\' OR eventType = \'StopCompletedReported\' OR eventType = \'ProofOfDeliveryCaptured\') AND resubmitTo IS NULL) OR resubmitTo = \'driver-reports\''
+    }
+  }
+}
+
+// The E1 Billing Logic App's subscription: TransportOrderBillable only, as the message's eventType property says. Its filter also routes
+// resubmits from the console, like every subscription's (coding guidelines §7). The AppHost's emulator gives the same subscription the
+// same condition (ResubmitAwareFilters).
+resource billing 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01' = {
+  parent: transportOrderEvents
+  name: 'billing'
+  properties: {
+    // Long enough for the Logic App's retries of the ERP call, which hold the message's lock.
+    lockDuration: 'PT5M'
+  }
+}
+
+resource billingFilter 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
+  parent: billing
+  name: '$Default'
+  properties: {
+    filterType: 'SqlFilter'
+    sqlFilter: {
+      sqlExpression: '(eventType = \'TransportOrderBillable\' AND resubmitTo IS NULL) OR resubmitTo = \'billing\''
     }
   }
 }
@@ -273,6 +299,17 @@ resource tripDispatchReceivesItsMessages 'Microsoft.Authorization/roleAssignment
   scope: tripDispatch
   properties: {
     principalId: tripDispatchPrincipalId
+    roleDefinitionId: serviceBusDataReceiver
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Scoped to the subscription, so the Billing Logic App reads Billable Transport Orders and no other message.
+resource billingReceivesItsMessages 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(billing.id, billingPrincipalId, serviceBusDataReceiver)
+  scope: billing
+  properties: {
+    principalId: billingPrincipalId
     roleDefinitionId: serviceBusDataReceiver
     principalType: 'ServicePrincipal'
   }

@@ -1,0 +1,14 @@
+{
+  "erpBaseUrl": {
+    "type": "String",
+    "value": "@appsetting('ERP_BASE_URL')"
+  },
+  "erpAudience": {
+    "type": "String",
+    "value": "@appsetting('ERP_API_CLIENT_ID')"
+  },
+  "billingIdentityId": {
+    "type": "String",
+    "value": "@appsetting('BILLING_IDENTITY_ID')"
+  }
+}

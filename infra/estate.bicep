@@ -73,6 +73,10 @@ param partnerPortalBaseUrl string = ''
 Logic App keeps it when the estate is deployed again.''')
 param driverAppBaseUrl string = ''
 
+@description('''The ERP billing API's address, empty before the apps are first deployed. azd's postdeploy hook stores it, so the Billing
+Logic App keeps it when the estate is deployed again.''')
+param erpBaseUrl string = ''
+
 var tags = {
   'azd-env-name': environmentName
 }
@@ -105,6 +109,7 @@ module messaging 'estate/messaging.bicep' = {
     carrierCancellationPrincipalId: identities.outputs.carrierCancellationPrincipalId
     tripDispatchPrincipalId: identities.outputs.tripDispatchPrincipalId
     driverReportsPrincipalId: identities.outputs.driverReportsPrincipalId
+    billingPrincipalId: identities.outputs.billingPrincipalId
     driverAppPrincipalId: identities.outputs.driverAppPrincipalId
     trackingPrincipalId: identities.outputs.trackingPrincipalId
     proofOfDeliveryPrincipalId: identities.outputs.proofOfDeliveryPrincipalId
@@ -275,6 +280,23 @@ module driverReportsLogicApp 'estate/driver-reports-logic-app.bicep' = {
   }
 }
 
+module billingLogicApp 'estate/billing-logic-app.bicep' = {
+  scope: resourceGroup
+  params: {
+    location: location
+    tags: tags
+    integrationRetentionDays: integrationRetentionDays
+    billingIdentityName: identities.outputs.billingIdentityName
+    erpApiClientId: identities.outputs.erpApiClientId
+    erpBaseUrl: erpBaseUrl
+    applicationInsightsName: monitoring.outputs.applicationInsightsName
+    serviceBusName: messaging.outputs.namespaceName
+    planName: intakeLogicApp.outputs.planName
+    contentKeyVaultName: intakeLogicApp.outputs.keyVaultName
+    integrationConsolePrincipalId: identities.outputs.integrationConsolePrincipalId
+  }
+}
+
 module trackingLogicApp 'estate/tracking-logic-app.bicep' = {
   scope: resourceGroup
   params: {
@@ -375,7 +397,6 @@ output ESTATE_CARRIER_CANCELLATION_IDENTITY_NAME string = identities.outputs.car
 output ESTATE_CARRIER_CANCELLATION_CLIENT_ID string = identities.outputs.carrierCancellationClientId
 output ESTATE_TRIP_DISPATCH_IDENTITY_NAME string = identities.outputs.tripDispatchIdentityName
 output ESTATE_DRIVER_REPORTS_IDENTITY_NAME string = identities.outputs.driverReportsIdentityName
-output ESTATE_DRIVER_REPORTS_CLIENT_ID string = identities.outputs.driverReportsClientId
 output ESTATE_DRIVER_APP_API_CLIENT_ID string = identities.outputs.driverAppApiClientId
 output ESTATE_DRIVER_APP_IDENTITY_NAME string = identities.outputs.driverAppIdentityName
 output ESTATE_DRIVER_APP_CLIENT_ID string = identities.outputs.driverAppClientId
@@ -389,6 +410,7 @@ output ESTATE_SHIPPER_NOTIFICATION_LOGIC_APP string = shipperNotificationLogicAp
 output ESTATE_CARRIER_CANCELLATION_LOGIC_APP string = carrierCancellationLogicApp.outputs.logicAppName
 output ESTATE_TRIP_DISPATCH_LOGIC_APP string = tripDispatchLogicApp.outputs.logicAppName
 output ESTATE_DRIVER_REPORTS_LOGIC_APP string = driverReportsLogicApp.outputs.logicAppName
+output ESTATE_BILLING_LOGIC_APP string = billingLogicApp.outputs.logicAppName
 output ESTATE_ANSWER_LOGIC_APP string = answerLogicApp.outputs.logicAppName
 output ESTATE_ANSWER_IDENTITY_NAME string = identities.outputs.answerIdentityName
 output ESTATE_TRACKING_LOGIC_APP string = trackingLogicApp.outputs.logicAppName

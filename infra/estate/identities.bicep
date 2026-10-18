@@ -1053,6 +1053,20 @@ resource erpApiPrincipal 'Microsoft.Graph/servicePrincipals@v1.0' = {
   appRoleAssignmentRequired: true
 }
 
+// The E1 Billing Logic App's identity, which it runs as. It is the one principal holding the ERP's record role, so no Billable line
+// is recorded without passing the integration layer, and it holds nothing else on the ERP or the TMS.
+resource billingIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
+  name: 'id-billing-${uniqueString(resourceGroup().id)}'
+  location: location
+  tags: tags
+}
+
+resource billingRecordRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: erpApiPrincipal.id
+  appRoleId: billableLinesRecordRoleId
+  principalId: billingIdentity.properties.principalId
+}
+
 output entraIssuer string = '${environment().authentication.loginEndpoint}${tenant().tenantId}/v2.0'
 output entraTenantId string = tenant().tenantId
 output tmsApiClientId string = tmsApi.appId
@@ -1112,7 +1126,6 @@ output driverAppPrincipalId string = driverAppIdentity.properties.principalId
 output driverAppClientId string = driverAppIdentity.properties.clientId
 output driverReportsIdentityName string = driverReportsIdentity.name
 output driverReportsPrincipalId string = driverReportsIdentity.properties.principalId
-output driverReportsClientId string = driverReportsIdentity.properties.clientId
 output driverAppApiClientId string = driverAppApi.appId
 output simulatorIdentityName string = simulatorIdentity.name
 output simulatorClientId string = simulatorIdentity.properties.clientId
@@ -1122,3 +1135,5 @@ output driverClientIds array = [for (driver, i) in drivers: '${driver.id}=${driv
 output erpIdentityName string = erpIdentity.name
 output erpRegistrationClientId string = erp.appId
 output erpApiClientId string = erpApi.appId
+output billingIdentityName string = billingIdentity.name
+output billingPrincipalId string = billingIdentity.properties.principalId

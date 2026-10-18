@@ -15,8 +15,7 @@ public sealed class LayoutTests : ErpWebContext
         var layout = RenderLayout();
 
         layout.Find("nav").TextContent.Should().Contain("Dev Eloper");
-        // Fluent UI's anchors are web components, not <a> elements.
-        var links = layout.FindAll("nav fluent-anchor");
+        var links = layout.FindAll("nav a");
         links.Select(link => link.TextContent.Trim()).Should().Equal("Waiting billable lines", "Shippers", "Carriers", "Rate Cards", "Carrier Rate Cards");
         links.Select(link => link.GetAttribute("href")).Should().Equal("/billable-lines", "/", "/carriers", "/rate-cards", "/carrier-rate-cards");
         layout.Find("main").TextContent.Should().Contain("the page");

@@ -1,0 +1,13 @@
+{
+  "name": "norvia-erp-web",
+  "private": true,
+  "description": "Builds the ERP UI's stylesheet with Tailwind CSS; the build runs it (see Norvia.Erp.Web.csproj).",
+  "scripts": {
+    "build:css": "tailwindcss --input Styles/app.css --output wwwroot/app.css --minify"
+  },
+  "devDependencies": {
+    "@fontsource/source-sans-3": "5.3.1",
+    "@tailwindcss/cli": "4.3.3",
+    "tailwindcss": "4.3.3"
+  }
+}
