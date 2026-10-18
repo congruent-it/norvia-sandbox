@@ -411,6 +411,13 @@ public class TmsFixture : IAsyncLifetime
         await _app.ResourceNotifications.WaitForResourceHealthyAsync("tms-api", restart.Token);
     }
 
+    /// <summary>A client for the TMS UI, once it is healthy, that shows a redirect rather than following it.</summary>
+    public async Task<HttpClient> CreateTmsWebClientAsync(CancellationToken cancellationToken)
+    {
+        await WaitForHealthyAsync("tms-web", cancellationToken);
+        return new HttpClient(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false }) { BaseAddress = _app!.GetEndpoint("tms-web", "http") };
+    }
+
     /// <summary>A client for the TMS API that sends the given token, or none.</summary>
     public HttpClient CreateTmsClient(string? token)
     {

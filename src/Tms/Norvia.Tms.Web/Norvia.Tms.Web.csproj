@@ -16,6 +16,8 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Norvia.Tms.Web.UnitTests" />
+    <!-- The integration tests read the Planner home page's counts through the TMS UI's own adapter. -->
+    <InternalsVisibleTo Include="Norvia.Tms.TestSupport" />
     <!-- NSubstitute substitutes the internal token port. -->
     <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
   </ItemGroup>
