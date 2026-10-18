@@ -1,0 +1,48 @@
+@page "/home"
+@rendermode InteractiveServer
+@using Microsoft.Extensions.Options
+@implements IAsyncDisposable
+@inject ITransportOrderQueries Queries
+@inject TimeProvider Time
+@inject IOptions<LiveListOptions> Options
+@inject ILogger<LiveTransportOrderList<PlannerHomeCounts>> Logger
+
+<PageTitle>Home · Norvia TMS</PageTitle>
+
+<h1>Home</h1>
+<p>What needs you to act now. Each item opens its list.</p>
+
+<LiveListStates Items="_list.Items" LastReadFailed="_list.LastReadFailed" Name="work to act on" Empty="Nothing to show." Context="counts">
+    <ul aria-label="Work to act on" class="m-0 grid list-none grid-cols-1 gap-4 p-0 sm:grid-cols-2 lg:grid-cols-3">
+        @foreach (var item in PlannerHomeItem.From(counts[0]))
+        {
+            <li class="rounded-flatly border border-gray-300 p-4">
+                <a href="@item.Path" class="text-lg font-bold">@item.Title</a>
+                @if (item.Count == 0)
+                {
+                    <p class="m-0 text-gray-500">@item.NothingToDo</p>
+                }
+                else
+                {
+                    <p class="m-0"><strong aria-label="@($"{item.Count} {item.Title}")">@item.Count</strong> @item.Unit</p>
+                }
+            </li>
+        }
+    </ul>
+</LiveListStates>
+
+@code {
+    private LiveTransportOrderList<PlannerHomeCounts> _list = null!;
+
+    protected override void OnInitialized()
+    {
+        _list = new LiveTransportOrderList<PlannerHomeCounts>(
+            cancellationToken => PlannerHomeReader.ReadAsync(Queries, cancellationToken), "what needs the Planner", Time, Options.Value.RefreshInterval, Logger);
+        _list.Changed += () => InvokeAsync(StateHasChanged);
+        _list.Start();
+    }
+
+    public ValueTask DisposeAsync() => _list.DisposeAsync();
+
+
+}
