@@ -37,6 +37,10 @@ param driverAppRedirectUris string = ''
 it, so the Simulator's app registration keeps it when the estate is deployed again.''')
 param simulatorRedirectUris string = ''
 
+@description('''Easy Auth's sign-in callback on the ERP, empty before the ERP is first deployed. azd's postdeploy hook stores it, so the
+ERP's app registration keeps it when the estate is deployed again.''')
+param erpRedirectUris string = ''
+
 @description('''Whether the Simulator does anything (Simulator:Enabled). The estate decides: switch it off to make the deployed Simulator answer
 every request but its health checks with 404, without removing it. The Simulator sends orders into the estate, so it is a demo tool.''')
 param simulatorEnabled bool = true
@@ -119,6 +123,7 @@ module identities 'estate/identities.bicep' = {
     integrationConsoleRedirectUris: integrationConsoleRedirectUris
     driverAppRedirectUris: driverAppRedirectUris
     simulatorRedirectUris: simulatorRedirectUris
+    erpRedirectUris: erpRedirectUris
   }
 }
 
@@ -364,7 +369,6 @@ output ESTATE_TMS_API_CLIENT_ID string = identities.outputs.tmsApiClientId
 output ESTATE_INTAKE_CLIENT_ID string = identities.outputs.intakeClientId
 output ESTATE_INTAKE_IDENTITY_ID string = identities.outputs.intakeIdentityId
 output ESTATE_BOOKING_IDENTITY_NAME string = identities.outputs.bookingIdentityName
-output ESTATE_BOOKING_CLIENT_ID string = identities.outputs.bookingClientId
 output ESTATE_SHIPPER_NOTIFICATION_IDENTITY_NAME string = identities.outputs.shipperNotificationIdentityName
 output ESTATE_SHIPPER_NOTIFICATION_CLIENT_ID string = identities.outputs.shipperNotificationClientId
 output ESTATE_CARRIER_CANCELLATION_IDENTITY_NAME string = identities.outputs.carrierCancellationIdentityName
@@ -387,7 +391,6 @@ output ESTATE_CARRIER_CANCELLATION_LOGIC_APP string = carrierCancellationLogicAp
 output ESTATE_TRIP_DISPATCH_LOGIC_APP string = tripDispatchLogicApp.outputs.logicAppName
 output ESTATE_DRIVER_REPORTS_LOGIC_APP string = driverReportsLogicApp.outputs.logicAppName
 output ESTATE_ANSWER_LOGIC_APP string = answerLogicApp.outputs.logicAppName
-output ESTATE_ANSWER_CLIENT_ID string = identities.outputs.answerClientId
 output ESTATE_ANSWER_IDENTITY_NAME string = identities.outputs.answerIdentityName
 output ESTATE_TRACKING_LOGIC_APP string = trackingLogicApp.outputs.logicAppName
 output ESTATE_TRACKING_CLIENT_ID string = identities.outputs.trackingClientId
@@ -413,6 +416,8 @@ output ESTATE_SIMULATOR_IDENTITY_NAME string = identities.outputs.simulatorIdent
 output ESTATE_SIMULATOR_CLIENT_ID string = identities.outputs.simulatorClientId
 output ESTATE_SIMULATOR_REGISTRATION_CLIENT_ID string = identities.outputs.simulatorRegistrationClientId
 output ESTATE_DRIVER_CLIENT_IDS string = join(identities.outputs.driverClientIds, ';')
+output ESTATE_ERP_IDENTITY_NAME string = identities.outputs.erpIdentityName
+output ESTATE_ERP_REGISTRATION_CLIENT_ID string = identities.outputs.erpRegistrationClientId
 output ESTATE_SIMULATOR_ENABLED string = string(simulatorEnabled)
 output ESTATE_SIMULATOR_MAX_ORDERS_PER_RUN string = string(simulatorMaxOrdersPerRun)
 output ESTATE_SIMULATOR_MAX_CONCURRENT_REQUESTS string = string(simulatorMaxConcurrentRequests)

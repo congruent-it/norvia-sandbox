@@ -1,0 +1,37 @@
+@page "/rate-cards"
+@attribute [Authorize(Policy = FinanceSignIn.FinancePolicy)]
+@using Mediator
+@using Norvia.Erp.Application.MasterData.RateCards
+@using Norvia.Erp.Application.MasterData.RateCards.List
+@inject IMediator Mediator
+@inject ILogger<RateCardsPage> Logger
+
+<PageTitle>Rate Cards · Norvia ERP</PageTitle>
+
+<h1>Rate Cards</h1>
+<p>Read-only. The ERP loads them from the seed file with the TMS's IDs.</p>
+
+<MasterDataStates Name="Rate Cards" Loaded="_loaded" Failed="_failed" Empty="_cards.Count == 0">
+    <RateCardList Cards="_cards" PartyKind="Shipper" />
+</MasterDataStates>
+
+@code {
+    private IReadOnlyList<RateCardView> _cards = [];
+    private bool _loaded;
+    private bool _failed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _cards = await Mediator.Send(new ListRateCardsQuery());
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogError(exception, "The Rate Cards couldn't be read");
+            _failed = true;
+        }
+
+        _loaded = true;
+    }
+}

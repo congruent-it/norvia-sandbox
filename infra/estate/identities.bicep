@@ -20,6 +20,9 @@ param driverAppRedirectUris string
 @description('Easy Auth\'s sign-in callback on the Simulator, empty before the Simulator is first deployed.')
 param simulatorRedirectUris string = ''
 
+@description('Easy Auth\'s sign-in callback on the ERP, empty before the ERP is first deployed.')
+param erpRedirectUris string = ''
+
 var intakeRole = 'TransportOrders.Intake'
 var intakeRoleId = guid('norvia-tms-api', environmentName, intakeRole)
 var manageRole = 'TransportOrders.Manage'
@@ -72,6 +75,8 @@ var simulatorRunRole = 'Simulator.Run'
 var simulatorRunRoleId = guid('norvia-simulator', environmentName, simulatorRunRole)
 var simulatorReadRole = 'Simulator.Read'
 var simulatorReadRoleId = guid('norvia-simulator', environmentName, simulatorReadRole)
+var erpFinanceRole = 'Finance'
+var erpFinanceRoleId = guid('norvia-erp', environmentName, erpFinanceRole)
 
 // Every active Driver the seed file names is one app role of the Driver app's registration, with the Driver ID as its value.
 var drivers = filter(loadJsonContent('../../seed/norvia.seed.json').drivers, driver => driver.active)
@@ -966,6 +971,55 @@ resource simulatorReadRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = if (!
   principalId: presenterPrincipalId
 }
 
+// The ERP's identity, which it runs as. Aspire deploys the ERP; the estate owns the identity because the estate grants it what it may do.
+// It holds no app role on another application: the ERP meets the rest of the estate only through Service Bus (ADR 0001).
+resource erpIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
+  name: 'id-erp-${uniqueString(resourceGroup().id)}'
+  location: location
+  tags: tags
+}
+
+// What Easy Auth signs Finance in to in front of the ERP (as ADR 0026 does for the Integration console). The ERP reads the user's
+// app roles and lets in only those holding Finance.
+resource erp 'Microsoft.Graph/applications@v1.0' = {
+  uniqueName: 'norvia-erp-${environmentName}'
+  displayName: 'Norvia ERP (${environmentName})'
+  signInAudience: 'AzureADMyOrg'
+  web: {
+    // The postdeploy hook adds it once Aspire has deployed the ERP.
+    redirectUris: filter(split(erpRedirectUris, ','), uri => !empty(uri))
+    implicitGrantSettings: {
+      // Without a client secret Easy Auth asks for an ID token only, which carries the user's app roles.
+      enableIdTokenIssuance: true
+    }
+  }
+  appRoles: [
+    {
+      id: erpFinanceRoleId
+      value: erpFinanceRole
+      displayName: 'Finance'
+      description: 'Use the ERP: see its master data, and in the slices after this one run Invoicing and issue Credit notes.'
+      allowedMemberTypes: [
+        'User'
+      ]
+      isEnabled: true
+    }
+  ]
+}
+
+resource erpPrincipal 'Microsoft.Graph/servicePrincipals@v1.0' = {
+  appId: erp.appId
+  // Entra signs in only users holding the Finance role, so someone without it is refused by Entra before they reach the ERP.
+  appRoleAssignmentRequired: true
+}
+
+// The presenter plays Finance in demos.
+resource erpFinanceRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = if (!empty(presenterPrincipalId)) {
+  resourceId: erpPrincipal.id
+  appRoleId: erpFinanceRoleId
+  principalId: presenterPrincipalId
+}
+
 output entraIssuer string = '${environment().authentication.loginEndpoint}${tenant().tenantId}/v2.0'
 output entraTenantId string = tenant().tenantId
 output tmsApiClientId string = tmsApi.appId
@@ -1033,3 +1087,5 @@ output simulatorClientId string = simulatorIdentity.properties.clientId
 output simulatorPrincipalId string = simulatorIdentity.properties.principalId
 output simulatorRegistrationClientId string = simulator.appId
 output driverClientIds array = [for (driver, i) in drivers: '${driver.id}=${driverClientApps[i].appId}']
+output erpIdentityName string = erpIdentity.name
+output erpRegistrationClientId string = erp.appId

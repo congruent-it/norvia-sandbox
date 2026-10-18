@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!--
+      Only the namespaces these tests unit test are gated: the seed file reader and loader. The rest of ERP Infrastructure is EF Core,
+      SQL and Service Bus code, which the integration tests run against real containers (coding guidelines §10).
+    -->
+    <Include>[Norvia.Erp.Infrastructure]Norvia.Erp.Infrastructure.Seed.*</Include>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="coverlet.msbuild" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.Testing" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+    <PackageReference Include="xunit.v3.mtp-off" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="AwesomeAssertions" />
+    <Using Include="NSubstitute" />
+    <ProjectReference Include="..\..\..\src\Erp\Norvia.Erp.Infrastructure\Norvia.Erp.Infrastructure.csproj" />
+  </ItemGroup>
+  <!-- Embedded, so the unit tests read the seed file without touching the file system (coding guidelines §10). -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\..\seed\norvia.seed.json" LogicalName="seed/norvia.seed.json" />
+  </ItemGroup>
+</Project>

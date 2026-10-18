@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <Include>[Norvia.Erp.Web]*</Include>
+    <!-- The composition root has no behaviour to unit test (coding guidelines §10). -->
+    <ExcludeByFile>**/Norvia.Erp.Web/Program.cs</ExcludeByFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="bunit" />
+    <PackageReference Include="coverlet.msbuild" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+    <PackageReference Include="xunit.v3.mtp-off" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="AwesomeAssertions" />
+    <Using Include="Bunit" />
+    <Using Include="NSubstitute" />
+    <ProjectReference Include="..\..\..\src\Erp\Norvia.Erp.Web\Norvia.Erp.Web.csproj" />
+  </ItemGroup>
+</Project>

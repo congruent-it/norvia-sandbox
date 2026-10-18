@@ -1,0 +1,40 @@
+@page "/"
+@attribute [Authorize(Policy = FinanceSignIn.FinancePolicy)]
+@using Mediator
+@using Norvia.Erp.Application.MasterData.Shippers.List
+@inject IMediator Mediator
+@inject ILogger<ShippersPage> Logger
+
+<PageTitle>Shippers · Norvia ERP</PageTitle>
+
+<h1>Shippers</h1>
+<p>Read-only. The ERP loads them from the seed file with the TMS's IDs.</p>
+
+<MasterDataStates Name="shippers" Loaded="_loaded" Failed="_failed" Empty="_rows.Count == 0">
+    <FluentDataGrid Items="_rows.AsQueryable()" TGridItem="ShipperView" aria-label="Shippers">
+        <PropertyColumn Title="ID" Property="@(row => row.Id)" />
+        <PropertyColumn Title="Name" Property="@(row => row.Name)" />
+        <TemplateColumn Title="Active">@(context.Active ? "Yes" : "No")</TemplateColumn>
+    </FluentDataGrid>
+</MasterDataStates>
+
+@code {
+    private IReadOnlyList<ShipperView> _rows = [];
+    private bool _loaded;
+    private bool _failed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _rows = await Mediator.Send(new ListShippersQuery());
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogError(exception, "The shippers couldn't be read");
+            _failed = true;
+        }
+
+        _loaded = true;
+    }
+}

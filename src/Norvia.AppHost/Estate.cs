@@ -113,6 +113,12 @@ public sealed class Estate(IDistributedApplicationBuilder builder)
     /// <summary>The Simulator's app registration, which Easy Auth signs the presenter in to. Its app roles say what an operator may do (ADR 0042).</summary>
     public IResourceBuilder<ParameterResource> SimulatorRegistrationClientId { get; } = builder.AddParameter("estate-simulator-registration-client-id");
 
+    /// <summary>The ERP's managed identity, which it runs as. The estate owns it, as it owns the Simulator's.</summary>
+    public IResourceBuilder<ParameterResource> ErpIdentity { get; } = builder.AddParameter("estate-erp-identity-name");
+
+    /// <summary>The ERP's app registration, which Easy Auth signs Finance in to. Its Finance app role says who may use the ERP.</summary>
+    public IResourceBuilder<ParameterResource> ErpRegistrationClientId { get; } = builder.AddParameter("estate-erp-registration-client-id");
+
     /// <summary>Each seeded Driver's client app for the Simulator: <c>driverId=clientId</c> pairs separated by semicolons.</summary>
     public IResourceBuilder<ParameterResource> DriverClientIds { get; } = builder.AddParameter("estate-driver-client-ids");
 

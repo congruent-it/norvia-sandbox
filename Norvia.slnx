@@ -28,6 +28,13 @@
     <Project Path="src/IntegrationConsole/Norvia.IntegrationConsole.Infrastructure/Norvia.IntegrationConsole.Infrastructure.csproj" />
     <Project Path="src/IntegrationConsole/Norvia.IntegrationConsole.Web/Norvia.IntegrationConsole.Web.csproj" />
   </Folder>
+  <Folder Name="/src/Erp/">
+    <Project Path="src/Erp/Norvia.Erp.Application/Norvia.Erp.Application.csproj" />
+    <Project Path="src/Erp/Norvia.Erp.Domain/Norvia.Erp.Domain.csproj" />
+    <Project Path="src/Erp/Norvia.Erp.Infrastructure/Norvia.Erp.Infrastructure.csproj" />
+    <Project Path="src/Erp/Norvia.Erp.Migrations/Norvia.Erp.Migrations.csproj" />
+    <Project Path="src/Erp/Norvia.Erp.Web/Norvia.Erp.Web.csproj" />
+  </Folder>
   <Folder Name="/src/DriverApp/">
     <Project Path="src/DriverApp/Norvia.DriverApp.Api/Norvia.DriverApp.Api.csproj" />
     <Project Path="src/DriverApp/Norvia.DriverApp.Application/Norvia.DriverApp.Application.csproj" />
@@ -77,6 +84,13 @@
     <Project Path="tests/IntegrationConsole/Norvia.IntegrationConsole.Infrastructure.UnitTests/Norvia.IntegrationConsole.Infrastructure.UnitTests.csproj" />
     <Project Path="tests/IntegrationConsole/Norvia.IntegrationConsole.Web.UiTests/Norvia.IntegrationConsole.Web.UiTests.csproj" />
     <Project Path="tests/IntegrationConsole/Norvia.IntegrationConsole.Web.UnitTests/Norvia.IntegrationConsole.Web.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/tests/Erp/">
+    <Project Path="tests/Erp/Norvia.Erp.Application.UnitTests/Norvia.Erp.Application.UnitTests.csproj" />
+    <Project Path="tests/Erp/Norvia.Erp.ArchitectureTests/Norvia.Erp.ArchitectureTests.csproj" />
+    <Project Path="tests/Erp/Norvia.Erp.Domain.UnitTests/Norvia.Erp.Domain.UnitTests.csproj" />
+    <Project Path="tests/Erp/Norvia.Erp.Infrastructure.UnitTests/Norvia.Erp.Infrastructure.UnitTests.csproj" />
+    <Project Path="tests/Erp/Norvia.Erp.Web.UnitTests/Norvia.Erp.Web.UnitTests.csproj" />
   </Folder>
   <Folder Name="/tests/DriverApp/">
     <Project Path="tests/DriverApp/Norvia.DriverApp.Api.IntegrationTests/Norvia.DriverApp.Api.IntegrationTests.csproj" />
