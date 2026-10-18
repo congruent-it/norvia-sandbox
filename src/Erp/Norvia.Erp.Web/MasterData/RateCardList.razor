@@ -3,7 +3,7 @@
 @* A Rate Card or a Carrier Rate Card: its versions and, for each, the Lanes it prices. View only. *@
 @foreach (var card in Cards)
 {
-    <section aria-label="@card.Id" style="margin-bottom: 2rem;">
+    <section aria-label="@card.Id" class="mb-8">
         <h2>@card.Id · @PartyKind @card.PartyName (@card.PartyId)</h2>
         @foreach (var version in card.Versions)
         {
@@ -13,7 +13,7 @@
                 @(version.ValidTo is { } validTo ? $"to {validTo.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)}" : "with no end date").
                 @version.ZoneCount Zones, @version.Lanes.Count Lanes.
             </p>
-            <FluentDataGrid Items="version.Lanes.AsQueryable()" TGridItem="LaneView" aria-label="@($"Lanes of {card.Id} version {version.Version}")">
+            <FluentDataGrid Class="cerulean-table" Items="version.Lanes.AsQueryable()" TGridItem="LaneView" aria-label="@($"Lanes of {card.Id} version {version.Version}")">
                 <PropertyColumn Title="From" Property="@(lane => lane.Origin)" />
                 <PropertyColumn Title="To" Property="@(lane => lane.Destination)" />
                 <PropertyColumn Title="Minimum charge (EUR)" Property="@(lane => lane.MinimumCharge)" Format="N2" />

@@ -17,6 +17,7 @@ internal static class ResubmitAwareFilters
         ["carrier-booking"] = "assignedTo = 'Carrier'",
         ["shipper-notification"] = "eventType = 'ShipperNotificationRequested'",
         ["carrier-cancellation"] = "eventType = 'CarrierBookingCancelled' OR eventType = 'CarrierBookingWithdrawn'",
+        ["billing"] = "eventType = 'TransportOrderBillable'",
         ["trip-dispatch"] = "eventType = 'TripDispatched'",
         ["driver-reports"] = "eventType = 'TripStartReported' OR eventType = 'TripEndReported' OR eventType = 'StopCompletedReported' OR eventType = 'ProofOfDeliveryCaptured'",
     };

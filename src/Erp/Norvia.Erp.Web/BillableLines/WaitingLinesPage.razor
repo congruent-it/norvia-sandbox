@@ -18,7 +18,7 @@
 
 <LiveListStates Items="_list.Items" LastReadFailed="_list.LastReadFailed" Name="Waiting billable lines"
                 Empty="No billable lines are waiting. A line appears here as soon as the TMS makes a Transport Order Billable." Context="shippers">
-    <FluentDataGrid Items="shippers.AsQueryable()" TGridItem="WaitingShipperView" aria-label="Waiting billable lines per Shipper">
+    <FluentDataGrid Class="cerulean-table" Items="shippers.AsQueryable()" TGridItem="WaitingShipperView" aria-label="Waiting billable lines per Shipper">
         <TemplateColumn Title="Shipper">
             <a href="/billable-lines/@context.ShipperId">@context.ShipperName</a>
         </TemplateColumn>

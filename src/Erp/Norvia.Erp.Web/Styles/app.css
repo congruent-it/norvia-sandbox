@@ -1,0 +1,211 @@
+/*
+ * The ERP UI's stylesheet, built by Tailwind CSS into wwwroot/app.css (ADR 0044). It gives the app the look of
+ * Bootswatch's Cerulean theme: a sky-blue navbar, Source Sans, light surfaces. Tailwind's preflight resets the page instead of Fluent
+ * UI's reboot.css: the reboot isn't in a cascade layer, so it would win over every Tailwind utility.
+ */
+@import "tailwindcss";
+
+@source "../**/*.razor";
+
+/*
+ * Cerulean's palette and type (Bootswatch 5, cerulean/_variables.scss). Static, so every colour is emitted as a variable:
+ * the Fluent UI overrides below use some that no utility does.
+ */
+@theme static {
+    --color-primary: #2fa4e7;
+    --color-secondary: #e9ecef;
+    --color-success: #73a839;
+    --color-info: #033c73;
+    --color-warning: #dd5600;
+    --color-danger: #c71c22;
+    --color-light: #f8f9fa;
+    --color-dark: #343a40;
+    --color-body: #495057;
+    --color-border: #dee2e6;
+    --color-muted: #6c757d;
+    --font-sans: "Source Sans 3", -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --radius-cerulean: 0.4rem;
+}
+
+@font-face {
+    font-family: "Source Sans 3";
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("fonts/source-sans-3-latin-400-normal.woff2") format("woff2");
+}
+
+@font-face {
+    font-family: "Source Sans 3";
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url("fonts/source-sans-3-latin-700-normal.woff2") format("woff2");
+}
+
+@layer base {
+    body {
+        /* Fluent UI's components read their font from this token, which Fluent's script sets on the root. */
+        --body-font: var(--font-sans);
+        margin: 0;
+        background-color: #fff;
+        color: var(--color-body);
+        font-family: var(--font-sans);
+        font-size: 1rem;
+        line-height: 1.5;
+    }
+
+    h1,
+    h2 {
+        margin-top: 0;
+        font-weight: 700;
+        line-height: 1.2;
+        color: var(--color-dark);
+    }
+
+    h1 {
+        margin-bottom: 1.5rem;
+        font-size: 1.875rem;
+    }
+
+    h2 {
+        margin-bottom: 0.75rem;
+        font-size: 1.25rem;
+    }
+
+    a {
+        color: var(--color-primary);
+        text-decoration: underline;
+    }
+
+    a:hover {
+        color: #2682b8;
+    }
+}
+
+@layer components {
+    .detail-list {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        column-gap: 1.5rem;
+        row-gap: 0.25rem;
+        margin: 0;
+    }
+
+    .detail-list dt {
+        font-weight: 700;
+    }
+
+    .detail-list dd {
+        margin: 0;
+    }
+}
+
+/*
+ * Fluent UI's own component styles aren't in a cascade layer, so these overrides aren't either: a layered rule would
+ * always lose to them.
+ */
+
+/* Tables as Cerulean draws them: bold headers over a heavier rule, a light rule between rows, a hover tint. */
+.cerulean-table.fluent-data-grid,
+table.cerulean-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.cerulean-table.fluent-data-grid th,
+.cerulean-table.fluent-data-grid td,
+table.cerulean-table th,
+table.cerulean-table td {
+    vertical-align: top;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-body);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+}
+
+.cerulean-table.fluent-data-grid th,
+table.cerulean-table th {
+    border-bottom: 2px solid var(--color-dark);
+    font-weight: 700;
+    text-align: left;
+}
+
+.cerulean-table.fluent-data-grid .col-title {
+    padding: 0;
+}
+
+/* A header that doesn't fit wraps at its words instead of being cut off with an ellipsis. */
+.cerulean-table.fluent-data-grid .col-title-text {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+}
+
+.cerulean-table.fluent-data-grid tbody tr:hover td,
+table.cerulean-table tbody tr:hover td {
+    background-color: var(--color-light);
+}
+
+/*
+ * A FluentSelect inside a grid cell isn't a floating overlay: its open list grows in normal flow, so the cell's own
+ * clip (or scroll, under MultiLine) cuts it off. Only the row holding an open select loses its clip, so the list isn't cut
+ * off and the cells it spills over, which scroll under MultiLine, don't show a scrollbar; every other row keeps it.
+ */
+.cerulean-table.fluent-data-grid tr:has(fluent-select[open]) td {
+    overflow: visible;
+}
+
+/*
+ * Tailwind's preflight zeroes the padding of every element, the options' hosts included, which puts their text against
+ * the edge of the list and under the selected option's marker. This gives back Fluent's own inset.
+ */
+fluent-option {
+    padding-inline: 0.75rem;
+}
+
+/*
+ * Alerts as Cerulean draws them: solid colour, white text, in light mode. Fluent scopes its own with an attribute
+ * (.fluent-messagebar.intent-error[b-…], three classes' worth), so these add body and :not(.dark) to outrank it.
+ */
+body .fluent-messagebar.intent-error:not(.dark),
+body .fluent-messagebar.intent-warning:not(.dark),
+body .fluent-messagebar.intent-info:not(.dark) {
+    padding: 0.75rem 1rem;
+    border: none;
+    border-radius: var(--radius-cerulean);
+    color: #fff;
+    font-family: var(--font-sans);
+    font-size: 1rem;
+}
+
+body .fluent-messagebar.intent-error:not(.dark) {
+    background-color: var(--color-danger);
+}
+
+body .fluent-messagebar.intent-warning:not(.dark) {
+    background-color: var(--color-warning);
+}
+
+body .fluent-messagebar.intent-info:not(.dark) {
+    background-color: var(--color-info);
+}
+
+body .fluent-messagebar.intent-error:not(.dark) svg,
+body .fluent-messagebar.intent-warning:not(.dark) svg,
+body .fluent-messagebar.intent-info:not(.dark) svg {
+    fill: #fff !important;
+}
+
+body .fluent-messagebar .fluent-messagebar-message {
+    color: inherit;
+    font-size: inherit;
+}
+
+#blazor-error-ui {
+    display: none;
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 1000;
+}

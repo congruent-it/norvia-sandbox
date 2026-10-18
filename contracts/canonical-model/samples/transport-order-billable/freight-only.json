@@ -1,0 +1,22 @@
+{
+  "eventId": "0198e7c0-0000-7000-8000-0000000000c1",
+  "eventType": "TransportOrderBillable",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-16T09:12:40+00:00",
+  "correlationId": "b6f2a1d4-8c3e-4a57-9d10-2e7f5c8a4b91",
+  "intakeCorrelationId": "3a9d7e52-1f64-4c08-b2a3-6d85e0c17f49",
+  "transportOrderNumber": "TO-0000042",
+  "shipperId": "SHP-0001",
+  "shipperReference": "BD-2026-1187",
+  "shipmentNumber": "SH-0000042",
+  "deliveryTime": "2026-10-16T10:45:00+02:00",
+  "freightCharge": {
+    "currency": "EUR",
+    "total": 412.5,
+    "chargeLines": [
+      { "type": "Freight", "amount": 412.5 }
+    ],
+    "rateCardVersion": { "rateCardId": "RC-0001", "version": 1 }
+  },
+  "releasedWithoutProofOfDelivery": false
+}

@@ -55,5 +55,8 @@
     <EmbeddedResource Include="..\..\..\src\Integration\TripDispatchLogicApp\trip-dispatch\workflow.json" LogicalName="TripDispatchLogicApp/trip-dispatch/workflow.json" />
     <EmbeddedResource Include="..\..\..\src\Integration\DriverReportsLogicApp\*.json" LogicalName="DriverReportsLogicApp/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\src\Integration\DriverReportsLogicApp\driver-reports\workflow.json" LogicalName="DriverReportsLogicApp/driver-reports/workflow.json" />
+    <EmbeddedResource Include="..\..\..\src\Integration\BillingLogicApp\*.json" LogicalName="BillingLogicApp/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\src\Integration\BillingLogicApp\billing\workflow.json" LogicalName="BillingLogicApp/billing/workflow.json" />
+    <EmbeddedResource Include="..\..\..\contracts\canonical-model\samples\transport-order-billable\*.json" LogicalName="CanonicalModel/samples/transport-order-billable/%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

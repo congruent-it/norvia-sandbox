@@ -1,0 +1,23 @@
+{
+  "eventId": "0198e7c0-0000-7000-8000-0000000000c2",
+  "eventType": "TransportOrderBillable",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-16T14:03:11+00:00",
+  "correlationId": "f08c4b73-5d29-4e16-a7b0-93c1d2e6f8a5",
+  "intakeCorrelationId": "c7e15a08-92b4-4d3f-8e61-0a4b7d9c2f13",
+  "transportOrderNumber": "TO-0000043",
+  "shipperId": "SHP-0001",
+  "shipperReference": "BD-2026-1190",
+  "shipmentNumber": "SH-0000043",
+  "deliveryTime": "2026-10-16T15:30:00+02:00",
+  "freightCharge": {
+    "currency": "EUR",
+    "total": 150,
+    "chargeLines": [
+      { "type": "Freight", "amount": 96.4 },
+      { "type": "MinimumChargeAdjustment", "amount": 53.6 }
+    ],
+    "rateCardVersion": { "rateCardId": "RC-0001", "version": 2 }
+  },
+  "releasedWithoutProofOfDelivery": false
+}

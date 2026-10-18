@@ -32,6 +32,9 @@ public static class TrackingKeys
     /// <summary>The <see cref="Flow"/> of a Carrier cancellation or withdrawal, from the event to the report to the TMS.</summary>
     public const string CarrierCancellation = "carrier-cancellation";
 
+    /// <summary>The <see cref="Flow"/> of a Billable line, from TransportOrderBillable to the ERP billing API's answer.</summary>
+    public const string Billing = "billing";
+
     /// <summary>The <see cref="Flow"/> of a Trip version sent to the Driver app, from the dispatch to the report to the TMS.</summary>
     public const string TripDispatch = "trip-dispatch";
 

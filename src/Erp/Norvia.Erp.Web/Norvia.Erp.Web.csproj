@@ -16,4 +16,32 @@
     <InternalsVisibleTo Include="Norvia.Erp.Web.IntegrationTests" />
     <InternalsVisibleTo Include="Norvia.Erp.Web.UnitTests" />
   </ItemGroup>
+  <!--
+    The stylesheet is built with Tailwind CSS (ADR 0044), which needs Node.js. Tailwind and the Source Sans font come from npm;
+    the build installs them, writes wwwroot/app.css and copies the fonts next to it. Both are build output, not source.
+  -->
+  <ItemGroup>
+    <None Remove="node_modules/**" />
+    <Content Remove="node_modules/**;package.json;package-lock.json" />
+    <TailwindInput Include="Styles/**/*.css;**/*.razor" Exclude="node_modules/**;bin/**;obj/**" />
+    <SansFont Include="node_modules/@fontsource/source-sans-3/files/source-sans-3-latin-400-normal.woff2;node_modules/@fontsource/source-sans-3/files/source-sans-3-latin-700-normal.woff2" />
+  </ItemGroup>
+
+  <Target Name="InstallStylesheetTools" Inputs="package.json;package-lock.json" Outputs="node_modules/.install-stamp">
+    <Exec Command="npm ci --no-audit --no-fund" />
+    <Touch Files="node_modules/.install-stamp" AlwaysCreate="true" />
+  </Target>
+
+  <Target Name="BuildStylesheet" DependsOnTargets="InstallStylesheetTools" Inputs="@(TailwindInput)" Outputs="wwwroot/app.css">
+    <Exec Command="npm run build:css" />
+  </Target>
+
+  <!-- Before the static web assets are collected, so a first build already serves the stylesheet and the fonts. -->
+  <Target Name="IncludeStylesheet" BeforeTargets="AssignTargetPaths;ResolveStaticWebAssetsConfiguration" DependsOnTargets="BuildStylesheet">
+    <Copy SourceFiles="@(SansFont)" DestinationFolder="wwwroot/fonts" SkipUnchangedFiles="true" />
+    <ItemGroup>
+      <Content Remove="wwwroot/app.css;wwwroot/fonts/*.woff2" />
+      <Content Include="wwwroot/app.css;wwwroot/fonts/*.woff2" />
+    </ItemGroup>
+  </Target>
 </Project>
