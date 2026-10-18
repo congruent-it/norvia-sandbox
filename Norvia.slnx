@@ -117,7 +117,9 @@
     <Project Path="tests/Tms/Norvia.Tms.Domain.UnitTests/Norvia.Tms.Domain.UnitTests.csproj" />
     <Project Path="tests/Tms/Norvia.Tms.Infrastructure.UnitTests/Norvia.Tms.Infrastructure.UnitTests.csproj" />
     <Project Path="tests/Tms/Norvia.Tms.TestSupport/Norvia.Tms.TestSupport.csproj" />
-    <Project Path="tests/Tms/Norvia.Tms.Web.UiTests/Norvia.Tms.Web.UiTests.csproj" />
+    <Project Path="tests/Tms/Norvia.Tms.Web.UiTests.Remaining/Norvia.Tms.Web.UiTests.Remaining.csproj" />
+    <Project Path="tests/Tms/Norvia.Tms.Web.UiTests.Shipments/Norvia.Tms.Web.UiTests.Shipments.csproj" />
+    <Project Path="tests/Tms/Norvia.Tms.Web.UiTests.TransportOrders/Norvia.Tms.Web.UiTests.TransportOrders.csproj" />
     <Project Path="tests/Tms/Norvia.Tms.Web.UnitTests/Norvia.Tms.Web.UnitTests.csproj" />
   </Folder>
 </Solution>
