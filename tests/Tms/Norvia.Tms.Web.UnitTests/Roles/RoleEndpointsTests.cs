@@ -7,13 +7,13 @@ namespace Norvia.Tms.Web.UnitTests.Roles;
 public sealed class RoleEndpointsTests
 {
     [Fact]
-    public void OpenHome_WithNoRoleChosen_OpensThePlannersView()
+    public void OpenHome_WithNoRoleChosen_OpensThePlannersHomePage()
     {
         var context = new DefaultHttpContext();
 
         var result = RoleEndpoints.OpenHome(context.Request);
 
-        result.Should().BeOfType<RedirectHttpResult>().Which.Url.Should().Be("/transport-orders");
+        result.Should().BeOfType<RedirectHttpResult>().Which.Url.Should().Be("/home");
     }
 
     [Fact]
@@ -28,20 +28,20 @@ public sealed class RoleEndpointsTests
     }
 
     [Fact]
-    public void OpenHome_WithARoleThatDoesntExist_OpensThePlannersView()
+    public void OpenHome_WithARoleThatDoesntExist_OpensThePlannersHomePage()
     {
         var context = new DefaultHttpContext();
         context.Request.Headers.Cookie = $"{NorviaRole.CookieName}=administrator";
 
         var result = RoleEndpoints.OpenHome(context.Request);
 
-        result.Should().BeOfType<RedirectHttpResult>().Which.Url.Should().Be("/transport-orders");
+        result.Should().BeOfType<RedirectHttpResult>().Which.Url.Should().Be("/home");
     }
 
     [Theory]
     [InlineData("customer-service", "/rejected-bookings")]
-    [InlineData("planner", "/transport-orders")]
-    public void Switch_ToARole_RemembersItAndOpensItsView(string role, string view)
+    [InlineData("planner", "/home")]
+    public void Switch_ToARole_RemembersItAndOpensItsHome(string role, string view)
     {
         var context = new DefaultHttpContext();
 

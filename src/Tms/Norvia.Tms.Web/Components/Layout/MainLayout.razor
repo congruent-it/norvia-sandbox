@@ -1,4 +1,5 @@
 @inherits LayoutComponentBase
+@inject NavigationManager Navigation
 
 @* Fluent UI's own components take Flatly's navy as their accent, and stay light as Flatly is. *@
 <FluentDesignTheme Mode="DesignThemeModes.Light" CustomColor="#2c3e50" />
@@ -7,13 +8,44 @@
 <header class="bg-primary text-white">
     <nav aria-label="Main" class="mx-auto flex max-w-7xl flex-wrap items-center gap-x-8 gap-y-2 px-4 py-4">
         <a href="/" class="text-xl font-bold text-white no-underline hover:text-white">Norvia TMS</a>
-        @foreach (var view in _role.Views)
+        @if (_role.HomePath is { } homePath)
         {
-            <NavLink href="@view.Path" Match="NavLinkMatch.Prefix"
+            <NavLink href="@homePath" Match="NavLinkMatch.All"
                      class="text-white/75 no-underline hover:text-success"
                      ActiveClass="!text-white">
-                @view.Title
+                Home
             </NavLink>
+        }
+        @foreach (var entry in Entries())
+        {
+            @if (entry.Group is { } group)
+            {
+                @* A group is a menu: a details element needs no script, so it works before the page is interactive, and sharing a name opens one at a time. *@
+                <details name="main-menu" class="group relative">
+                    <summary class="cursor-pointer list-none @(entry.Views.Any(IsOpen) ? "text-white" : "text-white/75") hover:text-success">@group</summary>
+                    <ul aria-label="@group" class="absolute left-0 z-10 m-0 mt-2 hidden min-w-64 list-none group-open:block rounded-flatly bg-primary p-2 shadow-lg">
+                        @foreach (var view in entry.Views)
+                        {
+                            <li class="py-1">
+                                <NavLink href="@view.Path" Match="NavLinkMatch.Prefix"
+                                         class="text-white/75 no-underline hover:text-success"
+                                         ActiveClass="!text-white">
+                                    @view.Title
+                                </NavLink>
+                            </li>
+                        }
+                    </ul>
+                </details>
+            }
+            else
+            {
+                var view = entry.Views[0];
+                <NavLink href="@view.Path" Match="NavLinkMatch.Prefix"
+                         class="text-white/75 no-underline hover:text-success"
+                         ActiveClass="!text-white">
+                    @view.Title
+                </NavLink>
+            }
         }
         <div class="ml-auto">
             <RoleSwitcher Current="_role" />
@@ -40,4 +72,27 @@
 
     protected override void OnParametersSet() =>
         _role = HttpContext is null ? NorviaRole.Planner : NorviaRole.Current(HttpContext.Request);
+
+    // The views in the role's order, each group's views together at the group's first view; a view without a group stands alone.
+    private IEnumerable<(string? Group, IReadOnlyList<RoleView> Views)> Entries()
+    {
+        var shown = new HashSet<string>();
+        foreach (var view in _role.Views)
+        {
+            if (view.Group is null)
+            {
+                yield return (null, [view]);
+            }
+            else if (shown.Add(view.Group))
+            {
+                yield return (view.Group, [.. _role.Views.Where(other => other.Group == view.Group)]);
+            }
+        }
+    }
+
+    private bool IsOpen(RoleView view)
+    {
+        var path = "/" + Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0];
+        return path == view.Path || path.StartsWith(view.Path + "/", StringComparison.Ordinal);
+    }
 }

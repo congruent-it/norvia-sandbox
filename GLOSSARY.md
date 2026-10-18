@@ -33,7 +33,7 @@ The Norvia employees who answer Shippers about their bookings and Transport Orde
 _Avoid_: support, helpdesk, account management
 
 **Role switcher**:
-The control in the TMS UI that moves a Norvia user between Planner and Customer service without a login, so a demo moves quickly. Each role opens on its own view.
+The control in the TMS UI that moves a Norvia user between Planner and Customer service without a login, so a demo moves quickly. Each role opens on its own page: the Planner on its home page, which counts the work to act on, and Customer service on its first view.
 _Avoid_: login, impersonation, persona (that is for parties outside Norvia)
 
 **Integration operator**:
