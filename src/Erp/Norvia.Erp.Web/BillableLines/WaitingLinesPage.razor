@@ -1,0 +1,48 @@
+@page "/billable-lines"
+@attribute [Authorize(Policy = FinanceSignIn.FinancePolicy)]
+@rendermode InteractiveServer
+@using Mediator
+@using Microsoft.Extensions.Options
+@using Norvia.Erp.Application.BillableLines.ListWaiting
+@using Norvia.Erp.Web.Live
+@implements IAsyncDisposable
+@inject IServiceScopeFactory Scopes
+@inject TimeProvider Time
+@inject IOptions<LiveListOptions> Options
+@inject ILogger<LiveList<WaitingShipperView>> Logger
+
+<PageTitle>Waiting billable lines · Norvia ERP</PageTitle>
+
+<h1>Waiting billable lines</h1>
+<p>The Billable Transport Orders no Invoice run has invoiced yet, per Shipper. The list updates as the TMS hands more over.</p>
+
+<LiveListStates Items="_list.Items" LastReadFailed="_list.LastReadFailed" Name="Waiting billable lines"
+                Empty="No billable lines are waiting. A line appears here as soon as the TMS makes a Transport Order Billable." Context="shippers">
+    <FluentDataGrid Items="shippers.AsQueryable()" TGridItem="WaitingShipperView" aria-label="Waiting billable lines per Shipper">
+        <TemplateColumn Title="Shipper">
+            <a href="/billable-lines/@context.ShipperId">@context.ShipperName</a>
+        </TemplateColumn>
+        <PropertyColumn Title="ID" Property="@(row => row.ShipperId)" />
+        <PropertyColumn Title="Waiting lines" Property="@(row => row.LineCount)" />
+        <PropertyColumn Title="Total without VAT" Property="@(row => Money.Format(row.Total))" />
+    </FluentDataGrid>
+</LiveListStates>
+
+@code {
+    private LiveList<WaitingShipperView> _list = null!;
+
+    protected override void OnInitialized()
+    {
+        _list = new LiveList<WaitingShipperView>(ReadAsync, "the Waiting billable lines", Time, Options.Value.RefreshInterval, Logger);
+        _list.Changed += () => InvokeAsync(StateHasChanged);
+        _list.Start();
+    }
+
+    private async Task<IReadOnlyList<WaitingShipperView>> ReadAsync(CancellationToken cancellationToken)
+    {
+        await using var scope = Scopes.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<IMediator>().Send(new ListWaitingBillableLinesQuery(), cancellationToken);
+    }
+
+    public ValueTask DisposeAsync() => _list.DisposeAsync();
+}

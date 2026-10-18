@@ -22,6 +22,62 @@ namespace Norvia.Erp.Infrastructure.Data.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("Norvia.Erp.Domain.BillableLines.BillableLine", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("BillingCorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTimeOffset>("DeliveryTime")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("FreightCharge")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("IntakeCorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("ReleasedWithoutProofOfDelivery")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("ShipmentNumber")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("ShipperId")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("ShipperReference")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ShipperId", "Status");
+
+                    b.ToTable("BillableLines", (string)null);
+                });
+
             modelBuilder.Entity("Norvia.Erp.Domain.Carriers.Carrier", b =>
                 {
                     b.Property<string>("Id")
@@ -158,6 +214,15 @@ namespace Norvia.Erp.Infrastructure.Data.Migrations
                         .HasFilter("[PublishedAt] IS NULL");
 
                     b.ToTable("OutboxMessages", (string)null);
+                });
+
+            modelBuilder.Entity("Norvia.Erp.Domain.BillableLines.BillableLine", b =>
+                {
+                    b.HasOne("Norvia.Erp.Domain.Shippers.Shipper", null)
+                        .WithMany()
+                        .HasForeignKey("ShipperId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Norvia.Erp.Domain.RateCards.CarrierRateCard", b =>

@@ -4,13 +4,14 @@ Who each identity is in Entra, which app roles it holds, which APIs it may call,
 
 Everything is declared in [identities.bicep](../../infra/estate/identities.bicep) and the role assignments beside each resource in [infra/estate/](../../infra/estate/). No application holds a client secret: every caller is a managed identity, and the Persona client apps trust the Partner portal's managed identity, and the Simulator's, through federated credentials ([ADR 0005](../adr/0005-partner-identity-comes-from-the-token.md), [ADR 0042](../adr/0042-the-simulator-signs-in-with-easy-auth-reaches-the-estate-as-its-own-identity-and-plays-the-personas-and-drivers-through-entra-client-apps.md)). There is no drift test for this page; the [coding guidelines §11](../coding-guidelines.md#11-workflow) rule that a PR changing an app role updates the matching architecture page keeps it current.
 
-## The four API audiences
+## The API audiences
 
 An app role belongs to the app registration of the API it guards. Each registration is an audience; the caller asks Entra for a token for that audience.
 
 | App registration | Audience | Who may get a token | Roles it defines |
 |---|---|---|---|
 | **Norvia TMS API** | `api://<tenant>/norvia-tms-<env>` | Only principals granted one of its roles (`appRoleAssignmentRequired`) | The [TMS API roles](#tms-api-roles) |
+| **Norvia ERP API** | `api://<tenant>/norvia-erp-api-<env>` | Only principals granted its role (`appRoleAssignmentRequired`) | `BillableLines.Record`, which the [Billing Logic App](../processes/erp/e1-invoicing.md#erp-api) will hold once it is built |
 | **Norvia Partner API** | `api://<tenant>/norvia-partner-api-<env>` | Any Persona, holding a role or not, so a Carrier Persona calling a Shipper operation gets 403 from API Management, which the demo shows | The [Partner API roles](#partner-api-roles) |
 | **Norvia intake Logic App trigger** | `api://<tenant>/norvia-intake-trigger-<env>` | Only API Management | `TransportOrderIntake.Trigger` |
 | **Norvia Carrier-answer Logic App trigger** | `api://<tenant>/norvia-answer-trigger-<env>` | Only API Management | `CarrierAnswer.Trigger` |
@@ -63,6 +64,14 @@ The TMS validates the token and the role; the Shipper or Carrier a call is for c
 | `ShipperTracking.Read` | `apim` | List, get and find a Shipper's Transport Orders, and read a current Proof of delivery file. The TMS trusts the Shipper ID header only from this caller | [P8](../processes/tms/p8-shipper-visibility.md) |
 
 The TMS API's queries (Transport Orders, Shipments, Exceptions, Proof of delivery files) ask only for a valid token. Because Entra issues one only to a principal holding one of the roles above, in practice the callers are these identities. The TMS UI reads in process and uses the API to change things ([ADR 0028](../adr/0028-the-tms-ui-reads-in-process-and-changes-things-through-the-tms-api.md)).
+
+## ERP API roles
+
+The ERP billing API validates the token and the role, and takes everything else from the Canonical Model body.
+
+| Role | Held by | Guards | Process |
+|---|---|---|---|
+| `BillableLines.Record` | The Billing Logic App's identity, when that Logic App is built | Record a Billable line from `TransportOrderBillable` | [E1](../processes/erp/e1-invoicing.md#erp-api) |
 
 ## Partner API roles
 

@@ -119,6 +119,9 @@ public sealed class Estate(IDistributedApplicationBuilder builder)
     /// <summary>The ERP's app registration, which Easy Auth signs Finance in to. Its Finance app role says who may use the ERP.</summary>
     public IResourceBuilder<ParameterResource> ErpRegistrationClientId { get; } = builder.AddParameter("estate-erp-registration-client-id");
 
+    /// <summary>The ERP billing API's app registration, which is the audience of the tokens it accepts.</summary>
+    public IResourceBuilder<ParameterResource> ErpApiClientId { get; } = builder.AddParameter("estate-erp-api-client-id");
+
     /// <summary>Each seeded Driver's client app for the Simulator: <c>driverId=clientId</c> pairs separated by semicolons.</summary>
     public IResourceBuilder<ParameterResource> DriverClientIds { get; } = builder.AddParameter("estate-driver-client-ids");
 

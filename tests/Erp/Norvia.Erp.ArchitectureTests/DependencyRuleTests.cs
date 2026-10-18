@@ -1,5 +1,6 @@
 using System.Reflection;
 using NetArchTest.Rules;
+using Norvia.Erp.Api.Tracking;
 using Norvia.Erp.Application.MasterData.Load;
 using Norvia.Erp.Domain.Shippers;
 using Norvia.Erp.Infrastructure;
@@ -17,6 +18,7 @@ public sealed class DependencyRuleTests
     private const string ApplicationNamespace = "Norvia.Erp.Application";
     private const string InfrastructureNamespace = "Norvia.Erp.Infrastructure";
     private const string WebNamespace = "Norvia.Erp.Web";
+    private const string ApiNamespace = "Norvia.Erp.Api";
 
     private static readonly string[] Frameworks =
     [
@@ -30,11 +32,12 @@ public sealed class DependencyRuleTests
     private static readonly Assembly Application = typeof(LoadMasterDataCommand).Assembly;
     private static readonly Assembly Infrastructure = typeof(DependencyInjection).Assembly;
     private static readonly Assembly Web = typeof(FinanceSignIn).Assembly;
+    private static readonly Assembly Api = typeof(TrackedFlow).Assembly;
 
     [Fact]
     public void Domain_DependsOnNoOuterLayer()
     {
-        ShouldHold(Types.InAssembly(Domain).ShouldNot().HaveDependencyOnAny(ApplicationNamespace, InfrastructureNamespace, WebNamespace));
+        ShouldHold(Types.InAssembly(Domain).ShouldNot().HaveDependencyOnAny(ApplicationNamespace, InfrastructureNamespace, WebNamespace, ApiNamespace));
     }
 
     [Fact]
@@ -46,7 +49,7 @@ public sealed class DependencyRuleTests
     [Fact]
     public void Application_DependsOnNoOuterLayer()
     {
-        ShouldHold(Types.InAssembly(Application).ShouldNot().HaveDependencyOnAny(InfrastructureNamespace, WebNamespace));
+        ShouldHold(Types.InAssembly(Application).ShouldNot().HaveDependencyOnAny(InfrastructureNamespace, WebNamespace, ApiNamespace));
     }
 
     [Fact]
@@ -58,7 +61,25 @@ public sealed class DependencyRuleTests
     [Fact]
     public void Infrastructure_DoesNotDependOnPresentation()
     {
-        ShouldHold(Types.InAssembly(Infrastructure).ShouldNot().HaveDependencyOn(WebNamespace));
+        ShouldHold(Types.InAssembly(Infrastructure).ShouldNot().HaveDependencyOnAny(WebNamespace, ApiNamespace));
+    }
+
+    [Fact]
+    public void Api_UsesInfrastructureOnlyInItsCompositionRoot()
+    {
+        ShouldHold(Types.InAssembly(Api)
+            .That().DoNotHaveName("Program")
+            .And().DoNotHaveNameStartingWith("<")
+            .ShouldNot().HaveDependencyOn(InfrastructureNamespace));
+    }
+
+    [Fact]
+    public void Api_DoesNotUseEntityFramework()
+    {
+        ShouldHold(Types.InAssembly(Api)
+            .That().DoNotHaveName("Program")
+            .And().DoNotHaveNameStartingWith("<")
+            .ShouldNot().HaveDependencyOn("Microsoft.EntityFrameworkCore"));
     }
 
     [Fact]
@@ -73,7 +94,7 @@ public sealed class DependencyRuleTests
     [Fact]
     public void DbContext_StaysInsideInfrastructure()
     {
-        ShouldHold(Types.InAssemblies([Domain, Application, Web])
+        ShouldHold(Types.InAssemblies([Domain, Application, Web, Api])
             .That().DoNotHaveName("Program")
             .ShouldNot().HaveDependencyOn("Microsoft.EntityFrameworkCore"));
     }
@@ -82,7 +103,7 @@ public sealed class DependencyRuleTests
     public void TheErp_NeverUsesAnotherApplicationsCode()
     {
         // Applications meet only through Azure Integration Services (ADR 0001, coding guidelines §2).
-        ShouldHold(Types.InAssemblies([Domain, Application, Infrastructure, Web])
+        ShouldHold(Types.InAssemblies([Domain, Application, Infrastructure, Web, Api])
             .ShouldNot().HaveDependencyOnAny("Norvia.Tms", "Norvia.PartnerPortal", "Norvia.DriverApp", "Norvia.Simulator", "Norvia.IntegrationConsole", "Norvia.Integration."));
     }
 

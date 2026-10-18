@@ -29,6 +29,7 @@
     <Project Path="src/IntegrationConsole/Norvia.IntegrationConsole.Web/Norvia.IntegrationConsole.Web.csproj" />
   </Folder>
   <Folder Name="/src/Erp/">
+    <Project Path="src/Erp/Norvia.Erp.Api/Norvia.Erp.Api.csproj" />
     <Project Path="src/Erp/Norvia.Erp.Application/Norvia.Erp.Application.csproj" />
     <Project Path="src/Erp/Norvia.Erp.Domain/Norvia.Erp.Domain.csproj" />
     <Project Path="src/Erp/Norvia.Erp.Infrastructure/Norvia.Erp.Infrastructure.csproj" />
@@ -86,6 +87,7 @@
     <Project Path="tests/IntegrationConsole/Norvia.IntegrationConsole.Web.UnitTests/Norvia.IntegrationConsole.Web.UnitTests.csproj" />
   </Folder>
   <Folder Name="/tests/Erp/">
+    <Project Path="tests/Erp/Norvia.Erp.Api.UnitTests/Norvia.Erp.Api.UnitTests.csproj" />
     <Project Path="tests/Erp/Norvia.Erp.Application.UnitTests/Norvia.Erp.Application.UnitTests.csproj" />
     <Project Path="tests/Erp/Norvia.Erp.ArchitectureTests/Norvia.Erp.ArchitectureTests.csproj" />
     <Project Path="tests/Erp/Norvia.Erp.Domain.UnitTests/Norvia.Erp.Domain.UnitTests.csproj" />

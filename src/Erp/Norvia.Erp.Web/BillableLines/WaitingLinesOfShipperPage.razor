@@ -1,0 +1,71 @@
+@page "/billable-lines/{ShipperId}"
+@attribute [Authorize(Policy = FinanceSignIn.FinancePolicy)]
+@rendermode InteractiveServer
+@using Mediator
+@using Microsoft.Extensions.Options
+@using Norvia.Erp.Application.BillableLines
+@using Norvia.Erp.Application.BillableLines.ListWaitingOfShipper
+@using Norvia.Erp.Web.Live
+@implements IAsyncDisposable
+@inject IServiceScopeFactory Scopes
+@inject TimeProvider Time
+@inject IOptions<LiveListOptions> Options
+@inject ILogger<LiveList<WaitingShipperLinesView>> Logger
+
+<PageTitle>Waiting billable lines of @ShipperId · Norvia ERP</PageTitle>
+
+<p><a href="/billable-lines">All Shippers</a></p>
+
+@* The query answers one Shipper, or none when the ERP has no such Shipper. *@
+<LiveListStates Items="_list.Items" LastReadFailed="_list.LastReadFailed" Name="@($"Waiting billable lines of {ShipperId}")"
+                Empty="@($"The ERP has no Shipper {ShipperId}.")" Context="shippers">
+    @{ var shipper = shippers[0]; }
+    <h1>Waiting billable lines of @shipper.ShipperName</h1>
+    <p>@shipper.Lines.Count Waiting @(shipper.Lines.Count == 1 ? "line" : "lines"), @Money.Format(shipper.Total) without VAT.</p>
+
+    @if (shipper.Lines.Count == 0)
+    {
+        <div role="status">
+            <FluentMessageBar Intent="MessageIntent.Info" AllowDismiss="false">
+                @shipper.ShipperName has no Waiting billable lines.
+            </FluentMessageBar>
+        </div>
+    }
+    else
+    {
+        <FluentAccordion aria-label="Waiting billable lines">
+            @foreach (var line in shipper.Lines)
+            {
+                <FluentAccordionItem Heading="@Heading(line)" @key="line.TransportOrderNumber">
+                    <BillableLineDetails Line="line" />
+                </FluentAccordionItem>
+            }
+        </FluentAccordion>
+    }
+</LiveListStates>
+
+@code {
+    private LiveList<WaitingShipperLinesView> _list = null!;
+
+    [Parameter]
+    public string ShipperId { get; set; } = "";
+
+    protected override void OnInitialized()
+    {
+        _list = new LiveList<WaitingShipperLinesView>(ReadAsync, "the Waiting billable lines of a Shipper", Time, Options.Value.RefreshInterval, Logger);
+        _list.Changed += () => InvokeAsync(StateHasChanged);
+        _list.Start();
+    }
+
+    private async Task<IReadOnlyList<WaitingShipperLinesView>> ReadAsync(CancellationToken cancellationToken)
+    {
+        await using var scope = Scopes.CreateAsyncScope();
+        var shipper = await scope.ServiceProvider.GetRequiredService<IMediator>().Send(new ListWaitingBillableLinesOfShipperQuery(ShipperId), cancellationToken);
+        return shipper is null ? [] : [shipper];
+    }
+
+    private static string Heading(BillableLineView line) =>
+        $"{line.TransportOrderNumber} · {Money.Format(line.FreightCharge.Total)}{(line.ReleasedWithoutProofOfDelivery ? " · Released without Proof of delivery" : "")}";
+
+    public ValueTask DisposeAsync() => _list.DisposeAsync();
+}

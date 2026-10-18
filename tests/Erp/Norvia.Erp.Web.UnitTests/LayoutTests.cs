@@ -10,15 +10,15 @@ namespace Norvia.Erp.Web.UnitTests;
 public sealed class LayoutTests : ErpWebContext
 {
     [Fact]
-    public void Render_ForFinance_ShowsWhoTheyAreAndTheFourMasterDataLists()
+    public void Render_ForFinance_ShowsWhoTheyAreTheWaitingLinesAndTheFourMasterDataLists()
     {
         var layout = RenderLayout();
 
         layout.Find("nav").TextContent.Should().Contain("Dev Eloper");
         // Fluent UI's anchors are web components, not <a> elements.
         var links = layout.FindAll("nav fluent-anchor");
-        links.Select(link => link.TextContent.Trim()).Should().Equal("Shippers", "Carriers", "Rate Cards", "Carrier Rate Cards");
-        links.Select(link => link.GetAttribute("href")).Should().Equal("/", "/carriers", "/rate-cards", "/carrier-rate-cards");
+        links.Select(link => link.TextContent.Trim()).Should().Equal("Waiting billable lines", "Shippers", "Carriers", "Rate Cards", "Carrier Rate Cards");
+        links.Select(link => link.GetAttribute("href")).Should().Equal("/billable-lines", "/", "/carriers", "/rate-cards", "/carrier-rate-cards");
         layout.Find("main").TextContent.Should().Contain("the page");
     }
 

@@ -1,0 +1,68 @@
+@* What a live list shows before and around its items: loading, a first read that failed, a refresh that failed and an
+   empty list. Only a list with items renders ChildContent. *@
+@typeparam TItem
+
+@if (Items is null)
+{
+    @if (LastReadFailed)
+    {
+        <div role="alert">
+            <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+                The @Name couldn't be loaded. Trying again…
+            </FluentMessageBar>
+        </div>
+    }
+    else
+    {
+        <FluentStack VerticalAlignment="VerticalAlignment.Center" role="status">
+            <FluentProgressRing />
+            <span>Loading the @Name…</span>
+        </FluentStack>
+    }
+}
+else
+{
+    @if (LastReadFailed)
+    {
+        <div role="alert">
+            <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
+                The list couldn't be refreshed and may be out of date. Trying again…
+            </FluentMessageBar>
+        </div>
+    }
+
+    @if (Items.Count == 0)
+    {
+        <div role="status">
+            <FluentMessageBar Intent="MessageIntent.Info" AllowDismiss="false">
+                @Empty
+            </FluentMessageBar>
+        </div>
+    }
+    else
+    {
+        @ChildContent(Items)
+    }
+}
+
+@code {
+    /// <summary>The items from the last read that succeeded; null until one has.</summary>
+    [Parameter]
+    public IReadOnlyList<TItem>? Items { get; set; }
+
+    /// <summary>True when the last read failed; <see cref="Items"/> then still holds what was read before.</summary>
+    [Parameter]
+    public bool LastReadFailed { get; set; }
+
+    /// <summary>What the list holds, as its loading and error messages name it.</summary>
+    [Parameter, EditorRequired]
+    public string Name { get; set; } = null!;
+
+    /// <summary>What an empty list says instead of an empty table.</summary>
+    [Parameter, EditorRequired]
+    public string Empty { get; set; } = null!;
+
+    /// <summary>The list, once it has items.</summary>
+    [Parameter, EditorRequired]
+    public RenderFragment<IReadOnlyList<TItem>> ChildContent { get; set; } = null!;
+}

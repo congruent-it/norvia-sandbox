@@ -1,6 +1,7 @@
 using Microsoft.FluentUI.AspNetCore.Components;
 using Norvia.Erp.Application.MasterData.Shippers.List;
 using Norvia.Erp.Infrastructure;
+using Norvia.Erp.Web.Live;
 using Norvia.Erp.Web.Operators;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,6 +10,7 @@ builder.AddServiceDefaults();
 
 // The ERP keeps its own database and outbox, and loads its master data from the seed file as it starts. Only Finance reaches its UI.
 builder.AddErpInfrastructure();
+builder.AddErpSeedLoading();
 builder.AddErpOutboxPublisher();
 builder.AddFinanceSignIn();
 builder.Services.AddMediator(options =>
@@ -17,6 +19,7 @@ builder.Services.AddMediator(options =>
     options.Assemblies = [typeof(ListShippersQuery)];
 });
 
+builder.Services.AddOptions<LiveListOptions>().BindConfiguration(LiveListOptions.SectionName).ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddFluentUIComponents();
 

@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/billable-line.v1.schema.json",
+  "title": "BillableLine",
+  "description": "The ERP's record of one Billable Transport Order (Canonical Model document, version 1): what TransportOrderBillable carries, kept as the TMS froze it, with the status of the line. The ERP never recalculates the Freight Charge. A line is Waiting until an Invoice run puts it on a Shipper invoice; there is one per Transport Order number.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "transportOrderNumber",
+    "shipperId",
+    "shipperReference",
+    "shipmentNumber",
+    "deliveryTime",
+    "freightCharge",
+    "releasedWithoutProofOfDelivery",
+    "intakeCorrelationId",
+    "billingCorrelationId",
+    "recordedAt",
+    "status"
+  ],
+  "properties": {
+    "transportOrderNumber": {
+      "type": "string",
+      "pattern": "^TO-[0-9]{7}$"
+    },
+    "shipperId": {
+      "description": "The Shipper to invoice.",
+      "type": "string",
+      "minLength": 1
+    },
+    "shipperReference": {
+      "description": "The Shipper's own reference for the Transport Order.",
+      "type": "string",
+      "minLength": 1
+    },
+    "shipmentNumber": {
+      "type": "string",
+      "pattern": "^SH-[0-9]{7}$"
+    },
+    "deliveryTime": {
+      "description": "When the Shipment was Delivered, with the offset of where it happened.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "freightCharge": {
+      "description": "The frozen price Norvia charges the Shipper for the Transport Order, without VAT, as TransportOrderBillable carried it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "total",
+        "chargeLines",
+        "rateCardId",
+        "rateCardVersion"
+      ],
+      "properties": {
+        "currency": {
+          "const": "EUR"
+        },
+        "total": {
+          "description": "The sum of the charge lines.",
+          "type": "number",
+          "minimum": 0,
+          "multipleOf": 0.01
+        },
+        "chargeLines": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "amount"
+            ],
+            "properties": {
+              "type": {
+                "enum": [
+                  "Freight",
+                  "MinimumChargeAdjustment"
+                ]
+              },
+              "amount": {
+                "type": "number",
+                "minimum": 0,
+                "multipleOf": 0.01
+              }
+            }
+          }
+        },
+        "rateCardId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rateCardVersion": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "releasedWithoutProofOfDelivery": {
+      "description": "Whether Customer service released the Transport Order without a Proof of delivery.",
+      "type": "boolean"
+    },
+    "intakeCorrelationId": {
+      "description": "The correlation ID of the Transport Order's intake.",
+      "type": "string",
+      "minLength": 1
+    },
+    "billingCorrelationId": {
+      "description": "The correlation ID of the transaction that made the Transport Order Billable.",
+      "type": "string",
+      "minLength": 1
+    },
+    "recordedAt": {
+      "description": "When the ERP recorded the line.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "description": "Waiting until an Invoice run invoices the line.",
+      "enum": [
+        "Waiting"
+      ]
+    }
+  }
+}
