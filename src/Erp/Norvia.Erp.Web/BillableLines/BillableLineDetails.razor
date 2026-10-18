@@ -1,0 +1,41 @@
+@using Norvia.Erp.Application.BillableLines
+
+@* Everything a Billable line holds. A line released without a Proof of delivery is marked. *@
+@if (Line.ReleasedWithoutProofOfDelivery)
+{
+    <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
+        Released without Proof of delivery.
+    </FluentMessageBar>
+}
+
+<dl aria-label="@($"Billable line {Line.TransportOrderNumber}")">
+    <dt>Transport Order</dt>
+    <dd>@Line.TransportOrderNumber</dd>
+    <dt>Shipper reference</dt>
+    <dd>@Line.ShipperReference</dd>
+    <dt>Shipment</dt>
+    <dd>@Line.ShipmentNumber</dd>
+    <dt>Delivered</dt>
+    <dd>@Line.DeliveryTime.ToString("yyyy-MM-dd HH:mm zzz")</dd>
+    <dt>Proof of delivery</dt>
+    <dd>@(Line.ReleasedWithoutProofOfDelivery ? "Released without one" : "Received")</dd>
+    <dt>Rate Card version</dt>
+    <dd>@Line.FreightCharge.RateCardId version @Line.FreightCharge.RateCardVersion</dd>
+    <dt>Intake correlation ID</dt>
+    <dd>@Line.IntakeCorrelationId</dd>
+    <dt>Billing correlation ID</dt>
+    <dd>@Line.BillingCorrelationId</dd>
+    <dt>Recorded</dt>
+    <dd>@Line.RecordedAt.ToString("yyyy-MM-dd HH:mm zzz")</dd>
+</dl>
+
+<FluentDataGrid Items="Line.FreightCharge.ChargeLines.AsQueryable()" TGridItem="ChargeLineView" aria-label="@($"Charge lines of {Line.TransportOrderNumber}")">
+    <PropertyColumn Title="Charge line" Property="@(row => row.Type)" />
+    <PropertyColumn Title="Amount without VAT" Property="@(row => Money.Format(row.Amount))" />
+</FluentDataGrid>
+<p>Total without VAT: @Money.Format(Line.FreightCharge.Total)</p>
+
+@code {
+    [Parameter, EditorRequired]
+    public BillableLineView Line { get; set; } = null!;
+}

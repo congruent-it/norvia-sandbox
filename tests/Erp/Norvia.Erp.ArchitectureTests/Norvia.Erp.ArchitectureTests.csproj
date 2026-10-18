@@ -12,6 +12,7 @@
   <ItemGroup>
     <Using Include="Xunit" />
     <Using Include="AwesomeAssertions" />
+    <ProjectReference Include="..\..\..\src\Erp\Norvia.Erp.Api\Norvia.Erp.Api.csproj" />
     <ProjectReference Include="..\..\..\src\Erp\Norvia.Erp.Web\Norvia.Erp.Web.csproj" />
   </ItemGroup>
 </Project>

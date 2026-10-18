@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/billable-line-recording.v1.schema.json",
+  "title": "BillableLineRecording",
+  "description": "The ERP billing API's answer to recording a Billable line (Canonical Model document, version 1): 201 for the first recording, 200 with repeat true when the same content arrives again for a Transport Order that is already recorded, in which case the line is the original one. Recording publishes nothing.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "line",
+    "repeat"
+  ],
+  "properties": {
+    "line": {
+      "$ref": "billable-line.v1.schema.json"
+    },
+    "repeat": {
+      "type": "boolean"
+    }
+  }
+}

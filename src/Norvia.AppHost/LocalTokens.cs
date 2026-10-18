@@ -13,6 +13,7 @@ namespace Norvia.AppHost;
 /// The local Proof of delivery worker's client ID stands in for the Carrier Proof of delivery Logic App's, the one holder of the Proof of delivery record role.
 /// The local answer Logic App's client ID, which the stand-in Partner API signs its token with, is the one holder of the answer role.
 /// The local API Management client ID, which the stand-in Partner API signs its Shipper tracking token with, is the one holder of the Shipper tracking role.
+/// The local Billing Logic App's client ID stands in for the Billing Logic App's, the one holder of the ERP billing API's record role; the ERP API trusts the same key.
 /// The TMS UI signs its own token for the TMS API with the key too, as its managed identity holding the manage role.
 /// The local Partner API trusts the same key for the Personas' tokens, which the Partner portal signs itself (ADR 0023).
 /// </summary>
@@ -21,6 +22,8 @@ public static class LocalTokens
     public const string SigningKeyParameter = "local-token-signing-key";
     public const string Issuer = "https://norvia.local/tokens";
     public const string TmsAudience = "api://norvia-tms";
+    public const string ErpAudience = "api://norvia-erp";
+    public const string BillingLogicAppClientId = "norvia-local-billing-logic-app";
     public const string IntakeLogicAppClientId = "norvia-local-intake-logic-app";
     public const string BookingLogicAppClientId = "norvia-local-booking-logic-app";
     public const string ShipperNotificationLogicAppClientId = "norvia-local-shipper-notification-logic-app";

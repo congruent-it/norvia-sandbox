@@ -336,6 +336,13 @@ _Avoid_: ad-hoc rate, quote
 Said of a Transport Order that is ready to invoice: Delivered, Rated, with a current Proof of delivery and no open Exception, or released by Customer service without a Proof of delivery. Once Billable, it stays Billable.
 _Avoid_: invoiceable, ready to bill
 
+**Billable line**:
+The ERP's record of one Billable Transport Order: what `TransportOrderBillable` carries, including the Freight Charge, which the ERP never recalculates. It is Waiting until an Invoice run puts it on a Shipper invoice, then Invoiced with that invoice's number, once and only once.
+_Avoid_: invoice line (that is a line on a Shipper invoice)
+
+**Waiting**:
+The status of a Billable line no Invoice run has invoiced yet.
+
 **Invoice run**:
 The ERP turning each Shipper's Billable Transport Orders that aren't yet invoiced into one Shipper invoice per Shipper.
 _Avoid_: billing run

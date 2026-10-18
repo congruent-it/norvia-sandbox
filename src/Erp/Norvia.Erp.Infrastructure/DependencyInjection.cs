@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Norvia.Erp.Application;
 using Norvia.Erp.Application.IntegrationEvents;
 using Norvia.Erp.Infrastructure.Data;
 using Norvia.Erp.Infrastructure.Outbox;
@@ -20,14 +21,26 @@ public static class DependencyInjection
         ArgumentNullException.ThrowIfNull(builder);
 
         builder.AddErpDbContext();
+        builder.Services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
+        builder.Services.AddScoped(typeof(IReadRepository<>), typeof(EfRepository<>));
+        builder.Services.AddScoped<IDomainEventDispatcher, MediatorDomainEventDispatcher>();
+        builder.Services.AddScoped<IConflictRetrier, EfConflictRetrier>();
+        builder.Services.AddScoped<IOutbox>(services => services.GetRequiredService<OutboxBuffer>());
+
+        return builder;
+    }
+
+    /// <summary>
+    /// Loads the master data from the seed file as the application starts. One process does it: the ERP UI, which the ERP API waits for.
+    /// </summary>
+    public static IHostApplicationBuilder AddErpSeedLoading(this IHostApplicationBuilder builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
         builder.Services.AddOptions<SeedOptions>().BindConfiguration(SeedOptions.SectionName)
             .ValidateDataAnnotations()
             .Validate(options => File.Exists(options.Path), "The seed file doesn't exist.")
             .ValidateOnStart();
-        builder.Services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
-        builder.Services.AddScoped(typeof(IReadRepository<>), typeof(EfRepository<>));
-        builder.Services.AddScoped<IDomainEventDispatcher, MediatorDomainEventDispatcher>();
-        builder.Services.AddScoped<IOutbox>(services => services.GetRequiredService<OutboxBuffer>());
         builder.Services.AddHostedService<LoadSeedOnStart>();
 
         return builder;

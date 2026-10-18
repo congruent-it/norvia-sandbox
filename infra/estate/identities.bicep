@@ -77,6 +77,8 @@ var simulatorReadRole = 'Simulator.Read'
 var simulatorReadRoleId = guid('norvia-simulator', environmentName, simulatorReadRole)
 var erpFinanceRole = 'Finance'
 var erpFinanceRoleId = guid('norvia-erp', environmentName, erpFinanceRole)
+var billableLinesRecordRole = 'BillableLines.Record'
+var billableLinesRecordRoleId = guid('norvia-erp-api', environmentName, billableLinesRecordRole)
 
 // Every active Driver the seed file names is one app role of the Driver app's registration, with the Driver ID as its value.
 var drivers = filter(loadJsonContent('../../seed/norvia.seed.json').drivers, driver => driver.active)
@@ -1020,6 +1022,37 @@ resource erpFinanceRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = if (!emp
   principalId: presenterPrincipalId
 }
 
+// The ERP billing API's registration, which is the audience of the Billing Logic App's token (ADR 0005). Entra issues one only to a
+// principal granted the role. The role is granted to the Billing Logic App's managed identity when that Logic App is built.
+resource erpApi 'Microsoft.Graph/applications@v1.0' = {
+  uniqueName: 'norvia-erp-api-${environmentName}'
+  displayName: 'Norvia ERP API (${environmentName})'
+  signInAudience: 'AzureADMyOrg'
+  identifierUris: [
+    'api://${tenant().tenantId}/norvia-erp-api-${environmentName}'
+  ]
+  api: {
+    requestedAccessTokenVersion: 2
+  }
+  appRoles: [
+    {
+      id: billableLinesRecordRoleId
+      value: billableLinesRecordRole
+      displayName: 'Record a billable line'
+      description: 'Record the Billable line a TransportOrderBillable carries (E1). Only the Billing Logic App holds it.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
+  ]
+}
+
+resource erpApiPrincipal 'Microsoft.Graph/servicePrincipals@v1.0' = {
+  appId: erpApi.appId
+  appRoleAssignmentRequired: true
+}
+
 output entraIssuer string = '${environment().authentication.loginEndpoint}${tenant().tenantId}/v2.0'
 output entraTenantId string = tenant().tenantId
 output tmsApiClientId string = tmsApi.appId
@@ -1074,7 +1107,6 @@ output integrationConsoleIdentityName string = integrationConsoleIdentity.name
 output integrationConsolePrincipalId string = integrationConsoleIdentity.properties.principalId
 output tripDispatchIdentityName string = tripDispatchIdentity.name
 output tripDispatchPrincipalId string = tripDispatchIdentity.properties.principalId
-output tripDispatchClientId string = tripDispatchIdentity.properties.clientId
 output driverAppIdentityName string = driverAppIdentity.name
 output driverAppPrincipalId string = driverAppIdentity.properties.principalId
 output driverAppClientId string = driverAppIdentity.properties.clientId
@@ -1089,3 +1121,4 @@ output simulatorRegistrationClientId string = simulator.appId
 output driverClientIds array = [for (driver, i) in drivers: '${driver.id}=${driverClientApps[i].appId}']
 output erpIdentityName string = erpIdentity.name
 output erpRegistrationClientId string = erp.appId
+output erpApiClientId string = erpApi.appId

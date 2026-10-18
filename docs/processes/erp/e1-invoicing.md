@@ -68,7 +68,8 @@ Claims for damage or a shortage are settled outside the TMS and the ERP (P7). Th
 | Rule | Failure code |
 |---|---|
 | The Shipper exists in the ERP's seed-loaded Shipper data | `ShipperNotFound` |
-| The Freight Charge has at least one charge line, and its total is the sum of its lines | Client error |
+| The Freight Charge has at least one charge line | `FreightChargeWithoutChargeLines`, a client error |
+| The Freight Charge's total is the sum of its lines | `FreightChargeTotalMismatch`, a client error |
 | A Transport Order number already recorded with different content | `BillableLineConflict` |
 
 Each failure has a stable code and a readable message. A client error or conflict fails the Billing Logic App's run, and the message is dead-lettered.
@@ -130,7 +131,7 @@ Recording a billable line publishes nothing. The Invoice run is what the Shipper
 
 ## Implementation
 
-For engineers and coding agents. It shows where E1 lives in the repository. Only the first slice is built: the ERP application with its seed-loaded master data, read-only. Billable lines, the Invoice run, Shipper invoices, Credit notes, the ERP API and the Logic Apps are designed above and not built yet.
+For engineers and coding agents. It shows where E1 lives in the repository. Built so far: the ERP application with its seed-loaded master data, and recording Billable lines through the ERP billing API with the list of Waiting lines. The Billing Logic App, the Invoice run, Shipper invoices, Credit notes and the other Logic Apps are designed above and not built yet.
 
 ### What is built
 
@@ -140,13 +141,18 @@ For engineers and coding agents. It shows where E1 lives in the repository. Only
 | Application | [src/Erp/Norvia.Erp.Application](../../../src/Erp/Norvia.Erp.Application/) | The queries behind the four lists, and `LoadMasterDataCommand`, which adds what the seed file has and reloads what is there already, so loading twice changes nothing |
 | Infrastructure | [src/Erp/Norvia.Erp.Infrastructure](../../../src/Erp/Norvia.Erp.Infrastructure/) | The ERP's own `ErpDbContext` and database (`erp`), the transactional outbox and its publisher, and the seed loader that runs as the ERP starts |
 | Migrations | [src/Erp/Norvia.Erp.Migrations](../../../src/Erp/Norvia.Erp.Migrations/) | A Container Apps job that applies the database's migrations; azd's postdeploy hook runs it |
-| ERP UI | [src/Erp/Norvia.Erp.Web](../../../src/Erp/Norvia.Erp.Web/) | Four lists, Shippers, Carriers, Rate Cards and Carrier Rate Cards, with no edit action. Built with Fluent UI components only |
+| Billable lines | [src/Erp/Norvia.Erp.Domain/BillableLines](../../../src/Erp/Norvia.Erp.Domain/BillableLines/) | The `BillableLine` aggregate, keyed by its Transport Order number, and the billing rules: the charge lines are there and add up to the total, and what counts as the same content on a repeat. The Waiting status is the only one built |
+| Record a Billable line | [src/Erp/Norvia.Erp.Application/BillableLines](../../../src/Erp/Norvia.Erp.Application/BillableLines/Record/) | `RecordBillableLineCommand` and its handler: idempotent on the Transport Order number, `ShipperNotFound` for an unknown Shipper, `BillableLineConflict` for different content. It publishes nothing. The queries behind the Waiting lines list are beside it |
+| ERP billing API | [src/Erp/Norvia.Erp.Api](../../../src/Erp/Norvia.Erp.Api/) | `POST /v1/billable-lines` takes only `TransportOrderBillable` (the Canonical Model) and needs the `BillableLines.Record` app role. 201 for a new line, 200 with `repeat: true` for the same content again. Refusals are `ProblemDetails` with the stable `code`: `ShipperNotFound` (422), `BillableLineConflict` (409), `FreightChargeWithoutChargeLines` and `FreightChargeTotalMismatch` (400). A body outside the Canonical Model is a 400. The OpenAPI document is published for API Management |
+| ERP UI | [src/Erp/Norvia.Erp.Web](../../../src/Erp/Norvia.Erp.Web/) | The Waiting billable lines list, per Shipper with its count and total, and each Shipper's lines opening to everything a line holds (a release without Proof of delivery is marked), reading again every second so a line the API records appears without a refresh. Four master data lists, Shippers, Carriers, Rate Cards and Carrier Rate Cards, with no edit action. Built with Fluent UI components only |
 
-The seed loader reads `shippers`, `carriers`, `rateCards` and `carrierRateCards` from `seed/norvia.seed.json` (`Seed:Path`), as the TMS does. A broken seed stops the ERP as it starts. The outbox publishes nothing yet: the events are the slices after this one's.
+The Canonical Model has the answer as [billable-line.v1](../../../contracts/canonical-model/billable-line.v1.schema.json) and [billable-line-recording.v1](../../../contracts/canonical-model/billable-line-recording.v1.schema.json). Locally the AppHost hosts the API as `erp-api` and trusts a token signed with the local key, the Billing Logic App's client ID standing in for its managed identity. In Azure the estate defines the API's app registration and the role; the Billing Logic App's identity gets the role when that Logic App is built.
+
+The seed loader reads `shippers`, `carriers`, `rateCards` and `carrierRateCards` from `seed/norvia.seed.json` (`Seed:Path`), as the TMS does. A broken seed stops the ERP as it starts. The outbox publishes nothing yet: recording a Billable line publishes nothing by design, and the events are the slices after this one's.
 
 ### Access
 
-Only a user with the `Finance` app role reaches the UI. In Azure Container Apps' Easy Auth signs Finance in to the ERP's app registration and Entra refuses a user without the role; the ERP checks the role as well. Locally the AppHost signs the developer in as a local user holding `Finance` (`LocalUser` settings, accepted only in Development). See [identity and access](../../architecture/identity-and-access.md).
+Only a user with the `Finance` app role reaches the UI. The billing API is the other door, for the Billing Logic App alone. In Azure Container Apps' Easy Auth signs Finance in to the ERP's app registration and Entra refuses a user without the role; the ERP checks the role as well. Locally the AppHost signs the developer in as a local user holding `Finance` (`LocalUser` settings, accepted only in Development). See [identity and access](../../architecture/identity-and-access.md).
 
 ### Hosting
 

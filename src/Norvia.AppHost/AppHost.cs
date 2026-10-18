@@ -114,6 +114,13 @@ var erpWeb = builder.AddProject<Projects.Norvia_Erp_Web>("erp-web")
     .WithHttpHealthCheck("/health")
     .WithUrlForEndpoint("http", url => url.DisplayText = "ERP");
 
+// The ERP billing API records the Billable lines the Billing Logic App hands over (E1). The ERP UI loads the master data it checks Shippers
+// against, so the API waits for it; it publishes nothing yet, so it needs no Service Bus.
+var erpApi = builder.AddProject<Projects.Norvia_Erp_Api>("erp-api")
+    .WithReference(erpDatabase).WaitForCompletion(erpMigrations)
+    .WaitFor(erpWeb)
+    .WithHttpHealthCheck("/health");
+
 // The Integration console, for the Integration operator. It has no database: it reads what the estate records (ADR 0017).
 var integrationConsole = builder.AddProject<Projects.Norvia_IntegrationConsole_Web>("integration-console-web")
     .WithHttpHealthCheck("/health")
@@ -173,7 +180,7 @@ if (builder.ExecutionContext.IsPublishMode)
     messaging.PublishAsExisting(estate.ServiceBusNamespace, null);
 
     var insights = builder.AddAzureApplicationInsights("insights").PublishAsExisting(estate.ApplicationInsights, null);
-    foreach (var project in new[] { tmsMigrations, tmsApi, tmsWeb, partnerPortalMigrations, partnerPortal, driverAppMigrations, driverAppApi, driverAppWeb, erpMigrations, erpWeb, integrationConsole, simulatorMigrations, simulator })
+    foreach (var project in new[] { tmsMigrations, tmsApi, tmsWeb, partnerPortalMigrations, partnerPortal, driverAppMigrations, driverAppApi, driverAppWeb, erpMigrations, erpWeb, erpApi, integrationConsole, simulatorMigrations, simulator })
     {
         project.WithReference(insights);
     }
@@ -286,6 +293,13 @@ if (builder.ExecutionContext.IsPublishMode)
     // as ADR 0026 has the Integration console do. It runs as the managed identity the estate made for it, which sends to Service Bus.
     var erpIdentity = builder.AddAzureUserAssignedIdentity("erp-identity")
         .PublishAsExisting(estate.ErpIdentity, null);
+    // The billing API trusts Entra only. The Billing Logic App runs outside the Container Apps environment, so the API is reachable from
+    // outside it, and Entra issues a token for its audience only to a principal holding the record role.
+    erpApi.WithExternalHttpEndpoints()
+        .WithEnvironment("Authentication__Schemes__Bearer__Authority", estate.EntraIssuer)
+        .WithEnvironment("Authentication__Schemes__Bearer__ValidIssuer", estate.EntraIssuer)
+        .WithEnvironment("Authentication__Schemes__Bearer__ValidAudiences__0", estate.ErpApiClientId)
+        .WithAzureUserAssignedIdentity(erpIdentity);
     erpWeb.WithExternalHttpEndpoints()
         .WithAzureUserAssignedIdentity(erpIdentity)
         .PublishAsAzureContainerApp((infrastructure, app) =>
@@ -570,6 +584,18 @@ else
     erpWeb.WithEnvironment("LocalUser__Name", $"{Environment.UserName} (local)")
         .WithEnvironment("LocalUser__Roles__0", "Finance");
 
+    // Locally the ERP billing API trusts tokens signed with the same key. The Billing Logic App's client ID stands in for its managed
+    // identity, the one holder of the record role.
+    erpApi
+        .WithEnvironment("Authentication__Schemes__Bearer__ValidIssuer", LocalTokens.Issuer)
+        .WithEnvironment("Authentication__Schemes__Bearer__ValidAudiences__0", LocalTokens.ErpAudience)
+        .WithEnvironment("Authentication__Schemes__Bearer__SigningKeys__0__Issuer", LocalTokens.Issuer)
+        .WithUrlForEndpoint("http", url =>
+        {
+            url.Url = "/scalar";
+            url.DisplayText = "API reference (Scalar)";
+        });
+
     // Locally the Simulator is on, signs the developer in as an operator holding both app roles, and signs every token it sends itself,
     // with the key the local stand-ins trust (ADR 0042). It waits for the stand-in that plays API Management.
     simulator.WaitFor(partnerApi)
@@ -641,6 +667,7 @@ else
         (driverReportsWorker.Resource, "DriverReports__TmsTokens__SigningKey"),
         (driverReportsWorker.Resource, "DriverReports__DriverApp__Tokens__SigningKey"),
         (driverAppApi.Resource, "Authentication__Schemes__Bearer__SigningKeys__0__Value"),
+        (erpApi.Resource, "Authentication__Schemes__Bearer__SigningKeys__0__Value"),
         (trackingWorker.Resource, "Tracking__TmsTokens__SigningKey"),
         (proofOfDeliveryWorker.Resource, "ProofOfDelivery__TmsTokens__SigningKey"),
         (partnerPortal.Resource, "PartnerApi__LocalTokens__SigningKey"),
