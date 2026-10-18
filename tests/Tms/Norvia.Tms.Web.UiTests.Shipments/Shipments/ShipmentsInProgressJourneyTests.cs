@@ -22,7 +22,7 @@ public sealed class ShipmentsInProgressJourneyTests(TmsUiFixture tms) : BrowserP
         var reference = $"VDT-{Guid.NewGuid():N}"[..12];
         await ConfirmAsync(bookingNumber, reference);
 
-        await Page.GetByRole(AriaRole.Link, new() { Name = "Shipments in progress" }).ClickAsync();
+        await OpenViewAsync("Shipments in progress");
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Shipments in progress", Level = 1 })).ToBeVisibleAsync();
         var shipment = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipmentNumber });
         await Expect(shipment).ToContainTextAsync("Van Dijk Transport");
@@ -45,7 +45,7 @@ public sealed class ShipmentsInProgressJourneyTests(TmsUiFixture tms) : BrowserP
         await Expect(rows.Nth(2)).ToContainTextAsync("Departed");
         await Expect(rows.Nth(2)).ToContainTextAsync("Yes");
 
-        await Page.GetByRole(AriaRole.Link, new() { Name = "Shipments in progress" }).ClickAsync();
+        await OpenViewAsync("Shipments in progress");
         await Expect(shipment).ToBeVisibleAsync();
         await RecordAsync("Delivered", reference, now.AddMinutes(-10));
         await Expect(shipment).ToHaveCountAsync(0);

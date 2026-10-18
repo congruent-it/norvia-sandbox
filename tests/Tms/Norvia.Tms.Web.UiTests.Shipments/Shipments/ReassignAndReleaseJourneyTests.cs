@@ -18,6 +18,7 @@ public sealed class ReassignAndReleaseJourneyTests(TmsUiFixture tms) : BrowserPa
 
         await Page.GotoAsync("/");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Planner" }).ClickAsync();
+        await OpenViewAsync("Waiting for planning");
         var row = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipperReference });
         var select = row.GetByRole(AriaRole.Checkbox, new() { Name = $"Select {number}" });
         await select.ClickAsync();
@@ -30,7 +31,7 @@ public sealed class ReassignAndReleaseJourneyTests(TmsUiFixture tms) : BrowserPa
         var shipmentLink = outcome.GetByRole(AriaRole.Link);
         var shipmentNumber = await shipmentLink.TextContentAsync();
 
-        await Page.GetByRole(AriaRole.Link, new() { Name = "Shipments to release" }).ClickAsync();
+        await OpenViewAsync("Shipments to release");
         await Expect(Heading("Shipments to release")).ToBeVisibleAsync();
         var shipmentRow = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipmentNumber });
         await Expect(shipmentRow).ToContainTextAsync("Kessler Spedition");

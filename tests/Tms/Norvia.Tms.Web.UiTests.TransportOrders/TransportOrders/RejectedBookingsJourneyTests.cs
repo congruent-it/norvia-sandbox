@@ -24,7 +24,7 @@ public sealed class RejectedBookingsJourneyTests(TmsUiFixture tms) : BrowserPage
 
         // A browser that hasn't switched role opens as the Planner.
         await Page.GotoAsync("/");
-        await Expect(Heading("Transport Orders waiting for planning")).ToBeVisibleAsync();
+        await Expect(Heading("Home")).ToBeVisibleAsync();
 
         await Page.GetByRole(AriaRole.Button, new() { Name = "Customer service" }).ClickAsync();
 
@@ -49,7 +49,7 @@ public sealed class RejectedBookingsJourneyTests(TmsUiFixture tms) : BrowserPage
 
         await Page.GetByRole(AriaRole.Button, new() { Name = "Planner" }).ClickAsync();
 
-        await Expect(Heading("Transport Orders waiting for planning")).ToBeVisibleAsync();
+        await Expect(Heading("Home")).ToBeVisibleAsync();
     }
 
     private ILocator Heading(string name) => Page.GetByRole(AriaRole.Heading, new() { Name = name, Level = 1 });

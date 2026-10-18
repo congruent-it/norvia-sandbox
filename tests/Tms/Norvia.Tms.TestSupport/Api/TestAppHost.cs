@@ -16,12 +16,26 @@ public static class TestAppHost
         "simulator", "simulator-migrations", "simulator-web",
     ];
 
+    // The TMS UI's journeys keep the Partner portal and the workers that play the booking, notification, cancellation and Trip dispatch Logic Apps,
+    // with the Driver app API a dispatched Trip goes to. They record Tracking events and Proofs of delivery through the TMS API themselves, so
+    // the tracking and Proof of delivery workers, the Driver reports worker, the Driver app's screens, the Integration console and the Simulator only cost startup time and memory.
+    private static readonly string[] UnneededByTheTmsUi =
+    [
+        "dbgate", "driver-app-web", "integration-console-web", "driver-reports-worker", "tracking-worker", "proof-of-delivery-worker",
+        "simulator", "simulator-migrations", "simulator-web",
+    ];
+
+    /// <summary>Takes the resources the TMS UI's tests don't use out of the AppHost, so it starts the TMS, its UI, the Partner portal, the workers that play the Logic Apps the journeys go through, and the Driver app API.</summary>
+    public static void RemoveWhatTheTmsUiTestsDontUse(this IDistributedApplicationTestingBuilder builder) => builder.Remove(UnneededByTheTmsUi);
+
     /// <summary>Takes the resources the TMS API's tests don't use out of the AppHost, so it starts the TMS (with its UI, which the demo seed test needs), its database and the Service Bus emulator.</summary>
-    public static void RemoveWhatTheTmsApiTestsDontUse(this IDistributedApplicationTestingBuilder builder)
+    public static void RemoveWhatTheTmsApiTestsDontUse(this IDistributedApplicationTestingBuilder builder) => builder.Remove(Unneeded);
+
+    private static void Remove(this IDistributedApplicationTestingBuilder builder, string[] unneeded)
     {
         ArgumentNullException.ThrowIfNull(builder);
         foreach (var resource in builder.Resources
-            .Where(resource => Unneeded.Any(name => resource.Name == name || resource.Name == $"{name}-rebuilder"))
+            .Where(resource => unneeded.Any(name => resource.Name == name || resource.Name == $"{name}-rebuilder"))
             .ToList())
         {
             builder.Resources.Remove(resource);

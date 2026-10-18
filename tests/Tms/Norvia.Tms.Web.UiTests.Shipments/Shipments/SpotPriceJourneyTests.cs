@@ -18,6 +18,7 @@ public sealed class SpotPriceJourneyTests(TmsUiFixture tms) : BrowserPage(tms)
 
         await Page.GotoAsync("/");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Planner" }).ClickAsync();
+        await OpenViewAsync("Waiting for planning");
         var order = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipperReference });
         await order.GetByRole(AriaRole.Checkbox, new() { Name = $"Select {number}" }).ClickAsync();
         var assign = Page.GetByRole(AriaRole.Group, new() { Name = "Assign" });
@@ -28,7 +29,7 @@ public sealed class SpotPriceJourneyTests(TmsUiFixture tms) : BrowserPage(tms)
         await Expect(planned).ToContainTextAsync($"Transport Order {number} is planned as Shipment");
         var shipmentNumber = await planned.GetByRole(AriaRole.Link).TextContentAsync();
 
-        await Page.GetByRole(AriaRole.Link, new() { Name = "Shipments to release" }).ClickAsync();
+        await OpenViewAsync("Shipments to release");
         var shipmentRow = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipmentNumber });
 
         // The TMS says it can't price the Shipment before any release is tried (in plain words, as the UI words the code), and says so again after a reload.
@@ -55,7 +56,7 @@ public sealed class SpotPriceJourneyTests(TmsUiFixture tms) : BrowserPage(tms)
             .ToContainTextAsync($"Shipment {shipmentNumber} is released.");
         await Expect(shipmentRow).ToHaveCountAsync(0);
 
-        await Page.GetByRole(AriaRole.Link, new() { Name = "Bookings awaiting an answer" }).ClickAsync();
+        await OpenViewAsync("Bookings awaiting an answer");
         var awaiting = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipmentNumber });
         await Expect(awaiting).ToContainTextAsync("480.50 EUR · Spot price: agreed with Van Dijk by phone, €480.50");
 

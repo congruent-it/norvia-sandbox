@@ -19,6 +19,7 @@ public sealed class PlanningJourneyTests(TmsUiFixture tms) : BrowserPage(tms)
 
         await Page.GotoAsync("/");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Planner" }).ClickAsync();
+        await OpenViewAsync("Waiting for planning");
         await Expect(Heading("Transport Orders waiting for planning")).ToBeVisibleAsync();
         var row = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipperReference });
         await Expect(row).ToContainTextAsync("Rotterdam, NL");

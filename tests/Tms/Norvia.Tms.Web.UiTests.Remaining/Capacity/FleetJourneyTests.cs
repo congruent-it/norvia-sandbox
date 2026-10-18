@@ -14,7 +14,7 @@ public sealed class FleetJourneyTests(TmsUiFixture tms) : BrowserPage(tms)
     public async Task ThePlanner_OpensCapacity_AndReadsTheVehiclesAndThenTheDrivers()
     {
         await Page.GotoAsync("/");
-        await Page.GetByRole(AriaRole.Navigation, new() { Name = "Main" }).GetByRole(AriaRole.Link, new() { Name = "Capacity" }).ClickAsync();
+        await OpenViewAsync("Capacity");
 
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Capacity", Level = 1 })).ToBeVisibleAsync();
         var vehicles = Page.GetByRole(AriaRole.Table, new() { Name = "Vehicles" });

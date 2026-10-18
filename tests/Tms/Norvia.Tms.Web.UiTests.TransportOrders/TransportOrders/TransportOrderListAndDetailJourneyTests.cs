@@ -130,7 +130,7 @@ public sealed partial class TransportOrderListAndDetailJourneyTests(TmsUiFixture
 
         await Page.GotoAsync("/");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Customer service" }).ClickAsync();
-        await Page.GetByRole(AriaRole.Navigation, new() { Name = "Main" }).GetByRole(AriaRole.Link, new() { Name = "Transport Orders", Exact = true }).ClickAsync();
+        await OpenViewAsync("Transport Orders");
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Transport Orders", Level = 1 })).ToBeVisibleAsync();
         await SearchAsync(reference);
         await OrderRow(number).GetByRole(AriaRole.Link, new() { Name = number }).ClickAsync();
@@ -150,12 +150,12 @@ public sealed partial class TransportOrderListAndDetailJourneyTests(TmsUiFixture
         await AssignToOwnFleetAsync(number);
         var shipment = (await Page.GetByRole(AriaRole.List, new() { Name = "Assignment outcomes" }).GetByRole(AriaRole.Link).TextContentAsync())!;
 
-        await Page.GetByRole(AriaRole.Navigation, new() { Name = "Main" }).GetByRole(AriaRole.Link, new() { Name = "Shipments to release" }).ClickAsync();
+        await OpenViewAsync("Shipments to release");
         await Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipment }).GetByRole(AriaRole.Checkbox, new() { Name = $"Select {shipment}" }).ClickAsync();
         await Page.GetByRole(AriaRole.Group, new() { Name = "Release" }).GetByRole(AriaRole.Button, new() { Name = "Release selected" }).ClickAsync();
         await Expect(Page.GetByRole(AriaRole.List, new() { Name = "Release outcomes" }).GetByRole(AriaRole.Status)).ToContainTextAsync($"Shipment {shipment} is released.");
 
-        await Page.GetByRole(AriaRole.Navigation, new() { Name = "Main" }).GetByRole(AriaRole.Link, new() { Name = "Shipments to put on Trips" }).ClickAsync();
+        await OpenViewAsync("Shipments to put on Trips");
         await Expect(Page.GetByRole(AriaRole.Status).Filter(new() { HasText = "Loading the" })).ToHaveCountAsync(0);
         await Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipment }).GetByRole(AriaRole.Checkbox).ClickAsync();
         await Page.GetByRole(AriaRole.Group, new() { Name = "Put on a Trip" }).GetByRole(AriaRole.Button, new() { Name = "Create Trip" }).ClickAsync();
@@ -223,12 +223,12 @@ public sealed partial class TransportOrderListAndDetailJourneyTests(TmsUiFixture
     }
 
     [Fact]
-    public async Task TheTms_StillOpensOnItsFirstView_AndTheListIsOneClickAway()
+    public async Task ThePlanner_OpensOnTheHomePage_AndTheListIsOneMenuAway()
     {
         await Page.GotoAsync("/");
 
-        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Transport Orders waiting for planning", Level = 1 })).ToBeVisibleAsync();
-        await Page.GetByRole(AriaRole.Navigation, new() { Name = "Main" }).GetByRole(AriaRole.Link, new() { Name = "Transport Orders", Exact = true }).ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Home", Level = 1 })).ToBeVisibleAsync();
+        await OpenViewAsync("Transport Orders");
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Transport Orders", Level = 1, Exact = true })).ToBeVisibleAsync();
     }
 
@@ -262,7 +262,7 @@ public sealed partial class TransportOrderListAndDetailJourneyTests(TmsUiFixture
     {
         await Page.GotoAsync("/");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Planner" }).ClickAsync();
-        await Page.GetByRole(AriaRole.Navigation, new() { Name = "Main" }).GetByRole(AriaRole.Link, new() { Name = "Transport Orders", Exact = true }).ClickAsync();
+        await OpenViewAsync("Transport Orders");
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Transport Orders", Level = 1, Exact = true })).ToBeVisibleAsync();
     }
 
@@ -270,6 +270,7 @@ public sealed partial class TransportOrderListAndDetailJourneyTests(TmsUiFixture
     {
         await Page.GotoAsync("/");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Planner" }).ClickAsync();
+        await OpenViewAsync("Waiting for planning");
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Transport Orders waiting for planning", Level = 1 })).ToBeVisibleAsync();
     }
 

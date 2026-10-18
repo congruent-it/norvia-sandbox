@@ -17,6 +17,7 @@ public sealed class WithdrawBookingJourneyTests(TmsUiFixture tms) : BrowserPage(
 
         await Page.GotoAsync("/");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Planner" }).ClickAsync();
+        await OpenViewAsync("Waiting for planning");
         var order = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipperReference });
         await order.GetByRole(AriaRole.Checkbox, new() { Name = $"Select {number}" }).ClickAsync();
         var assign = Page.GetByRole(AriaRole.Group, new() { Name = "Assign" });
@@ -27,7 +28,7 @@ public sealed class WithdrawBookingJourneyTests(TmsUiFixture tms) : BrowserPage(
         await Expect(planned).ToContainTextAsync($"Transport Order {number} is planned as Shipment");
         var shipmentNumber = await planned.GetByRole(AriaRole.Link).TextContentAsync();
 
-        await Page.GetByRole(AriaRole.Link, new() { Name = "Shipments to release" }).ClickAsync();
+        await OpenViewAsync("Shipments to release");
         var toRelease = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipmentNumber });
         await toRelease.GetByRole(AriaRole.Checkbox, new() { Name = $"Select {shipmentNumber}" }).ClickAsync();
         await Page.GetByRole(AriaRole.Group, new() { Name = "Release" }).GetByRole(AriaRole.Button, new() { Name = "Release selected" }).ClickAsync();
@@ -35,7 +36,7 @@ public sealed class WithdrawBookingJourneyTests(TmsUiFixture tms) : BrowserPage(
             .ToContainTextAsync($"Shipment {shipmentNumber} is released.");
         await Expect(toRelease).ToHaveCountAsync(0);
 
-        await Page.GetByRole(AriaRole.Link, new() { Name = "Bookings awaiting an answer" }).ClickAsync();
+        await OpenViewAsync("Bookings awaiting an answer");
         await Expect(Heading("Bookings awaiting an answer")).ToBeVisibleAsync();
         var awaiting = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipmentNumber });
         await Expect(awaiting).ToContainTextAsync("Van Dijk Transport");
@@ -45,7 +46,7 @@ public sealed class WithdrawBookingJourneyTests(TmsUiFixture tms) : BrowserPage(
             .ToContainTextAsync("is withdrawn");
         await Expect(awaiting).ToHaveCountAsync(0);
 
-        await Page.GetByRole(AriaRole.Link, new() { Name = "Shipments to release" }).ClickAsync();
+        await OpenViewAsync("Shipments to release");
         var backToRelease = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipmentNumber });
         await Expect(backToRelease).ToContainTextAsync("Withdrawn from Van Dijk Transport");
     }

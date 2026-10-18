@@ -21,6 +21,7 @@ public sealed class SendBookingJourneyTests(TmsUiFixture tms) : BrowserPage(tms)
 
         await Page.GotoAsync("/");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Planner" }).ClickAsync();
+        await OpenViewAsync("Waiting for planning");
         var order = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipperReference });
         await order.GetByRole(AriaRole.Checkbox, new() { Name = $"Select {number}" }).ClickAsync();
         var assign = Page.GetByRole(AriaRole.Group, new() { Name = "Assign" });
@@ -31,7 +32,7 @@ public sealed class SendBookingJourneyTests(TmsUiFixture tms) : BrowserPage(tms)
         await Expect(planned).ToContainTextAsync($"Transport Order {number} is planned as Shipment");
         var shipmentNumber = await planned.GetByRole(AriaRole.Link).TextContentAsync();
 
-        await Page.GetByRole(AriaRole.Link, new() { Name = "Shipments to release" }).ClickAsync();
+        await OpenViewAsync("Shipments to release");
         var toRelease = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipmentNumber });
         await toRelease.GetByRole(AriaRole.Checkbox, new() { Name = $"Select {shipmentNumber}" }).ClickAsync();
         await Page.GetByRole(AriaRole.Group, new() { Name = "Release" }).GetByRole(AriaRole.Button, new() { Name = "Release selected" }).ClickAsync();
@@ -39,7 +40,7 @@ public sealed class SendBookingJourneyTests(TmsUiFixture tms) : BrowserPage(tms)
             .ToContainTextAsync($"Shipment {shipmentNumber} is released.");
 
         // The worker sends the request and reports it sent; the list says "Not yet sent" until it has.
-        await Page.GetByRole(AriaRole.Link, new() { Name = "Bookings awaiting an answer" }).ClickAsync();
+        await OpenViewAsync("Bookings awaiting an answer");
         var awaiting = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipmentNumber });
         await Expect(awaiting).ToContainTextAsync("Van Dijk Transport");
         await Expect(awaiting).Not.ToContainTextAsync("Not yet sent");

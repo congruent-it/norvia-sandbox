@@ -20,7 +20,7 @@ public sealed class ProofOfDeliveryJourneyTests(TmsUiFixture tms) : BrowserPage(
     public async Task AnEarlyProofOfDelivery_IsMarkedInProgress_AndOnTheTimelineWithItsFile_UntilALaterOneSupersedesIt()
     {
         var (shipmentNumber, reference) = await InTransitShipmentAsync();
-        await Page.GetByRole(AriaRole.Link, new() { Name = "Shipments in progress" }).ClickAsync();
+        await OpenViewAsync("Shipments in progress");
         var shipment = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipmentNumber });
         await Expect(shipment).ToContainTextAsync("In transit");
         await Expect(shipment).Not.ToContainTextAsync("Proof of delivery received");
@@ -55,7 +55,7 @@ public sealed class ProofOfDeliveryJourneyTests(TmsUiFixture tms) : BrowserPage(
         var (shipmentNumber, reference) = await InTransitShipmentAsync();
         await RecordRotterdamTrackingAsync("Delivered", reference, DateTimeOffset.UtcNow.AddMinutes(-10));
 
-        await Page.GetByRole(AriaRole.Link, new() { Name = "Delivered without Proof of delivery" }).ClickAsync();
+        await OpenViewAsync("Delivered without Proof of delivery");
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Delivered without Proof of delivery", Level = 1 })).ToBeVisibleAsync();
         var shipment = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipmentNumber });
         await Expect(shipment).ToContainTextAsync("Van Dijk Transport");
