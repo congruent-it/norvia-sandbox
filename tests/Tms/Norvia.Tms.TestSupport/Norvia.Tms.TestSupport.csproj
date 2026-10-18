@@ -17,6 +17,14 @@
     <ProjectReference Include="..\..\..\src\Tms\Norvia.Tms.Api\Norvia.Tms.Api.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="Norvia.Tms.Api.IntegrationTests.Billing" />
+    <InternalsVisibleTo Include="Norvia.Tms.Api.IntegrationTests.Capacity" />
+    <InternalsVisibleTo Include="Norvia.Tms.Api.IntegrationTests.CarrierBookings" />
+    <InternalsVisibleTo Include="Norvia.Tms.Api.IntegrationTests.Planning" />
+    <InternalsVisibleTo Include="Norvia.Tms.Api.IntegrationTests.Remaining" />
+    <InternalsVisibleTo Include="Norvia.Tms.Api.IntegrationTests.Trips" />
+  </ItemGroup>
+  <ItemGroup>
     <None Include="..\..\..\contracts\canonical-model\*.json" Link="CanonicalModel\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Seed\*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

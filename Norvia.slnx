@@ -106,7 +106,12 @@
     <Project Path="tests/Simulator/Norvia.Simulator.Web.UiTests/Norvia.Simulator.Web.UiTests.csproj" />
   </Folder>
   <Folder Name="/tests/Tms/">
-    <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests/Norvia.Tms.Api.IntegrationTests.csproj" />
+    <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.Billing/Norvia.Tms.Api.IntegrationTests.Billing.csproj" />
+    <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.Capacity/Norvia.Tms.Api.IntegrationTests.Capacity.csproj" />
+    <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.CarrierBookings/Norvia.Tms.Api.IntegrationTests.CarrierBookings.csproj" />
+    <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.Planning/Norvia.Tms.Api.IntegrationTests.Planning.csproj" />
+    <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.Remaining/Norvia.Tms.Api.IntegrationTests.Remaining.csproj" />
+    <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.Trips/Norvia.Tms.Api.IntegrationTests.Trips.csproj" />
     <Project Path="tests/Tms/Norvia.Tms.Application.UnitTests/Norvia.Tms.Application.UnitTests.csproj" />
     <Project Path="tests/Tms/Norvia.Tms.ArchitectureTests/Norvia.Tms.ArchitectureTests.csproj" />
     <Project Path="tests/Tms/Norvia.Tms.Domain.UnitTests/Norvia.Tms.Domain.UnitTests.csproj" />

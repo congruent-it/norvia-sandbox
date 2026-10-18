@@ -8,7 +8,7 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
   </PropertyGroup>
 
-  <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('Tests'))">
+  <PropertyGroup Condition="$(MSBuildProjectName.Contains('Tests'))">
     <IsPackable>false</IsPackable>
     <!-- Test names follow Method_Scenario_ExpectedOutcome (coding guidelines §10). -->
     <NoWarn>$(NoWarn);CA1707</NoWarn>

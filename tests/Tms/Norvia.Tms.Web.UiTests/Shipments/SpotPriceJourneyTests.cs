@@ -31,17 +31,17 @@ public sealed class SpotPriceJourneyTests(TmsUiFixture tms) : BrowserPage(tms)
         await Page.GetByRole(AriaRole.Link, new() { Name = "Shipments to release" }).ClickAsync();
         var shipmentRow = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipmentNumber });
 
-        // The TMS says it can't price the Shipment before any release is tried, and says so again after a reload.
-        await Expect(shipmentRow).ToContainTextAsync("NoMatchingLane");
+        // The TMS says it can't price the Shipment before any release is tried (in plain words, as the UI words the code), and says so again after a reload.
+        await Expect(shipmentRow).ToContainTextAsync("The Carrier Rate Card has no Lane for this origin and destination.");
         await Page.ReloadAsync();
-        await Expect(shipmentRow).ToContainTextAsync("NoMatchingLane");
+        await Expect(shipmentRow).ToContainTextAsync("The Carrier Rate Card has no Lane for this origin and destination.");
         await shipmentRow.GetByRole(AriaRole.Checkbox, new() { Name = $"Select {shipmentNumber}" }).ClickAsync();
         await Page.GetByRole(AriaRole.Group, new() { Name = "Release" }).GetByRole(AriaRole.Button, new() { Name = "Release selected" }).ClickAsync();
 
         var failure = Page.GetByRole(AriaRole.List, new() { Name = "Release outcomes" }).GetByRole(AriaRole.Alert);
         await Expect(failure).ToContainTextAsync($"Shipment {shipmentNumber} wasn't released (NoMatchingLane)");
         await Expect(failure).ToContainTextAsync("Van Dijk Transport");
-        await Expect(shipmentRow).ToContainTextAsync("NoMatchingLane");
+        await Expect(shipmentRow).ToContainTextAsync("The Carrier Rate Card has no Lane for this origin and destination.");
 
         await shipmentRow.GetByRole(AriaRole.Button, new() { Name = $"Release {shipmentNumber} with Spot price" }).ClickAsync();
         var form = Page.GetByRole(AriaRole.Group, new() { Name = $"Release {shipmentNumber} with Spot price" });
