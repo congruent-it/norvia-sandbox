@@ -6,7 +6,8 @@
 
 @* Flatly's navbar: navy, with the brand and the main navigation in white. *@
 <header class="bg-primary text-white">
-    <nav aria-label="Main" class="mx-auto flex max-w-7xl flex-wrap items-center gap-x-8 gap-y-2 px-4 py-4">
+    @* The layout renders statically, so it only shows the open view when the page loads in full: enhanced navigation would leave the previous view highlighted. *@
+    <nav aria-label="Main" data-enhance-nav="false" class="mx-auto flex max-w-7xl flex-wrap items-center gap-x-8 gap-y-2 px-4 py-4">
         <a href="/" class="text-xl font-bold text-white no-underline hover:text-white">Norvia TMS</a>
         @if (_role.HomePath is { } homePath)
         {

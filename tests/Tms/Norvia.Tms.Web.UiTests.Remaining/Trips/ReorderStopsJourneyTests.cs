@@ -14,7 +14,7 @@ public sealed partial class ReorderStopsJourneyTests(TmsUiFixture tms) : Browser
     public async Task ThePlanner_DragsStopsIntoOrder_AndCantPutADeliveryBeforeItsCollection()
     {
         await Page.GotoAsync("/");
-        await Page.GetByRole(AriaRole.Navigation, new() { Name = "Main" }).GetByRole(AriaRole.Link, new() { Name = "Shipments to put on Trips" }).ClickAsync();
+        await OpenViewAsync("Shipments to put on Trips");
         await Expect(Page.GetByRole(AriaRole.Status).Filter(new() { HasText = "Loading the" })).ToHaveCountAsync(0);
 
         // The demo's DEMO-TRIP-5 carries 300 kg and DEMO-TRIP-2 carries 2,000 kg.

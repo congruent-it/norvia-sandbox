@@ -19,7 +19,7 @@ public sealed class NotYetBillableJourneyTests(TmsUiFixture tms) : BrowserPage(t
 
         await Page.GotoAsync("/");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Customer service" }).ClickAsync();
-        await Page.GetByRole(AriaRole.Navigation, new() { Name = "Main" }).GetByRole(AriaRole.Link, new() { Name = "Not yet billable" }).ClickAsync();
+        await OpenViewAsync("Not yet billable");
 
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Not yet billable", Level = 1 })).ToBeVisibleAsync();
         var row = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipmentNumber });

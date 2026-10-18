@@ -19,7 +19,7 @@ public sealed class RatingExceptionsJourneyTests(TmsUiFixture tms) : BrowserPage
 
         await Page.GotoAsync("/");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Customer service" }).ClickAsync();
-        await Page.GetByRole(AriaRole.Navigation, new() { Name = "Main" }).GetByRole(AriaRole.Link, new() { Name = "Rating exceptions" }).ClickAsync();
+        await OpenViewAsync("Rating exceptions");
 
         await Expect(Heading("Rating exceptions")).ToBeVisibleAsync();
         var row = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipperReference });

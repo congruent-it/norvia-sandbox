@@ -22,7 +22,7 @@ public sealed class OpenExceptionsJourneyTests(TmsUiFixture tms) : BrowserPage(t
     {
         var (shipmentNumber, exceptionNumber) = await ShipmentWithFailedDeliveryAsync();
 
-        await Page.GetByRole(AriaRole.Link, new() { Name = "Open Exceptions", Exact = true }).ClickAsync();
+        await OpenViewAsync("Open Exceptions");
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Open Exceptions", Level = 1 })).ToBeVisibleAsync();
         var exception = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = exceptionNumber });
         await Expect(exception).ToContainTextAsync(shipmentNumber);
@@ -65,7 +65,7 @@ public sealed class OpenExceptionsJourneyTests(TmsUiFixture tms) : BrowserPage(t
         await Expect(Page.GetByRole(AriaRole.Status)).ToContainTextAsync($"The delivery window for {exceptionNumber} is agreed.");
 
         // The marker on the Shipments in progress.
-        await Page.GetByRole(AriaRole.Link, new() { Name = "Shipments in progress" }).ClickAsync();
+        await OpenViewAsync("Shipments in progress");
         await Expect(Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipmentNumber })).ToContainTextAsync("Open Exception");
 
         // The timeline shows the Exception with its cause, note and notification, and the agreed window.
@@ -119,7 +119,7 @@ public sealed class OpenExceptionsJourneyTests(TmsUiFixture tms) : BrowserPage(t
         // The Exception stays open, but no longer offers cancelling: the Shipment is Planned again.
         await Expect(exception.GetByRole(AriaRole.Button, new() { Name = $"Cancel Carrier booking of {exceptionNumber}" })).ToHaveCountAsync(0);
 
-        await Page.GetByRole(AriaRole.Link, new() { Name = "Shipments to release" }).ClickAsync();
+        await OpenViewAsync("Shipments to release");
         var toRelease = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipmentNumber });
         await Expect(toRelease).ToContainTextAsync("Cancelled by Norvia: Van Dijk can't collect today");
         // The worker that plays the Carrier cancellation Logic App tells the Carrier, so it isn't flagged.

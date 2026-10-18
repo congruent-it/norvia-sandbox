@@ -67,6 +67,7 @@ public sealed class TmsUiFixture : IAsyncLifetime
         var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(
             [$"Parameters:{LocalTokens.SigningKeyParameter}={_tokenSigningKey}", "AppHost:SeedDemoData=true"],
             startup.Token);
+        builder.RemoveWhatTheTmsUiTestsDontUse();
         _app = await builder.BuildAsync(startup.Token);
         await _app.StartAsync(startup.Token);
         await _app.ResourceNotifications.WaitForResourceHealthyAsync("tms-api", startup.Token);

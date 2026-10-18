@@ -14,7 +14,7 @@ public sealed class ShipmentsOnTripJourneyTests(TmsUiFixture tms) : BrowserPage(
     public async Task ThePlanner_CreatesATripFromTheHeavyShipment_SeesItsStops_AndCantPutItOnTheVan()
     {
         await Page.GotoAsync("/");
-        await Page.GetByRole(AriaRole.Navigation, new() { Name = "Main" }).GetByRole(AriaRole.Link, new() { Name = "Shipments to put on Trips" }).ClickAsync();
+        await OpenViewAsync("Shipments to put on Trips");
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Shipments to put on Trips", Level = 1 })).ToBeVisibleAsync();
         await Expect(Page.GetByRole(AriaRole.Status).Filter(new() { HasText = "Loading the" })).ToHaveCountAsync(0);
 
@@ -28,7 +28,7 @@ public sealed class ShipmentsOnTripJourneyTests(TmsUiFixture tms) : BrowserPage(
         var number = Regex.Match(await created.TextContentAsync() ?? string.Empty, "TR-[0-9]{7}").Value;
         await Expect(heavy).ToHaveCountAsync(0);
 
-        await Page.GetByRole(AriaRole.Navigation, new() { Name = "Main" }).GetByRole(AriaRole.Link, new() { Name = "Trips", Exact = true }).ClickAsync();
+        await OpenViewAsync("Trips");
         await Page.GetByRole(AriaRole.Link, new() { Name = number }).ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = $"Trip {number}", Level = 1 })).ToBeVisibleAsync();
         var stops = Page.GetByRole(AriaRole.Table, new() { Name = "Stops" });
