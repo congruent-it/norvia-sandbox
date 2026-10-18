@@ -15,6 +15,7 @@
     <Using Include="AwesomeAssertions" />
     <ProjectReference Include="..\..\..\src\Norvia.AppHost\Norvia.AppHost.csproj" />
     <ProjectReference Include="..\..\..\src\Tms\Norvia.Tms.Api\Norvia.Tms.Api.csproj" />
+    <ProjectReference Include="..\..\..\src\Tms\Norvia.Tms.Web\Norvia.Tms.Web.csproj" Aliases="TmsWeb" />  <!-- Aliased: the TMS API and the TMS UI each generate their own AddMediator. -->
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Norvia.Tms.Api.IntegrationTests.Billing" />
