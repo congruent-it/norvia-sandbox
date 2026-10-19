@@ -12,6 +12,7 @@ using Norvia.PartnerPortal.Web.CarrierShipments;
 using Norvia.PartnerPortal.Web.Components;
 using Norvia.PartnerPortal.Web.Personas;
 using Norvia.PartnerPortal.Web.Reset;
+using Norvia.PartnerPortal.Web.ShipperInvoices;
 using Norvia.PartnerPortal.Web.ShipperNotifications;
 using Norvia.PartnerPortal.Web.ShipperTracking;
 
@@ -63,6 +64,7 @@ app.MapPersonaSwitcher();
 app.MapCarrierBookingEndpoint();
 app.MapCarrierCancellationEndpoint();
 app.MapShipperNotificationEndpoint();
+app.MapShipperInvoiceEndpoint();
 app.MapProofOfDeliveryFileEndpoint();
 app.MapResetEndpoints();
 app.MapDefaultEndpoints();

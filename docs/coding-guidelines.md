@@ -143,7 +143,7 @@ Every flow records the same keys under the same names, so the [Integration conso
 | `correlationId` | The Message trail's correlation ID |
 | `flow` | A stable flow name such as `transport-order-intake`, `carrier-tracking` or `billing`, not the workflow's resource name |
 | `partyId` | The Shipper or Carrier ID from the token (ADR 0005) |
-| `transportOrderNumber`, `shipmentNumber`, `carrierBookingNumber`, `tripNumber` | The business keys the message carries |
+| `transportOrderNumber`, `shipmentNumber`, `carrierBookingNumber`, `tripNumber`, `documentNumber` (a Shipper invoice or Credit note) | The business keys the message carries |
 | `sourceMessageId` | The Carrier's event ID or document ID, or the Driver app event ID |
 | `outcome` | `Succeeded`, `Refused`, `Retrying`, `DeadLettered` or `Failed` |
 | `failureCode` | The stable failure code, when there is one |

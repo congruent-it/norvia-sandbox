@@ -1,0 +1,23 @@
+{
+  "documentType": "CREDIT_NOTE",
+  "documentNumber": "CN-2030-000001",
+  "documentDate": "05-11-2030",
+  "creditedInvoiceNumber": "INV-2030-000001",
+  "creditedTransportOrderNumber": "TO-0000002",
+  "reason": "Rate Card error on Lane NL-BE, see ticket 4411",
+  "lines": [
+    {
+      "transportOrderNumber": "TO-0000002",
+      "bookingRef": "BD-2030-0002",
+      "deliveryDate": "21-10-2030",
+      "chargeLines": [
+        { "code": "MINIMUM_CHARGE_ADJUSTMENT", "amount": 14.50 }
+      ],
+      "lineTotal": 14.50
+    }
+  ],
+  "currency": "EUR",
+  "totalWithoutVat": 14.50,
+  "vat": 3.05,
+  "totalWithVat": 17.55
+}
