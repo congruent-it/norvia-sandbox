@@ -34,6 +34,5 @@ public sealed class MasterDataJourneyTests(ErpUiFixture erp) : BrowserPage(erp)
         await Expect(Page.GetByRole(AriaRole.Main).GetByRole(AriaRole.Button)).ToHaveCountAsync(0);
     }
 
-    private async Task OpenViewAsync(string title) =>
-        await Page.GetByRole(AriaRole.Navigation, new() { Name = "Main" }).GetByRole(AriaRole.Link, new() { Name = title, Exact = true }).ClickAsync();
+    private Task OpenViewAsync(string title) => OpenViewAsync("Master data", title);
 }

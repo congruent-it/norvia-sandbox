@@ -19,6 +19,7 @@ internal sealed class CarrierInvoiceConfiguration : IEntityTypeConfiguration<Car
         builder.Property(invoice => invoice.Lines).AsLinesDocument();
         builder.Property(invoice => invoice.Total).HasPrecision(18, 2);
         builder.Property(invoice => invoice.ApprovedAmount).HasPrecision(18, 2);
+        builder.Property(invoice => invoice.NotToldMessage).HasMaxLength(CarrierInvoice.MaxCauseLength);
         builder.Property(invoice => invoice.CorrelationId).HasMaxLength(128).IsRequired();
         builder.Property(invoice => invoice.Status).HasConversion<string>().HasMaxLength(20);
         // A Carrier's invoice number is unique, so two sends of one Carrier invoice can't both be stored: the loser is run again and finds the first.

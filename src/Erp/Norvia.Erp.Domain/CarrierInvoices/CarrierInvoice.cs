@@ -16,6 +16,9 @@ public sealed class CarrierInvoice : EntityBase<CarrierInvoiceId>, IAggregateRoo
     /// <summary>The longest remark or reason Finance can give when it decides a line.</summary>
     public const int MaxRemarkLength = 500;
 
+    /// <summary>The longest technical cause kept when the outcome is reported not delivered.</summary>
+    public const int MaxCauseLength = 500;
+
     private CarrierInvoice()
     {
     }
@@ -65,6 +68,53 @@ public sealed class CarrierInvoice : EntityBase<CarrierInvoiceId>, IAggregateRoo
     public decimal? ApprovedAmount { get; private set; }
 
     public DateTimeOffset? ApprovedAt { get; private set; }
+
+    /// <summary>When the Carrier invoice outcome Logic App reported the Carrier told the outcome; null until then.</summary>
+    public DateTimeOffset? ToldAt { get; private set; }
+
+    /// <summary>When the Carrier invoice outcome Logic App reported the outcome not delivered; null unless the Carrier is not told.</summary>
+    public DateTimeOffset? NotToldAt { get; private set; }
+
+    /// <summary>The Carrier endpoint's HTTP status code of an outcome not delivered; null when the failure had none, such as a timeout.</summary>
+    public int? NotToldStatusCode { get; private set; }
+
+    /// <summary>The technical cause of an outcome not delivered, in plain language.</summary>
+    public string? NotToldMessage { get; private set; }
+
+    /// <summary>
+    /// Records that the Carrier's invoice outcome endpoint acknowledged the outcome. Only an Approved invoice whose outcome has not been
+    /// reported yet can be reported; false for any other, which the caller ignores and logs.
+    /// </summary>
+    public bool ReportTold(DateTimeOffset at)
+    {
+        if (!OutcomeAwaitsReport)
+        {
+            return false;
+        }
+
+        ToldAt = at;
+        return true;
+    }
+
+    /// <summary>
+    /// Records that the outcome never reached the Carrier, with the technical cause: the invoice is flagged Carrier not told. Only an
+    /// Approved invoice whose outcome has not been reported yet can be reported; false for any other, which the caller ignores and logs.
+    /// </summary>
+    public bool ReportNotDelivered(int? statusCode, string message, DateTimeOffset at)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(message);
+        if (!OutcomeAwaitsReport)
+        {
+            return false;
+        }
+
+        NotToldAt = at;
+        NotToldStatusCode = statusCode;
+        NotToldMessage = message.Length > MaxCauseLength ? message[..MaxCauseLength] : message;
+        return true;
+    }
+
+    private bool OutcomeAwaitsReport => Status == CarrierInvoiceStatus.Approved && ToldAt is null && NotToldAt is null;
 
     /// <summary>
     /// Receives a Carrier invoice: checks the receiving rules, matches each line against <paramref name="costs"/>, and makes each Matched

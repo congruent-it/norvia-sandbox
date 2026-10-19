@@ -1,0 +1,31 @@
+{
+  "serviceProviderConnections": {
+    "serviceBus": {
+      "displayName": "Invoicing events",
+      "parameterValues": {
+        "fullyQualifiedNamespace": "@appsetting('SERVICE_BUS_NAMESPACE')",
+        "authProvider": {
+          "Type": "ManagedServiceIdentity",
+          "Identity": "@appsetting('CARRIER_INVOICE_OUTCOME_IDENTITY_ID')"
+        }
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/serviceBus"
+      }
+    },
+    "keyVault": {
+      "displayName": "Carrier endpoint credentials",
+      "parameterValues": {
+        "VaultUri": "@appsetting('KEY_VAULT_URI')",
+        "authProvider": {
+          "Type": "ManagedServiceIdentity",
+          "Identity": "@appsetting('CARRIER_INVOICE_OUTCOME_IDENTITY_ID')"
+        }
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/keyVault"
+      }
+    }
+  },
+  "managedApiConnections": {}
+}

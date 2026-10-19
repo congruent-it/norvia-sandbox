@@ -65,6 +65,9 @@ param shipperNotificationPrincipalId string
 @description('The E1 Shipper invoice Logic App\'s identity, which may read the Shipper endpoints\' credentials and nothing else in the vault.')
 param shipperInvoicePrincipalId string
 
+@description('The E2 Carrier invoice outcome Logic App\'s identity, which may read the Carrier endpoints\' credentials and nothing else in the vault.')
+param carrierInvoiceOutcomePrincipalId string
+
 @description('The P7 Carrier cancellation Logic App\'s identity, which may read the Carrier endpoints\' credentials and nothing else in the vault.')
 param carrierCancellationPrincipalId string
 
@@ -682,6 +685,19 @@ resource carrierCancellationReadsTheCarrierEndpointKeys 'Microsoft.Authorization
     scope: carrierEndpointKeys[i]
     properties: {
       principalId: carrierCancellationPrincipalId
+      roleDefinitionId: keyVaultSecretsUser
+      principalType: 'ServicePrincipal'
+    }
+  }
+]
+
+// The invoice outcome endpoint asks for the credential the booking endpoint does, so this is the same secret. Scoped to each secret.
+resource carrierInvoiceOutcomeReadsTheCarrierEndpointKeys 'Microsoft.Authorization/roleAssignments@2022-04-01' = [
+  for (carrierId, i) in carrierIds: {
+    name: guid(carrierEndpointKeys[i].id, carrierInvoiceOutcomePrincipalId, keyVaultSecretsUser)
+    scope: carrierEndpointKeys[i]
+    properties: {
+      principalId: carrierInvoiceOutcomePrincipalId
       roleDefinitionId: keyVaultSecretsUser
       principalType: 'ServicePrincipal'
     }

@@ -26,5 +26,9 @@ internal static class CarrierInvoiceViews
         invoice.ReceivedAt,
         invoice.Status.ToString(),
         invoice.ApprovedAmount,
-        invoice.ApprovedAt);
+        invoice.ApprovedAt,
+        invoice.ToldAt,
+        invoice.NotToldAt,
+        invoice.NotToldStatusCode,
+        invoice.NotToldMessage);
 }

@@ -31,7 +31,7 @@ public sealed class InvoiceNowJourneyTests(ErpUiFixture erp) : BrowserPage(erp)
         invoiceNumber.Should().MatchRegex(@"^INV-\d{4}-\d{6}$");
         await Expect(row).ToHaveCountAsync(0);
 
-        await Page.GetByRole(AriaRole.Navigation, new() { Name = "Main" }).GetByRole(AriaRole.Link, new() { Name = "Shipper invoices" }).ClickAsync();
+        await OpenViewAsync("Billing", "Shipper invoices");
         var invoice = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = invoiceNumber });
         await Expect(invoice).ToContainTextAsync(BrouwerName);
         await Expect(invoice).ToContainTextAsync("€ 250.00");

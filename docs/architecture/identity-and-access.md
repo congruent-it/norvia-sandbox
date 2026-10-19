@@ -11,7 +11,7 @@ An app role belongs to the app registration of the API it guards. Each registrat
 | App registration | Audience | Who may get a token | Roles it defines |
 |---|---|---|---|
 | **Norvia TMS API** | `api://<tenant>/norvia-tms-<env>` | Only principals granted one of its roles (`appRoleAssignmentRequired`) | The [TMS API roles](#tms-api-roles) |
-| **Norvia ERP API** | `api://<tenant>/norvia-erp-api-<env>` | Only principals granted its role (`appRoleAssignmentRequired`) | `BillableLines.Record`, which the [Billing Logic App](../processes/erp/e1-invoicing.md#erp-api) holds, `ShipperInvoices.Report`, which the Shipper invoice Logic App holds, `ShipperInvoices.Manage`, which the Simulator holds, `CarrierCosts.Record`, which the Carrier cost Logic App holds, and `CarrierInvoices.Receive`, which the Carrier invoice Logic App will hold |
+| **Norvia ERP API** | `api://<tenant>/norvia-erp-api-<env>` | Only principals granted its role (`appRoleAssignmentRequired`) | `BillableLines.Record`, which the [Billing Logic App](../processes/erp/e1-invoicing.md#erp-api) holds, `ShipperInvoices.Report`, which the Shipper invoice Logic App holds, `ShipperInvoices.Manage`, which the Simulator holds, `CarrierCosts.Record`, which the Carrier cost Logic App holds, `CarrierInvoices.Receive`, which the Carrier invoice Logic App holds, and `CarrierInvoices.Report`, which the Carrier invoice outcome Logic App holds |
 | **Norvia Partner API** | `api://<tenant>/norvia-partner-api-<env>` | Any Persona, holding a role or not, so a Carrier Persona calling a Shipper operation gets 403 from API Management, which the demo shows | The [Partner API roles](#partner-api-roles) |
 | **Norvia intake Logic App trigger** | `api://<tenant>/norvia-intake-trigger-<env>` | Only API Management | `TransportOrderIntake.Trigger` |
 | **Norvia Carrier-answer Logic App trigger** | `api://<tenant>/norvia-answer-trigger-<env>` | Only API Management | `CarrierAnswer.Trigger` |
@@ -31,6 +31,7 @@ The three Logic App triggers sit behind Easy Auth, and the workflow's first step
 | `trip-dispatch` | The Trip dispatch Logic App (P11) | `Trips.ReportDelivery` | Receives the `trip-dispatch` subscription. Reads the Driver app's endpoint key |
 | `shipper-invoice` | The Shipper invoice Logic App (E1) | `ShipperInvoices.Report` on the ERP API; nothing on the TMS | Receives the `shipper-invoice` subscription. Reads each Shipper's endpoint key |
 | `carrier-invoice` | The Carrier invoice Logic App (E2) | `CarrierInvoices.Receive` on the ERP billing API; nothing on the TMS | Reads no secret and no queue: API Management calls it |
+| `carrier-invoice-outcome` | The Carrier invoice outcome Logic App (E2) | `CarrierInvoices.Report` on the ERP API; nothing on the TMS | Receives the `carrier-invoice-outcome` subscription. Reads each Carrier's endpoint key |
 | `carrier-cost` | The Carrier cost Logic App (P9, E2) | `CarrierCosts.Record` on the ERP billing API; nothing on the TMS | Receives the `carrier-cost` subscription. Reads no secret |
 | `billing` | The Billing Logic App (E1) | `BillableLines.Record` on the ERP billing API; nothing on the TMS | Receives the `billing` subscription. Reads no secret |
 | `driver-reports` | The Driver reports Logic App (P12) | `Trips.Start`, `Trips.End`, `TrackingEvents.Record` and `ProofsOfDelivery.Record` on the TMS; `DriverReports.ReportOutcome` on the Driver app | Receives the `driver-reports` subscription. Reads and deletes files in the Driver app's transit container |
@@ -79,6 +80,7 @@ The ERP billing API validates the token and the role, and takes everything else 
 | `BillableLines.Record` | The Billing Logic App's identity (`billing`) | Record a Billable line from `TransportOrderBillable` | [E1](../processes/erp/e1-invoicing.md#erp-api) |
 | `CarrierCosts.Record` | The Carrier cost Logic App's identity | Record a Carrier cost from `CarrierCostIncurred` | [E2](../processes/erp/e2-carrier-invoice-matching.md#erp-api) |
 | `CarrierInvoices.Receive` | The Carrier invoice Logic App's identity | Receive a Carrier invoice and match its lines. The Carrier ID in the body is the one API Management took from the token. | [E2](../processes/erp/e2-carrier-invoice-matching.md#erp-api) |
+| `CarrierInvoices.Report` | The Carrier invoice outcome Logic App's identity (`carrier-invoice-outcome`) | Report the outcome of a Carrier invoice as told to the Carrier, or not delivered | [E2](../processes/erp/e2-carrier-invoice-matching.md#erp-api) |
 | `ShipperInvoices.Report` | The Shipper invoice Logic App's identity (`shipper-invoice`) | Report a Shipper invoice as sent | [E1](../processes/erp/e1-invoicing.md#erp-api) |
 | `ShipperInvoices.Manage` | The Simulator's identity (`simulator`) | Run Invoice now for a Shipper and issue a Credit note on an invoice line, the Finance actions the Simulator plays | [E1](../processes/erp/e1-invoicing.md#erp-api) |
 

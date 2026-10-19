@@ -71,5 +71,9 @@
     <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\shipper-invoices\*.json" LogicalName="PartnerApi/samples/shipper-invoices/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\src\Integration\ShipperInvoiceLogicApp\*.json" LogicalName="ShipperInvoiceLogicApp/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\src\Integration\ShipperInvoiceLogicApp\shipper-invoice\workflow.json" LogicalName="ShipperInvoiceLogicApp/shipper-invoice/workflow.json" />
+    <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\carrier-invoice-outcomes\*.json" LogicalName="PartnerApi/samples/carrier-invoice-outcomes/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\contracts\canonical-model\samples\carrier-invoice-approved\*.json" LogicalName="CanonicalModel/samples/carrier-invoice-approved/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\src\Integration\CarrierInvoiceOutcomeLogicApp\*.json" LogicalName="CarrierInvoiceOutcomeLogicApp/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\src\Integration\CarrierInvoiceOutcomeLogicApp\carrier-invoice-outcome\workflow.json" LogicalName="CarrierInvoiceOutcomeLogicApp/carrier-invoice-outcome/workflow.json" />
   </ItemGroup>
 </Project>

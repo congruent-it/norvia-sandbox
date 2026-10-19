@@ -6,6 +6,7 @@
 @using Norvia.Erp.Application.CarrierInvoices
 @using Norvia.Erp.Application.CarrierInvoices.List
 @using Norvia.Erp.Web.Live
+@using Norvia.Erp.Web.ShipperInvoices
 @implements IAsyncDisposable
 @inject IServiceScopeFactory Scopes
 @inject TimeProvider Time
@@ -20,7 +21,7 @@
 <LiveListStates Items="_list.Items" LastReadFailed="_list.LastReadFailed" Name="Carrier invoices"
                 Empty="No Carrier invoice has been received yet. One appears here as soon as a Carrier sends it." Context="invoices">
     <FluentDataGrid Class="cerulean-table" Items="invoices.AsQueryable()" TGridItem="CarrierInvoiceListItem" aria-label="Carrier invoices"
-                    GridTemplateColumns="minmax(140px,1.5fr) minmax(120px,1.5fr) minmax(100px,1fr) minmax(90px,1fr) minmax(110px,1.2fr) minmax(120px,1.4fr) minmax(130px,1.4fr)">
+                    GridTemplateColumns="minmax(140px,1.5fr) minmax(120px,1.5fr) minmax(100px,1fr) minmax(90px,1fr) minmax(110px,1.2fr) minmax(120px,1.4fr) minmax(130px,1.4fr) minmax(140px,1.4fr)">
         <PropertyColumn Title="Carrier" Property="@(row => row.CarrierName)" />
         <PropertyColumn Title="Invoice number" Property="@(row => row.Invoice.InvoiceNumber)" />
         <PropertyColumn Title="Date" Property="@(row => row.Invoice.InvoiceDate.ToString("yyyy-MM-dd"))" />
@@ -28,6 +29,7 @@
         <PropertyColumn Title="Total without VAT" Property="@(row => Money.Format(row.Invoice.Total))" />
         <PropertyColumn Title="Lines" Property="@(row => LinesText(row.Invoice))" />
         <PropertyColumn Title="Approved amount" Property="@(row => ApprovedText(row.Invoice))" />
+        <PropertyColumn Title="Carrier told" Property="@(row => ToldText(row.Invoice))" />
     </FluentDataGrid>
 </LiveListStates>
 
@@ -53,6 +55,10 @@
 
     private static string ApprovedText(CarrierInvoiceView invoice) =>
         invoice.ApprovedAmount is { } approved ? Money.Format(approved) : "–";
+
+    // When the Carrier was told the outcome, in Amsterdam time; "Carrier not told" for an outcome that never reached it; a dash while it is yet to be told.
+    private static string ToldText(CarrierInvoiceView invoice) =>
+        invoice.NotToldAt is not null ? "Carrier not told" : SentTime.Format(invoice.ToldAt);
 
     private static string ResultText(string result) => result switch
     {

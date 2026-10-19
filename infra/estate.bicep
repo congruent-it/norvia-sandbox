@@ -111,7 +111,8 @@ module messaging 'estate/messaging.bicep' = {
     driverReportsPrincipalId: identities.outputs.driverReportsPrincipalId
     billingPrincipalId: identities.outputs.billingPrincipalId
     carrierCostIdentityName: identities.outputs.carrierCostIdentityName
-    shipperInvoicePrincipalId: identities.outputs.shipperInvoicePrincipalId
+    shipperInvoicePrincipalId: identities.outputs.shipperInvoice.principalId
+    carrierInvoiceOutcomePrincipalId: identities.outputs.carrierInvoiceOutcome.principalId
     driverAppPrincipalId: identities.outputs.driverAppPrincipalId
     trackingPrincipalId: identities.outputs.trackingPrincipalId
     proofOfDeliveryPrincipalId: identities.outputs.proofOfDeliveryPrincipalId
@@ -342,7 +343,7 @@ module shipperInvoiceLogicApp 'estate/shipper-invoice-logic-app.bicep' = {
     location: location
     tags: tags
     integrationRetentionDays: integrationRetentionDays
-    shipperInvoiceIdentityName: identities.outputs.shipperInvoiceIdentityName
+    shipperInvoiceIdentityName: identities.outputs.shipperInvoice.identityName
     erpApiClientId: identities.outputs.erpApiClientId
     erpBaseUrl: erpBaseUrl
     partnerPortalBaseUrl: partnerPortalBaseUrl
@@ -351,6 +352,25 @@ module shipperInvoiceLogicApp 'estate/shipper-invoice-logic-app.bicep' = {
     planName: intakeLogicApp.outputs.planName
     contentKeyVaultName: intakeLogicApp.outputs.keyVaultName
     shipperKeyVaultName: partnerApi.outputs.partnerPortalKeyVaultName
+    integrationConsolePrincipalId: identities.outputs.integrationConsolePrincipalId
+  }
+}
+
+module carrierInvoiceOutcomeLogicApp 'estate/carrier-invoice-outcome-logic-app.bicep' = {
+  scope: resourceGroup
+  params: {
+    location: location
+    tags: tags
+    integrationRetentionDays: integrationRetentionDays
+    carrierInvoiceOutcomeIdentityName: identities.outputs.carrierInvoiceOutcome.identityName
+    erpApiClientId: identities.outputs.erpApiClientId
+    erpBaseUrl: erpBaseUrl
+    partnerPortalBaseUrl: partnerPortalBaseUrl
+    applicationInsightsName: monitoring.outputs.applicationInsightsName
+    serviceBusName: messaging.outputs.namespaceName
+    planName: intakeLogicApp.outputs.planName
+    contentKeyVaultName: intakeLogicApp.outputs.keyVaultName
+    carrierKeyVaultName: partnerApi.outputs.partnerPortalKeyVaultName
     integrationConsolePrincipalId: identities.outputs.integrationConsolePrincipalId
   }
 }
@@ -431,7 +451,8 @@ module partnerApi 'estate/partner-api.bicep' = {
     simulatorPrincipalId: identities.outputs.simulatorPrincipalId
     bookingPrincipalId: identities.outputs.bookingPrincipalId
     shipperNotificationPrincipalId: identities.outputs.shipperNotificationPrincipalId
-    shipperInvoicePrincipalId: identities.outputs.shipperInvoicePrincipalId
+    shipperInvoicePrincipalId: identities.outputs.shipperInvoice.principalId
+    carrierInvoiceOutcomePrincipalId: identities.outputs.carrierInvoiceOutcome.principalId
     carrierCancellationPrincipalId: identities.outputs.carrierCancellationPrincipalId
     carrierEndpointKeySeed: carrierEndpointKeySeed
   }

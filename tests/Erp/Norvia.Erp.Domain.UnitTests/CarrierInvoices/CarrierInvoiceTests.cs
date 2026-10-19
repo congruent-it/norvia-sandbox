@@ -465,4 +465,75 @@ public sealed class CarrierInvoiceTests
         invoice.Status.Should().Be(CarrierInvoiceStatus.Received);
         invoice.Lines[0].Status.Should().Be(CarrierInvoiceLineStatus.Matched);
     }
+    private static CarrierInvoice ApprovedInvoice() =>
+        CarrierInvoice.Receive(Invoice(Line("TRX-1", 70m)), [Cost("CB-0000001", "TRX-1", 70m)], 0m, Now).Invoice!;
+
+    [Fact]
+    public void ReportTold_AnApprovedInvoice_RecordsTheTime_OnceOnly()
+    {
+        var invoice = ApprovedInvoice();
+
+        invoice.ReportTold(Now.AddMinutes(1)).Should().BeTrue();
+        invoice.ReportTold(Now.AddMinutes(2)).Should().BeFalse();
+
+        invoice.ToldAt.Should().Be(Now.AddMinutes(1));
+        invoice.NotToldAt.Should().BeNull();
+    }
+
+    [Fact]
+    public void ReportTold_AnInvoiceThatIsNotApproved_IsRefused()
+    {
+        var invoice = CarrierInvoice.Receive(Invoice(Line("TRX-1", 80m)), [Cost("CB-0000001", "TRX-1", 70m)], 0m, Now).Invoice!;
+
+        invoice.ReportTold(Now).Should().BeFalse();
+
+        invoice.ToldAt.Should().BeNull();
+    }
+
+    [Fact]
+    public void ReportNotDelivered_AnApprovedInvoice_FlagsItCarrierNotToldWithTheCause_OnceOnly()
+    {
+        var invoice = ApprovedInvoice();
+
+        invoice.ReportNotDelivered(503, "Overloaded", Now.AddMinutes(1)).Should().BeTrue();
+        invoice.ReportNotDelivered(500, "Again", Now.AddMinutes(2)).Should().BeFalse();
+
+        invoice.NotToldAt.Should().Be(Now.AddMinutes(1));
+        invoice.NotToldStatusCode.Should().Be(503);
+        invoice.NotToldMessage.Should().Be("Overloaded");
+        invoice.ToldAt.Should().BeNull();
+    }
+
+    [Fact]
+    public void ReportNotDelivered_AnInvoiceTheCarrierWasToldAlready_IsRefused()
+    {
+        var invoice = ApprovedInvoice();
+        invoice.ReportTold(Now);
+
+        invoice.ReportNotDelivered(500, "late", Now.AddMinutes(1)).Should().BeFalse();
+
+        invoice.NotToldAt.Should().BeNull();
+    }
+
+    [Fact]
+    public void ReportNotDelivered_AnInvoiceThatIsNotApproved_IsRefused()
+    {
+        var invoice = CarrierInvoice.Receive(Invoice(Line("TRX-1", 80m)), [Cost("CB-0000001", "TRX-1", 70m)], 0m, Now).Invoice!;
+
+        invoice.ReportNotDelivered(null, "cause", Now).Should().BeFalse();
+    }
+
+    [Fact]
+    public void ReportNotDelivered_ALongCause_IsKeptToFiveHundredCharacters()
+    {
+        var invoice = ApprovedInvoice();
+
+        invoice.ReportNotDelivered(null, new string('x', 501), Now);
+
+        invoice.NotToldMessage.Should().HaveLength(CarrierInvoice.MaxCauseLength);
+    }
+
+    [Fact]
+    public void ReportNotDelivered_WithoutACause_Throws() =>
+        FluentActions.Invoking(() => ApprovedInvoice().ReportNotDelivered(null, " ", Now)).Should().Throw<ArgumentException>();
 }
