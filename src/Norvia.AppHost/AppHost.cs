@@ -377,6 +377,8 @@ else
     shipmentEvents.AddServiceBusSubscription("shipper-notification");
     // The P7 Carrier cancellation Logic App's subscription: CarrierBookingCancelled and CarrierBookingWithdrawn only (see ResubmitAwareFilters).
     shipmentEvents.AddServiceBusSubscription("carrier-cancellation");
+    // The P9 Carrier cost Logic App's subscription: CarrierCostIncurred only (see ResubmitAwareFilters).
+    shipmentEvents.AddServiceBusSubscription("carrier-cost");
     // The Trip events topic (P11). Monitoring is its first consumer, then the Trip dispatch Logic App with a subscription of its
     // own: TripDispatched only (see ResubmitAwareFilters).
     var tripEvents = messaging.AddServiceBusTopic("trip-events");
@@ -546,6 +548,15 @@ else
         .WithEnvironment("Billing__ErpTokens__Issuer", LocalTokens.Issuer)
         .WithEnvironment("Billing__ErpTokens__Audience", LocalTokens.ErpAudience)
         .WithEnvironment("Billing__ErpTokens__ClientId", LocalTokens.BillingLogicAppClientId);
+    // Locally a worker plays the P9 Carrier cost Logic App as well. It reads the Carrier cost subscription and records each Carrier cost with
+    // the ERP billing API as the identity holding the Carrier cost record role.
+    var carrierCostWorker = builder.AddProject<Projects.Norvia_Integration_LocalCarrierCostWorker>("carrier-cost-worker")
+        .WithReference(messaging).WaitFor(messaging)
+        .WithReference(erpApi).WaitFor(erpApi)
+        .WithEnvironment("CarrierCost__ErpBaseAddress", erpApi.GetEndpoint("http"))
+        .WithEnvironment("CarrierCost__ErpTokens__Issuer", LocalTokens.Issuer)
+        .WithEnvironment("CarrierCost__ErpTokens__Audience", LocalTokens.ErpAudience)
+        .WithEnvironment("CarrierCost__ErpTokens__ClientId", LocalTokens.CarrierCostLogicAppClientId);
     // Locally a worker plays the E1 Shipper invoice Logic App too. It reads its subscription, sends each Shipper Persona's invoice to the
     // Persona's invoice endpoint in the Partner portal with a credential for the run, and reports it Sent to the ERP API as the identity
     // holding the report role.
@@ -635,7 +646,7 @@ else
     erpWeb.WithEnvironment("LocalUser__Name", $"{Environment.UserName} (local)")
         .WithEnvironment("LocalUser__Roles__0", "Finance");
 
-    // Locally the ERP billing API trusts tokens signed with the same key. The Billing and Shipper invoice Logic Apps' client IDs stand in for
+    // Locally the ERP billing API trusts tokens signed with the same key. The Billing, Carrier cost and Shipper invoice Logic Apps' client IDs stand in for
     // their managed identities, the holders of the record and the report role.
     erpApi
         .WithEnvironment("Authentication__Schemes__Bearer__ValidIssuer", LocalTokens.Issuer)
@@ -720,6 +731,7 @@ else
         (carrierCancellationWorker.Resource, "CarrierCancellation__TmsTokens__SigningKey"),
         (tripDispatchWorker.Resource, "TripDispatch__TmsTokens__SigningKey"),
         (billingWorker.Resource, "Billing__ErpTokens__SigningKey"),
+        (carrierCostWorker.Resource, "CarrierCost__ErpTokens__SigningKey"),
         (shipperInvoiceWorker.Resource, "ShipperInvoice__ErpTokens__SigningKey"),
         (driverReportsWorker.Resource, "DriverReports__TmsTokens__SigningKey"),
         (driverReportsWorker.Resource, "DriverReports__DriverApp__Tokens__SigningKey"),

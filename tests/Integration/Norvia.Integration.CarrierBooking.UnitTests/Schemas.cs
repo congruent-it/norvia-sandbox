@@ -32,6 +32,15 @@ internal sealed class Schemas
 
     private static readonly Lazy<Schemas> TransportOrderBillableSchema = new(() => Of("CanonicalModel/transport-order-billable.v1.schema.json"));
 
+    private static readonly Lazy<Schemas> CarrierCostSchema = new(() => Of("CanonicalModel/carrier-cost.v1.schema.json"));
+
+    // The event refers to the Carrier cost document by its $id, so that schema is read first.
+    private static readonly Lazy<Schemas> CarrierCostIncurredSchema = new(() =>
+    {
+        _ = CarrierCostSchema.Value;
+        return Of("CanonicalModel/carrier-cost-incurred.v1.schema.json");
+    });
+
     private static readonly Lazy<Schemas> ShipperInvoiceSchema = new(() => Of("PartnerApi/shipper-invoice.v1.schema.json"));
     private static readonly Lazy<Schemas> InvoiceDocumentSchema = new(() => Of("CanonicalModel/shipper-invoice.v1.schema.json"));
 
@@ -87,6 +96,9 @@ internal sealed class Schemas
 
     /// <summary>The Canonical Model's event the Billing Logic App hands to the ERP billing API as it is.</summary>
     public static Schemas TransportOrderBillable => TransportOrderBillableSchema.Value;
+
+    /// <summary>The Canonical Model's event the Carrier cost Logic App hands to the ERP billing API as it is.</summary>
+    public static Schemas CarrierCostIncurred => CarrierCostIncurredSchema.Value;
 
     /// <summary>The Shipper invoice format, as the Shipper's invoice endpoint in the Partner portal takes it.</summary>
     public static Schemas ShipperInvoice => ShipperInvoiceSchema.Value;

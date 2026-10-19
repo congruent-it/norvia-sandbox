@@ -20,6 +20,9 @@ param tripDispatchPrincipalId string
 @description('The P12 Driver reports Logic App\'s identity, which receives from its own subscription and from nothing else.')
 param driverReportsPrincipalId string
 
+@description('The P9 Carrier cost Logic App\'s identity, which receives from its own subscription and from nothing else.')
+param carrierCostIdentityName string
+
 @description('The E1 Billing Logic App\'s identity, which receives from its own subscription and from nothing else.')
 param billingPrincipalId string
 
@@ -251,6 +254,33 @@ resource carrierCancellationFilter 'Microsoft.ServiceBus/namespaces/topics/subsc
   }
 }
 
+resource carrierCostIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
+  name: carrierCostIdentityName
+}
+
+// The P9 Carrier cost Logic App's subscription: CarrierCostIncurred only, as the message's eventType property says. Its filter also routes
+// resubmits from the console, like every subscription's (coding guidelines §7). The AppHost's emulator gives the same subscription the same
+// condition (ResubmitAwareFilters).
+resource carrierCost 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01' = {
+  parent: shipmentEvents
+  name: 'carrier-cost'
+  properties: {
+    // Long enough for the Logic App's retries of the ERP call, which hold the message's lock.
+    lockDuration: 'PT5M'
+  }
+}
+
+resource carrierCostFilter 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
+  parent: carrierCost
+  name: '$Default'
+  properties: {
+    filterType: 'SqlFilter'
+    sqlFilter: {
+      sqlExpression: '(eventType = \'CarrierCostIncurred\' AND resubmitTo IS NULL) OR resubmitTo = \'carrier-cost\''
+    }
+  }
+}
+
 var serviceBusDataReceiver = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0')
 
 resource presenterReadsMessages 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(presenterPrincipalId)) {
@@ -302,6 +332,17 @@ resource tripDispatchReceivesItsMessages 'Microsoft.Authorization/roleAssignment
   scope: tripDispatch
   properties: {
     principalId: tripDispatchPrincipalId
+    roleDefinitionId: serviceBusDataReceiver
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Scoped to the subscription, so the Carrier cost Logic App reads Carrier costs and no other message.
+resource carrierCostReceivesItsMessages 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(carrierCost.id, carrierCostIdentity.id, serviceBusDataReceiver)
+  scope: carrierCost
+  properties: {
+    principalId: carrierCostIdentity.properties.principalId
     roleDefinitionId: serviceBusDataReceiver
     principalType: 'ServicePrincipal'
   }

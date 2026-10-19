@@ -1,0 +1,26 @@
+{
+  "eventId": "0198e7c0-0000-7000-8000-0000000000d1",
+  "eventType": "CarrierCostIncurred",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-16T08:45:00+00:00",
+  "correlationId": "c3d1f0a2-5b7e-4e19-8a64-90b2d7e1f3c5",
+  "carrierBookingNumber": "CB-0000042",
+  "carrierBookingReference": "TRX-8841",
+  "shipmentNumber": "SH-0000042",
+  "transportOrderNumber": "TO-0000042",
+  "carrierId": "CAR-0001",
+  "carrierCost": {
+    "currency": "EUR",
+    "total": 301.4,
+    "chargeLines": [
+      { "type": "Freight", "amount": 286.4 },
+      { "type": "MinimumChargeAdjustment", "amount": 15 }
+    ],
+    "source": {
+      "kind": "CarrierRateCard",
+      "rateCardVersion": { "rateCardId": "CRC-0001", "version": 2 }
+    },
+    "calculatedAt": "2026-10-14T11:20:00+00:00"
+  },
+  "deliveryTime": "2026-10-16T10:45:00+02:00"
+}

@@ -79,6 +79,8 @@ var erpFinanceRole = 'Finance'
 var erpFinanceRoleId = guid('norvia-erp', environmentName, erpFinanceRole)
 var billableLinesRecordRole = 'BillableLines.Record'
 var billableLinesRecordRoleId = guid('norvia-erp-api', environmentName, billableLinesRecordRole)
+var carrierCostsRecordRole = 'CarrierCosts.Record'
+var carrierCostsRecordRoleId = guid('norvia-erp-api', environmentName, carrierCostsRecordRole)
 var shipperInvoicesReportRole = 'ShipperInvoices.Report'
 var shipperInvoicesReportRoleId = guid('norvia-erp-api', environmentName, shipperInvoicesReportRole)
 var shipperInvoicesManageRole = 'ShipperInvoices.Manage'
@@ -1050,6 +1052,16 @@ resource erpApi 'Microsoft.Graph/applications@v1.0' = {
       isEnabled: true
     }
     {
+      id: carrierCostsRecordRoleId
+      value: carrierCostsRecordRole
+      displayName: 'Record a Carrier cost'
+      description: 'Record the Carrier cost a CarrierCostIncurred carries (E2). Only the Carrier cost Logic App holds it.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
+    {
       id: shipperInvoicesReportRoleId
       value: shipperInvoicesReportRole
       displayName: 'Report a Shipper invoice'
@@ -1111,6 +1123,20 @@ resource simulatorErpManageRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = 
   resourceId: erpApiPrincipal.id
   appRoleId: shipperInvoicesManageRoleId
   principalId: simulatorIdentity.properties.principalId
+}
+
+// The P9 Carrier cost Logic App's identity, which it runs as. It is the one principal holding the ERP's Carrier cost record role, so no
+// Carrier cost is recorded without passing the integration layer, and it holds nothing else on the ERP or the TMS.
+resource carrierCostIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
+  name: 'id-carrier-cost-${uniqueString(resourceGroup().id)}'
+  location: location
+  tags: tags
+}
+
+resource carrierCostRecordRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: erpApiPrincipal.id
+  appRoleId: carrierCostsRecordRoleId
+  principalId: carrierCostIdentity.properties.principalId
 }
 
 output entraIssuer string = '${environment().authentication.loginEndpoint}${tenant().tenantId}/v2.0'
@@ -1183,3 +1209,4 @@ output shipperInvoiceIdentityName string = shipperInvoiceIdentity.name
 output shipperInvoicePrincipalId string = shipperInvoiceIdentity.properties.principalId
 output billingIdentityName string = billingIdentity.name
 output billingPrincipalId string = billingIdentity.properties.principalId
+output carrierCostIdentityName string = carrierCostIdentity.name

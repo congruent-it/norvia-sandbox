@@ -74,7 +74,7 @@ Logic App keeps it when the estate is deployed again.''')
 param driverAppBaseUrl string = ''
 
 @description('''The ERP billing API's address, empty before the apps are first deployed. azd's postdeploy hook stores it, so the Billing
-Logic App keeps it when the estate is deployed again.''')
+and Carrier cost Logic Apps keep it when the estate is deployed again.''')
 param erpBaseUrl string = ''
 
 var tags = {
@@ -110,6 +110,7 @@ module messaging 'estate/messaging.bicep' = {
     tripDispatchPrincipalId: identities.outputs.tripDispatchPrincipalId
     driverReportsPrincipalId: identities.outputs.driverReportsPrincipalId
     billingPrincipalId: identities.outputs.billingPrincipalId
+    carrierCostIdentityName: identities.outputs.carrierCostIdentityName
     shipperInvoicePrincipalId: identities.outputs.shipperInvoicePrincipalId
     driverAppPrincipalId: identities.outputs.driverAppPrincipalId
     trackingPrincipalId: identities.outputs.trackingPrincipalId
@@ -298,6 +299,23 @@ module billingLogicApp 'estate/billing-logic-app.bicep' = {
   }
 }
 
+module carrierCostLogicApp 'estate/carrier-cost-logic-app.bicep' = {
+  scope: resourceGroup
+  params: {
+    location: location
+    tags: tags
+    integrationRetentionDays: integrationRetentionDays
+    carrierCostIdentityName: identities.outputs.carrierCostIdentityName
+    erpApiClientId: identities.outputs.erpApiClientId
+    erpBaseUrl: erpBaseUrl
+    applicationInsightsName: monitoring.outputs.applicationInsightsName
+    serviceBusName: messaging.outputs.namespaceName
+    planName: intakeLogicApp.outputs.planName
+    contentKeyVaultName: intakeLogicApp.outputs.keyVaultName
+    integrationConsolePrincipalId: identities.outputs.integrationConsolePrincipalId
+  }
+}
+
 module shipperInvoiceLogicApp 'estate/shipper-invoice-logic-app.bicep' = {
   scope: resourceGroup
   params: {
@@ -431,9 +449,9 @@ output ESTATE_CARRIER_CANCELLATION_LOGIC_APP string = carrierCancellationLogicAp
 output ESTATE_TRIP_DISPATCH_LOGIC_APP string = tripDispatchLogicApp.outputs.logicAppName
 output ESTATE_DRIVER_REPORTS_LOGIC_APP string = driverReportsLogicApp.outputs.logicAppName
 output ESTATE_BILLING_LOGIC_APP string = billingLogicApp.outputs.logicAppName
+output ESTATE_CARRIER_COST_LOGIC_APP string = carrierCostLogicApp.outputs.logicAppName
 output ESTATE_SHIPPER_INVOICE_LOGIC_APP string = shipperInvoiceLogicApp.outputs.logicAppName
 output ESTATE_ANSWER_LOGIC_APP string = answerLogicApp.outputs.logicAppName
-output ESTATE_ANSWER_IDENTITY_NAME string = identities.outputs.answerIdentityName
 output ESTATE_TRACKING_LOGIC_APP string = trackingLogicApp.outputs.logicAppName
 output ESTATE_TRACKING_CLIENT_ID string = identities.outputs.trackingClientId
 output ESTATE_TRACKING_IDENTITY_NAME string = identities.outputs.trackingIdentityName

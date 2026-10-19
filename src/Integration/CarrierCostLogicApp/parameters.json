@@ -1,0 +1,14 @@
+{
+  "erpBaseUrl": {
+    "type": "String",
+    "value": "@appsetting('ERP_BASE_URL')"
+  },
+  "erpAudience": {
+    "type": "String",
+    "value": "@appsetting('ERP_API_CLIENT_ID')"
+  },
+  "carrierCostIdentityId": {
+    "type": "String",
+    "value": "@appsetting('CARRIER_COST_IDENTITY_ID')"
+  }
+}

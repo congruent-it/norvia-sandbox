@@ -29,6 +29,7 @@ Both Logic App triggers sit behind Easy Auth, and the workflow's first step refu
 | `shipper-notification` | The Shipper notification Logic App (P7) | `ShipperNotifications.Report` | Receives the `shipper-notification` subscription. Reads each Shipper's endpoint key |
 | `trip-dispatch` | The Trip dispatch Logic App (P11) | `Trips.ReportDelivery` | Receives the `trip-dispatch` subscription. Reads the Driver app's endpoint key |
 | `shipper-invoice` | The Shipper invoice Logic App (E1) | `ShipperInvoices.Report` on the ERP API; nothing on the TMS | Receives the `shipper-invoice` subscription. Reads each Shipper's endpoint key |
+| `carrier-cost` | The Carrier cost Logic App (P9, E2) | `CarrierCosts.Record` on the ERP billing API; nothing on the TMS | Receives the `carrier-cost` subscription. Reads no secret |
 | `billing` | The Billing Logic App (E1) | `BillableLines.Record` on the ERP billing API; nothing on the TMS | Receives the `billing` subscription. Reads no secret |
 | `driver-reports` | The Driver reports Logic App (P12) | `Trips.Start`, `Trips.End`, `TrackingEvents.Record` and `ProofsOfDelivery.Record` on the TMS; `DriverReports.ReportOutcome` on the Driver app | Receives the `driver-reports` subscription. Reads and deletes files in the Driver app's transit container |
 | `driver-app` | The Driver app (P11) | None: it reaches the TMS only through the integration layer | Reads the Driver app's endpoint key. Sends to the `driver-app-events` topic (P12). Its screens store Proof of delivery files in the Driver app's transit container |
@@ -129,6 +130,7 @@ Azure RBAC, scoped as narrowly as the resource allows, so an identity sees its o
 | Service Bus subscription `carrier-cancellation` | The subscription | `carrier-cancellation` | Data Receiver |
 | Service Bus subscription `trip-dispatch` | The subscription | `trip-dispatch` | Data Receiver |
 | Service Bus subscription `billing` | The subscription | `billing` | Data Receiver |
+| Service Bus subscription `carrier-cost` | The subscription | `carrier-cost` | Data Receiver |
 | Service Bus subscription `shipper-invoice` | The subscription | `shipper-invoice` | Data Receiver |
 | Service Bus subscription `driver-reports` | The subscription | `driver-reports` | Data Receiver |
 | Service Bus topic `driver-app-events` | The topic | `driver-app` | Data Sender |
