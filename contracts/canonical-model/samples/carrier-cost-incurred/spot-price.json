@@ -1,0 +1,22 @@
+{
+  "eventId": "0198e7c0-0000-7000-8000-0000000000d2",
+  "eventType": "CarrierCostIncurred",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-16T09:10:00+00:00",
+  "correlationId": "7e4b2a91-3d58-4c06-b1f7-a52c9e08d364",
+  "carrierBookingNumber": "CB-0000043",
+  "carrierBookingReference": "TRX-8842",
+  "shipmentNumber": "SH-0000043",
+  "transportOrderNumber": "TO-0000043",
+  "carrierId": "CAR-0002",
+  "carrierCost": {
+    "currency": "EUR",
+    "total": 540,
+    "chargeLines": [
+      { "type": "Freight", "amount": 540 }
+    ],
+    "source": { "kind": "Spot", "remark": "No Lane covers Eindhoven to Tallinn; agreed by phone." },
+    "calculatedAt": "2026-10-14T13:05:00+00:00"
+  },
+  "deliveryTime": "2026-10-16T11:30:00+02:00"
+}

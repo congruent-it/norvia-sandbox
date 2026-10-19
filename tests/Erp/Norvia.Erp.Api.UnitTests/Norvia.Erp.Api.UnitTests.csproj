@@ -12,9 +12,10 @@
     <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
     <PackageReference Include="xunit.v3.mtp-off" />
   </ItemGroup>
-  <!-- Embedded, so the unit tests read the Billing Logic App's sample messages without touching the file system (coding guidelines §10). -->
+  <!-- Embedded, so the unit tests read the Billing and Carrier cost Logic Apps' sample messages without touching the file system (coding guidelines §10). -->
   <ItemGroup>
     <EmbeddedResource Include="..\..\..\contracts\canonical-model\samples\transport-order-billable\*.json" LogicalName="samples/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\contracts\canonical-model\samples\carrier-cost-incurred\*.json" LogicalName="carrier-cost-samples/%(Filename)%(Extension)" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

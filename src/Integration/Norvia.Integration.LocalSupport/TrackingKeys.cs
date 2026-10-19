@@ -36,6 +36,9 @@ public static class TrackingKeys
     /// <summary>The <see cref="Flow"/> of a Billable line, from TransportOrderBillable to the ERP billing API's answer.</summary>
     public const string Billing = "billing";
 
+    /// <summary>The <see cref="Flow"/> of a Carrier cost, from CarrierCostIncurred to the ERP billing API's answer.</summary>
+    public const string CarrierCost = "carrier-costs";
+
     /// <summary>The <see cref="Flow"/> of a Shipper invoice, from ShipperInvoiceIssued to the report to the ERP.</summary>
     public const string Invoicing = "invoicing";
 

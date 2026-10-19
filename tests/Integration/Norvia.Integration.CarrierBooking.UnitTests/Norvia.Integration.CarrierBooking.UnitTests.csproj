@@ -57,6 +57,9 @@
     <EmbeddedResource Include="..\..\..\src\Integration\DriverReportsLogicApp\driver-reports\workflow.json" LogicalName="DriverReportsLogicApp/driver-reports/workflow.json" />
     <EmbeddedResource Include="..\..\..\src\Integration\BillingLogicApp\*.json" LogicalName="BillingLogicApp/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\src\Integration\BillingLogicApp\billing\workflow.json" LogicalName="BillingLogicApp/billing/workflow.json" />
+    <EmbeddedResource Include="..\..\..\src\Integration\CarrierCostLogicApp\*.json" LogicalName="CarrierCostLogicApp/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\src\Integration\CarrierCostLogicApp\carrier-cost\workflow.json" LogicalName="CarrierCostLogicApp/carrier-cost/workflow.json" />
+    <EmbeddedResource Include="..\..\..\contracts\canonical-model\samples\carrier-cost-incurred\*.json" LogicalName="CanonicalModel/samples/carrier-cost-incurred/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\contracts\canonical-model\samples\transport-order-billable\*.json" LogicalName="CanonicalModel/samples/transport-order-billable/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\contracts\canonical-model\samples\shipper-invoice-issued\*.json" LogicalName="CanonicalModel/samples/shipper-invoice-issued/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\contracts\canonical-model\samples\credit-note-issued\*.json" LogicalName="CanonicalModel/samples/credit-note-issued/%(Filename)%(Extension)" />
