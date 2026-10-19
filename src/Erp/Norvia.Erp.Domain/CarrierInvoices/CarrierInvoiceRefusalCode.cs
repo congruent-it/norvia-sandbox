@@ -1,6 +1,6 @@
 namespace Norvia.Erp.Domain.CarrierInvoices;
 
-/// <summary>The stable codes of the receiving rules. The names are part of the ERP billing API's contract.</summary>
+/// <summary>The stable codes of the receiving and deciding rules. The names are part of the ERP billing API's contract.</summary>
 public enum CarrierInvoiceRefusalCode
 {
     CarrierNotFound,
@@ -9,4 +9,11 @@ public enum CarrierInvoiceRefusalCode
     CarrierInvoiceLineWithoutReference,
     CarrierInvoiceLineAmountNotAboveZero,
     CarrierInvoiceReferenceRepeated,
+    CarrierInvoiceNotFound,
+    CarrierInvoiceLineNotFound,
+    CarrierInvoiceLineAlreadyDecided,
+    CarrierInvoiceLineHasNoOpenCarrierCost,
+    CarrierInvoiceAdjustedAmountNotAboveZero,
+    CarrierInvoiceAdjustedAmountNeedsRemark,
+    CarrierInvoiceRejectionNeedsReason,
 }

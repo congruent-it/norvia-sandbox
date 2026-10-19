@@ -13,6 +13,9 @@ public sealed class CarrierInvoice : EntityBase<CarrierInvoiceId>, IAggregateRoo
 {
     public const int MaxInvoiceNumberLength = 50;
 
+    /// <summary>The longest remark or reason Finance can give when it decides a line.</summary>
+    public const int MaxRemarkLength = 500;
+
     private CarrierInvoice()
     {
     }
@@ -84,6 +87,88 @@ public sealed class CarrierInvoice : EntityBase<CarrierInvoiceId>, IAggregateRoo
 
         var lines = data.Lines.Select(line => Match(line, costs, tolerance)).ToList();
         return (new CarrierInvoice(data, lines, receivedAt), null);
+    }
+
+    /// <summary>
+    /// Finance accepts a line To decide, at the invoiced amount or, with a remark, at an adjusted one, and its Carrier cost becomes
+    /// Invoiced. <paramref name="cost"/> is the Carrier cost the line was matched against; a line without an Open Carrier cost for this
+    /// Carrier can only be rejected. Returns whether this decision made the invoice Approved.
+    /// </summary>
+    public (bool Approved, CarrierInvoiceRefusal? Refusal) Accept(
+        string carrierBookingReference, decimal? adjustedAmount, string? remark, CarrierCost? cost, DateTimeOffset decidedAt)
+    {
+        var index = IndexOfLineToDecide(carrierBookingReference, out var refusal);
+        if (refusal is not null)
+        {
+            return (false, refusal);
+        }
+
+        var line = Lines[index];
+        if (cost is null || line.CarrierBookingNumber != cost.Id.CarrierBookingNumber || cost.CarrierId != CarrierId || cost.Status != CarrierCostStatus.Open)
+        {
+            return (false, CarrierInvoiceRefusal.LineHasNoOpenCarrierCost(InvoiceNumber, carrierBookingReference));
+        }
+
+        var amount = adjustedAmount ?? line.Amount;
+        if (amount <= 0)
+        {
+            return (false, CarrierInvoiceRefusal.AdjustedAmountNotAboveZero(InvoiceNumber, carrierBookingReference, amount));
+        }
+
+        var adjusted = amount != line.Amount;
+        if (adjusted && string.IsNullOrWhiteSpace(remark))
+        {
+            return (false, CarrierInvoiceRefusal.AdjustedAmountNeedsRemark(InvoiceNumber, carrierBookingReference));
+        }
+
+        cost.MarkInvoiced();
+        return (Decide(index, line with { Status = CarrierInvoiceLineStatus.Accepted, DecidedAmount = amount, Remark = adjusted ? remark!.Trim() : null }, decidedAt), null);
+    }
+
+    /// <summary>
+    /// Finance rejects a line To decide, with a reason. Its Carrier cost, if any, stays as it was. Returns whether this decision made
+    /// the invoice Approved.
+    /// </summary>
+    public (bool Approved, CarrierInvoiceRefusal? Refusal) Reject(string carrierBookingReference, string? reason, DateTimeOffset decidedAt)
+    {
+        var index = IndexOfLineToDecide(carrierBookingReference, out var refusal);
+        if (refusal is not null)
+        {
+            return (false, refusal);
+        }
+
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return (false, CarrierInvoiceRefusal.RejectionNeedsReason(InvoiceNumber, carrierBookingReference));
+        }
+
+        return (Decide(index, Lines[index] with { Status = CarrierInvoiceLineStatus.Rejected, Remark = reason.Trim() }, decidedAt), null);
+    }
+
+    private int IndexOfLineToDecide(string carrierBookingReference, out CarrierInvoiceRefusal? refusal)
+    {
+        var index = Lines.ToList().FindIndex(line => line.CarrierBookingReference == carrierBookingReference);
+        refusal = index < 0
+            ? CarrierInvoiceRefusal.LineNotFound(InvoiceNumber, carrierBookingReference)
+            : Lines[index].Status != CarrierInvoiceLineStatus.ToDecide
+                ? CarrierInvoiceRefusal.LineAlreadyDecided(InvoiceNumber, carrierBookingReference)
+                : null;
+        return index;
+    }
+
+    private bool Decide(int index, CarrierInvoiceLine decided, DateTimeOffset decidedAt)
+    {
+        // A new list, so the change is seen as one.
+        Lines = [.. Lines.Select((line, at) => at == index ? decided : line)];
+        if (Lines.Any(line => line.Status == CarrierInvoiceLineStatus.ToDecide))
+        {
+            return false;
+        }
+
+        Status = CarrierInvoiceStatus.Approved;
+        ApprovedAt = decidedAt;
+        ApprovedAmount = Lines.Sum(line => line.AcceptedAmount ?? 0m);
+        return true;
     }
 
     /// <summary>

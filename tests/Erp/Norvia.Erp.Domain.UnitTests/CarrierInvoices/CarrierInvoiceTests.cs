@@ -196,4 +196,183 @@ public sealed class CarrierInvoiceTests
         invoice.HasSameContentAs(Invoice(Line("TRX-1", 5m), Line("TRX-2", 6m)) with { CarrierId = new CarrierId("CAR-0002") }).Should().BeFalse("the Carrier differs");
         invoice.HasSameContentAs(Invoice(Line("TRX-1", 5m), Line("TRX-2", 6m)) with { InvoiceNumber = "VDT-2" }).Should().BeFalse("the number differs");
     }
+
+    // An invoice with a Price mismatch (TRX-1, claims 80 against 70), an Unknown booking (TRX-2) and a Matched line (TRX-3).
+    private static (CarrierInvoice Invoice, CarrierCost Mismatched, CarrierCost Matched) ReceivedInvoice()
+    {
+        var mismatched = Cost("CB-0000001", "TRX-1", 70m);
+        var matched = Cost("CB-0000003", "TRX-3", 5m);
+        var (invoice, _) = CarrierInvoice.Receive(Invoice(Line("TRX-1", 80m), Line("TRX-2", 10m), Line("TRX-3", 5m)), [mismatched, matched], 0m, Now);
+        return (invoice!, mismatched, matched);
+    }
+
+    private static readonly DateTimeOffset Later = Now.AddHours(2);
+
+    [Fact]
+    public void Accept_AtTheInvoicedAmount_InvoicesTheCostAndLeavesTheInvoiceReceivedWhileLinesWait()
+    {
+        var (invoice, cost, _) = ReceivedInvoice();
+
+        var (approved, refusal) = invoice.Accept("TRX-1", null, null, cost, Later);
+
+        refusal.Should().BeNull();
+        approved.Should().BeFalse();
+        cost.Status.Should().Be(CarrierCostStatus.Invoiced);
+        invoice.Status.Should().Be(CarrierInvoiceStatus.Received);
+        invoice.ApprovedAmount.Should().BeNull();
+        invoice.Lines[0].Should().Match<CarrierInvoiceLine>(line => line.Status == CarrierInvoiceLineStatus.Accepted && line.AcceptedAmount == 80m && line.Remark == null);
+    }
+
+    [Fact]
+    public void Accept_AtAnAdjustedAmountWithARemark_KeepsBoth()
+    {
+        var (invoice, cost, _) = ReceivedInvoice();
+
+        var (_, refusal) = invoice.Accept("TRX-1", 70m, "  Agreed rate  ", cost, Later);
+
+        refusal.Should().BeNull();
+        invoice.Lines[0].Should().Match<CarrierInvoiceLine>(line => line.AcceptedAmount == 70m && line.Amount == 80m && line.Remark == "Agreed rate");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("  ")]
+    public void Accept_AtAnAdjustedAmountWithoutARemark_IsRefusedAndChangesNothing(string? remark)
+    {
+        var (invoice, cost, _) = ReceivedInvoice();
+
+        var (approved, refusal) = invoice.Accept("TRX-1", 70m, remark, cost, Later);
+
+        approved.Should().BeFalse();
+        refusal!.Code.Should().Be(CarrierInvoiceRefusalCode.CarrierInvoiceAdjustedAmountNeedsRemark);
+        cost.Status.Should().Be(CarrierCostStatus.Open);
+        invoice.Lines[0].Status.Should().Be(CarrierInvoiceLineStatus.ToDecide);
+    }
+
+    [Fact]
+    public void Accept_AnAdjustedAmountEqualToTheInvoicedOne_NeedsNoRemark()
+    {
+        var (invoice, cost, _) = ReceivedInvoice();
+
+        var (_, refusal) = invoice.Accept("TRX-1", 80m, null, cost, Later);
+
+        refusal.Should().BeNull();
+        invoice.Lines[0].Remark.Should().BeNull();
+    }
+
+    [Fact]
+    public void Accept_AnAdjustedAmountNotAboveZero_IsRefused()
+    {
+        var (invoice, cost, _) = ReceivedInvoice();
+
+        invoice.Accept("TRX-1", 0m, "free", cost, Later).Refusal!.Code.Should().Be(CarrierInvoiceRefusalCode.CarrierInvoiceAdjustedAmountNotAboveZero);
+    }
+
+    [Fact]
+    public void Accept_AnUnknownBooking_IsRefused_AsItHasNoCarrierCost()
+    {
+        var (invoice, _, _) = ReceivedInvoice();
+
+        invoice.Accept("TRX-2", null, null, null, Later).Refusal!.Code.Should().Be(CarrierInvoiceRefusalCode.CarrierInvoiceLineHasNoOpenCarrierCost);
+    }
+
+    [Fact]
+    public void Accept_WhenTheCarrierCostHasBeenInvoicedMeanwhile_IsRefused()
+    {
+        var (invoice, cost, _) = ReceivedInvoice();
+        cost.MarkInvoiced();
+
+        invoice.Accept("TRX-1", null, null, cost, Later).Refusal!.Code.Should().Be(CarrierInvoiceRefusalCode.CarrierInvoiceLineHasNoOpenCarrierCost);
+    }
+
+    [Fact]
+    public void Accept_ACarrierCostOfAnotherCarrierOrBooking_IsRefused()
+    {
+        var (invoice, _, _) = ReceivedInvoice();
+
+        invoice.Accept("TRX-1", null, null, Cost("CB-0000001", "TRX-1", 70m, "CAR-0002"), Later).Refusal!.Code
+            .Should().Be(CarrierInvoiceRefusalCode.CarrierInvoiceLineHasNoOpenCarrierCost);
+        invoice.Accept("TRX-1", null, null, Cost("CB-0000009", "TRX-1", 70m), Later).Refusal!.Code
+            .Should().Be(CarrierInvoiceRefusalCode.CarrierInvoiceLineHasNoOpenCarrierCost);
+    }
+
+    [Fact]
+    public void Accept_ADuplicateLine_IsRefused()
+    {
+        var invoiced = Cost("CB-0000001", "TRX-1", 70m);
+        invoiced.MarkInvoiced();
+        var (invoice, _) = CarrierInvoice.Receive(Invoice(Line("TRX-1", 70m)), [invoiced], 0m, Now);
+
+        invoice!.Accept("TRX-1", null, null, invoiced, Later).Refusal!.Code.Should().Be(CarrierInvoiceRefusalCode.CarrierInvoiceLineHasNoOpenCarrierCost);
+    }
+
+    [Fact]
+    public void Decide_AMatchedOrDecidedLine_IsRefusedAsAlreadyDecided()
+    {
+        var (invoice, cost, matched) = ReceivedInvoice();
+        invoice.Reject("TRX-1", "wrong", Later);
+
+        invoice.Accept("TRX-3", null, null, matched, Later).Refusal!.Code.Should().Be(CarrierInvoiceRefusalCode.CarrierInvoiceLineAlreadyDecided);
+        invoice.Reject("TRX-1", "again", Later).Refusal!.Code.Should().Be(CarrierInvoiceRefusalCode.CarrierInvoiceLineAlreadyDecided);
+        invoice.Accept("TRX-1", null, null, cost, Later).Refusal!.Code.Should().Be(CarrierInvoiceRefusalCode.CarrierInvoiceLineAlreadyDecided);
+    }
+
+    [Fact]
+    public void Decide_ALineTheInvoiceDoesNotHave_IsRefused()
+    {
+        var (invoice, cost, _) = ReceivedInvoice();
+
+        invoice.Accept("NOPE", null, null, cost, Later).Refusal!.Code.Should().Be(CarrierInvoiceRefusalCode.CarrierInvoiceLineNotFound);
+        invoice.Reject("NOPE", "x", Later).Refusal!.Code.Should().Be(CarrierInvoiceRefusalCode.CarrierInvoiceLineNotFound);
+    }
+
+    [Fact]
+    public void Reject_LeavesTheCarrierCostOpen_AndKeepsTheReason()
+    {
+        var (invoice, cost, _) = ReceivedInvoice();
+
+        var (approved, refusal) = invoice.Reject("TRX-1", " Not our booking ", Later);
+
+        refusal.Should().BeNull();
+        approved.Should().BeFalse();
+        cost.Status.Should().Be(CarrierCostStatus.Open);
+        invoice.Lines[0].Should().Match<CarrierInvoiceLine>(line => line.Status == CarrierInvoiceLineStatus.Rejected && line.Remark == "Not our booking" && line.AcceptedAmount == null);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(" ")]
+    public void Reject_WithoutAReason_IsRefused(string? reason)
+    {
+        var (invoice, _, _) = ReceivedInvoice();
+
+        invoice.Reject("TRX-1", reason, Later).Refusal!.Code.Should().Be(CarrierInvoiceRefusalCode.CarrierInvoiceRejectionNeedsReason);
+        invoice.Lines[0].Status.Should().Be(CarrierInvoiceLineStatus.ToDecide);
+    }
+
+    [Fact]
+    public void Decide_TheLastLine_ApprovesTheInvoiceAtTheSumOfTheMatchedAndAcceptedAmounts()
+    {
+        var (invoice, cost, _) = ReceivedInvoice();
+
+        invoice.Accept("TRX-1", 70m, "Agreed rate", cost, Later).Approved.Should().BeFalse();
+        var (approved, _) = invoice.Reject("TRX-2", "Unknown", Later);
+
+        approved.Should().BeTrue();
+        invoice.Status.Should().Be(CarrierInvoiceStatus.Approved);
+        invoice.ApprovedAmount.Should().Be(75m);
+        invoice.ApprovedAt.Should().Be(Later);
+    }
+
+    [Fact]
+    public void Decide_RejectingEveryLineToDecide_ApprovesForTheMatchedLinesOnly()
+    {
+        var (invoice, _, _) = ReceivedInvoice();
+
+        invoice.Reject("TRX-1", "no", Later);
+        invoice.Reject("TRX-2", "no", Later).Approved.Should().BeTrue();
+
+        invoice.ApprovedAmount.Should().Be(5m);
+    }
 }

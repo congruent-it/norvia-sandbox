@@ -18,15 +18,16 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["carrierBookingReference", "amount", "description", "result", "status", "carrierBookingNumber", "acceptedAmount"],
+        "required": ["carrierBookingReference", "amount", "description", "result", "status", "carrierBookingNumber", "acceptedAmount", "remark"],
         "properties": {
           "carrierBookingReference": { "type": "string", "minLength": 1 },
           "amount": { "description": "What the Carrier claims for the line.", "type": "number", "exclusiveMinimum": 0, "multipleOf": 0.01 },
           "description": { "type": ["string", "null"] },
           "result": { "description": "What matching found. Matched: the Carrier cost exists for this Carrier, is Open and the amount is within tolerance. PriceMismatch: it exists and is Open but the amount is outside tolerance. UnknownBooking: no Carrier cost with that reference has arrived for this Carrier, which includes a reference of another Carrier. Duplicate: the Carrier cost is already Invoiced.", "enum": ["Matched", "PriceMismatch", "UnknownBooking", "Duplicate"] },
-          "status": { "description": "Matched: accepted at once at the invoiced amount. ToDecide: waits for Finance.", "enum": ["Matched", "ToDecide"] },
+          "status": { "description": "Matched: accepted at once at the invoiced amount. ToDecide: waits for Finance. Accepted: Finance accepted it, at the invoiced or an adjusted amount. Rejected: Finance rejected it.", "enum": ["Matched", "ToDecide", "Accepted", "Rejected"] },
           "carrierBookingNumber": { "description": "The Carrier cost the line was matched against; null for an UnknownBooking.", "type": ["string", "null"], "pattern": "^CB-[0-9]{7}$" },
-          "acceptedAmount": { "description": "What the line contributes to the approved amount; null while it waits for Finance.", "type": ["number", "null"], "multipleOf": 0.01 }
+          "acceptedAmount": { "description": "What the line contributes to the approved amount; null while it waits for Finance and for a Rejected line.", "type": ["number", "null"], "multipleOf": 0.01 },
+          "remark": { "description": "Finance's remark on an adjusted amount, or its reason for a rejection; null otherwise.", "type": ["string", "null"] }
         }
       }
     },
