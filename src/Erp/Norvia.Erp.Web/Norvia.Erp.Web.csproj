@@ -13,6 +13,7 @@
     <None Include="..\..\..\seed\norvia.seed.json" Link="seed\norvia.seed.json" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="Norvia.Erp.Api.IntegrationTests" />
     <InternalsVisibleTo Include="Norvia.Erp.Web.IntegrationTests" />
     <InternalsVisibleTo Include="Norvia.Erp.Web.UnitTests" />
   </ItemGroup>
