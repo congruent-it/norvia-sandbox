@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/carrier-cost-record.v1.schema.json",
+  "title": "CarrierCostRecord",
+  "description": "The ERP's record of one Carrier cost (Canonical Model document, version 1): what CarrierCostIncurred carries, kept as the TMS froze it, with the status of the Carrier cost. The ERP never recalculates it. A Carrier cost is Open until a Carrier invoice line is Matched or Accepted against it, then Invoiced; there is one per Carrier booking number.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "carrierBookingNumber",
+    "carrierBookingReference",
+    "carrierId",
+    "shipmentNumber",
+    "transportOrderNumber",
+    "currency",
+    "total",
+    "chargeLines",
+    "source",
+    "deliveryTime",
+    "correlationId",
+    "recordedAt",
+    "status"
+  ],
+  "properties": {
+    "carrierBookingNumber": { "description": "The TMS's number for the Confirmed Carrier booking that carried the Shipment.", "type": "string", "pattern": "^CB-[0-9]{7}$" },
+    "carrierBookingReference": { "description": "The Carrier's own reference for the booking, which a Carrier invoice line quotes.", "type": "string", "minLength": 1 },
+    "carrierId": { "description": "The Carrier to pay.", "type": "string", "minLength": 1 },
+    "shipmentNumber": { "type": "string", "pattern": "^SH-[0-9]{7}$" },
+    "transportOrderNumber": { "type": "string", "pattern": "^TO-[0-9]{7}$" },
+    "currency": { "const": "EUR" },
+    "total": { "description": "The sum of the charge lines, without VAT.", "type": "number", "minimum": 0, "multipleOf": 0.01 },
+    "chargeLines": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "amount"],
+        "properties": {
+          "type": { "enum": ["Freight", "MinimumChargeAdjustment"] },
+          "amount": { "type": "number", "minimum": 0, "multipleOf": 0.01 }
+        }
+      }
+    },
+    "source": {
+      "description": "Where the Carrier cost came from, as CarrierCostIncurred carried it: the Carrier Rate Card version, or Spot with the Planner's remark.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": { "enum": ["CarrierRateCard", "Spot"] },
+        "rateCardId": { "description": "Present for CarrierRateCard only.", "type": ["string", "null"], "minLength": 1 },
+        "rateCardVersion": { "description": "Present for CarrierRateCard only.", "type": ["integer", "null"], "minimum": 1 },
+        "remark": { "description": "The Planner's remark with the Spot price. Present for Spot only.", "type": ["string", "null"], "minLength": 1, "maxLength": 500 }
+      }
+    },
+    "deliveryTime": { "description": "When the Shipment was Delivered, with the offset of where it happened.", "type": "string", "format": "date-time" },
+    "correlationId": { "description": "The correlation ID CarrierCostIncurred carried, which the Carrier cost keeps.", "type": "string", "minLength": 1 },
+    "recordedAt": { "description": "When the ERP recorded the Carrier cost.", "type": "string", "format": "date-time" },
+    "status": { "description": "Open until a Carrier invoice line is Matched or Accepted against the Carrier cost, then Invoiced.", "enum": ["Open", "Invoiced"] }
+  }
+}

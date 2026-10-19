@@ -2,7 +2,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <!-- Only the billing API's own hand-written logic is gated; Program.cs is the composition root (coding guidelines §10). -->
-    <Include>[Norvia.Erp.Api]Norvia.Erp.Api.BillableLines.*</Include>
+    <Include>[Norvia.Erp.Api]Norvia.Erp.Api.BillableLines.*,[Norvia.Erp.Api]Norvia.Erp.Api.CarrierCosts.*</Include>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="AwesomeAssertions" />

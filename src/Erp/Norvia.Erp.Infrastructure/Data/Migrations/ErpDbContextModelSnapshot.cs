@@ -87,6 +87,65 @@ namespace Norvia.Erp.Infrastructure.Data.Migrations
                     b.ToTable("BillableLines", (string)null);
                 });
 
+            modelBuilder.Entity("Norvia.Erp.Domain.CarrierCosts.CarrierCost", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("CarrierBookingReference")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("CarrierId")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Charge")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTimeOffset>("DeliveryTime")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ShipmentNumber")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("TransportOrderNumber")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CarrierId", "CarrierBookingReference");
+
+                    b.HasIndex("CarrierId", "Status");
+
+                    b.ToTable("CarrierCosts", (string)null);
+                });
+
             modelBuilder.Entity("Norvia.Erp.Domain.Carriers.Carrier", b =>
                 {
                     b.Property<string>("Id")
@@ -429,6 +488,15 @@ namespace Norvia.Erp.Infrastructure.Data.Migrations
                     b.HasOne("Norvia.Erp.Domain.Shippers.Shipper", null)
                         .WithMany()
                         .HasForeignKey("ShipperId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Norvia.Erp.Domain.CarrierCosts.CarrierCost", b =>
+                {
+                    b.HasOne("Norvia.Erp.Domain.Carriers.Carrier", null)
+                        .WithMany()
+                        .HasForeignKey("CarrierId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

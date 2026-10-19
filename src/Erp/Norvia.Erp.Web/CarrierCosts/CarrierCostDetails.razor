@@ -1,0 +1,40 @@
+@using Norvia.Erp.Application.BillableLines
+@using Norvia.Erp.Application.CarrierCosts
+
+@* Everything a Carrier cost holds. A Spot price is marked, with the Planner's remark. *@
+@if (Cost.Source.Kind == "Spot")
+{
+    <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
+        Spot price. The Planner's remark: @Cost.Source.Remark
+    </FluentMessageBar>
+}
+
+<dl class="detail-list" aria-label="@($"Carrier cost {Cost.CarrierBookingNumber}")">
+    <dt>Carrier booking</dt>
+    <dd>@Cost.CarrierBookingNumber</dd>
+    <dt>Carrier booking reference</dt>
+    <dd>@Cost.CarrierBookingReference</dd>
+    <dt>Shipment</dt>
+    <dd>@Cost.ShipmentNumber</dd>
+    <dt>Transport Order</dt>
+    <dd>@Cost.TransportOrderNumber</dd>
+    <dt>Delivered</dt>
+    <dd>@Cost.DeliveryTime.ToString("yyyy-MM-dd HH:mm zzz")</dd>
+    <dt>Source</dt>
+    <dd>@(Cost.Source.Kind == "Spot" ? "Spot price" : $"Carrier Rate Card {Cost.Source.RateCardId} version {Cost.Source.RateCardVersion}")</dd>
+    <dt>Correlation ID</dt>
+    <dd>@Cost.CorrelationId</dd>
+    <dt>Recorded</dt>
+    <dd>@Cost.RecordedAt.ToString("yyyy-MM-dd HH:mm zzz")</dd>
+</dl>
+
+<FluentDataGrid Class="cerulean-table" Items="Cost.ChargeLines.AsQueryable()" TGridItem="ChargeLineView" aria-label="@($"Charge lines of {Cost.CarrierBookingNumber}")">
+    <PropertyColumn Title="Charge line" Property="@(row => ChargeLineText.Of(row.Type))" />
+    <PropertyColumn Title="Amount without VAT" Property="@(row => Money.Format(row.Amount))" />
+</FluentDataGrid>
+<p>Total without VAT: @Money.Format(Cost.Total)</p>
+
+@code {
+    [Parameter, EditorRequired]
+    public CarrierCostView Cost { get; set; } = null!;
+}

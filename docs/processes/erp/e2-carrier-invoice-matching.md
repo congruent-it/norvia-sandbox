@@ -140,7 +140,16 @@ Recording a Carrier cost, receiving a Carrier invoice that still has lines To de
 
 ## Implementation
 
-Not built yet.
+For engineers and coding agents. Built so far: recording a Carrier cost and the Open Carrier costs list. The Carrier cost Logic App, receiving and matching Carrier invoices, deciding lines and the outcome are not built yet.
+
+| Piece | Where | Does |
+|---|---|---|
+| Record a Carrier cost | [src/Erp/Norvia.Erp.Application/CarrierCosts](../../../src/Erp/Norvia.Erp.Application/CarrierCosts/Record/) | `RecordCarrierCostCommand` and its handler: idempotent on the Carrier booking number, `CarrierNotFound` for an unknown Carrier, `CarrierCostConflict` for different content. The domain refuses charge lines that are missing or don't add up to the total. It publishes nothing |
+| Open Carrier costs | [src/Erp/Norvia.Erp.Application/CarrierCosts/ListOpen](../../../src/Erp/Norvia.Erp.Application/CarrierCosts/ListOpen/), [src/Erp/Norvia.Erp.Web/CarrierCosts](../../../src/Erp/Norvia.Erp.Web/CarrierCosts/) | The `/carrier-costs` page, for Finance only: Open Carrier costs per Carrier, oldest delivery first, each opening to its charge lines and source. A Spot price is marked with the Planner's remark. The list updates without a refresh |
+| ERP billing API | [src/Erp/Norvia.Erp.Api/CarrierCosts](../../../src/Erp/Norvia.Erp.Api/CarrierCosts/) | `POST /v1/carrier-costs` takes only `CarrierCostIncurred` (the Canonical Model, so the Carrier cost Logic App has nothing to map) and needs the `CarrierCosts.Record` app role. 201 for a new Carrier cost, 200 with `repeat: true` for the same content again. Refusals are `ProblemDetails` with the stable `code`: `CarrierNotFound` (422), `CarrierCostConflict` (409), `CarrierCostWithoutChargeLines` and `CarrierCostTotalMismatch` (400). A body outside the Canonical Model is a 400 |
+| Canonical schemas | [contracts/canonical-model](../../../contracts/canonical-model/) | [carrier-cost-record.v1](../../../contracts/canonical-model/carrier-cost-record.v1.schema.json) is the ERP's record of a Carrier cost, and [carrier-cost-recording.v1](../../../contracts/canonical-model/carrier-cost-recording.v1.schema.json) is the API's answer |
+
+The Carrier cost is traced on the `carrier-costs` flow, on the correlation ID of the Delivered Tracking event, with the Carrier booking number, Shipment number, Transport Order number and the Carrier as `partyId`.
 
 ## Deferred
 

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/carrier-cost-recording.v1.schema.json",
+  "title": "CarrierCostRecording",
+  "description": "The ERP billing API's answer to recording a Carrier cost (Canonical Model document, version 1): 201 for the first recording, 200 with repeat true when the same content arrives again for a Carrier booking that is already recorded, in which case the Carrier cost is the original one. Recording publishes nothing.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["cost", "repeat"],
+  "properties": {
+    "cost": { "$ref": "carrier-cost-record.v1.schema.json" },
+    "repeat": { "type": "boolean" }
+  }
+}
