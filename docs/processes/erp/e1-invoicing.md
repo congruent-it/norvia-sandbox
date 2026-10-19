@@ -129,6 +129,18 @@ All events go to a new topic for Invoicing events, through the ERP's transaction
 
 Recording a billable line publishes nothing. The Invoice run is what the Shipper sees.
 
+## Presenter smoke run
+
+After a deployment, and not in CI, the presenter checks the faults and the tracing of Invoicing on the deployed estate, before the headline relies on them. The happy path (Invoice now, Credit note, the Shipper's inbox) is played by the [Simulator](../../operations/simulator.md); this run doesn't repeat it. Do it after the presenter smoke run of Freight settlement ([P9](../tms/p9-freight-settlement.md#presenter-smoke-run)). The Logic Apps' faults are injected by pointing a Logic App at an address that doesn't answer, and put back when the run ends, even if it fails. The presenter's actions in the TMS UI and the ERP UI are theirs, and the script stops and says what to do. Run it in a terminal, with the TMS UI, the ERP UI and the Integration console side by side.
+
+1. **Get two Transport Orders.** Deliver two with a Proof of delivery, ready to become Billable. Note their numbers.
+2. **Run the check.** Run `infra/smoke-test-invoicing.sh <ERP fault order> <Shipper fault order>`. It reads Service Bus and Application Insights, which is usually 1 to 5 minutes behind.
+3. **The ERP billing API is down.** The script points the Billing Logic App away from the ERP. Make the first order Billable. The script checks that the message is retried and then dead-lettered on the `billing` subscription with `ErpUnavailable`. In the ERP UI, see that the line isn't Waiting. The script puts the address back; resubmit the message from the Integration console to see the line arrive.
+4. **The Shipper invoice endpoint is down.** The script points the Shipper invoice Logic App away from the Partner portal. Make the second order Billable and choose **Invoice now**. The script checks that the send is tracked `Failed` with `ShipperUnavailable`; the ERP UI shows the invoice Not delivered. The script puts the address back; choose **Send again**, and the script checks that the send is tracked `Succeeded`. The Shipper's inbox holds the invoice once.
+5. **Follow it.** The script checks that the dead-lettered message is in Application Insights by correlation ID, in the Billing Logic App and the TMS, and the invoice in the ERP, the Shipper invoice Logic App and the Partner portal, and prints the Integration console's links.
+
+The script prints `PASS` or `FAIL` per check, never a body, a token or a key. If a check fails, file the gap as its own issue against E1, rather than working around it in the run book.
+
 ## Implementation
 
 For engineers and coding agents. It shows where E1 lives in the repository. Built so far: the ERP application with its seed-loaded master data, recording Billable lines through the ERP billing API with the list of Waiting lines, the Billing Logic App that hands `TransportOrderBillable` to it, **Invoice now**, which issues a Shipper invoice and publishes `ShipperInvoiceIssued`, the monthly Invoice run, the Partner portal's Shipper invoice endpoint and invoices inbox, and the Shipper invoice Logic App, which sends the invoice and reports it Sent or Not delivered, and Send again. Not delivered handling with **Send again** is built too, and so is issuing **Credit notes**, which publishes `CreditNoteIssued`, and sending them: the Shipper invoice Logic App sends a Credit note like an invoice, with the same reports, Not delivered handling and Send again. The other Logic Apps are designed above and not built yet.
