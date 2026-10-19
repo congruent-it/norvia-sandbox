@@ -185,6 +185,16 @@ namespace Norvia.Erp.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<DateTimeOffset?>("NotToldAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("NotToldMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int?>("NotToldStatusCode")
+                        .HasColumnType("int");
+
                     b.Property<DateTimeOffset>("ReceivedAt")
                         .HasColumnType("datetimeoffset");
 
@@ -197,6 +207,9 @@ namespace Norvia.Erp.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTimeOffset?>("ToldAt")
+                        .HasColumnType("datetimeoffset");
 
                     b.Property<decimal>("Total")
                         .HasPrecision(18, 2)

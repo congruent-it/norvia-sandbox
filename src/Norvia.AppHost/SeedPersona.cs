@@ -30,6 +30,12 @@ public sealed record SeedPersona(string Id, string PartyType, string PartyId)
     /// </summary>
     public string? CancellationPath => IsShipper ? null : $"/carrier/v1/{PartyId}/cancellations";
 
+    /// <summary>
+    /// Where the Partner portal takes the outcome Norvia's E2 Carrier invoice outcome Logic App sends a Carrier Persona
+    /// (CarrierInvoiceOutcomeEndpoint has the same shape); a Shipper has none.
+    /// </summary>
+    public string? InvoiceOutcomePath => IsShipper ? null : $"/carrier/v1/{PartyId}/invoice-outcomes";
+
     public static IReadOnlyList<SeedPersona> ReadAll(string seedFile)
     {
         using var seed = JsonDocument.Parse(File.ReadAllText(seedFile));

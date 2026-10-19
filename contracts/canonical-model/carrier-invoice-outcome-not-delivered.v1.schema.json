@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/carrier-invoice-outcome-not-delivered.v1.schema.json",
+  "title": "CarrierInvoiceOutcomeNotDelivered",
+  "description": "The outcome of an Approved Carrier invoice never reached the Carrier (Canonical Model event, version 1). The Carrier invoice outcome Logic App used up its retries on a server error or timeout, or met a client error, and reported the outcome not delivered with the technical cause. The ERP flagged the Carrier invoice Carrier not told and shows the flag in the list of Carrier invoices, where Finance phones the Carrier. Published on the Invoicing events topic through the ERP's transactional outbox, in the transaction that recorded the report, under the Carrier invoice's correlation ID. Monitoring consumes it; an alert follows later.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "carrierId", "invoiceNumber", "statusCode", "message"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "const": "CarrierInvoiceOutcomeNotDelivered" },
+    "eventVersion": { "const": 1 },
+    "occurredAt": { "description": "When the report was recorded.", "type": "string", "format": "date-time" },
+    "correlationId": { "description": "The Carrier invoice's correlation ID, the one API Management created for it.", "type": "string", "minLength": 1 },
+    "carrierId": { "description": "The Carrier the outcome was addressed to.", "type": "string", "minLength": 1 },
+    "invoiceNumber": { "description": "The Carrier's own invoice number.", "type": "string", "minLength": 1 },
+    "statusCode": { "description": "The Carrier endpoint's HTTP status code; null when the failure had none, such as a timeout.", "type": ["integer", "null"] },
+    "message": { "description": "The technical cause in plain language.", "type": "string", "minLength": 1 }
+  }
+}

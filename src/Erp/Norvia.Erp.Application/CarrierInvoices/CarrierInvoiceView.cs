@@ -14,7 +14,11 @@ public sealed record CarrierInvoiceView(
     DateTimeOffset ReceivedAt,
     string Status,
     decimal? ApprovedAmount,
-    DateTimeOffset? ApprovedAt);
+    DateTimeOffset? ApprovedAt,
+    DateTimeOffset? ToldAt = null,
+    DateTimeOffset? NotToldAt = null,
+    int? NotToldStatusCode = null,
+    string? NotToldMessage = null);
 
 /// <param name="Result">What matching found: <c>Matched</c>, <c>PriceMismatch</c>, <c>UnknownBooking</c> or <c>Duplicate</c>.</param>
 /// <param name="Status"><c>Matched</c>, <c>ToDecide</c>, <c>Accepted</c> or <c>Rejected</c>.</param>

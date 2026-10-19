@@ -212,10 +212,11 @@ if (builder.ExecutionContext.IsPublishMode)
     // The TMS UI and the Partner portal have no login of their own, so in Azure they open to the presenter's browser
     // behind an Entra sign-in that only the presenter passes (ADR 0024). The apps don't know it is there.
     // The exceptions are each Carrier Persona's booking and cancellation endpoints and each Shipper Persona's notification
-    // endpoint and invoice endpoint: the Logic Apps that call them are no browsers, and the endpoints ask them for the party's own credential.
+    // endpoint and invoice endpoint, and each Carrier Persona's invoice outcome endpoint: the Logic Apps that call them are no browsers, and the endpoints ask them for the party's own credential.
     var personaEndpoints = personas.Select(persona => persona.EndpointPath)
         .Concat(personas.Select(persona => persona.CancellationPath).OfType<string>())
         .Concat(personas.Select(persona => persona.InvoicePath).OfType<string>())
+        .Concat(personas.Select(persona => persona.InvoiceOutcomePath).OfType<string>())
         // The Simulator's Reset estate calls the portal's reset endpoint, which asks for the Simulator's key (ADR 0039).
         .Append("/reset/v1")
         .ToList();
@@ -394,6 +395,7 @@ else
     var invoicingEvents = messagingEdge.AddServiceBusTopic("invoicing-events");
     invoicingEvents.AddServiceBusSubscription("invoicing-events-monitoring", subscriptionName: "monitoring");
     invoicingEvents.AddServiceBusSubscription("shipper-invoice");
+    invoicingEvents.AddServiceBusSubscription("carrier-invoice-outcome");
     // The tracking queue API Management puts a Carrier's tracking message on and the Carrier-tracking Logic App reads
     // (ADR 0008). A message the TMS refuses is dead-lettered; one it can't be given to is delivered again up to the
     // maximum delivery count, then dead-lettered by Service Bus itself. The estate Bicep sets the same count.
@@ -567,6 +569,16 @@ else
         .WithEnvironment("ShipperInvoice__ErpTokens__Issuer", LocalTokens.Issuer)
         .WithEnvironment("ShipperInvoice__ErpTokens__Audience", LocalTokens.ErpAudience)
         .WithEnvironment("ShipperInvoice__ErpTokens__ClientId", LocalTokens.ShipperInvoiceLogicAppClientId);
+    // Locally a worker plays the E2 Carrier invoice outcome Logic App too. It reads its subscription, sends each approved Carrier invoice's
+    // outcome to the Carrier Persona's invoice outcome endpoint in the Partner portal with the Carrier's credential, and reports it told or
+    // not delivered to the ERP API as the identity holding the report role.
+    var carrierInvoiceOutcomeWorker = builder.AddProject<Projects.Norvia_Integration_LocalCarrierInvoiceOutcomeWorker>("carrier-invoice-outcome-worker")
+        .WithReference(messagingEdge, "messaging").WaitFor(messagingEdge)
+        .WithReference(erpApi).WaitFor(erpApi)
+        .WithEnvironment("CarrierInvoiceOutcome__ErpBaseAddress", erpApi.GetEndpoint("http"))
+        .WithEnvironment("CarrierInvoiceOutcome__ErpTokens__Issuer", LocalTokens.Issuer)
+        .WithEnvironment("CarrierInvoiceOutcome__ErpTokens__Audience", LocalTokens.ErpAudience)
+        .WithEnvironment("CarrierInvoiceOutcome__ErpTokens__ClientId", LocalTokens.CarrierInvoiceOutcomeLogicAppClientId);
     // Locally a worker plays the P12 Driver reports Logic App as well. It reads the Driver app events subscription one Trip at a time, calls the
     // TMS as the identity holding the Trip start role, and tells the Driver app what became of each report as the identity holding the outcome
     // role.
@@ -612,6 +624,10 @@ else
         carrierCancellationWorker
             .WithEnvironment($"CarrierCancellation__Carriers__{persona.PartyId}__Address", ReferenceExpression.Create($"{partnerPortal.GetEndpoint("http")}{persona.CancellationPath}"))
             .WithEnvironment($"CarrierCancellation__Carriers__{persona.PartyId}__ApiKey", carrierApiKey);
+        // The invoice outcome endpoint asks for the credential the booking endpoint does, as Key Vault holds one secret per Carrier in Azure.
+        carrierInvoiceOutcomeWorker
+            .WithEnvironment($"CarrierInvoiceOutcome__Carriers__{persona.PartyId}__Address", ReferenceExpression.Create($"{partnerPortal.GetEndpoint("http")}{persona.InvoiceOutcomePath}"))
+            .WithEnvironment($"CarrierInvoiceOutcome__Carriers__{persona.PartyId}__ApiKey", carrierApiKey);
         // The Persona's booking and cancellation endpoints ask their callers for the same credential, as Key Vault holds it in Azure.
         partnerPortal.WithEnvironment($"CarrierEndpoint__ApiKeys__{persona.PartyId}", carrierApiKey);
     }
@@ -733,6 +749,7 @@ else
         (billingWorker.Resource, "Billing__ErpTokens__SigningKey"),
         (carrierCostWorker.Resource, "CarrierCost__ErpTokens__SigningKey"),
         (shipperInvoiceWorker.Resource, "ShipperInvoice__ErpTokens__SigningKey"),
+        (carrierInvoiceOutcomeWorker.Resource, "CarrierInvoiceOutcome__ErpTokens__SigningKey"),
         (driverReportsWorker.Resource, "DriverReports__TmsTokens__SigningKey"),
         (driverReportsWorker.Resource, "DriverReports__DriverApp__Tokens__SigningKey"),
         (driverAppApi.Resource, "Authentication__Schemes__Bearer__SigningKeys__0__Value"),

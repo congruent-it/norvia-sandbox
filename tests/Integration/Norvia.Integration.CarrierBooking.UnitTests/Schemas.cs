@@ -47,6 +47,9 @@ internal sealed class Schemas
     private static readonly Lazy<Schemas> ShipperInvoiceSchema = new(() => Of("PartnerApi/shipper-invoice.v1.schema.json"));
     private static readonly Lazy<Schemas> InvoiceDocumentSchema = new(() => Of("CanonicalModel/shipper-invoice.v1.schema.json"));
 
+    private static readonly Lazy<Schemas> CarrierInvoiceOutcomeSchema = new(() => Of("PartnerApi/carrier-invoice-outcome.v1.schema.json"));
+    private static readonly Lazy<Schemas> CarrierInvoiceApprovedSchema = new(() => Of("CanonicalModel/carrier-invoice-approved.v1.schema.json"));
+
     private static readonly Lazy<Schemas> CreditNoteDocumentSchema = new(() => Of("CanonicalModel/credit-note.v1.schema.json"));
 
     private readonly JsonSchema _schema;
@@ -116,6 +119,12 @@ internal sealed class Schemas
 
     /// <summary>The Canonical Model's Shipper invoice, the document <c>ShipperInvoiceIssued</c> carries.</summary>
     public static Schemas InvoiceDocument => InvoiceDocumentSchema.Value;
+
+    /// <summary>The Carrier invoice outcome format, as the Carrier's invoice outcome endpoint in the Partner portal takes it.</summary>
+    public static Schemas CarrierInvoiceOutcome => CarrierInvoiceOutcomeSchema.Value;
+
+    /// <summary>The Canonical Model's event the Carrier invoice outcome map reads.</summary>
+    public static Schemas CarrierInvoiceApproved => CarrierInvoiceApprovedSchema.Value;
 
     /// <summary>The Canonical Model's Credit note, the document <c>CreditNoteIssued</c> carries.</summary>
     public static Schemas CreditNoteDocument => CreditNoteDocumentSchema.Value;

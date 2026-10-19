@@ -23,7 +23,7 @@ public sealed class SendAgainJourneyTests(ErpUiFixture erp) : BrowserPage(erp)
             var issued = Page.GetByRole(AriaRole.Status).Filter(new() { HasText = "Issued INV-" }).GetByRole(AriaRole.Link);
             invoiceNumber = (await issued.InnerTextAsync()).Trim();
 
-            await Page.GetByRole(AriaRole.Navigation, new() { Name = "Main" }).GetByRole(AriaRole.Link, new() { Name = "Shipper invoices" }).ClickAsync();
+            await OpenViewAsync("Billing", "Shipper invoices");
             var invoice = Page.GetByRole(AriaRole.Row).Filter(new() { HasText = invoiceNumber });
             await Expect(invoice.GetByRole(AriaRole.Button, new() { Name = $"Send {invoiceNumber} again" })).ToHaveCountAsync(0);
 

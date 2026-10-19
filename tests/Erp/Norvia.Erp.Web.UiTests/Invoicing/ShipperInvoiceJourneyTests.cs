@@ -19,7 +19,7 @@ public sealed class ShipperInvoiceJourneyTests(ErpUiFixture erp) : BrowserPage(e
             .GetByRole(AriaRole.Button, new() { Name = $"Invoice now for {BrouwerName}" }).ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Status).Filter(new() { HasText = "Issued INV-" })).ToBeVisibleAsync();
 
-        await Page.GetByRole(AriaRole.Navigation, new() { Name = "Main" }).GetByRole(AriaRole.Link, new() { Name = "Shipper invoices" }).ClickAsync();
+        await OpenViewAsync("Billing", "Shipper invoices");
         await Page.GetByRole(AriaRole.Row).Filter(new() { HasText = BrouwerName }).GetByRole(AriaRole.Link, new() { NameRegex = new(@"^INV-\d{4}-\d{6}$") }).ClickAsync();
 
         var details = Page.GetByLabel("Shipper invoice INV-");

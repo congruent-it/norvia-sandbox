@@ -52,6 +52,24 @@ public sealed class CarrierInvoicesPageTests : ErpWebContext
     }
 
     [Fact]
+    public void Render_ShowsWhenTheCarrierWasTold_OrThatItWasNot_OrADashWhileItIsYetToBeTold()
+    {
+        var approved = Item("VDT-1", Line("Matched"));
+        var told = approved with { Invoice = approved.Invoice with { ToldAt = new DateTimeOffset(2026, 10, 19, 10, 30, 15, TimeSpan.Zero) } };
+        var second = Item("VDT-2", Line("Matched"));
+        var notTold = second with { Invoice = second.Invoice with { NotToldAt = DateTimeOffset.UnixEpoch, NotToldStatusCode = 503, NotToldMessage = "Overloaded" } };
+        Answer<ListCarrierInvoicesQuery, IReadOnlyList<CarrierInvoiceListItem>>([told, notTold, Item("VDT-3", Line("Matched"))]);
+
+        var page = Render<CarrierInvoicesPage>();
+
+        page.WaitForAssertion(() => page.Markup.Should().Contain("VDT-3"));
+        var rows = page.FindAll("tbody tr, [role=row]").Select(row => row.TextContent).ToList();
+        rows.Single(row => row.Contains("VDT-1", StringComparison.Ordinal)).Should().Contain("2026-10-19 12:30:15");
+        rows.Single(row => row.Contains("VDT-2", StringComparison.Ordinal)).Should().Contain("Carrier not told");
+        rows.Single(row => row.Contains("VDT-3", StringComparison.Ordinal)).Should().EndWith("—");
+    }
+
+    [Fact]
     public void Render_WithNone_SaysNoInvoiceWasReceived()
     {
         Answer<ListCarrierInvoicesQuery, IReadOnlyList<CarrierInvoiceListItem>>([]);

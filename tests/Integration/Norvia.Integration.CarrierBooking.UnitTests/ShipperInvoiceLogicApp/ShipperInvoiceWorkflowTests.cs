@@ -325,7 +325,7 @@ public sealed class ShipperInvoiceWorkflowTests
     public void TheShipperInvoiceIdentity_HoldsTheErpReportRole_AndNothingElseOnTheErp()
     {
         var identities = Contracts.Read("Estate/identities.bicep");
-        var grants = identities.Split("\n\n").Where(block => block.Contains("principalId: shipperInvoiceIdentity.properties.principalId", StringComparison.Ordinal)).ToList();
+        var grants = identities.Split("\n\n").Where(block => block.StartsWith("resource ", StringComparison.Ordinal) && block.Contains("principalId: shipperInvoiceIdentity.properties.principalId", StringComparison.Ordinal)).ToList();
 
         grants.Should().ContainSingle();
         grants.Single().Should().Contain("resourceId: erpApiPrincipal.id").And.Contain("appRoleId: shipperInvoicesReportRoleId");

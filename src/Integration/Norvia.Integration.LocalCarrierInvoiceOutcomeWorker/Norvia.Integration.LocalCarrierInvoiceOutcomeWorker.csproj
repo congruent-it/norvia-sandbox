@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+  <!-- Locally, plays the E1 Carrier invoice outcome Logic App (ADR 0033, ADR 0043). azd never deploys it. -->
+  <ItemGroup>
+    <PackageReference Include="Aspire.Azure.Messaging.ServiceBus" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Norvia.ServiceDefaults\Norvia.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\Norvia.Integration.CarrierBooking\Norvia.Integration.CarrierBooking.csproj" />
+    <ProjectReference Include="..\Norvia.Integration.LocalSupport\Norvia.Integration.LocalSupport.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Norvia.Integration.LocalCarrierInvoiceOutcomeWorker.UnitTests" />
+  </ItemGroup>
+</Project>

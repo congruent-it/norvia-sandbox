@@ -1,8 +1,11 @@
 using Mediator;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Norvia.Erp.Api.Tracking;
 using Norvia.Erp.Application;
 using Norvia.Erp.Application.CarrierInvoices.Receive;
+using Norvia.Erp.Application.CarrierInvoices.ReportNotDelivered;
+using Norvia.Erp.Application.CarrierInvoices.ReportTold;
 using Norvia.Erp.Application.IntegrationEvents;
 using Norvia.Erp.Domain.CarrierInvoices;
 
@@ -12,6 +15,11 @@ public static class CarrierInvoiceEndpoints
 {
     /// <summary>The app role only the Carrier invoice Logic App's managed identity holds, so nothing bypasses the integration layer.</summary>
     public const string ReceiveRole = "CarrierInvoices.Receive";
+
+    /// <summary>The app role only the Carrier invoice outcome Logic App's managed identity holds, for its reports on what it told the Carrier.</summary>
+    public const string ReportRole = "CarrierInvoices.Report";
+
+    public const string CorrelationIdHeader = TrackingScopeMiddleware.CorrelationIdHeader;
 
     public static IEndpointRouteBuilder MapCarrierInvoices(this IEndpointRouteBuilder app)
     {
@@ -34,7 +42,82 @@ public static class CarrierInvoiceEndpoints
                 + "CarrierInvoiceWithoutLines, CarrierInvoiceLineWithoutReference, CarrierInvoiceLineAmountNotAboveZero and "
                 + "CarrierInvoiceReferenceRepeated (400).");
 
+        carrierInvoices.MapPost("/{carrierId}/{invoiceNumber}/report-told", ReportToldAsync)
+            .WithName("ReportCarrierInvoiceTold")
+            .RequireAuthorization(policy => policy.RequireRole(ReportRole))
+            .WithMetadata(new TrackedFlow(Flows.CarrierInvoices))
+            .WithSummary("Report that the Carrier's invoice outcome endpoint acknowledged the outcome of an Approved Carrier invoice.")
+            .WithDescription(
+                "Records the time the Carrier was told and publishes nothing. A report for an invoice whose outcome was reported already, or that isn't "
+                + "Approved, is ignored and logged: it answers 200 with ignored true and changes nothing. The X-Correlation-ID is the Carrier invoice's "
+                + "own correlation ID, which CarrierInvoiceApproved carried. CarrierInvoiceNotFound (404, with that code) for an unknown Carrier invoice.");
+
+        carrierInvoices.MapPost("/{carrierId}/{invoiceNumber}/report-not-delivered", ReportNotDeliveredAsync)
+            .WithName("ReportCarrierInvoiceOutcomeNotDelivered")
+            .RequireAuthorization(policy => policy.RequireRole(ReportRole))
+            .WithMetadata(new TrackedFlow(Flows.CarrierInvoices))
+            .WithSummary("Report that the outcome of a Carrier invoice never reached the Carrier, with its technical cause.")
+            .WithDescription(
+                "Flags the invoice Carrier not told with the technical cause and publishes CarrierInvoiceOutcomeNotDelivered, in one transaction. A report "
+                + "for an invoice whose outcome was reported already, or that isn't Approved, is ignored and logged: it answers 200 with ignored true and "
+                + "changes and publishes nothing. The X-Correlation-ID is the Carrier invoice's own correlation ID. CarrierInvoiceNotFound (404, with that "
+                + "code) for an unknown Carrier invoice.");
+
         return app;
+    }
+
+    internal static async Task<Results<Ok<CarrierInvoiceReportResult>, ProblemHttpResult, ValidationProblem>> ReportToldAsync(
+        string carrierId,
+        string invoiceNumber,
+        [FromHeader(Name = CorrelationIdHeader)] string? correlationId,
+        IConflictRetrier retrier,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(correlationId))
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [CorrelationIdHeader] = [$"Reporting a Carrier invoice needs an {CorrelationIdHeader}."],
+            });
+        }
+
+        var result = await retrier.RunAsync(mediator => mediator.Send(new ReportCarrierInvoiceToldCommand(carrierId, invoiceNumber, correlationId), cancellationToken).AsTask());
+        return result.IsSuccess
+            ? TypedResults.Ok(result.Value)
+            : RefusalProblem.Of<CarrierInvoiceRefusalCode, CarrierInvoiceReportResult>(
+                result, "The report can't be recorded.", correlationId, _ => StatusCodes.Status404NotFound);
+    }
+
+    internal static async Task<Results<Ok<CarrierInvoiceReportResult>, ProblemHttpResult, ValidationProblem>> ReportNotDeliveredAsync(
+        string carrierId,
+        string invoiceNumber,
+        [FromHeader(Name = CorrelationIdHeader)] string? correlationId,
+        CarrierInvoiceOutcomeNotDeliveredRequest report,
+        IConflictRetrier retrier,
+        CancellationToken cancellationToken)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (string.IsNullOrWhiteSpace(correlationId))
+        {
+            errors[CorrelationIdHeader] = [$"Reporting a Carrier invoice needs an {CorrelationIdHeader}."];
+        }
+
+        if (string.IsNullOrWhiteSpace(report.Message))
+        {
+            errors[nameof(CarrierInvoiceOutcomeNotDeliveredRequest.Message)] = ["A not-delivered report needs the technical cause's message."];
+        }
+
+        if (errors.Count > 0 || correlationId is null || report.Message is not { } message)
+        {
+            return TypedResults.ValidationProblem(errors);
+        }
+
+        var result = await retrier.RunAsync(
+            mediator => mediator.Send(new ReportCarrierInvoiceOutcomeNotDeliveredCommand(carrierId, invoiceNumber, correlationId, report.StatusCode, message), cancellationToken).AsTask());
+        return result.IsSuccess
+            ? TypedResults.Ok(result.Value)
+            : RefusalProblem.Of<CarrierInvoiceRefusalCode, CarrierInvoiceReportResult>(
+                result, "The report can't be recorded.", correlationId, _ => StatusCodes.Status404NotFound);
     }
 
     internal static async Task<Results<Ok<ReceiveCarrierInvoiceResult>, Created<ReceiveCarrierInvoiceResult>, ProblemHttpResult, ValidationProblem>> ReceiveAsync(
@@ -71,3 +154,8 @@ public static class CarrierInvoiceEndpoints
                 _ => StatusCodes.Status400BadRequest,
             });
 }
+
+/// <summary>The Carrier invoice outcome Logic App's Not delivered report: the Carrier endpoint's status code, if it answered, and the cause.</summary>
+/// <param name="StatusCode">The HTTP status code, or null when the failure had none, such as a timeout.</param>
+/// <param name="Message">The technical cause in plain language.</param>
+public sealed record CarrierInvoiceOutcomeNotDeliveredRequest(int? StatusCode, string? Message);

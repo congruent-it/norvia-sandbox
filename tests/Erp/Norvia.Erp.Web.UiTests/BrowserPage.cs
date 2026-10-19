@@ -72,4 +72,11 @@ public abstract class BrowserPage(ErpUiFixture erp) : IAsyncLifetime
         await Erp.RecordBillableLineAsync(number, shipperId, freight, minimumChargeAdjustment, Ct);
         return number;
     }
+
+    /// <summary>Opens a view: the section in the main navigation, then the view in the strip of that section's views below it.</summary>
+    protected async Task OpenViewAsync(string section, string view)
+    {
+        await Page.GetByRole(AriaRole.Navigation, new() { Name = "Main" }).GetByRole(AriaRole.Link, new() { Name = section, Exact = true }).ClickAsync();
+        await Page.GetByRole(AriaRole.Navigation, new() { Name = section, Exact = true }).GetByRole(AriaRole.Link, new() { Name = view, Exact = true }).ClickAsync();
+    }
 }

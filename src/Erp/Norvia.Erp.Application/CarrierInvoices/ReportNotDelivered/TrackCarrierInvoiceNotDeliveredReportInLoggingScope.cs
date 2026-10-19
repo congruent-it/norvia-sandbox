@@ -1,0 +1,63 @@
+using Ardalis.Result;
+using Mediator;
+using Microsoft.Extensions.Logging;
+using Norvia.Erp.Application.CarrierInvoices.ReportTold;
+using Norvia.Erp.Application.IntegrationEvents;
+
+namespace Norvia.Erp.Application.CarrierInvoices.ReportNotDelivered;
+
+/// <summary>
+/// Traces the Carrier invoice outcome Logic App's Not delivered report on the trail of the Carrier invoice (coding guidelines §7): <c>correlationId</c>,
+/// <c>partyId</c> and <c>documentNumber</c> for the whole call and <c>outcome</c> for its outcome. A report that changes nothing is ignored
+/// and logged as such, still Succeeded; an unknown invoice records Refused with its <c>failureCode</c>. The API's request scope carries <c>flow</c>.
+/// </summary>
+public sealed partial class TrackCarrierInvoiceNotDeliveredReportInLoggingScope(ILogger<TrackCarrierInvoiceNotDeliveredReportInLoggingScope> logger)
+    : IPipelineBehavior<ReportCarrierInvoiceOutcomeNotDeliveredCommand, Result<CarrierInvoiceReportResult>>
+{
+    public async ValueTask<Result<CarrierInvoiceReportResult>> Handle(
+        ReportCarrierInvoiceOutcomeNotDeliveredCommand message,
+        MessageHandlerDelegate<ReportCarrierInvoiceOutcomeNotDeliveredCommand, Result<CarrierInvoiceReportResult>> next,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+        ArgumentNullException.ThrowIfNull(next);
+
+        using var trail = logger.Track(new()
+        {
+            [TrackingKeys.CorrelationId] = message.CorrelationId,
+            [TrackingKeys.PartyId] = message.CarrierId,
+            [TrackingKeys.DocumentNumber] = message.InvoiceNumber,
+        });
+
+        var result = await next(message, cancellationToken);
+        if (result.IsSuccess)
+        {
+            using var succeeded = logger.Track(new() { [TrackingKeys.Outcome] = TrackingKeys.Succeeded });
+            if (result.Value.Ignored)
+            {
+                LogIgnored(logger, message.InvoiceNumber, message.CarrierId);
+            }
+            else
+            {
+                LogNotDelivered(logger, message.InvoiceNumber, message.CarrierId, message.StatusCode, message.Message);
+            }
+        }
+        else
+        {
+            var refusal = result.ValidationErrors.First();
+            using var refused = logger.Track(new() { [TrackingKeys.Outcome] = TrackingKeys.Refused, [TrackingKeys.FailureCode] = refusal.ErrorCode });
+            LogRefused(logger, message.InvoiceNumber, refusal.ErrorMessage);
+        }
+
+        return result;
+    }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Carrier invoice {InvoiceNumber} of Carrier {CarrierId} reported Carrier not told (status {StatusCode}): {Cause}")]
+    private static partial void LogNotDelivered(ILogger logger, string invoiceNumber, string carrierId, int? statusCode, string cause);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "The outcome of Carrier invoice {InvoiceNumber} of Carrier {CarrierId} was reported already, or the invoice isn't Approved; the report is ignored")]
+    private static partial void LogIgnored(ILogger logger, string invoiceNumber, string carrierId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Not delivered report on Carrier invoice {InvoiceNumber} refused: {Reason}")]
+    private static partial void LogRefused(ILogger logger, string invoiceNumber, string reason);
+}

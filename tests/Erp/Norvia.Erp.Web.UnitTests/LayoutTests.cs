@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Http;
 using Norvia.Erp.Application.Operators;
 using Norvia.Erp.Web.Components.Layout;
@@ -10,15 +11,36 @@ namespace Norvia.Erp.Web.UnitTests;
 public sealed class LayoutTests : ErpWebContext
 {
     [Fact]
-    public void Render_ForFinance_ShowsWhoTheyAreTheBillingListsAndTheFourMasterDataLists()
+    public void Render_ForFinance_ShowsWhoTheyAreTheThreeSectionsAndTheViewsOfTheOpenOne()
     {
         var layout = RenderLayout();
 
         layout.Find("nav").TextContent.Should().Contain("Dev Eloper");
-        var links = layout.FindAll("nav a");
-        links.Select(link => link.TextContent.Trim()).Should().Equal("Waiting billable lines", "Shipper invoices", "Open carrier costs", "Carrier invoices to decide", "Carrier invoices", "Shippers", "Carriers", "Rate Cards", "Carrier Rate Cards");
-        links.Select(link => link.GetAttribute("href")).Should().Equal("/billable-lines", "/shipper-invoices", "/carrier-costs", "/carrier-invoices/to-decide", "/carrier-invoices", "/", "/carriers", "/rate-cards", "/carrier-rate-cards");
+        var sections = layout.FindAll("nav[aria-label=Main] a");
+        sections.Select(link => link.TextContent.Trim()).Should().Equal("Billing", "Carrier invoicing", "Master data");
+        sections.Select(link => link.GetAttribute("href")).Should().Equal("/billable-lines", "/carrier-costs", "/");
+        var views = layout.FindAll("nav:not([aria-label=Main]) a");
+        views.Select(link => link.TextContent.Trim()).Should().Equal("Shippers", "Carriers", "Rate Cards", "Carrier Rate Cards"); // the test's address is the Shippers list
         layout.Find("main").TextContent.Should().Contain("the page");
+    }
+
+    [Theory]
+    [InlineData("/", "Master data", "Shippers, Carriers, Rate Cards, Carrier Rate Cards")]
+    [InlineData("/carriers", "Master data", "Shippers, Carriers, Rate Cards, Carrier Rate Cards")]
+    [InlineData("/shipper-invoices/INV-2030-000001", "Billing", "Waiting billable lines, Shipper invoices")]
+    [InlineData("/carrier-costs", "Carrier invoicing", "Open carrier costs, Carrier invoices to decide, Carrier invoices")]
+    [InlineData("/carrier-invoices/to-decide", "Carrier invoicing", "Open carrier costs, Carrier invoices to decide, Carrier invoices")]
+    [InlineData("/carrier-invoices?x=1", "Carrier invoicing", "Open carrier costs, Carrier invoices to decide, Carrier invoices")]
+    [InlineData("/unknown", "Billing", "Waiting billable lines, Shipper invoices")]
+    public void Render_ShowsTheViewsOfTheSectionTheOpenPageIsIn(string path, string section, string views)
+    {
+        Services.GetRequiredService<NavigationManager>().NavigateTo(path);
+
+        var layout = RenderLayout();
+
+        layout.Find("nav:not([aria-label=Main])").GetAttribute("aria-label").Should().Be(section);
+        layout.Find("nav[aria-label=Main] a[aria-current=true]").TextContent.Trim().Should().Be(section);
+        layout.FindAll("nav:not([aria-label=Main]) a").Select(link => link.TextContent.Trim()).Should().Equal(views.Split(", "));
     }
 
     [Fact]

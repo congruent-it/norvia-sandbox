@@ -3,19 +3,29 @@
 @* Fluent UI's own components take Cerulean's sky blue as their accent, and stay light as Cerulean is. *@
 <FluentDesignTheme Mode="DesignThemeModes.Light" CustomColor="#2fa4e7" />
 
-@* Cerulean's navbar: sky blue, with the brand and the main navigation in white. *@
+@* Cerulean's navbar: sky blue, with the brand and the sections in white. The open section's views sit in a darker strip below, so the
+   navigation stays on two short rows however many views a section has. *@
 <header class="bg-primary text-white">
     @* The layout renders statically, so it only shows the open view when the page loads in full: enhanced navigation would leave the previous view highlighted. *@
     <nav aria-label="Main" data-enhance-nav="false" class="mx-auto flex max-w-7xl flex-wrap items-center gap-x-8 gap-y-2 px-4 py-4">
         <span class="text-xl font-bold">Norvia ERP</span>
-        @foreach (var (path, title, match) in Views)
+        @foreach (var section in Sections)
         {
-            <NavLink href="@path" Match="match" class="text-white/75 no-underline hover:text-white" ActiveClass="!text-white">@title</NavLink>
+            <a href="@section.Views[0].Path" class="@(section == _open ? "font-semibold text-white" : "text-white/75") no-underline hover:text-white"
+               aria-current="@(section == _open ? "true" : null)">@section.Title</a>
         }
         @if (_userName is not null)
         {
             <span class="ml-auto">@_userName</span>
         }
+    </nav>
+    <nav aria-label="@_open.Title" data-enhance-nav="false" class="bg-black/10">
+        <div class="mx-auto flex max-w-7xl flex-wrap items-center gap-x-8 gap-y-2 px-4 py-2 text-sm">
+            @foreach (var (path, title, match) in _open.Views)
+            {
+                <NavLink href="@path" Match="match" class="text-white/75 no-underline hover:text-white" ActiveClass="!text-white font-semibold">@title</NavLink>
+            }
+        </div>
     </nav>
 </header>
 
@@ -30,18 +40,36 @@
 </div>
 
 @code {
-    private static readonly (string Path, string Title, NavLinkMatch Match)[] Views =
+    private sealed record View(string Path, string Title, NavLinkMatch Match);
+
+    private sealed record Section(string Title, View[] Views);
+
+    private static readonly Section[] Sections =
     [
-        ("/billable-lines", "Waiting billable lines", NavLinkMatch.Prefix),
-        ("/shipper-invoices", "Shipper invoices", NavLinkMatch.Prefix),
-        ("/carrier-costs", "Open carrier costs", NavLinkMatch.Prefix),
-        ("/carrier-invoices/to-decide", "Carrier invoices to decide", NavLinkMatch.Prefix),
-        ("/carrier-invoices", "Carrier invoices", NavLinkMatch.All),
-        ("/", "Shippers", NavLinkMatch.All),
-        ("/carriers", "Carriers", NavLinkMatch.Prefix),
-        ("/rate-cards", "Rate Cards", NavLinkMatch.Prefix),
-        ("/carrier-rate-cards", "Carrier Rate Cards", NavLinkMatch.Prefix),
+        new("Billing",
+        [
+            new("/billable-lines", "Waiting billable lines", NavLinkMatch.Prefix),
+            new("/shipper-invoices", "Shipper invoices", NavLinkMatch.Prefix),
+        ]),
+        new("Carrier invoicing",
+        [
+            new("/carrier-costs", "Open carrier costs", NavLinkMatch.Prefix),
+            new("/carrier-invoices/to-decide", "Carrier invoices to decide", NavLinkMatch.Prefix),
+            new("/carrier-invoices", "Carrier invoices", NavLinkMatch.All),
+        ]),
+        new("Master data",
+        [
+            new("/", "Shippers", NavLinkMatch.All),
+            new("/carriers", "Carriers", NavLinkMatch.Prefix),
+            new("/rate-cards", "Rate Cards", NavLinkMatch.Prefix),
+            new("/carrier-rate-cards", "Carrier Rate Cards", NavLinkMatch.Prefix),
+        ]),
     ];
+
+    private Section _open = Sections[0];
+
+    [Inject]
+    private NavigationManager Navigation { get; set; } = null!;
 
     private string? _userName;
 
@@ -52,5 +80,14 @@
     {
         var identity = AuthenticationState is null ? null : (await AuthenticationState).User.Identity;
         _userName = identity is { IsAuthenticated: true } ? identity.Name : null;
+
+        // The section whose view is open; a page that is in none, such as an invoice's page under Shipper invoices, falls under its prefix.
+        var path = "/" + Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0].TrimEnd('/');
+        _open = Sections.FirstOrDefault(section => section.Views.Any(view => Matches(view, path))) ?? Sections[0];
     }
+
+    private static bool Matches(View view, string path) =>
+        view.Match == NavLinkMatch.All
+            ? string.Equals(path, view.Path, StringComparison.OrdinalIgnoreCase)
+            : path.StartsWith(view.Path, StringComparison.OrdinalIgnoreCase);
 }

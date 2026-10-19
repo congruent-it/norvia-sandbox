@@ -29,6 +29,9 @@ param billingPrincipalId string
 @description('The E1 Shipper invoice Logic App\'s identity, which receives from its own subscription and from nothing else.')
 param shipperInvoicePrincipalId string
 
+@description('The E2 Carrier invoice outcome Logic App\'s identity, which receives from its own subscription and from nothing else.')
+param carrierInvoiceOutcomePrincipalId string
+
 @description('The Driver app\'s identity, which sends to the Driver app events topic and to nothing else.')
 param driverAppPrincipalId string
 
@@ -441,6 +444,35 @@ resource shipperInvoiceReceivesItsMessages 'Microsoft.Authorization/roleAssignme
   scope: shipperInvoice
   properties: {
     principalId: shipperInvoicePrincipalId
+    roleDefinitionId: serviceBusDataReceiver
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// The E2 Carrier invoice outcome Logic App's subscription: CarrierInvoiceApproved only, as the message's eventType property says. Its filter
+// also routes resubmits from the console, like every subscription's (coding guidelines §7).
+resource carrierInvoiceOutcome 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01' = {
+  parent: invoicingEvents
+  name: 'carrier-invoice-outcome'
+}
+
+resource carrierInvoiceOutcomeFilter 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
+  parent: carrierInvoiceOutcome
+  name: '$Default'
+  properties: {
+    filterType: 'SqlFilter'
+    sqlFilter: {
+      sqlExpression: '(eventType = \'CarrierInvoiceApproved\' AND resubmitTo IS NULL) OR resubmitTo = \'carrier-invoice-outcome\''
+    }
+  }
+}
+
+// Scoped to the subscription, so the Carrier invoice outcome Logic App reads approved Carrier invoices and no other message.
+resource carrierInvoiceOutcomeReceivesItsMessages 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(carrierInvoiceOutcome.id, carrierInvoiceOutcomePrincipalId, serviceBusDataReceiver)
+  scope: carrierInvoiceOutcome
+  properties: {
+    principalId: carrierInvoiceOutcomePrincipalId
     roleDefinitionId: serviceBusDataReceiver
     principalType: 'ServicePrincipal'
   }

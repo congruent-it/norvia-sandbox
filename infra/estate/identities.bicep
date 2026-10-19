@@ -87,6 +87,8 @@ var carrierCostsRecordRole = 'CarrierCosts.Record'
 var carrierCostsRecordRoleId = guid('norvia-erp-api', environmentName, carrierCostsRecordRole)
 var carrierInvoicesReceiveRole = 'CarrierInvoices.Receive'
 var carrierInvoicesReceiveRoleId = guid('norvia-erp-api', environmentName, carrierInvoicesReceiveRole)
+var carrierInvoicesReportRole = 'CarrierInvoices.Report'
+var carrierInvoicesReportRoleId = guid('norvia-erp-api', environmentName, carrierInvoicesReportRole)
 var shipperInvoicesReportRole = 'ShipperInvoices.Report'
 var shipperInvoicesReportRoleId = guid('norvia-erp-api', environmentName, shipperInvoicesReportRole)
 var shipperInvoicesManageRole = 'ShipperInvoices.Manage'
@@ -1131,6 +1133,16 @@ resource erpApi 'Microsoft.Graph/applications@v1.0' = {
       isEnabled: true
     }
     {
+      id: carrierInvoicesReportRoleId
+      value: carrierInvoicesReportRole
+      displayName: 'Report a Carrier invoice outcome'
+      description: 'Report the outcome of a Carrier invoice as told to the Carrier, or not delivered (E2). Only the Carrier invoice outcome Logic App holds it.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
+    {
       id: shipperInvoicesReportRoleId
       value: shipperInvoicesReportRole
       displayName: 'Report a Shipper invoice'
@@ -1222,6 +1234,21 @@ resource carrierInvoiceReceiveRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0'
   principalId: carrierInvoiceIdentity.properties.principalId
 }
 
+// The E2 Carrier invoice outcome Logic App's identity, which it runs as. It is the one principal holding the ERP's Carrier invoice report role, so no
+// Carrier invoice outcome is reported told without passing the integration layer. It reads its subscription and the Carrier endpoints'
+// credentials, and holds nothing else on the ERP or the TMS.
+resource carrierInvoiceOutcomeIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
+  name: 'id-carrier-invoice-outcome-${uniqueString(resourceGroup().id)}'
+  location: location
+  tags: tags
+}
+
+resource carrierInvoiceReportRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: erpApiPrincipal.id
+  appRoleId: carrierInvoicesReportRoleId
+  principalId: carrierInvoiceOutcomeIdentity.properties.principalId
+}
+
 output entraIssuer string = '${environment().authentication.loginEndpoint}${tenant().tenantId}/v2.0'
 output entraTenantId string = tenant().tenantId
 output tmsApiClientId string = tmsApi.appId
@@ -1291,8 +1318,11 @@ output driverClientIds array = [for (driver, i) in drivers: '${driver.id}=${driv
 output erpIdentityName string = erpIdentity.name
 output erpRegistrationClientId string = erp.appId
 output erpApiClientId string = erpApi.appId
-output shipperInvoiceIdentityName string = shipperInvoiceIdentity.name
-output shipperInvoicePrincipalId string = shipperInvoiceIdentity.properties.principalId
+// Bicep allows 64 outputs, so the Shipper invoice Logic App's identity is one object.
+output shipperInvoice object = {
+  identityName: shipperInvoiceIdentity.name
+  principalId: shipperInvoiceIdentity.properties.principalId
+}
 output billingIdentityName string = billingIdentity.name
 output billingPrincipalId string = billingIdentity.properties.principalId
 output carrierCostIdentityName string = carrierCostIdentity.name
@@ -1300,4 +1330,9 @@ output carrierInvoice object = {
   identityName: carrierInvoiceIdentity.name
   triggerClientId: carrierInvoiceTrigger.appId
   triggerAudience: carrierInvoiceTrigger.identifierUris[0]
+}
+// Bicep allows 64 outputs, so the Carrier invoice outcome Logic App's identity is one object.
+output carrierInvoiceOutcome object = {
+  identityName: carrierInvoiceOutcomeIdentity.name
+  principalId: carrierInvoiceOutcomeIdentity.properties.principalId
 }
