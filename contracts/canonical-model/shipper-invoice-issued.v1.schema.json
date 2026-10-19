@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/shipper-invoice-issued.v1.schema.json",
+  "title": "ShipperInvoiceIssued",
+  "description": "The ERP issued a Shipper invoice over a Shipper's Waiting Billable lines (Canonical Model event, version 1). Published on the Invoicing events topic through the ERP's transactional outbox, in the transaction that issued the invoice, under a new correlation ID created for the invoice. It carries the whole invoice with its lines, totals and Shipper, so its consumers need nothing more.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "eventType",
+    "eventVersion",
+    "occurredAt",
+    "correlationId",
+    "invoice"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "eventType": {
+      "const": "ShipperInvoiceIssued"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "occurredAt": {
+      "description": "When the invoice was issued.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "correlationId": {
+      "description": "The correlation ID the ERP created for the invoice; the same as the invoice's.",
+      "type": "string",
+      "minLength": 1
+    },
+    "invoice": {
+      "$ref": "shipper-invoice.v1.schema.json"
+    }
+  }
+}

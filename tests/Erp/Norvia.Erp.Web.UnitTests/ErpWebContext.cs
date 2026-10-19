@@ -1,8 +1,13 @@
+using Ardalis.Result;
 using Bunit.TestDoubles;
 using Mediator;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.FluentUI.AspNetCore.Components;
+using Norvia.Erp.Application;
 using Norvia.Erp.Application.Operators;
+using Norvia.Erp.Application.ShipperInvoices.Issue;
+using Norvia.Erp.Web.ShipperInvoices;
 
 namespace Norvia.Erp.Web.UnitTests;
 
@@ -14,12 +19,29 @@ public abstract class ErpWebContext : BunitContext
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddFluentUIComponents();
         Services.AddSingleton(Mediator);
+        Services.AddSingleton(Retrier);
+        Services.AddSingleton(new ErpActivities(HostEnvironment));
+        Services.AddScoped<InvoiceNowAction>();
         User = AddAuthorization();
         User.SetAuthorized("Dev Eloper").SetRoles(ErpRoles.Finance);
         User.SetPolicies(ErpRoles.Finance);
+        Retrier.RunAsync(Arg.Any<Func<IMediator, Task<Result<IssueShipperInvoiceResult>>>>())
+            .Returns(call => call.Arg<Func<IMediator, Task<Result<IssueShipperInvoiceResult>>>>()(Mediator));
+    }
+
+    private static IHostEnvironment HostEnvironmentWithName()
+    {
+        var environment = Substitute.For<IHostEnvironment>();
+        environment.ApplicationName.Returns("Norvia.Erp.Web");
+        return environment;
     }
 
     protected BunitAuthorizationContext User { get; }
+
+    /// <summary>Runs what it is given on the substituted mediator, as the real one does once and without a conflict.</summary>
+    protected IConflictRetrier Retrier { get; } = Substitute.For<IConflictRetrier>();
+
+    private static IHostEnvironment HostEnvironment { get; } = HostEnvironmentWithName();
 
     protected IMediator Mediator { get; } = Substitute.For<IMediator>();
 

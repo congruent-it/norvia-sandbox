@@ -25,6 +25,9 @@
         <PropertyColumn Title="ID" Property="@(row => row.ShipperId)" />
         <PropertyColumn Title="Waiting lines" Property="@(row => row.LineCount)" />
         <PropertyColumn Title="Total without VAT" Property="@(row => Money.Format(row.Total))" />
+        <TemplateColumn Title="Action">
+            <InvoiceNowButton ShipperId="@context.ShipperId" ShipperName="@context.ShipperName" />
+        </TemplateColumn>
     </FluentDataGrid>
 </LiveListStates>
 

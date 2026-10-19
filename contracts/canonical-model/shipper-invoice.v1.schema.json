@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/shipper-invoice.v1.schema.json",
+  "title": "ShipperInvoice",
+  "description": "A Shipper invoice (Canonical Model document, version 1): the ERP's invoice to one Shipper over its Billable lines, one line per Transport Order, issued by an Invoice run. Final once issued; corrections are Credit notes. The ERP, which owns Shipper invoices, shows it and publishes it in ShipperInvoiceIssued.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "invoiceNumber",
+    "invoiceDate",
+    "shipper",
+    "lines",
+    "currency",
+    "totalWithoutVat",
+    "vat",
+    "totalWithVat",
+    "issuedAt",
+    "correlationId",
+    "status"
+  ],
+  "properties": {
+    "invoiceNumber": {
+      "description": "INV-<year>-<6 digits>, from a gapless sequence per calendar year, taken only in the transaction that issues the invoice.",
+      "type": "string",
+      "pattern": "^INV-[0-9]{4}-[0-9]{6}$"
+    },
+    "invoiceDate": {
+      "description": "The date of the Invoice run, Europe/Amsterdam.",
+      "type": "string",
+      "format": "date"
+    },
+    "shipper": {
+      "description": "The Shipper invoiced, from the ERP's seed-loaded Shipper data.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "shipperId",
+        "name"
+      ],
+      "properties": {
+        "shipperId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "lines": {
+      "description": "One per Transport Order.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "transportOrderNumber",
+          "shipperReference",
+          "shipmentNumber",
+          "deliveryDate",
+          "chargeLines",
+          "total"
+        ],
+        "properties": {
+          "transportOrderNumber": {
+            "type": "string",
+            "pattern": "^TO-[0-9]{7}$"
+          },
+          "shipperReference": {
+            "description": "The Shipper's own reference for the Transport Order.",
+            "type": "string",
+            "minLength": 1
+          },
+          "shipmentNumber": {
+            "description": "Kept on the line for Finance. It isn't sent to the Shipper (ADR 0011).",
+            "type": "string",
+            "pattern": "^SH-[0-9]{7}$"
+          },
+          "deliveryDate": {
+            "description": "The day the Shipment was Delivered, where it happened.",
+            "type": "string",
+            "format": "date"
+          },
+          "chargeLines": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "type",
+                "amount"
+              ],
+              "properties": {
+                "type": {
+                  "enum": [
+                    "Freight",
+                    "MinimumChargeAdjustment"
+                  ]
+                },
+                "amount": {
+                  "type": "number",
+                  "minimum": 0,
+                  "multipleOf": 0.01
+                }
+              }
+            }
+          },
+          "total": {
+            "description": "The sum of the charge lines, without VAT.",
+            "type": "number",
+            "minimum": 0,
+            "multipleOf": 0.01
+          }
+        }
+      }
+    },
+    "currency": {
+      "const": "EUR"
+    },
+    "totalWithoutVat": {
+      "description": "The sum of the line totals.",
+      "type": "number",
+      "minimum": 0,
+      "multipleOf": 0.01
+    },
+    "vat": {
+      "description": "21% of the total without VAT, rounded to cents, half away from zero.",
+      "type": "number",
+      "minimum": 0,
+      "multipleOf": 0.01
+    },
+    "totalWithVat": {
+      "description": "The total without VAT and the VAT added up.",
+      "type": "number",
+      "minimum": 0,
+      "multipleOf": 0.01
+    },
+    "issuedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "correlationId": {
+      "description": "The correlation ID the ERP created for this invoice.",
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "description": "Issued, final. Sent and Not delivered follow with the Shipper invoice Logic App's reports.",
+      "enum": [
+        "Issued"
+      ]
+    }
+  }
+}

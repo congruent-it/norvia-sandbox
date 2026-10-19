@@ -27,6 +27,7 @@ public sealed class AppHostModelTests
     [InlineData("transport-order-events")]
     [InlineData("shipment-events")]
     [InlineData("trip-events")]
+    [InlineData("invoicing-events")]
     public async Task Locally_AnEventsTopic_HasAMonitoringSubscription(string topicName)
     {
         await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(TestContext.Current.CancellationToken);

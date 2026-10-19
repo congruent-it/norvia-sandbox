@@ -31,7 +31,8 @@ public sealed class WaitingLinesPagesTests : ErpWebContext
         "intake-1",
         "billing-1",
         new DateTimeOffset(2026, 10, 18, 11, 0, 0, TimeSpan.Zero),
-        "Waiting");
+        "Waiting",
+        null);
 
     [Fact]
     public void RenderWaiting_ShowsEachShippersCountAndTotal_LinkingToItsLines()

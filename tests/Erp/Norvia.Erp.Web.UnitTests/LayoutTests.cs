@@ -10,14 +10,14 @@ namespace Norvia.Erp.Web.UnitTests;
 public sealed class LayoutTests : ErpWebContext
 {
     [Fact]
-    public void Render_ForFinance_ShowsWhoTheyAreTheWaitingLinesAndTheFourMasterDataLists()
+    public void Render_ForFinance_ShowsWhoTheyAreTheBillingListsAndTheFourMasterDataLists()
     {
         var layout = RenderLayout();
 
         layout.Find("nav").TextContent.Should().Contain("Dev Eloper");
         var links = layout.FindAll("nav a");
-        links.Select(link => link.TextContent.Trim()).Should().Equal("Waiting billable lines", "Shippers", "Carriers", "Rate Cards", "Carrier Rate Cards");
-        links.Select(link => link.GetAttribute("href")).Should().Equal("/billable-lines", "/", "/carriers", "/rate-cards", "/carrier-rate-cards");
+        links.Select(link => link.TextContent.Trim()).Should().Equal("Waiting billable lines", "Shipper invoices", "Shippers", "Carriers", "Rate Cards", "Carrier Rate Cards");
+        links.Select(link => link.GetAttribute("href")).Should().Equal("/billable-lines", "/shipper-invoices", "/", "/carriers", "/rate-cards", "/carrier-rate-cards");
         layout.Find("main").TextContent.Should().Contain("the page");
     }
 

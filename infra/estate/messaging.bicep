@@ -349,6 +349,29 @@ resource driverAppPeeksItsEvents 'Microsoft.Authorization/roleAssignments@2022-0
   }
 }
 
+// The topic for the ERP's invoicing events (E1). The ERP publishes through its outbox; its identity is Aspire's and gets the sender role on the topic
+// (WithRoleAssignments). Monitoring is the first consumer, then the Shipper invoice Logic App with a subscription of its own.
+resource invoicingEvents 'Microsoft.ServiceBus/namespaces/topics@2024-01-01' = {
+  parent: serviceBus
+  name: 'invoicing-events'
+}
+
+resource invoicingMonitoring 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01' = {
+  parent: invoicingEvents
+  name: 'monitoring'
+}
+
+resource invoicingMonitoringFilter 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
+  parent: invoicingMonitoring
+  name: '$Default'
+  properties: {
+    filterType: 'SqlFilter'
+    sqlFilter: {
+      sqlExpression: 'resubmitTo IS NULL OR resubmitTo = \'monitoring\''
+    }
+  }
+}
+
 // The queue API Management puts a Carrier's tracking message on and the Carrier-tracking Logic App reads (ADR 0008). A message
 // the TMS refuses is dead-lettered by the Logic App with the failure code; one that can't be recorded is delivered again, and
 // after the maximum delivery count Service Bus dead-letters it itself. The AppHost's emulator queue has the same count.

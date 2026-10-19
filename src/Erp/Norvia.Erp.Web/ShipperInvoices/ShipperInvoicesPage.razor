@@ -1,0 +1,51 @@
+@page "/shipper-invoices"
+@attribute [Authorize(Policy = FinanceSignIn.FinancePolicy)]
+@rendermode InteractiveServer
+@using Mediator
+@using Microsoft.Extensions.Options
+@using Norvia.Erp.Application.ShipperInvoices
+@using Norvia.Erp.Application.ShipperInvoices.List
+@using Norvia.Erp.Web.Live
+@implements IAsyncDisposable
+@inject IServiceScopeFactory Scopes
+@inject TimeProvider Time
+@inject IOptions<LiveListOptions> Options
+@inject ILogger<LiveList<ShipperInvoiceView>> Logger
+
+<PageTitle>Shipper invoices · Norvia ERP</PageTitle>
+
+<h1>Shipper invoices</h1>
+<p>The invoices the ERP issued, the newest first. An invoice appears here as soon as an Invoice run issues it.</p>
+
+<LiveListStates Items="_list.Items" LastReadFailed="_list.LastReadFailed" Name="Shipper invoices"
+                Empty="No Shipper invoice has been issued yet. Choose Invoice now for a Shipper with Waiting billable lines." Context="invoices">
+    <FluentDataGrid Class="cerulean-table" Items="invoices.AsQueryable()" TGridItem="ShipperInvoiceView" aria-label="Shipper invoices">
+        <TemplateColumn Title="Invoice number">
+            <a href="/shipper-invoices/@context.InvoiceNumber">@context.InvoiceNumber</a>
+        </TemplateColumn>
+        <PropertyColumn Title="Shipper" Property="@(row => row.Shipper.Name)" />
+        <PropertyColumn Title="Date" Property="@(row => row.InvoiceDate.ToString("yyyy-MM-dd"))" />
+        <PropertyColumn Title="Total without VAT" Property="@(row => Money.Format(row.TotalWithoutVat))" />
+        <PropertyColumn Title="VAT" Property="@(row => Money.Format(row.Vat))" />
+        <PropertyColumn Title="Total with VAT" Property="@(row => Money.Format(row.TotalWithVat))" />
+    </FluentDataGrid>
+</LiveListStates>
+
+@code {
+    private LiveList<ShipperInvoiceView> _list = null!;
+
+    protected override void OnInitialized()
+    {
+        _list = new LiveList<ShipperInvoiceView>(ReadAsync, "the Shipper invoices", Time, Options.Value.RefreshInterval, Logger);
+        _list.Changed += () => InvokeAsync(StateHasChanged);
+        _list.Start();
+    }
+
+    private async Task<IReadOnlyList<ShipperInvoiceView>> ReadAsync(CancellationToken cancellationToken)
+    {
+        await using var scope = Scopes.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<IMediator>().Send(new ListShipperInvoicesQuery(), cancellationToken);
+    }
+
+    public ValueTask DisposeAsync() => _list.DisposeAsync();
+}

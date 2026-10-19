@@ -343,12 +343,18 @@ _Avoid_: invoice line (that is a line on a Shipper invoice)
 **Waiting**:
 The status of a Billable line no Invoice run has invoiced yet.
 
+**Invoiced**:
+The status of a Billable line an Invoice run put on a Shipper invoice. The line holds that invoice's number and is never invoiced again.
+
 **Invoice run**:
 The ERP turning each Shipper's Billable Transport Orders that aren't yet invoiced into one Shipper invoice per Shipper.
 _Avoid_: billing run
 
+**Invoice now**:
+Finance's action in the ERP UI that runs an Invoice run for one Shipper over all its Waiting lines, so a demo doesn't wait for the monthly run.
+
 **Shipper invoice**:
-The ERP's document that charges a Shipper, with one line per Transport Order. The ERP owns it.
+The ERP's document that charges a Shipper, with one line per Transport Order. The ERP owns it. Its number is `INV-<year>-<6 digits>`, from a gapless sequence per calendar year.
 _Avoid_: bill, statement, invoice (on its own, when a Carrier invoice could be meant)
 
 **Credit note**:
