@@ -190,4 +190,127 @@ public sealed class ShipperInvoiceTests
         invoice.TotalWithVat.Should().Be(121m);
         invoice.IssuedAt.Should().Be(RunAt);
     }
+
+    private static ShipperInvoice Issued() => ShipperInvoice.Issue(Number, Shipper, [Line("TO-0000001", 100m)], RunAt, "corr-1");
+
+    [Fact]
+    public void ReportNotDelivered_AnIssuedInvoice_IsNotDeliveredWithTheCause()
+    {
+        var invoice = Issued();
+
+        var reported = invoice.ReportNotDelivered(503, "Overloaded", RunAt.AddMinutes(2));
+
+        reported.Should().BeTrue();
+        invoice.Status.Should().Be(ShipperInvoiceStatus.NotDelivered);
+        invoice.NotDeliveredAt.Should().Be(RunAt.AddMinutes(2));
+        invoice.NotDeliveredStatusCode.Should().Be(503);
+        invoice.NotDeliveredMessage.Should().Be("Overloaded");
+        invoice.SentAt.Should().BeNull();
+    }
+
+    [Fact]
+    public void ReportNotDelivered_ALongCause_IsCutTo500Characters()
+    {
+        var invoice = Issued();
+
+        invoice.ReportNotDelivered(null, new string('x', 900), RunAt);
+
+        invoice.NotDeliveredMessage.Should().HaveLength(ShipperInvoice.MaxCauseLength);
+        invoice.NotDeliveredStatusCode.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void ReportNotDelivered_WithoutACause_Throws(string message)
+    {
+        var report = () => Issued().ReportNotDelivered(500, message, RunAt);
+
+        report.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void ReportNotDelivered_AnInvoiceSentAlready_IsIgnored()
+    {
+        var invoice = Issued();
+        invoice.ReportSent(RunAt.AddMinutes(1));
+
+        var reported = invoice.ReportNotDelivered(500, "late", RunAt.AddMinutes(2));
+
+        reported.Should().BeFalse();
+        invoice.Status.Should().Be(ShipperInvoiceStatus.Sent);
+        invoice.NotDeliveredAt.Should().BeNull();
+    }
+
+    [Fact]
+    public void ReportNotDelivered_AnInvoiceNotDeliveredAlready_KeepsTheFirstCause()
+    {
+        var invoice = Issued();
+        invoice.ReportNotDelivered(500, "first", RunAt.AddMinutes(1));
+
+        var again = invoice.ReportNotDelivered(503, "second", RunAt.AddMinutes(2));
+
+        again.Should().BeFalse();
+        invoice.NotDeliveredMessage.Should().Be("first");
+    }
+
+    [Fact]
+    public void ReportSent_AnInvoiceNotDelivered_IsIgnored()
+    {
+        var invoice = Issued();
+        invoice.ReportNotDelivered(500, "cause", RunAt.AddMinutes(1));
+
+        var reported = invoice.ReportSent(RunAt.AddMinutes(2));
+
+        reported.Should().BeFalse();
+        invoice.Status.Should().Be(ShipperInvoiceStatus.NotDelivered);
+        invoice.SentAt.Should().BeNull();
+    }
+
+    [Fact]
+    public void SendAgain_ANotDeliveredInvoice_IsIssuedOnceMore_AndUnchanged()
+    {
+        var invoice = Issued();
+        invoice.ReportNotDelivered(500, "cause", RunAt.AddMinutes(1));
+
+        var sentAgain = invoice.SendAgain();
+
+        sentAgain.Should().BeTrue();
+        invoice.Status.Should().Be(ShipperInvoiceStatus.Issued);
+        invoice.NotDeliveredAt.Should().BeNull();
+        invoice.NotDeliveredStatusCode.Should().BeNull();
+        invoice.NotDeliveredMessage.Should().BeNull();
+        invoice.Id.Should().Be(Number);
+        invoice.TotalWithVat.Should().Be(121m);
+        invoice.CorrelationId.Should().Be("corr-1");
+    }
+
+    [Fact]
+    public void SendAgain_ThenReported_IsSentOrNotDeliveredLikeTheFirstTime()
+    {
+        var invoice = Issued();
+        invoice.ReportNotDelivered(500, "cause", RunAt.AddMinutes(1));
+        invoice.SendAgain();
+
+        invoice.ReportSent(RunAt.AddMinutes(5)).Should().BeTrue();
+
+        invoice.Status.Should().Be(ShipperInvoiceStatus.Sent);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SendAgain_AnInvoiceThatIsNotNotDelivered_ChangesNothing(bool sent)
+    {
+        var invoice = Issued();
+        if (sent)
+        {
+            invoice.ReportSent(RunAt.AddMinutes(1));
+        }
+
+        var sentAgain = invoice.SendAgain();
+
+        sentAgain.Should().BeFalse();
+        invoice.Status.Should().Be(sent ? ShipperInvoiceStatus.Sent : ShipperInvoiceStatus.Issued);
+    }
 }

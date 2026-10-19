@@ -6,6 +6,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.FluentUI.AspNetCore.Components;
 using Norvia.Erp.Application;
 using Norvia.Erp.Application.Operators;
+using Norvia.Erp.Application.ShipperInvoices;
 using Norvia.Erp.Application.ShipperInvoices.Issue;
 using Norvia.Erp.Web.ShipperInvoices;
 
@@ -22,11 +23,14 @@ public abstract class ErpWebContext : BunitContext
         Services.AddSingleton(Retrier);
         Services.AddSingleton(new ErpActivities(HostEnvironment));
         Services.AddScoped<InvoiceNowAction>();
+        Services.AddScoped<SendAgainAction>();
         User = AddAuthorization();
         User.SetAuthorized("Dev Eloper").SetRoles(ErpRoles.Finance);
         User.SetPolicies(ErpRoles.Finance);
         Retrier.RunAsync(Arg.Any<Func<IMediator, Task<Result<IssueShipperInvoiceResult>>>>())
             .Returns(call => call.Arg<Func<IMediator, Task<Result<IssueShipperInvoiceResult>>>>()(Mediator));
+        Retrier.RunAsync(Arg.Any<Func<IMediator, Task<Result<ShipperInvoiceView>>>>())
+            .Returns(call => call.Arg<Func<IMediator, Task<Result<ShipperInvoiceView>>>>()(Mediator));
     }
 
     private static IHostEnvironment HostEnvironmentWithName()

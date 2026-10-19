@@ -190,6 +190,21 @@ namespace Norvia.Erp.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<DateTimeOffset?>("NotDeliveredAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("NotDeliveredMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int?>("NotDeliveredStatusCode")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<DateTimeOffset?>("SentAt")
                         .HasColumnType("datetimeoffset");
 

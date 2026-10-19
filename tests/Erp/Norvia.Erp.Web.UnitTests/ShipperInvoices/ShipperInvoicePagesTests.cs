@@ -48,6 +48,22 @@ public sealed class ShipperInvoicePagesTests : ErpWebContext
     }
 
     [Fact]
+    public void RenderList_AnInvoiceNotDelivered_ShowsTheFlag_AndOffersSendAgainForThatInvoiceOnly()
+    {
+        Answer<ListShipperInvoicesQuery, IReadOnlyList<ShipperInvoiceView>>(
+            [
+                ShipperInvoicesTestData.Invoice(2, notDelivered: new NotDeliveredView(new DateTimeOffset(2026, 10, 19, 8, 0, 5, TimeSpan.Zero), 503, "Overloaded")),
+                ShipperInvoicesTestData.Invoice(1),
+            ]);
+
+        var page = Render<ShipperInvoicesPage>();
+
+        page.WaitForAssertion(() => page.Markup.Should().Contain("INV-2026-000002"));
+        page.FindAll("td").Select(cell => cell.TextContent.Trim()).Should().ContainInOrder("INV-2026-000002", "Not delivered", "Not delivered");
+        page.FindAll("fluent-button").Should().ContainSingle().Which.GetAttribute("aria-label").Should().Be("Send INV-2026-000002 again");
+    }
+
+    [Fact]
     public void RenderList_WithNoInvoices_SaysNoneWasIssued()
     {
         Answer<ListShipperInvoicesQuery, IReadOnlyList<ShipperInvoiceView>>([]);
@@ -92,6 +108,30 @@ public sealed class ShipperInvoicePagesTests : ErpWebContext
             .And.Contain("€ 200.00").And.Contain("€ 42.00").And.Contain("€ 242.00");
         page.Markup.Should().Contain("TO-0000001 · € 100.00").And.Contain("TO-0000002 · € 100.00");
         page.Markup.Should().Contain("PO-1").And.Contain("SH-0000001").And.Contain("2026-10-17").And.Contain("MinimumChargeAdjustment").And.Contain("€ 95.00");
+    }
+
+    [Fact]
+    public void RenderInvoice_ANotDeliveredInvoice_ShowsTheCause_AndOffersSendAgain()
+    {
+        Answer<OpenShipperInvoiceQuery, ShipperInvoiceView?>(
+            ShipperInvoicesTestData.Invoice(3, notDelivered: new NotDeliveredView(new DateTimeOffset(2026, 10, 19, 8, 0, 5, TimeSpan.Zero), 503, "Overloaded")));
+
+        var page = Render<ShipperInvoicePage>(parameters => parameters.Add(p => p.InvoiceNumber, "INV-2026-000003"));
+
+        page.WaitForAssertion(() => page.Markup.Should().Contain("Shipper invoice INV-2026-000003"));
+        page.Markup.Should().Contain("Not delivered").And.Contain("2026-10-19 10:00:05").And.Contain("status 503: Overloaded");
+        page.Find("fluent-button").GetAttribute("aria-label").Should().Be("Send INV-2026-000003 again");
+    }
+
+    [Fact]
+    public void RenderInvoice_AnInvoiceThatIsNotNotDelivered_OffersNoSendAgain()
+    {
+        Answer<OpenShipperInvoiceQuery, ShipperInvoiceView?>(ShipperInvoicesTestData.Invoice(3));
+
+        var page = Render<ShipperInvoicePage>(parameters => parameters.Add(p => p.InvoiceNumber, "INV-2026-000003"));
+
+        page.WaitForAssertion(() => page.Markup.Should().Contain("Shipper invoice INV-2026-000003"));
+        page.FindAll("fluent-button").Should().BeEmpty();
     }
 
     [Fact]

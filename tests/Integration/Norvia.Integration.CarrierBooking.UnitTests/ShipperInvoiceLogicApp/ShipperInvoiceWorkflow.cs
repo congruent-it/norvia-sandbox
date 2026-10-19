@@ -10,7 +10,9 @@ internal static class ShipperInvoiceWorkflow
     public const string MapAction = "Map_the_invoice";
     public const string Credential = "Get_the_Shipper_endpoint_credential";
     public const string Send = "Send_to_the_Shipper";
+    public const string Report = "Report_the_outcome_to_the_ERP";
     public const string ReportSent = "Report_the_invoice_sent";
+    public const string ReportNotDelivered = "Report_the_invoice_not_delivered";
 
     private static readonly Lazy<JsonObject> Parsed = new(() => Read("ShipperInvoiceLogicApp/shipper-invoice/workflow.json"));
 

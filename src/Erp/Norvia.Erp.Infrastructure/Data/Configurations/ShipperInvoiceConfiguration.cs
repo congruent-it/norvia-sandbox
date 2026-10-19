@@ -24,6 +24,11 @@ internal sealed class ShipperInvoiceConfiguration : IEntityTypeConfiguration<Shi
         builder.Property(invoice => invoice.CorrelationId).HasMaxLength(128).IsRequired();
         builder.Property(invoice => invoice.Status).HasConversion<string>().HasMaxLength(20);
         builder.Property(invoice => invoice.SentAt);
+        builder.Property(invoice => invoice.NotDeliveredAt);
+        builder.Property(invoice => invoice.NotDeliveredStatusCode);
+        builder.Property(invoice => invoice.NotDeliveredMessage).HasMaxLength(ShipperInvoice.MaxCauseLength);
+        // Two reports, or a report and Send again, at once conflict instead of both winning; the loser is run again and finds the new status.
+        builder.Property<byte[]>("RowVersion").IsRowVersion();
         // Newest first.
         builder.HasIndex(invoice => invoice.IssuedAt);
     }

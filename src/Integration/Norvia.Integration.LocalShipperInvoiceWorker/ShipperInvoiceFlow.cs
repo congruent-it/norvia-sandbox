@@ -9,19 +9,13 @@ namespace Norvia.Integration.LocalShipperInvoiceWorker;
 /// <summary>How the flow's run ended: <see cref="Done"/>, or the way it failed, as the workflow's run would fail.</summary>
 internal enum ShipperInvoiceFlowOutcome
 {
-    /// <summary>The invoice was sent and reported Sent.</summary>
+    /// <summary>The invoice was sent and reported Sent, or the Shipper didn't acknowledge it and it was reported Not delivered.</summary>
     Done,
 
     /// <summary>The message isn't a <c>ShipperInvoiceIssued</c> the Shipper can be sent, so nothing was sent.</summary>
     Unreadable,
 
-    /// <summary>The Shipper's endpoint didn't answer, or answered a server error, after the retries. Failure handling is the next slice.</summary>
-    ShipperUnavailable,
-
-    /// <summary>The Shipper's endpoint refused the invoice, which sending it again won't change. Failure handling is the next slice.</summary>
-    ShipperRefused,
-
-    /// <summary>The ERP didn't answer the report.</summary>
+    /// <summary>The ERP didn't answer the report. The invoice stays Issued without a sent time.</summary>
     ErpUnavailable,
 
     /// <summary>The ERP refused the report, which sending it again won't change.</summary>
@@ -30,8 +24,9 @@ internal enum ShipperInvoiceFlowOutcome
 
 /// <summary>
 /// The E1 Shipper invoice Logic App's steps, played locally (ADR 0033, ADR 0043): map the invoice, send it to the Shipper's invoice
-/// endpoint under the bounded exponential retry policy, and report it Sent to the ERP under the invoice's correlation ID. The happy
-/// path only: when the Shipper doesn't acknowledge the invoice, the run fails and the invoice stays Issued.
+/// endpoint under the bounded exponential retry policy, and report the outcome to the ERP under the invoice's correlation ID: Sent when
+/// the Shipper acknowledged it, Not delivered with the technical cause when the retries are used up or the Shipper refused it. When the ERP
+/// can't be reached the run fails and the invoice stays Issued without a sent time.
 /// </summary>
 internal sealed partial class ShipperInvoiceFlow(
     ShipperEndpoint shipper,
@@ -56,17 +51,28 @@ internal sealed partial class ShipperInvoiceFlow(
         if (!answer.Succeeded)
         {
             var failure = answer.IsRetryable ? "ShipperUnavailable" : "ShipperRefused";
-            using var failed = logger.BeginScope(TrackingKeys.OutcomeOf(TrackingKeys.Failed, failure));
-            LogNotAcknowledged(answer.StatusCode);
-            return answer.IsRetryable ? ShipperInvoiceFlowOutcome.ShipperUnavailable : ShipperInvoiceFlowOutcome.ShipperRefused;
+            using (logger.BeginScope(TrackingKeys.OutcomeOf(TrackingKeys.Failed, failure)))
+            {
+                LogNotAcknowledged(answer.StatusCode);
+            }
+
+            return await ReportAsync(
+                token => erp.ReportNotDeliveredAsync(request.DocumentNumber, request.CorrelationId, answer.StatusCode, answer.Message, token),
+                "Not delivered",
+                cancellationToken);
         }
 
-        var status = await erp.ReportSentAsync(request.DocumentNumber, request.CorrelationId, cancellationToken);
+        return await ReportAsync(token => erp.ReportSentAsync(request.DocumentNumber, request.CorrelationId, token), "Sent", cancellationToken);
+    }
+
+    private async Task<ShipperInvoiceFlowOutcome> ReportAsync(Func<CancellationToken, Task<int>> report, string what, CancellationToken cancellationToken)
+    {
+        var status = await report(cancellationToken);
         using var reported = logger.BeginScope(
             status is >= 200 and < 300
                 ? TrackingKeys.OutcomeOf(TrackingKeys.Succeeded)
                 : TrackingKeys.OutcomeOf(TrackingKeys.Failed, status is 0 or 408 or 429 or >= 500 ? "ErpUnavailable" : "ErpCallRefused"));
-        LogReported(status);
+        LogReported(what, status);
         return status switch
         {
             >= 200 and < 300 => ShipperInvoiceFlowOutcome.Done,
@@ -129,11 +135,11 @@ internal sealed partial class ShipperInvoiceFlow(
     [LoggerMessage(Level = LogLevel.Warning, Message = "The Shipper's endpoint answered {StatusCode}; retry {Attempt} of {Count} in {Wait}")]
     private partial void LogRetrying(int statusCode, int attempt, int count, TimeSpan wait);
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "The Shipper's endpoint didn't acknowledge the invoice (status {StatusCode}); it stays Issued")]
+    [LoggerMessage(Level = LogLevel.Error, Message = "The Shipper's endpoint didn't acknowledge the invoice (status {StatusCode}); reporting it Not delivered")]
     private partial void LogNotAcknowledged(int statusCode);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Reported the invoice Sent to the ERP, which answered {StatusCode}")]
-    private partial void LogReported(int statusCode);
+    [LoggerMessage(Level = LogLevel.Information, Message = "Reported the invoice {Report} to the ERP, which answered {StatusCode}")]
+    private partial void LogReported(string report, int statusCode);
 
     /// <summary>What a request names, and the tracking contract's keys it gives the trail.</summary>
     private sealed record Request(string CorrelationId, string DocumentNumber, string ShipperId, string? EventId)

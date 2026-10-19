@@ -66,29 +66,36 @@ public class ShipperInvoiceFlowTests
     }
 
     [Fact]
-    public async Task RunAsync_ServerErrorsEveryTime_StopsAfterTheBound_ReportsNothingAndFails()
+    public async Task RunAsync_ServerErrorsEveryTime_StopsAfterTheBound_AndReportsNotDeliveredWithTheCause()
     {
         var world = new ShipperInvoiceWorld(retryCount: 3);
         world.Shipper.Otherwise(HttpStatusCode.ServiceUnavailable, "Overloaded");
 
         var outcome = await world.RunAsync(ShipperInvoiceWorld.Issued());
 
-        outcome.Should().Be(ShipperInvoiceFlowOutcome.ShipperUnavailable);
+        outcome.Should().Be(ShipperInvoiceFlowOutcome.Done);
         world.Shipper.Requests.Should().HaveCount(4);
-        world.Erp.Requests.Should().BeEmpty();
+        var report = world.Erp.Requests.Should().ContainSingle().Subject;
+        report.Uri.AbsolutePath.Should().Be("/v1/shipper-invoices/INV-2030-000001/report-not-delivered");
+        report.Headers["X-Correlation-ID"].Should().Be("invoice-1");
+        var body = JsonNode.Parse(report.Body)!.AsObject();
+        body["statusCode"]!.GetValue<int>().Should().Be(503);
+        body["message"]!.GetValue<string>().Should().Be("Overloaded");
     }
 
     [Fact]
-    public async Task RunAsync_AClientError_IsNotRetriedAndReportsNothing()
+    public async Task RunAsync_AClientError_IsNotRetriedAndReportsNotDelivered()
     {
         var world = new ShipperInvoiceWorld();
         world.Shipper.Then(HttpStatusCode.BadRequest, "Invalid invoice");
 
         var outcome = await world.RunAsync(ShipperInvoiceWorld.Issued());
 
-        outcome.Should().Be(ShipperInvoiceFlowOutcome.ShipperRefused);
+        outcome.Should().Be(ShipperInvoiceFlowOutcome.Done);
         world.Shipper.Requests.Should().ContainSingle();
-        world.Erp.Requests.Should().BeEmpty();
+        var report = world.Erp.Requests.Should().ContainSingle().Subject;
+        report.Uri.AbsolutePath.Should().EndWith("/report-not-delivered");
+        JsonNode.Parse(report.Body)!["statusCode"]!.GetValue<int>().Should().Be(400);
     }
 
     [Fact]
@@ -104,15 +111,17 @@ public class ShipperInvoiceFlowTests
     }
 
     [Fact]
-    public async Task RunAsync_AShipperWithoutAnEndpoint_SendsNothingAndFails()
+    public async Task RunAsync_AShipperWithoutAnEndpoint_SendsNothingAndReportsNotDeliveredWithoutAStatus()
     {
         var world = new ShipperInvoiceWorld(shipperConfigured: false);
 
         var outcome = await world.RunAsync(ShipperInvoiceWorld.Issued());
 
-        outcome.Should().Be(ShipperInvoiceFlowOutcome.ShipperUnavailable);
+        outcome.Should().Be(ShipperInvoiceFlowOutcome.Done);
         world.Shipper.Requests.Should().BeEmpty();
-        world.Erp.Requests.Should().BeEmpty();
+        var body = JsonNode.Parse(world.Erp.Requests.Single().Body)!.AsObject();
+        body["statusCode"].Should().BeNull();
+        body["message"]!.GetValue<string>().Should().Contain("No invoice endpoint is configured for Shipper SHP-0001");
     }
 
     [Theory]
@@ -164,5 +173,31 @@ public class ShipperInvoiceFlowTests
         var outcome = await world.RunAsync(ShipperInvoiceWorld.Issued());
 
         outcome.Should().Be(ShipperInvoiceFlowOutcome.Done);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.ServiceUnavailable, "ErpUnavailable")]
+    [InlineData(HttpStatusCode.NotFound, "ErpRefused")]
+    public async Task RunAsync_TheErpDoesNotTakeTheNotDeliveredReport_FailsTheRun(HttpStatusCode erpStatus, string expected)
+    {
+        var world = new ShipperInvoiceWorld();
+        world.Shipper.Then(HttpStatusCode.BadRequest, "Invalid invoice");
+        world.Erp.Otherwise(erpStatus);
+
+        var outcome = await world.RunAsync(ShipperInvoiceWorld.Issued());
+
+        outcome.Should().Be(Enum.Parse<ShipperInvoiceFlowOutcome>(expected));
+    }
+
+    [Fact]
+    public async Task RunAsync_TheErpCannotBeReachedToReportNotDelivered_FailsTheRun()
+    {
+        var world = new ShipperInvoiceWorld();
+        world.Shipper.Then(HttpStatusCode.BadRequest, "Invalid invoice");
+        world.Erp.ThenFail(new HttpRequestException("connection refused"));
+
+        var outcome = await world.RunAsync(ShipperInvoiceWorld.Issued());
+
+        outcome.Should().Be(ShipperInvoiceFlowOutcome.ErpUnavailable);
     }
 }
