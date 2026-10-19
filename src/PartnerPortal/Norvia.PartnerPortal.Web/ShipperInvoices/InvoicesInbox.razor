@@ -1,0 +1,167 @@
+@page "/personas/{PersonaId}/invoices"
+@* Interactive like the other pages: Fluent UI's components don't survive static streaming rendering. *@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject IPartnerPortal Portal
+@inject NavigationManager Navigation
+@inject ILogger<InvoicesInbox> Logger
+@inject TimeProvider Time
+@implements IAsyncDisposable
+@using Norvia.PartnerPortal.Application.ShipperInvoices
+@using Norvia.PartnerPortal.Domain.ShipperInvoices
+
+<PageTitle>Invoices · @(_persona?.DisplayName ?? PersonaId) · Partner portal</PageTitle>
+
+<h1>Invoices</h1>
+
+@if (_loadFailed)
+{
+    <div role="alert">
+        <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+            The invoices couldn't be loaded. Reload the page to try again.
+        </FluentMessageBar>
+    </div>
+}
+else if (_invoices is null)
+{
+    <FluentStack VerticalAlignment="VerticalAlignment.Center" role="status">
+        <FluentProgressRing />
+        <span>Loading the invoices…</span>
+    </FluentStack>
+}
+else if (_invoices.Count == 0)
+{
+    <div role="status">
+        <FluentMessageBar Intent="MessageIntent.Info" AllowDismiss="false">
+            Norvia hasn't sent @_persona!.DisplayName an invoice yet.
+        </FluentMessageBar>
+    </div>
+}
+else
+{
+    <p class="mb-6">Every invoice and Credit note Norvia sent @_persona!.DisplayName, the latest first. You can't reply to them here.</p>
+    @foreach (var invoice in _invoices)
+    {
+        <article class="mb-8" aria-label="@invoice.DocumentNumber">
+            <h2>@InvoiceText.Of(invoice.DocumentType) @invoice.DocumentNumber</h2>
+            <p class="text-muted">
+                Dated @LocalDateText.Of(invoice.DocumentDate), received @PortalTime.Format(invoice.ReceivedAt)
+                @if (invoice.Credit is not null)
+                {
+                    <span class="credits"> · @InvoiceText.Credits(invoice.Credit)</span>
+                }
+            </p>
+            <table class="lux-table" aria-label="Lines of @invoice.DocumentNumber">
+                <thead>
+                    <tr>
+                        <th>Transport Order</th>
+                        <th>Shipper reference</th>
+                        <th>Delivered</th>
+                        <th>Charges</th>
+                        <th class="text-right">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var line in invoice.Lines)
+                    {
+                        <tr>
+                            <td>@line.TransportOrderNumber</td>
+                            <td>@line.BookingRef</td>
+                            <td>@LocalDateText.Of(line.DeliveryDate)</td>
+                            <td>@string.Join(", ", line.ChargeLines.Select(charge => $"{InvoiceText.Of(charge.Code)} {InvoiceText.Money(charge.Amount)}"))</td>
+                            <td class="text-right">@InvoiceText.Money(line.LineTotal)</td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr><th colspan="4" scope="row">Total without VAT</th><td class="text-right total-without-vat">@InvoiceText.Money(invoice.TotalWithoutVat)</td></tr>
+                    <tr><th colspan="4" scope="row">VAT</th><td class="text-right vat">@InvoiceText.Money(invoice.Vat)</td></tr>
+                    <tr><th colspan="4" scope="row">Total with VAT</th><td class="text-right total-with-vat">@InvoiceText.Money(invoice.TotalWithVat)</td></tr>
+                </tfoot>
+            </table>
+        </article>
+    }
+}
+
+@code {
+    /// <summary>How often the inbox reads itself again, so a document shows as it arrives without a page refresh.</summary>
+    public static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(2);
+
+    private readonly CancellationTokenSource _stopped = new();
+    private Task? _refreshing;
+    private PersonaView? _persona;
+    private IReadOnlyList<ShipperInvoiceView>? _invoices;
+    private bool _loadFailed;
+
+    [Parameter]
+    public string PersonaId { get; set; } = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _invoices = null;
+        try
+        {
+            _persona = PersonaChoice.Find(PersonaId, await Portal.ListPersonasAsync(CancellationToken.None));
+            if (_persona is null || _persona.PartyType != PartyType.Shipper)
+            {
+                Navigation.NotFound();
+                return;
+            }
+
+            _invoices = await Portal.ListShipperInvoicesAsync(new PersonaId(PersonaId), CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            PageLog.InvoicesLoadFailed(Logger, exception, PersonaId);
+            _loadFailed = true;
+        }
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _refreshing = RefreshUntilStoppedAsync(_stopped.Token);
+        }
+    }
+
+    // A refresh that fails keeps what the inbox showed and tries again on the next tick.
+    private async Task RefreshUntilStoppedAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(RefreshInterval, Time);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                if (_persona is null || _invoices is null)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    _invoices = await Portal.ListShipperInvoicesAsync(new PersonaId(PersonaId), cancellationToken);
+                    await InvokeAsync(StateHasChanged);
+                }
+                catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+                {
+                    PageLog.InvoicesLoadFailed(Logger, exception, PersonaId);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The page is gone.
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _stopped.CancelAsync();
+        if (_refreshing is not null)
+        {
+            await _refreshing;
+        }
+
+        _stopped.Dispose();
+    }
+}

@@ -12,6 +12,7 @@ The format in which a Shipper books a Transport-only transport through the Norvi
 | [carrier-tracking.v1](carrier-tracking.v1.schema.json) | A Carrier's tracking message, as the Carrier sends it to the Norvia Partner API (see [Carrier tracking](#carrier-tracking)) |
 | [carrier-proof-of-delivery.v1](carrier-proof-of-delivery.v1.schema.json) | A Carrier's Proof of delivery with its files base64-encoded, as the Carrier sends it to the Norvia Partner API (see [Carrier Proof of delivery](#carrier-proof-of-delivery)) |
 | [shipper-notification.v1](shipper-notification.v1.schema.json) | A notification, as Norvia's P7 Shipper notification Logic App sends it to a Shipper's notification endpoint (see [Shipper notification](#shipper-notification)) |
+| [shipper-invoice.v1](shipper-invoice.v1.schema.json) | A Shipper invoice or Credit note, as Norvia's E1 Shipper invoice Logic App sends it to a Shipper's invoice endpoint (see [Shipper invoice](#shipper-invoice)) |
 | [shipper-tracking.v1](shipper-tracking.v1.schema.json) | One Transport Order with its tracking, as a Shipper gets or finds it (see [Shipper tracking](#shipper-tracking)) |
 | [shipper-tracking-list-item.v1](shipper-tracking-list-item.v1.schema.json) | One Transport Order in the list a Shipper gets; the list is an array of these (see [Shipper tracking](#shipper-tracking)) |
 
@@ -231,6 +232,12 @@ The Carrier's booking inbox shows the booking as "Withdrawn by Norvia", or "Canc
 The Carrier cancellation Logic App sends it: it picks up `CarrierBookingCancelled` and `CarrierBookingWithdrawn` from its own subscription on the `shipment-events` topic (filter `((eventType = 'CarrierBookingCancelled' OR eventType = 'CarrierBookingWithdrawn') AND resubmitTo IS NULL) OR resubmitTo = 'carrier-cancellation'`), maps the event with `CarrierCancellationMap`, run as a local function of the Logic App ([ADR 0019](../../docs/adr/0019-the-intake-map-is-dotnet-code-run-as-a-logic-apps-local-function.md)), and sends it with the action's correlation ID and the Carrier's credential.
 
 It retries a server error, a timeout, `408` and `429` up to three times, waiting 5, 10 and 20 seconds, and no other client error. It then reports the booking to the TMS as told (`POST /v1/carrier-bookings/<Carrier booking number>/report-cancellation-told`), or as not delivered (`report-cancellation-not-delivered`) with the endpoint's status code, `0` for a timeout, and a message of at most 500 characters, as an identity holding `CarrierBookings.Report` and nothing else. A message the map can't read is dead-lettered with `CarrierCancellationUnreadable` as `DeadLetterReason`. Locally a hosted worker plays the Logic App ([ADR 0034](../../docs/adr/0034-locally-a-hosted-worker-plays-the-p7-carrier-cancellation-logic-app.md)).
+
+## Shipper invoice
+
+[E1](../../docs/processes/erp/e1-invoicing.md#shipper-invoice-format): a Shipper invoice or Credit note goes to the Shipper Persona's invoice endpoint, `POST /shipper/v1/<Shipper ID>/invoices` in the Partner portal, as a [shipper-invoice.v1](shipper-invoice.v1.schema.json) message, with sample documents in `samples/shipper-invoices`. The format names neither the Carrier nor the Shipment number ([ADR 0011](../../docs/adr/0011-shippers-see-a-tracking-status-not-the-shipments-workings.md)). A Credit note names the invoice and the Transport Order number of the line it credits, and the reason.
+
+The request carries the correlation ID in `X-Correlation-ID` and the Shipper's credential in `X-Api-Key`: the one Key Vault holds as `shipper-endpoint-key-<Shipper ID>` for the notification endpoint. The document number is the key: a document sent again is acknowledged and ignored. The endpoint only acknowledges and has no answer modes. It answers `200` with `{ "documentNumber": "...", "repeated": true | false }` when the document is in the Shipper's invoices inbox, or already was, `401` for a missing or wrong credential, `404` for an unknown Shipper and `400` for a message that breaks the format.
 
 ## Shipper tracking
 

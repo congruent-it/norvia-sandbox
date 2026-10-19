@@ -10,6 +10,7 @@ internal static class Contracts
     private static readonly Lazy<JsonSchema> CarrierAnswerSchema = new(() => JsonSchema.FromText(Read("PartnerApi/carrier-answer.v1.schema.json")));
     private static readonly Lazy<JsonSchema> CarrierTrackingSchema = new(() => JsonSchema.FromText(Read("PartnerApi/carrier-tracking.v1.schema.json")));
     private static readonly Lazy<JsonSchema> CarrierProofOfDeliverySchema = new(() => JsonSchema.FromText(Read("PartnerApi/carrier-proof-of-delivery.v1.schema.json")));
+    private static readonly Lazy<JsonSchema> ShipperInvoiceSchema = new(() => JsonSchema.FromText(Read("PartnerApi/shipper-invoice.v1.schema.json")));
     private static readonly Lazy<JsonSchema> BookingSchema = new(() => JsonSchema.FromText(Read("PartnerApi/booking.v1.schema.json")));
 
     public static string Read(string path)
@@ -30,6 +31,9 @@ internal static class Contracts
 
     /// <summary>What breaks the Norvia Partner API's Carrier Proof of delivery schema, or nothing.</summary>
     public static IEnumerable<string> CarrierProofOfDeliverySchemaErrors(JsonNode? message) => Errors(CarrierProofOfDeliverySchema.Value, message);
+
+    /// <summary>What breaks the Norvia Partner API's Shipper invoice schema, or nothing.</summary>
+    public static IEnumerable<string> ShipperInvoiceSchemaErrors(JsonNode? document) => Errors(ShipperInvoiceSchema.Value, document);
 
     private static IEnumerable<string> Errors(JsonSchema schema, JsonNode? instance)
     {

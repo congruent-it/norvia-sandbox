@@ -25,6 +25,8 @@ public static class PersonaChoice
 
     public static string NotificationsPath(string personaId) => $"/personas/{Uri.EscapeDataString(personaId)}/notifications";
 
+    public static string InvoicesPath(string personaId) => $"/personas/{Uri.EscapeDataString(personaId)}/invoices";
+
     public static string TrackingPath(string personaId) => $"/personas/{Uri.EscapeDataString(personaId)}/tracking";
 
     public static string TrackingPath(string personaId, string transportOrderNumber) =>

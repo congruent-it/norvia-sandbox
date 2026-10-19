@@ -1,0 +1,30 @@
+{
+  "documentType": "INVOICE",
+  "documentNumber": "INV-2030-000001",
+  "documentDate": "01-11-2030",
+  "lines": [
+    {
+      "transportOrderNumber": "TO-0000001",
+      "bookingRef": "BD-2030-0001",
+      "deliveryDate": "18-10-2030",
+      "chargeLines": [
+        { "code": "FREIGHT", "amount": 80.00 }
+      ],
+      "lineTotal": 80.00
+    },
+    {
+      "transportOrderNumber": "TO-0000002",
+      "bookingRef": "BD-2030-0002",
+      "deliveryDate": "21-10-2030",
+      "chargeLines": [
+        { "code": "FREIGHT", "amount": 35.50 },
+        { "code": "MINIMUM_CHARGE_ADJUSTMENT", "amount": 14.50 }
+      ],
+      "lineTotal": 50.00
+    }
+  ],
+  "currency": "EUR",
+  "totalWithoutVat": 130.00,
+  "vat": 27.30,
+  "totalWithVat": 157.30
+}

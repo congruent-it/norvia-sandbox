@@ -20,6 +20,8 @@ using Norvia.PartnerPortal.Application.DriverSignIns;
 using Norvia.PartnerPortal.Application.DriverSignIns.List;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Application.Personas.List;
+using Norvia.PartnerPortal.Application.ShipperInvoices;
+using Norvia.PartnerPortal.Application.ShipperInvoices.List;
 using Norvia.PartnerPortal.Application.ShipperNotifications;
 using Norvia.PartnerPortal.Application.ShipperNotifications.List;
 using Norvia.PartnerPortal.Application.ShipperTracking;
@@ -65,6 +67,9 @@ internal sealed class PartnerPortalRequests(IServiceScopeFactory scopes) : IPart
 
     public Task<IReadOnlyList<CarrierBookingRequestView>> ListCarrierBookingRequestsAsync(PersonaId personaId, CancellationToken cancellationToken) =>
         SendAsync(new ListCarrierBookingRequestsQuery(personaId), cancellationToken);
+
+    public Task<IReadOnlyList<ShipperInvoiceView>> ListShipperInvoicesAsync(PersonaId personaId, CancellationToken cancellationToken) =>
+        SendAsync(new ListShipperInvoicesQuery(personaId), cancellationToken);
 
     public Task<IReadOnlyList<ShipperNotificationView>> ListShipperNotificationsAsync(PersonaId personaId, CancellationToken cancellationToken) =>
         SendAsync(new ListShipperNotificationsQuery(personaId), cancellationToken);

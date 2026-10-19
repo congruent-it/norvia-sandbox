@@ -25,5 +25,6 @@
   <!-- Embedded, so the unit tests read the sample notifications the Shipper notification map produces without touching the file system (coding guidelines §10). -->
   <ItemGroup>
     <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\shipper-notifications\*.shipper-notification.json" LogicalName="shipper-notifications/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\shipper-invoices\*.shipper-invoice.json" LogicalName="shipper-invoices/%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

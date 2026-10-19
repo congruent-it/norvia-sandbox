@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/partner-api/shipper-invoice.v1.schema.json",
+  "title": "ShipperInvoice",
+  "description": "A Shipper invoice or Credit note, as Norvia's Shipper invoice Logic App sends it to the Shipper's invoice endpoint in the Partner portal (Shipper invoice format, version 1). It follows the Shipper booking format: its own field names, local dates formatted dd-MM-yyyy and the Shipper's own reference as bookingRef. Towards the Shipper, Norvia carries the goods, so it never names the Carrier or the Shipment number (ADR 0011). The document number is its key: a document sent again is ignored.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["documentType", "documentNumber", "documentDate", "lines", "currency", "totalWithoutVat", "vat", "totalWithVat"],
+  "properties": {
+    "documentType": { "description": "An invoice, or a Credit note that corrects one.", "enum": ["INVOICE", "CREDIT_NOTE"] },
+    "documentNumber": { "description": "The key of the document: INV-<year>-<6 digits> for an invoice, CN-<year>-<6 digits> for a Credit note.", "type": "string", "pattern": "^(INV|CN)-[0-9]{4}-[0-9]{6}$" },
+    "documentDate": { "description": "The date of the document, in the Netherlands.", "$ref": "#/$defs/localDate" },
+    "creditedInvoiceNumber": { "description": "The invoice a Credit note corrects. Only on a Credit note, and always there.", "type": "string", "pattern": "^INV-[0-9]{4}-[0-9]{6}$" },
+    "creditedTransportOrderNumber": { "description": "The Transport Order number of the line of that invoice the Credit note credits. Only on a Credit note, and always there.", "type": "string", "pattern": "^TO-[0-9]{7}$" },
+    "reason": { "description": "Why Norvia issued the Credit note. Only on a Credit note, and always there.", "type": "string", "minLength": 1 },
+    "lines": {
+      "description": "One per Transport Order. On a Credit note, the credited amounts of the credited line.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["transportOrderNumber", "bookingRef", "deliveryDate", "chargeLines", "lineTotal"],
+        "properties": {
+          "transportOrderNumber": { "description": "Norvia's number of the Transport Order.", "type": "string", "pattern": "^TO-[0-9]{7}$" },
+          "bookingRef": { "description": "The Shipper's own reference of the booking, so the Shipper recognises the Transport Order.", "type": "string", "minLength": 1 },
+          "deliveryDate": { "description": "The day the goods were delivered, in the Netherlands or where it happened.", "$ref": "#/$defs/localDate" },
+          "chargeLines": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["code", "amount"],
+              "properties": {
+                "code": { "enum": ["FREIGHT", "MINIMUM_CHARGE_ADJUSTMENT"] },
+                "amount": { "$ref": "#/$defs/amount" }
+              }
+            }
+          },
+          "lineTotal": { "description": "The sum of the charge lines, without VAT.", "$ref": "#/$defs/amount" }
+        }
+      }
+    },
+    "currency": { "const": "EUR" },
+    "totalWithoutVat": { "description": "The sum of the line totals.", "$ref": "#/$defs/amount" },
+    "vat": { "description": "21% of the total without VAT, rounded to cents.", "$ref": "#/$defs/amount" },
+    "totalWithVat": { "description": "The total without VAT and the VAT added up.", "$ref": "#/$defs/amount" }
+  },
+  "if": { "properties": { "documentType": { "const": "CREDIT_NOTE" } }, "required": ["documentType"] },
+  "then": { "required": ["creditedInvoiceNumber", "creditedTransportOrderNumber", "reason"], "properties": { "documentNumber": { "pattern": "^CN-" } } },
+  "else": { "properties": { "documentNumber": { "pattern": "^INV-" } }, "not": { "anyOf": [{ "required": ["creditedInvoiceNumber"] }, { "required": ["creditedTransportOrderNumber"] }, { "required": ["reason"] }] } },
+  "$defs": {
+    "localDate": {
+      "description": "A local date as dd-MM-yyyy.",
+      "type": "string",
+      "pattern": "^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{4}$",
+      "examples": ["01-11-2030"]
+    },
+    "amount": {
+      "description": "An amount in euros, with at most two decimals. A Credit note carries positive amounts too: its document type says it credits.",
+      "type": "number",
+      "minimum": 0,
+      "multipleOf": 0.01
+    }
+  }
+}
