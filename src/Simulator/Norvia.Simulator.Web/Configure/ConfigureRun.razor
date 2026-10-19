@@ -17,7 +17,7 @@
     A run books for the estate's Shippers through the Norvia Partner API, as each Shipper's Persona, plans what Norvia
     accepted through the TMS API, as the Planner, and then has the Carriers answer, track and deliver what went to them, as their
     Personas. What stays with the Own fleet goes on Trips the Planner dispatches, and the Drivers work the Trips of today through the Driver app,
-    as themselves, so every booking, assignment, Carrier message and Driver report has a real Message trail. Choose a Preset or
+    as themselves. Once the deliveries are in, Finance runs Invoice now in the ERP and credits part of a line, and the invoices reach the Shippers' inboxes. Every booking, assignment, Carrier message, Driver report and invoice has a real Message trail. Choose a Preset or
     set the numbers yourself, then preview the plan: the same seed always gives the same plan.
 </p>
 
@@ -113,6 +113,13 @@ else
                 <div class="flex flex-col gap-1"><FluentNumberField TValue="int" @bind-Value="_form.DeliveryFailedPercent" Label="Deliveries that fail (%)" Min="0" Max="100" /></div>
                 <div class="flex flex-col gap-1"><FluentNumberField TValue="int" @bind-Value="_form.DamagedPercent" Label="Damage reported (%)" Min="0" Max="100" /></div>
                 <div class="flex flex-col gap-1"><FluentNumberField TValue="int" @bind-Value="_form.ReservationsPercent" Label="Delivered with reservations (%)" Min="0" Max="100" /></div>
+                </div>
+            </FluentAccordionItem>
+            <FluentAccordionItem Heading="Finance and invoicing" Expanded="true">
+                <p class="text-muted mb-4 text-sm">Once the deliveries are in, Finance runs Invoice now in the ERP and credits part of a line. The invoices reach the Shippers' inboxes.</p>
+                <div class="grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-4 [&_fluent-number-field]:w-full [&_fluent-select]:w-full [&_fluent-select]:min-w-0">
+                <div class="flex flex-col gap-1"><FluentNumberField TValue="int" @bind-Value="_form.InvoicePercent" Label="Shippers invoiced (%)" Min="0" Max="100" /></div>
+                <div class="flex flex-col gap-1"><FluentNumberField TValue="int" @bind-Value="_form.CreditNotePercent" Label="Invoices credited in part (%)" Min="0" Max="100" /></div>
                 </div>
             </FluentAccordionItem>
             <FluentAccordionItem Heading="How it is sent" Expanded="true">

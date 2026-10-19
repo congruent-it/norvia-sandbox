@@ -38,7 +38,7 @@ public sealed class SimulatorFixture : IAsyncLifetime
     private static readonly string[] Unneeded = ["dbgate", "tms-web", "driver-app-web"];
 
     private static readonly string[] SimulatorSettings =
-        ["ConnectionStrings__", "Seed__", "Simulator__", "PartnerApi__", "PartnerPortal__", "TmsApi__", "DriverApp__", "IntegrationConsole__", "LocalOperator__"];
+        ["ConnectionStrings__", "Seed__", "Simulator__", "PartnerApi__", "PartnerPortal__", "TmsApi__", "DriverApp__", "ErpApi__", "IntegrationConsole__", "LocalOperator__"];
 
     private static readonly string[] IntakeRoles = ["TransportOrders.Intake"];
     private static readonly string[] ManageRoles = ["TransportOrders.Manage"];
@@ -78,6 +78,7 @@ public sealed class SimulatorFixture : IAsyncLifetime
         await _app.ResourceNotifications.WaitForResourceHealthyAsync("partner-api", startup.Token);
         await _app.ResourceNotifications.WaitForResourceHealthyAsync("partner-portal-web", startup.Token);
         await _app.ResourceNotifications.WaitForResourceHealthyAsync("driver-app-api", startup.Token);
+        await _app.ResourceNotifications.WaitForResourceHealthyAsync("erp-api", startup.Token);
 
         var configuration = await ExecutionConfigurationBuilder.Create(simulator)
             .WithEnvironmentVariablesConfig()

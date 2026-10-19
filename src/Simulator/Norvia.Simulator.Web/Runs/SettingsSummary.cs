@@ -42,6 +42,11 @@ public static class SettingsSummary
             ("Damage reported (%)", Percent(settings.Drivers.DamagedPercent)),
             ("Delivered with reservations (%)", Percent(settings.Drivers.ReservationsPercent)),
         ]),
+        new("Finance and invoicing",
+        [
+            ("Shippers invoiced (%)", Percent(settings.Invoicing.InvoicePercent)),
+            ("Invoices credited in part (%)", Percent(settings.Invoicing.CreditNotePercent)),
+        ]),
         new("How it is sent",
         [
             ("Sending", settings.Mode == RunMode.Paced ? $"Paced over {(int)settings.Window.TotalMinutes} minutes" : "Burst"),

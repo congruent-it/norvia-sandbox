@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Norvia.Simulator.Domain.Carriers;
 using Norvia.Simulator.Domain.Drivers;
+using Norvia.Simulator.Domain.Invoicing;
 using Norvia.Simulator.Domain.Runs;
 
 namespace Norvia.Simulator.Web.Configure;
@@ -72,6 +73,12 @@ public sealed class RunForm : IValidatableObject
     [Range(0, 100, ErrorMessage = "The share of delivered Shipments with reservations is a percentage from 0 to 100.")]
     public int ReservationsPercent { get; set; } = DriverShares.DefaultReservationsPercent;
 
+    [Range(0, 100, ErrorMessage = "The share of Shippers Finance invoices is a percentage from 0 to 100.")]
+    public int InvoicePercent { get; set; } = InvoicingShares.DefaultInvoicePercent;
+
+    [Range(0, 100, ErrorMessage = "The share of invoices Finance credits is a percentage from 0 to 100.")]
+    public int CreditNotePercent { get; set; } = InvoicingShares.DefaultCreditNotePercent;
+
     public string Mode { get; set; } = nameof(RunMode.Burst);
 
     [Range(1, SimulationSettings.MaxWindowMinutes, ErrorMessage = "A paced run is spread over 1 to 240 minutes.")]
@@ -93,6 +100,7 @@ public sealed class RunForm : IValidatableObject
         Carriers = new CarrierShares(
             ReleasePercent, ConfirmPercent, DeclinePercent, TrackedPercent, ExceptionPercent, DeliveredPercent, ProofOfDeliveryPercent, CancelPercent),
         Drivers = new DriverShares(CollectionFailedPercent, DeliveryFailedPercent, DamagedPercent, ReservationsPercent),
+        Invoicing = new InvoicingShares(InvoicePercent, CreditNotePercent),
     };
 
     public void Fill(Preset preset)
@@ -120,6 +128,9 @@ public sealed class RunForm : IValidatableObject
         DeliveryFailedPercent = drivers.DeliveryFailedPercent;
         DamagedPercent = drivers.DamagedPercent;
         ReservationsPercent = drivers.ReservationsPercent;
+        var invoicing = preset.Invoicing ?? new InvoicingShares();
+        InvoicePercent = invoicing.InvoicePercent;
+        CreditNotePercent = invoicing.CreditNotePercent;
         Mode = preset.Mode.ToString();
         WindowMinutes = preset.Mode == RunMode.Paced ? (int)preset.Window.TotalMinutes : WindowMinutes;
     }
@@ -150,6 +161,8 @@ public sealed class RunForm : IValidatableObject
         DeliveryFailedPercent = settings.Drivers.DeliveryFailedPercent;
         DamagedPercent = settings.Drivers.DamagedPercent;
         ReservationsPercent = settings.Drivers.ReservationsPercent;
+        InvoicePercent = settings.Invoicing.InvoicePercent;
+        CreditNotePercent = settings.Invoicing.CreditNotePercent;
         Mode = settings.Mode.ToString();
         WindowMinutes = settings.Mode == RunMode.Paced ? (int)settings.Window.TotalMinutes : WindowMinutes;
         Seed = settings.Seed;

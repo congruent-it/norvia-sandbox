@@ -9,6 +9,7 @@ using Norvia.Simulator.Application.Runs.Cancel;
 using Norvia.Simulator.Application.Runs.ClearHistory;
 using Norvia.Simulator.Application.Runs.List;
 using Norvia.Simulator.Application.Runs.Open;
+using Norvia.Simulator.Domain.Invoicing;
 using Norvia.Simulator.Domain.Log;
 using Norvia.Simulator.Domain.Runs;
 
@@ -139,6 +140,7 @@ public sealed class RunQueriesAndCommandsTests
         lines.ListAsync(Arg.Any<CarrierOutcomesOfRunSpec>(), Arg.Any<CancellationToken>())
             .Returns([LogOutcome.Confirmed, LogOutcome.Confirmed, LogOutcome.Declined, LogOutcome.NoAnswer]);
         lines.ListAsync(Arg.Any<DriverOutcomesOfRunSpec>(), Arg.Any<CancellationToken>()).Returns([]);
+        lines.ListAsync(Arg.Any<InvoicingOutcomesOfRunSpec>(), Arg.Any<CancellationToken>()).Returns([]);
 
         var result = await new GetRunHandler(reads, lines, World()).Handle(new GetRunQuery(run.Id), CancellationToken.None);
 
@@ -159,6 +161,7 @@ public sealed class RunQueriesAndCommandsTests
         lines.ListAsync(Arg.Any<PlanningOutcomesOfRunSpec>(), Arg.Any<CancellationToken>()).Returns([LogOutcome.Planned, LogOutcome.TripBuilt, LogOutcome.TripDispatched]);
         lines.ListAsync(Arg.Any<CarrierOutcomesOfRunSpec>(), Arg.Any<CancellationToken>()).Returns([]);
         lines.ListAsync(Arg.Any<DriverOutcomesOfRunSpec>(), Arg.Any<CancellationToken>()).Returns([LogOutcome.DriverReported, LogOutcome.DriverReported, LogOutcome.DriverRefused, LogOutcome.TripCompleted]);
+        lines.ListAsync(Arg.Any<InvoicingOutcomesOfRunSpec>(), Arg.Any<CancellationToken>()).Returns([]);
         var world = Substitute.For<IWorldSource>();
         world.Load().Returns(TestData.FleetWorld);
 
@@ -167,6 +170,41 @@ public sealed class RunQueriesAndCommandsTests
         result.Value.Outcomes.Should().Contain(new OutcomeCount(LogOutcome.TripBuilt, 1)).And.Contain(new OutcomeCount(LogOutcome.TripDispatched, 1))
             .And.Contain(new OutcomeCount(LogOutcome.DriverReported, 2)).And.Contain(new OutcomeCount(LogOutcome.DriverRefused, 1)).And.Contain(new OutcomeCount(LogOutcome.TripCompleted, 1));
         result.Value.Actors.Should().Contain(["Planner", "Anouk de Vries", "Bram Visser", "Sanne Jansen"]);
+    }
+
+    [Fact]
+    public async Task Open_ARunWithInvoicing_CountsWhatFinanceDidAndNamesFinance()
+    {
+        var run = TestData.Run(TestData.Settings(orders: 10, assigned: 100, ownFleet: 100) with { Invoicing = new InvoicingShares(100, 50) });
+        var reads = Substitute.For<IReadRepository<SimulationRun>>();
+        reads.FirstOrDefaultAsync(Arg.Any<ISpecification<SimulationRun>>(), Arg.Any<CancellationToken>()).Returns(run);
+        var lines = Substitute.For<IReadRepository<LogEntry>>();
+        lines.ListAsync(Arg.Any<ISpecification<LogEntry, LogOutcome>>(), Arg.Any<CancellationToken>()).Returns([]);
+        lines.ListAsync(Arg.Any<InvoicingOutcomesOfRunSpec>(), Arg.Any<CancellationToken>()).Returns([LogOutcome.InvoiceIssued, LogOutcome.InvoiceIssued, LogOutcome.CreditNoteIssued, LogOutcome.InboxReceived]);
+        var world = Substitute.For<IWorldSource>();
+        world.Load().Returns(TestData.FleetWorld);
+
+        var result = await new GetRunHandler(reads, lines, world).Handle(new GetRunQuery(run.Id), CancellationToken.None);
+
+        result.Value.Outcomes.Should().Contain(new OutcomeCount(LogOutcome.InvoiceIssued, 2)).And.Contain(new OutcomeCount(LogOutcome.CreditNoteIssued, 1))
+            .And.Contain(new OutcomeCount(LogOutcome.InboxReceived, 1));
+        result.Value.Actors.Should().Contain("Finance");
+    }
+
+    [Fact]
+    public async Task Open_ARunThatInvoicesNobody_NamesNoFinance()
+    {
+        var run = TestData.Run(TestData.Settings(orders: 10, assigned: 100, ownFleet: 100));
+        var reads = Substitute.For<IReadRepository<SimulationRun>>();
+        reads.FirstOrDefaultAsync(Arg.Any<ISpecification<SimulationRun>>(), Arg.Any<CancellationToken>()).Returns(run);
+        var lines = Substitute.For<IReadRepository<LogEntry>>();
+        lines.ListAsync(Arg.Any<ISpecification<LogEntry, LogOutcome>>(), Arg.Any<CancellationToken>()).Returns([]);
+        var world = Substitute.For<IWorldSource>();
+        world.Load().Returns(TestData.FleetWorld);
+
+        var result = await new GetRunHandler(reads, lines, world).Handle(new GetRunQuery(run.Id), CancellationToken.None);
+
+        result.Value.Actors.Should().NotContain("Finance");
     }
 
     [Fact]
@@ -225,6 +263,7 @@ public sealed class RunQueriesAndCommandsTests
         lines.ListAsync(Arg.Any<PlanningOutcomesOfRunSpec>(), Arg.Any<CancellationToken>()).Returns([]);
         lines.ListAsync(Arg.Any<CarrierOutcomesOfRunSpec>(), Arg.Any<CancellationToken>()).Returns([]);
         lines.ListAsync(Arg.Any<DriverOutcomesOfRunSpec>(), Arg.Any<CancellationToken>()).Returns([]);
+        lines.ListAsync(Arg.Any<InvoicingOutcomesOfRunSpec>(), Arg.Any<CancellationToken>()).Returns([]);
 
         var result = await new GetRunHandler(reads, lines, World()).Handle(new GetRunQuery(run.Id), CancellationToken.None);
 
@@ -246,6 +285,7 @@ public sealed class RunQueriesAndCommandsTests
             .Returns([LogOutcome.Planned, LogOutcome.Reassigned, LogOutcome.Planned, LogOutcome.PlanningRefused]);
         lines.ListAsync(Arg.Any<CarrierOutcomesOfRunSpec>(), Arg.Any<CancellationToken>()).Returns([]);
         lines.ListAsync(Arg.Any<DriverOutcomesOfRunSpec>(), Arg.Any<CancellationToken>()).Returns([]);
+        lines.ListAsync(Arg.Any<InvoicingOutcomesOfRunSpec>(), Arg.Any<CancellationToken>()).Returns([]);
 
         var result = await new GetRunHandler(reads, lines, World()).Handle(new GetRunQuery(run.Id), CancellationToken.None);
 

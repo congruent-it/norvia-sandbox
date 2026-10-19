@@ -11,7 +11,7 @@ An app role belongs to the app registration of the API it guards. Each registrat
 | App registration | Audience | Who may get a token | Roles it defines |
 |---|---|---|---|
 | **Norvia TMS API** | `api://<tenant>/norvia-tms-<env>` | Only principals granted one of its roles (`appRoleAssignmentRequired`) | The [TMS API roles](#tms-api-roles) |
-| **Norvia ERP API** | `api://<tenant>/norvia-erp-api-<env>` | Only principals granted its role (`appRoleAssignmentRequired`) | `BillableLines.Record` and `ShipperInvoices.Report`, which the [Billing Logic App](../processes/erp/e1-invoicing.md#erp-api) holds |
+| **Norvia ERP API** | `api://<tenant>/norvia-erp-api-<env>` | Only principals granted its role (`appRoleAssignmentRequired`) | `BillableLines.Record`, which the [Billing Logic App](../processes/erp/e1-invoicing.md#erp-api) holds, `ShipperInvoices.Report`, which the Shipper invoice Logic App holds, and `ShipperInvoices.Manage`, which the Simulator holds |
 | **Norvia Partner API** | `api://<tenant>/norvia-partner-api-<env>` | Any Persona, holding a role or not, so a Carrier Persona calling a Shipper operation gets 403 from API Management, which the demo shows | The [Partner API roles](#partner-api-roles) |
 | **Norvia intake Logic App trigger** | `api://<tenant>/norvia-intake-trigger-<env>` | Only API Management | `TransportOrderIntake.Trigger` |
 | **Norvia Carrier-answer Logic App trigger** | `api://<tenant>/norvia-answer-trigger-<env>` | Only API Management | `CarrierAnswer.Trigger` |
@@ -37,7 +37,7 @@ Both Logic App triggers sit behind Easy Auth, and the workflow's first step refu
 | `tms-ui` | The TMS UI | `TransportOrders.Manage` | |
 | `apim` | API Management | `ShipperTracking.Read` | Holds `TransportOrderIntake.Trigger` and `CarrierAnswer.Trigger`. Sends to the `carrier-tracking` and `carrier-proof-of-delivery` queues. Writes blobs in the inbound container. Publishes telemetry to Application Insights |
 | `partner-portal` | The Partner portal | | Reads the Persona subscription keys. Each Persona client app trusts it |
-| `simulator` | The Simulator | `TransportOrders.Manage` and `Estate.Reset` on the TMS; `Estate.Reset` on the Driver app | Reads the Persona subscription keys and the Partner portal's reset key. Each Persona client app and each Driver client app trusts it ([ADR 0042](../adr/0042-the-simulator-signs-in-with-easy-auth-reaches-the-estate-as-its-own-identity-and-plays-the-personas-and-drivers-through-entra-client-apps.md)) |
+| `simulator` | The Simulator | `TransportOrders.Manage` and `Estate.Reset` on the TMS; `Estate.Reset` on the Driver app; `ShipperInvoices.Manage` on the ERP API | Reads the Persona subscription keys, the Partner portal's reset key and the Shippers' endpoint keys, to read their invoices inboxes. Each Persona client app and each Driver client app trusts it ([ADR 0042](../adr/0042-the-simulator-signs-in-with-easy-auth-reaches-the-estate-as-its-own-identity-and-plays-the-personas-and-drivers-through-entra-client-apps.md)) |
 | `integration-console` | The Integration console | | Reads the Log Analytics workspace. Reads the run history of all seven Logic Apps |
 
 Each Logic App also has a **host identity** (`id-<name>-host-…`) that only the Logic Apps runtime uses: it owns the Logic App's own storage account and reads the one Key Vault secret holding that account's connection string, which Logic Apps Standard still needs for its content share. Nothing else uses it. The identities are separate on purpose: a Logic App's role in the TMS API is never the same principal as the one that runs its runtime.
@@ -75,6 +75,7 @@ The ERP billing API validates the token and the role, and takes everything else 
 |---|---|---|---|
 | `BillableLines.Record` | The Billing Logic App's identity (`billing`) | Record a Billable line from `TransportOrderBillable` | [E1](../processes/erp/e1-invoicing.md#erp-api) |
 | `ShipperInvoices.Report` | The Shipper invoice Logic App's identity (`shipper-invoice`) | Report a Shipper invoice as sent | [E1](../processes/erp/e1-invoicing.md#erp-api) |
+| `ShipperInvoices.Manage` | The Simulator's identity (`simulator`) | Run Invoice now for a Shipper and issue a Credit note on an invoice line, the Finance actions the Simulator plays | [E1](../processes/erp/e1-invoicing.md#erp-api) |
 
 ## Partner API roles
 

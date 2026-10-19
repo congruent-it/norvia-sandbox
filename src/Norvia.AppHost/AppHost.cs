@@ -138,12 +138,14 @@ var simulator = builder.AddProject<Projects.Norvia_Simulator_Web>("simulator-web
     .WithReference(simulatorDatabase).WaitForCompletion(simulatorMigrations)
     .WithReference(tmsApi).WaitFor(tmsApi)
     .WaitFor(driverAppApi)
+    .WaitFor(erpApi)
     .WithHttpHealthCheck("/health")
     .WithUrlForEndpoint("http", url => url.DisplayText = "Simulator")
     .WithEnvironment("IntegrationConsole__Address", integrationConsole.GetEndpoint("http"))
     .WithEnvironment("TmsWeb__Address", tmsWeb.GetEndpoint("http"))
     .WithEnvironment("TmsApi__BaseAddress", tmsApi.GetEndpoint("http"))
-    .WithEnvironment("DriverApp__BaseAddress", driverAppApi.GetEndpoint("http"));
+    .WithEnvironment("DriverApp__BaseAddress", driverAppApi.GetEndpoint("http"))
+    .WithEnvironment("ErpApi__BaseAddress", erpApi.GetEndpoint("http"));
 
 // Locally the TMS, the ERP and the Partner portal read the repo's seed file; in Azure the copy each image carries, next to the
 // app (the image's working directory).
@@ -328,11 +330,20 @@ if (builder.ExecutionContext.IsPublishMode)
         .WithEnvironment("DriverApp__Entra__Scope", ReferenceExpression.Create($"{estate.DriverAppApiClientId}/.default"))
         .WithEnvironment("DriverApp__Entra__ManagedIdentityClientId", estate.SimulatorClientId)
         .WithEnvironment("DriverApp__Entra__DriverClientIds", estate.DriverClientIds)
+        // Finance's Invoice now and Credit note go to the ERP API as the Simulator's own identity, which holds the ERP API's manage role.
+        .WithEnvironment("ErpApi__Entra__Scope", ReferenceExpression.Create($"{estate.ErpApiClientId}/.default"))
+        .WithEnvironment("ErpApi__Entra__ManagedIdentityClientId", estate.SimulatorClientId)
         .PublishAsAzureContainerApp((infrastructure, app) =>
             infrastructure.Add(EntraSignIn.For(infrastructure, app, estate.SimulatorRegistrationClientId, estate.EntraIssuer)));
     foreach (var persona in personas)
     {
         simulator.WithEnvironment($"PartnerApi__SubscriptionKeys__{persona.Id}", partnerPortalSecrets.Resource.GetSecret($"subscription-key-{persona.Id}"));
+    }
+
+    // The Simulator reads each Shipper Persona's invoices inbox with the Shipper's own endpoint key, from the portal's vault.
+    foreach (var shipper in personas.Where(persona => persona.IsShipper))
+    {
+        simulator.WithEnvironment($"PartnerPortal__ShipperEndpointKeys__{shipper.PartyId}", partnerPortalSecrets.Resource.GetSecret($"shipper-endpoint-key-{shipper.PartyId}"));
     }
 
     // The estate switches the reset on (resetEnabled, off by default). The Partner portal and the Simulator share a key from the portal's vault.
@@ -600,6 +611,8 @@ else
             .WithEnvironment($"ShipperInvoice__Shippers__{persona.PartyId}__Address", ReferenceExpression.Create($"{partnerPortal.GetEndpoint("http")}{persona.InvoicePath}"))
             .WithEnvironment($"ShipperInvoice__Shippers__{persona.PartyId}__ApiKey", shipperApiKey);
         partnerPortal.WithEnvironment($"ShipperEndpoint__ApiKeys__{persona.PartyId}", shipperApiKey);
+        // The Simulator reads the Shipper's invoices inbox with the same key.
+        simulator.WithEnvironment($"PartnerPortal__ShipperEndpointKeys__{persona.PartyId}", shipperApiKey);
     }
 
     // Locally every application takes the Simulator's Reset estate (ADR 0039); in Azure the estate switches it on. The Partner portal's reset takes a key,
@@ -648,7 +661,11 @@ else
         // Each Driver works their Trips through the Driver app API with a token of their own, signed locally with the Driver ID as the one app role.
         .WithEnvironment("DriverApp__LocalTokens__Issuer", LocalTokens.Issuer)
         .WithEnvironment("DriverApp__LocalTokens__Audience", LocalTokens.DriverAppAudience)
-        .WithEnvironment("DriverApp__LocalTokens__ClientId", LocalTokens.SimulatorClientId);
+        .WithEnvironment("DriverApp__LocalTokens__ClientId", LocalTokens.SimulatorClientId)
+        // Finance signs its own token for the ERP API: the Simulator's client ID and the manage role.
+        .WithEnvironment("ErpApi__LocalTokens__Issuer", LocalTokens.Issuer)
+        .WithEnvironment("ErpApi__LocalTokens__Audience", LocalTokens.ErpAudience)
+        .WithEnvironment("ErpApi__LocalTokens__ClientId", LocalTokens.SimulatorClientId);
 
     partnerPortal.WaitFor(partnerApi)
         .WithEnvironment("PartnerApi__BaseAddress", ReferenceExpression.Create($"{partnerApi.GetEndpoint("http")}/partner/v1"))
@@ -707,6 +724,7 @@ else
         (simulator.Resource, "PartnerApi__LocalTokens__SigningKey"),
         (simulator.Resource, "TmsApi__LocalTokens__SigningKey"),
         (simulator.Resource, "DriverApp__LocalTokens__SigningKey"),
+        (simulator.Resource, "ErpApi__LocalTokens__SigningKey"),
     })
     {
         builder.CreateResourceBuilder(holder).WithEnvironment(async context =>

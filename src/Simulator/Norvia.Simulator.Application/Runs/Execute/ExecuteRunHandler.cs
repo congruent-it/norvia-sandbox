@@ -25,7 +25,9 @@ public sealed class ExecuteRunHandler(
     TimeProvider time,
     CarrierPacing pacing,
     IDriverApp driverApp,
-    DriverPacing driverPacing)
+    DriverPacing driverPacing,
+    IErpApi erpApi,
+    IShipperInbox shipperInbox)
     : ICommandHandler<ExecuteRunCommand, Result>
 {
     // The run's first line, "Run started", is sequence 1.
@@ -48,6 +50,7 @@ public sealed class ExecuteRunHandler(
         var trips = TripResult.None;
         var drivers = DriverResult.None;
         var followUp = FollowUpResult.None;
+        var invoicing = InvoicingResult.None;
         if (!stopped)
         {
             var planned = await new PlannerStage(tmsApi, time).RunAsync(run, [.. accepted], world.Load(), writer, command.StopSending, cancellationToken);
@@ -75,6 +78,13 @@ public sealed class ExecuteRunHandler(
                 followUp = await new FollowUpStage(tmsApi, time, driverPacing).RunAsync(run, drivers.Failures, world.Load(), writer, command.StopSending, cancellationToken);
                 stopped = followUp.Stopped;
             }
+
+            // Finance has something to invoice once a Shipment was delivered, by a Carrier or by a Driver.
+            if (!stopped && (carrier.Delivered > 0 || drivers.Completed > 0))
+            {
+                invoicing = await new InvoicingStage(erpApi, shipperInbox, time, driverPacing).RunAsync(run, ShippersOf(accepted), writer, command.StopSending, cancellationToken);
+                stopped = invoicing.Stopped;
+            }
         }
 
         if (stopped)
@@ -85,7 +95,7 @@ public sealed class ExecuteRunHandler(
 
         run.Complete(time.GetUtcNow());
         await runs.UpdateAsync(run, cancellationToken);
-        await writer.NoteAsync(time.GetUtcNow(), Finished(run, carrier, trips, drivers, followUp), cancellationToken);
+        await writer.NoteAsync(time.GetUtcNow(), Finished(run, carrier, trips, drivers, followUp, invoicing), cancellationToken);
         return Result.Success();
     }
 
@@ -122,13 +132,22 @@ public sealed class ExecuteRunHandler(
         return stopSending.IsCancellationRequested;
     }
 
-    private static string Finished(SimulationRun run, CarrierResult carrier, TripResult trips, DriverResult drivers, FollowUpResult followUp)
+    // The Shippers that booked in the run, by ID, so Finance meets them in the same order for the same seed.
+    private static List<InvoicedShipper> ShippersOf(IEnumerable<AcceptedOrder> accepted) =>
+    [
+        .. accepted.Select(order => new InvoicedShipper(order.Booking.ShipperId, order.Booking.PersonaName))
+            .DistinctBy(shipper => shipper.ShipperId)
+            .OrderBy(shipper => shipper.ShipperId, StringComparer.Ordinal),
+    ];
+
+    private static string Finished(SimulationRun run, CarrierResult carrier, TripResult trips, DriverResult drivers, FollowUpResult followUp, InvoicingResult invoicing)
     {
         var sent = $"Run {run.Number} finished: {run.Plan.Bookings.Count} bookings sent";
         var planned = run.Plan.Choices.Count == 0 ? sent : $"{sent}, {run.Plan.Choices.Count} Transport Orders for the Planner";
         var carried = carrier.Released == 0 ? planned : $"{planned}, {carrier.Released} released, {carrier.Confirmed} confirmed, {carrier.Delivered} reported delivered";
         var driven = trips.Dispatched == 0 ? carried : $"{carried}, {trips.Dispatched} Trips dispatched, {drivers.Started} started and {drivers.Completed} completed by their Drivers";
-        return followUp.Redeliveries == 0 ? driven : $"{driven}, {followUp.Redeliveries} Re-delivery Trips dispatched";
+        var followed = followUp.Redeliveries == 0 ? driven : $"{driven}, {followUp.Redeliveries} Re-delivery Trips dispatched";
+        return invoicing.Invoiced == 0 ? followed : $"{followed}, {invoicing.Invoiced} invoices and {invoicing.Credited} Credit notes issued, {invoicing.Received} in the Shippers' inboxes";
     }
 
     private async Task SendAsync(

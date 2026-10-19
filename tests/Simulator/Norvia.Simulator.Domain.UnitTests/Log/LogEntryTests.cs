@@ -1,3 +1,4 @@
+using Norvia.Simulator.Domain.Invoicing;
 using Norvia.Simulator.Domain.Log;
 using Norvia.Simulator.Domain.Runs;
 
@@ -81,8 +82,25 @@ public sealed class LogEntryTests
         LogOutcomes.Planning.Should().Contain([LogOutcome.Released, LogOutcome.BookingCancelled, LogOutcome.ExceptionResolved]);
         LogOutcomes.Carrier.Should().BeEquivalentTo(
             [LogOutcome.Confirmed, LogOutcome.Declined, LogOutcome.NoAnswer, LogOutcome.TrackingSent, LogOutcome.ProofOfDeliverySent, LogOutcome.CarrierRefused, LogOutcome.CarrierNotReceived]);
-        LogOutcomes.Booking.Concat(LogOutcomes.Planning).Concat(LogOutcomes.Carrier).Should().OnlyHaveUniqueItems();
+        LogOutcomes.Booking.Concat(LogOutcomes.Planning).Concat(LogOutcomes.Carrier).Concat(LogOutcomes.Driver).Concat(LogOutcomes.Invoicing).Should().OnlyHaveUniqueItems();
     }
+
+    [Fact]
+    public void Invoicing_ALineOfFinanceOrAnInbox_NamesItsActorActionAndTheKeysItKnows()
+    {
+        var entry = LogEntry.Invoicing(
+            new SimulationRunId(Guid.NewGuid()), 4, DateTimeOffset.UnixEpoch, InvoicingActions.FinanceActor, InvoicingActions.IssueCreditNote, LogOutcome.CreditNoteIssued,
+            "corr-7", "SIM-1-2", "TO-0000002", "CN-2026-000001 on INV-2026-000001");
+
+        (entry.Sequence, entry.Actor, entry.Action, entry.Outcome).Should().Be((4, "Finance", "Issue Credit note", LogOutcome.CreditNoteIssued));
+        (entry.CorrelationId, entry.ShipperReference, entry.TransportOrderNumber, entry.Detail).Should().Be(("corr-7", "SIM-1-2", "TO-0000002", "CN-2026-000001 on INV-2026-000001"));
+        (entry.ShipmentNumber, entry.TripNumber).Should().Be((null, null));
+    }
+
+    [Fact]
+    public void Outcomes_Invoicing_HasItsOwn() =>
+        LogOutcomes.Invoicing.Should().BeEquivalentTo(
+            [LogOutcome.InvoiceIssued, LogOutcome.NothingToInvoice, LogOutcome.CreditNoteIssued, LogOutcome.InvoicingRefused, LogOutcome.InvoicingNotReceived, LogOutcome.InboxReceived]);
 
     [Fact]
     public void Outcomes_TheNamesFitTheDatabasesColumn()

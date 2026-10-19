@@ -2,6 +2,7 @@ using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Mediator;
 using Norvia.Simulator.Application.Ports;
+using Norvia.Simulator.Domain.Invoicing;
 using Norvia.Simulator.Domain.Log;
 using Norvia.Simulator.Domain.Runs;
 
@@ -24,7 +25,8 @@ public sealed class GetRunHandler(IReadRepository<SimulationRun> runs, IReadRepo
         var planning = await log.ListAsync(new PlanningOutcomesOfRunSpec(query.RunId), cancellationToken);
         var carriers = await log.ListAsync(new CarrierOutcomesOfRunSpec(query.RunId), cancellationToken);
         var drivers = await log.ListAsync(new DriverOutcomesOfRunSpec(query.RunId), cancellationToken);
-        var outcomes = answers.Concat(planning).Concat(carriers).Concat(drivers).GroupBy(outcome => outcome)
+        var invoicing = await log.ListAsync(new InvoicingOutcomesOfRunSpec(query.RunId), cancellationToken);
+        var outcomes = answers.Concat(planning).Concat(carriers).Concat(drivers).Concat(invoicing).GroupBy(outcome => outcome)
             .Select(group => new OutcomeCount(group.Key, group.Count()))
             .OrderBy(count => count.Outcome)
             .ToList();
@@ -41,6 +43,12 @@ public sealed class GetRunHandler(IReadRepository<SimulationRun> runs, IReadRepo
             {
                 // The Drivers act as themselves, on the Trips for today.
                 actors.AddRange(world.Load().OwnFleetDrivers.Select(driver => driver.Name));
+            }
+
+            if (run.Settings.Invoicing.InvoicePercent > 0)
+            {
+                // Finance invoices in the ERP once the deliveries are in.
+                actors.Add(InvoicingActions.FinanceActor);
             }
         }
 

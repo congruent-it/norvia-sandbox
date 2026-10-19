@@ -75,6 +75,21 @@ public sealed class PreviewPlanHandlerTests
     }
 
     [Fact]
+    public async Task Handle_InvoicingShares_ShowTheInvoicingStageOfTheFunnelForTheShippersWhoseBookingsAreAccepted()
+    {
+        var settings = TestData.Settings(orders: 20, bad: 0, assigned: 100, ownFleet: 100) with
+        {
+            Invoicing = new Norvia.Simulator.Domain.Invoicing.InvoicingShares(InvoicePercent: 100, CreditNotePercent: 50),
+        };
+
+        var result = await Handler().Handle(new PreviewPlanQuery(settings), CancellationToken.None);
+
+        result.Value.Invoicing.Shippers.Should().Be(2);
+        result.Value.Invoicing.Counts.Should().Be(new Norvia.Simulator.Domain.Invoicing.InvoicingFunnelCounts(2, 2, 1));
+        result.Value.Invoicing.Shares.Should().Be(settings.Invoicing);
+    }
+
+    [Fact]
     public async Task Handle_ATripShare_ScalesTheShipmentsTheDriversWork()
     {
         var all = TestData.Settings(orders: 20, bad: 0, assigned: 100, ownFleet: 100);

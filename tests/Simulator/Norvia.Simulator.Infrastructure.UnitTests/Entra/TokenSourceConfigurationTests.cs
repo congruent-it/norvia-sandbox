@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Norvia.Simulator.Infrastructure.DriverApi;
 using Norvia.Simulator.Infrastructure.Entra;
+using Norvia.Simulator.Infrastructure.ErpApi;
 using Norvia.Simulator.Infrastructure.PartnerApi;
 using Norvia.Simulator.Infrastructure.TmsApi;
 
@@ -87,6 +88,55 @@ public sealed class TokenSourceConfigurationTests : IDisposable
         services.GetRequiredService<IPersonaTokens>().Should().BeOfType<EntraPersonaTokens>();
         services.GetRequiredService<ITmsTokens>().Should().BeOfType<EntraTmsTokens>();
         services.GetRequiredService<IDriverTokens>().Should().BeOfType<EntraDriverTokens>();
+    }
+
+    [Fact]
+    public void ErpTokens_WhenEntraIsConfigured_ComeFromEntra()
+    {
+        using var services = Services(PartnerEntra, TmsEntra, DriverEntra, new()
+        {
+            ["ErpApi:BaseAddress"] = "https://erp.example",
+            ["ErpApi:Entra:Scope"] = "erp-client/.default",
+            ["ErpApi:Entra:ManagedIdentityClientId"] = "simulator-client",
+        });
+
+        services.GetRequiredService<IErpTokens>().Should().BeOfType<EntraErpTokens>();
+        services.GetRequiredService<IOptions<ErpApiOptions>>().Value.BaseAddress.Should().Be(new Uri("https://erp.example"));
+    }
+
+    [Fact]
+    public void ErpTokens_WhenLocalTokensAreConfigured_AreSignedLocally()
+    {
+        using var services = Services(PartnerEntra, TmsEntra, DriverEntra, new()
+        {
+            ["ErpApi:BaseAddress"] = "https://erp.example",
+            ["ErpApi:LocalTokens:Issuer"] = "https://issuer",
+            ["ErpApi:LocalTokens:Audience"] = "api://erp",
+            ["ErpApi:LocalTokens:ClientId"] = "simulator",
+            ["ErpApi:LocalTokens:SigningKey"] = Convert.ToBase64String(new byte[32]),
+        });
+
+        services.GetRequiredService<IErpTokens>().Should().BeOfType<LocalErpTokens>();
+    }
+
+    [Fact]
+    public void ErpApiOptions_WithNeither_AreInvalid()
+    {
+        using var services = Services(PartnerEntra, TmsEntra, DriverEntra, new() { ["ErpApi:BaseAddress"] = "https://erp.example" });
+
+        var reading = () => services.GetRequiredService<IOptions<ErpApiOptions>>().Value;
+
+        reading.Should().Throw<OptionsValidationException>().WithMessage("*ErpApi:Entra or ErpApi:LocalTokens*");
+    }
+
+    [Fact]
+    public void ErpApiOptions_WithAnIncompleteEntra_AreInvalid()
+    {
+        using var services = Services(PartnerEntra, TmsEntra, DriverEntra, new() { ["ErpApi:BaseAddress"] = "https://erp.example", ["ErpApi:Entra:Scope"] = "erp-client/.default" });
+
+        var reading = () => services.GetRequiredService<IOptions<ErpApiOptions>>().Value;
+
+        reading.Should().Throw<OptionsValidationException>().WithMessage("*ErpApi:Entra needs*");
     }
 
     [Fact]

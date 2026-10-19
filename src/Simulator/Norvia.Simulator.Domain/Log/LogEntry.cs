@@ -89,6 +89,12 @@ public sealed class LogEntry : EntityBase<LogEntryId>, IAggregateRoot
         string? correlationId, string? shipperReference, string? transportOrderNumber, string? shipmentNumber, string tripNumber, string? detail) =>
         new(runId, sequence, at, actor, action, outcome, correlationId, shipperReference, transportOrderNumber, shipmentNumber, detail, tripNumber);
 
+    /// <summary>A step of invoicing: Finance's call to the ERP API, or a document arriving in a Shipper Persona's inbox. It names the keys it knows.</summary>
+    public static LogEntry Invoicing(
+        SimulationRunId runId, int sequence, DateTimeOffset at, string actor, string action, LogOutcome outcome,
+        string? correlationId, string? shipperReference, string? transportOrderNumber, string? detail) =>
+        new(runId, sequence, at, actor, action, outcome, correlationId, shipperReference, transportOrderNumber, null, detail);
+
     public static LogEntry Note(SimulationRunId runId, int sequence, DateTimeOffset at, string text) =>
         new(runId, sequence, at, SimulatorActor, text, LogOutcome.Info, null, null, null, null, null);
 }

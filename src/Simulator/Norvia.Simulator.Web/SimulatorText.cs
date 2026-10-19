@@ -39,6 +39,12 @@ public static class SimulatorText
         LogOutcome.DriverRefused => "Driver app refused",
         LogOutcome.DriverNotReceived => "Driver report not received",
         LogOutcome.TripCompleted => "Trip completed",
+        LogOutcome.InvoiceIssued => "Invoice issued",
+        LogOutcome.NothingToInvoice => "Nothing to invoice",
+        LogOutcome.CreditNoteIssued => "Credit note issued",
+        LogOutcome.InvoicingRefused => "ERP refused",
+        LogOutcome.InvoicingNotReceived => "ERP not reached",
+        LogOutcome.InboxReceived => "In the inbox",
         _ => throw new ArgumentOutOfRangeException(nameof(outcome), outcome, "Every outcome has a wording."),
     };
 

@@ -1,5 +1,6 @@
 using Norvia.Simulator.Domain.Carriers;
 using Norvia.Simulator.Domain.Drivers;
+using Norvia.Simulator.Domain.Invoicing;
 
 namespace Norvia.Simulator.Domain.Runs;
 
@@ -21,6 +22,9 @@ public sealed record SimulationSettings(
 
     /// <summary>The Driver stage of the funnel: what goes wrong on the road for the Shipments on today's Trips. A plan made before it existed has the defaults.</summary>
     public DriverShares Drivers { get; init; } = new();
+
+    /// <summary>The invoicing stage of the funnel: what Finance does once the deliveries are in. A plan made before it existed has the defaults.</summary>
+    public InvoicingShares Invoicing { get; init; } = new();
 
     /// <summary>The share of the Shipments that stay with the Own fleet that the Planner puts on Trips; the rest stay Planned. A plan made before the Trips existed has the default.</summary>
     public int TripPercent { get; init; } = DefaultTripPercent;
@@ -88,6 +92,7 @@ public sealed record SimulationSettings(
 
         problems.AddRange(Carriers.Problems());
         problems.AddRange(Drivers.Problems());
+        problems.AddRange(Invoicing.Problems());
         return problems;
     }
 }

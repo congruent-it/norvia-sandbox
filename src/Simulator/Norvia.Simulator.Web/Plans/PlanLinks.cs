@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.AspNetCore.WebUtilities;
 using Norvia.Simulator.Domain.Carriers;
 using Norvia.Simulator.Domain.Drivers;
+using Norvia.Simulator.Domain.Invoicing;
 using Norvia.Simulator.Domain.Runs;
 
 namespace Norvia.Simulator.Web.Plans;
@@ -31,7 +32,8 @@ public static class PlanLinks
             + $"&assigned={settings.AssignedPercent}&ownfleet={settings.OwnFleetPercent}&reassign={settings.ReassignPercent}&trips={settings.TripPercent}"
             + $"&release={settings.Carriers.ReleasePercent}&confirm={settings.Carriers.ConfirmPercent}&decline={settings.Carriers.DeclinePercent}&tracked={settings.Carriers.TrackedPercent}"
             + $"&exception={settings.Carriers.ExceptionPercent}&delivered={settings.Carriers.DeliveredPercent}&pod={settings.Carriers.ProofOfDeliveryPercent}&cancel={settings.Carriers.CancelPercent}"
-            + $"&collfail={settings.Drivers.CollectionFailedPercent}&delfail={settings.Drivers.DeliveryFailedPercent}&damaged={settings.Drivers.DamagedPercent}&reservations={settings.Drivers.ReservationsPercent}");
+            + $"&collfail={settings.Drivers.CollectionFailedPercent}&delfail={settings.Drivers.DeliveryFailedPercent}&damaged={settings.Drivers.DamagedPercent}&reservations={settings.Drivers.ReservationsPercent}"
+            + $"&invoiced={settings.Invoicing.InvoicePercent}&credited={settings.Invoicing.CreditNotePercent}");
         return settings.PresetName is { } preset ? $"{query}&preset={Uri.EscapeDataString(preset)}" : query;
     }
 
@@ -47,7 +49,7 @@ public static class PlanLinks
             Number("orders"), Number("bad"), Number("today"), Number("seed") ?? newSeed, Text("mode"), Number("window"), Text("preset"),
             Number("assigned"), Number("ownfleet"), Number("reassign"),
             Number("release"), Number("confirm"), Number("decline"), Number("tracked"), Number("exception"), Number("delivered"), Number("pod"), Number("cancel"),
-            Number("collfail"), Number("delfail"), Number("damaged"), Number("reservations"), Number("trips"));
+            Number("collfail"), Number("delfail"), Number("damaged"), Number("reservations"), Number("trips"), Number("invoiced"), Number("credited"));
     }
 
     public static string Run(Guid runId) => $"/runs/{runId}";
@@ -57,7 +59,8 @@ public static class PlanLinks
         int? orders, int? bad, int? today, int? seed, string? mode, int? window, string? preset,
         int? assigned = null, int? ownFleet = null, int? reassign = null,
         int? release = null, int? confirm = null, int? decline = null, int? tracked = null, int? exception = null, int? delivered = null, int? pod = null, int? cancel = null,
-        int? collectionFailed = null, int? deliveryFailed = null, int? damaged = null, int? reservations = null, int? trips = null)
+        int? collectionFailed = null, int? deliveryFailed = null, int? damaged = null, int? reservations = null, int? trips = null,
+        int? invoiced = null, int? credited = null)
     {
         if (orders is null || bad is null || today is null || seed is null || !Enum.TryParse<RunMode>(mode, out var runMode))
         {
@@ -84,6 +87,9 @@ public static class PlanLinks
                 deliveryFailed ?? DriverShares.DefaultDeliveryFailedPercent,
                 damaged ?? DriverShares.DefaultDamagedPercent,
                 reservations ?? DriverShares.DefaultReservationsPercent),
+            Invoicing = new InvoicingShares(
+                invoiced ?? InvoicingShares.DefaultInvoicePercent,
+                credited ?? InvoicingShares.DefaultCreditNotePercent),
         };
     }
 }
