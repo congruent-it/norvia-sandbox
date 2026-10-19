@@ -65,6 +65,10 @@ var triggerRole = 'TransportOrderIntake.Trigger'
 var triggerRoleId = guid('norvia-intake-trigger', environmentName, triggerRole)
 var answerTriggerRole = 'CarrierAnswer.Trigger'
 var answerTriggerRoleId = guid('norvia-answer-trigger', environmentName, answerTriggerRole)
+var carrierInvoiceTriggerRole = 'CarrierInvoice.Trigger'
+var carrierInvoiceTriggerRoleId = guid('norvia-carrier-invoice-trigger', environmentName, carrierInvoiceTriggerRole)
+var carrierInvoicesSubmitRole = 'CarrierInvoices.Submit'
+var carrierInvoicesSubmitRoleId = guid('norvia-partner-api', environmentName, carrierInvoicesSubmitRole)
 var demoUisRole = 'DemoUis.Use'
 var demoUisRoleId = guid('norvia-demo-uis', environmentName, demoUisRole)
 var consoleReadRole = 'IntegrationConsole.Read'
@@ -558,6 +562,16 @@ resource partnerApi 'Microsoft.Graph/applications@v1.0' = {
       ]
       isEnabled: true
     }
+    {
+      id: carrierInvoicesSubmitRoleId
+      value: carrierInvoicesSubmitRole
+      displayName: 'Submit Carrier invoices'
+      description: 'Send a Carrier invoice as a Carrier (E2). Only Carrier Personas hold it, so a Shipper Persona gets 403.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
   ]
 }
 
@@ -639,6 +653,15 @@ resource proofSubmitRoleGrants 'Microsoft.Graph/appRoleAssignedTo@v1.0' = [
   }
 ]
 
+// Carrier Personas may send Carrier invoices too; the others may not, and API Management refuses them with 403 (E2).
+resource carrierInvoicesSubmitRoleGrants 'Microsoft.Graph/appRoleAssignedTo@v1.0' = [
+  for (persona, i) in personas: if (persona.party.type == 'Carrier') {
+    resourceId: partnerApiPrincipal.id
+    appRoleId: carrierInvoicesSubmitRoleId
+    principalId: personaPrincipals[i].id
+  }
+]
+
 // What Easy Auth on the intake Logic App validates API Management's tokens for.
 resource intakeTrigger 'Microsoft.Graph/applications@v1.0' = {
   uniqueName: 'norvia-intake-trigger-${environmentName}'
@@ -704,6 +727,40 @@ resource answerTriggerPrincipal 'Microsoft.Graph/servicePrincipals@v1.0' = {
 resource answerTriggerRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
   resourceId: answerTriggerPrincipal.id
   appRoleId: answerTriggerRoleId
+  principalId: apiManagementIdentity.properties.principalId
+}
+
+// What Easy Auth on the Carrier invoice Logic App validates API Management's tokens for.
+resource carrierInvoiceTrigger 'Microsoft.Graph/applications@v1.0' = {
+  uniqueName: 'norvia-carrier-invoice-trigger-${environmentName}'
+  displayName: 'Norvia Carrier invoice Logic App trigger (${environmentName})'
+  signInAudience: 'AzureADMyOrg'
+  identifierUris: [
+    'api://${tenant().tenantId}/norvia-carrier-invoice-trigger-${environmentName}'
+  ]
+  appRoles: [
+    {
+      id: carrierInvoiceTriggerRoleId
+      value: carrierInvoiceTriggerRole
+      displayName: 'Trigger Carrier invoices'
+      description: 'Call the Carrier invoice Logic App\'s trigger. Only API Management holds it.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
+  ]
+}
+
+resource carrierInvoiceTriggerPrincipal 'Microsoft.Graph/servicePrincipals@v1.0' = {
+  appId: carrierInvoiceTrigger.appId
+  // Entra issues tokens for the trigger only to API Management.
+  appRoleAssignmentRequired: true
+}
+
+resource carrierInvoiceTriggerRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: carrierInvoiceTriggerPrincipal.id
+  appRoleId: carrierInvoiceTriggerRoleId
   principalId: apiManagementIdentity.properties.principalId
 }
 
@@ -1151,6 +1208,20 @@ resource carrierCostRecordRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
   principalId: carrierCostIdentity.properties.principalId
 }
 
+// The E2 Carrier invoice Logic App's identity, which it runs as. It is the one principal holding the ERP's Carrier invoice receive role, so no
+// Carrier invoice is received without passing the integration layer, and it holds nothing else on the ERP or the TMS.
+resource carrierInvoiceIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
+  name: 'id-carrier-invoice-${uniqueString(resourceGroup().id)}'
+  location: location
+  tags: tags
+}
+
+resource carrierInvoiceReceiveRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: erpApiPrincipal.id
+  appRoleId: carrierInvoicesReceiveRoleId
+  principalId: carrierInvoiceIdentity.properties.principalId
+}
+
 output entraIssuer string = '${environment().authentication.loginEndpoint}${tenant().tenantId}/v2.0'
 output entraTenantId string = tenant().tenantId
 output tmsApiClientId string = tmsApi.appId
@@ -1194,8 +1265,11 @@ output apiManagementPrincipalId string = apiManagementIdentity.properties.princi
 output apiManagementClientId string = apiManagementIdentity.properties.clientId
 output intakeTriggerClientId string = intakeTrigger.appId
 output intakeTriggerAudience string = intakeTrigger.identifierUris[0]
-output answerTriggerClientId string = answerTrigger.appId
-output answerTriggerAudience string = answerTrigger.identifierUris[0]
+// Bicep allows 64 outputs, so a Logic App's trigger registration is one object.
+output answerTrigger object = {
+  clientId: answerTrigger.appId
+  audience: answerTrigger.identifierUris[0]
+}
 output demoUisClientId string = demoUis.appId
 output integrationConsoleClientId string = integrationConsole.appId
 output driverAppRegistrationClientId string = driverApp.appId
@@ -1222,3 +1296,8 @@ output shipperInvoicePrincipalId string = shipperInvoiceIdentity.properties.prin
 output billingIdentityName string = billingIdentity.name
 output billingPrincipalId string = billingIdentity.properties.principalId
 output carrierCostIdentityName string = carrierCostIdentity.name
+output carrierInvoice object = {
+  identityName: carrierInvoiceIdentity.name
+  triggerClientId: carrierInvoiceTrigger.appId
+  triggerAudience: carrierInvoiceTrigger.identifierUris[0]
+}

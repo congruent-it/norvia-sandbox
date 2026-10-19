@@ -37,6 +37,7 @@ hooks:
       ./infra/deploy-carrier-cost-logic-app.sh &&
       ./infra/deploy-shipper-invoice-logic-app.sh &&
       ./infra/deploy-answer-logic-app.sh &&
+      ./infra/deploy-carrier-invoice-logic-app.sh &&
       ./infra/deploy-tracking-logic-app.sh &&
       ./infra/deploy-proof-of-delivery-logic-app.sh &&
       ./infra/register-sign-in-callbacks.sh

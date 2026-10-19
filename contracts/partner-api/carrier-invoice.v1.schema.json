@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/partner-api/carrier-invoice.v1.schema.json",
+  "title": "CarrierInvoice",
+  "description": "A Carrier's invoice, as the Carrier sends it to the Norvia Partner API (Carrier invoice format, version 1). It follows the Carrier booking format: its own field names, the Carrier's own booking reference as bookingRef and local dates formatted dd-MM-yyyy. It differs from the Canonical Model on purpose. It never names the Carrier or a correlation ID: API Management takes the Carrier from the token (ADR 0005) and creates the correlation ID. Amounts are in EUR without VAT.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["invoiceNo", "invoiceDate", "lines"],
+  "properties": {
+    "invoiceNo": { "description": "The Carrier's own invoice number. It is the key of the invoice: unique per Carrier, and an invoice sent again with the same content is acknowledged and ignored.", "type": "string", "minLength": 1, "maxLength": 50, "pattern": "\\S" },
+    "invoiceDate": { "description": "The date of the invoice, a local date as dd-MM-yyyy.", "type": "string", "pattern": "^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{4}$", "examples": ["20-10-2026"] },
+    "lines": {
+      "description": "One line per Carrier booking the Carrier claims, with no bookingRef twice.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["bookingRef", "amount"],
+        "properties": {
+          "bookingRef": { "description": "The Carrier's own reference for the booking, as it gave it when it confirmed.", "type": "string", "minLength": 1, "maxLength": 200, "pattern": "\\S" },
+          "amount": { "description": "What the Carrier claims for the booking in EUR, without VAT: above zero, to the cent.", "type": "number", "exclusiveMinimum": 0, "multipleOf": 0.01 },
+          "description": { "type": "string", "maxLength": 500 }
+        }
+      }
+    }
+  }
+}

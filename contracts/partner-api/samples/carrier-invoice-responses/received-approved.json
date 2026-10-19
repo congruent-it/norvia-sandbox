@@ -1,0 +1,1 @@
+{ "result": "RECEIVED", "messageId": "1c7b0d3e-5a54-4f6a-9d5f-6a2f3c0d9a11", "invoiceNo": "VDT-2026-0412", "repeated": false, "status": "APPROVED", "approvedAmount": 190.50, "lines": [ { "bookingRef": "TRX-998", "amount": 70.50, "result": "MATCHED" }, { "bookingRef": "TRX-999", "amount": 120.00, "result": "MATCHED" } ] }
