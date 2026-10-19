@@ -28,6 +28,9 @@
     <EmbeddedResource Include="..\..\..\contracts\partner-api\*.json" LogicalName="PartnerApi/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\responses\*.json" LogicalName="PartnerApi/samples/responses/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\carrier-answer-responses\*.json" LogicalName="PartnerApi/samples/carrier-answer-responses/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\carrier-invoices\*.carrier-invoice.json" LogicalName="PartnerApi/samples/carrier-invoices/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\carrier-invoice-responses\*.json" LogicalName="PartnerApi/samples/carrier-invoice-responses/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\carrier-invoice-outcomes\*.carrier-invoice-outcome.json" LogicalName="PartnerApi/samples/carrier-invoice-outcomes/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\shipper-invoices\*.shipper-invoice.json" LogicalName="PartnerApi/samples/shipper-invoices/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\shipper-tracking\*.shipper-tracking.json" LogicalName="PartnerApi/samples/shipper-tracking/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\shipper-tracking-lists\*.shipper-tracking-list.json" LogicalName="PartnerApi/samples/shipper-tracking-lists/%(Filename)%(Extension)" />

@@ -11,6 +11,7 @@ The format in which a Shipper books a Transport-only transport through the Norvi
 | [carrier-answer-response.v1](carrier-answer-response.v1.schema.json) | Norvia's answer to a Carrier's answer: Recorded, Booking not open, Booking not found, Not allowed, Invalid or Not received |
 | [carrier-invoice.v1](carrier-invoice.v1.schema.json) | A Carrier's invoice, as the Carrier sends it to the Norvia Partner API (see [Carrier invoice](#carrier-invoice)) |
 | [carrier-invoice-response.v1](carrier-invoice-response.v1.schema.json) | Norvia's answer to a Carrier's invoice: Received with each line's result, Invoice number used, Carrier not found, Invalid or Not received |
+| [carrier-invoice-outcome.v1](carrier-invoice-outcome.v1.schema.json) | What Norvia tells a Carrier about an Approved invoice: the approved amount and each line's result (see [Carrier invoice outcome](#carrier-invoice-outcome)) |
 | [carrier-tracking.v1](carrier-tracking.v1.schema.json) | A Carrier's tracking message, as the Carrier sends it to the Norvia Partner API (see [Carrier tracking](#carrier-tracking)) |
 | [carrier-proof-of-delivery.v1](carrier-proof-of-delivery.v1.schema.json) | A Carrier's Proof of delivery with its files base64-encoded, as the Carrier sends it to the Norvia Partner API (see [Carrier Proof of delivery](#carrier-proof-of-delivery)) |
 | [shipper-notification.v1](shipper-notification.v1.schema.json) | A notification, as Norvia's P7 Shipper notification Logic App sends it to a Shipper's notification endpoint (see [Shipper notification](#shipper-notification)) |
@@ -196,6 +197,21 @@ The Logic App retries the ERP on a timeout, `408`, `429` and a server error: exp
 ### How API Management calls the Carrier invoice Logic App
 
 API Management passes the invoice to the Logic App's HTTP trigger as the Carrier sent it, with two headers of its own that replace any the Carrier sent: `X-Carrier-ID` (the Carrier ID it took from the token) and `X-Correlation-ID` (the new correlation ID, which becomes the run's client tracking ID and the response's `messageId`). The trigger accepts only API Management ([ADR 0020](../../docs/adr/0020-only-api-management-may-call-the-intake-logic-app.md)). The Logic App passes the invoice to the map base64-encoded, so no field of it can stand in for the `X-Carrier-ID` it passes alongside.
+
+## Carrier invoice outcome
+
+When a Carrier invoice is Approved, Norvia tells the Carrier what became of each line ([E2](../../docs/processes/erp/e2-carrier-invoice-matching.md)). The Carrier invoice outcome Logic App maps `CarrierInvoiceApproved` to the [carrier-invoice-outcome.v1](carrier-invoice-outcome.v1.schema.json) format and sends it with `POST {the Carrier Persona's endpoint}/carrier/v1/{carrierId}/invoice-outcomes`, with the Carrier's credential in `X-Api-Key` and the invoice's correlation ID in `X-Correlation-ID`, like a booking request. Sample outcomes are in `samples/carrier-invoice-outcomes`.
+
+| Outcome | What it carries |
+|---|---|
+| `invoiceNo` | The Carrier's own invoice number, the key of the outcome |
+| `approvedAmount` | The sum of the accepted amounts, in EUR without VAT |
+| `lines[].bookingRef` | The Carrier's own booking reference of the line |
+| `lines[].result` | `MATCHED` (accepted automatically), `ACCEPTED` (Finance accepted it at the invoiced amount), `ACCEPTED_ADJUSTED` (at another amount, with a remark) or `REJECTED` (with a reason) |
+| `lines[].acceptedAmount` | What Norvia accepts for the line; `0` when rejected |
+| `lines[].remark` | Finance's remark on an adjustment, or its reason for a rejection |
+
+The endpoint only acknowledges. It answers `200` with `repeated: false` once it stored the outcome, and `200` with `repeated: true` for an outcome it has for that `invoiceNo` already, which it doesn't store again. A missing or wrong credential is `401`, a body outside the format `400` with a `ProblemDetails`, and a Carrier the portal doesn't have `404`. A rejected line is free to be invoiced again, with a new `invoiceNo`.
 
 ## Carrier tracking
 

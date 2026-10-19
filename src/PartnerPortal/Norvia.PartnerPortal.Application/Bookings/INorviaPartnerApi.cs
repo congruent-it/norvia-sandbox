@@ -1,6 +1,8 @@
+using Norvia.PartnerPortal.Application.CarrierInvoices.Submit;
 using Norvia.PartnerPortal.Application.ShipperTracking;
 using Norvia.PartnerPortal.Domain.Bookings;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
+using Norvia.PartnerPortal.Domain.CarrierInvoices;
 using Norvia.PartnerPortal.Domain.Personas;
 
 namespace Norvia.PartnerPortal.Application.Bookings;
@@ -35,6 +37,14 @@ public interface INorviaPartnerApi
     /// portal's own trace: it is not sent. Norvia unreachable is a reply, not an error: <see cref="TrackingResult.NotReceived"/>.
     /// </summary>
     Task<TrackingReply> SubmitProofOfDeliveryAsync(Persona persona, string shipmentNumber, CarrierProofOfDelivery proof, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Sends a Carrier invoice as the Carrier Persona, with its own token and subscription key, and returns Norvia's answer
+    /// with the result of each line. The Carrier is the one in the token, never named by the invoice (ADR 0005). Norvia
+    /// unreachable is a reply, not an error: <see cref="CarrierInvoiceReplyResult.NotReceived"/>.
+    /// </summary>
+    Task<CarrierInvoiceReply> SubmitCarrierInvoiceAsync(
+        Persona persona, string invoiceNumber, DateOnly invoiceDate, IReadOnlyList<CarrierInvoiceLineDraft> lines, CancellationToken cancellationToken);
 
     /// <summary>
     /// Lists the Shipper Persona's Transport Orders as the Persona, with its own token and subscription key, newest

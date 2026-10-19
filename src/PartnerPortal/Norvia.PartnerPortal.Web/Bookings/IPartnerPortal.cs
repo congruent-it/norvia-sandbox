@@ -2,6 +2,10 @@ using Norvia.PartnerPortal.Application.Bookings;
 using Norvia.PartnerPortal.Application.CarrierBookings;
 using Norvia.PartnerPortal.Application.CarrierBookings.Answer;
 using Norvia.PartnerPortal.Application.CarrierBookings.AnswerSettings;
+using Ardalis.Result;
+using Norvia.PartnerPortal.Application.CarrierInvoices;
+using Norvia.PartnerPortal.Application.CarrierInvoices.Draft;
+using Norvia.PartnerPortal.Application.CarrierInvoices.Submit;
 using Norvia.PartnerPortal.Application.CarrierShipments;
 using Norvia.PartnerPortal.Application.CarrierShipments.Send;
 using Norvia.PartnerPortal.Application.CarrierShipments.SendProofOfDelivery;
@@ -74,6 +78,23 @@ public interface IPartnerPortal
     /// settings; null when there is no such Carrier Persona. A delay out of range throws, as the page limits it.
     /// </summary>
     Task<CarrierTrackingSettingsView?> ChangeCarrierTrackingSettingsAsync(PersonaId personaId, CarrierTrackingSettingsView settings, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The Carrier Persona's draft Carrier invoice, built from its own bookings and Tracking records: no call to Norvia.
+    /// Null when there is no such Carrier Persona.
+    /// </summary>
+    Task<CarrierInvoiceDraftView?> GetCarrierInvoiceDraftAsync(PersonaId personaId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Sends a Carrier invoice as the Carrier Persona to Norvia and returns what the Partner API replied, with the result of
+    /// each line. Not found when there is no such Carrier Persona; invalid, with the reason, when the invoice breaks the rules
+    /// the portal checks before it sends.
+    /// </summary>
+    Task<Result<SubmittedCarrierInvoice>> SubmitCarrierInvoiceAsync(
+        PersonaId personaId, string invoiceNumber, DateOnly invoiceDate, IReadOnlyList<CarrierInvoiceLineDraft> lines, CancellationToken cancellationToken);
+
+    /// <summary>The Carrier invoices the Carrier Persona sent, the latest first, each with the outcome per line once Norvia told it.</summary>
+    Task<IReadOnlyList<CarrierInvoiceView>> ListCarrierInvoicesAsync(PersonaId personaId, CancellationToken cancellationToken);
 
     /// <summary>The invoices and Credit notes in the Shipper Persona's inbox, the latest first.</summary>
     Task<IReadOnlyList<ShipperInvoiceView>> ListShipperInvoicesAsync(PersonaId personaId, CancellationToken cancellationToken);

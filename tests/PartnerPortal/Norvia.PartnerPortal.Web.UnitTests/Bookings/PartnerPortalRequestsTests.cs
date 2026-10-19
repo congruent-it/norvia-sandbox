@@ -8,6 +8,10 @@ using Norvia.PartnerPortal.Application.Bookings.Submit;
 using Norvia.PartnerPortal.Application.CarrierBookings;
 using Norvia.PartnerPortal.Application.CarrierBookings.Answer;
 using Norvia.PartnerPortal.Application.CarrierBookings.AnswerSettings;
+using Norvia.PartnerPortal.Application.CarrierInvoices;
+using Norvia.PartnerPortal.Application.CarrierInvoices.Draft;
+using Norvia.PartnerPortal.Application.CarrierInvoices.List;
+using Norvia.PartnerPortal.Application.CarrierInvoices.Submit;
 using Norvia.PartnerPortal.Application.CarrierShipments;
 using Norvia.PartnerPortal.Application.CarrierShipments.List;
 using Norvia.PartnerPortal.Application.CarrierShipments.Send;
@@ -22,6 +26,7 @@ using Norvia.PartnerPortal.Application.ShipperTracking.GetTransportOrder;
 using Norvia.PartnerPortal.Application.ShipperTracking.List;
 using Norvia.PartnerPortal.Domain.Bookings;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
+using Norvia.PartnerPortal.Domain.CarrierInvoices;
 using Norvia.PartnerPortal.Domain.Personas;
 using Norvia.PartnerPortal.Web.Bookings;
 using Norvia.PartnerPortal.Web.CarrierShipments;
@@ -162,6 +167,37 @@ public sealed class PartnerPortalRequestsTests : IDisposable
 
         (await _portal.SendProofOfDeliveryAsync(new PersonaId("van-dijk-transport"), "CB-0000001", draft, Xunit.TestContext.Current.CancellationToken)).Should().BeSameAs(sent);
         (await _portal.SendProofOfDeliveryAsync(new PersonaId("van-dijk-transport"), "CB-0000009", draft, Xunit.TestContext.Current.CancellationToken)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetCarrierInvoiceDraftAsync_IsTheDraftOfTheCarrierPersona()
+    {
+        var draft = new CarrierInvoiceDraftView("INV-1", new DateOnly(2026, 10, 20), []);
+        _mediator.Send(new GetCarrierInvoiceDraftQuery(new PersonaId("van-dijk-transport")), Arg.Any<CancellationToken>()).Returns(draft);
+
+        (await _portal.GetCarrierInvoiceDraftAsync(new PersonaId("van-dijk-transport"), Xunit.TestContext.Current.CancellationToken)).Should().BeSameAs(draft);
+    }
+
+    [Fact]
+    public async Task SubmitCarrierInvoiceAsync_SendsTheInvoiceAsThePersona_AndReturnsTheResult()
+    {
+        IReadOnlyList<CarrierInvoiceLineDraft> lines = [new("VDT-1", 10m)];
+        var sent = new SubmittedCarrierInvoice("INV-1", CarrierInvoiceReply.NotReceived(null), Invoice: null);
+        _mediator.Send(new SubmitCarrierInvoiceCommand(new PersonaId("van-dijk-transport"), "INV-1", new DateOnly(2026, 10, 20), lines), Arg.Any<CancellationToken>())
+            .Returns(Result.Success(sent));
+
+        var result = await _portal.SubmitCarrierInvoiceAsync(new PersonaId("van-dijk-transport"), "INV-1", new DateOnly(2026, 10, 20), lines, Xunit.TestContext.Current.CancellationToken);
+
+        result.Value.Should().BeSameAs(sent);
+    }
+
+    [Fact]
+    public async Task ListCarrierInvoicesAsync_ListsThePersonasCarrierInvoices()
+    {
+        IReadOnlyList<CarrierInvoiceView> invoices = [];
+        _mediator.Send(new ListCarrierInvoicesQuery(new PersonaId("van-dijk-transport")), Arg.Any<CancellationToken>()).Returns(invoices);
+
+        (await _portal.ListCarrierInvoicesAsync(new PersonaId("van-dijk-transport"), Xunit.TestContext.Current.CancellationToken)).Should().BeSameAs(invoices);
     }
 
     [Fact]

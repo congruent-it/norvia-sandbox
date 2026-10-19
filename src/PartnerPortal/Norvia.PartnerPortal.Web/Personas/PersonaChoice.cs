@@ -23,6 +23,10 @@ public static class PersonaChoice
 
     public static string ShipmentsPath(string personaId) => $"/personas/{Uri.EscapeDataString(personaId)}/shipments";
 
+    public static string DraftInvoicePath(string personaId) => $"/personas/{Uri.EscapeDataString(personaId)}/draft-invoice";
+
+    public static string CarrierInvoicesPath(string personaId) => $"/personas/{Uri.EscapeDataString(personaId)}/carrier-invoices";
+
     public static string NotificationsPath(string personaId) => $"/personas/{Uri.EscapeDataString(personaId)}/notifications";
 
     public static string InvoicesPath(string personaId) => $"/personas/{Uri.EscapeDataString(personaId)}/invoices";

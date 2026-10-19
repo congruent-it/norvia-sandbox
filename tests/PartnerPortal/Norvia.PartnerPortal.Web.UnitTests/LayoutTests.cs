@@ -35,6 +35,8 @@ public sealed class LayoutTests : PortalWebContext
 
         layout.FindAll("nav a").Select(link => link.GetAttribute("href")).Should().Contain("/personas/van-dijk-transport/booking-requests")
             .And.Contain("/personas/van-dijk-transport/shipments")
+            .And.Contain("/personas/van-dijk-transport/draft-invoice")
+            .And.Contain("/personas/van-dijk-transport/carrier-invoices")
             .And.NotContain("/personas/van-dijk-transport/bookings/new")
             .And.NotContain("/personas/van-dijk-transport/notifications")
             .And.NotContain("/personas/van-dijk-transport/invoices")

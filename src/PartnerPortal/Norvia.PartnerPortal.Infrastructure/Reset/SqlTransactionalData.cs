@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Norvia.PartnerPortal.Application.Reset;
 using Norvia.PartnerPortal.Domain.Bookings;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
+using Norvia.PartnerPortal.Domain.CarrierInvoices;
 using Norvia.PartnerPortal.Domain.ShipperInvoices;
 using Norvia.PartnerPortal.Domain.ShipperNotifications;
 using Norvia.PartnerPortal.Infrastructure.Data;
@@ -26,6 +27,8 @@ internal sealed class SqlTransactionalData(PartnerPortalDbContext dbContext) : I
                 await DeleteAsync<ShipperNotification>("Shipper notifications", cancellationToken),
                 await DeleteAsync<ShipperInvoice>("Shipper invoices", cancellationToken),
                 await DeleteAsync<CarrierBookingRequest>("Carrier booking requests", cancellationToken),
+                await DeleteAsync<CarrierInvoice>("Carrier invoices", cancellationToken),
+                await DeleteAsync<CarrierInvoiceOutcome>("Carrier invoice outcomes", cancellationToken),
                 await DeleteAsync<CarrierAnswerSettings>("Answer modes", cancellationToken),
                 await DeleteAsync<CarrierTrackingSettings>("Tracking modes", cancellationToken),
             };

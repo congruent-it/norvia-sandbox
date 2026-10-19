@@ -1,0 +1,1 @@
+{ "invoiceNo": "VDT-2026-0413", "approvedAmount": 70.50, "lines": [ { "bookingRef": "TRX-998", "result": "MATCHED", "acceptedAmount": 70.50 }, { "bookingRef": "TRX-1001", "result": "REJECTED", "acceptedAmount": 0, "remark": "Invoiced on VDT-2026-0301 already." } ] }

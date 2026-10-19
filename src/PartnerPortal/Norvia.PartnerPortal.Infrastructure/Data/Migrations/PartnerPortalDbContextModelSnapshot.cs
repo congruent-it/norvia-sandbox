@@ -225,6 +225,94 @@ namespace Norvia.PartnerPortal.Infrastructure.Data.Migrations
                     b.ToTable("CarrierTrackingSettings", (string)null);
                 });
 
+            modelBuilder.Entity("Norvia.PartnerPortal.Domain.CarrierInvoices.CarrierInvoice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("ApprovedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateOnly>("InvoiceDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("InvoiceNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Lines")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PersonaId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTimeOffset>("SubmittedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PersonaId", "InvoiceNumber")
+                        .IsUnique();
+
+                    b.HasIndex("PersonaId", "SubmittedAt");
+
+                    b.ToTable("CarrierInvoices", (string)null);
+                });
+
+            modelBuilder.Entity("Norvia.PartnerPortal.Domain.CarrierInvoices.CarrierInvoiceOutcome", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("ApprovedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("InvoiceNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Lines")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PersonaId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PersonaId", "InvoiceNumber")
+                        .IsUnique();
+
+                    b.ToTable("CarrierInvoiceOutcomes", (string)null);
+                });
+
             modelBuilder.Entity("Norvia.PartnerPortal.Domain.ShipperInvoices.ShipperInvoice", b =>
                 {
                     b.Property<Guid>("Id")

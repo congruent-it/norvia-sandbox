@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Norvia.PartnerPortal.Domain.Bookings;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
+using Norvia.PartnerPortal.Domain.CarrierInvoices;
 
 namespace Norvia.PartnerPortal.Infrastructure.PartnerApi;
 
@@ -87,6 +88,70 @@ internal static class PartnerAnswers
             413 => TrackingReply.Refused(Text(json, "text") ?? "A Proof of delivery is at most 25 MB.", messageId),
             _ => ReadTrackingReply(statusCode, body, correlationId),
         };
+    }
+
+    /// <summary>
+    /// Reads Norvia's reply to a Carrier invoice (contracts/partner-api/README.md, Carrier invoice responses, and API
+    /// Management's refusals). A reply that doesn't say the invoice was received, or why not, means it wasn't: nothing was
+    /// recorded, and sending it again is safe.
+    /// </summary>
+    public static CarrierInvoiceReply ReadCarrierInvoiceReply(int statusCode, string body, string? correlationId)
+    {
+        var json = Parse(body);
+        var messageId = Text(json, "messageId") ?? correlationId;
+
+        return (statusCode, Text(json, "result")) switch
+        {
+            (200 or 201, "RECEIVED") when Receipt(json) is { } receipt => CarrierInvoiceReply.Received(messageId, receipt),
+            (409, "INVOICE_NUMBER_USED") => InvoiceRefusal(CarrierInvoiceReplyResult.InvoiceNumberUsed, json, messageId, "Norvia has this invoice number with different content."),
+            (422, "CARRIER_NOT_FOUND") => InvoiceRefusal(CarrierInvoiceReplyResult.CarrierNotFound, json, messageId, "Norvia has no Carrier for this Persona."),
+            (400, "INVALID") => InvoiceRefusal(CarrierInvoiceReplyResult.Invalid, json, messageId, "Norvia can't use this invoice."),
+            (403, _) => CarrierInvoiceReply.Refusal(CarrierInvoiceReplyResult.Refused, Text(json, "text") ?? UnrecognisedCredentials, messageId),
+            (401, _) => CarrierInvoiceReply.Refusal(CarrierInvoiceReplyResult.Refused, UnrecognisedCredentials, messageId),
+            _ => CarrierInvoiceReply.NotReceived(messageId),
+        };
+    }
+
+    private static CarrierInvoiceReply InvoiceRefusal(CarrierInvoiceReplyResult result, JsonObject? json, string? messageId, string fallbackText) =>
+        CarrierInvoiceReply.Refusal(result, Text(json, "text") ?? fallbackText, messageId);
+
+    // A received invoice with a line the portal can't read isn't relayed in part: it counts as not received, as the Logic App does.
+    private static CarrierInvoiceReceipt? Receipt(JsonObject? json)
+    {
+        if (json?["repeated"] is not JsonValue repeated || !repeated.TryGetValue<bool>(out var wasRepeated)
+            || Text(json, "status") is not { } status
+            || json["lines"] is not JsonArray { Count: > 0 } wireLines)
+        {
+            return null;
+        }
+
+        var approved = status switch
+        {
+            "APPROVED" => CarrierInvoiceStatus.Approved,
+            "RECEIVED" => CarrierInvoiceStatus.Received,
+            _ => (CarrierInvoiceStatus?)null,
+        };
+        if (approved is null)
+        {
+            return null;
+        }
+
+        var lines = new List<CarrierInvoiceReceiptLine>();
+        foreach (var node in wireLines)
+        {
+            if (node is not JsonObject line
+                || Text(line, "bookingRef") is not { } bookingRef
+                || line["amount"] is not JsonValue amount || !amount.TryGetValue<decimal>(out var lineAmount)
+                || !CarrierInvoiceLineResults.TryParse(Text(line, "result"), out var result))
+            {
+                return null;
+            }
+
+            lines.Add(new CarrierInvoiceReceiptLine(bookingRef, lineAmount, result));
+        }
+
+        decimal? approvedAmount = json["approvedAmount"] is JsonValue value && value.TryGetValue<decimal>(out var total) ? total : null;
+        return new CarrierInvoiceReceipt(wasRepeated, approved.Value, approvedAmount, lines);
     }
 
     private static NorviaReply Refusal(CarrierAnswerResult result, JsonObject? json, string? messageId, string fallbackText) =>
