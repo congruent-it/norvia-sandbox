@@ -90,6 +90,47 @@ public sealed class CarrierInvoice : EntityBase<CarrierInvoiceId>, IAggregateRoo
     }
 
     /// <summary>
+    /// A Carrier cost has arrived: matches again every undecided Unknown booking line of this Carrier invoice that quotes its reference.
+    /// The line gets its new result (Matched, Price mismatch or Duplicate) and a Matched line is accepted at once, making the Carrier cost
+    /// Invoiced. A Carrier cost of another Carrier, and lines Finance already decided, are left alone. Returns whether this made the invoice
+    /// Approved.
+    /// </summary>
+    /// <param name="tolerance">How far, in EUR, a line's amount may be from the Carrier cost's total and still match.</param>
+    public bool MatchAgain(CarrierCost cost, decimal tolerance, DateTimeOffset matchedAt)
+    {
+        ArgumentNullException.ThrowIfNull(cost);
+        ArgumentOutOfRangeException.ThrowIfNegative(tolerance);
+
+        if (cost.CarrierId != CarrierId || Status != CarrierInvoiceStatus.Received)
+        {
+            return false;
+        }
+
+        var changed = false;
+        var lines = Lines.Select(line =>
+        {
+            if (line.Status != CarrierInvoiceLineStatus.ToDecide
+                || line.Result != CarrierInvoiceLineResult.UnknownBooking
+                || line.CarrierBookingReference != cost.CarrierBookingReference)
+            {
+                return line;
+            }
+
+            changed = true;
+            return Match(new CarrierInvoiceLineData(line.CarrierBookingReference, line.Amount, line.Description), [cost], tolerance);
+        }).ToList();
+
+        if (!changed)
+        {
+            return false;
+        }
+
+        // A new list, so the change is seen as one.
+        Lines = lines;
+        return ApproveWhenDecided(matchedAt);
+    }
+
+    /// <summary>
     /// Finance accepts a line To decide, at the invoiced amount or, with a remark, at an adjusted one, and its Carrier cost becomes
     /// Invoiced. <paramref name="cost"/> is the Carrier cost the line was matched against; a line without an Open Carrier cost for this
     /// Carrier can only be rejected. Returns whether this decision made the invoice Approved.
@@ -160,6 +201,11 @@ public sealed class CarrierInvoice : EntityBase<CarrierInvoiceId>, IAggregateRoo
     {
         // A new list, so the change is seen as one.
         Lines = [.. Lines.Select((line, at) => at == index ? decided : line)];
+        return ApproveWhenDecided(decidedAt);
+    }
+
+    private bool ApproveWhenDecided(DateTimeOffset decidedAt)
+    {
         if (Lines.Any(line => line.Status == CarrierInvoiceLineStatus.ToDecide))
         {
             return false;

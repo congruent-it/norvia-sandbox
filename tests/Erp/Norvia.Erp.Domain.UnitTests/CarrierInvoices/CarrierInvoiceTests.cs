@@ -375,4 +375,94 @@ public sealed class CarrierInvoiceTests
 
         invoice.ApprovedAmount.Should().Be(5m);
     }
+
+    private static CarrierInvoice Waiting(params CarrierInvoiceLineData[] lines) => CarrierInvoice.Receive(Invoice(lines), [], 0m, Now).Invoice!;
+
+    [Fact]
+    public void MatchAgain_AnUnknownBookingLineWhoseCostArrives_IsMatchedAndTheLastLineApprovesTheInvoice()
+    {
+        var invoice = Waiting(Line("TRX-1", 70m));
+        var cost = Cost("CB-0000001", "TRX-1", 70m);
+
+        var approved = invoice.MatchAgain(cost, 0m, Now.AddHours(1));
+
+        approved.Should().BeTrue();
+        invoice.Status.Should().Be(CarrierInvoiceStatus.Approved);
+        invoice.ApprovedAmount.Should().Be(70m);
+        invoice.ApprovedAt.Should().Be(Now.AddHours(1));
+        invoice.Lines.Single().Should().Match<CarrierInvoiceLine>(line => line.Result == CarrierInvoiceLineResult.Matched
+            && line.Status == CarrierInvoiceLineStatus.Matched && line.CarrierBookingNumber == "CB-0000001");
+        cost.Status.Should().Be(CarrierCostStatus.Invoiced);
+    }
+
+    [Fact]
+    public void MatchAgain_AnAmountOutsideTolerance_BecomesAPriceMismatchStillToDecide()
+    {
+        var invoice = Waiting(Line("TRX-1", 75m));
+        var cost = Cost("CB-0000001", "TRX-1", 70m);
+
+        invoice.MatchAgain(cost, 0m, Now).Should().BeFalse();
+
+        invoice.Status.Should().Be(CarrierInvoiceStatus.Received);
+        invoice.Lines.Single().Should().Match<CarrierInvoiceLine>(line => line.Result == CarrierInvoiceLineResult.PriceMismatch
+            && line.Status == CarrierInvoiceLineStatus.ToDecide && line.CarrierBookingNumber == "CB-0000001");
+        cost.Status.Should().Be(CarrierCostStatus.Open);
+    }
+
+    [Fact]
+    public void MatchAgain_ACostOfAnotherCarrier_MatchesNothing()
+    {
+        var invoice = Waiting(Line("TRX-1", 70m));
+        var cost = Cost("CB-0000001", "TRX-1", 70m, "CAR-0002");
+
+        invoice.MatchAgain(cost, 0m, Now).Should().BeFalse();
+
+        invoice.Lines.Single().Result.Should().Be(CarrierInvoiceLineResult.UnknownBooking);
+        cost.Status.Should().Be(CarrierCostStatus.Open);
+    }
+
+    [Fact]
+    public void MatchAgain_ALineFinanceAlreadyRejected_IsUntouched()
+    {
+        var invoice = Waiting(Line("TRX-1", 70m), Line("TRX-2", 10m));
+        invoice.Reject("TRX-1", "Not ours", Now);
+        var cost = Cost("CB-0000001", "TRX-1", 70m);
+
+        invoice.MatchAgain(cost, 0m, Now).Should().BeFalse();
+
+        invoice.Lines[0].Should().Match<CarrierInvoiceLine>(line => line.Status == CarrierInvoiceLineStatus.Rejected && line.Result == CarrierInvoiceLineResult.UnknownBooking);
+        cost.Status.Should().Be(CarrierCostStatus.Open);
+    }
+
+    [Fact]
+    public void MatchAgain_ALineWithAnotherReference_IsUntouched()
+    {
+        var invoice = Waiting(Line("TRX-2", 70m));
+        var cost = Cost("CB-0000001", "TRX-1", 70m);
+
+        invoice.MatchAgain(cost, 0m, Now).Should().BeFalse();
+
+        invoice.Lines.Single().Result.Should().Be(CarrierInvoiceLineResult.UnknownBooking);
+    }
+
+    [Fact]
+    public void MatchAgain_AnApprovedInvoice_IsUntouched()
+    {
+        var invoice = CarrierInvoice.Receive(Invoice(Line("TRX-1", 70m)), [Cost("CB-0000001", "TRX-1", 70m)], 0m, Now).Invoice!;
+
+        invoice.MatchAgain(Cost("CB-0000002", "TRX-1", 70m), 0m, Now).Should().BeFalse();
+
+        invoice.Lines.Single().CarrierBookingNumber.Should().Be("CB-0000001");
+    }
+
+    [Fact]
+    public void MatchAgain_WithAnotherLineStillToDecide_DoesNotApproveTheInvoice()
+    {
+        var invoice = Waiting(Line("TRX-1", 70m), Line("TRX-2", 10m));
+
+        invoice.MatchAgain(Cost("CB-0000001", "TRX-1", 70m), 0m, Now).Should().BeFalse();
+
+        invoice.Status.Should().Be(CarrierInvoiceStatus.Received);
+        invoice.Lines[0].Status.Should().Be(CarrierInvoiceLineStatus.Matched);
+    }
 }
