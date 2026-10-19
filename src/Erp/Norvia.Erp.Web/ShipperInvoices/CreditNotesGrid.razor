@@ -13,6 +13,14 @@
     <PropertyColumn Title="VAT" Property="@(row => Money.Format(row.Vat))" />
     <PropertyColumn Title="Total with VAT" Property="@(row => Money.Format(row.TotalWithVat))" />
     <PropertyColumn Title="Reason" Property="@(row => row.Reason)" />
+    <PropertyColumn Title="Status" Property="@(row => row.Status == "NotDelivered" ? "Not delivered" : row.Status)" />
+    <PropertyColumn Title="Sent" Property="@(row => SentTime.Format(row))" />
+    <TemplateColumn Title="Actions">
+        @if (context.Status == "NotDelivered")
+        {
+            <SendAgainButton InvoiceNumber="@context.CreditNoteNumber" @key="context.CreditNoteNumber" />
+        }
+    </TemplateColumn>
 </FluentDataGrid>
 
 @code {

@@ -375,7 +375,7 @@ resource invoicingMonitoringFilter 'Microsoft.ServiceBus/namespaces/topics/subsc
   }
 }
 
-// The E1 Shipper invoice Logic App's subscription: ShipperInvoiceIssued only, as the message's eventType property says. Its filter also
+// The E1 Shipper invoice Logic App's subscription: ShipperInvoiceIssued and CreditNoteIssued only, as the message's eventType property says. Its filter also
 // routes resubmits from the console, like every subscription's (coding guidelines §7). The AppHost's emulator gives the same subscription
 // the same condition (ResubmitAwareFilters).
 resource shipperInvoice 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01' = {
@@ -389,7 +389,7 @@ resource shipperInvoiceFilter 'Microsoft.ServiceBus/namespaces/topics/subscripti
   properties: {
     filterType: 'SqlFilter'
     sqlFilter: {
-      sqlExpression: '(eventType = \'ShipperInvoiceIssued\' AND resubmitTo IS NULL) OR resubmitTo = \'shipper-invoice\''
+      sqlExpression: '(eventType IN (\'ShipperInvoiceIssued\', \'CreditNoteIssued\') AND resubmitTo IS NULL) OR resubmitTo = \'shipper-invoice\''
     }
   }
 }

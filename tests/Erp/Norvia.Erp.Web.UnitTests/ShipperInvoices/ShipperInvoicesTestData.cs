@@ -20,7 +20,7 @@ internal static class ShipperInvoicesTestData
         sentAt,
         notDelivered);
 
-    public static CreditNoteView CreditNote(int sequence, int invoice = 3, decimal withoutVat = 40m, string reason = "Rate Card error") => new(
+    public static CreditNoteView CreditNote(int sequence, int invoice = 3, decimal withoutVat = 40m, string reason = "Rate Card error", DateTimeOffset? sentAt = null, NotDeliveredView? notDelivered = null) => new(
         $"CN-2026-{sequence:D6}",
         new DateOnly(2026, 10, 20),
         new ShipperOnInvoiceView("SHP-0001", "Brouwer Dranken"),
@@ -35,7 +35,10 @@ internal static class ShipperInvoicesTestData
         withoutVat + decimal.Round(withoutVat * 0.21m, 2, MidpointRounding.AwayFromZero),
         reason,
         new DateTimeOffset(2026, 10, 20, 8, 0, 0, TimeSpan.Zero),
-        $"corr-cn-{sequence}");
+        $"corr-cn-{sequence}",
+        notDelivered is not null ? "NotDelivered" : sentAt is null ? "Issued" : "Sent",
+        sentAt,
+        notDelivered);
 
     private static ShipperInvoiceLineView Line(int index, decimal total) => new(
         $"TO-{index:D7}",

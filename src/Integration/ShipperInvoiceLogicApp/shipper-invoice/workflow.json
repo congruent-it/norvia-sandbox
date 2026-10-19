@@ -27,8 +27,8 @@
         "type": "Compose",
         "inputs": {
           "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
-          "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['invoice']?['shipper']?['shipperId']",
-          "documentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['invoice']?['invoiceNumber']",
+          "partyId": "@coalesce(json(base64ToString(triggerBody()?['contentData']))?['invoice']?['shipper']?['shipperId'], json(base64ToString(triggerBody()?['contentData']))?['creditNote']?['shipper']?['shipperId'])",
+          "documentNumber": "@coalesce(json(base64ToString(triggerBody()?['contentData']))?['invoice']?['invoiceNumber'], json(base64ToString(triggerBody()?['contentData']))?['creditNote']?['creditNoteNumber'])",
           "sourceMessageId": "@json(base64ToString(triggerBody()?['contentData']))?['eventId']"
         },
         "runAfter": {},
@@ -43,9 +43,9 @@
       "Map_the_invoice": {
         "type": "InvokeFunction",
         "inputs": {
-          "functionName": "MapShipperInvoiceIssued",
+          "functionName": "MapShipperDocument",
           "parameters": {
-            "shipperInvoiceIssued": "@{triggerBody()?['contentData']}"
+            "message": "@{triggerBody()?['contentData']}"
           }
         },
         "runAfter": {
@@ -68,7 +68,7 @@
             "subscriptionName": "shipper-invoice",
             "lockToken": "@triggerBody()?['lockToken']",
             "deadLetterReason": "ShipperInvoiceIssuedUnreadable",
-            "deadLetterErrorDescription": "The message isn't an invoice the Shipper can be sent, so nothing was sent to the Shipper."
+            "deadLetterErrorDescription": "The message isn't an invoice or Credit note the Shipper can be sent, so nothing was sent to the Shipper."
           },
           "serviceProviderConfiguration": {
             "connectionName": "serviceBus",
@@ -97,7 +97,7 @@
           "runStatus": "Failed",
           "runError": {
             "code": "ShipperInvoiceIssuedUnreadable",
-            "message": "The message isn't an invoice the Shipper can be sent, so it was dead-lettered."
+            "message": "The message isn't an invoice or Credit note the Shipper can be sent, so it was dead-lettered."
           }
         },
         "runAfter": {
@@ -215,7 +215,7 @@
             "type": "Http",
             "inputs": {
               "method": "POST",
-              "uri": "@{parameters('erpBaseUrl')}/v1/shipper-invoices/@{outputs('Track_the_invoice')?['documentNumber']}/report-sent",
+              "uri": "@{parameters('erpBaseUrl')}/v1/@{if(startsWith(outputs('Track_the_invoice')?['documentNumber'], 'CN-'), 'credit-notes', 'shipper-invoices')}/@{outputs('Track_the_invoice')?['documentNumber']}/report-sent",
               "headers": {
                 "Content-Type": "application/json",
                 "X-Correlation-ID": "@{outputs('Track_the_invoice')?['correlationId']}"
@@ -255,7 +255,7 @@
               "type": "Http",
               "inputs": {
                 "method": "POST",
-                "uri": "@{parameters('erpBaseUrl')}/v1/shipper-invoices/@{outputs('Track_the_invoice')?['documentNumber']}/report-not-delivered",
+                "uri": "@{parameters('erpBaseUrl')}/v1/@{if(startsWith(outputs('Track_the_invoice')?['documentNumber'], 'CN-'), 'credit-notes', 'shipper-invoices')}/@{outputs('Track_the_invoice')?['documentNumber']}/report-not-delivered",
                 "headers": {
                   "Content-Type": "application/json",
                   "X-Correlation-ID": "@{outputs('Track_the_invoice')?['correlationId']}"

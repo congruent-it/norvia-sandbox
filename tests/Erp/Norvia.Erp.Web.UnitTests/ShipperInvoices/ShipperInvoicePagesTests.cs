@@ -67,6 +67,25 @@ public sealed class ShipperInvoicePagesTests : ErpWebContext
     }
 
     [Fact]
+    public void RenderList_ACreditNoteNotDelivered_ShowsTheFlag_AndOffersSendAgainForThatCreditNoteOnly()
+    {
+        Answer<ListShipperInvoicesQuery, IReadOnlyList<ShipperInvoiceView>>([]);
+        Answer<ListCreditNotesQuery, IReadOnlyList<CreditNoteView>>(
+            [
+                ShipperInvoicesTestData.CreditNote(2, notDelivered: new NotDeliveredView(new DateTimeOffset(2026, 10, 20, 8, 0, 5, TimeSpan.Zero), 503, "Overloaded")),
+                ShipperInvoicesTestData.CreditNote(1, sentAt: new DateTimeOffset(2026, 10, 20, 8, 0, 5, TimeSpan.Zero)),
+            ]);
+
+        var page = Render<ShipperInvoicesPage>();
+
+        page.WaitForAssertion(() => page.Markup.Should().Contain("CN-2026-000002"));
+        page.FindAll("td").Select(cell => cell.TextContent.Trim()).Should().ContainInOrder(
+            "CN-2026-000002", "Rate Card error", "Not delivered", "Not delivered",
+            "CN-2026-000001", "Rate Card error", "Sent", "2026-10-20 10:00:05");
+        page.FindAll("fluent-button").Should().ContainSingle().Which.GetAttribute("aria-label").Should().Be("Send CN-2026-000002 again");
+    }
+
+    [Fact]
     public void RenderList_WithNoInvoices_SaysNoneWasIssued()
     {
         Answer<ListShipperInvoicesQuery, IReadOnlyList<ShipperInvoiceView>>([]);

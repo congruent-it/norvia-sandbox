@@ -4,13 +4,15 @@ using System.Text.Json.Nodes;
 namespace Norvia.Integration.CarrierBooking;
 
 /// <summary>
-/// The E1 Shipper invoice map: turns a Canonical Model <c>ShipperInvoiceIssued</c> into the Shipper invoice format (E1), which follows the
-/// Shipper booking format of P1: its own field names, the Shipper's own reference as <c>bookingRef</c> and local dates as dd-MM-yyyy.
+/// The E1 Shipper invoice map: turns a Canonical Model <c>ShipperInvoiceIssued</c> or <c>CreditNoteIssued</c> into the Shipper invoice
+/// format (E1), which follows the Shipper booking format of P1: its own field names, the Shipper's own reference as <c>bookingRef</c> and
+/// local dates as dd-MM-yyyy.
 /// </summary>
 /// <remarks>
-/// Towards the Shipper, Norvia carries the goods, so the invoice names neither the Carrier nor the Shipment number (ADR 0011). It also
-/// leaves out what is Norvia's own: the Shipper's name, the correlation ID and the invoice's status. The amounts go over as they are:
-/// the ERP rated and added them up, and the map never recalculates.
+/// Towards the Shipper, Norvia carries the goods, so the document names neither the Carrier nor the Shipment number (ADR 0011). It also
+/// leaves out what is Norvia's own: the Shipper's name, the correlation ID and the document's status. The amounts go over as they are:
+/// the ERP rated and added them up, and the map never recalculates. A Credit note carries the credited amount of its one line as a single
+/// <c>FREIGHT</c> charge line: the Canonical Model's Credit note doesn't say which charge it corrects.
 /// </remarks>
 public static class ShipperInvoiceMap
 {
@@ -19,6 +21,13 @@ public static class ShipperInvoiceMap
         ["Freight"] = "FREIGHT",
         ["MinimumChargeAdjustment"] = "MINIMUM_CHARGE_ADJUSTMENT",
     };
+
+    /// <param name="message">A <c>ShipperInvoiceIssued</c> or <c>CreditNoteIssued</c> event as JSON text, as the Service Bus message carries it.</param>
+    /// <returns>The document, or null when the text is neither an event the Shipper can be sent.</returns>
+    public static JsonObject? ToShipperDocument(string message) =>
+        JsonFields.Parse(message) is { } parsed && JsonFields.Text(parsed, "eventType") == "CreditNoteIssued"
+            ? ToCreditNote(message)
+            : ToShipperInvoice(message);
 
     /// <param name="shipperInvoiceIssued">The <c>ShipperInvoiceIssued</c> event as JSON text, as the Service Bus message carries it.</param>
     /// <returns>The invoice, or null when the text isn't a <c>ShipperInvoiceIssued</c> the Shipper can be sent, so the invoice always has what its schema requires.</returns>
@@ -55,6 +64,51 @@ public static class ShipperInvoiceMap
             ["documentNumber"] = number,
             ["documentDate"] = date,
             ["lines"] = lines,
+            ["currency"] = "EUR",
+            ["totalWithoutVat"] = totalWithoutVat,
+            ["vat"] = vat,
+            ["totalWithVat"] = totalWithVat,
+        };
+    }
+
+    /// <param name="creditNoteIssued">The <c>CreditNoteIssued</c> event as JSON text, as the Service Bus message carries it.</param>
+    /// <returns>The Credit note, or null when the text isn't a <c>CreditNoteIssued</c> the Shipper can be sent, so the Credit note always has what its schema requires.</returns>
+    public static JsonObject? ToCreditNote(string creditNoteIssued)
+    {
+        if (JsonFields.Parse(creditNoteIssued) is not { } issued
+            || JsonFields.Text(issued, "eventType") != "CreditNoteIssued"
+            || issued["creditNote"] is not JsonObject note
+            || JsonFields.Text(note, "creditNoteNumber") is not { } number
+            || LocalDate(JsonFields.Text(note, "creditNoteDate")) is not { } date
+            || JsonFields.Text(note, "invoiceNumber") is not { } invoiceNumber
+            || JsonFields.Text(note, "transportOrderNumber") is not { } transportOrderNumber
+            || JsonFields.Text(note, "shipperReference") is not { } reference
+            || LocalDate(JsonFields.Text(note, "deliveryDate")) is not { } deliveryDate
+            || JsonFields.Text(note, "reason") is not { } reason
+            || Amount(note, "totalWithoutVat") is not { } totalWithoutVat
+            || Amount(note, "vat") is not { } vat
+            || Amount(note, "totalWithVat") is not { } totalWithVat
+            || JsonFields.Text(note, "currency") != "EUR")
+        {
+            return null;
+        }
+
+        return new JsonObject
+        {
+            ["documentType"] = "CREDIT_NOTE",
+            ["documentNumber"] = number,
+            ["documentDate"] = date,
+            ["creditedInvoiceNumber"] = invoiceNumber,
+            ["creditedTransportOrderNumber"] = transportOrderNumber,
+            ["reason"] = reason,
+            ["lines"] = new JsonArray(new JsonObject
+            {
+                ["transportOrderNumber"] = transportOrderNumber,
+                ["bookingRef"] = reference,
+                ["deliveryDate"] = deliveryDate,
+                ["chargeLines"] = new JsonArray(new JsonObject { ["code"] = "FREIGHT", ["amount"] = totalWithoutVat }),
+                ["lineTotal"] = totalWithoutVat,
+            }),
             ["currency"] = "EUR",
             ["totalWithoutVat"] = totalWithoutVat,
             ["vat"] = vat,

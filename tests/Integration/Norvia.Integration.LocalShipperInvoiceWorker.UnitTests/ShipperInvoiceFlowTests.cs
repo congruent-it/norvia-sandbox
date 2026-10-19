@@ -200,4 +200,64 @@ public class ShipperInvoiceFlowTests
 
         outcome.Should().Be(ShipperInvoiceFlowOutcome.ErpUnavailable);
     }
+
+    [Fact]
+    public async Task RunAsync_ACreditNote_IsMappedAsACreditNote_AndSentToTheSameEndpointWithItsOwnCorrelationId()
+    {
+        var world = new ShipperInvoiceWorld();
+
+        var outcome = await world.RunAsync(ShipperInvoiceWorld.CreditNoteIssued());
+
+        outcome.Should().Be(ShipperInvoiceFlowOutcome.Done);
+        var sent = world.Shipper.Requests.Single();
+        sent.Uri.Should().Be(new Uri("http://shipper.test/shipper/v1/SHP-0001/invoices"));
+        sent.Headers["X-Correlation-ID"].Should().Be("credit-note-1");
+        sent.Headers["X-Api-Key"].Should().Be("shipper-secret");
+        var note = JsonNode.Parse(sent.Body)!.AsObject();
+        note["documentType"]!.GetValue<string>().Should().Be("CREDIT_NOTE");
+        note["documentNumber"]!.GetValue<string>().Should().Be("CN-2030-000001");
+        note["creditedInvoiceNumber"]!.GetValue<string>().Should().Be("INV-2030-000001");
+        sent.Body.Should().NotContain("SH-0000001");
+    }
+
+    [Fact]
+    public async Task RunAsync_ACreditNoteTheShipperAcknowledges_IsReportedSentToTheErpsCreditNotes()
+    {
+        var world = new ShipperInvoiceWorld();
+
+        await world.RunAsync(ShipperInvoiceWorld.CreditNoteIssued());
+
+        var report = world.Erp.Requests.Should().ContainSingle().Subject;
+        report.Uri.AbsolutePath.Should().Be("/v1/credit-notes/CN-2030-000001/report-sent");
+        report.Headers["X-Correlation-ID"].Should().Be("credit-note-1");
+    }
+
+    [Fact]
+    public async Task RunAsync_ACreditNoteTheShipperRefuses_IsReportedNotDeliveredWithTheCause_WithoutRetrying()
+    {
+        var world = new ShipperInvoiceWorld();
+        world.Shipper.Then(HttpStatusCode.BadRequest);
+
+        var outcome = await world.RunAsync(ShipperInvoiceWorld.CreditNoteIssued());
+
+        outcome.Should().Be(ShipperInvoiceFlowOutcome.Done);
+        world.Shipper.Requests.Should().ContainSingle();
+        var report = world.Erp.Requests.Should().ContainSingle().Subject;
+        report.Uri.AbsolutePath.Should().Be("/v1/credit-notes/CN-2030-000001/report-not-delivered");
+        JsonNode.Parse(report.Body)!["statusCode"]!.GetValue<int>().Should().Be(400);
+    }
+
+    [Fact]
+    public async Task RunAsync_ACreditNoteWithoutAReason_IsUnreadable_SendingNothing()
+    {
+        var world = new ShipperInvoiceWorld();
+        var note = JsonNode.Parse(ShipperInvoiceWorld.CreditNoteIssued())!;
+        note["creditNote"]!.AsObject().Remove("reason");
+
+        var outcome = await world.RunAsync(note.ToJsonString());
+
+        outcome.Should().Be(ShipperInvoiceFlowOutcome.Unreadable);
+        world.Shipper.Requests.Should().BeEmpty();
+        world.Erp.Requests.Should().BeEmpty();
+    }
 }

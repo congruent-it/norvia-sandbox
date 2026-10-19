@@ -46,4 +46,48 @@ public sealed class CreditNoteSampleTests
         message["vat"]!.GetValue<decimal>().Should().Be(partner["vat"]!.GetValue<decimal>());
         message["reason"]!.GetValue<string>().Should().Be(partner["reason"]!.GetValue<string>());
     }
+
+    [Fact]
+    public void ToCreditNote_TheSample_GivesTheSampleCreditNoteOfThePartnerApi()
+    {
+        var expected = JsonNode.Parse(Contracts.Read("PartnerApi/samples/shipper-invoices/credit-note.shipper-invoice.json"));
+
+        var note = ShipperInvoiceMap.ToCreditNote(Contracts.Read($"{Folder}/partial-credit.json"));
+
+        JsonNode.DeepEquals(note, expected).Should().BeTrue($"the map gave {note?.ToJsonString()}");
+    }
+
+    [Theory]
+    [MemberData(nameof(Samples))]
+    public void ToCreditNote_SampleEvent_ValidatesAgainstTheShipperInvoiceSchema(string sample)
+    {
+        var note = ShipperInvoiceMap.ToCreditNote(Contracts.Read($"{Folder}/{sample}.json"));
+
+        var results = Schemas.ShipperInvoice.Validate(note);
+        results.IsValid.Should().BeTrue(Schemas.Errors(results));
+    }
+
+    [Theory]
+    [MemberData(nameof(Samples))]
+    public void ToCreditNote_SampleEvent_CarriesNoCarrierOrShipmentNumber(string sample)
+    {
+        var shipmentNumber = JsonNode.Parse(Contracts.Read($"{Folder}/{sample}.json"))!["creditNote"]!["shipmentNumber"]!.GetValue<string>();
+
+        var text = ShipperInvoiceMap.ToCreditNote(Contracts.Read($"{Folder}/{sample}.json"))!.ToJsonString();
+
+        text.Should().NotContain(shipmentNumber).And.NotContain("shipmentNumber").And.NotContain("CAR-").And.NotContain("arrier");
+    }
+
+    [Theory]
+    [MemberData(nameof(Samples))]
+    public void Tracking_SampleMessage_GivesTheKeysTheWorkflowTracks(string sample)
+    {
+        var message = JsonNode.Parse(Contracts.Read($"{Folder}/{sample}.json"))!;
+        var inputs = ShipperInvoiceLogicApp.ShipperInvoiceWorkflow.Action(ShipperInvoiceLogicApp.ShipperInvoiceWorkflow.Tracking)["inputs"]!.AsObject();
+
+        foreach (var (key, expression) in inputs)
+        {
+            ShipperInvoiceSampleTests.Resolve(message, expression!.GetValue<string>()).Should().NotBeNullOrWhiteSpace($"the workflow tracks {key}");
+        }
+    }
 }

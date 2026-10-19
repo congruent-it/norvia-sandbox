@@ -2,6 +2,8 @@ using Ardalis.Result;
 using Mediator;
 using Microsoft.Extensions.DependencyInjection;
 using Norvia.Erp.Application;
+using Norvia.Erp.Application.CreditNotes;
+using Norvia.Erp.Application.CreditNotes.SendAgain;
 using Norvia.Erp.Application.ShipperInvoices;
 using Norvia.Erp.Application.ShipperInvoices.SendAgain;
 using Norvia.Erp.Web.ShipperInvoices;
@@ -28,6 +30,34 @@ public sealed class SendAgainActionTests : ErpWebContext
 
         outcome.Should().Be(new SendAgainOutcome.SentAgain("INV-2026-000007"));
         await Mediator.Received(1).Send(new SendShipperInvoiceAgainCommand("INV-2026-000007"), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Run_ANotDeliveredCreditNote_SendsTheCreditNoteAgain_NotAnInvoice()
+    {
+#pragma warning disable CA2012 // NSubstitute configures the call by reading its return value, which is never consumed.
+        Mediator.Send(Arg.Any<SendCreditNoteAgainCommand>(), Arg.Any<CancellationToken>())
+            .Returns(ValueTask.FromResult<Result<CreditNoteView>>(ShipperInvoicesTestData.CreditNote(7)));
+#pragma warning restore CA2012
+
+        var outcome = await Action.RunAsync("CN-2026-000007", Xunit.TestContext.Current.CancellationToken);
+
+        outcome.Should().Be(new SendAgainOutcome.SentAgain("CN-2026-000007"));
+        await Mediator.Received(1).Send(new SendCreditNoteAgainCommand("CN-2026-000007"), Arg.Any<CancellationToken>());
+        await Mediator.DidNotReceive().Send(Arg.Any<SendShipperInvoiceAgainCommand>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Run_ACreditNoteThatIsRefused_SaysWhy()
+    {
+#pragma warning disable CA2012 // NSubstitute configures the call by reading its return value, which is never consumed.
+        Mediator.Send(Arg.Any<SendCreditNoteAgainCommand>(), Arg.Any<CancellationToken>())
+            .Returns(ValueTask.FromResult(Result<CreditNoteView>.Invalid(new ValidationError("CreditNote", "Credit note CN-2026-000007 is Sent; only a Not delivered Credit note can be sent again.", "CreditNoteNotSendableAgain", ValidationSeverity.Error))));
+#pragma warning restore CA2012
+
+        var outcome = await Action.RunAsync("CN-2026-000007", Xunit.TestContext.Current.CancellationToken);
+
+        outcome.Should().Be(new SendAgainOutcome.Refused("Credit note CN-2026-000007 is Sent; only a Not delivered Credit note can be sent again."));
     }
 
     [Fact]

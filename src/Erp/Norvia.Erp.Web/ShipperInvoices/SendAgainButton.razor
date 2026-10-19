@@ -1,13 +1,13 @@
 @inject SendAgainAction Action
 
-@* Finance's Send again for one Not delivered Shipper invoice. What it did is said beside it. *@
+@* Finance's Send again for one Not delivered Shipper invoice or Credit note, by its number. What it did is said beside it. *@
 <FluentButton Appearance="Appearance.Accent" Disabled="_running" OnClick="RunAsync" aria-label="@($"Send {InvoiceNumber} again")">Send again</FluentButton>
 
 <span role="status" class="ml-2">
     @switch (_outcome)
     {
         case SendAgainOutcome.SentAgain:
-            <span>Sent again. The invoice is Issued until the Shipper's endpoint acknowledges it.</span>
+            <span>Sent again. It is Issued until the Shipper's endpoint acknowledges it.</span>
             break;
         case SendAgainOutcome.Refused refused:
             <span role="alert">@refused.Reason</span>

@@ -21,5 +21,8 @@ internal static class CreditNoteViews
         note.TotalWithVat,
         note.Reason,
         note.IssuedAt,
-        note.CorrelationId);
+        note.CorrelationId,
+        note.Status.ToString(),
+        note.SentAt,
+        note is { NotDeliveredAt: { } at, NotDeliveredMessage: { } message } ? new NotDeliveredView(at, note.NotDeliveredStatusCode, message) : null);
 }
