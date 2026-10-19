@@ -97,7 +97,7 @@ public class DriverAppFixture : IAsyncLifetime
         DriverReports = DriverReportsClient(IssueToken([ReportOutcomeRole]));
 
         _blobs = new BlobServiceClient(await _app.GetConnectionStringAsync("blobs", startup.Token));
-        _serviceBus = new ServiceBusClient(await _app.GetConnectionStringAsync("messaging", startup.Token));
+        _serviceBus = new ServiceBusClient(await _app.GetConnectionStringAsync("messaging-2", startup.Token));
         _processor = _serviceBus.CreateProcessor(DriverAppEventsTopic, TestSubscription);
         _processor.ProcessMessageAsync += args =>
         {

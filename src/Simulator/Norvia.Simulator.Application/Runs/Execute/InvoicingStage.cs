@@ -28,59 +28,66 @@ internal sealed class InvoicingStage(IErpApi erp, IShipperInbox inbox, TimeProvi
         var expected = new List<Expected>();
         var invoiced = 0;
         var credited = 0;
-        foreach (var journey in journeys.Where(journey => journey.Invoice))
+
+        // Every Shipper picked is asked in each round, in ID order, so the wait for Transport Orders to become Waiting lines is the one wait, however many Shippers there are.
+        var pending = journeys.Where(journey => journey.Invoice).ToList();
+        InvoiceNowAnswer? last = null;
+        for (var attempt = 1; pending.Count > 0 && attempt <= pacing.PollAttempts; attempt++)
         {
-            if (stopSending.IsCancellationRequested)
+            if (attempt > 1 && !await PauseAsync(stopSending))
             {
                 return new InvoicingResult(true, invoiced, credited, 0);
             }
 
-            var shipper = shippers[journey.Index];
-            var issued = await InvoiceNowAsync(shipper, writer, stopSending, cancellationToken);
-            if (issued.Stopped)
+            var next = new List<InvoicingJourney>();
+            foreach (var journey in pending)
             {
-                return new InvoicingResult(true, invoiced, credited, 0);
+                if (stopSending.IsCancellationRequested)
+                {
+                    return new InvoicingResult(true, invoiced, credited, 0);
+                }
+
+                var shipper = shippers[journey.Index];
+                var answer = await erp.InvoiceNowAsync(shipper.ShipperId, cancellationToken);
+                last = answer;
+                if (answer.Outcome == LogOutcome.NothingToInvoice)
+                {
+                    next.Add(journey);
+                    continue;
+                }
+
+                await LogInvoiceNowAsync(shipper, answer, writer, cancellationToken);
+                if (answer is not { Outcome: LogOutcome.InvoiceIssued, InvoiceNumber: { } invoiceNumber })
+                {
+                    continue;
+                }
+
+                invoiced++;
+                var documents = new List<string> { invoiceNumber };
+                if (journey.CreditNote && await CreditAsync(run, shipper, answer, writer, cancellationToken) is { } creditNoteNumber)
+                {
+                    credited++;
+                    documents.Add(creditNoteNumber);
+                }
+
+                expected.Add(new Expected(shipper, documents));
             }
 
-            if (issued.Answer is not { InvoiceNumber: { } invoiceNumber } answer)
-            {
-                continue;
-            }
+            pending = next;
+        }
 
-            invoiced++;
-            var documents = new List<string> { invoiceNumber };
-            if (journey.CreditNote && await CreditAsync(run, shipper, answer, writer, cancellationToken) is { } creditNoteNumber)
-            {
-                credited++;
-                documents.Add(creditNoteNumber);
-            }
-
-            expected.Add(new Expected(shipper, documents));
+        // Still nothing Waiting for these after the last round: one line each.
+        foreach (var journey in pending)
+        {
+            await LogInvoiceNowAsync(shippers[journey.Index], last!, writer, cancellationToken);
         }
 
         var received = await WatchInboxesAsync(expected, writer, stopSending, cancellationToken);
         return new InvoicingResult(received.Stopped, invoiced, credited, received.Count);
     }
 
-    // Asks again while nothing is Waiting: the Billing Logic App records a delivered Transport Order's line a little after the TMS makes it Billable.
-    private async Task<Invoiced> InvoiceNowAsync(InvoicedShipper shipper, RunLogWriter writer, CancellationToken stopSending, CancellationToken cancellationToken)
+    private async Task LogInvoiceNowAsync(InvoicedShipper shipper, InvoiceNowAnswer answer, RunLogWriter writer, CancellationToken cancellationToken)
     {
-        InvoiceNowAnswer? last = null;
-        for (var attempt = 1; attempt <= pacing.PollAttempts; attempt++)
-        {
-            if (attempt > 1 && !await PauseAsync(stopSending))
-            {
-                return new Invoiced(null, Stopped: true);
-            }
-
-            last = await erp.InvoiceNowAsync(shipper.ShipperId, cancellationToken);
-            if (last.Outcome != LogOutcome.NothingToInvoice)
-            {
-                break;
-            }
-        }
-
-        var answer = last!;
         var detail = answer.Outcome switch
         {
             LogOutcome.InvoiceIssued => $"{answer.InvoiceNumber}: {answer.Lines.Count} lines, {Euros(answer.TotalWithoutVat)} without VAT",
@@ -90,7 +97,6 @@ internal sealed class InvoicingStage(IErpApi erp, IShipperInbox inbox, TimeProvi
         await writer.InvoicingAsync(
             time.GetUtcNow(), InvoicingActions.FinanceActor, InvoicingActions.InvoiceNow, answer.Outcome, answer.CorrelationId, answer.Lines.Count > 0 ? answer.Lines[0].ShipperReference : null, null, Prefixed(shipper, detail),
             cancellationToken);
-        return new Invoiced(answer.Outcome == LogOutcome.InvoiceIssued ? answer : null, Stopped: false);
     }
 
     // A partial Credit note on the invoice's first line: a quarter of its total, in cents, with a reason. The Credit note's number, or null when the ERP refused.
@@ -191,8 +197,6 @@ internal sealed class InvoicingStage(IErpApi erp, IShipperInbox inbox, TimeProvi
     private static string? Prefixed(InvoicedShipper shipper, string? detail) => detail is null ? $"For {shipper.PersonaName}" : $"For {shipper.PersonaName}. {detail}";
 
     private static string Euros(decimal amount) => string.Create(System.Globalization.CultureInfo.InvariantCulture, $"EUR {amount:0.00}");
-
-    private sealed record Invoiced(InvoiceNowAnswer? Answer, bool Stopped);
 
     private sealed record Expected(InvoicedShipper Shipper, IReadOnlyList<string> DocumentNumbers);
 

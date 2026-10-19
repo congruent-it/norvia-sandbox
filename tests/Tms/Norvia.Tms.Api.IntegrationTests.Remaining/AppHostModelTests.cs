@@ -230,7 +230,7 @@ public sealed class AppHostModelTests
         subscription.RequiresSession.Should().BeTrue("one Trip's reports are read one at a time and in order (ADR 0016)");
         builder.Resources.OfType<AzureServiceBusSubscriptionResource>().Where(s => s.Parent == topic).Should().ContainSingle("the Driver reports Logic App is the only consumer");
         Resource(builder, "driver-reports-worker").Annotations.OfType<WaitAnnotation>().Should().Contain(wait => wait.Resource.Name == "driver-app-api");
-        Resource(builder, "driver-app-api").Annotations.OfType<WaitAnnotation>().Should().Contain(wait => wait.Resource.Name == "messaging", "its outbox publishes to Service Bus");
+        Resource(builder, "driver-app-api").Annotations.OfType<WaitAnnotation>().Should().Contain(wait => wait.Resource.Name == "messaging-2", "its outbox publishes to Service Bus, to the second emulator locally");
     }
 
     [Fact]
@@ -310,8 +310,8 @@ public sealed class AppHostModelTests
 
         var bicep = builder.Resources.OfType<AzureSqlServerResource>().Single().GetBicepTemplateString();
 
-        Regex.Count(bicep, "useFreeLimit: true").Should().Be(4, "all four databases stay on the free offer");
-        Regex.Count(bicep, "freeLimitExhaustionBehavior: 'BillOverUsage'").Should().Be(4, "a paused database fails the migrations and the demo");
+        Regex.Count(bicep, "useFreeLimit: true").Should().Be(5, "all five databases (TMS, Partner portal, Driver app, ERP and Simulator) stay on the free offer");
+        Regex.Count(bicep, "freeLimitExhaustionBehavior: 'BillOverUsage'").Should().Be(5, "a paused database fails the migrations and the demo");
     }
 
     [Fact]

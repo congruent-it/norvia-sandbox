@@ -5,6 +5,7 @@ using Norvia.Simulator.Application.Plans.Preview;
 using Norvia.Simulator.Application.Runs;
 using Norvia.Simulator.Domain.Carriers;
 using Norvia.Simulator.Domain.Drivers;
+using Norvia.Simulator.Domain.Invoicing;
 using Norvia.Simulator.Domain.Log;
 using Norvia.Simulator.Domain.Runs;
 
@@ -25,10 +26,13 @@ internal static class Runs
     private static int _seed = Environment.TickCount;
 
     /// <summary>A seed of this test's own, so no two tests make the same plan.</summary>
+    /// <summary>The runs of these tests are about the stages before Finance's; the invoicing stage waits for deliveries to become Waiting lines, which would only slow them.</summary>
+    private static readonly InvoicingShares NoInvoicing = new(InvoicePercent: 0, CreditNotePercent: 0);
+
     public static int NextSeed() => Interlocked.Increment(ref _seed);
 
     public static SimulationSettings Burst(int orders, int badSharePercent, int seed) =>
-        new(orders, badSharePercent, CollectedTodayPercent: 30, seed, RunMode.Burst, TimeSpan.Zero) { TripPercent = 0 };
+        new(orders, badSharePercent, CollectedTodayPercent: 30, seed, RunMode.Burst, TimeSpan.Zero) { TripPercent = 0, Invoicing = NoInvoicing };
 
     /// <summary>A run of good bookings whose Planner assigns, sends to Own fleet and reassigns the given shares of the orders.</summary>
     public static SimulationSettings Planned(int orders, int seed, int assignedPercent, int ownFleetPercent, int reassignPercent, int badSharePercent = 0) =>
@@ -38,6 +42,7 @@ internal static class Runs
             // These runs test the Planner: the Shipments stay Planned, and the Carrier stage has its own tests (#354), the Trips and Drivers theirs (#356).
             Carriers = new CarrierShares(ReleasePercent: 0),
             TripPercent = 0,
+            Invoicing = NoInvoicing,
         };
 
     /// <summary>
@@ -50,6 +55,7 @@ internal static class Runs
         {
             Carriers = carriers,
             TripPercent = 0,
+            Invoicing = NoInvoicing,
         };
 
     /// <summary>
@@ -63,11 +69,12 @@ internal static class Runs
             Carriers = new CarrierShares(ReleasePercent: 0),
             Drivers = drivers,
             TripPercent = 100,
+            Invoicing = NoInvoicing,
         };
 
     /// <summary>A run that sends its first booking at once and the next a minute later.</summary>
     public static SimulationSettings Paced(int orders, int seed) =>
-        new(orders, BadSharePercent: 0, CollectedTodayPercent: 30, seed, RunMode.Paced, TimeSpan.FromMinutes(orders)) { TripPercent = 0 };
+        new(orders, BadSharePercent: 0, CollectedTodayPercent: 30, seed, RunMode.Paced, TimeSpan.FromMinutes(orders)) { TripPercent = 0, Invoicing = NoInvoicing };
 
     public static async Task<RunSummary> StartAsync(this ISimulatorRequests simulator, SimulationSettings settings, CancellationToken cancellationToken)
     {

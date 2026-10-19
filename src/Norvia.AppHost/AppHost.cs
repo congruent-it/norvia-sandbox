@@ -35,6 +35,12 @@ var erpDatabase = sql.AddDatabase("erp");
 // The estate Bicep owns Service Bus in Azure (ADR 0004); locally the emulator stands in for it.
 var messaging = builder.AddAzureServiceBus("messaging");
 
+// Locally the Service Bus emulator accepts only 10 concurrent connections per namespace (the Microsoft docs say it can be configured, but no
+// setting of the emulator image honours that), and every app that sends or receives holds one: the estate has more than ten of them. So a
+// second emulator holds the topics and queues of the Driver app, the ERP and the Carrier tracking path, and the apps that use them ask for it
+// under the same connection name, "messaging". No app knows there are two. In Azure there is one namespace and both names are it.
+var messagingEdge = builder.ExecutionContext.IsPublishMode ? messaging : builder.AddAzureServiceBus("messaging-2");
+
 // The TMS keeps Proof of delivery files in a blob container of its own (ADR 0002). Locally Azurite stands in for the storage
 // account. In Azure a lifecycle rule moves the files to the cool tier after 30 days; they are never deleted.
 var storage = builder.AddAzureStorage("storage").RunAsEmulator()
@@ -86,8 +92,8 @@ var driverAppMigrations = builder.AddProject<Projects.Norvia_DriverApp_Migration
 // Its outbox publishes what the Driver reports to the topic for Driver app events (P12), and it takes the Driver reports Logic App's outcome reports.
 var driverAppApi = builder.AddProject<Projects.Norvia_DriverApp_Api>("driver-app-api")
     .WithReference(driverAppDatabase).WaitForCompletion(driverAppMigrations)
-    .WithReference(messaging).WaitFor(messaging)
-    .WithRoleAssignments(messaging, ServiceBusBuiltInRole.AzureServiceBusDataSender)
+    .WithReference(messagingEdge, "messaging").WaitFor(messagingEdge)
+    .WithRoleAssignments(messagingEdge, ServiceBusBuiltInRole.AzureServiceBusDataSender)
     .WithHttpHealthCheck("/health");
 
 // The Partner portal's presenter panel switches the Driver app's "unavailable" fault through its API (P11).
@@ -109,8 +115,8 @@ var erpMigrations = builder.AddProject<Projects.Norvia_Erp_Migrations>("erp-migr
 
 var erpWeb = builder.AddProject<Projects.Norvia_Erp_Web>("erp-web")
     .WithReference(erpDatabase).WaitForCompletion(erpMigrations)
-    .WithReference(messaging).WaitFor(messaging)
-    .WithRoleAssignments(messaging, ServiceBusBuiltInRole.AzureServiceBusDataSender)
+    .WithReference(messagingEdge, "messaging").WaitFor(messagingEdge)
+    .WithRoleAssignments(messagingEdge, ServiceBusBuiltInRole.AzureServiceBusDataSender)
     .WithHttpHealthCheck("/health")
     .WithUrlForEndpoint("http", url => url.DisplayText = "ERP");
 
@@ -357,6 +363,7 @@ else
 {
     // The emulator won't start a topic without a subscription. Monitoring is the consumer P1 and P3 name for their events.
     messaging.RunAsEmulator(emulator => emulator.WithConfiguration(ResubmitAwareFilters.Apply));
+    messagingEdge.RunAsEmulator(emulator => emulator.WithConfiguration(ResubmitAwareFilters.Apply));
     var transportOrderEvents = messaging.AddServiceBusTopic("transport-order-events");
     transportOrderEvents.AddServiceBusSubscription("monitoring");
     // The E1 Billing Logic App's subscription: TransportOrderBillable only (see ResubmitAwareFilters).
@@ -377,21 +384,21 @@ else
     tripEvents.AddServiceBusSubscription("trip-dispatch");
     // The topic for Driver app events (P12). The Driver reports Logic App is the only consumer, with a subscription of its own that uses sessions
     // keyed by Trip number, so one Trip's reports are read one at a time and in order: the Driver's reports only (see ResubmitAwareFilters).
-    messaging.AddServiceBusTopic("driver-app-events")
+    messagingEdge.AddServiceBusTopic("driver-app-events")
         .AddServiceBusSubscription("driver-reports")
         .WithProperties(subscription => subscription.RequiresSession = true);
     // The topic for the ERP's invoicing events (E1). Monitoring is its first consumer; the E1 Shipper invoice Logic App has a subscription of its own:
     // ShipperInvoiceIssued only (see ResubmitAwareFilters).
-    var invoicingEvents = messaging.AddServiceBusTopic("invoicing-events");
+    var invoicingEvents = messagingEdge.AddServiceBusTopic("invoicing-events");
     invoicingEvents.AddServiceBusSubscription("invoicing-events-monitoring", subscriptionName: "monitoring");
     invoicingEvents.AddServiceBusSubscription("shipper-invoice");
     // The tracking queue API Management puts a Carrier's tracking message on and the Carrier-tracking Logic App reads
     // (ADR 0008). A message the TMS refuses is dead-lettered; one it can't be given to is delivered again up to the
     // maximum delivery count, then dead-lettered by Service Bus itself. The estate Bicep sets the same count.
-    messaging.AddServiceBusQueue("carrier-tracking").WithProperties(queue => queue.MaxDeliveryCount = 10);
+    messagingEdge.AddServiceBusQueue("carrier-tracking").WithProperties(queue => queue.MaxDeliveryCount = 10);
     // The Proof of delivery queue holds only the reference to a blob in the inbound container, which API Management stores a
     // Carrier's Proof of delivery in (ADR 0009). Azurite holds the container here; the estate Bicep makes it in Azure.
-    messaging.AddServiceBusQueue("carrier-proof-of-delivery").WithProperties(queue => queue.MaxDeliveryCount = 10);
+    messagingEdge.AddServiceBusQueue("carrier-proof-of-delivery").WithProperties(queue => queue.MaxDeliveryCount = 10);
     storage.AddBlobContainer("inbound-proofs-of-delivery");
 
     // Locally there is no Easy Auth, so the console signs the developer in as an Integration operator with both app
@@ -467,7 +474,7 @@ else
     // is a Shipper or the respond role if it is a Carrier.
     var partnerApi = builder.AddProject<Projects.Norvia_Integration_LocalPartnerApi>("partner-api")
         .WithReference(tmsApi).WaitFor(tmsApi)
-        .WithReference(messaging).WaitFor(messaging)
+        .WithReference(messagingEdge, "messaging").WaitFor(messagingEdge)
         .WithReference(blobs).WaitFor(blobs)
         .WithHttpHealthCheck("/health")
         .WithEnvironment("PartnerApi__Tokens__Issuer", LocalTokens.Issuer)
@@ -543,7 +550,7 @@ else
     // Persona's invoice endpoint in the Partner portal with a credential for the run, and reports it Sent to the ERP API as the identity
     // holding the report role.
     var shipperInvoiceWorker = builder.AddProject<Projects.Norvia_Integration_LocalShipperInvoiceWorker>("shipper-invoice-worker")
-        .WithReference(messaging).WaitFor(messaging)
+        .WithReference(messagingEdge, "messaging").WaitFor(messagingEdge)
         .WithReference(erpApi).WaitFor(erpApi)
         .WithEnvironment("ShipperInvoice__ErpBaseAddress", erpApi.GetEndpoint("http"))
         .WithEnvironment("ShipperInvoice__ErpTokens__Issuer", LocalTokens.Issuer)
@@ -553,7 +560,7 @@ else
     // TMS as the identity holding the Trip start role, and tells the Driver app what became of each report as the identity holding the outcome
     // role.
     var driverReportsWorker = builder.AddProject<Projects.Norvia_Integration_LocalDriverReportsWorker>("driver-reports-worker")
-        .WithReference(messaging).WaitFor(messaging)
+        .WithReference(messagingEdge, "messaging").WaitFor(messagingEdge)
         .WithReference(tmsApi).WaitFor(tmsApi)
         .WaitFor(driverAppApi)
         .WithReference(blobs, "driver-app-blobs").WaitFor(blobs)
@@ -568,7 +575,7 @@ else
     // Locally a worker plays the Carrier-tracking Logic App too (ADR 0031). It reads the tracking queue API Management's
     // stand-in fills and records each Tracking event with the TMS as the identity holding the record role.
     var trackingWorker = builder.AddProject<Projects.Norvia_Integration_LocalTrackingWorker>("tracking-worker")
-        .WithReference(messaging).WaitFor(messaging)
+        .WithReference(messagingEdge, "messaging").WaitFor(messagingEdge)
         .WithReference(tmsApi).WaitFor(tmsApi)
         .WithEnvironment("Tracking__TmsBaseAddress", tmsApi.GetEndpoint("http"))
         .WithEnvironment("Tracking__TmsTokens__Issuer", LocalTokens.Issuer)
@@ -578,7 +585,7 @@ else
     // the stand-in fills, fetches the blob the stand-in stored, and records the Proof of delivery with the TMS as the
     // identity holding the record role.
     var proofOfDeliveryWorker = builder.AddProject<Projects.Norvia_Integration_LocalProofOfDeliveryWorker>("proof-of-delivery-worker")
-        .WithReference(messaging).WaitFor(messaging)
+        .WithReference(messagingEdge, "messaging").WaitFor(messagingEdge)
         .WithReference(blobs).WaitFor(blobs)
         .WithReference(tmsApi).WaitFor(tmsApi)
         .WithEnvironment("ProofOfDelivery__TmsBaseAddress", tmsApi.GetEndpoint("http"))
