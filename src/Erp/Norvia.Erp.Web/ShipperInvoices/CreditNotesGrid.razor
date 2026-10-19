@@ -1,7 +1,8 @@
 @using Norvia.Erp.Application.CreditNotes
 
 @* The Credit notes the ERP issued, as the lists show them. *@
-<FluentDataGrid Class="cerulean-table" Items="CreditNotes.AsQueryable()" TGridItem="CreditNoteView" aria-label="@Label">
+<FluentDataGrid Class="cerulean-table" Items="CreditNotes.AsQueryable()" TGridItem="CreditNoteView" aria-label="@Label"
+                GridTemplateColumns="minmax(135px,1.4fr) minmax(150px,1.4fr) minmax(110px,1fr) minmax(105px,1.6fr) minmax(100px,1fr) minmax(90px,0.9fr) minmax(65px,0.7fr) minmax(90px,0.9fr) minmax(95px,2fr) minmax(70px,0.8fr) minmax(105px,1.3fr) minmax(80px,1fr)">
     <PropertyColumn Title="Credit note number" Property="@(row => row.CreditNoteNumber)" />
     <TemplateColumn Title="Invoice">
         <a href="/shipper-invoices/@context.InvoiceNumber">@context.InvoiceNumber</a>

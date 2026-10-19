@@ -143,6 +143,33 @@ table.cerulean-table th {
     white-space: normal;
 }
 
+/*
+ * Fluent gives every cell and header a fixed height and a single line that is cut off with an ellipsis, and centres each cell in its
+ * row. A header that wraps then spills into the first row, a value is cut off, and the rules between rows don't line up. Rows here
+ * grow with their content, cells wrap at their words, and a cell fills its row, so the rules line up.
+ */
+.cerulean-table.fluent-data-grid {
+    align-items: stretch;
+    margin-bottom: 1.5rem;
+}
+
+.cerulean-table.fluent-data-grid th,
+.cerulean-table.fluent-data-grid td {
+    height: auto !important;
+}
+
+/* Fluent gives each header a minimum width of 100px, which spills a narrow column's header out of its track. The grid's own columns say how narrow one may be. */
+.cerulean-table.fluent-data-grid th {
+    min-width: 0 !important;
+}
+
+.cerulean-table.fluent-data-grid td {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
 .cerulean-table.fluent-data-grid tbody tr:hover td,
 table.cerulean-table tbody tr:hover td {
     background-color: var(--color-light);
