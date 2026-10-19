@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.FluentUI.AspNetCore.Components;
 using Norvia.Erp.Application;
+using Norvia.Erp.Application.CreditNotes;
 using Norvia.Erp.Application.Operators;
 using Norvia.Erp.Application.ShipperInvoices;
 using Norvia.Erp.Application.ShipperInvoices.Issue;
@@ -24,11 +25,14 @@ public abstract class ErpWebContext : BunitContext
         Services.AddSingleton(new ErpActivities(HostEnvironment));
         Services.AddScoped<InvoiceNowAction>();
         Services.AddScoped<SendAgainAction>();
+        Services.AddScoped<IssueCreditNoteAction>();
         User = AddAuthorization();
         User.SetAuthorized("Dev Eloper").SetRoles(ErpRoles.Finance);
         User.SetPolicies(ErpRoles.Finance);
         Retrier.RunAsync(Arg.Any<Func<IMediator, Task<Result<IssueShipperInvoiceResult>>>>())
             .Returns(call => call.Arg<Func<IMediator, Task<Result<IssueShipperInvoiceResult>>>>()(Mediator));
+        Retrier.RunAsync(Arg.Any<Func<IMediator, Task<Result<CreditNoteView>>>>())
+            .Returns(call => call.Arg<Func<IMediator, Task<Result<CreditNoteView>>>>()(Mediator));
         Retrier.RunAsync(Arg.Any<Func<IMediator, Task<Result<ShipperInvoiceView>>>>())
             .Returns(call => call.Arg<Func<IMediator, Task<Result<ShipperInvoiceView>>>>()(Mediator));
     }

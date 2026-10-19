@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/credit-note-issued.v1.schema.json",
+  "title": "CreditNoteIssued",
+  "description": "Finance issued a Credit note on one line of a Shipper invoice (Canonical Model event, version 1). Published on the Invoicing events topic through the ERP's transactional outbox, in the transaction that issued the Credit note, under a new correlation ID created for the Credit note. It carries the whole Credit note with the invoice and line it credits, amounts, reason and Shipper, so its consumers need nothing more. The TMS never learns about it (ADR 0012).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "eventType",
+    "eventVersion",
+    "occurredAt",
+    "correlationId",
+    "creditNote"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "eventType": {
+      "const": "CreditNoteIssued"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "occurredAt": {
+      "description": "When the Credit note was issued.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "correlationId": {
+      "description": "The correlation ID the ERP created for the Credit note; the same as the Credit note's.",
+      "type": "string",
+      "minLength": 1
+    },
+    "creditNote": {
+      "$ref": "credit-note.v1.schema.json"
+    }
+  }
+}

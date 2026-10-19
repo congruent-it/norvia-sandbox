@@ -1,6 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
+using Norvia.Erp.Application.CreditNotes;
+using Norvia.Erp.Application.CreditNotes.List;
 using Norvia.Erp.Application.ShipperInvoices;
 using Norvia.Erp.Application.ShipperInvoices.List;
 using Norvia.Erp.Application.ShipperInvoices.Open;
@@ -18,6 +20,7 @@ public sealed class ShipperInvoicePagesTests : ErpWebContext
     {
         Services.AddSingleton<TimeProvider>(_time);
         Services.AddSingleton(Options.Create(new LiveListOptions { RefreshInterval = Refresh }));
+        Answer<ListCreditNotesQuery, IReadOnlyList<CreditNoteView>>([]);
     }
 
     [Fact]
@@ -120,7 +123,7 @@ public sealed class ShipperInvoicePagesTests : ErpWebContext
 
         page.WaitForAssertion(() => page.Markup.Should().Contain("Shipper invoice INV-2026-000003"));
         page.Markup.Should().Contain("Not delivered").And.Contain("2026-10-19 10:00:05").And.Contain("status 503: Overloaded");
-        page.Find("fluent-button").GetAttribute("aria-label").Should().Be("Send INV-2026-000003 again");
+        page.FindAll("fluent-button").Select(button => button.GetAttribute("aria-label")).Should().Contain("Send INV-2026-000003 again");
     }
 
     [Fact]
@@ -131,7 +134,7 @@ public sealed class ShipperInvoicePagesTests : ErpWebContext
         var page = Render<ShipperInvoicePage>(parameters => parameters.Add(p => p.InvoiceNumber, "INV-2026-000003"));
 
         page.WaitForAssertion(() => page.Markup.Should().Contain("Shipper invoice INV-2026-000003"));
-        page.FindAll("fluent-button").Should().BeEmpty();
+        page.FindAll("fluent-button").Select(button => button.GetAttribute("aria-label")).Should().NotContain(label => label!.StartsWith("Send ", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -142,6 +145,92 @@ public sealed class ShipperInvoicePagesTests : ErpWebContext
         var page = Render<ShipperInvoicePage>(parameters => parameters.Add(p => p.InvoiceNumber, "INV-2026-999999"));
 
         page.WaitForAssertion(() => page.Markup.Should().Contain("The ERP has no Shipper invoice INV-2026-999999."));
+    }
+
+    [Fact]
+    public void RenderInvoice_OffersACreditNoteOnEachLine()
+    {
+        Answer<OpenShipperInvoiceQuery, ShipperInvoiceView?>(ShipperInvoicesTestData.Invoice(3, 200m, lines: 2));
+
+        var page = Render<ShipperInvoicePage>(parameters => parameters.Add(p => p.InvoiceNumber, "INV-2026-000003"));
+
+        page.WaitForAssertion(() => page.Markup.Should().Contain("Shipper invoice INV-2026-000003"));
+        page.FindAll("fluent-button").Select(button => button.GetAttribute("aria-label")).Should()
+            .Equal("Issue Credit note on TO-0000001", "Issue Credit note on TO-0000002");
+    }
+
+    [Fact]
+    public void RenderInvoice_ListsTheCreditNotesOnTheInvoice_AskingForThatInvoicesOnly()
+    {
+        Answer<OpenShipperInvoiceQuery, ShipperInvoiceView?>(ShipperInvoicesTestData.Invoice(3));
+        Answer<ListCreditNotesQuery, IReadOnlyList<CreditNoteView>>([ShipperInvoicesTestData.CreditNote(2), ShipperInvoicesTestData.CreditNote(1, withoutVat: 10m, reason: "Damaged pallet")]);
+
+        var page = Render<ShipperInvoicePage>(parameters => parameters.Add(p => p.InvoiceNumber, "INV-2026-000003"));
+
+        page.WaitForAssertion(() => page.Markup.Should().Contain("CN-2026-000002"));
+        page.FindAll("td").Select(cell => cell.TextContent.Trim()).Should().ContainInOrder(
+            "CN-2026-000002", "INV-2026-000003", "TO-0000001", "Brouwer Dranken", "2026-10-20", "€ 40.00", "€ 8.40", "€ 48.40", "Rate Card error",
+            "CN-2026-000001", "INV-2026-000003", "TO-0000001", "Brouwer Dranken", "2026-10-20", "€ 10.00", "€ 2.10", "€ 12.10", "Damaged pallet");
+        Mediator.ReceivedCalls().Select(call => call.GetArguments()[0]).Should().Contain(new ListCreditNotesQuery("INV-2026-000003"));
+    }
+
+    [Fact]
+    public void RenderInvoice_WithoutCreditNotes_SaysNoneWasIssued()
+    {
+        Answer<OpenShipperInvoiceQuery, ShipperInvoiceView?>(ShipperInvoicesTestData.Invoice(3));
+
+        var page = Render<ShipperInvoicePage>(parameters => parameters.Add(p => p.InvoiceNumber, "INV-2026-000003"));
+
+        page.WaitForAssertion(() => page.Markup.Should().Contain("No Credit note has been issued on INV-2026-000003."));
+    }
+
+    [Fact]
+    public void RenderInvoice_WhenACreditNoteIsIssuedMeanwhile_ListsItWithoutARefresh()
+    {
+        Answer<OpenShipperInvoiceQuery, ShipperInvoiceView?>(ShipperInvoicesTestData.Invoice(3));
+        var page = Render<ShipperInvoicePage>(parameters => parameters.Add(p => p.InvoiceNumber, "INV-2026-000003"));
+        page.WaitForAssertion(() => page.Markup.Should().Contain("No Credit note has been issued"));
+
+        Answer<ListCreditNotesQuery, IReadOnlyList<CreditNoteView>>([ShipperInvoicesTestData.CreditNote(1)]);
+        _time.Advance(Refresh);
+
+        page.WaitForAssertion(() => page.Markup.Should().Contain("CN-2026-000001"));
+    }
+
+    [Fact]
+    public void RenderList_ListsTheCreditNotesWithTheInvoices_LinkingToTheirInvoice()
+    {
+        Answer<ListShipperInvoicesQuery, IReadOnlyList<ShipperInvoiceView>>([ShipperInvoicesTestData.Invoice(3)]);
+        Answer<ListCreditNotesQuery, IReadOnlyList<CreditNoteView>>([ShipperInvoicesTestData.CreditNote(1)]);
+
+        var page = Render<ShipperInvoicesPage>();
+
+        page.WaitForAssertion(() => page.Markup.Should().Contain("CN-2026-000001"));
+        page.Find("table[aria-label='Credit notes'] a[href='/shipper-invoices/INV-2026-000003']").TextContent.Should().Be("INV-2026-000003");
+        Mediator.ReceivedCalls().Select(call => call.GetArguments()[0]).Should().Contain(new ListCreditNotesQuery());
+    }
+
+    [Fact]
+    public void RenderList_WithoutCreditNotes_SaysNoneWasIssued()
+    {
+        Answer<ListShipperInvoicesQuery, IReadOnlyList<ShipperInvoiceView>>([ShipperInvoicesTestData.Invoice(3)]);
+
+        var page = Render<ShipperInvoicesPage>();
+
+        page.WaitForAssertion(() => page.Markup.Should().Contain("No Credit note has been issued yet."));
+    }
+
+    [Fact]
+    public void RenderList_WhenACreditNoteIsIssuedMeanwhile_ListsItWithoutARefresh()
+    {
+        Answer<ListShipperInvoicesQuery, IReadOnlyList<ShipperInvoiceView>>([ShipperInvoicesTestData.Invoice(3)]);
+        var page = Render<ShipperInvoicesPage>();
+        page.WaitForAssertion(() => page.Markup.Should().Contain("No Credit note has been issued yet."));
+
+        Answer<ListCreditNotesQuery, IReadOnlyList<CreditNoteView>>([ShipperInvoicesTestData.CreditNote(1)]);
+        _time.Advance(Refresh);
+
+        page.WaitForAssertion(() => page.Markup.Should().Contain("CN-2026-000001"));
     }
 
     [Fact]

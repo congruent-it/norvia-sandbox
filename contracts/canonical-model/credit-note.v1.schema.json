@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/credit-note.v1.schema.json",
+  "title": "CreditNote",
+  "description": "A Credit note (Canonical Model document, version 1): Finance's correction of one line of an issued Shipper invoice, in full or in part, with a reason. The ERP, which owns Credit notes, issues it and publishes it in CreditNoteIssued. Final once issued: it is never changed or deleted, and the invoice it credits is left as it was.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "creditNoteNumber",
+    "creditNoteDate",
+    "shipper",
+    "invoiceNumber",
+    "transportOrderNumber",
+    "shipperReference",
+    "shipmentNumber",
+    "deliveryDate",
+    "currency",
+    "totalWithoutVat",
+    "vat",
+    "totalWithVat",
+    "reason",
+    "issuedAt",
+    "correlationId"
+  ],
+  "properties": {
+    "creditNoteNumber": {
+      "description": "CN-<year>-<6 digits>, from its own gapless sequence per calendar year, taken only in the transaction that issues the Credit note.",
+      "type": "string",
+      "pattern": "^CN-[0-9]{4}-[0-9]{6}$"
+    },
+    "creditNoteDate": {
+      "description": "The day the Credit note was issued, Europe/Amsterdam.",
+      "type": "string",
+      "format": "date"
+    },
+    "shipper": {
+      "description": "The Shipper of the credited invoice, from the ERP's seed-loaded Shipper data.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "shipperId",
+        "name"
+      ],
+      "properties": {
+        "shipperId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "invoiceNumber": {
+      "description": "The Shipper invoice credited.",
+      "type": "string",
+      "pattern": "^INV-[0-9]{4}-[0-9]{6}$"
+    },
+    "transportOrderNumber": {
+      "description": "The Transport Order number of the invoice line credited, which identifies the line within its invoice.",
+      "type": "string",
+      "pattern": "^TO-[0-9]{7}$"
+    },
+    "shipperReference": {
+      "description": "The Shipper's own reference for the credited line's Transport Order.",
+      "type": "string",
+      "minLength": 1
+    },
+    "shipmentNumber": {
+      "description": "Kept for Finance. It isn't sent to the Shipper (ADR 0011).",
+      "type": "string",
+      "pattern": "^SH-[0-9]{7}$"
+    },
+    "deliveryDate": {
+      "description": "The day the credited line's Shipment was Delivered, where it happened.",
+      "type": "string",
+      "format": "date"
+    },
+    "currency": {
+      "const": "EUR"
+    },
+    "totalWithoutVat": {
+      "description": "The amount credited, without VAT: above zero and at most the line's total minus the earlier Credit notes on that line.",
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "multipleOf": 0.01
+    },
+    "vat": {
+      "description": "21% of the amount credited, rounded to cents, half away from zero.",
+      "type": "number",
+      "minimum": 0,
+      "multipleOf": 0.01
+    },
+    "totalWithVat": {
+      "description": "The amount credited and the VAT added up.",
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "multipleOf": 0.01
+    },
+    "reason": {
+      "description": "Why Finance credited the line, for example \"Rate Card error on Lane NL-BE, see ticket 4411\". Required.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "issuedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "correlationId": {
+      "description": "The correlation ID the ERP created for this Credit note.",
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

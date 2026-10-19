@@ -1,0 +1,24 @@
+{
+  "eventId": "0198e7c0-0000-7000-8000-0000000000e1",
+  "eventType": "CreditNoteIssued",
+  "eventVersion": 1,
+  "occurredAt": "2030-11-05T09:30:00+00:00",
+  "correlationId": "e1f2a3b4-5c6d-4e7f-8a9b-0c1d2e3f4a5b",
+  "creditNote": {
+    "creditNoteNumber": "CN-2030-000001",
+    "creditNoteDate": "2030-11-05",
+    "shipper": { "shipperId": "SHP-0001", "name": "Brouwer Dranken" },
+    "invoiceNumber": "INV-2030-000001",
+    "transportOrderNumber": "TO-0000002",
+    "shipperReference": "BD-2030-0002",
+    "shipmentNumber": "SH-0000002",
+    "deliveryDate": "2030-10-21",
+    "currency": "EUR",
+    "totalWithoutVat": 14.50,
+    "vat": 3.05,
+    "totalWithVat": 17.55,
+    "reason": "Rate Card error on Lane NL-BE, see ticket 4411",
+    "issuedAt": "2030-11-05T09:30:00+00:00",
+    "correlationId": "e1f2a3b4-5c6d-4e7f-8a9b-0c1d2e3f4a5b"
+  }
+}

@@ -1,0 +1,24 @@
+@using Norvia.Erp.Application.CreditNotes
+
+@* The Credit notes the ERP issued, as the lists show them. *@
+<FluentDataGrid Class="cerulean-table" Items="CreditNotes.AsQueryable()" TGridItem="CreditNoteView" aria-label="@Label">
+    <PropertyColumn Title="Credit note number" Property="@(row => row.CreditNoteNumber)" />
+    <TemplateColumn Title="Invoice">
+        <a href="/shipper-invoices/@context.InvoiceNumber">@context.InvoiceNumber</a>
+    </TemplateColumn>
+    <PropertyColumn Title="Line" Property="@(row => row.TransportOrderNumber)" />
+    <PropertyColumn Title="Shipper" Property="@(row => row.Shipper.Name)" />
+    <PropertyColumn Title="Date" Property="@(row => row.CreditNoteDate.ToString("yyyy-MM-dd"))" />
+    <PropertyColumn Title="Total without VAT" Property="@(row => Money.Format(row.TotalWithoutVat))" />
+    <PropertyColumn Title="VAT" Property="@(row => Money.Format(row.Vat))" />
+    <PropertyColumn Title="Total with VAT" Property="@(row => Money.Format(row.TotalWithVat))" />
+    <PropertyColumn Title="Reason" Property="@(row => row.Reason)" />
+</FluentDataGrid>
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<CreditNoteView> CreditNotes { get; set; } = [];
+
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = "";
+}

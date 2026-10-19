@@ -35,6 +35,8 @@ internal sealed class Schemas
     private static readonly Lazy<Schemas> ShipperInvoiceSchema = new(() => Of("PartnerApi/shipper-invoice.v1.schema.json"));
     private static readonly Lazy<Schemas> InvoiceDocumentSchema = new(() => Of("CanonicalModel/shipper-invoice.v1.schema.json"));
 
+    private static readonly Lazy<Schemas> CreditNoteDocumentSchema = new(() => Of("CanonicalModel/credit-note.v1.schema.json"));
+
     private readonly JsonSchema _schema;
 
     private Schemas(JsonSchema schema) => _schema = schema;
@@ -91,6 +93,9 @@ internal sealed class Schemas
 
     /// <summary>The Canonical Model's Shipper invoice, the document <c>ShipperInvoiceIssued</c> carries.</summary>
     public static Schemas InvoiceDocument => InvoiceDocumentSchema.Value;
+
+    /// <summary>The Canonical Model's Credit note, the document <c>CreditNoteIssued</c> carries.</summary>
+    public static Schemas CreditNoteDocument => CreditNoteDocumentSchema.Value;
 
     public EvaluationResults Validate(JsonNode? instance) =>
         _schema.Evaluate(
