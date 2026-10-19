@@ -11,6 +11,9 @@ public sealed class ShipperInvoiceWorkflowTests
 {
     private const string CorrelationId = "@{outputs('Track_the_invoice')?['correlationId']}";
 
+    /// <summary>A Credit note's report goes to the ERP's Credit notes, an invoice's to its Shipper invoices.</summary>
+    private const string ReportPath = "@{if(startsWith(outputs('Track_the_invoice')?['documentNumber'], 'CN-'), 'credit-notes', 'shipper-invoices')}";
+
     private static string[] Statuses(JsonObject action, string after) =>
         [.. action["runAfter"]![after]!.AsArray().Select(status => status!.GetValue<string>())];
 
@@ -40,15 +43,17 @@ public sealed class ShipperInvoiceWorkflowTests
     }
 
     [Fact]
-    public void Tracking_TakesTheKeysFromTheInvoiceTheMessageCarries_LeavingOutAMissingOne()
+    public void Tracking_TakesTheKeysFromTheInvoiceOrCreditNoteTheMessageCarries_LeavingOutAMissingOne()
     {
         var inputs = ShipperInvoiceWorkflow.Action(ShipperInvoiceWorkflow.Tracking)["inputs"]!.AsObject();
 
         inputs.Select(input => input.Key).Should().BeEquivalentTo("correlationId", "partyId", "documentNumber", "sourceMessageId");
         inputs.Select(input => input.Value!.GetValue<string>()).Should().OnlyContain(
-            expression => expression.StartsWith("@json(base64ToString(triggerBody()?['contentData']))?['", StringComparison.Ordinal) && !expression.Contains("@{", StringComparison.Ordinal));
-        inputs["partyId"]!.GetValue<string>().Should().EndWith("?['invoice']?['shipper']?['shipperId']");
-        inputs["documentNumber"]!.GetValue<string>().Should().EndWith("?['invoice']?['invoiceNumber']");
+            expression => (expression.StartsWith("@json(base64ToString(triggerBody()?['contentData']))?['", StringComparison.Ordinal)
+                    || expression.StartsWith("@coalesce(json(base64ToString(triggerBody()?['contentData']))?['", StringComparison.Ordinal))
+                && !expression.Contains("@{", StringComparison.Ordinal));
+        inputs["partyId"]!.GetValue<string>().Should().Contain("?['invoice']?['shipper']?['shipperId']").And.Contain("?['creditNote']?['shipper']?['shipperId']");
+        inputs["documentNumber"]!.GetValue<string>().Should().Contain("?['invoice']?['invoiceNumber']").And.Contain("?['creditNote']?['creditNoteNumber']");
         inputs["sourceMessageId"]!.GetValue<string>().Should().EndWith("?['eventId']");
     }
 
@@ -74,13 +79,13 @@ public sealed class ShipperInvoiceWorkflowTests
     }
 
     [Fact]
-    public void Map_RunsTheShipperInvoiceMapOnTheMessageContent_AndTracksAnUnreadableInvoiceAsFailed()
+    public void Map_RunsTheShipperDocumentMapOnTheMessageContent_AndTracksAnUnreadableDocumentAsFailed()
     {
         var map = ShipperInvoiceWorkflow.Action(ShipperInvoiceWorkflow.MapAction);
 
         map["type"]!.GetValue<string>().Should().Be("InvokeFunction");
-        map["inputs"]!["functionName"]!.GetValue<string>().Should().Be("MapShipperInvoiceIssued");
-        map["inputs"]!["parameters"]!["shipperInvoiceIssued"]!.GetValue<string>().Should().Be("@{triggerBody()?['contentData']}");
+        map["inputs"]!["functionName"]!.GetValue<string>().Should().Be("MapShipperDocument");
+        map["inputs"]!["parameters"]!["message"]!.GetValue<string>().Should().Be("@{triggerBody()?['contentData']}");
         map["trackedProperties"]!["failureCode"]!.GetValue<string>().Should().Contain("ShipperInvoiceIssuedUnreadable");
     }
 
@@ -179,10 +184,20 @@ public sealed class ShipperInvoiceWorkflowTests
 
         report["runAfter"]!.AsObject().Should().BeEmpty("it sits in the Report branch that runs once the Shipper acknowledged");
         inputs["method"]!.GetValue<string>().Should().Be("POST");
-        inputs["uri"]!.GetValue<string>().Should().Be("@{parameters('erpBaseUrl')}/v1/shipper-invoices/@{outputs('Track_the_invoice')?['documentNumber']}/report-sent");
+        inputs["uri"]!.GetValue<string>().Should().Be($"@{{parameters('erpBaseUrl')}}/v1/{ReportPath}/@{{outputs('Track_the_invoice')?['documentNumber']}}/report-sent");
         inputs["authentication"]!["type"]!.GetValue<string>().Should().Be("ManagedServiceIdentity");
         inputs["authentication"]!["identity"]!.GetValue<string>().Should().Be("@parameters('shipperInvoiceIdentityId')");
         inputs["authentication"]!["audience"]!.GetValue<string>().Should().Be("@parameters('erpAudience')");
+    }
+
+    [Fact]
+    public void Tracking_ACreditNoteMessage_GivesTheCreditNotesNumberAndShipper()
+    {
+        var message = Contracts.Read("CanonicalModel/samples/credit-note-issued/partial-credit.json");
+        var inputs = ShipperInvoiceWorkflow.Action(ShipperInvoiceWorkflow.Tracking)["inputs"]!.AsObject();
+
+        ShipperInvoiceSampleTests.Resolve(JsonNode.Parse(message)!, inputs["documentNumber"]!.GetValue<string>()).Should().Be("CN-2030-000001");
+        ShipperInvoiceSampleTests.Resolve(JsonNode.Parse(message)!, inputs["partyId"]!.GetValue<string>()).Should().Be("SHP-0001");
     }
 
     [Fact]
@@ -203,7 +218,7 @@ public sealed class ShipperInvoiceWorkflowTests
         var inputs = ShipperInvoiceWorkflow.Action(ShipperInvoiceWorkflow.ReportNotDelivered)["inputs"]!;
 
         inputs["method"]!.GetValue<string>().Should().Be("POST");
-        inputs["uri"]!.GetValue<string>().Should().Be("@{parameters('erpBaseUrl')}/v1/shipper-invoices/@{outputs('Track_the_invoice')?['documentNumber']}/report-not-delivered");
+        inputs["uri"]!.GetValue<string>().Should().Be($"@{{parameters('erpBaseUrl')}}/v1/{ReportPath}/@{{outputs('Track_the_invoice')?['documentNumber']}}/report-not-delivered");
         inputs["authentication"]!["type"]!.GetValue<string>().Should().Be("ManagedServiceIdentity");
         inputs["authentication"]!["identity"]!.GetValue<string>().Should().Be("@parameters('shipperInvoiceIdentityId')");
         inputs["authentication"]!["audience"]!.GetValue<string>().Should().Be("@parameters('erpAudience')");
@@ -293,18 +308,18 @@ public sealed class ShipperInvoiceWorkflowTests
     }
 
     [Fact]
-    public void TheSubscription_AdmitsOnlyShipperInvoiceIssued_AndAResubmitToItself()
+    public void TheSubscription_AdmitsOnlyShipperInvoiceIssuedAndCreditNoteIssued_AndAResubmitToItself()
     {
         var messaging = Contracts.Read("Estate/messaging.bicep");
         var filter = messaging[messaging.IndexOf("resource shipperInvoiceFilter", StringComparison.Ordinal)..];
         filter = filter[..filter.IndexOf("\n}\n", StringComparison.Ordinal)];
 
-        filter.Should().Contain("(eventType = \\'ShipperInvoiceIssued\\' AND resubmitTo IS NULL) OR resubmitTo = \\'shipper-invoice\\'");
+        filter.Should().Contain("(eventType IN (\\'ShipperInvoiceIssued\\', \\'CreditNoteIssued\\') AND resubmitTo IS NULL) OR resubmitTo = \\'shipper-invoice\\'");
     }
 
     [Fact]
     public void TheLocalEmulator_GivesTheSubscriptionTheSameCondition() =>
-        Contracts.Read("AppHost/ResubmitAwareFilters.cs").Should().Contain("[\"shipper-invoice\"] = \"eventType = 'ShipperInvoiceIssued'\"");
+        Contracts.Read("AppHost/ResubmitAwareFilters.cs").Should().Contain("[\"shipper-invoice\"] = \"eventType IN ('ShipperInvoiceIssued', 'CreditNoteIssued')\"");
 
     [Fact]
     public void TheShipperInvoiceIdentity_HoldsTheErpReportRole_AndNothingElseOnTheErp()

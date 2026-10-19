@@ -119,7 +119,7 @@ public sealed class IssueCreditNoteHandlerTests
         body.Select(property => property.Key).Should().BeEquivalentTo("eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "creditNote");
         body["creditNote"]!.AsObject().Select(property => property.Key).Should().BeEquivalentTo(
             "creditNoteNumber", "creditNoteDate", "shipper", "invoiceNumber", "transportOrderNumber", "shipperReference", "shipmentNumber",
-            "deliveryDate", "currency", "totalWithoutVat", "vat", "totalWithVat", "reason", "issuedAt", "correlationId");
+            "deliveryDate", "currency", "totalWithoutVat", "vat", "totalWithVat", "reason", "issuedAt", "correlationId", "status");
         body["creditNote"]!["creditNoteDate"]!.GetValue<string>().Should().Be("2026-10-22");
     }
 

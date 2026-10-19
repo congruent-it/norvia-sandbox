@@ -9,6 +9,8 @@ using Norvia.Erp.Api.BillableLines;
 using Norvia.Erp.Api.ShipperInvoices;
 using Norvia.Erp.Api.Tracking;
 using Norvia.Erp.Application.BillableLines.Record;
+using Norvia.Erp.Application.CreditNotes.ReportNotDelivered;
+using Norvia.Erp.Application.CreditNotes.ReportSent;
 using Norvia.Erp.Application.ShipperInvoices.ReportNotDelivered;
 using Norvia.Erp.Application.ShipperInvoices.ReportSent;
 using Norvia.Erp.Infrastructure;
@@ -20,6 +22,8 @@ builder.AddServiceDefaults();
 builder.Services.AddScoped<IPipelineBehavior<RecordBillableLineCommand, Result<RecordBillableLineResult>>, TrackBillableLineInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<ReportShipperInvoiceSentCommand, Result<ShipperInvoiceReportResult>>, TrackShipperInvoiceReportInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<ReportShipperInvoiceNotDeliveredCommand, Result<ShipperInvoiceReportResult>>, TrackShipperInvoiceNotDeliveredReportInLoggingScope>();
+builder.Services.AddScoped<IPipelineBehavior<ReportCreditNoteSentCommand, Result<CreditNoteReportResult>>, TrackCreditNoteReportInLoggingScope>();
+builder.Services.AddScoped<IPipelineBehavior<ReportCreditNoteNotDeliveredCommand, Result<CreditNoteReportResult>>, TrackCreditNoteNotDeliveredReportInLoggingScope>();
 
 // The ERP API records and answers; a Not delivered report writes its event to the outbox, and the ERP UI's process publishes it, so the API runs no outbox publisher. The ERP UI loads the master data it checks Shippers against.
 builder.AddErpInfrastructure();
@@ -107,6 +111,7 @@ if (app.Environment.IsDevelopment())
 app.MapDefaultEndpoints();
 app.MapBillableLines();
 app.MapShipperInvoices();
+app.MapCreditNotes();
 
 await app.RunAsync();
 

@@ -20,4 +20,10 @@ public enum CreditNoteRefusalCode
 
     /// <summary>The amount is above the line's total minus the earlier Credit notes on that line.</summary>
     CreditNoteAboveLineTotal,
+
+    /// <summary>The ERP has no Credit note with the number given, for a report or Send again.</summary>
+    CreditNoteNotFound,
+
+    /// <summary>Send again was chosen for a Credit note that isn't Not delivered.</summary>
+    CreditNoteNotSendableAgain,
 }

@@ -98,9 +98,16 @@ public sealed class ShipperInvoiceSampleTests
 
         foreach (var (key, expression) in inputs)
         {
-            var path = expression!.GetValue<string>().Split("))?['", 2)[1].Split("?['").Select(part => part.TrimEnd(']', '\''));
-            var node = path.Aggregate(message, (current, field) => current![field]!);
-            node.GetValue<string>().Should().NotBeNullOrWhiteSpace($"the workflow tracks {key}");
+            Resolve(message, expression!.GetValue<string>()).Should().NotBeNullOrWhiteSpace($"the workflow tracks {key}");
         }
     }
+
+    /// <summary>What a tracking expression of the workflow gives for a message: the first of its <c>json(...)</c> paths that the message has.</summary>
+    internal static string? Resolve(JsonNode message, string expression) =>
+        expression.Split("json(base64ToString(triggerBody()?['contentData']))", StringSplitOptions.RemoveEmptyEntries)
+            .Select(segment => System.Text.RegularExpressions.Regex.Matches(segment, @"\?\['(\w+)'\]").Select(match => match.Groups[1].Value).ToList())
+            .Where(path => path.Count > 0)
+            .Select(path => path.Aggregate((JsonNode?)message, (current, field) => current?[field]))
+            .Select(node => node?.GetValue<string>())
+            .FirstOrDefault(value => value is not null);
 }

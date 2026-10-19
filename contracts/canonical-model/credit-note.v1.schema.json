@@ -20,7 +20,8 @@
     "totalWithVat",
     "reason",
     "issuedAt",
-    "correlationId"
+    "correlationId",
+    "status"
   ],
   "properties": {
     "creditNoteNumber": {
@@ -112,6 +113,26 @@
       "description": "The correlation ID the ERP created for this Credit note.",
       "type": "string",
       "minLength": 1
+    },
+    "status": {
+      "description": "Issued, final; Sent once the Shipper invoice Logic App reported the Shipper's endpoint acknowledged it, or NotDelivered once it reported the Credit note never reached the Shipper. Finance sending a NotDelivered Credit note again makes it Issued once more.",
+      "enum": ["Issued", "Sent", "NotDelivered"]
+    },
+    "sentAt": {
+      "description": "When the Credit note was reported Sent. Absent while it is Issued only.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "notDelivered": {
+      "description": "Why the Credit note never reached the Shipper. Present only while the status is NotDelivered.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["at", "statusCode", "message"],
+      "properties": {
+        "at": { "description": "When the report was recorded.", "type": "string", "format": "date-time" },
+        "statusCode": { "description": "The Shipper endpoint's HTTP status code; null when the failure had none, such as a timeout.", "type": ["integer", "null"] },
+        "message": { "description": "The technical cause in plain language.", "type": "string", "minLength": 1 }
+      }
     }
   }
 }

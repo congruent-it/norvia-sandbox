@@ -75,6 +75,34 @@ internal sealed class ShipperInvoiceWorld
         }
         """;
 
+    public static string CreditNoteIssued(string shipperId = ShipperId) => $$"""
+        {
+          "eventId": "0198e7c0-0000-7000-8000-0000000000e1",
+          "eventType": "CreditNoteIssued",
+          "eventVersion": 1,
+          "occurredAt": "2030-11-05T09:30:00+00:00",
+          "correlationId": "credit-note-1",
+          "creditNote": {
+            "creditNoteNumber": "CN-2030-000001",
+            "creditNoteDate": "2030-11-05",
+            "shipper": { "shipperId": "{{shipperId}}", "name": "Brouwer Dranken" },
+            "invoiceNumber": "{{DocumentNumber}}",
+            "transportOrderNumber": "TO-0000001",
+            "shipperReference": "BD-2030-0001",
+            "shipmentNumber": "SH-0000001",
+            "deliveryDate": "2030-10-18",
+            "currency": "EUR",
+            "totalWithoutVat": 14.50,
+            "vat": 3.05,
+            "totalWithVat": 17.55,
+            "reason": "Rate Card error",
+            "issuedAt": "2030-11-05T09:30:00+00:00",
+            "correlationId": "credit-note-1",
+            "status": "Issued"
+          }
+        }
+        """;
+
     /// <summary>Runs the flow, moving the clock on whenever it waits to retry.</summary>
     public async Task<ShipperInvoiceFlowOutcome> RunAsync(string issued)
     {

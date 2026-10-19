@@ -11,7 +11,7 @@
       "bookingRef": "BD-2030-0002",
       "deliveryDate": "21-10-2030",
       "chargeLines": [
-        { "code": "MINIMUM_CHARGE_ADJUSTMENT", "amount": 14.50 }
+        { "code": "FREIGHT", "amount": 14.50 }
       ],
       "lineTotal": 14.50
     }

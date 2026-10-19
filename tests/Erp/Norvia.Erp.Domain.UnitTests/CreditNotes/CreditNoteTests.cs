@@ -151,4 +151,112 @@ public sealed class CreditNoteTests
 
         issue.Should().Throw<ArgumentException>();
     }
+
+    [Fact]
+    public void Issue_StartsIssued_WithoutADeliveryOutcome()
+    {
+        var note = Issue();
+
+        note.Status.Should().Be(ShipperInvoiceStatus.Issued);
+        note.SentAt.Should().BeNull();
+        note.NotDeliveredAt.Should().BeNull();
+    }
+
+    [Fact]
+    public void ReportSent_AnIssuedCreditNote_IsSentWithTheTime()
+    {
+        var note = Issue();
+
+        var reported = note.ReportSent(IssuedAt.AddMinutes(1));
+
+        reported.Should().BeTrue();
+        note.Status.Should().Be(ShipperInvoiceStatus.Sent);
+        note.SentAt.Should().Be(IssuedAt.AddMinutes(1));
+    }
+
+    [Fact]
+    public void ReportSent_ACreditNoteReportedAlready_IsIgnored()
+    {
+        var note = Issue();
+        note.ReportSent(IssuedAt.AddMinutes(1));
+
+        var reported = note.ReportSent(IssuedAt.AddMinutes(2));
+
+        reported.Should().BeFalse();
+        note.SentAt.Should().Be(IssuedAt.AddMinutes(1));
+    }
+
+    [Fact]
+    public void ReportNotDelivered_AnIssuedCreditNote_IsNotDeliveredWithTheCause()
+    {
+        var note = Issue();
+
+        var reported = note.ReportNotDelivered(503, "Overloaded", IssuedAt.AddMinutes(2));
+
+        reported.Should().BeTrue();
+        note.Status.Should().Be(ShipperInvoiceStatus.NotDelivered);
+        (note.NotDeliveredAt, note.NotDeliveredStatusCode, note.NotDeliveredMessage).Should().Be((IssuedAt.AddMinutes(2), 503, "Overloaded"));
+    }
+
+    [Fact]
+    public void ReportNotDelivered_ALongCause_IsCutTo500Characters()
+    {
+        var note = Issue();
+
+        note.ReportNotDelivered(null, new string('x', 900), IssuedAt);
+
+        note.NotDeliveredMessage.Should().HaveLength(500);
+        note.NotDeliveredStatusCode.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void ReportNotDelivered_WithoutACause_Throws(string message)
+    {
+        var report = () => Issue().ReportNotDelivered(500, message, IssuedAt);
+
+        report.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void ReportNotDelivered_ACreditNoteSentAlready_IsIgnored()
+    {
+        var note = Issue();
+        note.ReportSent(IssuedAt.AddMinutes(1));
+
+        var reported = note.ReportNotDelivered(500, "late", IssuedAt.AddMinutes(2));
+
+        reported.Should().BeFalse();
+        note.Status.Should().Be(ShipperInvoiceStatus.Sent);
+        note.NotDeliveredAt.Should().BeNull();
+    }
+
+    [Fact]
+    public void SendAgain_ANotDeliveredCreditNote_IsIssuedOnceMore_WithoutTheCause()
+    {
+        var note = Issue();
+        note.ReportNotDelivered(500, "cause", IssuedAt.AddMinutes(1));
+
+        var again = note.SendAgain();
+
+        again.Should().BeTrue();
+        note.Status.Should().Be(ShipperInvoiceStatus.Issued);
+        (note.NotDeliveredAt, note.NotDeliveredStatusCode, note.NotDeliveredMessage).Should().Be((null, null, null));
+        note.AmountWithoutVat.Should().Be(40m);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SendAgain_ACreditNoteThatIsNotNotDelivered_IsRefused(bool sent)
+    {
+        var note = Issue();
+        if (sent)
+        {
+            note.ReportSent(IssuedAt.AddMinutes(1));
+        }
+
+        note.SendAgain().Should().BeFalse();
+    }
 }

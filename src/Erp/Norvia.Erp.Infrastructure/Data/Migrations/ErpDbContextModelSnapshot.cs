@@ -135,10 +135,23 @@ namespace Norvia.Erp.Infrastructure.Data.Migrations
                     b.Property<DateTimeOffset>("IssuedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<DateTimeOffset?>("NotDeliveredAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("NotDeliveredMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int?>("NotDeliveredStatusCode")
+                        .HasColumnType("int");
+
                     b.Property<string>("Reason")
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTimeOffset?>("SentAt")
+                        .HasColumnType("datetimeoffset");
 
                     b.Property<string>("ShipmentNumber")
                         .IsRequired()
@@ -154,6 +167,11 @@ namespace Norvia.Erp.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<decimal>("TotalWithVat")
                         .HasPrecision(18, 2)

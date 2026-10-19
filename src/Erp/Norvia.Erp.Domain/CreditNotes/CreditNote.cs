@@ -7,7 +7,8 @@ namespace Norvia.Erp.Domain.CreditNotes;
 
 /// <summary>
 /// Finance's correction of one line of an issued Shipper invoice, in full or in part, with a reason. Once issued it is never changed or
-/// deleted, and the invoice it corrects is left as it was. Sending it to the Shipper is a later step.
+/// deleted, and the invoice it corrects is left as it was. Its delivery status follows the Shipper invoice's: Issued until the Shipper invoice
+/// Logic App reports it Sent or Not delivered, and Issued once more when Finance sends it again.
 /// </summary>
 public sealed class CreditNote : EntityBase<CreditNoteNumber>, IAggregateRoot
 {
@@ -40,6 +41,7 @@ public sealed class CreditNote : EntityBase<CreditNoteNumber>, IAggregateRoot
         Reason = reason;
         IssuedAt = issuedAt;
         CorrelationId = correlationId;
+        Status = ShipperInvoiceStatus.Issued;
     }
 
     public ShipperId ShipperId { get; private set; }
@@ -72,6 +74,73 @@ public sealed class CreditNote : EntityBase<CreditNoteNumber>, IAggregateRoot
 
     /// <summary>The correlation ID the ERP created for this Credit note; the event carries it on.</summary>
     public string CorrelationId { get; private set; } = string.Empty;
+
+    public ShipperInvoiceStatus Status { get; private set; }
+
+    /// <summary>When the Shipper invoice Logic App reported the Credit note Sent; null while it is Issued only.</summary>
+    public DateTimeOffset? SentAt { get; private set; }
+
+    /// <summary>When the Shipper invoice Logic App reported the Credit note Not delivered; null unless it is Not delivered now.</summary>
+    public DateTimeOffset? NotDeliveredAt { get; private set; }
+
+    /// <summary>The Shipper endpoint's HTTP status code of a Not delivered Credit note; null when the failure had none, such as a timeout.</summary>
+    public int? NotDeliveredStatusCode { get; private set; }
+
+    /// <summary>The technical cause of a Not delivered Credit note, in plain language.</summary>
+    public string? NotDeliveredMessage { get; private set; }
+
+    /// <summary>
+    /// Records that the Shipper's endpoint acknowledged the Credit note. Only an Issued one can be reported; false for one reported
+    /// already, which the caller ignores and logs.
+    /// </summary>
+    public bool ReportSent(DateTimeOffset at)
+    {
+        if (Status != ShipperInvoiceStatus.Issued)
+        {
+            return false;
+        }
+
+        Status = ShipperInvoiceStatus.Sent;
+        SentAt = at;
+        return true;
+    }
+
+    /// <summary>
+    /// Records that the Credit note never reached the Shipper, with the technical cause. Only an Issued one can be reported; false for
+    /// one reported already or sent again since, which the caller ignores and logs.
+    /// </summary>
+    public bool ReportNotDelivered(int? statusCode, string message, DateTimeOffset at)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(message);
+        if (Status != ShipperInvoiceStatus.Issued)
+        {
+            return false;
+        }
+
+        Status = ShipperInvoiceStatus.NotDelivered;
+        NotDeliveredAt = at;
+        NotDeliveredStatusCode = statusCode;
+        NotDeliveredMessage = message.Length > ShipperInvoice.MaxCauseLength ? message[..ShipperInvoice.MaxCauseLength] : message;
+        return true;
+    }
+
+    /// <summary>
+    /// Finance sends a Not delivered Credit note again: it is Issued once more, without a sent time, until the Logic App reports it. The
+    /// Credit note itself is unchanged. False for one that isn't Not delivered.
+    /// </summary>
+    public bool SendAgain()
+    {
+        if (Status != ShipperInvoiceStatus.NotDelivered)
+        {
+            return false;
+        }
+
+        Status = ShipperInvoiceStatus.Issued;
+        NotDeliveredAt = null;
+        NotDeliveredStatusCode = null;
+        NotDeliveredMessage = null;
+        return true;
+    }
 
     /// <summary>
     /// What stops a Credit note of <paramref name="amount"/> on <paramref name="transportOrderNumber"/>'s line of the invoice, or null when

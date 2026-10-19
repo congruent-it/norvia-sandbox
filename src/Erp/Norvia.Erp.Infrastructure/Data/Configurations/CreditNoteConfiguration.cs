@@ -31,6 +31,8 @@ internal sealed class CreditNoteConfiguration : IEntityTypeConfiguration<CreditN
         builder.Property(note => note.TotalWithVat).HasPrecision(18, 2);
         builder.Property(note => note.Reason).HasMaxLength(CreditNote.MaxReasonLength).IsRequired();
         builder.Property(note => note.CorrelationId).HasMaxLength(128).IsRequired();
+        builder.Property(note => note.Status).HasConversion<string>().HasMaxLength(20);
+        builder.Property(note => note.NotDeliveredMessage).HasMaxLength(ShipperInvoice.MaxCauseLength);
         // The Credit notes of an invoice line, summed against its total, and newest first.
         builder.HasIndex(note => new { note.InvoiceNumber, note.TransportOrderNumber });
         builder.HasIndex(note => note.IssuedAt);

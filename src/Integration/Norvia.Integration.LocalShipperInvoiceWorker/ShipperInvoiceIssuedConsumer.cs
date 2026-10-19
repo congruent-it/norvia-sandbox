@@ -4,8 +4,8 @@ using Microsoft.Extensions.Options;
 namespace Norvia.Integration.LocalShipperInvoiceWorker;
 
 /// <summary>
-/// The Shipper invoice Logic App's trigger, played locally (ADR 0033, ADR 0043): picks up <c>ShipperInvoiceIssued</c> from the Shipper
-/// invoice subscription and runs the flow for it. As in the workflow, a message that can't be mapped is dead-lettered with the failure
+/// The Shipper invoice Logic App's trigger, played locally (ADR 0033, ADR 0043): picks up <c>ShipperInvoiceIssued</c> and
+/// <c>CreditNoteIssued</c> from the Shipper invoice subscription and runs the flow for it. As in the workflow, a message that can't be mapped is dead-lettered with the failure
 /// code, and any other is completed: a run that fails later is on the trail, not redelivered.
 /// </summary>
 internal sealed partial class ShipperInvoiceIssuedConsumer(
@@ -15,7 +15,7 @@ internal sealed partial class ShipperInvoiceIssuedConsumer(
     ILogger<ShipperInvoiceIssuedConsumer> logger) : BackgroundService
 {
     internal const string UnreadableCode = "ShipperInvoiceIssuedUnreadable";
-    internal const string UnreadableDescription = "The message isn't an invoice the Shipper can be sent, so nothing was sent to the Shipper.";
+    internal const string UnreadableDescription = "The message isn't an invoice or Credit note the Shipper can be sent, so nothing was sent to the Shipper.";
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {

@@ -19,6 +19,7 @@
     "totalWithVat": 17.55,
     "reason": "Rate Card error on Lane NL-BE, see ticket 4411",
     "issuedAt": "2030-11-05T09:30:00+00:00",
-    "correlationId": "e1f2a3b4-5c6d-4e7f-8a9b-0c1d2e3f4a5b"
+    "correlationId": "e1f2a3b4-5c6d-4e7f-8a9b-0c1d2e3f4a5b",
+    "status": "Issued"
   }
 }
