@@ -17,7 +17,8 @@ internal static class ShipperInvoiceViews
         invoice.IssuedAt,
         invoice.CorrelationId,
         invoice.Status.ToString(),
-        invoice.SentAt);
+        invoice.SentAt,
+        invoice is { NotDeliveredAt: { } at, NotDeliveredMessage: { } message } ? new NotDeliveredView(at, invoice.NotDeliveredStatusCode, message) : null);
 
     private static ShipperInvoiceLineView Of(ShipperInvoiceLine line) => new(
         line.TransportOrderNumber,

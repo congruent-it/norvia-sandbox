@@ -30,9 +30,14 @@
         <dt>Invoice date</dt>
         <dd>@invoice.InvoiceDate.ToString("yyyy-MM-dd")</dd>
         <dt>Status</dt>
-        <dd>@invoice.Status</dd>
+        <dd>@(invoice.Status == "NotDelivered" ? "Not delivered" : invoice.Status)</dd>
         <dt>Sent</dt>
-        <dd>@SentTime.Format(invoice.SentAt)</dd>
+        <dd>@SentTime.Format(invoice)</dd>
+        @if (invoice.NotDelivered is { } notDelivered)
+        {
+            <dt>Not delivered</dt>
+            <dd>@SentTime.Format(notDelivered.At) · @(notDelivered.StatusCode is { } code ? $"status {code}: " : "")@notDelivered.Message</dd>
+        }
         <dt>Total without VAT</dt>
         <dd>@Money.Format(invoice.TotalWithoutVat)</dd>
         <dt>VAT (21%)</dt>
@@ -42,6 +47,11 @@
         <dt>Correlation ID</dt>
         <dd>@invoice.CorrelationId</dd>
     </dl>
+
+    @if (invoice.Status == "NotDelivered")
+    {
+        <p><SendAgainButton InvoiceNumber="@invoice.InvoiceNumber" /></p>
+    }
 
     <h2>Lines</h2>
     <FluentAccordion aria-label="@($"Lines of {invoice.InvoiceNumber}")">

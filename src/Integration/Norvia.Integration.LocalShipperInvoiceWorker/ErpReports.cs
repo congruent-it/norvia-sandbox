@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using Microsoft.Extensions.Options;
 
 using Norvia.Integration.LocalSupport;
@@ -14,12 +15,25 @@ internal sealed partial class ErpReports(HttpClient http, IOptions<ShipperInvoic
     private const string ReportRole = "ShipperInvoices.Report";
 
     /// <summary>The ERP's status, or 0 when it didn't answer.</summary>
-    public async Task<int> ReportSentAsync(string documentNumber, string correlationId, CancellationToken cancellationToken)
+    public Task<int> ReportSentAsync(string documentNumber, string correlationId, CancellationToken cancellationToken) =>
+        PostAsync(documentNumber, "report-sent", correlationId, null, cancellationToken);
+
+    /// <summary>Reports the invoice Not delivered with the endpoint's status (null when it didn't answer) and the technical cause. The ERP's status, or 0 when it didn't answer.</summary>
+    public Task<int> ReportNotDeliveredAsync(
+        string documentNumber, string correlationId, int statusCode, string message, CancellationToken cancellationToken) =>
+        PostAsync(
+            documentNumber, "report-not-delivered", correlationId,
+            JsonContent.Create(new { statusCode = statusCode == 0 ? (int?)null : statusCode, message }), cancellationToken);
+
+    private async Task<int> PostAsync(string documentNumber, string report, string correlationId, HttpContent? content, CancellationToken cancellationToken)
     {
         try
         {
             using var request = new HttpRequestMessage(
-                HttpMethod.Post, new Uri($"/v1/shipper-invoices/{Uri.EscapeDataString(documentNumber)}/report-sent", UriKind.Relative));
+                HttpMethod.Post, new Uri($"/v1/shipper-invoices/{Uri.EscapeDataString(documentNumber)}/{report}", UriKind.Relative))
+            {
+                Content = content,
+            };
             request.Headers.Add("X-Correlation-ID", correlationId);
             request.Headers.Authorization = new AuthenticationHeaderValue(
                 "Bearer", TmsTokens.Create(options.Value.ErpTokens, time, options.Value.ErpTokens.ClientId!, ReportRole));

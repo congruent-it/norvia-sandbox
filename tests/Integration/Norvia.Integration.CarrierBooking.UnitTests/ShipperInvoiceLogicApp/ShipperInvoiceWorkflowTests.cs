@@ -70,7 +70,7 @@ public sealed class ShipperInvoiceWorkflowTests
 
         tracked.Select(operation => operation.Operation["trackedProperties"]!["flow"]!.GetValue<string>()).Should().OnlyContain(flow => flow == ShipperInvoiceWorkflow.Flow);
         tracked.Select(operation => operation.Name).Should().Contain(
-            [ShipperInvoiceWorkflow.Tracking, ShipperInvoiceWorkflow.MapAction, ShipperInvoiceWorkflow.Send, ShipperInvoiceWorkflow.ReportSent]);
+            [ShipperInvoiceWorkflow.Tracking, ShipperInvoiceWorkflow.MapAction, ShipperInvoiceWorkflow.Send, ShipperInvoiceWorkflow.ReportSent, ShipperInvoiceWorkflow.ReportNotDelivered]);
     }
 
     [Fact]
@@ -152,6 +152,7 @@ public sealed class ShipperInvoiceWorkflowTests
     [Theory]
     [InlineData(ShipperInvoiceWorkflow.Send)]
     [InlineData(ShipperInvoiceWorkflow.ReportSent)]
+    [InlineData(ShipperInvoiceWorkflow.ReportNotDelivered)]
     public void Calls_RetryWithTheBoundedExponentialPolicy_AsTheOtherLogicAppsDo(string name)
     {
         var retry = ShipperInvoiceWorkflow.Action(name)["inputs"]!["retryPolicy"]!;
@@ -166,21 +167,68 @@ public sealed class ShipperInvoiceWorkflowTests
     [Theory]
     [InlineData(ShipperInvoiceWorkflow.Send)]
     [InlineData(ShipperInvoiceWorkflow.ReportSent)]
+    [InlineData(ShipperInvoiceWorkflow.ReportNotDelivered)]
     public void Calls_CarryTheInvoicesCorrelationId(string name) =>
         ShipperInvoiceWorkflow.Action(name)["inputs"]!["headers"]!["X-Correlation-ID"]!.GetValue<string>().Should().Be(CorrelationId);
 
     [Fact]
-    public void ReportSent_RunsOnlyOnceTheShipperAcknowledged_AndCallsTheErpsReportOperationAsTheShipperInvoiceIdentity()
+    public void ReportSent_CallsTheTheErpsReportOperationAsTheShipperInvoiceIdentity()
     {
         var report = ShipperInvoiceWorkflow.Action(ShipperInvoiceWorkflow.ReportSent);
         var inputs = report["inputs"]!;
 
-        Statuses(report, ShipperInvoiceWorkflow.Send).Should().BeEquivalentTo("Succeeded");
+        report["runAfter"]!.AsObject().Should().BeEmpty("it sits in the Report branch that runs once the Shipper acknowledged");
         inputs["method"]!.GetValue<string>().Should().Be("POST");
         inputs["uri"]!.GetValue<string>().Should().Be("@{parameters('erpBaseUrl')}/v1/shipper-invoices/@{outputs('Track_the_invoice')?['documentNumber']}/report-sent");
         inputs["authentication"]!["type"]!.GetValue<string>().Should().Be("ManagedServiceIdentity");
         inputs["authentication"]!["identity"]!.GetValue<string>().Should().Be("@parameters('shipperInvoiceIdentityId')");
         inputs["authentication"]!["audience"]!.GetValue<string>().Should().Be("@parameters('erpAudience')");
+    }
+
+    [Fact]
+    public void Report_RunsWhateverTheShipperAnswered_AndReportsSentOnASuccess_AndNotDeliveredOtherwise()
+    {
+        var report = ShipperInvoiceWorkflow.Action(ShipperInvoiceWorkflow.Report);
+
+        Statuses(report, ShipperInvoiceWorkflow.Send).Should().BeEquivalentTo("Succeeded", "Failed", "TimedOut");
+        report["actions"]!.AsObject().Select(action => action.Key).Should().Equal(ShipperInvoiceWorkflow.ReportSent);
+        report["else"]!["actions"]!.AsObject().Select(action => action.Key).Should().Contain(ShipperInvoiceWorkflow.ReportNotDelivered);
+        var expression = report["expression"]!.ToJsonString();
+        expression.Should().Contain("greaterOrEquals").And.Contain("200").And.Contain("less").And.Contain("300");
+    }
+
+    [Fact]
+    public void ReportNotDelivered_CallsTheErpsNotDeliveredOperationAsTheShipperInvoiceIdentity()
+    {
+        var inputs = ShipperInvoiceWorkflow.Action(ShipperInvoiceWorkflow.ReportNotDelivered)["inputs"]!;
+
+        inputs["method"]!.GetValue<string>().Should().Be("POST");
+        inputs["uri"]!.GetValue<string>().Should().Be("@{parameters('erpBaseUrl')}/v1/shipper-invoices/@{outputs('Track_the_invoice')?['documentNumber']}/report-not-delivered");
+        inputs["authentication"]!["type"]!.GetValue<string>().Should().Be("ManagedServiceIdentity");
+        inputs["authentication"]!["identity"]!.GetValue<string>().Should().Be("@parameters('shipperInvoiceIdentityId')");
+        inputs["authentication"]!["audience"]!.GetValue<string>().Should().Be("@parameters('erpAudience')");
+    }
+
+    [Fact]
+    public void ReportNotDelivered_CarriesTheStatusCodeAndAMessageOfAtMost500Characters()
+    {
+        var body = ShipperInvoiceWorkflow.Action(ShipperInvoiceWorkflow.ReportNotDelivered)["inputs"]!["body"]!.AsObject();
+
+        body.Select(property => property.Key).Should().BeEquivalentTo("statusCode", "message");
+        body["statusCode"]!.GetValue<string>().Should().Contain("coalesce(actions('Send_to_the_Shipper')?['outputs']?['statusCode'], 0)");
+        body["message"]!.GetValue<string>().Should().Contain("min(500,");
+    }
+
+    [Fact]
+    public void ErpReports_TrackTheOutcomeAndTheFailureCodeOfTheCall()
+    {
+        foreach (var name in new[] { ShipperInvoiceWorkflow.ReportSent, ShipperInvoiceWorkflow.ReportNotDelivered })
+        {
+            var tracked = ShipperInvoiceWorkflow.Action(name)["trackedProperties"]!.AsObject();
+
+            tracked.Select(property => property.Key).Should().Contain(["outcome", "failureCode", "documentNumber", "correlationId", "partyId"]);
+            tracked["failureCode"]!.GetValue<string>().Should().Contain("ErpUnavailable").And.Contain("ErpCallRefused").And.Contain($"actions('{name}')");
+        }
     }
 
     [Fact]
@@ -203,7 +251,7 @@ public sealed class ShipperInvoiceWorkflowTests
     [Fact]
     public void Calls_AreTheShippersEndpointAndTheErpsReport_AndNothingElse() =>
         ShipperInvoiceWorkflow.Operations().Where(operation => operation.Operation["type"]!.GetValue<string>() == "Http").Select(operation => operation.Name)
-            .Should().BeEquivalentTo(ShipperInvoiceWorkflow.Send, ShipperInvoiceWorkflow.ReportSent);
+            .Should().BeEquivalentTo(ShipperInvoiceWorkflow.Send, ShipperInvoiceWorkflow.ReportSent, ShipperInvoiceWorkflow.ReportNotDelivered);
 
     [Fact]
     public void Workflow_IsStateful_BecauseTheRunHistoryIsTheIntegrationOperatorsTrail() =>

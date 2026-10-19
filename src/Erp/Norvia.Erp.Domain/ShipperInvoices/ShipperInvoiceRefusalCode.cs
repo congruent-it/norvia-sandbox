@@ -4,4 +4,7 @@ namespace Norvia.Erp.Domain.ShipperInvoices;
 public enum ShipperInvoiceRefusalCode
 {
     ShipperInvoiceNotFound,
+
+    /// <summary>Send again was chosen for an invoice that isn't Not delivered.</summary>
+    ShipperInvoiceNotSendableAgain,
 }

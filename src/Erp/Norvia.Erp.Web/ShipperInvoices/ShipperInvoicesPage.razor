@@ -28,8 +28,14 @@
         <PropertyColumn Title="Total without VAT" Property="@(row => Money.Format(row.TotalWithoutVat))" />
         <PropertyColumn Title="VAT" Property="@(row => Money.Format(row.Vat))" />
         <PropertyColumn Title="Total with VAT" Property="@(row => Money.Format(row.TotalWithVat))" />
-        <PropertyColumn Title="Status" Property="@(row => row.Status)" />
-        <PropertyColumn Title="Sent" Property="@(row => SentTime.Format(row.SentAt))" />
+        <PropertyColumn Title="Status" Property="@(row => row.Status == "NotDelivered" ? "Not delivered" : row.Status)" />
+        <PropertyColumn Title="Sent" Property="@(row => SentTime.Format(row))" />
+        <TemplateColumn Title="Actions">
+            @if (context.Status == "NotDelivered")
+            {
+                <SendAgainButton InvoiceNumber="@context.InvoiceNumber" @key="context.InvoiceNumber" />
+            }
+        </TemplateColumn>
     </FluentDataGrid>
 </LiveListStates>
 

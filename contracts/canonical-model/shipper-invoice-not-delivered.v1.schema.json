@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/shipper-invoice-not-delivered.v1.schema.json",
+  "title": "ShipperInvoiceNotDelivered",
+  "description": "A Shipper invoice never reached the Shipper (Canonical Model event, version 1). The Shipper invoice Logic App used up its retries on a server error or timeout, or met a client error, and reported the invoice Not delivered with the technical cause. The ERP moved the invoice to Not delivered, shows the flag in the list of Shipper invoices and offers Send again to Finance. Published on the Invoicing events topic through the ERP's transactional outbox, in the transaction that recorded the report, under the invoice's correlation ID. Monitoring consumes it; an alert follows later.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "documentType", "documentNumber", "shipperId", "statusCode", "message"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "const": "ShipperInvoiceNotDelivered" },
+    "eventVersion": { "const": 1 },
+    "occurredAt": { "description": "When the report was recorded.", "type": "string", "format": "date-time" },
+    "correlationId": { "description": "The correlation ID the ERP created for the document; the same as the document's.", "type": "string", "minLength": 1 },
+    "documentType": { "description": "INVOICE now; CREDIT_NOTE when Credit notes are sent the same way.", "enum": ["INVOICE", "CREDIT_NOTE"] },
+    "documentNumber": { "description": "The invoice number, INV-<year>-<6 digits>, or the Credit note number.", "type": "string", "pattern": "^(INV|CN)-[0-9]{4}-[0-9]{6}$" },
+    "shipperId": { "description": "The Shipper the document was addressed to.", "type": "string", "minLength": 1 },
+    "statusCode": { "description": "The Shipper endpoint's HTTP status code; null when the failure had none, such as a timeout.", "type": ["integer", "null"] },
+    "message": { "description": "The technical cause in plain language.", "type": "string", "minLength": 1 }
+  }
+}

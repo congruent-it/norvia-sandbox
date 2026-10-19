@@ -1,0 +1,42 @@
+@inject SendAgainAction Action
+
+@* Finance's Send again for one Not delivered Shipper invoice. What it did is said beside it. *@
+<FluentButton Appearance="Appearance.Accent" Disabled="_running" OnClick="RunAsync" aria-label="@($"Send {InvoiceNumber} again")">Send again</FluentButton>
+
+<span role="status" class="ml-2">
+    @switch (_outcome)
+    {
+        case SendAgainOutcome.SentAgain:
+            <span>Sent again. The invoice is Issued until the Shipper's endpoint acknowledges it.</span>
+            break;
+        case SendAgainOutcome.Refused refused:
+            <span role="alert">@refused.Reason</span>
+            break;
+    }
+</span>
+
+@code {
+    private bool _running;
+    private SendAgainOutcome? _outcome;
+
+    [Parameter, EditorRequired]
+    public string InvoiceNumber { get; set; } = "";
+
+    private async Task RunAsync()
+    {
+        if (_running)
+        {
+            return;
+        }
+
+        _running = true;
+        try
+        {
+            _outcome = await Action.RunAsync(InvoiceNumber);
+        }
+        finally
+        {
+            _running = false;
+        }
+    }
+}

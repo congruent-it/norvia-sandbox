@@ -14,6 +14,8 @@ public sealed class ShipperInvoice : EntityBase<InvoiceNumber>, IAggregateRoot
     /// <summary>Dutch VAT rate; reverse charge and other Dutch VAT rules are deferred, as every seed Shipper is Dutch.</summary>
     public const decimal VatRate = 0.21m;
 
+    public const int MaxCauseLength = 500;
+
     private static readonly TimeZoneInfo Amsterdam = TimeZoneInfo.FindSystemTimeZoneById("Europe/Amsterdam");
 
     private ShipperInvoice()
@@ -63,6 +65,15 @@ public sealed class ShipperInvoice : EntityBase<InvoiceNumber>, IAggregateRoot
     /// <summary>When the Shipper invoice Logic App reported the invoice Sent; null while it is Issued only.</summary>
     public DateTimeOffset? SentAt { get; private set; }
 
+    /// <summary>When the Shipper invoice Logic App reported the invoice Not delivered; null unless it is Not delivered now.</summary>
+    public DateTimeOffset? NotDeliveredAt { get; private set; }
+
+    /// <summary>The Shipper endpoint's HTTP status code of a Not delivered invoice; null when the failure had none, such as a timeout.</summary>
+    public int? NotDeliveredStatusCode { get; private set; }
+
+    /// <summary>The technical cause of a Not delivered invoice, in plain language.</summary>
+    public string? NotDeliveredMessage { get; private set; }
+
     /// <summary>
     /// Records that the Shipper's endpoint acknowledged the invoice. Only an Issued invoice can be reported; false for one reported
     /// already, which the caller ignores and logs.
@@ -76,6 +87,43 @@ public sealed class ShipperInvoice : EntityBase<InvoiceNumber>, IAggregateRoot
 
         Status = ShipperInvoiceStatus.Sent;
         SentAt = at;
+        return true;
+    }
+
+    /// <summary>
+    /// Records that the invoice never reached the Shipper, with the technical cause. Only an Issued invoice can be reported; false for
+    /// one reported already or sent again since, which the caller ignores and logs.
+    /// </summary>
+    public bool ReportNotDelivered(int? statusCode, string message, DateTimeOffset at)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(message);
+        if (Status != ShipperInvoiceStatus.Issued)
+        {
+            return false;
+        }
+
+        Status = ShipperInvoiceStatus.NotDelivered;
+        NotDeliveredAt = at;
+        NotDeliveredStatusCode = statusCode;
+        NotDeliveredMessage = message.Length > MaxCauseLength ? message[..MaxCauseLength] : message;
+        return true;
+    }
+
+    /// <summary>
+    /// Finance sends a Not delivered invoice again: it is Issued once more, without a sent time, until the Logic App reports it. The
+    /// invoice itself is unchanged. False for an invoice that isn't Not delivered.
+    /// </summary>
+    public bool SendAgain()
+    {
+        if (Status != ShipperInvoiceStatus.NotDelivered)
+        {
+            return false;
+        }
+
+        Status = ShipperInvoiceStatus.Issued;
+        NotDeliveredAt = null;
+        NotDeliveredStatusCode = null;
+        NotDeliveredMessage = null;
         return true;
     }
 
