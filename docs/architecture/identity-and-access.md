@@ -11,7 +11,7 @@ An app role belongs to the app registration of the API it guards. Each registrat
 | App registration | Audience | Who may get a token | Roles it defines |
 |---|---|---|---|
 | **Norvia TMS API** | `api://<tenant>/norvia-tms-<env>` | Only principals granted one of its roles (`appRoleAssignmentRequired`) | The [TMS API roles](#tms-api-roles) |
-| **Norvia ERP API** | `api://<tenant>/norvia-erp-api-<env>` | Only principals granted its role (`appRoleAssignmentRequired`) | `BillableLines.Record`, which the [Billing Logic App](../processes/erp/e1-invoicing.md#erp-api) holds, `ShipperInvoices.Report`, which the Shipper invoice Logic App holds, and `ShipperInvoices.Manage`, which the Simulator holds |
+| **Norvia ERP API** | `api://<tenant>/norvia-erp-api-<env>` | Only principals granted its role (`appRoleAssignmentRequired`) | `BillableLines.Record`, which the [Billing Logic App](../processes/erp/e1-invoicing.md#erp-api) holds, `ShipperInvoices.Report`, which the Shipper invoice Logic App holds, `ShipperInvoices.Manage`, which the Simulator holds, and `CarrierCosts.Record`, which the Carrier cost Logic App holds |
 | **Norvia Partner API** | `api://<tenant>/norvia-partner-api-<env>` | Any Persona, holding a role or not, so a Carrier Persona calling a Shipper operation gets 403 from API Management, which the demo shows | The [Partner API roles](#partner-api-roles) |
 | **Norvia intake Logic App trigger** | `api://<tenant>/norvia-intake-trigger-<env>` | Only API Management | `TransportOrderIntake.Trigger` |
 | **Norvia Carrier-answer Logic App trigger** | `api://<tenant>/norvia-answer-trigger-<env>` | Only API Management | `CarrierAnswer.Trigger` |
@@ -74,6 +74,7 @@ The ERP billing API validates the token and the role, and takes everything else 
 | Role | Held by | Guards | Process |
 |---|---|---|---|
 | `BillableLines.Record` | The Billing Logic App's identity (`billing`) | Record a Billable line from `TransportOrderBillable` | [E1](../processes/erp/e1-invoicing.md#erp-api) |
+| `CarrierCosts.Record` | The Carrier cost Logic App's identity | Record a Carrier cost from `CarrierCostIncurred` | [E2](../processes/erp/e2-carrier-invoice-matching.md#erp-api) |
 | `ShipperInvoices.Report` | The Shipper invoice Logic App's identity (`shipper-invoice`) | Report a Shipper invoice as sent | [E1](../processes/erp/e1-invoicing.md#erp-api) |
 | `ShipperInvoices.Manage` | The Simulator's identity (`simulator`) | Run Invoice now for a Shipper and issue a Credit note on an invoice line, the Finance actions the Simulator plays | [E1](../processes/erp/e1-invoicing.md#erp-api) |
 

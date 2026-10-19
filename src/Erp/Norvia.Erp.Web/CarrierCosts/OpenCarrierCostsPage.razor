@@ -1,0 +1,59 @@
+@page "/carrier-costs"
+@attribute [Authorize(Policy = FinanceSignIn.FinancePolicy)]
+@rendermode InteractiveServer
+@using Mediator
+@using Microsoft.Extensions.Options
+@using Norvia.Erp.Application.CarrierCosts
+@using Norvia.Erp.Application.CarrierCosts.ListOpen
+@using Norvia.Erp.Web.Live
+@implements IAsyncDisposable
+@inject IServiceScopeFactory Scopes
+@inject TimeProvider Time
+@inject IOptions<LiveListOptions> Options
+@inject ILogger<LiveList<OpenCarrierCostsOfCarrierView>> Logger
+
+<PageTitle>Open carrier costs · Norvia ERP</PageTitle>
+
+<h1>Open carrier costs</h1>
+<p>The Carrier costs no Carrier invoice line has been matched to yet, per Carrier, the oldest delivery first. The list updates as the TMS hands more over.</p>
+
+<LiveListStates Items="_list.Items" LastReadFailed="_list.LastReadFailed" Name="Open carrier costs"
+                Empty="No carrier costs are open. A Carrier cost appears here once the TMS has delivered a Carrier's Shipment." Context="carriers">
+    @foreach (var carrier in carriers)
+    {
+        <section aria-label="@($"Open carrier costs of {carrier.CarrierName}")" @key="carrier.CarrierId">
+            <h2>@carrier.CarrierName</h2>
+            <p>@carrier.Costs.Count Open @(carrier.Costs.Count == 1 ? "cost" : "costs"), @Money.Format(carrier.Total) without VAT.</p>
+            <FluentAccordion>
+                @foreach (var cost in carrier.Costs)
+                {
+                    <FluentAccordionItem Heading="@Heading(cost)" @key="cost.CarrierBookingNumber">
+                        <CarrierCostDetails Cost="cost" />
+                    </FluentAccordionItem>
+                }
+            </FluentAccordion>
+        </section>
+    }
+</LiveListStates>
+
+@code {
+    private LiveList<OpenCarrierCostsOfCarrierView> _list = null!;
+
+    protected override void OnInitialized()
+    {
+        _list = new LiveList<OpenCarrierCostsOfCarrierView>(ReadAsync, "the Open carrier costs", Time, Options.Value.RefreshInterval, Logger);
+        _list.Changed += () => InvokeAsync(StateHasChanged);
+        _list.Start();
+    }
+
+    private async Task<IReadOnlyList<OpenCarrierCostsOfCarrierView>> ReadAsync(CancellationToken cancellationToken)
+    {
+        await using var scope = Scopes.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<IMediator>().Send(new ListOpenCarrierCostsQuery(), cancellationToken);
+    }
+
+    private static string Heading(CarrierCostView cost) =>
+        $"{cost.CarrierBookingReference} · {Money.Format(cost.Total)} · delivered {cost.DeliveryTime:yyyy-MM-dd}{(cost.Source.Kind == "Spot" ? " · Spot price" : "")}";
+
+    public ValueTask DisposeAsync() => _list.DisposeAsync();
+}

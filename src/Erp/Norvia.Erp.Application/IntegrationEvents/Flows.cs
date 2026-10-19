@@ -11,4 +11,10 @@ public static class Flows
 
     /// <summary>Invoicing (E1): the ERP issues a Shipper invoice, on a correlation ID of its own.</summary>
     public const string Invoicing = "invoicing";
+
+    /// <summary>
+    /// Carrier costs (E2): the Carrier cost Logic App hands the ERP the Carrier cost of a Delivered Shipment, on the correlation ID of the
+    /// Delivered Tracking event.
+    /// </summary>
+    public const string CarrierCosts = "carrier-costs";
 }
