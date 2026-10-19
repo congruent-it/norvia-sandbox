@@ -110,6 +110,7 @@ module messaging 'estate/messaging.bicep' = {
     tripDispatchPrincipalId: identities.outputs.tripDispatchPrincipalId
     driverReportsPrincipalId: identities.outputs.driverReportsPrincipalId
     billingPrincipalId: identities.outputs.billingPrincipalId
+    shipperInvoicePrincipalId: identities.outputs.shipperInvoicePrincipalId
     driverAppPrincipalId: identities.outputs.driverAppPrincipalId
     trackingPrincipalId: identities.outputs.trackingPrincipalId
     proofOfDeliveryPrincipalId: identities.outputs.proofOfDeliveryPrincipalId
@@ -297,6 +298,25 @@ module billingLogicApp 'estate/billing-logic-app.bicep' = {
   }
 }
 
+module shipperInvoiceLogicApp 'estate/shipper-invoice-logic-app.bicep' = {
+  scope: resourceGroup
+  params: {
+    location: location
+    tags: tags
+    integrationRetentionDays: integrationRetentionDays
+    shipperInvoiceIdentityName: identities.outputs.shipperInvoiceIdentityName
+    erpApiClientId: identities.outputs.erpApiClientId
+    erpBaseUrl: erpBaseUrl
+    partnerPortalBaseUrl: partnerPortalBaseUrl
+    applicationInsightsName: monitoring.outputs.applicationInsightsName
+    serviceBusName: messaging.outputs.namespaceName
+    planName: intakeLogicApp.outputs.planName
+    contentKeyVaultName: intakeLogicApp.outputs.keyVaultName
+    shipperKeyVaultName: partnerApi.outputs.partnerPortalKeyVaultName
+    integrationConsolePrincipalId: identities.outputs.integrationConsolePrincipalId
+  }
+}
+
 module trackingLogicApp 'estate/tracking-logic-app.bicep' = {
   scope: resourceGroup
   params: {
@@ -371,6 +391,7 @@ module partnerApi 'estate/partner-api.bicep' = {
     simulatorPrincipalId: identities.outputs.simulatorPrincipalId
     bookingPrincipalId: identities.outputs.bookingPrincipalId
     shipperNotificationPrincipalId: identities.outputs.shipperNotificationPrincipalId
+    shipperInvoicePrincipalId: identities.outputs.shipperInvoicePrincipalId
     carrierCancellationPrincipalId: identities.outputs.carrierCancellationPrincipalId
     carrierEndpointKeySeed: carrierEndpointKeySeed
   }
@@ -390,7 +411,6 @@ output ESTATE_ENTRA_TENANT_ID string = identities.outputs.entraTenantId
 output ESTATE_TMS_API_CLIENT_ID string = identities.outputs.tmsApiClientId
 output ESTATE_INTAKE_CLIENT_ID string = identities.outputs.intakeClientId
 output ESTATE_INTAKE_IDENTITY_ID string = identities.outputs.intakeIdentityId
-output ESTATE_BOOKING_IDENTITY_NAME string = identities.outputs.bookingIdentityName
 output ESTATE_SHIPPER_NOTIFICATION_IDENTITY_NAME string = identities.outputs.shipperNotificationIdentityName
 output ESTATE_SHIPPER_NOTIFICATION_CLIENT_ID string = identities.outputs.shipperNotificationClientId
 output ESTATE_CARRIER_CANCELLATION_IDENTITY_NAME string = identities.outputs.carrierCancellationIdentityName
@@ -411,6 +431,7 @@ output ESTATE_CARRIER_CANCELLATION_LOGIC_APP string = carrierCancellationLogicAp
 output ESTATE_TRIP_DISPATCH_LOGIC_APP string = tripDispatchLogicApp.outputs.logicAppName
 output ESTATE_DRIVER_REPORTS_LOGIC_APP string = driverReportsLogicApp.outputs.logicAppName
 output ESTATE_BILLING_LOGIC_APP string = billingLogicApp.outputs.logicAppName
+output ESTATE_SHIPPER_INVOICE_LOGIC_APP string = shipperInvoiceLogicApp.outputs.logicAppName
 output ESTATE_ANSWER_LOGIC_APP string = answerLogicApp.outputs.logicAppName
 output ESTATE_ANSWER_IDENTITY_NAME string = identities.outputs.answerIdentityName
 output ESTATE_TRACKING_LOGIC_APP string = trackingLogicApp.outputs.logicAppName

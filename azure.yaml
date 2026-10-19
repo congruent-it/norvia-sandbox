@@ -34,6 +34,7 @@ hooks:
       ./infra/deploy-trip-dispatch-logic-app.sh &&
       ./infra/deploy-driver-reports-logic-app.sh &&
       ./infra/deploy-billing-logic-app.sh &&
+      ./infra/deploy-shipper-invoice-logic-app.sh &&
       ./infra/deploy-answer-logic-app.sh &&
       ./infra/deploy-tracking-logic-app.sh &&
       ./infra/deploy-proof-of-delivery-logic-app.sh &&

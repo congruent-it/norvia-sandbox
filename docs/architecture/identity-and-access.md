@@ -11,7 +11,7 @@ An app role belongs to the app registration of the API it guards. Each registrat
 | App registration | Audience | Who may get a token | Roles it defines |
 |---|---|---|---|
 | **Norvia TMS API** | `api://<tenant>/norvia-tms-<env>` | Only principals granted one of its roles (`appRoleAssignmentRequired`) | The [TMS API roles](#tms-api-roles) |
-| **Norvia ERP API** | `api://<tenant>/norvia-erp-api-<env>` | Only principals granted its role (`appRoleAssignmentRequired`) | `BillableLines.Record`, which the [Billing Logic App](../processes/erp/e1-invoicing.md#erp-api) holds |
+| **Norvia ERP API** | `api://<tenant>/norvia-erp-api-<env>` | Only principals granted its role (`appRoleAssignmentRequired`) | `BillableLines.Record` and `ShipperInvoices.Report`, which the [Billing Logic App](../processes/erp/e1-invoicing.md#erp-api) holds |
 | **Norvia Partner API** | `api://<tenant>/norvia-partner-api-<env>` | Any Persona, holding a role or not, so a Carrier Persona calling a Shipper operation gets 403 from API Management, which the demo shows | The [Partner API roles](#partner-api-roles) |
 | **Norvia intake Logic App trigger** | `api://<tenant>/norvia-intake-trigger-<env>` | Only API Management | `TransportOrderIntake.Trigger` |
 | **Norvia Carrier-answer Logic App trigger** | `api://<tenant>/norvia-answer-trigger-<env>` | Only API Management | `CarrierAnswer.Trigger` |
@@ -28,6 +28,7 @@ Both Logic App triggers sit behind Easy Auth, and the workflow's first step refu
 | `carrier-cancellation` | The Carrier cancellation Logic App (P7) | `CarrierBookings.Report` | Receives the `carrier-cancellation` subscription. Reads each Carrier's endpoint key |
 | `shipper-notification` | The Shipper notification Logic App (P7) | `ShipperNotifications.Report` | Receives the `shipper-notification` subscription. Reads each Shipper's endpoint key |
 | `trip-dispatch` | The Trip dispatch Logic App (P11) | `Trips.ReportDelivery` | Receives the `trip-dispatch` subscription. Reads the Driver app's endpoint key |
+| `shipper-invoice` | The Shipper invoice Logic App (E1) | `ShipperInvoices.Report` on the ERP API; nothing on the TMS | Receives the `shipper-invoice` subscription. Reads each Shipper's endpoint key |
 | `billing` | The Billing Logic App (E1) | `BillableLines.Record` on the ERP billing API; nothing on the TMS | Receives the `billing` subscription. Reads no secret |
 | `driver-reports` | The Driver reports Logic App (P12) | `Trips.Start`, `Trips.End`, `TrackingEvents.Record` and `ProofsOfDelivery.Record` on the TMS; `DriverReports.ReportOutcome` on the Driver app | Receives the `driver-reports` subscription. Reads and deletes files in the Driver app's transit container |
 | `driver-app` | The Driver app (P11) | None: it reaches the TMS only through the integration layer | Reads the Driver app's endpoint key. Sends to the `driver-app-events` topic (P12). Its screens store Proof of delivery files in the Driver app's transit container |
@@ -73,6 +74,7 @@ The ERP billing API validates the token and the role, and takes everything else 
 | Role | Held by | Guards | Process |
 |---|---|---|---|
 | `BillableLines.Record` | The Billing Logic App's identity (`billing`) | Record a Billable line from `TransportOrderBillable` | [E1](../processes/erp/e1-invoicing.md#erp-api) |
+| `ShipperInvoices.Report` | The Shipper invoice Logic App's identity (`shipper-invoice`) | Report a Shipper invoice as sent | [E1](../processes/erp/e1-invoicing.md#erp-api) |
 
 ## Partner API roles
 
@@ -125,6 +127,7 @@ Azure RBAC, scoped as narrowly as the resource allows, so an identity sees its o
 | Service Bus subscription `carrier-cancellation` | The subscription | `carrier-cancellation` | Data Receiver |
 | Service Bus subscription `trip-dispatch` | The subscription | `trip-dispatch` | Data Receiver |
 | Service Bus subscription `billing` | The subscription | `billing` | Data Receiver |
+| Service Bus subscription `shipper-invoice` | The subscription | `shipper-invoice` | Data Receiver |
 | Service Bus subscription `driver-reports` | The subscription | `driver-reports` | Data Receiver |
 | Service Bus topic `driver-app-events` | The topic | `driver-app` | Data Sender |
 | Service Bus queue `carrier-tracking` | The queue | `apim` | Data Sender |
@@ -135,7 +138,7 @@ Azure RBAC, scoped as narrowly as the resource allows, so an identity sees its o
 | Driver app's transit container for Proof of delivery files | The container | `driver-app`, `driver-reports` | Storage Blob Data Contributor |
 | Partner portal's Key Vault | The vault | `partner-portal`, `simulator` | Key Vault Secrets User |
 | Each Carrier endpoint key | The secret | `booking`, `carrier-cancellation` | Key Vault Secrets User |
-| Each Shipper endpoint key | The secret | `shipper-notification` | Key Vault Secrets User |
+| Each Shipper endpoint key | The secret | `shipper-notification`, `shipper-invoice` | Key Vault Secrets User |
 | The Driver app's endpoint key (`driver-app-endpoint-key`, in the Driver app's Key Vault) | The secret | `driver-app`, `trip-dispatch` | Key Vault Secrets User |
 | Logic App's content connection string | The secret | The Logic App's host identity | Key Vault Secrets User |
 | Logic App's storage account | The account | The Logic App's host identity | Blob Data Owner, Queue and Table Data Contributor, Account Contributor |

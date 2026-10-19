@@ -151,4 +151,43 @@ public sealed class ShipperInvoiceTests
         invoice.Lines[0].DeliveryTime.Should().Be(new DateTimeOffset(2026, 10, 17, 23, 30, 0, TimeSpan.FromHours(2)));
         invoice.Lines[0].DeliveryTime.Offset.Should().Be(TimeSpan.FromHours(2));
     }
+
+    [Fact]
+    public void ReportSent_AnIssuedInvoice_IsSentWithTheTime()
+    {
+        var invoice = ShipperInvoice.Issue(Number, Shipper, [Line("TO-0000001", 100m)], RunAt, "corr-1");
+        invoice.SentAt.Should().BeNull();
+
+        var reported = invoice.ReportSent(RunAt.AddMinutes(2));
+
+        reported.Should().BeTrue();
+        invoice.Status.Should().Be(ShipperInvoiceStatus.Sent);
+        invoice.SentAt.Should().Be(RunAt.AddMinutes(2));
+    }
+
+    [Fact]
+    public void ReportSent_AnInvoiceReportedAlready_ChangesNothing()
+    {
+        var invoice = ShipperInvoice.Issue(Number, Shipper, [Line("TO-0000001", 100m)], RunAt, "corr-1");
+        invoice.ReportSent(RunAt.AddMinutes(2));
+
+        var again = invoice.ReportSent(RunAt.AddHours(1));
+
+        again.Should().BeFalse();
+        invoice.SentAt.Should().Be(RunAt.AddMinutes(2));
+    }
+
+    [Fact]
+    public void ReportSent_LeavesTheNumberLinesAndTotalsAsIssued()
+    {
+        var invoice = ShipperInvoice.Issue(Number, Shipper, [Line("TO-0000001", 100m)], RunAt, "corr-1");
+
+        invoice.ReportSent(RunAt.AddMinutes(2));
+
+        invoice.Id.Should().Be(Number);
+        invoice.Lines.Should().ContainSingle();
+        invoice.TotalWithoutVat.Should().Be(100m);
+        invoice.TotalWithVat.Should().Be(121m);
+        invoice.IssuedAt.Should().Be(RunAt);
+    }
 }

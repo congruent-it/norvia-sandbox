@@ -204,9 +204,10 @@ if (builder.ExecutionContext.IsPublishMode)
     // The TMS UI and the Partner portal have no login of their own, so in Azure they open to the presenter's browser
     // behind an Entra sign-in that only the presenter passes (ADR 0024). The apps don't know it is there.
     // The exceptions are each Carrier Persona's booking and cancellation endpoints and each Shipper Persona's notification
-    // endpoint: the Logic Apps that call them are no browsers, and the endpoints ask them for the party's own credential.
+    // endpoint and invoice endpoint: the Logic Apps that call them are no browsers, and the endpoints ask them for the party's own credential.
     var personaEndpoints = personas.Select(persona => persona.EndpointPath)
         .Concat(personas.Select(persona => persona.CancellationPath).OfType<string>())
+        .Concat(personas.Select(persona => persona.InvoicePath).OfType<string>())
         // The Simulator's Reset estate calls the portal's reset endpoint, which asks for the Simulator's key (ADR 0039).
         .Append("/reset/v1")
         .ToList();
@@ -368,9 +369,11 @@ else
     messaging.AddServiceBusTopic("driver-app-events")
         .AddServiceBusSubscription("driver-reports")
         .WithProperties(subscription => subscription.RequiresSession = true);
-    // The topic for the ERP's invoicing events (E1). Monitoring is its first consumer; the Shipper invoice Logic App follows with a subscription of its own.
-    messaging.AddServiceBusTopic("invoicing-events")
-        .AddServiceBusSubscription("invoicing-events-monitoring", subscriptionName: "monitoring");
+    // The topic for the ERP's invoicing events (E1). Monitoring is its first consumer; the E1 Shipper invoice Logic App has a subscription of its own:
+    // ShipperInvoiceIssued only (see ResubmitAwareFilters).
+    var invoicingEvents = messaging.AddServiceBusTopic("invoicing-events");
+    invoicingEvents.AddServiceBusSubscription("invoicing-events-monitoring", subscriptionName: "monitoring");
+    invoicingEvents.AddServiceBusSubscription("shipper-invoice");
     // The tracking queue API Management puts a Carrier's tracking message on and the Carrier-tracking Logic App reads
     // (ADR 0008). A message the TMS refuses is dead-lettered; one it can't be given to is delivered again up to the
     // maximum delivery count, then dead-lettered by Service Bus itself. The estate Bicep sets the same count.
@@ -525,6 +528,16 @@ else
         .WithEnvironment("Billing__ErpTokens__Issuer", LocalTokens.Issuer)
         .WithEnvironment("Billing__ErpTokens__Audience", LocalTokens.ErpAudience)
         .WithEnvironment("Billing__ErpTokens__ClientId", LocalTokens.BillingLogicAppClientId);
+    // Locally a worker plays the E1 Shipper invoice Logic App too. It reads its subscription, sends each Shipper Persona's invoice to the
+    // Persona's invoice endpoint in the Partner portal with a credential for the run, and reports it Sent to the ERP API as the identity
+    // holding the report role.
+    var shipperInvoiceWorker = builder.AddProject<Projects.Norvia_Integration_LocalShipperInvoiceWorker>("shipper-invoice-worker")
+        .WithReference(messaging).WaitFor(messaging)
+        .WithReference(erpApi).WaitFor(erpApi)
+        .WithEnvironment("ShipperInvoice__ErpBaseAddress", erpApi.GetEndpoint("http"))
+        .WithEnvironment("ShipperInvoice__ErpTokens__Issuer", LocalTokens.Issuer)
+        .WithEnvironment("ShipperInvoice__ErpTokens__Audience", LocalTokens.ErpAudience)
+        .WithEnvironment("ShipperInvoice__ErpTokens__ClientId", LocalTokens.ShipperInvoiceLogicAppClientId);
     // Locally a worker plays the P12 Driver reports Logic App as well. It reads the Driver app events subscription one Trip at a time, calls the
     // TMS as the identity holding the Trip start role, and tells the Driver app what became of each report as the identity holding the outcome
     // role.
@@ -582,6 +595,10 @@ else
         shipperNotificationWorker
             .WithEnvironment($"ShipperNotification__Shippers__{persona.PartyId}__Address", ReferenceExpression.Create($"{partnerPortal.GetEndpoint("http")}{persona.EndpointPath}"))
             .WithEnvironment($"ShipperNotification__Shippers__{persona.PartyId}__ApiKey", shipperApiKey);
+        // The invoice endpoint asks for the credential the notification endpoint does, as Key Vault holds one secret per Shipper in Azure.
+        shipperInvoiceWorker
+            .WithEnvironment($"ShipperInvoice__Shippers__{persona.PartyId}__Address", ReferenceExpression.Create($"{partnerPortal.GetEndpoint("http")}{persona.InvoicePath}"))
+            .WithEnvironment($"ShipperInvoice__Shippers__{persona.PartyId}__ApiKey", shipperApiKey);
         partnerPortal.WithEnvironment($"ShipperEndpoint__ApiKeys__{persona.PartyId}", shipperApiKey);
     }
 
@@ -598,8 +615,8 @@ else
     erpWeb.WithEnvironment("LocalUser__Name", $"{Environment.UserName} (local)")
         .WithEnvironment("LocalUser__Roles__0", "Finance");
 
-    // Locally the ERP billing API trusts tokens signed with the same key. The Billing Logic App's client ID stands in for its managed
-    // identity, the one holder of the record role.
+    // Locally the ERP billing API trusts tokens signed with the same key. The Billing and Shipper invoice Logic Apps' client IDs stand in for
+    // their managed identities, the holders of the record and the report role.
     erpApi
         .WithEnvironment("Authentication__Schemes__Bearer__ValidIssuer", LocalTokens.Issuer)
         .WithEnvironment("Authentication__Schemes__Bearer__ValidAudiences__0", LocalTokens.ErpAudience)
@@ -679,6 +696,7 @@ else
         (carrierCancellationWorker.Resource, "CarrierCancellation__TmsTokens__SigningKey"),
         (tripDispatchWorker.Resource, "TripDispatch__TmsTokens__SigningKey"),
         (billingWorker.Resource, "Billing__ErpTokens__SigningKey"),
+        (shipperInvoiceWorker.Resource, "ShipperInvoice__ErpTokens__SigningKey"),
         (driverReportsWorker.Resource, "DriverReports__TmsTokens__SigningKey"),
         (driverReportsWorker.Resource, "DriverReports__DriverApp__Tokens__SigningKey"),
         (driverAppApi.Resource, "Authentication__Schemes__Bearer__SigningKeys__0__Value"),

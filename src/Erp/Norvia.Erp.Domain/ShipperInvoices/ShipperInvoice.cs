@@ -5,8 +5,9 @@ using Norvia.Erp.Domain.Shippers;
 namespace Norvia.Erp.Domain.ShipperInvoices;
 
 /// <summary>
-/// The ERP's invoice to a Shipper over its Billable lines, one line per Transport Order. Once issued it is final: nothing on it changes
-/// and it is never deleted. Corrections are Credit notes.
+/// The ERP's invoice to a Shipper over its Billable lines, one line per Transport Order. Once issued it is final: its number, lines and
+/// totals never change and it is never deleted. Only its delivery status follows the Shipper invoice Logic App's reports. Corrections are
+/// Credit notes.
 /// </summary>
 public sealed class ShipperInvoice : EntityBase<InvoiceNumber>, IAggregateRoot
 {
@@ -58,6 +59,25 @@ public sealed class ShipperInvoice : EntityBase<InvoiceNumber>, IAggregateRoot
     public string CorrelationId { get; private set; } = string.Empty;
 
     public ShipperInvoiceStatus Status { get; private set; }
+
+    /// <summary>When the Shipper invoice Logic App reported the invoice Sent; null while it is Issued only.</summary>
+    public DateTimeOffset? SentAt { get; private set; }
+
+    /// <summary>
+    /// Records that the Shipper's endpoint acknowledged the invoice. Only an Issued invoice can be reported; false for one reported
+    /// already, which the caller ignores and logs.
+    /// </summary>
+    public bool ReportSent(DateTimeOffset at)
+    {
+        if (Status != ShipperInvoiceStatus.Issued)
+        {
+            return false;
+        }
+
+        Status = ShipperInvoiceStatus.Sent;
+        SentAt = at;
+        return true;
+    }
 
     /// <summary>The calendar year of an Invoice run, which picks the sequence its number comes from.</summary>
     public static int InvoiceYear(DateTimeOffset runAt) => InvoiceDateOf(runAt).Year;

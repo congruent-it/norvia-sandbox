@@ -23,6 +23,7 @@ internal sealed class ShipperInvoiceConfiguration : IEntityTypeConfiguration<Shi
         builder.Property(invoice => invoice.TotalWithVat).HasPrecision(18, 2);
         builder.Property(invoice => invoice.CorrelationId).HasMaxLength(128).IsRequired();
         builder.Property(invoice => invoice.Status).HasConversion<string>().HasMaxLength(20);
+        builder.Property(invoice => invoice.SentAt);
         // Newest first.
         builder.HasIndex(invoice => invoice.IssuedAt);
     }

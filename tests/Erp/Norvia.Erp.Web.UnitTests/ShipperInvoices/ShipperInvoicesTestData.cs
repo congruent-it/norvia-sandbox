@@ -4,7 +4,7 @@ namespace Norvia.Erp.Web.UnitTests.ShipperInvoices;
 
 internal static class ShipperInvoicesTestData
 {
-    public static ShipperInvoiceView Invoice(int sequence, decimal withoutVat = 100m, int lines = 1) => new(
+    public static ShipperInvoiceView Invoice(int sequence, decimal withoutVat = 100m, int lines = 1, DateTimeOffset? sentAt = null) => new(
         $"INV-2026-{sequence:D6}",
         new DateOnly(2026, 10, 19),
         new ShipperOnInvoiceView("SHP-0001", "Brouwer Dranken"),
@@ -15,7 +15,8 @@ internal static class ShipperInvoicesTestData
         withoutVat + decimal.Round(withoutVat * 0.21m, 2, MidpointRounding.AwayFromZero),
         new DateTimeOffset(2026, 10, 19, 8, 0, 0, TimeSpan.Zero),
         $"corr-{sequence}",
-        "Issued");
+        sentAt is null ? "Issued" : "Sent",
+        sentAt);
 
     private static ShipperInvoiceLineView Line(int index, decimal total) => new(
         $"TO-{index:D7}",

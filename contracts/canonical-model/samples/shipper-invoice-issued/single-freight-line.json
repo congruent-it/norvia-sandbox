@@ -1,0 +1,31 @@
+{
+  "eventId": "0198e7c0-0000-7000-8000-0000000000d2",
+  "eventType": "ShipperInvoiceIssued",
+  "eventVersion": 1,
+  "occurredAt": "2030-12-12T10:15:30+00:00",
+  "correlationId": "d2e3f4a5-6b7c-4d8e-9fa0-1b2c3d4e5f60",
+  "invoice": {
+    "invoiceNumber": "INV-2030-000002",
+    "invoiceDate": "2030-12-12",
+    "shipper": { "shipperId": "SHP-0002", "name": "Kaasmakerij Hoeve de Linde" },
+    "lines": [
+      {
+        "transportOrderNumber": "TO-0000017",
+        "shipperReference": "KHL-30-0417",
+        "shipmentNumber": "SH-0000017",
+        "deliveryDate": "2030-12-11",
+        "chargeLines": [
+          { "type": "Freight", "amount": 412.50 }
+        ],
+        "total": 412.50
+      }
+    ],
+    "currency": "EUR",
+    "totalWithoutVat": 412.50,
+    "vat": 86.63,
+    "totalWithVat": 499.13,
+    "issuedAt": "2030-12-12T10:15:30+00:00",
+    "correlationId": "d2e3f4a5-6b7c-4d8e-9fa0-1b2c3d4e5f60",
+    "status": "Issued"
+  }
+}

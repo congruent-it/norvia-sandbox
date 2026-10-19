@@ -8,6 +8,7 @@
     <Project Path="src/Integration/Norvia.Integration.CarrierAnswer.Functions/Norvia.Integration.CarrierAnswer.Functions.csproj" />
     <Project Path="src/Integration/Norvia.Integration.CarrierBooking/Norvia.Integration.CarrierBooking.csproj" />
     <Project Path="src/Integration/Norvia.Integration.CarrierBooking.Functions/Norvia.Integration.CarrierBooking.Functions.csproj" />
+    <Project Path="src/Integration/Norvia.Integration.ShipperInvoice.Functions/Norvia.Integration.ShipperInvoice.Functions.csproj" />
     <Project Path="src/Integration/Norvia.Integration.ShipperNotification.Functions/Norvia.Integration.ShipperNotification.Functions.csproj" />
     <Project Path="src/Integration/Norvia.Integration.CarrierCancellation.Functions/Norvia.Integration.CarrierCancellation.Functions.csproj" />
     <Project Path="src/Integration/Norvia.Integration.CarrierTracking.Functions/Norvia.Integration.CarrierTracking.Functions.csproj" />
@@ -16,6 +17,7 @@
     <Project Path="src/Integration/Norvia.Integration.LocalShipperNotificationWorker/Norvia.Integration.LocalShipperNotificationWorker.csproj" />
     <Project Path="src/Integration/Norvia.Integration.LocalCarrierCancellationWorker/Norvia.Integration.LocalCarrierCancellationWorker.csproj" />
     <Project Path="src/Integration/Norvia.Integration.LocalBillingWorker/Norvia.Integration.LocalBillingWorker.csproj" />
+    <Project Path="src/Integration/Norvia.Integration.LocalShipperInvoiceWorker/Norvia.Integration.LocalShipperInvoiceWorker.csproj" />
     <Project Path="src/Integration/Norvia.Integration.LocalTripDispatchWorker/Norvia.Integration.LocalTripDispatchWorker.csproj" />
     <Project Path="src/Integration/Norvia.Integration.LocalDriverReportsWorker/Norvia.Integration.LocalDriverReportsWorker.csproj" />
     <Project Path="src/Integration/Norvia.Integration.LocalTrackingWorker/Norvia.Integration.LocalTrackingWorker.csproj" />
@@ -74,6 +76,7 @@
     <Project Path="tests/Integration/Norvia.Integration.LocalShipperNotificationWorker.UnitTests/Norvia.Integration.LocalShipperNotificationWorker.UnitTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.LocalCarrierCancellationWorker.UnitTests/Norvia.Integration.LocalCarrierCancellationWorker.UnitTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.LocalBillingWorker.UnitTests/Norvia.Integration.LocalBillingWorker.UnitTests.csproj" />
+    <Project Path="tests/Integration/Norvia.Integration.LocalShipperInvoiceWorker.UnitTests/Norvia.Integration.LocalShipperInvoiceWorker.UnitTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.LocalTripDispatchWorker.UnitTests/Norvia.Integration.LocalTripDispatchWorker.UnitTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.LocalDriverReportsWorker.UnitTests/Norvia.Integration.LocalDriverReportsWorker.UnitTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.LocalTrackingWorker.UnitTests/Norvia.Integration.LocalTrackingWorker.UnitTests.csproj" />

@@ -16,7 +16,8 @@ internal static class ShipperInvoiceViews
         invoice.TotalWithVat,
         invoice.IssuedAt,
         invoice.CorrelationId,
-        invoice.Status.ToString());
+        invoice.Status.ToString(),
+        invoice.SentAt);
 
     private static ShipperInvoiceLineView Of(ShipperInvoiceLine line) => new(
         line.TransportOrderNumber,

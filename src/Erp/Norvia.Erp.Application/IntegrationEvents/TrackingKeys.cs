@@ -13,6 +13,7 @@ public static class TrackingKeys
     public const string ShipmentNumber = "shipmentNumber";
     public const string CarrierBookingNumber = "carrierBookingNumber";
     public const string TripNumber = "tripNumber";
+    public const string DocumentNumber = "documentNumber";
     public const string Outcome = "outcome";
 
     /// <summary>The sender's own ID for the message, such as a Carrier's document ID.</summary>

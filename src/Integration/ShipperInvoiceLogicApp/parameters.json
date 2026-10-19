@@ -1,0 +1,18 @@
+{
+  "erpBaseUrl": {
+    "type": "String",
+    "value": "@appsetting('ERP_BASE_URL')"
+  },
+  "erpAudience": {
+    "type": "String",
+    "value": "@appsetting('ERP_API_CLIENT_ID')"
+  },
+  "shipperInvoiceIdentityId": {
+    "type": "String",
+    "value": "@appsetting('SHIPPER_INVOICE_IDENTITY_ID')"
+  },
+  "partnerPortalBaseUrl": {
+    "type": "String",
+    "value": "@appsetting('PARTNER_PORTAL_BASE_URL')"
+  }
+}

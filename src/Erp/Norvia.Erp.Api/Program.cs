@@ -6,8 +6,10 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Norvia.Erp.Api.BillableLines;
+using Norvia.Erp.Api.ShipperInvoices;
 using Norvia.Erp.Api.Tracking;
 using Norvia.Erp.Application.BillableLines.Record;
+using Norvia.Erp.Application.ShipperInvoices.ReportSent;
 using Norvia.Erp.Infrastructure;
 using Scalar.AspNetCore;
 
@@ -15,8 +17,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 builder.Services.AddScoped<IPipelineBehavior<RecordBillableLineCommand, Result<RecordBillableLineResult>>, TrackBillableLineInLoggingScope>();
+builder.Services.AddScoped<IPipelineBehavior<ReportShipperInvoiceSentCommand, Result<ShipperInvoiceReportResult>>, TrackShipperInvoiceReportInLoggingScope>();
 
-// The ERP API records and answers; it publishes nothing yet, so it runs no outbox publisher. The ERP UI loads the master data it checks Shippers against.
+// The ERP API records and answers; it publishes nothing, so it runs no outbox publisher. The ERP UI loads the master data it checks Shippers against.
 builder.AddErpInfrastructure();
 
 // Issuer, audience and keys come from Authentication:Schemes:Bearer: Entra in Azure, the AppHost's local key otherwise.
@@ -101,6 +104,7 @@ if (app.Environment.IsDevelopment())
 
 app.MapDefaultEndpoints();
 app.MapBillableLines();
+app.MapShipperInvoices();
 
 await app.RunAsync();
 
