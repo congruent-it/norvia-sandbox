@@ -3,10 +3,13 @@ using Ardalis.SharedKernel;
 using Ardalis.Specification;
 using Microsoft.Extensions.Time.Testing;
 using Norvia.Erp.Application.CarrierCosts.Record;
+using Norvia.Erp.Application.CarrierInvoices;
+using Norvia.Erp.Application.IntegrationEvents;
 using Norvia.Erp.Application.UnitTests.BillableLines;
 using Norvia.Erp.Domain.BillableLines;
 using Norvia.Erp.Domain.Carriers;
 using Norvia.Erp.Domain.CarrierCosts;
+using Norvia.Erp.Domain.CarrierInvoices;
 
 namespace Norvia.Erp.Application.UnitTests.CarrierCosts;
 
@@ -28,7 +31,24 @@ public sealed class RecordCarrierCostHandlerTests
     private readonly IRepository<CarrierCost> _costs = Substitute.For<IRepository<CarrierCost>>();
     private readonly IReadRepository<Carrier> _carriers = Substitute.For<IReadRepository<Carrier>>();
 
-    private RecordCarrierCostHandler Handler => new(_costs, _carriers, Time);
+    private readonly IRepository<CarrierInvoice> _invoices = Substitute.For<IRepository<CarrierInvoice>>();
+    private readonly IMatchingTolerance _tolerance = Substitute.For<IMatchingTolerance>();
+    private readonly IOutbox _outbox = Substitute.For<IOutbox>();
+
+    public RecordCarrierCostHandlerTests() => WaitingInvoices();
+
+    private RecordCarrierCostHandler Handler => new(_costs, _invoices, _carriers, _tolerance, _outbox, Time);
+
+    private void WaitingInvoices(params CarrierInvoice[] invoices) =>
+        _invoices.ListAsync(Arg.Any<ISpecification<CarrierInvoice>>(), Arg.Any<CancellationToken>()).Returns(invoices.ToList());
+
+    private static CarrierInvoice Received(string number, decimal amount, params string[] otherReferences) =>
+        CarrierInvoice.Receive(
+            new CarrierInvoiceData(
+                new CarrierId("CAR-0001"), number, new DateOnly(2026, 10, 19),
+                [new CarrierInvoiceLineData("TRX-998", amount, null), .. otherReferences.Select(reference => new CarrierInvoiceLineData(reference, 5m, null))],
+                "invoice-" + number),
+            [], 0m, Time.GetUtcNow()).Invoice!;
 
     private void KnowCarrier() =>
         _carriers.FirstOrDefaultAsync(Arg.Any<ISpecification<Carrier>>(), Arg.Any<CancellationToken>())
@@ -62,6 +82,52 @@ public sealed class RecordCarrierCostHandlerTests
     }
 
     [Fact]
+    public async Task Handle_AWaitingUnknownBookingLine_IsMatchedAgainAndTheInvoiceApprovedOnce()
+    {
+        KnowCarrier();
+        var invoice = Received("VDT-1", 70m);
+        WaitingInvoices(invoice);
+
+        var result = await Handler.Handle(new RecordCarrierCostCommand(Data), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        invoice.Status.Should().Be(CarrierInvoiceStatus.Approved);
+        invoice.Lines.Single().Result.Should().Be(CarrierInvoiceLineResult.Matched);
+        _outbox.Received(1).Add(Arg.Is<CarrierInvoiceApprovedV1>(approved => approved.InvoiceNumber == "VDT-1"));
+        await _costs.Received(1).AddAsync(Arg.Any<CarrierCost>(), Arg.Any<CancellationToken>());
+        await _invoices.DidNotReceive().UpdateAsync(Arg.Any<CarrierInvoice>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_AWaitingLineThatIsNotTheLastToDecide_PublishesNothing()
+    {
+        KnowCarrier();
+        var invoice = Received("VDT-1", 99m, "TRX-other");
+        WaitingInvoices(invoice);
+
+        await Handler.Handle(new RecordCarrierCostCommand(Data), CancellationToken.None);
+
+        invoice.Lines[0].Result.Should().Be(CarrierInvoiceLineResult.PriceMismatch);
+        invoice.Status.Should().Be(CarrierInvoiceStatus.Received);
+        _outbox.DidNotReceive().Add(Arg.Any<CarrierInvoiceApprovedV1>());
+    }
+
+    [Fact]
+    public async Task Handle_TwoInvoicesWaitingForOneReference_TheOldestGetsTheCostAndTheNextIsADuplicate()
+    {
+        KnowCarrier();
+        var first = Received("VDT-1", 70m);
+        var second = Received("VDT-2", 70m);
+        WaitingInvoices(first, second);
+
+        await Handler.Handle(new RecordCarrierCostCommand(Data), CancellationToken.None);
+
+        first.Lines.Single().Result.Should().Be(CarrierInvoiceLineResult.Matched);
+        second.Lines.Single().Result.Should().Be(CarrierInvoiceLineResult.Duplicate);
+        _outbox.Received(1).Add(Arg.Any<CarrierInvoiceApprovedV1>());
+    }
+
+    [Fact]
     public async Task Handle_TheSameContentAgain_ReturnsTheOriginalAsARepeat()
     {
         HaveRecorded(Data);
@@ -72,6 +138,8 @@ public sealed class RecordCarrierCostHandlerTests
         result.Value.Repeat.Should().BeTrue();
         result.Value.Cost.CorrelationId.Should().Be("delivered-1", "it is the original Carrier cost");
         await _costs.DidNotReceive().AddAsync(Arg.Any<CarrierCost>(), Arg.Any<CancellationToken>());
+        await _invoices.DidNotReceive().ListAsync(Arg.Any<ISpecification<CarrierInvoice>>(), Arg.Any<CancellationToken>());
+        _outbox.DidNotReceive().Add(Arg.Any<CarrierInvoiceApprovedV1>());
     }
 
     [Fact]
