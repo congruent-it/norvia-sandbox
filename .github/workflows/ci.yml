@@ -64,7 +64,7 @@ jobs:
       # nowhere, so a new application's tests either join a leg (or tests/Integration) or fail here.
       - name: Check that every test project is claimed by a leg
         run: |
-          claimed=$(yq '.jobs.integration.strategy.matrix.include[].directory' .github/workflows/ci.yml; echo Integration)
+          claimed=$(yq '.jobs.integration.strategy.matrix.include[].directory' .github/workflows/ci.yml; echo Integration; echo Branding)
           unclaimed=$(find tests -name '*.csproj' | cut -d/ -f2 | sort -u | grep -vxF "$claimed" || true)
           if [ -n "$unclaimed" ]; then
             echo "::error::Test projects under tests/ that no integration leg runs: $unclaimed"
@@ -73,10 +73,10 @@ jobs:
 
       # The Integration functions have unit tests only, so they run here. Each project enforces the 80% line coverage
       # threshold itself (Directory.Build.props).
-      - name: Unit tests of the Integration functions
+      - name: Unit tests of the Integration functions and the shared Branding library
         run: |
           failed=0
-          for project in $(find tests/Integration -name '*.UnitTests.csproj' | sort); do
+          for project in $(find tests/Integration tests/Branding -name '*.UnitTests.csproj' | sort); do
             dotnet test "$project" --no-build --configuration "$CONFIGURATION" \
               --logger trx --results-directory TestResults || failed=1
           done
@@ -85,8 +85,8 @@ jobs:
       - name: Coverage summary
         if: always()
         run: |
-          if find tests/Integration -name coverage.cobertura.xml | grep -q .; then
-            dotnet reportgenerator -reports:"tests/Integration/**/coverage.cobertura.xml" -targetdir:TestResults/coverage \
+          if find tests/Integration tests/Branding -name coverage.cobertura.xml | grep -q .; then
+            dotnet reportgenerator -reports:"tests/Integration/**/coverage.cobertura.xml;tests/Branding/**/coverage.cobertura.xml" -targetdir:TestResults/coverage \
               -reporttypes:"MarkdownSummaryGithub;Cobertura"
             cat TestResults/coverage/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
           fi

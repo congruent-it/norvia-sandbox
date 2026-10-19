@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Norvia</title>
+  <!--
+    The Norvia mark: an N drawn as a route, with the destination marked in the accent colour. It is the source of every
+    Norvia icon (see docs/branding.md). The background is transparent; the colours follow the browser's colour scheme.
+  -->
+  <style>
+    .route { stroke: #14365d; }
+    .stop { fill: #e8730c; }
+    @media (prefers-color-scheme: dark) {
+      .route { stroke: #f1f5f9; }
+      .stop { fill: #ff9a3c; }
+    }
+  </style>
+  <path class="route" d="M14 52V14L50 50V20" fill="none" stroke-width="10" stroke-linecap="butt" stroke-linejoin="miter"/>
+  <circle class="stop" cx="50" cy="14" r="8"/>
+</svg>

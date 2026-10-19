@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <!--
+    The Norvia icon, shared by every web UI. The icons are static web assets, served by each UI under /_content/Norvia.Branding/,
+    so there is one copy of them. It has no dependency on any application, as coding guidelines §2 asks.
+  -->
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Norvia.Branding.UnitTests" />
+  </ItemGroup>
+</Project>
