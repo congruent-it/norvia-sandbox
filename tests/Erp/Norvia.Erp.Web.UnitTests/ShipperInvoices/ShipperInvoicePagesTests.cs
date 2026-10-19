@@ -29,9 +29,22 @@ public sealed class ShipperInvoicePagesTests : ErpWebContext
 
         page.WaitForAssertion(() => page.Markup.Should().Contain("INV-2026-000002"));
         page.FindAll("td").Select(cell => cell.TextContent.Trim()).Should().ContainInOrder(
-            "INV-2026-000002", "Brouwer Dranken", "2026-10-19", "€ 1,000.00", "€ 210.00", "€ 1,210.00",
-            "INV-2026-000001", "Brouwer Dranken", "2026-10-19", "€ 100.00", "€ 21.00", "€ 121.00");
+            "INV-2026-000002", "Brouwer Dranken", "2026-10-19", "€ 1,000.00", "€ 210.00", "€ 1,210.00", "Issued", "—",
+            "INV-2026-000001", "Brouwer Dranken", "2026-10-19", "€ 100.00", "€ 21.00", "€ 121.00", "Issued", "—");
         page.Find("a[href='/shipper-invoices/INV-2026-000002']").TextContent.Should().Be("INV-2026-000002");
+    }
+
+    [Fact]
+    public void RenderList_ShowsTheSentTimeInAmsterdam_OfAnInvoiceReportedSent_AndNoneForOneThatWasNot()
+    {
+        Answer<ListShipperInvoicesQuery, IReadOnlyList<ShipperInvoiceView>>(
+            [ShipperInvoicesTestData.Invoice(2), ShipperInvoicesTestData.Invoice(1, sentAt: new DateTimeOffset(2026, 10, 19, 8, 0, 5, TimeSpan.Zero))]);
+
+        var page = Render<ShipperInvoicesPage>();
+
+        page.WaitForAssertion(() => page.Markup.Should().Contain("INV-2026-000002"));
+        var cells = page.FindAll("td").Select(cell => cell.TextContent.Trim()).ToList();
+        cells.Should().ContainInOrder("INV-2026-000002", "Issued", "—", "INV-2026-000001", "Sent", "2026-10-19 10:00:05");
     }
 
     [Fact]

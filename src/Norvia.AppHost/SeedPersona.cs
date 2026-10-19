@@ -19,6 +19,12 @@ public sealed record SeedPersona(string Id, string PartyType, string PartyId)
     public string EndpointPath => IsShipper ? $"/shipper/v1/{PartyId}/notifications" : $"/carrier/v1/{PartyId}/bookings";
 
     /// <summary>
+    /// Where the Partner portal takes the Shipper invoices and Credit notes Norvia's E1 Shipper invoice Logic App sends a Shipper Persona
+    /// (ShipperInvoiceEndpoint has the same shape); a Carrier has none.
+    /// </summary>
+    public string? InvoicePath => IsShipper ? $"/shipper/v1/{PartyId}/invoices" : null;
+
+    /// <summary>
     /// Where the Partner portal takes what Norvia's P7 Carrier cancellation Logic App sends a Carrier Persona (CarrierCancellationEndpoint
     /// has the same shape); a Shipper has none.
     /// </summary>

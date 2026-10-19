@@ -478,7 +478,7 @@ public sealed class AppHostModelTests
 
         var bicep = ContainerAppBicepOf(builder, demoUi);
 
-        bicep.Should().MatchRegex(@"excludedPaths: \[\s*'/health'\s*'/alive'(\s*'/(carrier|shipper)/v1/[^']+/(bookings|notifications|cancellations)')*(\s*'/reset/v1')?\s*\]");
+        bicep.Should().MatchRegex(@"excludedPaths: \[\s*'/health'\s*'/alive'(\s*'/(carrier|shipper)/v1/[^']+/(bookings|notifications|cancellations|invoices)')*(\s*'/reset/v1')?\s*\]");
     }
 
     [Fact]
@@ -492,11 +492,11 @@ public sealed class AppHostModelTests
     [Fact]
     public async Task InAzure_ThePartnerPortal_AlsoLeavesEachPersonasEndpointOutsideTheGate()
     {
-        // The P4 booking, P7 Shipper notification and P7 Carrier cancellation Logic Apps are no browsers, and each endpoint asks its caller for the party's own credential (ADR 0024). So is the Simulator, whose reset endpoint asks for its key (ADR 0039).
+        // The P4 booking, P7 Shipper notification, P7 Carrier cancellation and E1 Shipper invoice Logic Apps are no browsers, and each endpoint asks its caller for the party's own credential (ADR 0024). So is the Simulator, whose reset endpoint asks for its key (ADR 0039).
         await using var builder = await CreateForAzureAsync();
 
         ContainerAppBicepOf(builder, "partner-portal-web").Should()
-            .MatchRegex(@"excludedPaths: \[\s*'/health'\s*'/alive'\s*'/shipper/v1/SHP-0001/notifications'\s*'/shipper/v1/SHP-0003/notifications'\s*'/carrier/v1/CAR-0001/bookings'\s*'/carrier/v1/CAR-0002/bookings'\s*'/carrier/v1/CAR-0003/bookings'\s*'/carrier/v1/CAR-0001/cancellations'\s*'/carrier/v1/CAR-0002/cancellations'\s*'/carrier/v1/CAR-0003/cancellations'\s*'/reset/v1'\s*\]");
+            .MatchRegex(@"excludedPaths: \[\s*'/health'\s*'/alive'\s*'/shipper/v1/SHP-0001/notifications'\s*'/shipper/v1/SHP-0003/notifications'\s*'/carrier/v1/CAR-0001/bookings'\s*'/carrier/v1/CAR-0002/bookings'\s*'/carrier/v1/CAR-0003/bookings'\s*'/carrier/v1/CAR-0001/cancellations'\s*'/carrier/v1/CAR-0002/cancellations'\s*'/carrier/v1/CAR-0003/cancellations'\s*'/shipper/v1/SHP-0001/invoices'\s*'/shipper/v1/SHP-0003/invoices'\s*'/reset/v1'\s*\]");
     }
 
     [Theory]

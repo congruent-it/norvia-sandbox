@@ -13,6 +13,7 @@ public static class TrackingKeys
     public const string ShipmentNumber = "shipmentNumber";
     public const string CarrierBookingNumber = "carrierBookingNumber";
     public const string TripNumber = "tripNumber";
+    public const string DocumentNumber = "documentNumber";
     public const string SourceMessageId = "sourceMessageId";
     public const string Outcome = "outcome";
     public const string FailureCode = "failureCode";
@@ -34,6 +35,9 @@ public static class TrackingKeys
 
     /// <summary>The <see cref="Flow"/> of a Billable line, from TransportOrderBillable to the ERP billing API's answer.</summary>
     public const string Billing = "billing";
+
+    /// <summary>The <see cref="Flow"/> of a Shipper invoice, from ShipperInvoiceIssued to the report to the ERP.</summary>
+    public const string Invoicing = "invoicing";
 
     /// <summary>The <see cref="Flow"/> of a Trip version sent to the Driver app, from the dispatch to the report to the TMS.</summary>
     public const string TripDispatch = "trip-dispatch";

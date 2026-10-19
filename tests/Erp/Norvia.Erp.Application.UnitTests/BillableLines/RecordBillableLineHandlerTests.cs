@@ -173,6 +173,8 @@ internal sealed class CapturingLogger<T> : ILogger<T>
 {
     public List<Dictionary<string, object?>> Scopes { get; } = [];
 
+    public List<string> Messages { get; } = [];
+
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull
     {
         if (state is IEnumerable<KeyValuePair<string, object?>> keys)
@@ -185,7 +187,6 @@ internal sealed class CapturingLogger<T> : ILogger<T>
 
     public bool IsEnabled(LogLevel logLevel) => true;
 
-    public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
-    {
-    }
+    public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+        Messages.Add(formatter(state, exception));
 }

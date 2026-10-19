@@ -79,6 +79,8 @@ var erpFinanceRole = 'Finance'
 var erpFinanceRoleId = guid('norvia-erp', environmentName, erpFinanceRole)
 var billableLinesRecordRole = 'BillableLines.Record'
 var billableLinesRecordRoleId = guid('norvia-erp-api', environmentName, billableLinesRecordRole)
+var shipperInvoicesReportRole = 'ShipperInvoices.Report'
+var shipperInvoicesReportRoleId = guid('norvia-erp-api', environmentName, shipperInvoicesReportRole)
 
 // Every active Driver the seed file names is one app role of the Driver app's registration, with the Driver ID as its value.
 var drivers = filter(loadJsonContent('../../seed/norvia.seed.json').drivers, driver => driver.active)
@@ -1045,6 +1047,16 @@ resource erpApi 'Microsoft.Graph/applications@v1.0' = {
       ]
       isEnabled: true
     }
+    {
+      id: shipperInvoicesReportRoleId
+      value: shipperInvoicesReportRole
+      displayName: 'Report a Shipper invoice'
+      description: 'Report a Shipper invoice as sent to the Shipper (E1). Only the Shipper invoice Logic App holds it.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
   ]
 }
 
@@ -1067,6 +1079,21 @@ resource billingRecordRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
   principalId: billingIdentity.properties.principalId
 }
 
+// The E1 Shipper invoice Logic App's identity, which it runs as. It is the one principal holding the ERP's report role, so no Shipper
+// invoice is reported sent without passing the integration layer. It reads its subscription and the Shipper endpoints' credentials,
+// and holds nothing else on the ERP or the TMS.
+resource shipperInvoiceIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
+  name: 'id-shipper-invoice-${uniqueString(resourceGroup().id)}'
+  location: location
+  tags: tags
+}
+
+resource shipperInvoiceReportRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: erpApiPrincipal.id
+  appRoleId: shipperInvoicesReportRoleId
+  principalId: shipperInvoiceIdentity.properties.principalId
+}
+
 output entraIssuer string = '${environment().authentication.loginEndpoint}${tenant().tenantId}/v2.0'
 output entraTenantId string = tenant().tenantId
 output tmsApiClientId string = tmsApi.appId
@@ -1074,7 +1101,6 @@ output intakeClientId string = intakeIdentity.properties.clientId
 output intakeIdentityId string = intakeIdentity.id
 output intakeIdentityName string = intakeIdentity.name
 output answerIdentityName string = answerIdentity.name
-output answerClientId string = answerIdentity.properties.clientId
 output trackingIdentityName string = trackingIdentity.name
 output trackingPrincipalId string = trackingIdentity.properties.principalId
 output trackingClientId string = trackingIdentity.properties.clientId
@@ -1083,7 +1109,6 @@ output proofOfDeliveryPrincipalId string = proofOfDeliveryIdentity.properties.pr
 output proofOfDeliveryClientId string = proofOfDeliveryIdentity.properties.clientId
 output bookingIdentityName string = bookingIdentity.name
 output bookingPrincipalId string = bookingIdentity.properties.principalId
-output bookingClientId string = bookingIdentity.properties.clientId
 output shipperNotificationIdentityName string = shipperNotificationIdentity.name
 output shipperNotificationPrincipalId string = shipperNotificationIdentity.properties.principalId
 output shipperNotificationClientId string = shipperNotificationIdentity.properties.clientId
@@ -1135,5 +1160,7 @@ output driverClientIds array = [for (driver, i) in drivers: '${driver.id}=${driv
 output erpIdentityName string = erpIdentity.name
 output erpRegistrationClientId string = erp.appId
 output erpApiClientId string = erpApi.appId
+output shipperInvoiceIdentityName string = shipperInvoiceIdentity.name
+output shipperInvoicePrincipalId string = shipperInvoiceIdentity.properties.principalId
 output billingIdentityName string = billingIdentity.name
 output billingPrincipalId string = billingIdentity.properties.principalId

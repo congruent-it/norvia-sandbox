@@ -23,6 +23,9 @@ param driverReportsPrincipalId string
 @description('The E1 Billing Logic App\'s identity, which receives from its own subscription and from nothing else.')
 param billingPrincipalId string
 
+@description('The E1 Shipper invoice Logic App\'s identity, which receives from its own subscription and from nothing else.')
+param shipperInvoicePrincipalId string
+
 @description('The Driver app\'s identity, which sends to the Driver app events topic and to nothing else.')
 param driverAppPrincipalId string
 
@@ -369,6 +372,36 @@ resource invoicingMonitoringFilter 'Microsoft.ServiceBus/namespaces/topics/subsc
     sqlFilter: {
       sqlExpression: 'resubmitTo IS NULL OR resubmitTo = \'monitoring\''
     }
+  }
+}
+
+// The E1 Shipper invoice Logic App's subscription: ShipperInvoiceIssued only, as the message's eventType property says. Its filter also
+// routes resubmits from the console, like every subscription's (coding guidelines §7). The AppHost's emulator gives the same subscription
+// the same condition (ResubmitAwareFilters).
+resource shipperInvoice 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01' = {
+  parent: invoicingEvents
+  name: 'shipper-invoice'
+}
+
+resource shipperInvoiceFilter 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
+  parent: shipperInvoice
+  name: '$Default'
+  properties: {
+    filterType: 'SqlFilter'
+    sqlFilter: {
+      sqlExpression: '(eventType = \'ShipperInvoiceIssued\' AND resubmitTo IS NULL) OR resubmitTo = \'shipper-invoice\''
+    }
+  }
+}
+
+// Scoped to the subscription, so the Shipper invoice Logic App reads issued Shipper invoices and no other message.
+resource shipperInvoiceReceivesItsMessages 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(shipperInvoice.id, shipperInvoicePrincipalId, serviceBusDataReceiver)
+  scope: shipperInvoice
+  properties: {
+    principalId: shipperInvoicePrincipalId
+    roleDefinitionId: serviceBusDataReceiver
+    principalType: 'ServicePrincipal'
   }
 }
 

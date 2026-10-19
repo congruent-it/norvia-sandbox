@@ -58,5 +58,9 @@
     <EmbeddedResource Include="..\..\..\src\Integration\BillingLogicApp\*.json" LogicalName="BillingLogicApp/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\src\Integration\BillingLogicApp\billing\workflow.json" LogicalName="BillingLogicApp/billing/workflow.json" />
     <EmbeddedResource Include="..\..\..\contracts\canonical-model\samples\transport-order-billable\*.json" LogicalName="CanonicalModel/samples/transport-order-billable/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\contracts\canonical-model\samples\shipper-invoice-issued\*.json" LogicalName="CanonicalModel/samples/shipper-invoice-issued/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\contracts\partner-api\samples\shipper-invoices\*.json" LogicalName="PartnerApi/samples/shipper-invoices/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\src\Integration\ShipperInvoiceLogicApp\*.json" LogicalName="ShipperInvoiceLogicApp/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\src\Integration\ShipperInvoiceLogicApp\shipper-invoice\workflow.json" LogicalName="ShipperInvoiceLogicApp/shipper-invoice/workflow.json" />
   </ItemGroup>
 </Project>

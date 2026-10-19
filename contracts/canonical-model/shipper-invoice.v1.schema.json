@@ -148,10 +148,16 @@
       "minLength": 1
     },
     "status": {
-      "description": "Issued, final. Sent and Not delivered follow with the Shipper invoice Logic App's reports.",
+      "description": "Issued, final; Sent once the Shipper invoice Logic App reported the Shipper's endpoint acknowledged it. Not delivered follows with a later slice.",
       "enum": [
-        "Issued"
+        "Issued",
+        "Sent"
       ]
+    },
+    "sentAt": {
+      "description": "When the invoice was reported Sent. Absent while it is Issued only.",
+      "type": "string",
+      "format": "date-time"
     }
   }
 }

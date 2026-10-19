@@ -31,6 +31,8 @@
         <dd>@invoice.InvoiceDate.ToString("yyyy-MM-dd")</dd>
         <dt>Status</dt>
         <dd>@invoice.Status</dd>
+        <dt>Sent</dt>
+        <dd>@SentTime.Format(invoice.SentAt)</dd>
         <dt>Total without VAT</dt>
         <dd>@Money.Format(invoice.TotalWithoutVat)</dd>
         <dt>VAT (21%)</dt>

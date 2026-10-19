@@ -2,6 +2,9 @@ namespace Norvia.Erp.Domain.ShipperInvoices;
 
 public enum ShipperInvoiceStatus
 {
-    /// <summary>The invoice is issued and final. Sending it is built in a later slice.</summary>
+    /// <summary>The invoice is issued and final. It stays Issued, without a sent time, until the Shipper invoice Logic App reports it.</summary>
     Issued,
+
+    /// <summary>The Shipper invoice Logic App reported that the Shipper's invoice endpoint acknowledged the invoice.</summary>
+    Sent,
 }

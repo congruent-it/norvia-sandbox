@@ -19,5 +19,6 @@ public sealed record ShipperInvoiceIssuedV1(Guid EventId, DateTimeOffset Occurre
     [
         new(TrackingKeys.Flow, Flows.Invoicing),
         new(TrackingKeys.PartyId, Invoice.Shipper.ShipperId),
+        new(TrackingKeys.DocumentNumber, Invoice.InvoiceNumber),
     ];
 }

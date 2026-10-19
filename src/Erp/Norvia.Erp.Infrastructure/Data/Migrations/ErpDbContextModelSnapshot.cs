@@ -190,6 +190,9 @@ namespace Norvia.Erp.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<DateTimeOffset?>("SentAt")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<string>("ShipperId")
                         .IsRequired()
                         .HasMaxLength(50)

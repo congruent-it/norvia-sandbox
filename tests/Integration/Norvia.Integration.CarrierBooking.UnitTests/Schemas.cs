@@ -32,6 +32,9 @@ internal sealed class Schemas
 
     private static readonly Lazy<Schemas> TransportOrderBillableSchema = new(() => Of("CanonicalModel/transport-order-billable.v1.schema.json"));
 
+    private static readonly Lazy<Schemas> ShipperInvoiceSchema = new(() => Of("PartnerApi/shipper-invoice.v1.schema.json"));
+    private static readonly Lazy<Schemas> InvoiceDocumentSchema = new(() => Of("CanonicalModel/shipper-invoice.v1.schema.json"));
+
     private readonly JsonSchema _schema;
 
     private Schemas(JsonSchema schema) => _schema = schema;
@@ -82,6 +85,12 @@ internal sealed class Schemas
 
     /// <summary>The Canonical Model's event the Billing Logic App hands to the ERP billing API as it is.</summary>
     public static Schemas TransportOrderBillable => TransportOrderBillableSchema.Value;
+
+    /// <summary>The Shipper invoice format, as the Shipper's invoice endpoint in the Partner portal takes it.</summary>
+    public static Schemas ShipperInvoice => ShipperInvoiceSchema.Value;
+
+    /// <summary>The Canonical Model's Shipper invoice, the document <c>ShipperInvoiceIssued</c> carries.</summary>
+    public static Schemas InvoiceDocument => InvoiceDocumentSchema.Value;
 
     public EvaluationResults Validate(JsonNode? instance) =>
         _schema.Evaluate(

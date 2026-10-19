@@ -28,6 +28,8 @@
         <PropertyColumn Title="Total without VAT" Property="@(row => Money.Format(row.TotalWithoutVat))" />
         <PropertyColumn Title="VAT" Property="@(row => Money.Format(row.Vat))" />
         <PropertyColumn Title="Total with VAT" Property="@(row => Money.Format(row.TotalWithVat))" />
+        <PropertyColumn Title="Status" Property="@(row => row.Status)" />
+        <PropertyColumn Title="Sent" Property="@(row => SentTime.Format(row.SentAt))" />
     </FluentDataGrid>
 </LiveListStates>
 
