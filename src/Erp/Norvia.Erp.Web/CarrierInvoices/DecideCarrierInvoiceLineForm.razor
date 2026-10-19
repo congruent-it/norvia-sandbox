@@ -1,0 +1,71 @@
+@using Norvia.Erp.Application.CarrierInvoices
+@using Norvia.Erp.Domain.CarrierInvoices
+@inject DecideCarrierInvoiceLineAction Action
+
+@* Finance's decision on one Carrier invoice line: accept it, accept it at an adjusted amount with a remark, or reject it with a reason.
+   Accept is offered only when the line has an Open Carrier cost for the Carrier; an Unknown booking or Duplicate line offers reject only. *@
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+    @if (CanAccept)
+    {
+        <FluentNumberField TValue="decimal?" @bind-Value="_adjustedAmount" Label="@($"Adjusted amount for {Line.CarrierBookingReference} (without VAT, empty to accept as invoiced)")" Min="0.01" Step="0.01" />
+        <FluentTextArea @bind-Value="_remark" Label="@($"Remark on the adjusted amount for {Line.CarrierBookingReference}")" MaxLength="@CarrierInvoice.MaxRemarkLength" Rows="2" />
+        <div>
+            <FluentButton Appearance="Appearance.Accent" Disabled="_running" OnClick="AcceptAsync" aria-label="@($"Accept {Line.CarrierBookingReference}")">@(_adjustedAmount is null ? "Accept" : "Accept adjusted")</FluentButton>
+        </div>
+    }
+    <FluentTextArea @bind-Value="_reason" Label="@($"Reason for rejecting {Line.CarrierBookingReference}")" MaxLength="@CarrierInvoice.MaxRemarkLength" Rows="2" />
+    <div>
+        <FluentButton Appearance="Appearance.Stealth" Disabled="_running" OnClick="RejectAsync" aria-label="@($"Reject {Line.CarrierBookingReference}")">Reject</FluentButton>
+        <span role="status" class="ml-2">
+            @if (_outcome is DecideCarrierInvoiceLineOutcome.Refused refused)
+            {
+                <span role="alert">@refused.Reason</span>
+            }
+        </span>
+    </div>
+</FluentStack>
+
+@code {
+    private bool _running;
+    private decimal? _adjustedAmount;
+    private string? _remark;
+    private string? _reason;
+    private DecideCarrierInvoiceLineOutcome? _outcome;
+
+    [Parameter, EditorRequired]
+    public string CarrierId { get; set; } = "";
+
+    [Parameter, EditorRequired]
+    public string InvoiceNumber { get; set; } = "";
+
+    [Parameter, EditorRequired]
+    public CarrierInvoiceLineView Line { get; set; } = null!;
+
+    /// <summary>True when the line has an Open Carrier cost for the Carrier.</summary>
+    [Parameter]
+    public bool CanAccept { get; set; }
+
+    private Task AcceptAsync() =>
+        RunAsync(() => Action.AcceptAsync(CarrierId, InvoiceNumber, Line.CarrierBookingReference, _adjustedAmount, _remark));
+
+    private Task RejectAsync() =>
+        RunAsync(() => Action.RejectAsync(CarrierId, InvoiceNumber, Line.CarrierBookingReference, _reason));
+
+    private async Task RunAsync(Func<Task<DecideCarrierInvoiceLineOutcome>> decide)
+    {
+        if (_running)
+        {
+            return;
+        }
+
+        _running = true;
+        try
+        {
+            _outcome = await decide();
+        }
+        finally
+        {
+            _running = false;
+        }
+    }
+}

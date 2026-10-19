@@ -50,4 +50,27 @@ public sealed class CarrierInvoiceSpecsTests
 
         new CarrierCostsOfCarrierByReferencesSpec(new CarrierId("CAR-0001"), ["TRX-1"]).Evaluate(all).Should().Equal(wanted);
     }
+
+    [Fact]
+    public void ToDecide_KeepsOnlyReceivedInvoices_TheOldestFirst()
+    {
+        var old = Invoice("CAR-0001", "A-1", Now);
+        var recent = Invoice("CAR-0001", "A-2", Now.AddHours(1));
+        var approved = CarrierInvoice.Receive(
+            new CarrierInvoiceData(new CarrierId("CAR-0001"), "A-3", new DateOnly(2026, 10, 19), [new CarrierInvoiceLineData("TRX-9", 5m, null)], "invoice"),
+            [Cost("CB-0000009", "TRX-9", "CAR-0001")],
+            0m,
+            Now).Invoice!;
+
+        new CarrierInvoicesToDecideSpec().Evaluate([recent, approved, old]).Should().Equal(old, recent);
+    }
+
+    [Fact]
+    public void CostsByBookingNumbers_FindsOnlyThoseCosts()
+    {
+        var wanted = Cost("CB-0000001", "TRX-1", "CAR-0001");
+        CarrierCost[] all = [wanted, Cost("CB-0000002", "TRX-2", "CAR-0001")];
+
+        new CarrierCostsByBookingNumbersSpec(["CB-0000001", "CB-0000007"]).Evaluate(all).Should().Equal(wanted);
+    }
 }

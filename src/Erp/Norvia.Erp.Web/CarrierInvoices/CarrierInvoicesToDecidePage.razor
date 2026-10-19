@@ -1,0 +1,108 @@
+@page "/carrier-invoices/to-decide"
+@attribute [Authorize(Policy = FinanceSignIn.FinancePolicy)]
+@rendermode InteractiveServer
+@using Mediator
+@using Microsoft.Extensions.Options
+@using Norvia.Erp.Application.CarrierInvoices
+@using Norvia.Erp.Application.CarrierInvoices.List
+@using Norvia.Erp.Web.Live
+@implements IAsyncDisposable
+@inject IServiceScopeFactory Scopes
+@inject TimeProvider Time
+@inject IOptions<LiveListOptions> Options
+@inject ILogger<LiveList<CarrierInvoiceToDecide>> Logger
+
+<PageTitle>Carrier invoices to decide · Norvia ERP</PageTitle>
+
+<h1>Carrier invoices to decide</h1>
+<p>The Received Carrier invoices, the oldest first. Open a line to see its Carrier cost and accept, adjust or reject it. When the last line is decided the invoice is Approved. The list updates as invoices arrive and lines are decided.</p>
+
+<LiveListStates Items="_list.Items" LastReadFailed="_list.LastReadFailed" Name="Carrier invoices to decide"
+                Empty="No Carrier invoice waits for a decision." Context="invoices">
+    @foreach (var item in invoices)
+    {
+        <section aria-label="@($"Carrier invoice {item.Invoice.InvoiceNumber} of {item.CarrierName}")" @key="@($"{item.Invoice.CarrierId}/{item.Invoice.InvoiceNumber}")">
+            <h2>@item.Invoice.InvoiceNumber · @item.CarrierName</h2>
+            <p>@item.Invoice.InvoiceDate.ToString("yyyy-MM-dd") · @Money.Format(item.Invoice.Total) without VAT · @LinesText(item.Invoice)</p>
+            <FluentAccordion>
+                @foreach (var line in item.Invoice.Lines)
+                {
+                    <FluentAccordionItem Heading="@Heading(line)" @key="line.CarrierBookingReference">
+                        <dl class="detail-list" aria-label="@($"Line {line.CarrierBookingReference}")">
+                            <dt>Carrier booking reference</dt>
+                            <dd>@line.CarrierBookingReference</dd>
+                            <dt>Claimed</dt>
+                            <dd>@Money.Format(line.Amount) without VAT</dd>
+                            <dt>Result</dt>
+                            <dd>@ResultText(line.Result)</dd>
+                            <dt>Status</dt>
+                            <dd>@StatusText(line)</dd>
+                            @if (line.Description is { Length: > 0 })
+                            {
+                                <dt>Description</dt>
+                                <dd>@line.Description</dd>
+                            }
+                            @if (line.Remark is { Length: > 0 })
+                            {
+                                <dt>@(line.Status == "Rejected" ? "Reason" : "Remark")</dt>
+                                <dd>@line.Remark</dd>
+                            }
+                        </dl>
+                        @if (CostOf(item, line) is { } cost)
+                        {
+                            <h3>Carrier cost</h3>
+                            <CarrierCostDetails Cost="cost" />
+                        }
+                        else
+                        {
+                            <p>No Carrier cost has arrived for this line.</p>
+                        }
+                        @if (line.Status == "ToDecide")
+                        {
+                            <DecideCarrierInvoiceLineForm CarrierId="@item.Invoice.CarrierId" InvoiceNumber="@item.Invoice.InvoiceNumber" Line="line"
+                                                          CanAccept="@(CostOf(item, line) is { Status: "Open" })" />
+                        }
+                    </FluentAccordionItem>
+                }
+            </FluentAccordion>
+        </section>
+    }
+</LiveListStates>
+
+@code {
+    private LiveList<CarrierInvoiceToDecide> _list = null!;
+
+    protected override void OnInitialized()
+    {
+        _list = new LiveList<CarrierInvoiceToDecide>(ReadAsync, "the Carrier invoices to decide", Time, Options.Value.RefreshInterval, Logger);
+        _list.Changed += () => InvokeAsync(StateHasChanged);
+        _list.Start();
+    }
+
+    private async Task<IReadOnlyList<CarrierInvoiceToDecide>> ReadAsync(CancellationToken cancellationToken)
+    {
+        await using var scope = Scopes.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<IMediator>().Send(new ListCarrierInvoicesToDecideQuery(), cancellationToken);
+    }
+
+    private static Norvia.Erp.Application.CarrierCosts.CarrierCostView? CostOf(CarrierInvoiceToDecide item, CarrierInvoiceLineView line) =>
+        line.CarrierBookingNumber is { } number && item.Costs.TryGetValue(number, out var cost) ? cost : null;
+
+    private static string Heading(CarrierInvoiceLineView line) =>
+        $"{line.CarrierBookingReference} · {Money.Format(line.Amount)} · {ResultText(line.Result)} · {StatusText(line)}";
+
+    // The number of lines per result, such as "2 Matched, 1 Price mismatch".
+    private static string LinesText(CarrierInvoiceView invoice) =>
+        string.Join(", ", invoice.Lines.GroupBy(line => line.Result).Select(group => $"{group.Count()} {ResultText(group.Key)}"));
+
+    private static string StatusText(CarrierInvoiceLineView line) => line.Status == "ToDecide" ? "To decide" : line.Status;
+
+    private static string ResultText(string result) => result switch
+    {
+        "PriceMismatch" => "Price mismatch",
+        "UnknownBooking" => "Unknown booking",
+        _ => result,
+    };
+
+    public ValueTask DisposeAsync() => _list.DisposeAsync();
+}

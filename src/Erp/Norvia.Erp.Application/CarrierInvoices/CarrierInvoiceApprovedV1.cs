@@ -31,7 +31,7 @@ public sealed record CarrierInvoiceApprovedV1(
         invoice.CarrierId.Value,
         invoice.InvoiceNumber,
         invoice.ApprovedAmount ?? throw new InvalidOperationException($"Carrier invoice {invoice.InvoiceNumber} is not Approved."),
-        [.. invoice.Lines.Select(line => new CarrierInvoiceApprovedLine(line.CarrierBookingReference, line.Status.ToString(), line.Amount, line.AcceptedAmount, null))]);
+        [.. invoice.Lines.Select(line => new CarrierInvoiceApprovedLine(line.CarrierBookingReference, line.Status.ToString(), line.Amount, line.AcceptedAmount, line.Remark))]);
 
     protected override IEnumerable<KeyValuePair<string, object>> TrackingProperties() =>
     [

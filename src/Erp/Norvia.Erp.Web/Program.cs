@@ -1,6 +1,7 @@
 using Microsoft.FluentUI.AspNetCore.Components;
 using Norvia.Erp.Application.MasterData.Shippers.List;
 using Norvia.Erp.Infrastructure;
+using Norvia.Erp.Web.CarrierInvoices;
 using Norvia.Erp.Web.Live;
 using Norvia.Erp.Web.Operators;
 using Norvia.Erp.Web.ShipperInvoices;
@@ -24,6 +25,7 @@ builder.Services.AddSingleton<ErpActivities>();
 builder.Services.AddScoped<InvoiceNowAction>();
 builder.Services.AddScoped<SendAgainAction>();
 builder.Services.AddScoped<IssueCreditNoteAction>();
+builder.Services.AddScoped<DecideCarrierInvoiceLineAction>();
 builder.Services.AddSingleton<MonthlyInvoiceRun>();
 builder.Services.AddHostedService<MonthlyInvoiceRunWorker>();
 builder.Services.AddOptions<LiveListOptions>().BindConfiguration(LiveListOptions.SectionName).ValidateDataAnnotations().ValidateOnStart();
