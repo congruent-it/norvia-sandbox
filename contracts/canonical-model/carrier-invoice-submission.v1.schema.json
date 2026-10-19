@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/carrier-invoice-submission.v1.schema.json",
+  "title": "CarrierInvoiceSubmission",
+  "description": "A Carrier invoice as the Carrier invoice Logic App hands it to the ERP billing API (Canonical Model document, version 1): the Carrier's own invoice number and date and one line per Carrier booking it claims. The carrierId is the Carrier API Management took from the token (ADR 0005); what the Carrier wrote never sets it. Amounts are in EUR without VAT.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["carrierId", "invoiceNumber", "invoiceDate", "correlationId", "lines"],
+  "properties": {
+    "carrierId": { "description": "The Carrier, from the caller's token.", "type": "string", "minLength": 1 },
+    "invoiceNumber": { "description": "The Carrier's own invoice number. Unique per Carrier.", "type": "string", "minLength": 1, "maxLength": 50 },
+    "invoiceDate": { "type": "string", "format": "date" },
+    "correlationId": { "description": "The correlation ID API Management created for the Carrier invoice.", "type": "string", "minLength": 1 },
+    "lines": {
+      "description": "One line per Carrier booking, with no Carrier booking reference twice. The ERP refuses an invoice without lines, a line without a reference and a line with an amount of zero or less, each with a stable code.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["carrierBookingReference", "amount"],
+        "properties": {
+          "carrierBookingReference": { "description": "The Carrier's own reference for the booking, as the Carrier cost has it.", "type": "string", "maxLength": 200 },
+          "amount": { "description": "What the Carrier claims for the booking, without VAT.", "type": "number", "multipleOf": 0.01 },
+          "description": { "type": ["string", "null"], "maxLength": 500 }
+        }
+      }
+    }
+  }
+}

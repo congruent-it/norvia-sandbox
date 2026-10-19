@@ -118,6 +118,11 @@ namespace Norvia.Erp.Infrastructure.Data.Migrations
                     b.Property<DateTimeOffset>("RecordedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<string>("ShipmentNumber")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -144,6 +149,67 @@ namespace Norvia.Erp.Infrastructure.Data.Migrations
                     b.HasIndex("CarrierId", "Status");
 
                     b.ToTable("CarrierCosts", (string)null);
+                });
+
+            modelBuilder.Entity("Norvia.Erp.Domain.CarrierInvoices.CarrierInvoice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("ApprovedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTimeOffset?>("ApprovedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CarrierId")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateOnly>("InvoiceDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("InvoiceNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Lines")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<decimal>("Total")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReceivedAt");
+
+                    b.HasIndex("CarrierId", "InvoiceNumber")
+                        .IsUnique();
+
+                    b.ToTable("CarrierInvoices", (string)null);
                 });
 
             modelBuilder.Entity("Norvia.Erp.Domain.Carriers.Carrier", b =>
@@ -493,6 +559,15 @@ namespace Norvia.Erp.Infrastructure.Data.Migrations
                 });
 
             modelBuilder.Entity("Norvia.Erp.Domain.CarrierCosts.CarrierCost", b =>
+                {
+                    b.HasOne("Norvia.Erp.Domain.Carriers.Carrier", null)
+                        .WithMany()
+                        .HasForeignKey("CarrierId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Norvia.Erp.Domain.CarrierInvoices.CarrierInvoice", b =>
                 {
                     b.HasOne("Norvia.Erp.Domain.Carriers.Carrier", null)
                         .WithMany()

@@ -1,0 +1,65 @@
+@page "/carrier-invoices"
+@attribute [Authorize(Policy = FinanceSignIn.FinancePolicy)]
+@rendermode InteractiveServer
+@using Mediator
+@using Microsoft.Extensions.Options
+@using Norvia.Erp.Application.CarrierInvoices
+@using Norvia.Erp.Application.CarrierInvoices.List
+@using Norvia.Erp.Web.Live
+@implements IAsyncDisposable
+@inject IServiceScopeFactory Scopes
+@inject TimeProvider Time
+@inject IOptions<LiveListOptions> Options
+@inject ILogger<LiveList<CarrierInvoiceListItem>> Logger
+
+<PageTitle>Carrier invoices · Norvia ERP</PageTitle>
+
+<h1>Carrier invoices</h1>
+<p>The Carrier invoices the ERP received, the newest first. An invoice whose lines all match is Approved on receipt; the others are Received and wait for Finance.</p>
+
+<LiveListStates Items="_list.Items" LastReadFailed="_list.LastReadFailed" Name="Carrier invoices"
+                Empty="No Carrier invoice has been received yet. One appears here as soon as a Carrier sends it." Context="invoices">
+    <FluentDataGrid Class="cerulean-table" Items="invoices.AsQueryable()" TGridItem="CarrierInvoiceListItem" aria-label="Carrier invoices"
+                    GridTemplateColumns="minmax(140px,1.5fr) minmax(120px,1.5fr) minmax(100px,1fr) minmax(90px,1fr) minmax(110px,1.2fr) minmax(120px,1.4fr) minmax(130px,1.4fr)">
+        <PropertyColumn Title="Carrier" Property="@(row => row.CarrierName)" />
+        <PropertyColumn Title="Invoice number" Property="@(row => row.Invoice.InvoiceNumber)" />
+        <PropertyColumn Title="Date" Property="@(row => row.Invoice.InvoiceDate.ToString("yyyy-MM-dd"))" />
+        <PropertyColumn Title="Status" Property="@(row => row.Invoice.Status)" />
+        <PropertyColumn Title="Total without VAT" Property="@(row => Money.Format(row.Invoice.Total))" />
+        <PropertyColumn Title="Lines" Property="@(row => LinesText(row.Invoice))" />
+        <PropertyColumn Title="Approved amount" Property="@(row => ApprovedText(row.Invoice))" />
+    </FluentDataGrid>
+</LiveListStates>
+
+@code {
+    private LiveList<CarrierInvoiceListItem> _list = null!;
+
+    protected override void OnInitialized()
+    {
+        _list = new LiveList<CarrierInvoiceListItem>(ReadAsync, "the Carrier invoices", Time, Options.Value.RefreshInterval, Logger);
+        _list.Changed += () => InvokeAsync(StateHasChanged);
+        _list.Start();
+    }
+
+    private async Task<IReadOnlyList<CarrierInvoiceListItem>> ReadAsync(CancellationToken cancellationToken)
+    {
+        await using var scope = Scopes.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<IMediator>().Send(new ListCarrierInvoicesQuery(), cancellationToken);
+    }
+
+    // The number of lines per result, such as "2 Matched, 1 Price mismatch".
+    private static string LinesText(CarrierInvoiceView invoice) =>
+        string.Join(", ", invoice.Lines.GroupBy(line => line.Result).Select(group => $"{group.Count()} {ResultText(group.Key)}"));
+
+    private static string ApprovedText(CarrierInvoiceView invoice) =>
+        invoice.ApprovedAmount is { } approved ? Money.Format(approved) : "–";
+
+    private static string ResultText(string result) => result switch
+    {
+        "PriceMismatch" => "Price mismatch",
+        "UnknownBooking" => "Unknown booking",
+        _ => result,
+    };
+
+    public ValueTask DisposeAsync() => _list.DisposeAsync();
+}

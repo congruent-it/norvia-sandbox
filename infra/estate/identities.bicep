@@ -81,6 +81,8 @@ var billableLinesRecordRole = 'BillableLines.Record'
 var billableLinesRecordRoleId = guid('norvia-erp-api', environmentName, billableLinesRecordRole)
 var carrierCostsRecordRole = 'CarrierCosts.Record'
 var carrierCostsRecordRoleId = guid('norvia-erp-api', environmentName, carrierCostsRecordRole)
+var carrierInvoicesReceiveRole = 'CarrierInvoices.Receive'
+var carrierInvoicesReceiveRoleId = guid('norvia-erp-api', environmentName, carrierInvoicesReceiveRole)
 var shipperInvoicesReportRole = 'ShipperInvoices.Report'
 var shipperInvoicesReportRoleId = guid('norvia-erp-api', environmentName, shipperInvoicesReportRole)
 var shipperInvoicesManageRole = 'ShipperInvoices.Manage'
@@ -1056,6 +1058,16 @@ resource erpApi 'Microsoft.Graph/applications@v1.0' = {
       value: carrierCostsRecordRole
       displayName: 'Record a Carrier cost'
       description: 'Record the Carrier cost a CarrierCostIncurred carries (E2). Only the Carrier cost Logic App holds it.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
+    {
+      id: carrierInvoicesReceiveRoleId
+      value: carrierInvoicesReceiveRole
+      displayName: 'Receive a Carrier invoice'
+      description: 'Receive a Carrier invoice and match its lines against the Carrier costs (E2). Only the Carrier invoice Logic App holds it.'
       allowedMemberTypes: [
         'Application'
       ]

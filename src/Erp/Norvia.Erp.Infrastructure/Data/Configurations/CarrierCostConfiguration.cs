@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using Norvia.Erp.Domain.Carriers;
 using Norvia.Erp.Domain.CarrierCosts;
+using Norvia.Erp.Domain.Carriers;
 
 namespace Norvia.Erp.Infrastructure.Data.Configurations;
 
@@ -29,5 +29,7 @@ internal sealed class CarrierCostConfiguration : IEntityTypeConfiguration<Carrie
         // A Carrier invoice line finds its Carrier cost by Carrier and Carrier booking reference, and the Open list reads a Carrier's Open costs.
         builder.HasIndex(cost => new { cost.CarrierId, cost.CarrierBookingReference });
         builder.HasIndex(cost => new { cost.CarrierId, cost.Status });
+        // Two Carrier invoices matching one Carrier cost at once conflict instead of both winning; the loser is run again and finds it Invoiced.
+        builder.Property<byte[]>("RowVersion").IsRowVersion();
     }
 }

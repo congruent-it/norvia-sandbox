@@ -77,6 +77,17 @@ public sealed class CarrierCost : EntityBase<CarrierCostId>, IAggregateRoot
         return (new CarrierCost(data, recordedAt), null);
     }
 
+    /// <summary>A Carrier invoice line was Matched or Accepted against this Carrier cost.</summary>
+    public void MarkInvoiced()
+    {
+        if (Status == CarrierCostStatus.Invoiced)
+        {
+            throw new InvalidOperationException($"Carrier cost {Id} is already Invoiced.");
+        }
+
+        Status = CarrierCostStatus.Invoiced;
+    }
+
     /// <summary>
     /// Whether a repeat carries the same content as this Carrier cost. The correlation ID of the message is left out: a Logic App's
     /// retry is the same Carrier cost whichever run delivers it.

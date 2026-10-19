@@ -369,6 +369,10 @@ _Avoid_: purchase invoice, bill
 Checking each Carrier invoice line against the Carrier cost of its Carrier booking.
 _Avoid_: reconciliation, 3-way match
 
+**Matching tolerance**:
+How far, in EUR, a Carrier invoice line's amount may be from its Carrier cost's total and still be Matched. An ERP setting, €0 by default: the amount must equal the Carrier cost to the cent.
+_Avoid_: margin, threshold
+
 ## Systems
 
 **TMS**:

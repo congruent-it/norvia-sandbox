@@ -1,0 +1,9 @@
+{
+  "carrierId": "CAR-0001",
+  "invoiceNumber": "VDT-2026-0413",
+  "invoiceDate": "2026-10-20",
+  "correlationId": "7c1e6f0a-2b8d-4c3e-8a1b-0f4d5e6a7b22",
+  "lines": [
+    { "carrierBookingReference": "TRX-1001", "amount": 95.00, "description": "Waiting time included" }
+  ]
+}
