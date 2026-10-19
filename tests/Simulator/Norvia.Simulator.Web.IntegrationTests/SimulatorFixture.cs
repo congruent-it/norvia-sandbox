@@ -154,6 +154,30 @@ public sealed class SimulatorFixture : IAsyncLifetime
         return host;
     }
 
+    /// <summary>A Simulator whose seed file is changed by the given edits and whose ERP API address leads nowhere, so none of Finance's calls reach the ERP.</summary>
+    public Task<SimulatorHost> StartSimulatorWithoutErpAsync(CancellationToken cancellationToken, params Action<JsonObject>[] edits) =>
+        StartSimulatorWithSeedAndSettingAsync("ErpApi:BaseAddress", "http://127.0.0.1:1", edits, cancellationToken);
+
+    /// <summary>A Simulator whose seed file is changed by the given edits and whose Partner portal address leads nowhere, so Finance can invoice but the Shippers' inboxes can't be read.</summary>
+    public Task<SimulatorHost> StartSimulatorWithoutPartnerPortalAsync(CancellationToken cancellationToken, params Action<JsonObject>[] edits) =>
+        StartSimulatorWithSeedAndSettingAsync("PartnerPortal:BaseAddress", "http://127.0.0.1:1", edits, cancellationToken);
+
+    private async Task<SimulatorHost> StartSimulatorWithSeedAndSettingAsync(string name, string value, Action<JsonObject>[] edits, CancellationToken cancellationToken)
+    {
+        var seed = JsonNode.Parse(await File.ReadAllTextAsync(_settings["Seed:Path"], cancellationToken))!.AsObject();
+        foreach (var edit in edits)
+        {
+            edit(seed);
+        }
+
+        var copy = Path.Combine(Path.GetTempPath(), $"norvia-seed-{Guid.NewGuid():N}.json");
+        _seedCopies.Add(copy);
+        await File.WriteAllTextAsync(copy, seed.ToJsonString(), cancellationToken);
+        var host = new SimulatorHost(new Dictionary<string, string>(_settings) { ["Seed:Path"] = copy, [name] = value });
+        _hosts.Add(host);
+        return host;
+    }
+
     /// <summary>A Simulator whose TMS API is at the address, such as a stand-in that refuses the reset. Everything else is the AppHost's.</summary>
     public SimulatorHost StartSimulatorWithTmsAt(Uri address)
     {

@@ -72,6 +72,24 @@ internal static class Runs
             Invoicing = NoInvoicing,
         };
 
+    /// <summary>
+    /// A run of good bookings that the Planner assigns all to Carriers, whose Carrier release, confirm, track and deliver every Shipment with a Proof of
+    /// delivery and no Exception, so each Transport Order becomes Billable and Finance has something to invoice. Finance has the given shares.
+    /// </summary>
+    public static SimulationSettings Invoiced(int orders, int seed, InvoicingShares invoicing) =>
+        new(orders, BadSharePercent: 0, CollectedTodayPercent: 30, seed, RunMode.Burst, TimeSpan.Zero,
+            AssignedPercent: 100, OwnFleetPercent: 0, ReassignPercent: 0)
+        {
+            Carriers = new CarrierShares(
+                ReleasePercent: 100, ConfirmPercent: 100, DeclinePercent: 0, TrackedPercent: 100, ExceptionPercent: 0,
+                DeliveredPercent: 100, ProofOfDeliveryPercent: 100, CancelPercent: 0),
+            TripPercent = 0,
+            Invoicing = invoicing,
+        };
+
+    /// <summary>The lines in which Finance called the ERP or a Shipper Persona's invoices inbox took a document.</summary>
+    public static bool IsInvoicing(LogLine line) => LogOutcomes.Invoicing.Contains(line.Outcome);
+
     /// <summary>A run that sends its first booking at once and the next a minute later.</summary>
     public static SimulationSettings Paced(int orders, int seed) =>
         new(orders, BadSharePercent: 0, CollectedTodayPercent: 30, seed, RunMode.Paced, TimeSpan.FromMinutes(orders)) { TripPercent = 0, Invoicing = NoInvoicing };
