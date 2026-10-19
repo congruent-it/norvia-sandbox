@@ -1,3 +1,4 @@
+using Norvia.Erp.Application.CreditNotes;
 using Norvia.Erp.Application.ShipperInvoices;
 
 namespace Norvia.Erp.Web.UnitTests.ShipperInvoices;
@@ -18,6 +19,23 @@ internal static class ShipperInvoicesTestData
         notDelivered is not null ? "NotDelivered" : sentAt is null ? "Issued" : "Sent",
         sentAt,
         notDelivered);
+
+    public static CreditNoteView CreditNote(int sequence, int invoice = 3, decimal withoutVat = 40m, string reason = "Rate Card error") => new(
+        $"CN-2026-{sequence:D6}",
+        new DateOnly(2026, 10, 20),
+        new ShipperOnInvoiceView("SHP-0001", "Brouwer Dranken"),
+        $"INV-2026-{invoice:D6}",
+        "TO-0000001",
+        "PO-1",
+        "SH-0000001",
+        new DateOnly(2026, 10, 17),
+        "EUR",
+        withoutVat,
+        decimal.Round(withoutVat * 0.21m, 2, MidpointRounding.AwayFromZero),
+        withoutVat + decimal.Round(withoutVat * 0.21m, 2, MidpointRounding.AwayFromZero),
+        reason,
+        new DateTimeOffset(2026, 10, 20, 8, 0, 0, TimeSpan.Zero),
+        $"corr-cn-{sequence}");
 
     private static ShipperInvoiceLineView Line(int index, decimal total) => new(
         $"TO-{index:D7}",

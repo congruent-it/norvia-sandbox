@@ -1,0 +1,58 @@
+@using Norvia.Erp.Domain.CreditNotes
+@inject IssueCreditNoteAction Action
+
+@* Finance's Credit note on one invoice line: an amount without VAT and a reason. What it did is said beside the form. *@
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+    <FluentNumberField TValue="decimal" @bind-Value="_amount" Label="@($"Amount to credit on {TransportOrderNumber} (without VAT)")" Min="0.01" Step="0.01" />
+    <FluentTextArea @bind-Value="_reason" Label="@($"Reason for the Credit note on {TransportOrderNumber}")" MaxLength="@CreditNote.MaxReasonLength" Rows="2" />
+    <div>
+        <FluentButton Appearance="Appearance.Accent" Disabled="_running" OnClick="RunAsync" aria-label="@($"Issue Credit note on {TransportOrderNumber}")">Credit note</FluentButton>
+        <span role="status" class="ml-2">
+            @switch (_outcome)
+            {
+                case IssueCreditNoteOutcome.Issued issued:
+                    <span>Issued Credit note @issued.CreditNoteNumber.</span>
+                    break;
+                case IssueCreditNoteOutcome.Refused refused:
+                    <span role="alert">@refused.Reason</span>
+                    break;
+            }
+        </span>
+    </div>
+</FluentStack>
+
+@code {
+    private bool _running;
+    private decimal _amount;
+    private string? _reason;
+    private IssueCreditNoteOutcome? _outcome;
+
+    [Parameter, EditorRequired]
+    public string InvoiceNumber { get; set; } = "";
+
+    [Parameter, EditorRequired]
+    public string TransportOrderNumber { get; set; } = "";
+
+    private async Task RunAsync()
+    {
+        if (_running)
+        {
+            return;
+        }
+
+        _running = true;
+        try
+        {
+            _outcome = await Action.RunAsync(InvoiceNumber, TransportOrderNumber, _amount, _reason);
+            if (_outcome is IssueCreditNoteOutcome.Issued)
+            {
+                _amount = 0m;
+                _reason = null;
+            }
+        }
+        finally
+        {
+            _running = false;
+        }
+    }
+}

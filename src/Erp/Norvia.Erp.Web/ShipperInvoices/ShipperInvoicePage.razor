@@ -3,6 +3,8 @@
 @rendermode InteractiveServer
 @using Mediator
 @using Microsoft.Extensions.Options
+@using Norvia.Erp.Application.CreditNotes
+@using Norvia.Erp.Application.CreditNotes.List
 @using Norvia.Erp.Application.ShipperInvoices
 @using Norvia.Erp.Application.ShipperInvoices.Open
 @using Norvia.Erp.Web.Live
@@ -11,6 +13,7 @@
 @inject TimeProvider Time
 @inject IOptions<LiveListOptions> Options
 @inject ILogger<LiveList<ShipperInvoiceView>> Logger
+@inject ILogger<LiveList<CreditNoteView>> CreditNoteLogger
 
 <PageTitle>Shipper invoice @InvoiceNumber · Norvia ERP</PageTitle>
 
@@ -73,13 +76,22 @@
                     <PropertyColumn Title="Amount without VAT" Property="@(row => Money.Format(row.Amount))" />
                 </FluentDataGrid>
                 <p>Line total without VAT: @Money.Format(line.Total)</p>
+                <h3>Credit note</h3>
+                <IssueCreditNoteForm InvoiceNumber="@invoice.InvoiceNumber" TransportOrderNumber="@line.TransportOrderNumber" />
             </FluentAccordionItem>
         }
     </FluentAccordion>
+
+    <h2>Credit notes</h2>
+    <LiveListStates Items="_creditNotes.Items" LastReadFailed="_creditNotes.LastReadFailed" Name="Credit notes"
+                    Empty="@($"No Credit note has been issued on {invoice.InvoiceNumber}.")" Context="creditNotes">
+        <CreditNotesGrid CreditNotes="creditNotes" Label="@($"Credit notes on {invoice.InvoiceNumber}")" />
+    </LiveListStates>
 </LiveListStates>
 
 @code {
     private LiveList<ShipperInvoiceView> _list = null!;
+    private LiveList<CreditNoteView> _creditNotes = null!;
 
     [Parameter]
     public string InvoiceNumber { get; set; } = "";
@@ -89,6 +101,16 @@
         _list = new LiveList<ShipperInvoiceView>(ReadAsync, "the Shipper invoice", Time, Options.Value.RefreshInterval, Logger);
         _list.Changed += () => InvokeAsync(StateHasChanged);
         _list.Start();
+
+        _creditNotes = new LiveList<CreditNoteView>(ReadCreditNotesAsync, "the Credit notes", Time, Options.Value.RefreshInterval, CreditNoteLogger);
+        _creditNotes.Changed += () => InvokeAsync(StateHasChanged);
+        _creditNotes.Start();
+    }
+
+    private async Task<IReadOnlyList<CreditNoteView>> ReadCreditNotesAsync(CancellationToken cancellationToken)
+    {
+        await using var scope = Scopes.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<IMediator>().Send(new ListCreditNotesQuery(InvoiceNumber), cancellationToken);
     }
 
     private async Task<IReadOnlyList<ShipperInvoiceView>> ReadAsync(CancellationToken cancellationToken)
@@ -98,5 +120,9 @@
         return invoice is null ? [] : [invoice];
     }
 
-    public ValueTask DisposeAsync() => _list.DisposeAsync();
+    public async ValueTask DisposeAsync()
+    {
+        await _list.DisposeAsync();
+        await _creditNotes.DisposeAsync();
+    }
 }
