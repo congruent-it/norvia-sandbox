@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Norvia.Erp.Domain.BillableLines;
+using Norvia.Erp.Domain.ShipperInvoices;
 using Norvia.Erp.Domain.Shippers;
 
 namespace Norvia.Erp.Infrastructure.Data.Configurations;
@@ -25,6 +26,11 @@ internal sealed class BillableLineConfiguration : IEntityTypeConfiguration<Billa
         builder.Property(line => line.IntakeCorrelationId).HasMaxLength(128).IsRequired();
         builder.Property(line => line.BillingCorrelationId).HasMaxLength(128).IsRequired();
         builder.Property(line => line.Status).HasConversion<string>().HasMaxLength(20);
+        builder.Property(line => line.InvoiceNumber)
+            .HasConversion(number => number!.Value.Value, value => new InvoiceNumber(value))
+            .HasMaxLength(20);
+        // Two Invoice runs that take the same Waiting line conflict on the row version, so a line is invoiced once and only once.
+        builder.Property<byte[]>("RowVersion").IsRowVersion();
         // An Invoice run takes a Shipper's Waiting lines.
         builder.HasIndex(line => new { line.ShipperId, line.Status });
     }

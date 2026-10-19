@@ -45,11 +45,20 @@ namespace Norvia.Erp.Infrastructure.Data.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
 
+                    b.Property<string>("InvoiceNumber")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.Property<DateTimeOffset>("RecordedAt")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<bool>("ReleasedWithoutProofOfDelivery")
                         .HasColumnType("bit");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
 
                     b.Property<string>("ShipmentNumber")
                         .IsRequired()
@@ -139,6 +148,77 @@ namespace Norvia.Erp.Infrastructure.Data.Migrations
                     b.HasIndex("ShipperId");
 
                     b.ToTable("RateCards", (string)null);
+                });
+
+            modelBuilder.Entity("Norvia.Erp.Domain.ShipperInvoices.InvoiceNumberSequence", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("int")
+                        .HasColumnName("Year");
+
+                    b.Property<int>("LastTaken")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("InvoiceNumberSequences", (string)null);
+                });
+
+            modelBuilder.Entity("Norvia.Erp.Domain.ShipperInvoices.ShipperInvoice", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateOnly>("InvoiceDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTimeOffset>("IssuedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Lines")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ShipperId")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<decimal>("TotalWithVat")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("TotalWithoutVat")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("Vat")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IssuedAt");
+
+                    b.HasIndex("ShipperId");
+
+                    b.ToTable("ShipperInvoices", (string)null);
                 });
 
             modelBuilder.Entity("Norvia.Erp.Domain.Shippers.Shipper", b =>
@@ -235,6 +315,15 @@ namespace Norvia.Erp.Infrastructure.Data.Migrations
                 });
 
             modelBuilder.Entity("Norvia.Erp.Domain.RateCards.RateCard", b =>
+                {
+                    b.HasOne("Norvia.Erp.Domain.Shippers.Shipper", null)
+                        .WithMany()
+                        .HasForeignKey("ShipperId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Norvia.Erp.Domain.ShipperInvoices.ShipperInvoice", b =>
                 {
                     b.HasOne("Norvia.Erp.Domain.Shippers.Shipper", null)
                         .WithMany()

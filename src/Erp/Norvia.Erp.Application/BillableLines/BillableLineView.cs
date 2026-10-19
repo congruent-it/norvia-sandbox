@@ -12,7 +12,8 @@ public sealed record BillableLineView(
     string IntakeCorrelationId,
     string BillingCorrelationId,
     DateTimeOffset RecordedAt,
-    string Status);
+    string Status,
+    string? InvoiceNumber);
 
 public sealed record FreightChargeView(string Currency, decimal Total, IReadOnlyList<ChargeLineView> ChargeLines, string RateCardId, int RateCardVersion);
 

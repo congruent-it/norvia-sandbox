@@ -368,6 +368,9 @@ else
     messaging.AddServiceBusTopic("driver-app-events")
         .AddServiceBusSubscription("driver-reports")
         .WithProperties(subscription => subscription.RequiresSession = true);
+    // The topic for the ERP's invoicing events (E1). Monitoring is its first consumer; the Shipper invoice Logic App follows with a subscription of its own.
+    messaging.AddServiceBusTopic("invoicing-events")
+        .AddServiceBusSubscription("invoicing-events-monitoring", subscriptionName: "monitoring");
     // The tracking queue API Management puts a Carrier's tracking message on and the Carrier-tracking Logic App reads
     // (ADR 0008). A message the TMS refuses is dead-lettered; one it can't be given to is delivered again up to the
     // maximum delivery count, then dead-lettered by Service Bus itself. The estate Bicep sets the same count.

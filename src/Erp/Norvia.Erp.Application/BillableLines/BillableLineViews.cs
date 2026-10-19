@@ -20,5 +20,6 @@ internal static class BillableLineViews
         line.IntakeCorrelationId,
         line.BillingCorrelationId,
         line.RecordedAt,
-        line.Status.ToString());
+        line.Status.ToString(),
+        line.InvoiceNumber?.Value);
 }

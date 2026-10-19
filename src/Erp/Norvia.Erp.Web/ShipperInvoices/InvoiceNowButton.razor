@@ -1,0 +1,48 @@
+@inject InvoiceNowAction Action
+
+@* Finance's Invoice now for one Shipper. What it did is said beside it, with a link to the invoice it issued. *@
+<FluentButton Appearance="Appearance.Accent" Disabled="_running" OnClick="RunAsync" aria-label="@($"Invoice now for {ShipperName}")">Invoice now</FluentButton>
+
+<span role="status" class="ml-2">
+    @switch (_outcome)
+    {
+        case InvoiceNowOutcome.Issued issued:
+            <span>Issued <a href="/shipper-invoices/@issued.InvoiceNumber">@issued.InvoiceNumber</a> over @issued.LineCount @(issued.LineCount == 1 ? "line" : "lines").</span>
+            break;
+        case InvoiceNowOutcome.NothingWaiting:
+            <span>@ShipperName has no Waiting lines, so there is no invoice to issue.</span>
+            break;
+        case InvoiceNowOutcome.Failed failed:
+            <span role="alert">@failed.Reason</span>
+            break;
+    }
+</span>
+
+@code {
+    private bool _running;
+    private InvoiceNowOutcome? _outcome;
+
+    [Parameter, EditorRequired]
+    public string ShipperId { get; set; } = "";
+
+    [Parameter, EditorRequired]
+    public string ShipperName { get; set; } = "";
+
+    private async Task RunAsync()
+    {
+        if (_running)
+        {
+            return;
+        }
+
+        _running = true;
+        try
+        {
+            _outcome = await Action.RunAsync(ShipperId);
+        }
+        finally
+        {
+            _running = false;
+        }
+    }
+}

@@ -21,7 +21,7 @@ public sealed class BillableLineEndpointsTests
     private static BillableLineView View() => new(
         "TO-0000123", "SHP-0001", "PO-77", "SH-0000123", DateTimeOffset.UnixEpoch,
         new FreightChargeView("EUR", 100.50m, [new ChargeLineView("Freight", 100.50m)], "RC-0001", 2),
-        false, "intake-1", "billing-1", DateTimeOffset.UnixEpoch, "Waiting");
+        false, "intake-1", "billing-1", DateTimeOffset.UnixEpoch, "Waiting", null);
 
     private void Answer(Result<RecordBillableLineResult> result)
     {

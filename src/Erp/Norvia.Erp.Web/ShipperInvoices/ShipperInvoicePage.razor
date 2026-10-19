@@ -1,0 +1,90 @@
+@page "/shipper-invoices/{InvoiceNumber}"
+@attribute [Authorize(Policy = FinanceSignIn.FinancePolicy)]
+@rendermode InteractiveServer
+@using Mediator
+@using Microsoft.Extensions.Options
+@using Norvia.Erp.Application.ShipperInvoices
+@using Norvia.Erp.Application.ShipperInvoices.Open
+@using Norvia.Erp.Web.Live
+@implements IAsyncDisposable
+@inject IServiceScopeFactory Scopes
+@inject TimeProvider Time
+@inject IOptions<LiveListOptions> Options
+@inject ILogger<LiveList<ShipperInvoiceView>> Logger
+
+<PageTitle>Shipper invoice @InvoiceNumber · Norvia ERP</PageTitle>
+
+<p><a href="/shipper-invoices">All Shipper invoices</a></p>
+
+@* The query answers one invoice, or none when the ERP has no invoice with that number. *@
+<LiveListStates Items="_list.Items" LastReadFailed="_list.LastReadFailed" Name="@($"Shipper invoice {InvoiceNumber}")"
+                Empty="@($"The ERP has no Shipper invoice {InvoiceNumber}.")" Context="invoices">
+    @{ var invoice = invoices[0]; }
+    <h1>Shipper invoice @invoice.InvoiceNumber</h1>
+
+    <dl class="detail-list" aria-label="@($"Shipper invoice {invoice.InvoiceNumber}")">
+        <dt>Invoice number</dt>
+        <dd>@invoice.InvoiceNumber</dd>
+        <dt>Shipper</dt>
+        <dd>@invoice.Shipper.Name (@invoice.Shipper.ShipperId)</dd>
+        <dt>Invoice date</dt>
+        <dd>@invoice.InvoiceDate.ToString("yyyy-MM-dd")</dd>
+        <dt>Status</dt>
+        <dd>@invoice.Status</dd>
+        <dt>Total without VAT</dt>
+        <dd>@Money.Format(invoice.TotalWithoutVat)</dd>
+        <dt>VAT (21%)</dt>
+        <dd>@Money.Format(invoice.Vat)</dd>
+        <dt>Total with VAT</dt>
+        <dd>@Money.Format(invoice.TotalWithVat)</dd>
+        <dt>Correlation ID</dt>
+        <dd>@invoice.CorrelationId</dd>
+    </dl>
+
+    <h2>Lines</h2>
+    <FluentAccordion aria-label="@($"Lines of {invoice.InvoiceNumber}")">
+        @foreach (var line in invoice.Lines)
+        {
+            <FluentAccordionItem Heading="@($"{line.TransportOrderNumber} · {Money.Format(line.Total)}")" @key="line.TransportOrderNumber">
+                <dl class="detail-list" aria-label="@($"Invoice line {line.TransportOrderNumber}")">
+                    <dt>Transport Order</dt>
+                    <dd>@line.TransportOrderNumber</dd>
+                    <dt>Shipper reference</dt>
+                    <dd>@line.ShipperReference</dd>
+                    <dt>Shipment</dt>
+                    <dd>@line.ShipmentNumber</dd>
+                    <dt>Delivered</dt>
+                    <dd>@line.DeliveryDate.ToString("yyyy-MM-dd")</dd>
+                </dl>
+                <FluentDataGrid Class="cerulean-table" Items="line.ChargeLines.AsQueryable()" TGridItem="InvoiceChargeLineView" aria-label="@($"Charge lines of {line.TransportOrderNumber}")">
+                    <PropertyColumn Title="Charge line" Property="@(row => row.Type)" />
+                    <PropertyColumn Title="Amount without VAT" Property="@(row => Money.Format(row.Amount))" />
+                </FluentDataGrid>
+                <p>Line total without VAT: @Money.Format(line.Total)</p>
+            </FluentAccordionItem>
+        }
+    </FluentAccordion>
+</LiveListStates>
+
+@code {
+    private LiveList<ShipperInvoiceView> _list = null!;
+
+    [Parameter]
+    public string InvoiceNumber { get; set; } = "";
+
+    protected override void OnInitialized()
+    {
+        _list = new LiveList<ShipperInvoiceView>(ReadAsync, "the Shipper invoice", Time, Options.Value.RefreshInterval, Logger);
+        _list.Changed += () => InvokeAsync(StateHasChanged);
+        _list.Start();
+    }
+
+    private async Task<IReadOnlyList<ShipperInvoiceView>> ReadAsync(CancellationToken cancellationToken)
+    {
+        await using var scope = Scopes.CreateAsyncScope();
+        var invoice = await scope.ServiceProvider.GetRequiredService<IMediator>().Send(new OpenShipperInvoiceQuery(InvoiceNumber), cancellationToken);
+        return invoice is null ? [] : [invoice];
+    }
+
+    public ValueTask DisposeAsync() => _list.DisposeAsync();
+}

@@ -47,7 +47,7 @@ public static class DependencyInjection
     }
 
     /// <summary>
-    /// Sends committed outbox messages to Service Bus. The ERP's slices after this one raise the events (ADR 0003: events out); the
+    /// Sends committed outbox messages to Service Bus. The ERP raises its events through the outbox (ADR 0003: events out); the
     /// process that runs it is the only one that does, so a message is not sent twice.
     /// </summary>
     public static IHostApplicationBuilder AddErpOutboxPublisher(this IHostApplicationBuilder builder)

@@ -8,4 +8,7 @@ public static class Flows
     /// made it Billable.
     /// </summary>
     public const string Billing = "billing";
+
+    /// <summary>Invoicing (E1): the ERP issues a Shipper invoice, on a correlation ID of its own.</summary>
+    public const string Invoicing = "invoicing";
 }

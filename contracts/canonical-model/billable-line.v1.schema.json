@@ -118,10 +118,19 @@
       "format": "date-time"
     },
     "status": {
-      "description": "Waiting until an Invoice run invoices the line.",
+      "description": "Waiting until an Invoice run invoices the line, then Invoiced with the number of the Shipper invoice.",
       "enum": [
-        "Waiting"
+        "Waiting",
+        "Invoiced"
       ]
+    },
+    "invoiceNumber": {
+      "description": "The number of the Shipper invoice that invoiced the line; null while it is Waiting.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^INV-[0-9]{4}-[0-9]{6}$"
     }
   }
 }

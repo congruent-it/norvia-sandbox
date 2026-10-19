@@ -1,4 +1,5 @@
 using Ardalis.SharedKernel;
+using Norvia.Erp.Domain.ShipperInvoices;
 using Norvia.Erp.Domain.Shippers;
 
 namespace Norvia.Erp.Domain.BillableLines;
@@ -51,6 +52,9 @@ public sealed class BillableLine : EntityBase<BillableLineId>, IAggregateRoot
 
     public BillableLineStatus Status { get; private set; }
 
+    /// <summary>The number of the Shipper invoice that invoiced the line; null while it is Waiting.</summary>
+    public InvoiceNumber? InvoiceNumber { get; private set; }
+
     /// <summary>The line's total: the Freight Charge's total.</summary>
     public decimal Total => FreightCharge.Total;
 
@@ -75,6 +79,18 @@ public sealed class BillableLine : EntityBase<BillableLineId>, IAggregateRoot
         }
 
         return (new BillableLine(data, recordedAt), null);
+    }
+
+    /// <summary>Sets a Waiting line to Invoiced with the invoice's number. A line is invoiced once and only once.</summary>
+    public void Invoice(InvoiceNumber invoiceNumber)
+    {
+        if (Status != BillableLineStatus.Waiting)
+        {
+            throw new InvalidOperationException($"Billable line {Id} is already invoiced.");
+        }
+
+        Status = BillableLineStatus.Invoiced;
+        InvoiceNumber = invoiceNumber;
     }
 
     /// <summary>

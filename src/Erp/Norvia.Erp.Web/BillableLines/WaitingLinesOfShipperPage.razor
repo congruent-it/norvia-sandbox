@@ -22,6 +22,7 @@
     @{ var shipper = shippers[0]; }
     <h1>Waiting billable lines of @shipper.ShipperName</h1>
     <p>@shipper.Lines.Count Waiting @(shipper.Lines.Count == 1 ? "line" : "lines"), @Money.Format(shipper.Total) without VAT.</p>
+    <p><InvoiceNowButton ShipperId="@shipper.ShipperId" ShipperName="@shipper.ShipperName" /></p>
 
     @if (shipper.Lines.Count == 0)
     {
