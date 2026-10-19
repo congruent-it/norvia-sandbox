@@ -40,6 +40,7 @@ public class DriverAppFixture : IAsyncLifetime
         "dbgate", "tms", "tms-migrations", "tms-api", "tms-web", "partner-portal", "partner-portal-migrations", "partner-portal-web",
         "integration-console-web", "partner-api", "booking-worker", "shipper-notification-worker", "carrier-cancellation-worker",
         "trip-dispatch-worker", "driver-reports-worker", "tracking-worker", "proof-of-delivery-worker",
+        "billing-worker", "shipper-invoice-worker",
         "simulator", "simulator-migrations", "simulator-web",
     ];
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
@@ -96,7 +97,7 @@ public class DriverAppFixture : IAsyncLifetime
         DriverReports = DriverReportsClient(IssueToken([ReportOutcomeRole]));
 
         _blobs = new BlobServiceClient(await _app.GetConnectionStringAsync("blobs", startup.Token));
-        _serviceBus = new ServiceBusClient(await _app.GetConnectionStringAsync("messaging", startup.Token));
+        _serviceBus = new ServiceBusClient(await _app.GetConnectionStringAsync("messaging-2", startup.Token));
         _processor = _serviceBus.CreateProcessor(DriverAppEventsTopic, TestSubscription);
         _processor.ProcessMessageAsync += args =>
         {

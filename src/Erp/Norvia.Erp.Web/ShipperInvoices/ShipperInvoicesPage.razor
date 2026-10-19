@@ -22,7 +22,8 @@
 
 <LiveListStates Items="_list.Items" LastReadFailed="_list.LastReadFailed" Name="Shipper invoices"
                 Empty="No Shipper invoice has been issued yet. Choose Invoice now for a Shipper with Waiting billable lines." Context="invoices">
-    <FluentDataGrid Class="cerulean-table" Items="invoices.AsQueryable()" TGridItem="ShipperInvoiceView" aria-label="Shipper invoices">
+    <FluentDataGrid Class="cerulean-table" Items="invoices.AsQueryable()" TGridItem="ShipperInvoiceView" aria-label="Shipper invoices"
+                    GridTemplateColumns="minmax(150px,1.5fr) minmax(120px,2fr) minmax(100px,1fr) minmax(110px,1.2fr) minmax(90px,1fr) minmax(110px,1.2fr) minmax(80px,1fr) minmax(100px,1.5fr) minmax(110px,1.2fr)">
         <TemplateColumn Title="Invoice number">
             <a href="/shipper-invoices/@context.InvoiceNumber">@context.InvoiceNumber</a>
         </TemplateColumn>

@@ -65,6 +65,7 @@ app.MapCarrierBookingEndpoint();
 app.MapCarrierCancellationEndpoint();
 app.MapShipperNotificationEndpoint();
 app.MapShipperInvoiceEndpoint();
+app.MapShipperInboxEndpoint();
 app.MapProofOfDeliveryFileEndpoint();
 app.MapResetEndpoints();
 app.MapDefaultEndpoints();

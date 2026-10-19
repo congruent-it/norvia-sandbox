@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Norvia.Simulator.Domain.Carriers;
 using Norvia.Simulator.Domain.Drivers;
+using Norvia.Simulator.Domain.Invoicing;
 using Norvia.Simulator.Domain.Runs;
 
 namespace Norvia.Simulator.Domain.UnitTests.Runs;
@@ -96,6 +97,23 @@ public sealed class SimulationSettingsTests
             """{"orderCount":10,"badSharePercent":10,"collectedTodayPercent":30,"seed":1,"mode":"Burst","window":"00:00:00"}""", PlanJson);
 
         older!.Carriers.Should().Be(new CarrierShares());
+    }
+
+    [Fact]
+    public void Problems_InvoicingSharesOutOfRange_AreNamed()
+    {
+        var settings = Settings() with { Invoicing = new InvoicingShares(101, -1) };
+
+        settings.Problems(Limits).Should().HaveCount(2).And.Contain(problem => problem.Contains("invoices")).And.Contain(problem => problem.Contains("credits"));
+    }
+
+    [Fact]
+    public void Invoicing_ASettingsDocumentFromBeforeInvoicing_ReadsWithTheDefaultShares()
+    {
+        var older = JsonSerializer.Deserialize<SimulationSettings>(
+            """{"orderCount":10,"badSharePercent":10,"collectedTodayPercent":30,"seed":1,"mode":"Burst","window":"00:00:00"}""", PlanJson);
+
+        older!.Invoicing.Should().Be(new InvoicingShares());
     }
 
     [Fact]

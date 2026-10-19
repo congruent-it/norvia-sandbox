@@ -129,7 +129,7 @@ public sealed class ShipperInvoicePagesTests : ErpWebContext
         page.Markup.Should().Contain("Brouwer Dranken (SHP-0001)").And.Contain("2026-10-19").And.Contain("Issued")
             .And.Contain("€ 200.00").And.Contain("€ 42.00").And.Contain("€ 242.00");
         page.Markup.Should().Contain("TO-0000001 · € 100.00").And.Contain("TO-0000002 · € 100.00");
-        page.Markup.Should().Contain("PO-1").And.Contain("SH-0000001").And.Contain("2026-10-17").And.Contain("MinimumChargeAdjustment").And.Contain("€ 95.00");
+        page.Markup.Should().Contain("PO-1").And.Contain("SH-0000001").And.Contain("2026-10-17").And.Contain("Minimum charge adjustment").And.Contain("€ 95.00");
     }
 
     [Fact]

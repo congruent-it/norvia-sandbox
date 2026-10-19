@@ -30,7 +30,7 @@
 </dl>
 
 <FluentDataGrid Class="cerulean-table" Items="Line.FreightCharge.ChargeLines.AsQueryable()" TGridItem="ChargeLineView" aria-label="@($"Charge lines of {Line.TransportOrderNumber}")">
-    <PropertyColumn Title="Charge line" Property="@(row => row.Type)" />
+    <PropertyColumn Title="Charge line" Property="@(row => ChargeLineText.Of(row.Type))" />
     <PropertyColumn Title="Amount without VAT" Property="@(row => Money.Format(row.Amount))" />
 </FluentDataGrid>
 <p>Total without VAT: @Money.Format(Line.FreightCharge.Total)</p>

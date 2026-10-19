@@ -90,7 +90,7 @@ public sealed class RunPageTests : SimulatorWebContext
         var settings = RenderRun().Find("[aria-label='Settings']");
 
         var groups = settings.QuerySelectorAll("dl[aria-label]").ToDictionary(group => group.GetAttribute("aria-label")!, group => group.TextContent);
-        groups.Keys.Should().Equal("Shippers", "Planner", "Carriers", "Own fleet and Drivers", "How it is sent");
+        groups.Keys.Should().Equal("Shippers", "Planner", "Carriers", "Own fleet and Drivers", "Finance and invoicing", "How it is sent");
         groups["Shippers"].Should().Contain("Orders").And.Contain("10").And.Contain("Bad bookings (%)").And.Contain("Collected today (%)").And.Contain("30");
         groups["Planner"].Should().Contain("Assigned by the Planner (%)").And.Contain("70").And.Contain("To Own fleet where it fits (%)").And.Contain("40")
             .And.Contain("Reassigned (%)").And.Contain("Released by the Planner (%)").And.Contain("60");
@@ -98,6 +98,7 @@ public sealed class RunPageTests : SimulatorWebContext
             .And.Contain("Exceptions on the way (%)").And.Contain("Delivered (%)").And.Contain("With a Proof of delivery (%)").And.Contain("65").And.Contain("Failed collections cancelled (%)");
         groups["Own fleet and Drivers"].Should().Contain("Own fleet put on Trips (%)").And.Contain("90").And.Contain("Collections that fail (%)")
             .And.Contain("Deliveries that fail (%)").And.Contain("Damage reported (%)").And.Contain("Delivered with reservations (%)").And.Contain("12");
+        groups["Finance and invoicing"].Should().Contain("Shippers invoiced (%)").And.Contain("100").And.Contain("Invoices credited in part (%)").And.Contain("50");
         groups["How it is sent"].Should().Contain("Burst").And.Contain("Seed").And.Contain("77").And.Contain("Preset").And.Contain("Quiet Monday");
     }
 

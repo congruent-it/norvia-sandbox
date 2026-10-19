@@ -77,4 +77,22 @@ public enum LogOutcome
 
     /// <summary>The TMS recorded the Driver's End Trip: the Trip is Completed.</summary>
     TripCompleted,
+
+    /// <summary>Finance ran Invoice now in the ERP and it issued a Shipper invoice.</summary>
+    InvoiceIssued,
+
+    /// <summary>Finance ran Invoice now and the Shipper had no Waiting lines, so the ERP issued nothing.</summary>
+    NothingToInvoice,
+
+    /// <summary>Finance issued a Credit note on a line of a Shipper invoice in the ERP.</summary>
+    CreditNoteIssued,
+
+    /// <summary>The ERP refused Invoice now or a Credit note, with a code that says which rule it broke.</summary>
+    InvoicingRefused,
+
+    /// <summary>Finance's call didn't reach the ERP, or its answer couldn't be read.</summary>
+    InvoicingNotReceived,
+
+    /// <summary>An invoice or Credit note arrived in the Shipper Persona's invoices inbox.</summary>
+    InboxReceived,
 }

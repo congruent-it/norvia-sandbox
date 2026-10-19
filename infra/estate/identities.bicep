@@ -81,6 +81,8 @@ var billableLinesRecordRole = 'BillableLines.Record'
 var billableLinesRecordRoleId = guid('norvia-erp-api', environmentName, billableLinesRecordRole)
 var shipperInvoicesReportRole = 'ShipperInvoices.Report'
 var shipperInvoicesReportRoleId = guid('norvia-erp-api', environmentName, shipperInvoicesReportRole)
+var shipperInvoicesManageRole = 'ShipperInvoices.Manage'
+var shipperInvoicesManageRoleId = guid('norvia-erp-api', environmentName, shipperInvoicesManageRole)
 
 // Every active Driver the seed file names is one app role of the Driver app's registration, with the Driver ID as its value.
 var drivers = filter(loadJsonContent('../../seed/norvia.seed.json').drivers, driver => driver.active)
@@ -1057,6 +1059,16 @@ resource erpApi 'Microsoft.Graph/applications@v1.0' = {
       ]
       isEnabled: true
     }
+    {
+      id: shipperInvoicesManageRoleId
+      value: shipperInvoicesManageRole
+      displayName: 'Invoice now and issue Credit notes'
+      description: 'Run Invoice now for a Shipper and issue a Credit note on an invoice line (E1), as Finance does in the ERP UI. Only the Simulator holds it.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
   ]
 }
 
@@ -1092,6 +1104,13 @@ resource shipperInvoiceReportRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' 
   resourceId: erpApiPrincipal.id
   appRoleId: shipperInvoicesReportRoleId
   principalId: shipperInvoiceIdentity.properties.principalId
+}
+
+// The Simulator plays Finance (E1): Invoice now and a Credit note go to the ERP API as its own identity.
+resource simulatorErpManageRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: erpApiPrincipal.id
+  appRoleId: shipperInvoicesManageRoleId
+  principalId: simulatorIdentity.properties.principalId
 }
 
 output entraIssuer string = '${environment().authentication.loginEndpoint}${tenant().tenantId}/v2.0'

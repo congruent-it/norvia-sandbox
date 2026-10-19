@@ -5,6 +5,7 @@ using Norvia.Simulator.Application.Ports;
 using Norvia.Simulator.Application.Runs.Execute;
 using Norvia.Simulator.Domain.Carriers;
 using Norvia.Simulator.Domain.Drivers;
+using Norvia.Simulator.Domain.Invoicing;
 using Norvia.Simulator.Domain.Log;
 using Norvia.Simulator.Domain.Planner;
 using Norvia.Simulator.Domain.Plans;
@@ -27,6 +28,8 @@ internal sealed class FleetRun
     public readonly IPartnerApi Partner = Substitute.For<IPartnerApi>();
     public readonly ITmsApi Tms = Substitute.For<ITmsApi>();
     public readonly IDriverApp Drivers = Substitute.For<IDriverApp>();
+    public readonly IErpApi Erp = Substitute.For<IErpApi>();
+    public readonly IShipperInbox Inbox = Substitute.For<IShipperInbox>();
     public readonly IWorldSource World = Substitute.For<IWorldSource>();
     public readonly FakeTimeProvider Time = new(TestData.Now);
     public readonly List<LogEntry> Lines = [];
@@ -97,15 +100,16 @@ internal sealed class FleetRun
         }),
     ];
 
-    public static SimulationSettings Settings(int todayPercent = 100, DriverShares? drivers = null, int orders = Orders) =>
+    public static SimulationSettings Settings(int todayPercent = 100, DriverShares? drivers = null, int orders = Orders, InvoicingShares? invoicing = null) =>
         new(orders, 0, todayPercent, 11, RunMode.Burst, TimeSpan.Zero, null, AssignedPercent: 100, OwnFleetPercent: 100, ReassignPercent: 0)
         {
             Carriers = new CarrierShares(ReleasePercent: 0),
             Drivers = drivers ?? new DriverShares(0, 0, 0, 0),
+            Invoicing = invoicing ?? new InvoicingShares(InvoicePercent: 0, CreditNotePercent: 0),
         };
 
     public ExecuteRunHandler Handler() => new(
-        Runs, Log, Partner, Tms, World, new SimulationLimits(50, 3), Time, new CarrierPacing(TimeSpan.Zero, 1), Drivers, new DriverPacing(TimeSpan.Zero, 2));
+        Runs, Log, Partner, Tms, World, new SimulationLimits(50, 3), Time, new CarrierPacing(TimeSpan.Zero, 1), Drivers, new DriverPacing(TimeSpan.Zero, 2), Erp, Inbox);
 
     public async Task<SimulationRun> RunAsync(SimulationSettings settings, CancellationTokenSource? stop = null)
     {

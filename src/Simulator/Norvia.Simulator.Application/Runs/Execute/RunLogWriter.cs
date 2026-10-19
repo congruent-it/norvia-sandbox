@@ -58,6 +58,12 @@ internal sealed class RunLogWriter(IRepository<LogEntry> log, SimulationRunId ru
             shipment.Booking.Reference, shipment.TransportOrderNumber, shipment.ShipmentNumber, detail),
             cancellationToken);
 
+    /// <summary>A step of invoicing: Finance's call to the ERP API, or a document arriving in a Shipper Persona's inbox.</summary>
+    public Task InvoicingAsync(
+        DateTimeOffset at, string actor, string action, LogOutcome outcome, string? correlationId, string? shipperReference, string? transportOrderNumber, string? detail,
+        CancellationToken cancellationToken) =>
+        AddAsync(sequence => LogEntry.Invoicing(runId, sequence, at, actor, action, outcome, correlationId, shipperReference, transportOrderNumber, detail), cancellationToken);
+
     public Task NoteAsync(DateTimeOffset at, string text, CancellationToken cancellationToken) =>
         AddAsync(sequence => LogEntry.Note(runId, sequence, at, text), cancellationToken);
 

@@ -1,6 +1,6 @@
 namespace Norvia.Simulator.Domain.Log;
 
-/// <summary>Which stage of the funnel an outcome belongs to: a booking sent to the Partner API, a call the Planner made to the TMS, a call a Carrier made to the Partner API, or a call a Driver made to the Driver app.</summary>
+/// <summary>Which stage of the funnel an outcome belongs to: a booking sent to the Partner API, a call the Planner made to the TMS, a call a Carrier made to the Partner API, a call a Driver made to the Driver app, or a step of Finance's invoicing in the ERP and the Shippers' inboxes.</summary>
 public static class LogOutcomes
 {
     public static IReadOnlyList<LogOutcome> Booking { get; } =
@@ -20,4 +20,9 @@ public static class LogOutcomes
 
     public static IReadOnlyList<LogOutcome> Driver { get; } =
         [LogOutcome.DriverReported, LogOutcome.DriverRefused, LogOutcome.DriverNotReceived, LogOutcome.TripCompleted];
+
+    public static IReadOnlyList<LogOutcome> Invoicing { get; } =
+    [
+        LogOutcome.InvoiceIssued, LogOutcome.NothingToInvoice, LogOutcome.CreditNoteIssued, LogOutcome.InvoicingRefused, LogOutcome.InvoicingNotReceived, LogOutcome.InboxReceived,
+    ];
 }

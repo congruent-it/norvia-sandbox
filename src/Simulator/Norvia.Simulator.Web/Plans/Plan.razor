@@ -74,6 +74,12 @@ else
         @_preview.Drivers.Counts.DeliveriesFailed deliveries, and report damage on @_preview.Drivers.Counts.Damaged. Trips for later days stay Dispatched.
     </p>
 
+    <p class="text-muted" data-testid="invoicing-funnel">
+        Once Shipments are delivered, Finance runs Invoice now for @_preview.Invoicing.Counts.Invoiced of the @_preview.Invoicing.Shippers Shippers whose bookings are accepted (@_preview.Settings.Invoicing.InvoicePercent%)
+        and credits part of one line on @_preview.Invoicing.Counts.Credited of the invoices (@_preview.Settings.Invoicing.CreditNotePercent%). The invoice and the Credit note then show in the Shipper's invoices inbox.
+        A Shipper none of whose orders were delivered gets no invoice.
+    </p>
+
     @if (_startProblems.Count > 0)
     {
         <div role="alert" class="mb-4">
@@ -192,6 +198,12 @@ else
     [SupplyParameterFromQuery(Name = "reservations")]
     private int? Reservations { get; set; }
 
+    [SupplyParameterFromQuery(Name = "invoiced")]
+    private int? Invoiced { get; set; }
+
+    [SupplyParameterFromQuery(Name = "credited")]
+    private int? Credited { get; set; }
+
     private static string KindOf(PlanRow row) => row.Bad is { } bad ? SimulatorText.Of(bad) : "Good";
 
     protected override async Task OnParametersSetAsync()
@@ -199,7 +211,7 @@ else
         _settings = PlanLinks.Settings(
             Orders, Bad, Today, Seed, Mode, Window, Preset, Assigned, OwnFleet, Reassign,
             Release, Confirm, Decline, Tracked, ExceptionShare, Delivered, ProofOfDelivery, CancelShare,
-            CollectionFailed, DeliveryFailed, Damaged, Reservations, Trips);
+            CollectionFailed, DeliveryFailed, Damaged, Reservations, Trips, Invoiced, Credited);
         if (_settings is null)
         {
             return;

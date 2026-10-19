@@ -73,6 +73,14 @@
         font-size: 1.25rem;
     }
 
+    h3 {
+        margin: 1.25rem 0 0.5rem;
+        font-size: 1.1rem;
+        font-weight: 700;
+        line-height: 1.2;
+        color: var(--color-dark);
+    }
+
     a {
         color: var(--color-primary);
         text-decoration: underline;
@@ -89,7 +97,7 @@
         grid-template-columns: max-content 1fr;
         column-gap: 1.5rem;
         row-gap: 0.25rem;
-        margin: 0;
+        margin: 0 0 1.5rem;
     }
 
     .detail-list dt {
@@ -141,6 +149,33 @@ table.cerulean-table th {
     overflow: visible;
     text-overflow: clip;
     white-space: normal;
+}
+
+/*
+ * Fluent gives every cell and header a fixed height and a single line that is cut off with an ellipsis, and centres each cell in its
+ * row. A header that wraps then spills into the first row, a value is cut off, and the rules between rows don't line up. Rows here
+ * grow with their content, cells wrap at their words, and a cell fills its row, so the rules line up.
+ */
+.cerulean-table.fluent-data-grid {
+    align-items: stretch;
+    margin-bottom: 1.5rem;
+}
+
+.cerulean-table.fluent-data-grid th,
+.cerulean-table.fluent-data-grid td {
+    height: auto !important;
+}
+
+/* Fluent gives each header a minimum width of 100px, which spills a narrow column's header out of its track. The grid's own columns say how narrow one may be. */
+.cerulean-table.fluent-data-grid th {
+    min-width: 0 !important;
+}
+
+.cerulean-table.fluent-data-grid td {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 .cerulean-table.fluent-data-grid tbody tr:hover td,
@@ -208,4 +243,32 @@ body .fluent-messagebar .fluent-messagebar-message {
     position: fixed;
     inset: auto 0 0 0;
     z-index: 1000;
+}
+
+/*
+ * An accordion item and the fields in it read their size from Fluent's 14px type ramp, which sets them smaller than the page. This puts
+ * them on the page's own size, with room around a paragraph (Tailwind's preflight removes it) and fields wide enough for what goes in.
+ */
+fluent-accordion-item,
+fluent-number-field,
+fluent-text-area {
+    --type-ramp-base-font-size: 1rem;
+    --type-ramp-base-line-height: 1.5;
+    font-size: 1rem;
+}
+
+fluent-accordion {
+    margin-bottom: 1.5rem;
+}
+
+fluent-accordion-item p {
+    margin: 0.75rem 0;
+}
+
+fluent-number-field {
+    width: 14rem;
+}
+
+fluent-text-area {
+    width: min(32rem, 100%);
 }

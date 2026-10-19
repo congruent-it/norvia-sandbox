@@ -10,10 +10,12 @@ using Norvia.Simulator.Application.Runs.Execute;
 using Norvia.Simulator.Domain.Runs;
 using Norvia.Simulator.Infrastructure.Data;
 using Norvia.Simulator.Infrastructure.DriverApi;
+using Norvia.Simulator.Infrastructure.ErpApi;
 using Norvia.Simulator.Infrastructure.Entra;
 using Norvia.Simulator.Infrastructure.Execution;
 using Norvia.Simulator.Infrastructure.PartnerApi;
 using Norvia.Simulator.Infrastructure.Reset;
+using Norvia.Simulator.Infrastructure.ShipperInbox;
 using Norvia.Simulator.Infrastructure.TmsApi;
 using Norvia.Simulator.Infrastructure.World;
 using Polly;
@@ -63,6 +65,8 @@ public static class DependencyInjection
         builder.AddNorviaPartnerApi();
         builder.AddNorviaTmsApi();
         builder.AddNorviaDriverApp();
+        builder.AddNorviaErpApi();
+        builder.AddShipperInbox();
 
         builder.AddEstateReset();
 
@@ -152,6 +156,38 @@ public static class DependencyInjection
         // The standard resilience handler stays: the Driver app answers a report it has taken already as taken, so a retry changes nothing.
         builder.Services.AddHttpClient<IDriverApp, NorviaDriverAppClient>((services, http) =>
             http.BaseAddress = services.GetRequiredService<IOptions<DriverApiOptions>>().Value.BaseAddress);
+    }
+
+    /// <summary>The ERP API client, as Finance calls it. Locally the Simulator signs its own token, as the ERP UI's Logic Apps' are; in Azure it is the managed identity's (ADR 0042).</summary>
+    private static void AddNorviaErpApi(this IHostApplicationBuilder builder)
+    {
+        builder.Services.AddOptions<ErpApiOptions>().BindConfiguration(ErpApiOptions.SectionName)
+            .ValidateDataAnnotations()
+            .Validate(options => (options.Entra is null) != (options.LocalTokens is null), "Configure either ErpApi:Entra or ErpApi:LocalTokens.")
+            // Data annotations don't look inside the nested options, so whichever is configured is checked here.
+            .Validate(options => options.Entra is null || IsValid(options.Entra), "ErpApi:Entra needs a Scope and a ManagedIdentityClientId.")
+            .Validate(options => options.LocalTokens is null || IsValid(options.LocalTokens), "ErpApi:LocalTokens needs an Issuer, an Audience, a ClientId and a SigningKey.")
+            .ValidateOnStart();
+
+        builder.Services.AddSingleton<IErpTokens>(services =>
+            services.GetRequiredService<IOptions<ErpApiOptions>>().Value.LocalTokens is null
+                ? ActivatorUtilities.CreateInstance<EntraErpTokens>(services)
+                : ActivatorUtilities.CreateInstance<LocalErpTokens>(services));
+
+        // Invoice now is safe to ask again (it finds nothing Waiting), but a Credit note is not, so no retry: the standard handler's attempts would issue it twice.
+#pragma warning disable EXTEXP0001
+        builder.Services.AddHttpClient<IErpApi, NorviaErpApiClient>((services, http) =>
+                http.BaseAddress = services.GetRequiredService<IOptions<ErpApiOptions>>().Value.BaseAddress)
+            .RemoveAllResilienceHandlers()
+            .AddResilienceHandler("norvia-erp-api", pipeline => pipeline.AddTimeout(TimeSpan.FromSeconds(60)));
+#pragma warning restore EXTEXP0001
+    }
+
+    /// <summary>The Shipper Personas' invoices inboxes, read from the Partner portal with each Shipper's own endpoint key.</summary>
+    private static void AddShipperInbox(this IHostApplicationBuilder builder)
+    {
+        builder.Services.AddOptions<ShipperInboxOptions>().BindConfiguration(ShipperInboxOptions.SectionName);
+        builder.Services.AddHttpClient<IShipperInbox, PartnerPortalShipperInbox>();
     }
 
     /// <summary>

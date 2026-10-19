@@ -1,4 +1,5 @@
 using Norvia.Simulator.Domain.Carriers;
+using Norvia.Simulator.Domain.Invoicing;
 using Norvia.Simulator.Domain.Plans;
 using Norvia.Simulator.Domain.Runs;
 using Norvia.Simulator.Domain.Worlds;
@@ -35,6 +36,8 @@ internal static class TestData
         {
             // The Planner's tests don't go on to release what they assign, unless they ask for the Carrier stage.
             Carriers = carriers ?? new CarrierShares(ReleasePercent: 0),
+            // Finance's tests are the invoicing stage's own.
+            Invoicing = new InvoicingShares(InvoicePercent: 0, CreditNotePercent: 0),
         };
 
     public static SimulationRun Run(SimulationSettings? settings = null, int number = 1)
