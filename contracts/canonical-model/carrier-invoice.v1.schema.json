@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/carrier-invoice.v1.schema.json",
+  "title": "CarrierInvoice",
+  "description": "The ERP's record of one Carrier invoice (Canonical Model document, version 1): what the Carrier claimed, with the result of matching each line against the Carrier cost of its Carrier booking reference. An invoice whose lines all match is Approved on receipt; otherwise it is Received and its other lines wait for Finance. The Carrier's invoice number is unique per Carrier.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["carrierId", "invoiceNumber", "invoiceDate", "currency", "total", "lines", "correlationId", "receivedAt", "status", "approvedAmount", "approvedAt"],
+  "properties": {
+    "carrierId": { "type": "string", "minLength": 1 },
+    "invoiceNumber": { "description": "The Carrier's own invoice number.", "type": "string", "minLength": 1 },
+    "invoiceDate": { "type": "string", "format": "date" },
+    "currency": { "const": "EUR" },
+    "total": { "description": "What the Carrier claims in all, without VAT: the sum of the lines.", "type": "number", "exclusiveMinimum": 0, "multipleOf": 0.01 },
+    "lines": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["carrierBookingReference", "amount", "description", "result", "status", "carrierBookingNumber", "acceptedAmount"],
+        "properties": {
+          "carrierBookingReference": { "type": "string", "minLength": 1 },
+          "amount": { "description": "What the Carrier claims for the line.", "type": "number", "exclusiveMinimum": 0, "multipleOf": 0.01 },
+          "description": { "type": ["string", "null"] },
+          "result": { "description": "What matching found. Matched: the Carrier cost exists for this Carrier, is Open and the amount is within tolerance. PriceMismatch: it exists and is Open but the amount is outside tolerance. UnknownBooking: no Carrier cost with that reference has arrived for this Carrier, which includes a reference of another Carrier. Duplicate: the Carrier cost is already Invoiced.", "enum": ["Matched", "PriceMismatch", "UnknownBooking", "Duplicate"] },
+          "status": { "description": "Matched: accepted at once at the invoiced amount. ToDecide: waits for Finance.", "enum": ["Matched", "ToDecide"] },
+          "carrierBookingNumber": { "description": "The Carrier cost the line was matched against; null for an UnknownBooking.", "type": ["string", "null"], "pattern": "^CB-[0-9]{7}$" },
+          "acceptedAmount": { "description": "What the line contributes to the approved amount; null while it waits for Finance.", "type": ["number", "null"], "multipleOf": 0.01 }
+        }
+      }
+    },
+    "correlationId": { "description": "The correlation ID API Management created for the Carrier invoice, which the ERP keeps.", "type": "string", "minLength": 1 },
+    "receivedAt": { "type": "string", "format": "date-time" },
+    "status": { "description": "Received while a line is ToDecide, Approved once every line is decided.", "enum": ["Received", "Approved"] },
+    "approvedAmount": { "description": "The sum of the Matched and Accepted amounts; null until the invoice is Approved.", "type": ["number", "null"], "multipleOf": 0.01 },
+    "approvedAt": { "type": ["string", "null"], "format": "date-time" }
+  }
+}

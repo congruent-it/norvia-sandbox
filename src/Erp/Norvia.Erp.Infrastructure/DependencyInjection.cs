@@ -3,8 +3,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Norvia.Erp.Application;
+using Norvia.Erp.Application.CarrierInvoices;
 using Norvia.Erp.Application.IntegrationEvents;
+using Norvia.Erp.Infrastructure.CarrierInvoices;
 using Norvia.Erp.Infrastructure.Data;
 using Norvia.Erp.Infrastructure.Outbox;
 using Norvia.Erp.Infrastructure.Seed;
@@ -26,6 +29,9 @@ public static class DependencyInjection
         builder.Services.AddScoped<IDomainEventDispatcher, MediatorDomainEventDispatcher>();
         builder.Services.AddScoped<IConflictRetrier, EfConflictRetrier>();
         builder.Services.AddScoped<IOutbox>(services => services.GetRequiredService<OutboxBuffer>());
+        builder.Services.AddOptions<MatchingOptions>().BindConfiguration(MatchingOptions.SectionName)
+            .ValidateDataAnnotations().ValidateOnStart();
+        builder.Services.AddSingleton<IMatchingTolerance>(services => services.GetRequiredService<IOptions<MatchingOptions>>().Value);
 
         return builder;
     }

@@ -17,4 +17,10 @@ public static class Flows
     /// Delivered Tracking event.
     /// </summary>
     public const string CarrierCosts = "carrier-costs";
+
+    /// <summary>
+    /// Carrier invoices (E2): a Carrier sends the ERP a Carrier invoice through the Carrier invoice Logic App, on a correlation ID API
+    /// Management created for it, which the ERP keeps and <c>CarrierInvoiceApproved</c> carries.
+    /// </summary>
+    public const string CarrierInvoices = "carrier-invoices";
 }

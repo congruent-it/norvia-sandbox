@@ -1,6 +1,6 @@
 using Norvia.Erp.Domain.BillableLines;
-using Norvia.Erp.Domain.Carriers;
 using Norvia.Erp.Domain.CarrierCosts;
+using Norvia.Erp.Domain.Carriers;
 
 namespace Norvia.Erp.Domain.UnitTests.CarrierCosts;
 
@@ -36,6 +36,27 @@ public sealed class CarrierCostTests
         cost.CorrelationId.Should().Be("delivered-1");
         cost.RecordedAt.Should().Be(Now);
         cost.Status.Should().Be(CarrierCostStatus.Open);
+    }
+
+    [Fact]
+    public void MarkInvoiced_AnOpenCost_BecomesInvoiced()
+    {
+        var cost = CarrierCost.Record(Data, Now).Cost!;
+
+        cost.MarkInvoiced();
+
+        cost.Status.Should().Be(CarrierCostStatus.Invoiced);
+    }
+
+    [Fact]
+    public void MarkInvoiced_AnInvoicedCost_IsABug()
+    {
+        var cost = CarrierCost.Record(Data, Now).Cost!;
+        cost.MarkInvoiced();
+
+        var again = cost.MarkInvoiced;
+
+        again.Should().Throw<InvalidOperationException>();
     }
 
     [Fact]

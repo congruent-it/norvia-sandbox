@@ -1,0 +1,10 @@
+{
+  "carrierId": "CAR-0001",
+  "invoiceNumber": "VDT-2026-0412",
+  "invoiceDate": "2026-10-19",
+  "correlationId": "1c7b0d3e-5a54-4f6a-9d5f-6a2f3c0d9a11",
+  "lines": [
+    { "carrierBookingReference": "TRX-998", "amount": 70.50, "description": "Rotterdam to Utrecht, 14 pallets" },
+    { "carrierBookingReference": "TRX-999", "amount": 120.00 }
+  ]
+}

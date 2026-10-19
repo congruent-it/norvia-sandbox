@@ -1,0 +1,167 @@
+using Ardalis.SharedKernel;
+using Norvia.Erp.Domain.CarrierCosts;
+using Norvia.Erp.Domain.Carriers;
+
+namespace Norvia.Erp.Domain.CarrierInvoices;
+
+/// <summary>
+/// What a Carrier asks to be paid for any number of its Carrier bookings. It is recorded and matched in one step: each line is matched
+/// against the Carrier cost with its Carrier booking reference, a Matched line is accepted at once and its Carrier cost becomes Invoiced,
+/// and an invoice whose lines all match is Approved straight away. Otherwise it is Received, and its other lines wait for Finance.
+/// </summary>
+public sealed class CarrierInvoice : EntityBase<CarrierInvoiceId>, IAggregateRoot
+{
+    public const int MaxInvoiceNumberLength = 50;
+
+    private CarrierInvoice()
+    {
+    }
+
+    private CarrierInvoice(CarrierInvoiceData data, IReadOnlyList<CarrierInvoiceLine> lines, DateTimeOffset receivedAt)
+    {
+        Id = CarrierInvoiceId.New();
+        CarrierId = data.CarrierId;
+        InvoiceNumber = data.InvoiceNumber;
+        InvoiceDate = data.InvoiceDate;
+        Lines = lines;
+        CorrelationId = data.CorrelationId;
+        ReceivedAt = receivedAt;
+        Total = lines.Sum(line => line.Amount);
+        if (lines.All(line => line.Status == CarrierInvoiceLineStatus.Matched))
+        {
+            Status = CarrierInvoiceStatus.Approved;
+            ApprovedAt = receivedAt;
+            ApprovedAmount = Total;
+        }
+        else
+        {
+            Status = CarrierInvoiceStatus.Received;
+        }
+    }
+
+    public CarrierId CarrierId { get; private set; }
+
+    /// <summary>The Carrier's own invoice number, unique per Carrier.</summary>
+    public string InvoiceNumber { get; private set; } = string.Empty;
+
+    public DateOnly InvoiceDate { get; private set; }
+
+    public IReadOnlyList<CarrierInvoiceLine> Lines { get; private set; } = [];
+
+    /// <summary>What the Carrier claims in all, in EUR without VAT: the sum of the lines.</summary>
+    public decimal Total { get; private set; }
+
+    /// <summary>The correlation ID API Management created for the Carrier invoice; the event carries it.</summary>
+    public string CorrelationId { get; private set; } = string.Empty;
+
+    public DateTimeOffset ReceivedAt { get; private set; }
+
+    public CarrierInvoiceStatus Status { get; private set; }
+
+    /// <summary>The sum of the Matched and Accepted amounts; null until the invoice is Approved.</summary>
+    public decimal? ApprovedAmount { get; private set; }
+
+    public DateTimeOffset? ApprovedAt { get; private set; }
+
+    /// <summary>
+    /// Receives a Carrier invoice: checks the receiving rules, matches each line against <paramref name="costs"/>, and makes each Matched
+    /// line's Carrier cost Invoiced. <paramref name="costs"/> are the Carrier's own Carrier costs with the lines' references, so a
+    /// reference of another Carrier is an Unknown booking. Whether the Carrier exists, and whether the invoice number was used, are for
+    /// the caller to check.
+    /// </summary>
+    /// <param name="tolerance">How far, in EUR, a line's amount may be from the Carrier cost's total and still match.</param>
+    public static (CarrierInvoice? Invoice, CarrierInvoiceRefusal? Refusal) Receive(
+        CarrierInvoiceData data, IReadOnlyList<CarrierCost> costs, decimal tolerance, DateTimeOffset receivedAt)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        ArgumentNullException.ThrowIfNull(costs);
+        ArgumentOutOfRangeException.ThrowIfNegative(tolerance);
+
+        if (Refuse(data) is { } refusal)
+        {
+            return (null, refusal);
+        }
+
+        var lines = data.Lines.Select(line => Match(line, costs, tolerance)).ToList();
+        return (new CarrierInvoice(data, lines, receivedAt), null);
+    }
+
+    /// <summary>
+    /// Whether a repeat carries the same content as this Carrier invoice. The correlation ID of the message is left out: a Logic App's
+    /// retry is the same Carrier invoice whichever run delivers it.
+    /// </summary>
+    public bool HasSameContentAs(CarrierInvoiceData data)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        return CarrierId == data.CarrierId
+            && InvoiceNumber == data.InvoiceNumber
+            && InvoiceDate == data.InvoiceDate
+            && Lines.Count == data.Lines.Count
+            && Lines.OrderBy(line => line.CarrierBookingReference, StringComparer.Ordinal)
+                .Select(line => (line.CarrierBookingReference, line.Amount, line.Description))
+                .SequenceEqual(
+                    data.Lines.OrderBy(line => line.CarrierBookingReference, StringComparer.Ordinal)
+                        .Select(line => (line.CarrierBookingReference, line.Amount, line.Description)));
+    }
+
+    private static CarrierInvoiceRefusal? Refuse(CarrierInvoiceData data)
+    {
+        if (data.Lines.Count == 0)
+        {
+            return CarrierInvoiceRefusal.NoLines(data.InvoiceNumber);
+        }
+
+        for (var index = 0; index < data.Lines.Count; index++)
+        {
+            var line = data.Lines[index];
+            if (string.IsNullOrWhiteSpace(line.CarrierBookingReference))
+            {
+                return CarrierInvoiceRefusal.LineWithoutReference(data.InvoiceNumber, index + 1);
+            }
+
+            if (line.Amount <= 0)
+            {
+                return CarrierInvoiceRefusal.LineAmountNotAboveZero(data.InvoiceNumber, index + 1, line.Amount);
+            }
+        }
+
+        var repeated = data.Lines.GroupBy(line => line.CarrierBookingReference, StringComparer.Ordinal).FirstOrDefault(group => group.Count() > 1);
+        return repeated is null ? null : CarrierInvoiceRefusal.ReferenceRepeated(data.InvoiceNumber, repeated.Key);
+    }
+
+    private static CarrierInvoiceLine Match(CarrierInvoiceLineData line, IReadOnlyList<CarrierCost> costs, decimal tolerance)
+    {
+        // An Open Carrier cost first, so a reference that somehow has two is matched before it is called a Duplicate.
+        var cost = costs
+            .Where(candidate => candidate.CarrierBookingReference == line.CarrierBookingReference)
+            .OrderBy(candidate => candidate.Status)
+            .FirstOrDefault();
+
+        if (cost is null)
+        {
+            return Line(line, CarrierInvoiceLineResult.UnknownBooking, null);
+        }
+
+        if (cost.Status == CarrierCostStatus.Invoiced)
+        {
+            return Line(line, CarrierInvoiceLineResult.Duplicate, cost);
+        }
+
+        if (Math.Abs(line.Amount - cost.Total) > tolerance)
+        {
+            return Line(line, CarrierInvoiceLineResult.PriceMismatch, cost);
+        }
+
+        cost.MarkInvoiced();
+        return Line(line, CarrierInvoiceLineResult.Matched, cost);
+    }
+
+    private static CarrierInvoiceLine Line(CarrierInvoiceLineData line, CarrierInvoiceLineResult result, CarrierCost? cost) =>
+        new(
+            line.CarrierBookingReference,
+            line.Amount,
+            line.Description,
+            result,
+            result == CarrierInvoiceLineResult.Matched ? CarrierInvoiceLineStatus.Matched : CarrierInvoiceLineStatus.ToDecide,
+            cost?.Id.CarrierBookingNumber);
+}

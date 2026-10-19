@@ -16,8 +16,8 @@ public sealed class LayoutTests : ErpWebContext
 
         layout.Find("nav").TextContent.Should().Contain("Dev Eloper");
         var links = layout.FindAll("nav a");
-        links.Select(link => link.TextContent.Trim()).Should().Equal("Waiting billable lines", "Shipper invoices", "Open carrier costs", "Shippers", "Carriers", "Rate Cards", "Carrier Rate Cards");
-        links.Select(link => link.GetAttribute("href")).Should().Equal("/billable-lines", "/shipper-invoices", "/carrier-costs", "/", "/carriers", "/rate-cards", "/carrier-rate-cards");
+        links.Select(link => link.TextContent.Trim()).Should().Equal("Waiting billable lines", "Shipper invoices", "Open carrier costs", "Carrier invoices", "Shippers", "Carriers", "Rate Cards", "Carrier Rate Cards");
+        links.Select(link => link.GetAttribute("href")).Should().Equal("/billable-lines", "/shipper-invoices", "/carrier-costs", "/carrier-invoices", "/", "/carriers", "/rate-cards", "/carrier-rate-cards");
         layout.Find("main").TextContent.Should().Contain("the page");
     }
 

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/carrier-invoice-receipt.v1.schema.json",
+  "title": "CarrierInvoiceReceipt",
+  "description": "The ERP billing API's answer to receiving a Carrier invoice (Canonical Model document, version 1): 201 for the first receipt, 200 with repeat true when the same Carrier, invoice number and content arrive again, in which case the Carrier invoice is the original one and nothing is published. The Carrier gets each line's result straight away.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["invoice", "repeat"],
+  "properties": {
+    "invoice": { "$ref": "carrier-invoice.v1.schema.json" },
+    "repeat": { "type": "boolean" }
+  }
+}

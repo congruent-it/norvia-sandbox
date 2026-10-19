@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/carrier-invoice-approved.v1.schema.json",
+  "title": "CarrierInvoiceApproved",
+  "description": "Every line of a Carrier invoice is Matched, Accepted or Rejected (Canonical Model event, version 1). Published on the Invoicing events topic through the ERP's transactional outbox, in the transaction that approved the invoice, under the correlation ID API Management created for it, and published once. It carries what the Carrier invoice outcome Logic App needs to tell the Carrier, so it looks nothing up.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "carrierId", "invoiceNumber", "approvedAmount", "lines"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "const": "CarrierInvoiceApproved" },
+    "eventVersion": { "const": 1 },
+    "occurredAt": { "description": "When the invoice became Approved.", "type": "string", "format": "date-time" },
+    "correlationId": { "description": "The Carrier invoice's correlation ID.", "type": "string", "minLength": 1 },
+    "carrierId": { "type": "string", "minLength": 1 },
+    "invoiceNumber": { "description": "The Carrier's own invoice number.", "type": "string", "minLength": 1 },
+    "approvedAmount": { "description": "The sum of the Matched and Accepted amounts, without VAT, in EUR.", "type": "number", "minimum": 0, "multipleOf": 0.01 },
+    "lines": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["carrierBookingReference", "result", "invoicedAmount", "acceptedAmount", "remark"],
+        "properties": {
+          "carrierBookingReference": { "type": "string", "minLength": 1 },
+          "result": { "enum": ["Matched", "Accepted", "Rejected"] },
+          "invoicedAmount": { "description": "What the Carrier claimed for the line.", "type": "number", "multipleOf": 0.01 },
+          "acceptedAmount": { "description": "What the line contributes to the approved amount; null for a Rejected line.", "type": ["number", "null"], "multipleOf": 0.01 },
+          "remark": { "description": "Finance's remark on an adjusted amount, or its reason for a rejection; null for a Matched line.", "type": ["string", "null"] }
+        }
+      }
+    }
+  }
+}

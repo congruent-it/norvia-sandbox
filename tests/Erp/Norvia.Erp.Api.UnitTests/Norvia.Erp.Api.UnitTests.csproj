@@ -2,7 +2,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <!-- Only the billing API's own hand-written logic is gated; Program.cs is the composition root (coding guidelines §10). -->
-    <Include>[Norvia.Erp.Api]Norvia.Erp.Api.BillableLines.*,[Norvia.Erp.Api]Norvia.Erp.Api.CarrierCosts.*</Include>
+    <Include>[Norvia.Erp.Api]Norvia.Erp.Api.BillableLines.*,[Norvia.Erp.Api]Norvia.Erp.Api.CarrierCosts.*,[Norvia.Erp.Api]Norvia.Erp.Api.CarrierInvoices.*</Include>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="AwesomeAssertions" />
@@ -12,10 +12,11 @@
     <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
     <PackageReference Include="xunit.v3.mtp-off" />
   </ItemGroup>
-  <!-- Embedded, so the unit tests read the Billing and Carrier cost Logic Apps' sample messages without touching the file system (coding guidelines §10). -->
+  <!-- Embedded, so the unit tests read the Billing, Carrier cost and Carrier invoice Logic Apps' sample messages without touching the file system (coding guidelines §10). -->
   <ItemGroup>
     <EmbeddedResource Include="..\..\..\contracts\canonical-model\samples\transport-order-billable\*.json" LogicalName="samples/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\contracts\canonical-model\samples\carrier-cost-incurred\*.json" LogicalName="carrier-cost-samples/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\contracts\canonical-model\samples\carrier-invoice\*.json" LogicalName="carrier-invoice-samples/%(Filename)%(Extension)" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

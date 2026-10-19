@@ -7,10 +7,12 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Norvia.Erp.Api.BillableLines;
 using Norvia.Erp.Api.CarrierCosts;
+using Norvia.Erp.Api.CarrierInvoices;
 using Norvia.Erp.Api.ShipperInvoices;
 using Norvia.Erp.Api.Tracking;
 using Norvia.Erp.Application.BillableLines.Record;
 using Norvia.Erp.Application.CarrierCosts.Record;
+using Norvia.Erp.Application.CarrierInvoices.Receive;
 using Norvia.Erp.Application.CreditNotes.ReportNotDelivered;
 using Norvia.Erp.Application.CreditNotes.ReportSent;
 using Norvia.Erp.Application.ShipperInvoices.ReportNotDelivered;
@@ -23,6 +25,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.Services.AddScoped<IPipelineBehavior<RecordBillableLineCommand, Result<RecordBillableLineResult>>, TrackBillableLineInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<RecordCarrierCostCommand, Result<RecordCarrierCostResult>>, TrackCarrierCostInLoggingScope>();
+builder.Services.AddScoped<IPipelineBehavior<ReceiveCarrierInvoiceCommand, Result<ReceiveCarrierInvoiceResult>>, TrackCarrierInvoiceInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<ReportShipperInvoiceSentCommand, Result<ShipperInvoiceReportResult>>, TrackShipperInvoiceReportInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<ReportShipperInvoiceNotDeliveredCommand, Result<ShipperInvoiceReportResult>>, TrackShipperInvoiceNotDeliveredReportInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<ReportCreditNoteSentCommand, Result<CreditNoteReportResult>>, TrackCreditNoteReportInLoggingScope>();
@@ -114,6 +117,7 @@ if (app.Environment.IsDevelopment())
 app.MapDefaultEndpoints();
 app.MapBillableLines();
 app.MapCarrierCosts();
+app.MapCarrierInvoices();
 app.MapShipperInvoices();
 app.MapCreditNotes();
 
