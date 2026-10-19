@@ -22,6 +22,8 @@ builder.Services.AddMediator(options =>
 
 builder.Services.AddSingleton<ErpActivities>();
 builder.Services.AddScoped<InvoiceNowAction>();
+builder.Services.AddSingleton<MonthlyInvoiceRun>();
+builder.Services.AddHostedService<MonthlyInvoiceRunWorker>();
 builder.Services.AddOptions<LiveListOptions>().BindConfiguration(LiveListOptions.SectionName).ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddFluentUIComponents();

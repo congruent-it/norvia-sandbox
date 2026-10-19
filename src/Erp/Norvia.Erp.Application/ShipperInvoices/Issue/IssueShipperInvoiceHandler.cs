@@ -34,7 +34,7 @@ public sealed partial class IssueShipperInvoiceHandler(
             return Result.NotFound($"The ERP has no Shipper {command.ShipperId}.");
         }
 
-        var waiting = await lines.ListAsync(new WaitingBillableLinesToInvoiceSpec(shipperId), cancellationToken);
+        var waiting = await lines.ListAsync(new WaitingBillableLinesToInvoiceSpec(shipperId, command.DeliveredBefore), cancellationToken);
         if (waiting.Count == 0)
         {
             LogNothingToInvoice(logger, command.ShipperId);
