@@ -14,6 +14,12 @@ internal static class EntraSignIn
     /// <summary>Container Apps probes these, and they tell nobody more than whether the app is up.</summary>
     private static readonly string[] HealthProbePaths = ["/health", "/alive"];
 
+    /// <summary>
+    /// The Norvia icons (Norvia.Branding's static web assets, which every UI serves under this path). They are no secret, and a browser
+    /// asks for the tab icon on the sign-in redirect too, where it has no session yet.
+    /// </summary>
+    private const string BrandingPath = "/_content/Norvia.Branding/*";
+
     public static ContainerAppAuthConfig For(
         AzureResourceInfrastructure infrastructure,
         ContainerApp app,
@@ -32,7 +38,7 @@ internal static class EntraSignIn
             {
                 UnauthenticatedClientAction = ContainerAppUnauthenticatedClientActionV2.RedirectToLoginPage,
                 RedirectToProvider = "azureactivedirectory",
-                ExcludedPaths = [.. HealthProbePaths, .. pathsOutsideTheGate ?? []],
+                ExcludedPaths = [.. HealthProbePaths, BrandingPath, .. pathsOutsideTheGate ?? []],
             },
             HttpSettings = new ContainerAppHttpSettings { RequireHttps = true },
             IdentityProviders = new ContainerAppIdentityProvidersConfiguration

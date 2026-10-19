@@ -5,6 +5,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Norvia.ServiceDefaults\Norvia.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\Norvia.Branding\Norvia.Branding.csproj" />
     <ProjectReference Include="..\Norvia.PartnerPortal.Application\Norvia.PartnerPortal.Application.csproj" />
     <ProjectReference Include="..\Norvia.PartnerPortal.Infrastructure\Norvia.PartnerPortal.Infrastructure.csproj" />
   </ItemGroup>

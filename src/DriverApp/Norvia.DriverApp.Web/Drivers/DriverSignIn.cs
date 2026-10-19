@@ -5,6 +5,7 @@ using Mediator;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
+using Norvia.Branding;
 using Norvia.DriverApp.Application.Drivers.List;
 
 namespace Norvia.DriverApp.Web.Drivers;
@@ -70,6 +71,12 @@ public static class DriverSignIn
         return builder;
     }
 
+    /// <summary>The Norvia icon, as the Blazor pages get it from NorviaFavicon: this page is plain HTML, so it links the same files itself.</summary>
+    internal static readonly string IconLinks =
+        $"<link rel=\"icon\" href=\"/{BrandingAssets.Svg}\" type=\"image/svg+xml\" sizes=\"any\" />"
+        + $"<link rel=\"icon\" href=\"/{BrandingAssets.Ico}\" sizes=\"16x16 32x32 48x48\" />"
+        + $"<link rel=\"apple-touch-icon\" href=\"/{BrandingAssets.AppleTouchIcon}\" />";
+
     /// <summary>Maps the stand-in's sign-in page, when there is one. Elsewhere there is nothing to map.</summary>
     public static IEndpointRouteBuilder MapDriverSignInStandIn(this WebApplication app)
     {
@@ -88,6 +95,7 @@ public static class DriverSignIn
             var drivers = await mediator.Send(new ListDriversQuery(), cancellationToken);
             var page = new StringBuilder("<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\" />")
                 .Append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" /><title>Sign in</title>")
+                .Append(IconLinks)
                 .Append("<link rel=\"stylesheet\" href=\"/app.css\" /></head><body><main class=\"app-main\"><h1>Sign in as a Driver</h1>")
                 .Append("<p>This stands in for Entra ID, which signs Drivers in when the Driver app runs in Azure. Pick a seeded Driver.</p>")
                 .Append("<form method=\"post\" action=\"").Append(StandInSignInPath).Append("\" aria-label=\"Sign in\" class=\"driver-list\">")

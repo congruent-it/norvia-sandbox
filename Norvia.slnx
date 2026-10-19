@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/Norvia.AppHost/Norvia.AppHost.csproj" />
     <Project Path="src/Norvia.ServiceDefaults/Norvia.ServiceDefaults.csproj" />
+    <Project Path="src/Norvia.Branding/Norvia.Branding.csproj" />
   </Folder>
   <Folder Name="/src/Integration/">
     <Project Path="src/Integration/Norvia.Integration.TransportOrderIntake/Norvia.Integration.TransportOrderIntake.csproj" />
@@ -118,6 +119,9 @@
     <Project Path="tests/PartnerPortal/Norvia.PartnerPortal.Web.IntegrationTests/Norvia.PartnerPortal.Web.IntegrationTests.csproj" />
     <Project Path="tests/PartnerPortal/Norvia.PartnerPortal.Web.UiTests/Norvia.PartnerPortal.Web.UiTests.csproj" />
     <Project Path="tests/PartnerPortal/Norvia.PartnerPortal.Web.UnitTests/Norvia.PartnerPortal.Web.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/tests/Branding/">
+    <Project Path="tests/Branding/Norvia.Branding.UnitTests/Norvia.Branding.UnitTests.csproj" />
   </Folder>
   <Folder Name="/tests/Simulator/">
     <Project Path="tests/Simulator/Norvia.Simulator.Application.UnitTests/Norvia.Simulator.Application.UnitTests.csproj" />
