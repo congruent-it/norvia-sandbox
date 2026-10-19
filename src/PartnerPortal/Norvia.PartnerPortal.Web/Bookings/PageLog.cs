@@ -42,6 +42,15 @@ internal static partial class PageLog
     [LoggerMessage(Level = LogLevel.Error, Message = "Sending Persona {PersonaId}'s Proof of delivery for {CarrierBookingNumber} failed")]
     public static partial void ProofOfDeliveryFailed(ILogger logger, Exception exception, string personaId, string carrierBookingNumber);
 
+    [LoggerMessage(Level = LogLevel.Error, Message = "Loading the draft invoice of Persona {PersonaId} failed")]
+    public static partial void DraftInvoiceLoadFailed(ILogger logger, Exception exception, string personaId);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Sending or keeping Persona {PersonaId}'s Carrier invoice {InvoiceNumber} failed")]
+    public static partial void CarrierInvoiceFailed(ILogger logger, Exception exception, string personaId, string invoiceNumber);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Loading the Carrier invoices of Persona {PersonaId} failed")]
+    public static partial void CarrierInvoicesLoadFailed(ILogger logger, Exception exception, string personaId);
+
     [LoggerMessage(Level = LogLevel.Error, Message = "Loading the invoices of Persona {PersonaId} failed")]
     public static partial void InvoicesLoadFailed(ILogger logger, Exception exception, string personaId);
 

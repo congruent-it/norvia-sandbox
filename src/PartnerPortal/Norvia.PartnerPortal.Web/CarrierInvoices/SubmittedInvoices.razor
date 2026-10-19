@@ -1,0 +1,175 @@
+@page "/personas/{PersonaId}/carrier-invoices"
+@* Interactive like the other pages: Fluent UI's components don't survive static streaming rendering. *@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject IPartnerPortal Portal
+@inject NavigationManager Navigation
+@inject ILogger<SubmittedInvoices> Logger
+@inject TimeProvider Time
+@implements IAsyncDisposable
+@using Norvia.PartnerPortal.Application.CarrierInvoices
+@using Norvia.PartnerPortal.Domain.CarrierInvoices
+@using Norvia.PartnerPortal.Domain.ShipperInvoices
+@using Norvia.PartnerPortal.Web.ShipperInvoices
+
+<PageTitle>Invoices · @(_persona?.DisplayName ?? PersonaId) · Partner portal</PageTitle>
+
+<h1>Invoices</h1>
+
+@if (_loadFailed)
+{
+    <div role="alert">
+        <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+            The invoices couldn't be loaded. Reload the page to try again.
+        </FluentMessageBar>
+    </div>
+}
+else if (_invoices is null)
+{
+    <FluentStack VerticalAlignment="VerticalAlignment.Center" role="status">
+        <FluentProgressRing />
+        <span>Loading the invoices…</span>
+    </FluentStack>
+}
+else if (_invoices.Count == 0)
+{
+    <div role="status">
+        <FluentMessageBar Intent="MessageIntent.Info" AllowDismiss="false">
+            @_persona!.DisplayName hasn't sent Norvia an invoice yet. Send one from the draft invoice.
+        </FluentMessageBar>
+    </div>
+}
+else
+{
+    <p class="mb-6">
+        Every invoice @_persona!.DisplayName sent Norvia, the latest first. Norvia tells the outcome of each line once its Finance
+        has decided. A rejected line can be invoiced again from the draft invoice, with a new invoice number.
+    </p>
+    @foreach (var invoice in _invoices)
+    {
+        <article class="mb-8" aria-label="@invoice.InvoiceNumber">
+            <h2>Invoice @invoice.InvoiceNumber</h2>
+            <p class="text-muted">
+                Dated @LocalDateText.Of(invoice.InvoiceDate), sent @PortalTime.Format(invoice.SubmittedAt) ·
+                <span class="status">@CarrierInvoiceText.Of(invoice.Status)</span>
+                @if (invoice.OutcomeTold)
+                {
+                    <span class="told"> · Norvia told the outcome @PortalTime.Format(invoice.OutcomeReceivedAt!.Value)</span>
+                }
+            </p>
+            <table class="lux-table" aria-label="Lines of @invoice.InvoiceNumber">
+                <thead>
+                    <tr>
+                        <th>Booking reference</th>
+                        <th class="text-right">Amount</th>
+                        <th>Norvia's result on receipt</th>
+                        <th>Outcome</th>
+                        <th>Remark</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var line in invoice.Lines)
+                    {
+                        <tr>
+                            <td>@line.BookingRef</td>
+                            <td class="text-right">@InvoiceText.Money(line.Amount)</td>
+                            <td>@CarrierInvoiceText.Of(line.Result)</td>
+                            <td class="outcome">@CarrierInvoiceText.Outcome(line.Outcome)</td>
+                            <td>@line.Outcome?.Remark</td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr><th colspan="4" scope="row">Total claimed</th><td class="text-right total">@InvoiceText.Money(invoice.Total)</td></tr>
+                    @if (invoice.ApprovedAmount is { } approved)
+                    {
+                        <tr><th colspan="4" scope="row">Approved</th><td class="text-right approved">@InvoiceText.Money(approved)</td></tr>
+                    }
+                </tfoot>
+            </table>
+        </article>
+    }
+}
+
+@code {
+    /// <summary>How often the list reads itself again, so an outcome shows as Norvia tells it without a page refresh.</summary>
+    public static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(2);
+
+    private readonly CancellationTokenSource _stopped = new();
+    private Task? _refreshing;
+    private PersonaView? _persona;
+    private IReadOnlyList<CarrierInvoiceView>? _invoices;
+    private bool _loadFailed;
+
+    [Parameter]
+    public string PersonaId { get; set; } = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _invoices = null;
+        try
+        {
+            _persona = PersonaChoice.Find(PersonaId, await Portal.ListPersonasAsync(CancellationToken.None));
+            if (_persona is null || _persona.PartyType != PartyType.Carrier)
+            {
+                Navigation.NotFound();
+                return;
+            }
+
+            _invoices = await Portal.ListCarrierInvoicesAsync(new PersonaId(PersonaId), CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            PageLog.CarrierInvoicesLoadFailed(Logger, exception, PersonaId);
+            _loadFailed = true;
+        }
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _refreshing = RefreshUntilStoppedAsync(_stopped.Token);
+        }
+    }
+
+    // A refresh that fails keeps what the list showed and tries again on the next tick.
+    private async Task RefreshUntilStoppedAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(RefreshInterval, Time);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                if (_persona is null || _invoices is null)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    _invoices = await Portal.ListCarrierInvoicesAsync(new PersonaId(PersonaId), cancellationToken);
+                    await InvokeAsync(StateHasChanged);
+                }
+                catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+                {
+                    PageLog.CarrierInvoicesLoadFailed(Logger, exception, PersonaId);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The page is gone.
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _stopped.CancelAsync();
+        if (_refreshing is not null)
+        {
+            await _refreshing;
+        }
+
+        _stopped.Dispose();
+    }
+}

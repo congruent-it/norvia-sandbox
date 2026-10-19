@@ -20,6 +20,10 @@ using Norvia.PartnerPortal.Application.DriverSignIns;
 using Norvia.PartnerPortal.Application.DriverSignIns.List;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Application.Personas.List;
+using Norvia.PartnerPortal.Application.CarrierInvoices;
+using Norvia.PartnerPortal.Application.CarrierInvoices.Draft;
+using Norvia.PartnerPortal.Application.CarrierInvoices.List;
+using Norvia.PartnerPortal.Application.CarrierInvoices.Submit;
 using Norvia.PartnerPortal.Application.ShipperInvoices;
 using Norvia.PartnerPortal.Application.ShipperInvoices.List;
 using Norvia.PartnerPortal.Application.ShipperNotifications;
@@ -67,6 +71,16 @@ internal sealed class PartnerPortalRequests(IServiceScopeFactory scopes) : IPart
 
     public Task<IReadOnlyList<CarrierBookingRequestView>> ListCarrierBookingRequestsAsync(PersonaId personaId, CancellationToken cancellationToken) =>
         SendAsync(new ListCarrierBookingRequestsQuery(personaId), cancellationToken);
+
+    public Task<CarrierInvoiceDraftView?> GetCarrierInvoiceDraftAsync(PersonaId personaId, CancellationToken cancellationToken) =>
+        SendAsync(new GetCarrierInvoiceDraftQuery(personaId), cancellationToken);
+
+    public Task<Result<SubmittedCarrierInvoice>> SubmitCarrierInvoiceAsync(
+        PersonaId personaId, string invoiceNumber, DateOnly invoiceDate, IReadOnlyList<CarrierInvoiceLineDraft> lines, CancellationToken cancellationToken) =>
+        SendAsync(new SubmitCarrierInvoiceCommand(personaId, invoiceNumber, invoiceDate, lines), cancellationToken);
+
+    public Task<IReadOnlyList<CarrierInvoiceView>> ListCarrierInvoicesAsync(PersonaId personaId, CancellationToken cancellationToken) =>
+        SendAsync(new ListCarrierInvoicesQuery(personaId), cancellationToken);
 
     public Task<IReadOnlyList<ShipperInvoiceView>> ListShipperInvoicesAsync(PersonaId personaId, CancellationToken cancellationToken) =>
         SendAsync(new ListShipperInvoicesQuery(personaId), cancellationToken);

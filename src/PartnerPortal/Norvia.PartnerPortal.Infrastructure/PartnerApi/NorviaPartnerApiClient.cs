@@ -5,11 +5,14 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Norvia.PartnerPortal.Application.Bookings;
 using Norvia.PartnerPortal.Application.CarrierBookings.Answer;
+using Norvia.PartnerPortal.Application.CarrierInvoices;
+using Norvia.PartnerPortal.Application.CarrierInvoices.Submit;
 using Norvia.PartnerPortal.Application.CarrierShipments;
 using Norvia.PartnerPortal.Application.CarrierShipments.SendProofOfDelivery;
 using Norvia.PartnerPortal.Application.ShipperTracking;
 using Norvia.PartnerPortal.Domain.Bookings;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
+using Norvia.PartnerPortal.Domain.CarrierInvoices;
 using Norvia.PartnerPortal.Domain.Personas;
 
 namespace Norvia.PartnerPortal.Infrastructure.PartnerApi;
@@ -181,6 +184,49 @@ internal sealed partial class NorviaPartnerApiClient(
         using (logger.BeginScope(keys))
         {
             LogProofOfDeliveryReplied(persona.Id.Value, proof.CarrierBookingNumber, reply.Result);
+        }
+
+        return reply;
+    }
+
+    public async Task<CarrierInvoiceReply> SubmitCarrierInvoiceAsync(
+        Persona persona, string invoiceNumber, DateOnly invoiceDate, IReadOnlyList<CarrierInvoiceLineDraft> lines, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(persona);
+
+        using var span = activities.Source.StartActivity("Send Carrier invoice", ActivityKind.Internal);
+        CarrierInvoiceReply reply;
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("carrier-invoices", UriKind.Relative))
+            {
+                Content = JsonContent.Create(CarrierInvoiceFormat.ToJson(invoiceNumber, invoiceDate, lines)),
+            };
+            // Buffered, so it goes out with its length: the Carrier invoice Logic App's trigger gets no body from a chunked one.
+            await request.Content.LoadIntoBufferAsync(cancellationToken);
+            request.Headers.Add("Ocp-Apim-Subscription-Key", options.Value.SubscriptionKeyOf(persona.Id));
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await tokens.GetTokenAsync(persona.Id, cancellationToken));
+
+            using var response = await http.SendAsync(request, cancellationToken);
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            reply = PartnerAnswers.ReadCarrierInvoiceReply((int)response.StatusCode, body, CorrelationIdOf(response));
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Unreachable, too slow, or no token to call with: nothing reached Norvia, so nothing was recorded.
+            LogCarrierInvoiceNotSent(exception, persona.Id.Value, invoiceNumber);
+            reply = CarrierInvoiceReply.NotReceived(messageId: null);
+        }
+
+        var keys = CarrierInvoiceTracking.KeysOf(persona, invoiceNumber, reply.MessageId);
+        foreach (var (key, value) in CarrierInvoiceTracking.OutcomeOf(reply.Result))
+        {
+            keys[key] = value;
+        }
+
+        using (logger.BeginScope(keys))
+        {
+            LogCarrierInvoiceReplied(persona.Id.Value, invoiceNumber, reply.Result);
         }
 
         return reply;
@@ -363,6 +409,12 @@ internal sealed partial class NorviaPartnerApiClient(
 
     [LoggerMessage(Level = LogLevel.Information, Message = "The Norvia Partner API replied to a Proof of delivery by Persona {PersonaId} for {CarrierBookingNumber}: {Result}")]
     private partial void LogProofOfDeliveryReplied(string personaId, string carrierBookingNumber, TrackingResult result);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "A Carrier invoice {InvoiceNumber} by Persona {PersonaId} didn't reach the Norvia Partner API")]
+    private partial void LogCarrierInvoiceNotSent(Exception exception, string personaId, string invoiceNumber);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "The Norvia Partner API replied to the Carrier invoice {InvoiceNumber} by Persona {PersonaId}: {Result}")]
+    private partial void LogCarrierInvoiceReplied(string personaId, string invoiceNumber, CarrierInvoiceReplyResult result);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "A tracking query ({Query}) by Persona {PersonaId} got no answer it could read")]
     private partial void LogTrackingQueryFailed(Exception exception, string personaId, string query);

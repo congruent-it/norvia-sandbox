@@ -1,0 +1,255 @@
+@page "/personas/{PersonaId}/draft-invoice"
+@*
+    Interactive like the other pages, and not prerendered, so a button never shows before it works. The draft is built from
+    the Persona's own booking and Tracking records, so it needs no call to Norvia to list the bookings.
+*@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject IPartnerPortal Portal
+@inject NavigationManager Navigation
+@inject ILogger<DraftInvoice> Logger
+@using Ardalis.Result
+@using Norvia.PartnerPortal.Application.CarrierInvoices
+@using Norvia.PartnerPortal.Application.CarrierInvoices.Draft
+@using Norvia.PartnerPortal.Application.CarrierInvoices.Submit
+@using Norvia.PartnerPortal.Domain.CarrierInvoices
+@using Norvia.PartnerPortal.Domain.ShipperInvoices
+@using Norvia.PartnerPortal.Web.ShipperInvoices
+
+<PageTitle>Draft invoice · @(_persona?.DisplayName ?? PersonaId) · Partner portal</PageTitle>
+
+<h1>Draft invoice</h1>
+
+@if (_loadFailed)
+{
+    <div role="alert">
+        <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+            The draft invoice couldn't be loaded. Reload the page to try again.
+        </FluentMessageBar>
+    </div>
+}
+else if (_draft is null)
+{
+    <FluentStack VerticalAlignment="VerticalAlignment.Center" role="status">
+        <FluentProgressRing />
+        <span>Loading the draft invoice…</span>
+    </FluentStack>
+}
+else
+{
+    @if (_notice is not null)
+    {
+        <div role="@(_notice.Intent == MessageIntent.Error || _notice.Intent == MessageIntent.Warning ? "alert" : "status")" class="mb-6 max-w-3xl">
+            <FluentMessageBar Intent="_notice.Intent" AllowDismiss="false">
+                @_notice.Text
+                @if (_notice.MessageId is not null)
+                {
+                    <span class="block mt-2 text-xs">Norvia's ID for this invoice: @_notice.MessageId</span>
+                }
+            </FluentMessageBar>
+        </div>
+    }
+    @if (_failed)
+    {
+        <div role="alert" class="mb-6 max-w-3xl">
+            <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+                The invoice couldn't be sent or kept. Check the invoices page before you send it again.
+            </FluentMessageBar>
+        </div>
+    }
+    @if (_problem is not null)
+    {
+        <div role="alert" class="mb-6 max-w-3xl">
+            <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">@_problem</FluentMessageBar>
+        </div>
+    }
+    @if (_sent?.Invoice is { } sentInvoice)
+    {
+        <section aria-label="Result of invoice @sentInvoice.InvoiceNumber" class="mb-8 max-w-3xl">
+            <h2>Invoice @sentInvoice.InvoiceNumber</h2>
+            <table class="lux-table" aria-label="Lines of @sentInvoice.InvoiceNumber">
+                <thead>
+                    <tr><th>Booking reference</th><th class="text-right">Amount</th><th>Result</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var line in sentInvoice.Lines)
+                    {
+                        <tr>
+                            <td>@line.BookingRef</td>
+                            <td class="text-right">@InvoiceText.Money(line.Amount)</td>
+                            <td>@CarrierInvoiceText.Of(line.Result)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </section>
+    }
+
+    @if (_draft.Lines.Count == 0)
+    {
+        <div role="status">
+            <FluentMessageBar Intent="MessageIntent.Info" AllowDismiss="false">
+                @_persona!.DisplayName has nothing to invoice. Report a Confirmed Shipment Delivered to get a booking to invoice.
+            </FluentMessageBar>
+        </div>
+    }
+    else
+    {
+        <p class="mb-6">
+            The bookings @_persona!.DisplayName has delivered and not invoiced yet, each with the price from its booking request.
+            Select the bookings to invoice and edit an amount to show a mismatch on purpose.
+        </p>
+        <div class="mb-6 grid max-w-3xl gap-4 sm:grid-cols-2">
+            <FluentTextField Label="Invoice number" @bind-Value="_invoiceNumber" Disabled="_sending" />
+            <div>
+                <span class="lux-label">Invoice date</span>
+                <div>@LocalDateText.Of(_draft.InvoiceDate)</div>
+            </div>
+        </div>
+        <table class="lux-table mb-6" aria-label="Bookings to invoice">
+            <thead>
+                <tr>
+                    <th>Invoice</th>
+                    <th>Booking number</th>
+                    <th>Shipment</th>
+                    <th>Your reference</th>
+                    <th class="text-right">Agreed price</th>
+                    <th>Amount to invoice (EUR)</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in _rows)
+                {
+                    <tr>
+                        <td>
+                            <InputCheckbox @bind-Value="row.Selected" disabled="@_sending" aria-label="@($"Invoice {row.Line.BookingRef}")" />
+                        </td>
+                        <td>@row.Line.CarrierBookingNumber</td>
+                        <td>@row.Line.ShipmentNumber</td>
+                        <td>@row.Line.BookingRef</td>
+                        <td class="text-right">@(row.Line.AgreedAmount is { } agreed ? InvoiceText.Money(agreed) : "None")</td>
+                        <td>
+                            <FluentTextField @bind-Value="row.Amount" Disabled="_sending" aria-label="@($"Amount for {row.Line.BookingRef}")" />
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <FluentButton Appearance="Appearance.Accent" Disabled="_sending" OnClick="SubmitAsync">Send invoice</FluentButton>
+    }
+}
+
+@code {
+    private sealed class Row(CarrierInvoiceDraftLine line)
+    {
+        public CarrierInvoiceDraftLine Line { get; } = line;
+
+        public bool Selected { get; set; } = true;
+
+        public string Amount { get; set; } = CarrierInvoiceText.Amount(line.AgreedAmount);
+    }
+
+    private PersonaView? _persona;
+    private CarrierInvoiceDraftView? _draft;
+    private List<Row> _rows = [];
+    private string _invoiceNumber = string.Empty;
+    private bool _loadFailed;
+    private bool _sending;
+    private bool _failed;
+    private string? _problem;
+    private CarrierInvoiceNotice? _notice;
+    private SubmittedCarrierInvoice? _sent;
+
+    [Parameter]
+    public string PersonaId { get; set; } = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _draft = null;
+        try
+        {
+            _persona = PersonaChoice.Find(PersonaId, await Portal.ListPersonasAsync(CancellationToken.None));
+            if (_persona is null || _persona.PartyType != PartyType.Carrier)
+            {
+                Navigation.NotFound();
+                return;
+            }
+
+            await LoadDraftAsync();
+        }
+        catch (Exception exception)
+        {
+            PageLog.DraftInvoiceLoadFailed(Logger, exception, PersonaId);
+            _loadFailed = true;
+        }
+    }
+
+    private async Task LoadDraftAsync()
+    {
+        var draft = await Portal.GetCarrierInvoiceDraftAsync(new PersonaId(PersonaId), CancellationToken.None);
+        if (draft is null)
+        {
+            Navigation.NotFound();
+            return;
+        }
+
+        _draft = draft;
+        _rows = [.. draft.Lines.Select(line => new Row(line))];
+        _invoiceNumber = draft.SuggestedInvoiceNumber;
+    }
+
+    private async Task SubmitAsync()
+    {
+        _notice = null;
+        _failed = false;
+        _problem = null;
+        _sent = null;
+
+        var lines = new List<CarrierInvoiceLineDraft>();
+        foreach (var row in _rows.Where(row => row.Selected))
+        {
+            if (!CarrierInvoiceText.TryParseAmount(row.Amount, out var amount))
+            {
+                _problem = $"The amount for {row.Line.BookingRef} must be a number, such as 1250.00.";
+                return;
+            }
+
+            lines.Add(new CarrierInvoiceLineDraft(row.Line.BookingRef, amount));
+        }
+
+        _sending = true;
+        try
+        {
+            var result = await Portal.SubmitCarrierInvoiceAsync(new PersonaId(PersonaId), _invoiceNumber, _draft!.InvoiceDate, lines, CancellationToken.None);
+            if (result.Status == ResultStatus.NotFound)
+            {
+                Navigation.NotFound();
+                return;
+            }
+
+            if (!result.IsSuccess)
+            {
+                _problem = string.Join(' ', result.ValidationErrors.Select(error => error.ErrorMessage));
+                return;
+            }
+
+            var sent = result.Value;
+            _sent = sent;
+            _notice = CarrierInvoiceText.NoticeOf(sent);
+            // Norvia having the invoice is the end of it: the draft is built again without the bookings just invoiced.
+            if (sent.Reply.Result == CarrierInvoiceReplyResult.Received)
+            {
+                await LoadDraftAsync();
+            }
+        }
+        catch (Exception exception)
+        {
+            // Norvia unreachable is a reply, not this: here the portal itself failed.
+            PageLog.CarrierInvoiceFailed(Logger, exception, PersonaId, _invoiceNumber);
+            _failed = true;
+        }
+        finally
+        {
+            _sending = false;
+        }
+    }
+}
