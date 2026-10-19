@@ -145,7 +145,7 @@ jobs:
             kinds: UnitTests ArchitectureTests IntegrationTests UiTests
           - application: ERP
             directory: Erp
-            kinds: UnitTests ArchitectureTests IntegrationTests
+            kinds: UnitTests ArchitectureTests IntegrationTests UiTests
           - application: Driver app
             directory: DriverApp
             kinds: UnitTests ArchitectureTests IntegrationTests
