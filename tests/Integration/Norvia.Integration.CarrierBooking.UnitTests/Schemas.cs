@@ -13,6 +13,9 @@ internal sealed class Schemas
     private static readonly Lazy<Schemas> CarrierBookingSchema = new(() => Of("PartnerApi/carrier-booking.v1.schema.json"));
     private static readonly Lazy<Schemas> CarrierAnswerSchema = new(() => Of("PartnerApi/carrier-answer.v1.schema.json"));
     private static readonly Lazy<Schemas> CarrierAnswerResponseSchema = new(() => Of("PartnerApi/carrier-answer-response.v1.schema.json"));
+    private static readonly Lazy<Schemas> CarrierInvoiceSchema = new(() => Of("PartnerApi/carrier-invoice.v1.schema.json"));
+    private static readonly Lazy<Schemas> CarrierInvoiceResponseSchema = new(() => Of("PartnerApi/carrier-invoice-response.v1.schema.json"));
+    private static readonly Lazy<Schemas> CarrierInvoiceSubmissionSchema = new(() => Of("CanonicalModel/carrier-invoice-submission.v1.schema.json"));
     private static readonly Lazy<Schemas> CarrierTrackingSchema = new(() => Of("PartnerApi/carrier-tracking.v1.schema.json"));
     private static readonly Lazy<Schemas> CarrierProofOfDeliverySchema = new(() => Of("PartnerApi/carrier-proof-of-delivery.v1.schema.json"));
     private static readonly Lazy<Schemas> ProofOfDeliverySchema = new(() => Of("CanonicalModel/proof-of-delivery.v1.schema.json"));
@@ -55,6 +58,14 @@ internal sealed class Schemas
     public static Schemas CarrierAnswer => CarrierAnswerSchema.Value;
 
     public static Schemas CarrierAnswerResponse => CarrierAnswerResponseSchema.Value;
+
+    /// <summary>The Carrier invoice format, as a Carrier sends it to the Norvia Partner API.</summary>
+    public static Schemas CarrierInvoice => CarrierInvoiceSchema.Value;
+
+    public static Schemas CarrierInvoiceResponse => CarrierInvoiceResponseSchema.Value;
+
+    /// <summary>The Canonical Model's Carrier invoice, as the ERP billing API takes it.</summary>
+    public static Schemas CarrierInvoiceSubmission => CarrierInvoiceSubmissionSchema.Value;
 
     public static Schemas CarrierTracking => CarrierTrackingSchema.Value;
 

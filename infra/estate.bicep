@@ -73,8 +73,8 @@ param partnerPortalBaseUrl string = ''
 Logic App keeps it when the estate is deployed again.''')
 param driverAppBaseUrl string = ''
 
-@description('''The ERP billing API's address, empty before the apps are first deployed. azd's postdeploy hook stores it, so the Billing
-and Carrier cost Logic Apps keep it when the estate is deployed again.''')
+@description('''The ERP billing API's address, empty before the apps are first deployed. azd's postdeploy hook stores it, so the Billing,
+Carrier cost and Carrier invoice Logic Apps keep it when the estate is deployed again.''')
 param erpBaseUrl string = ''
 
 var tags = {
@@ -166,8 +166,28 @@ module answerLogicApp 'estate/answer-logic-app.bicep' = {
     contentKeyVaultName: intakeLogicApp.outputs.keyVaultName
     apiManagementPrincipalId: identities.outputs.apiManagementPrincipalId
     apiManagementClientId: identities.outputs.apiManagementClientId
-    answerTriggerClientId: identities.outputs.answerTriggerClientId
-    answerTriggerAudience: identities.outputs.answerTriggerAudience
+    answerTriggerClientId: identities.outputs.answerTrigger.clientId
+    answerTriggerAudience: identities.outputs.answerTrigger.audience
+    integrationConsolePrincipalId: identities.outputs.integrationConsolePrincipalId
+  }
+}
+
+module carrierInvoiceLogicApp 'estate/carrier-invoice-logic-app.bicep' = {
+  scope: resourceGroup
+  params: {
+    location: location
+    tags: tags
+    integrationRetentionDays: integrationRetentionDays
+    carrierInvoiceIdentityName: identities.outputs.carrierInvoice.identityName
+    erpApiClientId: identities.outputs.erpApiClientId
+    erpBaseUrl: erpBaseUrl
+    applicationInsightsName: monitoring.outputs.applicationInsightsName
+    planName: intakeLogicApp.outputs.planName
+    contentKeyVaultName: intakeLogicApp.outputs.keyVaultName
+    apiManagementPrincipalId: identities.outputs.apiManagementPrincipalId
+    apiManagementClientId: identities.outputs.apiManagementClientId
+    carrierInvoiceTriggerClientId: identities.outputs.carrierInvoice.triggerClientId
+    carrierInvoiceTriggerAudience: identities.outputs.carrierInvoice.triggerAudience
     integrationConsolePrincipalId: identities.outputs.integrationConsolePrincipalId
   }
 }
@@ -398,7 +418,9 @@ module partnerApi 'estate/partner-api.bicep' = {
     intakeLogicAppHostName: intakeLogicApp.outputs.logicAppHostName
     intakeTriggerAudience: identities.outputs.intakeTriggerAudience
     answerLogicAppHostName: answerLogicApp.outputs.logicAppHostName
-    answerTriggerAudience: identities.outputs.answerTriggerAudience
+    answerTriggerAudience: identities.outputs.answerTrigger.audience
+    carrierInvoiceLogicAppHostName: carrierInvoiceLogicApp.outputs.logicAppHostName
+    carrierInvoiceTriggerAudience: identities.outputs.carrierInvoice.triggerAudience
     serviceBusName: messaging.outputs.namespaceName
     trackingQueueName: messaging.outputs.queueName
     proofOfDeliveryQueueName: messaging.outputs.proofOfDeliveryQueueName

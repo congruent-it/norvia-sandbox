@@ -1,0 +1,1 @@
+{ "result": "RECEIVED", "messageId": "1c7b0d3e-5a54-4f6a-9d5f-6a2f3c0d9a11", "invoiceNo": "VDT-2026-0413", "repeated": true, "status": "RECEIVED", "approvedAmount": null, "lines": [ { "bookingRef": "TRX-1001", "amount": 95.00, "result": "PRICE_MISMATCH" } ] }

@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/partner-api/carrier-invoice-response.v1.schema.json",
+  "title": "CarrierInvoiceResponse",
+  "description": "Norvia's answer to a Carrier invoice sent to the Norvia Partner API (version 1). The result says which of the answers it is; each comes with its own HTTP status, listed in the Partner API README. A received invoice carries the result of each line straight away.",
+  "type": "object",
+  "required": ["result", "messageId"],
+  "properties": {
+    "result": { "enum": ["RECEIVED", "INVOICE_NUMBER_USED", "CARRIER_NOT_FOUND", "INVALID", "NOT_RECEIVED"] },
+    "messageId": {
+      "description": "Norvia's ID for this invoice (the correlation ID). Quote it when asking Norvia about the invoice.",
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/received" },
+    { "$ref": "#/$defs/refusal" }
+  ],
+  "$defs": {
+    "received": {
+      "description": "HTTP 201 for the first time, 200 when Norvia already had the same invoice (repeated is then true and nothing was recorded again). Every line has its result. The invoice is APPROVED when every line is MATCHED; otherwise it is RECEIVED and the lines that are not MATCHED wait for Norvia's Finance, which tells the Carrier the outcome later.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result", "messageId", "invoiceNo", "repeated", "status", "approvedAmount", "lines"],
+      "properties": {
+        "result": { "const": "RECEIVED" },
+        "messageId": true,
+        "invoiceNo": { "type": "string", "minLength": 1 },
+        "repeated": { "description": "True when the same invoice was received before.", "type": "boolean" },
+        "status": { "enum": ["RECEIVED", "APPROVED"] },
+        "approvedAmount": { "description": "The sum of the MATCHED amounts once the invoice is APPROVED; null while it is RECEIVED.", "type": ["number", "null"], "multipleOf": 0.01 },
+        "lines": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["bookingRef", "amount", "result"],
+            "properties": {
+              "bookingRef": { "type": "string", "minLength": 1 },
+              "amount": { "description": "What the Carrier claimed for the line.", "type": "number", "multipleOf": 0.01 },
+              "result": {
+                "description": "MATCHED: Norvia agreed the booking and the amount, so the line is accepted. PRICE_MISMATCH: Norvia has the booking but agreed another amount. UNKNOWN_BOOKING: Norvia has no such booking of yours (yet). DUPLICATE: the booking is already invoiced. The lines that are not MATCHED wait for Norvia's Finance.",
+                "enum": ["MATCHED", "PRICE_MISMATCH", "UNKNOWN_BOOKING", "DUPLICATE"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "refusal": {
+      "description": "Norvia did not receive the invoice. INVOICE_NUMBER_USED (HTTP 409): the Carrier used this invoiceNo for different content; send the claim with a new number. CARRIER_NOT_FOUND (HTTP 422): Norvia has no such Carrier. INVALID (HTTP 400): the invoice can't be used; text says why. NOT_RECEIVED (HTTP 502): Norvia could not take the invoice in, so nothing was recorded; send it again.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result", "messageId", "text"],
+      "properties": {
+        "result": { "enum": ["INVOICE_NUMBER_USED", "CARRIER_NOT_FOUND", "INVALID", "NOT_RECEIVED"] },
+        "messageId": true,
+        "invoiceNo": { "type": "string", "minLength": 1 },
+        "text": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

@@ -15,8 +15,9 @@ An app role belongs to the app registration of the API it guards. Each registrat
 | **Norvia Partner API** | `api://<tenant>/norvia-partner-api-<env>` | Any Persona, holding a role or not, so a Carrier Persona calling a Shipper operation gets 403 from API Management, which the demo shows | The [Partner API roles](#partner-api-roles) |
 | **Norvia intake Logic App trigger** | `api://<tenant>/norvia-intake-trigger-<env>` | Only API Management | `TransportOrderIntake.Trigger` |
 | **Norvia Carrier-answer Logic App trigger** | `api://<tenant>/norvia-answer-trigger-<env>` | Only API Management | `CarrierAnswer.Trigger` |
+| **Norvia Carrier invoice Logic App trigger** | `api://<tenant>/norvia-carrier-invoice-trigger-<env>` | Only API Management | `CarrierInvoice.Trigger` |
 
-Both Logic App triggers sit behind Easy Auth, and the workflow's first step refuses a call that Easy Auth didn't authenticate as API Management ([ADR 0020](../adr/0020-only-api-management-may-call-the-intake-logic-app.md)). The other Logic Apps have no HTTP caller: they read a Service Bus subscription or queue.
+The three Logic App triggers sit behind Easy Auth, and the workflow's first step refuses a call that Easy Auth didn't authenticate as API Management ([ADR 0020](../adr/0020-only-api-management-may-call-the-intake-logic-app.md)). The other Logic Apps have no HTTP caller: they read a Service Bus subscription or queue.
 
 ## Managed identities
 
@@ -29,6 +30,7 @@ Both Logic App triggers sit behind Easy Auth, and the workflow's first step refu
 | `shipper-notification` | The Shipper notification Logic App (P7) | `ShipperNotifications.Report` | Receives the `shipper-notification` subscription. Reads each Shipper's endpoint key |
 | `trip-dispatch` | The Trip dispatch Logic App (P11) | `Trips.ReportDelivery` | Receives the `trip-dispatch` subscription. Reads the Driver app's endpoint key |
 | `shipper-invoice` | The Shipper invoice Logic App (E1) | `ShipperInvoices.Report` on the ERP API; nothing on the TMS | Receives the `shipper-invoice` subscription. Reads each Shipper's endpoint key |
+| `carrier-invoice` | The Carrier invoice Logic App (E2) | `CarrierInvoices.Receive` on the ERP billing API; nothing on the TMS | Reads no secret and no queue: API Management calls it |
 | `carrier-cost` | The Carrier cost Logic App (P9, E2) | `CarrierCosts.Record` on the ERP billing API; nothing on the TMS | Receives the `carrier-cost` subscription. Reads no secret |
 | `billing` | The Billing Logic App (E1) | `BillableLines.Record` on the ERP billing API; nothing on the TMS | Receives the `billing` subscription. Reads no secret |
 | `driver-reports` | The Driver reports Logic App (P12) | `Trips.Start`, `Trips.End`, `TrackingEvents.Record` and `ProofsOfDelivery.Record` on the TMS; `DriverReports.ReportOutcome` on the Driver app | Receives the `driver-reports` subscription. Reads and deletes files in the Driver app's transit container |
@@ -36,7 +38,7 @@ Both Logic App triggers sit behind Easy Auth, and the workflow's first step refu
 | `tracking` | The Carrier-tracking Logic App (P5) | `TrackingEvents.Record` | Receives the `carrier-tracking` queue |
 | `proof-of-delivery` | The Carrier Proof of delivery Logic App (P6) | `ProofsOfDelivery.Record` | Receives the `carrier-proof-of-delivery` queue. Reads and deletes blobs in the inbound container |
 | `tms-ui` | The TMS UI | `TransportOrders.Manage` | |
-| `apim` | API Management | `ShipperTracking.Read` | Holds `TransportOrderIntake.Trigger` and `CarrierAnswer.Trigger`. Sends to the `carrier-tracking` and `carrier-proof-of-delivery` queues. Writes blobs in the inbound container. Publishes telemetry to Application Insights |
+| `apim` | API Management | `ShipperTracking.Read` | Holds `TransportOrderIntake.Trigger`, `CarrierAnswer.Trigger` and `CarrierInvoice.Trigger`. Sends to the `carrier-tracking` and `carrier-proof-of-delivery` queues. Writes blobs in the inbound container. Publishes telemetry to Application Insights |
 | `partner-portal` | The Partner portal | | Reads the Persona subscription keys. Each Persona client app trusts it |
 | `simulator` | The Simulator | `TransportOrders.Manage` and `Estate.Reset` on the TMS; `Estate.Reset` on the Driver app; `ShipperInvoices.Manage` on the ERP API | Reads the Persona subscription keys, the Partner portal's reset key and the Shippers' endpoint keys, to read their invoices inboxes. Each Persona client app and each Driver client app trusts it ([ADR 0042](../adr/0042-the-simulator-signs-in-with-easy-auth-reaches-the-estate-as-its-own-identity-and-plays-the-personas-and-drivers-through-entra-client-apps.md)) |
 | `integration-console` | The Integration console | | Reads the Log Analytics workspace. Reads the run history of all seven Logic Apps |
@@ -76,7 +78,7 @@ The ERP billing API validates the token and the role, and takes everything else 
 |---|---|---|---|
 | `BillableLines.Record` | The Billing Logic App's identity (`billing`) | Record a Billable line from `TransportOrderBillable` | [E1](../processes/erp/e1-invoicing.md#erp-api) |
 | `CarrierCosts.Record` | The Carrier cost Logic App's identity | Record a Carrier cost from `CarrierCostIncurred` | [E2](../processes/erp/e2-carrier-invoice-matching.md#erp-api) |
-| `CarrierInvoices.Receive` | The Carrier invoice Logic App's identity | Receive a Carrier invoice and match its lines. The Carrier ID in the body is the one API Management took from the token. The role is defined; the Logic App and its grant follow | [E2](../processes/erp/e2-carrier-invoice-matching.md#erp-api) |
+| `CarrierInvoices.Receive` | The Carrier invoice Logic App's identity | Receive a Carrier invoice and match its lines. The Carrier ID in the body is the one API Management took from the token. | [E2](../processes/erp/e2-carrier-invoice-matching.md#erp-api) |
 | `ShipperInvoices.Report` | The Shipper invoice Logic App's identity (`shipper-invoice`) | Report a Shipper invoice as sent | [E1](../processes/erp/e1-invoicing.md#erp-api) |
 | `ShipperInvoices.Manage` | The Simulator's identity (`simulator`) | Run Invoice now for a Shipper and issue a Credit note on an invoice line, the Finance actions the Simulator plays | [E1](../processes/erp/e1-invoicing.md#erp-api) |
 
@@ -91,6 +93,7 @@ API Management validates the Persona's token for each operation, takes the Shipp
 | `CarrierBookings.Respond` | Carrier Personas | Confirm or reject a Carrier booking | [P4](../processes/tms/p4-carrier-booking.md) |
 | `Tracking.Submit` | Carrier Personas | Report a Tracking event | [P5](../processes/tms/p5-shipment-tracking.md) |
 | `ProofsOfDelivery.Submit` | Carrier Personas | Submit a Proof of delivery with its files | [P6](../processes/tms/p6-proof-of-delivery.md) |
+| `CarrierInvoices.Submit` | Carrier Personas | Send a Carrier invoice and get each line's result. A Shipper Persona gets 403 | [E2](../processes/erp/e2-carrier-invoice-matching.md#carrier-invoice-format) |
 
 The Personas come from [norvia.seed.json](../../seed/norvia.seed.json); each is a client app registration (`norvia-persona-<id>`) with no secret.
 

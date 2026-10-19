@@ -1,0 +1,7 @@
+{
+  "invoiceNo": "VDT-2026-0413",
+  "invoiceDate": "20-10-2026",
+  "lines": [
+    { "bookingRef": "TRX-1001", "amount": 95.00, "description": "Waiting time included" }
+  ]
+}

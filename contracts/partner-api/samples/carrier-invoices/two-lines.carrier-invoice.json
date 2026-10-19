@@ -1,0 +1,8 @@
+{
+  "invoiceNo": "VDT-2026-0412",
+  "invoiceDate": "19-10-2026",
+  "lines": [
+    { "bookingRef": "TRX-998", "amount": 70.50, "description": "Rotterdam to Utrecht, 14 pallets" },
+    { "bookingRef": "TRX-999", "amount": 120.00 }
+  ]
+}

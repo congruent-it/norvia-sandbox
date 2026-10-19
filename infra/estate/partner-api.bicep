@@ -31,6 +31,10 @@ param intakeTriggerAudience string
 param answerLogicAppHostName string
 param answerTriggerAudience string
 
+@description('The Carrier invoice Logic App\'s host name, and the audience of the tokens its Easy Auth accepts.')
+param carrierInvoiceLogicAppHostName string
+param carrierInvoiceTriggerAudience string
+
 @description('The TMS API app registration, the audience of the tokens API Management gets for the TMS, and the TMS API\'s address, empty until the apps are first deployed (the postdeploy hook sets it).')
 param tmsApiClientId string
 param tmsBaseUrl string
@@ -112,6 +116,7 @@ var namedValues = {
   'carriers-by-client-id': carriersByClientId
   'intake-trigger-audience': intakeTriggerAudience
   'answer-trigger-audience': answerTriggerAudience
+  'carrier-invoice-trigger-audience': carrierInvoiceTriggerAudience
   'api-management-identity-client-id': apiManagementIdentity.properties.clientId
   'tms-api-client-id': tmsApiClientId
   'service-bus-namespace': serviceBusName
@@ -123,7 +128,7 @@ var namedValues = {
 
 resource policyValues 'Microsoft.ApiManagement/service/namedValues@2024-05-01' = [
   // The loop runs over the names, which are known before the deployment starts; the values aren't.
-  for name in ['entra-tenant-id', 'partner-api-client-id', 'shippers-by-client-id', 'carriers-by-client-id', 'intake-trigger-audience', 'answer-trigger-audience', 'api-management-identity-client-id', 'tms-api-client-id', 'service-bus-namespace', 'tracking-queue-name', 'proof-of-delivery-queue-name', 'inbound-storage-account', 'inbound-container-name']: {
+  for name in ['entra-tenant-id', 'partner-api-client-id', 'shippers-by-client-id', 'carriers-by-client-id', 'intake-trigger-audience', 'answer-trigger-audience', 'carrier-invoice-trigger-audience', 'api-management-identity-client-id', 'tms-api-client-id', 'service-bus-namespace', 'tracking-queue-name', 'proof-of-delivery-queue-name', 'inbound-storage-account', 'inbound-container-name']: {
     parent: apiManagement
     name: name
     properties: {
@@ -216,6 +221,16 @@ resource answerLogicApp 'Microsoft.ApiManagement/service/backends@2024-05-01' = 
   }
 }
 
+resource carrierInvoiceLogicApp 'Microsoft.ApiManagement/service/backends@2024-05-01' = {
+  parent: apiManagement
+  name: 'carrier-invoice-logic-app'
+  properties: {
+    description: 'The Carrier invoice Logic App (E2.6). The policy names the trigger.'
+    url: 'https://${carrierInvoiceLogicAppHostName}'
+    protocol: 'http'
+  }
+}
+
 // The TMS Shipper tracking API (P8), which the tracking policies query as API Management's identity. Before the apps are first
 // deployed there is no address; the placeholder fails every query with a gateway error, which the policy turns into "temporarily unavailable".
 resource tmsApi 'Microsoft.ApiManagement/service/backends@2024-05-01' = {
@@ -291,6 +306,30 @@ resource answerCarrierBookingPolicy 'Microsoft.ApiManagement/service/apis/operat
   dependsOn: [
     policyValues
     answerLogicApp
+  ]
+}
+
+resource submitCarrierInvoice 'Microsoft.ApiManagement/service/apis/operations@2024-05-01' = {
+  parent: partnerApi
+  name: 'submit-carrier-invoice'
+  properties: {
+    displayName: 'Submit Carrier invoice'
+    description: 'Send a Carrier invoice as a Carrier and get each line\'s result straight away (contracts/partner-api).'
+    method: 'POST'
+    urlTemplate: '/carrier-invoices'
+  }
+}
+
+resource submitCarrierInvoicePolicy 'Microsoft.ApiManagement/service/apis/operations/policies@2024-05-01' = {
+  parent: submitCarrierInvoice
+  name: 'policy'
+  properties: {
+    format: 'rawxml'
+    value: loadTextContent('partner-api/submit-carrier-invoice.policy.xml')
+  }
+  dependsOn: [
+    policyValues
+    carrierInvoiceLogicApp
   ]
 }
 

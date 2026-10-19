@@ -79,7 +79,7 @@ public static class CarrierAnswerResponses
     /// The TMS's answer. Logic Apps passes a body whose content type it doesn't read as JSON, such as the TMS's
     /// <c>application/problem+json</c>, as base64 <c>$content</c>.
     /// </summary>
-    private static JsonNode? TmsAnswer(string tmsResponse)
+    internal static JsonNode? TmsAnswer(string tmsResponse)
     {
         var answer = PartnerFields.Parse(tmsResponse);
         if (new PartnerFields(answer).Text("$content") is not { } content)
