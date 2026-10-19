@@ -72,7 +72,7 @@
                     <dd>@line.DeliveryDate.ToString("yyyy-MM-dd")</dd>
                 </dl>
                 <FluentDataGrid Class="cerulean-table" Items="line.ChargeLines.AsQueryable()" TGridItem="InvoiceChargeLineView" aria-label="@($"Charge lines of {line.TransportOrderNumber}")">
-                    <PropertyColumn Title="Charge line" Property="@(row => row.Type)" />
+                    <PropertyColumn Title="Charge line" Property="@(row => ChargeLineText.Of(row.Type))" />
                     <PropertyColumn Title="Amount without VAT" Property="@(row => Money.Format(row.Amount))" />
                 </FluentDataGrid>
                 <p>Line total without VAT: @Money.Format(line.Total)</p>

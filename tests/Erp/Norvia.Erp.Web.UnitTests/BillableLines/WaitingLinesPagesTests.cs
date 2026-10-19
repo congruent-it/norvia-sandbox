@@ -121,7 +121,7 @@ public sealed class WaitingLinesPagesTests : ErpWebContext
         details.Should().HaveCount(2);
         details[0].Markup.Should().Contain("PO-TO-0000001").And.Contain("SH-0000123").And.Contain("2026-10-17 14:30 +02:00")
             .And.Contain("RC-0001 version 3").And.Contain("intake-1").And.Contain("billing-1")
-            .And.Contain("MinimumChargeAdjustment").And.Contain("€ 5.00").And.NotContain("Released without Proof of delivery.");
+            .And.Contain("Minimum charge adjustment").And.Contain("€ 5.00").And.NotContain("Released without Proof of delivery.");
         details[1].Markup.Should().Contain("Released without Proof of delivery.");
     }
 
