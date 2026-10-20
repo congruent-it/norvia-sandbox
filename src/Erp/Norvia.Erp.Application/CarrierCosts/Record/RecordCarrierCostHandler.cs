@@ -3,9 +3,9 @@ using Ardalis.SharedKernel;
 using Mediator;
 using Norvia.Erp.Application.CarrierInvoices;
 using Norvia.Erp.Application.IntegrationEvents;
-using Norvia.Erp.Domain.Carriers;
 using Norvia.Erp.Domain.CarrierCosts;
 using Norvia.Erp.Domain.CarrierInvoices;
+using Norvia.Erp.Domain.Carriers;
 
 namespace Norvia.Erp.Application.CarrierCosts.Record;
 

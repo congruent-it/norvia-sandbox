@@ -1,8 +1,7 @@
 using Microsoft.Extensions.Options;
 using Norvia.Integration.CarrierBooking;
-using Norvia.Integration.TransportOrderIntake;
-
 using Norvia.Integration.LocalSupport;
+using Norvia.Integration.TransportOrderIntake;
 
 namespace Norvia.Integration.LocalCarrierInvoiceWorker;
 

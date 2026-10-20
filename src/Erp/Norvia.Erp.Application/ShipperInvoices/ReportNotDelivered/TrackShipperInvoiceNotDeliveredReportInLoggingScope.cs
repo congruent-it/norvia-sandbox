@@ -1,8 +1,8 @@
 using Ardalis.Result;
 using Mediator;
-using Norvia.Erp.Application.ShipperInvoices.ReportSent;
 using Microsoft.Extensions.Logging;
 using Norvia.Erp.Application.IntegrationEvents;
+using Norvia.Erp.Application.ShipperInvoices.ReportSent;
 
 namespace Norvia.Erp.Application.ShipperInvoices.ReportNotDelivered;
 
