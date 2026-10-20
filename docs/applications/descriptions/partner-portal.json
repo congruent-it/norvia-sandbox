@@ -1,1 +1,115 @@
-{ "tables": {} }
+{
+  "tables": {
+    "Bookings": {
+      "description": "A booking a Persona sent Norvia through the Norvia Partner API, with Norvia's answer: the outside party's own record of it. Norvia owns the Transport Order (ADR 0002); the portal keeps only what the party sent and heard back, every attempt included (P1).",
+      "columns": {
+        "Id": "The portal's own ID for the attempt.",
+        "Answer": "Norvia's answer as the party got it, as JSON: the result (booked, rejected, not received or refused), the Message ID, the Transport Order number when booked and every reason when rejected.",
+        "PersonaId": "The Shipper Persona that sent the booking.",
+        "SentAt": "When the Persona sent it.",
+        "ShipperReference": "The Shipper's own reference for the booking; null when it sent none, which Norvia rejects."
+      }
+    },
+    "CarrierAnswerSettings": {
+      "description": "How one Carrier Persona answers booking requests, as the presenter chose on its page (P4). A Persona never changed has no row and follows the seed file's default.",
+      "columns": {
+        "Id": "The setting's own ID.",
+        "DelayMilliseconds": "How long an automatic answer waits after the request arrives.",
+        "Mode": "`Manual`, `AutoConfirm` or `AutoReject`.",
+        "PersonaId": "The Carrier Persona; unique, one setting per Persona.",
+        "RejectionReason": "The reason code an automatic rejection carries: `NoCapacity`, `LaneNotServed`, `WindowNotFeasible`, `GoodsNotAccepted`, `PriceNotAccepted` or `Other`."
+      }
+    },
+    "CarrierBookingRequests": {
+      "description": "A request Norvia sent a Carrier Persona to carry a Shipment, in the Carrier's inbox (P4). It stays after the Carrier answers, to carry what became of the booking: its answer, any cancellation by Norvia, and the schedule of automatic Tracking events and Proof of delivery that follow a confirmation (P5, P6).",
+      "columns": {
+        "Id": "The portal's own ID for the request.",
+        "AnswerCorrelationId": "Message trail Norvia gave the answer that closed the request; null while Open or when Norvia never replied.",
+        "AutoAnswerDueAt": "When the automatic answer is due; null for a request answered by hand and once closed.",
+        "AutoAnswerMode": "The answer mode the Persona's policy had when the request arrived, if automatic. It stays the request's whatever the policy becomes.",
+        "AutoAnswerReason": "The rejection reason an automatic rejection carries.",
+        "AutoProgressDelayMilliseconds": "Delay between the automatic Tracking events, if the policy was auto-progress when the Carrier confirmed.",
+        "AutoProgressDueAt": "When the next automatic Tracking event (or, once Delivered, the Proof of delivery) is due; null for a Shipment tracked by hand and once the Proof of delivery has gone.",
+        "CancellationText": "Why Norvia cancelled the confirmed booking; null unless it did.",
+        "CancelledAt": "When Norvia's cancellation arrived; null unless Cancelled.",
+        "CarrierBookingNumber": "Norvia's number for the Carrier booking, the request's key: the same request received again is the one the inbox already has.",
+        "CarrierBookingReference": "The Carrier's own reference for the booking, set when it confirms. It is what the Carrier's tracking events and invoice lines quote.",
+        "ClosedAt": "When the request left Open: answered, or found withdrawn by Norvia.",
+        "CorrelationId": "The release's Message trail, which the request arrived with.",
+        "Details": "What the request asks of the Carrier, as JSON in the Carrier booking format: collection and delivery addresses and windows, the Consignee's name, the goods lines and the Carrier cost Norvia offers. It never names the Shipper.",
+        "LastProgress": "The last progress Tracking event the Persona sent for the Shipment; null until it sends one.",
+        "PersonaId": "The Carrier Persona whose inbox holds the request.",
+        "PlannedCollection": "The collection time the Carrier confirmed.",
+        "ReceivedAt": "When the request reached the inbox.",
+        "RejectionReason": "The reason code the Carrier rejected with.",
+        "RejectionText": "The Carrier's reason text; needed for `Other`.",
+        "ShipmentNumber": "The Shipment to carry (a logical reference to the TMS).",
+        "Status": "`Open`, `Confirmed`, `Rejected`, `WithdrawnByNorvia` or `CancelledByNorvia`."
+      }
+    },
+    "CarrierInvoiceOutcomes": {
+      "description": "What Norvia told a Carrier Persona about an Approved Carrier invoice, through the Persona's invoice outcome endpoint (E2): the approved amount and the result of each line. It stands on its own, not inside CarrierInvoices, because Norvia can tell the outcome of an invoice approved on receipt before the Persona has stored the invoice's own row.",
+      "columns": {
+        "Id": "The portal's own ID for the outcome.",
+        "ApprovedAmount": "The sum of the Matched and Accepted amounts, in EUR without VAT.",
+        "CorrelationId": "The Carrier invoice's Message trail, which the outcome arrived with.",
+        "InvoiceNumber": "The Carrier's own invoice number, the outcome's key: the same outcome told again is stored once.",
+        "Lines": "The result of each line as JSON: the Carrier booking reference, whether it was accepted or rejected, the amount and the reason.",
+        "PersonaId": "The Carrier Persona that was told.",
+        "ReceivedAt": "When the outcome reached the endpoint."
+      }
+    },
+    "CarrierInvoices": {
+      "description": "A Carrier invoice a Carrier Persona sent Norvia through the Norvia Partner API, with how it stands at Norvia (E2). The Carrier's own record of its claim; the ERP owns the invoice once received (ADR 0002).",
+      "columns": {
+        "Id": "The portal's own ID for the invoice.",
+        "ApprovedAmount": "The approved amount in EUR without VAT, once Norvia approved the invoice; null before.",
+        "CorrelationId": "The Message trail the portal gave the submission.",
+        "InvoiceDate": "The date on the invoice.",
+        "InvoiceNumber": "The Carrier's own invoice number; unique per Persona.",
+        "Lines": "The lines as JSON: the Carrier booking reference, the amount claimed, a description and the result Norvia's Matching gave.",
+        "PersonaId": "The Carrier Persona that sent the invoice.",
+        "Status": "Where the invoice stands at Norvia as it last told the Carrier: a line waits for Finance, or every line is decided (Approved).",
+        "SubmittedAt": "When the Persona sent it."
+      }
+    },
+    "CarrierTrackingSettings": {
+      "description": "How one Carrier Persona sends Tracking events for the Shipments it confirmed, as the presenter chose on its page (P5). A Persona never changed has no row and follows the seed file's default.",
+      "columns": {
+        "Id": "The setting's own ID.",
+        "DelayMilliseconds": "The delay between automatic Tracking events.",
+        "Mode": "`Manual` (the presenter sends each event) or `AutoProgress` (Collected, Departed, Out for delivery and Delivered in turn).",
+        "PersonaId": "The Carrier Persona; unique, one setting per Persona."
+      }
+    },
+    "ShipperInvoices": {
+      "description": "An invoice or Credit note Norvia sent a Shipper Persona, in the Shipper's invoices inbox (E1). The Shipper's own copy of what the ERP issued; it only acknowledges and can't reply. The Simulator reads it to check that documents arrive.",
+      "columns": {
+        "Id": "The portal's own ID for the document.",
+        "Content": "The document as JSON, in the Shipper invoice format: invoice or Credit note, dates, lines with charge lines, totals, and for a Credit note the invoice, line and reason it corrects.",
+        "CorrelationId": "The Message trail the document arrived with.",
+        "DocumentNumber": "Norvia's number of the invoice or Credit note, the inbox's key: the same document received again is the one the inbox already has.",
+        "PersonaId": "The Shipper Persona the document was sent to.",
+        "ReceivedAt": "When it reached the inbox."
+      }
+    },
+    "ShipperNotifications": {
+      "description": "A notification Norvia sent a Shipper Persona about an Exception, in the Shipper's inbox (P7). The Shipper can't reply.",
+      "columns": {
+        "Id": "The portal's own ID for the notification.",
+        "Content_BookingRef": "The Shipper's own reference for the booking.",
+        "Content_Contact": "Who at Norvia to contact.",
+        "Content_ExceptionCode": "What went wrong, as a stable code.",
+        "Content_Message": "The message the Planner sent the Shipper.",
+        "Content_TransportOrderNumber": "The Transport Order concerned (a logical reference to the TMS).",
+        "CorrelationId": "The Message trail the notification arrived with.",
+        "DeliverFrom": "Start of the agreed delivery window, local time at the delivery address; null when none was agreed.",
+        "DeliverUntil": "End of the agreed delivery window, local time at the delivery address.",
+        "Eta": "The current ETA, local time at the delivery address; never set together with a delivery window.",
+        "NotificationId": "Norvia's ID of the notification, the inbox's key.",
+        "PersonaId": "The Shipper Persona notified.",
+        "ReceivedAt": "When it reached the inbox."
+      }
+    }
+  }
+}
