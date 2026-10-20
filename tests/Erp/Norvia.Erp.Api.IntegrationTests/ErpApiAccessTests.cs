@@ -16,6 +16,8 @@ public sealed class ErpApiAccessTests(ErpFixture fixture) : ErpTest(fixture)
         { "/v1/shipper-invoices/INV-2026-000001/report-not-delivered", ErpFixture.ReportRole },
         { "/v1/credit-notes/CN-2026-000001/report-sent", ErpFixture.ReportRole },
         { "/v1/credit-notes/CN-2026-000001/report-not-delivered", ErpFixture.ReportRole },
+        { "/v1/carrier-invoices/CAR-0001/VDT-1/lines/BK-1/accept", ErpFixture.ManageCarrierInvoiceRole },
+        { "/v1/carrier-invoices/CAR-0001/VDT-1/lines/BK-1/reject", ErpFixture.ManageCarrierInvoiceRole },
     };
 
     [Theory]
