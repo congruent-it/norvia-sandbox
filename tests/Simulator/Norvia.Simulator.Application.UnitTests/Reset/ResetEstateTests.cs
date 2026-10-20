@@ -45,7 +45,7 @@ public sealed class ResetEstateTests
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Complete.Should().BeTrue();
-        result.Value.Apps.Select(app => app.App).Should().Equal(EstateApp.Tms, EstateApp.PartnerPortal, EstateApp.DriverApp);
+        result.Value.Apps.Select(app => app.App).Should().Equal(EstateApp.Tms, EstateApp.PartnerPortal, EstateApp.DriverApp, EstateApp.Erp);
         result.Value.Simulator.Should().Equal(new DeletedKind("Runs", 2), new DeletedKind("Log lines", 1));
         await _runs.Received(1).DeleteRangeAsync(finished, Arg.Any<CancellationToken>());
         await _log.Received(1).DeleteRangeAsync(lines, Arg.Any<CancellationToken>());
@@ -104,7 +104,7 @@ public sealed class ResetEstateTests
         var readiness = await new GetResetReadinessHandler(reads, _doors).Handle(new GetResetReadinessQuery(), CancellationToken.None);
 
         readiness.RunActive.Should().BeTrue();
-        readiness.Apps.Should().HaveCount(3);
+        readiness.Apps.Should().HaveCount(4);
     }
 }
 

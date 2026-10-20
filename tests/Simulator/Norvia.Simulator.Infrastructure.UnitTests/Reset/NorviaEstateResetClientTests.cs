@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Options;
 using Norvia.Simulator.Application.Reset;
 using Norvia.Simulator.Infrastructure.DriverApi;
+using Norvia.Simulator.Infrastructure.ErpApi;
 using Norvia.Simulator.Infrastructure.Reset;
 using Norvia.Simulator.Infrastructure.TmsApi;
 using Norvia.Simulator.Infrastructure.UnitTests.PartnerApi;
@@ -14,6 +15,7 @@ public sealed class NorviaEstateResetClientTests : IDisposable
     private readonly StubHandler _estate = new();
     private readonly ITmsTokens _tmsTokens = Substitute.For<ITmsTokens>();
     private readonly IDriverTokens _driverTokens = Substitute.For<IDriverTokens>();
+    private readonly IErpTokens _erpTokens = Substitute.For<IErpTokens>();
     private readonly HttpClient _http;
 
     public NorviaEstateResetClientTests()
@@ -21,6 +23,7 @@ public sealed class NorviaEstateResetClientTests : IDisposable
         _http = new HttpClient(_estate);
         _tmsTokens.GetTokenAsync(Arg.Any<CancellationToken>()).Returns("tms-token");
         _driverTokens.GetResetTokenAsync(Arg.Any<CancellationToken>()).Returns("driver-token");
+        _erpTokens.GetTokenAsync(Arg.Any<CancellationToken>()).Returns("erp-token");
     }
 
     public void Dispose()
@@ -29,12 +32,14 @@ public sealed class NorviaEstateResetClientTests : IDisposable
         _estate.Dispose();
     }
 
-    private NorviaEstateResetClient Client(PartnerPortalResetOptions? portal = null) => new(
+    private NorviaEstateResetClient Client(PartnerPortalResetOptions? portal = null, ErpApiOptions? erp = null) => new(
         _http,
         _tmsTokens,
         _driverTokens,
+        _erpTokens,
         Options.Create(new TmsApiOptions { BaseAddress = new Uri("https://tms.example/") }),
         Options.Create(new DriverApiOptions { BaseAddress = new Uri("https://driver.example") }),
+        Options.Create(erp ?? new ErpApiOptions { BaseAddress = new Uri("https://erp.example") }),
         Options.Create(portal ?? new PartnerPortalResetOptions { BaseAddress = new Uri("https://portal.example"), ResetApiKey = "portal-key" }),
         new FakeLogger<NorviaEstateResetClient>());
 
@@ -61,6 +66,29 @@ public sealed class NorviaEstateResetClientTests : IDisposable
         _estate.Request!.RequestUri.Should().Be(new Uri("https://driver.example/v1/reset"));
         _estate.Request.Headers.Authorization!.Parameter.Should().Be("driver-token");
         readiness.BusySubscription.Should().Be("driver-app-events/driver-reports");
+    }
+
+    [Fact]
+    public async Task Check_Erp_AsksTheResetDoorWithTheSimulatorsToken()
+    {
+        _estate.Answer(HttpStatusCode.OK, """{"enabled":true,"busySubscription":"outbox (unpublished events)"}""");
+
+        var readiness = await Client().CheckAsync(EstateApp.Erp, CancellationToken.None);
+
+        _estate.Request!.Method.Should().Be(HttpMethod.Get);
+        _estate.Request.RequestUri.Should().Be(new Uri("https://erp.example/v1/reset"));
+        _estate.Request.Headers.Authorization!.Parameter.Should().Be("erp-token");
+        readiness.Should().Be(new AppReadiness(EstateApp.Erp, Reachable: true, Enabled: true, "outbox (unpublished events)"));
+    }
+
+    [Fact]
+    public async Task Reset_ErpWithoutAnAddress_IsRefusedWithoutCallingIt()
+    {
+        var result = await Client(erp: new ErpApiOptions()).ResetAsync(EstateApp.Erp, CancellationToken.None);
+
+        result.Succeeded.Should().BeFalse();
+        result.Refusal.Should().Be("The Simulator isn't set up to reach the ERP's reset.");
+        _estate.Request.Should().BeNull();
     }
 
     [Fact]

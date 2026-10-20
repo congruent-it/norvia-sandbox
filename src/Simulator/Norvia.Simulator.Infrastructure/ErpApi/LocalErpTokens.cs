@@ -16,6 +16,9 @@ internal sealed class LocalErpTokens(IOptions<ErpApiOptions> options, TimeProvid
     /// <summary>The ERP API's app role for the Finance decisions on Carrier invoice lines the Simulator plays.</summary>
     public const string CarrierInvoicesManageRole = "CarrierInvoices.Manage";
 
+    /// <summary>The ERP API's app role for the reset door.</summary>
+    public const string ResetRole = "Estate.Reset";
+
     private static readonly TimeSpan Lifetime = TimeSpan.FromHours(1);
 
     public Task<string> GetTokenAsync(CancellationToken cancellationToken)
@@ -29,7 +32,7 @@ internal sealed class LocalErpTokens(IOptions<ErpApiOptions> options, TimeProvid
             IssuedAt = now,
             NotBefore = now,
             Expires = now.Add(Lifetime),
-            Claims = new Dictionary<string, object> { ["azp"] = local.ClientId, ["roles"] = new[] { ManageRole, CarrierInvoicesManageRole } },
+            Claims = new Dictionary<string, object> { ["azp"] = local.ClientId, ["roles"] = new[] { ManageRole, CarrierInvoicesManageRole, ResetRole } },
             SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(Convert.FromBase64String(local.SigningKey)), SecurityAlgorithms.HmacSha256),
         }));
     }

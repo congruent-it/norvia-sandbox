@@ -95,6 +95,8 @@ var shipperInvoicesReportRole = 'ShipperInvoices.Report'
 var shipperInvoicesReportRoleId = guid('norvia-erp-api', environmentName, shipperInvoicesReportRole)
 var shipperInvoicesManageRole = 'ShipperInvoices.Manage'
 var shipperInvoicesManageRoleId = guid('norvia-erp-api', environmentName, shipperInvoicesManageRole)
+var erpResetRole = 'Estate.Reset'
+var erpResetRoleId = guid('norvia-erp-api', environmentName, erpResetRole)
 
 // Every active Driver the seed file names is one app role of the Driver app's registration, with the Driver ID as its value.
 var drivers = filter(loadJsonContent('../../seed/norvia.seed.json').drivers, driver => driver.active)
@@ -923,7 +925,7 @@ resource simulatorManageRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
   principalId: simulatorIdentity.properties.principalId
 }
 
-// The Simulator's Reset estate calls the reset door of the TMS API and of the Driver app API (ADR 0039). The roles do nothing until the
+// The Simulator's Reset estate calls the reset door of the TMS API, of the Driver app API and, below, of the ERP API (ADR 0039). The roles do nothing until the
 // estate switches each application's Reset setting on.
 resource simulatorTmsResetRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
   resourceId: tmsApiPrincipal.id
@@ -1174,6 +1176,16 @@ resource erpApi 'Microsoft.Graph/applications@v1.0' = {
       ]
       isEnabled: true
     }
+    {
+      id: erpResetRoleId
+      value: erpResetRole
+      displayName: 'Reset the estate'
+      description: 'Delete the ERP\'s Shipper invoices, Credit notes, Billable lines, Carrier costs and Carrier invoices, for the Simulator\'s Reset estate (ADR 0039). Only the Simulator holds it, and the ERP honours it only while its Reset setting is on.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
   ]
 }
 
@@ -1209,6 +1221,13 @@ resource shipperInvoiceReportRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' 
   resourceId: erpApiPrincipal.id
   appRoleId: shipperInvoicesReportRoleId
   principalId: shipperInvoiceIdentity.properties.principalId
+}
+
+// The Simulator's Reset estate calls the ERP API's reset door too (ADR 0039). The role does nothing until the estate switches the ERP's Reset setting on.
+resource simulatorErpResetRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: erpApiPrincipal.id
+  appRoleId: erpResetRoleId
+  principalId: simulatorIdentity.properties.principalId
 }
 
 // The Simulator plays Finance (E1): Invoice now and a Credit note go to the ERP API as its own identity.

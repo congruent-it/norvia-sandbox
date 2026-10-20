@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Norvia.Erp.Api.BillableLines;
 using Norvia.Erp.Api.CarrierCosts;
 using Norvia.Erp.Api.CarrierInvoices;
+using Norvia.Erp.Api.Reset;
 using Norvia.Erp.Api.ShipperInvoices;
 using Norvia.Erp.Api.Tracking;
 using Norvia.Erp.Application.BillableLines.Record;
@@ -37,6 +38,7 @@ builder.Services.AddScoped<IPipelineBehavior<ReportCreditNoteNotDeliveredCommand
 
 // The ERP API records and answers; a Not delivered report writes its event to the outbox, and the ERP UI's process publishes it, so the API runs no outbox publisher. The ERP UI loads the master data it checks Shippers against.
 builder.AddErpInfrastructure();
+builder.AddErpReset();
 
 // Issuer, audience and keys come from Authentication:Schemes:Bearer: Entra in Azure, the AppHost's local key otherwise.
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -124,6 +126,7 @@ app.MapCarrierCosts();
 app.MapCarrierInvoices();
 app.MapShipperInvoices();
 app.MapCreditNotes();
+app.MapReset();
 
 await app.RunAsync();
 

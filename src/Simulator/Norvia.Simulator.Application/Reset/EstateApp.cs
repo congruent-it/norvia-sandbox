@@ -6,17 +6,19 @@ public enum EstateApp
     Tms,
     PartnerPortal,
     DriverApp,
+    Erp,
 }
 
 public static class EstateApps
 {
-    public static IReadOnlyList<EstateApp> All { get; } = [EstateApp.Tms, EstateApp.PartnerPortal, EstateApp.DriverApp];
+    public static IReadOnlyList<EstateApp> All { get; } = [EstateApp.Tms, EstateApp.PartnerPortal, EstateApp.DriverApp, EstateApp.Erp];
 
     public static string NameOf(EstateApp app) => app switch
     {
         EstateApp.Tms => "TMS",
         EstateApp.PartnerPortal => "Partner portal",
         EstateApp.DriverApp => "Driver app",
+        EstateApp.Erp => "ERP",
         _ => throw new ArgumentOutOfRangeException(nameof(app)),
     };
 }

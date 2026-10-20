@@ -7,12 +7,13 @@ using Microsoft.Extensions.Options;
 using Norvia.Simulator.Application.Ports;
 using Norvia.Simulator.Application.Reset;
 using Norvia.Simulator.Infrastructure.DriverApi;
+using Norvia.Simulator.Infrastructure.ErpApi;
 using Norvia.Simulator.Infrastructure.TmsApi;
 
 namespace Norvia.Simulator.Infrastructure.Reset;
 
 /// <summary>
-/// Calls the reset door of the TMS API and the Driver app API as the Simulator's own identity, and the Partner portal's with its reset key. The doors
+/// Calls the reset door of the TMS API, the Driver app API and the ERP API as the Simulator's own identity, and the Partner portal's with its reset key. The doors
 /// answer in one shape: GET says whether the application would take a reset, POST resets and says what it deleted, or refuses with a problem whose detail
 /// says why.
 /// </summary>
@@ -20,8 +21,10 @@ internal sealed partial class NorviaEstateResetClient(
     HttpClient http,
     ITmsTokens tmsTokens,
     IDriverTokens driverTokens,
+    IErpTokens erpTokens,
     IOptions<TmsApiOptions> tms,
     IOptions<DriverApiOptions> driver,
+    IOptions<ErpApiOptions> erp,
     IOptions<PartnerPortalResetOptions> portal,
     ILogger<NorviaEstateResetClient> logger) : IEstateReset
 {
@@ -95,6 +98,8 @@ internal sealed partial class NorviaEstateResetClient(
                 return Bearer(method, new Uri(Join(tms.Value.BaseAddress!, "v1/reset")), await tmsTokens.GetTokenAsync(cancellationToken));
             case EstateApp.DriverApp:
                 return Bearer(method, new Uri(Join(driver.Value.BaseAddress!, "v1/reset")), await driverTokens.GetResetTokenAsync(cancellationToken));
+            case EstateApp.Erp when erp.Value.BaseAddress is not null:
+                return Bearer(method, new Uri(Join(erp.Value.BaseAddress!, "v1/reset")), await erpTokens.GetTokenAsync(cancellationToken));
             case EstateApp.PartnerPortal when portal.Value.IsConfigured:
                 var request = new HttpRequestMessage(method, new Uri(Join(portal.Value.BaseAddress!, "reset/v1")));
                 request.Headers.Add(ApiKeyHeader, portal.Value.ResetApiKey);

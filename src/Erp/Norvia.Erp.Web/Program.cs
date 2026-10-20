@@ -12,6 +12,7 @@ builder.AddServiceDefaults();
 
 // The ERP keeps its own database and outbox, and loads its master data from the seed file as it starts. Only Finance reaches its UI.
 builder.AddErpInfrastructure();
+builder.AddErpResetUnavailable();
 builder.AddErpSeedLoading();
 builder.AddErpOutboxPublisher();
 builder.AddFinanceSignIn();

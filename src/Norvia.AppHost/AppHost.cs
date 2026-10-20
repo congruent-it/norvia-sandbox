@@ -121,7 +121,7 @@ var erpWeb = builder.AddProject<Projects.Norvia_Erp_Web>("erp-web")
     .WithUrlForEndpoint("http", url => url.DisplayText = "ERP");
 
 // The ERP billing API records the Billable lines the Billing Logic App hands over (E1). The ERP UI loads the master data it checks Shippers
-// against, so the API waits for it; it publishes nothing yet, so it needs no Service Bus.
+// against, so the API waits for it; it publishes nothing, and reaches Service Bus only to peek the subscriptions a reset waits on (ADR 0039).
 var erpApi = builder.AddProject<Projects.Norvia_Erp_Api>("erp-api")
     .WithReference(erpDatabase).WaitForCompletion(erpMigrations)
     .WaitFor(erpWeb)
@@ -174,6 +174,20 @@ tmsApi.WithEnvironment("Reset__QuietSubscriptions__0", "shipment-events/carrier-
     .WithEnvironment("Reset__QuietSubscriptions__2", "shipment-events/carrier-cancellation")
     .WithEnvironment("Reset__QuietSubscriptions__3", "trip-events/trip-dispatch");
 driverAppApi.WithEnvironment("Reset__QuietSubscriptions__0", "driver-app-events/driver-reports");
+// The ERP API waits for every subscription whose consumer records into the ERP (Billing, Carrier cost, the Shipper invoice report and the Carrier invoice
+// outcome report), and for its own outbox. Locally the Edge topics are in a namespace of their own, which the entry names; in Azure they are all in `messaging`.
+var edgeNamespace = builder.ExecutionContext.IsPublishMode ? "" : "messaging-edge/";
+erpApi.WithReference(messaging, "messaging").WaitFor(messaging)
+    .WithRoleAssignments(messaging, ServiceBusBuiltInRole.AzureServiceBusDataReceiver)
+    .WithEnvironment("Reset__QuietSubscriptions__0", "transport-order-events/billing")
+    .WithEnvironment("Reset__QuietSubscriptions__1", "shipment-events/carrier-cost")
+    .WithEnvironment("Reset__QuietSubscriptions__2", $"{edgeNamespace}invoicing-events/shipper-invoice")
+    .WithEnvironment("Reset__QuietSubscriptions__3", $"{edgeNamespace}invoicing-events/carrier-invoice-outcome");
+if (!builder.ExecutionContext.IsPublishMode)
+{
+    erpApi.WithReference(messagingEdge, "messaging-edge").WaitFor(messagingEdge);
+}
+
 simulator.WithEnvironment("PartnerPortal__BaseAddress", partnerPortal.GetEndpoint("http"));
 
 if (builder.ExecutionContext.IsPublishMode)
@@ -362,6 +376,7 @@ if (builder.ExecutionContext.IsPublishMode)
     // The estate switches the reset on (resetEnabled, off by default). The Partner portal and the Simulator share a key from the portal's vault.
     tmsApi.WithEnvironment("Reset__Enabled", estate.ResetEnabled);
     driverAppApi.WithEnvironment("Reset__Enabled", estate.ResetEnabled);
+    erpApi.WithEnvironment("Reset__Enabled", estate.ResetEnabled);
     partnerPortal.WithEnvironment("Reset__Enabled", estate.ResetEnabled)
         .WithEnvironment("ResetEndpoint__ApiKey", partnerPortalSecrets.Resource.GetSecret("reset-endpoint-key"));
     simulator.WithEnvironment("PartnerPortal__ResetApiKey", partnerPortalSecrets.Resource.GetSecret("reset-endpoint-key"));
@@ -679,6 +694,7 @@ else
     var resetApiKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
     tmsApi.WithEnvironment("Reset__Enabled", "true");
     driverAppApi.WithEnvironment("Reset__Enabled", "true");
+    erpApi.WithEnvironment("Reset__Enabled", "true");
     partnerPortal.WithEnvironment("Reset__Enabled", "true")
         .WithEnvironment("ResetEndpoint__ApiKey", resetApiKey);
     simulator.WithEnvironment("PartnerPortal__ResetApiKey", resetApiKey);

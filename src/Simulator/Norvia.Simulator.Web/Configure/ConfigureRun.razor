@@ -188,7 +188,7 @@ else
     <h2>Reset estate</h2>
     <p class="text-muted">
         Clear history removes only the Simulator's own runs and logs. Reset estate returns the whole estate to a clean sheet, so the next demo starts from nothing:
-        what a run or a person created is deleted, whoever created it, in the TMS, the Partner portal, the Driver app and here.
+        what a run or a person created is deleted, whoever created it, in the TMS, the Partner portal, the Driver app, the ERP and here.
     </p>
     @if (_resetReason is not null)
     {
@@ -205,6 +205,7 @@ else
                     <li>In the TMS: every Transport Order, Shipment, Trip, Exception, Carrier booking, Tracking event, Proof of delivery and Message, and the Planner's changes to Rosters, Absences and Off the road days.</li>
                     <li>In the Partner portal: every booking, Carrier booking request and notification, and the Personas' answer and tracking modes.</li>
                     <li>In the Driver app: every Trip and Driver report.</li>
+                    <li>In the ERP: every Shipper invoice, Credit note, Billable line, Carrier cost and Carrier invoice with its line decisions, and the invoice number sequences.</li>
                     <li>In the Simulator: every run and log line. The next run is number 1, with the Shipper references <code>SIM-1-1</code>, <code>SIM-1-2</code> and so on.</li>
                 </ul>
                 <p>The Shippers, Carriers, Drivers, Vehicles, Rate Cards and Personas stay.</p>

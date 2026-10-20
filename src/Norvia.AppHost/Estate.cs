@@ -128,7 +128,7 @@ public sealed class Estate(IDistributedApplicationBuilder builder)
     /// <summary>Whether the Simulator does anything (<c>Simulator:Enabled</c>): the estate decides.</summary>
     public IResourceBuilder<ParameterResource> SimulatorEnabled { get; } = builder.AddParameter("estate-simulator-enabled");
 
-    /// <summary>Whether the TMS API, the Partner portal and the Driver app API take the Simulator's Reset estate (<c>Reset:Enabled</c>): the estate decides, and off by default.</summary>
+    /// <summary>Whether the TMS API, the Partner portal, the Driver app API and the ERP API take the Simulator's Reset estate (<c>Reset:Enabled</c>): the estate decides, and off by default.</summary>
     public IResourceBuilder<ParameterResource> ResetEnabled { get; } = builder.AddParameter("estate-reset-enabled");
 
     /// <summary>The hard cap on the orders of a Simulation run (<c>Simulator:MaxOrdersPerRun</c>).</summary>

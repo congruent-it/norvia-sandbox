@@ -104,7 +104,8 @@
  */
 body .fluent-messagebar.intent-error:not(.light),
 body .fluent-messagebar.intent-warning:not(.light),
-body .fluent-messagebar.intent-info:not(.light) {
+body .fluent-messagebar.intent-info:not(.light),
+body .fluent-messagebar.intent-success:not(.light) {
     padding: 0.75rem 1rem;
     border: none;
     border-radius: var(--radius-darkly);
@@ -128,9 +129,15 @@ body .fluent-messagebar.intent-info:not(.light) {
     background-color: var(--color-info);
 }
 
+body .fluent-messagebar.dark.intent-success:not(.light),
+body .fluent-messagebar.intent-success:not(.light) {
+    background-color: var(--color-success);
+}
+
 body .fluent-messagebar.intent-error:not(.light) svg,
 body .fluent-messagebar.intent-warning:not(.light) svg,
-body .fluent-messagebar.intent-info:not(.light) svg {
+body .fluent-messagebar.intent-info:not(.light) svg,
+body .fluent-messagebar.intent-success:not(.light) svg {
     fill: #fff !important;
 }
 
