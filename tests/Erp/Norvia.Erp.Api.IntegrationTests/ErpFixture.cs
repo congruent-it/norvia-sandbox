@@ -41,6 +41,15 @@ public sealed class ErpFixture : IAsyncLifetime
     /// <summary>The app role only the Shipper invoice Logic App's managed identity holds.</summary>
     public const string ReportRole = "ShipperInvoices.Report";
 
+    /// <summary>The app role only the Carrier cost Logic App's managed identity holds.</summary>
+    public const string RecordCarrierCostRole = "CarrierCosts.Record";
+
+    /// <summary>The app role only the Carrier invoice Logic App's managed identity holds, for the Carrier invoices it receives.</summary>
+    public const string ReceiveCarrierInvoiceRole = "CarrierInvoices.Receive";
+
+    /// <summary>The app role only the Simulator's identity holds, for the Finance decisions on Carrier invoice lines it plays.</summary>
+    public const string ManageCarrierInvoiceRole = "CarrierInvoices.Manage";
+
     /// <summary>How often the ERP's outbox looks for a message to publish; quick, so tests don't wait for it.</summary>
     private static readonly TimeSpan OutboxPollingInterval = TimeSpan.FromMilliseconds(50);
 
@@ -150,7 +159,7 @@ public sealed class ErpFixture : IAsyncLifetime
         // Whatever the last test left unpublished goes out first, so it doesn't arrive in this test.
         await WaitUntilAsync(async () => await ScalarAsync(connection, "SELECT COUNT(*) FROM OutboxMessages WHERE PublishedAt IS NULL", cancellationToken) == 0, cancellationToken);
 
-        foreach (var table in new[] { "CreditNotes", "ShipperInvoices", "BillableLines", "CreditNoteNumberSequences", "InvoiceNumberSequences", "OutboxMessages" })
+        foreach (var table in new[] { "CarrierInvoices", "CarrierCosts", "CreditNotes", "ShipperInvoices", "BillableLines", "CreditNoteNumberSequences", "InvoiceNumberSequences", "OutboxMessages" })
         {
             await using var delete = connection.CreateCommand();
             delete.CommandText = $"DELETE FROM {table}";
