@@ -10,7 +10,7 @@
 @inject NavigationManager Navigation
 @implements IDisposable
 
-<PageTitle>Configure · Simulator</PageTitle>
+<PageTitle>Simulator · Configure</PageTitle>
 
 <h1>Configure a run</h1>
 <p class="text-muted">
@@ -116,10 +116,12 @@ else
                 </div>
             </FluentAccordionItem>
             <FluentAccordionItem Heading="Finance and invoicing" Expanded="true">
-                <p class="text-muted mb-4 text-sm">Once the deliveries are in, Finance runs Invoice now in the ERP and credits part of a line. The invoices reach the Shippers' inboxes.</p>
+                <p class="text-muted mb-4 text-sm">Once the deliveries are in, Finance runs Invoice now in the ERP and credits part of a line. The invoices reach the Shippers' inboxes. Each Carrier that delivered sends its invoice, and Finance decides the lines Norvia couldn't match.</p>
                 <div class="grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-4 [&_fluent-number-field]:w-full [&_fluent-select]:w-full [&_fluent-select]:min-w-0">
                 <div class="flex flex-col gap-1"><FluentNumberField TValue="int" @bind-Value="_form.InvoicePercent" Label="Shippers invoiced (%)" Min="0" Max="100" /></div>
                 <div class="flex flex-col gap-1"><FluentNumberField TValue="int" @bind-Value="_form.CreditNotePercent" Label="Invoices credited in part (%)" Min="0" Max="100" /></div>
+                <div class="flex flex-col gap-1"><FluentNumberField TValue="int" @bind-Value="_form.EditedCarrierInvoicePercent" Label="Carrier invoices with an edited amount (%)" Min="0" Max="100" /></div>
+                <div class="flex flex-col gap-1"><FluentNumberField TValue="int" @bind-Value="_form.RejectedCarrierLinePercent" Label="Carrier invoice lines rejected (%)" Min="0" Max="100" /></div>
                 </div>
             </FluentAccordionItem>
             <FluentAccordionItem Heading="How it is sent" Expanded="true">

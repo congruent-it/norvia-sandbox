@@ -109,7 +109,7 @@ internal sealed class FleetRun
         };
 
     public ExecuteRunHandler Handler() => new(
-        Runs, Log, Partner, Tms, World, new SimulationLimits(50, 3), Time, new CarrierPacing(TimeSpan.Zero, 1), Drivers, new DriverPacing(TimeSpan.Zero, 2), Erp, Inbox);
+        Runs, Log, Partner, Tms, World, new SimulationLimits(50, 3), Time, new CarrierPacing(TimeSpan.Zero, 1), Drivers, new DriverPacing(TimeSpan.Zero, 2), Erp, Inbox, Substitute.For<ICarrierInbox>());
 
     public async Task<SimulationRun> RunAsync(SimulationSettings settings, CancellationTokenSource? stop = null)
     {

@@ -79,6 +79,12 @@ public sealed class RunForm : IValidatableObject
     [Range(0, 100, ErrorMessage = "The share of invoices Finance credits is a percentage from 0 to 100.")]
     public int CreditNotePercent { get; set; } = InvoicingShares.DefaultCreditNotePercent;
 
+    [Range(0, 100, ErrorMessage = "The share of Carrier invoices with an edited amount is a percentage from 0 to 100.")]
+    public int EditedCarrierInvoicePercent { get; set; } = InvoicingShares.DefaultEditedCarrierInvoicePercent;
+
+    [Range(0, 100, ErrorMessage = "The share of Carrier invoice lines Finance rejects is a percentage from 0 to 100.")]
+    public int RejectedCarrierLinePercent { get; set; } = InvoicingShares.DefaultRejectedCarrierLinePercent;
+
     public string Mode { get; set; } = nameof(RunMode.Burst);
 
     [Range(1, SimulationSettings.MaxWindowMinutes, ErrorMessage = "A paced run is spread over 1 to 240 minutes.")]
@@ -100,7 +106,7 @@ public sealed class RunForm : IValidatableObject
         Carriers = new CarrierShares(
             ReleasePercent, ConfirmPercent, DeclinePercent, TrackedPercent, ExceptionPercent, DeliveredPercent, ProofOfDeliveryPercent, CancelPercent),
         Drivers = new DriverShares(CollectionFailedPercent, DeliveryFailedPercent, DamagedPercent, ReservationsPercent),
-        Invoicing = new InvoicingShares(InvoicePercent, CreditNotePercent),
+        Invoicing = new InvoicingShares(InvoicePercent, CreditNotePercent, EditedCarrierInvoicePercent, RejectedCarrierLinePercent),
     };
 
     public void Fill(Preset preset)
@@ -131,6 +137,8 @@ public sealed class RunForm : IValidatableObject
         var invoicing = preset.Invoicing ?? new InvoicingShares();
         InvoicePercent = invoicing.InvoicePercent;
         CreditNotePercent = invoicing.CreditNotePercent;
+        EditedCarrierInvoicePercent = invoicing.EditedCarrierInvoicePercent;
+        RejectedCarrierLinePercent = invoicing.RejectedCarrierLinePercent;
         Mode = preset.Mode.ToString();
         WindowMinutes = preset.Mode == RunMode.Paced ? (int)preset.Window.TotalMinutes : WindowMinutes;
     }
@@ -163,6 +171,8 @@ public sealed class RunForm : IValidatableObject
         ReservationsPercent = settings.Drivers.ReservationsPercent;
         InvoicePercent = settings.Invoicing.InvoicePercent;
         CreditNotePercent = settings.Invoicing.CreditNotePercent;
+        EditedCarrierInvoicePercent = settings.Invoicing.EditedCarrierInvoicePercent;
+        RejectedCarrierLinePercent = settings.Invoicing.RejectedCarrierLinePercent;
         Mode = settings.Mode.ToString();
         WindowMinutes = settings.Mode == RunMode.Paced ? (int)settings.Window.TotalMinutes : WindowMinutes;
         Seed = settings.Seed;

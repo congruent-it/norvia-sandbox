@@ -56,12 +56,45 @@ internal static class CarrierAnswers
         };
     }
 
+    /// <summary>Norvia's answer to a Carrier invoice: received with each line's result (201, or 200 for a repeat), refused with its code, or not received.</summary>
+    public static CarrierInvoiceAnswer Invoiced(int statusCode, string body, string? correlationHeader)
+    {
+        var json = Parse(body);
+        var correlationId = Text(json, "messageId") ?? correlationHeader;
+        var result = Text(json, "result");
+
+        if (statusCode is 200 or 201 && result == "RECEIVED" && json?["lines"] is JsonArray lines && lines.Count > 0)
+        {
+            return new CarrierInvoiceAnswer(
+                LogOutcome.CarrierInvoiced, correlationId, Text(json, "status"),
+                [.. lines.OfType<JsonObject>().Select(line => new CarrierInvoiceLineAnswer(Text(line, "bookingRef") ?? string.Empty, Amount(line, "amount"), Text(line, "result") ?? string.Empty))], null);
+        }
+
+        if (result == "NOT_RECEIVED")
+        {
+            return new CarrierInvoiceAnswer(LogOutcome.CarrierNotReceived, correlationId, null, [], Code(result, statusCode));
+        }
+
+        if (result is not null && statusCode is >= 400 and < 500)
+        {
+            return new CarrierInvoiceAnswer(LogOutcome.CarrierRefused, correlationId, null, [], Code(result, statusCode));
+        }
+
+        return statusCode is 401 or 403 && json is not null
+            ? new CarrierInvoiceAnswer(LogOutcome.CarrierRefused, correlationId, null, [], $"Refused at the edge ({statusCode})")
+            : new CarrierInvoiceAnswer(LogOutcome.CarrierNotReceived, correlationId, null, [], $"Norvia answered {statusCode} without an answer to the invoice.");
+    }
+
+    public static CarrierInvoiceAnswer InvoiceNotReceived(string detail) => new(LogOutcome.CarrierNotReceived, null, null, [], detail);
+
     public static CarrierCallAnswer NotReceived(string detail) => new(LogOutcome.CarrierNotReceived, null, detail);
 
     private static CarrierCallAnswer NotReceived(string? correlationId, int statusCode) =>
         new(LogOutcome.CarrierNotReceived, correlationId, $"Norvia answered {statusCode} without an answer to the call.");
 
     private static string Code(string result, int statusCode) => string.Create(CultureInfo.InvariantCulture, $"{result} ({statusCode})");
+
+    private static decimal Amount(JsonObject json, string name) => json[name] is JsonValue value && value.TryGetValue<decimal>(out var amount) ? amount : 0m;
 
     private static string? Text(JsonObject? json, string name) =>
         json?[name] is JsonValue value && value.TryGetValue<string>(out var text) && !string.IsNullOrWhiteSpace(text) ? text : null;

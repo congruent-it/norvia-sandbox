@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 using Norvia.Simulator.Application.Ports;
 using Norvia.Simulator.Application.Runs.Execute;
 using Norvia.Simulator.Domain.Runs;
+using Norvia.Simulator.Infrastructure.CarrierInbox;
 using Norvia.Simulator.Infrastructure.Data;
 using Norvia.Simulator.Infrastructure.DriverApi;
 using Norvia.Simulator.Infrastructure.ErpApi;
@@ -67,6 +68,7 @@ public static class DependencyInjection
         builder.AddNorviaDriverApp();
         builder.AddNorviaErpApi();
         builder.AddShipperInbox();
+        builder.Services.AddHttpClient<ICarrierInbox, PartnerPortalCarrierInbox>();
 
         builder.AddEstateReset();
 

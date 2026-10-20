@@ -65,6 +65,7 @@ app.MapPersonaSwitcher();
 app.MapCarrierBookingEndpoint();
 app.MapCarrierCancellationEndpoint();
 app.MapCarrierInvoiceOutcomeEndpoint();
+app.MapCarrierInboxEndpoints();
 app.MapShipperNotificationEndpoint();
 app.MapShipperInvoiceEndpoint();
 app.MapShipperInboxEndpoint();

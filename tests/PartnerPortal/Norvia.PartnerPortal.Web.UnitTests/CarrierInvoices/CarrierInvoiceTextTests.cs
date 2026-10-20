@@ -112,4 +112,13 @@ public sealed class CarrierInvoiceTextTests
         notice.Intent.Should().Be(MessageIntent.Error);
         notice.Text.Should().Be("No key.");
     }
+
+    [Fact]
+    public void OnReceiptAndClaimed_AnInvoiceThePortalNeverSaw_ShowADash()
+    {
+        CarrierInvoiceText.OnReceipt(null).Should().Be("—");
+        CarrierInvoiceText.Claimed(null).Should().Be("—");
+        CarrierInvoiceText.OnReceipt(CarrierInvoiceLineResult.PriceMismatch).Should().Be("Price mismatch");
+        CarrierInvoiceText.Claimed(95m).Should().Be("€ 95.00");
+    }
 }

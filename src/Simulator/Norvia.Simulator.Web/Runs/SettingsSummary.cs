@@ -46,6 +46,8 @@ public static class SettingsSummary
         [
             ("Shippers invoiced (%)", Percent(settings.Invoicing.InvoicePercent)),
             ("Invoices credited in part (%)", Percent(settings.Invoicing.CreditNotePercent)),
+            ("Carrier invoices with an edited amount (%)", Percent(settings.Invoicing.EditedCarrierInvoicePercent)),
+            ("Carrier invoice lines rejected (%)", Percent(settings.Invoicing.RejectedCarrierLinePercent)),
         ]),
         new("How it is sent",
         [

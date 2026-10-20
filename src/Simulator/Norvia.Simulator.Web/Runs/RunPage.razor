@@ -15,7 +15,7 @@
 @inject IJSRuntime Js
 @implements IDisposable
 
-<PageTitle>Run @_run?.Run.Number · Simulator</PageTitle>
+<PageTitle>Simulator · Run @_run?.Run.Number</PageTitle>
 
 @if (_failed)
 {
@@ -237,7 +237,7 @@ else
     {
         LogOutcome.Rejected or LogOutcome.Refused or LogOutcome.NotReceived or LogOutcome.PlanningRefused or LogOutcome.PlanningNotReceived or LogOutcome.CarrierRefused or LogOutcome.CarrierNotReceived or LogOutcome.DriverRefused or LogOutcome.DriverNotReceived or LogOutcome.InvoicingRefused or LogOutcome.InvoicingNotReceived => "font-bold text-danger",
         LogOutcome.AlreadyBooked or LogOutcome.Declined or LogOutcome.NoAnswer or LogOutcome.ExceptionFound or LogOutcome.NothingToInvoice => "text-warning",
-        LogOutcome.Accepted or LogOutcome.Planned or LogOutcome.Reassigned or LogOutcome.Released or LogOutcome.Confirmed or LogOutcome.TrackingSent or LogOutcome.ProofOfDeliverySent or LogOutcome.BookingCancelled or LogOutcome.ExceptionResolved or LogOutcome.TripBuilt or LogOutcome.TripDispatched or LogOutcome.DriverReported or LogOutcome.TripCompleted or LogOutcome.InvoiceIssued or LogOutcome.CreditNoteIssued or LogOutcome.InboxReceived => "text-success",
+        LogOutcome.Accepted or LogOutcome.Planned or LogOutcome.Reassigned or LogOutcome.Released or LogOutcome.Confirmed or LogOutcome.TrackingSent or LogOutcome.ProofOfDeliverySent or LogOutcome.BookingCancelled or LogOutcome.ExceptionResolved or LogOutcome.TripBuilt or LogOutcome.TripDispatched or LogOutcome.DriverReported or LogOutcome.TripCompleted or LogOutcome.InvoiceIssued or LogOutcome.CreditNoteIssued or LogOutcome.InboxReceived or LogOutcome.CarrierInvoiced or LogOutcome.LineAccepted or LogOutcome.LineRejected or LogOutcome.OutcomeReceived => "text-success",
         _ => "text-muted",
     };
 

@@ -83,16 +83,58 @@ internal sealed partial class NorviaErpApiClient(
         return answer;
     }
 
+    public Task<LineDecisionAnswer> AcceptCarrierInvoiceLineAsync(
+        string carrierId, string invoiceNumber, string bookingReference, decimal? adjustedAmount, string? remark, CancellationToken cancellationToken) =>
+        DecideLineAsync(
+            InvoicingActions.AcceptCarrierInvoiceLine, carrierId, invoiceNumber, bookingReference, "accept", new { AdjustedAmount = adjustedAmount, Remark = remark }, LogOutcome.LineAccepted,
+            cancellationToken);
+
+    public Task<LineDecisionAnswer> RejectCarrierInvoiceLineAsync(string carrierId, string invoiceNumber, string bookingReference, string reason, CancellationToken cancellationToken) =>
+        DecideLineAsync(
+            InvoicingActions.RejectCarrierInvoiceLine, carrierId, invoiceNumber, bookingReference, "reject", new { Reason = reason }, LogOutcome.LineRejected, cancellationToken);
+
+    // A decision can't be decided twice (the ERP refuses it as already decided), so like a Credit note it is never retried by the client.
+    private async Task<LineDecisionAnswer> DecideLineAsync(
+        string action, string carrierId, string invoiceNumber, string bookingReference, string decision, object body, LogOutcome success, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(carrierId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(invoiceNumber);
+        ArgumentException.ThrowIfNullOrWhiteSpace(bookingReference);
+
+        using var span = activities.Source.StartActivity(action, ActivityKind.Internal);
+        LineDecisionAnswer answer;
+        try
+        {
+            var path = $"/v1/carrier-invoices/{Uri.EscapeDataString(carrierId)}/{Uri.EscapeDataString(invoiceNumber)}/lines/{Uri.EscapeDataString(bookingReference)}/{decision}";
+            using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(path, UriKind.Relative)) { Content = JsonContent.Create(body) };
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await tokens.GetTokenAsync(cancellationToken));
+            using var response = await http.SendAsync(request, cancellationToken);
+            answer = ErpAnswers.LineDecision((int)response.StatusCode, await response.Content.ReadAsStringAsync(cancellationToken), success);
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            LogNotSent(exception, action);
+            answer = ErpAnswers.LineDecisionNotReceived("The call didn't reach the ERP API.");
+        }
+
+        using (logger.BeginScope(TrackingKeysOf(answer.Outcome, answer.CorrelationId, invoiceNumber, answer.Detail, carrierId, "carrier-invoice")))
+        {
+            LogAnswered(action, answer.Outcome);
+        }
+
+        return answer;
+    }
+
     /// <summary>
     /// The tracking contract's keys the Simulator knows (coding guidelines §7), so its trace joins the ERP's Message trail. A key that doesn't apply is left
     /// out, never sent empty.
     /// </summary>
-    internal static Dictionary<string, object?> TrackingKeysOf(LogOutcome outcome, string? correlationId, string? documentNumber, string? detail, string? shipperId)
+    internal static Dictionary<string, object?> TrackingKeysOf(LogOutcome outcome, string? correlationId, string? documentNumber, string? detail, string? shipperId, string flow = FlowName)
     {
-        var keys = new Dictionary<string, object?> { ["flow"] = FlowName };
+        var keys = new Dictionary<string, object?> { ["flow"] = flow };
         switch (outcome)
         {
-            case LogOutcome.InvoiceIssued or LogOutcome.CreditNoteIssued or LogOutcome.NothingToInvoice:
+            case LogOutcome.InvoiceIssued or LogOutcome.CreditNoteIssued or LogOutcome.NothingToInvoice or LogOutcome.LineAccepted or LogOutcome.LineRejected:
                 keys["outcome"] = "Succeeded";
                 break;
             case LogOutcome.InvoicingRefused:

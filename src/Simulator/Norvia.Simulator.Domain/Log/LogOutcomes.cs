@@ -24,5 +24,6 @@ public static class LogOutcomes
     public static IReadOnlyList<LogOutcome> Invoicing { get; } =
     [
         LogOutcome.InvoiceIssued, LogOutcome.NothingToInvoice, LogOutcome.CreditNoteIssued, LogOutcome.InvoicingRefused, LogOutcome.InvoicingNotReceived, LogOutcome.InboxReceived,
+        LogOutcome.CarrierInvoiced, LogOutcome.LineAccepted, LogOutcome.LineRejected, LogOutcome.OutcomeReceived,
     ];
 }

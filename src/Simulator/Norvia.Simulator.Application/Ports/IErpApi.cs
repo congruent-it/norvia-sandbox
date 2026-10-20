@@ -11,4 +11,13 @@ public interface IErpApi
 
     /// <summary>Issues a Credit note on one line of an issued invoice, for an amount without VAT.</summary>
     Task<CreditNoteAnswer> IssueCreditNoteAsync(string invoiceNumber, string transportOrderNumber, decimal amountWithoutVat, string reason, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Accepts a Carrier invoice line that waits for Finance: at the invoiced amount, or at <paramref name="adjustedAmount"/> with a <paramref name="remark"/>.
+    /// </summary>
+    Task<LineDecisionAnswer> AcceptCarrierInvoiceLineAsync(
+        string carrierId, string invoiceNumber, string bookingReference, decimal? adjustedAmount, string? remark, CancellationToken cancellationToken);
+
+    /// <summary>Rejects a Carrier invoice line that waits for Finance, with a reason.</summary>
+    Task<LineDecisionAnswer> RejectCarrierInvoiceLineAsync(string carrierId, string invoiceNumber, string bookingReference, string reason, CancellationToken cancellationToken);
 }

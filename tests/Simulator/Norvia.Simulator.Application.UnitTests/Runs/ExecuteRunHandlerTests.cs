@@ -30,7 +30,7 @@ public sealed class ExecuteRunHandlerTests
     }
 
     private ExecuteRunHandler Handler(int concurrency = 3) =>
-        new(_runs, _log, _api, _tms, _world, new SimulationLimits(50, concurrency), _time, new CarrierPacing(TimeSpan.Zero, 1), _drivers, new DriverPacing(TimeSpan.Zero, 1), Substitute.For<IErpApi>(), Substitute.For<IShipperInbox>());
+        new(_runs, _log, _api, _tms, _world, new SimulationLimits(50, concurrency), _time, new CarrierPacing(TimeSpan.Zero, 1), _drivers, new DriverPacing(TimeSpan.Zero, 1), Substitute.For<IErpApi>(), Substitute.For<IShipperInbox>(), Substitute.For<ICarrierInbox>());
 
     private SimulationRun Active(SimulationSettings settings)
     {

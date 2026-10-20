@@ -11,7 +11,7 @@
 @inject AuthenticationStateProvider Authentication
 @implements IDisposable
 
-<PageTitle>Plan preview · Simulator</PageTitle>
+<PageTitle>Simulator · Plan preview</PageTitle>
 
 <h1>Plan preview</h1>
 
@@ -78,6 +78,11 @@ else
         Once Shipments are delivered, Finance runs Invoice now for @_preview.Invoicing.Counts.Invoiced of the @_preview.Invoicing.Shippers Shippers whose bookings are accepted (@_preview.Settings.Invoicing.InvoicePercent%)
         and credits part of one line on @_preview.Invoicing.Counts.Credited of the invoices (@_preview.Settings.Invoicing.CreditNotePercent%). The invoice and the Credit note then show in the Shipper's invoices inbox.
         A Shipper none of whose orders were delivered gets no invoice.
+    </p>
+
+    <p class="text-muted" data-testid="carrier-invoicing-funnel">
+        Each Carrier that delivers then sends an invoice for its delivered bookings, with one edited amount on @_preview.Settings.Invoicing.EditedCarrierInvoicePercent% of the invoices, and Finance rejects
+        @_preview.Settings.Invoicing.RejectedCarrierLinePercent% of the lines left to decide and accepts the rest at the agreed amount. The outcome of each line then shows on the Carrier's invoices page.
     </p>
 
     @if (_startProblems.Count > 0)
@@ -204,6 +209,12 @@ else
     [SupplyParameterFromQuery(Name = "credited")]
     private int? Credited { get; set; }
 
+    [SupplyParameterFromQuery(Name = "editedinvoices")]
+    private int? EditedInvoices { get; set; }
+
+    [SupplyParameterFromQuery(Name = "rejectedlines")]
+    private int? RejectedLines { get; set; }
+
     private static string KindOf(PlanRow row) => row.Bad is { } bad ? SimulatorText.Of(bad) : "Good";
 
     protected override async Task OnParametersSetAsync()
@@ -211,7 +222,7 @@ else
         _settings = PlanLinks.Settings(
             Orders, Bad, Today, Seed, Mode, Window, Preset, Assigned, OwnFleet, Reassign,
             Release, Confirm, Decline, Tracked, ExceptionShare, Delivered, ProofOfDelivery, CancelShare,
-            CollectionFailed, DeliveryFailed, Damaged, Reservations, Trips, Invoiced, Credited);
+            CollectionFailed, DeliveryFailed, Damaged, Reservations, Trips, Invoiced, Credited, EditedInvoices, RejectedLines);
         if (_settings is null)
         {
             return;

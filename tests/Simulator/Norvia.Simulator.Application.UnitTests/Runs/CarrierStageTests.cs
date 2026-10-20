@@ -84,7 +84,7 @@ public sealed class CarrierStageTests
 
     private static string ShipmentOf(string carrierBookingNumber) => $"SH-{carrierBookingNumber[3..]}";
 
-    private ExecuteRunHandler Handler(CarrierPacing? pacing = null) => new(_runs, _log, _api, _tms, _world, new SimulationLimits(50, 3), _time, pacing ?? new CarrierPacing(TimeSpan.Zero, 3), _drivers, new DriverPacing(TimeSpan.Zero, 1), Substitute.For<IErpApi>(), Substitute.For<IShipperInbox>());
+    private ExecuteRunHandler Handler(CarrierPacing? pacing = null) => new(_runs, _log, _api, _tms, _world, new SimulationLimits(50, 3), _time, pacing ?? new CarrierPacing(TimeSpan.Zero, 3), _drivers, new DriverPacing(TimeSpan.Zero, 1), Substitute.For<IErpApi>(), Substitute.For<IShipperInbox>(), Substitute.For<ICarrierInbox>());
 
     private async Task<SimulationRun> RunAsync(CarrierShares shares, int orders = 6, int ownFleet = 0, CancellationTokenSource? stop = null)
     {

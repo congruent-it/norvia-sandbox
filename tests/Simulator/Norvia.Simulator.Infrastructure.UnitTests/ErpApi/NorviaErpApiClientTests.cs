@@ -133,6 +133,62 @@ public sealed class NorviaErpApiClientTests : IDisposable
     }
 
     [Fact]
+    public async Task AcceptCarrierInvoiceLine_PostsTheAdjustedAmountAndRemark_OnTheLine_AsTheSimulator()
+    {
+        _erp.Answer(HttpStatusCode.OK, """{"carrierId":"CAR-0001","invoiceNumber":"VDT-SIM1-INV","correlationId":"corr-4","status":"Approved","lines":[]}""");
+
+        var answer = await _client.AcceptCarrierInvoiceLineAsync("CAR-0001", "VDT-SIM1-INV", "VDT-SIM1-3", 100m, "Agreed price applies", TestContext.Current.CancellationToken);
+
+        _erp.Request!.RequestUri.Should().Be(new Uri("https://erp.example/v1/carrier-invoices/CAR-0001/VDT-SIM1-INV/lines/VDT-SIM1-3/accept"));
+        _erp.Request.Headers.Authorization!.Parameter.Should().Be("finance-token");
+        var sent = JsonNode.Parse(_erp.RequestBody!)!;
+        (sent["adjustedAmount"]!.GetValue<decimal>(), sent["remark"]!.GetValue<string>()).Should().Be((100m, "Agreed price applies"));
+        answer.Should().Be(new Application.Ports.LineDecisionAnswer(LogOutcome.LineAccepted, "corr-4", null));
+        _spans.Should().ContainSingle().Which.OperationName.Should().Be("Accept Carrier invoice line");
+    }
+
+    [Fact]
+    public async Task RejectCarrierInvoiceLine_PostsTheReason_OnTheLine()
+    {
+        _erp.Answer(HttpStatusCode.OK, """{"carrierId":"CAR-0001","invoiceNumber":"VDT-SIM1-INV","correlationId":"corr-5","status":"Approved","lines":[]}""");
+
+        var answer = await _client.RejectCarrierInvoiceLineAsync("CAR-0001", "VDT-SIM1-INV", "VDT-SIM1-3", "Not agreed", TestContext.Current.CancellationToken);
+
+        _erp.Request!.RequestUri.Should().Be(new Uri("https://erp.example/v1/carrier-invoices/CAR-0001/VDT-SIM1-INV/lines/VDT-SIM1-3/reject"));
+        JsonNode.Parse(_erp.RequestBody!)!["reason"]!.GetValue<string>().Should().Be("Not agreed");
+        answer.Outcome.Should().Be(LogOutcome.LineRejected);
+        _spans.Should().ContainSingle().Which.OperationName.Should().Be("Reject Carrier invoice line");
+    }
+
+    [Fact]
+    public async Task ALineDecision_IsLoggedWithTheCarrierInvoiceKeys()
+    {
+        _erp.Answer(HttpStatusCode.Conflict, """{"code":"CarrierInvoiceLineAlreadyDecided","correlationId":"corr-6"}""");
+
+        var answer = await _client.RejectCarrierInvoiceLineAsync("CAR-0001", "VDT-SIM1-INV", "VDT-SIM1-3", "Not agreed", TestContext.Current.CancellationToken);
+
+        answer.Outcome.Should().Be(LogOutcome.InvoicingRefused);
+        var scope = _logger.Collector.GetSnapshot().Should().ContainSingle().Subject.Scopes.Should().ContainSingle().Subject;
+        var keys = scope.Should().BeAssignableTo<IEnumerable<KeyValuePair<string, object?>>>().Subject.ToDictionary(pair => pair.Key, pair => pair.Value);
+        keys.Should().Contain("flow", "carrier-invoice").And.Contain("outcome", "Refused").And.Contain("failureCode", "CarrierInvoiceLineAlreadyDecided")
+            .And.Contain("documentNumber", "VDT-SIM1-INV").And.Contain("partyId", "CAR-0001");
+    }
+
+    [Fact]
+    public async Task ALineDecision_TheErpUnreachable_IsAnAnswer_NotAnError()
+    {
+        _erp.Fail(new HttpRequestException("down"));
+
+        var answer = await _client.AcceptCarrierInvoiceLineAsync("CAR-0001", "VDT-SIM1-INV", "VDT-SIM1-3", null, null, TestContext.Current.CancellationToken);
+
+        answer.Outcome.Should().Be(LogOutcome.InvoicingNotReceived);
+    }
+
+    [Fact]
+    public void LineDecision_AnythingElse_IsNotReceived() =>
+        ErpAnswers.LineDecision(200, "not json", LogOutcome.LineAccepted).Outcome.Should().Be(LogOutcome.InvoicingNotReceived);
+
+    [Fact]
     public void TrackingKeys_AnythingElse_IsFailed_AndLeavesOutWhatDoesNotApply()
     {
         var keys = NorviaErpApiClient.TrackingKeysOf(LogOutcome.InvoicingNotReceived, null, null, "down", null);

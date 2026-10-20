@@ -71,6 +71,33 @@ public sealed class SubmittedInvoicesTests : PortalWebContext
     }
 
     [Fact]
+    public void Render_AnInvoiceSentFromTheCarriersOwnSystem_IsShownByItsOutcome_WithoutDatesOrClaimedAmounts()
+    {
+        var elsewhere = CarrierInvoiceView.FromOutcome(CarrierInvoiceOutcome.Receive(
+            Carrier, "VDT-SIM1-INV", "corr-9", Samples.SentAt.AddHours(2), 100m,
+            [
+                new CarrierInvoiceOutcomeLine("VDT-SIM1-1", CarrierInvoiceOutcomeResult.Matched, 100m, null),
+                new CarrierInvoiceOutcomeLine("VDT-SIM1-2", CarrierInvoiceOutcomeResult.Rejected, 0m, "Simulated"),
+            ]));
+        Portal.ListCarrierInvoicesAsync(Carrier, Arg.Any<CancellationToken>()).Returns([elsewhere, Told("INV-2")]);
+
+        var article = RenderPage().Find("article[aria-label='VDT-SIM1-INV']");
+
+        article.QuerySelector(".elsewhere")!.TextContent.Should().Contain("own system").And.Contain("not from this portal");
+        article.QuerySelector(".status")!.TextContent.Should().Be("Approved");
+        article.QuerySelector(".told").Should().NotBeNull();
+        article.QuerySelectorAll("td.outcome").Select(cell => cell.TextContent).Should().Equal("Matched at € 100.00", "Rejected");
+        var rows = article.QuerySelectorAll("tbody tr");
+        rows[0].TextContent.Should().Contain("VDT-SIM1-1").And.NotContain("—");
+        rows[1].TextContent.Should().Contain("Simulated");
+        article.QuerySelectorAll("thead th").Select(header => header.TextContent).Should().Equal("Booking reference", "Outcome", "Remark");
+        article.QuerySelector("td.outcome.text-danger")!.TextContent.Should().Be("Rejected");
+        article.QuerySelector("td.outcome.text-success")!.TextContent.Should().Be("Matched at € 100.00");
+        article.QuerySelector(".total").Should().BeNull();
+        article.QuerySelector(".approved")!.TextContent.Should().Be("€ 100.00");
+    }
+
+    [Fact]
     public void Render_WithNoInvoices_SaysSo()
     {
         Portal.ListCarrierInvoicesAsync(Carrier, Arg.Any<CancellationToken>()).Returns([]);

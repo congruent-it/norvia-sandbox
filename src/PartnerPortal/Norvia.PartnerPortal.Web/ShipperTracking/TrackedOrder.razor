@@ -4,7 +4,7 @@
 @inherits ShipperTrackingPage<ShipperTrackingDetail>
 @using Norvia.PartnerPortal.Application.ShipperTracking
 
-<PageTitle>@TransportOrderNumber · Tracking · @(Persona?.DisplayName ?? PersonaId) · Partner portal</PageTitle>
+<PageTitle>Partner portal · @(Persona?.DisplayName ?? PersonaId) · Tracking · @TransportOrderNumber</PageTitle>
 
 <p class="mb-2 text-sm"><a href="@PersonaChoice.TrackingPath(PersonaId)">← All Transport Orders</a></p>
 <h1>@TransportOrderNumber</h1>

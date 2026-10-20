@@ -51,7 +51,7 @@ public sealed class PlannerStageTests
         .. Enumerable.Range(0, 10).Select(offset => new FleetDay(DateOnly.FromDateTime(TestData.Now.UtcDateTime).AddDays(offset), capacityKg, capacityPallets, 0, 0)),
     ];
 
-    private ExecuteRunHandler Handler() => new(_runs, _log, _api, _tms, _world, new SimulationLimits(50, 3), _time, new CarrierPacing(TimeSpan.Zero, 1), _drivers, new DriverPacing(TimeSpan.Zero, 1), Substitute.For<IErpApi>(), Substitute.For<IShipperInbox>());
+    private ExecuteRunHandler Handler() => new(_runs, _log, _api, _tms, _world, new SimulationLimits(50, 3), _time, new CarrierPacing(TimeSpan.Zero, 1), _drivers, new DriverPacing(TimeSpan.Zero, 1), Substitute.For<IErpApi>(), Substitute.For<IShipperInbox>(), Substitute.For<ICarrierInbox>());
 
     private async Task<SimulationRun> RunAsync(SimulationSettings settings)
     {

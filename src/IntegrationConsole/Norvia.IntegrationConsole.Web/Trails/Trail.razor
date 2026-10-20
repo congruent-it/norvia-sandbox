@@ -8,7 +8,7 @@
 @inject ILogger<Trail> Logger
 @implements IDisposable
 
-<PageTitle>Message trail · Integration console</PageTitle>
+<PageTitle>Integration console · Trail @PageTitles.ShortId(CorrelationId)</PageTitle>
 
 <h1>Message trail <span class="font-mono text-base">@CorrelationId</span></h1>
 @* Search and the trail come from Application Insights, so a hop may not be there yet (docs/operations/integration-console.md). *@

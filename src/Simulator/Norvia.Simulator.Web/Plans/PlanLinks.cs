@@ -33,7 +33,8 @@ public static class PlanLinks
             + $"&release={settings.Carriers.ReleasePercent}&confirm={settings.Carriers.ConfirmPercent}&decline={settings.Carriers.DeclinePercent}&tracked={settings.Carriers.TrackedPercent}"
             + $"&exception={settings.Carriers.ExceptionPercent}&delivered={settings.Carriers.DeliveredPercent}&pod={settings.Carriers.ProofOfDeliveryPercent}&cancel={settings.Carriers.CancelPercent}"
             + $"&collfail={settings.Drivers.CollectionFailedPercent}&delfail={settings.Drivers.DeliveryFailedPercent}&damaged={settings.Drivers.DamagedPercent}&reservations={settings.Drivers.ReservationsPercent}"
-            + $"&invoiced={settings.Invoicing.InvoicePercent}&credited={settings.Invoicing.CreditNotePercent}");
+            + $"&invoiced={settings.Invoicing.InvoicePercent}&credited={settings.Invoicing.CreditNotePercent}"
+            + $"&editedinvoices={settings.Invoicing.EditedCarrierInvoicePercent}&rejectedlines={settings.Invoicing.RejectedCarrierLinePercent}");
         return settings.PresetName is { } preset ? $"{query}&preset={Uri.EscapeDataString(preset)}" : query;
     }
 
@@ -60,7 +61,7 @@ public static class PlanLinks
         int? assigned = null, int? ownFleet = null, int? reassign = null,
         int? release = null, int? confirm = null, int? decline = null, int? tracked = null, int? exception = null, int? delivered = null, int? pod = null, int? cancel = null,
         int? collectionFailed = null, int? deliveryFailed = null, int? damaged = null, int? reservations = null, int? trips = null,
-        int? invoiced = null, int? credited = null)
+        int? invoiced = null, int? credited = null, int? editedInvoices = null, int? rejectedLines = null)
     {
         if (orders is null || bad is null || today is null || seed is null || !Enum.TryParse<RunMode>(mode, out var runMode))
         {
@@ -89,7 +90,9 @@ public static class PlanLinks
                 reservations ?? DriverShares.DefaultReservationsPercent),
             Invoicing = new InvoicingShares(
                 invoiced ?? InvoicingShares.DefaultInvoicePercent,
-                credited ?? InvoicingShares.DefaultCreditNotePercent),
+                credited ?? InvoicingShares.DefaultCreditNotePercent,
+                editedInvoices ?? InvoicingShares.DefaultEditedCarrierInvoicePercent,
+                rejectedLines ?? InvoicingShares.DefaultRejectedCarrierLinePercent),
         };
     }
 }

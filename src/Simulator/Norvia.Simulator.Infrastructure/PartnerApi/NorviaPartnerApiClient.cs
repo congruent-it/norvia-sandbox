@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Norvia.Simulator.Application.Ports;
 using Norvia.Simulator.Domain.Carriers;
+using Norvia.Simulator.Domain.Invoicing;
 using Norvia.Simulator.Domain.Log;
 using Norvia.Simulator.Domain.Plans;
 using Norvia.Simulator.Domain.Worlds;
@@ -86,6 +87,68 @@ internal sealed partial class NorviaPartnerApiClient(
         return SendCarrierAsync(
             carrier, CarrierActions.ProveDelivery, "carrier-proofs-of-delivery", "carrier-proof-of-delivery", () => CarrierFormats.Proof(proof), proof.CarrierBookingNumber,
             (status, body, correlation) => CarrierAnswers.Accepted(status, body, correlation, LogOutcome.ProofOfDeliverySent), cancellationToken);
+    }
+
+    public async Task<CarrierInvoiceAnswer> SendCarrierInvoiceAsync(SimulatedCarrier carrier, CarrierInvoiceRequest invoice, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(carrier);
+        ArgumentNullException.ThrowIfNull(invoice);
+        var personaId = carrier.PersonaId ?? throw new InvalidOperationException($"Carrier {carrier.Id} has no Persona to call Norvia as.");
+
+        using var span = activities.Source.StartActivity(InvoicingActions.SendCarrierInvoice, ActivityKind.Internal);
+        CarrierInvoiceAnswer answer;
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("carrier-invoices", UriKind.Relative)) { Content = JsonContent.Create(CarrierFormats.Invoice(invoice)) };
+            // Buffered, so it goes out with its length, as a booking does.
+            await request.Content.LoadIntoBufferAsync(cancellationToken);
+            request.Headers.Add("Ocp-Apim-Subscription-Key", options.Value.SubscriptionKeyOf(personaId));
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await tokens.GetTokenAsync(personaId, cancellationToken));
+
+            using var response = await http.SendAsync(request, cancellationToken);
+            answer = CarrierAnswers.Invoiced((int)response.StatusCode, await response.Content.ReadAsStringAsync(cancellationToken), CorrelationIdOf(response));
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Unreachable, too slow, or no token to call with: nothing reached Norvia.
+            LogCarrierNotSent(exception, InvoicingActions.SendCarrierInvoice, personaId);
+            answer = CarrierAnswers.InvoiceNotReceived("The invoice didn't reach the Norvia Partner API.");
+        }
+
+        using (logger.BeginScope(CarrierInvoiceKeysOf(carrier.Id, invoice.InvoiceNumber, answer)))
+        {
+            LogCarrierAnswered(InvoicingActions.SendCarrierInvoice, personaId, answer.Outcome);
+        }
+
+        return answer;
+    }
+
+    /// <summary>The tracking contract's keys the Simulator knows of a Carrier invoice (coding guidelines §7). A key that doesn't apply is left out, never sent empty.</summary>
+    internal static Dictionary<string, object?> CarrierInvoiceKeysOf(string carrierId, string invoiceNumber, CarrierInvoiceAnswer answer)
+    {
+        ArgumentNullException.ThrowIfNull(answer);
+
+        var keys = new Dictionary<string, object?> { ["flow"] = "carrier-invoice", ["partyId"] = carrierId, ["documentNumber"] = invoiceNumber };
+        switch (answer.Outcome)
+        {
+            case LogOutcome.CarrierInvoiced:
+                keys["outcome"] = "Succeeded";
+                break;
+            case LogOutcome.CarrierRefused:
+                keys["outcome"] = "Refused";
+                break;
+            default:
+                keys["outcome"] = "Failed";
+                keys["failureCode"] = "InvoiceNotReceived";
+                break;
+        }
+
+        if (answer.CorrelationId is { } correlationId)
+        {
+            keys["correlationId"] = correlationId;
+        }
+
+        return keys;
     }
 
     private async Task<CarrierCallAnswer> SendCarrierAsync(

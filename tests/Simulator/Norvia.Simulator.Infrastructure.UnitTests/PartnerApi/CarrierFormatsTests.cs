@@ -148,4 +148,18 @@ public sealed class CarrierFormatsTests
 
         Encoding.Latin1.GetString(Convert.FromBase64String(file["content"]!.GetValue<string>())).Should().Contain("Van Dijk Transport").And.Contain("2026-10-13 09:30");
     }
+
+    [Fact]
+    public void Invoice_KeepsToTheCarrierInvoiceSchema_WithALocalDateAndTheCarriersOwnReferences()
+    {
+        var json = CarrierFormats.Invoice(new CarrierInvoiceRequest(
+            "VDT-SIM1-INV", new DateOnly(2026, 10, 20), [new CarrierInvoiceLineRequest("VDT-SIM1-3", 95.00m, "Waiting time included"), new CarrierInvoiceLineRequest("VDT-SIM1-4", 70.5m, null)]));
+
+        Contracts.CarrierInvoiceSchemaErrors(json).Should().BeEmpty();
+        json["invoiceNo"]!.GetValue<string>().Should().Be("VDT-SIM1-INV");
+        json["invoiceDate"]!.GetValue<string>().Should().Be("20-10-2026");
+        json["lines"]!.AsArray()[0]!["description"]!.GetValue<string>().Should().Be("Waiting time included");
+        json["lines"]!.AsArray()[1]!.AsObject().ContainsKey("description").Should().BeFalse();
+        json.Select(pair => pair.Key).Should().NotContain(key => key.Contains("carrierId", StringComparison.OrdinalIgnoreCase));
+    }
 }
