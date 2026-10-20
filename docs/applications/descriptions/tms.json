@@ -1,1 +1,288 @@
-{ "tables": {} }
+{
+  "tables": {
+    "Absences": {
+      "description": "A whole day on which one Driver can't work, for leave, sickness or training (an Absence). It takes the Driver's Shift off that day's Planning day. A Driver is absent a day or isn't, so recording one twice is one record.",
+      "columns": {
+        "Id": "The Absence's own ID.",
+        "Date": "The day the Driver can't work.",
+        "DriverId": "The Driver who is absent: their Driver ID (`DRV-0001`), owned by the ERP (ADR 0014).",
+        "Reason": "Why: `Leave`, `Sickness` or `Training`.",
+        "Remark": "The Planner's free-text remark (empty when there is none).",
+        "RowVersion": "Concurrency token: two Planners' changes to one Absence don't both land."
+      }
+    },
+    "CarrierBookings": {
+      "description": "A Carrier booking: one request to one Carrier to carry one Shipment, with the Carrier's answer, its Carrier cost and what became of any withdrawal or cancellation message (P4, P7, P9). A Shipment has several over its life, one after each that ends without being carried out, but only one open at a time.",
+      "columns": {
+        "Id": "The Carrier booking's own ID.",
+        "AnswerCorrelationId": "Message trail of the call that recorded the Carrier's answer; null while Requested.",
+        "AnsweredAt": "When the TMS recorded the Carrier's answer; null while Requested.",
+        "CancellationCorrelationId": "Message trail of the Planner's cancellation of the Confirmed booking; null unless Cancelled.",
+        "CancellationExceptionNumber": "Number of the Exception the Planner cancelled the booking from; null unless Cancelled.",
+        "CancellationKey": "Idempotency key of the cancellation, so the same call sent again is a repeat; null unless Cancelled.",
+        "CancellationReasonText": "The Planner's reason for cancelling, which the Carrier is told; null unless Cancelled.",
+        "CancelledAt": "When the Planner cancelled the Confirmed booking; null unless Cancelled.",
+        "CarrierBookingReference": "The Carrier's own reference for the booking, given in its answer; null until it answers.",
+        "CarrierCost": "The Carrier cost frozen at release, as JSON: charge lines, total, source (Carrier Rate Card or Spot price) and when it was calculated. Never changes after release. See ADR 0013.",
+        "CarrierId": "The Carrier asked to carry the Shipment, owned by the ERP (ADR 0002).",
+        "CarrierNotToldAt": "When the cancellation or withdrawal message was reported not delivered; null unless the Carrier was not told.",
+        "CarrierNotToldMessage": "The technical cause of that failure; null unless the Carrier was not told.",
+        "CarrierNotToldStatusCode": "The HTTP status code of that failure, if the Carrier's endpoint answered; null unless the Carrier was not told.",
+        "CarrierToldAt": "When the Carrier acknowledged the cancellation or withdrawal message; null until it is told.",
+        "CorrelationId": "Message trail of the release that asked the Carrier.",
+        "NotDeliveredAt": "When the request was reported not delivered to the Carrier; null unless NotDelivered.",
+        "NotDeliveredMessage": "The technical cause of that failure; null unless NotDelivered.",
+        "NotDeliveredStatusCode": "The HTTP status code of that failure, if the Carrier's endpoint answered; null unless NotDelivered.",
+        "Number": "The Carrier booking number, such as `CB-0000042`, from the `CarrierBookingNumbers` sequence.",
+        "PlannedCollectionTime": "The collection time the Carrier confirmed; null unless Confirmed.",
+        "RejectionReason": "Why the Carrier rejected: `NoCapacity`, `LaneNotServed`, `WindowNotFeasible`, `GoodsNotAccepted`, `PriceNotAccepted` or `Other`; null unless Rejected.",
+        "RejectionReasonText": "The Carrier's own words for the rejection; null unless Rejected.",
+        "RequestedAt": "When the Planner released the Shipment and so asked the Carrier.",
+        "SentAt": "When the request was reported as reaching the Carrier; null until then.",
+        "ShipmentId": "The Shipment the Carrier is asked to carry.",
+        "ShipmentNumber": "That Shipment's number, kept beside its ID for lists and the Message trail.",
+        "Status": "`Requested`, `Confirmed`, `Rejected`, `NotDelivered`, `Withdrawn` or `Cancelled`.",
+        "WithdrawalCorrelationId": "Message trail of the Planner's withdrawal; null unless Withdrawn.",
+        "WithdrawalKey": "Idempotency key of the withdrawal, so the same call sent again is a repeat; null unless Withdrawn.",
+        "WithdrawnAt": "When the Planner withdrew the booking before the Carrier answered; null unless Withdrawn."
+      }
+    },
+    "Exceptions": {
+      "description": "An Exception: something that went wrong with one Shipment on its way and needs the Planner's decision (P7). A Shipment has many over its life, but at most one open of each type. The TMS opens it; only the Planner resolves it. Not to be confused with a rating exception, which is a Transport Order whose Rating failed.",
+      "columns": {
+        "Id": "The Exception's own ID.",
+        "AfterDelivered": "Whether the Exception was opened after the Shipment was Delivered (a Proof of delivery with reservations, or damage found at delivery).",
+        "CarrierId": "The Carrier that carried the Shipment when the Exception opened; null for Own fleet.",
+        "CauseCleared": "Whether the cause no longer holds (Cause cleared), such as a Collection failed Exception once the Shipment is Collected. The TMS never closes an Exception itself.",
+        "Causes": "What opened the Exception, as a JSON list, one entry per cause: a Tracking event, a Proof of delivery or the delivery window passing. Never empty.",
+        "CorrelationId": "Message trail of the work that opened the Exception.",
+        "Notes": "The Planner's notes, as a JSON list; empty until one is added.",
+        "Number": "The Exception number, such as `EX-0000042`, from the `ExceptionNumbers` sequence.",
+        "OpenedAt": "When the TMS opened the Exception.",
+        "Outcome": "How the Planner resolved it: `NoActionNeeded`, `Redelivered`, `Replanned`, `ReturnedToShipper` or `ClaimHandledOutsideTms`; null while Open.",
+        "Remark": "The Planner's remark on the resolution; null while Open.",
+        "ResolutionCorrelationId": "Message trail of the resolution; null while Open.",
+        "ResolvedAt": "When the Planner resolved it; null while Open.",
+        "RowVersion": "Concurrency token: two Planners' changes to one Exception don't both land.",
+        "ShipmentId": "The Shipment the Exception is about.",
+        "ShipmentNumber": "That Shipment's number, kept beside its ID for lists and the Message trail.",
+        "ShipperId": "The Shipper whose Transport Order the Shipment carries, owned by the ERP (ADR 0002).",
+        "Status": "`Open` or `Resolved`.",
+        "TransportOrderNumber": "The number of the Shipment's Transport Order.",
+        "Type": "`DeliveryFailed`, `CollectionFailed`, `Damaged`, `Reservations` or `LateDelivery`."
+      }
+    },
+    "OffTheRoadDays": {
+      "description": "A day on which one Vehicle can't be used, for maintenance or repair (Off the road). It takes the Vehicle off that day's Planning day. Recording one twice is one record.",
+      "columns": {
+        "Id": "The Off the road day's own ID.",
+        "Date": "The day the Vehicle can't be used.",
+        "Reason": "Why: `Maintenance` or `Repair`.",
+        "Remark": "The Planner's free-text remark (empty when there is none).",
+        "RowVersion": "Concurrency token: two Planners' changes to one record don't both land.",
+        "VehicleId": "The Vehicle that is off the road, owned by the ERP (ADR 0014)."
+      }
+    },
+    "OutboxMessages": {
+      "description": "The transactional outbox (ADR 0003): an integration event stored in the same transaction as the change that caused it, until a background publisher sends it to Service Bus. Not a business concept; the TMS never reads its own events back.",
+      "columns": {
+        "Id": "Position in the outbox. Events are published in this order.",
+        "ApplicationProperties": "The message's Service Bus application properties, as a JSON object.",
+        "Body": "The event as a JSON document (Canonical Model).",
+        "CorrelationId": "Message trail of the work that raised the event.",
+        "CreatedAt": "When the event was stored.",
+        "EventId": "The event's own ID, unique, so a message is never stored twice.",
+        "EventType": "The event's name, such as `ShipmentReleased`.",
+        "PublishedAt": "When it was sent to Service Bus; null while it waits.",
+        "Topic": "The Service Bus topic it is sent to (`shipment-events`, `transport-order-events` or `trip-events`).",
+        "TraceParent": "The W3C trace context of the work that raised the event, which publishing continues; null when there was none."
+      }
+    },
+    "PlanningDays": {
+      "description": "One day of the Planning horizon: which Drivers work it, when, and which Vehicles are available (P10). A daily job opens each new day from the Rosters; a day before today is Closed and read-only. The key is the date itself, so two jobs can't open a day twice.",
+      "columns": {
+        "Date": "The day.",
+        "AvailableVehicles": "The Vehicles the Own fleet can use that day, as a JSON list of Vehicle IDs; a Vehicle that is Off the road isn't in it.",
+        "RowVersion": "Concurrency token: two Planners' edits of one day don't both land.",
+        "Shifts": "The Drivers who work that day, as a JSON list of Driver ID, start, end and whether the Planner edited the Shift by hand; a Driver without a Shift doesn't work it.",
+        "Status": "`Open` (the Planner can still change it) or `Closed` (before today, read-only)."
+      }
+    },
+    "ProofsOfDelivery": {
+      "description": "A Proof of delivery: the Consignee's confirmation that a Shipment's goods arrived, sent by a Carrier (P6) or by a Driver (P12), with descriptions of its files. A Shipment has at most one current one; a later one replaces it and the earlier one is kept as superseded. The files themselves are in the TMS's blob container (ADR 0009).",
+      "columns": {
+        "Id": "The Proof of delivery's own ID.",
+        "CarrierBookingReference": "The Carrier's own reference for the booking it matched; null for an Own fleet one.",
+        "Condition": "`Clean`, or `Reservations` when the goods were taken with reservations, which opens an Exception.",
+        "CorrelationId": "Message trail of the call that recorded it.",
+        "DeliveryTime": "When the goods were delivered, with the offset of where.",
+        "DocumentId": "The sender's own ID for the document, unique per source, so one sent twice is one Proof of delivery.",
+        "DriverId": "The Driver who reported it, from their token; null for a Carrier's. Owned by the ERP (ADR 0014).",
+        "Files": "The files it is backed by (signed CMR, signature, photos), as a JSON list of file ID, name, content type and size. The bytes are in the blob container.",
+        "IsCurrent": "Whether this is the Shipment's current Proof of delivery. False once a later one replaced it.",
+        "LocationCountryCode": "Country code of where the goods were delivered.",
+        "LocationPlace": "Place where the goods were delivered.",
+        "LocationPostcode": "Postcode where the goods were delivered.",
+        "ReceivedAt": "When the TMS recorded it, apart from when it was delivered.",
+        "ReceivedBy": "Who signed for the goods.",
+        "Remark": "Free-text remark from the sender; null when there is none.",
+        "ShipmentId": "The Shipment the goods belong to.",
+        "ShipmentNumber": "That Shipment's number, kept beside its ID for lists and the Message trail.",
+        "SourceId": "Who sent it: the Carrier's ID, or `OWN-FLEET`.",
+        "TripNumber": "The Trip it was reported on; null for a Carrier's. A number, not a foreign key.",
+        "TripVersion": "The version of the Trip the Driver app held when it reported, kept for tracing only; null for a Carrier's."
+      }
+    },
+    "Rosters": {
+      "description": "A Driver's standard weekly working pattern, as the Planner changed it (Roster). Only Drivers whose Roster was changed have a row here; the others use the Roster in the seed file. A Roster is copied onto each Planning day as it opens.",
+      "columns": {
+        "DriverId": "The Driver the Roster is for, owned by the ERP (ADR 0014).",
+        "Weekdays": "The Shift for each weekday the Driver works, as a JSON object from weekday name to start and end."
+      }
+    },
+    "Shipments": {
+      "description": "A Shipment: the physical movement that carries out one Transport Order (ADR 0007), made when the Planner assigns the order (P3). It records who carries it, its history of assignments and where it stands from planning to delivery.",
+      "columns": {
+        "Id": "The Shipment's own ID.",
+        "AgreedDeliveryWindows": "Delivery windows the Planner agreed from an Exception, as a JSON list; the last one counts. Empty until one is agreed. The Transport Order keeps the Shipper's original window.",
+        "Assignments": "The history of who carried the Shipment, as a JSON list of Carrier ID (null for Own fleet), when and under which Message trail. Never empty.",
+        "AwaitingRedelivery": "Set when a Driver ended a Trip without delivering a collected Shipment; a flag, not a status, since Norvia still holds the goods (Re-delivery).",
+        "CarrierBookingNumber": "The number of the Carrier booking made at the last release; null for Own fleet or while Planned.",
+        "CarrierId": "The Carrier that carries the Shipment, owned by the ERP (ADR 0002); null for Own fleet.",
+        "CorrelationId": "Message trail of the assignment that planned it.",
+        "Number": "The Shipment number, such as `SH-0000042`, from the `ShipmentNumbers` sequence.",
+        "PlannedAt": "When the Planner assigned the Transport Order.",
+        "ReleaseCorrelationId": "Message trail of the last release; null while Planned.",
+        "ReleaseKey": "Idempotency key of the last release, so the same call sent again is a repeat; null while Planned.",
+        "ReleasedAt": "When the Planner last released the Shipment; null while Planned.",
+        "RowVersion": "Concurrency token: two Planners' changes to one Shipment don't both land.",
+        "ShipperId": "The Shipper whose Transport Order it carries, owned by the ERP (ADR 0002).",
+        "Status": "`Planned`, `Released`, `Booked`, `Dispatched`, `Collected`, `InTransit` or `Delivered`.",
+        "TransportOrderId": "The Transport Order the Shipment carries. Unique: one Shipment per Transport Order (ADR 0007).",
+        "TransportOrderNumber": "That Transport Order's number, kept beside its ID for lists and the Message trail."
+      }
+    },
+    "ShipperNotifications": {
+      "description": "A Shipper notification: a message the Planner sent the Shipper about an open Exception (P7). It is Requested until the Shipper notification Logic App reports it Sent or Not delivered. One-way: the Shipper can't reply through the TMS.",
+      "columns": {
+        "Id": "The notification ID.",
+        "AgreedDeliveryEarliest": "Start of the Agreed delivery window the message states; null when it states none.",
+        "AgreedDeliveryLatest": "End of the Agreed delivery window the message states; null when it states none.",
+        "CorrelationId": "Message trail of the Planner's Notify Shipper call.",
+        "Eta": "The Shipment's ETA the message states; null when it states none.",
+        "ExceptionId": "The Exception the message is about.",
+        "ExceptionNumber": "That Exception's number.",
+        "Message": "The text sent to the Shipper, which the Planner started from the template for the Exception's type.",
+        "NotDeliveredAt": "When it was reported not delivered to the Shipper; null unless NotDelivered.",
+        "NotDeliveredMessage": "The technical cause of that failure; null unless NotDelivered.",
+        "NotDeliveredStatusCode": "The HTTP status code of that failure, if the Shipper's endpoint answered; null unless NotDelivered.",
+        "Planner": "The name of the Planner who sent it.",
+        "RequestedAt": "When the Planner asked for it to be sent.",
+        "RowVersion": "Concurrency token: a report of the outcome and another change don't both land.",
+        "SentAt": "When the Shipper's endpoint acknowledged it; null until then.",
+        "ShipmentNumber": "The number of the Exception's Shipment.",
+        "ShipperId": "The Shipper it is sent to, owned by the ERP (ADR 0002).",
+        "ShipperReference": "The Shipper's own reference for the Transport Order, so the Shipper can tell which one it concerns; null when none.",
+        "Status": "`Requested`, `Sent` or `NotDelivered`.",
+        "TransportOrderNumber": "The number of the Exception's Transport Order.",
+        "Type": "The type of the Exception when it was sent (`DeliveryFailed`, `CollectionFailed`, `Damaged`, `Reservations` or `LateDelivery`)."
+      }
+    },
+    "TrackingEvents": {
+      "description": "A Tracking event: one report from a Carrier (P5) or a Driver (P12) that something happened to a Shipment. The TMS keeps every one it accepts as a log, apart from what it concluded from it, and never changes or deletes it.",
+      "columns": {
+        "Id": "The Tracking event's own ID.",
+        "CarrierBookingReference": "The Carrier's own reference for the booking the event was matched by; null for an Own fleet event.",
+        "CorrelationId": "Message trail of the call that reported it.",
+        "DriverId": "The Driver who reported an Own fleet event, from their token; null for a Carrier's. Owned by the ERP (ADR 0014).",
+        "Eta": "The reporter's estimated time of arrival, if it gave one.",
+        "EventTime": "When it happened, with the offset of where.",
+        "LocationCountryCode": "Country code of where it happened.",
+        "LocationPlace": "Place where it happened.",
+        "LocationPostcode": "Postcode where it happened.",
+        "MovedShipment": "Whether the event moved the Shipment's status; an event that didn't is only logged.",
+        "ReceivedAt": "When the TMS recorded it, apart from when it happened.",
+        "Remark": "Free-text remark from the reporter; null when there is none.",
+        "ShipmentId": "The Shipment it is about.",
+        "ShipmentNumber": "That Shipment's number, kept beside its ID for lists and the Message trail.",
+        "SourceEventId": "The reporter's own ID for the event, unique per source, so one sent twice is one event. For a Driver it is the Driver app event ID.",
+        "SourceId": "Who reported it: the Carrier's ID, or `OWN-FLEET`.",
+        "TripNumber": "The Trip an Own fleet event was reported on; null for a Carrier's. A Trip's Stop outcomes are read from these. A number, not a foreign key.",
+        "TripVersion": "The version of the Trip the Driver app held when it reported, kept for tracing only; null for a Carrier's.",
+        "Type": "`Collected`, `Departed`, `Arrived`, `OutForDelivery`, `Delivered`, `CollectionFailed`, `DeliveryFailed` or `Damaged`."
+      }
+    },
+    "TransportOrders": {
+      "description": "A Transport Order: a Shipper's instruction to move goods from an origin to a destination (P1). It also keeps a Rejected booking, with its rejection reasons and no number. It carries where the order stands in Rating (P2), planning (P3) and billing (P9).",
+      "columns": {
+        "Id": "The Transport Order's own ID, given at intake. It is also the ID of a Rejected booking.",
+        "BecameBillableAt": "When it became Billable; null until then. Once Billable, it stays Billable.",
+        "BillingCorrelationId": "Message trail of the delivery or release that made it Billable; null until then.",
+        "BillingState": "Where it stands for billing: `NotBilledSeparately` (a Fulfilment order), `NotYetBillable` or `Billable`; null for a Rejected booking.",
+        "Channel": "The Intake channel it came through: `ShipperApi` (Transport-only) or `Wms` (Fulfilment).",
+        "CorrelationId": "Message trail of the intake call.",
+        "DeliveredAt": "When its Shipment was delivered; null until then.",
+        "Details": "Everything the Shipper submitted, kept as received, as a JSON document: collection and delivery addresses and windows, goods lines and instructions.",
+        "FreightCharge": "The Freight Charge Rating calculated, frozen whole as JSON: charge lines, total and the Rate Card version used. Null until Rated.",
+        "LastReRateKey": "Idempotency key of the last re-rate, so the same call sent again is a repeat.",
+        "Number": "The Transport Order number, such as `TO-0000042`, from the `TransportOrderNumbers` sequence; null for a Rejected booking.",
+        "NumberText": "The number as text, computed by the database so the list's search can match part of it in SQL.",
+        "PlanningKey": "Idempotency key of the assignment that planned it, so the same call sent again is a repeat.",
+        "RatedAt": "When Rating last succeeded; null until then.",
+        "RatingFailedAt": "When Rating last failed; null unless Rating failed.",
+        "RatingFailure": "Why Rating failed, as JSON: a stable code (`NoRateCard`, `NoValidRateCardVersion`, `NoMatchingLane` or `WeightAboveHighestBreak`) and a message. Null unless Rating failed.",
+        "RatingResult": "`NotYetRated`, `Rated`, `RatingFailed` or `NotRatedSeparately`; null for a Rejected booking.",
+        "ReceivedAt": "When the TMS took the booking in.",
+        "RejectionReasons": "Why a Rejected booking was rejected, as a JSON list of stable code and message; `[]` for an Accepted order.",
+        "ReleaseRemark": "Customer service's remark when it released the order without a Proof of delivery; null otherwise.",
+        "ReleasedAt": "When Customer service released it without a Proof of delivery; null otherwise.",
+        "ReleasedBy": "Who released it without a Proof of delivery; null otherwise.",
+        "ReleasedWithoutProofOfDelivery": "Whether Customer service made it Billable without a Proof of delivery.",
+        "RowVersion": "Concurrency token: two TMS instances that rate or plan one order don't both land.",
+        "ShipmentNumber": "The number of its one Shipment, once Planned; null while Waiting for planning.",
+        "ShipmentNumberText": "The Shipment number as text, computed by the database so the list's search can match part of it in SQL.",
+        "ShipperId": "The Shipper who sent the booking, taken from the caller's token (ADR 0005); owned by the ERP (ADR 0002).",
+        "ShipperReference": "The Shipper's own reference. Unique per Shipper among Accepted orders, so the same booking sent again gets the original back; null for a Rejected booking.",
+        "Status": "`Accepted`, `Planned` or `Rejected`."
+      }
+    },
+    "TripStops": {
+      "description": "One Stop of a Trip: which Shipment, whether its collection or its delivery, and its place in the sequence. A Stop is derived from its Shipment and holds no outcome of its own (ADR 0007); the outcome is read from the Tracking events the Trip recorded.",
+      "columns": {
+        "Id": "Row ID.",
+        "Kind": "`Collection` or `Delivery`.",
+        "Position": "Place in the Trip's sequence. Unique within the Trip.",
+        "ShipmentId": "The Shipment visited. A Shipment's Stop of one kind is on at most one Trip. Not a foreign key.",
+        "TripId": "The Trip the Stop belongs to. Stops are deleted with it."
+      }
+    },
+    "TripVersionDeliveries": {
+      "description": "Whether the Driver app has each version of a Dispatched Trip (P11). Every version sent has one row, which starts as Sending and is settled by the Trip dispatch Logic App's report.",
+      "columns": {
+        "Id": "Row ID.",
+        "Cause": "The technical cause when the version was not delivered; null otherwise.",
+        "ReportedAt": "When the Trip dispatch Logic App reported the outcome; null while Sending.",
+        "State": "`Sending`, `Delivered` or `NotDelivered`.",
+        "TripId": "The Trip the version belongs to. Rows are deleted with it.",
+        "Version": "The Trip's version. Unique within the Trip."
+      }
+    },
+    "Trips": {
+      "description": "A Trip: one run on one day by one Vehicle and Driver that visits an ordered sequence of Stops (P11, P12). A Draft is still being built; a Dispatched Trip is sent to the Driver as whole versions and never deleted. A Vehicle or Driver has at most one Trip a day.",
+      "columns": {
+        "Id": "The Trip's own ID.",
+        "Day": "The day of the run.",
+        "DriverId": "The Driver, owned by the ERP (ADR 0014); null while a Draft has none.",
+        "IdempotencyKey": "Idempotency key of the call that created the Draft, so the same call sent again is a repeat.",
+        "Number": "The Trip number, such as `TRIP-0000007`, from the `TripNumbers` sequence.",
+        "PlannedDrivingDuration": "The Planned driving duration, which uses up the Driver's Driving-hour budget; null while not yet entered.",
+        "PlannedStart": "The Planned start on the Trip's day, inside the Driver's Shift; null while not yet entered.",
+        "RowVersion": "Concurrency token: two Planners' changes to one Trip don't both land.",
+        "StartedByEventId": "The Driver app event ID of the Start Trip report that started it, so a repeat of that report is recognised; null until started.",
+        "Status": "`Draft`, `Dispatched`, `InProgress` or `Completed`.",
+        "VehicleId": "The Vehicle, owned by the ERP (ADR 0014); null while a Draft has none.",
+        "Version": "The version of the Trip last sent to the Driver. Each Amend sends a new whole version."
+      }
+    }
+  }
+}
