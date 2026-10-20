@@ -9,7 +9,10 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Norvia.AppHost;
 using Norvia.PartnerPortal.Application.Bookings;
+using Norvia.PartnerPortal.Application.CarrierInvoices.Submit;
 using Norvia.PartnerPortal.Domain.Bookings;
+using Norvia.PartnerPortal.Domain.CarrierBookings;
+using Norvia.PartnerPortal.Domain.CarrierInvoices;
 using NSubstitute;
 using PortalWeb::Norvia.PartnerPortal.Web.Bookings;
 
@@ -119,13 +122,20 @@ public sealed class PortalWebHost : IAsyncDisposable
 
     internal PortalWebHost(IReadOnlyDictionary<string, string> settings)
     {
-        _factory = new PortalFactory(settings);
+        PartnerApi = NorviaAsAlwaysAccepting();
+        _factory = new PortalFactory(settings, PartnerApi);
         Portal = _factory.Services.GetRequiredService<IPartnerPortal>();
         Http = _factory.CreateClient();
     }
 
     /// <summary>What the portal's pages ask of it.</summary>
     public IPartnerPortal Portal { get; }
+
+    /// <summary>
+    /// Norvia's Partner API at the edge. Out of the box it takes every booking, answer, Tracking event and Carrier invoice as Norvia would accept it, every invoice
+    /// line Matched. A test that needs another answer sets it for its own invoice number; the tests run one at a time.
+    /// </summary>
+    public INorviaPartnerApi PartnerApi { get; }
 
     /// <summary>The portal's endpoints, called as the Simulator and the Logic Apps' stand-ins call them.</summary>
     public HttpClient Http { get; }
@@ -136,7 +146,31 @@ public sealed class PortalWebHost : IAsyncDisposable
         await _factory.DisposeAsync();
     }
 
-    private sealed class PortalFactory(IReadOnlyDictionary<string, string> settings) : WebApplicationFactory<PortalWeb::Program>
+    private static INorviaPartnerApi NorviaAsAlwaysAccepting()
+    {
+        var partnerApi = Substitute.For<INorviaPartnerApi>();
+        partnerApi.SubmitAsync(Arg.Any<Norvia.PartnerPortal.Domain.Personas.Persona>(), Arg.Any<BookingRequest>(), Arg.Any<CancellationToken>())
+            .Returns(_ => Task.FromResult(NorviaAnswer.Accepted("TO-0000001", Guid.NewGuid().ToString())));
+        partnerApi.AnswerAsync(
+                Arg.Any<Norvia.PartnerPortal.Domain.Personas.Persona>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CarrierAnswer>(), Arg.Any<CancellationToken>())
+            .Returns(_ => Task.FromResult(NorviaReply.Recorded(Guid.NewGuid().ToString())));
+        partnerApi.SubmitTrackingAsync(
+                Arg.Any<Norvia.PartnerPortal.Domain.Personas.Persona>(), Arg.Any<string>(), Arg.Any<CarrierTrackingEvent>(), Arg.Any<CancellationToken>())
+            .Returns(_ => Task.FromResult(TrackingReply.Accepted(Guid.NewGuid().ToString())));
+        partnerApi.SubmitCarrierInvoiceAsync(
+                Arg.Any<Norvia.PartnerPortal.Domain.Personas.Persona>(), Arg.Any<string>(), Arg.Any<DateOnly>(), Arg.Any<IReadOnlyList<CarrierInvoiceLineDraft>>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                var lines = call.Arg<IReadOnlyList<CarrierInvoiceLineDraft>>();
+                var receipt = new CarrierInvoiceReceipt(
+                    Repeated: false, CarrierInvoiceStatus.Approved, lines.Sum(line => line.Amount),
+                    [.. lines.Select(line => new CarrierInvoiceReceiptLine(line.BookingRef, line.Amount, CarrierInvoiceLineResult.Matched))]);
+                return Task.FromResult(CarrierInvoiceReply.Received(Guid.NewGuid().ToString(), receipt));
+            });
+        return partnerApi;
+    }
+
+    private sealed class PortalFactory(IReadOnlyDictionary<string, string> settings, INorviaPartnerApi partnerApi) : WebApplicationFactory<PortalWeb::Program>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
@@ -148,12 +182,8 @@ public sealed class PortalWebHost : IAsyncDisposable
 
             builder.ConfigureServices(services =>
             {
-                // Norvia answers every booking as an acceptance, which is all the tests need of it.
-                var partnerApi = Substitute.For<INorviaPartnerApi>();
-                partnerApi.SubmitAsync(Arg.Any<Norvia.PartnerPortal.Domain.Personas.Persona>(), Arg.Any<BookingRequest>(), Arg.Any<CancellationToken>())
-                    .Returns(_ => Task.FromResult(NorviaAnswer.Accepted("TO-0000001", Guid.NewGuid().ToString())));
+                // Norvia answers as the test host's substitute does: see PortalWebHost.PartnerApi.
                 services.AddSingleton(partnerApi);
-                services.AddSingleton<INorviaPartnerApi>(partnerApi);
             });
         }
     }
