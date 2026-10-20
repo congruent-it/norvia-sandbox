@@ -97,6 +97,16 @@ public sealed class TransportOrdersSearchSpecTests
     }
 
     [Fact]
+    public void Evaluated_WithOnlyTheseTransportOrders_ListsJustThose()
+    {
+        var wanted = Accepted(1, "SHP-0001", "BD-1", Morning);
+        var other = Accepted(2, "SHP-0001", "BD-2", Morning);
+
+        new TransportOrdersSearchSpec(null, null, null, 1, 25, [wanted.Id]).Evaluate([wanted, other]).Should().ContainSingle().Which.Should().BeSameAs(wanted);
+        new TransportOrdersSearchSpec(null, null, null, 1, 25, []).Evaluate([wanted, other]).Should().BeEmpty();
+    }
+
+    [Fact]
     public void Evaluated_ReturnsOnlyTheRequestedPage()
     {
         var orders = Enumerable.Range(1, 5).Select(sequence => Accepted(sequence, "SHP-0001", $"BD-{sequence}", Morning.AddHours(sequence))).ToList();

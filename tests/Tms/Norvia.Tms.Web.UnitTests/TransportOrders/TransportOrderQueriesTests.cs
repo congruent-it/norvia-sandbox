@@ -235,9 +235,9 @@ public sealed class TransportOrderQueriesTests : IDisposable
     public async Task ListTransportOrdersAsync_SendsTheFiltersTheSearchAndThePage()
     {
         var page = new TransportOrderPage([], 0, 2, ListAllTransportOrdersQuery.DefaultPageSize);
-        _mediator.Send(new ListAllTransportOrdersQuery(TransportOrderStatus.Planned, "SHP-0001", "bd-2026", 2), Arg.Any<CancellationToken>()).Returns(page);
+        _mediator.Send(new ListAllTransportOrdersQuery(TransportOrderStatus.Planned, "SHP-0001", "bd-2026", 2, CarriedBy: "CAR-0001"), Arg.Any<CancellationToken>()).Returns(page);
 
-        var listed = await _queries.ListTransportOrdersAsync(TransportOrderStatus.Planned, "SHP-0001", "bd-2026", 2, Xunit.TestContext.Current.CancellationToken);
+        var listed = await _queries.ListTransportOrdersAsync(TransportOrderStatus.Planned, "SHP-0001", "CAR-0001", "bd-2026", 2, Xunit.TestContext.Current.CancellationToken);
 
         listed.Should().BeSameAs(page);
     }

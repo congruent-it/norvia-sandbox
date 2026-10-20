@@ -5,12 +5,13 @@ namespace Norvia.Tms.Domain.TransportOrders;
 
 /// <summary>
 /// The Transport Orders of the TMS's list, newest first, one page at a time: the Accepted and Planned ones, optionally of one
-/// status and one Shipper, and optionally those whose Transport Order number, Shipper reference or Shipment number contains the
+/// status, one Shipper and the given Transport Orders (those whose Shipment a Carrier or the Own fleet carries), and optionally those whose Transport Order number, Shipper reference or Shipment number contains the
 /// search text, whatever its case. A Rejected booking has no number and is never listed.
 /// </summary>
 public sealed class TransportOrdersSearchSpec : Specification<TransportOrder>
 {
-    public TransportOrdersSearchSpec(TransportOrderStatus? status, ShipperId? shipperId, string? search, int page, int pageSize)
+    public TransportOrdersSearchSpec(TransportOrderStatus? status, ShipperId? shipperId, string? search, int page, int pageSize,
+        IReadOnlyCollection<TransportOrderId>? onlyTransportOrders = null)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(page, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
@@ -24,6 +25,11 @@ public sealed class TransportOrdersSearchSpec : Specification<TransportOrder>
         if (shipperId is not null)
         {
             Query.Where(order => order.ShipperId == shipperId);
+        }
+
+        if (onlyTransportOrders is not null)
+        {
+            Query.Where(order => onlyTransportOrders.Contains(order.Id));
         }
 
         if (NormalizeSearch(search) is { } term)

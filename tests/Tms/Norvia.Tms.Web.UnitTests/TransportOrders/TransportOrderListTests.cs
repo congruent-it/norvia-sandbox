@@ -1,3 +1,4 @@
+using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.Browse;
 using Norvia.Tms.Domain.Shipments;
@@ -13,14 +14,15 @@ public sealed class TransportOrderListTests : TmsWebContext
     public TransportOrderListTests()
     {
         Queries.ListShippersAsync(Arg.Any<CancellationToken>()).Returns([Samples.BrouwerDranken, Verhoeven]);
-        Queries.ListTransportOrdersAsync(Arg.Any<TransportOrderStatus?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+        Queries.ListActiveCarriersAsync(Arg.Any<CancellationToken>()).Returns([Samples.VanDijk, Samples.Kessler]);
+        Queries.ListTransportOrdersAsync(Arg.Any<TransportOrderStatus?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(PageOf());
     }
 
     [Fact]
     public void Render_BeforeTheTransportOrdersAreRead_ShowsLoading()
     {
-        Queries.ListTransportOrdersAsync(null, null, null, 1, Arg.Any<CancellationToken>()).Returns(new TaskCompletionSource<TransportOrderPage>().Task);
+        Queries.ListTransportOrdersAsync(null, null, null, null, 1, Arg.Any<CancellationToken>()).Returns(new TaskCompletionSource<TransportOrderPage>().Task);
 
         var page = Render<TransportOrderList>();
 
@@ -30,18 +32,29 @@ public sealed class TransportOrderListTests : TmsWebContext
     [Fact]
     public void Render_AnAcceptedAndAPlannedOrder_ListsEachWithItsColumnsAndTheShipmentWhenThereIsOne()
     {
-        Queries.ListTransportOrdersAsync(null, null, null, 1, Arg.Any<CancellationToken>()).Returns(PageOf(
-            Item("TO-0000043", TransportOrderStatus.Planned, "SH-0000012", ShipmentStatus.Released),
-            Item("TO-0000042", TransportOrderStatus.Accepted, null, null)));
+        Queries.ListTransportOrdersAsync(null, null, null, null, 1, Arg.Any<CancellationToken>()).Returns(PageOf(
+            Item("TO-0000043", TransportOrderStatus.Planned, "SH-0000012", ShipmentStatus.Released, new CarriedByView(AssignedTo.Carrier, Samples.Kessler)),
+            Item("TO-0000042", TransportOrderStatus.Accepted, null, null, null)));
 
         var page = Render<TransportOrderList>();
 
         var planned = page.WaitForElement("tr:has(a[href='/transport-orders/TO-0000043'])");
         Cells(planned).Should().Equal(
-            "TO-0000043", "Brouwer Dranken", "BD-2026-0042", "Planned", "Rotterdam, NL", "Utrecht, NL", "Sat 26 Sep 2026, 06:00–10:00", "SH-0000012", "Released");
+            "TO-0000043", "Brouwer Dranken", "BD-2026-0042", "Planned", "Rotterdam, NL", "Utrecht, NL", "Sat 26 Sep 2026, 06:00–10:00", "SH-0000012", "Released", "Kessler Spedition");
         planned.QuerySelector("a[href='/shipments/SH-0000012']").Should().NotBeNull();
         Cells(page.Find("tr:has(a[href='/transport-orders/TO-0000042'])")).Should().Equal(
-            "TO-0000042", "Brouwer Dranken", "BD-2026-0042", "Accepted", "Rotterdam, NL", "Utrecht, NL", "Sat 26 Sep 2026, 06:00–10:00", "—", "—");
+            "TO-0000042", "Brouwer Dranken", "BD-2026-0042", "Accepted", "Rotterdam, NL", "Utrecht, NL", "Sat 26 Sep 2026, 06:00–10:00", "—", "—", "—");
+    }
+
+    [Fact]
+    public void Render_AnOwnFleetShipment_ShowsOwnFleetInCarriedBy()
+    {
+        Queries.ListTransportOrdersAsync(null, null, null, null, 1, Arg.Any<CancellationToken>()).Returns(PageOf(
+            Item("TO-0000043", TransportOrderStatus.Planned, "SH-0000012", ShipmentStatus.Planned, new CarriedByView(AssignedTo.OwnFleet, null))));
+
+        var page = Render<TransportOrderList>();
+
+        Cells(page.WaitForElement("tr:has(a[href='/transport-orders/TO-0000043'])")).Last().Should().Be("Own fleet");
     }
 
     [Fact]
@@ -59,7 +72,7 @@ public sealed class TransportOrderListTests : TmsWebContext
 
         page.WaitForElement("fluent-select[aria-label='Status']").Change("Planned");
 
-        page.WaitForAssertion(() => Queries.Received().ListTransportOrdersAsync(TransportOrderStatus.Planned, null, null, 1, Arg.Any<CancellationToken>()));
+        page.WaitForAssertion(() => Queries.Received().ListTransportOrdersAsync(TransportOrderStatus.Planned, null, null, null, 1, Arg.Any<CancellationToken>()));
     }
 
     [Fact]
@@ -69,7 +82,42 @@ public sealed class TransportOrderListTests : TmsWebContext
 
         page.WaitForElement("fluent-select[aria-label='Shipper']").Change("SHP-0002");
 
-        page.WaitForAssertion(() => Queries.Received().ListTransportOrdersAsync(null, "SHP-0002", null, 1, Arg.Any<CancellationToken>()));
+        page.WaitForAssertion(() => Queries.Received().ListTransportOrdersAsync(null, "SHP-0002", null, null, 1, Arg.Any<CancellationToken>()));
+    }
+
+    [Fact]
+    public void Render_TheCarriedByFilter_OffersTheOwnFleetAndEveryActiveCarrierByName()
+    {
+        var page = Render<TransportOrderList>();
+
+        var options = page.WaitForElements("fluent-select[aria-label='Carried by'] fluent-option");
+
+        options.Select(option => (option.GetAttribute("value"), option.TextContent.Trim())).Should().Equal(
+            ("", "All"), ("OWN-FLEET", "Own fleet"), ("CAR-0001", "Van Dijk Transport"), ("CAR-0002", "Kessler Spedition"));
+    }
+
+    [Theory]
+    [InlineData("OWN-FLEET")]
+    [InlineData("CAR-0002")]
+    public void ChoosingWhoCarries_ReadsAgainWithThatFromTheFirstPage(string carriedBy)
+    {
+        var page = Render<TransportOrderList>();
+
+        page.WaitForElement("fluent-select[aria-label='Carried by']").Change(carriedBy);
+
+        page.WaitForAssertion(() => Queries.Received().ListTransportOrdersAsync(null, null, carriedBy, null, 1, Arg.Any<CancellationToken>()));
+    }
+
+    [Fact]
+    public void Render_WhenTheCarriersCantBeRead_StillListsTheTransportOrders()
+    {
+        Queries.ListActiveCarriersAsync(Arg.Any<CancellationToken>()).Returns<IReadOnlyList<CarrierView>>(_ => throw new TimeoutException("No Carriers."));
+        Queries.ListTransportOrdersAsync(null, null, null, null, 1, Arg.Any<CancellationToken>())
+            .Returns(PageOf(Item("TO-0000042", TransportOrderStatus.Accepted, null, null, null)));
+
+        var page = Render<TransportOrderList>();
+
+        page.WaitForElement("a[href='/transport-orders/TO-0000042']");
     }
 
     [Fact]
@@ -80,13 +128,13 @@ public sealed class TransportOrderListTests : TmsWebContext
 
         page.WaitForElement("fluent-text-field[aria-label='Search']").Change("  bd-2026  ");
 
-        page.WaitForAssertion(() => Queries.Received().ListTransportOrdersAsync(TransportOrderStatus.Accepted, null, "bd-2026", 1, Arg.Any<CancellationToken>()));
+        page.WaitForAssertion(() => Queries.Received().ListTransportOrdersAsync(TransportOrderStatus.Accepted, null, null, "bd-2026", 1, Arg.Any<CancellationToken>()));
     }
 
     [Fact]
     public void Searching_WithNoMatch_ShowsAnEmptyStateNotAnError()
     {
-        Queries.ListTransportOrdersAsync(null, null, "nothing", 1, Arg.Any<CancellationToken>()).Returns(PageOf());
+        Queries.ListTransportOrdersAsync(null, null, null, "nothing", 1, Arg.Any<CancellationToken>()).Returns(PageOf());
         var page = Render<TransportOrderList>();
 
         page.WaitForElement("fluent-text-field[aria-label='Search']").Change("nothing");
@@ -106,10 +154,10 @@ public sealed class TransportOrderListTests : TmsWebContext
     [Fact]
     public void Render_AManyPageResult_ShowsThePositionAndPagesWithNextAndPrevious()
     {
-        Queries.ListTransportOrdersAsync(null, null, null, 1, Arg.Any<CancellationToken>())
-            .Returns(PageOf(totalCount: 60, page: 1, items: [Item("TO-0000042", TransportOrderStatus.Accepted, null, null)]));
-        Queries.ListTransportOrdersAsync(null, null, null, 2, Arg.Any<CancellationToken>())
-            .Returns(PageOf(totalCount: 60, page: 2, items: [Item("TO-0000017", TransportOrderStatus.Accepted, null, null)]));
+        Queries.ListTransportOrdersAsync(null, null, null, null, 1, Arg.Any<CancellationToken>())
+            .Returns(PageOf(totalCount: 60, page: 1, items: [Item("TO-0000042", TransportOrderStatus.Accepted, null, null, null)]));
+        Queries.ListTransportOrdersAsync(null, null, null, null, 2, Arg.Any<CancellationToken>())
+            .Returns(PageOf(totalCount: 60, page: 2, items: [Item("TO-0000017", TransportOrderStatus.Accepted, null, null, null)]));
         var page = Render<TransportOrderList>();
         page.WaitForAssertion(() => page.Find("nav[aria-label=Pages] [role=status]").TextContent.Should().Be("Page 1 of 3 · 60 Transport Orders"));
         page.FindAll("nav[aria-label=Pages] fluent-button")[0].HasAttribute("disabled").Should().BeTrue("there is no page before the first");
@@ -123,7 +171,7 @@ public sealed class TransportOrderListTests : TmsWebContext
     [Fact]
     public void Render_WhenTheTransportOrdersCantBeRead_ShowsAnError()
     {
-        Queries.ListTransportOrdersAsync(null, null, null, 1, Arg.Any<CancellationToken>())
+        Queries.ListTransportOrdersAsync(null, null, null, null, 1, Arg.Any<CancellationToken>())
             .Returns<TransportOrderPage>(_ => throw new TimeoutException("The database didn't answer."));
 
         var page = Render<TransportOrderList>();
@@ -135,8 +183,8 @@ public sealed class TransportOrderListTests : TmsWebContext
     public void Render_WhenTheShippersCantBeRead_StillListsTheTransportOrders()
     {
         Queries.ListShippersAsync(Arg.Any<CancellationToken>()).Returns<IReadOnlyList<ShipperView>>(_ => throw new TimeoutException("No Shippers."));
-        Queries.ListTransportOrdersAsync(null, null, null, 1, Arg.Any<CancellationToken>())
-            .Returns(PageOf(Item("TO-0000042", TransportOrderStatus.Accepted, null, null)));
+        Queries.ListTransportOrdersAsync(null, null, null, null, 1, Arg.Any<CancellationToken>())
+            .Returns(PageOf(Item("TO-0000042", TransportOrderStatus.Accepted, null, null, null)));
 
         var page = Render<TransportOrderList>();
 
@@ -150,7 +198,7 @@ public sealed class TransportOrderListTests : TmsWebContext
     private static TransportOrderPage PageOf(int totalCount, int page, TransportOrderListItem[] items) => new(items, totalCount, page, 25);
 
     // Collection 06:00–10:00 on 26 September 2026 in Rotterdam (UTC+2), from Rotterdam to Utrecht.
-    private static TransportOrderListItem Item(string number, TransportOrderStatus status, string? shipmentNumber, ShipmentStatus? shipmentStatus) => new(
+    private static TransportOrderListItem Item(string number, TransportOrderStatus status, string? shipmentNumber, ShipmentStatus? shipmentStatus, CarriedByView? carriedBy) => new(
         number,
         status,
         Samples.BrouwerDranken,
@@ -160,5 +208,6 @@ public sealed class TransportOrderListTests : TmsWebContext
         new DateTimeOffset(2026, 9, 26, 4, 0, 0, TimeSpan.Zero),
         new DateTimeOffset(2026, 9, 26, 8, 0, 0, TimeSpan.Zero),
         shipmentNumber,
-        shipmentStatus);
+        shipmentStatus,
+        carriedBy);
 }
