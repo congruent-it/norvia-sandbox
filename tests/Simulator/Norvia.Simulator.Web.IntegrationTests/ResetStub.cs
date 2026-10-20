@@ -6,7 +6,7 @@ using System.Text;
 namespace Norvia.Simulator.Web.IntegrationTests;
 
 /// <summary>
-/// Stands in for the TMS API's reset door (ADR 0039) where a test needs to see or steer what the Simulator asks of it: it records every call, says its reset is
+/// Stands in for an application's reset door, such as the TMS API's or the ERP API's, (ADR 0039) where a test needs to see or steer what the Simulator asks of it: it records every call, says its reset is
 /// switched on, and either takes the reset or refuses it with a reason.
 /// </summary>
 public sealed class ResetStub : IDisposable
@@ -29,10 +29,10 @@ public sealed class ResetStub : IDisposable
     /// <summary>The methods of the calls the Simulator has made so far, in order.</summary>
     public IReadOnlyList<string> Calls => [.. _calls];
 
-    /// <summary>A TMS API that would take a reset and answers that it did, deleting nothing.</summary>
+    /// <summary>An application that would take a reset and answers that it did, deleting nothing.</summary>
     public static ResetStub Accepting() => Start(refusing: false);
 
-    /// <summary>A TMS API that would take a reset, and refuses it with <see cref="RefusalDetail"/>.</summary>
+    /// <summary>An application that would take a reset, and refuses it with <see cref="RefusalDetail"/>.</summary>
     public static ResetStub Refusing() => Start(refusing: true);
 
     public void Dispose() => _listener.Close();

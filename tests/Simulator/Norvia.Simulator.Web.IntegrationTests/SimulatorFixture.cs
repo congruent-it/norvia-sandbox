@@ -186,6 +186,14 @@ public sealed class SimulatorFixture : IAsyncLifetime
         return host;
     }
 
+    /// <summary>A Simulator whose ERP API is at the address, such as a stand-in that refuses the reset. Everything else is the AppHost's.</summary>
+    public SimulatorHost StartSimulatorWithErpAt(Uri address)
+    {
+        var host = new SimulatorHost(new Dictionary<string, string>(_settings) { ["ErpApi:BaseAddress"] = address.ToString() });
+        _hosts.Add(host);
+        return host;
+    }
+
     /// <summary>Stops one of the AppHost's resources, such as a worker that empties a Service Bus subscription, and waits until it has ended.</summary>
     public Task StopAsync(string resourceName, CancellationToken cancellationToken) =>
         ExecuteAsync(resourceName, KnownResourceCommands.StopCommand, state => KnownResourceStates.TerminalStates.Contains(state), cancellationToken);
