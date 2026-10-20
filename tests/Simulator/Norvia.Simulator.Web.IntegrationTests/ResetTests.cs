@@ -1,22 +1,29 @@
 extern alias SimulatorWeb;
 
+using System.Text.RegularExpressions;
 using Ardalis.Result;
 using Azure.Messaging.ServiceBus;
 using Norvia.Simulator.Application.Reset;
 using Norvia.Simulator.Domain.Carriers;
+using Norvia.Simulator.Domain.Invoicing;
+using Norvia.Simulator.Domain.Log;
 using Norvia.Simulator.Domain.Runs;
 
 namespace Norvia.Simulator.Web.IntegrationTests;
 
 /// <summary>
-/// The Simulator's Reset estate against the real applications (ADR 0039): the TMS API, the Partner portal and the Driver app API each reset through their own
+/// The Simulator's Reset estate against the real applications (ADR 0039): the TMS API, the Partner portal, the Driver app API and the ERP API each reset through their own
 /// door, and the Simulator clears its own runs and log last. A reset empties the whole estate, so these tests take their turn with the others and each starts from
 /// whatever an earlier test left, which the first reset clears.
 /// </summary>
 [Collection("Simulator runs")]
-public sealed class ResetTests(SimulatorFixture fixture)
+public sealed partial class ResetTests(SimulatorFixture fixture)
 {
     private static readonly TimeSpan Patience = TimeSpan.FromSeconds(120);
+    private static readonly TimeSpan InvoicingPatience = TimeSpan.FromMinutes(5);
+
+    // The Shipper whose every Lane the Carriers' Rate Cards cover, so the run's Transport Orders become Billable and its Carriers invoice.
+    private const string PricedShipper = "SHP-0001";
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -161,6 +168,71 @@ public sealed class ResetTests(SimulatorFixture fixture)
         again.Complete.Should().BeTrue();
         (await fixture.Simulator.Requests.ListRunsAsync(Ct)).Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task AResetAfterAnInvoicedRun_DeletesTheErpsRecordsByKind_AndTheSameRunNumberInvoicesAgainWithoutDuplicates()
+    {
+        await ResetWhenQuietAsync(fixture.Simulator);
+        await using var simulator = await fixture.StartSimulatorWithSeedAsync(Ct, SeedEdits.OnlyShippers(PricedShipper));
+        var settings = Runs.Invoiced(orders: 6, Runs.NextSeed(), new InvoicingShares(InvoicePercent: 100, CreditNotePercent: 100, EditedCarrierInvoicePercent: 100, RejectedCarrierLinePercent: 0));
+        var (_, first, firstLog) = await simulator.RunToEndAsync(settings, Ct, InvoicingPatience);
+        first.Status.Should().Be(SimulationRunStatus.Completed);
+        var invoiceNumber = ShipperInvoiceNumber(firstLog);
+        CarrierInvoicesSent(firstLog).Should().NotBeEmpty("the Carriers invoiced");
+
+        var report = await ResetWhenQuietAsync(fixture.Simulator);
+
+        report.Complete.Should().BeTrue();
+        foreach (var kind in new[] { "Shipper invoices", "Credit notes", "Billable lines", "Carrier costs", "Carrier invoices" })
+        {
+            Deleted(report, EstateApp.Erp, kind).Should().BePositive($"the run left {kind} in the ERP");
+        }
+
+        var again = await ResetWhenQuietAsync(fixture.Simulator);
+        again.Apps.Single(app => app.App == EstateApp.Erp).Deleted.Should().OnlyContain(kind => kind.Count == 0, "the first reset emptied the ERP");
+
+        var (_, second, secondLog) = await simulator.RunToEndAsync(settings, Ct, InvoicingPatience);
+        second.Number.Should().Be(1);
+        second.Status.Should().Be(SimulationRunStatus.Completed);
+        ShipperInvoiceNumber(secondLog).Should().Be(invoiceNumber, "the ERP's invoice numbers start again");
+        var sent = CarrierInvoicesSent(secondLog);
+        sent.Should().NotBeEmpty();
+        sent.Should().NotContain(line => line.Detail!.Contains("DUPLICATE", StringComparison.Ordinal), "the ERP forgot the Carrier invoices the first run sent under the same numbers");
+        sent.Should().Contain(line => line.Detail!.Contains("MATCHED", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task WhenTheErpRefuses_TheResultNamesItAndWhy_TheOthersCountsAreReported_TheHistoryIsKept_AndAnotherResetCompletes()
+    {
+        await ResetWhenQuietAsync(fixture.Simulator);
+        var (_, run, _) = await fixture.Simulator.RunToEndAsync(Runs.Burst(orders: 4, badSharePercent: 0, Runs.NextSeed()), Ct);
+        using var erp = ResetStub.Refusing();
+        await using var simulator = fixture.StartSimulatorWithErpAt(erp.Address);
+
+        var report = (await simulator.Requests.ResetEstateAsync(Ct)).Value;
+
+        report.Complete.Should().BeFalse();
+        var erpResult = report.Apps.Single(app => app.App == EstateApp.Erp);
+        erpResult.Succeeded.Should().BeFalse();
+        erpResult.Refusal.Should().Contain(ResetStub.RefusalDetail);
+        report.Apps.Where(app => app.App != EstateApp.Erp).Should().OnlyContain(app => app.Succeeded && app.Deleted.Count > 0, "the other applications were told to reset all the same, and their counts are reported");
+        report.Simulator.Should().BeEmpty("the Simulator clears its own history only once every application has reset");
+        (await simulator.Requests.ListRunsAsync(Ct)).Should().Contain(summary => summary.Id == run.Id);
+
+        var again = await ResetWhenQuietAsync(fixture.Simulator);
+
+        again.Complete.Should().BeTrue();
+        (await fixture.Simulator.Requests.ListRunsAsync(Ct)).Should().BeEmpty();
+    }
+
+    private static string ShipperInvoiceNumber(IReadOnlyList<LogLine> log) =>
+        ShipperInvoice().Match(log.Single(line => line.Outcome == LogOutcome.InvoiceIssued).Detail!).Value;
+
+    private static List<LogLine> CarrierInvoicesSent(IReadOnlyList<LogLine> log) =>
+        [.. log.Where(line => line.Action == InvoicingActions.SendCarrierInvoice && line.Outcome == LogOutcome.CarrierInvoiced)];
+
+    [GeneratedRegex(@"INV-\d{4}-\d{6}")]
+    private static partial Regex ShipperInvoice();
 
     private static int Deleted(EstateResetReport report, EstateApp app, string kind) =>
         report.Apps.Single(result => result.App == app).Deleted.Single(deleted => deleted.Kind == kind).Count;

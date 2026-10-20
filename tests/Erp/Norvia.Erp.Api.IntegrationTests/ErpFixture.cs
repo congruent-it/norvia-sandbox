@@ -53,6 +53,13 @@ public sealed class ErpFixture : IAsyncLifetime
     /// <summary>The app role only the Simulator's identity holds, for the Finance decisions on Carrier invoice lines it plays.</summary>
     public const string ManageCarrierInvoiceRole = "CarrierInvoices.Manage";
 
+    /// <summary>The app role only the Simulator's identity holds, for returning the estate to a clean sheet.</summary>
+    public const string ResetRole = "Estate.Reset";
+
+    /// <summary>The subscriptions whose consumers record into the ERP, which the reset waits on as the AppHost configures it, as <c>topic/subscription</c>.</summary>
+    public static readonly IReadOnlyList<string> QuietSubscriptions =
+        ["transport-order-events/billing", "shipment-events/carrier-cost", "invoicing-events/shipper-invoice", "invoicing-events/carrier-invoice-outcome"];
+
     /// <summary>How often the ERP's outbox looks for a message to publish; quick, so tests don't wait for it.</summary>
     private static readonly TimeSpan OutboxPollingInterval = TimeSpan.FromMilliseconds(50);
 
@@ -61,12 +68,16 @@ public sealed class ErpFixture : IAsyncLifetime
 
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan WaitTimeout = TimeSpan.FromSeconds(30);
+    private const string MessagingConnectionName = "messaging";
+
     private static readonly string SigningKey = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
 
     private readonly ConcurrentQueue<PublishedMessage> _published = new();
     private DistributedApplication? _app;
     private string _connectionString = string.Empty;
+    private readonly OutboxGate _outboxGate = new();
     private ApiFactory? _api;
+    private ApiFactory? _apiResetOff;
     private WebFactory? _web;
 
     /// <summary>The time the ERP sees. A test sets it; each starts at <see cref="DefaultNow"/>.</summary>
@@ -74,6 +85,9 @@ public sealed class ErpFixture : IAsyncLifetime
 
     /// <summary>Monday 19 October 2026, 10:00 in Amsterdam: well inside a month, so no monthly run is due.</summary>
     public static DateTimeOffset DefaultNow { get; } = new(2026, 10, 19, 8, 0, 0, TimeSpan.Zero);
+
+    /// <summary>The topic subscriptions the billing API's quiet check peeks, which a test fills and empties as the consumers' messages would.</summary>
+    public FakeSubscriptions Subscriptions { get; } = new();
 
     /// <summary>Finance's side of the ERP: its UI's actions, its monthly run and its lists.</summary>
     public Finance Finance { get; private set; } = null!;
@@ -100,9 +114,9 @@ public sealed class ErpFixture : IAsyncLifetime
             ?? throw new InvalidOperationException("The ERP's database has no connection string.");
 
         // The UI's process goes first: it loads the master data the API checks Shippers against.
-        _web = new WebFactory(_connectionString, Clock, _published);
+        _web = new WebFactory(_connectionString, Clock, _published, _outboxGate);
         Finance = new Finance(_web.Services, Clock);
-        _api = new ApiFactory(_connectionString, Clock);
+        _api = new ApiFactory(_connectionString, Clock, resetEnabled: true, Subscriptions);
         _ = _api.Services;
     }
 
@@ -111,6 +125,11 @@ public sealed class ErpFixture : IAsyncLifetime
         if (_api is not null)
         {
             await _api.DisposeAsync();
+        }
+
+        if (_apiResetOff is not null)
+        {
+            await _apiResetOff.DisposeAsync();
         }
 
         if (_web is not null)
@@ -126,6 +145,21 @@ public sealed class ErpFixture : IAsyncLifetime
 
     /// <summary>A client of the billing API holding the app roles, as a managed identity holding them calls.</summary>
     public HttpClient ApiAs(params string[] roles) => ApiWith(IssueToken(roles));
+
+    /// <summary>A client of a billing API whose reset is switched off, as it is in Azure unless the estate switches it on, holding the app roles.</summary>
+    public HttpClient ResetOffApiAs(params string[] roles)
+    {
+        _apiResetOff ??= new ApiFactory(_connectionString, Clock, resetEnabled: false, Subscriptions);
+        var client = _apiResetOff.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", IssueToken(roles));
+        return client;
+    }
+
+    /// <summary>
+    /// Holds what the ERP's outbox sends until the returned scope is disposed, so the events its next action writes stay unpublished. A test that
+    /// holds the outbox disposes the scope before it ends.
+    /// </summary>
+    public IDisposable HoldOutbox() => _outboxGate.Close();
 
     /// <summary>A client of the billing API that sends the token as it is, or none.</summary>
     public HttpClient ApiWith(string? token)
@@ -170,6 +204,7 @@ public sealed class ErpFixture : IAsyncLifetime
         }
 
         _published.Clear();
+        Subscriptions.Empty();
         Clock.Set(DefaultNow);
     }
 
@@ -230,23 +265,34 @@ public sealed class ErpFixture : IAsyncLifetime
         || resource.GetType().Name.Contains("Blob", StringComparison.Ordinal);
 
     /// <summary>The ERP billing API in the tests' process.</summary>
-    private sealed class ApiFactory(string connectionString, TimeProvider clock) : WebApplicationFactory<ErpApiProgram>
+    private sealed class ApiFactory(string connectionString, TimeProvider clock, bool resetEnabled, FakeSubscriptions subscriptions) : WebApplicationFactory<ErpApiProgram>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Development");
             builder.UseSetting("ConnectionStrings:erp", connectionString);
+            builder.UseSetting("Reset:Enabled", resetEnabled ? "true" : "false");
+            for (var index = 0; index < QuietSubscriptions.Count; index++)
+            {
+                builder.UseSetting($"Reset:QuietSubscriptions:{index}", QuietSubscriptions[index]);
+            }
+
             builder.UseSetting("Authentication:Schemes:Bearer:ValidIssuer", LocalTokens.Issuer);
             builder.UseSetting("Authentication:Schemes:Bearer:ValidAudiences:0", LocalTokens.ErpAudience);
             builder.UseSetting("Authentication:Schemes:Bearer:SigningKeys:0:Issuer", LocalTokens.Issuer);
             // JWT bearer configuration takes a key as base64.
             builder.UseSetting("Authentication:Schemes:Bearer:SigningKeys:0:Value", Convert.ToBase64String(Encoding.UTF8.GetBytes(SigningKey)));
-            builder.ConfigureTestServices(services => services.AddSingleton(clock));
+            // Service Bus is outside the ERP: the quiet check peeks the subscriptions the test says hold a message.
+            builder.ConfigureTestServices(services =>
+            {
+                services.AddSingleton(clock);
+                services.AddKeyedSingleton(MessagingConnectionName, subscriptions.AsServiceBusClient());
+            });
         }
     }
 
     /// <summary>The ERP UI's process in the tests' process, as the Finance user, with its outbox publishing to a stand-in for Service Bus.</summary>
-    private sealed class WebFactory(string connectionString, TimeProvider clock, ConcurrentQueue<PublishedMessage> published) : WebApplicationFactory<ErpWebProgram>
+    private sealed class WebFactory(string connectionString, TimeProvider clock, ConcurrentQueue<PublishedMessage> published, OutboxGate outboxGate) : WebApplicationFactory<ErpWebProgram>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
@@ -267,16 +313,66 @@ public sealed class ErpFixture : IAsyncLifetime
                 {
                     var topic = call.Arg<string>();
                     var sender = Substitute.For<ServiceBusSender>();
-                    sender.SendMessageAsync(Arg.Any<ServiceBusMessage>(), Arg.Any<CancellationToken>()).Returns(sent =>
+                    sender.SendMessageAsync(Arg.Any<ServiceBusMessage>(), Arg.Any<CancellationToken>()).Returns(async sent =>
                     {
+                        await outboxGate.WaitAsync();
                         published.Enqueue(PublishedMessage.From(topic, sent.Arg<ServiceBusMessage>()));
-                        return Task.CompletedTask;
                     });
                     return sender;
                 });
                 services.AddSingleton(serviceBus);
             });
         }
+    }
+}
+
+/// <summary>Whether the stand-in for Service Bus takes what the outbox sends: open unless a test closes it, so events stay unpublished.</summary>
+public sealed class OutboxGate
+{
+    private volatile TaskCompletionSource? _closed;
+
+    public Task WaitAsync() => _closed?.Task ?? Task.CompletedTask;
+
+    public IDisposable Close()
+    {
+        var closed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _closed = closed;
+        return new Opening(this, closed);
+    }
+
+    private sealed class Opening(OutboxGate gate, TaskCompletionSource closed) : IDisposable
+    {
+        public void Dispose()
+        {
+            gate._closed = null;
+            closed.TrySetResult();
+        }
+    }
+}
+
+/// <summary>The topic subscriptions the billing API's quiet check peeks, as a stand-in for Service Bus: each holds a message while a test says so.</summary>
+public sealed class FakeSubscriptions
+{
+    private readonly ConcurrentDictionary<string, bool> _holding = new();
+
+    /// <summary>Makes the subscription, as <c>topic/subscription</c>, hold an unprocessed message.</summary>
+    public void Hold(string subscription) => _holding[subscription] = true;
+
+    /// <summary>The consumers have taken every message.</summary>
+    public void Empty() => _holding.Clear();
+
+    internal ServiceBusClient AsServiceBusClient()
+    {
+        var client = Substitute.For<ServiceBusClient>();
+        client.CreateReceiver(Arg.Any<string>(), Arg.Any<string>()).Returns(call =>
+        {
+            var name = $"{call.ArgAt<string>(0)}/{call.ArgAt<string>(1)}";
+            var receiver = Substitute.For<ServiceBusReceiver>();
+            receiver.PeekMessageAsync(Arg.Any<long?>(), Arg.Any<CancellationToken>()).Returns(_ =>
+                Task.FromResult(_holding.ContainsKey(name) ? ServiceBusModelFactory.ServiceBusReceivedMessage() : null));
+            return receiver;
+        });
+        return client;
     }
 }
 
