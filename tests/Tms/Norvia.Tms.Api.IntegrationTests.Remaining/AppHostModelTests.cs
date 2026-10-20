@@ -478,7 +478,7 @@ public sealed class AppHostModelTests
 
         var bicep = ContainerAppBicepOf(builder, demoUi);
 
-        bicep.Should().MatchRegex(@"excludedPaths: \[\s*'/health'\s*'/alive'(\s*'/(carrier|shipper)/v1/[^']+/(bookings|notifications|cancellations|invoices|invoice-outcomes)')*(\s*'/reset/v1')?\s*\]");
+        bicep.Should().MatchRegex(@"excludedPaths: \[\s*'/health'\s*'/alive'\s*'/_content/Norvia\.Branding/\*'(\s*'/(carrier|shipper)/v1/[^']+/(bookings|notifications|cancellations|invoices|invoice-outcomes)')*(\s*'/reset/v1')?\s*\]");
     }
 
     [Fact]
@@ -486,7 +486,7 @@ public sealed class AppHostModelTests
     {
         await using var builder = await CreateForAzureAsync();
 
-        ContainerAppBicepOf(builder, "tms-web").Should().MatchRegex(@"excludedPaths: \[\s*'/health'\s*'/alive'\s*\]");
+        ContainerAppBicepOf(builder, "tms-web").Should().MatchRegex(@"excludedPaths: \[\s*'/health'\s*'/alive'\s*'/_content/Norvia\.Branding/\*'\s*\]");
     }
 
     [Fact]
@@ -496,7 +496,7 @@ public sealed class AppHostModelTests
         await using var builder = await CreateForAzureAsync();
 
         ContainerAppBicepOf(builder, "partner-portal-web").Should()
-            .MatchRegex(@"excludedPaths: \[\s*'/health'\s*'/alive'\s*'/shipper/v1/SHP-0001/notifications'\s*'/shipper/v1/SHP-0003/notifications'\s*'/carrier/v1/CAR-0001/bookings'\s*'/carrier/v1/CAR-0002/bookings'\s*'/carrier/v1/CAR-0003/bookings'\s*'/carrier/v1/CAR-0001/cancellations'\s*'/carrier/v1/CAR-0002/cancellations'\s*'/carrier/v1/CAR-0003/cancellations'\s*'/shipper/v1/SHP-0001/invoices'\s*'/shipper/v1/SHP-0003/invoices'\s*'/carrier/v1/CAR-0001/invoice-outcomes'\s*'/carrier/v1/CAR-0002/invoice-outcomes'\s*'/carrier/v1/CAR-0003/invoice-outcomes'\s*'/reset/v1'\s*\]");
+            .MatchRegex(@"excludedPaths: \[\s*'/health'\s*'/alive'\s*'/_content/Norvia\.Branding/\*'\s*'/shipper/v1/SHP-0001/notifications'\s*'/shipper/v1/SHP-0003/notifications'\s*'/carrier/v1/CAR-0001/bookings'\s*'/carrier/v1/CAR-0002/bookings'\s*'/carrier/v1/CAR-0003/bookings'\s*'/carrier/v1/CAR-0001/cancellations'\s*'/carrier/v1/CAR-0002/cancellations'\s*'/carrier/v1/CAR-0003/cancellations'\s*'/shipper/v1/SHP-0001/invoices'\s*'/shipper/v1/SHP-0003/invoices'\s*'/carrier/v1/CAR-0001/invoice-outcomes'\s*'/carrier/v1/CAR-0002/invoice-outcomes'\s*'/carrier/v1/CAR-0003/invoice-outcomes'\s*'/reset/v1'\s*\]");
     }
 
     [Theory]
@@ -520,7 +520,7 @@ public sealed class AppHostModelTests
             .And.Contain("unauthenticatedClientAction: 'RedirectToLoginPage'")
             .And.Contain("clientId: estate_driver_app_registration_client_id")
             .And.Contain("openIdIssuer: estate_entra_issuer")
-            .And.MatchRegex(@"excludedPaths: \[\s*'/health'\s*'/alive'\s*\]");
+            .And.MatchRegex(@"excludedPaths: \[\s*'/health'\s*'/alive'\s*'/_content/Norvia\.Branding/\*'\s*\]");
         bicep.Should().NotContain("clientSecret", "Entra gives Easy Auth an ID token without a secret");
         (await EnvironmentOfAsync(builder, "driver-app-web")).Keys.Should().NotContain(key => key.StartsWith("LocalSignIn__", StringComparison.Ordinal), "only Entra signs Drivers in in Azure");
     }

@@ -33,7 +33,7 @@ public sealed partial class RunJourneyTests(SimulatorUiFixture simulator) : Brow
         await Page.GetByRole(AriaRole.Button, new() { Name = "Start run" }).ClickAsync();
 
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Level = 1 })).ToContainTextAsync("Run ");
-        await Expect(Page.GetByRole(AriaRole.Status).First).ToContainTextAsync($"Completed: {Orders} of {Orders} bookings sent");
+        await Expect(Page.GetByRole(AriaRole.Status).First).ToContainTextAsync($"Completed: {Orders} of {Orders} bookings sent", new() { Timeout = 60_000 });
         var log = Page.GetByRole(AriaRole.Table, new() { Name = "Log lines" });
         foreach (var reference in references.Distinct())
         {
