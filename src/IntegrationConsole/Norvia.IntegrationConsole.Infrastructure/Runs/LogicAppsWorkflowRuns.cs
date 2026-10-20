@@ -15,7 +15,7 @@ namespace Norvia.IntegrationConsole.Infrastructure.Runs;
 /// from run history's signed content links only when asked for, and never logged.
 /// </summary>
 internal sealed class LogicAppsWorkflowRuns(IHttpClientFactory clients, TokenCredential credential, IOptions<WorkflowRunsOptions> options)
-    : IWorkflowRuns
+    : IWorkflowRuns, IFailedRuns
 {
     /// <summary>Calls the management API with the console's token.</summary>
     public const string ManagementClient = "logic-apps-management";

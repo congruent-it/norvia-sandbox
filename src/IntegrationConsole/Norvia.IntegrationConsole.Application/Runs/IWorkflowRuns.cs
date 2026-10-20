@@ -16,10 +16,4 @@ public interface IWorkflowRuns
     /// behind secure inputs or outputs is not fetched, and one run history has already cleared is none.
     /// </summary>
     Task<RecordedBodies?> BodiesAsync(WorkflowRun run, string stepName, CancellationToken cancellationToken);
-
-    /// <summary>
-    /// The runs that failed since <paramref name="since"/> on every Logic App of the estate, in no particular order. Each
-    /// carries the flow and correlation ID its steps tracked, so the Message trail can be opened from it.
-    /// </summary>
-    Task<IReadOnlyList<RecordedFailedRun>> FailedRunsAsync(DateTimeOffset since, CancellationToken cancellationToken);
 }

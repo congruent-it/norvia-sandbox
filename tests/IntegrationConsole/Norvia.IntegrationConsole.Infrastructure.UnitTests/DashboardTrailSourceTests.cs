@@ -1,5 +1,6 @@
 using System.Net;
 using Microsoft.Extensions.Options;
+using Norvia.IntegrationConsole.Application.Runs;
 using Norvia.IntegrationConsole.Application.Trails;
 using Norvia.IntegrationConsole.Infrastructure.Trails;
 
@@ -33,6 +34,31 @@ public sealed class DashboardTrailSourceTests : IDisposable
     }
 
     public void Dispose() => _http.Dispose();
+
+    [Fact]
+    public async Task FailedRunsAsync_ForFailuresInTheWindow_ListsOneFailedRunPerFlowAndApplicationOfATrail_WithoutARun()
+    {
+        _dashboard
+            .Add("partner-api", Now.AddMinutes(-9), new() { ["correlationId"] = Booked, ["flow"] = "transport-order-intake", ["outcome"] = "Failed", ["failureCode"] = "TmsUnavailable" })
+            .Add("partner-api", Now.AddMinutes(-4), new() { ["correlationId"] = Booked, ["flow"] = "transport-order-intake", ["outcome"] = "Failed", ["failureCode"] = "TmsUnavailable" })
+            .Add("tms-api", Now.AddMinutes(-3), new() { ["correlationId"] = Booked, ["flow"] = "transport-order-intake", ["outcome"] = "Succeeded" })
+            .Add("partner-api", Now.AddMinutes(-2), new() { ["correlationId"] = Other, ["flow"] = "carrier-answer", ["outcome"] = "Refused", ["failureCode"] = "CallerNotAllowed" })
+            .Add("partner-api", Now.AddHours(-30), new() { ["correlationId"] = Other, ["flow"] = "carrier-answer", ["outcome"] = "Failed" });
+
+        var failed = await new DashboardTrailSource(_http, Options.Create(new DashboardTrailSourceOptions())).FailedRunsAsync(Now.AddHours(-24), TestContext.Current.CancellationToken);
+
+        failed.Should().Equal(new RecordedFailedRun(null, Now.AddMinutes(-4), "transport-order-intake", Booked, null, new StepError("TmsUnavailable", null)));
+    }
+
+    [Fact]
+    public async Task FailedRunsAsync_ForAFailureWithoutAFailureCode_HasNoError()
+    {
+        _dashboard.Add("partner-api", Now.AddMinutes(-4), new() { ["correlationId"] = Booked, ["outcome"] = "Failed" });
+
+        var failed = await new DashboardTrailSource(_http, Options.Create(new DashboardTrailSourceOptions())).FailedRunsAsync(Now.AddHours(-24), TestContext.Current.CancellationToken);
+
+        failed.Should().ContainSingle().Which.Should().Be(new RecordedFailedRun(null, Now.AddMinutes(-4), null, Booked, null, null));
+    }
 
     [Fact]
     public async Task SearchAsync_ByTransportOrderNumber_FindsTheTrailThatCarriedIt_WithEveryHopsKeys()

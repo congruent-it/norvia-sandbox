@@ -329,7 +329,7 @@ public sealed class LogicAppsWorkflowRunsTests : IDisposable
 
         var failed = await WorkflowRuns().FailedRunsAsync(Started, TestContext.Current.CancellationToken);
 
-        failed.Should().ContainSingle().Which.Run.Workflow.Should().Be("second-flow");
+        failed.Should().ContainSingle().Which.Run!.Workflow.Should().Be("second-flow");
     }
 
     [Fact]

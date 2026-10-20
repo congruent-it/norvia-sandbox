@@ -9,7 +9,7 @@ public sealed class ListFailedRunsHandlerTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 26, 10, 0, 0, TimeSpan.Zero);
 
-    private readonly IWorkflowRuns _runs = Substitute.For<IWorkflowRuns>();
+    private readonly IFailedRuns _runs = Substitute.For<IFailedRuns>();
     private readonly FakeTimeProvider _time = new(Now);
 
     [Fact]
@@ -34,7 +34,7 @@ public sealed class ListFailedRunsHandlerTests
 
         var failed = await ListAsync();
 
-        failed.Runs.Select(run => run.Run.LogicApp).Should().Equal("logic-answer", "logic-intake", "logic-intake");
+        failed.Runs.Select(run => run.Run!.LogicApp).Should().Equal("logic-answer", "logic-intake", "logic-intake");
         failed.Runs.Select(run => run.Start).Should().BeInDescendingOrder();
     }
 
@@ -69,6 +69,17 @@ public sealed class ListFailedRunsHandlerTests
         var failed = await ListAsync();
 
         failed.Runs.Should().ContainSingle().Which.Flow.Should().Be("transport-order-intake");
+    }
+
+    [Fact]
+    public async Task Handle_ForARunWithNeitherFlowNorWorkflow_NamesTheFlowUnknown()
+    {
+        // Locally there are no Logic Apps, so a failure without a flow has no workflow to name it after.
+        Record(new RecordedFailedRun(null, Now.AddHours(-1), null, "corr-1", null, null));
+
+        var failed = await ListAsync();
+
+        failed.Runs.Should().ContainSingle().Which.Should().Be(new FailedRun("unknown", null, Now.AddHours(-1), "corr-1", null, null));
     }
 
     [Fact]

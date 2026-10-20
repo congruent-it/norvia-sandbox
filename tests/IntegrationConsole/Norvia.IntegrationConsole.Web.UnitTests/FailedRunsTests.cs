@@ -60,6 +60,20 @@ public sealed class FailedRunsTests : ConsoleWebContext
     }
 
     [Fact]
+    public void Render_ForAFailureWithoutARun_ShowsItsErrorAndTrail_ButNoLinkToARun()
+    {
+        // Locally there are no Logic Apps to open a run in.
+        Answer(Intake("run-1", 5) with { Run = null, FailedStep = null });
+
+        var page = Render<FailedRuns>();
+
+        var row = page.Find("tbody tr");
+        row.QuerySelectorAll("a[href^='/runs/']").Should().BeEmpty();
+        row.TextContent.Should().Contain("ServiceUnavailable: The TMS answered 503.");
+        row.QuerySelector("a[href='/trails/corr-run-1']").Should().NotBeNull();
+    }
+
+    [Fact]
     public void Render_Always_OffersNoWayToResubmitARun_ForAnyFlow()
     {
         Answer(Intake("run-1", 5), Intake("run-2", 6) with { Flow = "carrier-answer" });

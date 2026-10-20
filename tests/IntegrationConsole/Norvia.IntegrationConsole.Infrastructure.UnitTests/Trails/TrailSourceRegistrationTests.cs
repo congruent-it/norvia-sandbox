@@ -2,7 +2,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Norvia.IntegrationConsole.Application.Runs;
 using Norvia.IntegrationConsole.Application.Trails;
+using Norvia.IntegrationConsole.Infrastructure.Runs;
 using Norvia.IntegrationConsole.Infrastructure.Trails;
 
 namespace Norvia.IntegrationConsole.Infrastructure.UnitTests.Trails;
@@ -58,6 +60,16 @@ public sealed class TrailSourceRegistrationTests
 
         start.Should().NotThrow();
         services.GetRequiredService<ITrailSource>().Should().BeOfType<DashboardTrailSource>();
+        // No Logic Apps run locally, so failed runs are the failures the dashboard holds.
+        services.GetRequiredService<IFailedRuns>().Should().BeOfType<DashboardTrailSource>();
+    }
+
+    [Fact]
+    public void AddIntegrationConsoleInfrastructure_InAzure_ListsFailedRunsFromTheEstatesLogicApps()
+    {
+        using var services = ServicesWith(new() { ["Estate:ResourceGroupId"] = Runs.RunHistory.ResourceGroupId });
+
+        services.GetRequiredService<IFailedRuns>().Should().BeOfType<LogicAppsWorkflowRuns>();
     }
 
     [Fact]

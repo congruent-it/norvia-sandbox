@@ -2,7 +2,7 @@ using Mediator;
 
 namespace Norvia.IntegrationConsole.Application.Runs.Failed;
 
-public sealed class ListFailedRunsHandler(IWorkflowRuns runs, TimeProvider time) : IQueryHandler<ListFailedRunsQuery, FailedRunList>
+public sealed class ListFailedRunsHandler(IFailedRuns runs, TimeProvider time) : IQueryHandler<ListFailedRunsQuery, FailedRunList>
 {
     private static readonly TimeSpan Window = TimeSpan.FromHours(24);
 
@@ -16,7 +16,7 @@ public sealed class ListFailedRunsHandler(IWorkflowRuns runs, TimeProvider time)
 
         var failed = recorded
             .Where(run => run.Start >= from)
-            .Select(run => new FailedRun(run.Flow ?? run.Run.Workflow, run.Run, run.Start, run.CorrelationId, run.FailedStep, run.Error))
+            .Select(run => new FailedRun(run.Flow ?? run.Run?.Workflow ?? "unknown", run.Run, run.Start, run.CorrelationId, run.FailedStep, run.Error))
             .OrderByDescending(run => run.Start)
             .ToList();
         var flows = failed.Select(run => run.Flow).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();

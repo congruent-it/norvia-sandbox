@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
+using Norvia.IntegrationConsole.Application.Runs;
 using Norvia.IntegrationConsole.Application.Trails;
 
 namespace Norvia.IntegrationConsole.Infrastructure.Trails;
@@ -11,9 +12,10 @@ namespace Norvia.IntegrationConsole.Infrastructure.Trails;
 /// (ADR 0027). Locally the applications log the tracking contract's keys (coding guidelines §7) in their logging scope,
 /// which reaches the dashboard as each log record's attributes. It answers the same search as
 /// <see cref="LogAnalyticsTrailSource"/>, and reads those attributes only, never a record's body. A trail's hops are
-/// the requests those records were written in, from the spans of their traces.
+/// the requests those records were written in, from the spans of their traces. With no Logic Apps locally, it also
+/// lists the failures those records tell of as failed runs (<see cref="IFailedRuns"/>).
 /// </summary>
-internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTrailSourceOptions> options) : ITrailSource
+internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTrailSourceOptions> options) : ITrailSource, IFailedRuns
 {
     /// <summary>
     /// The dashboard keeps at most this many log records in memory (<c>Dashboard:TelemetryLimits:MaxLogCount</c>), so
@@ -87,6 +89,28 @@ internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTr
                 spans.GetValueOrDefault(hop.Key) is { } span
                     ? HopCauses.Of(hop.Key, span.ParentSpanId, hopIds, id => spans.GetValueOrDefault(id)?.ParentSpanId)
                     : null)),
+        ];
+    }
+
+    /// <summary>
+    /// A failed run locally is where the tracking keys say <c>outcome=Failed</c>: one per correlation ID, flow and
+    /// application, as of its last such record. There are no steps to name, so the failure code is the error, and no run to open.
+    /// </summary>
+    public async Task<IReadOnlyList<RecordedFailedRun>> FailedRunsAsync(DateTimeOffset since, CancellationToken cancellationToken)
+    {
+        var records = await TrackedRecordsAsync(cancellationToken);
+        return
+        [
+            .. records.Where(record => record.Time >= since && record.Keys.GetValueOrDefault("outcome") == nameof(Outcome.Failed))
+                .GroupBy(record => (record.CorrelationId, Flow: record.Keys.GetValueOrDefault("flow"), record.Resource))
+                .Select(failures => failures.MaxBy(record => record.Time)!)
+                .Select(record => new RecordedFailedRun(
+                    null,
+                    record.Time,
+                    record.Keys.GetValueOrDefault("flow"),
+                    record.CorrelationId,
+                    null,
+                    record.Keys.GetValueOrDefault("failureCode") is { } code ? new StepError(code, null) : null)),
         ];
     }
 

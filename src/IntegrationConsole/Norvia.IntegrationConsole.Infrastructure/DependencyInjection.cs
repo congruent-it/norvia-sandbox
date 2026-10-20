@@ -4,6 +4,7 @@ using Azure.Identity;
 using Azure.Monitor.Query.Logs;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Norvia.IntegrationConsole.Application.Runs;
@@ -38,8 +39,11 @@ public static partial class DependencyInjection
                     options => options.DashboardUrl is null || options.DashboardUrl.IsAbsoluteUri,
                     $"{DashboardTrailSourceOptions.SectionName}:{nameof(DashboardTrailSourceOptions.DashboardUrl)} must be the dashboard's absolute address.")
                 .ValidateOnStart();
-            builder.Services.AddHttpClient<ITrailSource, DashboardTrailSource>((services, http) =>
+            builder.Services.AddHttpClient<DashboardTrailSource>((services, http) =>
                 http.BaseAddress = services.GetRequiredService<IOptions<DashboardTrailSourceOptions>>().Value.DashboardUrl);
+            builder.Services.AddTransient<ITrailSource>(services => services.GetRequiredService<DashboardTrailSource>());
+            // No Logic Apps run locally, so the failures are the ones the dashboard holds.
+            builder.Services.Replace(ServiceDescriptor.Transient<IFailedRuns>(services => services.GetRequiredService<DashboardTrailSource>()));
             return builder;
         }
 
@@ -73,7 +77,9 @@ public static partial class DependencyInjection
         // A content link is signed, so it is as good as the body it fetches: neither is logged. Traces leave out a URL's
         // query, where the signature is.
         builder.Services.AddHttpClient(LogicAppsWorkflowRuns.ContentsClient).RemoveAllLoggers();
-        builder.Services.AddSingleton<IWorkflowRuns, LogicAppsWorkflowRuns>();
+        builder.Services.AddSingleton<LogicAppsWorkflowRuns>();
+        builder.Services.AddSingleton<IWorkflowRuns>(services => services.GetRequiredService<LogicAppsWorkflowRuns>());
+        builder.Services.AddSingleton<IFailedRuns>(services => services.GetRequiredService<LogicAppsWorkflowRuns>());
     }
 
     [GeneratedRegex("^/subscriptions/[0-9a-fA-F-]{36}/resourceGroups/[^/]+$")]

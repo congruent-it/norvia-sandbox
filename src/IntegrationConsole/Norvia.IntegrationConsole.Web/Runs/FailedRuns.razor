@@ -64,13 +64,17 @@ else if (_result is { } found)
         <PropertyColumn Title="Flow" Property="@(run => run.Flow)" />
         <PropertyColumn Title="Time" Property="@(run => ConsoleTime.Format(run.Start))" />
         <TemplateColumn Title="Failing step">
-            @if (context.FailedStep is { } step)
+            @if (context.Run is { } logicAppRun)
             {
-                <a href="@TrailLinks.Run(context.Run)" class="font-mono text-xs">@step</a>
-            }
-            else
-            {
-                <a href="@TrailLinks.Run(context.Run)">Open the run</a>
+                @* Locally there are no Logic Apps, so no run to open and no step to name. *@
+                @if (context.FailedStep is { } step)
+                {
+                    <a href="@TrailLinks.Run(logicAppRun)" class="font-mono text-xs">@step</a>
+                }
+                else
+                {
+                    <a href="@TrailLinks.Run(logicAppRun)">Open the run</a>
+                }
             }
             @if (RunText.Of(context.Error) is { } error)
             {
