@@ -78,6 +78,7 @@
   <Folder Name="/tests/" />
   <Folder Name="/tests/Integration/">
     <Project Path="tests/Integration/Norvia.Integration.CarrierBooking.UnitTests/Norvia.Integration.CarrierBooking.UnitTests.csproj" />
+    <Project Path="tests/Integration/Norvia.Integration.CarrierInvoice.IntegrationTests/Norvia.Integration.CarrierInvoice.IntegrationTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.LocalBookingWorker.UnitTests/Norvia.Integration.LocalBookingWorker.UnitTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.LocalShipperNotificationWorker.UnitTests/Norvia.Integration.LocalShipperNotificationWorker.UnitTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.LocalCarrierCancellationWorker.UnitTests/Norvia.Integration.LocalCarrierCancellationWorker.UnitTests.csproj" />
