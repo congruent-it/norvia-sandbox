@@ -18,6 +18,7 @@ using Norvia.Tms.Application.TransportOrders.ToPlan;
 using Norvia.Tms.Application.Trips;
 using Norvia.Tms.Application.Trips.Choices;
 using Norvia.Tms.Application.Trips.GetByNumber;
+using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TransportOrders;
 
 namespace Norvia.Tms.Web.TransportOrders;
@@ -32,8 +33,9 @@ public interface ITransportOrderQueries
     /// One page of every Accepted and Planned Transport Order, newest first. <paramref name="search"/> is a case-insensitive "contains" on the
     /// Transport Order number, the Shipper reference and the Shipment number, and combines with the filters.
     /// <paramref name="carriedBy"/> keeps the orders whose Shipment this Carrier (its ID) or <see cref="ListAllTransportOrdersQuery.OwnFleet"/> carries.
+    /// <paramref name="shipmentStatus"/> keeps the orders whose Shipment has that status.
     /// </summary>
-    Task<TransportOrderPage> ListTransportOrdersAsync(TransportOrderStatus? status, string? shipperId, string? carriedBy, string? search, int page, CancellationToken cancellationToken);
+    Task<TransportOrderPage> ListTransportOrdersAsync(TransportOrderStatus? status, string? shipperId, string? carriedBy, ShipmentStatus? shipmentStatus, string? search, int page, CancellationToken cancellationToken);
 
     /// <summary>The Shippers the TMS knows, by name.</summary>
     Task<IReadOnlyList<ShipperView>> ListShippersAsync(CancellationToken cancellationToken);

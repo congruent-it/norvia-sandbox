@@ -15,14 +15,14 @@ public sealed class TransportOrderListTests : TmsWebContext
     {
         Queries.ListShippersAsync(Arg.Any<CancellationToken>()).Returns([Samples.BrouwerDranken, Verhoeven]);
         Queries.ListActiveCarriersAsync(Arg.Any<CancellationToken>()).Returns([Samples.VanDijk, Samples.Kessler]);
-        Queries.ListTransportOrdersAsync(Arg.Any<TransportOrderStatus?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+        Queries.ListTransportOrdersAsync(Arg.Any<TransportOrderStatus?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<ShipmentStatus?>(), Arg.Any<string?>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(PageOf());
     }
 
     [Fact]
     public void Render_BeforeTheTransportOrdersAreRead_ShowsLoading()
     {
-        Queries.ListTransportOrdersAsync(null, null, null, null, 1, Arg.Any<CancellationToken>()).Returns(new TaskCompletionSource<TransportOrderPage>().Task);
+        Queries.ListTransportOrdersAsync(null, null, null, null, null, 1, Arg.Any<CancellationToken>()).Returns(new TaskCompletionSource<TransportOrderPage>().Task);
 
         var page = Render<TransportOrderList>();
 
@@ -32,7 +32,7 @@ public sealed class TransportOrderListTests : TmsWebContext
     [Fact]
     public void Render_AnAcceptedAndAPlannedOrder_ListsEachWithItsColumnsAndTheShipmentWhenThereIsOne()
     {
-        Queries.ListTransportOrdersAsync(null, null, null, null, 1, Arg.Any<CancellationToken>()).Returns(PageOf(
+        Queries.ListTransportOrdersAsync(null, null, null, null, null, 1, Arg.Any<CancellationToken>()).Returns(PageOf(
             Item("TO-0000043", TransportOrderStatus.Planned, "SH-0000012", ShipmentStatus.Released, new CarriedByView(AssignedTo.Carrier, Samples.Kessler)),
             Item("TO-0000042", TransportOrderStatus.Accepted, null, null, null)));
 
@@ -49,7 +49,7 @@ public sealed class TransportOrderListTests : TmsWebContext
     [Fact]
     public void Render_AnOwnFleetShipment_ShowsOwnFleetInCarriedBy()
     {
-        Queries.ListTransportOrdersAsync(null, null, null, null, 1, Arg.Any<CancellationToken>()).Returns(PageOf(
+        Queries.ListTransportOrdersAsync(null, null, null, null, null, 1, Arg.Any<CancellationToken>()).Returns(PageOf(
             Item("TO-0000043", TransportOrderStatus.Planned, "SH-0000012", ShipmentStatus.Planned, new CarriedByView(AssignedTo.OwnFleet, null))));
 
         var page = Render<TransportOrderList>();
@@ -72,7 +72,7 @@ public sealed class TransportOrderListTests : TmsWebContext
 
         page.WaitForElement("fluent-select[aria-label='Status']").Change("Planned");
 
-        page.WaitForAssertion(() => Queries.Received().ListTransportOrdersAsync(TransportOrderStatus.Planned, null, null, null, 1, Arg.Any<CancellationToken>()));
+        page.WaitForAssertion(() => Queries.Received().ListTransportOrdersAsync(TransportOrderStatus.Planned, null, null, null, null, 1, Arg.Any<CancellationToken>()));
     }
 
     [Fact]
@@ -82,7 +82,7 @@ public sealed class TransportOrderListTests : TmsWebContext
 
         page.WaitForElement("fluent-select[aria-label='Shipper']").Change("SHP-0002");
 
-        page.WaitForAssertion(() => Queries.Received().ListTransportOrdersAsync(null, "SHP-0002", null, null, 1, Arg.Any<CancellationToken>()));
+        page.WaitForAssertion(() => Queries.Received().ListTransportOrdersAsync(null, "SHP-0002", null, null, null, 1, Arg.Any<CancellationToken>()));
     }
 
     [Fact]
@@ -105,14 +105,35 @@ public sealed class TransportOrderListTests : TmsWebContext
 
         page.WaitForElement("fluent-select[aria-label='Carried by']").Change(carriedBy);
 
-        page.WaitForAssertion(() => Queries.Received().ListTransportOrdersAsync(null, null, carriedBy, null, 1, Arg.Any<CancellationToken>()));
+        page.WaitForAssertion(() => Queries.Received().ListTransportOrdersAsync(null, null, carriedBy, null, null, 1, Arg.Any<CancellationToken>()));
+    }
+
+    [Fact]
+    public void Render_OffersEveryShipmentStatusToFilterOn()
+    {
+        var page = Render<TransportOrderList>();
+
+        var options = page.WaitForElements("fluent-select[aria-label='Shipment status'] fluent-option");
+
+        options.Select(option => option.TextContent.Trim()).Should().Equal(
+            "All", "Planned", "Released", "Booked", "Dispatched", "Collected", "In transit", "Delivered");
+    }
+
+    [Fact]
+    public void ChoosingAShipmentStatus_ReadsAgainWithThatFromTheFirstPage()
+    {
+        var page = Render<TransportOrderList>();
+
+        page.WaitForElement("fluent-select[aria-label='Shipment status']").Change(nameof(ShipmentStatus.InTransit));
+
+        page.WaitForAssertion(() => Queries.Received().ListTransportOrdersAsync(null, null, null, ShipmentStatus.InTransit, null, 1, Arg.Any<CancellationToken>()));
     }
 
     [Fact]
     public void Render_WhenTheCarriersCantBeRead_StillListsTheTransportOrders()
     {
         Queries.ListActiveCarriersAsync(Arg.Any<CancellationToken>()).Returns<IReadOnlyList<CarrierView>>(_ => throw new TimeoutException("No Carriers."));
-        Queries.ListTransportOrdersAsync(null, null, null, null, 1, Arg.Any<CancellationToken>())
+        Queries.ListTransportOrdersAsync(null, null, null, null, null, 1, Arg.Any<CancellationToken>())
             .Returns(PageOf(Item("TO-0000042", TransportOrderStatus.Accepted, null, null, null)));
 
         var page = Render<TransportOrderList>();
@@ -128,13 +149,13 @@ public sealed class TransportOrderListTests : TmsWebContext
 
         page.WaitForElement("fluent-text-field[aria-label='Search']").Change("  bd-2026  ");
 
-        page.WaitForAssertion(() => Queries.Received().ListTransportOrdersAsync(TransportOrderStatus.Accepted, null, null, "bd-2026", 1, Arg.Any<CancellationToken>()));
+        page.WaitForAssertion(() => Queries.Received().ListTransportOrdersAsync(TransportOrderStatus.Accepted, null, null, null, "bd-2026", 1, Arg.Any<CancellationToken>()));
     }
 
     [Fact]
     public void Searching_WithNoMatch_ShowsAnEmptyStateNotAnError()
     {
-        Queries.ListTransportOrdersAsync(null, null, null, "nothing", 1, Arg.Any<CancellationToken>()).Returns(PageOf());
+        Queries.ListTransportOrdersAsync(null, null, null, null, "nothing", 1, Arg.Any<CancellationToken>()).Returns(PageOf());
         var page = Render<TransportOrderList>();
 
         page.WaitForElement("fluent-text-field[aria-label='Search']").Change("nothing");
@@ -154,9 +175,9 @@ public sealed class TransportOrderListTests : TmsWebContext
     [Fact]
     public void Render_AManyPageResult_ShowsThePositionAndPagesWithNextAndPrevious()
     {
-        Queries.ListTransportOrdersAsync(null, null, null, null, 1, Arg.Any<CancellationToken>())
+        Queries.ListTransportOrdersAsync(null, null, null, null, null, 1, Arg.Any<CancellationToken>())
             .Returns(PageOf(totalCount: 60, page: 1, items: [Item("TO-0000042", TransportOrderStatus.Accepted, null, null, null)]));
-        Queries.ListTransportOrdersAsync(null, null, null, null, 2, Arg.Any<CancellationToken>())
+        Queries.ListTransportOrdersAsync(null, null, null, null, null, 2, Arg.Any<CancellationToken>())
             .Returns(PageOf(totalCount: 60, page: 2, items: [Item("TO-0000017", TransportOrderStatus.Accepted, null, null, null)]));
         var page = Render<TransportOrderList>();
         page.WaitForAssertion(() => page.Find("nav[aria-label=Pages] [role=status]").TextContent.Should().Be("Page 1 of 3 · 60 Transport Orders"));
@@ -171,7 +192,7 @@ public sealed class TransportOrderListTests : TmsWebContext
     [Fact]
     public void Render_WhenTheTransportOrdersCantBeRead_ShowsAnError()
     {
-        Queries.ListTransportOrdersAsync(null, null, null, null, 1, Arg.Any<CancellationToken>())
+        Queries.ListTransportOrdersAsync(null, null, null, null, null, 1, Arg.Any<CancellationToken>())
             .Returns<TransportOrderPage>(_ => throw new TimeoutException("The database didn't answer."));
 
         var page = Render<TransportOrderList>();
@@ -183,7 +204,7 @@ public sealed class TransportOrderListTests : TmsWebContext
     public void Render_WhenTheShippersCantBeRead_StillListsTheTransportOrders()
     {
         Queries.ListShippersAsync(Arg.Any<CancellationToken>()).Returns<IReadOnlyList<ShipperView>>(_ => throw new TimeoutException("No Shippers."));
-        Queries.ListTransportOrdersAsync(null, null, null, null, 1, Arg.Any<CancellationToken>())
+        Queries.ListTransportOrdersAsync(null, null, null, null, null, 1, Arg.Any<CancellationToken>())
             .Returns(PageOf(Item("TO-0000042", TransportOrderStatus.Accepted, null, null, null)));
 
         var page = Render<TransportOrderList>();

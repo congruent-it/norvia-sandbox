@@ -33,6 +33,7 @@ using Norvia.Tms.Application.Trips;
 using Norvia.Tms.Application.Trips.Choices;
 using Norvia.Tms.Application.Trips.GetByNumber;
 using Norvia.Tms.Application.Trips.List;
+using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TransportOrders;
 
 namespace Norvia.Tms.Web.TransportOrders;
@@ -92,8 +93,8 @@ internal sealed class TransportOrderQueries(IServiceScopeFactory scopes) : ITran
         SendAsync(new ListOffTheRoadDaysQuery(), cancellationToken);
 
     public Task<TransportOrderPage> ListTransportOrdersAsync(
-        TransportOrderStatus? status, string? shipperId, string? carriedBy, string? search, int page, CancellationToken cancellationToken) =>
-        SendAsync(new ListAllTransportOrdersQuery(status, shipperId, search, page, CarriedBy: carriedBy), cancellationToken);
+        TransportOrderStatus? status, string? shipperId, string? carriedBy, ShipmentStatus? shipmentStatus, string? search, int page, CancellationToken cancellationToken) =>
+        SendAsync(new ListAllTransportOrdersQuery(status, shipperId, search, page, CarriedBy: carriedBy, ShipmentStatus: shipmentStatus), cancellationToken);
 
     public Task<IReadOnlyList<ShipperView>> ListShippersAsync(CancellationToken cancellationToken) =>
         SendAsync(new ListShippersQuery(), cancellationToken);
