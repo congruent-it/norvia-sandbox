@@ -22,12 +22,16 @@ public abstract class BrowserPages(PartnerPortalUiFixture norvia) : IAsyncLifeti
     /// <summary>The TMS UI, beside it.</summary>
     protected IPage Tms { get; private set; } = null!;
 
+    /// <summary>The ERP UI, where Finance works.</summary>
+    protected IPage Erp { get; private set; } = null!;
+
     public async ValueTask InitializeAsync()
     {
         _context = await norvia.Browser.NewContextAsync(new BrowserNewContextOptions { RecordVideoDir = _videoDirectory });
         await _context.Tracing.StartAsync(new TracingStartOptions { Screenshots = true, Snapshots = true, Sources = true });
         Portal = await _context.NewPageAsync();
         Tms = await _context.NewPageAsync();
+        Erp = await _context.NewPageAsync();
     }
 
     public async ValueTask DisposeAsync()
@@ -41,12 +45,12 @@ public abstract class BrowserPages(PartnerPortalUiFixture norvia) : IAsyncLifeti
         var failed = TestContext.Current.TestState?.Result == TestResult.Failed;
         var name = string.Concat((TestContext.Current.Test?.TestDisplayName ?? "test").Split(Path.GetInvalidFileNameChars()));
         await _context.Tracing.StopAsync(failed ? new TracingStopOptions { Path = Path.Combine(ArtifactsDirectory, $"{name}.trace.zip") } : new());
-        var videos = new[] { Portal.Video, Tms.Video };
+        var videos = new[] { Portal.Video, Tms.Video, Erp.Video };
         await _context.DisposeAsync();
 
         if (failed)
         {
-            foreach (var (video, page) in videos.Zip(["portal", "tms"]))
+            foreach (var (video, page) in videos.Zip(["portal", "tms", "erp"]))
             {
                 if (video is not null)
                 {
