@@ -3,11 +3,14 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Norvia.Erp.Api.Tracking;
 using Norvia.Erp.Application;
+using Norvia.Erp.Application.CarrierInvoices;
+using Norvia.Erp.Application.CarrierInvoices.Decide;
 using Norvia.Erp.Application.CarrierInvoices.Receive;
 using Norvia.Erp.Application.CarrierInvoices.ReportNotDelivered;
 using Norvia.Erp.Application.CarrierInvoices.ReportTold;
 using Norvia.Erp.Application.IntegrationEvents;
 using Norvia.Erp.Domain.CarrierInvoices;
+using Norvia.Erp.Domain.Carriers;
 
 namespace Norvia.Erp.Api.CarrierInvoices;
 
@@ -18,6 +21,9 @@ public static class CarrierInvoiceEndpoints
 
     /// <summary>The app role only the Carrier invoice outcome Logic App's managed identity holds, for its reports on what it told the Carrier.</summary>
     public const string ReportRole = "CarrierInvoices.Report";
+
+    /// <summary>The app role only the Simulator's identity holds, for the Finance decisions on Carrier invoice lines it plays.</summary>
+    public const string ManageRole = "CarrierInvoices.Manage";
 
     public const string CorrelationIdHeader = TrackingScopeMiddleware.CorrelationIdHeader;
 
@@ -63,8 +69,70 @@ public static class CarrierInvoiceEndpoints
                 + "changes and publishes nothing. The X-Correlation-ID is the Carrier invoice's own correlation ID. CarrierInvoiceNotFound (404, with that "
                 + "code) for an unknown Carrier invoice.");
 
+        carrierInvoices.MapPost("/{carrierId}/{invoiceNumber}/lines/{bookingReference}/accept", AcceptLineAsync)
+            .WithName("AcceptCarrierInvoiceLine")
+            .RequireAuthorization(policy => policy.RequireRole(ManageRole))
+            .WithMetadata(new TrackedFlow(Flows.CarrierInvoices))
+            .WithSummary("Accept a Carrier invoice line that waits for Finance, at the invoiced amount or an adjusted one.")
+            .WithDescription(
+                "What Finance's Accept button does in the ERP UI, through the same command. The optional adjusted amount needs a remark. The line's Carrier "
+                + "cost becomes Invoiced; when it is the last line to decide, the invoice becomes Approved and CarrierInvoiceApproved is published, once, in "
+                + "the same transaction. Answers 200 with the invoice. Refusals carry the stable code: CarrierInvoiceNotFound and CarrierInvoiceLineNotFound "
+                + "(404), CarrierInvoiceLineAlreadyDecided (409), CarrierInvoiceLineHasNoOpenCarrierCost (422), CarrierInvoiceAdjustedAmountNotAboveZero and "
+                + "CarrierInvoiceAdjustedAmountNeedsRemark (400).");
+
+        carrierInvoices.MapPost("/{carrierId}/{invoiceNumber}/lines/{bookingReference}/reject", RejectLineAsync)
+            .WithName("RejectCarrierInvoiceLine")
+            .RequireAuthorization(policy => policy.RequireRole(ManageRole))
+            .WithMetadata(new TrackedFlow(Flows.CarrierInvoices))
+            .WithSummary("Reject a Carrier invoice line that waits for Finance, with a reason.")
+            .WithDescription(
+                "What Finance's Reject button does in the ERP UI, through the same command. The line's Carrier cost, if any, stays as it was; when it is the "
+                + "last line to decide, the invoice becomes Approved and CarrierInvoiceApproved is published, once, in the same transaction. Answers 200 with "
+                + "the invoice. Refusals carry the stable code: CarrierInvoiceNotFound and CarrierInvoiceLineNotFound (404), CarrierInvoiceLineAlreadyDecided "
+                + "(409), CarrierInvoiceRejectionNeedsReason (400).");
+
         return app;
     }
+
+    internal static async Task<Results<Ok<CarrierInvoiceView>, ProblemHttpResult>> AcceptLineAsync(
+        string carrierId,
+        string invoiceNumber,
+        string bookingReference,
+        AcceptCarrierInvoiceLineRequest? request,
+        IConflictRetrier retrier,
+        CancellationToken cancellationToken)
+    {
+        var result = await retrier.RunAsync(
+            mediator => mediator.Send(
+                new AcceptCarrierInvoiceLineCommand(new CarrierId(carrierId), invoiceNumber, bookingReference, request?.AdjustedAmount, request?.Remark), cancellationToken).AsTask());
+        return DecisionAnswer(result, "The Carrier invoice line can't be accepted.");
+    }
+
+    internal static async Task<Results<Ok<CarrierInvoiceView>, ProblemHttpResult>> RejectLineAsync(
+        string carrierId,
+        string invoiceNumber,
+        string bookingReference,
+        RejectCarrierInvoiceLineRequest? request,
+        IConflictRetrier retrier,
+        CancellationToken cancellationToken)
+    {
+        var result = await retrier.RunAsync(
+            mediator => mediator.Send(new RejectCarrierInvoiceLineCommand(new CarrierId(carrierId), invoiceNumber, bookingReference, request?.Reason), cancellationToken).AsTask());
+        return DecisionAnswer(result, "The Carrier invoice line can't be rejected.");
+    }
+
+    private static Results<Ok<CarrierInvoiceView>, ProblemHttpResult> DecisionAnswer(Ardalis.Result.Result<CarrierInvoiceView> result, string title) =>
+        result.IsSuccess
+            ? TypedResults.Ok(result.Value)
+            : RefusalProblem.Of<CarrierInvoiceRefusalCode, CarrierInvoiceView>(
+                result, title, Guid.NewGuid().ToString(), code => code switch
+                {
+                    CarrierInvoiceRefusalCode.CarrierInvoiceNotFound or CarrierInvoiceRefusalCode.CarrierInvoiceLineNotFound => StatusCodes.Status404NotFound,
+                    CarrierInvoiceRefusalCode.CarrierInvoiceLineAlreadyDecided => StatusCodes.Status409Conflict,
+                    CarrierInvoiceRefusalCode.CarrierInvoiceLineHasNoOpenCarrierCost => StatusCodes.Status422UnprocessableEntity,
+                    _ => StatusCodes.Status400BadRequest,
+                });
 
     internal static async Task<Results<Ok<CarrierInvoiceReportResult>, ProblemHttpResult, ValidationProblem>> ReportToldAsync(
         string carrierId,
@@ -159,3 +227,9 @@ public static class CarrierInvoiceEndpoints
 /// <param name="StatusCode">The HTTP status code, or null when the failure had none, such as a timeout.</param>
 /// <param name="Message">The technical cause in plain language.</param>
 public sealed record CarrierInvoiceOutcomeNotDeliveredRequest(int? StatusCode, string? Message);
+
+/// <summary>Finance accepting a Carrier invoice line: at the invoiced amount, or at an adjusted amount with a remark.</summary>
+public sealed record AcceptCarrierInvoiceLineRequest(decimal? AdjustedAmount, string? Remark);
+
+/// <summary>Finance rejecting a Carrier invoice line, with a reason.</summary>
+public sealed record RejectCarrierInvoiceLineRequest(string? Reason);

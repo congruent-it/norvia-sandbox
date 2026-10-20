@@ -12,7 +12,7 @@ public sealed class LocalErpTokensTests
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 10, 19, 9, 0, 0, TimeSpan.Zero));
 
     [Fact]
-    public async Task GetToken_IsSignedAsTheEstateWouldIssueItToTheSimulator_WithTheManageRole()
+    public async Task GetToken_IsSignedAsTheEstateWouldIssueItToTheSimulator_WithTheManageRoles()
     {
         var tokens = new LocalErpTokens(
             Options.Create(new ErpApiOptions
@@ -34,7 +34,7 @@ public sealed class LocalErpTokensTests
         validation.IsValid.Should().BeTrue();
         var jwt = (JsonWebToken)validation.SecurityToken;
         jwt.GetClaim("azp").Value.Should().Be("simulator");
-        jwt.GetPayloadValue<string[]>("roles").Should().Equal("ShipperInvoices.Manage");
+        jwt.GetPayloadValue<string[]>("roles").Should().Equal("ShipperInvoices.Manage", "CarrierInvoices.Manage");
         jwt.ValidTo.Should().Be(_time.GetUtcNow().UtcDateTime.AddHours(1));
     }
 
