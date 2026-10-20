@@ -141,6 +141,19 @@ All events go to the topic for Invoicing events, through the ERP's transactional
 
 Recording a Carrier cost, receiving a Carrier invoice that still has lines To decide, and deciding a line that isn't the last publish nothing.
 
+## Presenter smoke run
+
+After a deployment, and not in CI, the presenter checks Carrier invoice matching on the deployed estate, before the headline relies on it. Do it after the presenter smoke run of Freight settlement ([P9](../tms/p9-freight-settlement.md#presenter-smoke-run)). The Logic App's fault is injected by pointing the Carrier invoice outcome Logic App at an address that doesn't answer, and put back when the run ends, even if it fails. The presenter's actions in the Partner portal and the ERP UI are theirs, and the script stops and says what to do. Run it in a terminal, with the Partner portal, the ERP UI and the Integration console side by side.
+
+1. **Get two delivered bookings.** Take two Shipments of Van Dijk Transport through Freight settlement: Confirmed, Delivered by the Persona's Tracking events, with their Carrier costs in the ERP's Open Carrier costs. Don't invoice either.
+2. **Run the check.** Run `infra/smoke-test-carrier-invoice-matching.sh`. It reads Application Insights, which is usually 1 to 5 minutes behind.
+3. **Story 15.** As Van Dijk Transport, draft an invoice for the first booking with an edited amount and submit it. The answer shows PRICE_MISMATCH. In the ERP UI, Finance opens the invoice in Carrier invoices to decide and accepts the line at the agreed amount. The script checks that the Carrier invoice Logic App and the ERP tracked the invoice and that the outcome was sent. The invoices page shows the outcome, and the ERP's Carrier told column a time.
+4. **A Shipper Persona.** The script submits a Carrier invoice as Brouwer Dranken and checks for 403 and no Carrier invoice Logic App run.
+5. **The invoice outcome endpoint is down.** The script points the outcome Logic App away from the Partner portal. Submit an invoice for the second booking at its price: it is Matched and Approved on receipt. The script checks that the send is tracked `Failed` with `CarrierUnavailable`; the ERP UI shows **Carrier not told** with the technical cause. The script puts the address back.
+6. **Follow it.** The script checks that the first invoice is in Application Insights by correlation ID, in API Management, the Carrier invoice Logic App, the ERP and the Partner portal, and prints the Integration console's links.
+
+The script prints `PASS` or `FAIL` per check, never a body, a token or a key. If a check fails, file the gap as its own issue against E2, rather than working around it in the run book.
+
 ## Implementation
 
 For engineers and coding agents. Built so far: the Carrier cost Logic App, recording a Carrier cost and the Open Carrier costs list, receiving and matching a Carrier invoice with the Carrier invoices list, Finance deciding lines, matching again when a Carrier cost arrives, the Carrier invoice Logic App with its API Management operation, the Partner portal's draft invoice screen, invoice outcome endpoint and invoices page, and the Carrier invoice outcome Logic App, which tells the Carrier and reports it told or not delivered. Nothing plays the Carrier invoice path itself under Aspire yet, but locally a hosted worker plays the outcome Logic App.
