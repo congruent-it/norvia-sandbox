@@ -13,6 +13,16 @@ public static class CarrierInvoiceOutcomeResults
 {
     public static IReadOnlyList<string> WireNames { get; } = ["MATCHED", "ACCEPTED", "ACCEPTED_ADJUSTED", "REJECTED"];
 
+    /// <summary>How the Carrier invoice outcome format spells a result.</summary>
+    public static string WireNameOf(CarrierInvoiceOutcomeResult result) => result switch
+    {
+        CarrierInvoiceOutcomeResult.Matched => "MATCHED",
+        CarrierInvoiceOutcomeResult.Accepted => "ACCEPTED",
+        CarrierInvoiceOutcomeResult.AcceptedAdjusted => "ACCEPTED_ADJUSTED",
+        CarrierInvoiceOutcomeResult.Rejected => "REJECTED",
+        _ => throw new ArgumentOutOfRangeException(nameof(result), result, "Every result has a wire name."),
+    };
+
     /// <summary>The result the Carrier invoice outcome format spells so, or false for any other text.</summary>
     public static bool TryParse(string? wire, out CarrierInvoiceOutcomeResult result)
     {

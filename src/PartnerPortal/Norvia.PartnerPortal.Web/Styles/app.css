@@ -216,14 +216,20 @@ fluent-button::part(control) {
     text-transform: uppercase;
 }
 
-/* Tables as Lux draws them: small uppercase headers, generous rows, a light rule between them. */
-.lux-table.fluent-data-grid {
+/*
+ * Tables as Lux draws them: small uppercase headers, generous rows, a light rule between them. A plain table, such as the
+ * lines of an invoice, takes the same rules as a data grid.
+ */
+.lux-table.fluent-data-grid,
+table.lux-table {
     width: 100%;
     border-collapse: collapse;
 }
 
 .lux-table.fluent-data-grid th,
-.lux-table.fluent-data-grid td {
+.lux-table.fluent-data-grid td,
+table.lux-table th,
+table.lux-table td {
     padding: 0.75rem;
     border-bottom: 1px solid var(--color-border);
     color: var(--color-body);
@@ -232,7 +238,8 @@ fluent-button::part(control) {
     vertical-align: top;
 }
 
-.lux-table.fluent-data-grid th {
+.lux-table.fluent-data-grid th,
+table.lux-table th {
     color: var(--color-primary);
     font-size: 0.75rem;
     font-weight: 600;
@@ -243,6 +250,11 @@ fluent-button::part(control) {
 
 .lux-table.fluent-data-grid .col-title {
     padding: 0;
+}
+
+table.lux-table th.text-right,
+table.lux-table td.text-right {
+    text-align: right;
 }
 
 /* A header that doesn't fit wraps at its words instead of being cut off with an ellipsis. */

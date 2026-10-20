@@ -17,6 +17,9 @@ public static class CarrierReferences
     /// <summary>The Carrier's ID for the Proof of delivery.</summary>
     public static string DocumentId(SimulatedCarrier carrier, int runNumber, int step) => $"{BookingReference(carrier, runNumber, step)}-POD";
 
+    /// <summary>The Carrier's own number for its invoice of a run, unique per Carrier.</summary>
+    public static string InvoiceNumber(SimulatedCarrier carrier, int runNumber) => $"{PrefixOf(carrier)}-SIM{runNumber}-INV";
+
     /// <summary>The shared status code list of the Carrier tracking format (P5).</summary>
     public static string StatusCode(CarrierEvent carrierEvent) => carrierEvent switch
     {

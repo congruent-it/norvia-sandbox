@@ -95,4 +95,16 @@ public enum LogOutcome
 
     /// <summary>An invoice or Credit note arrived in the Shipper Persona's invoices inbox.</summary>
     InboxReceived,
+
+    /// <summary>Norvia took a Carrier's invoice in and matched its lines.</summary>
+    CarrierInvoiced,
+
+    /// <summary>Finance accepted a Carrier invoice line in the ERP.</summary>
+    LineAccepted,
+
+    /// <summary>Finance rejected a Carrier invoice line in the ERP.</summary>
+    LineRejected,
+
+    /// <summary>The outcome of a Carrier invoice line arrived on the Carrier Persona's invoices page.</summary>
+    OutcomeReceived,
 }

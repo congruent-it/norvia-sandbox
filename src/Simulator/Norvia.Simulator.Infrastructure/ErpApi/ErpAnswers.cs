@@ -53,6 +53,25 @@ internal static class ErpAnswers
         return new CreditNoteAnswer(LogOutcome.InvoicingNotReceived, null, null, $"The ERP API answered {statusCode} without an answer to the Credit note.");
     }
 
+    /// <summary>The ERP's answer to Finance accepting or rejecting a Carrier invoice line: the invoice, or a refusal with its code.</summary>
+    public static LineDecisionAnswer LineDecision(int statusCode, string body, LogOutcome success)
+    {
+        var json = Parse(body) as JsonObject;
+        if (statusCode == 200 && json is not null && Text(json, "invoiceNumber") is not null)
+        {
+            return new LineDecisionAnswer(success, Text(json, "correlationId"), null);
+        }
+
+        if (statusCode is >= 400 and < 500 && Text(json, "code") is { } code)
+        {
+            return new LineDecisionAnswer(LogOutcome.InvoicingRefused, Text(json, "correlationId"), $"{code} ({statusCode})");
+        }
+
+        return new LineDecisionAnswer(LogOutcome.InvoicingNotReceived, null, $"The ERP API answered {statusCode} without an answer to the decision.");
+    }
+
+    public static LineDecisionAnswer LineDecisionNotReceived(string detail) => new(LogOutcome.InvoicingNotReceived, null, detail);
+
     public static InvoiceNowAnswer InvoiceNotReceived(string detail) => new(LogOutcome.InvoicingNotReceived, null, null, [], detail);
 
     public static CreditNoteAnswer CreditNoteNotReceived(string detail) => new(LogOutcome.InvoicingNotReceived, null, null, detail);

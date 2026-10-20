@@ -15,4 +15,16 @@ public static class InvoicingActions
 
     /// <summary>A Shipper Persona's inbox taking the Credit note.</summary>
     public const string ReceiveCreditNote = "Receive Credit note";
+
+    /// <summary>A Carrier Persona sending its Carrier invoice through the Partner API.</summary>
+    public const string SendCarrierInvoice = "Send Carrier invoice";
+
+    /// <summary>Finance accepting a Carrier invoice line that waits for it, in the ERP.</summary>
+    public const string AcceptCarrierInvoiceLine = "Accept Carrier invoice line";
+
+    /// <summary>Finance rejecting a Carrier invoice line that waits for it, in the ERP.</summary>
+    public const string RejectCarrierInvoiceLine = "Reject Carrier invoice line";
+
+    /// <summary>A Carrier Persona's invoices page taking the outcome of a line.</summary>
+    public const string ReceiveInvoiceOutcome = "Receive invoice outcome";
 }

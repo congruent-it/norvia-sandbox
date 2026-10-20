@@ -100,7 +100,8 @@ public sealed class LogEntryTests
     [Fact]
     public void Outcomes_Invoicing_HasItsOwn() =>
         LogOutcomes.Invoicing.Should().BeEquivalentTo(
-            [LogOutcome.InvoiceIssued, LogOutcome.NothingToInvoice, LogOutcome.CreditNoteIssued, LogOutcome.InvoicingRefused, LogOutcome.InvoicingNotReceived, LogOutcome.InboxReceived]);
+            [LogOutcome.InvoiceIssued, LogOutcome.NothingToInvoice, LogOutcome.CreditNoteIssued, LogOutcome.InvoicingRefused, LogOutcome.InvoicingNotReceived, LogOutcome.InboxReceived,
+             LogOutcome.CarrierInvoiced, LogOutcome.LineAccepted, LogOutcome.LineRejected, LogOutcome.OutcomeReceived]);
 
     [Fact]
     public void Outcomes_TheNamesFitTheDatabasesColumn()

@@ -215,6 +215,52 @@ public sealed class NorviaPartnerApiClientTests : IDisposable
     }
 
     [Fact]
+    public async Task SendCarrierInvoice_PostsToCarrierInvoices_AsTheCarriersPersona_InASpanOfItsOwn()
+    {
+        _partnerApi.Answer(
+            HttpStatusCode.Created, """{"result":"RECEIVED","messageId":"m-4","invoiceNo":"VDT-SIM1-INV","repeated":false,"status":"APPROVED","approvedAmount":100.00,"lines":[{"bookingRef":"VDT-SIM1-3","amount":100.00,"result":"MATCHED"}]}""");
+
+        var answer = await _client.SendCarrierInvoiceAsync(
+            VanDijk, new CarrierInvoiceRequest("VDT-SIM1-INV", new DateOnly(2026, 10, 20), [new CarrierInvoiceLineRequest("VDT-SIM1-3", 100.00m, null)]), CancellationToken.None);
+
+        _partnerApi.Request!.RequestUri.Should().Be(new Uri("https://apim.example/partner/v1/carrier-invoices"));
+        _partnerApi.Request.Headers.Authorization!.Parameter.Should().Be("van-dijk-token");
+        _partnerApi.Request.Headers.GetValues("Ocp-Apim-Subscription-Key").Should().Equal("van-dijk-key");
+        _partnerApi.RequestContentLength.Should().NotBeNull();
+        JsonNode.Parse(_partnerApi.RequestBody!)!["invoiceNo"]!.GetValue<string>().Should().Be("VDT-SIM1-INV");
+        answer.Outcome.Should().Be(LogOutcome.CarrierInvoiced);
+        answer.Approved.Should().BeTrue();
+        _spans.Should().ContainSingle().Which.OperationName.Should().Be("Send Carrier invoice");
+    }
+
+    [Fact]
+    public async Task SendCarrierInvoice_NorviaUnreachable_IsNotReceived()
+    {
+        _partnerApi.Fail(new HttpRequestException("down"));
+
+        var answer = await _client.SendCarrierInvoiceAsync(VanDijk, new CarrierInvoiceRequest("N", new DateOnly(2026, 10, 20), [new CarrierInvoiceLineRequest("R", 1m, null)]), CancellationToken.None);
+
+        answer.Outcome.Should().Be(LogOutcome.CarrierNotReceived);
+    }
+
+    [Theory]
+    [InlineData(LogOutcome.CarrierInvoiced, "Succeeded", null)]
+    [InlineData(LogOutcome.CarrierRefused, "Refused", null)]
+    [InlineData(LogOutcome.CarrierNotReceived, "Failed", "InvoiceNotReceived")]
+    public void CarrierInvoiceKeysOf_NamesTheTrackingContractsKeysTheSimulatorKnows(LogOutcome outcome, string expected, string? failureCode)
+    {
+        var keys = NorviaPartnerApiClient.CarrierInvoiceKeysOf("CAR-0001", "VDT-SIM1-INV", new CarrierInvoiceAnswer(outcome, "m-5", null, [], null));
+
+        keys["flow"].Should().Be("carrier-invoice");
+        (keys["partyId"], keys["documentNumber"], keys["outcome"], keys["correlationId"]).Should().Be(("CAR-0001", "VDT-SIM1-INV", expected, "m-5"));
+        keys.GetValueOrDefault("failureCode").Should().Be(failureCode);
+    }
+
+    [Fact]
+    public void CarrierInvoiceKeysOf_WithoutACorrelationId_LeavesTheKeyOut() =>
+        NorviaPartnerApiClient.CarrierInvoiceKeysOf("CAR-0001", "N", new CarrierInvoiceAnswer(LogOutcome.CarrierNotReceived, null, null, [], null)).Should().NotContainKey("correlationId");
+
+    [Fact]
     public async Task ACarrierCall_NorviaUnreachable_IsNotReceived()
     {
         _partnerApi.Fail(new HttpRequestException("down"));

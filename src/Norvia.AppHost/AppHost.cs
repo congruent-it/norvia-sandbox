@@ -353,6 +353,12 @@ if (builder.ExecutionContext.IsPublishMode)
         simulator.WithEnvironment($"PartnerPortal__ShipperEndpointKeys__{shipper.PartyId}", partnerPortalSecrets.Resource.GetSecret($"shipper-endpoint-key-{shipper.PartyId}"));
     }
 
+    // And each Carrier Persona's booking inbox and invoices page, with the Carrier's own endpoint key, from the same vault.
+    foreach (var carrier in personas.Where(persona => !persona.IsShipper))
+    {
+        simulator.WithEnvironment($"PartnerPortal__CarrierEndpointKeys__{carrier.PartyId}", partnerPortalSecrets.Resource.GetSecret($"carrier-endpoint-key-{carrier.PartyId}"));
+    }
+
     // The estate switches the reset on (resetEnabled, off by default). The Partner portal and the Simulator share a key from the portal's vault.
     tmsApi.WithEnvironment("Reset__Enabled", estate.ResetEnabled);
     driverAppApi.WithEnvironment("Reset__Enabled", estate.ResetEnabled);
@@ -647,6 +653,8 @@ else
             .WithEnvironment($"CarrierInvoiceOutcome__Carriers__{persona.PartyId}__ApiKey", carrierApiKey);
         // The Persona's booking and cancellation endpoints ask their callers for the same credential, as Key Vault holds it in Azure.
         partnerPortal.WithEnvironment($"CarrierEndpoint__ApiKeys__{persona.PartyId}", carrierApiKey);
+        // The Simulator reads the Carrier's booking inbox and invoices page with the same key.
+        simulator.WithEnvironment($"PartnerPortal__CarrierEndpointKeys__{persona.PartyId}", carrierApiKey);
     }
 
     // Each Shipper Persona's notification endpoint asks its caller, the P7 Shipper notification Logic App, for a credential
@@ -745,11 +753,12 @@ else
             partnerPortal.WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__1", LocalTokens.TrackingSubmitRole);
             partnerPortal.WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__2", LocalTokens.ProofsOfDeliverySubmitRole);
             partnerPortal.WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__3", LocalTokens.CarrierInvoicesSubmitRole);
-            // The Simulator plays each Carrier as its Persona: it answers the booking, tracks the Shipment and proves the delivery, with the same subscription key.
+            // The Simulator plays each Carrier as its Persona: it answers the booking, tracks the Shipment, proves the delivery and invoices it, with the same subscription key.
             simulator.WithEnvironment($"PartnerApi__SubscriptionKeys__{persona.Id}", subscriptionKey)
                 .WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__0", LocalTokens.RespondRole)
                 .WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__1", LocalTokens.TrackingSubmitRole)
-                .WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__2", LocalTokens.ProofsOfDeliverySubmitRole);
+                .WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__2", LocalTokens.ProofsOfDeliverySubmitRole)
+                .WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__3", LocalTokens.CarrierInvoicesSubmitRole);
         }
     }
 

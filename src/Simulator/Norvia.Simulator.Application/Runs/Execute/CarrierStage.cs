@@ -129,6 +129,7 @@ internal sealed class CarrierStage(IPartnerApi partner, ITmsApi tms, TimeProvide
             if (carrierEvent == CarrierEvent.Delivered)
             {
                 tally.Delivered++;
+                tally.Deliveries.Add(new CarrierDelivery(shipment, carrierBookingNumber, reference));
             }
         }
 
@@ -245,6 +246,8 @@ internal sealed class CarrierStage(IPartnerApi partner, ITmsApi tms, TimeProvide
 
         public int Delivered { get; set; }
 
-        public CarrierResult Result(bool stopped) => new(stopped, Released, Confirmed, Delivered);
+        public List<CarrierDelivery> Deliveries { get; } = [];
+
+        public CarrierResult Result(bool stopped) => new(stopped, Released, Confirmed, Delivered, Deliveries);
     }
 }

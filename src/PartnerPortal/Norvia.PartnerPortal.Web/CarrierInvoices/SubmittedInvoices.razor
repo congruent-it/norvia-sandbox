@@ -11,7 +11,7 @@
 @using Norvia.PartnerPortal.Domain.ShipperInvoices
 @using Norvia.PartnerPortal.Web.ShipperInvoices
 
-<PageTitle>Invoices · @(_persona?.DisplayName ?? PersonaId) · Partner portal</PageTitle>
+<PageTitle>Partner portal · @(_persona?.DisplayName ?? PersonaId) · Invoices</PageTitle>
 
 <h1>Invoices</h1>
 
@@ -41,27 +41,38 @@ else if (_invoices.Count == 0)
 else
 {
     <p class="mb-6">
-        Every invoice @_persona!.DisplayName sent Norvia, the latest first. Norvia tells the outcome of each line once its Finance
+        Every invoice @_persona!.DisplayName sent Norvia, the latest first, from this portal or from its own system. Norvia tells the outcome of each line once its Finance
         has decided. A rejected line can be invoiced again from the draft invoice, with a new invoice number.
     </p>
     @foreach (var invoice in _invoices)
     {
         <article class="mb-8" aria-label="@invoice.InvoiceNumber">
             <h2>Invoice @invoice.InvoiceNumber</h2>
-            <p class="text-muted">
-                Dated @LocalDateText.Of(invoice.InvoiceDate), sent @PortalTime.Format(invoice.SubmittedAt) ·
-                <span class="status">@CarrierInvoiceText.Of(invoice.Status)</span>
+            <div class="text-muted mb-3 flex flex-wrap items-center gap-x-4 gap-y-1">
+                <span class="status @StatusClass(invoice) text-xs font-semibold tracking-widest uppercase">@CarrierInvoiceText.Of(invoice.Status)</span>
+                @if (invoice.InvoiceDate is { } invoiceDate)
+                {
+                    <span>Dated @LocalDateText.Of(invoiceDate)</span>
+                    <span>Sent @PortalTime.Format(invoice.SubmittedAt)</span>
+                }
+                else
+                {
+                    <span class="elsewhere">Sent from @_persona!.DisplayName's own system, not from this portal. Only Norvia's outcome is known here.</span>
+                }
                 @if (invoice.OutcomeTold)
                 {
-                    <span class="told"> · Norvia told the outcome @PortalTime.Format(invoice.OutcomeReceivedAt!.Value)</span>
+                    <span class="told">Norvia told the outcome @PortalTime.Format(invoice.OutcomeReceivedAt!.Value)</span>
                 }
-            </p>
+            </div>
             <table class="lux-table" aria-label="Lines of @invoice.InvoiceNumber">
                 <thead>
                     <tr>
                         <th>Booking reference</th>
-                        <th class="text-right">Amount</th>
-                        <th>Norvia's result on receipt</th>
+                        @if (invoice.SentFromPortal)
+                        {
+                            <th class="text-right">Amount</th>
+                            <th>Norvia's result on receipt</th>
+                        }
                         <th>Outcome</th>
                         <th>Remark</th>
                     </tr>
@@ -71,18 +82,25 @@ else
                     {
                         <tr>
                             <td>@line.BookingRef</td>
-                            <td class="text-right">@InvoiceText.Money(line.Amount)</td>
-                            <td>@CarrierInvoiceText.Of(line.Result)</td>
-                            <td class="outcome">@CarrierInvoiceText.Outcome(line.Outcome)</td>
+                            @if (invoice.SentFromPortal)
+                            {
+                                <td class="text-right">@CarrierInvoiceText.Claimed(line.Amount)</td>
+                                <td>@CarrierInvoiceText.OnReceipt(line.Result)</td>
+                            }
+                            <td class="outcome @OutcomeClass(line.Outcome)">@CarrierInvoiceText.Outcome(line.Outcome)</td>
                             <td>@line.Outcome?.Remark</td>
                         </tr>
                     }
                 </tbody>
                 <tfoot>
-                    <tr><th colspan="4" scope="row">Total claimed</th><td class="text-right total">@InvoiceText.Money(invoice.Total)</td></tr>
+                    @if (invoice.Total is { } total)
+                    {
+                        <tr><th scope="row">Total claimed</th><td class="text-right total">@InvoiceText.Money(total)</td><td colspan="3"></td></tr>
+                    }
                     @if (invoice.ApprovedAmount is { } approved)
                     {
-                        <tr><th colspan="4" scope="row">Approved</th><td class="text-right approved">@InvoiceText.Money(approved)</td></tr>
+                        @* Under the outcomes, which say what was accepted. *@
+                        <tr><th scope="row">Approved</th>@if (invoice.SentFromPortal){<td colspan="2"></td>}<td class="approved">@InvoiceText.Money(approved)</td><td></td></tr>
                     }
                 </tfoot>
             </table>
@@ -91,6 +109,15 @@ else
 }
 
 @code {
+    private static string StatusClass(CarrierInvoiceView invoice) => invoice.Status == CarrierInvoiceStatus.Approved ? "text-success" : "text-warning";
+
+    private static string OutcomeClass(CarrierInvoiceOutcomeLine? outcome) => outcome?.Result switch
+    {
+        null => "text-muted",
+        CarrierInvoiceOutcomeResult.Rejected => "text-danger",
+        _ => "text-success",
+    };
+
     /// <summary>How often the list reads itself again, so an outcome shows as Norvia tells it without a page refresh.</summary>
     public static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(2);
 

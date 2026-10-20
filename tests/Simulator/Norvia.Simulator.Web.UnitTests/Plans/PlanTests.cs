@@ -16,7 +16,7 @@ namespace Norvia.Simulator.Web.UnitTests.Plans;
 
 public sealed class PlanTests : SimulatorWebContext
 {
-    private const string Address = "/plan?orders=3&bad=34&today=30&seed=77&mode=Paced&window=10&assigned=60&ownfleet=40&reassign=20&trips=100&release=90&confirm=70&decline=15&tracked=90&exception=10&delivered=80&pod=85&cancel=50&collfail=10&delfail=10&damaged=5&reservations=10&invoiced=100&credited=50&preset=Busy%20day";
+    private const string Address = "/plan?orders=3&bad=34&today=30&seed=77&mode=Paced&window=10&assigned=60&ownfleet=40&reassign=20&trips=100&release=90&confirm=70&decline=15&tracked=90&exception=10&delivered=80&pod=85&cancel=50&collfail=10&delfail=10&damaged=5&reservations=10&invoiced=100&credited=50&editedinvoices=50&rejectedlines=25&preset=Busy%20day";
 
     private static readonly SimulationSettings Settings = new(3, 34, 30, 77, RunMode.Paced, TimeSpan.FromMinutes(10), "Busy day", 60, 40, 20);
 
@@ -165,7 +165,7 @@ public sealed class PlanTests : SimulatorWebContext
     [Fact]
     public void PlanLinks_ACustomRun_NamesNoPreset()
     {
-        PlanLinks.Plan(Settings with { PresetName = null, Mode = RunMode.Burst, Window = TimeSpan.Zero }).Should().Be("/plan?orders=3&bad=34&today=30&seed=77&mode=Burst&window=0&assigned=60&ownfleet=40&reassign=20&trips=100&release=90&confirm=70&decline=15&tracked=90&exception=10&delivered=80&pod=85&cancel=50&collfail=10&delfail=10&damaged=5&reservations=10&invoiced=100&credited=50");
+        PlanLinks.Plan(Settings with { PresetName = null, Mode = RunMode.Burst, Window = TimeSpan.Zero }).Should().Be("/plan?orders=3&bad=34&today=30&seed=77&mode=Burst&window=0&assigned=60&ownfleet=40&reassign=20&trips=100&release=90&confirm=70&decline=15&tracked=90&exception=10&delivered=80&pod=85&cancel=50&collfail=10&delfail=10&damaged=5&reservations=10&invoiced=100&credited=50&editedinvoices=50&rejectedlines=25");
     }
 
     [Fact]
@@ -264,7 +264,7 @@ public sealed class PlanTests : SimulatorWebContext
 
         var link = PlanLinks.Plan(settings);
 
-        link.Should().Contain("&invoiced=60&credited=25");
+        link.Should().Contain("&invoiced=60&credited=25&editedinvoices=50&rejectedlines=25");
         PlanLinks.Settings(3, 34, 30, 77, "Paced", 10, "Busy day", 60, 40, 20, invoiced: 60, credited: 25).Should().Be(settings);
     }
 
@@ -279,7 +279,7 @@ public sealed class PlanTests : SimulatorWebContext
 
         var link = PlanLinks.Plan(settings);
 
-        link.Should().Contain("collfail=20&delfail=25&damaged=7&reservations=40&invoiced=100&credited=50");
+        link.Should().Contain("collfail=20&delfail=25&damaged=7&reservations=40&invoiced=100&credited=50&editedinvoices=50&rejectedlines=25");
         PlanLinks.Settings(3, 34, 30, 77, "Paced", 10, "Busy day", 60, 40, 20, collectionFailed: 20, deliveryFailed: 25, damaged: 7, reservations: 40).Should().Be(settings);
     }
 

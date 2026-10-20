@@ -15,7 +15,7 @@
 @using Norvia.PartnerPortal.Domain.ShipperInvoices
 @using Norvia.PartnerPortal.Web.ShipperInvoices
 
-<PageTitle>Draft invoice · @(_persona?.DisplayName ?? PersonaId) · Partner portal</PageTitle>
+<PageTitle>Partner portal · @(_persona?.DisplayName ?? PersonaId) · Draft invoice</PageTitle>
 
 <h1>Draft invoice</h1>
 
@@ -75,8 +75,8 @@ else
                     {
                         <tr>
                             <td>@line.BookingRef</td>
-                            <td class="text-right">@InvoiceText.Money(line.Amount)</td>
-                            <td>@CarrierInvoiceText.Of(line.Result)</td>
+                            <td class="text-right">@CarrierInvoiceText.Claimed(line.Amount)</td>
+                            <td>@CarrierInvoiceText.OnReceipt(line.Result)</td>
                         </tr>
                     }
                 </tbody>

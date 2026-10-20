@@ -11,6 +11,7 @@ internal static class Contracts
     private static readonly Lazy<JsonSchema> CarrierAnswerSchema = new(() => Schema("carrier-answer"));
     private static readonly Lazy<JsonSchema> CarrierTrackingSchema = new(() => Schema("carrier-tracking"));
     private static readonly Lazy<JsonSchema> CarrierProofSchema = new(() => Schema("carrier-proof-of-delivery"));
+    private static readonly Lazy<JsonSchema> CarrierInvoiceSchema = new(() => Schema("carrier-invoice"));
 
     public static string ReadText(string path)
     {
@@ -33,6 +34,9 @@ internal static class Contracts
 
     /// <summary>What breaks the Carrier Proof of delivery schema, or nothing.</summary>
     public static IEnumerable<string> CarrierProofSchemaErrors(JsonNode? proof) => Errors(CarrierProofSchema.Value, proof);
+
+    /// <summary>What breaks the Carrier invoice schema, or nothing.</summary>
+    public static IEnumerable<string> CarrierInvoiceSchemaErrors(JsonNode? invoice) => Errors(CarrierInvoiceSchema.Value, invoice);
 
     private static JsonSchema Schema(string name) => JsonSchema.FromText(ReadText($"PartnerApi/{name}.v1.schema.json"));
 

@@ -18,6 +18,12 @@ public static class CarrierInvoiceText
         _ => throw new ArgumentOutOfRangeException(nameof(result), result, "The screens have no words for this result."),
     };
 
+    /// <summary>What Norvia made of a line on receipt, or a dash for an invoice the portal never saw.</summary>
+    public static string OnReceipt(CarrierInvoiceLineResult? result) => result is { } known ? Of(known) : "—";
+
+    /// <summary>What a line or an invoice claims, or a dash for an invoice the portal never saw.</summary>
+    public static string Claimed(decimal? amount) => amount is { } known ? InvoiceText.Money(known) : "—";
+
     /// <summary>What became of a line once Norvia told the outcome.</summary>
     public static string Of(CarrierInvoiceOutcomeResult result) => result switch
     {

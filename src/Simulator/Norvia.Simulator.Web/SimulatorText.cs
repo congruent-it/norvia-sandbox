@@ -45,6 +45,10 @@ public static class SimulatorText
         LogOutcome.InvoicingRefused => "ERP refused",
         LogOutcome.InvoicingNotReceived => "ERP not reached",
         LogOutcome.InboxReceived => "In the inbox",
+        LogOutcome.CarrierInvoiced => "Carrier invoice sent",
+        LogOutcome.LineAccepted => "Line accepted",
+        LogOutcome.LineRejected => "Line rejected",
+        LogOutcome.OutcomeReceived => "Outcome received",
         _ => throw new ArgumentOutOfRangeException(nameof(outcome), outcome, "Every outcome has a wording."),
     };
 

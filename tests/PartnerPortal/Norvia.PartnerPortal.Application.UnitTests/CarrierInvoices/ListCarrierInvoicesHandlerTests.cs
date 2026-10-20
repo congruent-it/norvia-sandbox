@@ -44,4 +44,42 @@ public sealed class ListCarrierInvoicesHandlerTests
         told.Lines.Select(line => line.Outcome!.Result).Should().Equal(CarrierInvoiceOutcomeResult.Accepted, CarrierInvoiceOutcomeResult.Rejected);
         invoices[1].OutcomeTold.Should().BeFalse("another invoice number was not told");
     }
+
+    [Fact]
+    public async Task Handle_AnOutcomeOfAnInvoiceThePortalNeverSaw_IsListedByItsOutcomeAlone_AmongTheOthersLatestFirst()
+    {
+        _invoices.ListAsync(Arg.Any<CarrierInvoicesOfPersonaSpec>(), Arg.Any<CancellationToken>()).Returns([CarrierInvoiceSamples.Invoice("INV-1", "VDT-1")]);
+        _outcomes.ListAsync(Arg.Any<CarrierInvoiceOutcomesOfPersonaSpec>(), Arg.Any<CancellationToken>())
+            .Returns([CarrierInvoiceSamples.Outcome("INV-1", ("VDT-1", CarrierInvoiceOutcomeResult.Accepted)), CarrierInvoiceSamples.Outcome("SIM-INV", ("SIM-1", CarrierInvoiceOutcomeResult.Matched))]);
+
+        var invoices = await ListAsync();
+
+        invoices.Select(invoice => invoice.InvoiceNumber).Should().BeEquivalentTo(["INV-1", "SIM-INV"]);
+        var elsewhere = invoices.Single(invoice => invoice.InvoiceNumber == "SIM-INV");
+        elsewhere.SentFromPortal.Should().BeFalse();
+        (elsewhere.InvoiceDate, elsewhere.Total, elsewhere.Status, elsewhere.ApprovedAmount, elsewhere.OutcomeTold).Should().Be((null, null, CarrierInvoiceStatus.Approved, 100m, true));
+        elsewhere.Lines.Should().ContainSingle().Which.Should().Match<Application.CarrierInvoices.CarrierInvoiceLineView>(line => line.BookingRef == "SIM-1" && line.Amount == null && line.Result == null && line.Outcome!.Result == CarrierInvoiceOutcomeResult.Matched);
+        invoices.Single(invoice => invoice.InvoiceNumber == "INV-1").SentFromPortal.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Handle_NothingSentAndNothingToldYet_ListsNothing()
+    {
+        _invoices.ListAsync(Arg.Any<CarrierInvoicesOfPersonaSpec>(), Arg.Any<CancellationToken>()).Returns([]);
+        _outcomes.ListAsync(Arg.Any<CarrierInvoiceOutcomesOfPersonaSpec>(), Arg.Any<CancellationToken>()).Returns([]);
+
+        (await ListAsync()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Handle_TheLatestFirst_WhetherSentFromThePortalOrNot()
+    {
+        var older = CarrierInvoiceSamples.Invoice("INV-OLD", "VDT-1");
+        _invoices.ListAsync(Arg.Any<CarrierInvoicesOfPersonaSpec>(), Arg.Any<CancellationToken>()).Returns([older]);
+        var later = CarrierInvoiceOutcome.Receive(
+            CarrierInvoiceSamples.Persona, "SIM-INV", "corr-3", UnitTests.Samples.Now.AddDays(1), 10m, [new CarrierInvoiceOutcomeLine("SIM-1", CarrierInvoiceOutcomeResult.Matched, 10m, null)]);
+        _outcomes.ListAsync(Arg.Any<CarrierInvoiceOutcomesOfPersonaSpec>(), Arg.Any<CancellationToken>()).Returns([later]);
+
+        (await ListAsync()).Select(invoice => invoice.InvoiceNumber).Should().Equal("SIM-INV", "INV-OLD");
+    }
 }

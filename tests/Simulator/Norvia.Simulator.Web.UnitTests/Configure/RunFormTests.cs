@@ -35,6 +35,8 @@ public sealed class RunFormTests
     [InlineData(nameof(RunForm.DeliveredPercent), -1)]
     [InlineData(nameof(RunForm.ProofOfDeliveryPercent), 101)]
     [InlineData(nameof(RunForm.CancelPercent), -1)]
+    [InlineData(nameof(RunForm.EditedCarrierInvoicePercent), 101)]
+    [InlineData(nameof(RunForm.RejectedCarrierLinePercent), -1)]
     public void Validate_AFieldOutOfRange_IsNamedByItsField(string field, int value)
     {
         var form = new RunForm { Limits = TestData.Limits };
@@ -139,5 +141,24 @@ public sealed class RunFormTests
         form.Fill(Presets.All[1]);
 
         form.ToSettings().Should().Be(Presets.All[1].ToSettings(0));
+    }
+
+    [Fact]
+    public void ToSettings_TheCarrierInvoicingShares_AreTheInvoicingSettings()
+    {
+        var settings = new RunForm { Limits = TestData.Limits, EditedCarrierInvoicePercent = 30, RejectedCarrierLinePercent = 70 }.ToSettings();
+
+        (settings.Invoicing.EditedCarrierInvoicePercent, settings.Invoicing.RejectedCarrierLinePercent).Should().Be((30, 70));
+    }
+
+    [Fact]
+    public void Fill_TheSettingsOfAnEarlierRun_BringBackTheCarrierInvoicingShares()
+    {
+        var form = new RunForm { Limits = TestData.Limits };
+        var earlier = new RunForm { Limits = TestData.Limits, EditedCarrierInvoicePercent = 10, RejectedCarrierLinePercent = 90 }.ToSettings();
+
+        form.Fill(earlier, []);
+
+        (form.EditedCarrierInvoicePercent, form.RejectedCarrierLinePercent).Should().Be((10, 90));
     }
 }

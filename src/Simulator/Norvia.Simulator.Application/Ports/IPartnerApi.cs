@@ -21,4 +21,7 @@ public interface IPartnerApi
 
     /// <summary>The Carrier proves a delivery (P6), by claim check: Norvia accepts it at once and processes it later.</summary>
     Task<CarrierCallAnswer> SendProofOfDeliveryAsync(SimulatedCarrier carrier, CarrierProofRequest proof, CancellationToken cancellationToken);
+
+    /// <summary>The Carrier sends its Carrier invoice (E2), which Norvia matches line by line and answers at once.</summary>
+    Task<CarrierInvoiceAnswer> SendCarrierInvoiceAsync(SimulatedCarrier carrier, CarrierInvoiceRequest invoice, CancellationToken cancellationToken);
 }

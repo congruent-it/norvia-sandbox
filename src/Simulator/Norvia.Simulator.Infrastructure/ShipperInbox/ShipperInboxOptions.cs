@@ -16,4 +16,7 @@ public sealed class ShipperInboxOptions
 
     /// <summary>The Shipper's invoice endpoint key, by the Shipper's ID.</summary>
     public Dictionary<string, string> ShipperEndpointKeys { get; set; } = [];
+
+    /// <summary>The Carrier's booking endpoint key, by the Carrier's ID, which the portal's reads of the Carrier's booking inbox and invoices page ask too.</summary>
+    public Dictionary<string, string> CarrierEndpointKeys { get; set; } = [];
 }

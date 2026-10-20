@@ -7,7 +7,7 @@ namespace Norvia.Simulator.Infrastructure.PartnerApi;
 
 /// <summary>
 /// Writes what a Carrier says in the Norvia Partner API's Carrier formats (contracts/partner-api: carrier-answer, carrier-tracking and
-/// carrier-proof-of-delivery). None of them names the Carrier: API Management takes it from the token (ADR 0005). A unit test checks
+/// carrier-proof-of-delivery and carrier-invoice). None of them names the Carrier: API Management takes it from the token (ADR 0005). A unit test checks
 /// each against its schema.
 /// </summary>
 internal static class CarrierFormats
@@ -70,6 +70,26 @@ internal static class CarrierFormats
         Add(json, "remark", proof.Remark);
         json["files"] = new JsonArray(new JsonObject { ["name"] = $"{proof.DocumentId}.pdf", ["contentType"] = "application/pdf", ["content"] = ProofFile(proof) });
         return json;
+    }
+
+    public static JsonObject Invoice(CarrierInvoiceRequest invoice)
+    {
+        ArgumentNullException.ThrowIfNull(invoice);
+
+        var lines = new JsonArray();
+        foreach (var line in invoice.Lines)
+        {
+            var json = new JsonObject { ["bookingRef"] = line.BookingReference, ["amount"] = line.Amount };
+            Add(json, "description", line.Description);
+            lines.Add(json);
+        }
+
+        return new JsonObject
+        {
+            ["invoiceNo"] = invoice.InvoiceNumber,
+            ["invoiceDate"] = invoice.InvoiceDate.ToString("dd-MM-yyyy", CultureInfo.InvariantCulture),
+            ["lines"] = lines,
+        };
     }
 
     private static string ProofFile(CarrierProofRequest proof) =>
