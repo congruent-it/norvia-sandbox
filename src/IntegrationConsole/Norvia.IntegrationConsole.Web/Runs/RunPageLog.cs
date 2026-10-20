@@ -11,4 +11,7 @@ internal static partial class RunPageLog
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Fetching the bodies of step {Step} of the run {RunId} failed")]
     public static partial void StepFailed(ILogger logger, Exception exception, string step, string runId);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Listing the failed runs failed")]
+    public static partial void ListFailed(ILogger logger, Exception exception);
 }

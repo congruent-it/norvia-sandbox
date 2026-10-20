@@ -15,7 +15,7 @@ namespace Norvia.IntegrationConsole.Infrastructure.Runs;
 /// from run history's signed content links only when asked for, and never logged.
 /// </summary>
 internal sealed class LogicAppsWorkflowRuns(IHttpClientFactory clients, TokenCredential credential, IOptions<WorkflowRunsOptions> options)
-    : IWorkflowRuns
+    : IWorkflowRuns, IFailedRuns
 {
     /// <summary>Calls the management API with the console's token.</summary>
     public const string ManagementClient = "logic-apps-management";
@@ -24,6 +24,7 @@ internal sealed class LogicAppsWorkflowRuns(IHttpClientFactory clients, TokenCre
     public const string ContentsClient = "logic-apps-run-contents";
 
     private const string ApiVersion = "api-version=2018-11-01";
+    private const string SitesApiVersion = "2023-12-01";
     private const string Management = "https://management.azure.com";
     private static readonly string[] ManagementScopes = [$"{Management}/.default"];
 
@@ -76,6 +77,22 @@ internal sealed class LogicAppsWorkflowRuns(IHttpClientFactory clients, TokenCre
         return new RecordedBodies(
             await BodyAsync(step?["inputsLink"], secure.Inputs, cancellationToken),
             await BodyAsync(step?["outputsLink"], secure.Outputs, cancellationToken));
+    }
+
+    public async Task<IReadOnlyList<RecordedFailedRun>> FailedRunsAsync(DateTimeOffset since, CancellationToken cancellationToken)
+    {
+        var resourceGroup = ResourceGroup();
+        var workflows = new List<WorkflowRun>();
+        var apps = await ListAsync($"{Management}{resourceGroup}/providers/Microsoft.Web/sites?api-version={SitesApiVersion}", cancellationToken);
+        foreach (var app in apps.Where(IsLogicApp).Select(site => Text(site, "name")).OfType<string>())
+        {
+            var found = await ListAsync($"{AppAddress(resourceGroup, app)}/workflows?{ApiVersion}", cancellationToken);
+            workflows.AddRange(found.Select(workflow => Text(workflow, "name")).OfType<string>().Select(name => new WorkflowRun(app, name, string.Empty)));
+        }
+
+        // One workflow's failed runs don't wait for another's: the page refreshes every few seconds.
+        var failed = await Task.WhenAll(workflows.Select(workflow => FailedRunsOfAsync(resourceGroup, workflow, since, cancellationToken)));
+        return [.. failed.SelectMany(runs => runs)];
     }
 
     private async Task<RecordedBody> BodyAsync(JsonNode? link, bool secure, CancellationToken cancellationToken)
@@ -155,6 +172,63 @@ internal sealed class LogicAppsWorkflowRuns(IHttpClientFactory clients, TokenCre
         return JsonNode.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
     }
 
+    private async Task<List<RecordedFailedRun>> FailedRunsOfAsync(
+        string resourceGroup, WorkflowRun workflow, DateTimeOffset since, CancellationToken cancellationToken)
+    {
+        var address = $"{AppAddress(resourceGroup, workflow.LogicApp)}/workflows/{Escaped(workflow.Workflow)}";
+        var filter = Uri.EscapeDataString($"status eq 'Failed' and startTime ge {since.UtcDateTime:yyyy-MM-ddTHH:mm:ssZ}");
+        var failed = new List<RecordedFailedRun>();
+        foreach (var run in await ListAsync($"{address}/runs?{ApiVersion}&$filter={filter}", cancellationToken))
+        {
+            if (Text(run, "name") is not { } runId || Time(run["properties"], "startTime") is not { } start)
+            {
+                continue;
+            }
+
+            var steps = new List<(RecordedStep Step, JsonNode? Properties)>();
+            foreach (var action in await ListAsync($"{address}/runs/{Escaped(runId)}/actions?{ApiVersion}", cancellationToken))
+            {
+                steps.Add((Step(action, action["properties"] as JsonObject, []), action["properties"]));
+            }
+
+            // The first step to end in failure is the cause; a scope around it fails after it.
+            var cause = steps.Where(step => step.Step.Status is "Failed" or "TimedOut")
+                .OrderBy(step => step.Step.End ?? DateTimeOffset.MaxValue)
+                .Select(step => step.Step)
+                .FirstOrDefault();
+            failed.Add(new RecordedFailedRun(
+                new WorkflowRun(workflow.LogicApp, workflow.Workflow, runId),
+                start,
+                Tracked(steps, "flow"),
+                Tracked(steps, "correlationId"),
+                cause?.Name,
+                cause?.Error));
+        }
+
+        return failed;
+    }
+
+    // What a step tracked under a key of the tracking contract: any step may have, and the first to have is enough.
+    private static string? Tracked(IEnumerable<(RecordedStep Step, JsonNode? Properties)> steps, string key) =>
+        steps.Select(step => Text(step.Properties?["trackedProperties"], key)).FirstOrDefault(value => value is not null);
+
+    // Every item of a list the API answers a page at a time, as a bare array or in a value.
+    private async Task<List<JsonNode>> ListAsync(string address, CancellationToken cancellationToken)
+    {
+        var items = new List<JsonNode>();
+        string? page = address;
+        while (page is not null)
+        {
+            var answer = await GetAsync(page, cancellationToken);
+            items.AddRange(answer is JsonArray array ? array.OfType<JsonNode>() : answer is null ? [] : Items(answer));
+            page = answer is JsonObject paged ? paged["nextLink"]?.GetValue<string>() : null;
+        }
+
+        return items;
+    }
+
+    private static bool IsLogicApp(JsonNode site) => Text(site, "kind")?.Contains("workflowapp", StringComparison.OrdinalIgnoreCase) == true;
+
     private async Task<HttpRequestMessage> RequestAsync(string address, CancellationToken cancellationToken)
     {
         var token = await credential.GetTokenAsync(new TokenRequestContext(ManagementScopes), cancellationToken);
@@ -163,16 +237,16 @@ internal sealed class LogicAppsWorkflowRuns(IHttpClientFactory clients, TokenCre
         return request;
     }
 
-    private string WorkflowAddress(WorkflowRun run)
-    {
-        var resourceGroupId = !string.IsNullOrWhiteSpace(options.Value.ResourceGroupId)
+    private string WorkflowAddress(WorkflowRun run) => $"{AppAddress(ResourceGroup(), run.LogicApp)}/workflows/{Escaped(run.Workflow)}";
+
+    private string ResourceGroup() =>
+        !string.IsNullOrWhiteSpace(options.Value.ResourceGroupId)
             ? options.Value.ResourceGroupId.TrimEnd('/')
             : throw new InvalidOperationException(
                 $"The console isn't connected to an estate: {WorkflowRunsOptions.SectionName}:{nameof(WorkflowRunsOptions.ResourceGroupId)} is not set.");
 
-        return $"{Management}{resourceGroupId}/providers/Microsoft.Web/sites/{Escaped(run.LogicApp)}" +
-            $"/hostruntime/runtime/webhooks/workflow/api/management/workflows/{Escaped(run.Workflow)}";
-    }
+    private static string AppAddress(string resourceGroupId, string logicApp) =>
+        $"{Management}{resourceGroupId}/providers/Microsoft.Web/sites/{Escaped(logicApp)}/hostruntime/runtime/webhooks/workflow/api/management";
 
     private static string RunAddress(string workflow, WorkflowRun run, string below = "") =>
         $"{workflow}/runs/{Escaped(run.RunId)}{below}?{ApiVersion}";

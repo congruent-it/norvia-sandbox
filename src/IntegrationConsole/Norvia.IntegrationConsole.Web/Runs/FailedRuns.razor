@@ -1,0 +1,172 @@
+@page "/failed-runs"
+@* Interactive, not prerendered: the page reads the Logic Apps itself and keeps refreshing for as long as the circuit is open. *@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using Norvia.IntegrationConsole.Application.Runs.Failed
+@inject IRunRequests Runs
+@inject NavigationManager Navigation
+@inject TimeProvider Time
+@inject ILogger<FailedRuns> Logger
+@implements IDisposable
+
+<PageTitle>Integration console · Failed runs</PageTitle>
+
+<h1>Failed runs</h1>
+@* Read from the Logic Apps' run history, not Application Insights, so a failure shows within seconds. *@
+<p class="text-muted">
+    Logic App runs that failed in the last 24 hours, newest first. This page refreshes itself every few seconds.
+</p>
+<p role="note" class="text-muted mb-6">
+    Failed runs are view only. The console never resubmits a run; a dead-lettered message is resubmitted from its queue.
+</p>
+
+@if (_result is { } result)
+{
+    <form role="search" aria-label="Failed runs" class="mb-8 flex flex-wrap items-end gap-4">
+        <FluentSelect TOption="string" Value="@(_flow ?? string.Empty)" ValueChanged="Filter" Label="Flow">
+            <FluentOption TOption="string" Value="@string.Empty">All flows</FluentOption>
+            @foreach (var flow in result.Flows)
+            {
+                <FluentOption TOption="string" Value="@flow">@flow</FluentOption>
+            }
+        </FluentSelect>
+    </form>
+}
+
+@if (_loading)
+{
+    <div role="status">
+        <FluentStack VerticalAlignment="VerticalAlignment.Center">
+            <FluentProgressRing />
+            <span>Loading the failed runs…</span>
+        </FluentStack>
+    </div>
+}
+else if (_failed)
+{
+    <div role="alert">
+        <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+            The failed runs couldn't be listed. The page tries again in a moment; if it keeps failing, the console may not
+            reach the estate's Logic Apps.
+        </FluentMessageBar>
+    </div>
+}
+else if (_result is { Runs: { Count: 0 } })
+{
+    <p role="status">
+        No failed runs @(string.IsNullOrEmpty(_flow) ? "" : $"of {_flow} ")between @ConsoleTime.Format(_result.From) and @ConsoleTime.Format(_result.To).
+    </p>
+}
+else if (_result is { } found)
+{
+    @* Keys and errors only: a body holds personal data, and shows only when an operator opens a step of the run. *@
+    <FluentDataGrid Items="found.Runs.AsQueryable()" TGridItem="FailedRun" aria-label="Failed runs found" MultiLine="true"
+                    GridTemplateColumns="max-content max-content minmax(16rem, 1fr) max-content">
+        <PropertyColumn Title="Flow" Property="@(run => run.Flow)" />
+        <PropertyColumn Title="Time" Property="@(run => ConsoleTime.Format(run.Start))" />
+        <TemplateColumn Title="Failing step">
+            @if (context.Run is { } logicAppRun)
+            {
+                @* Locally there are no Logic Apps, so no run to open and no step to name. *@
+                @if (context.FailedStep is { } step)
+                {
+                    <a href="@TrailLinks.Run(logicAppRun)" class="font-mono text-xs">@step</a>
+                }
+                else
+                {
+                    <a href="@TrailLinks.Run(logicAppRun)">Open the run</a>
+                }
+            }
+            @if (RunText.Of(context.Error) is { } error)
+            {
+                <div class="text-danger">@error</div>
+            }
+        </TemplateColumn>
+        <TemplateColumn Title="Correlation ID">
+            @if (context.CorrelationId is { } correlationId)
+            {
+                <a href="@TrailLinks.Trail(correlationId)" class="font-mono text-xs">@correlationId</a>
+            }
+            else
+            {
+                <span class="text-muted">–</span>
+            }
+        </TemplateColumn>
+    </FluentDataGrid>
+}
+
+@code {
+    private static readonly TimeSpan RefreshEvery = TimeSpan.FromSeconds(5);
+
+    private readonly CancellationTokenSource _open = new();
+    private string? _flow;
+    private bool _loading;
+    private bool _failed;
+    private FailedRunList? _result;
+
+    [SupplyParameterFromQuery(Name = "flow")]
+    private string? Flow { get; set; }
+
+    protected override void OnInitialized() => _ = RefreshAsync(_open.Token);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _flow = Flow?.Trim();
+        _result = null;
+        await LoadAsync(_open.Token);
+    }
+
+    private async Task LoadAsync(CancellationToken cancellation)
+    {
+        // The list stays while it refreshes; only the first load shows progress.
+        _loading = _result is null;
+        try
+        {
+            _result = await Runs.ListFailedAsync(new ListFailedRunsQuery(_flow), cancellation);
+            _failed = false;
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            RunPageLog.ListFailed(Logger, exception);
+            _failed = true;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task RefreshAsync(CancellationToken cancellation)
+    {
+        using var timer = new PeriodicTimer(RefreshEvery, Time);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellation))
+            {
+                await InvokeAsync(async () =>
+                {
+                    await LoadAsync(cancellation);
+                    StateHasChanged();
+                });
+            }
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+    }
+
+    private void Filter(string flow) =>
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameters("/failed-runs", new Dictionary<string, object?>
+        {
+            ["flow"] = string.IsNullOrEmpty(flow) ? null : flow,
+        }));
+
+    public void Dispose()
+    {
+        _open.Cancel();
+        _open.Dispose();
+    }
+}

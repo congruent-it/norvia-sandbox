@@ -68,6 +68,7 @@ Search and the trail's outline come from Application Insights, so they can be a 
 - The failed runs of every Logic App in the estate over the last 24 hours, newest first, filterable by flow.
 - Each row shows the flow, the time, the failing step and its error, and the correlation ID, which opens the trail.
 - The panel refreshes itself every few seconds while it's open.
+- Locally there are no Logic Apps, so it lists the failures the Aspire dashboard holds instead ([ADR 0027](../adr/0027-locally-the-integration-console-searches-the-aspire-dashboards-telemetry.md)): each row has its flow, time, failure code and correlation ID, but no failing step and no run to open.
 
 ### Dead-letter queues (slice 2)
 
