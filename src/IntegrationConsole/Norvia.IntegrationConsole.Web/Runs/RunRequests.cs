@@ -1,5 +1,6 @@
 using Ardalis.Result;
 using Mediator;
+using Norvia.IntegrationConsole.Application.Runs.Failed;
 using Norvia.IntegrationConsole.Application.Runs.Open;
 using Norvia.IntegrationConsole.Application.Runs.Steps;
 
@@ -15,6 +16,9 @@ internal sealed class RunRequests(IServiceScopeFactory scopes) : IRunRequests
         SendAsync(query, cancellationToken);
 
     public Task<Result<StepDetail>> OpenStepAsync(OpenStepQuery query, CancellationToken cancellationToken) =>
+        SendAsync(query, cancellationToken);
+
+    public Task<FailedRunList> ListFailedAsync(ListFailedRunsQuery query, CancellationToken cancellationToken) =>
         SendAsync(query, cancellationToken);
 
     private async Task<TResult> SendAsync<TResult>(IQuery<TResult> query, CancellationToken cancellationToken)

@@ -274,6 +274,114 @@ public sealed class LogicAppsWorkflowRunsTests : IDisposable
         await read.Should().ThrowAsync<InvalidOperationException>().WithMessage("*Estate:ResourceGroupId*");
     }
 
+    [Fact]
+    public async Task FailedRunsAsync_ForTheEstate_ListsEachLogicAppsWorkflowsFailedRunsOfTheWindow()
+    {
+        const string Answer = "logic-answer-def456";
+        _history
+            .Answer(SitesAddress, Page(Site(LogicApp, "functionapp,workflowapp"), Site("func-other", "functionapp,linux"), Site(Answer, "functionapp,workflowapp")))
+            .Answer(WorkflowsAddress(LogicApp), new JsonArray(new JsonObject { ["name"] = Workflow }))
+            .Answer(WorkflowsAddress(Answer), Page(new JsonObject { ["name"] = "carrier-answer" }))
+            .Answer(FailedRunsAddress(LogicApp, Workflow, Started), Page(RunOf("run-1", 5), RunOf("run-2", 9)))
+            .Answer(FailedRunsAddress(Answer, "carrier-answer", Started), Page())
+            .Answer(RunActionsAddress(LogicApp, Workflow, "run-1"), Actions(
+                Action("Track_the_booking", "Succeeded", 0, 1, tracked: ("transport-order-intake", "corr-1")),
+                Action("Submit_to_the_TMS", "Failed", 1, 3, error: ("ServiceUnavailable", "The TMS answered 503.")),
+                Action("Scope", "Failed", 0, 4, error: ("ActionFailed", "An action failed."))))
+            .Answer(RunActionsAddress(LogicApp, Workflow, "run-2"), Actions(
+                Action("Submit_to_the_TMS", "TimedOut", 1, 3)));
+
+        var failed = await WorkflowRuns().FailedRunsAsync(Started, TestContext.Current.CancellationToken);
+
+        failed.Should().BeEquivalentTo(new[]
+        {
+            new RecordedFailedRun(new WorkflowRun(LogicApp, Workflow, "run-1"), Started.AddSeconds(5), "transport-order-intake", "corr-1",
+                "Submit_to_the_TMS", new StepError("ServiceUnavailable", "The TMS answered 503.")),
+            new RecordedFailedRun(new WorkflowRun(LogicApp, Workflow, "run-2"), Started.AddSeconds(9), null, null, "Submit_to_the_TMS", null),
+        });
+    }
+
+    [Fact]
+    public async Task FailedRunsAsync_ForARunWithNoFailedStep_StillListsIt()
+    {
+        _history
+            .Answer(SitesAddress, Page(Site(LogicApp, "functionapp,workflowapp")))
+            .Answer(WorkflowsAddress(LogicApp), Page(new JsonObject { ["name"] = Workflow }))
+            .Answer(FailedRunsAddress(LogicApp, Workflow, Started), Page(RunOf("run-1", 5)))
+            .Answer(RunActionsAddress(LogicApp, Workflow, "run-1"), Actions());
+
+        var failed = await WorkflowRuns().FailedRunsAsync(Started, TestContext.Current.CancellationToken);
+
+        failed.Should().ContainSingle().Which.Should().Be(new RecordedFailedRun(new WorkflowRun(LogicApp, Workflow, "run-1"), Started.AddSeconds(5), null, null, null, null));
+    }
+
+    [Fact]
+    public async Task FailedRunsAsync_ForALongList_FollowsItsNextLink()
+    {
+        var next = $"{WorkflowsAddress(LogicApp)}&$skiptoken=2";
+        _history
+            .Answer(SitesAddress, Page(Site(LogicApp, "functionapp,workflowapp")))
+            .Answer(WorkflowsAddress(LogicApp), Page(new JsonObject { ["name"] = Workflow }, nextLink: next))
+            .Answer(next, Page(new JsonObject { ["name"] = "second-flow" }))
+            .Answer(FailedRunsAddress(LogicApp, Workflow, Started), Page())
+            .Answer(FailedRunsAddress(LogicApp, "second-flow", Started), Page(RunOf("run-9", 1)))
+            .Answer(RunActionsAddress(LogicApp, "second-flow", "run-9"), Actions());
+
+        var failed = await WorkflowRuns().FailedRunsAsync(Started, TestContext.Current.CancellationToken);
+
+        failed.Should().ContainSingle().Which.Run.Workflow.Should().Be("second-flow");
+    }
+
+    [Fact]
+    public async Task FailedRunsAsync_Always_ReadsAsTheConsoleAndOnlyReads()
+    {
+        _history.Answer(SitesAddress, Page());
+
+        await WorkflowRuns().FailedRunsAsync(Started, TestContext.Current.CancellationToken);
+
+        _history.Requests.Should().OnlyContain(request => request.Method == HttpMethod.Get && request.Headers.Authorization!.Parameter == "console-token");
+    }
+
+    [Fact]
+    public async Task FailedRunsAsync_WithoutAnEstate_SaysTheConsoleIsNotConnected()
+    {
+        var act = () => WorkflowRuns(resourceGroupId: "").FailedRunsAsync(Started, TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*isn't connected to an estate*");
+    }
+
+    private static string SitesAddress => $"https://management.azure.com{ResourceGroupId}/providers/Microsoft.Web/sites?api-version=2023-12-01";
+
+    private static string WorkflowsAddress(string app) =>
+        $"https://management.azure.com{ResourceGroupId}/providers/Microsoft.Web/sites/{app}/hostruntime/runtime/webhooks/workflow/api/management/workflows?api-version=2018-11-01";
+
+    private static string FailedRunsAddress(string app, string workflow, DateTimeOffset since) =>
+        $"https://management.azure.com{ResourceGroupId}/providers/Microsoft.Web/sites/{app}/hostruntime/runtime/webhooks/workflow/api/management/workflows/{workflow}/runs?api-version=2018-11-01&$filter=" +
+        Uri.EscapeDataString($"status eq 'Failed' and startTime ge {since:yyyy-MM-ddTHH:mm:ssZ}");
+
+    private static string RunActionsAddress(string app, string workflow, string run) =>
+        $"https://management.azure.com{ResourceGroupId}/providers/Microsoft.Web/sites/{app}/hostruntime/runtime/webhooks/workflow/api/management/workflows/{workflow}/runs/{run}/actions?api-version=2018-11-01";
+
+    private static JsonObject Site(string name, string kind) => new() { ["name"] = name, ["kind"] = kind };
+
+    private static JsonObject RunOf(string name, double start) =>
+        new() { ["name"] = name, ["properties"] = new JsonObject { ["status"] = "Failed", ["startTime"] = Started.AddSeconds(start).ToString("O") } };
+
+    private static JsonObject Page(params JsonObject[] items) => Page(items, null);
+
+    private static JsonObject Page(JsonObject item, string nextLink) => Page([item], nextLink);
+
+    private static JsonObject Page(JsonObject[] items, string? nextLink)
+    {
+        var page = new JsonObject { ["value"] = new JsonArray([.. items]) };
+        if (nextLink is not null)
+        {
+            page["nextLink"] = nextLink;
+        }
+
+        return page;
+    }
+
     private LogicAppsWorkflowRuns WorkflowRuns(string resourceGroupId = ResourceGroupId)
     {
         var clients = Substitute.For<IHttpClientFactory>();
@@ -310,8 +418,17 @@ public sealed class LogicAppsWorkflowRunsTests : IDisposable
         double? end,
         string? inputsLink = null,
         string? outputsLink = null,
-        (string Code, string Message)? error = null) =>
-        Properties(name, status, start, end, inputsLink, outputsLink, error);
+        (string Code, string Message)? error = null,
+        (string Flow, string CorrelationId)? tracked = null)
+    {
+        var action = Properties(name, status, start, end, inputsLink, outputsLink, error);
+        if (tracked is { } keys)
+        {
+            action["properties"]!["trackedProperties"] = new JsonObject { ["flow"] = keys.Flow, ["correlationId"] = keys.CorrelationId };
+        }
+
+        return action;
+    }
 
     private static JsonObject Properties(
         string name,
