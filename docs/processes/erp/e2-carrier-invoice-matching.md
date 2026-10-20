@@ -123,8 +123,9 @@ On opening a line, Finance sees its Carrier cost next to it: the charge lines, t
 | Record a Carrier cost | Carrier cost Logic App | `CarrierCosts.Record` |
 | Receive a Carrier invoice | Carrier invoice Logic App | `CarrierInvoices.Receive` |
 | Report a Carrier invoice outcome as told or not delivered | Carrier invoice outcome Logic App | `CarrierInvoices.Report` |
+| Accept or reject a Carrier invoice line | The [Simulator](../../operations/simulator.md), playing Finance | `CarrierInvoices.Manage` |
 
-Finance decides lines in the ERP UI, with Finance permissions. The ERP billing API accepts only the Canonical Model (ADR 0003).
+Finance decides lines in the ERP UI, with Finance permissions, or through the API as the Simulator, which runs the same commands. `POST /v1/carrier-invoices/{carrierId}/{invoiceNumber}/lines/{bookingReference}/accept` (optional `adjustedAmount` and `remark`) and `/reject` (`reason`) answer 200 with the invoice, and a decision that makes the invoice Approved publishes `CarrierInvoiceApproved` once. Refusals are `ProblemDetails` with the domain's stable `code`: 404 for `CarrierInvoiceNotFound` and `CarrierInvoiceLineNotFound`, 409 for `CarrierInvoiceLineAlreadyDecided`, 422 for `CarrierInvoiceLineHasNoOpenCarrierCost`, 400 for `CarrierInvoiceAdjustedAmountNotAboveZero`, `CarrierInvoiceAdjustedAmountNeedsRemark` and `CarrierInvoiceRejectionNeedsReason`. The ERP billing API accepts only the Canonical Model (ADR 0003).
 
 ## Correlation ID
 

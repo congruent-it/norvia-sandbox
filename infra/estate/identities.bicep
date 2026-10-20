@@ -89,6 +89,8 @@ var carrierInvoicesReceiveRole = 'CarrierInvoices.Receive'
 var carrierInvoicesReceiveRoleId = guid('norvia-erp-api', environmentName, carrierInvoicesReceiveRole)
 var carrierInvoicesReportRole = 'CarrierInvoices.Report'
 var carrierInvoicesReportRoleId = guid('norvia-erp-api', environmentName, carrierInvoicesReportRole)
+var carrierInvoicesManageRole = 'CarrierInvoices.Manage'
+var carrierInvoicesManageRoleId = guid('norvia-erp-api', environmentName, carrierInvoicesManageRole)
 var shipperInvoicesReportRole = 'ShipperInvoices.Report'
 var shipperInvoicesReportRoleId = guid('norvia-erp-api', environmentName, shipperInvoicesReportRole)
 var shipperInvoicesManageRole = 'ShipperInvoices.Manage'
@@ -1143,6 +1145,16 @@ resource erpApi 'Microsoft.Graph/applications@v1.0' = {
       isEnabled: true
     }
     {
+      id: carrierInvoicesManageRoleId
+      value: carrierInvoicesManageRole
+      displayName: 'Decide Carrier invoice lines'
+      description: 'Accept or reject a Carrier invoice line that waits for Finance (E2), as Finance does in the ERP UI. Only the Simulator holds it.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
+    {
       id: shipperInvoicesReportRoleId
       value: shipperInvoicesReportRole
       displayName: 'Report a Shipper invoice'
@@ -1203,6 +1215,13 @@ resource shipperInvoiceReportRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' 
 resource simulatorErpManageRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
   resourceId: erpApiPrincipal.id
   appRoleId: shipperInvoicesManageRoleId
+  principalId: simulatorIdentity.properties.principalId
+}
+
+// The Simulator also plays Finance's decisions on Carrier invoice lines (E2).
+resource simulatorErpCarrierInvoicesManageRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: erpApiPrincipal.id
+  appRoleId: carrierInvoicesManageRoleId
   principalId: simulatorIdentity.properties.principalId
 }
 
