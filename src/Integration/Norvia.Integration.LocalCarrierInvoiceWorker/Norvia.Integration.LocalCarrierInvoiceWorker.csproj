@@ -10,5 +10,6 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Norvia.Integration.LocalCarrierInvoiceWorker.UnitTests" />
+    <InternalsVisibleTo Include="Norvia.Integration.CarrierInvoice.IntegrationTests" />
   </ItemGroup>
 </Project>
