@@ -8,6 +8,7 @@
 @using Norvia.Simulator.Domain.Runs
 @inject ISimulatorRequests Requests
 @inject NavigationManager Navigation
+@inject TimeProvider Time
 @implements IDisposable
 
 <PageTitle>Simulator · Configure</PageTitle>
@@ -175,6 +176,8 @@ else
             </TemplateColumn>
             <PropertyColumn Title="Status" Property="@(run => SimulatorText.Of(run.Status))" />
             <PropertyColumn Title="Started" Property="@(run => SimulatorText.DateAndTime(run.StartedAt))" />
+            @* A run still sending has no end yet. *@
+            <PropertyColumn Title="Ended" Property="@(run => SimulatorText.DateAndTime(run.FinishedAt))" />
             <PropertyColumn Title="Sent" Property="@(run => $"{run.Sent} of {run.Planned}")" />
             <PropertyColumn Title="Sending" Property="@(run => SimulatorText.Of(run.Mode, TimeSpan.Zero))" />
             <PropertyColumn Title="Preset" Property="@(run => run.PresetName ?? "Custom")" />
@@ -274,6 +277,8 @@ else
     private bool _confirmingReset;
     private bool _resetting;
     private readonly CancellationTokenSource _cancellation = new();
+    private static readonly TimeSpan PollEvery = TimeSpan.FromSeconds(1.5);
+    private ITimer? _poll;
 
     protected override async Task OnInitializedAsync()
     {
@@ -320,6 +325,7 @@ else
     public void Dispose()
     {
         Navigation.LocationChanged -= OnLocationChanged;
+        _poll?.Dispose();
         _cancellation.Cancel();
         _cancellation.Dispose();
     }
@@ -328,7 +334,36 @@ else
     {
         _runs = await Requests.ListRunsAsync(_cancellation.Token);
         _active = _runs.FirstOrDefault(run => run.IsActive);
+        FollowActiveRun();
         await LoadResetReadinessAsync();
+    }
+
+    // The list is read once, so a run that finishes meanwhile would stay "still sending". Poll while one is active.
+    private void FollowActiveRun()
+    {
+        if (_active is null)
+        {
+            _poll?.Dispose();
+            _poll = null;
+        }
+        else
+        {
+            _poll ??= Time.CreateTimer(_ => _ = InvokeAsync(PollAsync), state: null, PollEvery, PollEvery);
+        }
+    }
+
+    private async Task PollAsync()
+    {
+        try
+        {
+            await LoadRunsAsync();
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // Polling goes on: the next read may reach the database again.
+        }
+
+        StateHasChanged();
     }
 
     private async Task LoadResetReadinessAsync()

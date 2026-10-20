@@ -213,6 +213,31 @@ public sealed class ConfigureRunTests : SimulatorWebContext
     }
 
     [Fact]
+    public void Render_AnActiveRunThatFinishesMeanwhile_StopsSayingItIsSending()
+    {
+        Requests.ListRunsAsync(Arg.Any<CancellationToken>()).Returns([TestData.Summary()]);
+        var page = Render<ConfigureRun>();
+        page.Find("[role=status]").TextContent.Should().Contain("still sending");
+        Requests.ListRunsAsync(Arg.Any<CancellationToken>()).Returns([TestData.Summary(SimulationRunStatus.Completed)]);
+
+        page.InvokeAsync(() => Clock.Advance(TimeSpan.FromSeconds(1.5)));
+
+        page.WaitForAssertion(() => page.Markup.Should().NotContain("still sending"));
+        page.Find("fluent-button:contains('Clear history')").HasAttribute("disabled").Should().BeFalse();
+    }
+
+    [Fact]
+    public void Render_WithoutAnActiveRun_DoesNotPoll()
+    {
+        Requests.ListRunsAsync(Arg.Any<CancellationToken>()).Returns([TestData.Summary(SimulationRunStatus.Completed)]);
+        Render<ConfigureRun>();
+
+        Clock.Advance(TimeSpan.FromSeconds(30));
+
+        _ = Requests.Received(1).ListRunsAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public void Render_AnActiveRun_SaysSoAndLinksToIt()
     {
         var active = TestData.Summary();
@@ -236,6 +261,20 @@ public sealed class ConfigureRunTests : SimulatorWebContext
         var grid = page.Find("table");
         grid.TextContent.Should().Contain("Run 3").And.Contain("Completed").And.Contain("10 of 10").And.Contain("Quiet Monday");
         grid.QuerySelector("a")!.GetAttribute("href").Should().Be($"/runs/{finished.Id}");
+    }
+
+    [Fact]
+    public void Render_PreviousRuns_ShowWhenTheyEnded_AndADashForOneStillSending()
+    {
+        var finished = TestData.Summary(SimulationRunStatus.Completed, number: 3);
+        var running = TestData.Summary(SimulationRunStatus.Running, number: 4);
+        Requests.ListRunsAsync(Arg.Any<CancellationToken>()).Returns([running, finished]);
+
+        var page = Render<ConfigureRun>();
+
+        var rows = page.FindAll("tbody tr");
+        rows[1].TextContent.Should().Contain(SimulatorText.DateAndTime(finished.StartedAt)).And.Contain(SimulatorText.DateAndTime(finished.FinishedAt!.Value));
+        rows[0].Children[3].TextContent.Trim().Should().Be("–");
     }
 
     [Fact]

@@ -98,4 +98,7 @@ public static class SimulatorText
     public static string Time(DateTimeOffset at) => TimeZoneInfo.ConvertTime(at, Zone).ToString("HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
 
     public static string DateAndTime(DateTimeOffset at) => TimeZoneInfo.ConvertTime(at, Zone).ToString("dd-MM-yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>When a run ended, or a dash while it's still going.</summary>
+    public static string DateAndTime(DateTimeOffset? at) => at is { } moment ? DateAndTime(moment) : "–";
 }
