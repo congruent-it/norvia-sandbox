@@ -1,1 +1,167 @@
-{ "tables": {} }
+{
+  "tables": {
+    "BillableLines": {
+      "description": "The ERP's record of one Billable Transport Order (a Billable line), written from the `TransportOrderBillable` event. It is Waiting until an Invoice run puts it on a Shipper invoice, then Invoiced with that invoice's number, once and only once (E1). The Freight Charge is kept as the TMS rated it; the ERP never recalculates it (ADR 0006, ADR 0012).",
+      "columns": {
+        "Id": "The Transport Order number, which makes recording idempotent: the same order sent again is the same line.",
+        "BillingCorrelationId": "Message trail of the call that recorded the line.",
+        "DeliveryTime": "When the Transport Order was delivered.",
+        "FreightCharge": "The Freight Charge the TMS rated, kept whole as JSON: its charge lines in EUR without VAT, the total and the Rate Card version it came from.",
+        "IntakeCorrelationId": "Message trail of the Transport Order's intake (P1), so a Shipper invoice line traces back to the booking.",
+        "InvoiceNumber": "Number of the Shipper invoice that invoiced the line (`INV-2026-000001`); null while Waiting.",
+        "RecordedAt": "When the ERP recorded the line.",
+        "ReleasedWithoutProofOfDelivery": "Whether Customer service released the order as Billable without a Proof of delivery.",
+        "RowVersion": "Concurrency token: two Invoice runs never invoice the same line.",
+        "ShipmentNumber": "The Shipment of the Transport Order (a logical reference to the TMS).",
+        "ShipperId": "The Shipper to invoice.",
+        "ShipperReference": "The Shipper's own reference for the order, printed on the invoice line.",
+        "Status": "`Waiting` or `Invoiced`."
+      }
+    },
+    "CarrierCosts": {
+      "description": "What Norvia owes a Carrier for one Carrier booking (a Carrier cost), written from the `CarrierCostIncurred` event. It is Open until a Carrier invoice line is matched against it or Finance accepts a line for it, then Invoiced (E2). The TMS calculated it; the ERP keeps it as sent (ADR 0013).",
+      "columns": {
+        "Id": "The Carrier booking number, which makes recording idempotent.",
+        "CarrierBookingReference": "The Carrier's own reference for the booking, which is what a Carrier invoice line quotes and is matched on.",
+        "CarrierId": "The Carrier to pay.",
+        "Charge": "The Carrier cost's charge lines and total in EUR without VAT, as JSON.",
+        "CorrelationId": "Message trail of the call that recorded the Carrier cost.",
+        "DeliveryTime": "When the Shipment was delivered.",
+        "RecordedAt": "When the ERP recorded the Carrier cost.",
+        "RowVersion": "Concurrency token: two lines never both claim the same Carrier cost.",
+        "ShipmentNumber": "The Shipment the Carrier carried (a logical reference to the TMS).",
+        "Source": "Where the TMS got the price, as JSON: a Carrier Rate Card version or a Spot price with the Planner's remark.",
+        "Status": "`Open` or `Invoiced`.",
+        "TransportOrderNumber": "The Transport Order the Shipment belongs to (a logical reference to the TMS)."
+      }
+    },
+    "CarrierInvoices": {
+      "description": "A Carrier's claim for payment, as received through the Norvia Partner API, with the result of Matching each line against its Carrier cost (E2). Lines that match are accepted at once; the others wait for Finance. When every line is decided the invoice is Approved and the Carrier is told the outcome. One row per Carrier and invoice number.",
+      "columns": {
+        "Id": "The Carrier invoice's own ID.",
+        "ApprovedAmount": "Sum of the accepted amounts of the lines, in EUR without VAT; null until Approved.",
+        "ApprovedAt": "When the last line was decided; null until Approved.",
+        "CarrierId": "The Carrier that sent the invoice, taken from its token by API Management, never from the payload (ADR 0005).",
+        "CorrelationId": "The Carrier invoice's own Message trail, which the `CarrierInvoiceApproved` event and the outcome Logic App's reports carry.",
+        "InvoiceDate": "The date on the Carrier's invoice.",
+        "InvoiceNumber": "The Carrier's own invoice number, unique per Carrier.",
+        "Lines": "The lines as JSON, one per Carrier booking reference: the amount claimed, the Matching result (`Matched`, `PriceMismatch`, `UnknownBooking`, `Duplicate`), the line's status (`Matched`, `ToDecide`, `Accepted`, `Rejected`), the Carrier booking number it matched and Finance's decided amount and remark.",
+        "NotToldAt": "When the Carrier invoice outcome Logic App reported that the outcome never reached the Carrier; null otherwise.",
+        "NotToldMessage": "The technical cause of that failure, in plain language.",
+        "NotToldStatusCode": "The HTTP status code of the Carrier's outcome endpoint; null when the failure had none, such as a timeout.",
+        "ReceivedAt": "When the ERP received the invoice.",
+        "RowVersion": "Concurrency token: two Finance decisions on one invoice don't both land.",
+        "Status": "`Received` while a line waits for Finance, `Approved` once every line is decided.",
+        "ToldAt": "When the Carrier's outcome endpoint acknowledged the outcome; null until then.",
+        "Total": "The total the Carrier claims, in EUR without VAT."
+      }
+    },
+    "CarrierRateCards": {
+      "description": "What Norvia pays one Carrier for transport, by Lane and weight (a Carrier Rate Card). The ERP owns it; the TMS keeps a read copy to calculate a Carrier cost at release (ADR 0013). Master data, loaded from the seed file until the sync exists (ADR 0002).",
+      "columns": {
+        "Id": "The Carrier Rate Card's ID.",
+        "CarrierId": "The Carrier it belongs to.",
+        "Versions": "Every version of the card as JSON: its validity period, Zones, Lanes, Weight Breaks and minimum charges."
+      }
+    },
+    "Carriers": {
+      "description": "A transport company Norvia subcontracts to (a Carrier), as the ERP knows it. The ERP owns the Carrier; the TMS keeps a read copy (ADR 0002). Master data, loaded from the seed file.",
+      "columns": {
+        "Id": "The Carrier ID (`CAR-0001`), which the other applications store.",
+        "Active": "Whether Norvia still uses the Carrier. An inactive Carrier keeps its history.",
+        "Name": "The Carrier's name."
+      }
+    },
+    "CreditNoteNumberSequences": {
+      "description": "The last Credit note number taken in each calendar year, so numbers (`CN-2026-000001`) run without gaps. Separate from the Shipper invoice sequence.",
+      "columns": {
+        "Year": "The calendar year.",
+        "LastTaken": "The last sequence number issued that year.",
+        "RowVersion": "Concurrency token: two Credit notes never take the same number."
+      }
+    },
+    "CreditNotes": {
+      "description": "A document that reverses all or part of one line of a Shipper invoice, with a reason (a Credit note). Final once issued, like the invoice; delivery to the Shipper is tracked the same way (E1).",
+      "columns": {
+        "Id": "The Credit note number (`CN-2026-000001`).",
+        "AmountWithoutVat": "The credited amount in EUR without VAT.",
+        "CorrelationId": "The Credit note's own Message trail, which `CreditNoteIssued` and the Shipper invoice Logic App's reports carry.",
+        "CreditNoteDate": "The date of the Credit note.",
+        "DeliveryDate": "Delivery date of the credited invoice line.",
+        "InvoiceNumber": "The Shipper invoice credited.",
+        "IssuedAt": "When Finance issued it.",
+        "NotDeliveredAt": "When it was reported that the Credit note never reached the Shipper; null otherwise.",
+        "NotDeliveredMessage": "The technical cause of that failure, in plain language.",
+        "NotDeliveredStatusCode": "The HTTP status code of the Shipper's endpoint; null when the failure had none.",
+        "Reason": "Finance's reason, printed on the document.",
+        "SentAt": "When the Shipper's invoice endpoint acknowledged it; null until then.",
+        "ShipmentNumber": "The Shipment of the credited line (a logical reference to the TMS).",
+        "ShipperId": "The Shipper credited.",
+        "ShipperReference": "The Shipper's own reference of the credited line.",
+        "Status": "`Issued`, `Sent` or `NotDelivered`.",
+        "TotalWithVat": "The credited amount with VAT, in EUR.",
+        "TransportOrderNumber": "The Transport Order of the credited invoice line (a logical reference to the TMS).",
+        "Vat": "The VAT on the credited amount, in EUR."
+      }
+    },
+    "InvoiceNumberSequences": {
+      "description": "The last Shipper invoice number taken in each calendar year, so numbers (`INV-2026-000001`) run without gaps.",
+      "columns": {
+        "Year": "The calendar year.",
+        "LastTaken": "The last sequence number issued that year.",
+        "RowVersion": "Concurrency token: two Invoice runs never take the same number."
+      }
+    },
+    "OutboxMessages": {
+      "description": "Integration events the ERP raised in the same transaction as the change that caused them, waiting to be published to Service Bus (transactional outbox, ADR 0003). The ERP publishes `ShipperInvoiceIssued`, `CreditNoteIssued`, `ShipperInvoiceNotDelivered`, `CarrierInvoiceApproved` and `CarrierInvoiceOutcomeNotDelivered` this way.",
+      "columns": {
+        "Id": "Publishing order.",
+        "ApplicationProperties": "The Service Bus application properties of the message, as JSON.",
+        "Body": "The event as JSON, in the Canonical Model.",
+        "CorrelationId": "The Message trail the event belongs to.",
+        "CreatedAt": "When the event was raised.",
+        "EventId": "The event's own ID, unique, so a consumer can tell a duplicate.",
+        "EventType": "The event's type, such as `ShipperInvoiceIssued`.",
+        "PublishedAt": "When the publisher sent it to Service Bus; null while it waits.",
+        "Topic": "The Service Bus topic it goes to (`invoicing-events`).",
+        "TraceParent": "W3C trace context of the call that raised it, so the publish continues the same trace; null when there was none."
+      }
+    },
+    "RateCards": {
+      "description": "What Norvia charges one Shipper for transport, by Lane and weight (a Rate Card), part of the Shipper's Contract. The ERP owns it; the TMS keeps a read copy to rate from and never changes it (ADR 0006). Master data, loaded from the seed file until the sync exists (ADR 0002).",
+      "columns": {
+        "Id": "The Rate Card's ID.",
+        "ShipperId": "The Shipper it belongs to.",
+        "Versions": "Every version of the card as JSON: its validity period, Zones, Lanes, Weight Breaks and minimum charges."
+      }
+    },
+    "ShipperInvoices": {
+      "description": "The ERP's document charging a Shipper, with one line per Transport Order (a Shipper invoice), issued by an Invoice run or Finance's Invoice now (E1). Final once issued: its number, lines and totals never change, and corrections are Credit notes. Only its delivery status follows the Shipper invoice Logic App's reports.",
+      "columns": {
+        "Id": "The Shipper invoice number (`INV-2026-000001`).",
+        "CorrelationId": "The invoice's own Message trail, which `ShipperInvoiceIssued` and the Shipper invoice Logic App's reports carry.",
+        "InvoiceDate": "The date of the run, Europe/Amsterdam.",
+        "IssuedAt": "When the invoice was issued.",
+        "Lines": "The lines as JSON, one per Transport Order: its number, the Shipper's reference, delivery date, charge lines and line total.",
+        "NotDeliveredAt": "When it was reported that the invoice never reached the Shipper; null otherwise.",
+        "NotDeliveredMessage": "The technical cause of that failure, in plain language.",
+        "NotDeliveredStatusCode": "The HTTP status code of the Shipper's endpoint; null when the failure had none, such as a timeout.",
+        "RowVersion": "Concurrency token: two reports on one invoice don't both land.",
+        "SentAt": "When the Shipper's invoice endpoint acknowledged it; null until then.",
+        "ShipperId": "The Shipper invoiced.",
+        "Status": "`Issued`, `Sent` or `NotDelivered`. Finance can send a Not delivered invoice again.",
+        "TotalWithVat": "The total with VAT, in EUR.",
+        "TotalWithoutVat": "The total without VAT, in EUR.",
+        "Vat": "The VAT on the total, in EUR."
+      }
+    },
+    "Shippers": {
+      "description": "An organization that pays Norvia to store, move or deliver its goods (a Shipper), as the ERP knows it. The ERP owns the Shipper and its Contract; the TMS keeps a read copy (ADR 0002). Master data, loaded from the seed file.",
+      "columns": {
+        "Id": "The Shipper ID (`SHP-0001`), which the other applications store. It is the Shipper's identity in its token (ADR 0005).",
+        "Active": "Whether the Shipper is active. An inactive Shipper keeps its history.",
+        "Name": "The Shipper's name."
+      }
+    }
+  }
+}
