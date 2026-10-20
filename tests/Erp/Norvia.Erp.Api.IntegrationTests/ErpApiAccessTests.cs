@@ -5,7 +5,7 @@ namespace Norvia.Erp.Api.IntegrationTests;
 
 /// <summary>
 /// Who may call the ERP billing API (story 12 and the coding guidelines' §8): the Billing Logic App's identity records Billable lines and nothing else, the Shipper invoice
-/// Logic App's reports on documents and nothing else, and a caller whose token isn't the Entra tenant's, or isn't meant for the ERP, is not let in at all.
+/// Logic App's reports on documents and nothing else, the Carrier cost, Carrier invoice and Carrier invoice outcome Logic Apps' identities their own operations, and a caller whose token isn't the Entra tenant's, or isn't meant for the ERP, is not let in at all.
 /// </summary>
 public sealed class ErpApiAccessTests(ErpFixture fixture) : ErpTest(fixture)
 {
@@ -16,6 +16,10 @@ public sealed class ErpApiAccessTests(ErpFixture fixture) : ErpTest(fixture)
         { "/v1/shipper-invoices/INV-2026-000001/report-not-delivered", ErpFixture.ReportRole },
         { "/v1/credit-notes/CN-2026-000001/report-sent", ErpFixture.ReportRole },
         { "/v1/credit-notes/CN-2026-000001/report-not-delivered", ErpFixture.ReportRole },
+        { "/v1/carrier-costs", ErpFixture.RecordCarrierCostRole },
+        { "/v1/carrier-invoices", ErpFixture.ReceiveCarrierInvoiceRole },
+        { "/v1/carrier-invoices/CAR-0001/VDT-1/report-told", ErpFixture.ReportCarrierInvoiceRole },
+        { "/v1/carrier-invoices/CAR-0001/VDT-1/report-not-delivered", ErpFixture.ReportCarrierInvoiceRole },
         { "/v1/carrier-invoices/CAR-0001/VDT-1/lines/BK-1/accept", ErpFixture.ManageCarrierInvoiceRole },
         { "/v1/carrier-invoices/CAR-0001/VDT-1/lines/BK-1/reject", ErpFixture.ManageCarrierInvoiceRole },
     };

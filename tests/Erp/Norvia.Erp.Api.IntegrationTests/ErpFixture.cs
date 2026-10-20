@@ -47,6 +47,9 @@ public sealed class ErpFixture : IAsyncLifetime
     /// <summary>The app role only the Carrier invoice Logic App's managed identity holds, for the Carrier invoices it receives.</summary>
     public const string ReceiveCarrierInvoiceRole = "CarrierInvoices.Receive";
 
+    /// <summary>The app role only the Carrier invoice outcome Logic App's managed identity holds, for its reports on what it told the Carrier.</summary>
+    public const string ReportCarrierInvoiceRole = "CarrierInvoices.Report";
+
     /// <summary>The app role only the Simulator's identity holds, for the Finance decisions on Carrier invoice lines it plays.</summary>
     public const string ManageCarrierInvoiceRole = "CarrierInvoices.Manage";
 

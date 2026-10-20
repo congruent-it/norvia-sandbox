@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Nodes;
-using Norvia.Erp.Application.CarrierCosts.ListOpen;
 
 namespace Norvia.Erp.Api.IntegrationTests.CarrierInvoices;
 
@@ -9,9 +8,8 @@ namespace Norvia.Erp.Api.IntegrationTests.CarrierInvoices;
 /// The Simulator's Finance decisions on Carrier invoice lines through the ERP billing API (E2.11): accept and reject, the last decision publishing
 /// <c>CarrierInvoiceApproved</c> once, the stable codes of a refusal, and who may decide.
 /// </summary>
-public sealed class CarrierInvoiceDecisionTests(ErpFixture fixture) : ErpTest(fixture)
+public sealed class CarrierInvoiceDecisionTests(ErpFixture fixture) : CarrierTest(fixture)
 {
-    private const string Carrier = "CAR-0001";
     private const string InvoiceNumber = "VDT-2026-0001";
 
     // BK-A matches its Carrier cost, BK-B is 95.00 against 80.00 (Price mismatch), BK-X has no Carrier cost (Unknown booking).
@@ -22,59 +20,12 @@ public sealed class CarrierInvoiceDecisionTests(ErpFixture fixture) : ErpTest(fi
     private static string Path(string reference, string decision, string carrier = Carrier, string invoice = InvoiceNumber) =>
         $"/v1/carrier-invoices/{carrier}/{invoice}/lines/{reference}/{decision}";
 
-    private async Task RecordCostAsync(string bookingNumber, string reference, decimal total)
-    {
-        var number = int.Parse(bookingNumber[3..], System.Globalization.CultureInfo.InvariantCulture);
-        var cost = new JsonObject
-        {
-            ["eventId"] = Guid.NewGuid().ToString(),
-            ["eventType"] = "CarrierCostIncurred",
-            ["eventVersion"] = 1,
-            ["occurredAt"] = DateTimeOffset.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture),
-            ["correlationId"] = Guid.NewGuid().ToString(),
-            ["carrierBookingNumber"] = bookingNumber,
-            ["carrierBookingReference"] = reference,
-            ["shipmentNumber"] = $"SH-{number:D7}",
-            ["transportOrderNumber"] = $"TO-{number:D7}",
-            ["carrierId"] = Carrier,
-            ["carrierCost"] = new JsonObject
-            {
-                ["currency"] = "EUR",
-                ["total"] = total,
-                ["chargeLines"] = new JsonArray(new JsonObject { ["type"] = "Freight", ["amount"] = total }),
-                ["source"] = new JsonObject { ["kind"] = "Spot", ["remark"] = "Spot price agreed by phone." },
-                ["calculatedAt"] = DateTimeOffset.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture),
-            },
-            ["deliveryTime"] = Delivered.ToString("O", System.Globalization.CultureInfo.InvariantCulture),
-        };
-
-        using var client = Fixture.ApiAs(ErpFixture.RecordCarrierCostRole);
-        using var response = await client.PostAsJsonAsync(new Uri("/v1/carrier-costs", UriKind.Relative), cost, Ct);
-        response.StatusCode.Should().Be(HttpStatusCode.Created, await response.Content.ReadAsStringAsync(Ct));
-    }
-
-    private async Task ReceiveAsync(params (string Reference, decimal Amount)[] lines)
-    {
-        var invoice = new JsonObject
-        {
-            ["carrierId"] = Carrier,
-            ["invoiceNumber"] = InvoiceNumber,
-            ["invoiceDate"] = "2026-10-19",
-            ["correlationId"] = Guid.NewGuid().ToString(),
-            ["lines"] = new JsonArray([.. lines.Select(line => (JsonNode)new JsonObject { ["carrierBookingReference"] = line.Reference, ["amount"] = line.Amount })]),
-        };
-
-        using var client = Fixture.ApiAs(ErpFixture.ReceiveCarrierInvoiceRole);
-        using var response = await client.PostAsJsonAsync(new Uri("/v1/carrier-invoices", UriKind.Relative), invoice, Ct);
-        response.StatusCode.Should().Be(HttpStatusCode.Created, await response.Content.ReadAsStringAsync(Ct));
-    }
-
     /// <summary>An invoice with one Matched line and two that wait for Finance: a Price mismatch and an Unknown booking.</summary>
     private async Task ReceiveInvoiceToDecideAsync()
     {
         await RecordCostAsync("CB-0000101", Matched, 100m);
         await RecordCostAsync("CB-0000102", Mismatch, 80m);
-        await ReceiveAsync((Matched, 100m), (Mismatch, 95m), (Unknown, 50m));
+        await ReceiveAsync(InvoiceNumber, (Matched, 100m), (Mismatch, 95m), (Unknown, 50m));
     }
 
     private async Task<HttpResponseMessage> DecideAsync(string reference, string decision, object? body = null, string[]? roles = null, string carrier = Carrier, string invoice = InvoiceNumber)
@@ -91,9 +42,6 @@ public sealed class CarrierInvoiceDecisionTests(ErpFixture fixture) : ErpTest(fi
 
     private static JsonObject Line(JsonObject invoice, string reference) =>
         invoice["lines"]!.AsArray().Select(line => line!.AsObject()).Single(line => line["carrierBookingReference"]!.GetValue<string>() == reference);
-
-    private async Task<IReadOnlyList<string>> OpenCostsAsync() =>
-        [.. (await Finance.AskAsync(new ListOpenCarrierCostsQuery(), Ct)).SelectMany(carrier => carrier.Costs).Select(cost => cost.CarrierBookingReference)];
 
     [Fact]
     public async Task Accept_AtTheInvoicedAmount_AcceptsTheLine_AndInvoicesItsCarrierCost()
