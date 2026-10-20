@@ -579,6 +579,23 @@ else
         .WithEnvironment("CarrierInvoiceOutcome__ErpTokens__Issuer", LocalTokens.Issuer)
         .WithEnvironment("CarrierInvoiceOutcome__ErpTokens__Audience", LocalTokens.ErpAudience)
         .WithEnvironment("CarrierInvoiceOutcome__ErpTokens__ClientId", LocalTokens.CarrierInvoiceOutcomeLogicAppClientId);
+    // Locally a worker plays the E2 Carrier invoice Logic App too, behind the HTTP trigger only the stand-in Partner API may call. It maps each
+    // Carrier invoice, receives it at the ERP API as the identity holding the receive role and answers the Carrier at once.
+    var carrierInvoiceWorker = builder.AddProject<Projects.Norvia_Integration_LocalCarrierInvoiceWorker>("carrier-invoice-worker")
+        .WithReference(erpApi).WaitFor(erpApi)
+        .WithHttpHealthCheck("/health")
+        .WithEnvironment("CarrierInvoice__ErpBaseAddress", erpApi.GetEndpoint("http"))
+        .WithEnvironment("CarrierInvoice__ErpTokens__Issuer", LocalTokens.Issuer)
+        .WithEnvironment("CarrierInvoice__ErpTokens__Audience", LocalTokens.ErpAudience)
+        .WithEnvironment("CarrierInvoice__ErpTokens__ClientId", LocalTokens.CarrierInvoiceLogicAppClientId)
+        .WithEnvironment("CarrierInvoice__Trigger__Issuer", LocalTokens.Issuer)
+        .WithEnvironment("CarrierInvoice__Trigger__Audience", LocalTokens.CarrierInvoiceTriggerAudience)
+        .WithEnvironment("CarrierInvoice__Trigger__ClientId", LocalTokens.ApiManagementClientId);
+    partnerApi.WaitFor(carrierInvoiceWorker)
+        .WithEnvironment("CarrierInvoice__BaseAddress", carrierInvoiceWorker.GetEndpoint("http"))
+        .WithEnvironment("CarrierInvoice__Tokens__Issuer", LocalTokens.Issuer)
+        .WithEnvironment("CarrierInvoice__Tokens__Audience", LocalTokens.CarrierInvoiceTriggerAudience)
+        .WithEnvironment("CarrierInvoice__Tokens__ClientId", LocalTokens.ApiManagementClientId);
     // Locally a worker plays the P12 Driver reports Logic App as well. It reads the Driver app events subscription one Trip at a time, calls the
     // TMS as the identity holding the Trip start role, and tells the Driver app what became of each report as the identity holding the outcome
     // role.
@@ -727,6 +744,7 @@ else
             partnerPortal.WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__0", LocalTokens.RespondRole);
             partnerPortal.WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__1", LocalTokens.TrackingSubmitRole);
             partnerPortal.WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__2", LocalTokens.ProofsOfDeliverySubmitRole);
+            partnerPortal.WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__3", LocalTokens.CarrierInvoicesSubmitRole);
             // The Simulator plays each Carrier as its Persona: it answers the booking, tracks the Shipment and proves the delivery, with the same subscription key.
             simulator.WithEnvironment($"PartnerApi__SubscriptionKeys__{persona.Id}", subscriptionKey)
                 .WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__0", LocalTokens.RespondRole)
@@ -750,6 +768,9 @@ else
         (carrierCostWorker.Resource, "CarrierCost__ErpTokens__SigningKey"),
         (shipperInvoiceWorker.Resource, "ShipperInvoice__ErpTokens__SigningKey"),
         (carrierInvoiceOutcomeWorker.Resource, "CarrierInvoiceOutcome__ErpTokens__SigningKey"),
+        (carrierInvoiceWorker.Resource, "CarrierInvoice__ErpTokens__SigningKey"),
+        (carrierInvoiceWorker.Resource, "CarrierInvoice__Trigger__SigningKey"),
+        (partnerApi.Resource, "CarrierInvoice__Tokens__SigningKey"),
         (driverReportsWorker.Resource, "DriverReports__TmsTokens__SigningKey"),
         (driverReportsWorker.Resource, "DriverReports__DriverApp__Tokens__SigningKey"),
         (driverAppApi.Resource, "Authentication__Schemes__Bearer__SigningKeys__0__Value"),

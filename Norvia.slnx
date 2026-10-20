@@ -22,6 +22,7 @@
     <Project Path="src/Integration/Norvia.Integration.LocalBillingWorker/Norvia.Integration.LocalBillingWorker.csproj" />
     <Project Path="src/Integration/Norvia.Integration.LocalCarrierCostWorker/Norvia.Integration.LocalCarrierCostWorker.csproj" />
     <Project Path="src/Integration/Norvia.Integration.LocalShipperInvoiceWorker/Norvia.Integration.LocalShipperInvoiceWorker.csproj" />
+    <Project Path="src/Integration/Norvia.Integration.LocalCarrierInvoiceWorker/Norvia.Integration.LocalCarrierInvoiceWorker.csproj" />
     <Project Path="src/Integration/Norvia.Integration.LocalCarrierInvoiceOutcomeWorker/Norvia.Integration.LocalCarrierInvoiceOutcomeWorker.csproj" />
     <Project Path="src/Integration/Norvia.Integration.LocalTripDispatchWorker/Norvia.Integration.LocalTripDispatchWorker.csproj" />
     <Project Path="src/Integration/Norvia.Integration.LocalDriverReportsWorker/Norvia.Integration.LocalDriverReportsWorker.csproj" />
@@ -83,6 +84,7 @@
     <Project Path="tests/Integration/Norvia.Integration.LocalBillingWorker.UnitTests/Norvia.Integration.LocalBillingWorker.UnitTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.LocalCarrierCostWorker.UnitTests/Norvia.Integration.LocalCarrierCostWorker.UnitTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.LocalShipperInvoiceWorker.UnitTests/Norvia.Integration.LocalShipperInvoiceWorker.UnitTests.csproj" />
+    <Project Path="tests/Integration/Norvia.Integration.LocalCarrierInvoiceWorker.UnitTests/Norvia.Integration.LocalCarrierInvoiceWorker.UnitTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.LocalCarrierInvoiceOutcomeWorker.UnitTests/Norvia.Integration.LocalCarrierInvoiceOutcomeWorker.UnitTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.LocalTripDispatchWorker.UnitTests/Norvia.Integration.LocalTripDispatchWorker.UnitTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.LocalDriverReportsWorker.UnitTests/Norvia.Integration.LocalDriverReportsWorker.UnitTests.csproj" />

@@ -20,6 +20,11 @@ builder.Services.AddOptions<TmsOptions>().BindConfiguration(TmsOptions.SectionNa
     .Validate(options => !string.IsNullOrWhiteSpace(options.AnswerClientId), "Tms:AnswerClientId must name the Carrier-answer Logic App's client.")
     .Validate(options => !string.IsNullOrWhiteSpace(options.ShipperTrackingClientId), "Tms:ShipperTrackingClientId must name API Management's client.")
     .ValidateOnStart();
+builder.Services.AddOptions<CarrierInvoiceOptions>().BindConfiguration(CarrierInvoiceOptions.SectionName)
+    .ValidateDataAnnotations()
+    .Validate(options => options.Tokens.IsComplete, "CarrierInvoice:Tokens needs an Issuer, an Audience and a SigningKey.")
+    .Validate(options => !string.IsNullOrWhiteSpace(options.Tokens.ClientId), "CarrierInvoice:Tokens:ClientId must name API Management's client.")
+    .ValidateOnStart();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<PartnerEdge>();
 builder.Services.AddSingleton<TrackingRateLimit>();
@@ -42,11 +47,23 @@ builder.Services.AddHttpClient<TmsShipperTracking>((services, http) =>
     .RemoveAllResilienceHandlers();
 #pragma warning restore EXTEXP0001
 
+// The Logic App retries the ERP itself and answers the Carrier at once, so the call neither retries nor times out early: API Management
+// doesn't either. The workflow's own retries can run for about a minute.
+#pragma warning disable EXTEXP0001
+builder.Services.AddHttpClient<CarrierInvoiceLogicApp>((services, http) =>
+    {
+        http.BaseAddress = services.GetRequiredService<IOptions<CarrierInvoiceOptions>>().Value.BaseAddress;
+        http.Timeout = TimeSpan.FromMinutes(2);
+    })
+    .RemoveAllResilienceHandlers();
+#pragma warning restore EXTEXP0001
+
 var app = builder.Build();
 
 app.MapDefaultEndpoints();
 app.MapSubmitTransportOrder();
 app.MapAnswerCarrierBooking();
+app.MapSubmitCarrierInvoice();
 app.MapSubmitCarrierTracking();
 app.MapSubmitCarrierProofOfDelivery();
 app.MapShipperTrackingQueries();

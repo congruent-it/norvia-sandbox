@@ -16,6 +16,7 @@ namespace Norvia.AppHost;
 /// The local Billing Logic App's client ID stands in for the Billing Logic App's, the one holder of the ERP billing API's record role; the ERP API trusts the same key.
 /// The local Shipper invoice Logic App's client ID stands in for the Shipper invoice Logic App's, the one holder of the ERP API's Shipper invoice report role.
 /// The local Carrier invoice outcome Logic App's client ID stands in for the Carrier invoice outcome Logic App's, the one holder of the ERP API's Carrier invoice report role.
+/// The local Carrier invoice Logic App's client ID stands in for the Carrier invoice Logic App's, the one holder of the ERP API's Carrier invoice receive role. Its trigger takes only API Management's client, as the workflow's first step does in Azure.
 /// The TMS UI signs its own token for the TMS API with the key too, as its managed identity holding the manage role.
 /// The Simulator signs its own token for the ERP API with the key too, as its managed identity holding the ERP API's manage role (Invoice now and a Credit note).
 /// The local Partner API trusts the same key for the Personas' tokens, which the Partner portal signs itself (ADR 0023).
@@ -31,6 +32,8 @@ public static class LocalTokens
     public const string IntakeLogicAppClientId = "norvia-local-intake-logic-app";
     public const string BookingLogicAppClientId = "norvia-local-booking-logic-app";
     public const string ShipperInvoiceLogicAppClientId = "norvia-local-shipper-invoice-logic-app";
+    public const string CarrierInvoiceLogicAppClientId = "norvia-local-carrier-invoice-logic-app";
+    public const string CarrierInvoiceTriggerAudience = "api://norvia-carrier-invoice-logic-app";
     public const string CarrierInvoiceOutcomeLogicAppClientId = "norvia-local-carrier-invoice-outcome-logic-app";
     public const string ShipperNotificationLogicAppClientId = "norvia-local-shipper-notification-logic-app";
     public const string CarrierCancellationLogicAppClientId = "norvia-local-carrier-cancellation-logic-app";
@@ -56,6 +59,9 @@ public static class LocalTokens
 
     /// <summary>The app role a Carrier Persona holds on the Norvia Partner API to submit Proofs of delivery, as the estate grants it in Entra.</summary>
     public const string ProofsOfDeliverySubmitRole = "ProofsOfDelivery.Submit";
+
+    /// <summary>The app role a Carrier Persona holds on the Norvia Partner API to submit Carrier invoices, as the estate grants it in Entra. A Shipper Persona doesn't.</summary>
+    public const string CarrierInvoicesSubmitRole = "CarrierInvoices.Submit";
 
     /// <summary>The app role a Shipper Persona holds on the Norvia Partner API to read its tracking, as the estate grants it in Entra. A Carrier Persona doesn't.</summary>
     public const string TrackingReadRole = "Tracking.Read";
