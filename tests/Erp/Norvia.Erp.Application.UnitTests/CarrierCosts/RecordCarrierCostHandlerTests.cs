@@ -7,9 +7,9 @@ using Norvia.Erp.Application.CarrierInvoices;
 using Norvia.Erp.Application.IntegrationEvents;
 using Norvia.Erp.Application.UnitTests.BillableLines;
 using Norvia.Erp.Domain.BillableLines;
-using Norvia.Erp.Domain.Carriers;
 using Norvia.Erp.Domain.CarrierCosts;
 using Norvia.Erp.Domain.CarrierInvoices;
+using Norvia.Erp.Domain.Carriers;
 
 namespace Norvia.Erp.Application.UnitTests.CarrierCosts;
 

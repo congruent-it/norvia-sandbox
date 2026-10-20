@@ -1,11 +1,11 @@
-using Microsoft.Extensions.DependencyInjection;
+using Ardalis.Result;
+using Asp.Versioning;
+using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Routing;
-using Asp.Versioning;
-using Ardalis.Result;
-using Mediator;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Norvia.Erp.Api.CarrierInvoices;
 using Norvia.Erp.Application;
 using Norvia.Erp.Application.CarrierInvoices;

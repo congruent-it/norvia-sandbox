@@ -1,8 +1,8 @@
+using Ardalis.Result;
 using Norvia.PartnerPortal.Application.Bookings;
 using Norvia.PartnerPortal.Application.CarrierBookings;
 using Norvia.PartnerPortal.Application.CarrierBookings.Answer;
 using Norvia.PartnerPortal.Application.CarrierBookings.AnswerSettings;
-using Ardalis.Result;
 using Norvia.PartnerPortal.Application.CarrierInvoices;
 using Norvia.PartnerPortal.Application.CarrierInvoices.Draft;
 using Norvia.PartnerPortal.Application.CarrierInvoices.Submit;

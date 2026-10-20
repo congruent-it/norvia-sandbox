@@ -2,8 +2,8 @@ using Ardalis.SharedKernel;
 using Ardalis.Specification;
 using Norvia.Erp.Application.CarrierCosts.ListOpen;
 using Norvia.Erp.Domain.BillableLines;
-using Norvia.Erp.Domain.Carriers;
 using Norvia.Erp.Domain.CarrierCosts;
+using Norvia.Erp.Domain.Carriers;
 
 namespace Norvia.Erp.Application.UnitTests.CarrierCosts;
 

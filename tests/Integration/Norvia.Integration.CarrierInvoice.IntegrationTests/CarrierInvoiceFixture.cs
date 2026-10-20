@@ -2,7 +2,6 @@ extern alias ErpApi;
 extern alias ErpWeb;
 extern alias InvoiceWorker;
 extern alias PartnerApi;
-
 using System.Collections.Concurrent;
 using System.Net.Http.Headers;
 using System.Text;
@@ -20,12 +19,12 @@ using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Norvia.AppHost;
 using NSubstitute;
+using CarrierInvoiceLogicApp = PartnerApi::Norvia.Integration.LocalPartnerApi.CarrierInvoiceLogicApp;
 using ErpApiProgram = ErpApi::Program;
+using ErpCarrierInvoices = InvoiceWorker::Norvia.Integration.LocalCarrierInvoiceWorker.ErpCarrierInvoices;
 using ErpWebProgram = ErpWeb::Program;
 using InvoiceWorkerProgram = InvoiceWorker::Program;
 using PartnerApiProgram = PartnerApi::Program;
-using ErpCarrierInvoices = InvoiceWorker::Norvia.Integration.LocalCarrierInvoiceWorker.ErpCarrierInvoices;
-using CarrierInvoiceLogicApp = PartnerApi::Norvia.Integration.LocalPartnerApi.CarrierInvoiceLogicApp;
 
 [assembly: AssemblyFixture(typeof(Norvia.Integration.CarrierInvoice.IntegrationTests.CarrierInvoiceFixture))]
 

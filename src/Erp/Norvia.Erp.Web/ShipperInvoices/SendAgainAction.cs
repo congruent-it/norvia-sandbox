@@ -2,8 +2,8 @@ using System.Diagnostics;
 using Ardalis.Result;
 using Mediator;
 using Norvia.Erp.Application;
-using Norvia.Erp.Application.IntegrationEvents;
 using Norvia.Erp.Application.CreditNotes.SendAgain;
+using Norvia.Erp.Application.IntegrationEvents;
 using Norvia.Erp.Application.ShipperInvoices.SendAgain;
 
 namespace Norvia.Erp.Web.ShipperInvoices;

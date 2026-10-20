@@ -1,7 +1,7 @@
 using Ardalis.SharedKernel;
 using Mediator;
-using Norvia.Erp.Domain.Carriers;
 using Norvia.Erp.Domain.CarrierCosts;
+using Norvia.Erp.Domain.Carriers;
 
 namespace Norvia.Erp.Application.CarrierCosts.ListOpen;
 

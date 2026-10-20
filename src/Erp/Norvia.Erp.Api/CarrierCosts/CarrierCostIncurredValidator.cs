@@ -1,7 +1,7 @@
 using System.Text.RegularExpressions;
 using Norvia.Erp.Domain.BillableLines;
-using Norvia.Erp.Domain.Carriers;
 using Norvia.Erp.Domain.CarrierCosts;
+using Norvia.Erp.Domain.Carriers;
 
 namespace Norvia.Erp.Api.CarrierCosts;
 
