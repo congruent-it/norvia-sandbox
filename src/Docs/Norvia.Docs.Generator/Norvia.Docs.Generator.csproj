@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+  </ItemGroup>
+  <!-- A tool, not an application: it may see every application's Infrastructure and Api, which the applications themselves must not (coding guidelines §2). -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\Tms\Norvia.Tms.Api\Norvia.Tms.Api.csproj" />
+    <ProjectReference Include="..\..\Tms\Norvia.Tms.Infrastructure\Norvia.Tms.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Erp\Norvia.Erp.Api\Norvia.Erp.Api.csproj" />
+    <ProjectReference Include="..\..\Erp\Norvia.Erp.Infrastructure\Norvia.Erp.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\DriverApp\Norvia.DriverApp.Api\Norvia.DriverApp.Api.csproj" />
+    <ProjectReference Include="..\..\DriverApp\Norvia.DriverApp.Infrastructure\Norvia.DriverApp.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\PartnerPortal\Norvia.PartnerPortal.Infrastructure\Norvia.PartnerPortal.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Simulator\Norvia.Simulator.Infrastructure\Norvia.Simulator.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Norvia.Docs.Generator.UnitTests" />
+    <InternalsVisibleTo Include="Norvia.Docs.Generator.ArchitectureTests" />
+  </ItemGroup>
+</Project>

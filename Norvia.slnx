@@ -67,6 +67,9 @@
     <Project Path="src/Simulator/Norvia.Simulator.Migrations/Norvia.Simulator.Migrations.csproj" />
     <Project Path="src/Simulator/Norvia.Simulator.Web/Norvia.Simulator.Web.csproj" />
   </Folder>
+  <Folder Name="/src/Docs/">
+    <Project Path="src/Docs/Norvia.Docs.Generator/Norvia.Docs.Generator.csproj" />
+  </Folder>
   <Folder Name="/src/Tms/">
     <Project Path="src/Tms/Norvia.Tms.Api/Norvia.Tms.Api.csproj" />
     <Project Path="src/Tms/Norvia.Tms.Application/Norvia.Tms.Application.csproj" />
@@ -140,6 +143,9 @@
     <Project Path="tests/Simulator/Norvia.Simulator.Web.IntegrationTests/Norvia.Simulator.Web.IntegrationTests.csproj" />
     <Project Path="tests/Simulator/Norvia.Simulator.Web.UnitTests/Norvia.Simulator.Web.UnitTests.csproj" />
     <Project Path="tests/Simulator/Norvia.Simulator.Web.UiTests/Norvia.Simulator.Web.UiTests.csproj" />
+  </Folder>
+  <Folder Name="/tests/Docs/">
+    <Project Path="tests/Docs/Norvia.Docs.Generator.UnitTests/Norvia.Docs.Generator.UnitTests.csproj" />
   </Folder>
   <Folder Name="/tests/Tms/">
     <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.Billing/Norvia.Tms.Api.IntegrationTests.Billing.csproj" />

@@ -1,0 +1,2289 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "Norvia.Erp.Api | v1",
+    "description": "",
+    "version": "1"
+  },
+  "paths": {
+    "/v1/billable-lines": {
+      "post": {
+        "tags": [
+          "BillableLines"
+        ],
+        "summary": "Record the Billable line a TransportOrderBillable carries, as Waiting.",
+        "description": "The body is the Canonical Model's TransportOrderBillable, version 1, and nothing else. Idempotent on the Transport Order number: a repeat with the same content answers 200 with the original line and repeat true; the first recording answers 201. Publishes nothing. Refusals carry a stable code: ShipperNotFound (422), BillableLineConflict (409, the Transport Order is already recorded with different content), FreightChargeWithoutChargeLines and FreightChargeTotalMismatch (400).",
+        "operationId": "RecordBillableLine",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TransportOrderBillableRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordBillableLineResult"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordBillableLineResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/carrier-costs": {
+      "post": {
+        "tags": [
+          "CarrierCosts"
+        ],
+        "summary": "Record the Carrier cost a CarrierCostIncurred carries, as Open.",
+        "description": "The body is the Canonical Model's CarrierCostIncurred, version 1, and nothing else. Idempotent on the Carrier booking number: a repeat with the same content answers 200 with the original Carrier cost and repeat true; the first recording answers 201. Publishes nothing. Refusals carry a stable code: CarrierNotFound (422), CarrierCostConflict (409, the Carrier booking is already recorded with different content), CarrierCostWithoutChargeLines and CarrierCostTotalMismatch (400).",
+        "operationId": "RecordCarrierCost",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CarrierCostIncurredRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordCarrierCostResult"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordCarrierCostResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/carrier-invoices": {
+      "post": {
+        "tags": [
+          "CarrierInvoices"
+        ],
+        "summary": "Receive a Carrier invoice and match each of its lines against the Carrier cost.",
+        "description": "The body is the Canonical Model's Carrier invoice, version 1, and nothing else; its carrierId is the Carrier API Management took from the token. The invoice is recorded and every line matched in one transaction: Matched (accepted at once, its Carrier cost becomes Invoiced), Price mismatch, Unknown booking or Duplicate (both wait for Finance). An invoice whose lines all match is Approved and publishes CarrierInvoiceApproved through the outbox. Idempotent on the Carrier and its invoice number: a repeat with the same content answers 200 with the original and repeat true, publishing nothing; the first receipt answers 201. Refusals carry a stable code: CarrierNotFound (422), InvoiceNumberUsed (409, the number was used for different content), CarrierInvoiceWithoutLines, CarrierInvoiceLineWithoutReference, CarrierInvoiceLineAmountNotAboveZero and CarrierInvoiceReferenceRepeated (400).",
+        "operationId": "ReceiveCarrierInvoice",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CarrierInvoiceRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiveCarrierInvoiceResult"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiveCarrierInvoiceResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/carrier-invoices/{carrierId}/{invoiceNumber}/report-told": {
+      "post": {
+        "tags": [
+          "CarrierInvoices"
+        ],
+        "summary": "Report that the Carrier's invoice outcome endpoint acknowledged the outcome of an Approved Carrier invoice.",
+        "description": "Records the time the Carrier was told and publishes nothing. A report for an invoice whose outcome was reported already, or that isn't Approved, is ignored and logged: it answers 200 with ignored true and changes nothing. The X-Correlation-ID is the Carrier invoice's own correlation ID, which CarrierInvoiceApproved carried. CarrierInvoiceNotFound (404, with that code) for an unknown Carrier invoice.",
+        "operationId": "ReportCarrierInvoiceTold",
+        "parameters": [
+          {
+            "name": "carrierId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invoiceNumber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CarrierInvoiceReportResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/carrier-invoices/{carrierId}/{invoiceNumber}/report-not-delivered": {
+      "post": {
+        "tags": [
+          "CarrierInvoices"
+        ],
+        "summary": "Report that the outcome of a Carrier invoice never reached the Carrier, with its technical cause.",
+        "description": "Flags the invoice Carrier not told with the technical cause and publishes CarrierInvoiceOutcomeNotDelivered, in one transaction. A report for an invoice whose outcome was reported already, or that isn't Approved, is ignored and logged: it answers 200 with ignored true and changes and publishes nothing. The X-Correlation-ID is the Carrier invoice's own correlation ID. CarrierInvoiceNotFound (404, with that code) for an unknown Carrier invoice.",
+        "operationId": "ReportCarrierInvoiceOutcomeNotDelivered",
+        "parameters": [
+          {
+            "name": "carrierId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invoiceNumber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CarrierInvoiceOutcomeNotDeliveredRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CarrierInvoiceReportResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/carrier-invoices/{carrierId}/{invoiceNumber}/lines/{bookingReference}/accept": {
+      "post": {
+        "tags": [
+          "CarrierInvoices"
+        ],
+        "summary": "Accept a Carrier invoice line that waits for Finance, at the invoiced amount or an adjusted one.",
+        "description": "What Finance's Accept button does in the ERP UI, through the same command. The optional adjusted amount needs a remark. The line's Carrier cost becomes Invoiced; when it is the last line to decide, the invoice becomes Approved and CarrierInvoiceApproved is published, once, in the same transaction. Answers 200 with the invoice. Refusals carry the stable code: CarrierInvoiceNotFound and CarrierInvoiceLineNotFound (404), CarrierInvoiceLineAlreadyDecided (409), CarrierInvoiceLineHasNoOpenCarrierCost (422), CarrierInvoiceAdjustedAmountNotAboveZero and CarrierInvoiceAdjustedAmountNeedsRemark (400).",
+        "operationId": "AcceptCarrierInvoiceLine",
+        "parameters": [
+          {
+            "name": "carrierId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invoiceNumber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bookingReference",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AcceptCarrierInvoiceLineRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CarrierInvoiceView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/carrier-invoices/{carrierId}/{invoiceNumber}/lines/{bookingReference}/reject": {
+      "post": {
+        "tags": [
+          "CarrierInvoices"
+        ],
+        "summary": "Reject a Carrier invoice line that waits for Finance, with a reason.",
+        "description": "What Finance's Reject button does in the ERP UI, through the same command. The line's Carrier cost, if any, stays as it was; when it is the last line to decide, the invoice becomes Approved and CarrierInvoiceApproved is published, once, in the same transaction. Answers 200 with the invoice. Refusals carry the stable code: CarrierInvoiceNotFound and CarrierInvoiceLineNotFound (404), CarrierInvoiceLineAlreadyDecided (409), CarrierInvoiceRejectionNeedsReason (400).",
+        "operationId": "RejectCarrierInvoiceLine",
+        "parameters": [
+          {
+            "name": "carrierId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invoiceNumber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bookingReference",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RejectCarrierInvoiceLineRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CarrierInvoiceView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/shipper-invoices": {
+      "post": {
+        "tags": [
+          "ShipperInvoices"
+        ],
+        "summary": "Invoice now: run the Invoice run for one Shipper over all its Waiting lines.",
+        "description": "What Finance's Invoice now button does in the ERP UI, through the same command. Issues one Shipper invoice, sets the lines to Invoiced and publishes ShipperInvoiceIssued, in one transaction. Answers 200 with the invoice, or with invoice null when the Shipper has no Waiting lines. ShipperNotFound (404, with that code) for an unknown Shipper.",
+        "operationId": "InvoiceNow",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/InvoiceNowRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueShipperInvoiceResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/shipper-invoices/{invoiceNumber}/credit-notes": {
+      "post": {
+        "tags": [
+          "ShipperInvoices"
+        ],
+        "summary": "Issue a Credit note on one line of a Shipper invoice, in full or in part.",
+        "description": "What Finance's Credit note form does in the ERP UI, through the same command. The amount is without VAT. Issues the Credit note and publishes CreditNoteIssued, in one transaction, and answers 201 with it. Refusals carry the stable code of the Credit note rule broken: ShipperInvoiceNotFound and InvoiceLineNotFound (404), CreditNoteReasonRequired, CreditNoteReasonTooLong and CreditNoteAmountInvalid (400), CreditNoteAboveLineTotal (422).",
+        "operationId": "IssueCreditNote",
+        "parameters": [
+          {
+            "name": "invoiceNumber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/IssueCreditNoteRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreditNoteView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/shipper-invoices/{invoiceNumber}/report-sent": {
+      "post": {
+        "tags": [
+          "ShipperInvoices"
+        ],
+        "summary": "Report that the Shipper's invoice endpoint acknowledged a Shipper invoice.",
+        "description": "Moves the invoice from Issued to Sent, records the time and publishes nothing. A report for an invoice that was reported already is ignored and logged: it answers 200 with ignored true and changes nothing. The X-Correlation-ID is the correlation ID the ERP created for the invoice, which ShipperInvoiceIssued carried. ShipperInvoiceNotFound (404, with that code) for an unknown invoice number.",
+        "operationId": "ReportShipperInvoiceSent",
+        "parameters": [
+          {
+            "name": "invoiceNumber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShipperInvoiceReportResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/shipper-invoices/{invoiceNumber}/report-not-delivered": {
+      "post": {
+        "tags": [
+          "ShipperInvoices"
+        ],
+        "summary": "Report that a Shipper invoice never reached the Shipper, with its technical cause.",
+        "description": "Moves the invoice from Issued to Not delivered with the technical cause and publishes ShipperInvoiceNotDelivered, in one transaction. A report for an invoice that isn't Issued any more (reported already, or sent again since) is ignored and logged: it answers 200 with ignored true and changes and publishes nothing. The X-Correlation-ID is the correlation ID the ERP created for the invoice. ShipperInvoiceNotFound (404, with that code) for an unknown invoice number.",
+        "operationId": "ReportShipperInvoiceNotDelivered",
+        "parameters": [
+          {
+            "name": "invoiceNumber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShipperInvoiceNotDeliveredRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShipperInvoiceReportResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/credit-notes/{creditNoteNumber}/report-sent": {
+      "post": {
+        "tags": [
+          "CreditNotes"
+        ],
+        "summary": "Report that the Shipper's invoice endpoint acknowledged a Credit note.",
+        "description": "Moves the Credit note from Issued to Sent, records the time and publishes nothing. A report for a Credit note that was reported already is ignored and logged: it answers 200 with ignored true and changes nothing. The X-Correlation-ID is the correlation ID the ERP created for the Credit note, which CreditNoteIssued carried. CreditNoteNotFound (404, with that code) for an unknown number.",
+        "operationId": "ReportCreditNoteSent",
+        "parameters": [
+          {
+            "name": "creditNoteNumber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreditNoteReportResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/credit-notes/{creditNoteNumber}/report-not-delivered": {
+      "post": {
+        "tags": [
+          "CreditNotes"
+        ],
+        "summary": "Report that a Credit note never reached the Shipper, with its technical cause.",
+        "description": "Moves the Credit note from Issued to Not delivered with the technical cause and publishes ShipperInvoiceNotDelivered with document type CREDIT_NOTE, in one transaction. A report for a Credit note that isn't Issued any more (reported already, or sent again since) is ignored and logged: it answers 200 with ignored true and changes and publishes nothing. The X-Correlation-ID is the correlation ID the ERP created for the Credit note. CreditNoteNotFound (404, with that code) for an unknown number.",
+        "operationId": "ReportCreditNoteNotDelivered",
+        "parameters": [
+          {
+            "name": "creditNoteNumber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShipperInvoiceNotDeliveredRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreditNoteReportResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/reset": {
+      "get": {
+        "tags": [
+          "Reset"
+        ],
+        "summary": "Whether a reset would be taken now.",
+        "description": "enabled is the Reset setting, which is off unless the estate switches it on. busySubscription names the first topic subscription that holds unprocessed messages, as topic/subscription, or the outbox while it holds unpublished events, or is null when all are quiet.",
+        "operationId": "GetResetReadiness",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResetReadiness"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Reset"
+        ],
+        "summary": "Delete the ERP's transactional records.",
+        "description": "Deletes the Shipper invoices, Credit notes, Billable lines, Carrier costs and Carrier invoices, the invoice number sequences and the outbox Messages. Master data stays. Refused, deleting nothing, with a 403 problem (code ResetDisabled) while the setting is off, and a 409 problem (code SubscriptionBusy) naming the subscription (or the outbox) while one holds unprocessed messages or unpublished events.",
+        "operationId": "ResetEstate",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResetReport"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AcceptCarrierInvoiceLineRequest": {
+        "required": [
+          "adjustedAmount",
+          "remark"
+        ],
+        "type": "object",
+        "properties": {
+          "adjustedAmount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "remark": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "BillableLineView": {
+        "required": [
+          "transportOrderNumber",
+          "shipperId",
+          "shipperReference",
+          "shipmentNumber",
+          "deliveryTime",
+          "freightCharge",
+          "releasedWithoutProofOfDelivery",
+          "intakeCorrelationId",
+          "billingCorrelationId",
+          "recordedAt",
+          "status",
+          "invoiceNumber"
+        ],
+        "type": "object",
+        "properties": {
+          "transportOrderNumber": {
+            "type": "string"
+          },
+          "shipperId": {
+            "type": "string"
+          },
+          "shipperReference": {
+            "type": "string"
+          },
+          "shipmentNumber": {
+            "type": "string"
+          },
+          "deliveryTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "freightCharge": {
+            "$ref": "#/components/schemas/FreightChargeView"
+          },
+          "releasedWithoutProofOfDelivery": {
+            "type": "boolean"
+          },
+          "intakeCorrelationId": {
+            "type": "string"
+          },
+          "billingCorrelationId": {
+            "type": "string"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string"
+          },
+          "invoiceNumber": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "CarrierCostChargeLineRequest": {
+        "required": [
+          "type",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/ChargeLineType"
+          },
+          "amount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CarrierCostIncurredRequest": {
+        "required": [
+          "eventId",
+          "eventType",
+          "eventVersion",
+          "occurredAt",
+          "correlationId",
+          "carrierBookingNumber",
+          "carrierBookingReference",
+          "shipmentNumber",
+          "transportOrderNumber",
+          "carrierId",
+          "carrierCost",
+          "deliveryTime"
+        ],
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventType": {
+            "type": "string"
+          },
+          "eventVersion": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "carrierBookingNumber": {
+            "type": "string"
+          },
+          "carrierBookingReference": {
+            "type": "string"
+          },
+          "shipmentNumber": {
+            "type": "string"
+          },
+          "transportOrderNumber": {
+            "type": "string"
+          },
+          "carrierId": {
+            "type": "string"
+          },
+          "carrierCost": {
+            "$ref": "#/components/schemas/CarrierCostRequest"
+          },
+          "deliveryTime": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CarrierCostRequest": {
+        "required": [
+          "currency",
+          "total",
+          "chargeLines",
+          "source",
+          "calculatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "chargeLines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CarrierCostChargeLineRequest"
+            }
+          },
+          "source": {
+            "$ref": "#/components/schemas/CarrierCostSourceRequest"
+          },
+          "calculatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CarrierCostSourceKind": {
+        "enum": [
+          "CarrierRateCard",
+          "Spot"
+        ]
+      },
+      "CarrierCostSourceRequest": {
+        "required": [
+          "kind"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/CarrierCostSourceKind"
+          },
+          "rateCardVersion": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CarrierRateCardVersionRequest"
+              }
+            ]
+          },
+          "remark": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "CarrierCostSourceView": {
+        "required": [
+          "kind",
+          "rateCardId",
+          "rateCardVersion",
+          "remark"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "rateCardId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "rateCardVersion": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "remark": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "CarrierCostView": {
+        "required": [
+          "carrierBookingNumber",
+          "carrierBookingReference",
+          "carrierId",
+          "shipmentNumber",
+          "transportOrderNumber",
+          "currency",
+          "total",
+          "chargeLines",
+          "source",
+          "deliveryTime",
+          "correlationId",
+          "recordedAt",
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "carrierBookingNumber": {
+            "type": "string"
+          },
+          "carrierBookingReference": {
+            "type": "string"
+          },
+          "carrierId": {
+            "type": "string"
+          },
+          "shipmentNumber": {
+            "type": "string"
+          },
+          "transportOrderNumber": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "chargeLines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChargeLineView"
+            }
+          },
+          "source": {
+            "$ref": "#/components/schemas/CarrierCostSourceView"
+          },
+          "deliveryTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CarrierInvoiceLineRequest": {
+        "required": [
+          "carrierBookingReference",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "carrierBookingReference": {
+            "type": "string"
+          },
+          "amount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "CarrierInvoiceLineView": {
+        "required": [
+          "carrierBookingReference",
+          "amount",
+          "description",
+          "result",
+          "status",
+          "carrierBookingNumber",
+          "acceptedAmount"
+        ],
+        "type": "object",
+        "properties": {
+          "carrierBookingReference": {
+            "type": "string"
+          },
+          "amount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "result": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "carrierBookingNumber": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "acceptedAmount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "remark": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "CarrierInvoiceOutcomeNotDeliveredRequest": {
+        "required": [
+          "statusCode",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "message": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "CarrierInvoiceReportResult": {
+        "required": [
+          "carrierId",
+          "invoiceNumber",
+          "toldAt"
+        ],
+        "type": "object",
+        "properties": {
+          "carrierId": {
+            "type": "string"
+          },
+          "invoiceNumber": {
+            "type": "string"
+          },
+          "toldAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "ignored": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "CarrierInvoiceRequest": {
+        "required": [
+          "carrierId",
+          "invoiceNumber",
+          "invoiceDate",
+          "correlationId",
+          "lines"
+        ],
+        "type": "object",
+        "properties": {
+          "carrierId": {
+            "type": "string"
+          },
+          "invoiceNumber": {
+            "type": "string"
+          },
+          "invoiceDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CarrierInvoiceLineRequest"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "CarrierInvoiceView": {
+        "required": [
+          "carrierId",
+          "invoiceNumber",
+          "invoiceDate",
+          "currency",
+          "total",
+          "lines",
+          "correlationId",
+          "receivedAt",
+          "status",
+          "approvedAmount",
+          "approvedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "carrierId": {
+            "type": "string"
+          },
+          "invoiceNumber": {
+            "type": "string"
+          },
+          "invoiceDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CarrierInvoiceLineView"
+            }
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string"
+          },
+          "approvedAmount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "approvedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "toldAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "notToldAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "notToldStatusCode": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "notToldMessage": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "CarrierRateCardVersionRequest": {
+        "required": [
+          "rateCardId",
+          "version"
+        ],
+        "type": "object",
+        "properties": {
+          "rateCardId": {
+            "type": "string"
+          },
+          "version": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ChargeLineRequest": {
+        "required": [
+          "type",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/ChargeLineType"
+          },
+          "amount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ChargeLineType": {
+        "enum": [
+          "Freight",
+          "MinimumChargeAdjustment"
+        ]
+      },
+      "ChargeLineView": {
+        "required": [
+          "type",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "amount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreditNoteReportResult": {
+        "required": [
+          "creditNoteNumber",
+          "status",
+          "sentAt"
+        ],
+        "type": "object",
+        "properties": {
+          "creditNoteNumber": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "sentAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "ignored": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreditNoteView": {
+        "required": [
+          "creditNoteNumber",
+          "creditNoteDate",
+          "shipper",
+          "invoiceNumber",
+          "transportOrderNumber",
+          "shipperReference",
+          "shipmentNumber",
+          "deliveryDate",
+          "currency",
+          "totalWithoutVat",
+          "vat",
+          "totalWithVat",
+          "reason",
+          "issuedAt",
+          "correlationId",
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "creditNoteNumber": {
+            "type": "string"
+          },
+          "creditNoteDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "shipper": {
+            "$ref": "#/components/schemas/ShipperOnInvoiceView"
+          },
+          "invoiceNumber": {
+            "type": "string"
+          },
+          "transportOrderNumber": {
+            "type": "string"
+          },
+          "shipperReference": {
+            "type": "string"
+          },
+          "shipmentNumber": {
+            "type": "string"
+          },
+          "deliveryDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "totalWithoutVat": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "vat": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "totalWithVat": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "issuedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "sentAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "notDelivered": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/NotDeliveredView"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "DeletedKind": {
+        "required": [
+          "kind",
+          "count"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FreightChargeRequest": {
+        "required": [
+          "currency",
+          "total",
+          "chargeLines",
+          "rateCardVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "chargeLines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChargeLineRequest"
+            }
+          },
+          "rateCardVersion": {
+            "$ref": "#/components/schemas/RateCardVersionRequest"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FreightChargeView": {
+        "required": [
+          "currency",
+          "total",
+          "chargeLines",
+          "rateCardId",
+          "rateCardVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "chargeLines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChargeLineView"
+            }
+          },
+          "rateCardId": {
+            "type": "string"
+          },
+          "rateCardVersion": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "HttpValidationProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instance": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "errors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "InvoiceChargeLineView": {
+        "required": [
+          "type",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "amount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "InvoiceNowRequest": {
+        "required": [
+          "shipperId"
+        ],
+        "type": "object",
+        "properties": {
+          "shipperId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "IssueCreditNoteRequest": {
+        "required": [
+          "transportOrderNumber",
+          "amountWithoutVat",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "transportOrderNumber": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "amountWithoutVat": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "IssueShipperInvoiceResult": {
+        "required": [
+          "invoice"
+        ],
+        "type": "object",
+        "properties": {
+          "invoice": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ShipperInvoiceView"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "NotDeliveredView": {
+        "required": [
+          "at",
+          "statusCode",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "statusCode": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RateCardVersionRequest": {
+        "required": [
+          "rateCardId",
+          "version"
+        ],
+        "type": "object",
+        "properties": {
+          "rateCardId": {
+            "type": "string"
+          },
+          "version": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReceiveCarrierInvoiceResult": {
+        "required": [
+          "invoice",
+          "repeat"
+        ],
+        "type": "object",
+        "properties": {
+          "invoice": {
+            "$ref": "#/components/schemas/CarrierInvoiceView"
+          },
+          "repeat": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RecordBillableLineResult": {
+        "required": [
+          "line",
+          "repeat"
+        ],
+        "type": "object",
+        "properties": {
+          "line": {
+            "$ref": "#/components/schemas/BillableLineView"
+          },
+          "repeat": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RecordCarrierCostResult": {
+        "required": [
+          "cost",
+          "repeat"
+        ],
+        "type": "object",
+        "properties": {
+          "cost": {
+            "$ref": "#/components/schemas/CarrierCostView"
+          },
+          "repeat": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RejectCarrierInvoiceLineRequest": {
+        "required": [
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "ResetReadiness": {
+        "required": [
+          "enabled",
+          "busySubscription"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "busySubscription": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "ResetReport": {
+        "required": [
+          "deleted"
+        ],
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeletedKind"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "ShipperInvoiceLineView": {
+        "required": [
+          "transportOrderNumber",
+          "shipperReference",
+          "shipmentNumber",
+          "deliveryDate",
+          "chargeLines",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "transportOrderNumber": {
+            "type": "string"
+          },
+          "shipperReference": {
+            "type": "string"
+          },
+          "shipmentNumber": {
+            "type": "string"
+          },
+          "deliveryDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "chargeLines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InvoiceChargeLineView"
+            }
+          },
+          "total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ShipperInvoiceNotDeliveredRequest": {
+        "required": [
+          "statusCode",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "message": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "ShipperInvoiceReportResult": {
+        "required": [
+          "invoiceNumber",
+          "status",
+          "sentAt"
+        ],
+        "type": "object",
+        "properties": {
+          "invoiceNumber": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "sentAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "ignored": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "ShipperInvoiceView": {
+        "required": [
+          "invoiceNumber",
+          "invoiceDate",
+          "shipper",
+          "lines",
+          "currency",
+          "totalWithoutVat",
+          "vat",
+          "totalWithVat",
+          "issuedAt",
+          "correlationId",
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "invoiceNumber": {
+            "type": "string"
+          },
+          "invoiceDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "shipper": {
+            "$ref": "#/components/schemas/ShipperOnInvoiceView"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShipperInvoiceLineView"
+            }
+          },
+          "currency": {
+            "type": "string"
+          },
+          "totalWithoutVat": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "vat": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "totalWithVat": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "issuedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "sentAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "notDelivered": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/NotDeliveredView"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "ShipperOnInvoiceView": {
+        "required": [
+          "shipperId",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "shipperId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "TransportOrderBillableRequest": {
+        "required": [
+          "eventId",
+          "eventType",
+          "eventVersion",
+          "occurredAt",
+          "correlationId",
+          "intakeCorrelationId",
+          "transportOrderNumber",
+          "shipperId",
+          "shipperReference",
+          "shipmentNumber",
+          "deliveryTime",
+          "freightCharge",
+          "releasedWithoutProofOfDelivery"
+        ],
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "eventType": {
+            "type": "string"
+          },
+          "eventVersion": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "intakeCorrelationId": {
+            "type": "string"
+          },
+          "transportOrderNumber": {
+            "type": "string"
+          },
+          "shipperId": {
+            "type": "string"
+          },
+          "shipperReference": {
+            "type": "string"
+          },
+          "shipmentNumber": {
+            "type": "string"
+          },
+          "deliveryTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "freightCharge": {
+            "$ref": "#/components/schemas/FreightChargeRequest"
+          },
+          "releasedWithoutProofOfDelivery": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "BillableLines"
+    },
+    {
+      "name": "CarrierCosts"
+    },
+    {
+      "name": "CarrierInvoices"
+    },
+    {
+      "name": "ShipperInvoices"
+    },
+    {
+      "name": "CreditNotes"
+    },
+    {
+      "name": "Reset"
+    }
+  ]
+}
