@@ -1,1 +1,46 @@
-{ "tables": {} }
+{
+  "tables": {
+    "LogEntries": {
+      "description": "One line of a Simulation run's log: what an actor did, how Norvia answered, and the keys that find its Message trail in the Integration console. It never holds what was booked, which has personal data in it (coding guidelines §7). The Simulator keeps no copy of the estate's records; the owners do (ADR 0002, ADR 0039).",
+      "columns": {
+        "Id": "The line's own ID.",
+        "Action": "What the actor did, such as a booking, an assignment, a Carrier's answer, a Driver's report or Finance's Invoice now.",
+        "Actor": "Who acted: the Persona's or Driver's name, or the simulated Planner or Finance.",
+        "At": "When it happened.",
+        "CorrelationId": "The `X-Correlation-ID` Norvia answered with, by which the Integration console finds the Message trail (ADR 0017); null when Norvia never answered.",
+        "Detail": "What the plan intended and what Norvia said, such as the codes of a rejection; never the booking's content.",
+        "Outcome": "How Norvia answered the call: whether it took it, refused it or couldn't be reached.",
+        "RunId": "The Simulation run the line belongs to.",
+        "Sequence": "The line's place in its run, from 1.",
+        "ShipmentNumber": "The Shipment the line is about, when it is about one (a logical reference to the TMS).",
+        "ShipperReference": "The Shipper reference the run gave the booking (`SIM-<run number>-<n>`).",
+        "TransportOrderNumber": "The Transport Order the line is about, once Norvia numbered it (a logical reference to the TMS).",
+        "TripNumber": "The Trip the line is about, when it is about one (a logical reference to the TMS)."
+      }
+    },
+    "RunSequence": {
+      "description": "The last Simulation run number taken, one row for the whole app, so run numbers (and the Shipper references that carry them) don't repeat. Reset estate clears it and the next run is number 1 again.",
+      "columns": {
+        "Id": "Always 1: there is one row.",
+        "Last": "The last run number taken."
+      }
+    },
+    "SimulationRuns": {
+      "description": "A Simulation run: the plan that was made and how far it got. Only one run is active at a time; a run can be cancelled but not resumed after a restart.",
+      "columns": {
+        "Id": "The run's own ID.",
+        "FinishedAt": "When the run ended; null while Running.",
+        "Mode": "`Burst` (sent as fast as the estate accepts) or `Paced` (spread over the run's window).",
+        "Number": "The run's number, unique, which its Shipper references carry.",
+        "Plan": "The plan as JSON: the mix of Shippers and Carriers, the shares of failures and exceptions, and the settings for the Planner, Carriers, Drivers and Finance.",
+        "PlannedCount": "How many Transport Orders the plan intended to book.",
+        "PresetName": "The preset the plan started from; null for a plan configured by hand.",
+        "RowVersion": "Concurrency token: a cancel and the run's own progress don't both land.",
+        "Seed": "The random seed, so the same plan and seed play the same run.",
+        "StartedAt": "When the run started.",
+        "StartedBy": "Who started it: the presenter, or the local operator under Aspire.",
+        "Status": "`Running`, `Completed`, `Cancelled` or `Failed` (for example because the Simulator was restarted)."
+      }
+    }
+  }
+}
