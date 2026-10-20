@@ -1,4 +1,5 @@
 using Mediator;
+using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TransportOrders;
 
 namespace Norvia.Tms.Application.TransportOrders.Browse;
@@ -11,6 +12,7 @@ namespace Norvia.Tms.Application.TransportOrders.Browse;
 /// <param name="Search">Only the Transport Orders whose number, Shipper reference or Shipment number contains this text, whatever its case; null or blank for all.</param>
 /// <param name="Page">The page to return, counted from 1.</param>
 /// <param name="CarriedBy">Only the Transport Orders whose Shipment this Carrier (its ID) or <see cref="OwnFleet"/> carries, so none that has no Shipment yet; null or blank for all.</param>
+/// <param name="ShipmentStatus">Only the Transport Orders whose Shipment has this status, so none that has no Shipment yet; null for all.</param>
 /// <param name="PageSize">The number of Transport Orders on a page.</param>
 public sealed record ListAllTransportOrdersQuery(
     TransportOrderStatus? Status = null,
@@ -18,7 +20,8 @@ public sealed record ListAllTransportOrdersQuery(
     string? Search = null,
     int Page = 1,
     int PageSize = ListAllTransportOrdersQuery.DefaultPageSize,
-    string? CarriedBy = null) : IQuery<TransportOrderPage>
+    string? CarriedBy = null,
+    ShipmentStatus? ShipmentStatus = null) : IQuery<TransportOrderPage>
 {
     /// <summary>The <see cref="CarriedBy"/> that means the Own fleet; no Carrier ID looks like it.</summary>
     public const string OwnFleet = "OWN-FLEET";

@@ -22,7 +22,7 @@ public sealed class ListAllTransportOrdersHandler(
         var pageSize = Math.Clamp(query.PageSize, 1, ListAllTransportOrdersQuery.MaxPageSize);
         var shipperId = string.IsNullOrWhiteSpace(query.ShipperId) ? null : new ShipperId(query.ShipperId);
         var carriedBy = CarriedByOf(query.CarriedBy);
-        var onlyTransportOrders = carriedBy is null ? null : await TransportOrdersCarriedByAsync(carriedBy, cancellationToken);
+        var onlyTransportOrders = await OnlyTransportOrdersAsync(carriedBy, query.ShipmentStatus, cancellationToken);
         var spec = new TransportOrdersSearchSpec(query.Status, shipperId, query.Search, page, pageSize, onlyTransportOrders);
 
         // The database filters, searches, orders and pages; the count ignores the paging.
@@ -44,9 +44,27 @@ public sealed class ListAllTransportOrdersHandler(
         : carriedBy == ListAllTransportOrdersQuery.OwnFleet ? Domain.Shipments.CarriedBy.OwnFleet
         : Domain.Shipments.CarriedBy.Carrier(new CarrierId(carriedBy));
 
-    // A Shipment belongs to its own aggregate, so the orders it carries are found there and handed to the order search.
-    private async Task<IReadOnlyCollection<TransportOrderId>> TransportOrdersCarriedByAsync(CarriedBy carriedBy, CancellationToken cancellationToken) =>
-        [.. (await shipments.ListAsync(new ShipmentsCarriedBySpec(carriedBy), cancellationToken)).Select(shipment => shipment.TransportOrderId)];
+    // A Shipment belongs to its own aggregate, so the orders whose Shipment matches are found there and handed to the order search,
+    // which then filters, orders and pages in the database. With both filters set, an order must satisfy both.
+    private async Task<IReadOnlyCollection<TransportOrderId>?> OnlyTransportOrdersAsync(CarriedBy? carriedBy, ShipmentStatus? shipmentStatus, CancellationToken cancellationToken)
+    {
+        IReadOnlyCollection<TransportOrderId>? only = null;
+        if (carriedBy is not null)
+        {
+            only = await TransportOrdersOfAsync(new ShipmentsCarriedBySpec(carriedBy), cancellationToken);
+        }
+
+        if (shipmentStatus is { } status)
+        {
+            var ofStatus = await TransportOrdersOfAsync(new ShipmentsOfStatusSpec(status), cancellationToken);
+            only = only is null ? ofStatus : [.. only.Intersect(ofStatus)];
+        }
+
+        return only;
+    }
+
+    private async Task<IReadOnlyCollection<TransportOrderId>> TransportOrdersOfAsync(Ardalis.Specification.ISpecification<Shipment> spec, CancellationToken cancellationToken) =>
+        [.. (await shipments.ListAsync(spec, cancellationToken)).Select(shipment => shipment.TransportOrderId)];
 
     // The spec leaves out a Rejected booking, so every order here has its number; one that doesn't fails the list rather than dropping out unseen.
     private TransportOrderListItem Item(TransportOrder order, Shipment? shipment) => order.Number is { } number

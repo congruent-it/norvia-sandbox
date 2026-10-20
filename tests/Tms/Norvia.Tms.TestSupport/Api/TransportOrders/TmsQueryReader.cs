@@ -8,6 +8,7 @@ using Microsoft.Extensions.Hosting;
 using Norvia.Tms.Application.TransportOrders.Browse;
 using Norvia.Tms.Application.TransportOrders.GetDetail;
 using Norvia.Tms.Application.TransportOrders.List;
+using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TransportOrders;
 using Norvia.Tms.Infrastructure;
 using TmsWeb::Norvia.Tms.Web.Planner;
@@ -59,11 +60,11 @@ internal sealed class TmsQueryReader : IAsyncDisposable
     }
 
     public async Task<TransportOrderPage> ListAsync(
-        string search, CancellationToken cancellationToken, TransportOrderStatus? status = null, string? shipperId = null, int page = 1, int pageSize = 25, string? carriedBy = null)
+        string search, CancellationToken cancellationToken, TransportOrderStatus? status = null, string? shipperId = null, int page = 1, int pageSize = 25, string? carriedBy = null, ShipmentStatus? shipmentStatus = null)
     {
         await using var scope = _services.CreateAsyncScope();
         return await ActivatorUtilities.CreateInstance<ListAllTransportOrdersHandler>(scope.ServiceProvider)
-            .Handle(new ListAllTransportOrdersQuery(status, shipperId, search, page, pageSize, carriedBy), cancellationToken);
+            .Handle(new ListAllTransportOrdersQuery(status, shipperId, search, page, pageSize, carriedBy, shipmentStatus), cancellationToken);
     }
 
     public async Task<Result<TransportOrderDetailView>> DetailAsync(string transportOrderNumber, CancellationToken cancellationToken)

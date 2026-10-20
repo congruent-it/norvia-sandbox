@@ -125,6 +125,42 @@ public sealed class ListAllTransportOrdersHandlerTests
     }
 
     [Fact]
+    public async Task Handle_FilteredOnShipmentStatus_HandsTheOrdersOfThoseShipmentsToTheSearch()
+    {
+        var order = Samples.AcceptedOrder(sequence: 7);
+        var shipment = order.Plan(ShipmentNumber.FromSequence(12), CarriedBy.OwnFleet, new IdempotencyKey("key"), new CorrelationId("corr-plan"), Samples.Now)!;
+        Lists(totalCount: 1, order);
+        _shipments.ListAsync(Arg.Any<ShipmentsOfStatusSpec>(), Arg.Any<CancellationToken>()).Returns([shipment]);
+        _shipments.ListAsync(Arg.Any<ShipmentsOfTransportOrdersSpec>(), Arg.Any<CancellationToken>()).Returns([shipment]);
+
+        var page = await _handler.Handle(new ListAllTransportOrdersQuery(ShipmentStatus: ShipmentStatus.Planned), CancellationToken.None);
+
+        page.Items.Should().ContainSingle();
+        await _shipments.Received(1).ListAsync(Arg.Any<ShipmentsOfStatusSpec>(), Arg.Any<CancellationToken>());
+        await _transportOrders.Received(1).ListAsync(Arg.Is<TransportOrdersSearchSpec>(spec => spec.Take == 25), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_FilteredOnShipmentStatusAndWhoCarries_KeepsOnlyOrdersMatchingBoth()
+    {
+        var both = Samples.AcceptedOrder(sequence: 7);
+        var other = Samples.AcceptedOrder(sequence: 8);
+        var bothShipment = both.Plan(ShipmentNumber.FromSequence(12), CarriedBy.OwnFleet, new IdempotencyKey("key"), new CorrelationId("corr-plan"), Samples.Now)!;
+        var otherShipment = other.Plan(ShipmentNumber.FromSequence(13), CarriedBy.OwnFleet, new IdempotencyKey("key-2"), new CorrelationId("corr-plan-2"), Samples.Now)!;
+        Lists(totalCount: 1, both);
+        _shipments.ListAsync(Arg.Any<ShipmentsCarriedBySpec>(), Arg.Any<CancellationToken>()).Returns([bothShipment, otherShipment]);
+        _shipments.ListAsync(Arg.Any<ShipmentsOfStatusSpec>(), Arg.Any<CancellationToken>()).Returns([bothShipment]);
+        _shipments.ListAsync(Arg.Any<ShipmentsOfTransportOrdersSpec>(), Arg.Any<CancellationToken>()).Returns([bothShipment]);
+
+        await _handler.Handle(new ListAllTransportOrdersQuery(CarriedBy: ListAllTransportOrdersQuery.OwnFleet, ShipmentStatus: ShipmentStatus.Planned), CancellationToken.None);
+
+        await _transportOrders.Received(1).ListAsync(
+            Arg.Is<TransportOrdersSearchSpec>(spec => Matches(spec, both) && !Matches(spec, other)), Arg.Any<CancellationToken>());
+    }
+
+    private static bool Matches(TransportOrdersSearchSpec spec, TransportOrder order) => spec.Evaluate([order]).Any();
+
+    [Fact]
     public async Task Handle_WithoutAWhoCarriesFilter_DoesNotReadShipmentsToFilter()
     {
         Lists(totalCount: 0);
@@ -132,6 +168,7 @@ public sealed class ListAllTransportOrdersHandlerTests
         await _handler.Handle(new ListAllTransportOrdersQuery(CarriedBy: " "), CancellationToken.None);
 
         await _shipments.DidNotReceive().ListAsync(Arg.Any<ShipmentsCarriedBySpec>(), Arg.Any<CancellationToken>());
+        await _shipments.DidNotReceive().ListAsync(Arg.Any<ShipmentsOfStatusSpec>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

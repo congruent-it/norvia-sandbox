@@ -3,6 +3,8 @@
 @rendermode InteractiveServer
 @using Norvia.Tms.Application.Shipments
 @using Norvia.Tms.Application.TransportOrders.Browse
+@using Norvia.Tms.Domain.Shipments
+@using Norvia.Tms.Web.Shipments
 @using Norvia.Tms.Domain.TransportOrders
 @implements IDisposable
 @inject ITransportOrderQueries Queries
@@ -13,28 +15,45 @@
 <h1>Transport Orders</h1>
 
 <div role="search" aria-label="Filter Transport Orders" class="mb-4 flex flex-wrap items-end gap-4">
-    <FluentSelect TOption="string" Label="Status" aria-label="Status" Value="@_status" ValueChanged="StatusChangedAsync" Width="12rem">
-        <FluentOption TOption="string" Value="">All</FluentOption>
-        <FluentOption TOption="string" Value="@nameof(TransportOrderStatus.Accepted)">Accepted</FluentOption>
-        <FluentOption TOption="string" Value="@nameof(TransportOrderStatus.Planned)">Planned</FluentOption>
-    </FluentSelect>
-    <FluentSelect TOption="string" Label="Shipper" aria-label="Shipper" Value="@_shipperId" ValueChanged="ShipperChangedAsync" Width="16rem">
-        <FluentOption TOption="string" Value="">All</FluentOption>
-        @foreach (var shipper in _shippers)
-        {
-            <FluentOption TOption="string" Value="@shipper.Id">@(shipper.Name ?? shipper.Id)</FluentOption>
-        }
-    </FluentSelect>
-    <FluentSelect TOption="string" Label="Carried by" aria-label="Carried by" Value="@_carriedBy" ValueChanged="CarriedByChangedAsync" Width="14rem">
-        <FluentOption TOption="string" Value="">All</FluentOption>
-        <FluentOption TOption="string" Value="@ListAllTransportOrdersQuery.OwnFleet">@PlanningText.OwnFleet</FluentOption>
-        @foreach (var carrier in _carriers)
-        {
-            <FluentOption TOption="string" Value="@carrier.Id">@PlanningText.Carrier(carrier)</FluentOption>
-        }
-    </FluentSelect>
+    <div class="flex flex-col">
+        <FluentSelect TOption="string" Label="Status" aria-label="Status" Value="@_status" ValueChanged="StatusChangedAsync" Width="12rem">
+            <FluentOption TOption="string" Value="">All</FluentOption>
+            <FluentOption TOption="string" Value="@nameof(TransportOrderStatus.Accepted)">Accepted</FluentOption>
+            <FluentOption TOption="string" Value="@nameof(TransportOrderStatus.Planned)">Planned</FluentOption>
+        </FluentSelect>
+    </div>
+    <div class="flex flex-col">
+        <FluentSelect TOption="string" Label="Shipper" aria-label="Shipper" Value="@_shipperId" ValueChanged="ShipperChangedAsync" Width="16rem">
+            <FluentOption TOption="string" Value="">All</FluentOption>
+            @foreach (var shipper in _shippers)
+            {
+                <FluentOption TOption="string" Value="@shipper.Id">@(shipper.Name ?? shipper.Id)</FluentOption>
+            }
+        </FluentSelect>
+    </div>
+    <div class="flex flex-col">
+        <FluentSelect TOption="string" Label="Carried by" aria-label="Carried by" Value="@_carriedBy" ValueChanged="CarriedByChangedAsync" Width="14rem">
+            <FluentOption TOption="string" Value="">All</FluentOption>
+            <FluentOption TOption="string" Value="@ListAllTransportOrdersQuery.OwnFleet">@PlanningText.OwnFleet</FluentOption>
+            @foreach (var carrier in _carriers)
+            {
+                <FluentOption TOption="string" Value="@carrier.Id">@PlanningText.Carrier(carrier)</FluentOption>
+            }
+        </FluentSelect>
+    </div>
+    <div class="flex flex-col">
+        <FluentSelect TOption="string" Label="Shipment status" aria-label="Shipment status" Value="@_shipmentStatus" ValueChanged="ShipmentStatusChangedAsync" Width="14rem">
+            <FluentOption TOption="string" Value="">All</FluentOption>
+            @foreach (var shipmentStatus in Enum.GetValues<ShipmentStatus>())
+            {
+                <FluentOption TOption="string" Value="@shipmentStatus.ToString()">@TrackingText.Status(shipmentStatus)</FluentOption>
+            }
+        </FluentSelect>
+    </div>
     @* Applied when the Planner presses Enter or leaves the box: the database searches, so each search is a read. *@
-    <FluentTextField Label="Search" aria-label="Search" Value="@_search" ValueChanged="SearchChangedAsync" Placeholder="Number, Shipper reference or Shipment" Style="width: 18rem;" />
+    <div class="flex flex-col">
+        <FluentTextField Label="Search" aria-label="Search" Value="@_search" ValueChanged="SearchChangedAsync" Placeholder="Number, Shipper reference or Shipment" Style="width: 18rem;" />
+    </div>
 </div>
 
 @if (_failed)
@@ -104,15 +123,16 @@ else
     private string? _status = string.Empty;
     private string? _shipperId = string.Empty;
     private string? _carriedBy = string.Empty;
+    private string? _shipmentStatus = string.Empty;
     private string? _search = string.Empty;
     // The latest read wins: a slow read of an earlier search must not replace the page the Planner asked for since.
     private int _reads;
 
-    private static string ShipmentStatusText(TransportOrderListItem transportOrder) => transportOrder.ShipmentStatus?.ToString() ?? "—";
+    private static string ShipmentStatusText(TransportOrderListItem transportOrder) => transportOrder.ShipmentStatus is { } status ? TrackingText.Status(status) : "—";
 
     private static string CarriedByText(TransportOrderListItem transportOrder) => transportOrder.CarriedBy is { } carriedBy ? PlanningText.CarriedBy(carriedBy) : "—";
 
-    private bool Filtering => !string.IsNullOrEmpty(_status) || !string.IsNullOrEmpty(_shipperId) || !string.IsNullOrEmpty(_carriedBy) || !string.IsNullOrWhiteSpace(_search);
+    private bool Filtering => !string.IsNullOrEmpty(_status) || !string.IsNullOrEmpty(_shipperId) || !string.IsNullOrEmpty(_carriedBy) || !string.IsNullOrEmpty(_shipmentStatus) || !string.IsNullOrWhiteSpace(_search);
 
     protected override async Task OnInitializedAsync()
     {
@@ -153,6 +173,12 @@ else
         return LoadAsync(1);
     }
 
+    private Task ShipmentStatusChangedAsync(string? shipmentStatus)
+    {
+        _shipmentStatus = shipmentStatus;
+        return LoadAsync(1);
+    }
+
     private Task StatusChangedAsync(string? status)
     {
         _status = status;
@@ -180,8 +206,9 @@ else
         try
         {
             var status = Enum.TryParse<TransportOrderStatus>(_status, out var parsed) ? parsed : (TransportOrderStatus?)null;
+            var shipmentStatus = Enum.TryParse<ShipmentStatus>(_shipmentStatus, out var parsedShipmentStatus) ? parsedShipmentStatus : (ShipmentStatus?)null;
             var loaded = await Queries.ListTransportOrdersAsync(
-                status, string.IsNullOrEmpty(_shipperId) ? null : _shipperId, string.IsNullOrEmpty(_carriedBy) ? null : _carriedBy, string.IsNullOrWhiteSpace(_search) ? null : _search.Trim(), page, _closed.Token);
+                status, string.IsNullOrEmpty(_shipperId) ? null : _shipperId, string.IsNullOrEmpty(_carriedBy) ? null : _carriedBy, shipmentStatus, string.IsNullOrWhiteSpace(_search) ? null : _search.Trim(), page, _closed.Token);
             if (read == _reads)
             {
                 _page = loaded;
