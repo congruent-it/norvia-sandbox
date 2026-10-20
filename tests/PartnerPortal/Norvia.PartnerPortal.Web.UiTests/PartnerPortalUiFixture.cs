@@ -16,6 +16,8 @@ namespace Norvia.PartnerPortal.Web.UiTests;
 /// </summary>
 public sealed class PartnerPortalUiFixture : IAsyncLifetime
 {
+    private const string CarrierCostWorker = "carrier-cost-worker";
+
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
 
     private DistributedApplication? _app;
@@ -24,6 +26,9 @@ public sealed class PartnerPortalUiFixture : IAsyncLifetime
     public Uri PartnerPortal { get; private set; } = null!;
 
     public Uri TmsUi { get; private set; } = null!;
+
+    /// <summary>The ERP UI, where Finance decides the Carrier invoices.</summary>
+    public Uri ErpUi { get; private set; } = null!;
 
     public IBrowser Browser { get; private set; } = null!;
 
@@ -42,13 +47,20 @@ public sealed class PartnerPortalUiFixture : IAsyncLifetime
             startup.Token);
         _app = await builder.BuildAsync(startup.Token);
         await _app.StartAsync(startup.Token);
-        foreach (var resource in new[] { "tms-api", "tms-web", "partner-api", "partner-portal-web" })
+        foreach (var resource in new[] { "tms-api", "tms-web", "partner-api", "partner-portal-web", "erp-web", "erp-api" })
         {
             await _app.ResourceNotifications.WaitForResourceHealthyAsync(resource, startup.Token);
         }
 
+        // A delivered Carrier Shipment's cost reaches the ERP, a Carrier invoice reaches it and its outcome reaches the portal through the workers that play those Logic Apps.
+        foreach (var worker in new[] { "booking-worker", CarrierCostWorker, "carrier-invoice-worker", "carrier-invoice-outcome-worker" })
+        {
+            await _app.ResourceNotifications.WaitForResourceAsync(worker, KnownResourceStates.Running, startup.Token);
+        }
+
         PartnerPortal = _app.GetEndpoint("partner-portal-web", "http");
         TmsUi = _app.GetEndpoint("tms-web", "http");
+        ErpUi = _app.GetEndpoint("erp-web", "http");
 
         _playwright = await Playwright.CreateAsync();
         Browser = await _playwright.Chromium.LaunchAsync();
@@ -70,6 +82,27 @@ public sealed class PartnerPortalUiFixture : IAsyncLifetime
         using var starting = WithinTwoMinutes(cancellationToken);
         await _app!.ResourceCommands.ExecuteCommandAsync("tms-api", KnownResourceCommands.StartCommand, starting.Token);
         await _app.ResourceNotifications.WaitForResourceHealthyAsync("tms-api", starting.Token);
+    }
+
+    /// <summary>
+    /// Stops the worker that plays the Carrier cost Logic App, so no Carrier cost reaches the ERP until <see cref="StartCarrierCostWorkerAsync"/>:
+    /// a Carrier invoice then arrives before the Carrier cost it refers to, and its line is an Unknown booking.
+    /// </summary>
+    public async Task StopCarrierCostWorkerAsync(CancellationToken cancellationToken)
+    {
+        using var stopping = WithinTwoMinutes(cancellationToken);
+        await _app!.ResourceCommands.ExecuteCommandAsync(CarrierCostWorker, KnownResourceCommands.StopCommand, stopping.Token);
+        // What a stopped project reports varies (Exited, Finished, even Unknown); it is down once it is none of these.
+        string[] up = [KnownResourceStates.Starting, KnownResourceStates.Running, KnownResourceStates.Stopping, KnownResourceStates.Waiting];
+        await _app.ResourceNotifications.WaitForResourceAsync(
+            CarrierCostWorker, resource => resource.Snapshot.State?.Text is { } state && !up.Contains(state), stopping.Token);
+    }
+
+    public async Task StartCarrierCostWorkerAsync(CancellationToken cancellationToken)
+    {
+        using var starting = WithinTwoMinutes(cancellationToken);
+        await _app!.ResourceCommands.ExecuteCommandAsync(CarrierCostWorker, KnownResourceCommands.StartCommand, starting.Token);
+        await _app.ResourceNotifications.WaitForResourceAsync(CarrierCostWorker, KnownResourceStates.Running, starting.Token);
     }
 
     // A resource that never gets there fails the test, rather than hanging the run.
