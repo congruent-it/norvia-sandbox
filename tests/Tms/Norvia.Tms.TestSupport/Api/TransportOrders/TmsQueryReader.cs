@@ -59,11 +59,11 @@ internal sealed class TmsQueryReader : IAsyncDisposable
     }
 
     public async Task<TransportOrderPage> ListAsync(
-        string search, CancellationToken cancellationToken, TransportOrderStatus? status = null, string? shipperId = null, int page = 1, int pageSize = 25)
+        string search, CancellationToken cancellationToken, TransportOrderStatus? status = null, string? shipperId = null, int page = 1, int pageSize = 25, string? carriedBy = null)
     {
         await using var scope = _services.CreateAsyncScope();
         return await ActivatorUtilities.CreateInstance<ListAllTransportOrdersHandler>(scope.ServiceProvider)
-            .Handle(new ListAllTransportOrdersQuery(status, shipperId, search, page, pageSize), cancellationToken);
+            .Handle(new ListAllTransportOrdersQuery(status, shipperId, search, page, pageSize, carriedBy), cancellationToken);
     }
 
     public async Task<Result<TransportOrderDetailView>> DetailAsync(string transportOrderNumber, CancellationToken cancellationToken)

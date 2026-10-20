@@ -1,7 +1,10 @@
 using Ardalis.SharedKernel;
+using Norvia.Tms.Application.Carriers;
+using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.Shippers;
 using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.Browse;
+using Norvia.Tms.Domain.Carriers;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.Shippers;
 using Norvia.Tms.Domain.TransportOrders;
@@ -14,13 +17,15 @@ public sealed class ListAllTransportOrdersHandlerTests
     private readonly IReadRepository<TransportOrder> _transportOrders = Substitute.For<IReadRepository<TransportOrder>>();
     private readonly IReadRepository<Shipment> _shipments = Substitute.For<IReadRepository<Shipment>>();
     private readonly IShipperDirectory _shippers = Substitute.For<IShipperDirectory>();
+    private readonly ICarrierDirectory _carriers = Substitute.For<ICarrierDirectory>();
     private readonly ListAllTransportOrdersHandler _handler;
 
     public ListAllTransportOrdersHandlerTests()
     {
         _shippers.Find(new ShipperId("SHP-0001")).Returns(new Shipper(new ShipperId("SHP-0001"), "Brouwer Dranken", true));
+        _carriers.Find(new CarrierId("CAR-0001")).Returns(new Carrier(new CarrierId("CAR-0001"), "Van Dijk Transport", true));
         _shipments.ListAsync(Arg.Any<ShipmentsOfTransportOrdersSpec>(), Arg.Any<CancellationToken>()).Returns([]);
-        _handler = new ListAllTransportOrdersHandler(_transportOrders, _shipments, _shippers);
+        _handler = new ListAllTransportOrdersHandler(_transportOrders, _shipments, _shippers, _carriers);
     }
 
     [Fact]
@@ -40,6 +45,7 @@ public sealed class ListAllTransportOrdersHandlerTests
             Samples.Now.AddDays(1),
             Samples.Now.AddDays(1).AddHours(4),
             null,
+            null,
             null));
     }
 
@@ -57,6 +63,75 @@ public sealed class ListAllTransportOrdersHandlerTests
         item.Status.Should().Be(TransportOrderStatus.Planned);
         item.ShipmentNumber.Should().Be("SH-0000012");
         item.ShipmentStatus.Should().Be(ShipmentStatus.Planned);
+    }
+
+    [Fact]
+    public async Task Handle_ACarrierShipment_ListsTheCarrierByName()
+    {
+        var item = await ListPlanned(CarriedBy.Carrier(new CarrierId("CAR-0001")));
+
+        item.CarriedBy.Should().Be(new CarriedByView(AssignedTo.Carrier, new CarrierView("CAR-0001", "Van Dijk Transport")));
+    }
+
+    [Fact]
+    public async Task Handle_AnOwnFleetShipment_ListsOwnFleet()
+    {
+        var item = await ListPlanned(CarriedBy.OwnFleet);
+
+        item.CarriedBy.Should().Be(new CarriedByView(AssignedTo.OwnFleet, null));
+    }
+
+    [Fact]
+    public async Task Handle_AReassignedShipment_ListsItsNewAssignee()
+    {
+        var order = Samples.AcceptedOrder(sequence: 7);
+        var shipment = order.Plan(ShipmentNumber.FromSequence(12), CarriedBy.Carrier(new CarrierId("CAR-0001")), new IdempotencyKey("key"), new CorrelationId("corr-plan"), Samples.Now)!;
+        shipment.Reassign(CarriedBy.OwnFleet, new IdempotencyKey("key-2"), new CorrelationId("corr-reassign"), Samples.Now.AddMinutes(5));
+        Lists(totalCount: 1, order);
+        _shipments.ListAsync(Arg.Any<ShipmentsOfTransportOrdersSpec>(), Arg.Any<CancellationToken>()).Returns([shipment]);
+
+        var page = await _handler.Handle(new ListAllTransportOrdersQuery(), CancellationToken.None);
+
+        page.Items.Should().ContainSingle().Which.CarriedBy.Should().Be(new CarriedByView(AssignedTo.OwnFleet, null));
+    }
+
+    [Theory]
+    [InlineData("CAR-0001")]
+    [InlineData(ListAllTransportOrdersQuery.OwnFleet)]
+    public async Task Handle_FilteredOnWhoCarries_HandsTheOrdersOfThoseShipmentsToTheSearch(string carriedBy)
+    {
+        var order = Samples.AcceptedOrder(sequence: 7);
+        var shipment = order.Plan(ShipmentNumber.FromSequence(12), CarriedBy.OwnFleet, new IdempotencyKey("key"), new CorrelationId("corr-plan"), Samples.Now)!;
+        Lists(totalCount: 1, order);
+        _shipments.ListAsync(Arg.Any<ShipmentsCarriedBySpec>(), Arg.Any<CancellationToken>()).Returns([shipment]);
+        _shipments.ListAsync(Arg.Any<ShipmentsOfTransportOrdersSpec>(), Arg.Any<CancellationToken>()).Returns([shipment]);
+
+        var page = await _handler.Handle(new ListAllTransportOrdersQuery(CarriedBy: carriedBy), CancellationToken.None);
+
+        page.Items.Should().ContainSingle();
+        await _shipments.Received(1).ListAsync(Arg.Any<ShipmentsCarriedBySpec>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_NothingIsCarriedByWhoWasChosen_ListsNothing()
+    {
+        _shipments.ListAsync(Arg.Any<ShipmentsCarriedBySpec>(), Arg.Any<CancellationToken>()).Returns([]);
+        Lists(totalCount: 0);
+
+        var page = await _handler.Handle(new ListAllTransportOrdersQuery(CarriedBy: "CAR-0001"), CancellationToken.None);
+
+        page.Items.Should().BeEmpty();
+        await _transportOrders.Received(1).ListAsync(Arg.Is<TransportOrdersSearchSpec>(spec => spec.Take == 25), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_WithoutAWhoCarriesFilter_DoesNotReadShipmentsToFilter()
+    {
+        Lists(totalCount: 0);
+
+        await _handler.Handle(new ListAllTransportOrdersQuery(CarriedBy: " "), CancellationToken.None);
+
+        await _shipments.DidNotReceive().ListAsync(Arg.Any<ShipmentsCarriedBySpec>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -113,6 +188,18 @@ public sealed class ListAllTransportOrdersHandlerTests
         var list = async () => await _handler.Handle(new ListAllTransportOrdersQuery(), CancellationToken.None);
 
         await list.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    private async Task<TransportOrderListItem> ListPlanned(CarriedBy carriedBy)
+    {
+        var order = Samples.AcceptedOrder(sequence: 7);
+        var shipment = order.Plan(ShipmentNumber.FromSequence(12), carriedBy, new IdempotencyKey("key"), new CorrelationId("corr-plan"), Samples.Now)!;
+        Lists(totalCount: 1, order);
+        _shipments.ListAsync(Arg.Any<ShipmentsOfTransportOrdersSpec>(), Arg.Any<CancellationToken>()).Returns([shipment]);
+
+        var page = await _handler.Handle(new ListAllTransportOrdersQuery(), CancellationToken.None);
+
+        return page.Items.Should().ContainSingle().Subject;
     }
 
     private void Lists(int totalCount, params TransportOrder[] orders)

@@ -92,8 +92,8 @@ internal sealed class TransportOrderQueries(IServiceScopeFactory scopes) : ITran
         SendAsync(new ListOffTheRoadDaysQuery(), cancellationToken);
 
     public Task<TransportOrderPage> ListTransportOrdersAsync(
-        TransportOrderStatus? status, string? shipperId, string? search, int page, CancellationToken cancellationToken) =>
-        SendAsync(new ListAllTransportOrdersQuery(status, shipperId, search, page), cancellationToken);
+        TransportOrderStatus? status, string? shipperId, string? carriedBy, string? search, int page, CancellationToken cancellationToken) =>
+        SendAsync(new ListAllTransportOrdersQuery(status, shipperId, search, page, CarriedBy: carriedBy), cancellationToken);
 
     public Task<IReadOnlyList<ShipperView>> ListShippersAsync(CancellationToken cancellationToken) =>
         SendAsync(new ListShippersQuery(), cancellationToken);

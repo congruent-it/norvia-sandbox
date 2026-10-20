@@ -1,3 +1,4 @@
+using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TransportOrders;
 
@@ -8,6 +9,7 @@ namespace Norvia.Tms.Application.TransportOrders.Browse;
 /// <param name="DeliveryPlace">Where the goods are delivered; null when the Shipper gave no address.</param>
 /// <param name="ShipmentNumber">The Transport Order's one Shipment; null until it is Planned.</param>
 /// <param name="ShipmentStatus">The Shipment's status; null until the Transport Order is Planned.</param>
+/// <param name="CarriedBy">Who carries the Shipment now, so a reassignment shows; null until the Transport Order is Planned.</param>
 public sealed record TransportOrderListItem(
     string TransportOrderNumber,
     TransportOrderStatus Status,
@@ -18,4 +20,5 @@ public sealed record TransportOrderListItem(
     DateTimeOffset? CollectionEarliest,
     DateTimeOffset? CollectionLatest,
     string? ShipmentNumber,
-    ShipmentStatus? ShipmentStatus);
+    ShipmentStatus? ShipmentStatus,
+    CarriedByView? CarriedBy);
