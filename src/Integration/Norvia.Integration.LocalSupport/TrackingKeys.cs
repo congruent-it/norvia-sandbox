@@ -42,6 +42,9 @@ public static class TrackingKeys
     /// <summary>The <see cref="Flow"/> of a Shipper invoice, from ShipperInvoiceIssued to the report to the ERP.</summary>
     public const string Invoicing = "invoicing";
 
+    /// <summary>The <see cref="Flow"/> of a Carrier invoice, from the edge to the ERP billing API's answer.</summary>
+    public const string CarrierInvoice = "carrier-invoice";
+
     /// <summary>The <see cref="Flow"/> of a Carrier invoice's outcome, from CarrierInvoiceApproved to the report to the ERP.</summary>
     public const string CarrierInvoices = "carrier-invoices";
 

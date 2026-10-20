@@ -28,12 +28,16 @@ public sealed class LocalPartnerApiFactory : WebApplicationFactory<Program>
     public const string IntakeClientId = "norvia-local-intake-logic-app";
     public const string AnswerClientId = "norvia-local-answer-logic-app";
     public const string ApiManagementClientId = "norvia-local-api-management";
+    public const string CarrierInvoiceTriggerAudience = "api://norvia-carrier-invoice-logic-app";
 
     public LocalPartnerApiFactory() => ProofOfDeliveryQueue = new(InboundProofsOfDelivery);
 
     public byte[] SigningKey { get; } = RandomNumberGenerator.GetBytes(64);
 
     public StubTms Tms { get; } = new();
+
+    /// <summary>Stands in for the Carrier invoice Logic App's worker behind its trigger.</summary>
+    public StubTms CarrierInvoiceLogicApp { get; } = new();
 
     internal StubTrackingQueue TrackingQueue { get; } = new();
 
@@ -66,6 +70,11 @@ public sealed class LocalPartnerApiFactory : WebApplicationFactory<Program>
             ["Tms:Tokens:SigningKey"] = signingKey,
             ["Tms:AnswerClientId"] = AnswerClientId,
             ["Tms:ShipperTrackingClientId"] = ApiManagementClientId,
+            ["CarrierInvoice:BaseAddress"] = "http://carrier-invoice-worker",
+            ["CarrierInvoice:Tokens:Issuer"] = Issuer,
+            ["CarrierInvoice:Tokens:Audience"] = CarrierInvoiceTriggerAudience,
+            ["CarrierInvoice:Tokens:ClientId"] = ApiManagementClientId,
+            ["CarrierInvoice:Tokens:SigningKey"] = signingKey,
         })
         {
             builder.UseSetting(name, value);
@@ -80,6 +89,7 @@ public sealed class LocalPartnerApiFactory : WebApplicationFactory<Program>
             services.AddHttpClient<TmsIntake>().ConfigurePrimaryHttpMessageHandler(() => Tms);
             services.AddHttpClient<TmsCarrierAnswers>().ConfigurePrimaryHttpMessageHandler(() => Tms);
             services.AddHttpClient<TmsShipperTracking>().ConfigurePrimaryHttpMessageHandler(() => Tms);
+            services.AddHttpClient<CarrierInvoiceLogicApp>().ConfigurePrimaryHttpMessageHandler(() => CarrierInvoiceLogicApp);
             services.AddSingleton<TimeProvider>(Time);
             // Retries straight away, so a test of an unreachable TMS doesn't wait out the backoff.
             services.ConfigureAll<HttpStandardResilienceOptions>(options => options.Retry.Delay = TimeSpan.Zero);
@@ -120,6 +130,8 @@ public sealed class LocalPartnerApiFactory : WebApplicationFactory<Program>
     public static string CarrierProofOfDeliverySample(string name) => Embedded($"PartnerApi/samples/carrier-proofs-of-delivery/{name}");
 
     public static string CarrierAnswerSample(string name) => Embedded($"PartnerApi/samples/carrier-answers/{name}");
+
+    public static string CarrierInvoiceSample(string name) => Embedded($"PartnerApi/samples/carrier-invoices/{name}");
 
     public static string ShipperTrackingSample(string name) => Embedded($"PartnerApi/samples/shipper-tracking/{name}");
 
