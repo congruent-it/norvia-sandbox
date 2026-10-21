@@ -33,6 +33,8 @@ internal static class HopQuery
         // An application's own records, not those a framework wrote in its logging scope.
         let traces = AppTraces
             | where Properties has searched
+            // The console's own audit events are read by AuditQuery, not shown as hops.
+            | where isempty(tostring(Properties.Actor)) or isempty(tostring(Properties.Action))
             | where {{FrameworkLogs.NoneWrote("tostring(Properties.CategoryName)")}}
             | project TimeGenerated, source = "record", Id = "", ParentId, OperationId, Name = "", path = "", DurationMs = real(null), AppRoleName, Properties;
         let tracked = union requests, traces

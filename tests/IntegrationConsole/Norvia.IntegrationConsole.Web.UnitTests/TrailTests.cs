@@ -165,6 +165,47 @@ public sealed class TrailTests : ConsoleWebContext
         page.Find("[role=alert]").TextContent.Should().Contain("Open a Message trail by its correlation ID.");
     }
 
+    [Fact]
+    public void Render_ForAHopStillOnTheQueue_LinksToItsMessage()
+    {
+        Answer(Hop("logic-intake", seconds: 0, null, Outcome.DeadLettered) with { DeadLetter = new DeadLetterHandling(DeadLetterStatus.OnQueue, "shipment-events/carrier-booking", 7, null, null, null) });
+
+        var page = RenderTrail();
+
+        var link = page.Find("[data-dead-letter=onqueue] a");
+        link.GetAttribute("href").Should().Be("/dead-letter-queues/shipment-events/carrier-booking?message=7");
+        link.TextContent.Should().Be("Open in the dead-letter queue");
+    }
+
+    [Fact]
+    public void Render_ForAResubmittedHop_SaysWhoAndWhen_WithoutALink()
+    {
+        Answer(Hop("logic-intake", seconds: 0, null, Outcome.DeadLettered) with { DeadLetter = new DeadLetterHandling(DeadLetterStatus.Resubmitted, "q", null, "ana@norvia.example", Now, null) });
+
+        var page = RenderTrail();
+
+        page.Find("[data-dead-letter=resubmitted]").TextContent.Trim().Should().Be("Resubmitted by ana@norvia.example on Sat 26 Sep 2026, 12:00:00");
+        page.FindAll("[data-dead-letter] a").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Render_ForADiscardedHop_SaysWhoWhenAndWhy()
+    {
+        Answer(Hop("logic-intake", seconds: 0, null, Outcome.DeadLettered) with { DeadLetter = new DeadLetterHandling(DeadLetterStatus.Discarded, "q", null, "ben@norvia.example", Now, "Duplicate") });
+
+        var page = RenderTrail();
+
+        page.Find("[data-dead-letter=discarded]").TextContent.Trim().Should().Be("Discarded by ben@norvia.example on Sat 26 Sep 2026, 12:00:00: Duplicate");
+    }
+
+    [Fact]
+    public void Render_ForHopsWithoutADeadLetter_ShowsNoHandling()
+    {
+        Answer(Hop("tms-api", seconds: 0, null, Outcome.Succeeded));
+
+        RenderTrail().FindAll("[data-dead-letter]").Should().BeEmpty();
+    }
+
     private IRenderedComponent<Trail> RenderTrail(string correlationId = CorrelationId) =>
         Render<Trail>(parameters => parameters.Add(page => page.CorrelationId, correlationId));
 

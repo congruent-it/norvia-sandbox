@@ -7,7 +7,7 @@ namespace Norvia.IntegrationConsole.Application.Trails.Open;
 /// </summary>
 internal static class TrailOutline
 {
-    public static IReadOnlyList<TrailHop> Of(IReadOnlyList<RecordedHop> recorded)
+    public static IReadOnlyList<TrailHop> Of(IReadOnlyList<RecordedHop> recorded, IReadOnlyDictionary<string, DeadLetterHandling>? deadLetters = null)
     {
         var inTimeOrder = recorded.OrderBy(hop => hop.Time).ThenBy(hop => hop.Id, StringComparer.Ordinal).ToList();
         var ids = inTimeOrder.Select(hop => hop.Id).ToHashSet(StringComparer.Ordinal);
@@ -33,7 +33,7 @@ internal static class TrailOutline
                 return;
             }
 
-            outline.Add(new TrailHop(hop.Name, hop.Flow, hop.Time, hop.Duration, hop.Outcome, hop.FailureCode, depth, hop.Run));
+            outline.Add(new TrailHop(hop.Name, hop.Flow, hop.Time, hop.Duration, hop.Outcome, hop.FailureCode, depth, hop.Run, deadLetters?.GetValueOrDefault(hop.Id)));
             var consequences = caused[hop.Id].Where(next => !shown.Contains(next.Id)).ToList();
             var branchDepth = consequences.Count > 1 ? depth + 1 : depth;
             foreach (var next in consequences)

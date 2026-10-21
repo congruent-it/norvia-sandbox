@@ -1,5 +1,6 @@
 using Ardalis.Result;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Testing;
@@ -260,6 +261,32 @@ public sealed class DeadLetterMessagesTests : ConsoleWebContext
     public void Reason_Always_ShowsADashWhenThereIsNone(string? reason, string expected)
     {
         DeadLetterText.Reason(reason).Should().Be(expected);
+    }
+
+    [Fact]
+    public void Render_ForALinkedMessage_OpensIt()
+    {
+        AnswerOpen(3, Booking, new Dictionary<string, string>());
+
+        var page = RenderLinked(3);
+
+        _deadLetters.Received(1).OpenMessageAsync(new OpenDeadLetteredMessageQuery(Entity, 3), Arg.Any<CancellationToken>());
+        page.Find("[data-message=3]").GetAttribute("aria-expanded").Should().Be("true");
+    }
+
+    [Fact]
+    public void Render_ForALinkedMessageNotInTheList_OpensNothing()
+    {
+        RenderLinked(99);
+
+        _deadLetters.DidNotReceiveWithAnyArgs().OpenMessageAsync(default!, Xunit.TestContext.Current.CancellationToken);
+    }
+
+    private IRenderedComponent<DeadLetterMessages> RenderLinked(long sequenceNumber)
+    {
+        var navigation = Services.GetRequiredService<NavigationManager>();
+        navigation.NavigateTo(navigation.GetUriWithQueryParameter("message", sequenceNumber));
+        return RenderMessages();
     }
 
     private IRenderedComponent<DeadLetterMessages> RenderMessages() =>

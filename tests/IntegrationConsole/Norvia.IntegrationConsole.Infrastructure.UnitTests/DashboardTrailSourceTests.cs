@@ -433,6 +433,42 @@ public sealed class DashboardTrailSourceTests : IDisposable
         await open.Should().ThrowAsync<HttpRequestException>();
     }
 
+    [Fact]
+    public async Task AuditAsync_ForATrail_ReadsTheConsolesAuditEventsFromTheirAttributes_AndNoOthers()
+    {
+        var at = Now.AddMinutes(-5);
+        _dashboard
+            .Add("integration-console", at, new()
+            {
+                ["correlationId"] = Booked, ["Actor"] = "ana@norvia.example", ["Action"] = "discard", ["Entity"] = "carrier-tracking",
+                ["MessageId"] = "m-1", ["Reason"] = "Duplicate", ["shipmentNumber"] = "SH-0042",
+            })
+            .Add("integration-console", at.AddMinutes(1), new() { ["correlationId"] = Booked, ["Actor"] = "ben@norvia.example", ["Action"] = "resubmit", ["Entity"] = "carrier-tracking", ["MessageId"] = "m-2" })
+            .Add("tms-api", at, new() { ["correlationId"] = Booked, ["flow"] = "carrier-tracking", ["outcome"] = "DeadLettered" })
+            .Add("integration-console", at, new() { ["correlationId"] = Other, ["Actor"] = "ana@norvia.example", ["Action"] = "resubmit", ["Entity"] = "carrier-tracking", ["MessageId"] = "m-3" })
+            .Add("integration-console", Now.AddDays(-3), new() { ["correlationId"] = Booked, ["Actor"] = "ana@norvia.example", ["Action"] = "resubmit", ["Entity"] = "carrier-tracking", ["MessageId"] = "m-4" });
+
+        var audits = await Source().AuditAsync(new TrailLookup(Booked, Now - TimeSpan.FromHours(24), Now), TestContext.Current.CancellationToken);
+
+        audits.OrderBy(audit => audit.At).Should().BeEquivalentTo(
+        [
+            new RecordedAudit("ana@norvia.example", "discard", "carrier-tracking", "m-1", at, "Duplicate", [new BusinessKey(BusinessKeyKind.ShipmentNumber, "SH-0042")]),
+            new RecordedAudit("ben@norvia.example", "resubmit", "carrier-tracking", "m-2", at.AddMinutes(1), null, []),
+        ], options => options.WithStrictOrdering());
+    }
+
+    [Fact]
+    public async Task HopsAsync_ForATrailWithAuditEvents_ShowsOnlyTheHopsTheFlowsRecorded()
+    {
+        _dashboard
+            .Add("tms-api", Now.AddMinutes(-10), new() { ["correlationId"] = Booked, ["flow"] = "carrier-tracking", ["outcome"] = "DeadLettered" })
+            .Add("integration-console", Now.AddMinutes(-5), new() { ["correlationId"] = Booked, ["Actor"] = "ana@norvia.example", ["Action"] = "resubmit", ["Entity"] = "carrier-tracking", ["MessageId"] = "m-1" });
+
+        var hops = await HopsAsync(Booked);
+
+        hops.Should().ContainSingle().Which.Outcome.Should().Be(Outcome.DeadLettered);
+    }
+
     // What ASP.NET Core records on a request's span besides its name.
     private static Dictionary<string, string> Called(string method, string path) =>
         new() { ["http.request.method"] = method, ["url.path"] = path };

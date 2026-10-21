@@ -498,6 +498,30 @@ public sealed class ServiceBusDeadLetterQueuesTests
         _clients.DidNotReceive().Create(Arg.Any<string>());
     }
 
+    [Fact]
+    public async Task DeadLetteredAsync_ForACorrelationId_PeeksEveryNonEmptyDeadLetterQueue_ForTheMessagesCarryingIt()
+    {
+        Found(new ServiceBusEntity("sb", "carrier-tracking", null, 0), new ServiceBusEntity("sb", "shipment-events", "carrier-booking", 2));
+        PeeksMany(
+            Message(Enqueued, sequenceNumber: 4, correlationId: "corr-1", properties: new Dictionary<string, object> { ["shipmentNumber"] = "SH-0042" }),
+            Message(Enqueued, sequenceNumber: 5, correlationId: "CORR-2"));
+
+        var found = await Queues().DeadLetteredAsync("corr-1", TestContext.Current.CancellationToken);
+
+        found.Should().ContainSingle().Which.Should().BeEquivalentTo(
+            new FoundDeadLetter("shipment-events/carrier-booking", 4, Enqueued, [new BusinessKey(BusinessKeyKind.ShipmentNumber, "SH-0042")]));
+        _clients.Received(1).Create("sb");
+    }
+
+    [Fact]
+    public async Task DeadLetteredAsync_ForACorrelationIdInDifferentCase_StillFindsTheMessage()
+    {
+        Found(new ServiceBusEntity("sb", "carrier-tracking", null, 1));
+        PeeksMany(Message(Enqueued, correlationId: "Corr-1"));
+
+        (await Queues().DeadLetteredAsync("corr-1", TestContext.Current.CancellationToken)).Should().ContainSingle();
+    }
+
     private ServiceBusSender Sender()
     {
         var sender = Substitute.For<ServiceBusSender>();

@@ -57,8 +57,9 @@ internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTr
     {
         ArgumentNullException.ThrowIfNull(lookup);
 
+        // The console's own audit events are read by AuditAsync, and say what became of a hop's message; they aren't hops.
         var records = (await TrackedRecordsAsync(cancellationToken))
-            .Where(record => record.Time >= lookup.From && record.Time <= lookup.To
+            .Where(record => !record.IsAudit && record.Time >= lookup.From && record.Time <= lookup.To
                 && string.Equals(record.CorrelationId, lookup.CorrelationId, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
@@ -89,6 +90,26 @@ internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTr
                 spans.GetValueOrDefault(hop.Key) is { } span
                     ? HopCauses.Of(hop.Key, span.ParentSpanId, hopIds, id => spans.GetValueOrDefault(id)?.ParentSpanId)
                     : null)),
+        ];
+    }
+
+    public async Task<IReadOnlyList<RecordedAudit>> AuditAsync(TrailLookup lookup, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(lookup);
+
+        return
+        [
+            .. (await TrackedRecordsAsync(cancellationToken))
+                .Where(record => record.IsAudit && record.Time >= lookup.From && record.Time <= lookup.To
+                    && string.Equals(record.CorrelationId, lookup.CorrelationId, StringComparison.OrdinalIgnoreCase))
+                .Select(record => new RecordedAudit(
+                    record.Keys["Actor"],
+                    record.Keys["Action"],
+                    record.Keys.GetValueOrDefault("Entity") ?? string.Empty,
+                    record.Keys.GetValueOrDefault("MessageId") ?? string.Empty,
+                    record.Time,
+                    record.Keys.GetValueOrDefault("Reason"),
+                    BusinessKeysOf([record]))),
         ];
     }
 
@@ -296,8 +317,13 @@ internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTr
     /// <summary>A log record reduced to its time, where it was written and the tracking contract's keys, when it carries a correlation ID.</summary>
     private sealed record TrackedRecord(DateTimeOffset Time, string CorrelationId, string Resource, string TraceId, string SpanId, Dictionary<string, string> Keys)
     {
+        // The attributes the console's audit event is logged with (OpenTelemetryAuditLog), named after its message template's placeholders.
+        private static readonly string[] AuditKeys = ["Actor", "Action", "Entity", "MessageId", "Reason"];
+
         private static readonly string[] TrackedKeys =
-            ["correlationId", "flow", "outcome", "failureCode", "eventType", .. TrackedBusinessKeys.All.Select(key => key.Key)];
+            ["correlationId", "flow", "outcome", "failureCode", "eventType", .. AuditKeys, .. TrackedBusinessKeys.All.Select(key => key.Key)];
+
+        public bool IsAudit => Keys.ContainsKey("Actor") && Keys.ContainsKey("Action");
 
         public bool Carries(string key) =>
             string.Equals(CorrelationId, key, StringComparison.OrdinalIgnoreCase)

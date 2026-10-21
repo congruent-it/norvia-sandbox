@@ -18,4 +18,10 @@ public interface ITrailSource
     /// <see cref="TrailLookup.To"/>, fan-out included, in no particular order, each naming the hop that caused it.
     /// </summary>
     Task<IReadOnlyList<RecordedHop>> HopsAsync(TrailLookup lookup, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The audit events the console wrote under <see cref="TrailLookup.CorrelationId"/> between <see cref="TrailLookup.From"/>
+    /// and <see cref="TrailLookup.To"/> when an operator resubmitted or discarded one of the trail's messages, in no particular order.
+    /// </summary>
+    Task<IReadOnlyList<RecordedAudit>> AuditAsync(TrailLookup lookup, CancellationToken cancellationToken);
 }
