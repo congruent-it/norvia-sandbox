@@ -20,9 +20,10 @@ public sealed class DocsGeneratorTests
         var files = await generator.GenerateAsync();
 
         files.Select(file => file.Path).Should().Equal(
-            "docs/applications/sample.md", "docs/applications/openapi/sample.v1.json", "docs/applications/openapi/sample.v2.json");
+            "docs/applications/sample.md", "docs/architecture/diagrams/er-sample.json",
+            "docs/applications/openapi/sample.v1.json", "docs/applications/openapi/sample.v2.json");
         files[0].Content.Should().Contain("#### `Customers`");
-        files[1].Content.Should().Be("{}\n");
+        files[2].Content.Should().Be("{}\n");
     }
 
     [Fact]
@@ -65,7 +66,7 @@ public sealed class DocsGeneratorTests
 
         var stale = generator.Stale(await generator.GenerateAsync());
 
-        stale.Should().Equal("docs/applications/sample.md", "docs/applications/openapi/sample.v2.json");
+        stale.Should().Equal("docs/applications/sample.md", "docs/architecture/diagrams/er-sample.json", "docs/applications/openapi/sample.v2.json");
     }
 
     [Fact]

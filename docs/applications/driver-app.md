@@ -73,23 +73,9 @@ The database's tables are generated from its EF Core model by `Norvia.Docs.Gener
 
 ### Entity relationships
 
-Only the key columns are drawn; every column is in the tables below.
+Only the key columns are drawn; every column is in the tables below. The picture is drawn from [the model](../architecture/diagrams/er-driver-app.json) by `docs/architecture/diagrams/entities.py`, and its [Excalidraw file](../architecture/diagrams/er-driver-app.excalidraw) opens in Excalidraw.
 
-```mermaid
-erDiagram
-    DriverAppSettings {
-        int Id PK
-    }
-    DriverReports {
-        uniqueidentifier EventId PK
-    }
-    DriverTrips {
-        nvarchar(16) TripNumber PK
-    }
-    OutboxMessages {
-        bigint Id PK
-    }
-```
+![driver-app entity relationships](../architecture/diagrams/er-driver-app.png)
 
 ### Tables
 

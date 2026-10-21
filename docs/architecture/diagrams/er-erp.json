@@ -1,0 +1,278 @@
+{
+  "entities": [
+    {
+      "name": "BillableLines",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "nvarchar(20)",
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "ShipperId",
+          "type": "nvarchar(50)",
+          "keys": [
+            "FK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CarrierCosts",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "nvarchar(20)",
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "CarrierId",
+          "type": "nvarchar(50)",
+          "keys": [
+            "FK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CarrierInvoices",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "uniqueidentifier",
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "CarrierId",
+          "type": "nvarchar(50)",
+          "keys": [
+            "FK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CarrierRateCards",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "nvarchar(50)",
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "CarrierId",
+          "type": "nvarchar(50)",
+          "keys": [
+            "FK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Carriers",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "nvarchar(50)",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CreditNoteNumberSequences",
+      "columns": [
+        {
+          "name": "Year",
+          "type": "int",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CreditNotes",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "nvarchar(20)",
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "InvoiceNumber",
+          "type": "nvarchar(20)",
+          "keys": [
+            "FK"
+          ]
+        },
+        {
+          "name": "ShipperId",
+          "type": "nvarchar(50)",
+          "keys": [
+            "FK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "InvoiceNumberSequences",
+      "columns": [
+        {
+          "name": "Year",
+          "type": "int",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "OutboxMessages",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "bigint",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RateCards",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "nvarchar(50)",
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "ShipperId",
+          "type": "nvarchar(50)",
+          "keys": [
+            "FK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ShipperInvoices",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "nvarchar(20)",
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "ShipperId",
+          "type": "nvarchar(50)",
+          "keys": [
+            "FK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Shippers",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "nvarchar(50)",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "principal": "Shippers",
+      "dependent": "BillableLines",
+      "columns": [
+        "ShipperId"
+      ],
+      "optional": false,
+      "oneToOne": false
+    },
+    {
+      "principal": "Carriers",
+      "dependent": "CarrierCosts",
+      "columns": [
+        "CarrierId"
+      ],
+      "optional": false,
+      "oneToOne": false
+    },
+    {
+      "principal": "Carriers",
+      "dependent": "CarrierInvoices",
+      "columns": [
+        "CarrierId"
+      ],
+      "optional": false,
+      "oneToOne": false
+    },
+    {
+      "principal": "Carriers",
+      "dependent": "CarrierRateCards",
+      "columns": [
+        "CarrierId"
+      ],
+      "optional": false,
+      "oneToOne": false
+    },
+    {
+      "principal": "ShipperInvoices",
+      "dependent": "CreditNotes",
+      "columns": [
+        "InvoiceNumber"
+      ],
+      "optional": false,
+      "oneToOne": false
+    },
+    {
+      "principal": "Shippers",
+      "dependent": "CreditNotes",
+      "columns": [
+        "ShipperId"
+      ],
+      "optional": false,
+      "oneToOne": false
+    },
+    {
+      "principal": "Shippers",
+      "dependent": "RateCards",
+      "columns": [
+        "ShipperId"
+      ],
+      "optional": false,
+      "oneToOne": false
+    },
+    {
+      "principal": "Shippers",
+      "dependent": "ShipperInvoices",
+      "columns": [
+        "ShipperId"
+      ],
+      "optional": false,
+      "oneToOne": false
+    }
+  ]
+}

@@ -18,7 +18,7 @@ What each application offers and keeps, for engineers and coding agents working 
 
 ## What is generated
 
-The database section of each page (between the `generated:database` markers) and every file in [openapi/](openapi/) are written by `Norvia.Docs.Generator` from the code. The rest, including the table and column descriptions in [descriptions/](descriptions/), is written by hand.
+The database section of each page (between the `generated:database` markers), the model behind its ER diagram (`er-<slug>.json` in [docs/architecture/diagrams/](../architecture/diagrams/README.md#entity-relationships)) and every file in [openapi/](openapi/) are written by `Norvia.Docs.Generator` from the code. The ER picture itself is drawn from that JSON by `docs/architecture/diagrams/entities.py`, which you run after a schema change. The rest, including the table and column descriptions in [descriptions/](descriptions/), is written by hand.
 
 ```bash
 dotnet run --project src/Docs/Norvia.Docs.Generator            # writes the generated parts

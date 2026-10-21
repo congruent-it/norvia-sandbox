@@ -1,0 +1,53 @@
+{
+  "entities": [
+    {
+      "name": "DriverAppSettings",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "DriverReports",
+      "columns": [
+        {
+          "name": "EventId",
+          "type": "uniqueidentifier",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "DriverTrips",
+      "columns": [
+        {
+          "name": "TripNumber",
+          "type": "nvarchar(16)",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "OutboxMessages",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "bigint",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    }
+  ],
+  "relationships": []
+}

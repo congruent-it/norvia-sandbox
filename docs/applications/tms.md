@@ -156,72 +156,9 @@ The database's tables are generated from its EF Core model by `Norvia.Docs.Gener
 
 ### Entity relationships
 
-Only the key columns are drawn; every column is in the tables below.
+Only the key columns are drawn; every column is in the tables below. The picture is drawn from [the model](../architecture/diagrams/er-tms.json) by `docs/architecture/diagrams/entities.py`, and its [Excalidraw file](../architecture/diagrams/er-tms.excalidraw) opens in Excalidraw.
 
-```mermaid
-erDiagram
-    Absences {
-        uniqueidentifier Id PK
-    }
-    CarrierBookings {
-        uniqueidentifier Id PK
-        uniqueidentifier ShipmentId FK
-    }
-    Exceptions {
-        uniqueidentifier Id PK
-        uniqueidentifier ShipmentId FK
-    }
-    OffTheRoadDays {
-        uniqueidentifier Id PK
-    }
-    OutboxMessages {
-        bigint Id PK
-    }
-    PlanningDays {
-        date Date PK
-    }
-    ProofsOfDelivery {
-        uniqueidentifier Id PK
-        uniqueidentifier ShipmentId FK
-    }
-    Rosters {
-        nvarchar(20) DriverId PK
-    }
-    Shipments {
-        uniqueidentifier Id PK
-        uniqueidentifier TransportOrderId FK
-    }
-    ShipperNotifications {
-        uniqueidentifier Id PK
-        uniqueidentifier ExceptionId FK
-    }
-    TrackingEvents {
-        uniqueidentifier Id PK
-        uniqueidentifier ShipmentId FK
-    }
-    TransportOrders {
-        uniqueidentifier Id PK
-    }
-    TripStops {
-        int Id PK
-        uniqueidentifier TripId FK
-    }
-    TripVersionDeliveries {
-        int Id PK
-        uniqueidentifier TripId FK
-    }
-    Trips {
-        uniqueidentifier Id PK
-    }
-    Shipments ||--o{ CarrierBookings : "ShipmentId"
-    Shipments ||--o{ Exceptions : "ShipmentId"
-    Shipments ||--o{ ProofsOfDelivery : "ShipmentId"
-    TransportOrders ||--o| Shipments : "TransportOrderId"
-    Exceptions ||--o{ ShipperNotifications : "ExceptionId"
-    Shipments ||--o{ TrackingEvents : "ShipmentId"
-    Trips ||--o{ TripStops : "TripId"
-    Trips ||--o{ TripVersionDeliveries : "TripId"
-```
+![tms entity relationships](../architecture/diagrams/er-tms.png)
 
 ### Tables
 

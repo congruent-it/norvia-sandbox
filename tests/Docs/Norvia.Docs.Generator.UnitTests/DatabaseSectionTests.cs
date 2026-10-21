@@ -2,7 +2,7 @@ namespace Norvia.Docs.Generator.UnitTests;
 
 public sealed class DatabaseSectionTests
 {
-    private static readonly string Section = DatabaseSection.Render(SampleDatabase.Model(), ApplicationDescriptions.None);
+    private static readonly string Section = DatabaseSection.Render(SampleDatabase.Model(), ApplicationDescriptions.None, "sample");
 
     [Fact]
     public void Render_ATable_ListsItsColumnsWithTypeNullabilityDefaultAndKey()
@@ -26,7 +26,7 @@ public sealed class DatabaseSectionTests
             { "tables": { "Customers": { "description": "Who orders.", "columns": { "Name": "The trading name | legal name" } } } }
             """);
 
-        var section = DatabaseSection.Render(SampleDatabase.Model(), descriptions);
+        var section = DatabaseSection.Render(SampleDatabase.Model(), descriptions, "sample");
 
         section.Should().Contain("#### `Customers`\n\nWho orders.\n");
         section.Should().Contain("| `Name` | `nvarchar(200)` | no |  |  | The trading name \\| legal name |");
@@ -79,19 +79,16 @@ public sealed class DatabaseSectionTests
     }
 
     [Fact]
-    public void Render_TheDiagram_DrawsKeyColumnsAndEachKindOfRelationship()
+    public void Render_TheDiagram_EmbedsThePictureAndLinksItsSources()
     {
-        Section.Should().Contain("```mermaid\nerDiagram\n");
-        Section.Should().Contain("    Customers {\n        bigint Id PK\n    }");
-        Section.Should().Contain("    Orders {\n        int Id PK\n        bigint CustomerId FK\n    }");
-        Section.Should().Contain("    Customers ||--o{ Orders : \"CustomerId\"");
-        Section.Should().Contain("    Orders |o--o{ OrderNotes : \"OrderId\"");
-        Section.Should().Contain("    Orders ||--o| Receipts : \"OrderId\"");
+        Section.Should().Contain("![sample entity relationships](../architecture/diagrams/er-sample.png)");
+        Section.Should().Contain("(../architecture/diagrams/er-sample.json)");
+        Section.Should().Contain("(../architecture/diagrams/er-sample.excalidraw)");
     }
 
     [Fact]
     public void Render_Twice_GivesTheSameText()
     {
-        DatabaseSection.Render(SampleDatabase.Model(), ApplicationDescriptions.None).Should().Be(Section);
+        DatabaseSection.Render(SampleDatabase.Model(), ApplicationDescriptions.None, "sample").Should().Be(Section);
     }
 }

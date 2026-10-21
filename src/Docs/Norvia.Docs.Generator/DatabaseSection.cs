@@ -1,36 +1,23 @@
 using System.Globalization;
 using System.Text;
-using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace Norvia.Docs.Generator;
 
-/// <summary>Writes an application's database as Markdown: an ER diagram, then each table with its columns, keys and indexes, then its sequences.</summary>
-internal static partial class DatabaseSection
+/// <summary>Writes an application's database as Markdown: a link to its ER diagram, then each table with its columns, keys and indexes, then its sequences.</summary>
+internal static class DatabaseSection
 {
-    public static string Render(IModel model, ApplicationDescriptions descriptions)
+    public static string Render(IModel model, ApplicationDescriptions descriptions, string slug)
     {
         var relational = model.GetRelationalModel();
         var tables = relational.Tables.OrderBy(table => table.Schema, StringComparer.Ordinal).ThenBy(table => table.Name, StringComparer.Ordinal).ToArray();
 
         var text = new StringBuilder();
         text.AppendLine("### Entity relationships").AppendLine();
-        text.AppendLine("Only the key columns are drawn; every column is in the tables below.").AppendLine();
-        text.AppendLine("```mermaid");
-        text.AppendLine("erDiagram");
-        foreach (var table in tables)
-        {
-            AppendEntity(text, table);
-        }
-
-        foreach (var table in tables)
-        {
-            AppendRelationships(text, table);
-        }
-
-        text.AppendLine("```").AppendLine();
+        text.AppendLine("Only the key columns are drawn; every column is in the tables below. The picture is drawn from [the model](" + EntityDiagram.JsonPath(slug) + ") by `docs/architecture/diagrams/entities.py`, and its [Excalidraw file](" + EntityDiagram.ExcalidrawPath(slug) + ") opens in Excalidraw.").AppendLine();
+        text.AppendLine(CultureInfo.InvariantCulture, $"![{slug} entity relationships]({EntityDiagram.PngPath(slug)})").AppendLine();
 
         text.AppendLine("### Tables").AppendLine();
         foreach (var table in tables)
@@ -50,38 +37,6 @@ internal static partial class DatabaseSection
         }
 
         return text.ToString();
-    }
-
-    private static void AppendEntity(StringBuilder text, ITable table)
-    {
-        var keyColumns = table.Columns.Where(column => IsPrimaryKey(table, column) || IsForeignKey(table, column)).ToArray();
-        if (keyColumns.Length == 0)
-        {
-            text.AppendLine(CultureInfo.InvariantCulture, $"    {EntityName(table)}");
-            return;
-        }
-
-        text.AppendLine(CultureInfo.InvariantCulture, $"    {EntityName(table)} {{");
-        foreach (var column in keyColumns)
-        {
-            var keys = string.Join(", ", new[] { IsPrimaryKey(table, column) ? "PK" : null, IsForeignKey(table, column) ? "FK" : null }.OfType<string>());
-            text.AppendLine(CultureInfo.InvariantCulture, $"        {DiagramType(column.StoreType)} {column.Name} {keys}");
-        }
-
-        text.AppendLine("    }");
-    }
-
-    private static void AppendRelationships(StringBuilder text, ITable table)
-    {
-        foreach (var foreignKey in table.ForeignKeyConstraints.OrderBy(foreignKey => foreignKey.Name, StringComparer.Ordinal))
-        {
-            var oneToOne = IsUnique(table, foreignKey.Columns);
-            var optional = foreignKey.Columns.Any(column => column.IsNullable);
-            var principalSide = optional ? "|o" : "||";
-            var dependentSide = oneToOne ? "o|" : "o{";
-            text.AppendLine(CultureInfo.InvariantCulture,
-                $"    {EntityName(foreignKey.PrincipalTable)} {principalSide}--{dependentSide} {EntityName(table)} : \"{string.Join(", ", foreignKey.Columns.Select(column => column.Name))}\"");
-        }
     }
 
     private static void AppendTable(StringBuilder text, ITable table, ApplicationDescriptions descriptions)
@@ -158,11 +113,11 @@ internal static partial class DatabaseSection
         }
     }
 
-    private static bool IsPrimaryKey(ITable table, IColumn column) => table.PrimaryKey?.Columns.Contains(column) == true;
+    internal static bool IsPrimaryKey(ITable table, IColumn column) => table.PrimaryKey?.Columns.Contains(column) == true;
 
-    private static bool IsForeignKey(ITable table, IColumn column) => table.ForeignKeyConstraints.Any(foreignKey => foreignKey.Columns.Contains(column));
+    internal static bool IsForeignKey(ITable table, IColumn column) => table.ForeignKeyConstraints.Any(foreignKey => foreignKey.Columns.Contains(column));
 
-    private static bool IsUnique(ITable table, IReadOnlyList<IColumn> columns) =>
+    internal static bool IsUnique(ITable table, IReadOnlyList<IColumn> columns) =>
         SameColumns(table.PrimaryKey?.Columns, columns)
         || table.UniqueConstraints.Any(constraint => SameColumns(constraint.Columns, columns))
         || table.Indexes.Any(index => index.IsUnique && index.Filter is null && SameColumns(index.Columns, columns));
@@ -212,18 +167,6 @@ internal static partial class DatabaseSection
 
     private static string ColumnList(IEnumerable<IColumn> columns) => string.Join(", ", columns.Select(column => $"`{column.Name}`"));
 
-    private static string EntityName(ITable table) =>
-        NotAnIdentifier().Replace(table.Schema is null or "dbo" ? table.Name : $"{table.Schema}_{table.Name}", "_");
-
-    // Mermaid takes letters, digits, underscores, hyphens and brackets in a type, so nvarchar(200) stays and decimal(18,2) becomes decimal(18_2).
-    private static string DiagramType(string storeType) => NotADiagramTypeCharacter().Replace(storeType, "_");
-
     // A pipe would end the cell and a line break would end the row.
     private static string Cell(string? text) => (text ?? string.Empty).Replace("|", "\\|", StringComparison.Ordinal).ReplaceLineEndings(" ");
-
-    [GeneratedRegex("[^A-Za-z0-9_]")]
-    private static partial Regex NotAnIdentifier();
-
-    [GeneratedRegex(@"[^A-Za-z0-9_()\[\]-]")]
-    private static partial Regex NotADiagramTypeCharacter();
 }

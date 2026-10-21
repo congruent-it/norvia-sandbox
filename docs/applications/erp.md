@@ -78,63 +78,9 @@ The database's tables are generated from its EF Core model by `Norvia.Docs.Gener
 
 ### Entity relationships
 
-Only the key columns are drawn; every column is in the tables below.
+Only the key columns are drawn; every column is in the tables below. The picture is drawn from [the model](../architecture/diagrams/er-erp.json) by `docs/architecture/diagrams/entities.py`, and its [Excalidraw file](../architecture/diagrams/er-erp.excalidraw) opens in Excalidraw.
 
-```mermaid
-erDiagram
-    BillableLines {
-        nvarchar(20) Id PK
-        nvarchar(50) ShipperId FK
-    }
-    CarrierCosts {
-        nvarchar(20) Id PK
-        nvarchar(50) CarrierId FK
-    }
-    CarrierInvoices {
-        uniqueidentifier Id PK
-        nvarchar(50) CarrierId FK
-    }
-    CarrierRateCards {
-        nvarchar(50) Id PK
-        nvarchar(50) CarrierId FK
-    }
-    Carriers {
-        nvarchar(50) Id PK
-    }
-    CreditNoteNumberSequences {
-        int Year PK
-    }
-    CreditNotes {
-        nvarchar(20) Id PK
-        nvarchar(20) InvoiceNumber FK
-        nvarchar(50) ShipperId FK
-    }
-    InvoiceNumberSequences {
-        int Year PK
-    }
-    OutboxMessages {
-        bigint Id PK
-    }
-    RateCards {
-        nvarchar(50) Id PK
-        nvarchar(50) ShipperId FK
-    }
-    ShipperInvoices {
-        nvarchar(20) Id PK
-        nvarchar(50) ShipperId FK
-    }
-    Shippers {
-        nvarchar(50) Id PK
-    }
-    Shippers ||--o{ BillableLines : "ShipperId"
-    Carriers ||--o{ CarrierCosts : "CarrierId"
-    Carriers ||--o{ CarrierInvoices : "CarrierId"
-    Carriers ||--o{ CarrierRateCards : "CarrierId"
-    ShipperInvoices ||--o{ CreditNotes : "InvoiceNumber"
-    Shippers ||--o{ CreditNotes : "ShipperId"
-    Shippers ||--o{ RateCards : "ShipperId"
-    Shippers ||--o{ ShipperInvoices : "ShipperId"
-```
+![erp entity relationships](../architecture/diagrams/er-erp.png)
 
 ### Tables
 

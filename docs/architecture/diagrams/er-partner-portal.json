@@ -1,0 +1,101 @@
+{
+  "entities": [
+    {
+      "name": "Bookings",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "uniqueidentifier",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CarrierAnswerSettings",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "uniqueidentifier",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CarrierBookingRequests",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "uniqueidentifier",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CarrierInvoiceOutcomes",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "uniqueidentifier",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CarrierInvoices",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "uniqueidentifier",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CarrierTrackingSettings",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "uniqueidentifier",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ShipperInvoices",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "uniqueidentifier",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ShipperNotifications",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "uniqueidentifier",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    }
+  ],
+  "relationships": []
+}
