@@ -25,6 +25,7 @@ hooks:
     run: >-
       ./infra/migrate.sh tms-migrations "the TMS database" &&
       ./infra/migrate.sh partner-portal-migrations "the Partner portal's database" &&
+      ./infra/migrate.sh driver-app-migrations "the Driver app's database" &&
       ./infra/migrate.sh simulator-migrations "the Simulator's database" &&
       ./infra/migrate.sh erp-migrations "the ERP's database" &&
       ./infra/deploy-intake-logic-app.sh &&
