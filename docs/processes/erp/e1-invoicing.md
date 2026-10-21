@@ -144,17 +144,81 @@ The script prints `PASS` or `FAIL` per check, never a body, a token or a key. If
 
 ## Implementation
 
-For engineers and coding agents. It shows where E1 lives in the repository. Built so far: the ERP application with its seed-loaded master data, recording Billable lines through the ERP billing API with the list of Waiting lines, the Billing Logic App that hands `TransportOrderBillable` to it, **Invoice now**, which issues a Shipper invoice and publishes `ShipperInvoiceIssued`, the monthly Invoice run, the Partner portal's Shipper invoice endpoint and invoices inbox, and the Shipper invoice Logic App, which sends the invoice and reports it Sent or Not delivered, and Send again. Not delivered handling with **Send again** is built too, and so is issuing **Credit notes**, which publishes `CreditNoteIssued`, and sending them: the Shipper invoice Logic App sends a Credit note like an invoice, with the same reports, Not delivered handling and Send again. The other Logic Apps are designed above and not built yet.
+For engineers and coding agents. It shows where E1 lives in the repository. Built so far: the ERP application with its seed-loaded master data, recording Billable lines through the ERP billing API with the list of Waiting lines, the Billing Logic App that hands `TransportOrderBillable` to it, **Invoice now**, which issues a Shipper invoice and publishes `ShipperInvoiceIssued`, the monthly Invoice run, the Partner portal's Shipper invoice endpoint and invoices inbox, and the Shipper invoice Logic App, which sends the invoice and reports it Sent or Not delivered, and Send again. Not delivered handling with **Send again** is built too, and so is issuing **Credit notes**, which publishes `CreditNoteIssued`, and sending them: the Shipper invoice Logic App sends a Credit note like an invoice, with the same reports, Not delivered handling and Send again.
+
+### Message trail
+
+The Hops of E1, named as the [Integration console](../../operations/integration-console.md#message-trail) shows them, in time order. A Hop is grouped under the Flow it carries in the tracking contract. The same order's whole life, across every application, is drawn in [the order lifecycle](../../architecture/order-lifecycle.md#3-from-delivered-to-a-shipper-invoice).
+
+**1. A Billable line.** The TMS's `TransportOrderBillable` is on the `transport-order-events` topic. The Billing Logic App reacts on the same trail, with the event's correlation ID.
+
+```mermaid
+sequenceDiagram
+    box transparent Flow billing
+        participant sub as transport-order-events (topic): subscription billing
+        participant logic as logic-billing: billing
+        participant erp as erp-api: POST /v1/billable-lines
+    end
+    sub-)logic: A TransportOrderBillable message is available
+    logic->>logic: Track_the_billable_line (Transport Order number, Shipment number, Shipper as partyId)
+    logic->>erp: Record_the_billable_line (the message body as it is, X-Correlation-ID)
+    erp->>erp: Billable line Waiting. Idempotent on the Transport Order number. Nothing is published
+    erp-->>logic: 201, 200 (repeat), or 409, 422, 400 with a stable code
+    logic->>sub: Settle_the_message: complete, or dead-letter with the ERP's code
+```
+
+**2. An invoice.** Finance's **Invoice now**, or the monthly Invoice run, starts a new trail for the invoice. Its correlation ID is the invoice's own, and every later hop carries it.
+
+```mermaid
+sequenceDiagram
+    box transparent Flow invoicing
+        participant erp as erp-web: Invoice now
+        participant pub as erp-api: publish ShipperInvoiceIssued
+        participant logic as logic-shipper-invoice: shipper-invoice
+        participant portal as partner-portal-web: POST /shipper/v1/shipper-id/invoices
+        participant report as erp-api: POST /v1/shipper-invoices/number/report-sent
+    end
+    erp->>erp: IssueShipperInvoiceCommand: Waiting lines Invoiced, invoice numbered, outbox message, one transaction
+    erp-)pub: outbox, within a second
+    pub-)logic: invoicing-events, subscription shipper-invoice
+    logic->>logic: Track_the_invoice, Map_the_invoice (MapShipperDocument), Complete_the_message
+    logic->>logic: Get_the_Shipper_endpoint_credential (Key Vault)
+    logic->>portal: Send_to_the_Shipper (the invoice in the Shipper's format)
+    portal-->>logic: 200 acknowledged
+    logic->>report: Report_the_outcome_to_the_ERP: Report_the_invoice_sent
+    report-->>logic: 200 (or 200 ignored for a repeat)
+```
+
+**3. A Credit note** takes the same path from `IssueCreditNoteCommand`: it publishes `CreditNoteIssued` to the same subscription, and the Logic App sends it as a `CREDIT_NOTE` and reports it to `/v1/credit-notes/{number}/report-sent`.
+
+**4. An invoice the Shipper never got.** The send hop is `Failed` with `ShipperUnavailable` or `ShipperRefused`, and the Logic App reports it instead of failing the run.
+
+```mermaid
+sequenceDiagram
+    box transparent Flow invoicing
+        participant logic as logic-shipper-invoice: shipper-invoice
+        participant portal as partner-portal-web: POST /shipper/v1/shipper-id/invoices
+        participant report as erp-api: POST /v1/shipper-invoices/number/report-not-delivered
+        participant pub as erp-api: publish ShipperInvoiceNotDelivered
+        participant again as erp-web: Send again
+    end
+    logic->>portal: Send_to_the_Shipper (retried three times on a timeout, 408, 429 or 5xx)
+    portal-->>logic: no answer, or a client error
+    logic->>report: Report_the_outcome_to_the_ERP: Report_the_invoice_not_delivered (status code, cause up to 500 characters)
+    report->>report: Invoice Not delivered, with the outbox message, one transaction
+    report-)pub: outbox, within a second
+    again->>again: SendShipperInvoiceAgainCommand: back to Issued, ShipperInvoiceIssued published again, same correlation ID
+```
 
 ### What is built
 
 | Piece | Where | Does |
 |---|---|---|
-| Domain | [src/Erp/Norvia.Erp.Domain](../../../src/Erp/Norvia.Erp.Domain/) | The aggregates `Shipper`, `Carrier`, `RateCard` and `CarrierRateCard`, with the IDs the TMS uses, and their specifications. A card keeps its versions, Zones and Lanes as the seed file has them; the ERP shows them and never rates with them |
-| Application | [src/Erp/Norvia.Erp.Application](../../../src/Erp/Norvia.Erp.Application/) | The queries behind the four lists, and `LoadMasterDataCommand`, which adds what the seed file has and reloads what is there already, so loading twice changes nothing |
+| Domain | [src/Erp/Norvia.Erp.Domain](../../../src/Erp/Norvia.Erp.Domain/) | The aggregates `Shipper`, `Carrier`, `RateCard` and `CarrierRateCard`, with the IDs the TMS uses, and their specifications. A card keeps its versions, Zones and Lanes as the seed file has them; the ERP shows them and never rates with them. E1 adds `BillableLine`, `ShipperInvoice`, `CreditNote`, the year's `InvoiceNumberSequence` and the monthly run's schedule, and E2 the Carrier cost and Carrier invoice aggregates |
+| Application | [src/Erp/Norvia.Erp.Application](../../../src/Erp/Norvia.Erp.Application/) | The queries behind the four master data lists, and `LoadMasterDataCommand`, which adds what the seed file has and reloads what is there already, so loading twice changes nothing. The use cases of E1 are in the rows below, one feature folder each: `BillableLines`, `ShipperInvoices` and `CreditNotes` |
 | Infrastructure | [src/Erp/Norvia.Erp.Infrastructure](../../../src/Erp/Norvia.Erp.Infrastructure/) | The ERP's own `ErpDbContext` and database (`erp`), the transactional outbox and its publisher, and the seed loader that runs as the ERP starts |
 | Migrations | [src/Erp/Norvia.Erp.Migrations](../../../src/Erp/Norvia.Erp.Migrations/) | A Container Apps job that applies the database's migrations; azd's postdeploy hook runs it |
-| Billable lines | [src/Erp/Norvia.Erp.Domain/BillableLines](../../../src/Erp/Norvia.Erp.Domain/BillableLines/) | The `BillableLine` aggregate, keyed by its Transport Order number, and the billing rules: the charge lines are there and add up to the total, and what counts as the same content on a repeat. The Waiting status is the only one built |
+| Billable lines | [src/Erp/Norvia.Erp.Domain/BillableLines](../../../src/Erp/Norvia.Erp.Domain/BillableLines/) | The `BillableLine` aggregate, keyed by its Transport Order number, and the billing rules: the charge lines are there and add up to the total, and what counts as the same content on a repeat. Waiting is the status a recorded line starts in, and an Invoice run moves it to Invoiced exactly once |
 | Record a Billable line | [src/Erp/Norvia.Erp.Application/BillableLines](../../../src/Erp/Norvia.Erp.Application/BillableLines/Record/) | `RecordBillableLineCommand` and its handler: idempotent on the Transport Order number, `ShipperNotFound` for an unknown Shipper, `BillableLineConflict` for different content. It publishes nothing. The queries behind the Waiting lines list are beside it |
 | ERP billing API | [src/Erp/Norvia.Erp.Api](../../../src/Erp/Norvia.Erp.Api/) | `POST /v1/billable-lines` takes only `TransportOrderBillable` (the Canonical Model) and needs the `BillableLines.Record` app role. 201 for a new line, 200 with `repeat: true` for the same content again. Refusals are `ProblemDetails` with the stable `code`: `ShipperNotFound` (422), `BillableLineConflict` (409), `FreightChargeWithoutChargeLines` and `FreightChargeTotalMismatch` (400). A body outside the Canonical Model is a 400. The OpenAPI document is published for API Management |
 | Billing Logic App | [src/Integration/BillingLogicApp](../../../src/Integration/BillingLogicApp/), [billing-logic-app.bicep](../../../infra/estate/billing-logic-app.bicep) | A stateful workflow, `billing`, on the `billing` subscription of `transport-order-events` (the filter is `(eventType = 'TransportOrderBillable' AND resubmitTo IS NULL) OR resubmitTo = 'billing'`). It posts the message body to `POST /v1/billable-lines` as it is, because the ERP accepts the Canonical Model and there is nothing to map, as the Billing Logic App's identity with the event's correlation ID in `X-Correlation-ID` and as the run's client tracking ID. A `2xx` completes the message, a repeat (`200`) included. A timeout, `408`, `429` or a server error is retried three times (exponential, 5 s up to 20 s); another client error and a conflict are not. When the line is refused or the retries are used up, the message is dead-lettered with the ERP's code as `DeadLetterReason` (`ShipperNotFound`, `BillableLineConflict`, `FreightChargeWithoutChargeLines`, `FreightChargeTotalMismatch`, or `ErpCallRefused` and `ErpUnavailable`) and its message as `DeadLetterErrorDescription`, and the run fails. A message that isn't a `TransportOrderBillable` is dead-lettered as `BillableLineUnreadable`. The run tracks `billing` with the Transport Order number, the Shipment number, the Shipper as `partyId` and the event ID as `sourceMessageId`. The identity holds `BillableLines.Record` and the receiver role on its subscription, and nothing else. It has no Key Vault and no local function. Locally the AppHost runs `Norvia.Integration.LocalBillingWorker` in its place ([ADR 0043](../../adr/0043-locally-a-hosted-worker-plays-the-e1-billing-logic-app.md)), so a delivery in the TMS reaches the Waiting lines list; CI tests the workflow's definition and the [sample messages](../../../contracts/canonical-model/samples/transport-order-billable/) without Azure |
@@ -174,7 +238,7 @@ For engineers and coding agents. It shows where E1 lives in the repository. Buil
 
 The Canonical Model has the answer as [billable-line.v1](../../../contracts/canonical-model/billable-line.v1.schema.json) and [billable-line-recording.v1](../../../contracts/canonical-model/billable-line-recording.v1.schema.json). Locally the AppHost hosts the API as `erp-api` and trusts a token signed with the local key, the Billing Logic App's client ID standing in for its managed identity. In Azure the estate defines the API's app registration and the role, and grants the role to the Billing Logic App's identity.
 
-The seed loader reads `shippers`, `carriers`, `rateCards` and `carrierRateCards` from `seed/norvia.seed.json` (`Seed:Path`), as the TMS does. A broken seed stops the ERP as it starts. Recording a Billable line publishes nothing by design; Invoice now publishes `ShipperInvoiceIssued`. The other events are the slices after this one's.
+The seed loader reads `shippers`, `carriers`, `rateCards` and `carrierRateCards` from `seed/norvia.seed.json` (`Seed:Path`), as the TMS does. A broken seed stops the ERP as it starts. Recording a Billable line publishes nothing by design. Issuing an invoice publishes `ShipperInvoiceIssued`, issuing a Credit note `CreditNoteIssued`, and a document reported not delivered `ShipperInvoiceNotDelivered`, all through the ERP's outbox.
 
 ### Access
 

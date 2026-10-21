@@ -159,6 +159,86 @@ The script prints `PASS` or `FAIL` per check, never a body, a token or a key. If
 
 For engineers and coding agents. Built so far: the Carrier cost Logic App, recording a Carrier cost and the Open Carrier costs list, receiving and matching a Carrier invoice with the Carrier invoices list, Finance deciding lines, matching again when a Carrier cost arrives, the Carrier invoice Logic App with its API Management operation, the Partner portal's draft invoice screen, invoice outcome endpoint and invoices page, and the Carrier invoice outcome Logic App, which tells the Carrier and reports it told or not delivered. Locally the Carrier invoice path runs under Aspire too: the stand-in Partner API takes the invoice and a hosted worker plays the Carrier invoice Logic App, as another plays the outcome Logic App.
 
+
+### Message trail
+
+The Hops of E2, named as the [Integration console](../../operations/integration-console.md#message-trail) shows them, in time order. A Hop is grouped under the Flow it carries in the tracking contract. The same order's whole life, across every application, is drawn in [the order lifecycle](../../architecture/order-lifecycle.md#4-from-a-carrier-cost-to-a-carrier-invoice-outcome).
+
+**1. A Carrier cost.** The TMS publishes `CarrierCostIncurred` when a Carrier Shipment is Delivered, on the trail of the Delivered Tracking event.
+
+```mermaid
+sequenceDiagram
+    box transparent Flow carrier-costs
+        participant sub as shipment-events (topic): subscription carrier-cost
+        participant logic as logic-carrier-cost: carrier-cost
+        participant erp as erp-api: POST /v1/carrier-costs
+    end
+    sub-)logic: A CarrierCostIncurred message is available
+    logic->>logic: Track_the_carrier_cost, Check_the_carrier_cost
+    logic->>erp: Record_the_carrier_cost (the message body as it is, X-Correlation-ID)
+    erp->>erp: Carrier cost Open. Undecided Unknown booking lines of that Carrier with that reference are matched again, in the same save
+    erp-->>logic: 201, 200 (repeat), or 409, 422, 400 with a stable code
+    logic->>sub: Settle_the_message: complete, or dead-letter with the ERP's code
+```
+
+**2. A Carrier invoice.** The Carrier's submission starts a new trail, and API Management creates its correlation ID.
+
+```mermaid
+sequenceDiagram
+    box transparent Flow carrier-invoice
+        participant portal as partner-portal-web: Submit Carrier invoice
+        participant apim as apim-norvia: Submit Carrier invoice
+        participant logic as logic-carrier-invoice: carrier-invoice
+        participant erp as erp-api: POST /v1/carrier-invoices
+        participant pub as erp-api: publish CarrierInvoiceApproved
+    end
+    portal->>apim: POST /partner/v1/carrier-invoices (Persona token and subscription key)
+    apim->>apim: token, role CarrierInvoices.Submit, Carrier ID from azp, correlation ID
+    apim->>logic: Canonical call, X-Carrier-ID and X-Correlation-ID
+    logic->>logic: Refuse any caller but API Management, Track_the_invoice, Map_the_invoice (MapCarrierInvoice)
+    logic->>erp: Receive_at_the_ERP (Canonical Model submission)
+    erp->>erp: Every line matched against the Carrier's Carrier costs, matched Carrier costs Invoiced, one transaction
+    erp-->>logic: 201 or 200 (repeat), each line's result, or a refusal code
+    logic->>logic: Relay_the_ERP_outcome (RelayErpInvoiceAnswer)
+    logic-->>apim: Answer_the_Carrier: RECEIVED or APPROVED with each line's result, or a refusal
+    apim-->>portal: the same answer
+    erp-)pub: outbox, within a second, when every line matched
+```
+
+**3. Finance decides the lines left To decide.** Finance's action starts a new trail.
+
+```mermaid
+sequenceDiagram
+    box transparent Flow carrier-invoice
+        participant ui as erp-web: Accept or reject a line
+        participant pub as erp-api: publish CarrierInvoiceApproved
+    end
+    ui->>ui: AcceptCarrierInvoiceLineCommand or RejectCarrierInvoiceLineCommand: the line decided, its Carrier cost Invoiced if accepted
+    ui->>ui: The last line decided: the invoice Approved, with the outbox message, one transaction
+    ui-)pub: outbox, within a second
+```
+
+**4. The Carrier is told.** The Carrier invoice outcome Logic App reacts to the Approved event on its trail.
+
+```mermaid
+sequenceDiagram
+    box transparent Flow carrier-invoices
+        participant sub as invoicing-events (topic): subscription carrier-invoice-outcome
+        participant logic as logic-carrier-invoice-outcome: carrier-invoice-outcome
+        participant portal as partner-portal-web: POST /carrier/v1/carrier-id/invoice-outcomes
+        participant report as erp-api: POST /v1/carrier-invoices/carrier-id/number/report-told
+    end
+    sub-)logic: A CarrierInvoiceApproved message is available
+    logic->>logic: Track_the_invoice, Map_the_invoice (MapCarrierInvoiceOutcome), Complete_the_message
+    logic->>logic: Get_the_Carrier_endpoint_credential (Key Vault)
+    logic->>portal: Send_to_the_Carrier (the outcome of each line)
+    portal-->>logic: 200 acknowledged
+    logic->>report: Report_the_outcome_to_the_ERP: Report_the_outcome_told
+    report-->>logic: 200 (Report_the_outcome_not_delivered instead when the retries are used up)
+```
+
+### What is built
+
 | Piece | Where | Does |
 |---|---|---|
 | Record a Carrier cost | [src/Erp/Norvia.Erp.Application/CarrierCosts](../../../src/Erp/Norvia.Erp.Application/CarrierCosts/Record/) | `RecordCarrierCostCommand` and its handler: idempotent on the Carrier booking number, `CarrierNotFound` for an unknown Carrier, `CarrierCostConflict` for different content. The domain refuses charge lines that are missing or don't add up to the total. Recording also matches again, in the same save, every undecided Unknown booking line of that Carrier with that reference (`CarrierInvoice.MatchAgain`, over the Carrier's Received invoices, oldest first): the line becomes Matched (and accepted), Price mismatch or Duplicate, and an invoice whose last line this was is Approved with `CarrierInvoiceApproved` in the outbox. Lines Finance decided and references of other Carriers are untouched, and a repeat of a Carrier cost re-matches nothing. It publishes nothing otherwise |
