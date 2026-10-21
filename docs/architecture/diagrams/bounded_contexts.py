@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The bounded-context diagrams: the context map, the TMS hexagon and the TMS lifecycles.
 
-    python3 bounded_contexts.py [name ...]    # writes ../<name>.excalidraw and .png; no names draws them all
+    python3 bounded_contexts.py [name ...]    # writes <name>.excalidraw and .png; no names draws them all
 
 Graph style (see README.md). The PNGs need rsvg-convert.
 """
@@ -11,7 +11,7 @@ from pathlib import Path
 from excalidraw_graph import render_all
 from excalidraw_matrix import PALETTE, PERSON, PLANNED
 
-OUT = Path(__file__).parent.parent
+OUT = Path(__file__).parent
 L = lambda label, key: (label, PALETTE[key][2], PALETTE[key][3], False)
 LEG_PERSON = ("A person", *PERSON, False)
 LEG_PLANNED = ("Planned, not built yet", *PLANNED, True)

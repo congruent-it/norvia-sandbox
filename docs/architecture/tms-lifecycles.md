@@ -6,7 +6,7 @@ A transition that fails its guard returns `false` or a refusal with a stable cod
 
 ## Transport Order
 
-![Transport Order lifecycle: status, rating result and billing state](tms-state-transport-order.png)
+![Transport Order lifecycle: status, rating result and billing state](diagrams/tms-state-transport-order.png)
 
 A Transport Order has three separate dimensions, so "Planned but Rating failed" and "Delivered but not yet Billable" are ordinary states ([TransportOrder](../../src/Tms/Norvia.Tms.Domain/TransportOrders/TransportOrder.cs)).
 
@@ -21,7 +21,7 @@ A Transport Order has three separate dimensions, so "Planned but Rating failed" 
 
 ## Shipment
 
-![Shipment lifecycle: Planned, Released, Booked or Dispatched, Collected, In transit, Delivered, and the flag Awaiting re-delivery](tms-state-shipment.png)
+![Shipment lifecycle: Planned, Released, Booked or Dispatched, Collected, In transit, Delivered, and the flag Awaiting re-delivery](diagrams/tms-state-shipment.png)
 
 One Shipment carries one Transport Order, carried by Own fleet or by a Carrier ([Shipment](../../src/Tms/Norvia.Tms.Domain/Shipments/Shipment.cs)). The two ways of carrying it share one status and split at Released.
 
@@ -42,7 +42,7 @@ The Shipper never sees any of this. Its Tracking status (Received, Scheduled, Co
 
 ## Carrier booking
 
-![Carrier booking lifecycle: Requested, then Confirmed, Rejected, Not delivered or Withdrawn, and Confirmed then Cancelled](tms-state-carrier-booking.png)
+![Carrier booking lifecycle: Requested, then Confirmed, Rejected, Not delivered or Withdrawn, and Confirmed then Cancelled](diagrams/tms-state-carrier-booking.png)
 
 A Shipment can have several Carrier bookings over its life, one after each that ends without being carried out, but only one open at a time ([CarrierBooking](../../src/Tms/Norvia.Tms.Domain/CarrierBookings/CarrierBooking.cs)).
 
@@ -57,7 +57,7 @@ Overdue is derived from how long a booking has been Requested. It is a flag for 
 
 ## Trip
 
-![Trip lifecycle: Draft, Dispatched, In progress, Completed, and the delivery state of each version](tms-state-trip.png)
+![Trip lifecycle: Draft, Dispatched, In progress, Completed, and the delivery state of each version](diagrams/tms-state-trip.png)
 
 A Trip has two lifecycles that move independently: its own status, and the delivery state of each version the Planner sends ([Trip](../../src/Tms/Norvia.Tms.Domain/Trips/Trip.cs)).
 
@@ -75,7 +75,7 @@ A Trip has two lifecycles that move independently: its own status, and the deliv
 
 ## Smaller lifecycles
 
-![Exception, Shipper notification and planning day lifecycles](tms-state-supporting.png)
+![Exception, Shipper notification and planning day lifecycles](diagrams/tms-state-supporting.png)
 
 | Aggregate | Moves | By | Notes |
 |---|---|---|---|

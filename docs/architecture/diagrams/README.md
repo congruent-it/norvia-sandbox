@@ -4,7 +4,7 @@ Norvia's diagrams are Excalidraw files in one look: the same palette, type and s
 
 | Style | For | Example | Library |
 |---|---|---|---|
-| **Matrix** | Process steps against applications | [business-automation-model.excalidraw](../business-automation-model.excalidraw) | [excalidraw_matrix.py](excalidraw_matrix.py) |
+| **Matrix** | Process steps against applications | [business-automation-model.excalidraw](business-automation-model.excalidraw) | [excalidraw_matrix.py](excalidraw_matrix.py) |
 | **Sequence** | One flow across several applications, in time order | [order-lifecycle.md](../order-lifecycle.md) | [excalidraw_sequence.py](excalidraw_sequence.py) |
 | **Graph** | System context, containers and components (the C4 levels), context maps, hexagons and state diagrams | [c4.md](../c4.md), [context-map.md](../context-map.md), [tms-architecture.md](../tms-architecture.md), [tms-lifecycles.md](../tms-lifecycles.md) | [excalidraw_graph.py](excalidraw_graph.py) |
 
@@ -82,24 +82,24 @@ For one flow across several applications, from [order_lifecycle.py](order_lifecy
 ## Regenerating
 
 ```
-python3 docs/architecture/diagrams/<spec>.py /tmp/preview.svg        # writes the .excalidraw next to the spec's page
-rsvg-convert -w 2966 /tmp/preview.svg -o docs/architecture/<name>.png  # the PNG a Markdown page embeds
+python3 docs/architecture/diagrams/<spec>.py /tmp/preview.svg        # writes the .excalidraw next to the spec, in this folder
+rsvg-convert -w 2966 /tmp/preview.svg -o docs/architecture/diagrams/<name>.png  # the PNG a Markdown page embeds
 ```
 
 The PNG is rendered from the generator's SVG, not exported from Excalidraw, so its font differs slightly from the `.excalidraw` file's. Commit both.
 
 ## When you add a diagram
 
-Terms in titles come from [GLOSSARY.md](../../../GLOSSARY.md). Put the new spec in this folder, write the `.excalidraw` next to the other architecture pages, and add a row to [the architecture README](../README.md).
+Terms in titles come from [GLOSSARY.md](../../../GLOSSARY.md). Put the new spec in this folder, write the `.excalidraw` and the `.png` beside it, link both from the page that explains the diagram, and add a row to [the architecture README](../README.md).
 
 ## Graph style
 
 For the C4 diagrams in [c4.md](../c4.md), from [c4.py](c4.py), and for the context map, the TMS hexagon and the state diagrams, from [bounded_contexts.py](bounded_contexts.py), one spec per diagram. It looks like the matrix style (same colours, boxes, type, arrows, legend), but nodes sit on a grid and groups draw boundaries instead of lanes.
 
 ```
-python3 docs/architecture/diagrams/c4.py [name ...]                # writes docs/architecture/c4-<name>.excalidraw and .png; no names draws all
-python3 docs/architecture/diagrams/bounded_contexts.py [name ...]  # writes docs/architecture/<name>.excalidraw and .png
-python3 docs/architecture/diagrams/order_lifecycle.py [name ...]   # writes docs/architecture/order-lifecycle-<name>.excalidraw and .png
+python3 docs/architecture/diagrams/c4.py [name ...]                # writes docs/architecture/diagrams/c4-<name>.excalidraw and .png; no names draws all
+python3 docs/architecture/diagrams/bounded_contexts.py [name ...]  # writes docs/architecture/diagrams/<name>.excalidraw and .png
+python3 docs/architecture/diagrams/order_lifecycle.py [name ...]   # writes docs/architecture/diagrams/order-lifecycle-<name>.excalidraw and .png
 python3 docs/architecture/diagrams/deployment.py [name ...]        # writes the deployment view and the local-versus-Azure map
 ```
 

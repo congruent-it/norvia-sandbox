@@ -2,9 +2,9 @@
 
 How the Simulator is built inside, in the same hexagon as the [TMS](tms-architecture.md). For engineers and coding agents working on the Simulator and for a demo's technical audience. It is a caller of the estate and owns only its own runs and logs ([context map](context-map.md)). Terms are defined in [GLOSSARY.md](../../GLOSSARY.md).
 
-![The Simulator as a hexagon: the UI and the run executor, the Application with its use cases and ports, the Domain, and the clients in Infrastructure](simulator-hexagon.png)
+![The Simulator as a hexagon: the UI and the run executor, the Application with its use cases and ports, the Domain, and the clients in Infrastructure](diagrams/simulator-hexagon.png)
 
-The editable source is [simulator-hexagon.excalidraw](simulator-hexagon.excalidraw), generated from [bounded_contexts.py](diagrams/bounded_contexts.py). Operating it is in [operations/simulator.md](../operations/simulator.md).
+The editable source is [simulator-hexagon.excalidraw](diagrams/simulator-hexagon.excalidraw), generated from [bounded_contexts.py](diagrams/bounded_contexts.py). Operating it is in [operations/simulator.md](../operations/simulator.md).
 
 ## What differs from the TMS
 
@@ -39,7 +39,7 @@ The editable source is [simulator-hexagon.excalidraw](simulator-hexagon.excalidr
 
 ## A Simulation run
 
-![Simulation run lifecycle: Running, then Completed, Cancelled or Failed](simulator-state-run.png)
+![Simulation run lifecycle: Running, then Completed, Cancelled or Failed](diagrams/simulator-state-run.png)
 
 | Move | By | Guard |
 |---|---|---|

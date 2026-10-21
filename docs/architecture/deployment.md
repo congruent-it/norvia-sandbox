@@ -2,9 +2,9 @@
 
 What is deployed to Azure, what owns each piece, and in what order it goes up. For engineers and coding agents working on the estate and for the technical audience of a demo. [c4.md](c4.md) shows what the pieces do and how they talk, and [local-vs-azure.md](local-vs-azure.md) what plays each one on a developer's machine. Terms are defined in [GLOSSARY.md](../../GLOSSARY.md).
 
-![Deployment view: one resource group holding the Container Apps environment and data owned by the Aspire AppHost, and the integration layer owned by the estate Bicep](deployment.png)
+![Deployment view: one resource group holding the Container Apps environment and data owned by the Aspire AppHost, and the integration layer owned by the estate Bicep](diagrams/deployment.png)
 
-The editable source is [deployment.excalidraw](deployment.excalidraw), generated from [deployment.py](diagrams/deployment.py) in the [graph style](diagrams/README.md#graph-style).
+The editable source is [deployment.excalidraw](diagrams/deployment.excalidraw), generated from [deployment.py](diagrams/deployment.py) in the [graph style](diagrams/README.md#graph-style).
 
 ## Two owners, one resource group
 

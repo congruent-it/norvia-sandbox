@@ -12,9 +12,9 @@ The order is a Transport-only booking carried by a Carrier. An Own fleet order d
 
 ## 1. From a booking to a Booked Shipment
 
-![Sequence: the Shipper's booking, rating, planning and release, and the Carrier's booking request and answer](order-lifecycle-booked.png)
+![Sequence: the Shipper's booking, rating, planning and release, and the Carrier's booking request and answer](diagrams/order-lifecycle-booked.png)
 
-[P1](../processes/tms/p1-transport-order-intake.md) to [P4](../processes/tms/p4-carrier-booking.md). The editable source is [order-lifecycle-booked.excalidraw](order-lifecycle-booked.excalidraw).
+[P1](../processes/tms/p1-transport-order-intake.md) to [P4](../processes/tms/p4-carrier-booking.md). The editable source is [order-lifecycle-booked.excalidraw](diagrams/order-lifecycle-booked.excalidraw).
 
 - The Shipper is answered in the same call. The intake Logic App waits for the TMS and retries it, so the Shipper hears *not received* only once the retries are spent ([ADR 0021](../adr/0021-api-management-runs-on-the-developer-tier.md)).
 - A rating failure never rejects an order. It stays Accepted and the pricing gap goes to Customer service ([P2](../processes/tms/p2-rating.md)).
@@ -23,9 +23,9 @@ The order is a Transport-only booking carried by a Carrier. An Own fleet order d
 
 ## 2. From Booked to Delivered, and what everyone sees
 
-![Sequence: tracking and Proof of delivery through the queues, the Shipper reading its order, and an Exception](order-lifecycle-delivered.png)
+![Sequence: tracking and Proof of delivery through the queues, the Shipper reading its order, and an Exception](diagrams/order-lifecycle-delivered.png)
 
-[P5](../processes/tms/p5-shipment-tracking.md) to [P8](../processes/tms/p8-shipper-visibility.md). The editable source is [order-lifecycle-delivered.excalidraw](order-lifecycle-delivered.excalidraw).
+[P5](../processes/tms/p5-shipment-tracking.md) to [P8](../processes/tms/p8-shipper-visibility.md). The editable source is [order-lifecycle-delivered.excalidraw](diagrams/order-lifecycle-delivered.excalidraw).
 
 - Tracking and Proofs of delivery are accepted asynchronously: the Carrier gets `202` once the message is stored, and the Logic App records it later ([ADR 0008](../adr/0008-carrier-tracking-events-are-accepted-asynchronously.md)). A Proof of delivery travels as a claim check, the file in a blob and its reference on a queue ([ADR 0009](../adr/0009-carrier-proofs-of-delivery-use-a-claim-check.md)).
 - A Shipment's status only moves forward, and the Shipper sees a simpler Tracking status than Norvia's own ([ADR 0011](../adr/0011-shippers-see-a-tracking-status-not-the-shipments-workings.md)).
@@ -34,9 +34,9 @@ The order is a Transport-only booking carried by a Carrier. An Own fleet order d
 
 ## 3. From delivered to a Shipper invoice
 
-![Sequence: the order becomes Billable, the ERP records the Billable line and issues a Shipper invoice, and the Shipper's Persona receives it](order-lifecycle-invoice.png)
+![Sequence: the order becomes Billable, the ERP records the Billable line and issues a Shipper invoice, and the Shipper's Persona receives it](diagrams/order-lifecycle-invoice.png)
 
-[P9](../processes/tms/p9-freight-settlement.md) and [E1](../processes/erp/e1-invoicing.md). The editable source is [order-lifecycle-invoice.excalidraw](order-lifecycle-invoice.excalidraw).
+[P9](../processes/tms/p9-freight-settlement.md) and [E1](../processes/erp/e1-invoicing.md). The editable source is [order-lifecycle-invoice.excalidraw](diagrams/order-lifecycle-invoice.excalidraw).
 
 - "No Proof of delivery, no invoice": the order is Billable only when it is Delivered, Rated, has a current Proof of delivery and no open Exception, or Customer service releases it without a Proof. Once Billable it stays Billable ([ADR 0012](../adr/0012-the-tms-decides-when-to-bill-the-erp-invoices.md)).
 - The Freight Charge is frozen in the TMS, and the ERP never recalculates it.
@@ -44,9 +44,9 @@ The order is a Transport-only booking carried by a Carrier. An Own fleet order d
 
 ## 4. From a Carrier cost to a Carrier invoice outcome
 
-![Sequence: the Carrier cost handed to the ERP, the Carrier's invoice matched against it, Finance deciding the lines that do not match, and the Carrier told the outcome](order-lifecycle-carrier-invoice.png)
+![Sequence: the Carrier cost handed to the ERP, the Carrier's invoice matched against it, Finance deciding the lines that do not match, and the Carrier told the outcome](diagrams/order-lifecycle-carrier-invoice.png)
 
-[P9](../processes/tms/p9-freight-settlement.md) and [E2](../processes/erp/e2-carrier-invoice-matching.md). The editable source is [order-lifecycle-carrier-invoice.excalidraw](order-lifecycle-carrier-invoice.excalidraw).
+[P9](../processes/tms/p9-freight-settlement.md) and [E2](../processes/erp/e2-carrier-invoice-matching.md). The editable source is [order-lifecycle-carrier-invoice.excalidraw](diagrams/order-lifecycle-carrier-invoice.excalidraw).
 
 - The TMS prices the Carrier booking at release and freezes the cost. It hands the cost to the ERP when the Carrier Shipment is Delivered ([ADR 0013](../adr/0013-the-tms-rates-carrier-bookings-the-erp-owns-carrier-rate-cards.md)).
 - Matching is automatic and exact by default: a line must equal its Carrier cost to the cent. Anything else waits for Finance, which is one of the few manual steps in the whole life of an order.

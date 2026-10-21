@@ -2,9 +2,9 @@
 
 Which application performs each step of Norvia's business processes, and who or what does it: a person, the application itself, or an integration flow. It is a map of the whole estate on one page. Terms are defined in [GLOSSARY.md](../../GLOSSARY.md), and each process is documented in full in [the TMS](../processes/tms/README.md) and [ERP](../processes/erp/README.md) process catalogues.
 
-![Business automation model: process steps as columns, applications as rows](business-automation-model.png)
+![Business automation model: process steps as columns, applications as rows](diagrams/business-automation-model.png)
 
-The editable source is [business-automation-model.excalidraw](business-automation-model.excalidraw), generated from [a spec](diagrams/business-automation-model.py) in the [Excalidraw matrix style](diagrams/README.md). The PNG is rendered from the same spec.
+The editable source is [business-automation-model.excalidraw](diagrams/business-automation-model.excalidraw), generated from [a spec](diagrams/business-automation-model.py) in the [Excalidraw matrix style](diagrams/README.md). The PNG is rendered from the same spec.
 
 ## How to read it
 

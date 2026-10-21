@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The deployment view and the local-versus-Azure map.
 
-    python3 deployment.py [name ...]    # writes ../<name>.excalidraw and .png; no names draws all
+    python3 deployment.py [name ...]    # writes <name>.excalidraw and .png; no names draws all
 
 Graph style (see README.md). The PNGs need rsvg-convert.
 """
@@ -11,7 +11,7 @@ from pathlib import Path
 from excalidraw_graph import render_all
 from excalidraw_matrix import PALETTE, PERSON
 
-OUT = Path(__file__).parent.parent
+OUT = Path(__file__).parent
 L = lambda label, key: (label, PALETTE[key][2], PALETTE[key][3], False)
 SPECS = {}
 

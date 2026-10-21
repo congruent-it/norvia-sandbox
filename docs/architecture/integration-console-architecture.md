@@ -2,9 +2,9 @@
 
 How the Integration console is built inside. For engineers and coding agents working on the console. It owns nothing, so it is the one application without a Domain or a database ([context map](context-map.md)). Terms are defined in [GLOSSARY.md](../../GLOSSARY.md). What it offers its operators is in [operations/integration-console.md](../operations/integration-console.md).
 
-![The Integration console as a hexagon: the UI, the Application with its use cases and ports, and the adapters in Infrastructure, with no Domain](integration-console-hexagon.png)
+![The Integration console as a hexagon: the UI, the Application with its use cases and ports, and the adapters in Infrastructure, with no Domain](diagrams/integration-console-hexagon.png)
 
-The editable source is [integration-console-hexagon.excalidraw](integration-console-hexagon.excalidraw), generated from [bounded_contexts.py](diagrams/bounded_contexts.py).
+The editable source is [integration-console-hexagon.excalidraw](diagrams/integration-console-hexagon.excalidraw), generated from [bounded_contexts.py](diagrams/bounded_contexts.py).
 
 ## What differs from the other applications
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The C4 diagrams of ../c4.md, in the Excalidraw graph style.
 
-    python3 c4.py [name ...]    # writes ../c4-<name>.excalidraw and .png; no names draws them all
+    python3 c4.py [name ...]    # writes c4-<name>.excalidraw and .png; no names draws them all
 
 Needs rsvg-convert for the PNGs (the SVG preview is rendered by the generator, not by Excalidraw).
 """
@@ -11,7 +11,7 @@ from pathlib import Path
 from excalidraw_graph import render_all
 from excalidraw_matrix import PALETTE, PERSON, PLANNED
 
-OUT = Path(__file__).parent.parent
+OUT = Path(__file__).parent
 L = lambda label, key: (label, PALETTE[key][2], PALETTE[key][3], False)
 LEG_PERSON = ("A person", *PERSON, False)
 LEG_PLANNED = ("Planned, not built yet", *PLANNED, True)

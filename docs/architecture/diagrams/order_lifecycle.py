@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The life of an order across the estate, as four sequence diagrams.
 
-    python3 order_lifecycle.py [name ...]    # writes ../order-lifecycle-<name>.excalidraw and .png; no names draws all
+    python3 order_lifecycle.py [name ...]    # writes order-lifecycle-<name>.excalidraw and .png; no names draws all
 
 Sequence style (see README.md). The PNGs need rsvg-convert.
 """
@@ -11,7 +11,7 @@ from pathlib import Path
 from excalidraw_matrix import PALETTE, PERSON
 from excalidraw_sequence import render_all
 
-OUT = Path(__file__).parent.parent
+OUT = Path(__file__).parent
 L = lambda label, key: (label, PALETTE[key][2], PALETTE[key][3], False)
 LEGEND = [L("Outside Norvia", "gray"), L("Integration layer", "violet"), L("TMS", "blue"), L("ERP", "green"), ("A person", *PERSON, False)]
 LEGEND_ARROWS = "Solid arrows are calls, dashed arrows are replies and events. Every call between applications goes through the integration layer."

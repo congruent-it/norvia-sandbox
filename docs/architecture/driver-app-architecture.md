@@ -2,9 +2,9 @@
 
 How the Driver app is built inside, in the same hexagon as the [TMS](tms-architecture.md). For engineers and coding agents working on the Driver app. It reports and the TMS decides ([context map](context-map.md)). Terms are defined in [GLOSSARY.md](../../GLOSSARY.md).
 
-![The Driver app as a hexagon: the Driver app API and UI and the outbox worker, the Application with its use cases and ports, the Domain, and the adapters in Infrastructure](driver-app-hexagon.png)
+![The Driver app as a hexagon: the Driver app API and UI and the outbox worker, the Application with its use cases and ports, the Domain, and the adapters in Infrastructure](diagrams/driver-app-hexagon.png)
 
-The editable source is [driver-app-hexagon.excalidraw](driver-app-hexagon.excalidraw), generated from [bounded_contexts.py](diagrams/bounded_contexts.py).
+The editable source is [driver-app-hexagon.excalidraw](diagrams/driver-app-hexagon.excalidraw), generated from [bounded_contexts.py](diagrams/bounded_contexts.py).
 
 ## What differs from the TMS
 
@@ -40,7 +40,7 @@ Pipeline behaviours add the tracking-contract keys to the logging scope for the 
 
 ## Reports
 
-![Driver report lifecycle and the Trip progress derived from the reports](driver-app-state-report.png)
+![Driver report lifecycle and the Trip progress derived from the reports](diagrams/driver-app-state-report.png)
 
 | Move | By | Guard |
 |---|---|---|

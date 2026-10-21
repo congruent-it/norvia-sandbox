@@ -2,9 +2,9 @@
 
 How the TMS is built inside: the Domain at the centre, the Application around it with the ports it needs, and the adapters at the edge. For engineers and coding agents working on the TMS. The other applications follow the same rule with fewer parts; the [context map](context-map.md) says which. Terms are defined in [GLOSSARY.md](../../GLOSSARY.md).
 
-![The TMS as a hexagon: driving adapters, the Application with its use cases and ports, the Domain, and the driven adapters in Infrastructure](tms-hexagon.png)
+![The TMS as a hexagon: driving adapters, the Application with its use cases and ports, the Domain, and the driven adapters in Infrastructure](diagrams/tms-hexagon.png)
 
-The editable source is [tms-hexagon.excalidraw](tms-hexagon.excalidraw), generated from [bounded_contexts.py](diagrams/bounded_contexts.py). The layers are drawn as nested boundaries, not as a literal hexagon, so each can hold its parts.
+The editable source is [tms-hexagon.excalidraw](diagrams/tms-hexagon.excalidraw), generated from [bounded_contexts.py](diagrams/bounded_contexts.py). The layers are drawn as nested boundaries, not as a literal hexagon, so each can hold its parts.
 
 ## Reading the picture
 

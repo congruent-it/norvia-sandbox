@@ -4,7 +4,7 @@ How the ERP's aggregates move through their states, with the domain method behin
 
 ## Billable lines, invoices and Carrier costs
 
-![Billable line, Shipper invoice and Credit note, and Carrier cost lifecycles](erp-state-invoicing.png)
+![Billable line, Shipper invoice and Credit note, and Carrier cost lifecycles](diagrams/erp-state-invoicing.png)
 
 | Aggregate | Moves | By | Guard |
 |---|---|---|---|
@@ -19,7 +19,7 @@ How the ERP's aggregates move through their states, with the domain method behin
 
 ## Carrier invoices
 
-![Carrier invoice and Carrier invoice line lifecycles](erp-state-carrier-invoice.png)
+![Carrier invoice and Carrier invoice line lifecycles](diagrams/erp-state-carrier-invoice.png)
 
 | Aggregate | Moves | By | Guard |
 |---|---|---|---|

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The business automation model: which application performs each TMS and ERP process step.
 
-    python3 business-automation-model.py            # writes ../business-automation-model.excalidraw
+    python3 business-automation-model.py            # writes business-automation-model.excalidraw
     python3 business-automation-model.py preview.svg  # also writes an SVG to check the layout
 """
 import sys
@@ -119,4 +119,4 @@ SPEC = dict(
 )
 
 if __name__ == "__main__":
-    render(SPEC, Path(__file__).parent.parent / "business-automation-model.excalidraw", sys.argv[1] if len(sys.argv) > 1 else None)
+    render(SPEC, Path(__file__).parent / "business-automation-model.excalidraw", sys.argv[1] if len(sys.argv) > 1 else None)

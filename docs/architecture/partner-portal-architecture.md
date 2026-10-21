@@ -2,9 +2,9 @@
 
 How the Partner portal is built inside, in the same hexagon as the [TMS](tms-architecture.md). For engineers and coding agents working on the portal and for a demo's technical audience. It plays every Shipper and Carrier as a Persona and sits outside Norvia ([context map](context-map.md)). Terms are defined in [GLOSSARY.md](../../GLOSSARY.md).
 
-![The Partner portal as a hexagon: the Persona endpoints, the UI and the hosted workers, the Application with its use cases and ports, the Domain, and the adapters in Infrastructure](partner-portal-hexagon.png)
+![The Partner portal as a hexagon: the Persona endpoints, the UI and the hosted workers, the Application with its use cases and ports, the Domain, and the adapters in Infrastructure](diagrams/partner-portal-hexagon.png)
 
-The editable source is [partner-portal-hexagon.excalidraw](partner-portal-hexagon.excalidraw), generated from [bounded_contexts.py](diagrams/bounded_contexts.py).
+The editable source is [partner-portal-hexagon.excalidraw](diagrams/partner-portal-hexagon.excalidraw), generated from [bounded_contexts.py](diagrams/bounded_contexts.py).
 
 ## What differs from the TMS
 
@@ -41,7 +41,7 @@ The editable source is [partner-portal-hexagon.excalidraw](partner-portal-hexago
 
 ## A Carrier's booking request
 
-![Carrier booking request lifecycle, as the Carrier Persona keeps it](partner-portal-state-carrier-booking-request.png)
+![Carrier booking request lifecycle, as the Carrier Persona keeps it](diagrams/partner-portal-state-carrier-booking-request.png)
 
 The portal keeps a Carrier's own record of each request, one step behind Norvia's [Carrier booking](tms-lifecycles.md#carrier-booking).
 
