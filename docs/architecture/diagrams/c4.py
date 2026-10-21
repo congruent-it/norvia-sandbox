@@ -281,5 +281,55 @@ SPECS["l3-subscription-flows"] = dict(
 )
 
 
+# ---------------------------------------------------------------- L3 event topology
+SPECS["l3-event-topology"] = dict(
+    title="C4 L3 · Event topology",
+    subtitle="Who publishes to which topic, which subscription filters what, and which Logic App reads each subscription. "
+             "Every topic also has a monitoring subscription that takes every message.",
+    footnote="Source of truth: infra/estate/messaging.bicep and the AppHost, and docs/architecture/events.md for the events each filter lets through. "
+             "Every filter also passes a message resubmitted from the Integration console to the subscription it was dead-lettered from. "
+             "The Carrier-tracking and Carrier Proof of delivery Logic Apps read queues, not topics.",
+    legend=[L("TMS", "blue"), L("ERP", "green"), L("Driver app", "teal"), L("Integration layer", V)],
+    cell=(400, 100),
+    nodes=[
+        dict(id="tms", col=0, row=2.5, palette="blue", title="TMS", sub="[transactional outbox]"),
+        dict(id="erp", col=0, row=6.5, palette="green", title="ERP", sub="[transactional outbox]"),
+        dict(id="driver", col=0, row=8.0, palette="teal", title="Driver app", sub="[transactional outbox]"),
+        dict(id="tTo", col=1, row=0.0, palette=V, title="transport-order-events", sub="[topic]"),
+        dict(id="tSh", col=1, row=2.5, palette=V, title="shipment-events", sub="[topic]"),
+        dict(id="tTrip", col=1, row=5.0, palette=V, title="trip-events", sub="[topic]"),
+        dict(id="tInv", col=1, row=6.5, palette=V, title="invoicing-events", sub="[topic]"),
+        dict(id="tDrv", col=1, row=8.0, palette=V, title="driver-app-events", sub="[topic]"),
+        dict(id="sBilling", col=2, row=0.0, palette=V, title="billing", sub="[subscription]\nTransportOrderBillable"),
+        dict(id="sBooking", col=2, row=1.0, palette=V, title="carrier-booking", sub="[subscription]\nCarrier Shipments (assignedTo = Carrier)"),
+        dict(id="sCancel", col=2, row=2.0, palette=V, title="carrier-cancellation", sub="[subscription]\nCarrierBookingCancelled, CarrierBookingWithdrawn"),
+        dict(id="sNotify", col=2, row=3.0, palette=V, title="shipper-notification", sub="[subscription]\nShipperNotificationRequested"),
+        dict(id="sCost", col=2, row=4.0, palette=V, title="carrier-cost", sub="[subscription]\nCarrierCostIncurred"),
+        dict(id="sTrip", col=2, row=5.0, palette=V, title="trip-dispatch", sub="[subscription]\nTripDispatched"),
+        dict(id="sInvoice", col=2, row=6.0, palette=V, title="shipper-invoice", sub="[subscription]\nShipperInvoiceIssued, CreditNoteIssued"),
+        dict(id="sOutcome", col=2, row=7.0, palette=V, title="carrier-invoice-outcome", sub="[subscription]\nCarrierInvoiceApproved"),
+        dict(id="sReports", col=2, row=8.0, palette=V, title="driver-reports", sub="[subscription, sessions]\nthe four Driver reports, keyed by Trip number"),
+        dict(id="lBilling", col=3, row=0.0, palette=V, title="Billing", sub="[Logic App] E1"),
+        dict(id="lBooking", col=3, row=1.0, palette=V, title="Carrier booking", sub="[Logic App] P4"),
+        dict(id="lCancel", col=3, row=2.0, palette=V, title="Carrier cancellation", sub="[Logic App] P7"),
+        dict(id="lNotify", col=3, row=3.0, palette=V, title="Shipper notification", sub="[Logic App] P7"),
+        dict(id="lCost", col=3, row=4.0, palette=V, title="Carrier cost", sub="[Logic App] P9"),
+        dict(id="lTrip", col=3, row=5.0, palette=V, title="Trip dispatch", sub="[Logic App] P11"),
+        dict(id="lInvoice", col=3, row=6.0, palette=V, title="Shipper invoice", sub="[Logic App] E1"),
+        dict(id="lOutcome", col=3, row=7.0, palette=V, title="Carrier invoice outcome", sub="[Logic App] E2"),
+        dict(id="lReports", col=3, row=8.0, palette=V, title="Driver reports", sub="[Logic App] P12"),
+    ],
+    groups=[dict(id="bus", title="Service Bus", palette=V, members=["tTo", "tSh", "tTrip", "tInv", "tDrv", "sBilling", "sBooking", "sCancel", "sNotify", "sCost", "sTrip", "sInvoice", "sOutcome", "sReports"])],
+    edges=[
+        ("tms", "tTo", "publishes"), ("tms", "tSh", "publishes", dict(orient="h")), ("tms", "tTrip", "publishes"),
+        ("erp", "tInv", "publishes"), ("driver", "tDrv", "publishes"),
+        ("tTo", "sBilling"), ("tSh", "sBooking"), ("tSh", "sCancel"), ("tSh", "sNotify"), ("tSh", "sCost"), ("tTrip", "sTrip"),
+        ("tInv", "sInvoice"), ("tInv", "sOutcome"), ("tDrv", "sReports"),
+        ("sBilling", "lBilling"), ("sBooking", "lBooking"), ("sCancel", "lCancel"), ("sNotify", "lNotify"), ("sCost", "lCost"),
+        ("sTrip", "lTrip"), ("sInvoice", "lInvoice"), ("sOutcome", "lOutcome"), ("sReports", "lReports"),
+    ],
+)
+
+
 if __name__ == "__main__":
     render_all(SPECS, OUT, "c4-", sys.argv[1:])

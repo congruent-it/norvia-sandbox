@@ -6,6 +6,12 @@ An event's body is its [Canonical Model](../../contracts/canonical-model/README.
 
 Subscriptions and subscribers marked *planned* are designed in a process doc but not built yet. The `monitoring` subscription of each topic takes every message.
 
+## Topology
+
+![C4 level 3: the event topology, from publisher to topic, subscription and Logic App](diagrams/c4-l3-event-topology.png)
+
+*Editable source: [c4-l3-event-topology.excalidraw](diagrams/c4-l3-event-topology.excalidraw), generated from [c4.py](diagrams/c4.py). The picture is drawn by hand-kept spec, not read from the Bicep, so a new subscription needs a node there as well as a row below.*
+
 ## Catalogue
 
 One section per topic, with the events published to it. Each row names the subscriptions that receive the event, who reads each, and the process that owns it.
