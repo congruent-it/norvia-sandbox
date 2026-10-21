@@ -10,6 +10,7 @@ namespace Norvia.IntegrationConsole.Application.Audit;
 /// <param name="CorrelationId">The message's correlation ID, which puts the event on its Message trail.</param>
 /// <param name="BusinessKeys">The tracking contract's keys the message carried.</param>
 /// <param name="At">When.</param>
+/// <param name="Reason">Why, for a discard, which needs one. Null for a resubmit.</param>
 public sealed record AuditEvent(
     string Actor,
     string Action,
@@ -17,4 +18,5 @@ public sealed record AuditEvent(
     string MessageId,
     string? CorrelationId,
     IReadOnlyList<BusinessKey> BusinessKeys,
-    DateTimeOffset At);
+    DateTimeOffset At,
+    string? Reason = null);

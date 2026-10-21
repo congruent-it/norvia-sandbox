@@ -5,6 +5,7 @@
 @using Ardalis.Result
 @using Microsoft.AspNetCore.Components.Authorization
 @using Norvia.IntegrationConsole.Application.DeadLetters
+@using Norvia.IntegrationConsole.Application.DeadLetters.Discard
 @using Norvia.IntegrationConsole.Application.DeadLetters.Messages
 @using Norvia.IntegrationConsole.Application.DeadLetters.Resubmit
 @using Norvia.IntegrationConsole.Web.Operators
@@ -157,7 +158,26 @@ else if (_list is { } found)
                 @* Only for the Resubmit role. The use case refuses everyone else too. There is no way to edit the body first. *@
                 <AuthorizeView Policy="@OperatorSignIn.ResubmitPolicy">
                     <div class="mt-6">
-                        @if (_confirming)
+                        @if (_discarding)
+                        {
+                            <div role="alertdialog" aria-label="Confirm discard">
+                                <p class="mb-2">
+                                    Discard message @sequenceNumber of <span class="font-mono">@Entity</span>? It leaves the dead-letter queue for good and
+                                    nothing is sent. Your name and the reason are recorded.
+                                </p>
+                                <FluentTextArea Label="Reason for discarding" aria-label="Reason for discarding" @bind-Value="_reason" Immediate="true" Rows="3"
+                                                Disabled="_busy" Style="width: 100%;" />
+                                @if (_reasonMissing)
+                                {
+                                    <p role="alert" data-reason-missing class="mt-1 text-sm">Give a reason for discarding the message.</p>
+                                }
+                                <FluentStack class="mt-2">
+                                    <FluentButton Appearance="Appearance.Accent" Disabled="_busy" OnClick="() => DiscardAsync(sequenceNumber)">Confirm discard</FluentButton>
+                                    <FluentButton Disabled="_busy" OnClick="CancelDiscard">Cancel</FluentButton>
+                                </FluentStack>
+                            </div>
+                        }
+                        else if (_confirming)
                         {
                             <div role="alertdialog" aria-label="Confirm resubmit">
                                 <p class="mb-2">
@@ -165,14 +185,17 @@ else if (_list is { } found)
                                     the same body and properties, and this message leaves the dead-letter queue. Your name is recorded.
                                 </p>
                                 <FluentStack>
-                                    <FluentButton Appearance="Appearance.Accent" Disabled="_resubmitting" OnClick="() => ResubmitAsync(sequenceNumber)">Confirm resubmit</FluentButton>
-                                    <FluentButton Disabled="_resubmitting" OnClick="() => _confirming = false">Cancel</FluentButton>
+                                    <FluentButton Appearance="Appearance.Accent" Disabled="_busy" OnClick="() => ResubmitAsync(sequenceNumber)">Confirm resubmit</FluentButton>
+                                    <FluentButton Disabled="_busy" OnClick="() => _confirming = false">Cancel</FluentButton>
                                 </FluentStack>
                             </div>
                         }
                         else
                         {
-                            <FluentButton Appearance="Appearance.Accent" data-resubmit OnClick="() => _confirming = true">Resubmit</FluentButton>
+                            <FluentStack>
+                                <FluentButton Appearance="Appearance.Accent" data-resubmit OnClick="() => _confirming = true">Resubmit</FluentButton>
+                                <FluentButton data-discard OnClick="StartDiscard">Discard</FluentButton>
+                            </FluentStack>
                         }
                     </div>
                 </AuthorizeView>
@@ -194,7 +217,10 @@ else if (_list is { } found)
     private IReadOnlyList<string>? _openProblems;
     private RecordedDeadLetterBody? _message;
     private bool _confirming;
-    private bool _resubmitting;
+    private bool _discarding;
+    private string _reason = string.Empty;
+    private bool _reasonMissing;
+    private bool _busy;
     private Outcome? _outcome;
     // Cancel peeking when the operator leaves the page, opens another queue or another message.
     private CancellationTokenSource _peek = new();
@@ -291,7 +317,7 @@ else if (_list is { } found)
 
     private async Task ResubmitAsync(long sequenceNumber)
     {
-        _resubmitting = true;
+        _busy = true;
         try
         {
             var caller = (await Authentication.GetAuthenticationStateAsync()).User;
@@ -324,7 +350,63 @@ else if (_list is { } found)
         }
         finally
         {
-            _resubmitting = false;
+            _busy = false;
+        }
+    }
+
+    private void StartDiscard()
+    {
+        _discarding = true;
+        _reason = string.Empty;
+        _reasonMissing = false;
+    }
+
+    private void CancelDiscard() => _discarding = false;
+
+    private async Task DiscardAsync(long sequenceNumber)
+    {
+        // The form refuses a missing reason before anything is sent; the use case refuses it too.
+        if (string.IsNullOrWhiteSpace(_reason))
+        {
+            _reasonMissing = true;
+            return;
+        }
+
+        _reasonMissing = false;
+        _busy = true;
+        try
+        {
+            var caller = (await Authentication.GetAuthenticationStateAsync()).User;
+            var result = await DeadLetters.DiscardAsync(new DiscardDeadLetteredMessageCommand(caller, Entity, sequenceNumber, _reason), CancellationToken.None);
+            switch (result.Status)
+            {
+                case ResultStatus.Ok:
+                    _outcome = new Outcome(MessageIntent.Success, $"Discarded message {sequenceNumber} of {Entity}. It is off the dead-letter queue.");
+                    Remove(sequenceNumber);
+                    break;
+                case ResultStatus.NotFound:
+                    _outcome = new Outcome(MessageIntent.Info, $"Message {sequenceNumber} is no longer on the queue: it was resubmitted or discarded.");
+                    Remove(sequenceNumber);
+                    break;
+                case ResultStatus.Forbidden:
+                    _outcome = new Outcome(MessageIntent.Warning, "You aren't allowed to discard messages. Nothing was discarded.");
+                    _discarding = false;
+                    break;
+                default:
+                    _outcome = new Outcome(MessageIntent.Warning, string.Join(" ", result.ValidationErrors.Select(error => error.ErrorMessage)));
+                    _discarding = false;
+                    break;
+            }
+        }
+        catch (Exception exception)
+        {
+            DeadLetterPageLog.DiscardFailed(Logger, exception, sequenceNumber, Entity);
+            _outcome = new Outcome(MessageIntent.Error, $"Message {sequenceNumber} couldn't be discarded. It is still on the dead-letter queue; try again in a moment.");
+            _discarding = false;
+        }
+        finally
+        {
+            _busy = false;
         }
     }
 
@@ -339,6 +421,7 @@ else if (_list is { } found)
         _opened = null;
         _message = null;
         _confirming = false;
+        _discarding = false;
     }
 
     private sealed record Outcome(MessageIntent Intent, string Text);
@@ -355,6 +438,7 @@ else if (_list is { } found)
         _openProblems = null;
         _message = null;
         _confirming = false;
+        _discarding = false;
     }
 
     public void Dispose()

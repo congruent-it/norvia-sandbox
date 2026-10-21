@@ -399,6 +399,105 @@ public sealed class ServiceBusDeadLetterQueuesTests
         _sent.Single().ApplicationProperties.Should().NotContainKey("resubmitTo");
     }
 
+    [Fact]
+    public async Task DiscardAsync_ForAMessage_CompletesItOnTheDeadLetterQueue_SendsNothing_AndReportsIt()
+    {
+        Found(new ServiceBusEntity("sb", "carrier-tracking", null, 1));
+        Sender();
+        var original = Message(Enqueued, sequenceNumber: 3, messageId: "original-1", correlationId: "corr-1",
+            properties: new Dictionary<string, object> { ["shipmentNumber"] = "SH-0042" });
+        var receiver = Receives(original);
+
+        var discarded = await Queues().DiscardAsync("carrier-tracking", 3, TestContext.Current.CancellationToken);
+
+        discarded.Should().NotBeNull();
+        discarded!.Entity.Should().Be("carrier-tracking");
+        discarded.MessageId.Should().Be("original-1");
+        discarded.CorrelationId.Should().Be("corr-1");
+        discarded.BusinessKeys.Should().Equal(new BusinessKey(BusinessKeyKind.ShipmentNumber, "SH-0042"));
+        await receiver.Received(1).CompleteMessageAsync(original, Arg.Any<CancellationToken>());
+        _sent.Should().BeEmpty();
+        await _client.Received(1).DisposeAsync();
+    }
+
+    [Fact]
+    public async Task DiscardAsync_ForASubscriptionMessage_CompletesItOnThatSubscriptionsDeadLetterQueue()
+    {
+        Found(new ServiceBusEntity("sb", "driver-app-events", "driver-reports", 1));
+        var original = Message(Enqueued, sequenceNumber: 3, messageId: "original-1");
+        var receiver = Receives(original);
+
+        var discarded = await Queues().DiscardAsync("driver-app-events/driver-reports", 3, TestContext.Current.CancellationToken);
+
+        discarded!.Entity.Should().Be("driver-app-events/driver-reports");
+        await receiver.Received(1).CompleteMessageAsync(original, Arg.Any<CancellationToken>());
+        _client.Received(1).CreateReceiver("driver-app-events", "driver-reports", Arg.Any<ServiceBusReceiverOptions>());
+    }
+
+    [Fact]
+    public async Task DiscardAsync_WhenTheCompletionFails_LeavesTheMessageOnTheDeadLetterQueue_AndFails()
+    {
+        Found(new ServiceBusEntity("sb", "carrier-tracking", null, 1));
+        var original = Message(Enqueued, sequenceNumber: 3);
+        var receiver = Receives(original);
+        receiver.CompleteMessageAsync(original, Arg.Any<CancellationToken>())
+            .Returns(_ => throw new ServiceBusException("Lock lost", ServiceBusFailureReason.MessageLockLost));
+
+        var discard = async () => await Queues().DiscardAsync("carrier-tracking", 3, TestContext.Current.CancellationToken);
+
+        await discard.Should().ThrowAsync<ServiceBusException>();
+        await receiver.Received(1).AbandonMessageAsync(original, Arg.Any<IDictionary<string, object>>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task DiscardAsync_WhenEarlierMessagesComeFirst_LetsGoOfThem_AndDiscardsOnlyTheOneWanted()
+    {
+        Found(new ServiceBusEntity("sb", "carrier-tracking", null, 3));
+        var earlier = Message(Enqueued, sequenceNumber: 1, messageId: "earlier");
+        var wanted = Message(Enqueued, sequenceNumber: 2, messageId: "wanted");
+        var receiver = Receives(wanted, batches: [[earlier, wanted]]);
+
+        var discarded = await Queues().DiscardAsync("carrier-tracking", 2, TestContext.Current.CancellationToken);
+
+        discarded!.MessageId.Should().Be("wanted");
+        await receiver.Received(1).CompleteMessageAsync(wanted, Arg.Any<CancellationToken>());
+        await receiver.Received(1).AbandonMessageAsync(earlier, Arg.Any<IDictionary<string, object>>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task DiscardAsync_WhenTheMessageIsGone_ReturnsNull_AndCompletesNothing()
+    {
+        // A peek from a sequence number gives the next message when that one is gone.
+        Found(new ServiceBusEntity("sb", "carrier-tracking", null, 1));
+        var receiver = Receives(Message(Enqueued, sequenceNumber: 9));
+
+        (await Queues().DiscardAsync("carrier-tracking", 3, TestContext.Current.CancellationToken)).Should().BeNull();
+
+        await receiver.DidNotReceive().ReceiveMessagesAsync(Arg.Any<int>(), Arg.Any<TimeSpan?>(), Arg.Any<CancellationToken>());
+        await receiver.DidNotReceive().CompleteMessageAsync(Arg.Any<ServiceBusReceivedMessage>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task DiscardAsync_WhenAnotherOperatorTookItMeanwhile_ReturnsNull_AndCompletesNothing()
+    {
+        Found(new ServiceBusEntity("sb", "carrier-tracking", null, 1));
+        var receiver = Receives(Message(Enqueued, sequenceNumber: 3), batches: []);
+
+        (await Queues().DiscardAsync("carrier-tracking", 3, TestContext.Current.CancellationToken)).Should().BeNull();
+
+        await receiver.DidNotReceive().CompleteMessageAsync(Arg.Any<ServiceBusReceivedMessage>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task DiscardAsync_ForAQueueTheEstateDoesNotHave_ReturnsNull_AndOpensNoClient()
+    {
+        Found(new ServiceBusEntity("sb", "carrier-tracking", null, 1));
+
+        (await Queues().DiscardAsync("nope", 3, TestContext.Current.CancellationToken)).Should().BeNull();
+
+        _clients.DidNotReceive().Create(Arg.Any<string>());
+    }
+
     private ServiceBusSender Sender()
     {
         var sender = Substitute.For<ServiceBusSender>();

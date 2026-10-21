@@ -44,6 +44,16 @@ public sealed class OpenTelemetryAuditLogTests
         _logger.LatestRecord.Scopes.Single().Should().BeAssignableTo<IEnumerable<KeyValuePair<string, object>>>().Which.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task WriteAsync_ForADiscard_CarriesTheReason()
+    {
+        await new OpenTelemetryAuditLog(_logger).WriteAsync(Event() with { Action = AuditActions.Discard, Reason = "Duplicate of SH-0041" }, TestContext.Current.CancellationToken);
+
+        var record = _logger.Collector.GetSnapshot().Should().ContainSingle().Subject;
+        record.Message.Should().Contain("discard").And.Contain("reason: Duplicate of SH-0041");
+        record.StructuredState.Should().Contain(state => state.Key == "Reason" && state.Value == "Duplicate of SH-0041");
+    }
+
     private static AuditEvent Event() => new(
         "Iris Operator",
         AuditActions.Resubmit,

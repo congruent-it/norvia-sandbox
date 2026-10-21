@@ -17,4 +17,7 @@ internal static partial class DeadLetterPageLog
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Resubmitting the dead-lettered message {SequenceNumber} of {Entity} failed")]
     public static partial void ResubmitFailed(ILogger logger, Exception exception, long sequenceNumber, string entity);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Discarding the dead-lettered message {SequenceNumber} of {Entity} failed")]
+    public static partial void DiscardFailed(ILogger logger, Exception exception, long sequenceNumber, string entity);
 }

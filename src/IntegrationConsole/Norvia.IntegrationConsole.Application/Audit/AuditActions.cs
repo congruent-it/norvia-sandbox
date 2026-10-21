@@ -4,4 +4,6 @@ namespace Norvia.IntegrationConsole.Application.Audit;
 public static class AuditActions
 {
     public const string Resubmit = "resubmit";
+
+    public const string Discard = "discard";
 }

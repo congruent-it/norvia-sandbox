@@ -9,7 +9,7 @@ namespace Norvia.IntegrationConsole.Infrastructure.Audit;
 /// Writes an audit event as a log record, which the OpenTelemetry pipeline of <c>ServiceDefaults</c> exports to Application
 /// Insights with the rest of the estate's telemetry, so it is kept as long as that is. The tracking contract's keys go in the
 /// logging scope, as an application's do (coding guidelines §7), so the event carries the correlation ID and joins its
-/// Message trail. A message's body is never part of it.
+/// Message trail. A message's body is never part of it; a discard's reason is.
 /// </summary>
 internal sealed partial class OpenTelemetryAuditLog(ILogger<OpenTelemetryAuditLog> logger) : IAuditLog
 {
@@ -35,7 +35,7 @@ internal sealed partial class OpenTelemetryAuditLog(ILogger<OpenTelemetryAuditLo
         var at = auditEvent.At.ToString("O", CultureInfo.InvariantCulture);
         using (logger.BeginScope(keys))
         {
-            Audited(logger, auditEvent.Actor, auditEvent.Action, auditEvent.Entity, auditEvent.MessageId, businessKeys, at);
+            Audited(logger, auditEvent.Actor, auditEvent.Action, auditEvent.Entity, auditEvent.MessageId, businessKeys, at, auditEvent.Reason ?? string.Empty);
         }
 
         return Task.CompletedTask;
@@ -44,6 +44,6 @@ internal sealed partial class OpenTelemetryAuditLog(ILogger<OpenTelemetryAuditLo
     [LoggerMessage(
         EventId = 1,
         Level = LogLevel.Information,
-        Message = "Audit: {Actor} did {Action} on message {MessageId} of {Entity}, business keys [{BusinessKeys}], at {At}")]
-    private static partial void Audited(ILogger logger, string actor, string action, string entity, string messageId, string businessKeys, string at);
+        Message = "Audit: {Actor} did {Action} on message {MessageId} of {Entity}, business keys [{BusinessKeys}], at {At}, reason: {Reason}")]
+    private static partial void Audited(ILogger logger, string actor, string action, string entity, string messageId, string businessKeys, string at, string reason);
 }
