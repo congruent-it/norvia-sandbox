@@ -62,6 +62,7 @@
           "partyId": "@outputs('Track_the_message')?['partyId']",
           "sourceMessageId": "@outputs('Track_the_message')?['sourceMessageId']",
           "outcome": "@if(equals(action()?['status'], 'Failed'), 'DeadLettered', null)",
+          "messageId": "@if(equals(action()?['status'], 'Failed'), triggerBody()?['messageId'], null)",
           "failureCode": "@if(equals(action()?['status'], 'Failed'), 'ProofOfDeliveryBlobMissing', null)"
         }
       },
@@ -90,6 +91,7 @@
           "partyId": "@outputs('Track_the_message')?['partyId']",
           "sourceMessageId": "@outputs('Track_the_message')?['sourceMessageId']",
           "outcome": "DeadLettered",
+          "messageId": "@triggerBody()?['messageId']",
           "failureCode": "ProofOfDeliveryBlobMissing"
         }
       },
@@ -129,6 +131,7 @@
           "partyId": "@outputs('Track_the_message')?['partyId']",
           "sourceMessageId": "@outputs('Track_the_message')?['sourceMessageId']",
           "outcome": "@if(equals(action()?['status'], 'Failed'), 'DeadLettered', null)",
+          "messageId": "@if(equals(action()?['status'], 'Failed'), triggerBody()?['messageId'], null)",
           "failureCode": "@if(equals(action()?['status'], 'Failed'), 'UnmappableProofOfDelivery', null)"
         }
       },
@@ -157,6 +160,7 @@
           "partyId": "@outputs('Track_the_message')?['partyId']",
           "sourceMessageId": "@outputs('Track_the_message')?['sourceMessageId']",
           "outcome": "DeadLettered",
+          "messageId": "@triggerBody()?['messageId']",
           "failureCode": "UnmappableProofOfDelivery"
         }
       },
@@ -207,6 +211,7 @@
           "shipmentNumber": "@actions('Record_in_the_TMS')?['outputs']?['body']?['shipmentNumber']",
           "carrierBookingNumber": "@json(body('Map_the_proof_of_delivery'))?['$multipart']?[0]?['body']?['carrierBookingNumber']",
           "outcome": "@if(and(greaterOrEquals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', if(or(equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 500)), 'Retrying', 'DeadLettered'))",
+          "messageId": "@if(and(greaterOrEquals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 500)), null, triggerBody()?['messageId']))",
           "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 500)), 'TmsUnavailable', coalesce(actions('Record_in_the_TMS')?['outputs']?['body']?['code'], 'TmsCallRefused')))"
         }
       },
@@ -308,6 +313,7 @@
                     "partyId": "@outputs('Track_the_message')?['partyId']",
                     "sourceMessageId": "@outputs('Track_the_message')?['sourceMessageId']",
                     "outcome": "DeadLettered",
+                    "messageId": "@triggerBody()?['messageId']",
                     "failureCode": "@coalesce(actions('Record_in_the_TMS')?['outputs']?['body']?['code'], 'TmsCallRefused')"
                   }
                 },

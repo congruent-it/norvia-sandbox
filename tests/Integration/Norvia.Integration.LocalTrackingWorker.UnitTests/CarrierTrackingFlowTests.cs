@@ -66,6 +66,38 @@ public class CarrierTrackingFlowTests
         world.Tms.Requests.Should().ContainSingle();
     }
 
+    [Fact]
+    public async Task RunAsync_ADeadLetteredMessage_RecordsItsMessageIdWithTheOutcome()
+    {
+        var world = new TrackingWorld();
+        world.Tms.Otherwise(HttpStatusCode.NotFound, """{"code":"ShipmentNotFound","detail":"No Shipment has that booking reference."}""");
+
+        await world.Flow.RunAsync(TrackingWorld.Collected, TrackingWorld.Properties(), CancellationToken.None, "m-7");
+
+        world.KeysOf("DeadLettered").Should().Contain(new KeyValuePair<string, object?>("messageId", "m-7"));
+    }
+
+    [Fact]
+    public async Task RunAsync_ASucceededMessage_RecordsNoMessageId()
+    {
+        var world = new TrackingWorld();
+
+        await world.Flow.RunAsync(TrackingWorld.Collected, TrackingWorld.Properties(), CancellationToken.None, "m-7");
+
+        world.KeysOf("Succeeded").Should().NotContainKey("messageId");
+    }
+
+    [Fact]
+    public async Task RunAsync_ADeadLetteredMessageWithoutAMessageId_LeavesTheKeyOut()
+    {
+        var world = new TrackingWorld();
+        world.Tms.Otherwise(HttpStatusCode.NotFound, """{"code":"ShipmentNotFound","detail":"No Shipment has that booking reference."}""");
+
+        await world.Flow.RunAsync(TrackingWorld.Collected, TrackingWorld.Properties(), CancellationToken.None);
+
+        world.KeysOf("DeadLettered").Should().NotContainKey("messageId");
+    }
+
     [Theory]
     [InlineData(HttpStatusCode.InternalServerError)]
     [InlineData(HttpStatusCode.ServiceUnavailable)]

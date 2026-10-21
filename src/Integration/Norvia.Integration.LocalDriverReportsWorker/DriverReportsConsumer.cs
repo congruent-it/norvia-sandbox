@@ -60,7 +60,8 @@ internal sealed partial class DriverReportsConsumer(
                 Settlement.DeadLetter deadLetter => args.DeadLetterMessageAsync(args.Message, deadLetter.Reason, deadLetter.Description, cancellationToken),
                 _ => args.CompleteMessageAsync(args.Message, cancellationToken),
             },
-            args.CancellationToken);
+            args.CancellationToken,
+            args.Message.MessageId);
 
         if (outcome == DriverReportsRunOutcome.OutcomeNotReported)
         {

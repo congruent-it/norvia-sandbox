@@ -503,13 +503,13 @@ public sealed class ServiceBusDeadLetterQueuesTests
     {
         Found(new ServiceBusEntity("sb", "carrier-tracking", null, 0), new ServiceBusEntity("sb", "shipment-events", "carrier-booking", 2));
         PeeksMany(
-            Message(Enqueued, sequenceNumber: 4, correlationId: "corr-1", properties: new Dictionary<string, object> { ["shipmentNumber"] = "SH-0042" }),
+            Message(Enqueued, sequenceNumber: 4, correlationId: "corr-1", messageId: "m-4", properties: new Dictionary<string, object> { ["shipmentNumber"] = "SH-0042" }),
             Message(Enqueued, sequenceNumber: 5, correlationId: "CORR-2"));
 
         var found = await Queues().DeadLetteredAsync("corr-1", TestContext.Current.CancellationToken);
 
         found.Should().ContainSingle().Which.Should().BeEquivalentTo(
-            new FoundDeadLetter("shipment-events/carrier-booking", 4, Enqueued, [new BusinessKey(BusinessKeyKind.ShipmentNumber, "SH-0042")]));
+            new FoundDeadLetter("shipment-events/carrier-booking", 4, Enqueued, [new BusinessKey(BusinessKeyKind.ShipmentNumber, "SH-0042")], "m-4"));
         _clients.Received(1).Create("sb");
     }
 

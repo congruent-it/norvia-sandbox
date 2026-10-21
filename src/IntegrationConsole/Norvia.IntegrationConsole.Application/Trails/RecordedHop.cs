@@ -8,6 +8,7 @@ namespace Norvia.IntegrationConsole.Application.Trails;
 /// <param name="Name">What the hop was, as the telemetry names it, such as an application call's route.</param>
 /// <param name="Duration">How long it took, or null when the telemetry recorded only a moment.</param>
 /// <param name="Run">The Logic App run the hop was, or null when it wasn't one.</param>
+/// <param name="MessageId">The Service Bus message ID of the message the hop dead-lettered, or null when it recorded none.</param>
 public sealed record RecordedHop(
     string Id,
     string? CausedBy,
@@ -18,4 +19,5 @@ public sealed record RecordedHop(
     Outcome? Outcome,
     string? FailureCode,
     IReadOnlyList<BusinessKey> BusinessKeys,
-    WorkflowRun? Run = null);
+    WorkflowRun? Run = null,
+    string? MessageId = null);

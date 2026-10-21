@@ -47,7 +47,7 @@ internal sealed partial class ProofOfDeliveryQueueConsumer(
         await using var scope = scopes.CreateAsyncScope();
         var flow = scope.ServiceProvider.GetRequiredService<CarrierProofOfDeliveryFlow>();
         var properties = args.Message.ApplicationProperties.ToDictionary(property => property.Key, property => property.Value);
-        var run = await flow.RunAsync(args.Message.Body.ToString(), properties, args.CancellationToken);
+        var run = await flow.RunAsync(args.Message.Body.ToString(), properties, args.CancellationToken, args.Message.MessageId);
         if (run.RunFailed)
         {
             LogRunFailed(run.Settlement);

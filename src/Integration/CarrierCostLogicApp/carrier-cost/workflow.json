@@ -154,6 +154,7 @@
                     "shipmentNumber": "@outputs('Track_the_carrier_cost')?['shipmentNumber']",
                     "sourceMessageId": "@outputs('Track_the_carrier_cost')?['sourceMessageId']",
                     "outcome": "DeadLettered",
+                    "messageId": "@triggerBody()?['messageId']",
                     "failureCode": "@if(or(equals(coalesce(actions('Record_the_carrier_cost')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Record_the_carrier_cost')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Record_the_carrier_cost')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Record_the_carrier_cost')?['outputs']?['statusCode'], 0), 500)), 'ErpUnavailable', coalesce(actions('Record_the_carrier_cost')?['outputs']?['body']?['code'], 'ErpCallRefused'))"
                   }
                 },
@@ -212,6 +213,7 @@
                 "shipmentNumber": "@outputs('Track_the_carrier_cost')?['shipmentNumber']",
                 "sourceMessageId": "@outputs('Track_the_carrier_cost')?['sourceMessageId']",
                 "outcome": "DeadLettered",
+                "messageId": "@triggerBody()?['messageId']",
                 "failureCode": "CarrierCostUnreadable"
               }
             },

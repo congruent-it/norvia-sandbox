@@ -25,7 +25,7 @@ internal sealed partial class CarrierTrackingFlow(TmsTrackingEvents tms, ILogger
 
     /// <param name="body">The queue message's body: the Carrier's tracking message as it was sent.</param>
     /// <param name="properties">The message's application properties, which API Management set.</param>
-    public async Task<TrackingRun> RunAsync(string body, IReadOnlyDictionary<string, object> properties, CancellationToken cancellationToken)
+    public async Task<TrackingRun> RunAsync(string body, IReadOnlyDictionary<string, object> properties, CancellationToken cancellationToken, string? messageId = null)
     {
         ArgumentNullException.ThrowIfNull(body);
         ArgumentNullException.ThrowIfNull(properties);
@@ -50,7 +50,7 @@ internal sealed partial class CarrierTrackingFlow(TmsTrackingEvents tms, ILogger
         if (mapped.TrackingEvent is not { } trackingEvent)
         {
             const string Description = "The Carrier's tracking message could not be mapped: its status code is not in the Carrier tracking code list.";
-            using var unmappable = logger.BeginScope(TrackingKeys.OutcomeOf(TrackingKeys.DeadLettered, UnmappableTrackingMessage));
+            using var unmappable = logger.BeginScope(TrackingKeys.OutcomeOf(TrackingKeys.DeadLettered, UnmappableTrackingMessage, messageId));
             LogUnmappable();
             return new(TrackingSettlement.DeadLetter, UnmappableTrackingMessage, Description);
         }
@@ -58,7 +58,7 @@ internal sealed partial class CarrierTrackingFlow(TmsTrackingEvents tms, ILogger
         var (status, answer) = await tms.RecordAsync(trackingEvent.ToJsonString(), correlationId, cancellationToken);
         var outcome = TmsTrackingOutcome.Of(status, answer);
 
-        var recorded = TrackingKeys.OutcomeOf(outcome.Outcome, outcome.FailureCode);
+        var recorded = TrackingKeys.OutcomeOf(outcome.Outcome, outcome.FailureCode, messageId);
         if (outcome.ShipmentNumber is not null)
         {
             recorded[TrackingKeys.ShipmentNumber] = outcome.ShipmentNumber;

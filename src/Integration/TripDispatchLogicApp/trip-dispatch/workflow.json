@@ -267,6 +267,7 @@
                 "tripNumber": "@outputs('Track_the_trip')?['tripNumber']",
                 "sourceMessageId": "@outputs('Track_the_trip')?['sourceMessageId']",
                 "outcome": "DeadLettered",
+                "messageId": "@triggerBody()?['messageId']",
                 "failureCode": "TripDispatchUnreadable"
               }
             },

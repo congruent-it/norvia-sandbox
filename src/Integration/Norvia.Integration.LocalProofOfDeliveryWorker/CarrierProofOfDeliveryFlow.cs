@@ -18,7 +18,7 @@ internal sealed partial class CarrierProofOfDeliveryFlow(IInboundProofsOfDeliver
 
     /// <param name="body">The queue message's body: the blob's reference as JSON.</param>
     /// <param name="properties">The message's application properties, which API Management set.</param>
-    public async Task<ProofOfDeliveryRun> RunAsync(string body, IReadOnlyDictionary<string, object> properties, CancellationToken cancellationToken)
+    public async Task<ProofOfDeliveryRun> RunAsync(string body, IReadOnlyDictionary<string, object> properties, CancellationToken cancellationToken, string? messageId = null)
     {
         ArgumentNullException.ThrowIfNull(body);
         ArgumentNullException.ThrowIfNull(properties);
@@ -44,7 +44,7 @@ internal sealed partial class CarrierProofOfDeliveryFlow(IInboundProofsOfDeliver
         if (blobName is null || content is null)
         {
             const string Description = "The Proof of delivery's blob could not be read from the inbound container.";
-            using var missing = logger.BeginScope(TrackingKeys.OutcomeOf(TrackingKeys.DeadLettered, ProofOfDeliveryBlobMissing));
+            using var missing = logger.BeginScope(TrackingKeys.OutcomeOf(TrackingKeys.DeadLettered, ProofOfDeliveryBlobMissing, messageId));
             LogBlobMissing();
             return new(ProofOfDeliverySettlement.DeadLetter, ProofOfDeliveryBlobMissing, Description);
         }
@@ -58,7 +58,7 @@ internal sealed partial class CarrierProofOfDeliveryFlow(IInboundProofsOfDeliver
         catch (Exception exception) when (exception is InvalidProofOfDeliveryException or ArgumentException)
         {
             const string Description = "The Carrier's Proof of delivery could not be mapped: its content is not a Proof of delivery the map can read.";
-            using var unmappable = logger.BeginScope(TrackingKeys.OutcomeOf(TrackingKeys.DeadLettered, UnmappableProofOfDelivery));
+            using var unmappable = logger.BeginScope(TrackingKeys.OutcomeOf(TrackingKeys.DeadLettered, UnmappableProofOfDelivery, messageId));
             LogUnmappable(exception);
             return new(ProofOfDeliverySettlement.DeadLetter, UnmappableProofOfDelivery, Description);
         }
@@ -66,7 +66,7 @@ internal sealed partial class CarrierProofOfDeliveryFlow(IInboundProofsOfDeliver
         var (status, answer) = await tms.RecordAsync(mapped, correlationId, cancellationToken);
         var outcome = TmsProofOfDeliveryOutcome.Of(status, answer);
 
-        var recorded = TrackingKeys.OutcomeOf(outcome.Outcome, outcome.FailureCode);
+        var recorded = TrackingKeys.OutcomeOf(outcome.Outcome, outcome.FailureCode, messageId);
         if (outcome.ShipmentNumber is not null)
         {
             recorded[TrackingKeys.ShipmentNumber] = outcome.ShipmentNumber;
