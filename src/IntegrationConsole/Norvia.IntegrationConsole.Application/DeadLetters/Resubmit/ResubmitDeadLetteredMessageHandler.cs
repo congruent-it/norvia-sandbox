@@ -22,13 +22,7 @@ public sealed class ResubmitDeadLetteredMessageHandler(IDeadLetterQueues queues,
 
         if (command.Entity?.Trim() is not { Length: > 0 } entity || command.SequenceNumber < 0)
         {
-            return Result.Invalid(new ValidationError(nameof(command.Entity), "Resubmit a message by its queue and its sequence number."));
-        }
-
-        // A subscription's message is resubmitted to that subscription only, through the topic and its resubmitTo rule.
-        if (entity.Contains('/', StringComparison.Ordinal))
-        {
-            return Result.Invalid(new ValidationError(nameof(command.Entity), "Only a message on a queue can be resubmitted here, not one on a subscription."));
+            return Result.Invalid(new ValidationError(nameof(command.Entity), "Resubmit a message by its queue or subscription and its sequence number."));
         }
 
         if (await queues.ResubmitAsync(entity, command.SequenceNumber, cancellationToken) is not { } resubmitted)

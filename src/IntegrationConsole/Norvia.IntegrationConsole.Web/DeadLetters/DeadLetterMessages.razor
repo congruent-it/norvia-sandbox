@@ -154,31 +154,28 @@ else if (_list is { } found)
                     </dl>
                 }
 
-                @* Queues only, and only for the Resubmit role. The use case refuses everyone else too. There is no way to edit the body first. *@
-                @if (!Entity.Contains('/'))
-                {
-                    <AuthorizeView Policy="@OperatorSignIn.ResubmitPolicy">
-                        <div class="mt-6">
-                            @if (_confirming)
-                            {
-                                <div role="alertdialog" aria-label="Confirm resubmit">
-                                    <p class="mb-2">
-                                        Resubmit message @sequenceNumber to <span class="font-mono">@Entity</span>? A copy goes back to the queue with
-                                        the same body and properties, and this message leaves the dead-letter queue. Your name is recorded.
-                                    </p>
-                                    <FluentStack>
-                                        <FluentButton Appearance="Appearance.Accent" Disabled="_resubmitting" OnClick="() => ResubmitAsync(sequenceNumber)">Confirm resubmit</FluentButton>
-                                        <FluentButton Disabled="_resubmitting" OnClick="() => _confirming = false">Cancel</FluentButton>
-                                    </FluentStack>
-                                </div>
-                            }
-                            else
-                            {
-                                <FluentButton Appearance="Appearance.Accent" data-resubmit OnClick="() => _confirming = true">Resubmit</FluentButton>
-                            }
-                        </div>
-                    </AuthorizeView>
-                }
+                @* Only for the Resubmit role. The use case refuses everyone else too. There is no way to edit the body first. *@
+                <AuthorizeView Policy="@OperatorSignIn.ResubmitPolicy">
+                    <div class="mt-6">
+                        @if (_confirming)
+                        {
+                            <div role="alertdialog" aria-label="Confirm resubmit">
+                                <p class="mb-2">
+                                    Resubmit message @sequenceNumber to <span class="font-mono">@Entity</span>? @(Entity.Contains('/') ? "A copy goes to that subscription only" : "A copy goes back to the queue") with
+                                    the same body and properties, and this message leaves the dead-letter queue. Your name is recorded.
+                                </p>
+                                <FluentStack>
+                                    <FluentButton Appearance="Appearance.Accent" Disabled="_resubmitting" OnClick="() => ResubmitAsync(sequenceNumber)">Confirm resubmit</FluentButton>
+                                    <FluentButton Disabled="_resubmitting" OnClick="() => _confirming = false">Cancel</FluentButton>
+                                </FluentStack>
+                            </div>
+                        }
+                        else
+                        {
+                            <FluentButton Appearance="Appearance.Accent" data-resubmit OnClick="() => _confirming = true">Resubmit</FluentButton>
+                        }
+                    </div>
+                </AuthorizeView>
             }
         </section>
     }

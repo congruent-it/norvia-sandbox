@@ -27,9 +27,10 @@ public interface IDeadLetterQueues
 
     /// <summary>
     /// Sends a copy of one dead-lettered message of a queue to that queue, then completes the original on the dead-letter
-    /// queue. The copy has the same body, application properties, <c>SessionId</c>, <c>Subject</c>, <c>ContentType</c> and
+    /// queue. A subscription's message goes to its topic with <c>resubmitTo</c> naming the subscription, which only that
+    /// subscription's filter takes (coding guidelines §7). The copy has the same body, application properties, <c>SessionId</c>, <c>Subject</c>, <c>ContentType</c> and
     /// correlation ID, a new message ID, and <c>resubmittedFrom</c> naming the original's. The original stays when the send
-    /// fails. Null when the queue or the message is gone, because someone resubmitted or discarded it meanwhile.
+    /// fails. Null when the queue, subscription or message is gone, because someone resubmitted or discarded it meanwhile.
     /// </summary>
     Task<ResubmittedDeadLetter?> ResubmitAsync(string entity, long sequenceNumber, CancellationToken cancellationToken);
 }

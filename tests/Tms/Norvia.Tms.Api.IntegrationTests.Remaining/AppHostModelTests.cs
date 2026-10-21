@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
@@ -21,6 +22,36 @@ public sealed class AppHostModelTests
         var subscribedTopics = builder.Resources.OfType<AzureServiceBusSubscriptionResource>().Select(s => s.Parent).ToHashSet();
 
         builder.Resources.OfType<AzureServiceBusTopicResource>().Should().OnlyContain(topic => subscribedTopics.Contains(topic));
+    }
+
+    [Fact]
+    public async Task Locally_EverySubscription_TakesAResubmitOnlyWhenItNamesItself()
+    {
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(TestContext.Current.CancellationToken);
+        var subscriptions = builder.Resources.OfType<AzureServiceBusSubscriptionResource>().Select(s => s.SubscriptionName).ToList();
+        var configuration = new JsonObject
+        {
+            ["UserConfig"] = new JsonObject
+            {
+                ["Namespaces"] = new JsonArray(new JsonObject
+                {
+                    ["Topics"] = new JsonArray(new JsonObject
+                    {
+                        ["Subscriptions"] = new JsonArray([.. subscriptions.Select(name => (JsonNode)new JsonObject { ["Name"] = name })]),
+                    }),
+                }),
+            },
+        };
+
+        ResubmitAwareFilters.Apply(configuration);
+
+        var filters = configuration["UserConfig"]!["Namespaces"]![0]!["Topics"]![0]!["Subscriptions"]!.AsArray()
+            .ToDictionary(
+                subscription => subscription!["Name"]!.GetValue<string>(),
+                subscription => subscription!["Rules"]![0]!["Properties"]!["SqlFilter"]!["SqlExpression"]!.GetValue<string>());
+        subscriptions.Should().NotBeEmpty();
+        filters.Should().OnlyContain(filter => filter.Value.Contains("resubmitTo IS NULL", StringComparison.Ordinal)
+            && filter.Value.EndsWith($" OR resubmitTo = '{filter.Key}'", StringComparison.Ordinal));
     }
 
     [Theory]

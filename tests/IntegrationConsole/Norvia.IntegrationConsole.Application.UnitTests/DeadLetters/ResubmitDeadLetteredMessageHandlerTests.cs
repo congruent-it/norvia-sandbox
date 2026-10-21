@@ -86,14 +86,27 @@ public sealed class ResubmitDeadLetteredMessageHandlerTests
     [Theory]
     [InlineData("", 3)]
     [InlineData("carrier-tracking", -1)]
-    [InlineData("shipment-events/carrier-booking", 3)]
-    public async Task Handle_WithoutAQueueOrAValidSequenceNumber_OrForASubscription_IsInvalid_AndResubmitsNothing(string entity, long sequenceNumber)
+    public async Task Handle_WithoutAQueueOrAValidSequenceNumber_IsInvalid_AndResubmitsNothing(string entity, long sequenceNumber)
     {
         var result = await HandleAsync(Operator("Iris Operator", OperatorRoles.Resubmit), entity, sequenceNumber);
 
         result.Status.Should().Be(ResultStatus.Invalid);
         await _queues.DidNotReceive().ResubmitAsync(Arg.Any<string>(), Arg.Any<long>(), Arg.Any<CancellationToken>());
         await _audit.DidNotReceive().WriteAsync(Arg.Any<AuditEvent>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_ForASubscription_ResubmitsToThatSubscription_AndTheAuditEventNamesIt()
+    {
+        var resubmitted = new ResubmittedDeadLetter("shipment-events/carrier-booking", "original-1", "copy-1", "corr-1", []);
+        _queues.ResubmitAsync("shipment-events/carrier-booking", 3, Arg.Any<CancellationToken>()).Returns(resubmitted);
+
+        var result = await HandleAsync(Operator("Iris Operator", OperatorRoles.Resubmit), "shipment-events/carrier-booking", 3);
+
+        result.Value.Should().Be(resubmitted);
+        await _audit.Received(1).WriteAsync(
+            new AuditEvent("Iris Operator", AuditActions.Resubmit, "shipment-events/carrier-booking", "original-1", "corr-1", [], Now),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
