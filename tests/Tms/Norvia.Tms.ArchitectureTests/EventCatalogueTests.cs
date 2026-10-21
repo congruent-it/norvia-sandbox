@@ -73,22 +73,24 @@ public sealed partial class EventCatalogueTests
     private static List<CatalogueRow> Catalogue()
     {
         var rows = new List<CatalogueRow>();
+        string? topic = null;
         foreach (var line in File.ReadLines(Path.Combine(Root, "docs", "architecture", "events.md")))
         {
+            // A topic's section starts with "### `topic`".
+            if (line.StartsWith("### ", StringComparison.Ordinal))
+            {
+                topic = Backticked(line).FirstOrDefault();
+                continue;
+            }
+
             var cells = line.Split('|').Select(cell => cell.Trim()).ToArray();
-            // A table row is "| event | topic | publisher | subscriptions | subscribers | process |".
-            if (cells.Length != 8 || cells[0].Length != 0 || Backticked(cells[1]).FirstOrDefault() is not { } eventName)
+            // A table row is "| event | subscriptions | subscribers | process |".
+            if (topic is null || cells.Length != 6 || cells[0].Length != 0 || Backticked(cells[1]).FirstOrDefault() is not { } eventName)
             {
                 continue;
             }
 
-            var topic = Backticked(cells[2]).FirstOrDefault();
-            if (topic is null)
-            {
-                continue;
-            }
-
-            var subscriptions = cells[4].Split("<br/>")
+            var subscriptions = cells[2].Split("<br/>")
                 .Select(segment => (Name: Backticked(segment).FirstOrDefault(), Planned: segment.Contains("*planned*")))
                 .Where(s => s.Name is not null)
                 .Select(s => new CatalogueSubscription($"{topic}/{s.Name}", s.Planned))
