@@ -325,6 +325,18 @@ resource integrationConsolePeeksDeadLetters 'Microsoft.Authorization/roleAssignm
   }
 }
 
+// Resubmitting a dead-lettered queue message sends a copy to its queue; the receiver role above completes the original once the send
+// succeeds. Sending is a data operation of its own, so the console's identity is granted the sender role.
+resource integrationConsoleResubmitsDeadLetters 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(serviceBus.id, integrationConsolePrincipalId, serviceBusDataSender)
+  scope: serviceBus
+  properties: {
+    principalId: integrationConsolePrincipalId
+    roleDefinitionId: serviceBusDataSender
+    principalType: 'ServicePrincipal'
+  }
+}
+
 // Scoped to the subscription, so the booking Logic App reads Carrier Shipments and no other message.
 resource bookingReceivesItsMessages 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(carrierBooking.id, bookingPrincipalId, serviceBusDataReceiver)

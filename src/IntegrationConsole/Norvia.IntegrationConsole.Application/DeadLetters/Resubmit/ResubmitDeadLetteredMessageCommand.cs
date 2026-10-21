@@ -1,0 +1,16 @@
+using System.Security.Claims;
+using Ardalis.Result;
+using Mediator;
+
+namespace Norvia.IntegrationConsole.Application.DeadLetters.Resubmit;
+
+/// <summary>
+/// Sends a dead-lettered queue message back to its queue, as an operator holding <c>IntegrationConsole.Resubmit</c>. The
+/// body is never part of it: a copy goes out as it was dead-lettered, and a mapping fault is fixed in the map (ADR 0017).
+/// Resubmitting is safe to repeat, as every command is idempotent (coding guidelines §6).
+/// </summary>
+/// <param name="Caller">The operator, from their token.</param>
+/// <param name="Entity">The queue's name.</param>
+/// <param name="SequenceNumber">The broker's number for the message within its dead-letter queue.</param>
+public sealed record ResubmitDeadLetteredMessageCommand(ClaimsPrincipal Caller, string Entity, long SequenceNumber)
+    : ICommand<Result<ResubmittedDeadLetter>>;
