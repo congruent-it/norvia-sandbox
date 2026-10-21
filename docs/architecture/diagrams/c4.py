@@ -173,6 +173,47 @@ SPECS["l2-identity-secrets-telemetry"] = dict(
     ],
 )
 
+# ---------------------------------------------------------------- L2 agents (planned)
+SPECS["l2-agents"] = dict(
+    title="C4 L2 · Containers: Agents (planned)",
+    subtitle="How an Agent reads the estate and answers a person. An Agent reaches an application only through API Management's MCP server, "
+             "holds read roles only, and proposes Suggestions that the person confirms.",
+    footnote="Dashed grey is planned: ADR 0040 and ADR 0041 are Proposed and no Agent is built. Source of truth: docs/adr/0040 and 0041, and identity-and-access.md for the identities and roles. "
+             "Locally an in-process runner and an MCP stand-in play Foundry and API Management's MCP server (ADR 0041). Terms are defined in GLOSSARY.md.",
+    legend=[LEG_PERSON, LEG_PLANNED, L("Outside Norvia", "gray"), L("Integration layer", "violet"), L("A Norvia application", "blue")],
+    cell=(400, 128),
+    nodes=[
+        dict(id="person", col=0, row=0.7, kind="person", title="Planner, Customer service, Finance, Integration operator", sub="Asks, reads a Suggestion, decides", w=250),
+        dict(id="host", col=0, row=2.4, palette="blue", title="Host UIs", sub="[TMS UI, ERP UI, Integration console]\nEach owns its IAgentClient port, shows the Suggestion and deletes the run's conversation"),
+        dict(id="agents", col=1, row=2.4, kind="planned", title="Agents", sub="[Foundry prompt agents, definitions in the repo]\nEach has its own Entra agent identity once published. No write tools"),
+        dict(id="model", col=1, row=3.9, kind="planned", title="Model deployment", sub="[DataZoneStandard, EU region]"),
+        dict(id="mcp", col=2, row=2.4, kind="planned", title="MCP server per Agent", sub="[API Management]\nChecks the Agent's token and read role and rate-limits it. Records the identity and tool name"),
+        dict(id="entra", col=2, row=0.2, palette="gray", title="Microsoft Entra ID", sub="Agent identities, read roles of the agent views"),
+        dict(id="insights", col=2, row=4.1, palette="violet", title="Application Insights", sub="Each tool call is a hop on a Message trail. Foundry traces, content recording off"),
+        dict(id="tmsView", col=3, row=0.8, kind="planned", title="TMS agent view", sub="[read-only API group]\nNeeds an API Management front, which the TMS API has none of today"),
+        dict(id="erpView", col=3, row=1.95, kind="planned", title="ERP agent view", sub="[read-only API group]"),
+        dict(id="consoleView", col=3, row=3.1, kind="planned", title="Integration console agent API", sub="[read-only]"),
+        dict(id="healthView", col=3, row=4.25, kind="planned", title="Estate health-check app agent API", sub="[read-only]"),
+        dict(id="azure", col=4, row=3.7, palette="gray", title="Azure", sub="Resource Graph, Cost Management, run history, dead-letter queues, read under the application's own managed identity"),
+    ],
+    groups=[
+        dict(id="foundry", title="Microsoft Foundry [Agent Service]", palette="gray", dashed=True, members=["agents", "model"]),
+        dict(id="apim", title="API Management", palette="violet", dashed=True, members=["mcp"]),
+        dict(id="views", title="Agent views, from an allowlist of fields", palette="blue", dashed=True, members=["tmsView", "erpView", "consoleView", "healthView"]),
+    ],
+    edges=[
+        ("person", "host", "asks, then confirms a Suggestion", dict(orient="v")),
+        ("host", "agents", "asks, and a Suggestion comes back: plain text, never a command", dict(dashed=True, both=True)),
+                ("agents", "model", "", dict(dashed=True, plain=True, orient="v")),
+        ("agents", "mcp", "tool calls [MCP, agent identity token]", dict(dashed=True)),
+        ("mcp", "tmsView", "read", dict(dashed=True)), ("mcp", "erpView", "read", dict(dashed=True)),
+        ("mcp", "consoleView", "read", dict(dashed=True)), ("mcp", "healthView", "read", dict(dashed=True)),
+        ("consoleView", "azure", "reads", dict(dashed=True)), ("healthView", "azure", "reads", dict(dashed=True)),
+        ("mcp", "entra", "validates the Agent's token", dict(dashed=True, orient="v")),
+        ("mcp", "insights", "traces", dict(dashed=True, orient="v")),
+    ],
+)
+
 # ---------------------------------------------------------------- L3 flows that come in through API Management
 SPECS["l3-api-management-flows"] = dict(
     title="C4 L3 · Flows that come in through API Management",
