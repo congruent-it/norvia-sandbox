@@ -1,12 +1,19 @@
-# Diagram style: Excalidraw matrix
+# Diagram styles: Excalidraw
 
-How to draw a diagram that maps **process steps against applications**, in the same look as [business-automation-model.excalidraw](../business-automation-model.excalidraw). Open the `.excalidraw` file at [excalidraw.com](https://excalidraw.com) or with the VS Code Excalidraw extension. For system context and container diagrams keep using the Mermaid C4 style in [c4.md](../c4.md); this style is for matrices.
+Norvia's diagrams are Excalidraw files in one look: the same palette, type and shapes. Open a `.excalidraw` file at [excalidraw.com](https://excalidraw.com) or with the VS Code Excalidraw extension. There are two layouts:
+
+| Style | For | Example | Library |
+|---|---|---|---|
+| **Matrix** | Process steps against applications | [business-automation-model.excalidraw](../business-automation-model.excalidraw) | [excalidraw_matrix.py](excalidraw_matrix.py) |
+| **Graph** | System context, containers and components (the C4 levels) | [c4.md](../c4.md) | [excalidraw_graph.py](excalidraw_graph.py) |
+
+Both draw through [excalidraw_canvas.py](excalidraw_canvas.py), which holds the drawing primitives, and take their colours from `PALETTE` in the matrix library. The matrix style is described first, the graph style [below](#graph-style).
 
 Diagrams are generated from a spec, not drawn by hand, so a process change is an edit to a list and a re-run. Hand edits to the `.excalidraw` file are lost on the next run.
 
 | File | Is |
 |---|---|
-| [excalidraw_matrix.py](excalidraw_matrix.py) | The style: palette, geometry, routing. `render(spec, out.excalidraw, out.svg)` |
+| [excalidraw_matrix.py](excalidraw_matrix.py) | The matrix style: palette, geometry, routing. `render(spec, out.excalidraw, out.svg)` |
 | [business-automation-model.py](business-automation-model.py) | The reference spec. Copy it for a new diagram |
 
 ```
@@ -70,3 +77,27 @@ The PNG is rendered from the generator's SVG, not exported from Excalidraw, so i
 ## When you add a diagram
 
 Terms in titles come from [GLOSSARY.md](../../../GLOSSARY.md). Put the new spec in this folder, write the `.excalidraw` next to the other architecture pages, and add a row to [the architecture README](../README.md).
+
+## Graph style
+
+For the C4 diagrams in [c4.md](../c4.md), from [c4.py](c4.py), one spec per diagram. It looks like the matrix style (same colours, boxes, type, arrows, legend), but nodes sit on a grid and groups draw boundaries instead of lanes.
+
+```
+python3 docs/architecture/diagrams/c4.py [name ...]   # writes docs/architecture/c4-<name>.excalidraw and .png; no names draws all
+```
+
+| Key | Holds |
+|---|---|
+| `title`, `subtitle`, `footnote`, `legend`, `cell` | Header, legend entries, and the grid cell size in px (`cell=(width, height)`) |
+| `nodes` | `id`, `col`, `row` (floats are fine), `title`, optional `sub` (use `\n` for lines), `palette` (a `PALETTE` key), `kind` (`auto`, `person` or `planned`), `w` |
+| `groups` | A boundary around `members` (nodes, or other groups): `id`, `title`, `palette`, optional `dashed` |
+| `edges` | `(from, to, label, options)` |
+
+- **Colour is the application**, not the node's role: violet for the integration layer, blue for the TMS, and so on, as in the table above. A person is yellow, a planned system grey and dashed.
+- **Titles** are the container's name, **subtitles** its technology in square brackets and then what it does.
+- **The router** takes arrows orthogonally round boxes, spreads the arrows that share a side of a box, keeps parallel runs apart and puts each label where it covers no box. Leave it to it; lay the grid out so most arrows join neighbours.
+- **Edge options**: `dashed` (planned), `plain` (no arrowhead), `both`, `orient` (`"h"` or `"v"`, to force the side an arrow leaves), `sides` (`("r", "t")`, the side it leaves and enters), and `via` (`"top"` or `"bottom"`) to run an arrow out of a box's side and round the outside of the drawing, for a return flow that would otherwise cross everything.
+- Keep a group's members in neighbouring cells and leave about half a row between groups, or their boundaries touch.
+- Preview the SVG while you work: `c4.py` writes it to `/tmp/c4-<name>.svg`, and `rsvg-convert` makes the PNG.
+
+The PNGs are rendered from the generator's SVG, not exported from Excalidraw, so their font differs slightly from the `.excalidraw` files'. Commit both.

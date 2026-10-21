@@ -13,7 +13,6 @@ How Norvia's estate is put together, for engineers and coding agents working on 
 
 ## Conventions
 
-- Diagrams are Mermaid flowcharts drawn in a C4 style, not Mermaid's experimental `C4Context`, so they render on GitHub with no build step.
-- Matrices of process steps against applications are Excalidraw files in the [Excalidraw matrix style](diagrams/README.md).
+- Diagrams are Excalidraw files, generated from a spec and embedded as PNGs so they render on GitHub with no build step: the C4 diagrams in the graph style, and matrices of process steps against applications in the matrix style. Both are described in [diagrams/README.md](diagrams/README.md). Edit the spec and re-run it, never the file.
 - Planned systems and pieces, designed in a process doc but not built yet, are drawn dashed and grey. Each diagram page has a legend.
 - These pages are kept current in the same PR as the change they describe: see [coding guidelines §11](../coding-guidelines.md#11-workflow) for which changes.

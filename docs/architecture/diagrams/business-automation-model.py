@@ -58,7 +58,7 @@ steps = [
     ("m0", 9, "erp", 1, "person", "Correct with a Credit note", "E1 · Finance"),
 
     ("k1", 10, "portal", 0, "person", "Submit the Carrier invoice", "E2 · Carrier Persona"),
-    ("k2", 10, "int", 0, "auto", "Relay the invoice and each line's outcome", "E2 · Carrier invoice Logic Apps"),
+    ("k2", 10, "int", 0, "auto", "Relay the invoice and each line's outcome", "E2 · two Logic Apps"),
     ("k3", 10, "erp", 0, "auto", "Match each line to its Carrier cost", "E2 · cost frozen at booking, P4"),
     ("k4", 10, "erp", 1, "person", "Decide the lines that don't match", "E2 · Finance"),
 ]
