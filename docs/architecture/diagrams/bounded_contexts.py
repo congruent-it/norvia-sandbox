@@ -114,6 +114,155 @@ SPECS["tms-hexagon"] = dict(
     ],
 )
 
+# ------------------------------------------------------------------ the other contexts' hexagons
+def hexagon(title, subtitle, footnote, callers, driving, mediator, usecases, domain, ports, domain_title="Domain: aggregates, value objects, specifications"):
+    """The hexagon of one context. callers and driving are (title, sub, kind) rows that line up with each other;
+    domain is a list of (title, sub), up to six; ports is a list of (port title, port sub, adapter title, adapter sub, outside title, outside sub)."""
+    r0 = 0.5
+    nodes, edges = [], []
+    n = len(driving)
+    drows = [r0 + 1.15 * i + 0.0 for i in range(n)]
+    mid = sum(drows) / n
+    for i, ((ct, cs, ck), (dt, ds)) in enumerate(zip(callers, driving)):
+        row = drows[i]
+        nodes.append(dict(id=f"c{i}", col=-1.1, row=row, palette="gray", kind=ck, w=250, title=ct, sub=cs))
+        nodes.append(dict(id=f"w{i}", col=0.2, row=row, palette=DRIVE, w=270, title=dt, sub=ds))
+        edges.append((f"c{i}", f"w{i}", ""))
+        edges.append((f"w{i}", "mediator", ""))
+    nodes.append(dict(id="mediator", col=1.5, row=mid, palette=USE, w=240, title="Mediator", sub=mediator))
+    nodes.append(dict(id="uc", col=2.7, row=mid, palette=USE, w=300, title=usecases[0], sub=usecases[1]))
+    edges.append(("mediator", "uc", ""))
+    dnames = []
+    for i, (dt, ds) in enumerate(domain):
+        c, r = 4.1 + 1.1 * (i % 2), r0 - 0.1 + 1.1 * (i // 2)
+        nodes.append(dict(id=f"d{i}", col=c, row=r, palette=CORE, w=250, title=dt, sub=ds))
+        edges.append(("uc", f"d{i}", ""))
+        dnames.append(f"d{i}")
+    prow = r0 + 1.15 * ((len(domain) + 1) // 2) + 0.9 if domain else mid - 1.2
+    pnames, anames = [], []
+    for i, (pt, ps, at, as_, ot, os_) in enumerate(ports):
+        row = prow + 1.1 * i
+        nodes.append(dict(id=f"p{i}", col=4.6, row=row, palette=USE, w=330, title=pt, sub=ps))
+        nodes.append(dict(id=f"a{i}", col=6.5, row=row, palette=ADAPT, w=300, title=at, sub=as_))
+        nodes.append(dict(id=f"o{i}", col=7.9, row=row, palette="gray", w=210, title=ot, sub=os_))
+        edges += [("uc", f"p{i}", ""), (f"a{i}", f"p{i}", "implements"), (f"a{i}", f"o{i}", "")]
+        pnames.append(f"p{i}"); anames.append(f"a{i}")
+    groups = [dict(id="driving", title="Driving adapters", palette=DRIVE, members=[f"w{i}" for i in range(n)])]
+    app_members = ["mediator", "uc"] + pnames
+    if domain:
+        groups.append(dict(id="domain", title=domain_title, palette=CORE, members=dnames))
+        app_members.append("domain")
+    groups.append(dict(id="app", title="Application: use cases and ports", palette=USE, members=app_members))
+    groups.append(dict(id="infra", title="Infrastructure: driven adapters", palette=ADAPT, members=anames))
+    return dict(title=title, subtitle=subtitle, footnote=footnote, cell=(360, 112), nodes=nodes, groups=groups, edges=edges,
+                legend=[L("Driving adapters", DRIVE), L("Application", USE), L("Domain", CORE), L("Infrastructure", ADAPT), L("Outside", "gray"), LEG_PERSON])
+
+
+STD_FOOT = "Source of truth: src/{app}, docs/coding-guidelines.md section 1 and the architecture tests in tests/{app}. Use case counts are the handlers in each Application feature folder."
+SHARED = ("Persistence", "IRepository<T>, IReadRepository<T>, ITransactionalData, IConflictRetrier", "EF Core", "{db}, EfRepository<T>, SqlTransactionalData, EfConflictRetrier", "Azure SQL", "")
+RESET = ("Reset", "IResetSwitch, IQuietCheck", "Reset switch and quiet check", "ConfiguredResetSwitch, ServiceBusQuietCheck", "Service Bus management", "Is a subscription holding messages?")
+PERSON_K = "person"
+
+SPECS["erp-hexagon"] = hexagon(
+    "ERP · Clean Architecture as a hexagon",
+    "The ERP owns master data and invoicing. It takes commands as HTTP, publishes what happened through its outbox, and never uses another application's code.",
+    STD_FOOT.format(app="Erp"),
+    [("Logic Apps", "Billing, Carrier cost, Shipper invoice, Carrier invoice and its outcome, each with its own identity and role", None),
+     ("Finance", "Through the ERP UI: Invoice now, Credit note, Carrier invoice decisions", PERSON_K),
+     ("The clock and start-up", "A monthly timer, a start-up", None)],
+    [("ERP API", "[Minimal API]\nChecks the app role, records what an event carries, never touches EF Core"),
+     ("ERP UI", "[Blazor]\nReads and changes things in process, through the same commands the endpoints use"),
+     ("Hosted workers", "[in Infrastructure]\nMonthlyInvoiceRunWorker, LoadSeedOnStart, OutboxPublisher")],
+    "Pipeline behaviours add the tracking-contract keys to the logging scope for a use case",
+    ("Use cases · 30 handlers", "One command or query and one handler each, by feature:\nShipper invoices 6 · Carrier invoices 7 · Credit notes 5 · Master data 5 · Billable lines 3 · Carrier costs 2 · Reset 2"),
+    [("Billable lines", "BillableLine: Waiting, then Invoiced exactly once"),
+     ("Shipper invoices and Credit notes", "ShipperInvoice, CreditNote: Issued, Sent, Not delivered"),
+     ("Carrier costs", "CarrierCost: Open, then Invoiced"),
+     ("Carrier invoices", "CarrierInvoice and its lines: matching, Finance's decisions"),
+     ("Master data", "Shipper, Carrier, RateCard, CarrierRateCard: read-only, loaded from the seed file")],
+    [(SHARED[0], SHARED[1], SHARED[2], SHARED[3].format(db="ErpDbContext"), SHARED[4], "The ERP's own database"),
+     ("Events", "IOutbox", "Outbox", "OutboxBuffer saves with the change, OutboxPublisher sends it", "Service Bus", "The invoicing-events topic"),
+     ("Matching tolerance", "IMatchingTolerance", "Matching options", "MatchingOptions: EUR 0 by default", "Configuration", ""),
+     RESET])
+
+SPECS["driver-app-hexagon"] = hexagon(
+    "Driver app · Clean Architecture as a hexagon",
+    "The Driver app reports and the TMS decides. It makes no HTTP call at all: it is called, and it publishes what the Driver did as events.",
+    STD_FOOT.format(app="DriverApp"),
+    [("Trip dispatch and Driver reports Logic Apps", "Trip endpoint with the endpoint key, outcome endpoint with a role", None),
+     ("Driver", "Signs in with Entra: the Driver ID is their app role", PERSON_K),
+     ("The clock", "A timer", None)],
+    [("Driver app API", "[Minimal API]\nTrip endpoint, outcome endpoint, the Driver's own actions"),
+     ("Driver app UI", "[Blazor]\nThe Driver's Trips and Stops, with the state of each report"),
+     ("Hosted workers", "[in Infrastructure]\nOutboxPublisher")],
+    "Pipeline behaviours add the tracking-contract keys to the logging scope for a use case. Presentation reaches the Application only, never the Domain",
+    ("Use cases · 13 handlers", "One command or query and one handler each, by feature:\nReports 5 · Trips 3 · Settings 2 · Reset 2 · Drivers 1"),
+    [("Trips", "DriverTrip: the version the Driver app holds, taken or ignored by version"),
+     ("Reports and Stops", "DriverReport: Sending, Recorded, Refused, Not recorded. Stop and Trip end rules"),
+     ("Proof of delivery form", "The form and its rules at a delivery Stop")],
+    [(SHARED[0], SHARED[1], SHARED[2], SHARED[3].format(db="DriverAppDbContext"), SHARED[4], "The Driver app's own database"),
+     ("Events", "IDriverEventOutbox", "Outbox", "OutboxBuffer saves with the report, OutboxPublisher sends it in the Trip's session", "Service Bus", "The driver-app-events topic"),
+     ("Proof of delivery in transit", "IProofOfDeliveryTransit", "Blob storage", "AzureBlobProofOfDeliveryTransit", "Transit container", "Files wait here until the TMS has them"),
+     ("Driver directory", "IDriverDirectory", "Seed-file directory", "SeedFileDriverDirectory", "Seed file", ""),
+     RESET])
+
+SPECS["partner-portal-hexagon"] = hexagon(
+    "Partner portal · Clean Architecture as a hexagon",
+    "The Partner portal plays every Shipper and Carrier. Norvia's Logic Apps call its Persona endpoints, and it calls Norvia only through the Norvia Partner API.",
+    STD_FOOT.format(app="PartnerPortal"),
+    [("Logic Apps", "Booking requests, cancellations, notifications, invoices, each with the Persona's endpoint key", None),
+     ("Presenter", "Chooses the Persona, books, answers, tracks", PERSON_K),
+     ("The clock", "Timers for automatic answers and tracking", None)],
+    [("Persona endpoints", "[Minimal API, in the Web project]\nWhat Norvia's Logic Apps send to. Acknowledge only"),
+     ("Partner portal UI", "[Blazor]\nOne page set per Persona, and the Presenter panel"),
+     ("Hosted workers", "[in Infrastructure]\nAutoAnswerWorker, AutoProgressWorker")],
+    "One command or query per use case. No pipeline behaviours yet",
+    ("Use cases · 35 handlers", "One command or query and one handler each, by feature:\nCarrier bookings 7 · Carrier shipments 6 · Carrier invoices 5 · Shipper tracking 4 · Bookings 3 · Shipper invoices 2 · Shipper notifications 2 · Presenter faults and sign-ins 3 · Reset 2 · Personas 1"),
+    [("Bookings", "A Shipper's drafts and what Norvia answered"),
+     ("Carrier bookings", "CarrierBookingRequest: Open, Confirmed, Rejected, Withdrawn or Cancelled by Norvia"),
+     ("Carrier invoices", "A Carrier's invoices and Norvia's outcome"),
+     ("Shipper invoices and notifications", "What Norvia sent each Shipper Persona"),
+     ("Personas", "One fictional party each, with its own identity")],
+    [(SHARED[0], SHARED[1], SHARED[2], SHARED[3].format(db="PartnerPortalDbContext"), SHARED[4], "The portal's own database"),
+     ("Norvia Partner API", "INorviaPartnerApi", "Partner API client", "NorviaPartnerApiClient with the Persona's token, Entra in Azure, a local issuer under Aspire", "API Management", "The only way in to Norvia"),
+     ("Persona and Driver directories", "IPersonaDirectory, IDriverSignInDirectory", "Seed-file directories", "SeedFilePersonaDirectory, SeedFileDriverSignInDirectory", "Seed file", ""),
+     ("Driver app settings", "IDriverAppSettings", "Driver app client", "DriverAppSettingsClient", "Driver app", "The Presenter panel's fault switch"),
+     RESET])
+
+SPECS["simulator-hexagon"] = hexagon(
+    "Simulator · Clean Architecture as a hexagon",
+    "The Simulator is a caller of the estate. It acts only through the doors a real party would use, and never writes to another database or publishes to Service Bus itself.",
+    STD_FOOT.format(app="Simulator"),
+    [("Presenter", "Chooses a Preset, previews the plan, starts a run", PERSON_K),
+     ("The clock", "Paces a run, resumes nothing after a restart", None)],
+    [("Simulator UI", "[Blazor]\nConfigure, Plan preview, Runs, Log. There is no API"),
+     ("Hosted worker", "[in Infrastructure]\nRunExecutor: carries out the one active run")],
+    "One command or query per use case. No pipeline behaviours yet",
+    ("Use cases · 12 handlers", "One command or query and one handler each, by feature:\nRuns 7 · Reset 2 · Configure 1 · Log 1 · Plans 1"),
+    [("Worlds and Plans", "The seeded Shippers, Carriers and Drivers, and a Plan from the settings and a seed"),
+     ("Runs and the log", "SimulationRun: Running, then Completed, Cancelled or Failed. What each actor did"),
+     ("Actors", "What a Shipper, Carrier, Planner, Driver and Finance do, and when")],
+    [(SHARED[0], SHARED[1], SHARED[2], SHARED[3].format(db="SimulatorDbContext"), SHARED[4], "The Simulator's own runs and logs"),
+     ("Norvia Partner API", "IPartnerApi", "Partner API client", "NorviaPartnerApiClient as each Persona", "API Management", "Books, answers, tracks, sends Proofs"),
+     ("TMS API and ERP API", "ITmsApi, IErpApi", "API clients", "NorviaTmsApiClient, NorviaErpApiClient as the Simulator's own identity", "TMS API, ERP API", "Plans, releases, Invoice now"),
+     ("Driver app and inboxes", "IDriverApp, IShipperInbox, ICarrierInbox", "Clients", "NorviaDriverAppClient as each Driver, the Partner portal's inbox clients", "Driver app, Partner portal", "Works the Trips, reads invoices"),
+     ("Estate reset", "IEstateReset", "Reset client", "NorviaEstateResetClient: each application's own reset endpoint", "Every application", ""),
+     ("The world and the seed", "IWorldSource, ISeedSource", "Seed sources", "SeedFileWorldSource, RandomSeedSource", "Seed file", "The same seed always gives the same plan")])
+
+SPECS["integration-console-hexagon"] = hexagon(
+    "Integration console · Clean Architecture as a hexagon",
+    "The console owns nothing, so it has no Domain and no database. It reads the estate's telemetry and the dead-letter queues, and changes only Service Bus.",
+    STD_FOOT.format(app="IntegrationConsole"),
+    [("Integration operator", "Signs in with Easy Auth and needs a console role", PERSON_K)],
+    [("Integration console UI", "[Blazor]\nSearch, the Message trail, failed runs, dead-letter queues. There is no API")],
+    "One command or query per use case. No pipeline behaviours yet",
+    ("Use cases · 12 handlers", "One command or query and one handler each, by feature:\nDead letters 7 · Runs 3 · Trails 2"),
+    [],
+    [("Message trails", "ITrailSource", "Trail sources", "LogAnalyticsTrailSource in Azure, DashboardTrailSource under Aspire", "Application Insights, Log Analytics", "The Aspire dashboard locally"),
+     ("Failed runs and run details", "IFailedRuns, IWorkflowRuns", "Logic Apps clients", "LogicAppsWorkflowRuns in Azure, DashboardTrailSource under Aspire", "Logic Apps management API", "Run history and step bodies"),
+     ("Dead-letter queues", "IDeadLetterQueues", "Service Bus", "ServiceBusDeadLetterQueues, ServiceBusClients", "Service Bus", "Peeks, resubmits to one subscription, discards"),
+     ("Audit", "IAuditLog", "Telemetry", "OpenTelemetryAuditLog", "Application Insights", "Every resubmit and discard, with who and why")])
+
 # ------------------------------------------------------------------ TMS lifecycles
 S, END, OFF = "blue", "green", "gray"
 start = lambda i, c, r: dict(id=i, col=c, row=r, kind="planned", w=110, title="Start")
@@ -239,6 +388,100 @@ SPECS["tms-state-supporting"] = dict(
         ("e0", "open", "A Tracking event or Proof of delivery, or Late delivery, opens it"), ("open", "resolved", "Resolve"),
         ("n0", "req", "NotifyShipper"), ("req", "sent", "ReportSent"), ("req", "nd", "ReportNotDelivered"),
         ("d0", "dopen", "The daily horizon job opens the day"), ("dopen", "closed", "The daily horizon job closes days before today"),
+    ],
+)
+
+
+# ------------------------------------------------------------------ ERP, Driver app, Partner portal and Simulator lifecycles
+SPECS["erp-state-invoicing"] = dict(
+    title="ERP · Billable line, invoice and Carrier cost lifecycles",
+    subtitle="The ERP records what the TMS hands it, invoices it exactly once, and keeps Carrier costs open until a Carrier invoice line settles them.",
+    footnote=FOOT_STATES.replace("src/Tms/Norvia.Tms.Domain", "src/Erp/Norvia.Erp.Domain"), legend=LEG_STATES, cell=(340, 120),
+    nodes=[
+        start("b0", 0, 0.0), st("waiting", 1.1, 0.0, "Waiting", "Recorded once from TransportOrderBillable"), st("invoiced", 2.3, 0.0, "Invoiced", "Holds its Shipper invoice number, never invoiced again", END, 250),
+        start("i0", 0, 1.9), st("issued", 1.1, 1.9, "Issued", "A Shipper invoice or a Credit note"), st("sent", 2.3, 1.9, "Sent", "The Persona's endpoint acknowledged it", END), st("nd", 2.3, 3.0, "Not delivered", "Finance can send it again", OFF),
+        start("c0", 0, 4.8), st("open", 1.1, 4.8, "Open", "Recorded once from CarrierCostIncurred"), st("cinv", 2.3, 4.8, "Invoiced", "A Carrier invoice line settled it", END),
+    ],
+    groups=[
+        dict(id="g1", title="Billable line (BillableLineStatus)", palette="green", members=["b0", "waiting", "invoiced"]),
+        dict(id="g2", title="Shipper invoice and Credit note (ShipperInvoiceStatus)", palette="green", members=["i0", "issued", "sent", "nd"]),
+        dict(id="g3", title="Carrier cost (CarrierCostStatus)", palette="green", members=["c0", "open", "cinv"]),
+    ],
+    edges=[
+        ("b0", "waiting", "RecordBillableLine"), ("waiting", "invoiced", "Invoice: an Invoice run, once"),
+        ("i0", "issued", "IssueShipperInvoice, IssueCreditNote"), ("issued", "sent", "ReportSent"), ("issued", "nd", "ReportNotDelivered", dict(orient="v")),
+        ("nd", "issued", "SendAgain", dict(orient="v")),
+        ("c0", "open", "RecordCarrierCost"), ("open", "cinv", "MarkInvoiced"),
+    ],
+)
+
+SPECS["erp-state-carrier-invoice"] = dict(
+    title="ERP · Carrier invoice matching lifecycle",
+    subtitle="Each line is matched against the Carrier cost of its Carrier booking. The invoice is Approved once no line is left for Finance to decide.",
+    footnote=FOOT_STATES.replace("src/Tms/Norvia.Tms.Domain", "src/Erp/Norvia.Erp.Domain"), legend=LEG_STATES, cell=(340, 120),
+    nodes=[
+        start("s0", 0, 0.5), st("received", 1.1, 0.0, "Received", "At least one line to decide"), st("approved", 2.4, 0.5, "Approved", "The Carrier is told the outcome of each line", END, 230),
+        start("l0", 0, 2.6), st("matched", 1.1, 2.0, "Matched", "Within the Matching tolerance of the Carrier cost", END, 230), st("todecide", 1.1, 3.4, "To decide", "Price mismatch, unknown booking or duplicate"),
+        st("accepted", 2.4, 2.6, "Accepted", "At the invoiced amount, or adjusted with a remark", END, 230), st("rejected", 2.4, 3.9, "Rejected", "With a reason", OFF),
+    ],
+    groups=[
+        dict(id="g1", title="Carrier invoice (CarrierInvoiceStatus)", palette="green", members=["s0", "received", "approved"]),
+        dict(id="g2", title="Carrier invoice line (CarrierInvoiceLineStatus)", palette="green", members=["l0", "matched", "todecide", "accepted", "rejected"]),
+    ],
+    edges=[
+        ("s0", "received", "ReceiveCarrierInvoice"), ("s0", "approved", "Receive: every line Matched", dict(via="top", sides=("t", "t"))),
+        ("received", "approved", "A decision leaves no line to decide"),
+        ("l0", "matched", "Match: within the tolerance"), ("l0", "todecide", "Match: it does not"),
+        ("todecide", "accepted", "Accept, or MatchAgain when its Carrier cost arrives"), ("todecide", "rejected", "Reject"),
+    ],
+)
+
+SPECS["driver-app-state-report"] = dict(
+    title="Driver app · Driver report lifecycle",
+    subtitle="A report is saved and shown as Sending until the Driver reports Logic App says what became of it. Trip progress is derived from the reports, never stored.",
+    footnote=FOOT_STATES.replace("src/Tms/Norvia.Tms.Domain", "src/DriverApp/Norvia.DriverApp.Domain"), legend=LEG_STATES, cell=(340, 120),
+    nodes=[
+        start("r0", 0, 0.0), st("sending", 1.1, 0.0, "Sending", "Published through the outbox, no answer yet"),
+        st("recorded", 2.4, -0.55, "Recorded", "The TMS accepted it", END), st("refused", 2.4, 0.45, "Refused", "With the TMS's failure code and message", OFF), st("notrec", 2.4, 1.45, "Not recorded", "The Logic App gave up after its retries", OFF),
+        start("p0", 0, 3.4), st("held", 1.1, 3.4, "Version held", "A Trip version from the TMS, a lower one is ignored"), st("started", 2.4, 3.4, "Started", "A Start Trip report is Recorded"), st("ended", 3.7, 3.4, "Ended", "An End Trip report is Recorded", END),
+    ],
+    groups=[
+        dict(id="g1", title="Report state (ReportState)", palette="teal", members=["r0", "sending", "recorded", "refused", "notrec"]),
+        dict(id="g2", title="Trip progress (derived by TripProgress)", palette="teal", members=["p0", "held", "started", "ended"]),
+    ],
+    edges=[
+        ("r0", "sending", "The Driver reports"), ("sending", "recorded", "ReportOutcome: Recorded"), ("sending", "refused", "ReportOutcome: Refused"), ("sending", "notrec", "ReportOutcome: Not recorded"),
+        ("p0", "held", "ReceiveTripVersion"), ("held", "started", "StartTrip"), ("started", "ended", "EndTrip: every Stop has an outcome"),
+    ],
+)
+
+SPECS["partner-portal-state-carrier-booking-request"] = dict(
+    title="Partner portal · Carrier booking request lifecycle",
+    subtitle="What a Carrier Persona sees of a booking request from Norvia, kept as the Carrier's own record. It mirrors Norvia's Carrier booking, one step behind.",
+    footnote=FOOT_STATES.replace("src/Tms/Norvia.Tms.Domain", "src/PartnerPortal/Norvia.PartnerPortal.Domain"), legend=LEG_STATES, cell=(340, 120),
+    nodes=[
+        start("s0", 0, 1.1), st("open", 1.1, 1.1, "Open", "Waiting for the Persona's answer"), st("confirmed", 2.4, 0.0, "Confirmed", "The Persona answered yes", END),
+        st("rejected", 2.4, 1.1, "Rejected", "With the Persona's reason code", OFF), st("withdrawn", 2.4, 2.2, "Withdrawn by Norvia", "Norvia took it back before an answer", OFF, 230),
+        st("cancelled", 3.7, 0.0, "Cancelled by Norvia", "Norvia cancelled it before collection", OFF, 230),
+    ],
+    groups=[], 
+    edges=[
+        ("s0", "open", "ReceiveCarrierBooking"), ("open", "confirmed", "Answer: confirm"), ("open", "rejected", "Answer: reject"),
+        ("open", "withdrawn", "WithdrawnByNorvia"), ("confirmed", "cancelled", "CancelledByNorvia"),
+    ],
+)
+
+SPECS["simulator-state-run"] = dict(
+    title="Simulator · Simulation run lifecycle",
+    subtitle="Only one run is active at a time. A run can be cancelled but not resumed after a restart, and its log stays after a refresh.",
+    footnote=FOOT_STATES.replace("src/Tms/Norvia.Tms.Domain", "src/Simulator/Norvia.Simulator.Domain"), legend=LEG_STATES, cell=(340, 120),
+    nodes=[
+        start("s0", 0, 1.1), st("running", 1.1, 1.1, "Running", "Sending its plan, in a burst or paced"), st("completed", 2.4, 0.0, "Completed", "The whole plan was carried out", END),
+        st("cancelled", 2.4, 1.1, "Cancelled", "The Presenter cancelled it", OFF), st("failed", 2.4, 2.2, "Failed", "Still running when the Simulator restarted", "orange"),
+    ],
+    groups=[],
+    edges=[
+        ("s0", "running", "StartRun"), ("running", "completed", "Complete"), ("running", "cancelled", "Cancel"), ("running", "failed", "Fail: AbandonActiveRuns"),
     ],
 )
 
