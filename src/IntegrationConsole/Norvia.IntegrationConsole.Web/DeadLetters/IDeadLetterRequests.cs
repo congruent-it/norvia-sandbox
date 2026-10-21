@@ -1,5 +1,6 @@
 using Ardalis.Result;
 using Norvia.IntegrationConsole.Application.DeadLetters;
+using Norvia.IntegrationConsole.Application.DeadLetters.Bulk;
 using Norvia.IntegrationConsole.Application.DeadLetters.List;
 using Norvia.IntegrationConsole.Application.DeadLetters.Discard;
 using Norvia.IntegrationConsole.Application.DeadLetters.Messages;
@@ -19,4 +20,8 @@ public interface IDeadLetterRequests
     Task<Result<ResubmittedDeadLetter>> ResubmitAsync(ResubmitDeadLetteredMessageCommand command, CancellationToken cancellationToken);
 
     Task<Result<DiscardedDeadLetter>> DiscardAsync(DiscardDeadLetteredMessageCommand command, CancellationToken cancellationToken);
+
+    Task<Result<BulkOutcome>> ResubmitManyAsync(ResubmitDeadLetteredMessagesCommand command, CancellationToken cancellationToken);
+
+    Task<Result<BulkOutcome>> DiscardManyAsync(DiscardDeadLetteredMessagesCommand command, CancellationToken cancellationToken);
 }
