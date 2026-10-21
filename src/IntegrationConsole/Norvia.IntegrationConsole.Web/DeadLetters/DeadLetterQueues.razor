@@ -39,11 +39,11 @@ else if (_result is { Queues: { Count: 0 } })
 }
 else if (_result is { } found)
 {
-    @* Counts and ages only: the console reads no message here. *@
+    @* Counts and ages only: the console reads no message here; a queue's messages are listed when the operator opens it. *@
     <FluentDataGrid Items="found.Queues.AsQueryable()" TGridItem="DeadLetterEntity" aria-label="Dead-letter queues"
                     GridTemplateColumns="minmax(16rem, 1fr) max-content max-content">
         <TemplateColumn Title="Queue or subscription">
-            <span class="font-mono text-xs">@context.Name</span>
+            <a href="@DeadLetterLinks.Messages(context.Name)" class="font-mono text-xs">@context.Name</a>
         </TemplateColumn>
         <TemplateColumn Title="Dead-lettered">
             <span class="@(context.Count > 0 ? "text-danger font-bold" : "text-muted")">@context.Count</span>

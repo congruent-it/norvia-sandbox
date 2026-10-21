@@ -1,4 +1,7 @@
+using Ardalis.Result;
+using Norvia.IntegrationConsole.Application.DeadLetters;
 using Norvia.IntegrationConsole.Application.DeadLetters.List;
+using Norvia.IntegrationConsole.Application.DeadLetters.Messages;
 
 namespace Norvia.IntegrationConsole.Web.DeadLetters;
 
@@ -6,4 +9,8 @@ namespace Norvia.IntegrationConsole.Web.DeadLetters;
 public interface IDeadLetterRequests
 {
     Task<DeadLetterQueueList> ListAsync(ListDeadLetterQueuesQuery query, CancellationToken cancellationToken);
+
+    Task<Result<DeadLetteredMessageList>> ListMessagesAsync(ListDeadLetteredMessagesQuery query, CancellationToken cancellationToken);
+
+    Task<Result<RecordedDeadLetterBody>> OpenMessageAsync(OpenDeadLetteredMessageQuery query, CancellationToken cancellationToken);
 }

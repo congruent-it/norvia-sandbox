@@ -301,7 +301,8 @@ resource presenterReadsMessages 'Microsoft.Authorization/roleAssignments@2022-04
 
 // The Integration console's Dead-letter queues page lists every queue and subscription and counts their dead-lettered messages as its
 // own identity, never with the operator's token (ADR 0017). Reader finds the entities and their counts. A peek of the oldest
-// dead-lettered message, for its age, is a data operation and needs the receiver role; the console peeks and never receives.
+// dead-lettered message, for its age, and a peek of a queue's messages and of one message in full, are data operations and need the receiver
+// role; the console peeks and never receives.
 var reader = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'acdd72a7-3385-48ef-bd42-f606fba81ae7')
 
 resource integrationConsoleListsTheNamespace 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
