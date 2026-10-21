@@ -44,6 +44,14 @@ public sealed class RunPageTests : SimulatorWebContext
     }
 
     [Fact]
+    public void Run_OfAPacedRun_SaysHowLongItIsPacedOver()
+    {
+        GivenRun(TestData.Summary(SimulationRunStatus.Completed) with { Mode = RunMode.Paced, Window = TimeSpan.FromMinutes(10) });
+
+        RenderRun().Markup.Should().Contain("paced over 10 min");
+    }
+
+    [Fact]
     public void Render_ARunWithAPlanner_ShowsHowManyOrdersItPlanned()
     {
         GivenRun(TestData.Summary() with { Assigned = 2, ToAssign = 6 });

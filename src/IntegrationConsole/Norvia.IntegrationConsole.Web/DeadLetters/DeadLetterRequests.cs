@@ -1,6 +1,7 @@
 using Ardalis.Result;
 using Mediator;
 using Norvia.IntegrationConsole.Application.DeadLetters;
+using Norvia.IntegrationConsole.Application.DeadLetters.Bulk;
 using Norvia.IntegrationConsole.Application.DeadLetters.List;
 using Norvia.IntegrationConsole.Application.DeadLetters.Discard;
 using Norvia.IntegrationConsole.Application.DeadLetters.Messages;
@@ -27,6 +28,18 @@ internal sealed class DeadLetterRequests(IServiceScopeFactory scopes) : IDeadLet
     }
 
     public async Task<Result<DiscardedDeadLetter>> DiscardAsync(DiscardDeadLetteredMessageCommand command, CancellationToken cancellationToken)
+    {
+        await using var scope = scopes.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<IMediator>().Send(command, cancellationToken);
+    }
+
+    public async Task<Result<BulkOutcome>> ResubmitManyAsync(ResubmitDeadLetteredMessagesCommand command, CancellationToken cancellationToken)
+    {
+        await using var scope = scopes.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<IMediator>().Send(command, cancellationToken);
+    }
+
+    public async Task<Result<BulkOutcome>> DiscardManyAsync(DiscardDeadLetteredMessagesCommand command, CancellationToken cancellationToken)
     {
         await using var scope = scopes.CreateAsyncScope();
         return await scope.ServiceProvider.GetRequiredService<IMediator>().Send(command, cancellationToken);

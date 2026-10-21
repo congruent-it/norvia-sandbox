@@ -91,8 +91,9 @@ public static class SimulatorText
         return reassign ? $"{meant}, then reassigned" : meant;
     }
 
-    public static string Of(RunMode mode, TimeSpan window) =>
-        mode == RunMode.Burst ? "Burst" : $"Paced over {(int)window.TotalMinutes} min";
+    /// <summary>The window is unknown for a list row, which doesn't load the plan: then a paced run is just "Paced".</summary>
+    public static string Of(RunMode mode, TimeSpan? window) =>
+        mode == RunMode.Burst ? "Burst" : window is { } spread ? $"Paced over {(int)spread.TotalMinutes} min" : "Paced";
 
     /// <summary>A time of day in Norvia's own time zone, which the people watching a run keep.</summary>
     public static string Time(DateTimeOffset at) => TimeZoneInfo.ConvertTime(at, Zone).ToString("HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);

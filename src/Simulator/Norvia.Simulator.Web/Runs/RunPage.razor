@@ -45,7 +45,7 @@ else
     <h1>Run @run.Number</h1>
     <p role="status" class="mb-2">
         <strong data-status="@run.Status">@SimulatorText.Of(run.Status)</strong>:
-        @run.Sent of @run.Planned bookings sent@(run.ToAssign > 0 ? $", {run.Assigned} of {run.ToAssign} Transport Orders planned" : ""), @SimulatorText.Of(run.Mode, TimeSpan.Zero).ToLowerInvariant(), seed @run.Seed.
+        @run.Sent of @run.Planned bookings sent@(run.ToAssign > 0 ? $", {run.Assigned} of {run.ToAssign} Transport Orders planned" : ""), @SimulatorText.Of(run.Mode, run.Window).ToLowerInvariant(), seed @run.Seed.
         Started @SimulatorText.DateAndTime(run.StartedAt) by @run.StartedBy@(run.FinishedAt is { } done ? $", finished {SimulatorText.DateAndTime(done)}" : "").
     </p>
     <p class="text-muted">

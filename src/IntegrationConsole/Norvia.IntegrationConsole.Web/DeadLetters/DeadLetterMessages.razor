@@ -5,9 +5,11 @@
 @using Ardalis.Result
 @using Microsoft.AspNetCore.Components.Authorization
 @using Norvia.IntegrationConsole.Application.DeadLetters
+@using Norvia.IntegrationConsole.Application.DeadLetters.Bulk
 @using Norvia.IntegrationConsole.Application.DeadLetters.Discard
 @using Norvia.IntegrationConsole.Application.DeadLetters.Messages
 @using Norvia.IntegrationConsole.Application.DeadLetters.Resubmit
+@using Norvia.IntegrationConsole.Application.Operators
 @using Norvia.IntegrationConsole.Web.Operators
 @using Norvia.IntegrationConsole.Web.Runs
 @using Norvia.IntegrationConsole.Web.Trails
@@ -31,6 +33,21 @@
     <div role="status">
         <FluentMessageBar Intent="outcome.Intent" AllowDismiss="false">@outcome.Text</FluentMessageBar>
     </div>
+}
+
+@if (_bulkOutcome is { } bulkOutcome)
+{
+    <section aria-label="Outcome per message" data-bulk-outcome class="mb-6">
+        <h2 class="text-base font-bold">@bulkOutcome.Title</h2>
+        <ul class="m-0 list-none p-0">
+            @foreach (var message in bulkOutcome.Messages)
+            {
+                <li data-outcome="@message.Status.ToString().ToLowerInvariant()" data-message-outcome="@message.SequenceNumber">
+                    Message @message.SequenceNumber: @BulkText(message)
+                </li>
+            }
+        </ul>
+    </section>
 }
 
 @if (_loading)
@@ -70,8 +87,62 @@ else if (_list is { Messages: { Count: 0 } })
 else if (_list is { } found)
 {
     @* The tracking contract's keys only, never a body: that shows when the operator opens a message. *@
+    @* Only for the Resubmit role. The use cases refuse everyone else too. A selection is of this one queue or subscription. *@
+    @if (_canBulk && _selected.Count > 0)
+    {
+        <div class="mb-2" data-selection>
+            @if (_bulk == BulkAction.Discard)
+            {
+                <div role="alertdialog" aria-label="Confirm discard of the selection">
+                    <p class="mb-2">
+                        Discard @_selected.Count selected @(_selected.Count == 1 ? "message" : "messages") of <span class="font-mono">@Entity</span>? They leave the
+                        dead-letter queue for good and nothing is sent. Your name and the reason are recorded on each.
+                    </p>
+                    <FluentTextArea Label="Reason for discarding the selection" aria-label="Reason for discarding the selection" @bind-Value="_reason" Immediate="true" Rows="3"
+                                    Disabled="_busy" Style="width: 100%;" />
+                    @if (_reasonMissing)
+                    {
+                        <p role="alert" data-reason-missing class="mt-1 text-sm">Give a reason for discarding the messages.</p>
+                    }
+                    <FluentStack class="mt-2">
+                        <FluentButton Appearance="Appearance.Accent" Disabled="_busy" OnClick="DiscardSelectedAsync">Confirm discard of selection</FluentButton>
+                        <FluentButton Disabled="_busy" OnClick="() => _bulk = BulkAction.None">Cancel</FluentButton>
+                    </FluentStack>
+                </div>
+            }
+            else if (_bulk == BulkAction.Resubmit)
+            {
+                <div role="alertdialog" aria-label="Confirm resubmit of the selection">
+                    <p class="mb-2">
+                        Resubmit @_selected.Count selected @(_selected.Count == 1 ? "message" : "messages") to <span class="font-mono">@Entity</span>, oldest first, in
+                        the order they were enqueued? Each leaves the dead-letter queue as its copy is sent. Your name is recorded on each.
+                    </p>
+                    <FluentStack>
+                        <FluentButton Appearance="Appearance.Accent" Disabled="_busy" OnClick="ResubmitSelectedAsync">Confirm resubmit of selection</FluentButton>
+                        <FluentButton Disabled="_busy" OnClick="() => _bulk = BulkAction.None">Cancel</FluentButton>
+                    </FluentStack>
+                </div>
+            }
+            else
+            {
+                <FluentStack VerticalAlignment="VerticalAlignment.Center">
+                    <span data-selected-count>@_selected.Count selected</span>
+                    <FluentButton Appearance="Appearance.Accent" data-resubmit-selected OnClick="() => _bulk = BulkAction.Resubmit">Resubmit selected</FluentButton>
+                    <FluentButton data-discard-selected OnClick="StartDiscardSelected">Discard selected</FluentButton>
+                </FluentStack>
+            }
+        </div>
+    }
+
     <FluentDataGrid Items="found.Messages.AsQueryable()" TGridItem="RecordedDeadLetter" aria-label="Dead-lettered messages" MultiLine="true"
-                    GridTemplateColumns="max-content max-content minmax(10rem, 1fr) max-content minmax(12rem, max-content) minmax(10rem, 1fr)">
+                    GridTemplateColumns="@((_canBulk ? "max-content " : "") + "max-content max-content minmax(10rem, 1fr) max-content minmax(12rem, max-content) minmax(10rem, 1fr)")">
+        @if (_canBulk)
+        {
+            <TemplateColumn Title="Select">
+                <FluentCheckbox Value="_selected.Contains(context.SequenceNumber)" ValueChanged="(bool on) => Select(context.SequenceNumber, on)"
+                                aria-label="@($"Select message {context.SequenceNumber}")" data-select="@context.SequenceNumber" Disabled="_busy" />
+            </TemplateColumn>
+        }
         <TemplateColumn Title="Enqueued">
             <FluentButton Appearance="Appearance.Lightweight" data-message="@context.SequenceNumber"
                           aria-expanded="@(_opened == context.SequenceNumber ? "true" : "false")" OnClick="() => OpenAsync(context.SequenceNumber)">
@@ -222,6 +293,10 @@ else if (_list is { } found)
     private bool _reasonMissing;
     private bool _busy;
     private Outcome? _outcome;
+    private bool _canBulk;
+    private readonly HashSet<long> _selected = [];
+    private BulkAction _bulk;
+    private BulkResult? _bulkOutcome;
     // Cancel peeking when the operator leaves the page, opens another queue or another message.
     private CancellationTokenSource _peek = new();
     private CancellationTokenSource _fetch = new();
@@ -236,6 +311,10 @@ else if (_list is { } found)
         _problems = null;
         _list = null;
         _outcome = null;
+        _bulkOutcome = null;
+        _selected.Clear();
+        _bulk = BulkAction.None;
+        _canBulk = (await Authentication.GetAuthenticationStateAsync()).User.IsInRole(OperatorRoles.Resubmit);
         await CloseMessageAsync();
 
         await _peek.CancelAsync();
@@ -409,6 +488,98 @@ else if (_list is { } found)
             _busy = false;
         }
     }
+
+    private void Select(long sequenceNumber, bool on)
+    {
+        if (on)
+        {
+            _selected.Add(sequenceNumber);
+        }
+        else
+        {
+            _selected.Remove(sequenceNumber);
+        }
+
+        _bulk = BulkAction.None;
+    }
+
+    private void StartDiscardSelected()
+    {
+        _bulk = BulkAction.Discard;
+        _reason = string.Empty;
+        _reasonMissing = false;
+    }
+
+    private Task ResubmitSelectedAsync() =>
+        RunBulkAsync("Resubmit", (caller, messages) => DeadLetters.ResubmitManyAsync(new ResubmitDeadLetteredMessagesCommand(caller, messages), CancellationToken.None));
+
+    private async Task DiscardSelectedAsync()
+    {
+        // The form refuses a missing reason before anything is sent; the use case refuses it too.
+        if (string.IsNullOrWhiteSpace(_reason))
+        {
+            _reasonMissing = true;
+            return;
+        }
+
+        _reasonMissing = false;
+        await RunBulkAsync("Discard", (caller, messages) => DeadLetters.DiscardManyAsync(new DiscardDeadLetteredMessagesCommand(caller, messages, _reason), CancellationToken.None));
+    }
+
+    private async Task RunBulkAsync(string verb, Func<ClaimsPrincipal, IReadOnlyList<DeadLetterSelection>, Task<Result<BulkOutcome>>> send)
+    {
+        if (_list is not { } list)
+        {
+            return;
+        }
+
+        // Ordered by the use case, whatever order they were ticked in; the page only says which.
+        var selection = list.Messages.Where(message => _selected.Contains(message.SequenceNumber))
+            .Select(message => new DeadLetterSelection(Entity, message.SequenceNumber, message.EnqueuedAt)).ToList();
+        _busy = true;
+        try
+        {
+            var caller = (await Authentication.GetAuthenticationStateAsync()).User;
+            var result = await send(caller, selection);
+            switch (result.Status)
+            {
+                case ResultStatus.Ok:
+                    var done = result.Value.Messages.Where(message => message.Status != MessageOutcomeStatus.Failed).Select(message => message.SequenceNumber).ToHashSet();
+                    var failed = result.Value.Messages.Count(message => message.Status == MessageOutcomeStatus.Failed);
+                    _bulkOutcome = new BulkResult($"{verb} of {result.Value.Messages.Count} selected messages of {Entity}: {result.Value.Messages.Count - failed} done, {failed} failed.", result.Value.Messages);
+                    _list = list with { Messages = [.. list.Messages.Where(message => !done.Contains(message.SequenceNumber))] };
+                    _selected.RemoveWhere(done.Contains);
+                    break;
+                case ResultStatus.Forbidden:
+                    _outcome = new Outcome(MessageIntent.Warning, $"You aren't allowed to {verb.ToLowerInvariant()} messages. Nothing was changed.");
+                    break;
+                default:
+                    _outcome = new Outcome(MessageIntent.Warning, string.Join(" ", result.ValidationErrors.Select(error => error.ErrorMessage)));
+                    break;
+            }
+        }
+        catch (Exception exception)
+        {
+            DeadLetterPageLog.BulkFailed(Logger, exception, verb, Entity);
+            _outcome = new Outcome(MessageIntent.Error, "The selection couldn't be sent. Check the list for what is still on the dead-letter queue and try again in a moment.");
+        }
+        finally
+        {
+            _bulk = BulkAction.None;
+            _busy = false;
+        }
+    }
+
+    private static string BulkText(MessageOutcome message) => message.Status switch
+    {
+        MessageOutcomeStatus.Done => "done.",
+        MessageOutcomeStatus.Gone => "no longer on the queue: it was resubmitted or discarded.",
+        _ => $"failed. {message.Detail}",
+    };
+
+    private enum BulkAction { None, Resubmit, Discard }
+
+    private sealed record BulkResult(string Title, IReadOnlyList<MessageOutcome> Messages);
 
     // The list shows what was peeked, so the message leaves it here rather than on the next peek.
     private void Remove(long sequenceNumber)

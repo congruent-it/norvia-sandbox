@@ -20,4 +20,7 @@ internal static partial class DeadLetterPageLog
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Discarding the dead-lettered message {SequenceNumber} of {Entity} failed")]
     public static partial void DiscardFailed(ILogger logger, Exception exception, long sequenceNumber, string entity);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "{Action} of a selection of dead-lettered messages of {Entity} failed")]
+    public static partial void BulkFailed(ILogger logger, Exception exception, string action, string entity);
 }
