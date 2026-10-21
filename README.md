@@ -104,6 +104,8 @@ infra/smoke-test-intake.sh                   # after a deployment: checks intake
 infra/smoke-test-partner-api.sh              # and the demo smoke run: books through API Management as each Persona
 # after booking as Brouwer Dranken in the Partner portal, follows the booking's Message trail:
 infra/smoke-test-integration-console.sh <Transport Order number> [<correlation ID>]
+# after booking another Shipment to Van Dijk Transport, stops the TMS, dead-letters a POD and has you resubmit it, then discard another:
+infra/smoke-test-integration-console-dead-letters.sh <Transport Order number>
 # after booking Rotterdam to Antwerp and to Düsseldorf as Brouwer Dranken, checks their Rating:
 infra/smoke-test-rating.sh <Antwerp's Transport Order number> <Düsseldorf's Transport Order number>
 # after assigning, reassigning and releasing that booking's Shipment as the Planner in the TMS UI, checks planning:
