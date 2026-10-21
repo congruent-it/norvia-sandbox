@@ -32,7 +32,9 @@ def render(spec, out_excalidraw, out_svg=None):
     parts = spec["participants"]
     n = len(parts)
     xs = {p["id"]: M + COL_W / 2 + i * COL_W for i, p in enumerate(parts)}
-    width = M * 2 + n * COL_W
+    last = parts[-1]["id"]
+    right_pad = int(COL_W * 1.5) if any(st[0] == "self" and st[1] == last for st in spec["steps"]) else 0  # room for a note beside the last lifeline
+    width = max(M * 2 + n * COL_W + right_pad, int(len(spec["title"]) * 38 * CHAR) + 2 * M)
 
     # first pass: heights
     y = TOP + HEAD_H + 24

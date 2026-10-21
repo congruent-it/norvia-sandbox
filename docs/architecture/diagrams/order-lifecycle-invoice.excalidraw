@@ -29,14 +29,14 @@
       "updated": 1760000000000,
       "link": null,
       "locked": false,
-      "text": "Order lifecycle 3 \u00b7 From delivered to a Shipper invoice",
+      "text": "Order lifecycle 5 \u00b7 From delivered to a Shipper invoice",
       "fontSize": 38,
       "fontFamily": 6,
       "textAlign": "left",
       "verticalAlign": "top",
       "baseline": 34,
       "containerId": null,
-      "originalText": "Order lifecycle 3 \u00b7 From delivered to a Shipper invoice",
+      "originalText": "Order lifecycle 5 \u00b7 From delivered to a Shipper invoice",
       "autoResize": false,
       "lineHeight": 1.25
     },
@@ -46,7 +46,7 @@
       "x": 40,
       "y": 82,
       "width": 1400,
-      "height": 20.0,
+      "height": 40.0,
       "angle": 0,
       "strokeColor": "#6b7280",
       "backgroundColor": "transparent",
@@ -66,14 +66,14 @@
       "updated": 1760000000000,
       "link": null,
       "locked": false,
-      "text": "The TMS decides when an order is Billable, and the ERP does everything after that. P9 and E1.",
+      "text": "The TMS decides when an order is Billable, and the ERP does everything after that. P9 and E1. It is the same whether a Carrier or the Own fleet carried\nthe goods.",
       "fontSize": 16,
       "fontFamily": 6,
       "textAlign": "left",
       "verticalAlign": "top",
       "baseline": 14,
       "containerId": null,
-      "originalText": "The TMS decides when an order is Billable, and the ERP does everything after that. P9 and E1.",
+      "originalText": "The TMS decides when an order is Billable, and the ERP does everything after that. P9 and E1. It is the same whether a Carrier or the Own fleet carried\nthe goods.",
       "autoResize": false,
       "lineHeight": 1.25
     },
@@ -413,7 +413,7 @@
       "x": 140.0,
       "y": 226,
       "width": 0.0,
-      "height": 1085,
+      "height": 1115,
       "angle": 0,
       "strokeColor": "#ced4da",
       "backgroundColor": "transparent",
@@ -440,7 +440,7 @@
         ],
         [
           0.0,
-          1085
+          1115
         ]
       ],
       "lastCommittedPoint": null,
@@ -456,7 +456,7 @@
       "x": 340.0,
       "y": 226,
       "width": 0.0,
-      "height": 1085,
+      "height": 1115,
       "angle": 0,
       "strokeColor": "#ced4da",
       "backgroundColor": "transparent",
@@ -483,7 +483,7 @@
         ],
         [
           0.0,
-          1085
+          1115
         ]
       ],
       "lastCommittedPoint": null,
@@ -499,7 +499,7 @@
       "x": 540.0,
       "y": 226,
       "width": 0.0,
-      "height": 1085,
+      "height": 1115,
       "angle": 0,
       "strokeColor": "#ced4da",
       "backgroundColor": "transparent",
@@ -526,7 +526,7 @@
         ],
         [
           0.0,
-          1085
+          1115
         ]
       ],
       "lastCommittedPoint": null,
@@ -542,7 +542,7 @@
       "x": 740.0,
       "y": 226,
       "width": 0.0,
-      "height": 1085,
+      "height": 1115,
       "angle": 0,
       "strokeColor": "#ced4da",
       "backgroundColor": "transparent",
@@ -569,7 +569,7 @@
         ],
         [
           0.0,
-          1085
+          1115
         ]
       ],
       "lastCommittedPoint": null,
@@ -585,7 +585,7 @@
       "x": 940.0,
       "y": 226,
       "width": 0.0,
-      "height": 1085,
+      "height": 1115,
       "angle": 0,
       "strokeColor": "#ced4da",
       "backgroundColor": "transparent",
@@ -612,7 +612,7 @@
         ],
         [
           0.0,
-          1085
+          1115
         ]
       ],
       "lastCommittedPoint": null,
@@ -628,7 +628,7 @@
       "x": 1140.0,
       "y": 226,
       "width": 0.0,
-      "height": 1085,
+      "height": 1115,
       "angle": 0,
       "strokeColor": "#ced4da",
       "backgroundColor": "transparent",
@@ -655,7 +655,7 @@
         ],
         [
           0.0,
-          1085
+          1115
         ]
       ],
       "lastCommittedPoint": null,
@@ -671,7 +671,7 @@
       "x": 1340.0,
       "y": 226,
       "width": 0.0,
-      "height": 1085,
+      "height": 1115,
       "angle": 0,
       "strokeColor": "#ced4da",
       "backgroundColor": "transparent",
@@ -698,7 +698,7 @@
         ],
         [
           0.0,
-          1085
+          1115
         ]
       ],
       "lastCommittedPoint": null,
@@ -2934,7 +2934,7 @@
       "x": 656.0,
       "y": 1220,
       "width": 368.0,
-      "height": 63,
+      "height": 93,
       "angle": 0,
       "strokeColor": "#f59f00",
       "backgroundColor": "#fff9db",
@@ -2963,7 +2963,7 @@
       "x": 664.0,
       "y": 1228,
       "width": 352.0,
-      "height": 30.0,
+      "height": 75.0,
       "angle": 0,
       "strokeColor": "#1e1e1e",
       "backgroundColor": "transparent",
@@ -2983,14 +2983,14 @@
       "updated": 1760000000000,
       "link": null,
       "locked": false,
-      "text": "Finance corrects an issued invoice with a Credit\nnote, which takes the same path as CreditNoteIssued",
+      "text": "Finance corrects an issued invoice with a Credit\nnote, which takes the same path as\nCreditNoteIssued. An Own fleet order is invoiced\nthe same way and has no Carrier cost, so lifecycle\n6 does not apply to it",
       "fontSize": 12,
       "fontFamily": 6,
       "textAlign": "center",
       "verticalAlign": "top",
       "baseline": 10,
       "containerId": null,
-      "originalText": "Finance corrects an issued invoice with a Credit\nnote, which takes the same path as CreditNoteIssued",
+      "originalText": "Finance corrects an issued invoice with a Credit\nnote, which takes the same path as\nCreditNoteIssued. An Own fleet order is invoiced\nthe same way and has no Carrier cost, so lifecycle\n6 does not apply to it",
       "autoResize": false,
       "lineHeight": 1.25
     },
@@ -2998,7 +2998,7 @@
       "id": "tex0084",
       "type": "text",
       "x": 40,
-      "y": 1315,
+      "y": 1345,
       "width": 1400,
       "height": 32.5,
       "angle": 0,

@@ -5,7 +5,7 @@ How Norvia's estate is put together, for engineers and coding agents working on 
 | Page | Covers |
 |---|---|
 | [c4.md](c4.md) | L1 system context: Norvia's systems, the parties outside Norvia and the people who use them. L2 containers: the applications, API Management, the Logic Apps, Service Bus, SQL, storage, Key Vault, Application Insights and Entra, and how they talk. L3 components of the integration layer: API Management's policies, the Logic Apps and their local functions, the subscriptions and queues, and the TMS APIs they call |
-| [order-lifecycle.md](order-lifecycle.md) | One order from booking to both invoices, in four sequence diagrams: intake to a Booked Shipment, tracking and proofs to Delivered, the Shipper invoice, and the Carrier cost to the Carrier invoice outcome |
+| [order-lifecycle.md](order-lifecycle.md) | One order from booking to the invoices, in six sequence diagrams, for a Carrier and for the Own fleet: intake to a Booked Shipment, to a Dispatched Trip and the Driver on the road, tracking and proofs to Delivered, the Shipper invoice, and the Carrier cost to the Carrier invoice outcome |
 | [deployment.md](deployment.md) | What is deployed to Azure and which layer owns it (the estate Bicep or the Aspire AppHost), and the order `azd up` deploys it in |
 | [context-map.md](context-map.md) | The bounded contexts: what each application owns, what it holds only a copy of, and how they relate (customer and supplier, partnership, open host service), with the ADR behind each relationship |
 | [tms-architecture.md](tms-architecture.md) | The TMS as a hexagon: Domain, Application with its use cases and ports, the adapters in Infrastructure, and what the architecture tests hold. The template for the other applications |

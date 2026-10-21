@@ -162,7 +162,7 @@ For engineers and coding agents. Built so far: the Carrier cost Logic App, recor
 
 ### Message trail
 
-The Hops of E2, named as the [Integration console](../../operations/integration-console.md#message-trail) shows them, in time order. A Hop is grouped under the Flow it carries in the tracking contract. The same order's whole life, across every application, is drawn in [the order lifecycle](../../architecture/order-lifecycle.md#4-from-a-carrier-cost-to-a-carrier-invoice-outcome).
+The Hops of E2, named as the [Integration console](../../operations/integration-console.md#message-trail) shows them, in time order. A Hop is grouped under the Flow it carries in the tracking contract. The same order's whole life, across every application, is drawn in [the order lifecycle](../../architecture/order-lifecycle.md#6-from-a-carrier-cost-to-a-carrier-invoice-outcome).
 
 **1. A Carrier cost.** The TMS publishes `CarrierCostIncurred` when a Carrier Shipment is Delivered, on the trail of the Delivered Tracking event.
 

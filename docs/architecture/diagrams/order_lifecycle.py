@@ -25,11 +25,13 @@ BUS = P("bus", "Service Bus", "violet", "topics and queues")
 TMS = P("tms", "TMS", "blue", "TMS API")
 ERP = P("erp", "ERP", "green", "ERP API")
 PLANNER = P("planner", "Planner", "blue", "TMS UI", "person")
+DRIVER = P("driver", "Driver", "teal", "Driver app UI", "person")
+DRIVERAPP = P("app", "Driver app", "teal", "Driver app API")
 FINANCE = P("finance", "Finance", "green", "ERP UI", "person")
 
 SPECS["booked"] = dict(
-    title="Order lifecycle 1 · From a booking to a Booked Shipment",
-    subtitle="A Shipper books, the TMS accepts and rates the order, the Planner assigns and releases it, and the Carrier confirms. P1 to P4, for a Carrier Shipment.",
+    title="Order lifecycle 1 · From a booking to a Booked Shipment, with a Carrier",
+    subtitle="A Shipper books, the TMS accepts and rates the order, the Planner assigns and releases it, and the Carrier confirms. P1 to P4. An Own fleet Shipment leaves this path at the release: see lifecycles 2 and 3.",
     footnote=LEGEND_ARROWS + " Source of truth: docs/processes/tms (P1 to P4) and docs/architecture/c4.md.",
     legend=LEGEND,
     participants=[SHIPPER, APIM, P("intake", "Intake Logic App"), TMS, PLANNER, BUS, P("booking", "Carrier booking Logic App"), CARRIER, P("answer", "Carrier answer Logic App")],
@@ -49,7 +51,7 @@ SPECS["booked"] = dict(
         ("self", "tms", "Checks the assignment rules, makes the Shipment and publishes ShipmentPlanned"),
         ("msg", "planner", "tms", "Release the Shipment, with a Spot price if no Carrier Rate Card prices it"),
         ("self", "tms", "Shipment Released, Carrier booking Requested and Carrier cost frozen, in one transaction"),
-        ("note", ["planner", "tms"], "An Own fleet Shipment is not booked: the Planner builds a Trip and dispatches it to the Driver app instead (P11)"),
+        ("note", ["planner", "tms"], "Own fleet: the Shipment is assigned to Own fleet instead, and released without a Carrier booking or a Carrier cost. The Planner then builds a Trip (lifecycle 2)"),
         ("msg", "tms", "bus", "ShipmentReleased, carrying the Carrier cost", dict(dashed=True)),
         ("phase", "P4 · Carrier booking"),
         ("msg", "bus", "booking", "Subscription carrier-booking: the Shipment is assigned to a Carrier", dict(dashed=True)),
@@ -63,9 +65,73 @@ SPECS["booked"] = dict(
     ],
 )
 
+SPECS["own-fleet-dispatch"] = dict(
+    title="Order lifecycle 2 · From a booking to a Dispatched Trip, with the Own fleet",
+    subtitle="After intake and rating (lifecycle 1), the Planner assigns the order to the Own fleet, releases it, builds a Trip and dispatches it to the Driver. P3, P10 and P11.",
+    footnote=LEGEND_ARROWS + " Source of truth: docs/processes/tms (P3, P10, P11).",
+    legend=LEGEND + [L("Driver app", "teal")],
+    participants=[PLANNER, TMS, BUS, P("dispatch", "Trip dispatch Logic App"), DRIVERAPP],
+    steps=[
+        ("phase", "P3 · Assign to the Own fleet and release"),
+        ("msg", "planner", "tms", "Assign the Transport Order to the Own fleet"),
+        ("self", "tms", "Checks the assignment rules and makes the Shipment. The load check for its collection day comes back as a warning, never a refusal (P10)"),
+        ("msg", "planner", "tms", "Release the Shipment: no Carrier booking and no Carrier cost"),
+        ("self", "tms", "Shipment Released. It now appears in the Shipments to put on Trips"),
+        ("note", ["planner", "tms"], "P10 keeps the Own fleet's availability: each day of the Planning horizon holds the Vehicles and Drivers available from the Rosters, Absences and Off the road days, and each Driver's Driving-hour budget. A daily job opens each new day"),
+        ("phase", "P11 · Trip dispatch"),
+        ("msg", "planner", "tms", "Create a Draft Trip: a Vehicle and Driver free that day, a Planned start inside the Driver's Shift, the driving hours, and the Shipments in the order to visit"),
+        ("self", "tms", "The Draft holds its Vehicle and Driver, so neither has another Trip that day. Nothing is published. The Planner can change it or discard it"),
+        ("msg", "planner", "tms", "Dispatch the Trip"),
+        ("self", "tms", "The Trip is Dispatched as version 1 and each Shipment Dispatched, in one transaction. A Trip is never deleted once dispatched"),
+        ("msg", "tms", "bus", "TripDispatched, with the whole Trip and its Stops in order", dict(dashed=True)),
+        ("msg", "bus", "dispatch", "Subscription trip-dispatch", dict(dashed=True)),
+        ("msg", "dispatch", "app", "The whole Trip, retried on a timeout, 408, 429 and 5xx. Endpoint key from Key Vault"),
+        ("self", "app", "Keeps the version. A repeat, or a lower version after a higher one, is acknowledged and ignored"),
+        ("msg", "app", "dispatch", "2xx, the Trip version kept", dict(dashed=True)),
+        ("msg", "dispatch", "tms", "Report the version delivered"),
+        ("self", "tms", "The version is Delivered to the Driver app. If the Logic App gives up, it is Not delivered and the Planner sees it and sends it again"),
+        ("note", ["planner", "dispatch"], "Amend sends the Driver a new version of the whole Trip. Once the Trip is under way, the only change allowed is taking off a Shipment that has not been collected, which puts it back to Planned"),
+    ],
+)
+
+SPECS["own-fleet-road"] = dict(
+    title="Order lifecycle 3 · The Driver on the road, with the Own fleet",
+    subtitle="The Driver reports, the TMS decides. Every report travels as an event in order per Trip, and the Shipment ends Delivered or goes back to planning. P12.",
+    footnote=LEGEND_ARROWS + " Source of truth: docs/processes/tms/p12-trip-execution.md.",
+    legend=LEGEND + [L("Driver app", "teal")],
+    participants=[DRIVER, DRIVERAPP, P("bus", "Service Bus", "violet", "driver-app-events topic"), P("reports", "Driver reports Logic App"), TMS],
+    steps=[
+        ("phase", "Start the Trip"),
+        ("msg", "driver", "app", "Start Trip, on the Trip's day"),
+        ("self", "app", "Saves the report as Sending and its event in the outbox, in one transaction"),
+        ("msg", "app", "bus", "TripStartReported, in the session of the Trip's number", dict(dashed=True)),
+        ("msg", "bus", "reports", "Subscription driver-reports: one Trip's reports are read one at a time, in order", dict(dashed=True)),
+        ("msg", "reports", "tms", "Start a Trip"),
+        ("self", "tms", "The Trip is In progress"),
+        ("msg", "reports", "app", "Report the outcome: Recorded, or Refused with the TMS's code"),
+        ("phase", "Collect and deliver"),
+        ("msg", "driver", "app", "Collected at a collection Stop"),
+        ("msg", "app", "bus", "StopCompletedReported, with a Collected Tracking event", dict(dashed=True)),
+        ("msg", "bus", "reports", "The next report in the Trip's session", dict(dashed=True)),
+        ("msg", "reports", "tms", "Record the Tracking event, as an Own fleet report"),
+        ("self", "tms", "The Shipment is Collected. Its ETA is its delivery window, since the Driver app sends no GPS and no planned times"),
+        ("msg", "driver", "app", "Deliver: received by, the condition, a signature and up to four photos"),
+        ("msg", "app", "bus", "StopCompletedReported and ProofOfDeliveryCaptured. The files wait in the transit container", dict(dashed=True)),
+        ("msg", "reports", "tms", "Record the Delivered event, then the Proof of delivery with its files"),
+        ("self", "tms", "The Shipment is Delivered and its Proof of delivery is the current one. Billable is decided in the same transaction"),
+        ("note", ["driver", "app"], "A Stop that fails is reported as Collection failed or Delivery failed, with a remark. The TMS opens an Exception for it, and the Planner resolves it as in lifecycle 4"),
+        ("phase", "End the Trip"),
+        ("msg", "driver", "app", "End Trip, once every Stop has an outcome"),
+        ("msg", "app", "bus", "TripEndReported, after the last Stop report in the session", dict(dashed=True)),
+        ("msg", "reports", "tms", "End a Trip"),
+        ("self", "tms", "The Trip is Completed. A Shipment not collected goes back to Planned, and one collected but not delivered is Awaiting re-delivery"),
+        ("note", ["app", "tms"], "A Shipment Awaiting re-delivery is still on Norvia's Vehicle. It goes on a later Trip with only its delivery Stop (P11, P12)"),
+    ],
+)
+
 SPECS["delivered"] = dict(
-    title="Order lifecycle 2 · From Booked to Delivered, and what everyone sees",
-    subtitle="The Carrier reports tracking and a Proof of delivery, the TMS moves the Shipment forward, and the Shipper reads where it stands. P5 to P8.",
+    title="Order lifecycle 4 · From Booked to Delivered by a Carrier, and what everyone sees",
+    subtitle="The Carrier reports tracking and a Proof of delivery, the TMS moves the Shipment forward, and the Shipper reads where it stands. P5 to P8. The Shipper and the Planner see the same whoever carries it.",
     footnote=LEGEND_ARROWS + " Source of truth: docs/processes/tms (P5 to P8).",
     legend=LEGEND,
     participants=[SHIPPER, CARRIER, APIM, P("bus", "Service Bus and storage", "violet", "queues and a blob"), P("tracking", "Carrier tracking Logic App"), P("pod", "Carrier Proof of delivery Logic App"), TMS, PLANNER],
@@ -79,7 +145,7 @@ SPECS["delivered"] = dict(
         ("self", "tms", "Records the event and moves the Shipment's status and ETA forward, never backwards. The event goes to the outbox in the same transaction"),
         ("msg", "tms", "tracking", "200, also for a repeat", dict(dashed=True)),
         ("msg", "tracking", "bus", "Settle the message: complete, dead-letter or abandon", dict(dashed=True)),
-        ("note", ["carrier", "tms"], "Own fleet Shipments: the Driver app reports the same Tracking events and Proofs of delivery through the Driver reports Logic App (P12)"),
+        ("note", ["carrier", "tms"], "Own fleet Shipments: the Driver reports the same Tracking events and Proofs of delivery through the Driver app, and they reach the TMS through the Driver reports Logic App (lifecycle 3)"),
         ("phase", "P6 · Proof of delivery"),
         ("msg", "carrier", "apim", "POST /partner/v1/carrier-proofs-of-delivery: a signed CMR, a signature or photos"),
         ("msg", "apim", "bus", "Stores the file as a blob and queues its reference (claim check)"),
@@ -101,8 +167,8 @@ SPECS["delivered"] = dict(
 )
 
 SPECS["invoice"] = dict(
-    title="Order lifecycle 3 · From delivered to a Shipper invoice",
-    subtitle="The TMS decides when an order is Billable, and the ERP does everything after that. P9 and E1.",
+    title="Order lifecycle 5 · From delivered to a Shipper invoice",
+    subtitle="The TMS decides when an order is Billable, and the ERP does everything after that. P9 and E1. It is the same whether a Carrier or the Own fleet carried the goods.",
     footnote=LEGEND_ARROWS + " Source of truth: docs/processes/tms/p9-freight-settlement.md and docs/processes/erp/e1-invoicing.md.",
     legend=LEGEND,
     participants=[TMS, BUS, P("billing", "Billing Logic App"), ERP, FINANCE, P("invlogic", "Shipper invoice Logic App"), SHIPPER],
@@ -122,13 +188,13 @@ SPECS["invoice"] = dict(
         ("msg", "invlogic", "shipper", "The invoice, in the Shipper's format, to the Persona's invoice endpoint"),
         ("msg", "shipper", "invlogic", "Acknowledged", dict(dashed=True)),
         ("msg", "invlogic", "erp", "Report the invoice Sent"),
-        ("note", ["erp", "finance"], "Finance corrects an issued invoice with a Credit note, which takes the same path as CreditNoteIssued"),
+        ("note", ["erp", "finance"], "Finance corrects an issued invoice with a Credit note, which takes the same path as CreditNoteIssued. An Own fleet order is invoiced the same way and has no Carrier cost, so lifecycle 6 does not apply to it"),
     ],
 )
 
 SPECS["carrier-invoice"] = dict(
-    title="Order lifecycle 4 · From a Carrier cost to a Carrier invoice outcome",
-    subtitle="The TMS prices the Carrier booking and hands the cost over, the ERP matches the Carrier's invoice against it, and the Carrier is told. P9 and E2.",
+    title="Order lifecycle 6 · From a Carrier cost to a Carrier invoice outcome",
+    subtitle="Carrier Shipments only. The TMS prices the Carrier booking and hands the cost over, the ERP matches the Carrier's invoice against it, and the Carrier is told. P9 and E2.",
     footnote=LEGEND_ARROWS + " Source of truth: docs/processes/tms/p9-freight-settlement.md and docs/processes/erp/e2-carrier-invoice-matching.md.",
     legend=LEGEND,
     participants=[TMS, BUS, P("costla", "Carrier cost Logic App"), ERP, P("outla", "Carrier invoice outcome Logic App"), FINANCE, P("cinvla", "Carrier invoice Logic App"), CARRIER],

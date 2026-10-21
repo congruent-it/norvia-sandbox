@@ -148,7 +148,7 @@ For engineers and coding agents. It shows where E1 lives in the repository. Buil
 
 ### Message trail
 
-The Hops of E1, named as the [Integration console](../../operations/integration-console.md#message-trail) shows them, in time order. A Hop is grouped under the Flow it carries in the tracking contract. The same order's whole life, across every application, is drawn in [the order lifecycle](../../architecture/order-lifecycle.md#3-from-delivered-to-a-shipper-invoice).
+The Hops of E1, named as the [Integration console](../../operations/integration-console.md#message-trail) shows them, in time order. A Hop is grouped under the Flow it carries in the tracking contract. The same order's whole life, across every application, is drawn in [the order lifecycle](../../architecture/order-lifecycle.md#5-from-delivered-to-a-shipper-invoice).
 
 **1. A Billable line.** The TMS's `TransportOrderBillable` is on the `transport-order-events` topic. The Billing Logic App reacts on the same trail, with the event's correlation ID.
 
