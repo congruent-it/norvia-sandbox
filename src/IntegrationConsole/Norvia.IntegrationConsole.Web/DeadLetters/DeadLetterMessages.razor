@@ -1,0 +1,273 @@
+@page "/dead-letter-queues/{*Entity}"
+@* Interactive, not prerendered: the page peeks the Service Bus itself, and opening a message needs the circuit. *@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using Ardalis.Result
+@using Norvia.IntegrationConsole.Application.DeadLetters
+@using Norvia.IntegrationConsole.Application.DeadLetters.Messages
+@using Norvia.IntegrationConsole.Web.Runs
+@using Norvia.IntegrationConsole.Web.Trails
+@inject IDeadLetterRequests DeadLetters
+@inject ILogger<DeadLetterMessages> Logger
+@implements IDisposable
+
+<PageTitle>Integration console · Dead-lettered messages of @Entity</PageTitle>
+
+<h1>Dead-lettered messages of <span class="font-mono text-base">@Entity</span></h1>
+<p class="text-muted mb-1"><a href="/dead-letter-queues">All dead-letter queues</a></p>
+@* Peeked, never received: a message keeps its delivery count and lock state, and stays on the queue. *@
+<p role="note" class="text-muted mb-6">
+    The oldest first. The console only looks: it receives, resubmits and discards nothing here, and shows a message's body
+    only when you open it.
+</p>
+
+@if (_loading)
+{
+    <div role="status">
+        <FluentStack VerticalAlignment="VerticalAlignment.Center">
+            <FluentProgressRing />
+            <span>Loading the dead-lettered messages…</span>
+        </FluentStack>
+    </div>
+}
+else if (_failed)
+{
+    <div role="alert">
+        <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+            The dead-lettered messages couldn't be listed. Try again in a moment; if it keeps failing, the console may not
+            reach the estate's Service Bus.
+        </FluentMessageBar>
+    </div>
+}
+else if (_problems is { Count: > 0 })
+{
+    <div role="alert">
+        <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
+            @string.Join(" ", _problems)
+        </FluentMessageBar>
+    </div>
+}
+else if (_missing)
+{
+    <p role="status">The Service Bus has no queue or subscription named @Entity.</p>
+}
+else if (_list is { Messages: { Count: 0 } })
+{
+    <p role="status">@Entity has no dead-lettered messages.</p>
+}
+else if (_list is { } found)
+{
+    @* The tracking contract's keys only, never a body: that shows when the operator opens a message. *@
+    <FluentDataGrid Items="found.Messages.AsQueryable()" TGridItem="RecordedDeadLetter" aria-label="Dead-lettered messages" MultiLine="true"
+                    GridTemplateColumns="max-content max-content minmax(10rem, 1fr) max-content minmax(12rem, max-content) minmax(10rem, 1fr)">
+        <TemplateColumn Title="Enqueued">
+            <FluentButton Appearance="Appearance.Lightweight" data-message="@context.SequenceNumber"
+                          aria-expanded="@(_opened == context.SequenceNumber ? "true" : "false")" OnClick="() => OpenAsync(context.SequenceNumber)">
+                @ConsoleTime.Format(context.EnqueuedAt)
+            </FluentButton>
+        </TemplateColumn>
+        <TemplateColumn Title="Reason">
+            <span class="font-mono text-xs">@DeadLetterText.Reason(context.Reason)</span>
+        </TemplateColumn>
+        <PropertyColumn Title="Description" Property="@(message => message.Description)" />
+        <PropertyColumn Title="Deliveries" Property="@(message => message.DeliveryCount)" />
+        <TemplateColumn Title="Correlation ID">
+            @if (context.CorrelationId is { Length: > 0 } correlationId)
+            {
+                <a href="@TrailLinks.Trail(correlationId)" class="font-mono text-xs">@correlationId</a>
+            }
+        </TemplateColumn>
+        <TemplateColumn Title="Business keys">
+            @foreach (var key in context.BusinessKeys)
+            {
+                <div><a href="@TrailLinks.Search(key)">@TrailText.Of(key)</a></div>
+            }
+        </TemplateColumn>
+    </FluentDataGrid>
+
+    @if (found.HasMore)
+    {
+        <p role="note" class="text-muted mt-2">Showing the oldest @found.Messages.Count messages. The queue holds more.</p>
+    }
+
+    @if (_opened is { } sequenceNumber)
+    {
+        <section aria-label="Message @sequenceNumber" class="mt-8">
+            <h2 class="font-mono">Message @sequenceNumber</h2>
+            @if (_opening)
+            {
+                <div role="status">
+                    <FluentStack VerticalAlignment="VerticalAlignment.Center">
+                        <FluentProgressRing />
+                        <span>Fetching message @sequenceNumber…</span>
+                    </FluentStack>
+                </div>
+            }
+            else if (_openFailed)
+            {
+                <div role="alert">
+                    <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+                        The message couldn't be opened. Try again in a moment.
+                    </FluentMessageBar>
+                </div>
+            }
+            else if (_openProblems is { Count: > 0 })
+            {
+                <div role="alert">
+                    <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
+                        @string.Join(" ", _openProblems)
+                    </FluentMessageBar>
+                </div>
+            }
+            else if (_gone)
+            {
+                <p role="status">The message is no longer on the queue: it was resubmitted or discarded.</p>
+            }
+            else if (_message is { } message)
+            {
+                <h3 class="mt-4 mb-2 text-base font-bold">Body</h3>
+                <pre class="bg-surface overflow-x-auto rounded-darkly p-4 font-mono text-xs whitespace-pre-wrap break-words">@RunText.Body(message.Body)</pre>
+                <h3 class="mt-4 mb-2 text-base font-bold">Application properties</h3>
+                @if (message.Properties.Count == 0)
+                {
+                    <p class="text-muted">No application properties.</p>
+                }
+                else
+                {
+                    <dl data-properties class="m-0 grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1">
+                        @foreach (var (name, value) in message.Properties.OrderBy(property => property.Key, StringComparer.Ordinal))
+                        {
+                            <dt class="font-mono text-xs">@name</dt>
+                            <dd class="m-0 font-mono text-xs break-words">@value</dd>
+                        }
+                    </dl>
+                }
+            }
+        </section>
+    }
+}
+
+@code {
+    private bool _loading;
+    private bool _failed;
+    private bool _missing;
+    private IReadOnlyList<string>? _problems;
+    private DeadLetteredMessageList? _list;
+    private long? _opened;
+    private bool _opening;
+    private bool _openFailed;
+    private bool _gone;
+    private IReadOnlyList<string>? _openProblems;
+    private RecordedDeadLetterBody? _message;
+    // Cancel peeking when the operator leaves the page, opens another queue or another message.
+    private CancellationTokenSource _peek = new();
+    private CancellationTokenSource _fetch = new();
+
+    [Parameter, EditorRequired]
+    public string Entity { get; set; } = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _failed = false;
+        _missing = false;
+        _problems = null;
+        _list = null;
+        await CloseMessageAsync();
+
+        await _peek.CancelAsync();
+        _peek.Dispose();
+        _peek = new CancellationTokenSource();
+        var cancellation = _peek.Token;
+        _loading = true;
+        try
+        {
+            var result = await DeadLetters.ListMessagesAsync(new ListDeadLetteredMessagesQuery(Entity), cancellation);
+            if (result.IsSuccess)
+            {
+                _list = result.Value;
+            }
+            else if (result.Status == ResultStatus.NotFound)
+            {
+                _missing = true;
+            }
+            else
+            {
+                _problems = [.. result.ValidationErrors.Select(error => error.ErrorMessage)];
+            }
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            DeadLetterPageLog.MessagesFailed(Logger, exception, Entity);
+            _failed = true;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenAsync(long sequenceNumber)
+    {
+        await CloseMessageAsync();
+        var cancellation = _fetch.Token;
+        _opened = sequenceNumber;
+        _opening = true;
+        try
+        {
+            // Fetched only now, as the operator opens the message, and kept only as long as the page shows it.
+            var result = await DeadLetters.OpenMessageAsync(new OpenDeadLetteredMessageQuery(Entity, sequenceNumber), cancellation);
+            if (result.IsSuccess)
+            {
+                _message = result.Value;
+            }
+            else if (result.Status == ResultStatus.NotFound)
+            {
+                _gone = true;
+            }
+            else
+            {
+                _openProblems = [.. result.ValidationErrors.Select(error => error.ErrorMessage)];
+            }
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            DeadLetterPageLog.OpenFailed(Logger, exception, sequenceNumber, Entity);
+            _openFailed = true;
+        }
+        finally
+        {
+            if (!cancellation.IsCancellationRequested)
+            {
+                _opening = false;
+            }
+        }
+    }
+
+    private async Task CloseMessageAsync()
+    {
+        await _fetch.CancelAsync();
+        _fetch.Dispose();
+        _fetch = new CancellationTokenSource();
+        _opened = null;
+        _opening = false;
+        _openFailed = false;
+        _gone = false;
+        _openProblems = null;
+        _message = null;
+    }
+
+    public void Dispose()
+    {
+        _peek.Cancel();
+        _peek.Dispose();
+        _fetch.Cancel();
+        _fetch.Dispose();
+    }
+}

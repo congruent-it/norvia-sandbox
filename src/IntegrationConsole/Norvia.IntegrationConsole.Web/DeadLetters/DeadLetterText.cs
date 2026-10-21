@@ -12,4 +12,7 @@ public static class DeadLetterText
         { TotalMinutes: >= 1 } minutes => $"{(int)minutes.TotalMinutes} min",
         _ => "under a minute",
     };
+
+    /// <summary>A message's dead-letter reason, or a dash when the one that dead-lettered it gave none.</summary>
+    public static string Reason(string? reason) => string.IsNullOrWhiteSpace(reason) ? "–" : reason;
 }
