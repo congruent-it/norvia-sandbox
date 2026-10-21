@@ -165,6 +165,7 @@ The dependency rule, the architecture tests, the mediator, the 80% line coverage
   2. After its maximum delivery count, the message reaches the tracking queue's dead-letter queue, and the dead-letter queue panel shows it within seconds.
   3. Start the TMS and resubmit the message. The Shipment moves to Delivered, and the trail shows the failed attempts and the resubmit.
   4. Post a Tracking event for an unknown reference. Discard it with a reason, and find the audit event on its trail.
+  Scripted in [infra/smoke-test-integration-console-dead-letters.sh](../../infra/smoke-test-integration-console-dead-letters.sh). See [Presenter smoke run: dead letters](#presenter-smoke-run-dead-letters).
 
 ## Presenter smoke run
 
@@ -177,6 +178,17 @@ After a deployment, and not in CI, the presenter shows the audience the path a b
 5. **Open the run.** On the intake run's hop, choose *Open run*. Its steps show with status and duration. Open `Map_the_booking` for the booking as Brouwer Dranken sent it and the Transport Order it became, and `Submit_to_the_TMS` for the call to the TMS and its answer.
 
 If a hop is still missing after the script's 10 minutes, and the run is younger than its retention, the flow that should have recorded it is breaking the [tracking contract](../coding-guidelines.md#tracking-contract). Fix that flow, or file it against its process; don't work around it in the console.
+
+### Presenter smoke run: dead letters
+
+After the slice 1 run and the presenter smoke run of [Shipment tracking](../processes/tms/p5-shipment-tracking.md#presenter-smoke-run), and not in CI, the presenter shows how a failed message is found and recovered. Get a new Shipment Booked and carried by Van Dijk Transport, as in the presenter smoke run of [Carrier booking](../processes/tms/p4-carrier-booking.md#presenter-smoke-run), and leave it untracked with the Persona's Auto-progress off. Run `infra/smoke-test-integration-console-dead-letters.sh <Transport Order number>` in a terminal, with the Integration console open beside it. It makes the Carrier's calls itself and stops at the two steps that are the presenter's.
+
+1. **Stop the TMS.** The script sends PU and DEP as Van Dijk Transport, stops the `tms-api` container app (`az containerapp stop`) and posts a `POD`. API Management still answers 202 Accepted, but the Carrier-tracking Logic App can't record it, so the queue delivers it again.
+2. **Find the dead letter.** After the queue's maximum delivery count (10, with a one-minute lock, so about ten minutes) Service Bus dead-letters the `POD` with `MaxDeliveryCountExceeded`. In the console, *Dead-letter queues* lists `carrier-tracking` first, with one message, within the panel's refresh of a few seconds. Open it for the reason, delivery count, correlation ID and Shipment number.
+3. **Resubmit.** The script starts the TMS again and asks you to resubmit the message in the console. The Shipment moves to Delivered. The script checks that and that the message left the dead-letter queue. The trail, opened by the correlation ID, shows the Carrier-tracking Logic App's failed runs, the run that delivered, and the resubmit's audit event with your name.
+4. **Discard.** The script posts a Tracking event for an unknown reference, which is dead-lettered with `ShipmentNotFound`, and asks you to discard it with a reason. The message leaves the dead-letter queue, and its trail holds the audit event of the discard, with the reason.
+
+The TMS is started again even if the run fails. If a step doesn't show, the flow that should have recorded it is breaking the [tracking contract](../coding-guidelines.md#tracking-contract): fix it, or file it against its process.
 
 ## Deferred
 
