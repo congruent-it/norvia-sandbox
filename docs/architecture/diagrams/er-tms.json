@@ -1,0 +1,314 @@
+{
+  "entities": [
+    {
+      "name": "Absences",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "uniqueidentifier",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CarrierBookings",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "uniqueidentifier",
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "ShipmentId",
+          "type": "uniqueidentifier",
+          "keys": [
+            "FK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Exceptions",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "uniqueidentifier",
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "ShipmentId",
+          "type": "uniqueidentifier",
+          "keys": [
+            "FK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "OffTheRoadDays",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "uniqueidentifier",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "OutboxMessages",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "bigint",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "PlanningDays",
+      "columns": [
+        {
+          "name": "Date",
+          "type": "date",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ProofsOfDelivery",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "uniqueidentifier",
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "ShipmentId",
+          "type": "uniqueidentifier",
+          "keys": [
+            "FK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Rosters",
+      "columns": [
+        {
+          "name": "DriverId",
+          "type": "nvarchar(20)",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Shipments",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "uniqueidentifier",
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "TransportOrderId",
+          "type": "uniqueidentifier",
+          "keys": [
+            "FK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ShipperNotifications",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "uniqueidentifier",
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "ExceptionId",
+          "type": "uniqueidentifier",
+          "keys": [
+            "FK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TrackingEvents",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "uniqueidentifier",
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "ShipmentId",
+          "type": "uniqueidentifier",
+          "keys": [
+            "FK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TransportOrders",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "uniqueidentifier",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TripStops",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "TripId",
+          "type": "uniqueidentifier",
+          "keys": [
+            "FK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TripVersionDeliveries",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "TripId",
+          "type": "uniqueidentifier",
+          "keys": [
+            "FK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Trips",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "uniqueidentifier",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "principal": "Shipments",
+      "dependent": "CarrierBookings",
+      "columns": [
+        "ShipmentId"
+      ],
+      "optional": false,
+      "oneToOne": false
+    },
+    {
+      "principal": "Shipments",
+      "dependent": "Exceptions",
+      "columns": [
+        "ShipmentId"
+      ],
+      "optional": false,
+      "oneToOne": false
+    },
+    {
+      "principal": "Shipments",
+      "dependent": "ProofsOfDelivery",
+      "columns": [
+        "ShipmentId"
+      ],
+      "optional": false,
+      "oneToOne": false
+    },
+    {
+      "principal": "TransportOrders",
+      "dependent": "Shipments",
+      "columns": [
+        "TransportOrderId"
+      ],
+      "optional": false,
+      "oneToOne": true
+    },
+    {
+      "principal": "Exceptions",
+      "dependent": "ShipperNotifications",
+      "columns": [
+        "ExceptionId"
+      ],
+      "optional": false,
+      "oneToOne": false
+    },
+    {
+      "principal": "Shipments",
+      "dependent": "TrackingEvents",
+      "columns": [
+        "ShipmentId"
+      ],
+      "optional": false,
+      "oneToOne": false
+    },
+    {
+      "principal": "Trips",
+      "dependent": "TripStops",
+      "columns": [
+        "TripId"
+      ],
+      "optional": false,
+      "oneToOne": false
+    },
+    {
+      "principal": "Trips",
+      "dependent": "TripVersionDeliveries",
+      "columns": [
+        "TripId"
+      ],
+      "optional": false,
+      "oneToOne": false
+    }
+  ]
+}

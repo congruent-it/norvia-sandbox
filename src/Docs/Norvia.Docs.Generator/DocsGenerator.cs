@@ -11,12 +11,14 @@ internal sealed class DocsGenerator(IReadOnlyList<DocumentedApplication> applica
         var files = new List<GeneratedFile>();
         foreach (var application in applications)
         {
-            if (application.Model is { } model)
+            if (application.Model is { } createModel)
             {
+                var model = createModel();
                 var page = read(application.PagePath)
                     ?? throw new InvalidOperationException($"{application.PagePath} doesn't exist. Add the page with a <!-- generated:database --> marker.");
                 var descriptions = ApplicationDescriptions.Parse(read(application.DescriptionsPath));
-                files.Add(new GeneratedFile(application.PagePath, MarkedSections.Replace(page, "database", DatabaseSection.Render(model(), descriptions))));
+                files.Add(new GeneratedFile(application.PagePath, MarkedSections.Replace(page, "database", DatabaseSection.Render(model, descriptions, application.Slug))));
+                files.Add(new GeneratedFile(EntityDiagram.JsonPath(application.Slug, fromRoot: true), EntityDiagram.Json(model)));
             }
 
             if (application.OpenApi is { } openApi)

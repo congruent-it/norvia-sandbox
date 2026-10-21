@@ -28,20 +28,9 @@ The database's tables are generated from its EF Core model by `Norvia.Docs.Gener
 
 ### Entity relationships
 
-Only the key columns are drawn; every column is in the tables below.
+Only the key columns are drawn; every column is in the tables below. The picture is drawn from [the model](../architecture/diagrams/er-simulator.json) by `docs/architecture/diagrams/entities.py`, and its [Excalidraw file](../architecture/diagrams/er-simulator.excalidraw) opens in Excalidraw.
 
-```mermaid
-erDiagram
-    LogEntries {
-        uniqueidentifier Id PK
-    }
-    RunSequence {
-        int Id PK
-    }
-    SimulationRuns {
-        uniqueidentifier Id PK
-    }
-```
+![simulator entity relationships](../architecture/diagrams/er-simulator.png)
 
 ### Tables
 

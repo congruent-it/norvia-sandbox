@@ -1,0 +1,41 @@
+{
+  "entities": [
+    {
+      "name": "LogEntries",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "uniqueidentifier",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RunSequence",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "SimulationRuns",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "uniqueidentifier",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    }
+  ],
+  "relationships": []
+}

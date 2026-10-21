@@ -191,7 +191,7 @@ def render(spec, out_excalidraw, out_svg=None):
     # corridors can run outside the boxes: make room for them above the title line and below the footer
     ys = [p[1] for e in edges for p in e["path"]]
     xs = [p[0] for e in edges for p in e["path"]]
-    shift = max(0, TOP - 10 - min(ys))
+    shift = max(0, TOP - 10 - min(ys, default=TOP))
     if shift:
         for n in nodes.values():
             n["y"] += shift; n["cy"] += shift
@@ -200,8 +200,8 @@ def render(spec, out_excalidraw, out_svg=None):
             g["rect"] = (x, y + shift, w, h)
         for e in edges:
             e["path"] = [(px, py + shift) for px, py in e["path"]]
-    width = max(width, max(xs) + M)
-    height = max(height, max(p[1] for e in edges for p in e["path"]) + 90)
+    width = max(width, max(xs, default=0) + M)
+    height = max(height, max((p[1] for e in edges for p in e["path"]), default=-90) + 90)
 
     # ----- drawing -----
     text, rect = cv.text, cv.rect

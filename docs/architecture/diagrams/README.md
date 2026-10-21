@@ -93,6 +93,10 @@ For who-has-what tables, from [access.py](access.py). Rows are the identities, g
 
 The failure patterns in [resilience.py](resilience.py) are a matrix, drawn with larger columns and boxes: a matrix spec may set `col_w` and `box_h` and its own `legend` when its boxes say more.
 
+## Entity relationships
+
+The database sections of the [application pages](../../applications/README.md) show their tables as a graph-style picture, drawn by [entities.py](entities.py) from `er-<slug>.json`. That JSON is not written by hand: `Norvia.Docs.Generator` writes it from the EF Core model, so `--check` fails when it is stale. After a schema change, run the generator, then `python3 docs/architecture/diagrams/entities.py` and `rsvg-convert` as below, and commit the JSON, `.excalidraw` and `.png` together. `entities.py` lays the tables out itself: a table sits under the table it references, and tables with no foreign keys sit in rows below. The PNG is the one piece `--check` cannot see go stale.
+
 ## BPMN
 
 The TMS process models in [docs/processes/tms](../../processes/tms/) are BPMN files, which stay the source: they open in any BPMN tool and carry their own layout. [bpmn.py](bpmn.py) draws each one in this style so a process page can show it: a person's task is yellow, a system's task takes its lane's colour, events are rings, gateways are diamonds, and message flows are dashed. The layout in the file is kept.
@@ -128,6 +132,7 @@ python3 docs/architecture/diagrams/deployment.py [name ...]        # writes the 
 python3 docs/architecture/diagrams/message_trails.py [name ...]    # writes the Message trails of the process docs
 python3 docs/architecture/diagrams/access.py                       # writes the identity and access grid
 python3 docs/architecture/diagrams/resilience.py                   # writes the failure patterns
+python3 docs/architecture/diagrams/entities.py [slug ...]          # writes the entity relationship diagrams of the application pages
 python3 docs/architecture/diagrams/bpmn.py [process ...]           # writes the BPMN pictures
 ```
 
