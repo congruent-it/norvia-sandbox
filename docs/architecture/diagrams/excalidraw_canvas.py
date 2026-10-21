@@ -90,8 +90,8 @@ class Canvas:
         h = max(p[1] for p in rel) - min(p[1] for p in rel)
         e = self.base("arrow", x0, y0, w, h, strokeColor=color, strokeWidth=2, strokeStyle="dashed" if dashed else "solid",
                       points=rel, lastCommittedPoint=None,
-                      startBinding={"elementId": start, "focus": 0, "gap": 4},
-                      endBinding={"elementId": end, "focus": 0, "gap": 4},
+                      startBinding={"elementId": start, "focus": 0, "gap": 4} if start else None,
+                      endBinding={"elementId": end, "focus": 0, "gap": 4} if end else None,
                       startArrowhead="arrow" if both else None, endArrowhead=None if plain else "arrow", elbowed=False)
         self.els.append(e)
         self.svg.append(f'<path d="M {" L ".join(f"{px} {py}" for px, py in pts)}" fill="none" stroke="{color}" '

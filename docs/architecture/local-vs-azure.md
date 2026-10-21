@@ -6,6 +6,10 @@ Locally there is no Azure subscription, no API Management, no Logic Apps runtime
 
 ## The map
 
+![Local versus Azure: each Azure piece and what plays it under Aspire](local-vs-azure.png)
+
+The editable source is [local-vs-azure.excalidraw](local-vs-azure.excalidraw), generated from [deployment.py](diagrams/deployment.py). The table below has the detail of each row.
+
 | Azure piece | Under Aspire | Decided in |
 |---|---|---|
 | **Norvia Partner API** (API Management, the operation policies) | `Norvia.Integration.LocalPartnerApi`, an ASP.NET Core app. It answers the same `/partner/v1/...` routes and makes the same checks in the same order: subscription key, Entra token, role, party for the token's `azp`. It creates the correlation ID, and for Shipper queries it applies the rate limit and runs the Liquid maps with the same DotLiquid version | [0023](../adr/0023-locally-a-stand-in-plays-the-norvia-partner-api.md), [0035](../adr/0035-the-shipper-tracking-map-is-liquid-with-the-clock-rules-written-out.md) |

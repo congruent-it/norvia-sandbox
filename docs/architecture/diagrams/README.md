@@ -1,13 +1,14 @@
 # Diagram styles: Excalidraw
 
-Norvia's diagrams are Excalidraw files in one look: the same palette, type and shapes. Open a `.excalidraw` file at [excalidraw.com](https://excalidraw.com) or with the VS Code Excalidraw extension. There are two layouts:
+Norvia's diagrams are Excalidraw files in one look: the same palette, type and shapes. Open a `.excalidraw` file at [excalidraw.com](https://excalidraw.com) or with the VS Code Excalidraw extension. There are three layouts:
 
 | Style | For | Example | Library |
 |---|---|---|---|
 | **Matrix** | Process steps against applications | [business-automation-model.excalidraw](../business-automation-model.excalidraw) | [excalidraw_matrix.py](excalidraw_matrix.py) |
+| **Sequence** | One flow across several applications, in time order | [order-lifecycle.md](../order-lifecycle.md) | [excalidraw_sequence.py](excalidraw_sequence.py) |
 | **Graph** | System context, containers and components (the C4 levels), context maps, hexagons and state diagrams | [c4.md](../c4.md), [context-map.md](../context-map.md), [tms-architecture.md](../tms-architecture.md), [tms-lifecycles.md](../tms-lifecycles.md) | [excalidraw_graph.py](excalidraw_graph.py) |
 
-Both draw through [excalidraw_canvas.py](excalidraw_canvas.py), which holds the drawing primitives, and take their colours from `PALETTE` in the matrix library. The matrix style is described first, the graph style [below](#graph-style).
+All three draw through [excalidraw_canvas.py](excalidraw_canvas.py), which holds the drawing primitives, and take their colours from `PALETTE` in the matrix library. The matrix style is described first, the graph style [below](#graph-style).
 
 Diagrams are generated from a spec, not drawn by hand, so a process change is an edit to a list and a re-run. Hand edits to the `.excalidraw` file are lost on the next run.
 
@@ -65,6 +66,19 @@ Nunito (Excalidraw font 6), roughness 0, rounded rectangles, 2 px outlines, no s
 | `edge_labels` | `(text, step id, dx, dy)` |
 | `legend` | Optional; defaults to the four entries above |
 
+## Sequence style
+
+For one flow across several applications, from [order_lifecycle.py](order_lifecycle.py). Participants run across the top, time runs down, and each message is an arrow with its label on it. It uses the same colours, so a participant is coloured by its application.
+
+| Key | Holds |
+|---|---|
+| `participants` | `id`, `title`, `sub`, `palette`, and `kind="person"` for a person |
+| `steps` | `("phase", title)` for a band, `("msg", from, to, label, options)` for an arrow, `("self", id, label)` for what a participant does on its own, `("note", [ids], text)` for a note across participants |
+
+- A solid arrow is a call, a dashed one is a reply or an event. Pass `dashed=True`.
+- Every arrow between two applications goes through the integration layer, so show it: a Logic App or API Management is a participant between them, never skipped.
+- Keep one diagram to one story and about eight participants. Split a longer flow by phase, as the order lifecycle does.
+
 ## Regenerating
 
 ```
@@ -85,6 +99,8 @@ For the C4 diagrams in [c4.md](../c4.md), from [c4.py](c4.py), and for the conte
 ```
 python3 docs/architecture/diagrams/c4.py [name ...]                # writes docs/architecture/c4-<name>.excalidraw and .png; no names draws all
 python3 docs/architecture/diagrams/bounded_contexts.py [name ...]  # writes docs/architecture/<name>.excalidraw and .png
+python3 docs/architecture/diagrams/order_lifecycle.py [name ...]   # writes docs/architecture/order-lifecycle-<name>.excalidraw and .png
+python3 docs/architecture/diagrams/deployment.py [name ...]        # writes the deployment view and the local-versus-Azure map
 ```
 
 | Key | Holds |

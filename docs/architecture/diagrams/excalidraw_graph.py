@@ -206,12 +206,13 @@ def render(spec, out_excalidraw, out_svg=None):
     # ----- drawing -----
     text, rect = cv.text, cv.rect
     text(M, 30, 1600, spec["title"], 38, INK, bold=True)
-    text(M, 82, 1600, spec["subtitle"], 16, MUTED)
+    sub_h = text(M, 82, width - 2 * M, spec["subtitle"], 16, MUTED, wrap_w=width - 2 * M)
+    legend_y = int(82 + sub_h + 10)
     legend = spec.get("legend", DEFAULT_LEGEND)
     lx = M
     for lab, fill, stroke, dashed in legend:
-        rect(lx, 112, 26, 18, fill, stroke, 2, dashed)
-        text(lx + 34, 113, len(lab) * 8.6 + 6, lab, 14, INK)
+        rect(lx, legend_y, 26, 18, fill, stroke, 2, dashed)
+        text(lx + 34, legend_y + 1, len(lab) * 8.6 + 6, lab, 14, INK)
         lx += 34 + len(lab) * 8.6 + 40
 
     for g in sorted(groups.values(), key=lambda g: -g["rect"][2] * g["rect"][3]):
