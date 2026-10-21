@@ -4,6 +4,12 @@ Who each identity is in Entra, which app roles it holds, which APIs it may call,
 
 Everything is declared in [identities.bicep](../../infra/estate/identities.bicep) and the role assignments beside each resource in [infra/estate/](../../infra/estate/). No application holds a client secret: every caller is a managed identity, and the Persona client apps trust the Partner portal's managed identity, and the Simulator's, through federated credentials ([ADR 0005](../adr/0005-partner-identity-comes-from-the-token.md), [ADR 0042](../adr/0042-the-simulator-signs-in-with-easy-auth-reaches-the-estate-as-its-own-identity-and-plays-the-personas-and-drivers-through-entra-client-apps.md)). There is no drift test for this page; the [coding guidelines §11](../coding-guidelines.md#11-workflow) rule that a PR changing an app role updates the matching architecture page keeps it current.
 
+## The access grid
+
+![Identity and access grid: each managed identity against the APIs, Service Bus, storage, Key Vault and telemetry it may use](diagrams/identity-access.png)
+
+The editable source is [identity-access.excalidraw](diagrams/identity-access.excalidraw), generated from [access.py](diagrams/access.py) in the [grid style](diagrams/README.md#grid-style). Read a row to see everything one identity may do, and a column to see who may reach one resource. The tables below have the detail and the reasons.
+
 ## The API audiences
 
 An app role belongs to the app registration of the API it guards. Each registration is an audience; the caller asks Entra for a token for that audience.
@@ -42,7 +48,7 @@ The three Logic App triggers sit behind Easy Auth, and the workflow's first step
 | `apim` | API Management | `ShipperTracking.Read` | Holds `TransportOrderIntake.Trigger`, `CarrierAnswer.Trigger` and `CarrierInvoice.Trigger`. Sends to the `carrier-tracking` and `carrier-proof-of-delivery` queues. Writes blobs in the inbound container. Publishes telemetry to Application Insights |
 | `partner-portal` | The Partner portal | | Reads the Persona subscription keys. Each Persona client app trusts it |
 | `simulator` | The Simulator | `TransportOrders.Manage` and `Estate.Reset` on the TMS; `Estate.Reset` on the Driver app; `ShipperInvoices.Manage`, `CarrierInvoices.Manage` and `Estate.Reset` on the ERP API | Reads the Persona subscription keys, the Partner portal's reset key and the Shippers' endpoint keys, to read their invoices inboxes. Each Persona client app and each Driver client app trusts it ([ADR 0042](../adr/0042-the-simulator-signs-in-with-easy-auth-reaches-the-estate-as-its-own-identity-and-plays-the-personas-and-drivers-through-entra-client-apps.md)) |
-| `integration-console` | The Integration console | | Reads the Log Analytics workspace. Reads the run history of all seven Logic Apps |
+| `integration-console` | The Integration console | | Reads the Log Analytics workspace. Reads the run history of every Logic App. On the Service Bus namespace it lists the queues and subscriptions (Reader), peeks dead-lettered messages (Data Receiver) and resubmits them (Data Sender) |
 
 Each Logic App also has a **host identity** (`id-<name>-host-…`) that only the Logic Apps runtime uses: it owns the Logic App's own storage account and reads the one Key Vault secret holding that account's connection string, which Logic Apps Standard still needs for its content share. Nothing else uses it. The identities are separate on purpose: a Logic App's role in the TMS API is never the same principal as the one that runs its runtime.
 
@@ -118,10 +124,10 @@ Users are assigned app roles on the enterprise application, not on an API. Entra
 |---|---|---|---|
 | **Norvia demo UIs** | `DemoUis.Use` | Open the TMS UI and the Partner portal in Azure ([ADR 0024](../adr/0024-the-demo-uis-are-public-behind-an-entra-gate-for-the-presenter.md)). The apps read no roles and don't know who signed in | The presenter, who ran `azd up` |
 | **Norvia Integration console** | `IntegrationConsole.Read` | Search Message trails and open run details and message bodies. The console refuses a user without it ([ADR 0026](../adr/0026-the-integration-console-signs-operators-in-with-easy-auth-and-checks-their-app-role.md)) | The presenter, who plays the Integration operator |
-| | `IntegrationConsole.Resubmit` | Also resubmit and discard dead-lettered messages ([planned](../operations/integration-console.md#resubmit-and-discard)) | The presenter |
+| | `IntegrationConsole.Resubmit` | Also resubmit and discard dead-lettered messages ([resubmit and discard](../operations/integration-console.md#resubmit-and-discard)) | The presenter |
 | **Norvia Simulator** | `Simulator.Run` | Configure, preview and start Simulation runs, cancel them and clear the history. A run sends orders, Shipments and Trips into the estate ([ADR 0042](../adr/0042-the-simulator-signs-in-with-easy-auth-reaches-the-estate-as-its-own-identity-and-plays-the-personas-and-drivers-through-entra-client-apps.md)) | The presenter, who plays the Simulator operator |
 | | `Simulator.Read` | See runs and their logs | The presenter |
-| **Norvia ERP** | `Finance` | Use the ERP's UI: today its read-only master data, later Invoice runs and Credit notes ([E1](../processes/erp/e1-invoicing.md)). The ERP refuses a user without it | The presenter, who plays Finance |
+| **Norvia ERP** | `Finance` | Use the ERP's UI: its read-only master data, Invoice now and Credit notes ([E1](../processes/erp/e1-invoicing.md)), and the Carrier costs and Carrier invoices with the decisions on their lines ([E2](../processes/erp/e2-carrier-invoice-matching.md)). The ERP refuses a user without it | The presenter, who plays Finance |
 | **Norvia Driver app** | One role per active seeded Driver, its value the Driver ID (`DRV-0001`) | Sign in to the Driver app as that Driver and see their Trips. The Driver app takes the Driver ID from this role and nowhere else ([ADR 0037](../adr/0037-drivers-sign-in-to-the-driver-app-with-entra-and-the-driver-id-is-their-app-role.md)), on its screens and on its API for the Driver's actions (`/v1/driver/trips`), where a caller that acts as the Driver, the Simulator, brings a token whose one app role is the Driver ID (in Azure from the Driver's client app for the Simulator, see the TMS API roles above) | The Driver's Entra test user, one per seeded Driver |
 
 Someone else presenting or operating needs the role assigned in Entra ID. The presenter also holds two Azure RBAC roles for looking behind the scenes, both optional (`presenterPrincipalId` empty for none): **Azure Service Bus Data Receiver** on the namespace, to read messages in the Service Bus Explorer, and **Storage Blob Data Reader** on the inbound container.
@@ -156,8 +162,25 @@ Azure RBAC, scoped as narrowly as the resource allows, so an identity sees its o
 | Log Analytics workspace | The workspace | `integration-console` | Log Analytics Reader |
 | Each Logic App | The app | `integration-console` | Logic Apps Standard Reader, so it opens a run and changes nothing |
 | Application Insights | The component | `apim` | Monitoring Metrics Publisher |
+| Service Bus namespace | The namespace | `integration-console` | Reader, Data Receiver and Data Sender |
+
+The one wide grant is the Integration console's on the Service Bus namespace. It has to find a dead-lettered message in any queue or subscription, and resubmit or discard it, so it holds Reader to list them, Data Receiver to peek and to complete the original, and Data Sender to send the copy ([ADR 0017](../adr/0017-the-integration-console-reads-the-estates-telemetry-and-stores-nothing.md)). It peeks and never receives to process a message, and it changes only Service Bus.
 
 The scoping is the design: the booking Logic App cannot read a Persona's subscription key or a Shipper's credential, API Management cannot read the queue it sends to, and the Integration console cannot change a Logic App. The Integration console calls Azure as its own identity and never with the operator's token ([ADR 0017](../adr/0017-the-integration-console-reads-the-estates-telemetry-and-stores-nothing.md)).
+
+## Roles the AppHost grants the applications
+
+The applications are owned by the Aspire AppHost, not the estate Bicep ([ADR 0004](../adr/0004-bicep-owns-the-estate-aspire-owns-the-apps.md)), so their Azure roles are declared in [AppHost.cs](../../src/Norvia.AppHost/AppHost.cs). They hold no API role of their own beyond the ones above.
+
+| Application | Azure role | On | Why |
+|---|---|---|---|
+| TMS API | Data Sender | The Service Bus namespace | Publishes its events through the outbox |
+| TMS API | Data Receiver | The Service Bus namespace | Peeks the subscriptions a reset waits on ([ADR 0039](../adr/0039-the-simulator-books-only-through-the-estates-real-doors.md)). It never receives from them |
+| TMS API | Storage Blob Data Contributor | The TMS's storage | Stores each Proof of delivery file |
+| TMS UI | Storage Blob Data Reader | The TMS's storage | Shows a Proof of delivery file |
+| ERP UI | Data Sender | The Service Bus namespace | Publishes its events through the outbox |
+| ERP API | Data Receiver | The Service Bus namespace | Peeks the subscriptions a reset waits on. It publishes nothing |
+| Driver app API | Data Sender | The Service Bus namespace | Publishes the Driver's reports through its outbox |
 
 ## Agents (planned)
 

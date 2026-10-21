@@ -20,6 +20,22 @@ Every command the TMS takes is idempotent ([coding guidelines §6](../coding-gui
 
 Hops that only fail in one place and look alike are written once: a Logic App whose first step maps with a .NET local function fails there with the run `Failed` and nothing sent to the TMS.
 
+## Failure patterns
+
+![Failure patterns: five ways a hop fails, and who finds out, in the caller, the owner's user, the Integration operator or nobody](diagrams/failure-patterns.png)
+
+The editable source is [failure-patterns.excalidraw](diagrams/failure-patterns.excalidraw), generated from [resilience.py](diagrams/resilience.py). Every row in the tables below fails in one of these ways, which is the quickest way to know what to expect of a hop you have not read yet.
+
+| Pattern | Hops | What happens | Who finds out |
+|---|---|---|---|
+| **A partner calls and waits** | The intake, the Carrier answer and the Carrier invoice, and a Shipper's queries | The Logic App retries the TMS or the ERP, and the answer goes back in the same call. A query has no Logic App | The caller, who sends again. The console shows the trail and the run, view only |
+| **A partner's message is queued** | Carrier tracking and Proof of delivery | API Management answers `202` once the message is stored, and the Logic App records it later. It is dead-lettered with a failure code or redelivered up to the maximum delivery count | Nobody, until someone opens the dead-letter queue in the console |
+| **Norvia sends outside and reports** | Carrier booking, Shipper notification, Carrier cancellation, Trip dispatch, the Shipper invoice and the Carrier invoice outcome | The message is completed first. The send is retried, and what became of it is reported to the owner as Not delivered | The Planner or Finance, in the owner's list, who sends again. A failed report fails the run |
+| **A Logic App records into an owner** | Billing, Carrier cost and Driver reports | A refusal or a used-up retry dead-letters the message with the owner's code | The operator, in the console. A Driver also sees the report's state |
+| **An application publishes an event** | Every outbox | Retried every second, forever, and a failed cycle holds back every message behind it | Nobody: the trail shows a hop that never happened |
+
+No alert is built for any of them, which is the as-found backlog below.
+
 ## P1: Transport Order intake
 
 Flow `transport-order-intake`, request-response ([ADR 0003](../adr/0003-http-in-events-out.md)). The Shipper is told the outcome in the answer, so nothing is dead-lettered.

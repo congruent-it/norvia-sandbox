@@ -41,6 +41,10 @@ CROSS_H = 92
 
 
 def render(spec, out_excalidraw, out_svg=None):
+    # a spec with a lot to say per box may make its columns and boxes bigger
+    COL_W = spec.get("col_w", 244)
+    BOX_W = COL_W - 36
+    BOX_H = spec.get("box_h", 94)
 
     lanes = {l["key"]: l for l in spec["lanes"]}
     cols = [c for s in spec["streams"] for c in s["cols"]]
@@ -80,10 +84,18 @@ def render(spec, out_excalidraw, out_svg=None):
     text(M, 30, 1500, spec["title"], 38, INK, bold=True)
     text(M, 82, 1500, spec["subtitle"], 16, MUTED)
     legend = spec.get("legend", DEFAULT_LEGEND)
-    lx = total_w - 20 - len(legend) * 196
-    for i, (lab, fill, stroke, dashed) in enumerate(legend):
-        rect(lx + i * 196, 44, 26, 18, fill, stroke, 2, dashed)
-        text(lx + i * 196 + 34, 45, 156, lab, 14, INK)
+    if "legend" in spec:  # a legend of its own is spaced to fit its labels
+        widths = [34 + len(lab) * 8.6 + 40 for lab, *_ in legend]
+        lx = total_w - 20 - sum(widths) + 40
+        for (lab, fill, stroke, dashed), w in zip(legend, widths):
+            rect(lx, 44, 26, 18, fill, stroke, 2, dashed)
+            text(lx + 34, 45, len(lab) * 8.6 + 6, lab, 14, INK)
+            lx += w
+    else:
+        lx = total_w - 20 - len(legend) * 196
+        for i, (lab, fill, stroke, dashed) in enumerate(legend):
+            rect(lx + i * 196, 44, 26, 18, fill, stroke, 2, dashed)
+            text(lx + i * 196 + 34, 45, 156, lab, 14, INK)
 
     # value streams and column headers
     c0 = 0
@@ -105,7 +117,7 @@ def render(spec, out_excalidraw, out_svg=None):
         rect(M, y0, right - M, h, tint, "#e5e7eb", 1, dashed)
         rect(M, y0, LABEL_W, h, colour, colour, 1, dashed)
         text(M + 16, y0 + h / 2 - 28, LABEL_W - 32, name, 18 if len(name) > 17 else 21, "#ffffff", bold=True)
-        text(M + 16, y0 + h / 2 + 2, LABEL_W - 32, sub, 13, "#ffffff")
+        text(M + 16, y0 + h / 2 + 2, LABEL_W - 32, sub, 13, "#ffffff", wrap_w=LABEL_W - 32)
 
     for l in spec["lanes"]:
         pal = PALETTE[l["palette"]]
