@@ -10,6 +10,12 @@ Freight settlement makes sure Norvia is paid for each Transport Order it deliver
 | **Applies to** | Both for the Shipper side. The Carrier cost is Carriers only. Own fleet has no Carrier cost |
 | **Integrations touched** | Service Bus (Transport Order and Shipment events), Billing Logic App, Carrier cost Logic App, ERP billing API. Partner portal (Carrier Personas) through P4. ERP, through the seed file for now (Carrier Rate Cards) |
 
+## Process model
+
+![P9 Freight settlement as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-p9-freight-settlement.png)
+
+The model is [p9-freight-settlement.bpmn](p9-freight-settlement.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p9-freight-settlement.excalidraw)).
+
 ## Scope
 
 P9 is the first process that needs the ERP, and it is where the ERP is first built (ADR 0001), as an invoicing slice. The two halves are split by owner:
@@ -201,83 +207,31 @@ The Hops of the TMS half, named as the [Integration console](../../operations/in
 
 **1. Release with a Spot price.** The Planner's action starts the trail, with a new correlation ID.
 
-```mermaid
-sequenceDiagram
-    box transparent Flow transport-planning
-        participant ui as tms-web: Release Shipment with Spot price
-        participant call as tms-api: POST /v1/shipments/SH-0000042/release-with-spot-price
-        participant pub as tms-api: publish ShipmentReleased
-    end
-    box transparent Flow carrier-booking
-        participant booking as logic-booking: carrier-booking
-    end
-    ui->>call: Spot price and remark, with an Idempotency-Key
-    call->>call: Carrier Rate Card can't price it, Spot price frozen on the Carrier booking, in one transaction
-    call-)pub: outbox, within a second (carries the Carrier cost)
-    pub-)booking: shipment-events, subscription carrier-booking
-```
+![Sequence diagram of the Hops: Release with a Spot price](../../architecture/diagrams/message-trail-p9-1.png)
+
+*Editable source: [message-trail-p9-1.excalidraw](../../architecture/diagrams/message-trail-p9-1.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
 
 The Carrier then confirms or rejects in the Partner portal ([P4](p4-carrier-booking.md#message-trail)). A release the Carrier Rate Card can't price is refused in `tms-api: POST /v1/shipments/SH-0000042/release` (422, with the failure code) and publishes nothing. A Spot price release the Carrier Rate Card could have priced is refused with `CarrierRateCardPricesShipment` (409). The plain release's Hops are those of [P3](p3-transport-planning.md#message-trail).
 
 **2. The Delivered Tracking event.** It is the trail of [P5](p5-shipment-tracking.md#message-trail), on the correlation ID API Management creates, with one more publish at its end.
 
-```mermaid
-sequenceDiagram
-    box transparent Flow carrier-tracking
-        participant apim as apim-norvia: Submit Carrier tracking
-        participant queue as carrier-tracking (queue)
-        participant logic as logic-tracking: carrier-tracking
-        participant tms as tms-api: POST /v1/tracking-events
-        participant delivered as tms-api: publish ShipmentDelivered
-        participant incurred as tms-api: publish CarrierCostIncurred
-    end
-    box transparent Flow billing
-        participant billable as tms-api: publish TransportOrderBillable
-    end
-    apim->>queue: Carrier tracking message (POD), 202 Accepted to the Carrier
-    queue-)logic: When_a_Carrier_tracking_message_is_available
-    logic->>tms: Record_in_the_TMS
-    tms->>tms: Shipment Delivered, Carrier cost incurred, Billable decided, with the outbox messages, in one transaction
-    tms-)delivered: outbox, within a second
-    tms-)incurred: outbox, within a second, Carrier Shipments only
-    tms-)billable: outbox, within a second, when this made the last condition true
-```
+![Sequence diagram of the Hops: The Delivered Tracking event](../../architecture/diagrams/message-trail-p9-2.png)
+
+*Editable source: [message-trail-p9-2.excalidraw](../../architecture/diagrams/message-trail-p9-2.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
 
 `publish CarrierCostIncurred` appears next to `publish ShipmentDelivered`, only for a Confirmed Carrier booking with a Carrier cost. An Own fleet Shipment publishes neither.
 
 **3. The Proof of delivery.** It is the trail of [P6](p6-proof-of-delivery.md#message-trail), with `publish TransportOrderBillable` at its end when the Proof of delivery was the last condition.
 
-```mermaid
-sequenceDiagram
-    box transparent Flow carrier-proof-of-delivery
-        participant apim as apim-norvia: Submit Carrier Proof of delivery
-        participant queue as carrier-proof-of-delivery (queue)
-        participant logic as logic-proof-of-delivery: carrier-proof-of-delivery
-        participant tms as tms-api: POST /v1/proofs-of-delivery
-    end
-    box transparent Flow billing
-        participant billable as tms-api: publish TransportOrderBillable
-    end
-    apim->>queue: the blob's reference, 202 Accepted to the Carrier
-    queue-)logic: When_a_Carrier_Proof_of_delivery_is_available
-    logic->>tms: Record_in_the_TMS (multipart: canonical metadata plus files)
-    tms->>tms: Proof of delivery recorded, Billable decided, with the outbox message, in one transaction
-    tms-)billable: outbox, within a second, when this made the last condition true
-```
+![Sequence diagram of the Hops: The Proof of delivery](../../architecture/diagrams/message-trail-p9-3.png)
+
+*Editable source: [message-trail-p9-3.excalidraw](../../architecture/diagrams/message-trail-p9-3.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
 
 **Customer service's release.** It starts a trail in the TMS UI, in Flow `billing` throughout, with a new correlation ID.
 
-```mermaid
-sequenceDiagram
-    box transparent Flow billing
-        participant ui as tms-web: Release without Proof of delivery
-        participant call as tms-api: POST /v1/transport-orders/TO-0000042/release-without-proof-of-delivery
-        participant pub as tms-api: publish TransportOrderBillable
-    end
-    ui->>call: remark and who released it
-    call->>call: release recorded, Billable decided, with the outbox message, in one transaction
-    call-)pub: outbox, within a second, when the release made the last condition true
-```
+![Sequence diagram of the Hops: Customer service's release](../../architecture/diagrams/message-trail-p9-4.png)
+
+*Editable source: [message-trail-p9-4.excalidraw](../../architecture/diagrams/message-trail-p9-4.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
 
 - The Billable check adds no Hop of its own. It runs in any call that can complete the last condition: the Tracking event and the Proof of delivery above, the rating or re-rate (`tms-api: Rate Transport Order`, Flow `transport-order-rating`, on the intake's trail, [P2](p2-rating.md#implementation)), the resolution of an Exception ([P7](p7-exception-handling.md#message-trail), Flow `exception-handling`) and Customer service's release.
 - A release that isn't allowed (the order isn't in billing state Not yet billable, or its Shipment isn't Delivered) is refused in the TMS call and publishes nothing. A release that leaves another condition unmet records the release and publishes nothing yet.

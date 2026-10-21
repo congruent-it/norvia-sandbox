@@ -10,6 +10,12 @@ Trip execution is the Driver working a Dispatched Trip on the road. In the Drive
 | **Applies to** | Own fleet only |
 | **Integrations touched** | Driver app (outbox, topic for Driver app events, transit container, outcome endpoint), Service Bus (Driver app events with sessions, Trip events, Shipment events), Driver reports Logic App, TMS Trip API, TMS Tracking event API, TMS Proof of delivery API, Entra ID |
 
+## Process model
+
+![P12 Trip execution as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-p12-trip-execution.png)
+
+The model is [p12-trip-execution.bpmn](p12-trip-execution.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p12-trip-execution.excalidraw)).
+
 ## What P12 decides, and what it doesn't
 
 P12 decides **what a Driver reports and how it reaches the TMS**: starting and ending a Trip, the outcome of each Stop, and the Proof of delivery captured at a delivery. It also decides what happens to Shipments that didn't finish on their Trip.
@@ -325,26 +331,9 @@ The demo is runnable end to end ([Demo seed](#demo-seed), [Presenter smoke run](
 
 The Hops one Driver action leaves on the Message trail, named as the [Integration console](../../operations/integration-console.md#message-trail) shows them, in time order. They belong to the Flow `trip-execution`. Each Driver action (Start Trip, completing a Stop, Deliver, End Trip) starts a trail of its own with a new correlation ID, found together by the Trip number; Deliver's two reports share one. The Driver waits for nothing: the Driver app shows the report as Sending until the outcome arrives. A Stop report is shown below; Start Trip and End Trip differ only in the TMS call, and a Proof of delivery adds the fetching and deleting of its files.
 
-```mermaid
-sequenceDiagram
-    box transparent Flow trip-execution
-        participant ui as driver-app-web: POST /trips/TRIP-0000007/stops/SHP-0000011/collection/collected
-        participant pub as driver-app-web: publish StopCompletedReported
-        participant lapp as logic-driver-reports: Send_the_report_to_the_TMS
-        participant call as tms-api: POST /v1/tracking-events
-        participant out as logic-driver-reports: Report_recorded
-        participant ocall as driver-app-api: POST /v1/report-outcomes
-    end
-    ui->>ui: DriverReport (Sending) and the outbox message in one transaction
-    ui-)pub: outbox, within a second
-    pub-)lapp: driver-app-events, session = Trip number, subscription driver-reports
-    lapp->>call: Own fleet Tracking event, retried on a timeout, 408, 429 and 5xx
-    call->>call: Driver report rules, then Tracking event, Shipment status and outbox in one transaction
-    call-->>lapp: 2xx, or 404, 409 or 400 and nothing changes
-    lapp->>out: message completed
-    out->>ocall: Recorded
-    ocall-->>out: 2xx, the report is Recorded
-```
+![Sequence diagram of the Hops on the Message trail](../../architecture/diagrams/message-trail-p12-1.png)
+
+*Editable source: [message-trail-p12-1.excalidraw](../../architecture/diagrams/message-trail-p12-1.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
 
 - A Start Trip calls `POST /v1/trips/TRIP-0000007/start`, an End Trip `.../end`, and a Proof of delivery `POST /v1/proofs-of-delivery`, preceded by `Fetch_the_files` and followed on success by `Delete_the_files`.
 - When the TMS refuses the report (a client error), `Send_the_report_to_the_TMS` is `Failed` with `TmsCallRefused`, the Logic App dead-letters the message with the TMS's failure code and message (`Dead_letter_the_refused_report`, `DeadLettered`) and calls `Report_refused`, which tells the Driver app the report is Refused. No retry, and the next report in the session goes on.

@@ -10,6 +10,12 @@ Transport planning turns an accepted Transport Order into a Shipment and decides
 | **Applies to** | Own fleet and Carriers alike. P3 makes the choice between them |
 | **Integrations touched** | Service Bus (Shipment events). ERP, through the seed file for now (Carriers) |
 
+## Process model
+
+![P3 Transport planning as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-p3-transport-planning.png)
+
+The model is [p3-transport-planning.bpmn](p3-transport-planning.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p3-transport-planning.excalidraw)).
+
 ## One Shipment per Transport Order
 
 Each Transport Order gets exactly one Shipment, and a Shipment never carries more than one Transport Order (ADR 0007). P3 does not consolidate. Several Shipments are brought together later, on a Trip (P11). P4 books each Shipment with its Carrier on its own, and consolidating Shipments in one Carrier booking is deferred.
@@ -125,23 +131,9 @@ Planning runs inside the TMS: there is no API Management operation, Function or 
 
 The Hops one Planner action leaves on the Message trail, named as the [Integration console](../../operations/integration-console.md#message-trail) shows them, in time order. They belong to the Flow `transport-planning`. Every action starts a trail of its own, with a new correlation ID ([Correlation ID](#correlation-id)), so the diagram is run once per action: an assignment, a reassignment and a release are three trails, found together by the Transport Order number. The Planner waits for the call, not for the publish.
 
-```mermaid
-sequenceDiagram
-    box transparent Flow transport-planning
-        participant ui as tms-web: Assign Transport Order
-        participant call as tms-api: POST /v1/transport-orders/TO-0000042/assign
-        participant pub as tms-api: publish ShipmentPlanned
-    end
-    box transparent Flow carrier-booking
-        participant booking as logic-booking: carrier-booking
-    end
-    ui->>call: command with an Idempotency-Key
-    call->>call: assignment rules, then the change and the outbox message in one transaction
-    call-->>ui: 201 or 200, or 404, 409 or 422 and nothing changes
-    call-)pub: outbox, within a second
-    pub-)booking: shipment-events, subscription carrier-booking
-    Note over booking: Takes all three events of a Carrier Shipment, acts on ShipmentReleased only
-```
+![Sequence diagram of the Hops on the Message trail](../../architecture/diagrams/message-trail-p3-1.png)
+
+*Editable source: [message-trail-p3-1.excalidraw](../../architecture/diagrams/message-trail-p3-1.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
 
 - The diagram shows an assignment. The other two actions have the same shape and differ only in their Hops:
 

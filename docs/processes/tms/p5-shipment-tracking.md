@@ -10,6 +10,12 @@ Shipment tracking records what happens to a Shipment after it has been handed ov
 | **Applies to** | Both. This design covers the Carrier source end to end. Own fleet feeds the same model through P12 |
 | **Integrations touched** | Partner portal (Carrier Personas), API Management, Service Bus (tracking queue, Shipment events), Carrier-tracking Logic App, TMS Tracking event API |
 
+## Process model
+
+![P5 Shipment tracking as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-p5-shipment-tracking.png)
+
+The model is [p5-shipment-tracking.bpmn](p5-shipment-tracking.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p5-shipment-tracking.excalidraw)).
+
 ## Scope
 
 P5 defines the tracking model (Tracking events, Shipment statuses, ETA, Stale) and the Carrier path into it.
@@ -227,28 +233,9 @@ P5 is built for the Carrier source. The Own fleet source is accepted by the TMS 
 
 The Hops a Carrier's Tracking event leaves on its Message trail, named as the [Integration console](../../operations/integration-console.md#message-trail) shows them, in time order. All of them belong to the one Flow `carrier-tracking`, on the correlation ID that API Management creates. The Carrier's event ID is the trail's `sourceMessageId`.
 
-```mermaid
-sequenceDiagram
-    box transparent Flow carrier-tracking
-        participant portal as partner-portal-web: Send Tracking event
-        participant apim as apim-norvia: Submit Carrier tracking
-        participant queue as carrier-tracking (queue)
-        participant logic as logic-tracking: carrier-tracking
-        participant tms as tms-api: POST /v1/tracking-events
-        participant pub as tms-api: publish ShipmentDelivered
-    end
-    portal->>apim: POST /partner/v1/carrier-tracking (Persona token and subscription key)
-    apim->>apim: token, role Tracking.Submit, Carrier ID from azp, correlation ID
-    apim->>queue: Carrier tracking message, with correlationId, flow, partyId, sourceMessageId
-    apim-->>portal: 202 Accepted
-    queue-)logic: When_a_Carrier_tracking_message_is_available
-    logic->>logic: Track_the_event, Map_the_event (CarrierTrackingMap)
-    logic->>tms: Record_in_the_TMS (Canonical Model Tracking event)
-    tms->>tms: Tracking event recorded, status and ETA moved, with the outbox message, in one transaction
-    tms-->>logic: 200 (also a repeat), or 404, 409 or 400
-    logic->>queue: Settle_the_message: complete, dead-letter or abandon
-    tms-)pub: outbox, within a second
-```
+![Sequence diagram of the Hops on the Message trail](../../architecture/diagrams/message-trail-p5-1.png)
+
+*Editable source: [message-trail-p5-1.excalidraw](../../architecture/diagrams/message-trail-p5-1.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
 
 - The Carrier's reply ends at `202 Accepted`. Everything after the queue is invisible to it ([ADR 0008](../../adr/0008-carrier-tracking-events-are-accepted-asynchronously.md)).
 - The publish Hop is named after the event the status landed on: `ShipmentCollected`, `ShipmentInTransit` or `ShipmentDelivered`. An exception Tracking event publishes `ShipmentExceptionReported`. A Tracking event that moves nothing, an ETA-only update and a repeat publish nothing, so the trail ends at the TMS call. The publish Hop appears only once the outbox has sent the message ([failure behaviour](../../architecture/failure-behaviour.md#the-tms-outbox)).

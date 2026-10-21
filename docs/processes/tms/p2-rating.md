@@ -10,6 +10,12 @@ Rating calculates the Freight Charge for an accepted Transport Order from the Sh
 | **Applies to** | Own fleet and Carriers alike. Rating happens before P3 decides who carries the goods |
 | **Integrations touched** | Service Bus (outcome events). ERP, through the seed file for now |
 
+## Process model
+
+![P2 Rating as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-p2-rating.png)
+
+The model is [p2-rating.bpmn](p2-rating.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p2-rating.excalidraw)).
+
 ## Rating result
 
 Each Transport Order has a rating result that is separate from its status. The status (Accepted, then planned, and so on) belongs to P3 and later processes, and a Transport Order can be planned whatever its rating result.
@@ -109,23 +115,9 @@ Rating runs entirely inside the TMS: there is no API Management operation, Logic
 
 The Hops that Rating adds to the Message trail of the Transport Order's intake, named as the [Integration console](../../operations/integration-console.md#message-trail) shows them, in time order. They belong to the Flow `transport-order-rating` and carry the intake's correlation ID, so they follow the intake's Hops ([P1](p1-transport-order-intake.md#implementation)) on the same trail. The Shipper does not wait for them: the booking is answered before Rating starts.
 
-```mermaid
-sequenceDiagram
-    box transparent Flow transport-order-rating
-        participant ui as tms-web: Re-rate Transport Order
-        participant tms as tms-api: Rate Transport Order
-        participant call as tms-api: POST /v1/transport-orders/TO-0000042/re-rate
-        participant pub as tms-api: publish TransportOrderRated
-    end
-    Note over tms: First rating, after the acceptance commit or the next sweep
-    tms->>tms: Rate Card version, Lane, Weight Break, Freight Charge
-    tms-)pub: outbox, within a second
-    Note over ui: Re-rate, only for an order whose Rating failed
-    ui->>call: re-rate command with an Idempotency-Key
-    call->>call: the same calculation
-    call-->>ui: 200 with the rating result, or 409 and nothing changes
-    call-)pub: outbox, within a second
-```
+![Sequence diagram of the Hops on the Message trail](../../architecture/diagrams/message-trail-p2-1.png)
+
+*Editable source: [message-trail-p2-1.excalidraw](../../architecture/diagrams/message-trail-p2-1.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
 
 - A Transport Order the Rate Card can't price publishes `TransportOrderRatingFailed` instead, and the `Rate Transport Order` Hop carries the `failureCode`. Its `outcome` is still `Succeeded`: Rating failed is Rating's answer, not a failed flow.
 - A Transport Order from the WMS channel is *Not rated separately* and has no rating Hop and no event.

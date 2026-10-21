@@ -159,6 +159,37 @@ The script prints `PASS` or `FAIL` per check, never a body, a token or a key. If
 
 For engineers and coding agents. Built so far: the Carrier cost Logic App, recording a Carrier cost and the Open Carrier costs list, receiving and matching a Carrier invoice with the Carrier invoices list, Finance deciding lines, matching again when a Carrier cost arrives, the Carrier invoice Logic App with its API Management operation, the Partner portal's draft invoice screen, invoice outcome endpoint and invoices page, and the Carrier invoice outcome Logic App, which tells the Carrier and reports it told or not delivered. Locally the Carrier invoice path runs under Aspire too: the stand-in Partner API takes the invoice and a hosted worker plays the Carrier invoice Logic App, as another plays the outcome Logic App.
 
+
+### Message trail
+
+The Hops of E2, named as the [Integration console](../../operations/integration-console.md#message-trail) shows them, in time order. A Hop is grouped under the Flow it carries in the tracking contract. The same order's whole life, across every application, is drawn in [the order lifecycle](../../architecture/order-lifecycle.md#6-from-a-carrier-cost-to-a-carrier-invoice-outcome).
+
+**1. A Carrier cost.** The TMS publishes `CarrierCostIncurred` when a Carrier Shipment is Delivered, on the trail of the Delivered Tracking event.
+
+![Sequence diagram of the Hops: A Carrier cost](../../architecture/diagrams/message-trail-e2-1.png)
+
+*Editable source: [message-trail-e2-1.excalidraw](../../architecture/diagrams/message-trail-e2-1.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
+
+**2. A Carrier invoice.** The Carrier's submission starts a new trail, and API Management creates its correlation ID.
+
+![Sequence diagram of the Hops: A Carrier invoice](../../architecture/diagrams/message-trail-e2-2.png)
+
+*Editable source: [message-trail-e2-2.excalidraw](../../architecture/diagrams/message-trail-e2-2.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
+
+**3. Finance decides the lines left To decide.** Finance's action starts a new trail.
+
+![Sequence diagram of the Hops: Finance decides the lines left To decide](../../architecture/diagrams/message-trail-e2-3.png)
+
+*Editable source: [message-trail-e2-3.excalidraw](../../architecture/diagrams/message-trail-e2-3.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
+
+**4. The Carrier is told.** The Carrier invoice outcome Logic App reacts to the Approved event on its trail.
+
+![Sequence diagram of the Hops: The Carrier is told](../../architecture/diagrams/message-trail-e2-4.png)
+
+*Editable source: [message-trail-e2-4.excalidraw](../../architecture/diagrams/message-trail-e2-4.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
+
+### What is built
+
 | Piece | Where | Does |
 |---|---|---|
 | Record a Carrier cost | [src/Erp/Norvia.Erp.Application/CarrierCosts](../../../src/Erp/Norvia.Erp.Application/CarrierCosts/Record/) | `RecordCarrierCostCommand` and its handler: idempotent on the Carrier booking number, `CarrierNotFound` for an unknown Carrier, `CarrierCostConflict` for different content. The domain refuses charge lines that are missing or don't add up to the total. Recording also matches again, in the same save, every undecided Unknown booking line of that Carrier with that reference (`CarrierInvoice.MatchAgain`, over the Carrier's Received invoices, oldest first): the line becomes Matched (and accepted), Price mismatch or Duplicate, and an invoice whose last line this was is Approved with `CarrierInvoiceApproved` in the outbox. Lines Finance decided and references of other Carriers are untouched, and a repeat of a Carrier cost re-matches nothing. It publishes nothing otherwise |

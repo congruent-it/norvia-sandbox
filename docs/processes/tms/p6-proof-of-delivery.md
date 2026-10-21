@@ -10,6 +10,12 @@ Proof of delivery records the Consignee's confirmation that it received a Shipme
 | **Applies to** | Both. This design covers the Carrier source end to end. Own fleet feeds the same model through P12 |
 | **Integrations touched** | Partner portal (Carrier Personas), API Management, inbound blob container, Service Bus (Proof of delivery queue, Shipment events), Carrier Proof of delivery Logic App, TMS Proof of delivery API |
 
+## Process model
+
+![P6 Proof of delivery as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-p6-proof-of-delivery.png)
+
+The model is [p6-proof-of-delivery.bpmn](p6-proof-of-delivery.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p6-proof-of-delivery.excalidraw)).
+
 ## Scope
 
 P6 defines the Proof of delivery model (content, current and superseded, the missing flag) and the Carrier path into it.
@@ -206,32 +212,9 @@ P6 is built for the Carrier source. The Own fleet source is accepted by the TMS 
 
 The Hops a Carrier's Proof of delivery leaves on its Message trail, named as the [Integration console](../../operations/integration-console.md#message-trail) shows them, in time order. All of them belong to the one Flow `carrier-proof-of-delivery`, on the correlation ID that API Management creates. The Carrier's document ID is the trail's `sourceMessageId`.
 
-```mermaid
-sequenceDiagram
-    box transparent Flow carrier-proof-of-delivery
-        participant portal as partner-portal-web: Send Proof of delivery
-        participant apim as apim-norvia: Submit Carrier Proof of delivery
-        participant blob as inbound-proofs-of-delivery (blob container)
-        participant queue as carrier-proof-of-delivery (queue)
-        participant logic as logic-proof-of-delivery: carrier-proof-of-delivery
-        participant tms as tms-api: POST /v1/proofs-of-delivery
-        participant pub as tms-api: publish ProofOfDeliveryReceived
-    end
-    portal->>apim: POST /partner/v1/carrier-proofs-of-delivery (Persona token and subscription key)
-    apim->>apim: token, role ProofsOfDelivery.Submit, 25 MB limit, Carrier ID from azp, correlation ID
-    apim->>blob: the body, unparsed, as a blob named for the correlation ID
-    apim->>queue: the blob's reference, with correlationId, flow, partyId, sourceMessageId
-    apim-->>portal: 202 Accepted
-    queue-)logic: When_a_Carrier_Proof_of_delivery_is_available
-    logic->>blob: Read_the_blob
-    logic->>logic: Map_the_proof_of_delivery (CarrierProofOfDeliveryMap)
-    logic->>tms: Record_in_the_TMS (multipart: canonical metadata plus files)
-    tms->>tms: Proof of delivery recorded as current, any earlier one superseded, Exception opened or joined, Billable decided, with the outbox message, in one transaction
-    tms-->>logic: 200 (also a repeat), or 404, 409 or 400
-    logic->>blob: Delete_the_blob
-    logic->>queue: Settle_the_message: complete, dead-letter or abandon
-    tms-)pub: outbox, within a second
-```
+![Sequence diagram of the Hops on the Message trail](../../architecture/diagrams/message-trail-p6-1.png)
+
+*Editable source: [message-trail-p6-1.excalidraw](../../architecture/diagrams/message-trail-p6-1.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
 
 - The Carrier's reply ends at `202 Accepted`, or at `413` for a body over 25 MB. Everything after the queue is invisible to it ([ADR 0009](../../adr/0009-carrier-proofs-of-delivery-use-a-claim-check.md)).
 - The blob is written before the message is queued. When API Management can't store it the Hop is `Failed` with `ProofOfDeliveryNotStored`, and when it can't queue the reference, `ProofOfDeliveryNotQueued`. Both give the Carrier `503`, so it sends the Proof of delivery again, and the second leaves a blob behind until the inbound container's retention rule removes it.
