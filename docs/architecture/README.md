@@ -8,10 +8,12 @@ How Norvia's estate is put together, for engineers and coding agents working on 
 | [events.md](events.md) | The event catalogue: every event with its topic, publisher, schema, subscriptions with their filters, subscribers and process. A test fails when it disagrees with the Canonical Model, the Bicep or the AppHost |
 | [identity-and-access.md](identity-and-access.md) | Each managed identity and app registration: who it is in Entra, the app roles it holds, the APIs it may call, and the subscriptions, containers and secrets it may read |
 | [failure-behaviour.md](failure-behaviour.md) | What happens when each hop of each Flow fails: its retry policy, dead-letter destination and `failureCode`s, the alert (or its absence), what the Integration console can resubmit or discard, and the as-found toggle that breaks it. Also the as-found backlog, since what is not built is marked *planned* |
+| [business-automation-model.md](business-automation-model.md) | Which application performs each TMS and ERP process step, and whether a person, the application or an integration flow does it: processes as columns, applications as rows. The diagram is an [Excalidraw file](business-automation-model.excalidraw) in the [matrix style](diagrams/README.md) |
 | [local-vs-azure.md](local-vs-azure.md) | What plays each Azure piece under Aspire, the ADR that decided it, and where the two can differ |
 
 ## Conventions
 
 - Diagrams are Mermaid flowcharts drawn in a C4 style, not Mermaid's experimental `C4Context`, so they render on GitHub with no build step.
+- Matrices of process steps against applications are Excalidraw files in the [Excalidraw matrix style](diagrams/README.md).
 - Planned systems and pieces, designed in a process doc but not built yet, are drawn dashed and grey. Each diagram page has a legend.
 - These pages are kept current in the same PR as the change they describe: see [coding guidelines §11](../coding-guidelines.md#11-workflow) for which changes.
