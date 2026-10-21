@@ -78,6 +78,7 @@ For one flow across several applications, from [order_lifecycle.py](order_lifecy
 
 - A solid arrow is a call, a dashed one is a reply or an event. Pass `dashed=True`.
 - Every arrow between two applications goes through the integration layer, so show it: a Logic App or API Management is a participant between them, never skipped.
+- The Message trails of the process docs are sequence diagrams too, in [message_trails.py](message_trails.py): one spec per trail, named after its doc (`p9-3` is the third trail in P9). A participant is a Hop, named `application: operation`, and a Flow draws as a band over its Hops. Edit the spec and run the script, as for the rest.
 - Keep one diagram to one story and about eight participants. Split a longer flow by phase, as the order lifecycle does.
 
 ## Grid style
@@ -124,6 +125,7 @@ python3 docs/architecture/diagrams/c4.py [name ...]                # writes docs
 python3 docs/architecture/diagrams/bounded_contexts.py [name ...]  # writes docs/architecture/diagrams/<name>.excalidraw and .png
 python3 docs/architecture/diagrams/order_lifecycle.py [name ...]   # writes docs/architecture/diagrams/order-lifecycle-<name>.excalidraw and .png
 python3 docs/architecture/diagrams/deployment.py [name ...]        # writes the deployment view and the local-versus-Azure map
+python3 docs/architecture/diagrams/message_trails.py [name ...]    # writes the Message trails of the process docs
 python3 docs/architecture/diagrams/access.py                       # writes the identity and access grid
 python3 docs/architecture/diagrams/resilience.py                   # writes the failure patterns
 python3 docs/architecture/diagrams/bpmn.py [process ...]           # writes the BPMN pictures

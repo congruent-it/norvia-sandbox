@@ -254,28 +254,9 @@ Taking a Shipment off: `POST /v1/trips/{number}/shipments/{shipmentNumber}/take-
 
 The Hops one dispatch leaves on the Message trail, named as the [Integration console](../../operations/integration-console.md#message-trail) shows them, in time order. They belong to the Flow `trip-dispatch`. Dispatching, each Amend, each take-off of a Shipment from a Dispatched Trip and each send again start a trail of their own with a new correlation ID, found together by the Trip number. Building a Draft (the Flow `trip-planning`) publishes nothing and has no trail beyond the TMS UI's and the TMS API's Hops. The Planner waits for the call, not for the publish.
 
-```mermaid
-sequenceDiagram
-    box transparent Flow trip-dispatch
-        participant ui as tms-web: Dispatch Trip
-        participant call as tms-api: POST /v1/trips/TRIP-0000007/dispatch
-        participant pub as tms-api: publish TripDispatched
-        participant app as logic-trip-dispatch: Send_to_the_Driver_app
-        participant drv as driver-app: POST /v1/trips
-        participant report as logic-trip-dispatch: Report_the_version_delivered
-        participant rcall as tms-api: POST /v1/trips/TRIP-0000007/versions/1/report-delivered
-    end
-    ui->>call: command
-    call->>call: Trip rules, then the new version and the outbox message in one transaction
-    call-->>ui: 200, or 404, 409 or 422 and nothing changes
-    call-)pub: outbox, within a second
-    pub-)app: trip-events, subscription trip-dispatch
-    app->>drv: the whole Trip, retried on a timeout, 408, 429 and 5xx
-    drv-->>app: 2xx, the Trip version kept
-    app->>report: delivered
-    report->>rcall: X-Correlation-ID of the dispatch
-    rcall-->>report: 2xx, the version is Delivered to Driver app
-```
+![Sequence diagram of the Hops on the Message trail](../../architecture/diagrams/message-trail-p11-1.png)
+
+*Editable source: [message-trail-p11-1.excalidraw](../../architecture/diagrams/message-trail-p11-1.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
 
 - When the Driver app doesn't take the Trip, the `Send_to_the_Driver_app` Hop is `Failed` with `DriverAppUnavailable` or `DriverAppRefused`, and the Logic App calls `Report_the_version_not_delivered` instead. The TMS marks the version **Not delivered** and publishes `TripNotDelivered`, with the same correlation ID. The Planner's send again (`Send Trip again` in the TMS UI) starts a new trail.
 - A message the Logic App can't read is dead-lettered as `TripDispatchUnreadable` and the run fails; no send or report Hop appears.

@@ -152,63 +152,23 @@ The Hops of E1, named as the [Integration console](../../operations/integration-
 
 **1. A Billable line.** The TMS's `TransportOrderBillable` is on the `transport-order-events` topic. The Billing Logic App reacts on the same trail, with the event's correlation ID.
 
-```mermaid
-sequenceDiagram
-    box transparent Flow billing
-        participant sub as transport-order-events (topic): subscription billing
-        participant logic as logic-billing: billing
-        participant erp as erp-api: POST /v1/billable-lines
-    end
-    sub-)logic: A TransportOrderBillable message is available
-    logic->>logic: Track_the_billable_line (Transport Order number, Shipment number, Shipper as partyId)
-    logic->>erp: Record_the_billable_line (the message body as it is, X-Correlation-ID)
-    erp->>erp: Billable line Waiting. Idempotent on the Transport Order number. Nothing is published
-    erp-->>logic: 201, 200 (repeat), or 409, 422, 400 with a stable code
-    logic->>sub: Settle_the_message: complete, or dead-letter with the ERP's code
-```
+![Sequence diagram of the Hops: A Billable line](../../architecture/diagrams/message-trail-e1-1.png)
+
+*Editable source: [message-trail-e1-1.excalidraw](../../architecture/diagrams/message-trail-e1-1.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
 
 **2. An invoice.** Finance's **Invoice now**, or the monthly Invoice run, starts a new trail for the invoice. Its correlation ID is the invoice's own, and every later hop carries it.
 
-```mermaid
-sequenceDiagram
-    box transparent Flow invoicing
-        participant erp as erp-web: Invoice now
-        participant pub as erp-api: publish ShipperInvoiceIssued
-        participant logic as logic-shipper-invoice: shipper-invoice
-        participant portal as partner-portal-web: POST /shipper/v1/shipper-id/invoices
-        participant report as erp-api: POST /v1/shipper-invoices/number/report-sent
-    end
-    erp->>erp: IssueShipperInvoiceCommand: Waiting lines Invoiced, invoice numbered, outbox message, one transaction
-    erp-)pub: outbox, within a second
-    pub-)logic: invoicing-events, subscription shipper-invoice
-    logic->>logic: Track_the_invoice, Map_the_invoice (MapShipperDocument), Complete_the_message
-    logic->>logic: Get_the_Shipper_endpoint_credential (Key Vault)
-    logic->>portal: Send_to_the_Shipper (the invoice in the Shipper's format)
-    portal-->>logic: 200 acknowledged
-    logic->>report: Report_the_outcome_to_the_ERP: Report_the_invoice_sent
-    report-->>logic: 200 (or 200 ignored for a repeat)
-```
+![Sequence diagram of the Hops: Invoice now](../../architecture/diagrams/message-trail-e1-2.png)
+
+*Editable source: [message-trail-e1-2.excalidraw](../../architecture/diagrams/message-trail-e1-2.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
 
 **3. A Credit note** takes the same path from `IssueCreditNoteCommand`: it publishes `CreditNoteIssued` to the same subscription, and the Logic App sends it as a `CREDIT_NOTE` and reports it to `/v1/credit-notes/{number}/report-sent`.
 
 **4. An invoice the Shipper never got.** The send hop is `Failed` with `ShipperUnavailable` or `ShipperRefused`, and the Logic App reports it instead of failing the run.
 
-```mermaid
-sequenceDiagram
-    box transparent Flow invoicing
-        participant logic as logic-shipper-invoice: shipper-invoice
-        participant portal as partner-portal-web: POST /shipper/v1/shipper-id/invoices
-        participant report as erp-api: POST /v1/shipper-invoices/number/report-not-delivered
-        participant pub as erp-api: publish ShipperInvoiceNotDelivered
-        participant again as erp-web: Send again
-    end
-    logic->>portal: Send_to_the_Shipper (retried three times on a timeout, 408, 429 or 5xx)
-    portal-->>logic: no answer, or a client error
-    logic->>report: Report_the_outcome_to_the_ERP: Report_the_invoice_not_delivered (status code, cause up to 500 characters)
-    report->>report: Invoice Not delivered, with the outbox message, one transaction
-    report-)pub: outbox, within a second
-    again->>again: SendShipperInvoiceAgainCommand: back to Issued, ShipperInvoiceIssued published again, same correlation ID
-```
+![Sequence diagram of the Hops: An invoice the Shipper never got](../../architecture/diagrams/message-trail-e1-3.png)
+
+*Editable source: [message-trail-e1-3.excalidraw](../../architecture/diagrams/message-trail-e1-3.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
 
 ### What is built
 

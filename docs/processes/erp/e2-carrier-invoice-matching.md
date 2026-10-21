@@ -166,76 +166,27 @@ The Hops of E2, named as the [Integration console](../../operations/integration-
 
 **1. A Carrier cost.** The TMS publishes `CarrierCostIncurred` when a Carrier Shipment is Delivered, on the trail of the Delivered Tracking event.
 
-```mermaid
-sequenceDiagram
-    box transparent Flow carrier-costs
-        participant sub as shipment-events (topic): subscription carrier-cost
-        participant logic as logic-carrier-cost: carrier-cost
-        participant erp as erp-api: POST /v1/carrier-costs
-    end
-    sub-)logic: A CarrierCostIncurred message is available
-    logic->>logic: Track_the_carrier_cost, Check_the_carrier_cost
-    logic->>erp: Record_the_carrier_cost (the message body as it is, X-Correlation-ID)
-    erp->>erp: Carrier cost Open. Undecided Unknown booking lines of that Carrier with that reference are matched again, in the same save
-    erp-->>logic: 201, 200 (repeat), or 409, 422, 400 with a stable code
-    logic->>sub: Settle_the_message: complete, or dead-letter with the ERP's code
-```
+![Sequence diagram of the Hops: A Carrier cost](../../architecture/diagrams/message-trail-e2-1.png)
+
+*Editable source: [message-trail-e2-1.excalidraw](../../architecture/diagrams/message-trail-e2-1.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
 
 **2. A Carrier invoice.** The Carrier's submission starts a new trail, and API Management creates its correlation ID.
 
-```mermaid
-sequenceDiagram
-    box transparent Flow carrier-invoice
-        participant portal as partner-portal-web: Submit Carrier invoice
-        participant apim as apim-norvia: Submit Carrier invoice
-        participant logic as logic-carrier-invoice: carrier-invoice
-        participant erp as erp-api: POST /v1/carrier-invoices
-        participant pub as erp-api: publish CarrierInvoiceApproved
-    end
-    portal->>apim: POST /partner/v1/carrier-invoices (Persona token and subscription key)
-    apim->>apim: token, role CarrierInvoices.Submit, Carrier ID from azp, correlation ID
-    apim->>logic: Canonical call, X-Carrier-ID and X-Correlation-ID
-    logic->>logic: Refuse any caller but API Management, Track_the_invoice, Map_the_invoice (MapCarrierInvoice)
-    logic->>erp: Receive_at_the_ERP (Canonical Model submission)
-    erp->>erp: Every line matched against the Carrier's Carrier costs, matched Carrier costs Invoiced, one transaction
-    erp-->>logic: 201 or 200 (repeat), each line's result, or a refusal code
-    logic->>logic: Relay_the_ERP_outcome (RelayErpInvoiceAnswer)
-    logic-->>apim: Answer_the_Carrier: RECEIVED or APPROVED with each line's result, or a refusal
-    apim-->>portal: the same answer
-    erp-)pub: outbox, within a second, when every line matched
-```
+![Sequence diagram of the Hops: A Carrier invoice](../../architecture/diagrams/message-trail-e2-2.png)
+
+*Editable source: [message-trail-e2-2.excalidraw](../../architecture/diagrams/message-trail-e2-2.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
 
 **3. Finance decides the lines left To decide.** Finance's action starts a new trail.
 
-```mermaid
-sequenceDiagram
-    box transparent Flow carrier-invoice
-        participant ui as erp-web: Accept or reject a line
-        participant pub as erp-api: publish CarrierInvoiceApproved
-    end
-    ui->>ui: AcceptCarrierInvoiceLineCommand or RejectCarrierInvoiceLineCommand: the line decided, its Carrier cost Invoiced if accepted
-    ui->>ui: The last line decided: the invoice Approved, with the outbox message, one transaction
-    ui-)pub: outbox, within a second
-```
+![Sequence diagram of the Hops: Finance decides the lines left To decide](../../architecture/diagrams/message-trail-e2-3.png)
+
+*Editable source: [message-trail-e2-3.excalidraw](../../architecture/diagrams/message-trail-e2-3.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
 
 **4. The Carrier is told.** The Carrier invoice outcome Logic App reacts to the Approved event on its trail.
 
-```mermaid
-sequenceDiagram
-    box transparent Flow carrier-invoices
-        participant sub as invoicing-events (topic): subscription carrier-invoice-outcome
-        participant logic as logic-carrier-invoice-outcome: carrier-invoice-outcome
-        participant portal as partner-portal-web: POST /carrier/v1/carrier-id/invoice-outcomes
-        participant report as erp-api: POST /v1/carrier-invoices/carrier-id/number/report-told
-    end
-    sub-)logic: A CarrierInvoiceApproved message is available
-    logic->>logic: Track_the_invoice, Map_the_invoice (MapCarrierInvoiceOutcome), Complete_the_message
-    logic->>logic: Get_the_Carrier_endpoint_credential (Key Vault)
-    logic->>portal: Send_to_the_Carrier (the outcome of each line)
-    portal-->>logic: 200 acknowledged
-    logic->>report: Report_the_outcome_to_the_ERP: Report_the_outcome_told
-    report-->>logic: 200 (Report_the_outcome_not_delivered instead when the retries are used up)
-```
+![Sequence diagram of the Hops: The Carrier is told](../../architecture/diagrams/message-trail-e2-4.png)
+
+*Editable source: [message-trail-e2-4.excalidraw](../../architecture/diagrams/message-trail-e2-4.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
 
 ### What is built
 

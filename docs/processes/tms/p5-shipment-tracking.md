@@ -233,28 +233,9 @@ P5 is built for the Carrier source. The Own fleet source is accepted by the TMS 
 
 The Hops a Carrier's Tracking event leaves on its Message trail, named as the [Integration console](../../operations/integration-console.md#message-trail) shows them, in time order. All of them belong to the one Flow `carrier-tracking`, on the correlation ID that API Management creates. The Carrier's event ID is the trail's `sourceMessageId`.
 
-```mermaid
-sequenceDiagram
-    box transparent Flow carrier-tracking
-        participant portal as partner-portal-web: Send Tracking event
-        participant apim as apim-norvia: Submit Carrier tracking
-        participant queue as carrier-tracking (queue)
-        participant logic as logic-tracking: carrier-tracking
-        participant tms as tms-api: POST /v1/tracking-events
-        participant pub as tms-api: publish ShipmentDelivered
-    end
-    portal->>apim: POST /partner/v1/carrier-tracking (Persona token and subscription key)
-    apim->>apim: token, role Tracking.Submit, Carrier ID from azp, correlation ID
-    apim->>queue: Carrier tracking message, with correlationId, flow, partyId, sourceMessageId
-    apim-->>portal: 202 Accepted
-    queue-)logic: When_a_Carrier_tracking_message_is_available
-    logic->>logic: Track_the_event, Map_the_event (CarrierTrackingMap)
-    logic->>tms: Record_in_the_TMS (Canonical Model Tracking event)
-    tms->>tms: Tracking event recorded, status and ETA moved, with the outbox message, in one transaction
-    tms-->>logic: 200 (also a repeat), or 404, 409 or 400
-    logic->>queue: Settle_the_message: complete, dead-letter or abandon
-    tms-)pub: outbox, within a second
-```
+![Sequence diagram of the Hops on the Message trail](../../architecture/diagrams/message-trail-p5-1.png)
+
+*Editable source: [message-trail-p5-1.excalidraw](../../architecture/diagrams/message-trail-p5-1.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
 
 - The Carrier's reply ends at `202 Accepted`. Everything after the queue is invisible to it ([ADR 0008](../../adr/0008-carrier-tracking-events-are-accepted-asynchronously.md)).
 - The publish Hop is named after the event the status landed on: `ShipmentCollected`, `ShipmentInTransit` or `ShipmentDelivered`. An exception Tracking event publishes `ShipmentExceptionReported`. A Tracking event that moves nothing, an ETA-only update and a repeat publish nothing, so the trail ends at the TMS call. The publish Hop appears only once the outbox has sent the message ([failure behaviour](../../architecture/failure-behaviour.md#the-tms-outbox)).

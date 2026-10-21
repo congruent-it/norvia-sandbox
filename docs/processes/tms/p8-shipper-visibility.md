@@ -171,20 +171,9 @@ P8 is read only: there is no Logic App, queue or event, so the trail is short an
 
 The Hops a Shipper's query leaves on its Message trail, named as the [Integration console](../../operations/integration-console.md#message-trail) shows them, in time order. All of them belong to the one Flow `shipper-tracking`, on the correlation ID that API Management creates. The diagram shows "Get Transport Order". List, Find and Download Proof of delivery file have the same shape, with their own operation and TMS route.
 
-```mermaid
-sequenceDiagram
-    box transparent Flow shipper-tracking
-        participant portal as partner-portal-web: Get Transport Order
-        participant apim as apim-norvia: Get Transport Order
-        participant tms as tms-api: GET /v1/shipper-tracking/transport-orders/{transportOrderNumber}
-    end
-    portal->>apim: GET /partner/v1/transport-orders/{number} (Persona token and subscription key)
-    apim->>apim: token, role Tracking.Read, Shipper ID from azp, rate limit, correlation ID
-    apim->>tms: managed identity, X-Shipper-ID, X-Correlation-ID
-    tms-->>apim: the Shipper's view (Canonical Model), or 404, or 5xx
-    apim->>apim: Liquid map, Canonical to Shipper tracking format
-    apim-->>portal: the Shipper tracking format, or 403, 429 or 503
-```
+![Sequence diagram of the Hops on the Message trail](../../architecture/diagrams/message-trail-p8-1.png)
+
+*Editable source: [message-trail-p8-1.excalidraw](../../architecture/diagrams/message-trail-p8-1.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
 
 - A refused call stops at `apim-norvia` with `Refused` and a `failureCode`: `NotAllowedToReadTracking` (a Carrier Persona's token), `NoShipperForClient` or a rate-limited call. A TMS that doesn't answer in 5 seconds, or answers with a server error, ends the trail at `apim-norvia` with `TmsUnavailable`. The TMS hop is missing when it never got the call.
 - The TMS's 4xx answers (`TransportOrderNotFound`, `ProofOfDeliveryNotFound`) pass through as `TmsRefused`.

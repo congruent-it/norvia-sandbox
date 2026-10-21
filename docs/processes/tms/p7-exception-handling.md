@@ -304,69 +304,21 @@ P7 leaves several Message trails, one per cause or Planner action. Each is named
 
 **Opening.** An Exception opens inside the call that causes it, so it adds no Hop of its own, only a publish at the end of that call's trail. The trails are those of [P5](p5-shipment-tracking.md#message-trail) (a Tracking event) and [P6](p6-proof-of-delivery.md#message-trail) (a Proof of delivery with reservations).
 
-```mermaid
-sequenceDiagram
-    box transparent Flow carrier-tracking
-        participant tms as tms-api: POST /v1/tracking-events
-        participant opened as tms-api: publish ExceptionOpened
-        participant reported as tms-api: publish ShipmentExceptionReported
-    end
-    tms->>tms: Tracking event recorded, Exception opened or the cause added, with the outbox messages, in one transaction
-    tms-)reported: outbox, within a second
-    tms-)opened: outbox, within a second
-```
+![Sequence diagram of the Hops: Opening](../../architecture/diagrams/message-trail-p7-1.png)
+
+*Editable source: [message-trail-p7-1.excalidraw](../../architecture/diagrams/message-trail-p7-1.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
 
 **Notifying the Shipper.**
 
-```mermaid
-sequenceDiagram
-    box transparent Flow exception-handling
-        participant ui as tms-web: Notify Shipper
-        participant notify as tms-api: POST /v1/exceptions/EX-0000042/notify-shipper
-        participant pub as tms-api: publish ShipperNotificationRequested
-        participant sent as tms-api: POST /v1/shipper-notifications/0192f0c1-7a2e-7c3b-9d4e-5a6b7c8d9e0f/report-sent
-    end
-    box transparent Flow shipper-notification
-        participant logic as logic-shipper-notification: shipper-notification
-        participant recv as partner-portal-web: POST /shipper/v1/shipper-id/notifications
-    end
-    ui->>notify: notify command (message as edited by the Planner)
-    notify->>notify: Shipper notification Requested and the action recorded on the Exception, with the outbox message, in one transaction
-    notify-->>ui: 200
-    notify-)pub: outbox, within a second
-    pub-)logic: shipment-events, subscription shipper-notification
-    logic->>logic: Map_the_notification, Complete_the_message, Get_the_Shipper_endpoint_credential
-    logic->>recv: Send_to_the_Shipper (Shipper notification format)
-    recv-->>logic: 200 received
-    logic->>sent: Report_the_notification_sent
-    sent-->>logic: 200
-```
+![Sequence diagram of the Hops: Notifying the Shipper](../../architecture/diagrams/message-trail-p7-2.png)
+
+*Editable source: [message-trail-p7-2.excalidraw](../../architecture/diagrams/message-trail-p7-2.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
 
 **Cancelling a Carrier booking.**
 
-```mermaid
-sequenceDiagram
-    box transparent Flow exception-handling
-        participant ui as tms-web: Cancel Carrier booking
-        participant cancel as tms-api: POST /v1/exceptions/EX-0000042/cancel-carrier-booking
-        participant pub as tms-api: publish CarrierBookingCancelled
-        participant told as tms-api: POST /v1/carrier-bookings/CB-0000042/report-cancellation-told
-    end
-    box transparent Flow carrier-cancellation
-        participant logic as logic-carrier-cancellation: carrier-cancellation
-        participant recv as partner-portal-web: POST /carrier/v1/carrier-id/cancellations
-    end
-    ui->>cancel: cancel command (reason text)
-    cancel->>cancel: Carrier booking Cancelled, Shipment back to Planned and the action recorded on the Exception, with the outbox message, in one transaction
-    cancel-->>ui: 200
-    cancel-)pub: outbox, within a second
-    pub-)logic: shipment-events, subscription carrier-cancellation
-    logic->>logic: Map_the_cancellation, Complete_the_message, Get_the_Carrier_endpoint_credential
-    logic->>recv: Send_to_the_Carrier (Carrier cancellation format)
-    recv-->>logic: 200 received
-    logic->>told: Report_the_cancellation_told
-    told-->>logic: 200
-```
+![Sequence diagram of the Hops: Cancelling a Carrier booking](../../architecture/diagrams/message-trail-p7-3.png)
+
+*Editable source: [message-trail-p7-3.excalidraw](../../architecture/diagrams/message-trail-p7-3.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
 
 - Agreeing a delivery window, adding a note and resolving each leave one short trail in the Flow `exception-handling`: `tms-web: Agree delivery window`, `tms-web: Add note` or `tms-web: Resolve Exception`, then the call. Only the first and the last publish, `ShipmentDeliveryWindowAgreed` and `ExceptionResolved`. A note publishes nothing, so its trail ends at the call.
 - A refused action stops at the call, with the failure code of the [action rules](#action-rules), and publishes nothing.

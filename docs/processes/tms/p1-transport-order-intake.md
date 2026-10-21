@@ -124,24 +124,9 @@ For engineers and coding agents. It shows what the estate does when a Shipper bo
 
 The Hops an accepted booking leaves on its Message trail, named as the [Integration console](../../operations/integration-console.md#message-trail) shows them, in time order. All of them belong to the one Flow `transport-order-intake`. The Shipper waits on the whole path, so every call returns before the one that started it does.
 
-```mermaid
-sequenceDiagram
-    box transparent Flow transport-order-intake
-        participant portal as partner-portal-web: Send booking
-        participant apim as apim-norvia: Submit transport order
-        participant logic as logic-intake: transport-order-intake
-        participant tms as tms-api: POST /v1/transport-orders
-        participant pub as tms-api: publish TransportOrderAccepted
-    end
-    portal->>apim: POST /partner/v1/transport-orders (partner booking)
-    apim->>logic: Canonical call, Shipper ID, correlation ID
-    logic->>logic: Map_the_booking (IntakeMap)
-    logic->>tms: Submit_to_the_TMS (Canonical Model Transport Order)
-    tms-->>logic: 201 or 200 (repeat) or 422
-    logic-->>apim: ACCEPTED, ALREADY_BOOKED or REJECTED
-    apim-->>portal: the same answer
-    tms-)pub: outbox, within a second
-```
+![Sequence diagram of the Hops on the Message trail](../../architecture/diagrams/message-trail-p1-1.png)
+
+*Editable source: [message-trail-p1-1.excalidraw](../../architecture/diagrams/message-trail-p1-1.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
 
 - A rejected booking publishes `TransportOrderRejected` instead of `TransportOrderAccepted`. A repeat publishes nothing, so its trail ends at the TMS call.
 - A refused call stops at `apim-norvia`. A booking with a value the map can't read still reaches the TMS, which rejects it. One the map can't parse at all fails the run before the TMS call.

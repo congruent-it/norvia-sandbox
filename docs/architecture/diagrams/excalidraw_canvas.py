@@ -19,9 +19,9 @@ def wrap(s, fs, width):
         line = ""
         words = []
         for w in para.split(" "):
-            if len(w) * fs * CHAR > width and "/" in w:  # a path: break it before a slash
+            if len(w) * fs * CHAR > width and ("/" in w or ("-" in w and len(w) > 28)):  # a path or an ID: break it before a slash, then, for a long one, before a hyphen
                 parts, cur = [], ""
-                for chunk in re.split(r"(?=/)", w):
+                for chunk in re.split(r"(?=/)", w) if "/" in w and all(len(c) * fs * CHAR <= width for c in re.split(r"(?=/)", w)) else re.split(r"(?=[/-])", w):
                     if cur and len(cur + chunk) * fs * CHAR > width:
                         parts.append(cur)
                         cur = ""

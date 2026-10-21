@@ -9,6 +9,7 @@ Same palette, type and look as the matrix and graph styles; see README.md. Usage
 A spec holds title, subtitle, footnote, legend (optional), participants and steps:
 
     participants: dict(id, title, sub, palette, kind)       kind "person" draws a person in yellow
+    groups:       [(label, [ids])]                          an optional band over consecutive participants, such as the Flow they belong to
     steps:  ("phase", "title")
             ("msg", from_id, to_id, "label", opts)           opts: dashed (a reply or an event), both
             ("self", id, "label")                            something the participant does on its own
@@ -21,8 +22,8 @@ from excalidraw_canvas import ARROW, ARROW_PLANNED, CHAR, INK, MUTED, SOFT, Canv
 from excalidraw_matrix import PALETTE, PERSON
 
 M, TOP = 40, 160
-COL_W = 200
-HEAD_W, HEAD_H = 168, 66
+DEFAULT_COL_W = 200
+DEFAULT_HEAD_W = 168
 GAP = 20
 
 
@@ -31,13 +32,26 @@ def render(spec, out_excalidraw, out_svg=None):
     text, rect = cv.text, cv.rect
     parts = spec["participants"]
     n = len(parts)
+    COL_W, HEAD_W = DEFAULT_COL_W, DEFAULT_HEAD_W
+    # a name that no wrapping can break (such as an event's) widens the columns instead of overflowing its box
+    if max((len(w) for p in parts for w in p["title"].split()), default=0) > 19:
+        COL_W, HEAD_W = 226, 200
     xs = {p["id"]: M + COL_W / 2 + i * COL_W for i, p in enumerate(parts)}
     last = parts[-1]["id"]
     right_pad = int(COL_W * 1.5) if any(st[0] == "self" and st[1] == last for st in spec["steps"]) else 0  # room for a note beside the last lifeline
     width = max(M * 2 + n * COL_W + right_pad, int(len(spec["title"]) * 38 * CHAR) + 2 * M)
 
     # first pass: heights
-    y = TOP + HEAD_H + 24
+    # header boxes grow to fit a long hop name; flow groups, if any, get a band above them
+    head_h = 66
+    for p in parts:
+        th = text_height(p["title"], 14, HEAD_W - 24)
+        sh = text_height(p["sub"], 11, HEAD_W - 20) if p.get("sub") else 0
+        head_h = max(head_h, 10 + th + (3 if sh else 0) + sh + 10)
+    head_h = int(head_h)
+    gy = 30 if spec.get("groups") else 0
+    HEAD_TOP = TOP + gy
+    y = HEAD_TOP + head_h + 24
     rows = []
     for step in spec["steps"]:
         kind = step[0]
@@ -69,15 +83,20 @@ def render(spec, out_excalidraw, out_svg=None):
     # lifelines first, so the rest sits on top
     for p in parts:
         x = xs[p["id"]]
-        cv.arrow([(x, TOP + HEAD_H), (x, height - 60)], "#ced4da", True, False, None, None, plain=True)
+        cv.arrow([(x, HEAD_TOP + head_h), (x, height - 60)], "#ced4da", True, False, None, None, plain=True)
     for p in parts:
         pal = PALETTE[p.get("palette", "gray")]
         fill, stroke = (PERSON if p.get("kind") == "person" else (pal[2], pal[3]))
         x = xs[p["id"]]
-        rect(x - HEAD_W / 2, TOP, HEAD_W, HEAD_H, fill, stroke, 2)
-        th = text(x - HEAD_W / 2 + 10, TOP + 10, HEAD_W - 20, p["title"], 14, INK, "center", wrap_w=HEAD_W - 24, bold=True)
+        rect(x - HEAD_W / 2, HEAD_TOP, HEAD_W, head_h, fill, stroke, 2)
+        th = text(x - HEAD_W / 2 + 10, HEAD_TOP + 10, HEAD_W - 20, p["title"], 14, INK, "center", wrap_w=HEAD_W - 24, bold=True)
         if p.get("sub"):
-            text(x - HEAD_W / 2 + 10, TOP + 10 + th + 3, HEAD_W - 20, p["sub"], 11, SOFT, "center", wrap_w=HEAD_W - 20)
+            text(x - HEAD_W / 2 + 10, HEAD_TOP + 10 + th + 3, HEAD_W - 20, p["sub"], 11, SOFT, "center", wrap_w=HEAD_W - 20)
+
+    for label, ids in spec.get("groups", []):
+        x1, x2 = min(xs[i] for i in ids) - HEAD_W / 2, max(xs[i] for i in ids) + HEAD_W / 2
+        rect(x1, TOP, x2 - x1, 24, "#f1f3f5", "#adb5bd", 1, radius=6)
+        text(x1 + 8, TOP + 4, x2 - x1 - 16, label, 12, MUTED, "center", wrap_w=x2 - x1 - 16, bold=True)
 
     for step, (ry, h) in zip(spec["steps"], rows):
         kind = step[0]

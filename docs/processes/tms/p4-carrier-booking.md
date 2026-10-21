@@ -214,55 +214,15 @@ P4 is two trails with a wait between them, not one. The release starts the booki
 
 The Hops of both trails, named as the [Integration console](../../operations/integration-console.md#message-trail) shows them, in time order. The release and the booking belong to the Flows `transport-planning` and `carrier-booking`, with the sent report in `carrier-booking-report`. The answer's Hops belong to two Flows on one correlation ID that API Management creates: `carrier-answer` for API Management and the Carrier-answer Logic App, and `carrier-booking-answer` for the TMS's calls.
 
-```mermaid
-sequenceDiagram
-    box transparent Flow transport-planning
-        participant ui as tms-web: Release Shipment
-        participant rel as tms-api: POST /v1/shipments/SH-0000042/release
-        participant pub as tms-api: publish ShipmentReleased
-    end
-    box transparent Flow carrier-booking
-        participant booking as logic-booking: carrier-booking
-        participant recv as partner-portal-web: POST /carrier/v1/carrier-id/bookings
-    end
-    box transparent Flow carrier-booking-report
-        participant sent as tms-api: POST /v1/carrier-bookings/CB-0000042/report-sent
-    end
-    ui->>rel: release command
-    rel->>rel: Shipment Released and Carrier booking Requested, with the outbox message, in one transaction
-    rel-->>ui: 201 or 200
-    rel-)pub: outbox, within a second
-    pub-)booking: shipment-events, subscription carrier-booking
-    booking->>booking: Map_the_release, Get_the_Carrier_endpoint_credential
-    booking->>recv: Send_to_the_Carrier (Carrier booking format)
-    recv-->>booking: 200 received
-    booking->>sent: Report_the_booking_sent
-    sent-->>booking: 200
-```
+![Sequence diagram of the Hops on the Message trail](../../architecture/diagrams/message-trail-p4-1.png)
+
+*Editable source: [message-trail-p4-1.excalidraw](../../architecture/diagrams/message-trail-p4-1.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
 
 The answer arrives later, as a trail of its own:
 
-```mermaid
-sequenceDiagram
-    box transparent Flow carrier-answer
-        participant portal as partner-portal-web: Send Carrier answer
-        participant apim as apim-norvia: Answer Carrier booking
-        participant logic as logic-answer: carrier-answer
-    end
-    box transparent Flow carrier-booking-answer
-        participant tms as tms-api: POST /v1/carrier-bookings/CB-0000042/answer
-        participant pub as tms-api: publish CarrierBookingConfirmed
-    end
-    portal->>apim: POST /partner/v1/carrier-answers (Persona token and subscription key)
-    apim->>logic: Canonical call, Carrier ID from azp, correlation ID
-    logic->>logic: Map_the_answer (CarrierAnswerMap)
-    logic->>tms: Answer_to_the_TMS (Canonical Model answer)
-    tms-->>logic: 200 (also a repeat), 404, 403, 409, 422 or 400
-    logic->>logic: Relay_the_TMS_outcome (CarrierAnswerResponses)
-    logic-->>apim: RECORDED or a refusal code
-    apim-->>portal: the same answer
-    tms-)pub: outbox, within a second
-```
+![Sequence diagram of the Hops on the Message trail](../../architecture/diagrams/message-trail-p4-2.png)
+
+*Editable source: [message-trail-p4-2.excalidraw](../../architecture/diagrams/message-trail-p4-2.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
 
 - A rejection publishes `CarrierBookingRejected` instead. A repeated answer and a refused one publish nothing, so the trail ends at the TMS call.
 - A refused call stops at `apim-norvia`. The Logic App refuses anything but API Management's call, and its run fails with `CallerNotApiManagement`.
