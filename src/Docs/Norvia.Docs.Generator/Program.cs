@@ -9,10 +9,16 @@ string? Read(string path) => File.Exists(Path.Combine(root, path)) ? File.ReadAl
 var generator = new DocsGenerator(DocumentedApplications.All, Read);
 var files = await generator.GenerateAsync();
 var stale = generator.Stale(files);
+var staleDiagrams = generator.StaleDiagrams(files);
 
 if (args.Contains("--check"))
 {
     foreach (var path in stale)
+    {
+        Console.Error.WriteLine($"Stale: {path}");
+    }
+
+    foreach (var path in staleDiagrams)
     {
         Console.Error.WriteLine($"Stale: {path}");
     }
@@ -22,7 +28,12 @@ if (args.Contains("--check"))
         Console.Error.WriteLine("Regenerate with: dotnet run --project src/Docs/Norvia.Docs.Generator");
     }
 
-    return stale.Count == 0 ? 0 : 1;
+    if (staleDiagrams.Count > 0)
+    {
+        Console.Error.WriteLine("Redraw with: python3 docs/architecture/diagrams/entities.py, then rsvg-convert as in docs/architecture/diagrams/README.md");
+    }
+
+    return stale.Count == 0 && staleDiagrams.Count == 0 ? 0 : 1;
 }
 
 foreach (var file in files.Where(file => stale.Contains(file.Path)))
@@ -34,4 +45,8 @@ foreach (var file in files.Where(file => stale.Contains(file.Path)))
 }
 
 Console.WriteLine(stale.Count == 0 ? "Everything is up to date." : $"Wrote {stale.Count} file(s).");
+foreach (var path in staleDiagrams)
+{
+    Console.WriteLine($"Redraw {path}: python3 docs/architecture/diagrams/entities.py");
+}
 return 0;

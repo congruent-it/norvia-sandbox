@@ -53,4 +53,33 @@ internal static class EntityDiagram
 
         return JsonSerializer.Serialize(new { entities, relationships }, Options) + "\n";
     }
+
+    /// <summary>The tables the Excalidraw file draws: a node's title is the text element before its subtitle, which starts with a key column.</summary>
+    public static IReadOnlySet<string> DrawnTables(string excalidraw)
+    {
+        using var diagram = JsonDocument.Parse(excalidraw);
+        var texts = diagram.RootElement.GetProperty("elements").EnumerateArray()
+            .Where(element => element.GetProperty("type").GetString() == "text")
+            .Select(element => element.GetProperty("text").GetString() ?? string.Empty)
+            .ToList();
+
+        return texts.Skip(1).Select((text, index) => (Text: text, Title: texts[index]))
+            .Where(pair => pair.Text.StartsWith("PK ", StringComparison.Ordinal) || pair.Text.StartsWith("FK ", StringComparison.Ordinal))
+            .Select(pair => pair.Title)
+            .ToHashSet(StringComparer.Ordinal);
+    }
+
+    /// <summary>The tables with a key column in a model's JSON, which the Excalidraw file has to draw.</summary>
+    public static IReadOnlySet<string> ModelledTables(string json)
+    {
+        using var model = JsonDocument.Parse(json);
+        return model.RootElement.GetProperty("entities").EnumerateArray()
+            .Where(entity => entity.GetProperty("columns").GetArrayLength() > 0)
+            .Select(entity => entity.GetProperty("name").GetString()!)
+            .ToHashSet(StringComparer.Ordinal);
+    }
+
+    public static bool IsModelPath(string path) => path.StartsWith($"{Folder}/er-", StringComparison.Ordinal) && path.EndsWith(".json", StringComparison.Ordinal);
+
+    public static string ExcalidrawPathOf(string modelPath) => string.Concat(modelPath.AsSpan(0, modelPath.Length - ".json".Length), ".excalidraw");
 }

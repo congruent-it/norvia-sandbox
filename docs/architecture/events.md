@@ -10,7 +10,7 @@ Subscriptions and subscribers marked *planned* are designed in a process doc but
 
 ![C4 level 3: the event topology, from publisher to topic, subscription and Logic App](diagrams/c4-l3-event-topology.png)
 
-*Editable source: [c4-l3-event-topology.excalidraw](diagrams/c4-l3-event-topology.excalidraw), generated from [c4.py](diagrams/c4.py). The picture is drawn by hand-kept spec, not read from the Bicep, so a new subscription needs a node there as well as a row below.*
+*Editable source: [c4-l3-event-topology.excalidraw](diagrams/c4-l3-event-topology.excalidraw), generated from [c4.py](diagrams/c4.py). [EventTopologyDiagramTests](../../tests/Tms/Norvia.Tms.ArchitectureTests/EventTopologyDiagramTests.cs) fails when its topics or subscriptions differ from the Bicep's. The arrows and filters are not checked.*
 
 ## Catalogue
 
@@ -103,6 +103,7 @@ Published by the Driver app.
 
 - every event schema in `contracts/canonical-model` has a row;
 - every subscription in `messaging.bicep` and in the AppHost has a row;
+- the [topology diagram](#topology) draws the Bicep's topics and subscriptions;
 - no row that is not *planned* names a subscription that does not exist.
 
 Publishers are not checked.
