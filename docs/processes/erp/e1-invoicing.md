@@ -10,6 +10,12 @@ Invoicing turns the Billable Transport Orders the TMS hands over into Shipper in
 | **Applies to** | Transport-only orders, whether Own fleet or a Carrier carried them. Fulfilment orders are not invoiced here |
 | **Integrations touched** | Service Bus (Transport Order events, Invoicing events), Billing Logic App, ERP billing API, Shipper invoice Logic App, Key Vault, Partner portal (Shipper invoice endpoint and inbox) |
 
+## Process model
+
+![E1 Invoicing as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-e1-invoicing.png)
+
+The model is [e1-invoicing.bpmn](e1-invoicing.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-e1-invoicing.excalidraw)).
+
 ## Billable lines
 
 The ERP keeps one **billable line** per Transport Order that the TMS made Billable. It holds what `TransportOrderBillable` carries: the Transport Order number, the Shipper, the Shipper reference, the Shipment number, the delivery time, the Freight Charge with its charge lines and Rate Card version, and whether it was released without a Proof of delivery. The ERP never recalculates a Freight Charge.

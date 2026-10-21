@@ -15,7 +15,7 @@ from excalidraw_canvas import ARROW, ARROW_PLANNED, INK, MUTED, SOFT, Canvas, te
 from excalidraw_matrix import PALETTE, PERSON
 
 HERE = Path(__file__).parent
-SOURCES = HERE.parent.parent / "processes" / "tms"
+SOURCES = [HERE.parent.parent / "processes" / "tms", HERE.parent.parent / "processes" / "erp"]
 NS = {"b": "http://www.omg.org/spec/BPMN/20100524/MODEL", "d": "http://www.omg.org/spec/BPMN/20100524/DI",
       "c": "http://www.omg.org/spec/DD/20100524/DC", "i": "http://www.omg.org/spec/DD/20100524/DI"}
 M, TOP = 40, 120
@@ -182,7 +182,7 @@ def render(path, out_excalidraw, out_svg):
 
 
 def main(names):
-    for path in sorted(SOURCES.glob("*.bpmn")):
+    for path in sorted(p for folder in SOURCES for p in folder.glob("*.bpmn")):
         if names and path.stem not in names:
             continue
         out = HERE / f"bpmn-{path.stem}.excalidraw"

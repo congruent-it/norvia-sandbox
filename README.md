@@ -21,7 +21,7 @@ The estate can also run *as found*, reproducing the problems a health check woul
 | [docs/architecture/](docs/architecture/README.md) | How the estate is put together: C4 context, containers and the integration layer, the event catalogue, the identity and access matrix, failure behaviour per Flow, and the local-vs-Azure map |
 | [docs/adr/](docs/adr/) | Architectural decisions, numbered 0001 onwards |
 | [docs/processes/tms/](docs/processes/tms/README.md) | The TMS process catalogue, P1 Transport Order intake to P12 Trip execution, each with a design doc and a BPMN diagram |
-| [docs/processes/erp/](docs/processes/erp/README.md) | The ERP process catalogue: E1 Invoicing, E2 Carrier invoice matching |
+| [docs/processes/erp/](docs/processes/erp/README.md) | The ERP process catalogue: E1 Invoicing, E2 Carrier invoice matching, each with a design doc and a BPMN diagram |
 | [docs/operations/integration-console.md](docs/operations/integration-console.md) | How the Integration operator finds Message trails and resolves failed messages |
 | [docs/operations/simulator.md](docs/operations/simulator.md) | How the Simulator feeds the estate with representative orders at a chosen volume, through the estate's real doors |
 | [docs/branding.md](docs/branding.md) | The Norvia icon every web UI shows in its tab, where its source is and how to export the other formats |

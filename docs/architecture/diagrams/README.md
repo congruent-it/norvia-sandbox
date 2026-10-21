@@ -99,13 +99,13 @@ The database sections of the [application pages](../../applications/README.md) s
 
 ## BPMN
 
-The TMS process models in [docs/processes/tms](../../processes/tms/) are BPMN files, which stay the source: they open in any BPMN tool and carry their own layout. [bpmn.py](bpmn.py) draws each one in this style so a process page can show it: a person's task is yellow, a system's task takes its lane's colour, events are rings, gateways are diamonds, and message flows are dashed. The layout in the file is kept.
+The process models in [docs/processes/tms](../../processes/tms/) and [docs/processes/erp](../../processes/erp/) are BPMN files, which stay the source: they open in any BPMN tool and carry their own layout. [bpmn.py](bpmn.py) draws each one in this style so a process page can show it: a person's task is yellow, a system's task takes its lane's colour, events are rings, gateways are diamonds, and message flows are dashed. A party outside Norvia, such as a Persona in the Partner portal, is a collapsed pool at the foot of the diagram, which the message flows run to and from. The layout in the file is kept.
 
 ```
 python3 docs/architecture/diagrams/bpmn.py [process ...]   # writes bpmn-<process>.excalidraw and .png here
 ```
 
-Change a process in its `.bpmn` and run the script. The ERP processes E1 and E2 have no model yet.
+Change a process in its `.bpmn` and run the script.
 
 ## Regenerating
 

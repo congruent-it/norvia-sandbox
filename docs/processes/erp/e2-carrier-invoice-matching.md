@@ -10,6 +10,12 @@ Carrier invoice matching checks what a Carrier asks to be paid against the Carri
 | **Applies to** | Carriers only |
 | **Integrations touched** | Service Bus (Shipment events, Invoicing events), Carrier cost Logic App, Partner portal (Carrier invoice screens and endpoint), API Management, Carrier invoice Logic App, Carrier invoice outcome Logic App, Key Vault, ERP billing API |
 
+## Process model
+
+![E2 Carrier invoice matching as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-e2-carrier-invoice-matching.png)
+
+The model is [e2-carrier-invoice-matching.bpmn](e2-carrier-invoice-matching.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-e2-carrier-invoice-matching.excalidraw)).
+
 ## Carrier costs
 
 The ERP keeps one **Carrier cost** per Carrier booking that the TMS handed over: the Carrier booking number, the Carrier booking reference, the Carrier, the Shipment number, the Transport Order number, the charge lines and total, the source (Carrier Rate Card version, or Spot with its remark) and the delivery time. The Carrier cost Logic App picks up `CarrierCostIncurred` and calls the ERP billing API to record it. A repeat for the same Carrier booking number with the same content returns the original, flagged as a repeat.
