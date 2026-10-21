@@ -179,7 +179,7 @@ else
             @* A run still sending has no end yet. *@
             <PropertyColumn Title="Ended" Property="@(run => SimulatorText.DateAndTime(run.FinishedAt))" />
             <PropertyColumn Title="Sent" Property="@(run => $"{run.Sent} of {run.Planned}")" />
-            <PropertyColumn Title="Sending" Property="@(run => SimulatorText.Of(run.Mode, TimeSpan.Zero))" />
+            <PropertyColumn Title="Sending" Property="@(run => SimulatorText.Of(run.Mode, run.Window))" />
             <PropertyColumn Title="Preset" Property="@(run => run.PresetName ?? "Custom")" />
             <PropertyColumn Title="Seed" Property="@(run => run.Seed)" />
         </FluentDataGrid>

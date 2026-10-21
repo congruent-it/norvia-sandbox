@@ -51,6 +51,12 @@ public sealed class SimulatorTextTests
     }
 
     [Fact]
+    public void Of_APacedRunWithoutAKnownWindow_SaysPacedOnly_NotZeroMinutes()
+    {
+        SimulatorText.Of(RunMode.Paced, null).Should().Be("Paced");
+    }
+
+    [Fact]
     public void Time_IsNorviasOwnLocalTime()
     {
         // 10:00 UTC is 12:00 in Rotterdam in October.
