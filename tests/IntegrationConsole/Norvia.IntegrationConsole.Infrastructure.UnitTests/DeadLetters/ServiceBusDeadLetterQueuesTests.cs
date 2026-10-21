@@ -360,14 +360,43 @@ public sealed class ServiceBusDeadLetterQueuesTests
     }
 
     [Fact]
-    public async Task ResubmitAsync_ForASubscription_IsNotSupported()
+    public async Task ResubmitAsync_ForASubscriptionMessage_SendsACopyToTheTopic_NamingTheSubscription_AndKeepsTheSessionAndCorrelation()
     {
-        Found(new ServiceBusEntity("sb", "shipment-events", "carrier-booking", 1));
+        Found(new ServiceBusEntity("sb", "driver-app-events", "driver-reports", 1));
+        var sender = Sender();
+        var original = Message(Enqueued, sequenceNumber: 3, messageId: "original-1", correlationId: "corr-1", subject: "TripStartReported", contentType: "application/json", sessionId: "TR-7",
+            properties: new Dictionary<string, object> { ["eventType"] = "TripStartReported", ["resubmitTo"] = "driver-reports" });
+        var receiver = Receives(original);
 
-        var resubmit = async () => await Queues().ResubmitAsync("shipment-events/carrier-booking", 3, TestContext.Current.CancellationToken);
+        var resubmitted = await Queues().ResubmitAsync("driver-app-events/driver-reports", 3, TestContext.Current.CancellationToken);
 
-        await resubmit.Should().ThrowAsync<NotSupportedException>();
-        _clients.DidNotReceiveWithAnyArgs().Create(default!);
+        resubmitted!.Entity.Should().Be("driver-app-events/driver-reports");
+        _client.Received(1).CreateSender("driver-app-events");
+        var sent = _sent.Should().ContainSingle().Subject;
+        sent.SessionId.Should().Be("TR-7");
+        sent.Subject.Should().Be("TripStartReported");
+        sent.ContentType.Should().Be("application/json");
+        sent.CorrelationId.Should().Be("corr-1");
+        sent.ApplicationProperties.Should().BeEquivalentTo(new Dictionary<string, object>
+        {
+            ["eventType"] = "TripStartReported",
+            ["resubmitTo"] = "driver-reports",
+            ["resubmittedFrom"] = "original-1",
+        });
+        await receiver.Received(1).CompleteMessageAsync(original, Arg.Any<CancellationToken>());
+        await sender.Received(1).SendMessageAsync(Arg.Any<ServiceBusMessage>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ResubmitAsync_ForAQueueMessage_NeverNamesASubscription()
+    {
+        Found(new ServiceBusEntity("sb", "carrier-tracking", null, 1));
+        Sender();
+        Receives(Message(Enqueued, sequenceNumber: 3, properties: new Dictionary<string, object> { ["resubmitTo"] = "stale" }));
+
+        await Queues().ResubmitAsync("carrier-tracking", 3, TestContext.Current.CancellationToken);
+
+        _sent.Single().ApplicationProperties.Should().NotContainKey("resubmitTo");
     }
 
     private ServiceBusSender Sender()

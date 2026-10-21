@@ -10,12 +10,18 @@ namespace Norvia.IntegrationConsole.Infrastructure.DeadLetters;
 /// Counts the dead-lettered messages of every queue and subscription the estate has, and peeks the oldest of each dead-letter
 /// queue that holds any, to see how long it has waited. It also peeks a queue's messages, and one message in full. A peek
 /// takes nothing off the queue, and no message is received, completed or sent: it keeps its delivery count and lock state.
-/// Resubmitting is the one thing that receives: it sends a copy to the queue and only then completes the original.
+/// Resubmitting is the one thing that receives: it sends a copy to the queue, or to the topic for one subscription, and only then completes the original.
 /// </summary>
 internal sealed class ServiceBusDeadLetterQueues(IServiceBusEntities entities, IServiceBusClients clients) : IDeadLetterQueues
 {
     /// <summary>The application property a resubmitted copy names the original's message ID in.</summary>
     public const string ResubmittedFrom = "resubmittedFrom";
+
+    /// <summary>
+    /// The application property a copy for a subscription names that subscription in. Every subscription's filter takes a
+    /// message that carries its own name here and none that carries another's (coding guidelines §7).
+    /// </summary>
+    public const string ResubmitTo = "resubmitTo";
 
     private const int ReceiveBatchSize = 10;
     private static readonly TimeSpan ReceiveWait = TimeSpan.FromSeconds(2);
@@ -94,11 +100,6 @@ internal sealed class ServiceBusDeadLetterQueues(IServiceBusEntities entities, I
             return null;
         }
 
-        if (found.Subscription is not null)
-        {
-            throw new NotSupportedException("A subscription's message is resubmitted through its topic, which this does not do.");
-        }
-
         await using var client = clients.Create(found.Namespace);
         await using var receiver = DeadLetterReceiver(client, found);
         // Peeked first, so a message that is gone doesn't lock the ones before it.
@@ -108,7 +109,8 @@ internal sealed class ServiceBusDeadLetterQueues(IServiceBusEntities entities, I
             return null;
         }
 
-        var copy = Copy(original);
+        // A subscription's message goes to its topic, for only that subscription to take; a queue's goes to the queue.
+        var copy = Copy(original, found.Subscription);
         await using var sender = client.CreateSender(found.Queue);
         try
         {
@@ -160,7 +162,7 @@ internal sealed class ServiceBusDeadLetterQueues(IServiceBusEntities entities, I
         }
     }
 
-    private static ServiceBusMessage Copy(ServiceBusReceivedMessage original)
+    private static ServiceBusMessage Copy(ServiceBusReceivedMessage original, string? subscription)
     {
         var copy = new ServiceBusMessage(original.Body)
         {
@@ -173,13 +175,18 @@ internal sealed class ServiceBusDeadLetterQueues(IServiceBusEntities entities, I
         foreach (var (name, value) in original.ApplicationProperties)
         {
             // The dead-letter reason and description are how it failed, not what it carried.
-            if (name is not ("DeadLetterReason" or "DeadLetterErrorDescription"))
+            if (name is not ("DeadLetterReason" or "DeadLetterErrorDescription" or ResubmitTo))
             {
                 copy.ApplicationProperties[name] = value;
             }
         }
 
         copy.ApplicationProperties[ResubmittedFrom] = original.MessageId;
+        if (subscription is not null)
+        {
+            copy.ApplicationProperties[ResubmitTo] = subscription;
+        }
+
         return copy;
     }
 

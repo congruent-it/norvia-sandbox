@@ -56,13 +56,14 @@ public sealed class ResubmitDeadLetteredMessageTests : ConsoleWebContext
     }
 
     [Fact]
-    public void Open_ForAMessageOnASubscription_HidesTheControl_ForItIsResubmittedToThatSubscriptionOnly()
+    public void Open_ForAMessageOnASubscription_OffersToResubmit_ToThatSubscriptionOnly()
     {
         Lists("shipment-events/carrier-booking", Listed(3));
 
         var page = OpenedMessage(3, "shipment-events/carrier-booking");
+        page.Find("[data-resubmit]").Click();
 
-        page.FindAll("[data-resubmit]").Should().BeEmpty();
+        page.Find("[role=alertdialog]").TextContent.Should().Contain("to shipment-events/carrier-booking").And.Contain("to that subscription only");
     }
 
     [Fact]
