@@ -10,6 +10,9 @@ matrix style; see README.md. Usage from a spec file:
 Nodes sit at (col, row) positions on a grid, the arrows are routed around them for you, and groups draw a
 boundary around their members (nodes or other groups).
 """
+import subprocess
+from pathlib import Path
+
 from excalidraw_canvas import ARROW, ARROW_PLANNED, CHAR, INK, MUTED, SOFT, Canvas, text_height, wrap
 from excalidraw_matrix import DEFAULT_LEGEND, PALETTE, PERSON, PLANNED
 
@@ -206,9 +209,10 @@ def render(spec, out_excalidraw, out_svg=None):
     text(M, 82, 1600, spec["subtitle"], 16, MUTED)
     legend = spec.get("legend", DEFAULT_LEGEND)
     lx = M
-    for i, (lab, fill, stroke, dashed) in enumerate(legend):
-        rect(lx + i * 196, 112, 26, 18, fill, stroke, 2, dashed)
-        text(lx + i * 196 + 34, 113, 156, lab, 14, INK)
+    for lab, fill, stroke, dashed in legend:
+        rect(lx, 112, 26, 18, fill, stroke, 2, dashed)
+        text(lx + 34, 113, len(lab) * 8.6 + 6, lab, 14, INK)
+        lx += 34 + len(lab) * 8.6 + 40
 
     for g in sorted(groups.values(), key=lambda g: -g["rect"][2] * g["rect"][3]):
         pal = PALETTE[g.get("palette", "gray")]
@@ -247,14 +251,27 @@ def render(spec, out_excalidraw, out_svg=None):
         spots = [((a[0] + (b[0] - a[0]) * f), (a[1] + (b[1] - a[1]) * f)) for a, b in segs for f in (0.5, 0.3, 0.7, 0.15, 0.85)]
         chosen = spots[0]
         for mx, my in spots:
-            r = (mx - lw / 2 - 3, my - lh / 2 - 4, mx + lw / 2 + 3, my + lh / 2 + 4)
+            r = (mx - lw / 2 - 12, my - lh / 2 - 6, mx + lw / 2 + 12, my + lh / 2 + 6)
             if not any(overlap(r, q) for q in node_rects + label_rects):
                 chosen = (mx, my)
                 break
         mx, my = chosen
-        label_rects.append((mx - lw / 2 - 3, my - lh / 2 - 4, mx + lw / 2 + 3, my + lh / 2 + 4))
+        label_rects.append((mx - lw / 2 - 12, my - lh / 2 - 6, mx + lw / 2 + 12, my + lh / 2 + 6))
         rect(mx - lw / 2, my - lh / 2 - 2, lw, lh + 4, "#ffffff", "#ffffff", 0, radius=4)
         text(mx - lw / 2, my - lh / 2, lw, "\n".join(lines), 12, ARROW, "center")
 
-    text(M, height - 60, 2600, spec["footnote"], 13, MUTED)
+    text(M, height - 60, width - 2 * M, spec["footnote"], 13, MUTED, wrap_w=width - 2 * M)
     cv.save(width, height, out_excalidraw, out_svg)
+
+
+def render_all(specs, out_dir, prefix, names=None, preview_dir="/tmp"):
+    """Draw each spec to <out_dir>/<prefix><name>.excalidraw and .png (the PNG needs rsvg-convert)."""
+    for name in names or specs:
+        out = Path(out_dir) / f"{prefix}{name}.excalidraw"
+        svg = f"{preview_dir}/{prefix}{name}.svg"
+        render(specs[name], out, svg)
+        try:
+            subprocess.run(["rsvg-convert", "-z", "1", svg, "-o", str(out.with_suffix(".png"))], check=True)
+        except FileNotFoundError:
+            print("rsvg-convert not found: wrote the .excalidraw only")
+        print("wrote", out.name)

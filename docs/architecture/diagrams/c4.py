@@ -5,11 +5,10 @@
 
 Needs rsvg-convert for the PNGs (the SVG preview is rendered by the generator, not by Excalidraw).
 """
-import subprocess
 import sys
 from pathlib import Path
 
-from excalidraw_graph import render
+from excalidraw_graph import render_all
 from excalidraw_matrix import PALETTE, PERSON, PLANNED
 
 OUT = Path(__file__).parent.parent
@@ -282,17 +281,5 @@ SPECS["l3-subscription-flows"] = dict(
 )
 
 
-def main(names):
-    for name in names or SPECS:
-        out = OUT / f"c4-{name}.excalidraw"
-        svg = f"/tmp/c4-{name}.svg"
-        render(SPECS[name], out, svg)
-        try:
-            subprocess.run(["rsvg-convert", "-z", "1", svg, "-o", str(out.with_suffix(".png"))], check=True)
-        except FileNotFoundError:
-            print("rsvg-convert not found: wrote the .excalidraw only")
-        print("wrote", out.name)
-
-
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    render_all(SPECS, OUT, "c4-", sys.argv[1:])

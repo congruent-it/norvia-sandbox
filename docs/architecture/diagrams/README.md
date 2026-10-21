@@ -5,7 +5,7 @@ Norvia's diagrams are Excalidraw files in one look: the same palette, type and s
 | Style | For | Example | Library |
 |---|---|---|---|
 | **Matrix** | Process steps against applications | [business-automation-model.excalidraw](../business-automation-model.excalidraw) | [excalidraw_matrix.py](excalidraw_matrix.py) |
-| **Graph** | System context, containers and components (the C4 levels) | [c4.md](../c4.md) | [excalidraw_graph.py](excalidraw_graph.py) |
+| **Graph** | System context, containers and components (the C4 levels), context maps, hexagons and state diagrams | [c4.md](../c4.md), [context-map.md](../context-map.md), [tms-architecture.md](../tms-architecture.md), [tms-lifecycles.md](../tms-lifecycles.md) | [excalidraw_graph.py](excalidraw_graph.py) |
 
 Both draw through [excalidraw_canvas.py](excalidraw_canvas.py), which holds the drawing primitives, and take their colours from `PALETTE` in the matrix library. The matrix style is described first, the graph style [below](#graph-style).
 
@@ -80,10 +80,11 @@ Terms in titles come from [GLOSSARY.md](../../../GLOSSARY.md). Put the new spec 
 
 ## Graph style
 
-For the C4 diagrams in [c4.md](../c4.md), from [c4.py](c4.py), one spec per diagram. It looks like the matrix style (same colours, boxes, type, arrows, legend), but nodes sit on a grid and groups draw boundaries instead of lanes.
+For the C4 diagrams in [c4.md](../c4.md), from [c4.py](c4.py), and for the context map, the TMS hexagon and the state diagrams, from [bounded_contexts.py](bounded_contexts.py), one spec per diagram. It looks like the matrix style (same colours, boxes, type, arrows, legend), but nodes sit on a grid and groups draw boundaries instead of lanes.
 
 ```
-python3 docs/architecture/diagrams/c4.py [name ...]   # writes docs/architecture/c4-<name>.excalidraw and .png; no names draws all
+python3 docs/architecture/diagrams/c4.py [name ...]                # writes docs/architecture/c4-<name>.excalidraw and .png; no names draws all
+python3 docs/architecture/diagrams/bounded_contexts.py [name ...]  # writes docs/architecture/<name>.excalidraw and .png
 ```
 
 | Key | Holds |
@@ -98,6 +99,8 @@ python3 docs/architecture/diagrams/c4.py [name ...]   # writes docs/architecture
 - **The router** takes arrows orthogonally round boxes, spreads the arrows that share a side of a box, keeps parallel runs apart and puts each label where it covers no box. Leave it to it; lay the grid out so most arrows join neighbours.
 - **Edge options**: `dashed` (planned), `plain` (no arrowhead), `both`, `orient` (`"h"` or `"v"`, to force the side an arrow leaves), `sides` (`("r", "t")`, the side it leaves and enters), and `via` (`"top"` or `"bottom"`) to run an arrow out of a box's side and round the outside of the drawing, for a return flow that would otherwise cross everything.
 - Keep a group's members in neighbouring cells and leave about half a row between groups, or their boundaries touch.
+- **A hexagon** draws the layers as nested groups, not a literal hexagon: driving adapters on the left, the Application (use cases and ports) with the Domain inside it, and the driven adapters on the right, with the outside world beyond them. Colour here is the **layer**, not the application, since the whole diagram is one application: orange for the driving adapters, teal for the Application, blue for the Domain, violet for Infrastructure, grey for what is outside, yellow for a person. Say so in the legend.
+- **A state diagram** is one group per aggregate or dimension, with a dashed "Start" node. States are blue, an end state where the thing was carried out is green, an end state where nothing was carried out is grey, and a state that needs attention is orange. Label each arrow with the domain method that makes the move, and keep the guard in a table beside the picture, not in the label.
 - Preview the SVG while you work: `c4.py` writes it to `/tmp/c4-<name>.svg`, and `rsvg-convert` makes the PNG.
 
 The PNGs are rendered from the generator's SVG, not exported from Excalidraw, so their font differs slightly from the `.excalidraw` files'. Commit both.

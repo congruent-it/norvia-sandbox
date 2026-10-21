@@ -5,6 +5,9 @@ How Norvia's estate is put together, for engineers and coding agents working on 
 | Page | Covers |
 |---|---|
 | [c4.md](c4.md) | L1 system context: Norvia's systems, the parties outside Norvia and the people who use them. L2 containers: the applications, API Management, the Logic Apps, Service Bus, SQL, storage, Key Vault, Application Insights and Entra, and how they talk. L3 components of the integration layer: API Management's policies, the Logic Apps and their local functions, the subscriptions and queues, and the TMS APIs they call |
+| [context-map.md](context-map.md) | The bounded contexts: what each application owns, what it holds only a copy of, and how they relate (customer and supplier, partnership, open host service), with the ADR behind each relationship |
+| [tms-architecture.md](tms-architecture.md) | The TMS as a hexagon: Domain, Application with its use cases and ports, the adapters in Infrastructure, and what the architecture tests hold. The template for the other applications |
+| [tms-lifecycles.md](tms-lifecycles.md) | The state diagrams of the TMS's aggregates (Transport Order, Shipment, Carrier booking, Trip, Exception, Shipper notification, planning day), each move with its domain method and guard |
 | [events.md](events.md) | The event catalogue: every event with its topic, publisher, schema, subscriptions with their filters, subscribers and process. A test fails when it disagrees with the Canonical Model, the Bicep or the AppHost |
 | [identity-and-access.md](identity-and-access.md) | Each managed identity and app registration: who it is in Entra, the app roles it holds, the APIs it may call, and the subscriptions, containers and secrets it may read |
 | [failure-behaviour.md](failure-behaviour.md) | What happens when each hop of each Flow fails: its retry policy, dead-letter destination and `failureCode`s, the alert (or its absence), what the Integration console can resubmit or discard, and the as-found toggle that breaks it. Also the as-found backlog, since what is not built is marked *planned* |
@@ -13,6 +16,6 @@ How Norvia's estate is put together, for engineers and coding agents working on 
 
 ## Conventions
 
-- Diagrams are Excalidraw files, generated from a spec and embedded as PNGs so they render on GitHub with no build step: the C4 diagrams in the graph style, and matrices of process steps against applications in the matrix style. Both are described in [diagrams/README.md](diagrams/README.md). Edit the spec and re-run it, never the file.
+- Diagrams are Excalidraw files, generated from a spec and embedded as PNGs so they render on GitHub with no build step: the C4 diagrams in the graph style, and matrices of process steps against applications in the matrix style. Their styles are described in [diagrams/README.md](diagrams/README.md). Edit the spec and re-run it, never the file.
 - Planned systems and pieces, designed in a process doc but not built yet, are drawn dashed and grey. Each diagram page has a legend.
 - These pages are kept current in the same PR as the change they describe: see [coding guidelines §11](../coding-guidelines.md#11-workflow) for which changes.
