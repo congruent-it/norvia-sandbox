@@ -132,6 +132,28 @@ Users are assigned app roles on the enterprise application, not on an API. Entra
 
 Someone else presenting or operating needs the role assigned in Entra ID. The presenter also holds two Azure RBAC roles for looking behind the scenes, both optional (`presenterPrincipalId` empty for none): **Azure Service Bus Data Receiver** on the namespace, to read messages in the Service Bus Explorer, and **Storage Blob Data Reader** on the inbound container.
 
+## How people sign in
+
+Three patterns, none with a client secret. Easy Auth asks Entra for an ID token only, which is all it needs, because it carries the user's app roles. In every picture, **Locally** is the last phase: no Entra and no Easy Auth, a stand-in signs a local user in, in Development only.
+
+**1. A person signs in to a UI** (the demo UIs, the Integration console, the ERP UI, the Simulator). Easy Auth sends the browser to Entra, Entra refuses a user with no role on the registration, and the app reads the user and roles from `X-MS-CLIENT-PRINCIPAL`, which Container Apps strips from a request from outside. The pictures show the Integration console; the others differ only in the role they check, listed under [People](#people). The demo UIs read no role.
+
+![Sequence diagram of sign-in 1: a person signs in to a UI with Easy Auth](diagrams/sign-in-easy-auth.png)
+
+*Editable source: [sign-in-easy-auth.excalidraw](diagrams/sign-in-easy-auth.excalidraw), generated from [sign_in.py](diagrams/sign_in.py).*
+
+**2. A Driver signs in to the Driver app.** The same Easy Auth, but the Driver's one app role has their Driver ID as its value, and the Driver app turns it into the `driverId` claim. The Driver ID is never taken from a request ([ADR 0037](../adr/0037-drivers-sign-in-to-the-driver-app-with-entra-and-the-driver-id-is-their-app-role.md)).
+
+![Sequence diagram of sign-in 2: a Driver signs in to the Driver app](diagrams/sign-in-driver.png)
+
+*Editable source: [sign-in-driver.excalidraw](diagrams/sign-in-driver.excalidraw).*
+
+**3. The Simulator reaches the estate.** It signs in as in pattern 1, then asks Entra for a token as its own managed identity or, through a federated credential, as a Persona's or a Driver's client app. What each may do is what the estate granted that client app ([ADR 0042](../adr/0042-the-simulator-signs-in-with-easy-auth-reaches-the-estate-as-its-own-identity-and-plays-the-personas-and-drivers-through-entra-client-apps.md)).
+
+![Sequence diagram of sign-in 3: the Simulator reaches the estate](diagrams/sign-in-simulator.png)
+
+*Editable source: [sign-in-simulator.excalidraw](diagrams/sign-in-simulator.excalidraw).*
+
 ## What each identity may read
 
 Azure RBAC, scoped as narrowly as the resource allows, so an identity sees its own messages and nothing else.

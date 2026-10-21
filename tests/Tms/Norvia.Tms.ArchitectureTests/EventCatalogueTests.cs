@@ -120,7 +120,7 @@ public sealed partial class EventCatalogueTests
         return titles;
     }
 
-    private static List<string> BicepSubscriptions()
+    internal static List<string> BicepSubscriptions()
     {
         var bicep = File.ReadAllText(Path.Combine(Root, "infra", "estate", "messaging.bicep"));
         var topics = BicepTopicRegex().Matches(bicep).ToDictionary(m => m.Groups[1].Value, m => m.Groups[2].Value);

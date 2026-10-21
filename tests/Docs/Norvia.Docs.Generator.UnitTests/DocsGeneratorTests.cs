@@ -81,4 +81,52 @@ public sealed class DocsGeneratorTests
 
         generator.Stale(await generator.GenerateAsync()).Should().BeEmpty();
     }
+
+    // An Excalidraw file as entities.py writes it: each table is a title, then a subtitle that starts with its key columns.
+    private static string DiagramOf(params string[] tables) =>
+        "{\"elements\":[" + string.Join(",", tables.SelectMany(table => new[] { table, "PK Id (int)" }).Select(text => $"{{\"type\":\"text\",\"text\":\"{text}\"}}")) + "]}";
+
+    private static async Task<(DocsGenerator Generator, IReadOnlyList<GeneratedFile> Files)> GenerateWith(string? diagram)
+    {
+        var files = new Dictionary<string, string> { ["docs/applications/sample.md"] = Page };
+        if (diagram is not null)
+        {
+            files["docs/architecture/diagrams/er-sample.excalidraw"] = diagram;
+        }
+
+        var generator = GeneratorOver(files, Sample);
+        return (generator, await generator.GenerateAsync());
+    }
+
+    [Fact]
+    public async Task StaleDiagrams_ADiagramThatDrawsTheModelsTables_ListsNothing()
+    {
+        var (generator, files) = await GenerateWith(DiagramOf("Customers", "Orders", "OrderNotes", "Receipts"));
+
+        generator.StaleDiagrams(files).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task StaleDiagrams_ADiagramThatMissesATable_IsListed()
+    {
+        var (generator, files) = await GenerateWith(DiagramOf("Customers", "Orders", "OrderNotes"));
+
+        generator.StaleDiagrams(files).Should().Equal("docs/architecture/diagrams/er-sample.excalidraw");
+    }
+
+    [Fact]
+    public async Task StaleDiagrams_ADiagramThatDrawsATableThatIsGone_IsListed()
+    {
+        var (generator, files) = await GenerateWith(DiagramOf("Customers", "Orders", "OrderNotes", "Receipts", "Invoices"));
+
+        generator.StaleDiagrams(files).Should().Equal("docs/architecture/diagrams/er-sample.excalidraw");
+    }
+
+    [Fact]
+    public async Task StaleDiagrams_NoDiagramFile_IsListed()
+    {
+        var (generator, files) = await GenerateWith(null);
+
+        generator.StaleDiagrams(files).Should().Equal("docs/architecture/diagrams/er-sample.excalidraw");
+    }
 }

@@ -78,6 +78,7 @@ For one flow across several applications, from [order_lifecycle.py](order_lifecy
 
 - A solid arrow is a call, a dashed one is a reply or an event. Pass `dashed=True`.
 - Every arrow between two applications goes through the integration layer, so show it: a Logic App or API Management is a participant between them, never skipped.
+- The sign-in flows of [identity-and-access.md](../identity-and-access.md#how-people-sign-in) are sequence diagrams too, in [sign_in.py](sign_in.py). A person or a Persona is a participant, and the last phase of each is **Locally**.
 - The Message trails of the process docs are sequence diagrams too, in [message_trails.py](message_trails.py): one spec per trail, named after its doc (`p9-3` is the third trail in P9). A participant is a Hop, named `application: operation`, and a Flow draws as a band over its Hops. Edit the spec and run the script, as for the rest.
 - Keep one diagram to one story and about eight participants. Split a longer flow by phase, as the order lifecycle does.
 
@@ -95,7 +96,7 @@ The failure patterns in [resilience.py](resilience.py) are a matrix, drawn with 
 
 ## Entity relationships
 
-The database sections of the [application pages](../../applications/README.md) show their tables as a graph-style picture, drawn by [entities.py](entities.py) from `er-<slug>.json`. That JSON is not written by hand: `Norvia.Docs.Generator` writes it from the EF Core model, so `--check` fails when it is stale. After a schema change, run the generator, then `python3 docs/architecture/diagrams/entities.py` and `rsvg-convert` as below, and commit the JSON, `.excalidraw` and `.png` together. `entities.py` lays the tables out itself: a table sits under the table it references, and tables with no foreign keys sit in rows below. The PNG is the one piece `--check` cannot see go stale.
+The database sections of the [application pages](../../applications/README.md) show their tables as a graph-style picture, drawn by [entities.py](entities.py) from `er-<slug>.json`. That JSON is not written by hand: `Norvia.Docs.Generator` writes it from the EF Core model, so `--check` fails when it is stale, and also when the `.excalidraw` file no longer draws the model's tables. After a schema change, run the generator, then `python3 docs/architecture/diagrams/entities.py` and `rsvg-convert` as below, and commit the JSON, `.excalidraw` and `.png` together. `entities.py` lays the tables out itself: a table sits under the table it references, and tables with no foreign keys sit in rows below. The PNG, and the columns and arrows inside the `.excalidraw`, are what `--check` cannot see go stale.
 
 ## BPMN
 
@@ -132,6 +133,7 @@ python3 docs/architecture/diagrams/deployment.py [name ...]        # writes the 
 python3 docs/architecture/diagrams/message_trails.py [name ...]    # writes the Message trails of the process docs
 python3 docs/architecture/diagrams/access.py                       # writes the identity and access grid
 python3 docs/architecture/diagrams/resilience.py                   # writes the failure patterns
+python3 docs/architecture/diagrams/sign_in.py [name ...]           # writes the sign-in sequence diagrams
 python3 docs/architecture/diagrams/entities.py [slug ...]          # writes the entity relationship diagrams of the application pages
 python3 docs/architecture/diagrams/bpmn.py [process ...]           # writes the BPMN pictures
 ```
