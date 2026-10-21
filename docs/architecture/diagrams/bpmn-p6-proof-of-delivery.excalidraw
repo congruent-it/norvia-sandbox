@@ -4280,9 +4280,9 @@
     {
       "id": "tex0119",
       "type": "text",
-      "x": 1022.0,
+      "x": 1025.0,
       "y": 531.0,
-      "width": 96.0,
+      "width": 90,
       "height": 27.5,
       "angle": 0,
       "strokeColor": "#1e1e1e",
@@ -4412,9 +4412,9 @@
     {
       "id": "tex0123",
       "type": "text",
-      "x": 1172.0,
+      "x": 1175.0,
       "y": 531.0,
-      "width": 96.0,
+      "width": 90,
       "height": 27.5,
       "angle": 0,
       "strokeColor": "#1e1e1e",

@@ -6981,9 +6981,9 @@
     {
       "id": "tex0192",
       "type": "text",
-      "x": 572.0,
+      "x": 575.0,
       "y": 1631.0,
-      "width": 96.0,
+      "width": 90,
       "height": 27.5,
       "angle": 0,
       "strokeColor": "#1e1e1e",
@@ -7113,9 +7113,9 @@
     {
       "id": "tex0196",
       "type": "text",
-      "x": 572.0,
+      "x": 575.0,
       "y": 2031.0,
-      "width": 96.0,
+      "width": 90,
       "height": 27.5,
       "angle": 0,
       "strokeColor": "#1e1e1e",

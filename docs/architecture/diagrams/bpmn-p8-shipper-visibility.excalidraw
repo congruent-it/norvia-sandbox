@@ -2715,9 +2715,9 @@
     {
       "id": "tex0076",
       "type": "text",
-      "x": 902.0,
-      "y": 311.0,
-      "width": 96.0,
+      "x": 905.0,
+      "y": 242.0,
+      "width": 90,
       "height": 13.75,
       "angle": 0,
       "strokeColor": "#1e1e1e",

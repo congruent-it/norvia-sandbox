@@ -163,7 +163,15 @@ def render(path, out_excalidraw, out_svg):
             body = (el.findtext("b:text", default="", namespaces=NS) or "").strip()
             text(x + 6, y + 5, w - 12, body, 11, INK, wrap_w=w - 14)
         lb = labels.get(i)
-        if name and not lb and (kind.endswith("Event") or kind.endswith("Gateway")):  # no position in the file: under the shape
+        if name and not lb and kind == "boundaryEvent" and el.get("attachedToRef") in shapes:
+            # no position in the file: on the outside of the task edge the event sits on, never over the task's own text
+            ax, ay, aw, ah, _ = shapes[el.get("attachedToRef")]
+            ex, ey = x - dx, y - dy
+            cx, cy = ex + w / 2, ey + h / 2
+            side = min((abs(cy - ay), "top"), (abs(cy - (ay + ah)), "bottom"), (abs(cx - ax), "left"), (abs(cx - (ax + aw)), "right"))[1]
+            lb = {"top": (cx - 45, ey - 30, 90, 28), "bottom": (cx - 45, ey + h + 3, 90, 28),
+                  "left": (ex - 96, cy - 14, 90, 28), "right": (ex + w + 6, cy - 14, 90, 28)}[side]
+        elif name and not lb and (kind.endswith("Event") or kind.endswith("Gateway")):  # no position in the file: under the shape
             lb = (x - dx - 30, y - dy + h + 3, w + 60, 30)
         if lb and name and (kind.endswith("Event") or kind.endswith("Gateway")):
             lx, ly, lw, lh = lb

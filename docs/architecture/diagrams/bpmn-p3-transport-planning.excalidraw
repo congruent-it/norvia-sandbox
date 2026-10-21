@@ -4266,9 +4266,9 @@
     {
       "id": "tex0117",
       "type": "text",
-      "x": 1952.0,
-      "y": 431.0,
-      "width": 96.0,
+      "x": 1955.0,
+      "y": 362.0,
+      "width": 90,
       "height": 13.75,
       "angle": 0,
       "strokeColor": "#1e1e1e",
