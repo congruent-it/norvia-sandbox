@@ -251,6 +251,7 @@ if (builder.ExecutionContext.IsPublishMode)
         .WithEnvironment("Estate__LogAnalyticsWorkspaceId", estate.LogAnalyticsWorkspaceId)
         .WithEnvironment("Estate__IntegrationRetentionDays", estate.IntegrationRetentionDays)
         .WithEnvironment("Estate__ResourceGroupId", estate.ResourceGroupId)
+        .WithEnvironment("Estate__ServiceBusNamespace", estate.ServiceBusNamespace)
         .PublishAsAzureContainerApp((infrastructure, app) =>
             infrastructure.Add(EntraSignIn.For(infrastructure, app, estate.IntegrationConsoleClientId, estate.EntraIssuer)));
 
@@ -458,6 +459,20 @@ else
         .WithEnvironment("Estate__ResourceGroupId", builder.Configuration["Parameters:estate-resource-group-id"] ?? string.Empty)
         // Without an estate no search reaches Azure, so the retention is only a placeholder the console starts with.
         .WithEnvironment("Estate__IntegrationRetentionDays", estateRetentionDays ?? "90");
+
+    // The Dead-letter queues page lists the emulators' entities. Each emulator keeps its management port apart from the one the
+    // apps connect to, and the console connects only while it reads, as the emulators allow few connections.
+    foreach (var emulator in new[] { ("messaging", messaging), ("messaging-edge", messagingEdge) })
+    {
+        var (name, servicebus) = emulator;
+        var management = servicebus.GetEndpoint("emulatorhealth");
+        integrationConsole
+            .WithEnvironment($"LocalServiceBus__Namespaces__{name}__ConnectionString", servicebus.Resource.ConnectionStringExpression)
+            .WithEnvironment(
+                $"LocalServiceBus__Namespaces__{name}__ManagementConnectionString",
+                ReferenceExpression.Create($"Endpoint=sb://{management.Property(EndpointProperty.Host)}:{management.Property(EndpointProperty.Port)};SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"))
+            .WaitFor(servicebus);
+    }
 
     // Without an estate, the console searches what the local apps traced: the telemetry the Aspire dashboard holds, read
     // through its telemetry API (ADR 0027). The dashboard listens on the launch profile's URL, and its API takes the key

@@ -117,6 +117,7 @@ module messaging 'estate/messaging.bicep' = {
     trackingPrincipalId: identities.outputs.trackingPrincipalId
     proofOfDeliveryPrincipalId: identities.outputs.proofOfDeliveryPrincipalId
     apiManagementPrincipalId: identities.outputs.apiManagementPrincipalId
+    integrationConsolePrincipalId: identities.outputs.integrationConsolePrincipalId
   }
 }
 

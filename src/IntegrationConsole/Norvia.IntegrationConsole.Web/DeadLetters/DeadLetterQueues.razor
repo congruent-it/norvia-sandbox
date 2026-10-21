@@ -1,0 +1,117 @@
+@page "/dead-letter-queues"
+@* Interactive, not prerendered: the page reads the Service Bus itself and keeps refreshing for as long as the circuit is open. *@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using Norvia.IntegrationConsole.Application.DeadLetters.List
+@inject IDeadLetterRequests DeadLetters
+@inject TimeProvider Time
+@inject ILogger<DeadLetterQueues> Logger
+@implements IDisposable
+
+<PageTitle>Integration console · Dead-letter queues</PageTitle>
+
+<h1>Dead-letter queues</h1>
+<p class="text-muted mb-6">
+    Every queue and subscription of the estate's Service Bus, with the messages dead-lettered in it and how long the oldest
+    has waited. Those holding messages come first. This page refreshes itself every few seconds.
+</p>
+
+@if (_loading)
+{
+    <div role="status">
+        <FluentStack VerticalAlignment="VerticalAlignment.Center">
+            <FluentProgressRing />
+            <span>Loading the dead-letter queues…</span>
+        </FluentStack>
+    </div>
+}
+else if (_failed)
+{
+    <div role="alert">
+        <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+            The dead-letter queues couldn't be listed. The page tries again in a moment; if it keeps failing, the console may
+            not reach the estate's Service Bus.
+        </FluentMessageBar>
+    </div>
+}
+else if (_result is { Queues: { Count: 0 } })
+{
+    <p role="status">The Service Bus has no queues or subscriptions.</p>
+}
+else if (_result is { } found)
+{
+    @* Counts and ages only: the console reads no message here. *@
+    <FluentDataGrid Items="found.Queues.AsQueryable()" TGridItem="DeadLetterEntity" aria-label="Dead-letter queues"
+                    GridTemplateColumns="minmax(16rem, 1fr) max-content max-content">
+        <TemplateColumn Title="Queue or subscription">
+            <span class="font-mono text-xs">@context.Name</span>
+        </TemplateColumn>
+        <TemplateColumn Title="Dead-lettered">
+            <span class="@(context.Count > 0 ? "text-danger font-bold" : "text-muted")">@context.Count</span>
+        </TemplateColumn>
+        <TemplateColumn Title="Oldest">@DeadLetterText.Age(context.OldestAge)</TemplateColumn>
+    </FluentDataGrid>
+}
+
+@code {
+    private static readonly TimeSpan RefreshEvery = TimeSpan.FromSeconds(5);
+
+    private readonly CancellationTokenSource _open = new();
+    private bool _loading;
+    private bool _failed;
+    private DeadLetterQueueList? _result;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync(_open.Token);
+        _ = RefreshAsync(_open.Token);
+    }
+
+    private async Task LoadAsync(CancellationToken cancellation)
+    {
+        // The list stays while it refreshes; only the first load shows progress.
+        _loading = _result is null;
+        try
+        {
+            _result = await DeadLetters.ListAsync(new ListDeadLetterQueuesQuery(), cancellation);
+            _failed = false;
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            DeadLetterPageLog.ListFailed(Logger, exception);
+            _failed = true;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task RefreshAsync(CancellationToken cancellation)
+    {
+        using var timer = new PeriodicTimer(RefreshEvery, Time);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellation))
+            {
+                await InvokeAsync(async () =>
+                {
+                    await LoadAsync(cancellation);
+                    StateHasChanged();
+                });
+            }
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+    }
+
+    public void Dispose()
+    {
+        _open.Cancel();
+        _open.Dispose();
+    }
+}

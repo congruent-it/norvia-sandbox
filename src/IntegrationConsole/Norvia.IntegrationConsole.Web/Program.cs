@@ -3,6 +3,7 @@ using Norvia.IntegrationConsole.Application.Trails;
 using Norvia.IntegrationConsole.Application.Trails.Search;
 using Norvia.IntegrationConsole.Infrastructure;
 using Norvia.IntegrationConsole.Web.Components;
+using Norvia.IntegrationConsole.Web.DeadLetters;
 using Norvia.IntegrationConsole.Web.Operators;
 using Norvia.IntegrationConsole.Web.Runs;
 using Norvia.IntegrationConsole.Web.Trails;
@@ -25,6 +26,7 @@ builder.Services.AddOptions<IntegrationRetention>().BindConfiguration(Integratio
     .ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddSingleton<ITrailRequests, TrailRequests>();
 builder.Services.AddSingleton<IRunRequests, RunRequests>();
+builder.Services.AddSingleton<IDeadLetterRequests, DeadLetterRequests>();
 
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddFluentUIComponents();
