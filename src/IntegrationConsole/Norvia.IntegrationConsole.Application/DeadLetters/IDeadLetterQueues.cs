@@ -5,7 +5,7 @@ namespace Norvia.IntegrationConsole.Application.DeadLetters;
 /// found by asking it, so a queue added later appears with no change to the console. In Azure that is read as the
 /// console's own identity (ADR 0017); locally, the Service Bus emulators'. It counts and peeks, which takes nothing off a
 /// dead-letter queue. Looking never receives, resubmits or discards anything: a looked-at message keeps its delivery count
-/// and lock state. Only <see cref="ResubmitAsync"/> takes a message off, and only after its copy is sent.
+/// and lock state. Only <see cref="ResubmitAsync"/> takes a message off, and only after its copy is sent, and <see cref="DiscardAsync"/>.
 /// </summary>
 public interface IDeadLetterQueues
 {
@@ -33,4 +33,10 @@ public interface IDeadLetterQueues
     /// fails. Null when the queue, subscription or message is gone, because someone resubmitted or discarded it meanwhile.
     /// </summary>
     Task<ResubmittedDeadLetter?> ResubmitAsync(string entity, long sequenceNumber, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Completes one dead-lettered message of a queue or subscription on its dead-letter queue, which removes it for good.
+    /// Nothing is sent. Null when the queue, subscription or message is gone, because someone resubmitted or discarded it meanwhile.
+    /// </summary>
+    Task<DiscardedDeadLetter?> DiscardAsync(string entity, long sequenceNumber, CancellationToken cancellationToken);
 }

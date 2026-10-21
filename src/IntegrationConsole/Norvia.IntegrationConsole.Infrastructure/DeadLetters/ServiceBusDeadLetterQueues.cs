@@ -10,7 +10,8 @@ namespace Norvia.IntegrationConsole.Infrastructure.DeadLetters;
 /// Counts the dead-lettered messages of every queue and subscription the estate has, and peeks the oldest of each dead-letter
 /// queue that holds any, to see how long it has waited. It also peeks a queue's messages, and one message in full. A peek
 /// takes nothing off the queue, and no message is received, completed or sent: it keeps its delivery count and lock state.
-/// Resubmitting is the one thing that receives: it sends a copy to the queue, or to the topic for one subscription, and only then completes the original.
+/// Resubmitting and discarding are the only things that receive: a resubmit sends a copy to the queue, or to the topic for one
+/// subscription, and only then completes the original; a discard completes it.
 /// </summary>
 internal sealed class ServiceBusDeadLetterQueues(IServiceBusEntities entities, IServiceBusClients clients) : IDeadLetterQueues
 {
@@ -126,6 +127,37 @@ internal sealed class ServiceBusDeadLetterQueues(IServiceBusEntities entities, I
         await receiver.CompleteMessageAsync(original, cancellationToken);
         var listed = Listed(original);
         return new ResubmittedDeadLetter(found.Name, original.MessageId, copy.MessageId, listed.CorrelationId, listed.BusinessKeys);
+    }
+
+    public async Task<DiscardedDeadLetter?> DiscardAsync(string entity, long sequenceNumber, CancellationToken cancellationToken)
+    {
+        if (await FindAsync(entity, cancellationToken) is not { } found)
+        {
+            return null;
+        }
+
+        await using var client = clients.Create(found.Namespace);
+        await using var receiver = DeadLetterReceiver(client, found);
+        // Peeked first, so a message that is gone doesn't lock the ones before it.
+        if (await receiver.PeekMessageAsync(sequenceNumber, cancellationToken) is not { } peeked || peeked.SequenceNumber != sequenceNumber
+            || await ReceiveAsync(receiver, sequenceNumber, cancellationToken) is not { } original)
+        {
+            return null;
+        }
+
+        try
+        {
+            await receiver.CompleteMessageAsync(original, cancellationToken);
+        }
+        catch
+        {
+            // Left on the dead-letter queue, and unlocked so the next try doesn't wait for the lock to expire.
+            await receiver.AbandonMessageAsync(original, cancellationToken: CancellationToken.None);
+            throw;
+        }
+
+        var listed = Listed(original);
+        return new DiscardedDeadLetter(found.Name, original.MessageId, listed.CorrelationId, listed.BusinessKeys);
     }
 
     /// <summary>
