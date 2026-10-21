@@ -39,4 +39,10 @@ public interface IDeadLetterQueues
     /// Nothing is sent. Null when the queue, subscription or message is gone, because someone resubmitted or discarded it meanwhile.
     /// </summary>
     Task<DiscardedDeadLetter?> DiscardAsync(string entity, long sequenceNumber, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The messages still on any dead-letter queue or subscription that carry this correlation ID, peeked and so left in place,
+    /// in no particular order.
+    /// </summary>
+    Task<IReadOnlyList<FoundDeadLetter>> DeadLetteredAsync(string correlationId, CancellationToken cancellationToken);
 }

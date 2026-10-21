@@ -9,4 +9,8 @@ public static class DeadLetterLinks
         ArgumentNullException.ThrowIfNull(entity);
         return "/dead-letter-queues/" + string.Join('/', entity.Split('/').Select(Uri.EscapeDataString));
     }
+
+    /// <summary>The messages of a queue or subscription, with this one opened.</summary>
+    public static string Message(string entity, long sequenceNumber) =>
+        $"{Messages(entity)}?message={sequenceNumber.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
 }

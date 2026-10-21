@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
+using Norvia.IntegrationConsole.Application.DeadLetters;
 using Norvia.IntegrationConsole.Application.Trails;
 using Norvia.IntegrationConsole.Application.Trails.Open;
 
@@ -12,6 +13,7 @@ public sealed class OpenTrailHandlerTests
     private static readonly DateTimeOffset Now = new(2026, 9, 26, 12, 0, 0, TimeSpan.Zero);
 
     private readonly ITrailSource _source = Substitute.For<ITrailSource>();
+    private readonly IDeadLetterQueues _queues = Substitute.For<IDeadLetterQueues>();
     private readonly FakeTimeProvider _time = new(Now);
 
     [Fact]
@@ -112,7 +114,7 @@ public sealed class OpenTrailHandlerTests
     [InlineData("  ")]
     public async Task Handle_WithoutACorrelationId_IsInvalid_AndLooksUpNothing(string correlationId)
     {
-        var handler = new OpenTrailHandler(_source, _time, Options.Create(new IntegrationRetention { IntegrationRetentionDays = 90 }));
+        var handler = new OpenTrailHandler(_source, _queues, _time, Options.Create(new IntegrationRetention { IntegrationRetentionDays = 90 }));
 
         var result = await handler.Handle(new OpenTrailQuery(correlationId), TestContext.Current.CancellationToken);
 
@@ -169,6 +171,18 @@ public sealed class OpenTrailHandlerTests
         trail.BusinessKeys.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task Handle_ForATrailWithoutDeadLetteredHops_AsksNeitherTheAuditNorTheQueues()
+    {
+        Record(Hop("apim-call", secondsAgo: 30), Hop("tms-call", secondsAgo: 10, causedBy: "apim-call"));
+
+        var trail = await OpenAsync();
+
+        trail.Hops.Should().OnlyContain(hop => hop.DeadLetter == null);
+        await _source.DidNotReceiveWithAnyArgs().AuditAsync(default!, TestContext.Current.CancellationToken);
+        await _queues.DidNotReceiveWithAnyArgs().DeadLetteredAsync(default!, TestContext.Current.CancellationToken);
+    }
+
     private void Record(params RecordedHop[] hops) =>
         _source.HopsAsync(Arg.Any<TrailLookup>(), Arg.Any<CancellationToken>()).Returns(hops);
 
@@ -177,7 +191,7 @@ public sealed class OpenTrailHandlerTests
 
     private async Task<MessageTrail> OpenAsync(string correlationId = CorrelationId, int retentionDays = 90)
     {
-        var handler = new OpenTrailHandler(_source, _time, Options.Create(new IntegrationRetention { IntegrationRetentionDays = retentionDays }));
+        var handler = new OpenTrailHandler(_source, _queues, _time, Options.Create(new IntegrationRetention { IntegrationRetentionDays = retentionDays }));
         var result = await handler.Handle(new OpenTrailQuery(correlationId), TestContext.Current.CancellationToken);
         return result.Value;
     }

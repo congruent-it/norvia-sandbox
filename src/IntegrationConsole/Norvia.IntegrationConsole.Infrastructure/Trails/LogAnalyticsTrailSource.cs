@@ -41,6 +41,29 @@ internal sealed class LogAnalyticsTrailSource(LogsQueryClient client, IOptions<T
         return TrailHops.Of([.. response.Value.Table.Rows.Select(HopRow.From)]);
     }
 
+    public async Task<IReadOnlyList<RecordedAudit>> AuditAsync(TrailLookup lookup, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(lookup);
+
+        var response = await client.QueryWorkspaceAsync(
+            WorkspaceId(),
+            AuditQuery.For(lookup.CorrelationId),
+            new LogsQueryTimeRange(lookup.From, lookup.To),
+            cancellationToken: cancellationToken);
+
+        return
+        [
+            .. response.Value.Table.Rows.Select(row => new RecordedAudit(
+                row.GetString("actor"),
+                row.GetString("action"),
+                row.GetString("entity") ?? string.Empty,
+                row.GetString("messageId") ?? string.Empty,
+                row.GetDateTimeOffset("at") ?? default,
+                row.GetString("reason") is { Length: > 0 } reason ? reason : null,
+                [.. TrackedBusinessKeys.All.Where(key => !string.IsNullOrEmpty(row.GetString(key.Key))).Select(key => new BusinessKey(key.Kind, row.GetString(key.Key)))]))
+        ];
+    }
+
     private string WorkspaceId() =>
         !string.IsNullOrWhiteSpace(options.Value.LogAnalyticsWorkspaceId)
             ? options.Value.LogAnalyticsWorkspaceId

@@ -4,6 +4,7 @@
 @using Ardalis.Result
 @using Norvia.IntegrationConsole.Application.Trails
 @using Norvia.IntegrationConsole.Application.Trails.Open
+@using Norvia.IntegrationConsole.Web.DeadLetters
 @inject ITrailRequests Trails
 @inject ILogger<Trail> Logger
 @implements IDisposable
@@ -83,6 +84,20 @@ else if (_trail is { } trail)
                 <span data-outcome="@context.Outcome" class="@(context.HasFailure ? "font-bold text-danger" : "")">
                     @TrailText.Of(context.Outcome)
                 </span>
+                @if (context.DeadLetter is { } handling)
+                {
+                    @* What became of the hop's message, so a second operator can tell it was already handled. *@
+                    <div data-dead-letter="@handling.Status.ToString().ToLowerInvariant()" class="text-sm">
+                        @if (handling is { Status: DeadLetterStatus.OnQueue, SequenceNumber: { } sequenceNumber })
+                        {
+                            <a href="@DeadLetterLinks.Message(handling.Entity, sequenceNumber)">Open in the dead-letter queue</a>
+                        }
+                        else
+                        {
+                            @TrailText.Of(handling)
+                        }
+                    </div>
+                }
             </TemplateColumn>
             <PropertyColumn Title="Failure code" Property="@(hop => hop.FailureCode)" />
         </FluentDataGrid>

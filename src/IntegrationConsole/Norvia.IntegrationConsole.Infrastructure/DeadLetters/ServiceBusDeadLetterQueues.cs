@@ -25,6 +25,10 @@ internal sealed class ServiceBusDeadLetterQueues(IServiceBusEntities entities, I
     public const string ResubmitTo = "resubmitTo";
 
     private const int ReceiveBatchSize = 10;
+
+    // A queue holding more than this many dead-lettered messages is past what a trail can sensibly point at.
+    private const int PeekLimit = 250;
+
     private static readonly TimeSpan ReceiveWait = TimeSpan.FromSeconds(2);
 
     public async Task<IReadOnlyList<RecordedDeadLetters>> DeadLetterQueuesAsync(CancellationToken cancellationToken)
@@ -190,6 +194,40 @@ internal sealed class ServiceBusDeadLetterQueues(IServiceBusEntities entities, I
             if (wanted is not null)
             {
                 return wanted;
+            }
+        }
+    }
+
+    public async Task<IReadOnlyList<FoundDeadLetter>> DeadLetteredAsync(string correlationId, CancellationToken cancellationToken)
+    {
+        var found = new List<FoundDeadLetter>();
+        var opened = new Dictionary<string, ServiceBusClient>(StringComparer.Ordinal);
+        try
+        {
+            foreach (var entity in (await entities.ListAsync(cancellationToken)).Where(entity => entity.DeadLetterCount > 0))
+            {
+                if (!opened.TryGetValue(entity.Namespace, out var client))
+                {
+                    opened[entity.Namespace] = client = clients.Create(entity.Namespace);
+                }
+
+                await using var receiver = DeadLetterReceiver(client, entity);
+                foreach (var message in (await receiver.PeekMessagesAsync(PeekLimit, cancellationToken: cancellationToken)).Select(Listed))
+                {
+                    if (string.Equals(message.CorrelationId, correlationId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        found.Add(new FoundDeadLetter(entity.Name, message.SequenceNumber, message.EnqueuedAt, message.BusinessKeys));
+                    }
+                }
+            }
+
+            return found;
+        }
+        finally
+        {
+            foreach (var client in opened.Values)
+            {
+                await client.DisposeAsync();
             }
         }
     }

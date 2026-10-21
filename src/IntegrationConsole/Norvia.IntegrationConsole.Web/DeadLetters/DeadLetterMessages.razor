@@ -304,6 +304,10 @@ else if (_list is { } found)
     [Parameter, EditorRequired]
     public string Entity { get; set; } = string.Empty;
 
+    // A Message trail links to its dead-lettered hop's message with this; the message opens as the list is shown.
+    [SupplyParameterFromQuery(Name = "message")]
+    public long? Message { get; set; }
+
     protected override async Task OnParametersSetAsync()
     {
         _failed = false;
@@ -350,6 +354,11 @@ else if (_list is { } found)
         finally
         {
             _loading = false;
+        }
+
+        if (Message is { } linked && _list?.Messages.Any(message => message.SequenceNumber == linked) == true)
+        {
+            await OpenAsync(linked);
         }
     }
 

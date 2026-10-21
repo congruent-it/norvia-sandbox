@@ -1,10 +1,11 @@
 using Ardalis.Result;
 using Mediator;
 using Microsoft.Extensions.Options;
+using Norvia.IntegrationConsole.Application.DeadLetters;
 
 namespace Norvia.IntegrationConsole.Application.Trails.Open;
 
-public sealed class OpenTrailHandler(ITrailSource source, TimeProvider time, IOptions<IntegrationRetention> retention)
+public sealed class OpenTrailHandler(ITrailSource source, IDeadLetterQueues queues, TimeProvider time, IOptions<IntegrationRetention> retention)
     : IQueryHandler<OpenTrailQuery, Result<MessageTrail>>
 {
     public async ValueTask<Result<MessageTrail>> Handle(OpenTrailQuery query, CancellationToken cancellationToken)
@@ -23,7 +24,15 @@ public sealed class OpenTrailHandler(ITrailSource source, TimeProvider time, IOp
         var from = to - retention.Value.Period;
         var hops = await source.HopsAsync(new TrailLookup(correlationId, from, to), cancellationToken);
 
-        return new MessageTrail(correlationId, from, to, TrailOutline.Of(hops), BusinessKeysOf(hops));
+        // Only a dead-lettered hop has a message to look for, so other trails cost no more than before.
+        var deadLetters = hops.Any(hop => hop.Outcome == Outcome.DeadLettered)
+            ? DeadLetterMatching.Of(
+                hops,
+                await source.AuditAsync(new TrailLookup(correlationId, from, to), cancellationToken),
+                await queues.DeadLetteredAsync(correlationId, cancellationToken))
+            : null;
+
+        return new MessageTrail(correlationId, from, to, TrailOutline.Of(hops, deadLetters), BusinessKeysOf(hops));
     }
 
     // In the tracking contract's order, so the Transport Order leads.

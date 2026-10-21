@@ -100,7 +100,7 @@ Rules:
 
 ### Audit
 
-Every resubmit and discard writes an audit event to Application Insights: who (from the token), which action, which message (entity, message ID, correlation ID, business keys), when, and the reason for a discard. The audit event carries the correlation ID, so it appears on the Message trail. It's kept as long as Application Insights keeps everything else.
+Every resubmit and discard writes an audit event to Application Insights: who (from the token), which action, which message (entity, message ID, correlation ID, business keys), when, and the reason for a discard. The audit event carries the correlation ID, so it appears on the Message trail. It's kept as long as Application Insights keeps everything else. A dead-lettered hop on the Message trail is paired with its message by correlation ID and business keys: a hop records no message ID, so each message, whether still on the dead-letter queue or in the audit, goes to the earliest dead-lettered hop that came before it with the same keys. The audit events are read from the same telemetry as the trail (locally the Aspire dashboard's log attributes) and are not shown as hops of their own.
 
 ## Personal data
 

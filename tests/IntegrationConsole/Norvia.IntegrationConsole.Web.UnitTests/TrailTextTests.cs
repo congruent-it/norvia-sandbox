@@ -1,3 +1,4 @@
+using Norvia.IntegrationConsole.Application.Trails.Open;
 using Norvia.IntegrationConsole.Web.Trails;
 
 namespace Norvia.IntegrationConsole.Web.UnitTests;
@@ -18,5 +19,17 @@ public sealed class TrailTextTests
     public void Of_NoDuration_IsADash()
     {
         TrailText.Of((TimeSpan?)null).Should().Be("–");
+    }
+
+    [Fact]
+    public void Of_ForAHandlingWithoutATime_SaysItIsUnknown()
+    {
+        TrailText.Of(new DeadLetterHandling(DeadLetterStatus.Resubmitted, "q", null, "ana", null, null)).Should().Be("Resubmitted by ana on an unknown time");
+    }
+
+    [Fact]
+    public void Of_ForAMessageOnTheQueue_SaysSo()
+    {
+        TrailText.Of(new DeadLetterHandling(DeadLetterStatus.OnQueue, "q", 1, null, null, null)).Should().Be("On the dead-letter queue");
     }
 }
