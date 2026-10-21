@@ -10,6 +10,12 @@ Transport planning turns an accepted Transport Order into a Shipment and decides
 | **Applies to** | Own fleet and Carriers alike. P3 makes the choice between them |
 | **Integrations touched** | Service Bus (Shipment events). ERP, through the seed file for now (Carriers) |
 
+## Process model
+
+![P3 Transport planning as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-p3-transport-planning.png)
+
+The model is [p3-transport-planning.bpmn](p3-transport-planning.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p3-transport-planning.excalidraw)).
+
 ## One Shipment per Transport Order
 
 Each Transport Order gets exactly one Shipment, and a Shipment never carries more than one Transport Order (ADR 0007). P3 does not consolidate. Several Shipments are brought together later, on a Trip (P11). P4 books each Shipment with its Carrier on its own, and consolidating Shipments in one Carrier booking is deferred.

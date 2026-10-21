@@ -83,6 +83,35 @@ class Canvas:
                             + (' font-weight="700"' if bold else '') + f'>{escape(ln)}</text>')
         return h
 
+    def ellipse(self, x, y, w, h, fill, stroke, sw=2, dashed=False):
+        e = self.base("ellipse", x, y, w, h, backgroundColor=fill, strokeColor=stroke, strokeWidth=sw,
+                      strokeStyle="dashed" if dashed else "solid", roundness={"type": 2})
+        self.els.append(e)
+        self.svg.append(f'<ellipse cx="{x + w / 2}" cy="{y + h / 2}" rx="{w / 2}" ry="{h / 2}" fill="{fill}" stroke="{stroke}" '
+                        f'stroke-width="{sw}"' + (' stroke-dasharray="7 5"' if dashed else '') + '/>')
+        return e
+
+    def diamond(self, x, y, w, h, fill, stroke, sw=2):
+        e = self.base("diamond", x, y, w, h, backgroundColor=fill, strokeColor=stroke, strokeWidth=sw, roundness={"type": 2})
+        self.els.append(e)
+        pts = f"{x + w / 2},{y} {x + w},{y + h / 2} {x + w / 2},{y + h} {x},{y + h / 2}"
+        self.svg.append(f'<polygon points="{pts}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}" stroke-linejoin="round"/>')
+        return e
+
+    def vtext(self, cx, cy, length, s, fs=13, color=INK, bold=False):
+        """Text read bottom to top, centred on (cx, cy), at most `length` long: a lane's label."""
+        lines = wrap(s, fs, length)
+        body = "\n".join(lines)
+        h = len(lines) * fs * LH
+        e = self.base("text", cx - length / 2, cy - h / 2, length, h, strokeColor=color, text=body, fontSize=fs,
+                      fontFamily=FONT, textAlign="center", verticalAlign="top", baseline=int(fs * 0.9),
+                      containerId=None, originalText=body, autoResize=False, lineHeight=LH, angle=-1.5707963267948966)
+        self.els.append(e)
+        for i, ln in enumerate(lines):
+            ty = cy - h / 2 + i * fs * LH + fs * 0.92
+            self.svg.append(f'<text x="{cx}" y="{ty}" font-size="{fs}" fill="{color}" text-anchor="middle" transform="rotate(-90 {cx} {cy})" '
+                            f'font-family="Nunito, Helvetica, Arial, sans-serif"' + (' font-weight="700"' if bold else '') + f'>{escape(ln)}</text>')
+
     def arrow(self, pts, color, dashed, both, start, end, plain=False):
         x0, y0 = pts[0]
         rel = [[px - x0, py - y0] for px, py in pts]

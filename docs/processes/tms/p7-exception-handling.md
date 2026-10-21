@@ -10,6 +10,12 @@ Exception handling makes sure someone acts when a Shipment on its way goes wrong
 | **Applies to** | Both. Re-planning by cancellation is for Carriers only. Taking an Own fleet Shipment off its Trip belongs to [P11](p11-trip-dispatch.md), and Re-delivery to [P12](p12-trip-execution.md#re-delivery) |
 | **Integrations touched** | Service Bus (Shipment events), Shipper notification Logic App, Carrier cancellation Logic App, Key Vault, Partner portal (Shipper notification endpoint and inbox, Carrier cancellation endpoint), TMS Exception API |
 
+## Process model
+
+![P7 Exception handling as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-p7-exception-handling.png)
+
+The model is [p7-exception-handling.bpmn](p7-exception-handling.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p7-exception-handling.excalidraw)).
+
 ## Scope
 
 P7 defines the Exception model, the Planner's actions on it and the two outbound messages those actions send: a notification to the Shipper and a cancellation to the Carrier.

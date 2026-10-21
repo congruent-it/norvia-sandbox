@@ -10,6 +10,12 @@ Transport Order intake takes a Shipper's booking into the TMS and accepts or rej
 | **Applies to** | Own fleet and Carriers alike. Intake happens before P3 decides who carries the goods |
 | **Integrations touched** | Partner portal, API Management, intake Logic App, TMS intake API, Service Bus (outcome events) |
 
+## Process model
+
+![P1 Transport Order intake as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-p1-transport-order-intake.png)
+
+The model is [p1-transport-order-intake.bpmn](p1-transport-order-intake.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p1-transport-order-intake.excalidraw)).
+
 ## Channels
 
 The intake API records the intake channel each Transport Order came from, and it is readable on the Transport Order through the query side. The channel follows from who calls: the TMS setting `IntakeCallers:ClientIdsByChannel` lists the client IDs (the token's `azp`, or `appid` in a v1 token) that may call for each channel, each client ID on one channel only, so a caller can't submit for a channel that isn't its own. In Azure the intake Logic App's managed identity is the only caller on the Shipper API channel.

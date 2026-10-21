@@ -10,6 +10,12 @@ Carrier booking asks a Carrier to carry a Shipment that the Planner released to 
 | **Applies to** | Carriers only. Own fleet Shipments go to P11 |
 | **Integrations touched** | Service Bus (Shipment events), P4 booking Logic App, Key Vault, Partner portal (Carrier booking endpoint and Carrier Personas), API Management, Carrier-answer Logic App, TMS Carrier booking API |
 
+## Process model
+
+![P4 Carrier booking as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-p4-carrier-booking.png)
+
+The model is [p4-carrier-booking.bpmn](p4-carrier-booking.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p4-carrier-booking.excalidraw)).
+
 ## One Carrier booking per Shipment
 
 Each Carrier booking covers exactly one Shipment. A Shipment can have several Carrier bookings over its life, one after each booking that ends without confirmation, but never more than one Requested at a time. Consolidating several Shipments into one Carrier booking is deferred (ADR 0007).

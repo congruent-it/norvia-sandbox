@@ -10,6 +10,12 @@ Trip dispatch brings Released Own fleet Shipments together on Trips and sends ea
 | **Applies to** | Own fleet only |
 | **Integrations touched** | Service Bus (Trip events and Shipment events), Trip dispatch Logic App, Driver app (Trip endpoint), TMS Trip API |
 
+## Process model
+
+![P11 Trip dispatch as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-p11-trip-dispatch.png)
+
+The model is [p11-trip-dispatch.bpmn](p11-trip-dispatch.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p11-trip-dispatch.excalidraw)).
+
 ## What P11 decides, and what it doesn't
 
 P11 decides **which Shipments go on which Trip, in what order, with which Vehicle and Driver**, and gets the Trip to the Driver. It doesn't choose between Own fleet and a Carrier. That stays in [P3](p3-transport-planning.md). It doesn't say what the Own fleet can do on a day. That is [P10](p10-fleet-capacity-planning.md), whose availability rules P11 applies. It doesn't record what happens on the road. Starting and ending a Trip, completing its Stops, and the Tracking events and Proofs of delivery that come from it are [P12](p12-trip-execution.md).

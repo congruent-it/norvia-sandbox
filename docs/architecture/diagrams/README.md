@@ -1,14 +1,15 @@
 # Diagram styles: Excalidraw
 
-Norvia's diagrams are Excalidraw files in one look: the same palette, type and shapes. Open a `.excalidraw` file at [excalidraw.com](https://excalidraw.com) or with the VS Code Excalidraw extension. There are three layouts:
+Norvia's diagrams are Excalidraw files in one look: the same palette, type and shapes. Open a `.excalidraw` file at [excalidraw.com](https://excalidraw.com) or with the VS Code Excalidraw extension. There are four layouts:
 
 | Style | For | Example | Library |
 |---|---|---|---|
 | **Matrix** | Process steps against applications | [business-automation-model.excalidraw](business-automation-model.excalidraw) | [excalidraw_matrix.py](excalidraw_matrix.py) |
+| **Grid** | Who has what: rows of identities against columns of resources | [identity-and-access.md](../identity-and-access.md) | [excalidraw_grid.py](excalidraw_grid.py) |
 | **Sequence** | One flow across several applications, in time order | [order-lifecycle.md](../order-lifecycle.md) | [excalidraw_sequence.py](excalidraw_sequence.py) |
 | **Graph** | System context, containers and components (the C4 levels), context maps, hexagons and state diagrams | [c4.md](../c4.md), [context-map.md](../context-map.md), [tms-architecture.md](../tms-architecture.md), [tms-lifecycles.md](../tms-lifecycles.md) | [excalidraw_graph.py](excalidraw_graph.py) |
 
-All three draw through [excalidraw_canvas.py](excalidraw_canvas.py), which holds the drawing primitives, and take their colours from `PALETTE` in the matrix library. The matrix style is described first, the graph style [below](#graph-style).
+All four draw through [excalidraw_canvas.py](excalidraw_canvas.py), which holds the drawing primitives, and take their colours from `PALETTE` in the matrix library. The matrix style is described first, the graph style [below](#graph-style).
 
 Diagrams are generated from a spec, not drawn by hand, so a process change is an edit to a list and a re-run. Hand edits to the `.excalidraw` file are lost on the next run.
 
@@ -79,6 +80,28 @@ For one flow across several applications, from [order_lifecycle.py](order_lifecy
 - Every arrow between two applications goes through the integration layer, so show it: a Logic App or API Management is a participant between them, never skipped.
 - Keep one diagram to one story and about eight participants. Split a longer flow by phase, as the order lifecycle does.
 
+## Grid style
+
+For who-has-what tables, from [access.py](access.py). Rows are the identities, grouped, and columns are the resources they may use. Each cell holds chips, one per grant, coloured by what the grant lets the row do: blue for an API role, green for reading or receiving, orange for sending or writing. A row that is nearly empty is the point: least privilege is visible.
+
+| Key | Holds |
+|---|---|
+| `columns` | `title`, `sub`, `palette` |
+| `groups` | `title`, `palette`, and `rows`: `id`, `title`, `sub` |
+| `cells` | `{(row id, column index): [(text, kind), ...]}` with `kind` `"role"`, `"read"` or `"write"` |
+
+The failure patterns in [resilience.py](resilience.py) are a matrix, drawn with larger columns and boxes: a matrix spec may set `col_w` and `box_h` and its own `legend` when its boxes say more.
+
+## BPMN
+
+The TMS process models in [docs/processes/tms](../../processes/tms/) are BPMN files, which stay the source: they open in any BPMN tool and carry their own layout. [bpmn.py](bpmn.py) draws each one in this style so a process page can show it: a person's task is yellow, a system's task takes its lane's colour, events are rings, gateways are diamonds, and message flows are dashed. The layout in the file is kept.
+
+```
+python3 docs/architecture/diagrams/bpmn.py [process ...]   # writes bpmn-<process>.excalidraw and .png here
+```
+
+Change a process in its `.bpmn` and run the script. The ERP processes E1 and E2 have no model yet.
+
 ## Regenerating
 
 ```
@@ -101,6 +124,9 @@ python3 docs/architecture/diagrams/c4.py [name ...]                # writes docs
 python3 docs/architecture/diagrams/bounded_contexts.py [name ...]  # writes docs/architecture/diagrams/<name>.excalidraw and .png
 python3 docs/architecture/diagrams/order_lifecycle.py [name ...]   # writes docs/architecture/diagrams/order-lifecycle-<name>.excalidraw and .png
 python3 docs/architecture/diagrams/deployment.py [name ...]        # writes the deployment view and the local-versus-Azure map
+python3 docs/architecture/diagrams/access.py                       # writes the identity and access grid
+python3 docs/architecture/diagrams/resilience.py                   # writes the failure patterns
+python3 docs/architecture/diagrams/bpmn.py [process ...]           # writes the BPMN pictures
 ```
 
 | Key | Holds |

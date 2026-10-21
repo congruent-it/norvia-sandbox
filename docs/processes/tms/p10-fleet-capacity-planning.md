@@ -10,6 +10,12 @@ Fleet capacity planning keeps track, day by day, of which Vehicles and Drivers N
 | **Applies to** | Own fleet only |
 | **Integrations touched** | None at runtime. ERP, through the seed file for now (Vehicles and Drivers) |
 
+## Process model
+
+![P10 Fleet capacity planning as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-p10-fleet-capacity-planning.png)
+
+The model is [p10-fleet-capacity-planning.bpmn](p10-fleet-capacity-planning.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p10-fleet-capacity-planning.excalidraw)).
+
 ## What P10 decides, and what it doesn't
 
 P10 says **what the Own fleet can do on a day**. It doesn't put a Shipment on a Trip, pick a Vehicle or Driver for a Trip, or sequence Stops. That is P11. It doesn't choose between Own fleet and a Carrier either. That stays with the Planner in P3.

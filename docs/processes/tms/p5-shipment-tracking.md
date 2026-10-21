@@ -10,6 +10,12 @@ Shipment tracking records what happens to a Shipment after it has been handed ov
 | **Applies to** | Both. This design covers the Carrier source end to end. Own fleet feeds the same model through P12 |
 | **Integrations touched** | Partner portal (Carrier Personas), API Management, Service Bus (tracking queue, Shipment events), Carrier-tracking Logic App, TMS Tracking event API |
 
+## Process model
+
+![P5 Shipment tracking as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-p5-shipment-tracking.png)
+
+The model is [p5-shipment-tracking.bpmn](p5-shipment-tracking.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p5-shipment-tracking.excalidraw)).
+
 ## Scope
 
 P5 defines the tracking model (Tracking events, Shipment statuses, ETA, Stale) and the Carrier path into it.

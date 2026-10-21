@@ -10,6 +10,12 @@ Trip execution is the Driver working a Dispatched Trip on the road. In the Drive
 | **Applies to** | Own fleet only |
 | **Integrations touched** | Driver app (outbox, topic for Driver app events, transit container, outcome endpoint), Service Bus (Driver app events with sessions, Trip events, Shipment events), Driver reports Logic App, TMS Trip API, TMS Tracking event API, TMS Proof of delivery API, Entra ID |
 
+## Process model
+
+![P12 Trip execution as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-p12-trip-execution.png)
+
+The model is [p12-trip-execution.bpmn](p12-trip-execution.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p12-trip-execution.excalidraw)).
+
 ## What P12 decides, and what it doesn't
 
 P12 decides **what a Driver reports and how it reaches the TMS**: starting and ending a Trip, the outcome of each Stop, and the Proof of delivery captured at a delivery. It also decides what happens to Shipments that didn't finish on their Trip.

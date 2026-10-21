@@ -10,6 +10,12 @@ Proof of delivery records the Consignee's confirmation that it received a Shipme
 | **Applies to** | Both. This design covers the Carrier source end to end. Own fleet feeds the same model through P12 |
 | **Integrations touched** | Partner portal (Carrier Personas), API Management, inbound blob container, Service Bus (Proof of delivery queue, Shipment events), Carrier Proof of delivery Logic App, TMS Proof of delivery API |
 
+## Process model
+
+![P6 Proof of delivery as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-p6-proof-of-delivery.png)
+
+The model is [p6-proof-of-delivery.bpmn](p6-proof-of-delivery.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p6-proof-of-delivery.excalidraw)).
+
 ## Scope
 
 P6 defines the Proof of delivery model (content, current and superseded, the missing flag) and the Carrier path into it.

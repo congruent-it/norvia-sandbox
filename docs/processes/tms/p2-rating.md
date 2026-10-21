@@ -10,6 +10,12 @@ Rating calculates the Freight Charge for an accepted Transport Order from the Sh
 | **Applies to** | Own fleet and Carriers alike. Rating happens before P3 decides who carries the goods |
 | **Integrations touched** | Service Bus (outcome events). ERP, through the seed file for now |
 
+## Process model
+
+![P2 Rating as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-p2-rating.png)
+
+The model is [p2-rating.bpmn](p2-rating.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p2-rating.excalidraw)).
+
 ## Rating result
 
 Each Transport Order has a rating result that is separate from its status. The status (Accepted, then planned, and so on) belongs to P3 and later processes, and a Transport Order can be planned whatever its rating result.

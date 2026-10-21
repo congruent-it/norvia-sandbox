@@ -10,6 +10,12 @@ Shipper visibility lets a Shipper see where its Transport Orders stand. The Ship
 | **Applies to** | Both. The Shipper can't tell Own fleet from a Carrier |
 | **Integrations touched** | Partner portal (Shipper Personas), API Management (tracking API and its mapping policy), TMS Shipper tracking API |
 
+## Process model
+
+![P8 Shipper visibility as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-p8-shipper-visibility.png)
+
+The model is [p8-shipper-visibility.bpmn](p8-shipper-visibility.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p8-shipper-visibility.excalidraw)).
+
 ## Scope
 
 P8 is **pull only**. The Shipper queries, and nothing is sent to it. A query goes from API Management straight to the TMS, because Logic Apps are never used for read actions (ADR 0003). No Logic App, queue or read model sits in between, so the Shipper always sees what the TMS believes.

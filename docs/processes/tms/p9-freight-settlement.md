@@ -10,6 +10,12 @@ Freight settlement makes sure Norvia is paid for each Transport Order it deliver
 | **Applies to** | Both for the Shipper side. The Carrier cost is Carriers only. Own fleet has no Carrier cost |
 | **Integrations touched** | Service Bus (Transport Order and Shipment events), Billing Logic App, Carrier cost Logic App, ERP billing API. Partner portal (Carrier Personas) through P4. ERP, through the seed file for now (Carrier Rate Cards) |
 
+## Process model
+
+![P9 Freight settlement as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-p9-freight-settlement.png)
+
+The model is [p9-freight-settlement.bpmn](p9-freight-settlement.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p9-freight-settlement.excalidraw)).
+
 ## Scope
 
 P9 is the first process that needs the ERP, and it is where the ERP is first built (ADR 0001), as an invoicing slice. The two halves are split by owner:
