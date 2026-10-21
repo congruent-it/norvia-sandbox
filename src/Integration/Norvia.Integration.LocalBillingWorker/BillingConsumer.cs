@@ -47,7 +47,7 @@ internal sealed partial class BillingConsumer(
         ArgumentNullException.ThrowIfNull(args);
 
         await using var scope = scopes.CreateAsyncScope();
-        var run = await scope.ServiceProvider.GetRequiredService<BillingFlow>().RunAsync(args.Message.Body.ToString(), args.CancellationToken);
+        var run = await scope.ServiceProvider.GetRequiredService<BillingFlow>().RunAsync(args.Message.Body.ToString(), args.CancellationToken, args.Message.MessageId);
         if (run.Recorded)
         {
             await args.CompleteMessageAsync(args.Message, args.CancellationToken);

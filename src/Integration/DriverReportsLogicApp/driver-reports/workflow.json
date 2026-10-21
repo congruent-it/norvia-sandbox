@@ -256,6 +256,7 @@
               "shipmentNumber": "@outputs('Track_the_report')?['shipmentNumber']",
               "sourceMessageId": "@outputs('Track_the_report')?['sourceMessageId']",
               "outcome": "DeadLettered",
+              "messageId": "@triggerBody()?['messageId']",
               "failureCode": "ProofOfDeliveryFilesGone"
             }
           },
@@ -495,6 +496,7 @@
                         "shipmentNumber": "@outputs('Track_the_report')?['shipmentNumber']",
                         "sourceMessageId": "@outputs('Track_the_report')?['sourceMessageId']",
                         "outcome": "DeadLettered",
+                        "messageId": "@triggerBody()?['messageId']",
                         "failureCode": "TmsUnavailable"
                       }
                     },
@@ -571,6 +573,7 @@
                           "shipmentNumber": "@outputs('Track_the_report')?['shipmentNumber']",
                           "sourceMessageId": "@outputs('Track_the_report')?['sourceMessageId']",
                           "outcome": "DeadLettered",
+                          "messageId": "@triggerBody()?['messageId']",
                           "failureCode": "@coalesce(outputs('Send_the_report_to_the_TMS')?['body']?['code'], 'TmsCallRefused')"
                         }
                       },
@@ -661,6 +664,7 @@
                 "shipmentNumber": "@outputs('Track_the_report')?['shipmentNumber']",
                 "sourceMessageId": "@outputs('Track_the_report')?['sourceMessageId']",
                 "outcome": "DeadLettered",
+                "messageId": "@triggerBody()?['messageId']",
                 "failureCode": "DriverReportUnreadable"
               }
             },

@@ -41,6 +41,7 @@ public sealed class LogAnalyticsTrailSourceHopsTests
         LogsQueryModelFactory.LogsTableColumn("tripNumber", LogsColumnType.String),
         LogsQueryModelFactory.LogsTableColumn("sourceMessageId", LogsColumnType.String),
         LogsQueryModelFactory.LogsTableColumn("inProcess", LogsColumnType.Bool),
+        LogsQueryModelFactory.LogsTableColumn("messageId", LogsColumnType.String),
     ];
 
     private static readonly string[] FrameworkCategories = ["Azure.", "Microsoft.", "System."];
@@ -204,6 +205,40 @@ public sealed class LogAnalyticsTrailSourceHopsTests
             Outcome = (Outcome?)Outcome.Succeeded,
             BusinessKeys = new[] { new BusinessKey(BusinessKeyKind.TransportOrderNumber, "TO-0000016") },
         });
+    }
+
+    [Fact]
+    public async Task HopsAsync_ADeadLetteredRun_CarriesTheMessageIdItRecorded()
+    {
+        Answer(
+            Row("run", "trigger", null, Now.AddSeconds(-5), 100, "When a message is received", "logic-intake", runId: "0858", workflow: "carrier-booking",
+                category: "Workflow.Operations.Triggers", flow: "carrier-booking", outcome: "DeadLettered", failureCode: "CarrierRefused", messageId: "m-7"));
+
+        var hops = await HopsAsync(CorrelationId);
+
+        hops.Should().ContainSingle().Which.MessageId.Should().Be("m-7");
+    }
+
+    [Fact]
+    public async Task HopsAsync_AHopThatRecordedNoMessageId_HasNone()
+    {
+        Answer(Row("request", "tms-req", null, Now.AddSeconds(-5), 100, "POST /x", "tms-api", flow: "carrier-booking", outcome: "Succeeded"));
+
+        (await HopsAsync(CorrelationId)).Should().ContainSingle().Which.MessageId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task HopsAsync_QueriesTheMessageIdOfEveryTrackedRow()
+    {
+        await HopsAsync(CorrelationId);
+
+        await _client.Received(1).QueryWorkspaceAsync(
+            WorkspaceId,
+            Arg.Is<string>(query => query.Contains("messageId = tostring(tracked.messageId)", StringComparison.Ordinal)
+                && query.Contains("messageId = coalesce(tostring(Properties.messageId), tostring(tracked.messageId))", StringComparison.Ordinal)),
+            Arg.Any<LogsQueryTimeRange>(),
+            Arg.Any<LogsQueryOptions>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -423,11 +458,12 @@ public sealed class LogAnalyticsTrailSourceHopsTests
         string? failureCode = null,
         string? transportOrderNumber = null,
         string? path = null,
-        string? eventType = null) =>
+        string? eventType = null,
+        string? messageId = null) =>
         LogsQueryModelFactory.LogsTableRow(Columns,
         [
             kind, id, parentId, start, durationMs, name, path, role, runId, workflow, category,
-            flow, outcome, failureCode, eventType, transportOrderNumber, null, null, null, null, null,
+            flow, outcome, failureCode, eventType, transportOrderNumber, null, null, null, null, null, messageId,
         ]);
 
     // A dependency the query returns with what places a hop in it: an in-process one is a span an application or a
@@ -436,6 +472,6 @@ public sealed class LogAnalyticsTrailSourceHopsTests
         LogsQueryModelFactory.LogsTableRow(Columns,
         [
             "link", id, parentId, start, durationMs, name, null, role, null, null, null,
-            null, null, null, null, null, null, null, null, null, inProcess,
+            null, null, null, null, null, null, null, null, null, inProcess, null,
         ]);
 }

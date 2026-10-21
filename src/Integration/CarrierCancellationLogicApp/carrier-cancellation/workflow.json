@@ -91,6 +91,7 @@
           "shipmentNumber": "@outputs('Track_the_cancellation')?['shipmentNumber']",
           "sourceMessageId": "@outputs('Track_the_cancellation')?['sourceMessageId']",
           "outcome": "DeadLettered",
+          "messageId": "@triggerBody()?['messageId']",
           "failureCode": "CarrierCancellationUnreadable"
         }
       },

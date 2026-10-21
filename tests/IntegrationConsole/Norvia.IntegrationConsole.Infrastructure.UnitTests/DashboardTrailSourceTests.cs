@@ -469,6 +469,25 @@ public sealed class DashboardTrailSourceTests : IDisposable
         hops.Should().ContainSingle().Which.Outcome.Should().Be(Outcome.DeadLettered);
     }
 
+    [Fact]
+    public async Task HopsAsync_ForADeadLetteredHop_ReadsTheMessageIdFromTheRecordsAttributes()
+    {
+        _dashboard
+            .Add("tms-api", Now.AddMinutes(-10), new() { ["correlationId"] = Booked, ["flow"] = "carrier-tracking", ["outcome"] = "DeadLettered", ["messageId"] = "m-7" });
+
+        var hops = await HopsAsync(Booked);
+
+        hops.Should().ContainSingle().Which.MessageId.Should().Be("m-7");
+    }
+
+    [Fact]
+    public async Task HopsAsync_ForAHopWithoutAMessageId_HasNone()
+    {
+        _dashboard.Add("tms-api", Now.AddMinutes(-10), new() { ["correlationId"] = Booked, ["flow"] = "carrier-tracking", ["outcome"] = "Succeeded" });
+
+        (await HopsAsync(Booked)).Should().ContainSingle().Which.MessageId.Should().BeNull();
+    }
+
     // What ASP.NET Core records on a request's span besides its name.
     private static Dictionary<string, string> Called(string method, string path) =>
         new() { ["http.request.method"] = method, ["url.path"] = path };

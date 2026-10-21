@@ -88,6 +88,7 @@
           "documentNumber": "@outputs('Track_the_invoice')?['documentNumber']",
           "sourceMessageId": "@outputs('Track_the_invoice')?['sourceMessageId']",
           "outcome": "DeadLettered",
+          "messageId": "@triggerBody()?['messageId']",
           "failureCode": "ShipperInvoiceIssuedUnreadable"
         }
       },

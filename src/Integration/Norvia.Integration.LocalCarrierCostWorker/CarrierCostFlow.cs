@@ -22,12 +22,12 @@ internal sealed partial class CarrierCostFlow(ErpCarrierCostApi erp, IOptions<Ca
 {
     private const string EventType = "CarrierCostIncurred";
 
-    public async Task<CarrierCostRun> RunAsync(string carrierCostIncurred, CancellationToken cancellationToken)
+    public async Task<CarrierCostRun> RunAsync(string carrierCostIncurred, CancellationToken cancellationToken, string? messageId = null)
     {
         var keys = TryReadKeys(carrierCostIncurred);
         if (keys is null)
         {
-            using var unreadable = logger.BeginScope(TrackingKeys.OutcomeOf(TrackingKeys.DeadLettered, CarrierCostFailureCodes.Unreadable));
+            using var unreadable = logger.BeginScope(TrackingKeys.OutcomeOf(TrackingKeys.DeadLettered, CarrierCostFailureCodes.Unreadable, messageId));
             LogUnreadable();
             return new(CarrierCostFailureCodes.Unreadable, "The message isn't a CarrierCostIncurred the ERP can record, so nothing was sent to the ERP.");
         }
@@ -36,7 +36,7 @@ internal sealed partial class CarrierCostFlow(ErpCarrierCostApi erp, IOptions<Ca
         var answer = await SendAsync(carrierCostIncurred, (string)keys[TrackingKeys.CorrelationId]!, cancellationToken);
 
         var failureCode = answer.FailureCode;
-        using var outcome = logger.BeginScope(TrackingKeys.OutcomeOf(failureCode is null ? TrackingKeys.Succeeded : TrackingKeys.DeadLettered, failureCode));
+        using var outcome = logger.BeginScope(TrackingKeys.OutcomeOf(failureCode is null ? TrackingKeys.Succeeded : TrackingKeys.DeadLettered, failureCode, messageId));
         LogAnswered(answer.StatusCode);
         return answer.Succeeded ? new() : new(failureCode, answer.Description);
     }

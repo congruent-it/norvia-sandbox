@@ -15,6 +15,7 @@ public static class TrackingKeys
     public const string TripNumber = "tripNumber";
     public const string DocumentNumber = "documentNumber";
     public const string SourceMessageId = "sourceMessageId";
+    public const string MessageId = "messageId";
     public const string Outcome = "outcome";
     public const string FailureCode = "failureCode";
 
@@ -70,9 +71,24 @@ public static class TrackingKeys
     public const string DeadLettered = "DeadLettered";
     public const string Failed = "Failed";
 
-    /// <summary>An outcome and, when there is one, its failure code; a key that doesn't apply is left out, never sent empty.</summary>
-    public static Dictionary<string, object?> OutcomeOf(string outcome, string? failureCode = null) =>
-        string.IsNullOrEmpty(failureCode)
-            ? new() { [Outcome] = outcome }
-            : new() { [Outcome] = outcome, [FailureCode] = failureCode };
+    /// <summary>
+    /// An outcome and, when there is one, its failure code; a key that doesn't apply is left out, never sent empty. The
+    /// <paramref name="messageId"/> of the Service Bus message is recorded only on a <see cref="DeadLettered"/> outcome,
+    /// so the console can join the hop to the message it dead-lettered.
+    /// </summary>
+    public static Dictionary<string, object?> OutcomeOf(string outcome, string? failureCode = null, string? messageId = null)
+    {
+        var keys = new Dictionary<string, object?> { [Outcome] = outcome };
+        if (!string.IsNullOrEmpty(failureCode))
+        {
+            keys[FailureCode] = failureCode;
+        }
+
+        if (outcome == DeadLettered && !string.IsNullOrEmpty(messageId))
+        {
+            keys[MessageId] = messageId;
+        }
+
+        return keys;
+    }
 }

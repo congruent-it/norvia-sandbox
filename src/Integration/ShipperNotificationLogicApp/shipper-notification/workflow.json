@@ -92,6 +92,7 @@
           "shipmentNumber": "@outputs('Track_the_notification')?['shipmentNumber']",
           "sourceMessageId": "@outputs('Track_the_notification')?['sourceMessageId']",
           "outcome": "DeadLettered",
+          "messageId": "@triggerBody()?['messageId']",
           "failureCode": "ShipperNotificationRequestedUnreadable"
         }
       },

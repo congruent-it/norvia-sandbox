@@ -212,11 +212,12 @@ internal sealed class ServiceBusDeadLetterQueues(IServiceBusEntities entities, I
                 }
 
                 await using var receiver = DeadLetterReceiver(client, entity);
-                foreach (var message in (await receiver.PeekMessagesAsync(PeekLimit, cancellationToken: cancellationToken)).Select(Listed))
+                foreach (var peeked in await receiver.PeekMessagesAsync(PeekLimit, cancellationToken: cancellationToken))
                 {
+                    var message = Listed(peeked);
                     if (string.Equals(message.CorrelationId, correlationId, StringComparison.OrdinalIgnoreCase))
                     {
-                        found.Add(new FoundDeadLetter(entity.Name, message.SequenceNumber, message.EnqueuedAt, message.BusinessKeys));
+                        found.Add(new FoundDeadLetter(entity.Name, message.SequenceNumber, message.EnqueuedAt, message.BusinessKeys, peeked.MessageId));
                     }
                 }
             }

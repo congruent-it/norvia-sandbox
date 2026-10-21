@@ -121,14 +121,94 @@ public sealed class OpenTrailDeadLetterTests
         trail.Hops.Single().DeadLetter!.SequenceNumber.Should().Be(7);
     }
 
+    [Fact]
+    public async Task Handle_ForTwoHopsOfIdenticalKeys_GivesEachItsOwnMessage()
+    {
+        // The hops were dead-lettered a minute apart, but their messages sit on the queue in the other order.
+        Record(
+            Hop("first", minutesAgo: 30, Outcome.DeadLettered, "m-2", Shipment),
+            Hop("second", minutesAgo: 29, Outcome.DeadLettered, "m-1", Shipment));
+        _queues.DeadLetteredAsync(CorrelationId, Arg.Any<CancellationToken>())
+            .Returns([
+                new FoundDeadLetter(Entity, 7, Now.AddMinutes(-28), [Shipment], "m-1"),
+                new FoundDeadLetter(Entity, 8, Now.AddMinutes(-27), [Shipment], "m-2"),
+            ]);
+
+        var trail = await OpenAsync();
+
+        trail.Hops.Select(hop => hop.DeadLetter?.SequenceNumber).Should().Equal(8, 7);
+    }
+
+    [Fact]
+    public async Task Handle_ForTwoHopsOfIdenticalKeys_JoinsTheAuditEventByMessageId()
+    {
+        Record(
+            Hop("first", minutesAgo: 60, Outcome.DeadLettered, "m-2", Shipment),
+            Hop("second", minutesAgo: 59, Outcome.DeadLettered, "m-1", Shipment));
+        _source.AuditAsync(Arg.Any<TrailLookup>(), Arg.Any<CancellationToken>())
+            .Returns([Audit(AuditActions.Discard, "ben@norvia.example", minutesAgo: 20, messageId: "m-1")]);
+        _queues.DeadLetteredAsync(CorrelationId, Arg.Any<CancellationToken>())
+            .Returns([new FoundDeadLetter(Entity, 8, Now.AddMinutes(-58), [Shipment], "m-2")]);
+
+        var trail = await OpenAsync();
+
+        trail.Hops.Select(hop => hop.DeadLetter?.Status).Should().Equal(DeadLetterStatus.OnQueue, DeadLetterStatus.Discarded);
+    }
+
+    [Fact]
+    public async Task Handle_ForAHopWhoseMessageIsGone_DoesNotTakeAnotherHopsMessage()
+    {
+        Record(Hop("run", minutesAgo: 30, Outcome.DeadLettered, "m-1", Shipment));
+        _queues.DeadLetteredAsync(CorrelationId, Arg.Any<CancellationToken>())
+            .Returns([new FoundDeadLetter(Entity, 7, Now.AddMinutes(-29), [Shipment], "m-9")]);
+
+        var trail = await OpenAsync();
+
+        trail.Hops.Single().DeadLetter.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Handle_ForAHopWithoutAMessageId_DoesNotTakeTheMessageAnotherHopNames()
+    {
+        Record(
+            Hop("old", minutesAgo: 31, Outcome.DeadLettered, Shipment),
+            Hop("named", minutesAgo: 30, Outcome.DeadLettered, "m-1", Shipment));
+        _queues.DeadLetteredAsync(CorrelationId, Arg.Any<CancellationToken>())
+            .Returns([new FoundDeadLetter(Entity, 7, Now.AddMinutes(-29), [Shipment], "m-1")]);
+
+        var trail = await OpenAsync();
+
+        trail.Hops.Select(hop => hop.DeadLetter?.SequenceNumber).Should().Equal(null, 7L);
+    }
+
+    [Fact]
+    public async Task Handle_ForHopsWithoutMessageIds_StillPairsThemByKeysAndTime()
+    {
+        Record(
+            Hop("first", minutesAgo: 30, Outcome.DeadLettered, Shipment),
+            Hop("second", minutesAgo: 20, Outcome.DeadLettered, Shipment));
+        _queues.DeadLetteredAsync(CorrelationId, Arg.Any<CancellationToken>())
+            .Returns([
+                new FoundDeadLetter(Entity, 7, Now.AddMinutes(-29), [Shipment], "m-1"),
+                new FoundDeadLetter(Entity, 8, Now.AddMinutes(-19), [Shipment], "m-2"),
+            ]);
+
+        var trail = await OpenAsync();
+
+        trail.Hops.Select(hop => hop.DeadLetter?.SequenceNumber).Should().Equal(7L, 8L);
+    }
+
     private void Record(params RecordedHop[] hops) =>
         _source.HopsAsync(Arg.Any<TrailLookup>(), Arg.Any<CancellationToken>()).Returns(hops);
 
     private static RecordedHop Hop(string id, int minutesAgo, Outcome outcome, params BusinessKey[] keys) =>
         new(id, null, id, "carrier-booking", Now.AddMinutes(-minutesAgo), TimeSpan.FromSeconds(1), outcome, null, keys);
 
-    private static RecordedAudit Audit(string action, string actor, int minutesAgo, string? reason = null) =>
-        new(actor, action, Entity, "m-1", Now.AddMinutes(-minutesAgo), reason, [Shipment]);
+    private static RecordedHop Hop(string id, int minutesAgo, Outcome outcome, string messageId, params BusinessKey[] keys) =>
+        Hop(id, minutesAgo, outcome, keys) with { MessageId = messageId };
+
+    private static RecordedAudit Audit(string action, string actor, int minutesAgo, string? reason = null, string messageId = "m-1") =>
+        new(actor, action, Entity, messageId, Now.AddMinutes(-minutesAgo), reason, [Shipment]);
 
     private async Task<MessageTrail> OpenAsync()
     {

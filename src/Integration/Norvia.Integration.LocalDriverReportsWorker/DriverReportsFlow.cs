@@ -40,13 +40,13 @@ internal sealed partial class DriverReportsFlow(
     /// <summary>The longest message the Driver app takes in an outcome report.</summary>
     private const int MaximumMessageLength = 1000;
 
-    public async Task<DriverReportsRunOutcome> RunAsync(string message, Func<Settlement, CancellationToken, Task> settle, CancellationToken cancellationToken)
+    public async Task<DriverReportsRunOutcome> RunAsync(string message, Func<Settlement, CancellationToken, Task> settle, CancellationToken cancellationToken, string? messageId = null)
     {
         ArgumentNullException.ThrowIfNull(settle);
 
         if (DriverReport.Read(message) is not { } report)
         {
-            using var unreadable = logger.BeginScope(TrackingKeys.OutcomeOf(TrackingKeys.DeadLettered, DriverReportsFailureCodes.Unreadable));
+            using var unreadable = logger.BeginScope(TrackingKeys.OutcomeOf(TrackingKeys.DeadLettered, DriverReportsFailureCodes.Unreadable, messageId));
             LogUnreadable();
             await settle(new Settlement.DeadLetter(DriverReportsFailureCodes.Unreadable, UnreadableDescription), cancellationToken);
             return DriverReportsRunOutcome.Unreadable;
@@ -58,7 +58,7 @@ internal sealed partial class DriverReportsFlow(
         {
             if (await proofFiles.FetchAsync(proof.Files, cancellationToken) is not { } fetched)
             {
-                return await GiveUpOnGoneFilesAsync(report, settle, cancellationToken);
+                return await GiveUpOnGoneFilesAsync(report, settle, messageId, cancellationToken);
             }
 
             files = fetched;
@@ -69,7 +69,7 @@ internal sealed partial class DriverReportsFlow(
 
         var (settlement, outcome) = Decide(report, answer, attempts);
         using (logger.BeginScope(TrackingKeys.OutcomeOf(
-            settlement is Settlement.DeadLetter deadLettered ? TrackingKeys.DeadLettered : TrackingKeys.Succeeded, (settlement as Settlement.DeadLetter)?.Reason)))
+            settlement is Settlement.DeadLetter deadLettered ? TrackingKeys.DeadLettered : TrackingKeys.Succeeded, (settlement as Settlement.DeadLetter)?.Reason, messageId)))
         {
             LogSettled(outcome.Outcome, answer.StatusCode);
             await settle(settlement, cancellationToken);
@@ -95,10 +95,10 @@ internal sealed partial class DriverReportsFlow(
     }
 
     /// <summary>The files are gone: the message is dead-lettered and the Driver app is told the report wasn't recorded, and the run fails, as the workflow's does.</summary>
-    private async Task<DriverReportsRunOutcome> GiveUpOnGoneFilesAsync(DriverReport report, Func<Settlement, CancellationToken, Task> settle, CancellationToken cancellationToken)
+    private async Task<DriverReportsRunOutcome> GiveUpOnGoneFilesAsync(DriverReport report, Func<Settlement, CancellationToken, Task> settle, string? messageId, CancellationToken cancellationToken)
     {
         const string description = "The Proof of delivery's files could not be read from the Driver app's transit container, so nothing was sent to the TMS.";
-        using (logger.BeginScope(TrackingKeys.OutcomeOf(TrackingKeys.DeadLettered, DriverReportsFailureCodes.ProofOfDeliveryFilesGone)))
+        using (logger.BeginScope(TrackingKeys.OutcomeOf(TrackingKeys.DeadLettered, DriverReportsFailureCodes.ProofOfDeliveryFilesGone, messageId)))
         {
             LogFilesGone();
             await settle(new Settlement.DeadLetter(DriverReportsFailureCodes.ProofOfDeliveryFilesGone, description), cancellationToken);

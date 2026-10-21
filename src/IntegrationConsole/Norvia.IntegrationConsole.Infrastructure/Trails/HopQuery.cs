@@ -56,7 +56,7 @@ internal static class HopQuery
                 flow = tostring(tracked.flow), outcome = tostring(tracked.outcome), failureCode = tostring(tracked.failureCode),
                 transportOrderNumber = tostring(tracked.transportOrderNumber), shipmentNumber = tostring(tracked.shipmentNumber),
                 carrierBookingNumber = tostring(tracked.carrierBookingNumber), tripNumber = tostring(tracked.tripNumber),
-                sourceMessageId = tostring(tracked.sourceMessageId), OperationId;
+                sourceMessageId = tostring(tracked.sourceMessageId), messageId = tostring(tracked.messageId), OperationId;
         let calls = tracked
             | where isempty(runId)
             | project rowKind = source, id = Id, parentId = ParentId, start = TimeGenerated, durationMs = DurationMs, name = Name, path,
@@ -68,7 +68,8 @@ internal static class HopQuery
                 shipmentNumber = coalesce(tostring(Properties.shipmentNumber), tostring(tracked.shipmentNumber)),
                 carrierBookingNumber = coalesce(tostring(Properties.carrierBookingNumber), tostring(tracked.carrierBookingNumber)),
                 tripNumber = coalesce(tostring(Properties.tripNumber), tostring(tracked.tripNumber)),
-                sourceMessageId = coalesce(tostring(Properties.sourceMessageId), tostring(tracked.sourceMessageId)), OperationId;
+                sourceMessageId = coalesce(tostring(Properties.sourceMessageId), tostring(tracked.sourceMessageId)),
+                messageId = coalesce(tostring(Properties.messageId), tostring(tracked.messageId)), OperationId;
         let operations = toscalar(union (calls | project OperationId), (runs | project OperationId) | summarize make_set(OperationId));
         let links = AppDependencies
             | where OperationId in (operations)
