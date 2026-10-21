@@ -7,9 +7,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Norvia.IntegrationConsole.Application.Audit;
 using Norvia.IntegrationConsole.Application.DeadLetters;
 using Norvia.IntegrationConsole.Application.Runs;
 using Norvia.IntegrationConsole.Application.Trails;
+using Norvia.IntegrationConsole.Infrastructure.Audit;
 using Norvia.IntegrationConsole.Infrastructure.DeadLetters;
 using Norvia.IntegrationConsole.Infrastructure.Runs;
 using Norvia.IntegrationConsole.Infrastructure.Trails;
@@ -31,6 +33,8 @@ public static partial class DependencyInjection
         builder.Services.AddSingleton(ConsoleCredential(builder.Configuration));
         builder.AddWorkflowRuns();
         builder.AddDeadLetterQueues();
+        // Through ServiceDefaults' OpenTelemetry logging, so it reaches the same Application Insights as everything else.
+        builder.Services.AddSingleton<IAuditLog, OpenTelemetryAuditLog>();
 
         // The AppHost gives the console the Aspire dashboard only locally, and only when no deployed estate is named
         // (ADR 0027). Local telemetry then stays on the developer's machine.

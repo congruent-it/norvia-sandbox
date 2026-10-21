@@ -4,7 +4,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Norvia.IntegrationConsole.Application.Audit;
 using Norvia.IntegrationConsole.Application.DeadLetters;
+using Norvia.IntegrationConsole.Infrastructure.Audit;
 using Norvia.IntegrationConsole.Infrastructure.DeadLetters;
 
 namespace Norvia.IntegrationConsole.Infrastructure.UnitTests.DeadLetters;
@@ -22,6 +24,14 @@ public sealed class DeadLetterQueuesRegistrationTests
         services.GetRequiredService<IDeadLetterQueues>().Should().BeOfType<ServiceBusDeadLetterQueues>();
         services.GetRequiredService<IServiceBusEntities>().Should().BeOfType<ArmServiceBusEntities>();
         services.GetRequiredService<IOptions<EstateServiceBusOptions>>().Value.ServiceBusNamespace.Should().Be("sb-norvia-abc");
+    }
+
+    [Fact]
+    public void AddIntegrationConsoleInfrastructure_Always_WritesTheAuditThroughOpenTelemetry()
+    {
+        using var services = ServicesWith(new() { ["Estate:ResourceGroupId"] = ResourceGroupId, ["Estate:ServiceBusNamespace"] = "sb-norvia-abc" });
+
+        services.GetRequiredService<IAuditLog>().Should().BeOfType<OpenTelemetryAuditLog>();
     }
 
     [Fact]

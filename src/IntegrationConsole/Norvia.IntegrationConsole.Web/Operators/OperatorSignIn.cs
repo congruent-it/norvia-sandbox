@@ -13,6 +13,9 @@ public static class OperatorSignIn
     /// <summary>Everything the console shows: search, Message trails, run details and bodies.</summary>
     public const string ReadPolicy = OperatorRoles.Read;
 
+    /// <summary>Also resubmitting a dead-lettered message, which the console audits.</summary>
+    public const string ResubmitPolicy = OperatorRoles.Resubmit;
+
     public static IHostApplicationBuilder AddOperatorSignIn(this IHostApplicationBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
@@ -38,7 +41,8 @@ public static class OperatorSignIn
         }
 
         builder.Services.AddAuthorizationBuilder()
-            .AddPolicy(ReadPolicy, policy => policy.RequireRole(OperatorRoles.Read));
+            .AddPolicy(ReadPolicy, policy => policy.RequireRole(OperatorRoles.Read))
+            .AddPolicy(ResubmitPolicy, policy => policy.RequireRole(OperatorRoles.Resubmit));
         builder.Services.AddCascadingAuthenticationState();
 
         return builder;

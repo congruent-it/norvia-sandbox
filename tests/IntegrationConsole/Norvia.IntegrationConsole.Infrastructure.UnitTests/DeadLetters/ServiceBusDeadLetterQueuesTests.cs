@@ -13,6 +13,7 @@ public sealed class ServiceBusDeadLetterQueuesTests
     private readonly IServiceBusEntities _entities = Substitute.For<IServiceBusEntities>();
     private readonly IServiceBusClients _clients = Substitute.For<IServiceBusClients>();
     private readonly ServiceBusClient _client = Substitute.For<ServiceBusClient>();
+    private readonly List<ServiceBusMessage> _sent = [];
 
     public ServiceBusDeadLetterQueuesTests() => _clients.Create(Arg.Any<string>()).Returns(_client);
 
@@ -229,6 +230,167 @@ public sealed class ServiceBusDeadLetterQueuesTests
         (await Queues().OpenAsync("nope", 3, TestContext.Current.CancellationToken)).Should().BeNull();
     }
 
+    [Fact]
+    public async Task ResubmitAsync_ForAQueueMessage_SendsACopyToTheQueue_WithTheSamePropertiesAndANewMessageId()
+    {
+        Found(new ServiceBusEntity("sb", "carrier-tracking", null, 1));
+        Sender();
+        Receives(Message(Enqueued, sequenceNumber: 3, reason: "MappingFailed", description: "Bad date", body: """{"consignee":"Café De Kroon"}""", correlationId: "corr-1",
+            messageId: "original-1", subject: "TrackingEvent", contentType: "application/json", sessionId: "TR-7",
+            properties: new Dictionary<string, object> { ["correlationId"] = "corr-1", ["shipmentNumber"] = "SH-0042", ["attempt"] = 3 }));
+
+        await Queues().ResubmitAsync("carrier-tracking", 3, TestContext.Current.CancellationToken);
+
+        _client.Received(1).CreateSender("carrier-tracking");
+        var sent = _sent.Should().ContainSingle().Subject;
+        sent.Body.ToString().Should().Be("""{"consignee":"Café De Kroon"}""");
+        sent.CorrelationId.Should().Be("corr-1");
+        sent.Subject.Should().Be("TrackingEvent");
+        sent.ContentType.Should().Be("application/json");
+        sent.SessionId.Should().Be("TR-7");
+        sent.MessageId.Should().NotBeNullOrEmpty().And.NotBe("original-1");
+        sent.ApplicationProperties.Should().BeEquivalentTo(new Dictionary<string, object>
+        {
+            ["correlationId"] = "corr-1",
+            ["shipmentNumber"] = "SH-0042",
+            ["attempt"] = 3,
+            ["resubmittedFrom"] = "original-1",
+        });
+    }
+
+    [Fact]
+    public async Task ResubmitAsync_WhenTheSendSucceeds_CompletesTheOriginal_AfterTheSend_AndReportsBothMessageIds()
+    {
+        Found(new ServiceBusEntity("sb", "carrier-tracking", null, 1));
+        var sender = Sender();
+        var original = Message(Enqueued, sequenceNumber: 3, messageId: "original-1", correlationId: "corr-1",
+            properties: new Dictionary<string, object> { ["shipmentNumber"] = "SH-0042" });
+        var receiver = Receives(original);
+
+        var resubmitted = await Queues().ResubmitAsync("carrier-tracking", 3, TestContext.Current.CancellationToken);
+
+        resubmitted.Should().NotBeNull();
+        resubmitted!.Entity.Should().Be("carrier-tracking");
+        resubmitted.OriginalMessageId.Should().Be("original-1");
+        resubmitted.ResubmittedMessageId.Should().NotBeNullOrEmpty().And.NotBe("original-1").And.Be(_sent.Single().MessageId);
+        resubmitted.CorrelationId.Should().Be("corr-1");
+        resubmitted.BusinessKeys.Should().Equal(new BusinessKey(BusinessKeyKind.ShipmentNumber, "SH-0042"));
+        Received.InOrder(() =>
+        {
+            sender.SendMessageAsync(Arg.Any<ServiceBusMessage>(), Arg.Any<CancellationToken>());
+            receiver.CompleteMessageAsync(original, Arg.Any<CancellationToken>());
+        });
+        await _client.Received(1).DisposeAsync();
+    }
+
+    [Fact]
+    public async Task ResubmitAsync_WhenTheSendFails_LeavesTheOriginalOnTheDeadLetterQueue_AndFails()
+    {
+        Found(new ServiceBusEntity("sb", "carrier-tracking", null, 1));
+        var sender = Sender();
+        sender.SendMessageAsync(Arg.Any<ServiceBusMessage>(), Arg.Any<CancellationToken>())
+            .Returns(_ => throw new ServiceBusException("Unavailable", ServiceBusFailureReason.ServiceCommunicationProblem));
+        var original = Message(Enqueued, sequenceNumber: 3);
+        var receiver = Receives(original);
+
+        var resubmit = async () => await Queues().ResubmitAsync("carrier-tracking", 3, TestContext.Current.CancellationToken);
+
+        await resubmit.Should().ThrowAsync<ServiceBusException>();
+        await receiver.DidNotReceive().CompleteMessageAsync(Arg.Any<ServiceBusReceivedMessage>(), Arg.Any<CancellationToken>());
+        await receiver.Received(1).AbandonMessageAsync(original, Arg.Any<IDictionary<string, object>>(), Arg.Any<CancellationToken>());
+        await _client.Received(1).DisposeAsync();
+    }
+
+    [Fact]
+    public async Task ResubmitAsync_WhenEarlierMessagesComeFirst_LetsGoOfThem_AndResubmitsOnlyTheOneWanted()
+    {
+        Found(new ServiceBusEntity("sb", "carrier-tracking", null, 3));
+        Sender();
+        var earlier = Message(Enqueued, sequenceNumber: 1, messageId: "earlier");
+        var wanted = Message(Enqueued, sequenceNumber: 2, messageId: "wanted");
+        var later = Message(Enqueued, sequenceNumber: 3, messageId: "later");
+        var receiver = Receives(wanted, batches: [[earlier], [wanted, later]]);
+
+        var resubmitted = await Queues().ResubmitAsync("carrier-tracking", 2, TestContext.Current.CancellationToken);
+
+        resubmitted!.OriginalMessageId.Should().Be("wanted");
+        await receiver.Received(1).CompleteMessageAsync(wanted, Arg.Any<CancellationToken>());
+        await receiver.Received(1).AbandonMessageAsync(earlier, Arg.Any<IDictionary<string, object>>(), Arg.Any<CancellationToken>());
+        await receiver.Received(1).AbandonMessageAsync(later, Arg.Any<IDictionary<string, object>>(), Arg.Any<CancellationToken>());
+        _sent.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task ResubmitAsync_WhenTheMessageIsGone_ReturnsNull_AndSendsNothing()
+    {
+        // A peek from a sequence number gives the next message when that one is gone.
+        Found(new ServiceBusEntity("sb", "carrier-tracking", null, 1));
+        Sender();
+        var receiver = Receives(Message(Enqueued, sequenceNumber: 9));
+
+        var resubmitted = await Queues().ResubmitAsync("carrier-tracking", 3, TestContext.Current.CancellationToken);
+
+        resubmitted.Should().BeNull();
+        await receiver.DidNotReceive().ReceiveMessagesAsync(Arg.Any<int>(), Arg.Any<TimeSpan?>(), Arg.Any<CancellationToken>());
+        _sent.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ResubmitAsync_WhenAnotherOperatorTookItMeanwhile_ReturnsNull_AndSendsNothing()
+    {
+        // Peeked, then gone before the receive: the receive finds nothing.
+        Found(new ServiceBusEntity("sb", "carrier-tracking", null, 1));
+        Sender();
+        Receives(Message(Enqueued, sequenceNumber: 3), batches: []);
+
+        var resubmitted = await Queues().ResubmitAsync("carrier-tracking", 3, TestContext.Current.CancellationToken);
+
+        resubmitted.Should().BeNull();
+        _sent.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ResubmitAsync_ForAQueueTheEstateDoesNotHave_ReturnsNull_AndOpensNoClient()
+    {
+        Found(new ServiceBusEntity("sb", "carrier-tracking", null, 1));
+
+        (await Queues().ResubmitAsync("nope", 3, TestContext.Current.CancellationToken)).Should().BeNull();
+
+        _clients.DidNotReceiveWithAnyArgs().Create(default!);
+    }
+
+    [Fact]
+    public async Task ResubmitAsync_ForASubscription_IsNotSupported()
+    {
+        Found(new ServiceBusEntity("sb", "shipment-events", "carrier-booking", 1));
+
+        var resubmit = async () => await Queues().ResubmitAsync("shipment-events/carrier-booking", 3, TestContext.Current.CancellationToken);
+
+        await resubmit.Should().ThrowAsync<NotSupportedException>();
+        _clients.DidNotReceiveWithAnyArgs().Create(default!);
+    }
+
+    private ServiceBusSender Sender()
+    {
+        var sender = Substitute.For<ServiceBusSender>();
+        sender.SendMessageAsync(Arg.Do<ServiceBusMessage>(_sent.Add), Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
+        _client.CreateSender(Arg.Any<string>()).Returns(sender);
+        return sender;
+    }
+
+    /// <summary>
+    /// A dead-letter queue that peeks the message (or <paramref name="peeked"/> when given) and receives in order:
+    /// <paramref name="batches"/> are what each receive returns, the message alone by default.
+    /// </summary>
+    private ServiceBusReceiver Receives(ServiceBusReceivedMessage message, IReadOnlyList<ServiceBusReceivedMessage>[]? batches = null)
+    {
+        var receiver = Peeks(message);
+        var queue = new Queue<IReadOnlyList<ServiceBusReceivedMessage>>(batches ?? [[message]]);
+        receiver.ReceiveMessagesAsync(Arg.Any<int>(), Arg.Any<TimeSpan?>(), Arg.Any<CancellationToken>())
+            .Returns(_ => queue.Count > 0 ? queue.Dequeue() : []);
+        return receiver;
+    }
+
     private ServiceBusReceiver PeeksMany(params ServiceBusReceivedMessage[] messages)
     {
         var receiver = Substitute.For<ServiceBusReceiver>();
@@ -259,7 +421,11 @@ public sealed class ServiceBusDeadLetterQueuesTests
         int deliveryCount = 1,
         string body = "{}",
         string? correlationId = null,
-        IDictionary<string, object>? properties = null)
+        IDictionary<string, object>? properties = null,
+        string? messageId = null,
+        string? subject = null,
+        string? contentType = null,
+        string? sessionId = null)
     {
         var applicationProperties = properties ?? new Dictionary<string, object>();
         if (reason is not null)
@@ -274,7 +440,11 @@ public sealed class ServiceBusDeadLetterQueuesTests
 
         return ServiceBusModelFactory.ServiceBusReceivedMessage(
             body: BinaryData.FromString(body),
+            messageId: messageId,
             correlationId: correlationId,
+            subject: subject,
+            contentType: contentType,
+            sessionId: sessionId,
             properties: applicationProperties,
             sequenceNumber: sequenceNumber,
             deliveryCount: deliveryCount,

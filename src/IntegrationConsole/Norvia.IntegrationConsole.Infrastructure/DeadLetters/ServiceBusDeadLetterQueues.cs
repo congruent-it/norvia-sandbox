@@ -10,9 +10,16 @@ namespace Norvia.IntegrationConsole.Infrastructure.DeadLetters;
 /// Counts the dead-lettered messages of every queue and subscription the estate has, and peeks the oldest of each dead-letter
 /// queue that holds any, to see how long it has waited. It also peeks a queue's messages, and one message in full. A peek
 /// takes nothing off the queue, and no message is received, completed or sent: it keeps its delivery count and lock state.
+/// Resubmitting is the one thing that receives: it sends a copy to the queue and only then completes the original.
 /// </summary>
 internal sealed class ServiceBusDeadLetterQueues(IServiceBusEntities entities, IServiceBusClients clients) : IDeadLetterQueues
 {
+    /// <summary>The application property a resubmitted copy names the original's message ID in.</summary>
+    public const string ResubmittedFrom = "resubmittedFrom";
+
+    private const int ReceiveBatchSize = 10;
+    private static readonly TimeSpan ReceiveWait = TimeSpan.FromSeconds(2);
+
     public async Task<IReadOnlyList<RecordedDeadLetters>> DeadLetterQueuesAsync(CancellationToken cancellationToken)
     {
         var found = await entities.ListAsync(cancellationToken);
@@ -78,6 +85,102 @@ internal sealed class ServiceBusDeadLetterQueues(IServiceBusEntities entities, I
         var properties = message.ApplicationProperties.ToDictionary(
             property => property.Key, property => Convert.ToString(property.Value, CultureInfo.InvariantCulture) ?? string.Empty, StringComparer.Ordinal);
         return new RecordedDeadLetterBody(Listed(message), message.Body.ToString(), properties);
+    }
+
+    public async Task<ResubmittedDeadLetter?> ResubmitAsync(string entity, long sequenceNumber, CancellationToken cancellationToken)
+    {
+        if (await FindAsync(entity, cancellationToken) is not { } found)
+        {
+            return null;
+        }
+
+        if (found.Subscription is not null)
+        {
+            throw new NotSupportedException("A subscription's message is resubmitted through its topic, which this does not do.");
+        }
+
+        await using var client = clients.Create(found.Namespace);
+        await using var receiver = DeadLetterReceiver(client, found);
+        // Peeked first, so a message that is gone doesn't lock the ones before it.
+        if (await receiver.PeekMessageAsync(sequenceNumber, cancellationToken) is not { } peeked || peeked.SequenceNumber != sequenceNumber
+            || await ReceiveAsync(receiver, sequenceNumber, cancellationToken) is not { } original)
+        {
+            return null;
+        }
+
+        var copy = Copy(original);
+        await using var sender = client.CreateSender(found.Queue);
+        try
+        {
+            await sender.SendMessageAsync(copy, cancellationToken);
+        }
+        catch
+        {
+            // Left on the dead-letter queue, and unlocked so the next try doesn't wait for the lock to expire.
+            await receiver.AbandonMessageAsync(original, cancellationToken: CancellationToken.None);
+            throw;
+        }
+
+        await receiver.CompleteMessageAsync(original, cancellationToken);
+        var listed = Listed(original);
+        return new ResubmittedDeadLetter(found.Name, original.MessageId, copy.MessageId, listed.CorrelationId, listed.BusinessKeys);
+    }
+
+    /// <summary>
+    /// A dead-letter queue can't be received from by sequence number, so it receives in order and lets go of the messages
+    /// before the one wanted. Null when it isn't there any more.
+    /// </summary>
+    private static async Task<ServiceBusReceivedMessage?> ReceiveAsync(ServiceBusReceiver receiver, long sequenceNumber, CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            var batch = await receiver.ReceiveMessagesAsync(ReceiveBatchSize, ReceiveWait, cancellationToken);
+            if (batch.Count == 0)
+            {
+                return null;
+            }
+
+            ServiceBusReceivedMessage? wanted = null;
+            foreach (var message in batch)
+            {
+                if (message.SequenceNumber == sequenceNumber)
+                {
+                    wanted = message;
+                }
+                else
+                {
+                    await receiver.AbandonMessageAsync(message, cancellationToken: cancellationToken);
+                }
+            }
+
+            if (wanted is not null)
+            {
+                return wanted;
+            }
+        }
+    }
+
+    private static ServiceBusMessage Copy(ServiceBusReceivedMessage original)
+    {
+        var copy = new ServiceBusMessage(original.Body)
+        {
+            MessageId = Guid.NewGuid().ToString("N"),
+            CorrelationId = original.CorrelationId,
+            ContentType = original.ContentType,
+            Subject = original.Subject,
+            SessionId = original.SessionId,
+        };
+        foreach (var (name, value) in original.ApplicationProperties)
+        {
+            // The dead-letter reason and description are how it failed, not what it carried.
+            if (name is not ("DeadLetterReason" or "DeadLetterErrorDescription"))
+            {
+                copy.ApplicationProperties[name] = value;
+            }
+        }
+
+        copy.ApplicationProperties[ResubmittedFrom] = original.MessageId;
+        return copy;
     }
 
     private async Task<ServiceBusEntity?> FindAsync(string entity, CancellationToken cancellationToken) =>

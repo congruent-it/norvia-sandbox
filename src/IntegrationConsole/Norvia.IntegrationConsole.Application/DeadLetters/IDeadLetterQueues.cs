@@ -4,8 +4,8 @@ namespace Norvia.IntegrationConsole.Application.DeadLetters;
 /// Where dead-lettered messages are counted as they are now: every queue and subscription of the estate's Service Bus,
 /// found by asking it, so a queue added later appears with no change to the console. In Azure that is read as the
 /// console's own identity (ADR 0017); locally, the Service Bus emulators'. It counts and peeks, which takes nothing off a
-/// dead-letter queue, and it never receives, resubmits or discards anything: a looked-at message keeps its delivery count
-/// and lock state.
+/// dead-letter queue. Looking never receives, resubmits or discards anything: a looked-at message keeps its delivery count
+/// and lock state. Only <see cref="ResubmitAsync"/> takes a message off, and only after its copy is sent.
 /// </summary>
 public interface IDeadLetterQueues
 {
@@ -24,4 +24,12 @@ public interface IDeadLetterQueues
     /// gone, because someone resubmitted or discarded it meanwhile.
     /// </summary>
     Task<RecordedDeadLetterBody?> OpenAsync(string entity, long sequenceNumber, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Sends a copy of one dead-lettered message of a queue to that queue, then completes the original on the dead-letter
+    /// queue. The copy has the same body, application properties, <c>SessionId</c>, <c>Subject</c>, <c>ContentType</c> and
+    /// correlation ID, a new message ID, and <c>resubmittedFrom</c> naming the original's. The original stays when the send
+    /// fails. Null when the queue or the message is gone, because someone resubmitted or discarded it meanwhile.
+    /// </summary>
+    Task<ResubmittedDeadLetter?> ResubmitAsync(string entity, long sequenceNumber, CancellationToken cancellationToken);
 }

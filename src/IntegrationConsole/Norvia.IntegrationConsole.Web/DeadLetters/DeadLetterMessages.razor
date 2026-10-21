@@ -1,13 +1,18 @@
 @page "/dead-letter-queues/{*Entity}"
 @* Interactive, not prerendered: the page peeks the Service Bus itself, and opening a message needs the circuit. *@
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using System.Security.Claims
 @using Ardalis.Result
+@using Microsoft.AspNetCore.Components.Authorization
 @using Norvia.IntegrationConsole.Application.DeadLetters
 @using Norvia.IntegrationConsole.Application.DeadLetters.Messages
+@using Norvia.IntegrationConsole.Application.DeadLetters.Resubmit
+@using Norvia.IntegrationConsole.Web.Operators
 @using Norvia.IntegrationConsole.Web.Runs
 @using Norvia.IntegrationConsole.Web.Trails
 @inject IDeadLetterRequests DeadLetters
 @inject ILogger<DeadLetterMessages> Logger
+@inject AuthenticationStateProvider Authentication
 @implements IDisposable
 
 <PageTitle>Integration console · Dead-lettered messages of @Entity</PageTitle>
@@ -16,9 +21,16 @@
 <p class="text-muted mb-1"><a href="/dead-letter-queues">All dead-letter queues</a></p>
 @* Peeked, never received: a message keeps its delivery count and lock state, and stays on the queue. *@
 <p role="note" class="text-muted mb-6">
-    The oldest first. The console only looks: it receives, resubmits and discards nothing here, and shows a message's body
+    The oldest first. Looking changes nothing: a message keeps its delivery count and stays on the queue, and its body shows
     only when you open it.
 </p>
+
+@if (_outcome is { } outcome)
+{
+    <div role="status">
+        <FluentMessageBar Intent="outcome.Intent" AllowDismiss="false">@outcome.Text</FluentMessageBar>
+    </div>
+}
 
 @if (_loading)
 {
@@ -141,6 +153,32 @@ else if (_list is { } found)
                         }
                     </dl>
                 }
+
+                @* Queues only, and only for the Resubmit role. The use case refuses everyone else too. There is no way to edit the body first. *@
+                @if (!Entity.Contains('/'))
+                {
+                    <AuthorizeView Policy="@OperatorSignIn.ResubmitPolicy">
+                        <div class="mt-6">
+                            @if (_confirming)
+                            {
+                                <div role="alertdialog" aria-label="Confirm resubmit">
+                                    <p class="mb-2">
+                                        Resubmit message @sequenceNumber to <span class="font-mono">@Entity</span>? A copy goes back to the queue with
+                                        the same body and properties, and this message leaves the dead-letter queue. Your name is recorded.
+                                    </p>
+                                    <FluentStack>
+                                        <FluentButton Appearance="Appearance.Accent" Disabled="_resubmitting" OnClick="() => ResubmitAsync(sequenceNumber)">Confirm resubmit</FluentButton>
+                                        <FluentButton Disabled="_resubmitting" OnClick="() => _confirming = false">Cancel</FluentButton>
+                                    </FluentStack>
+                                </div>
+                            }
+                            else
+                            {
+                                <FluentButton Appearance="Appearance.Accent" data-resubmit OnClick="() => _confirming = true">Resubmit</FluentButton>
+                            }
+                        </div>
+                    </AuthorizeView>
+                }
             }
         </section>
     }
@@ -158,6 +196,9 @@ else if (_list is { } found)
     private bool _gone;
     private IReadOnlyList<string>? _openProblems;
     private RecordedDeadLetterBody? _message;
+    private bool _confirming;
+    private bool _resubmitting;
+    private Outcome? _outcome;
     // Cancel peeking when the operator leaves the page, opens another queue or another message.
     private CancellationTokenSource _peek = new();
     private CancellationTokenSource _fetch = new();
@@ -171,6 +212,7 @@ else if (_list is { } found)
         _missing = false;
         _problems = null;
         _list = null;
+        _outcome = null;
         await CloseMessageAsync();
 
         await _peek.CancelAsync();
@@ -250,6 +292,60 @@ else if (_list is { } found)
         }
     }
 
+    private async Task ResubmitAsync(long sequenceNumber)
+    {
+        _resubmitting = true;
+        try
+        {
+            var caller = (await Authentication.GetAuthenticationStateAsync()).User;
+            var result = await DeadLetters.ResubmitAsync(new ResubmitDeadLetteredMessageCommand(caller, Entity, sequenceNumber), CancellationToken.None);
+            switch (result.Status)
+            {
+                case ResultStatus.Ok:
+                    _outcome = new Outcome(MessageIntent.Success, $"Resubmitted message {sequenceNumber} to {Entity}. The copy has message ID {result.Value.ResubmittedMessageId}.");
+                    Remove(sequenceNumber);
+                    break;
+                case ResultStatus.NotFound:
+                    _outcome = new Outcome(MessageIntent.Info, $"Message {sequenceNumber} is no longer on the queue: it was resubmitted or discarded.");
+                    Remove(sequenceNumber);
+                    break;
+                case ResultStatus.Forbidden:
+                    _outcome = new Outcome(MessageIntent.Warning, "You aren't allowed to resubmit messages. Nothing was sent.");
+                    _confirming = false;
+                    break;
+                default:
+                    _outcome = new Outcome(MessageIntent.Warning, string.Join(" ", result.ValidationErrors.Select(error => error.ErrorMessage)));
+                    _confirming = false;
+                    break;
+            }
+        }
+        catch (Exception exception)
+        {
+            DeadLetterPageLog.ResubmitFailed(Logger, exception, sequenceNumber, Entity);
+            _outcome = new Outcome(MessageIntent.Error, $"Message {sequenceNumber} couldn't be resubmitted. It is still on the dead-letter queue; try again in a moment.");
+            _confirming = false;
+        }
+        finally
+        {
+            _resubmitting = false;
+        }
+    }
+
+    // The list shows what was peeked, so the message leaves it here rather than on the next peek.
+    private void Remove(long sequenceNumber)
+    {
+        if (_list is { } list)
+        {
+            _list = list with { Messages = [.. list.Messages.Where(message => message.SequenceNumber != sequenceNumber)] };
+        }
+
+        _opened = null;
+        _message = null;
+        _confirming = false;
+    }
+
+    private sealed record Outcome(MessageIntent Intent, string Text);
+
     private async Task CloseMessageAsync()
     {
         await _fetch.CancelAsync();
@@ -261,6 +357,7 @@ else if (_list is { } found)
         _gone = false;
         _openProblems = null;
         _message = null;
+        _confirming = false;
     }
 
     public void Dispose()
