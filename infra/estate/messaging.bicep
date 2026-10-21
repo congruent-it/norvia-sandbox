@@ -44,6 +44,9 @@ param proofOfDeliveryPrincipalId string
 @description('API Management\'s identity, which sends to the tracking queue and the Proof of delivery queue and to nothing else.')
 param apiManagementPrincipalId string
 
+@description('The Integration console\'s identity, which counts the dead-lettered messages of every queue and subscription (ADR 0017).')
+param integrationConsolePrincipalId string
+
 resource serviceBus 'Microsoft.ServiceBus/namespaces@2024-01-01' = {
   name: 'sb-norvia-${uniqueString(resourceGroup().id)}'
   location: location
@@ -293,6 +296,31 @@ resource presenterReadsMessages 'Microsoft.Authorization/roleAssignments@2022-04
     principalId: presenterPrincipalId
     roleDefinitionId: serviceBusDataReceiver
     principalType: 'User'
+  }
+}
+
+// The Integration console's Dead-letter queues page lists every queue and subscription and counts their dead-lettered messages as its
+// own identity, never with the operator's token (ADR 0017). Reader finds the entities and their counts. A peek of the oldest
+// dead-lettered message, for its age, is a data operation and needs the receiver role; the console peeks and never receives.
+var reader = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'acdd72a7-3385-48ef-bd42-f606fba81ae7')
+
+resource integrationConsoleListsTheNamespace 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(serviceBus.id, integrationConsolePrincipalId, reader)
+  scope: serviceBus
+  properties: {
+    principalId: integrationConsolePrincipalId
+    roleDefinitionId: reader
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource integrationConsolePeeksDeadLetters 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(serviceBus.id, integrationConsolePrincipalId, serviceBusDataReceiver)
+  scope: serviceBus
+  properties: {
+    principalId: integrationConsolePrincipalId
+    roleDefinitionId: serviceBusDataReceiver
+    principalType: 'ServicePrincipal'
   }
 }
 

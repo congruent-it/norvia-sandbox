@@ -76,6 +76,7 @@ Search and the trail's outline come from Application Insights, so they can be a 
 - Opening one lists its messages, peeked and not received: enqueued time, dead-letter reason and description, delivery count, correlation ID and business keys. Opening a message shows its body and application properties.
 - Messages can be selected, one or several, to resubmit or discard.
 - The panel refreshes itself every few seconds while it's open.
+- Queues and subscriptions are discovered, not listed in configuration, so later ones appear with no change to the console. In Azure they come from Azure Resource Manager (Reader on the namespace) and the oldest message's age from a peek of each non-empty dead-letter queue (Data Receiver). Locally the console lists the entities of the Service Bus emulators the AppHost runs, through their management port; it connects only while it reads, as an emulator accepts few connections.
 
 ## Resubmit and discard
 

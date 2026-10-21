@@ -7,8 +7,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Norvia.IntegrationConsole.Application.DeadLetters;
 using Norvia.IntegrationConsole.Application.Runs;
 using Norvia.IntegrationConsole.Application.Trails;
+using Norvia.IntegrationConsole.Infrastructure.DeadLetters;
 using Norvia.IntegrationConsole.Infrastructure.Runs;
 using Norvia.IntegrationConsole.Infrastructure.Trails;
 
@@ -28,6 +30,7 @@ public static partial class DependencyInjection
 
         builder.Services.AddSingleton(ConsoleCredential(builder.Configuration));
         builder.AddWorkflowRuns();
+        builder.AddDeadLetterQueues();
 
         // The AppHost gives the console the Aspire dashboard only locally, and only when no deployed estate is named
         // (ADR 0027). Local telemetry then stays on the developer's machine.
@@ -80,6 +83,32 @@ public static partial class DependencyInjection
         builder.Services.AddSingleton<LogicAppsWorkflowRuns>();
         builder.Services.AddSingleton<IWorkflowRuns>(services => services.GetRequiredService<LogicAppsWorkflowRuns>());
         builder.Services.AddSingleton<IFailedRuns>(services => services.GetRequiredService<LogicAppsWorkflowRuns>());
+    }
+
+    /// <summary>
+    /// Dead-letter queues come from the estate's Service Bus, read as the console's credential: Reader on the namespace finds
+    /// every queue and subscription and counts them, and a peek reads the oldest message's age. Locally the AppHost gives the
+    /// console its emulators, which it lists instead; no local count is ever read from an estate.
+    /// </summary>
+    private static void AddDeadLetterQueues(this IHostApplicationBuilder builder)
+    {
+        builder.Services.AddOptions<LocalServiceBusOptions>().BindConfiguration(LocalServiceBusOptions.SectionName);
+        builder.Services.AddOptions<EstateServiceBusOptions>().BindConfiguration(EstateServiceBusOptions.SectionName)
+            .Validate(
+                options => string.IsNullOrEmpty(options.ResourceGroupId) || ResourceGroupId().IsMatch(options.ResourceGroupId),
+                $"{EstateServiceBusOptions.SectionName}:{nameof(EstateServiceBusOptions.ResourceGroupId)} must be the estate's resource group ID: /subscriptions/{{subscription}}/resourceGroups/{{name}}.")
+            .ValidateOnStart();
+        builder.Services.AddSingleton<IServiceBusClients, ServiceBusClients>();
+        builder.Services.AddSingleton<IDeadLetterQueues, ServiceBusDeadLetterQueues>();
+        if (builder.Configuration.GetSection(LocalServiceBusOptions.SectionName).Exists())
+        {
+            builder.Services.AddSingleton<IServiceBusEntities>(services => new EmulatorServiceBusEntities(services.GetRequiredService<IOptions<LocalServiceBusOptions>>()));
+        }
+        else
+        {
+            builder.Services.AddHttpClient(ArmServiceBusEntities.ManagementClient);
+            builder.Services.AddSingleton<IServiceBusEntities, ArmServiceBusEntities>();
+        }
     }
 
     [GeneratedRegex("^/subscriptions/[0-9a-fA-F-]{36}/resourceGroups/[^/]+$")]
