@@ -20,6 +20,18 @@ param integrationRetentionDays int = 90
 an event land on its topic, and is the one user who may open the demo UIs in Azure.''')
 param presenterPrincipalId string = ''
 
+@description('''The address the estate's alerts are emailed to, empty for none (ESTATE_ALERT_EMAIL).''')
+param alertEmail string = ''
+
+@description('''The as-found toggles, in one object (docs/operations/as-found.md). The presets in infra/presets are values of it.
+Each list names the flows or queues that have no alert, and an alert not built is absent, never disabled. The default is
+the fixed state: every alert, and a receiver.''')
+param asFound object = {
+  flowsWithoutFailedRunAlert: []
+  entitiesWithoutDeadLetterAlert: []
+  noAlertReceiver: false
+}
+
 @description('''Easy Auth's sign-in callbacks on the demo UIs (the TMS UI and the Partner portal), comma separated, empty before
 the apps are first deployed. azd's postdeploy hook stores them, so the demo UIs' app registration keeps them when the
 estate is deployed again.''')
@@ -95,6 +107,24 @@ module monitoring 'estate/monitoring.bicep' = {
     tags: tags
     integrationRetentionDays: integrationRetentionDays
     integrationConsolePrincipalId: identities.outputs.integrationConsolePrincipalId
+    alertEmail: alertEmail
+    noAlertReceiver: asFound.noAlertReceiver
+  }
+}
+
+module alerts 'estate/alerts.bicep' = {
+  scope: resourceGroup
+  params: {
+    tags: tags
+    actionGroupId: monitoring.outputs.actionGroupId
+    asFound: asFound
+    serviceBusName: messaging.outputs.namespaceName
+    flows: [
+      { name: 'carrier-tracking', logicAppName: trackingLogicApp.outputs.logicAppName, workflowName: 'carrier-tracking' }
+    ]
+    queues: [
+      messaging.outputs.queueName
+    ]
   }
 }
 
