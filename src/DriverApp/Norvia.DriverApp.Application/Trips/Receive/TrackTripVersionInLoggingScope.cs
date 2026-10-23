@@ -1,6 +1,7 @@
 using Ardalis.Result;
 using Mediator;
 using Microsoft.Extensions.Logging;
+using Norvia.DriverApp.Application.Faults;
 
 namespace Norvia.DriverApp.Application.Trips.Receive;
 
@@ -8,7 +9,7 @@ namespace Norvia.DriverApp.Application.Trips.Receive;
 /// Traces a Trip version on the trail the Dispatch started (coding guidelines §7): its <c>correlationId</c> and
 /// <c>tripNumber</c> for the whole call, and <c>outcome</c> for its outcome. A version the Driver app ignores because it
 /// holds an equal or later one records Succeeded: it isn't a refusal, only a no-op. A malformed version records Refused,
-/// with its <c>failureCode</c>, and one refused while the Driver app is unavailable records Failed.
+/// with its <c>failureCode</c>, and one refused while the Driver app is unavailable records Failed, with the fault that caused it as its <c>fault</c>.
 /// </summary>
 public sealed partial class TrackTripVersionInLoggingScope(ILogger<TrackTripVersionInLoggingScope> logger)
     : IPipelineBehavior<ReceiveTripVersionCommand, Result<TripVersionOutcome>>
@@ -47,7 +48,12 @@ public sealed partial class TrackTripVersionInLoggingScope(ILogger<TrackTripVers
 
                 break;
             default:
-                using (logger.Track(new() { [TrackingKeys.Outcome] = TrackingKeys.Failed, [TrackingKeys.FailureCode] = "DriverAppUnavailable" }))
+                using (logger.Track(new()
+                {
+                    [TrackingKeys.Outcome] = TrackingKeys.Failed,
+                    [TrackingKeys.FailureCode] = "DriverAppUnavailable",
+                    [TrackingKeys.Fault] = DriverAppFaultNames.Unavailable,
+                }))
                 {
                     LogUnavailable(logger, message.TripNumber, message.Version);
                 }

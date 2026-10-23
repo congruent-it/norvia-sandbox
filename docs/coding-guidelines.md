@@ -147,6 +147,7 @@ Every flow records the same keys under the same names, so the [Integration conso
 | `sourceMessageId` | The Carrier's event ID or document ID, or the Driver app event ID |
 | `outcome` | `Succeeded`, `Refused`, `Retrying`, `DeadLettered` or `Failed` |
 | `failureCode` | The stable failure code, when there is one |
+| `fault` | The name of the runtime Fault (`driver-app-unavailable`) that made the hop fail. Set only by the application the Fault breaks, on the hop it caused, and on the log of the switch itself; the Integration console shows it |
 | `messageId` | The Service Bus message ID of the message a hop dead-lettered. Optional: set only on a `DeadLettered` outcome, and only by a flow that dead-letters a message |
 
 A key that doesn't apply is left out, never sent empty.
@@ -167,6 +168,7 @@ A key that doesn't apply is left out, never sent empty.
 - Bind configuration to options classes with `ValidateDataAnnotations()` and `ValidateOnStart()`, so a misconfigured service fails at startup, not on the first request.
 - No secrets in source, `appsettings*.json` or environment files. In Azure, services authenticate with managed identity and read remaining secrets from Key Vault; locally, use user secrets or Aspire parameters.
 - Every API endpoint requires authorization unless explicitly marked otherwise with a reason. Authorize on app roles or scopes, not on the mere presence of a token.
+- A runtime **Fault** (a switch that makes the application fail on purpose for a demo) is declared with `AddFaults` and exposed with `MapFaults` from `Norvia.ServiceDefaults`, never with an endpoint of its own. `MapFaults` requires the app role `Demo.Fault` on every route, and the contract makes a Fault off by default and expiring by itself. An architecture test fails when an endpoint is mapped on a fault route without it.
 - Keep dependencies current; CI fails on known vulnerable packages (`dotnet list package --vulnerable`).
 
 ## 9. Web applications: Blazor

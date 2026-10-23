@@ -10,7 +10,6 @@ using Norvia.DriverApp.Infrastructure;
 using Norvia.DriverApp.Web.Components;
 using Norvia.DriverApp.Web.Drivers;
 using Norvia.DriverApp.Web.Reports;
-using Norvia.DriverApp.Web.Settings;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -53,7 +52,6 @@ app.MapStaticAssets();
 // Every screen is a Driver's own: it needs a token that carries a Driver ID (ADR 0005, ADR 0037).
 app.MapRazorComponents<App>().RequireAuthorization(DriverClaims.DriverPolicy);
 app.MapDriverSignInStandIn();
-app.MapSettings();
 app.MapReports();
 app.MapDefaultEndpoints();
 

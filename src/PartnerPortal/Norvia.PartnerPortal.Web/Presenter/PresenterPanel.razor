@@ -1,47 +1,74 @@
 @page "/presenter"
-@* The presenter's faults: switches that make a hop of the demo fail, so the failure can be found. Not part of any Persona. *@
+@* The presenter's faults: switches that make a hop of the demo fail, so the failure can be found. Each is off by default and, once on, expires by itself. Not part of any Persona. *@
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inject IPartnerPortal Portal
 @inject ILogger<PresenterPanel> Logger
+@inject TimeProvider Time
+@implements IAsyncDisposable
 @using Norvia.PartnerPortal.Application.DriverSignIns
 
 <PageTitle>Partner portal · Presenter panel</PageTitle>
 
 <h1>Presenter panel</h1>
 
-<div role="group" aria-label="Driver app unavailable" class="mb-8 max-w-3xl border border-border p-6">
-    <h2 class="mt-0">Driver app unavailable</h2>
+<section aria-label="Faults" class="mb-8 max-w-3xl">
+    <h2 class="mt-0">Faults</h2>
     <p class="mt-0 text-sm">
-        While the Driver app is unavailable it refuses every Trip the Trip dispatch Logic App sends, with a 503. The Planner
-        then sees the Trip as Not delivered, and the Logic App's run fails. Switch it off and send the Trip again.
+        A fault makes one hop of the demo fail so the failure can be found. Every fault is off until it is switched on, and switches itself off when
+        its time has run out. Each application checks that the presenter may switch its faults.
     </p>
     @if (_loadFailed)
     {
         <div role="alert">
             <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
-                The Driver app couldn't be reached. Reload the page to try again.
+                The faults couldn't be loaded. Reload the page to try again.
             </FluentMessageBar>
         </div>
     }
-    else if (_fault is null)
+    else if (_faults is null)
     {
-        <div role="status">Loading the fault…</div>
+        <div role="status">Loading the faults…</div>
+    }
+    else if (_faults.Count == 0)
+    {
+        <p role="status">No application owns a fault.</p>
     }
     else
     {
-        <p role="status">
-            @if (_fault.Unavailable)
-            {
-                <strong>The Driver app is unavailable.</strong>
-            }
-            else
-            {
-                <span>The Driver app is available.</span>
-            }
-        </p>
-        <FluentButton Appearance="Appearance.Accent" Disabled="_saving" OnClick="SwitchAsync">
-            @(_fault.Unavailable ? "Make the Driver app available" : "Make the Driver app unavailable")
-        </FluentButton>
+        @foreach (var fault in _faults)
+        {
+            var remaining = fault.RemainingAt(Time.GetUtcNow());
+            <div role="group" aria-label="@fault.Name" class="mb-4 border border-border p-6">
+                <h3 class="mt-0">@fault.Name</h3>
+                <p class="mt-0 text-sm">@fault.Description</p>
+                <dl class="text-sm">
+                    <dt class="inline">Owner:</dt> <dd class="inline ml-0 mr-4">@fault.Owner</dd>
+                </dl>
+                <p role="status">
+                    @if (remaining is { } left)
+                    {
+                        <strong>On</strong>
+                        <span>, @Remaining(left) left</span>
+                    }
+                    else
+                    {
+                        <span>Off</span>
+                    }
+                </p>
+                <div class="flex items-end gap-4">
+                    <FluentSelect TOption="string" Label="Duration" Items="DurationSeconds" Value="@DurationOf(fault)"
+                                  ValueChanged="@(seconds => _durations[fault.Name] = seconds)" OptionText="@(seconds => DurationText(int.Parse(seconds)))" />
+                    <FluentButton Appearance="Appearance.Accent" Disabled="_saving" aria-label="@($"Switch on {fault.Name}")"
+                                  OnClick="@(() => SwitchAsync(fault, int.Parse(DurationOf(fault))))">
+                        @(remaining is null ? "Switch on" : "Switch on again")
+                    </FluentButton>
+                    <FluentButton Disabled="@(_saving || remaining is null)" aria-label="@($"Switch off {fault.Name}")"
+                                  OnClick="@(() => SwitchAsync(fault, null))">
+                        Switch off
+                    </FluentButton>
+                </div>
+            </div>
+        }
         @if (_saveFailed)
         {
             <div role="alert" class="mt-4">
@@ -51,7 +78,7 @@
             </div>
         }
     }
-</div>
+</section>
 
 <div role="group" aria-label="Driver sign-in" class="mb-8 max-w-3xl border border-border p-6">
     <h2 class="mt-0">Driver sign-in</h2>
@@ -101,9 +128,18 @@
 </div>
 
 @code {
+    // The durations the presenter picks from, in seconds. The application refuses any longer than it allows (a few minutes by default).
+    private static readonly string[] DurationSeconds = ["60", "120", "300"];
+    private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan ReloadInterval = TimeSpan.FromSeconds(10);
+
+    private readonly Dictionary<string, string> _durations = [];
+    private readonly CancellationTokenSource _stopped = new();
+    private Task? _refreshing;
     private DriverSignInsView? _signIns;
     private bool _signInsLoadFailed;
-    private DriverAppFaultView? _fault;
+    private IReadOnlyList<FaultView>? _faults;
+    private DateTimeOffset _loadedAt;
     private bool _loadFailed;
     private bool _saving;
     private bool _saveFailed;
@@ -122,32 +158,95 @@
 
         try
         {
-            _fault = await Portal.GetDriverAppFaultAsync(CancellationToken.None);
+            _faults = await Portal.ListFaultsAsync(CancellationToken.None);
+            _loadedAt = Time.GetUtcNow();
         }
         catch (Exception exception)
         {
-            PageLog.DriverAppFaultLoadFailed(Logger, exception);
+            PageLog.FaultsLoadFailed(Logger, exception);
             _loadFailed = true;
         }
     }
 
-    private async Task SwitchAsync()
+    protected override void OnAfterRender(bool firstRender)
     {
-        var unavailable = !_fault!.Unavailable;
+        if (firstRender)
+        {
+            _refreshing = RefreshUntilStoppedAsync(_stopped.Token);
+        }
+    }
+
+    private string DurationOf(FaultView fault) => _durations.GetValueOrDefault(fault.Name, DurationSeconds[1]);
+
+    private static string DurationText(int seconds) => seconds == 60 ? "1 minute" : $"{seconds / 60} minutes";
+
+    private static string Remaining(TimeSpan left) => $"{(int)left.TotalMinutes}:{left.Seconds:00}";
+
+    private async Task SwitchAsync(FaultView fault, int? seconds)
+    {
         _saving = true;
         _saveFailed = false;
         try
         {
-            _fault = await Portal.SetDriverAppFaultAsync(unavailable, CancellationToken.None);
+            var switched = await Portal.SwitchFaultAsync(fault.Owner, fault.Name, seconds is { } on ? TimeSpan.FromSeconds(on) : null, CancellationToken.None);
+            _faults = [.. _faults!.Select(listed => listed.Name == switched.Name && listed.Owner == switched.Owner ? switched : listed)];
+            _loadedAt = Time.GetUtcNow();
         }
         catch (Exception exception)
         {
-            PageLog.DriverAppFaultSaveFailed(Logger, exception, unavailable);
+            PageLog.FaultSwitchFailed(Logger, exception, fault.Name);
             _saveFailed = true;
         }
         finally
         {
             _saving = false;
         }
+    }
+
+    // The remaining time counts down on the page each second, and the faults are read again every few seconds, so a fault that ran out
+    // shows Off. A refresh that fails keeps what the panel showed and tries again later.
+    private async Task RefreshUntilStoppedAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(RefreshInterval, Time);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                if (_faults is null || _saving)
+                {
+                    continue;
+                }
+
+                if (Time.GetUtcNow() - _loadedAt >= ReloadInterval)
+                {
+                    try
+                    {
+                        _faults = await Portal.ListFaultsAsync(cancellationToken);
+                        _loadedAt = Time.GetUtcNow();
+                    }
+                    catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+                    {
+                        PageLog.FaultsLoadFailed(Logger, exception);
+                    }
+                }
+
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The page is gone.
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _stopped.CancelAsync();
+        if (_refreshing is not null)
+        {
+            await _refreshing;
+        }
+
+        _stopped.Dispose();
     }
 }

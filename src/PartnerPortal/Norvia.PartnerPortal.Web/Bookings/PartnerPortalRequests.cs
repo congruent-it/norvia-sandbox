@@ -17,11 +17,11 @@ using Norvia.PartnerPortal.Application.CarrierShipments.List;
 using Norvia.PartnerPortal.Application.CarrierShipments.Send;
 using Norvia.PartnerPortal.Application.CarrierShipments.SendProofOfDelivery;
 using Norvia.PartnerPortal.Application.CarrierShipments.TrackingSettings;
-using Norvia.PartnerPortal.Application.DriverAppFault;
-using Norvia.PartnerPortal.Application.DriverAppFault.GetCurrent;
-using Norvia.PartnerPortal.Application.DriverAppFault.Switch;
 using Norvia.PartnerPortal.Application.DriverSignIns;
 using Norvia.PartnerPortal.Application.DriverSignIns.List;
+using Norvia.PartnerPortal.Application.Faults;
+using Norvia.PartnerPortal.Application.Faults.List;
+using Norvia.PartnerPortal.Application.Faults.Switch;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Application.Personas.List;
 using Norvia.PartnerPortal.Application.ShipperInvoices;
@@ -45,11 +45,11 @@ namespace Norvia.PartnerPortal.Web.Bookings;
 /// </summary>
 internal sealed class PartnerPortalRequests(IServiceScopeFactory scopes) : IPartnerPortal
 {
-    public Task<DriverAppFaultView> GetDriverAppFaultAsync(CancellationToken cancellationToken) =>
-        SendAsync(new GetDriverAppFaultQuery(), cancellationToken);
+    public Task<IReadOnlyList<FaultView>> ListFaultsAsync(CancellationToken cancellationToken) =>
+        SendAsync(new ListFaultsQuery(), cancellationToken);
 
-    public Task<DriverAppFaultView> SetDriverAppFaultAsync(bool unavailable, CancellationToken cancellationToken) =>
-        SendAsync(new SetDriverAppFaultCommand(unavailable), cancellationToken);
+    public Task<FaultView> SwitchFaultAsync(string owner, string name, TimeSpan? duration, CancellationToken cancellationToken) =>
+        SendAsync(new SwitchFaultCommand(owner, name, duration), cancellationToken);
 
     public Task<DriverSignInsView> ListDriverSignInsAsync(CancellationToken cancellationToken) =>
         SendAsync(new ListDriverSignInsQuery(), cancellationToken);

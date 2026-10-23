@@ -29,6 +29,9 @@ public class DriverAppFixture : IAsyncLifetime
     /// <summary>The app role only the P12 Driver reports Logic App's managed identity holds on the Driver app.</summary>
     public const string ReportOutcomeRole = "DriverReports.ReportOutcome";
 
+    /// <summary>The app role that guards every fault switch on the Driver app API; the Partner portal's presenter panel holds it.</summary>
+    public const string FaultRole = "Demo.Fault";
+
     /// <summary>The app role only the Simulator's identity holds on the Driver app API, for returning the estate to a clean sheet.</summary>
     public const string ResetRole = "Estate.Reset";
 
@@ -64,6 +67,9 @@ public class DriverAppFixture : IAsyncLifetime
     /// <summary>Calls the Driver app's API as the Driver reports Logic App does, with its token.</summary>
     public HttpClient DriverReports { get; private set; } = null!;
 
+    /// <summary>Calls the Driver app's API as the presenter panel does, with a token that holds the Demo.Fault role.</summary>
+    public HttpClient Presenter { get; private set; } = null!;
+
     public async ValueTask InitializeAsync()
     {
         using var startup = new CancellationTokenSource(StartupTimeout);
@@ -96,6 +102,7 @@ public class DriverAppFixture : IAsyncLifetime
         DriverApp.DefaultRequestHeaders.Add("X-Api-Key", EndpointKey);
         Anonymous = _app.CreateHttpClient("driver-app-api");
         DriverReports = DriverReportsClient(IssueToken([ReportOutcomeRole]));
+        Presenter = DriverReportsClient(IssueToken([FaultRole]));
 
         _blobs = new BlobServiceClient(await _app.GetConnectionStringAsync("blobs", startup.Token));
         _serviceBus = new ServiceBusClient(await _app.GetConnectionStringAsync("messaging-2", startup.Token));

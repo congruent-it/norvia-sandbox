@@ -10,8 +10,8 @@ using Norvia.PartnerPortal.Application.CarrierShipments;
 using Norvia.PartnerPortal.Application.CarrierShipments.Send;
 using Norvia.PartnerPortal.Application.CarrierShipments.SendProofOfDelivery;
 using Norvia.PartnerPortal.Application.CarrierShipments.TrackingSettings;
-using Norvia.PartnerPortal.Application.DriverAppFault;
 using Norvia.PartnerPortal.Application.DriverSignIns;
+using Norvia.PartnerPortal.Application.Faults;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Application.ShipperInvoices;
 using Norvia.PartnerPortal.Application.ShipperNotifications;
@@ -119,11 +119,11 @@ public interface IPartnerPortal
     Task<TrackingAnswer<ShipperProofFileContent>> DownloadProofOfDeliveryFileAsync(
         PersonaId personaId, string transportOrderNumber, Guid fileId, CancellationToken cancellationToken);
 
-    /// <summary>Whether the presenter panel's "Driver app unavailable" fault is on.</summary>
-    Task<DriverAppFaultView> GetDriverAppFaultAsync(CancellationToken cancellationToken);
+    /// <summary>Every fault the applications own, with whether it is on and when it expires, for the presenter panel.</summary>
+    Task<IReadOnlyList<FaultView>> ListFaultsAsync(CancellationToken cancellationToken);
 
-    /// <summary>Switches the "Driver app unavailable" fault on or off, and returns how it now stands.</summary>
-    Task<DriverAppFaultView> SetDriverAppFaultAsync(bool unavailable, CancellationToken cancellationToken);
+    /// <summary>Switches a fault on for <paramref name="duration"/>, or off when it is null, and returns how it now stands.</summary>
+    Task<FaultView> SwitchFaultAsync(string owner, string name, TimeSpan? duration, CancellationToken cancellationToken);
 
     /// <summary>The seeded Drivers' sign-in details to the Driver app, for the presenter panel.</summary>
     Task<DriverSignInsView> ListDriverSignInsAsync(CancellationToken cancellationToken);

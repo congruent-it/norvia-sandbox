@@ -237,14 +237,15 @@ pass "the Driver app's version 2 has the same $(jq -r '.stopCount' <<<"$trip") S
 echo
 echo "Scenario 2: the Driver app unavailable"
 cat <<EOF
-  1. Open the presenter panel ($portal/presenter) and make the Driver app unavailable.
+  1. Open the presenter panel ($portal/presenter) and switch on the fault driver-app-unavailable. It switches itself off after the
+     duration you pick (two minutes by default), so build and dispatch the Trip within that time.
   2. As the Planner, build Trip $scenario2 from the Shipments that are left (the one that was taken off, and the rest), with
      the other Vehicle and Driver, and Dispatch it.
   3. Wait for the Trip to show Not delivered (the Logic App retries for about a minute first).
 EOF
 pause
-curl -fsS "$driver_app/v1/settings/unavailable" | jq -e '.unavailable == true' >/dev/null \
-  || fail "the Driver app is available; switch the fault on in the presenter panel before dispatching Trip $scenario2"
+# The fault switch asks for the Demo.Fault role, which only the portal's identity holds, so the script doesn't read it: the Trip below being
+# Not delivered, and the Driver app not holding it, show the fault was on.
 trips=$(read_trips)
 trip=$(trip_of "$trips" "$scenario2")
 jq -e 'type == "object" and (.httpStatus | not)' <<<"$trip" >/dev/null \
@@ -274,9 +275,7 @@ jq -e --argjson version "$sent_version" '(.versions | length) == $version and .v
   || fail "Trip $scenario2's version $sent_version isn't Delivered to Driver app after sending it again: $trip"
 [ "$(driver_app_version "$driver2" "$scenario2")" = "$sent_version" ] \
   || fail "the Driver app doesn't hold version $sent_version of Trip $scenario2 for Driver $driver2"
-curl -fsS "$driver_app/v1/settings/unavailable" | jq -e '.unavailable == false' >/dev/null \
-  || fail "the Driver app is still unavailable; switch the fault off in the presenter panel"
-pass "version $sent_version of Trip $scenario2 was sent again and is Delivered to Driver app, with the fault off"
+pass "version $sent_version of Trip $scenario2 was sent again and is Delivered to Driver app, so the fault is off"
 
 # 4. The whole path, by correlation ID and by Trip number.
 echo

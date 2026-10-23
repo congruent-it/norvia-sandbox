@@ -63,6 +63,7 @@ internal static class HopQuery
                 role = AppRoleName, flow = coalesce(tostring(Properties.flow), tostring(tracked.flow)),
                 outcome = coalesce(tostring(Properties.outcome), tostring(tracked.outcome)),
                 failureCode = coalesce(tostring(Properties.failureCode), tostring(tracked.failureCode)),
+                fault = tostring(Properties.fault),
                 eventType = tostring(Properties.eventType),
                 transportOrderNumber = coalesce(tostring(Properties.transportOrderNumber), tostring(tracked.transportOrderNumber)),
                 shipmentNumber = coalesce(tostring(Properties.shipmentNumber), tostring(tracked.shipmentNumber)),

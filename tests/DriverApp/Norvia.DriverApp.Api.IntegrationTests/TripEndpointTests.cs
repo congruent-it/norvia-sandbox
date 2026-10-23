@@ -95,7 +95,7 @@ public sealed class TripEndpointTests(DriverAppFixture driverApp)
     [Fact]
     public async Task WhileTheDriverAppIsUnavailable_TheEndpointReturns503_AndStoresNothing()
     {
-        await SetUnavailableAsync(true);
+        await SwitchUnavailableAsync(on: true);
         try
         {
             var response = await PostAsync(await DriverAppFixture.SampleAsync("two-shipments", "TR-1000005", version: 1, driverId: "DRV-1000006"));
@@ -104,7 +104,7 @@ public sealed class TripEndpointTests(DriverAppFixture driverApp)
         }
         finally
         {
-            await SetUnavailableAsync(false);
+            await SwitchUnavailableAsync(on: false);
         }
 
         (await TripsOfAsync("DRV-1000006")).Should().BeEmpty();
@@ -152,7 +152,7 @@ public sealed class TripEndpointTests(DriverAppFixture driverApp)
     [Fact]
     public async Task WhileTheDriverAppIsUnavailable_AMalformedVersionIsStillRefusedWith503()
     {
-        await SetUnavailableAsync(true);
+        await SwitchUnavailableAsync(on: true);
         try
         {
             var json = await DriverAppFixture.SampleAsync("two-shipments", "TR-1000009", version: 0, driverId: "DRV-1000009");
@@ -163,7 +163,7 @@ public sealed class TripEndpointTests(DriverAppFixture driverApp)
         }
         finally
         {
-            await SetUnavailableAsync(false);
+            await SwitchUnavailableAsync(on: false);
         }
     }
 
@@ -192,27 +192,27 @@ public sealed class TripEndpointTests(DriverAppFixture driverApp)
     }
 
     [Fact]
-    public async Task TheUnavailableSetting_CanBeReadBack()
+    public async Task TheUnavailableFault_ShowsInTheFaultList_WhileItIsOn()
     {
-        await SetUnavailableAsync(true);
+        await SwitchUnavailableAsync(on: true);
         try
         {
-            var on = await driverApp.DriverApp.GetFromJsonAsync<JsonElement>("/v1/settings/unavailable", Ct);
-            on.GetProperty("unavailable").GetBoolean().Should().BeTrue();
+            var on = (await driverApp.Presenter.GetFromJsonAsync<List<JsonElement>>("/v1/faults", Ct))!.Single(fault => fault.GetProperty("name").GetString() == "driver-app-unavailable");
+            on.GetProperty("on").GetBoolean().Should().BeTrue();
         }
         finally
         {
-            await SetUnavailableAsync(false);
+            await SwitchUnavailableAsync(on: false);
         }
 
-        var off = await driverApp.DriverApp.GetFromJsonAsync<JsonElement>("/v1/settings/unavailable", Ct);
-        off.GetProperty("unavailable").GetBoolean().Should().BeFalse();
+        var off = (await driverApp.Presenter.GetFromJsonAsync<List<JsonElement>>("/v1/faults", Ct))!.Single(fault => fault.GetProperty("name").GetString() == "driver-app-unavailable");
+        off.GetProperty("on").GetBoolean().Should().BeFalse();
     }
 
-    private async Task SetUnavailableAsync(bool unavailable)
+    private async Task SwitchUnavailableAsync(bool on)
     {
-        var response = await driverApp.DriverApp.PutAsJsonAsync("/v1/settings/unavailable", new { unavailable }, Ct);
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        var response = await driverApp.Presenter.PutAsJsonAsync("/v1/faults/driver-app-unavailable", new { on, durationSeconds = 60 }, Ct);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     private Task<HttpResponseMessage> PostAsync(string json) =>

@@ -89,19 +89,6 @@ namespace Norvia.DriverApp.Infrastructure.Data.Migrations
                     b.ToTable("DriverReports", (string)null);
                 });
 
-            modelBuilder.Entity("Norvia.DriverApp.Domain.Settings.DriverAppSettings", b =>
-                {
-                    b.Property<int>("Id")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("Unavailable")
-                        .HasColumnType("bit");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("DriverAppSettings", (string)null);
-                });
-
             modelBuilder.Entity("Norvia.DriverApp.Domain.Trips.DriverTrip", b =>
                 {
                     b.Property<string>("Id")

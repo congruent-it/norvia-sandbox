@@ -1,4 +1,3 @@
-using Norvia.DriverApp.Domain.Settings;
 using Norvia.DriverApp.Domain.Trips;
 
 namespace Norvia.DriverApp.Domain.UnitTests.Trips;
@@ -74,16 +73,5 @@ public sealed class DriverTripTests
         one.ToString().Should().Be("TR-0000001");
         ((Func<int>)(() => ((IComparable)one).CompareTo("TR-0000002"))).Should().Throw<ArgumentException>();
         new DriverId("DRV-0001").ToString().Should().Be("DRV-0001");
-    }
-
-    [Fact]
-    public void TheDemoFault_StartsOff_AndSwitches()
-    {
-        var settings = new DriverAppSettings();
-
-        settings.Unavailable.Should().BeFalse();
-        settings.SetUnavailable(true);
-        settings.Unavailable.Should().BeTrue();
-        settings.Id.Should().Be(DriverAppSettings.SingleId);
     }
 }

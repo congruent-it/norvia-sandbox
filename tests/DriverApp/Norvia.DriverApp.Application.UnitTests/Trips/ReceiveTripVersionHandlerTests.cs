@@ -1,9 +1,9 @@
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Ardalis.Specification;
+using Norvia.DriverApp.Application.Faults;
 using Norvia.DriverApp.Application.Trips;
 using Norvia.DriverApp.Application.Trips.Receive;
-using Norvia.DriverApp.Domain.Settings;
 using Norvia.DriverApp.Domain.Trips;
 using NSubstitute;
 
@@ -13,7 +13,7 @@ namespace Norvia.DriverApp.Application.UnitTests.Trips;
 public sealed class ReceiveTripVersionHandlerTests
 {
     private readonly IRepository<DriverTrip> _trips = Substitute.For<IRepository<DriverTrip>>();
-    private readonly IReadRepository<DriverAppSettings> _settings = Substitute.For<IReadRepository<DriverAppSettings>>();
+    private readonly IDriverAppFaults _faults = Substitute.For<IDriverAppFaults>();
     private readonly List<DriverTrip> _stored = [];
 
     public ReceiveTripVersionHandlerTests()
@@ -38,7 +38,7 @@ public sealed class ReceiveTripVersionHandlerTests
         new StopConsigneeDto("Consignee BV", "Contact", "+31 10 123", "c@example.com"));
 
     private Task<Result<TripVersionOutcome>> Receive(ReceiveTripVersionCommand command) =>
-        new ReceiveTripVersionHandler(_trips, _settings).Handle(command, CancellationToken.None).AsTask();
+        new ReceiveTripVersionHandler(_trips, _faults).Handle(command, CancellationToken.None).AsTask();
 
     [Fact]
     public async Task ANewTrip_IsStored_WithItsStopsAsTheyWereSent()
@@ -87,9 +87,7 @@ public sealed class ReceiveTripVersionHandlerTests
     [Fact]
     public async Task WhileTheDriverAppIsUnavailable_EverythingIsRefused_AMalformedVersionIncluded()
     {
-        var settings = new DriverAppSettings();
-        settings.SetUnavailable(true);
-        _settings.GetByIdAsync(DriverAppSettings.SingleId, Arg.Any<CancellationToken>()).Returns(settings);
+        _faults.IsUnavailable.Returns(true);
 
         (await Receive(Version())).Status.Should().Be(ResultStatus.Unavailable);
         (await Receive(Version(0))).Status.Should().Be(ResultStatus.Unavailable);

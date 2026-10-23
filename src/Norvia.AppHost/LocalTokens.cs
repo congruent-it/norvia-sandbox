@@ -17,6 +17,7 @@ namespace Norvia.AppHost;
 /// The local Shipper invoice Logic App's client ID stands in for the Shipper invoice Logic App's, the one holder of the ERP API's Shipper invoice report role.
 /// The local Carrier invoice outcome Logic App's client ID stands in for the Carrier invoice outcome Logic App's, the one holder of the ERP API's Carrier invoice report role.
 /// The local Carrier invoice Logic App's client ID stands in for the Carrier invoice Logic App's, the one holder of the ERP API's Carrier invoice receive role. Its trigger takes only API Management's client, as the workflow's first step does in Azure.
+/// The Partner portal's panel signs its own token for the Driver app API, as its managed identity holding the Demo.Fault role, which guards every fault switch.
 /// The TMS UI signs its own token for the TMS API with the key too, as its managed identity holding the manage role.
 /// The Simulator signs its own token for the ERP API with the key too, as its managed identity holding the ERP API's manage role (Invoice now and a Credit note).
 /// The local Partner API trusts the same key for the Personas' tokens, which the Partner portal signs itself (ADR 0023).
@@ -46,6 +47,7 @@ public static class LocalTokens
     public const string ApiManagementClientId = "norvia-local-api-management";
     public const string TmsUiClientId = "norvia-local-tms-ui";
     public const string SimulatorClientId = "norvia-local-simulator";
+    public const string PartnerPortalClientId = "norvia-local-partner-portal";
     public const string PartnerApiAudience = "api://norvia-partner-api";
 
     /// <summary>The app role a Shipper Persona holds on the Norvia Partner API, as the estate grants it in Entra.</summary>

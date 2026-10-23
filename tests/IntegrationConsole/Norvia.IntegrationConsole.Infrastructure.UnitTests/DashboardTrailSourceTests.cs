@@ -424,6 +424,20 @@ public sealed class DashboardTrailSourceTests : IDisposable
     }
 
     [Fact]
+    public async Task HopsAsync_AHopAFaultCaused_NamesTheFault_AndAHopNoFaultCausedNamesNone()
+    {
+        _dashboard
+            .AddSpan("driver-app-api", Trace, "a1a1a1a1a1a1a1a1", null, "POST /v1/trips", Server, Now.AddSeconds(-10), Now.AddSeconds(-9))
+            .Add("driver-app-api", Now.AddMilliseconds(-9500), new() { ["correlationId"] = Booked, ["outcome"] = "Failed", ["failureCode"] = "DriverAppUnavailable", ["fault"] = "driver-app-unavailable" }, traceId: Trace, spanId: "a1a1a1a1a1a1a1a1")
+            .AddSpan("tms-api", Trace, "b2b2b2b2b2b2b2b2", null, "POST /v1/trips", Server, Now.AddSeconds(-8), Now.AddSeconds(-7))
+            .Add("tms-api", Now.AddMilliseconds(-7500), new() { ["correlationId"] = Booked, ["outcome"] = "Succeeded" }, traceId: Trace, spanId: "b2b2b2b2b2b2b2b2");
+
+        var hops = await HopsAsync(Booked);
+
+        hops.Select(hop => hop.Fault).Should().BeEquivalentTo(["driver-app-unavailable", null]);
+    }
+
+    [Fact]
     public async Task HopsAsync_TheDashboardRefuses_Throws_SoTheTrailPageSaysItCouldntBeOpened()
     {
         _dashboard.Status = HttpStatusCode.Unauthorized;
@@ -440,8 +454,13 @@ public sealed class DashboardTrailSourceTests : IDisposable
         _dashboard
             .Add("integration-console", at, new()
             {
-                ["correlationId"] = Booked, ["Actor"] = "ana@norvia.example", ["Action"] = "discard", ["Entity"] = "carrier-tracking",
-                ["MessageId"] = "m-1", ["Reason"] = "Duplicate", ["shipmentNumber"] = "SH-0042",
+                ["correlationId"] = Booked,
+                ["Actor"] = "ana@norvia.example",
+                ["Action"] = "discard",
+                ["Entity"] = "carrier-tracking",
+                ["MessageId"] = "m-1",
+                ["Reason"] = "Duplicate",
+                ["shipmentNumber"] = "SH-0042",
             })
             .Add("integration-console", at.AddMinutes(1), new() { ["correlationId"] = Booked, ["Actor"] = "ben@norvia.example", ["Action"] = "resubmit", ["Entity"] = "carrier-tracking", ["MessageId"] = "m-2" })
             .Add("tms-api", at, new() { ["correlationId"] = Booked, ["flow"] = "carrier-tracking", ["outcome"] = "DeadLettered" })

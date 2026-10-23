@@ -11,6 +11,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Norvia.PartnerPortal.Application\Norvia.PartnerPortal.Application.csproj" />
+    <ProjectReference Include="..\..\Norvia.ServiceDefaults\Norvia.ServiceDefaults.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Norvia.PartnerPortal.Infrastructure.UnitTests" />

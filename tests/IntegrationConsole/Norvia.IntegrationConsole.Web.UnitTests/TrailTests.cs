@@ -67,7 +67,21 @@ public sealed class TrailTests : ConsoleWebContext
         var page = RenderTrail();
 
         page.FindAll("thead th").Select(header => header.TextContent.Trim())
-            .Should().Equal("Hop", "Flow", "Time", "Duration", "Outcome", "Failure code");
+            .Should().Equal("Hop", "Flow", "Time", "Duration", "Outcome", "Failure code", "Fault");
+    }
+
+    [Fact]
+    public void Render_WithAHopAFaultCaused_NamesTheFault_ForCauseAndEffect()
+    {
+        Answer(
+            Hop("driver-app-api: POST /v1/trips", seconds: 0, null, Outcome.Failed, "DriverAppUnavailable") with { Fault = "driver-app-unavailable" },
+            Hop("tms-api", seconds: 1, null, Outcome.Succeeded));
+
+        var page = RenderTrail();
+
+        var rows = page.FindAll("tbody tr");
+        rows[0].TextContent.Should().Contain("driver-app-unavailable");
+        rows[1].TextContent.Should().NotContain("driver-app-unavailable");
     }
 
     [Fact]

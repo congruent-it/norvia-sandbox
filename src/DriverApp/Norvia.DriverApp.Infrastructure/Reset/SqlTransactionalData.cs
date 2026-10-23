@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Norvia.DriverApp.Application.Reset;
 using Norvia.DriverApp.Domain.Reports;
-using Norvia.DriverApp.Domain.Settings;
 using Norvia.DriverApp.Domain.Trips;
 using Norvia.DriverApp.Infrastructure.Data;
 using Norvia.DriverApp.Infrastructure.Outbox;
@@ -25,7 +24,6 @@ internal sealed class SqlTransactionalData(DriverAppDbContext dbContext) : ITran
                 await DeleteAsync<DriverReport>("Driver reports", cancellationToken),
                 await DeleteAsync<DriverTrip>("Trips", cancellationToken),
                 await DeleteAsync<OutboxMessage>("Messages", cancellationToken),
-                await DeleteAsync<DriverAppSettings>("Demo settings", cancellationToken),
             };
 
             await transaction.CommitAsync(cancellationToken);

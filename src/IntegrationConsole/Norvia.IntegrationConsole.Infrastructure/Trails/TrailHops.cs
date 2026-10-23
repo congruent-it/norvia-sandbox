@@ -143,7 +143,8 @@ internal static class TrailHops
                 failureCode,
                 [.. Rows.SelectMany(row => row.BusinessKeys).Distinct()],
                 Run,
-                Rows.Select(row => row.MessageId).FirstOrDefault(id => id is not null));
+                Rows.Select(row => row.MessageId).FirstOrDefault(id => id is not null),
+                Rows.Select(row => row.Fault).FirstOrDefault(fault => fault is not null));
         }
     }
 }

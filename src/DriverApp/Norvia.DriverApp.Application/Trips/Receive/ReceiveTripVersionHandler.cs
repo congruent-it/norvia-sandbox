@@ -2,12 +2,12 @@ using System.Xml;
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Mediator;
-using Norvia.DriverApp.Domain.Settings;
+using Norvia.DriverApp.Application.Faults;
 using Norvia.DriverApp.Domain.Trips;
 
 namespace Norvia.DriverApp.Application.Trips.Receive;
 
-public sealed class ReceiveTripVersionHandler(IRepository<DriverTrip> trips, IReadRepository<DriverAppSettings> settings)
+public sealed class ReceiveTripVersionHandler(IRepository<DriverTrip> trips, IDriverAppFaults faults)
     : ICommandHandler<ReceiveTripVersionCommand, Result<TripVersionOutcome>>
 {
     public async ValueTask<Result<TripVersionOutcome>> Handle(ReceiveTripVersionCommand command, CancellationToken cancellationToken)
@@ -15,7 +15,7 @@ public sealed class ReceiveTripVersionHandler(IRepository<DriverTrip> trips, IRe
         ArgumentNullException.ThrowIfNull(command);
 
         // The demo fault refuses everything, a malformed version included.
-        if (await settings.GetByIdAsync(DriverAppSettings.SingleId, cancellationToken) is { Unavailable: true })
+        if (faults.IsUnavailable)
         {
             return Result.Unavailable("The Driver app is unavailable.");
         }

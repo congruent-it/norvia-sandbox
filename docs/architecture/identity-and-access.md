@@ -46,7 +46,7 @@ The three Logic App triggers sit behind Easy Auth, and the workflow's first step
 | `proof-of-delivery` | The Carrier Proof of delivery Logic App (P6) | `ProofsOfDelivery.Record` | Receives the `carrier-proof-of-delivery` queue. Reads and deletes blobs in the inbound container |
 | `tms-ui` | The TMS UI | `TransportOrders.Manage` | |
 | `apim` | API Management | `ShipperTracking.Read` | Holds `TransportOrderIntake.Trigger`, `CarrierAnswer.Trigger` and `CarrierInvoice.Trigger`. Sends to the `carrier-tracking` and `carrier-proof-of-delivery` queues. Writes blobs in the inbound container. Publishes telemetry to Application Insights |
-| `partner-portal` | The Partner portal | | Reads the Persona subscription keys. Each Persona client app trusts it |
+| `partner-portal` | The Partner portal | `Demo.Fault` on the Driver app API | Reads the Persona subscription keys. Each Persona client app trusts it. The presenter panel switches the Driver app's Faults as this identity, since the portal is the presenter's gate ([ADR 0024](../adr/0024-the-demo-uis-are-public-behind-an-entra-gate-for-the-presenter.md)) |
 | `simulator` | The Simulator | `TransportOrders.Manage` and `Estate.Reset` on the TMS; `Estate.Reset` on the Driver app; `ShipperInvoices.Manage`, `CarrierInvoices.Manage` and `Estate.Reset` on the ERP API | Reads the Persona subscription keys, the Partner portal's reset key and the Shippers' endpoint keys, to read their invoices inboxes. Each Persona client app and each Driver client app trusts it ([ADR 0042](../adr/0042-the-simulator-signs-in-with-easy-auth-reaches-the-estate-as-its-own-identity-and-plays-the-personas-and-drivers-through-entra-client-apps.md)) |
 | `integration-console` | The Integration console | | Reads the Log Analytics workspace. Reads the run history of every Logic App. On the Service Bus namespace it lists the queues and subscriptions (Reader), peeks dead-lettered messages (Data Receiver) and resubmits them (Data Sender) |
 
@@ -69,6 +69,7 @@ The TMS validates the token and the role; the Shipper or Carrier a call is for c
 | `Trips.ReportDelivery` | `trip-dispatch` | Report a Trip version as delivered to the Driver app or not delivered | [P11](../processes/tms/p11-trip-dispatch.md#tms-api) |
 | `DriverReports.ReportOutcome` (on the Driver app API) | `driver-reports` | Tell the Driver app whether the TMS recorded a Driver's report, refused it, or was never reached | [P12](../processes/tms/p12-trip-execution.md#driver-app) |
 | One role per active Driver, its value the Driver ID (`DRV-0001`; on the Driver app API) | The Simulator's client app for that Driver, one each, which trusts `simulator` | Call the Driver app API's Driver actions (`/v1/driver/trips`) as that Driver. The API takes the Driver ID from the token's one role and nowhere else | [P12](../processes/tms/p12-trip-execution.md#driver-app), [ADR 0042](../adr/0042-the-simulator-signs-in-with-easy-auth-reaches-the-estate-as-its-own-identity-and-plays-the-personas-and-drivers-through-entra-client-apps.md) |
+| `Demo.Fault` (on the Driver app API, and on any application that owns a Fault) | `partner-portal` | Switch the application's Faults on, for a few minutes, or off, from the presenter panel: `GET /v1/faults` and `PUT /v1/faults/{name}`. A caller with no token gets 401, one without the role 403. Locally the AppHost signs the presenter's token in with it ([Faults](../operations/as-found.md#faults)) | [P11](../processes/tms/p11-trip-dispatch.md) |
 | `Trips.Start` | `driver-reports` | Start a Dispatched Trip for its Driver on the Trip's day | [P12](../processes/tms/p12-trip-execution.md#tms-api) |
 | `Trips.End` | `driver-reports` | End an In progress Trip for its Driver once every Stop has an outcome | [P12](../processes/tms/p12-trip-execution.md#tms-api) |
 | `TrackingEvents.Record` | `tracking` and `driver-reports` | Record a Tracking event, a Carrier's or a Driver's Stop report | [P5](../processes/tms/p5-shipment-tracking.md) |
@@ -221,7 +222,7 @@ Each Agent ([ADR 0040](../adr/0040-agents-read-the-estate-through-api-management
 | Intake agent | Nothing: it has no tools | None |
 | Simulator personas agent | Nothing: it has no tools | None |
 
-People get roles for the Agents' screens too, planned with the Agents: `HealthCheck.Run` and `HealthCheck.Read` for the Estate health check, and `TransportOrders.Draft` on the Norvia Partner API for Shipper Personas that use the Intake agent's booking drafts. A runtime fault switch needs `Demo.Fault` (#377).
+People get roles for the Agents' screens too, planned with the Agents: `HealthCheck.Run` and `HealthCheck.Read` for the Estate health check, and `TransportOrders.Draft` on the Norvia Partner API for Shipper Personas that use the Intake agent's booking drafts. Every runtime Fault switch needs `Demo.Fault`, on the application that owns the Fault.
 
 ## Locally
 

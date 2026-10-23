@@ -8,13 +8,13 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Norvia.PartnerPortal.Application;
 using Norvia.PartnerPortal.Application.Bookings;
-using Norvia.PartnerPortal.Application.DriverAppFault;
 using Norvia.PartnerPortal.Application.DriverSignIns;
+using Norvia.PartnerPortal.Application.Faults;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Application.Reset;
 using Norvia.PartnerPortal.Infrastructure.Data;
-using Norvia.PartnerPortal.Infrastructure.DriverApp;
 using Norvia.PartnerPortal.Infrastructure.DriverSignIns;
+using Norvia.PartnerPortal.Infrastructure.Faults;
 using Norvia.PartnerPortal.Infrastructure.PartnerApi;
 using Norvia.PartnerPortal.Infrastructure.Personas;
 using Norvia.PartnerPortal.Infrastructure.Reset;
@@ -44,7 +44,7 @@ public static class DependencyInjection
         builder.Services.AddSingleton<IDriverSignInDirectory, SeedFileDriverSignInDirectory>();
 
         builder.AddNorviaPartnerApi();
-        builder.AddDriverAppSettings();
+        builder.AddFaultSwitches();
 
         // The reset the Simulator's Reset estate calls (ADR 0039). Off unless the estate switches it on.
         builder.Services.AddOptions<ResetOptions>().BindConfiguration(ResetOptions.SectionName).ValidateOnStart();
@@ -139,13 +139,24 @@ public static class DependencyInjection
 #pragma warning restore EXTEXP0001
     }
 
-    /// <summary>The Driver app's API, which the presenter panel's "Driver app unavailable" fault switches.</summary>
-    private static void AddDriverAppSettings(this IHostApplicationBuilder builder)
+    /// <summary>
+    /// The faults the applications own, which the presenter panel switches through their APIs as the presenter. Locally the portal signs the presenter's
+    /// token itself; in Azure it is the portal's managed identity's (ADR 0024).
+    /// </summary>
+    private static void AddFaultSwitches(this IHostApplicationBuilder builder)
     {
-        builder.Services.AddOptions<DriverAppOptions>().BindConfiguration(DriverAppOptions.SectionName)
+        builder.Services.AddOptions<FaultsOptions>().BindConfiguration(FaultsOptions.SectionName)
             .ValidateDataAnnotations()
+            .Validate(options => (options.Entra is null) != (options.LocalTokens is null), "Configure either Faults:Entra or Faults:LocalTokens.")
+            // Data annotations don't look inside the nested options, so whichever is configured is checked here.
+            .Validate(options => options.Owners.Values.All(IsValid), "Faults:Owners needs an Address and an Audience for each application.")
+            .Validate(options => options.Entra is null || IsValid(options.Entra), "Faults:Entra needs a ManagedIdentityClientId.")
+            .Validate(options => options.LocalTokens is null || IsValid(options.LocalTokens), "Faults:LocalTokens needs an Issuer, a ClientId and a SigningKey.")
             .ValidateOnStart();
-        builder.Services.AddHttpClient<IDriverAppSettings, DriverAppSettingsClient>((services, http) =>
-            http.BaseAddress = services.GetRequiredService<IOptions<DriverAppOptions>>().Value.Address);
+        builder.Services.AddSingleton<IFaultTokens>(services =>
+            services.GetRequiredService<IOptions<FaultsOptions>>().Value.LocalTokens is null
+                ? ActivatorUtilities.CreateInstance<EntraFaultTokens>(services)
+                : ActivatorUtilities.CreateInstance<LocalFaultTokens>(services));
+        builder.Services.AddHttpClient<IFaultSwitches, FaultSwitchClient>();
     }
 }
