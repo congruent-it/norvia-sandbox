@@ -11,6 +11,9 @@ param alertEmail string
 @description('The as-found toggle: build the action group with no receiver, so the alerts exist and go nowhere.')
 param noAlertReceiver bool
 
+@description('The as-found toggle: Application Insights keeps what it traced for less time than run history, so run bodies outlive the index that finds them.')
+param appInsightsRetentionShort bool = false
+
 @description('The Integration console\'s managed identity, which searches the workspace for Message trails.')
 param integrationConsolePrincipalId string
 
@@ -37,7 +40,7 @@ resource applicationInsights 'Microsoft.Insights/components@2020-02-02' = {
     Application_Type: 'web'
     WorkspaceResourceId: workspace.id
     IngestionMode: 'LogAnalytics'
-    RetentionInDays: integrationRetentionDays
+    RetentionInDays: appInsightsRetentionShort ? min(30, integrationRetentionDays) : integrationRetentionDays
   }
 }
 

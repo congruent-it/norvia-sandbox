@@ -42,9 +42,16 @@ var messaging = builder.AddAzureServiceBus("messaging");
 var messagingEdge = builder.ExecutionContext.IsPublishMode ? messaging : builder.AddAzureServiceBus("messaging-2");
 
 // The TMS keeps Proof of delivery files in a blob container of its own (ADR 0002). Locally Azurite stands in for the storage
-// account. In Azure a lifecycle rule moves the files to the cool tier after 30 days; they are never deleted.
+// account. In Azure a lifecycle rule moves the files to the cool tier after 30 days; they are never deleted. The as-found toggle
+// proofFilesStayHot (azd's ESTATE_ASFOUND) leaves the rule out.
 var storage = builder.AddAzureStorage("storage").RunAsEmulator()
-    .ConfigureInfrastructure(infrastructure => ProofOfDeliveryStorage.AddLifecycleRule(infrastructure));
+    .ConfigureInfrastructure(infrastructure =>
+    {
+        if (!ProofOfDeliveryStorage.StayHot(builder.Configuration["ESTATE_ASFOUND"]))
+        {
+            ProofOfDeliveryStorage.AddLifecycleRule(infrastructure);
+        }
+    });
 var blobs = storage.AddBlobs("blobs");
 storage.AddBlobContainer(ProofOfDeliveryStorage.ContainerName);
 

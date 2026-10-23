@@ -24,7 +24,7 @@ az logicapp config appsettings set --subscription "$AZURE_SUBSCRIPTION_ID" --nam
 dotnet build src/Integration/Norvia.Integration.ShipperInvoice.Functions --configuration Release
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
-(cd src/Integration/ShipperInvoiceLogicApp && zip -qr "$work/shipper-invoice-logic-app.zip" host.json parameters.json connections.json shipper-invoice lib)
+infra/stage-logic-app.sh src/Integration/ShipperInvoiceLogicApp "$work/shipper-invoice-logic-app.zip" host.json parameters.json connections.json shipper-invoice lib
 
 # A changed app setting restarts the app, and a zip deployment during the restart fails. Deploying again is safe.
 for attempt in 1 2 3; do

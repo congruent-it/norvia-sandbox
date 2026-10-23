@@ -222,6 +222,17 @@ public sealed class AppHostModelTests
     }
 
     [Fact]
+    public async Task InAzure_WithTheProofFilesStayHotToggle_TheTmsBlobsHaveNoLifecycleRule()
+    {
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(
+            ["--operation", "publish", "--publisher", "default", "--output-path", Path.GetTempPath(), "--ESTATE_ASFOUND", "{\"proofFilesStayHot\":true}"],
+            TestContext.Current.CancellationToken);
+
+        builder.Resources.OfType<AzureStorageResource>().Single().GetBicepTemplateString()
+            .Should().NotContain("managementPolicies").And.NotContain("tierToCool");
+    }
+
+    [Fact]
     public async Task InAzure_TheTmsApi_CanWriteItsBlobs_AndTheTmsUiOnlyReadThem()
     {
         await using var builder = await CreateForAzureAsync();

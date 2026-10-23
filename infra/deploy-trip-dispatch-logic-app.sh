@@ -22,7 +22,7 @@ az logicapp config appsettings set --subscription "$AZURE_SUBSCRIPTION_ID" --nam
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
-(cd src/Integration/TripDispatchLogicApp && zip -qr "$work/trip-dispatch-logic-app.zip" host.json parameters.json connections.json trip-dispatch)
+infra/stage-logic-app.sh src/Integration/TripDispatchLogicApp "$work/trip-dispatch-logic-app.zip" host.json parameters.json connections.json trip-dispatch
 
 # A changed app setting restarts the app, and a zip deployment during the restart fails. Deploying again is safe.
 for attempt in 1 2 3; do

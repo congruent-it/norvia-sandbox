@@ -296,7 +296,7 @@ These were left out on purpose while designing P4, each with its reason.
 - **Driver and vehicle details from the Carrier.** Nothing needs them yet, including P5.
 - **Notifying the Shipper that its Shipment is booked.** Push to the Shipper is deferred in [P8](p8-shipper-visibility.md). The Shipper sees Scheduled when it queries.
 - **As-found toggles and presenter-panel faults.** They are added after the fixed state is built, as for P1 to P3. The candidates:
-  - Toggle: the Carrier endpoint's secret inlined in the P4 booking Logic App instead of read from Key Vault.
+  - Toggle: the Carrier endpoint's secret inlined in the P4 booking Logic App instead of read from Key Vault. Built: `carrierSecretInlined` ([as-found](../../operations/as-found.md#storage-secrets-and-retention)).
   - Toggle: no alert on the dead-letter queue of the `ShipmentReleased` subscription (from P3).
   - Presenter-panel fault: a Carrier's booking endpoint is down, which shows up as Not delivered.
   - Presenter-panel fault: a Carrier answers with a reason code the Carrier-answer Logic App can't map, so the run fails. Paired with a toggle for no alert on failed Logic App runs, this re-enacts the headline incident's silent failure on the booking side.

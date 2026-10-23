@@ -1,5 +1,12 @@
 {
   "flowsWithoutFailedRunAlert": [],
   "entitiesWithoutDeadLetterAlert": [],
-  "noAlertReceiver": false
+  "noAlertReceiver": false,
+  "noInboundLifecycleRule": false,
+  "noTransitLifecycleRule": false,
+  "proofFilesStayHot": false,
+  "noMalwareScanning": false,
+  "carrierSecretInlined": false,
+  "appInsightsRetentionShort": false,
+  "logicAppsWithoutTrackedProperties": []
 }
