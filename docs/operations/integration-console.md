@@ -107,6 +107,7 @@ Every resubmit and discard writes an audit event to Application Insights: who (f
 Message bodies hold personal data such as Consignee names and addresses.
 
 - Search results, trails and panels show only the tracking contract's keys, never bodies.
+- A hop a presenter-panel Fault caused shows the Fault's name in its **Fault** column. It is the tracking contract's `fault` key, a tracked property of the hop and not a log line of its own, so it is found and read like `failureCode`: it appears on the hop the Fault made fail, and nowhere else ([Faults](as-found.md#faults)).
 - A body is fetched only when someone with `IntegrationConsole.Read` opens a step or a message, and it's shown in full. Masking would need a map per message type, and a mapping fault is often in exactly those fields.
 - The console doesn't copy bodies anywhere, including its own logs.
 - Logic Apps use secure inputs and outputs only for steps that handle secrets, such as the Carrier endpoint credentials in P4. Anywhere else, they would hide the body the Integration operator needs.

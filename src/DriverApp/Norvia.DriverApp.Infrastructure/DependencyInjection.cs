@@ -9,10 +9,12 @@ using Microsoft.Extensions.Options;
 using Norvia.DriverApp.Application;
 using Norvia.DriverApp.Application.Drivers;
 using Norvia.DriverApp.Application.Events;
+using Norvia.DriverApp.Application.Faults;
 using Norvia.DriverApp.Application.Reports.Deliver;
 using Norvia.DriverApp.Application.Reset;
 using Norvia.DriverApp.Infrastructure.Data;
 using Norvia.DriverApp.Infrastructure.Drivers;
+using Norvia.DriverApp.Infrastructure.Faults;
 using Norvia.DriverApp.Infrastructure.Outbox;
 using Norvia.DriverApp.Infrastructure.ProofsOfDelivery;
 using Norvia.DriverApp.Infrastructure.Reset;
@@ -33,6 +35,10 @@ public static class DependencyInjection
         builder.Services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
         builder.Services.AddScoped(typeof(IReadRepository<>), typeof(EfRepository<>));
         builder.Services.AddScoped<IConflictRetrier, EfConflictRetrier>();
+
+        // The faults the presenter can switch on: off by default, and each expires by itself. Only the API exposes the switches.
+        builder.AddFaults(DriverAppFaultDefinitions.Unavailable);
+        builder.Services.AddSingleton<IDriverAppFaults, DriverAppFaults>();
 
         return builder;
     }

@@ -45,6 +45,8 @@ var tripEndRole = 'Trips.End'
 var tripEndRoleId = guid('norvia-tms-api', environmentName, tripEndRole)
 var driverReportOutcomeRole = 'DriverReports.ReportOutcome'
 var driverReportOutcomeRoleId = guid('norvia-driver-app-api', environmentName, driverReportOutcomeRole)
+var driverAppFaultRole = 'Demo.Fault'
+var driverAppFaultRoleId = guid('norvia-driver-app-api', environmentName, driverAppFaultRole)
 var recordRole = 'TrackingEvents.Record'
 var recordRoleId = guid('norvia-tms-api', environmentName, recordRole)
 var recordProofRole = 'ProofsOfDelivery.Record'
@@ -401,6 +403,16 @@ resource driverAppApi 'Microsoft.Graph/applications@v1.0' = {
         isEnabled: true
       }
       {
+        id: driverAppFaultRoleId
+        value: driverAppFaultRole
+        displayName: 'Switch the demo faults'
+        description: 'Switch the Driver app\'s runtime faults on, for a few minutes, or off, from the presenter panel. Only the Partner portal, the presenter\'s gate (ADR 0024), holds it.'
+        allowedMemberTypes: [
+          'Application'
+        ]
+        isEnabled: true
+      }
+      {
         id: driverAppResetRoleId
         value: driverAppResetRole
         displayName: 'Reset the estate'
@@ -424,6 +436,13 @@ resource driverReportsOutcomeRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' 
   resourceId: driverAppApiPrincipal.id
   appRoleId: driverReportOutcomeRoleId
   principalId: driverReportsIdentity.properties.principalId
+}
+
+// The Partner portal's panel switches the Driver app's faults as the portal's identity, so nothing else may.
+resource driverAppFaultRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: driverAppApiPrincipal.id
+  appRoleId: driverAppFaultRoleId
+  principalId: partnerPortalIdentity.properties.principalId
 }
 
 // The Carrier-answer Logic App's identity, which it runs as. It is the one principal holding the answer role, so nothing

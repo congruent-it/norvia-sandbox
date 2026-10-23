@@ -60,12 +60,12 @@ internal static partial class PageLog
     [LoggerMessage(Level = LogLevel.Error, Message = "Loading the tracking of Persona {PersonaId} failed")]
     public static partial void TrackingLoadFailed(ILogger logger, Exception exception, string personaId);
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "Reading the Driver app unavailable fault failed")]
-    public static partial void DriverAppFaultLoadFailed(ILogger logger, Exception exception);
+    [LoggerMessage(Level = LogLevel.Error, Message = "Reading the faults failed")]
+    public static partial void FaultsLoadFailed(ILogger logger, Exception exception);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Reading the Drivers' sign-in details failed")]
     public static partial void DriverSignInsLoadFailed(ILogger logger, Exception exception);
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "Switching the Driver app unavailable fault to {Unavailable} failed")]
-    public static partial void DriverAppFaultSaveFailed(ILogger logger, Exception exception, bool unavailable);
+    [LoggerMessage(Level = LogLevel.Error, Message = "Switching the fault {Fault} failed")]
+    public static partial void FaultSwitchFailed(ILogger logger, Exception exception, string fault);
 }

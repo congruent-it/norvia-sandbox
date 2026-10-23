@@ -13,4 +13,7 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Norvia.ServiceDefaults.UnitTests" />
+  </ItemGroup>
 </Project>

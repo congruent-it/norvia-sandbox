@@ -1,12 +1,5 @@
 {
   "tables": {
-    "DriverAppSettings": {
-      "description": "The Driver app's demo settings, one row for the whole app. The presenter switches them from the Partner portal's panel (P11).",
-      "columns": {
-        "Id": "Always 1: there is one row.",
-        "Unavailable": "The \"Driver app unavailable\" demo fault: while on, the Driver app refuses every Trip version with a 503, so the Trip dispatch Logic App reports it Not delivered."
-      }
-    },
     "DriverReports": {
       "description": "One thing a Driver reported from the road, with what became of it (P12). The Driver app owns nothing of the TMS's: it keeps a report only until the Driver reports Logic App tells it the TMS recorded it, refused it, or was never reached (ADR 0016).",
       "columns": {

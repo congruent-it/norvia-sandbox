@@ -201,6 +201,8 @@ The Driver app signs Drivers in with Entra ID, replacing P11's Driver picker. Ea
 
 The presenter panel holds the seeded users' sign-in details for demos. Locally the Driver app's sign-in page stands in for Entra and lists the seeded Drivers.
 
+The panel also lists every Fault with its owner and the time it has left, and switches one on (for a duration) or off; the Driver app's *Driver app unavailable* Fault is the one that affects P12's Driver too, because it refuses Trips before a Driver sees them ([P11](p11-trip-dispatch.md#use-cases)). Every Fault switch needs the app role `Demo.Fault` ([as-found.md](../../operations/as-found.md#faults)).
+
 ## Driver app
 
 P12 completes the Driver app that P11 started.

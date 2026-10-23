@@ -65,7 +65,7 @@ put("tmsapi", BUS, ("Namespace: send, and receive to peek the subscriptions a re
 put("tmsui", TMS, ("TransportOrders.Manage", R)); put("tmsui", BLOB, ("The TMS's storage: reader", D))
 put("erp", BUS, ("Send, through the outbox", W), ("Receive to peek the subscriptions a reset waits on", D))
 put("driver", BUS, ("Topic driver-app-events: send", W)); put("driver", BLOB, ("Driver app's transit container: contributor", W)); put("driver", KV, ("The Driver app's endpoint key", D))
-put("portal", KV, ("The Persona subscription keys", D))
+put("portal", KV, ("The Persona subscription keys", D)); put("portal", DRV, ("Demo.Fault", R))
 put("sim", TMS, ("TransportOrders.Manage, Estate.Reset", R)); put("sim", ERP, ("ShipperInvoices.Manage, CarrierInvoices.Manage, Estate.Reset", R)); put("sim", DRV, ("Estate.Reset", R))
 put("sim", KV, ("The Persona subscription keys, the Partner portal's reset key, the Shippers' endpoint keys", D))
 put("console", BUS, ("Namespace: list and peek", D), ("Namespace: send, to resubmit", W)); put("console", MON, ("Log Analytics Reader", D), ("Logic Apps Standard Reader: opens a run, changes nothing", D))

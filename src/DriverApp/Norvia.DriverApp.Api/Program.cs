@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Diagnostics;
 using Norvia.DriverApp.Api.Actions;
 using Norvia.DriverApp.Api.Reports;
 using Norvia.DriverApp.Api.Reset;
-using Norvia.DriverApp.Api.Settings;
 using Norvia.DriverApp.Api.Trips;
 using Norvia.DriverApp.Application.Reports.Deliver;
 using Norvia.DriverApp.Application.Reports.EndTrip;
@@ -16,6 +15,7 @@ using Norvia.DriverApp.Application.Reports.ReportStop;
 using Norvia.DriverApp.Application.Reports.StartTrip;
 using Norvia.DriverApp.Application.Trips.Receive;
 using Norvia.DriverApp.Infrastructure;
+using Norvia.ServiceDefaults.Faults;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -101,7 +101,11 @@ app.MapDefaultEndpoints();
 app.MapTrips();
 app.MapReportOutcomes();
 app.MapDriverActions();
-app.MapSettings();
+// The presenter panel's fault switches, guarded by the Demo.Fault role: MapFaults has no unguarded way to map them.
+app.NewVersionedApi("Faults")
+    .MapGroup("/v{version:apiVersion}/faults")
+    .HasApiVersion(1)
+    .MapFaults();
 app.MapReset();
 
 await app.RunAsync();

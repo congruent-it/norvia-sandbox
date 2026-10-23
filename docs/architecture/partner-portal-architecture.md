@@ -25,7 +25,7 @@ The editable source is [partner-portal-hexagon.excalidraw](diagrams/partner-port
 | `ShipperTracking` | 4 | List, find and get a Shipper's Transport Orders as Norvia reports them, and download a Proof of delivery file |
 | `Bookings` | 3 | Draft, submit and list a Shipper's bookings |
 | `ShipperInvoices`, `ShipperNotifications` | 4 | Receive and list what Norvia sends each Shipper Persona |
-| `DriverAppFault`, `DriverSignIns`, `Personas` | 4 | The Presenter panel's Driver app fault, the Driver sign-in list, and the Persona switcher |
+| `Faults`, `DriverSignIns`, `Personas` | 4 | The Presenter panel's list of Faults and their On and Off, the Driver sign-in list, and the Persona switcher |
 | `Reset` | 2 | Report whether a reset is allowed, and reset |
 
 ## Ports and adapters
@@ -35,7 +35,7 @@ The editable source is [partner-portal-hexagon.excalidraw](diagrams/partner-port
 | `IRepository<T>`, `IReadRepository<T>`, `ITransactionalData`, `IConflictRetrier` | `EfRepository<T>`, `SqlTransactionalData`, `EfConflictRetrier` on `PartnerPortalDbContext` | The portal's own database: what each Persona sent Norvia and what Norvia answered |
 | `INorviaPartnerApi` | `NorviaPartnerApiClient`, with `EntraPersonaTokens` in Azure and `LocalPersonaTokens` under Aspire | API Management |
 | `IPersonaDirectory`, `IDriverSignInDirectory` | `SeedFilePersonaDirectory`, `SeedFileDriverSignInDirectory` | The seed file |
-| `IDriverAppSettings` | `DriverAppSettingsClient` | The Driver app's settings endpoint, for the Presenter panel's fault switch |
+| `IFaultSwitches` | `FaultSwitchClient`, with `EntraFaultTokens` in Azure and `LocalFaultTokens` under Aspire | The fault endpoints of every application that owns a Fault (today the Driver app's), as the portal's identity holding `Demo.Fault` |
 | `IAutoAnswerSignal`, `IAutoProgressSignal`, `ISampleCmr` | In-process signals that make a worker look at the clock again, and the sample CMR an auto-progress Persona sends with its Proof of delivery | |
 | `IResetSwitch`, `IQuietCheck` | `ConfiguredResetSwitch`, `ServiceBusQuietCheck` | Service Bus management |
 

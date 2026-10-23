@@ -14,5 +14,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Norvia.DriverApp.Application\Norvia.DriverApp.Application.csproj" />
+    <ProjectReference Include="..\..\Norvia.ServiceDefaults\Norvia.ServiceDefaults.csproj" />
   </ItemGroup>
 </Project>

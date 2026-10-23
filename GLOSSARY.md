@@ -437,8 +437,12 @@ The person who runs a demo of the sandbox: they play Norvia's users through the 
 _Avoid_: user, admin, operator (that is the Integration operator)
 
 **Presenter panel**:
-The page of the Partner portal (`/presenter`) where the presenter switches the demo's faults, such as *Driver app unavailable*, which makes the Driver app refuse every Trip version so the Planner sees Not delivered. It is for faults only: a Carrier Persona's modes are set on its own page.
+The page of the Partner portal (`/presenter`) where the presenter switches the demo's **Faults**. It lists every Fault with its owner, whether it is on and how long it has left, and switches one on for a chosen duration or off. It is for faults only: a Carrier Persona's modes are set on its own page.
 _Avoid_: admin page, control panel
+
+**Fault**:
+A runtime failure the presenter makes happen in one application so a demo can show how the estate finds it, such as *Driver app unavailable*, which makes the Driver app refuse every Trip version so the Planner sees Not delivered. A Fault has a name, an **owner** (the application it breaks), is off by default and, once switched on for a duration (a few minutes at most), expires by itself. The app role `Demo.Fault` guards every Fault switch. A hop a Fault caused carries the Fault's name as its `fault` key, which the Integration console shows. Not a *toggle*: a toggle removes something that exists, in the estate's Bicep or an application's setting, and stays until it is switched back.
+_Avoid_: outage, failure (a Failure is what the estate records; a Fault is what makes it happen)
 
 **Demo UIs**:
 The TMS UI and the Partner portal, the two UIs a presenter shows side by side. They have no login; in Azure an Entra sign-in in front of them, the gate, admits only the presenter (ADR 0024). The gate is not a login in the domain's sense: the apps don't know who passed it.

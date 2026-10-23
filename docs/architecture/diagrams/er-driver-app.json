@@ -1,18 +1,6 @@
 {
   "entities": [
     {
-      "name": "DriverAppSettings",
-      "columns": [
-        {
-          "name": "Id",
-          "type": "int",
-          "keys": [
-            "PK"
-          ]
-        }
-      ]
-    },
-    {
       "name": "DriverReports",
       "columns": [
         {

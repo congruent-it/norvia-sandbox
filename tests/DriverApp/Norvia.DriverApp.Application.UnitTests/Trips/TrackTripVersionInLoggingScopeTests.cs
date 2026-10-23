@@ -49,5 +49,7 @@ public sealed class TrackTripVersionInLoggingScopeTests : IDisposable
             ["outcome"] = outcome,
         });
         keys.GetValueOrDefault("failureCode").Should().Be(failureCode);
+        // Only the hop the fault caused names it, so the Integration console can show cause and effect.
+        keys.GetValueOrDefault("fault").Should().Be(status == ResultStatus.Unavailable ? "driver-app-unavailable" : null);
     }
 }

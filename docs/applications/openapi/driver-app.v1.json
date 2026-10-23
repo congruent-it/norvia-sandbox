@@ -264,28 +264,43 @@
         }
       }
     },
-    "/v1/settings/unavailable": {
+    "/v1/faults": {
       "get": {
         "tags": [
-          "Settings"
+          "Faults"
         ],
-        "operationId": "GetDriverAppUnavailable",
+        "summary": "List the faults this application owns, with whether each is on and how long it has left.",
+        "operationId": "ListFaults",
         "responses": {
           "200": {
             "description": "OK"
           }
         }
-      },
+      }
+    },
+    "/v1/faults/{name}": {
       "put": {
         "tags": [
-          "Settings"
+          "Faults"
         ],
-        "operationId": "SetDriverAppUnavailable",
+        "summary": "Switch one of this application's faults on, for a duration after which it expires by itself, or off.",
+        "description": "Only a caller holding the app role Demo.Fault may call it. A duration longer than the application allows (a few minutes by default) is refused with 400.",
+        "operationId": "SwitchFault",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UnavailableRequest"
+                "$ref": "#/components/schemas/SwitchFaultRequest"
               }
             }
           },
@@ -783,6 +798,26 @@
           }
         }
       },
+      "SwitchFaultRequest": {
+        "required": [
+          "on"
+        ],
+        "type": "object",
+        "properties": {
+          "on": {
+            "type": "boolean"
+          },
+          "durationSeconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
       "TripDriverRequest": {
         "required": [
           "driverId",
@@ -869,17 +904,6 @@
             }
           }
         }
-      },
-      "UnavailableRequest": {
-        "required": [
-          "unavailable"
-        ],
-        "type": "object",
-        "properties": {
-          "unavailable": {
-            "type": "boolean"
-          }
-        }
       }
     }
   },
@@ -897,7 +921,7 @@
       "name": "DriverActions"
     },
     {
-      "name": "Settings"
+      "name": "Faults"
     },
     {
       "name": "Reset"

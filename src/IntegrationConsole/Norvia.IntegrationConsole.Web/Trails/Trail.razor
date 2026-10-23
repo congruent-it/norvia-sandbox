@@ -100,6 +100,7 @@ else if (_trail is { } trail)
                 }
             </TemplateColumn>
             <PropertyColumn Title="Failure code" Property="@(hop => hop.FailureCode)" />
+            <PropertyColumn Title="Fault" Property="@(hop => hop.Fault)" />
         </FluentDataGrid>
     }
 }

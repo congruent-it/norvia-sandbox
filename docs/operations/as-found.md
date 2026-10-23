@@ -2,6 +2,8 @@
 
 The sandbox exists to reproduce what an integration health check finds, and to fix it one problem at a time ([SCENARIO.md](../../SCENARIO.md)). The estate is built healthy. A **toggle** makes it as it was found: it removes something that exists. Terms are defined in [GLOSSARY.md](../../GLOSSARY.md).
 
+Besides the toggles there are [faults](#faults): runtime failures the presenter switches on for a few minutes from the Partner portal's presenter panel. They break something while it runs and put it back by themselves.
+
 So far the toggles cover the estate's alerts (a failed-run alert for every Logic App and a dead-letter alert for every queue and subscription a Logic App reads), its [storage, secrets and retention](#storage-secrets-and-retention) and its [business safety nets and API Management](#business-safety-nets-and-api-management). The headline incident is Carrier tracking (P5): the tracking Logic App fails and the tracking queue dead-letters, and nobody is told. [failure-behaviour.md](../architecture/failure-behaviour.md) names each hop's alert and toggle.
 
 ## The alerts
@@ -71,6 +73,39 @@ The business-side safety nets (P5, P6, P7) already exist as TMS settings; these 
 - **The cache and the rate limit are fragments of the policies.** The four Shipper tracking policies in [partner-api](../../infra/estate/partner-api) hold a place for each, and [partner-api.bicep](../../infra/estate/partner-api.bicep) fills it from [shipper-rate-limit.fragment.xml](../../infra/estate/partner-api/shipper-rate-limit.fragment.xml), [shipper-cache-lookup.fragment.xml](../../infra/estate/partner-api/shipper-cache-lookup.fragment.xml) and [shipper-cache-store.fragment.xml](../../infra/estate/partner-api/shipper-cache-store.fragment.xml), or with nothing. The cache key names the Shipper, so no Shipper is given another's answer. The answer is kept after it was mapped for the Shipper, and a hit is traced `Answered the Shipper from the cache` with outcome `Succeeded`. A file is never cached. Switching the toggle off leaves entries in the cache that nothing reads; they expire after a day.
 - **`noReportBackToDriverApp` is a deployment.** [stage-logic-app.sh](../../infra/stage-logic-app.sh) turns each call to the Driver app's `/v1/report-outcomes` into a step that answers 200 and does nothing, so the rest of the workflow, which reads the answer, runs as it does when the Driver app is well. The hops for those steps therefore say `Succeeded`: the finding is the Driver app's list, not the trail. `as-found.sh` deploys the Driver reports Logic App again when the toggle changes. The sources are never changed.
 
+## Faults
+
+A **fault** is a runtime failure the presenter makes happen in one application, so a demo can show how the estate finds it ([GLOSSARY.md](../../GLOSSARY.md)). A toggle removes something that exists and stays until it is switched back; a fault breaks something for a few minutes and then stops. The first fault is the Driver app's `driver-app-unavailable`, which refuses every Trip version with a 503 ([P11](../processes/tms/p11-trip-dispatch.md)).
+
+### The contract
+
+One contract in [Norvia.ServiceDefaults](../../src/Norvia.ServiceDefaults/Faults), for every application:
+
+| Part | What it is |
+|---|---|
+| **Name** and **owner** | `driver-app-unavailable`, owned by `driver-app`: the application it breaks. The application declares it with `builder.AddFaults(...)` and asks `IFaults.IsOn(name)` where it would fail |
+| **Off by default** | Nothing is on after a start. The state is the application's own, held in its process (an in-app setting, so the same code runs locally and in Azure), so a restart switches every fault off |
+| **Automatic expiry** | A fault is switched on for a duration and expires by itself. The default is 2 minutes and the longest allowed 5 (`Faults:DefaultDuration` and `Faults:MaxDuration` in the application's configuration); a longer duration is refused with 400. Switching on again starts the time over |
+| **The guard** | `MapFaults()` maps `GET /v1/faults` (the faults, with whether each is on and how many seconds it has left) and `PUT /v1/faults/{name}` (`{ "on": true, "durationSeconds": 120 }`, or `{ "on": false }`). Every route requires the app role `Demo.Fault`: no token gets 401, a token without the role 403, an unknown fault 404. `MapFaults` is the only way to expose a fault |
+
+The Driver app's old anonymous `GET` and `PUT /v1/settings/unavailable`, its `DriverAppSettings` table (dropped by a migration) and the `/settings` page of its screens are gone: nothing switches a fault without the role.
+
+### The role `Demo.Fault`
+
+An app role on each application that owns a fault (today the Driver app API's registration), granted to the **Partner portal's managed identity**. The presenter panel calls the application as the portal: the portal is already the presenter's gate ([ADR 0024](../adr/0024-the-demo-uis-are-public-behind-an-entra-gate-for-the-presenter.md)), and its Easy Auth gets an ID token only, which no other application could accept. `identities.bicep` defines the role and the grant. Locally there is no Entra, so the AppHost signs the presenter in: the portal signs a token itself with the key every local application trusts, its client ID in `azp` and `Demo.Fault` in `roles` (`Faults__LocalTokens__*`). [Identity and access](../architecture/identity-and-access.md) lists the role.
+
+### The presenter panel
+
+`/presenter` in the Partner portal lists every fault of every application that owns one (`Faults:Owners` in the portal's configuration, set by the AppHost; today one), with its owner, whether it is on and how long it has left, counting down. **Switch on** takes a duration (1, 2 or 5 minutes) and **Switch off** puts the fault back at once. The panel reads the faults again every ten seconds, so a fault that ran out, or was changed elsewhere, shows its true state.
+
+### Cause and effect in the Integration console
+
+A hop a fault made fail carries the fault's name: the Driver app's refusal of a Trip version is `Failed` with `DriverAppUnavailable` and `fault=driver-app-unavailable`, and the console's trail page shows it in the hop's **Fault** column, so the demo shows the cause beside the effect. It is a **tracked property**, a `fault` key of the [tracking contract](../coding-guidelines.md#tracking-contract), not a log line of its own: a log line would be a hop of its own and could not say which hop it belonged to, and a tracked key is found the way every other key is. Only the application the fault breaks sets it, on the hop it caused. The portal's switch logs itself with the same key (flow `fault-switch`), on a trail of its own.
+
+### Adding a fault
+
+Declare it (`AddFaults` with a `FaultDefinition`), check `IFaults.IsOn` where the application should fail, put the name on the hop it breaks as `fault`, and expose the owner to the panel (`Faults__Owners__<owner>__Address` and `__Audience` on the portal, `Demo.Fault` on the owner's registration and for the portal's identity). `FaultEndpointGuardTests` fails when an endpoint is mapped by hand on a route that mentions a fault.
+
 ## Presets
 
 A preset is a file in [infra/presets](../../infra/presets) holding a value of `asFound`.
@@ -111,6 +146,8 @@ It stores the toggles in the azd environment (`ESTATE_ASFOUND`), deploys the est
 - To see the incident, send a Tracking event the TMS refuses ([smoke-test-shipment-tracking.sh](../../infra/smoke-test-shipment-tracking.sh)): in `fixed` an email arrives within minutes; in `as-found` the message sits in the dead-letter queue until someone opens it in the Integration console.
 
 ## Testing
+
+The fault contract has unit tests of its own ([Norvia.ServiceDefaults.UnitTests](../../tests/ServiceDefaults/Norvia.ServiceDefaults.UnitTests)): the expiry (a fault is off after its time, switching on again starts over), the default off, the duration limits, the role guard (401 without a token, 403 without `Demo.Fault`, on every route `MapFaults` maps) and the guard test that reads the applications' source and fails when a fault endpoint is mapped without `MapFaults`. The Driver app's fault, the portal's client and the panel are covered by the Driver app's and the Partner portal's unit tests. The API's cases are in #414 and the panel's journeys in #415.
 
 The business safety-net toggles have template and policy tests of their own ([AsFoundBusinessSafetyNetTests](../../tests/Tms/Norvia.Tms.ArchitectureTests/AsFoundBusinessSafetyNetTests.cs)): per policy toggle, `bicep snapshot` gives the four Shipper tracking policies and the toggle changes only its fragment (the rate limit removed, or the cache added to the three reads and never the file), the staged Driver reports workflow loses only its calls to the Driver app, and the presets set them as described. The TMS settings flow is covered by a unit test of the settings binding ([BusinessSafetyNetSettingsTests](../../tests/Tms/Norvia.Tms.Infrastructure.UnitTests/Settings/BusinessSafetyNetSettingsTests.cs)) and by the AppHost model tests, which check that each toggle sets exactly its own environment variable.
 

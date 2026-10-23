@@ -33,7 +33,7 @@ internal static class TrailOutline
                 return;
             }
 
-            outline.Add(new TrailHop(hop.Name, hop.Flow, hop.Time, hop.Duration, hop.Outcome, hop.FailureCode, depth, hop.Run, deadLetters?.GetValueOrDefault(hop.Id)));
+            outline.Add(new TrailHop(hop.Name, hop.Flow, hop.Time, hop.Duration, hop.Outcome, hop.FailureCode, depth, hop.Run, deadLetters?.GetValueOrDefault(hop.Id), hop.Fault));
             var consequences = caused[hop.Id].Where(next => !shown.Contains(next.Id)).ToList();
             var branchDepth = consequences.Count > 1 ? depth + 1 : depth;
             foreach (var next in consequences)

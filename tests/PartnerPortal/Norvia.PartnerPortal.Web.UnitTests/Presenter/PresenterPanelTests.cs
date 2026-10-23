@@ -1,90 +1,143 @@
-using Norvia.PartnerPortal.Application.DriverAppFault;
 using Norvia.PartnerPortal.Application.DriverSignIns;
+using Norvia.PartnerPortal.Application.Faults;
 using Norvia.PartnerPortal.Web.Presenter;
 
 namespace Norvia.PartnerPortal.Web.UnitTests.Presenter;
 
 public sealed class PresenterPanelTests : PortalWebContext
 {
-    private void Current(bool unavailable) =>
-        Portal.GetDriverAppFaultAsync(Arg.Any<CancellationToken>()).Returns(new DriverAppFaultView(unavailable));
+    private static readonly FaultView Off = new("driver-app-unavailable", "driver-app", "The Driver app refuses every Trip.", false, null);
+
+    private void Current(params FaultView[] faults) =>
+        Portal.ListFaultsAsync(Arg.Any<CancellationToken>()).Returns(faults);
+
+    private FaultView OnFor(TimeSpan left) => Off with { On = true, Until = Time.GetUtcNow() + left };
 
     [Fact]
-    public void Render_WhenTheDriverAppIsAvailable_OffersToMakeItUnavailable()
+    public void Render_ListsEveryFault_WithItsOwner_AndDescription()
     {
-        Current(unavailable: false);
+        Current(Off, new FaultView("tms-slow", "tms", "The TMS answers slowly.", false, null));
 
         var panel = Render<PresenterPanel>();
 
-        panel.Find("[role=status]").TextContent.Should().Contain("available").And.NotContain("unavailable");
-        panel.Find("fluent-button").TextContent.Trim().Should().Be("Make the Driver app unavailable");
+        var faults = panel.FindAll("[aria-label='Faults'] [role=group]");
+        faults.Select(fault => fault.GetAttribute("aria-label")).Should().Equal("driver-app-unavailable", "tms-slow");
+        faults[0].TextContent.Should().Contain("driver-app").And.Contain("The Driver app refuses every Trip.");
     }
 
     [Fact]
-    public void Render_WhenTheFaultIsOn_SaysSo_AndOffersToSwitchItOff()
+    public void Render_WhenAFaultIsOff_SaysSo_AndOffersOnButNotOff()
     {
-        Current(unavailable: true);
+        Current(Off);
 
-        var panel = Render<PresenterPanel>();
+        var fault = Render<PresenterPanel>().Find("[role=group][aria-label='driver-app-unavailable']");
 
-        panel.Find("[role=status]").TextContent.Should().Contain("unavailable");
-        panel.Find("fluent-button").TextContent.Trim().Should().Be("Make the Driver app available");
+        fault.QuerySelector("[role=status]")!.TextContent.Trim().Should().Be("Off");
+        fault.QuerySelector("fluent-button[aria-label='Switch on driver-app-unavailable']").Should().NotBeNull();
+        fault.QuerySelector("fluent-button[aria-label='Switch off driver-app-unavailable']")!.HasAttribute("disabled").Should().BeTrue();
     }
 
     [Fact]
-    public void SwitchingTheFaultOn_SendsItToTheDriverApp_AndShowsTheNewState()
+    public void Render_WhenAFaultIsOn_ShowsTheRemainingTime()
     {
-        Current(unavailable: false);
-        Portal.SetDriverAppFaultAsync(true, Arg.Any<CancellationToken>()).Returns(new DriverAppFaultView(true));
-        var panel = Render<PresenterPanel>();
+        Current(OnFor(TimeSpan.FromSeconds(95)));
 
-        panel.Find("fluent-button").Click();
+        var fault = Render<PresenterPanel>().Find("[role=group][aria-label='driver-app-unavailable']");
 
-        Portal.Received(1).SetDriverAppFaultAsync(true, Arg.Any<CancellationToken>());
-        panel.Find("fluent-button").TextContent.Trim().Should().Be("Make the Driver app available");
+        fault.QuerySelector("[role=status]")!.TextContent.Should().Contain("On").And.Contain("1:35 left");
+        fault.QuerySelector("fluent-button[aria-label='Switch off driver-app-unavailable']")!.HasAttribute("disabled").Should().BeFalse();
     }
 
     [Fact]
-    public void SwitchingTheFaultOff_SendsItToTheDriverApp()
+    public void TheRemainingTime_CountsDown_AndTheFaultShowsOffWhenItRunsOut()
     {
-        Current(unavailable: true);
-        Portal.SetDriverAppFaultAsync(false, Arg.Any<CancellationToken>()).Returns(new DriverAppFaultView(false));
+        Current(OnFor(TimeSpan.FromSeconds(2)));
         var panel = Render<PresenterPanel>();
 
-        panel.Find("fluent-button").Click();
+        Time.Advance(TimeSpan.FromSeconds(1));
+        panel.WaitForAssertion(() => panel.Find("[aria-label='driver-app-unavailable'] [role=status]").TextContent.Should().Contain("0:01 left"));
+        Time.Advance(TimeSpan.FromSeconds(1));
 
-        Portal.Received(1).SetDriverAppFaultAsync(false, Arg.Any<CancellationToken>());
-        panel.Find("fluent-button").TextContent.Trim().Should().Be("Make the Driver app unavailable");
+        panel.WaitForAssertion(() => panel.Find("[aria-label='driver-app-unavailable'] [role=status]").TextContent.Trim().Should().Be("Off"));
     }
 
     [Fact]
-    public void WhenTheDriverAppCantBeReached_SaysSo_AndOffersNoSwitch()
+    public void TheFaults_AreReadAgainEveryFewSeconds()
     {
-        Portal.GetDriverAppFaultAsync(Arg.Any<CancellationToken>()).Returns<DriverAppFaultView>(_ => throw new HttpRequestException());
+        Current(Off);
+        var panel = Render<PresenterPanel>();
+        Current(OnFor(TimeSpan.FromSeconds(60)));
+
+        Time.Advance(TimeSpan.FromSeconds(10));
+
+        panel.WaitForAssertion(() => panel.Find("[aria-label='driver-app-unavailable'] [role=status]").TextContent.Should().Contain("On"));
+    }
+
+    [Fact]
+    public void SwitchingAFaultOn_SendsTheChosenDuration_AndShowsTheNewState()
+    {
+        Current(Off);
+        Portal.SwitchFaultAsync("driver-app", "driver-app-unavailable", Arg.Any<TimeSpan?>(), Arg.Any<CancellationToken>())
+            .Returns(_ => OnFor(TimeSpan.FromSeconds(120)));
+        var panel = Render<PresenterPanel>();
+
+        panel.Find("fluent-button[aria-label='Switch on driver-app-unavailable']").Click();
+
+        // The default is two minutes: a fault that is on is always switched on for a time.
+        Portal.Received(1).SwitchFaultAsync("driver-app", "driver-app-unavailable", TimeSpan.FromSeconds(120), Arg.Any<CancellationToken>());
+        panel.Find("[aria-label='driver-app-unavailable'] [role=status]").TextContent.Should().Contain("On").And.Contain("2:00 left");
+    }
+
+    [Fact]
+    public void SwitchingAFaultOff_SendsNoDuration_AndShowsItOff()
+    {
+        Current(OnFor(TimeSpan.FromSeconds(60)));
+        Portal.SwitchFaultAsync("driver-app", "driver-app-unavailable", null, Arg.Any<CancellationToken>()).Returns(Off);
+        var panel = Render<PresenterPanel>();
+
+        panel.Find("fluent-button[aria-label='Switch off driver-app-unavailable']").Click();
+
+        Portal.Received(1).SwitchFaultAsync("driver-app", "driver-app-unavailable", null, Arg.Any<CancellationToken>());
+        panel.Find("[aria-label='driver-app-unavailable'] [role=status]").TextContent.Trim().Should().Be("Off");
+    }
+
+    [Fact]
+    public void WhenTheFaultsCantBeLoaded_SaysSo_AndOffersNoSwitch()
+    {
+        Portal.ListFaultsAsync(Arg.Any<CancellationToken>()).Returns<IReadOnlyList<FaultView>>(_ => throw new HttpRequestException());
 
         var panel = Render<PresenterPanel>();
 
-        panel.Find("[role=alert]").TextContent.Should().Contain("couldn't be reached");
-        panel.FindAll("fluent-button").Should().BeEmpty();
+        panel.Find("[aria-label='Faults'] [role=alert]").TextContent.Should().Contain("couldn't be loaded");
+        panel.FindAll("[aria-label='Faults'] fluent-button").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void WhenNoApplicationOwnsAFault_SaysSo()
+    {
+        Current();
+
+        Render<PresenterPanel>().Find("[aria-label='Faults'] [role=status]").TextContent.Should().Contain("No application owns a fault");
     }
 
     [Fact]
     public void WhenSwitchingFails_SaysSo_AndKeepsTheOldState()
     {
-        Current(unavailable: false);
-        Portal.SetDriverAppFaultAsync(true, Arg.Any<CancellationToken>()).Returns<DriverAppFaultView>(_ => throw new HttpRequestException());
+        Current(Off);
+        Portal.SwitchFaultAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<TimeSpan?>(), Arg.Any<CancellationToken>())
+            .Returns<FaultView>(_ => throw new HttpRequestException());
         var panel = Render<PresenterPanel>();
 
-        panel.Find("fluent-button").Click();
+        panel.Find("fluent-button[aria-label='Switch on driver-app-unavailable']").Click();
 
-        panel.Find("[role=alert]").TextContent.Should().Contain("couldn't be switched");
-        panel.Find("fluent-button").TextContent.Trim().Should().Be("Make the Driver app unavailable");
+        panel.Find("[aria-label='Faults'] [role=alert]").TextContent.Should().Contain("couldn't be switched");
+        panel.Find("[aria-label='driver-app-unavailable'] [role=status]").TextContent.Trim().Should().Be("Off");
     }
 
     [Fact]
     public void Render_WithEntraTestUsers_ListsEachDriversUserName_AndThePassword()
     {
-        Current(unavailable: false);
+        Current(Off);
         Portal.ListDriverSignInsAsync(Arg.Any<CancellationToken>()).Returns(new DriverSignInsView(
             "s3cret",
             [new DriverSignInView("DRV-0001", "Anouk de Vries", "drv-0001@norvia.example"), new DriverSignInView("DRV-0002", "Joost Bakker", "drv-0002@norvia.example")]));
@@ -100,7 +153,7 @@ public sealed class PresenterPanelTests : PortalWebContext
     [Fact]
     public void Render_WithoutEntraTestUsers_SaysTheDriverAppsSignInPageStandsIn_AndListsTheDrivers()
     {
-        Current(unavailable: false);
+        Current(Off);
         Portal.ListDriverSignInsAsync(Arg.Any<CancellationToken>()).Returns(new DriverSignInsView(null, [new DriverSignInView("DRV-0001", "Anouk de Vries", null)]));
 
         var signIn = Render<PresenterPanel>().Find("[aria-label='Driver sign-in']");
@@ -112,12 +165,12 @@ public sealed class PresenterPanelTests : PortalWebContext
     [Fact]
     public void Render_WhenTheSignInDetailsCantBeLoaded_SaysSo_AndTheFaultStillWorks()
     {
-        Current(unavailable: false);
+        Current(Off);
         Portal.ListDriverSignInsAsync(Arg.Any<CancellationToken>()).Returns<DriverSignInsView>(_ => throw new InvalidDataException());
 
         var panel = Render<PresenterPanel>();
 
         panel.Find("[aria-label='Driver sign-in'] [role=alert]").TextContent.Should().Contain("sign-in details couldn't be loaded");
-        panel.Find("fluent-button").TextContent.Trim().Should().Be("Make the Driver app unavailable");
+        panel.Find("fluent-button[aria-label='Switch on driver-app-unavailable']").Should().NotBeNull();
     }
 }

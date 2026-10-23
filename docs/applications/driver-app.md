@@ -6,7 +6,7 @@ Part of the [applications](README.md).
 
 The Driver app API (`driver-app-api`) takes the Trip versions the TMS dispatches, the outcomes of the Driver's reports, and the Driver's own actions when a caller plays the Driver without the app's screens. Shapes come from the OpenAPI document [v1](openapi/driver-app.v1.json). Who holds which app role is in [identity-and-access.md](../architecture/identity-and-access.md); it is not copied here. The Driver app reaches the TMS only through the integration layer: it publishes what the Driver reports as events and never calls the TMS ([ADR 0001](../adr/0001-realistic-applications-integrated-only-through-ais.md)).
 
-- **Three kinds of credential.** The Trip endpoint asks for the Driver app's endpoint key (`X-Api-Key`, `driver-app-endpoint-key` in the Driver app's Key Vault). The outcome endpoint asks for a token with the app role `DriverReports.ReportOutcome`. The Driver actions ask for a token whose **one app role is the Driver ID** (`DRV-0001`); the API takes the Driver from that role and nowhere else ([ADR 0037](../adr/0037-drivers-sign-in-to-the-driver-app-with-entra-and-the-driver-id-is-their-app-role.md)). Reset takes `Estate.Reset`.
+- **Three kinds of credential.** The Trip endpoint asks for the Driver app's endpoint key (`X-Api-Key`, `driver-app-endpoint-key` in the Driver app's Key Vault). The outcome endpoint asks for a token with the app role `DriverReports.ReportOutcome`. The Driver actions ask for a token whose **one app role is the Driver ID** (`DRV-0001`); the API takes the Driver from that role and nowhere else ([ADR 0037](../adr/0037-drivers-sign-in-to-the-driver-app-with-entra-and-the-driver-id-is-their-app-role.md)). The fault switches take `Demo.Fault`. Reset takes `Estate.Reset`.
 - **Idempotency.** A Trip version sent twice, or a lower one after a higher, is acknowledged and ignored. An outcome for a report that has one already is acknowledged with result `Ignored`.
 - **Refusals.** A request that breaks a rule answers a problem with a stable `code`; the routes below list the success shape only.
 - **Locally.** There is no Entra under Aspire: every caller asks for a token with its own client ID and roles, signed with one key, and the Driver app API trusts that issuer. The Driver reports Logic App and the Trip dispatch Logic App are played by hosted workers ([ADR 0036](../adr/0036-locally-a-hosted-worker-plays-the-p11-trip-dispatch-logic-app.md), [ADR 0038](../adr/0038-locally-a-hosted-worker-plays-the-p12-driver-reports-logic-app.md)). The consumers and roles are the same.
@@ -20,7 +20,7 @@ Every consumer reaches the Driver app API **directly**; API Management never cal
 | **Trip dispatch Logic App** | `trip-dispatch`; reads the Driver app's endpoint key | [P11](../processes/tms/p11-trip-dispatch.md) | No: reads the `trip-dispatch` subscription, then sends direct |
 | **Driver reports Logic App** | `driver-reports`, `DriverReports.ReportOutcome` | [P12](../processes/tms/p12-trip-execution.md#driver-app) | No: reads the `driver-reports` subscription, then reports the outcome direct |
 | **Simulator** | A client app per Driver that trusts `simulator`, holding the Driver ID as its one app role. Plays the Drivers ([ADR 0042](../adr/0042-the-simulator-signs-in-with-easy-auth-reaches-the-estate-as-its-own-identity-and-plays-the-personas-and-drivers-through-entra-client-apps.md)); `simulator` itself holds `Estate.Reset` | [P12](../processes/tms/p12-trip-execution.md#driver-app), Reset estate | No: direct ([ADR 0039](../adr/0039-the-simulator-books-only-through-the-estates-real-doors.md)) |
-| **Partner portal** | None: the presenter panel calls the settings anonymously | [P11](../processes/tms/p11-trip-dispatch.md) | No: direct |
+| **Partner portal** | The portal's managed identity, holding `Demo.Fault`: the presenter panel switches the faults as the portal, which is the presenter's gate ([ADR 0024](../adr/0024-the-demo-uis-are-public-behind-an-entra-gate-for-the-presenter.md)) | [P11](../processes/tms/p11-trip-dispatch.md) | No: direct |
 | **Driver app screens** (`driver-app-web`) | A Driver signed in with Entra, one app role (the Driver ID) | [P11](../processes/tms/p11-trip-dispatch.md), [P12](../processes/tms/p12-trip-execution.md) | Not callers: the screens run the same commands in process |
 | **Agents (planned)** | None | None yet | No Agent reads the Driver app ([ADR 0040](../adr/0040-agents-read-the-estate-through-api-management-have-no-write-tools-and-their-own-identity.md)) |
 
@@ -51,19 +51,21 @@ The Simulator's per-Driver token is the credential for all of these. A Trip that
 |---|---|---|---|---|
 | `POST /v1/report-outcomes` | Tell the Driver app what became of a Driver's report: Recorded, Refused (with the TMS's code and message) or Not recorded. A report that has an outcome already is acknowledged with `Ignored`. `ReportNotFound` (404) for an unknown report or one of another Trip. | `DriverReports.ReportOutcome` | `ReportOutcomeRequest` → outcome result | Driver reports Logic App (P12) |
 
-### Settings
+### Faults
+
+The Driver app owns one fault, `driver-app-unavailable`. Every fault switch is the one contract of `Norvia.ServiceDefaults` ([as-found.md](../operations/as-found.md#faults)): off by default, switched on for a duration and expiring by itself, and guarded by the app role `Demo.Fault`. A caller without a token gets 401, one without the role 403.
 
 | Method and route | Purpose | Credential | Request and response | Consumers |
 |---|---|---|---|---|
-| `GET /v1/settings/unavailable` | Read the "Driver app unavailable" demo fault. | None, on purpose: it only makes the Driver app refuse Trips ([coding guidelines §8](../coding-guidelines.md#8-configuration-secrets-and-security)) | → current setting | Partner portal's presenter panel (P11) |
-| `PUT /v1/settings/unavailable` | Switch the fault on or off. | None, as above | `UnavailableRequest` → 204 | Partner portal's presenter panel (P11) |
+| `GET /v1/faults` | List the faults the Driver app owns, with whether each is on, when it expires and how many seconds it has left. | `Demo.Fault` | → fault list | Partner portal's presenter panel (P11) |
+| `PUT /v1/faults/{name}` | Switch a fault on, for `durationSeconds` (the default when left out, at most a few minutes), or off. A duration over the limit is refused with 400, an unknown fault with 404. | `Demo.Fault` | `SwitchFaultRequest` → the fault | Partner portal's presenter panel (P11) |
 
 ### Reset
 
 | Method and route | Purpose | Credential | Request and response | Consumers |
 |---|---|---|---|---|
 | `GET /v1/reset` | Whether a reset would be taken now: `enabled` is the `Reset:Enabled` setting, and `busySubscription` names the first subscription still holding unprocessed messages, or is null. | `Estate.Reset` | → `ResetReadiness` | Simulator (Reset estate) |
-| `POST /v1/reset` | Delete the Trips the Driver app was sent, the Drivers' reports and the outbox Messages, and put the demo settings back to their defaults. Refused with `ResetDisabled` (403) while the setting is off and `SubscriptionBusy` (409) while the estate isn't quiet. | `Estate.Reset` | → `ResetReport` | Simulator (Reset estate) |
+| `POST /v1/reset` | Delete the Trips the Driver app was sent, the Drivers' reports and the outbox Messages,. Refused with `ResetDisabled` (403) while the setting is off and `SubscriptionBusy` (409) while the estate isn't quiet. | `Estate.Reset` | → `ResetReport` | Simulator (Reset estate) |
 
 ## Database
 
@@ -78,17 +80,6 @@ Only the key columns are drawn; every column is in the tables below. The picture
 ![driver-app entity relationships](../architecture/diagrams/er-driver-app.png)
 
 ### Tables
-
-#### `DriverAppSettings`
-
-The Driver app's demo settings, one row for the whole app. The presenter switches them from the Partner portal's panel (P11).
-
-| Column | Type | Nullable | Default | Key | Description |
-|---|---|---|---|---|---|
-| `Id` | `int` | no |  | PK | Always 1: there is one row. |
-| `Unavailable` | `bit` | no |  |  | The "Driver app unavailable" demo fault: while on, the Driver app refuses every Trip version with a 503, so the Trip dispatch Logic App reports it Not delivered. |
-
-Primary key `PK_DriverAppSettings`: `Id`.
 
 #### `DriverReports`
 

@@ -11,6 +11,10 @@ public static class TrackingKeys
     public const string SourceMessageId = "sourceMessageId";
     public const string Outcome = "outcome";
     public const string FailureCode = "failureCode";
+
+    /// <summary>The name of the runtime fault that made a hop fail, set only on a hop a fault caused.</summary>
+    public const string Fault = "fault";
+
     public const string Succeeded = "Succeeded";
     public const string Refused = "Refused";
     public const string Failed = "Failed";

@@ -45,8 +45,8 @@
       "type": "text",
       "x": 40,
       "y": 82,
-      "width": 1680.0,
-      "height": 20.0,
+      "width": 1220.0,
+      "height": 40.0,
       "angle": 0,
       "strokeColor": "#6b7280",
       "backgroundColor": "transparent",
@@ -66,14 +66,14 @@
       "updated": 1760000000000,
       "link": null,
       "locked": false,
-      "text": "The tables of the database and the foreign keys between them. Only the key columns are drawn; every column is in the application page.",
+      "text": "The tables of the database and the foreign keys between them. Only the key columns are drawn; every column is in the application\npage.",
       "fontSize": 16,
       "fontFamily": 6,
       "textAlign": "left",
       "verticalAlign": "top",
       "baseline": 14,
       "containerId": null,
-      "originalText": "The tables of the database and the foreign keys between them. Only the key columns are drawn; every column is in the application page.",
+      "originalText": "The tables of the database and the foreign keys between them. Only the key columns are drawn; every column is in the application\npage.",
       "autoResize": false,
       "lineHeight": 1.25
     },
@@ -81,7 +81,7 @@
       "id": "rec0003",
       "type": "rectangle",
       "x": 40,
-      "y": 112,
+      "y": 132,
       "width": 26,
       "height": 18,
       "angle": 0,
@@ -110,7 +110,7 @@
       "id": "tex0004",
       "type": "text",
       "x": 74,
-      "y": 113,
+      "y": 133,
       "width": 66.19999999999999,
       "height": 17.5,
       "angle": 0,
@@ -144,7 +144,7 @@
       "lineHeight": 1.25
     },
     {
-      "id": "box-DriverAppSettings",
+      "id": "box-DriverReports",
       "type": "rectangle",
       "x": 40.0,
       "y": 160.0,
@@ -159,7 +159,7 @@
       "roughness": 0,
       "opacity": 100,
       "groupIds": [
-        "grp-DriverAppSettings"
+        "grp-DriverReports"
       ],
       "frameId": null,
       "roundness": {
@@ -190,7 +190,7 @@
       "roughness": 0,
       "opacity": 100,
       "groupIds": [
-        "grp-DriverAppSettings"
+        "grp-DriverReports"
       ],
       "frameId": null,
       "roundness": null,
@@ -202,14 +202,14 @@
       "updated": 1760000000000,
       "link": null,
       "locked": false,
-      "text": "DriverAppSettings",
+      "text": "DriverReports",
       "fontSize": 15,
       "fontFamily": 6,
       "textAlign": "center",
       "verticalAlign": "top",
       "baseline": 13,
       "containerId": null,
-      "originalText": "DriverAppSettings",
+      "originalText": "DriverReports",
       "autoResize": false,
       "lineHeight": 1.25
     },
@@ -229,7 +229,7 @@
       "roughness": 0,
       "opacity": 100,
       "groupIds": [
-        "grp-DriverAppSettings"
+        "grp-DriverReports"
       ],
       "frameId": null,
       "roundness": null,
@@ -241,19 +241,19 @@
       "updated": 1760000000000,
       "link": null,
       "locked": false,
-      "text": "PK Id (int)",
+      "text": "PK EventId (uniqueidentifier)",
       "fontSize": 12,
       "fontFamily": 6,
       "textAlign": "center",
       "verticalAlign": "top",
       "baseline": 10,
       "containerId": null,
-      "originalText": "PK Id (int)",
+      "originalText": "PK EventId (uniqueidentifier)",
       "autoResize": false,
       "lineHeight": 1.25
     },
     {
-      "id": "box-DriverReports",
+      "id": "box-DriverTrips",
       "type": "rectangle",
       "x": 500.0,
       "y": 160.0,
@@ -268,7 +268,7 @@
       "roughness": 0,
       "opacity": 100,
       "groupIds": [
-        "grp-DriverReports"
+        "grp-DriverTrips"
       ],
       "frameId": null,
       "roundness": {
@@ -299,7 +299,7 @@
       "roughness": 0,
       "opacity": 100,
       "groupIds": [
-        "grp-DriverReports"
+        "grp-DriverTrips"
       ],
       "frameId": null,
       "roundness": null,
@@ -311,14 +311,14 @@
       "updated": 1760000000000,
       "link": null,
       "locked": false,
-      "text": "DriverReports",
+      "text": "DriverTrips",
       "fontSize": 15,
       "fontFamily": 6,
       "textAlign": "center",
       "verticalAlign": "top",
       "baseline": 13,
       "containerId": null,
-      "originalText": "DriverReports",
+      "originalText": "DriverTrips",
       "autoResize": false,
       "lineHeight": 1.25
     },
@@ -338,7 +338,7 @@
       "roughness": 0,
       "opacity": 100,
       "groupIds": [
-        "grp-DriverReports"
+        "grp-DriverTrips"
       ],
       "frameId": null,
       "roundness": null,
@@ -350,19 +350,19 @@
       "updated": 1760000000000,
       "link": null,
       "locked": false,
-      "text": "PK EventId (uniqueidentifier)",
+      "text": "PK TripNumber (nvarchar(16))",
       "fontSize": 12,
       "fontFamily": 6,
       "textAlign": "center",
       "verticalAlign": "top",
       "baseline": 10,
       "containerId": null,
-      "originalText": "PK EventId (uniqueidentifier)",
+      "originalText": "PK TripNumber (nvarchar(16))",
       "autoResize": false,
       "lineHeight": 1.25
     },
     {
-      "id": "box-DriverTrips",
+      "id": "box-OutboxMessages",
       "type": "rectangle",
       "x": 960.0,
       "y": 160.0,
@@ -377,7 +377,7 @@
       "roughness": 0,
       "opacity": 100,
       "groupIds": [
-        "grp-DriverTrips"
+        "grp-OutboxMessages"
       ],
       "frameId": null,
       "roundness": {
@@ -408,7 +408,7 @@
       "roughness": 0,
       "opacity": 100,
       "groupIds": [
-        "grp-DriverTrips"
+        "grp-OutboxMessages"
       ],
       "frameId": null,
       "roundness": null,
@@ -420,14 +420,14 @@
       "updated": 1760000000000,
       "link": null,
       "locked": false,
-      "text": "DriverTrips",
+      "text": "OutboxMessages",
       "fontSize": 15,
       "fontFamily": 6,
       "textAlign": "center",
       "verticalAlign": "top",
       "baseline": 13,
       "containerId": null,
-      "originalText": "DriverTrips",
+      "originalText": "OutboxMessages",
       "autoResize": false,
       "lineHeight": 1.25
     },
@@ -447,122 +447,13 @@
       "roughness": 0,
       "opacity": 100,
       "groupIds": [
-        "grp-DriverTrips"
+        "grp-OutboxMessages"
       ],
       "frameId": null,
       "roundness": null,
       "seed": 911648020,
       "version": 1,
       "versionNonce": 126938844,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1760000000000,
-      "link": null,
-      "locked": false,
-      "text": "PK TripNumber (nvarchar(16))",
-      "fontSize": 12,
-      "fontFamily": 6,
-      "textAlign": "center",
-      "verticalAlign": "top",
-      "baseline": 10,
-      "containerId": null,
-      "originalText": "PK TripNumber (nvarchar(16))",
-      "autoResize": false,
-      "lineHeight": 1.25
-    },
-    {
-      "id": "box-OutboxMessages",
-      "type": "rectangle",
-      "x": 1420.0,
-      "y": 160.0,
-      "width": 300,
-      "height": 64,
-      "angle": 0,
-      "strokeColor": "#0c8599",
-      "backgroundColor": "#c5f6fa",
-      "fillStyle": "solid",
-      "strokeWidth": 2,
-      "strokeStyle": "solid",
-      "roughness": 0,
-      "opacity": 100,
-      "groupIds": [
-        "grp-OutboxMessages"
-      ],
-      "frameId": null,
-      "roundness": {
-        "type": 3
-      },
-      "seed": 1775651416,
-      "version": 1,
-      "versionNonce": 1214302568,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1760000000000,
-      "link": null,
-      "locked": false
-    },
-    {
-      "id": "tex0015",
-      "type": "text",
-      "x": 1432.0,
-      "y": 171.0,
-      "width": 276,
-      "height": 18.75,
-      "angle": 0,
-      "strokeColor": "#1e1e1e",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "solid",
-      "roughness": 0,
-      "opacity": 100,
-      "groupIds": [
-        "grp-OutboxMessages"
-      ],
-      "frameId": null,
-      "roundness": null,
-      "seed": 265862674,
-      "version": 1,
-      "versionNonce": 2034632751,
-      "isDeleted": false,
-      "boundElements": [],
-      "updated": 1760000000000,
-      "link": null,
-      "locked": false,
-      "text": "OutboxMessages",
-      "fontSize": 15,
-      "fontFamily": 6,
-      "textAlign": "center",
-      "verticalAlign": "top",
-      "baseline": 13,
-      "containerId": null,
-      "originalText": "OutboxMessages",
-      "autoResize": false,
-      "lineHeight": 1.25
-    },
-    {
-      "id": "tex0016",
-      "type": "text",
-      "x": 1432.0,
-      "y": 193.75,
-      "width": 276,
-      "height": 15.0,
-      "angle": 0,
-      "strokeColor": "#5c6370",
-      "backgroundColor": "transparent",
-      "fillStyle": "solid",
-      "strokeWidth": 1,
-      "strokeStyle": "solid",
-      "roughness": 0,
-      "opacity": 100,
-      "groupIds": [
-        "grp-OutboxMessages"
-      ],
-      "frameId": null,
-      "roundness": null,
-      "seed": 479402029,
-      "version": 1,
-      "versionNonce": 1354258845,
       "isDeleted": false,
       "boundElements": [],
       "updated": 1760000000000,
@@ -580,12 +471,12 @@
       "lineHeight": 1.25
     },
     {
-      "id": "tex0017",
+      "id": "tex0014",
       "type": "text",
       "x": 40,
       "y": 254.0,
-      "width": 1680.0,
-      "height": 32.5,
+      "width": 1220.0,
+      "height": 48.75,
       "angle": 0,
       "strokeColor": "#6b7280",
       "backgroundColor": "transparent",
@@ -597,22 +488,22 @@
       "groupIds": [],
       "frameId": null,
       "roundness": null,
-      "seed": 1347402587,
+      "seed": 1775651416,
       "version": 1,
-      "versionNonce": 1251976313,
+      "versionNonce": 1214302568,
       "isDeleted": false,
       "boundElements": [],
       "updated": 1760000000000,
       "link": null,
       "locked": false,
-      "text": "Source of truth: er-driver-app.json, which Norvia.Docs.Generator writes from the EF Core model. An arrow runs from the referenced table to the table that holds the foreign key, labelled with its foreign key column and its\ncardinality: 1 to n, with 0..1 in place of 1 for a nullable key and in place of n for a unique one. Tables with no foreign key to or from them sit in the rows below.",
+      "text": "Source of truth: er-driver-app.json, which Norvia.Docs.Generator writes from the EF Core model. An arrow runs from the referenced table to the table that holds the\nforeign key, labelled with its foreign key column and its cardinality: 1 to n, with 0..1 in place of 1 for a nullable key and in place of n for a unique one. Tables\nwith no foreign key to or from them sit in the rows below.",
       "fontSize": 13,
       "fontFamily": 6,
       "textAlign": "left",
       "verticalAlign": "top",
       "baseline": 11,
       "containerId": null,
-      "originalText": "Source of truth: er-driver-app.json, which Norvia.Docs.Generator writes from the EF Core model. An arrow runs from the referenced table to the table that holds the foreign key, labelled with its foreign key column and its\ncardinality: 1 to n, with 0..1 in place of 1 for a nullable key and in place of n for a unique one. Tables with no foreign key to or from them sit in the rows below.",
+      "originalText": "Source of truth: er-driver-app.json, which Norvia.Docs.Generator writes from the EF Core model. An arrow runs from the referenced table to the table that holds the\nforeign key, labelled with its foreign key column and its cardinality: 1 to n, with 0..1 in place of 1 for a nullable key and in place of n for a unique one. Tables\nwith no foreign key to or from them sit in the rows below.",
       "autoResize": false,
       "lineHeight": 1.25
     }

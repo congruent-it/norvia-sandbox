@@ -103,8 +103,8 @@ var driverAppApi = builder.AddProject<Projects.Norvia_DriverApp_Api>("driver-app
     .WithRoleAssignments(messagingEdge, ServiceBusBuiltInRole.AzureServiceBusDataSender)
     .WithHttpHealthCheck("/health");
 
-// The Partner portal's presenter panel switches the Driver app's "unavailable" fault through its API (P11).
-partnerPortal.WithEnvironment("DriverApp__Address", driverAppApi.GetEndpoint("http"));
+// The Partner portal's presenter panel switches the faults the applications own through their APIs; the Driver app's "unavailable" is the first (P11).
+partnerPortal.WithEnvironment("Faults__Owners__driver-app__Address", driverAppApi.GetEndpoint("http"));
 
 // The Driver's screens: sign in as a seeded Driver, then a read-only list of that Driver's Trips. Locally a stand-in plays
 // Entra ID's sign-in (ADR 0037); in Azure Easy Auth signs Drivers in.
@@ -281,7 +281,10 @@ if (builder.ExecutionContext.IsPublishMode)
         .WithEnvironment("PartnerApi__PersonaClientIds", estate.PersonaClientIds)
         .WithEnvironment("PartnerApi__Entra__TenantId", estate.EntraTenantId)
         .WithEnvironment("PartnerApi__Entra__Scope", ReferenceExpression.Create($"{estate.PartnerApiClientId}/.default"))
-        .WithEnvironment("PartnerApi__Entra__ManagedIdentityClientId", estate.PartnerPortalClientId);
+        .WithEnvironment("PartnerApi__Entra__ManagedIdentityClientId", estate.PartnerPortalClientId)
+        // The panel switches the Driver app's faults as the portal's identity, which holds the Demo.Fault role there.
+        .WithEnvironment("Faults__Owners__driver-app__Audience", estate.DriverAppApiClientId)
+        .WithEnvironment("Faults__Entra__ManagedIdentityClientId", estate.PartnerPortalClientId);
     foreach (var persona in personas)
     {
         partnerPortal.WithEnvironment($"PartnerApi__SubscriptionKeys__{persona.Id}", partnerPortalSecrets.Resource.GetSecret($"subscription-key-{persona.Id}"));
@@ -775,7 +778,11 @@ else
         .WithEnvironment("PartnerApi__BaseAddress", ReferenceExpression.Create($"{partnerApi.GetEndpoint("http")}/partner/v1"))
         .WithEnvironment("PartnerApi__PersonaClientIds", string.Join(';', personas.Select(persona => $"{persona.Id}={LocalTokens.PersonaClientId(persona.Id)}")))
         .WithEnvironment("PartnerApi__LocalTokens__Issuer", LocalTokens.Issuer)
-        .WithEnvironment("PartnerApi__LocalTokens__Audience", LocalTokens.PartnerApiAudience);
+        .WithEnvironment("PartnerApi__LocalTokens__Audience", LocalTokens.PartnerApiAudience)
+        // Locally the AppHost signs the presenter in: the panel signs its token for the Driver app API with the Demo.Fault role.
+        .WithEnvironment("Faults__Owners__driver-app__Audience", LocalTokens.DriverAppAudience)
+        .WithEnvironment("Faults__LocalTokens__Issuer", LocalTokens.Issuer)
+        .WithEnvironment("Faults__LocalTokens__ClientId", LocalTokens.PartnerPortalClientId);
     foreach (var persona in personas)
     {
         var subscriptionKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
@@ -832,6 +839,7 @@ else
         (trackingWorker.Resource, "Tracking__TmsTokens__SigningKey"),
         (proofOfDeliveryWorker.Resource, "ProofOfDelivery__TmsTokens__SigningKey"),
         (partnerPortal.Resource, "PartnerApi__LocalTokens__SigningKey"),
+        (partnerPortal.Resource, "Faults__LocalTokens__SigningKey"),
         (simulator.Resource, "PartnerApi__LocalTokens__SigningKey"),
         (simulator.Resource, "TmsApi__LocalTokens__SigningKey"),
         (simulator.Resource, "DriverApp__LocalTokens__SigningKey"),
