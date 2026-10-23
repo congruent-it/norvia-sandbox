@@ -451,7 +451,7 @@ These were left out on purpose while designing P12, each with its reason.
 - **As-found toggles and presenter-panel faults.** They are added after the fixed state is built, as for P1 to P11. The candidates:
   - Presenter-panel fault: the Driver reports Logic App is disabled. The Driver's reports stay Sending, the Planner's Trip never goes In progress, and Stale flags its Shipments.
   - Presenter-panel fault: the TMS is unavailable for a few minutes. The reports wait in their sessions and are processed in order afterwards, so nothing is lost.
-  - Toggle: no report back to the Driver app. The Driver is as blind as a Carrier.
+  - Toggle: no report back to the Driver app. The Driver is as blind as a Carrier. Built: `noReportBackToDriverApp` ([as-found](../../operations/as-found.md#business-safety-nets-and-api-management)).
   - Toggle: no alert on failed Driver reports Logic App runs, or on the dead-letter queue of its subscription.
   - Toggle: no lifecycle rule on the Driver app's transit container, and processed files aren't deleted.
   - Presenter-panel fault: the Driver app sends a photo as HEIC. The TMS refuses the Proof of delivery with `FileNotAccepted`, and the Driver sees it Refused.

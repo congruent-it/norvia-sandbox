@@ -62,8 +62,8 @@
         </return-response>
       </when>
     </choose>
-    <!-- One counter per subscription, shared by the four tracking operations, so a polling Persona stays well inside it. Over the limit API Management answers 429 itself. -->
-    <rate-limit-by-key calls="120" renewal-period="60" counter-key="@(context.Subscription.Id + &quot;:shipper-tracking&quot;)" />
+[[rate-limit]]
+[[cache-lookup]]
     <!-- Find: by the Shipper's own reference. The TMS knows the Shipper only from this header, which only API Management's identity may send (ADR 0005). -->
     <set-backend-service backend-id="tms-api" />
     <rewrite-uri template="/v1/shipper-tracking/transport-orders/find" />
@@ -141,6 +141,7 @@
     </choose>
     <choose>
       <when condition="@(context.Response.StatusCode == 200)">
+[[cache-store]]
         <trace source="norvia-partner-api" severity="information">
           <message>Answered the Shipper</message>
           <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />

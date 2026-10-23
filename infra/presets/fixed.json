@@ -8,5 +8,11 @@
   "noMalwareScanning": false,
   "carrierSecretInlined": false,
   "appInsightsRetentionShort": false,
-  "logicAppsWithoutTrackedProperties": []
+  "logicAppsWithoutTrackedProperties": [],
+  "staleThresholdsUnset": false,
+  "proofMissingThresholdUnset": false,
+  "lateDeliveryCheckOff": false,
+  "shipperTrackingCached": false,
+  "noShipperRateLimit": false,
+  "noReportBackToDriverApp": false
 }

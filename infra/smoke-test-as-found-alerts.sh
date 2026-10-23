@@ -11,7 +11,9 @@
 #   3. with noAlertReceiver=true, the rules exist and the action group has no receiver;
 #   4. with noInboundLifecycleRule=true, the inbound account has no lifecycle rule (fixed has one), and with carrierSecretInlined=true
 #      the booking Logic App has the Carrier credential in its settings, and none after fixed. A health check reports where such a
-#      secret is, never its value, and so does this script.
+#      secret is, never its value, and so does this script;
+#   5. with staleThresholdsUnset=true, the TMS API's ShipmentStale__ThresholdsSet setting is false (true under fixed), and with
+#      shipperTrackingCached=true the get-transport-order policy of the Partner API holds the cache (none under fixed).
 # It ends in the fixed state. Each step deploys the estate alone, as infra/as-found.sh does.
 set -euo pipefail
 
@@ -85,6 +87,31 @@ pass "the inbound account has no lifecycle rule"
 ./as-found.sh carrierSecretInlined=true
 [[ $(inlined_secret) -eq 1 ]] || fail "the booking Logic App has no inlined Carrier credential under carrierSecretInlined"
 pass "the booking Logic App has a Carrier credential in its settings (name only checked, the value is never printed)"
+
+tms_setting() {
+  az containerapp show --name tms-api --resource-group "$resource_group" \
+    --query "properties.template.containers[0].env[?name == '$1'].value | [0]" --output tsv
+}
+api_management=${AZURE_ESTATE_API_MANAGEMENT:?Deploy the estate first: azd hooks run preprovision}
+tracking_policy() {
+  az rest --method get --output tsv --query properties.value \
+    --url "https://management.azure.com/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/$resource_group/providers/Microsoft.ApiManagement/service/$api_management/apis/norvia-partner-api/operations/get-shipper-transport-order/policies/policy?api-version=2024-05-01&format=rawxml"
+}
+
+./as-found.sh fixed
+[[ $(tms_setting ShipmentStale__ThresholdsSet) == true ]] || fail "the Stale thresholds are not set under the fixed preset"
+pass "the TMS API has its Stale thresholds"
+tracking_policy | grep -q "cache-lookup-value" && fail "the Shipper tracking policy caches under the fixed preset"
+pass "the Shipper tracking policy has no cache, and its rate limit"
+
+./as-found.sh staleThresholdsUnset=true
+[[ $(tms_setting ShipmentStale__ThresholdsSet) == false ]] || fail "the Stale thresholds are still set under staleThresholdsUnset"
+[[ $(tms_setting LateDelivery__CheckEnabled) == true ]] || fail "staleThresholdsUnset changed the Late delivery check"
+pass "the Stale thresholds are unset, and only they"
+
+./as-found.sh shipperTrackingCached=true
+tracking_policy | grep -q "cache-lookup-value" || fail "the Shipper tracking policy has no cache under shipperTrackingCached"
+pass "the Shipper tracking policy caches the answer"
 
 ./as-found.sh fixed
 echo "Done: the estate is in the fixed state."

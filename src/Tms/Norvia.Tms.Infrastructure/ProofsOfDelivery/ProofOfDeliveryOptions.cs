@@ -15,6 +15,12 @@ public sealed class ProofOfDeliveryOptions
     public TimeSpan ClockSkew { get; init; } = TimeSpan.FromMinutes(5);
 
     /// <summary>
+    /// Whether <see cref="MissingAfter"/> is set. False leaves it unset: the Planner's list flags no Proof of delivery missing. Only the
+    /// as-found estate does this (the toggle <c>proofMissingThresholdUnset</c>, docs/operations/as-found.md).
+    /// </summary>
+    public bool MissingThresholdSet { get; init; } = true;
+
+    /// <summary>
     /// How long after a Shipment's Delivered Tracking event its Proof of delivery may stay away before the Planner's list
     /// flags it missing (P6).
     /// </summary>

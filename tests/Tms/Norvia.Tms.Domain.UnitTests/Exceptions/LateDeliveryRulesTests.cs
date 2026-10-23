@@ -45,4 +45,11 @@ public sealed class LateDeliveryRulesTests
         rules.HasWindowPassed(null, Latest.AddYears(1)).Should().BeFalse();
         rules.HasWindowPassed(new TimeWindow(Latest, null), Latest.AddYears(1)).Should().BeFalse();
     }
+
+    [Fact]
+    public void HasWindowPassed_WhenSwitchedOff_IsNeverTrue_ButAnEtaCanStillBeLate()
+    {
+        LateDeliveryRules.SwitchedOff.HasWindowPassed(Window, Latest.AddYears(1)).Should().BeFalse();
+        LateDeliveryRules.IsEtaLate(Latest.AddMinutes(1), Window).Should().BeTrue();
+    }
 }

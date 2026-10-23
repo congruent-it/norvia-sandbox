@@ -62,8 +62,7 @@
         </return-response>
       </when>
     </choose>
-    <!-- One counter per subscription, shared by the four tracking operations, so a polling Persona stays well inside it. Over the limit API Management answers 429 itself. -->
-    <rate-limit-by-key calls="120" renewal-period="60" counter-key="@(context.Subscription.Id + &quot;:shipper-tracking&quot;)" />
+[[rate-limit]]
     <!-- File: streamed by the TMS and passed through unchanged. The TMS knows the Shipper only from this header, which only API Management's identity may send (ADR 0005). -->
     <set-backend-service backend-id="tms-api" />
     <rewrite-uri template="/v1/shipper-tracking/transport-orders/{transportOrderNumber}/proof-of-delivery/files/{fileId}" />

@@ -71,6 +71,14 @@ param carrierInvoiceOutcomePrincipalId string
 @description('The P7 Carrier cancellation Logic App\'s identity, which may read the Carrier endpoints\' credentials and nothing else in the vault.')
 param carrierCancellationPrincipalId string
 
+@description('''The as-found toggle shipperTrackingCached (docs/operations/as-found.md): the Shipper tracking queries are answered from a cache that keeps
+the answer for a day, so a Shipper sees an old status after the TMS has changed. The policies are written without it.''')
+param shipperTrackingCached bool = false
+
+@description('''The as-found toggle noShipperRateLimit (docs/operations/as-found.md): the Shipper tracking operations have no rate limit. The policies are
+written with it.''')
+param noShipperRateLimit bool = false
+
 @secure()
 @description('''A random value the Carrier and Shipper endpoints' credentials are derived from, one per Persona. The deployment hook makes it
 once and keeps it in the azd environment, so deploying the estate again keeps the credentials the apps already hold.''')
@@ -393,6 +401,12 @@ resource submitCarrierProofOfDeliveryPolicy 'Microsoft.ApiManagement/service/api
 var shipperTrackingMap = xmlEscaped(loadTextContent('partner-api/shipper-tracking.liquid'))
 var shipperTrackingListMap = xmlEscaped(loadTextContent('partner-api/shipper-tracking-list.liquid'))
 
+// The Shipper product's rate limit and the response cache are fragments the four tracking policies hold a place for. The toggles leave the
+// rate limit out or put the cache in; a fragment not put in is absent, never disabled.
+var shipperRateLimit = noShipperRateLimit ? '' : loadTextContent('partner-api/shipper-rate-limit.fragment.xml')
+var shipperCacheLookup = shipperTrackingCached ? loadTextContent('partner-api/shipper-cache-lookup.fragment.xml') : ''
+var shipperCacheStore = shipperTrackingCached ? loadTextContent('partner-api/shipper-cache-store.fragment.xml') : ''
+
 resource listShipperTransportOrders 'Microsoft.ApiManagement/service/apis/operations@2024-05-01' = {
   parent: partnerApi
   name: 'list-shipper-transport-orders'
@@ -418,7 +432,7 @@ resource listShipperTransportOrdersPolicy 'Microsoft.ApiManagement/service/apis/
   name: 'policy'
   properties: {
     format: 'rawxml'
-    value: replace(loadTextContent('partner-api/list-shipper-transport-orders.policy.xml'), '[[shipper-tracking-list.liquid]]', shipperTrackingListMap)
+    value: replace(replace(replace(replace(loadTextContent('partner-api/list-shipper-transport-orders.policy.xml'), '[[shipper-tracking-list.liquid]]', shipperTrackingListMap), '[[rate-limit]]', shipperRateLimit), '[[cache-lookup]]', shipperCacheLookup), '[[cache-store]]', shipperCacheStore)
   }
   dependsOn: [
     policyValues
@@ -447,7 +461,7 @@ resource findShipperTransportOrderPolicy 'Microsoft.ApiManagement/service/apis/o
   name: 'policy'
   properties: {
     format: 'rawxml'
-    value: replace(loadTextContent('partner-api/find-shipper-transport-order.policy.xml'), '[[shipper-tracking.liquid]]', shipperTrackingMap)
+    value: replace(replace(replace(replace(loadTextContent('partner-api/find-shipper-transport-order.policy.xml'), '[[shipper-tracking.liquid]]', shipperTrackingMap), '[[rate-limit]]', shipperRateLimit), '[[cache-lookup]]', shipperCacheLookup), '[[cache-store]]', shipperCacheStore)
   }
   dependsOn: [
     policyValues
@@ -474,7 +488,7 @@ resource getShipperTransportOrderPolicy 'Microsoft.ApiManagement/service/apis/op
   name: 'policy'
   properties: {
     format: 'rawxml'
-    value: replace(loadTextContent('partner-api/get-shipper-transport-order.policy.xml'), '[[shipper-tracking.liquid]]', shipperTrackingMap)
+    value: replace(replace(replace(replace(loadTextContent('partner-api/get-shipper-transport-order.policy.xml'), '[[shipper-tracking.liquid]]', shipperTrackingMap), '[[rate-limit]]', shipperRateLimit), '[[cache-lookup]]', shipperCacheLookup), '[[cache-store]]', shipperCacheStore)
   }
   dependsOn: [
     policyValues
@@ -502,7 +516,7 @@ resource getShipperProofOfDeliveryFilePolicy 'Microsoft.ApiManagement/service/ap
   name: 'policy'
   properties: {
     format: 'rawxml'
-    value: loadTextContent('partner-api/get-shipper-proof-of-delivery-file.policy.xml')
+    value: replace(loadTextContent('partner-api/get-shipper-proof-of-delivery-file.policy.xml'), '[[rate-limit]]', shipperRateLimit)
   }
   dependsOn: [
     policyValues

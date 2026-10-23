@@ -37,6 +37,12 @@ param asFound object = {
   carrierSecretInlined: false
   appInsightsRetentionShort: false
   logicAppsWithoutTrackedProperties: []
+  staleThresholdsUnset: false
+  proofMissingThresholdUnset: false
+  lateDeliveryCheckOff: false
+  shipperTrackingCached: false
+  noShipperRateLimit: false
+  noReportBackToDriverApp: false
 }
 
 @description('''Easy Auth's sign-in callbacks on the demo UIs (the TMS UI and the Partner portal), comma separated, empty before
@@ -524,6 +530,8 @@ module partnerApi 'estate/partner-api.bicep' = {
     carrierInvoiceOutcomePrincipalId: identities.outputs.carrierInvoiceOutcome.principalId
     carrierCancellationPrincipalId: identities.outputs.carrierCancellationPrincipalId
     carrierEndpointKeySeed: carrierEndpointKeySeed
+    shipperTrackingCached: asFound.?shipperTrackingCached ?? false
+    noShipperRateLimit: asFound.?noShipperRateLimit ?? false
   }
 }
 

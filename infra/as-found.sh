@@ -7,7 +7,8 @@
 #   infra/as-found.sh flowsWithoutFailedRunAlert=a,b         a list toggle takes a comma-separated list, empty for none
 #
 # It stores the toggles in the azd environment as ESTATE_ASFOUND, runs the estate deployment alone (azd's preprovision
-# hook, not the apps), deploys again the Logic Apps whose tracked properties changed, and prints what changed. The TMS's
+# hook, not the apps), deploys again the Logic Apps whose workflow a toggle changes (tracked properties, the Driver app report),
+# sets the TMS Container App's settings for the business safety-net toggles, and prints what changed. The TMS's
 # lifecycle rule (proofFilesStayHot) is Aspire's, so it changes at the next azd provision; the script says so.
 set -eu
 cd "$(dirname "$0")"
@@ -54,6 +55,10 @@ azd hooks run preprovision
 
 flows_changed=$(jq -n -r --argjson before "$current" --argjson after "$updated" \
   '((($before.logicAppsWithoutTrackedProperties // []) - ($after.logicAppsWithoutTrackedProperties // [])) + (($after.logicAppsWithoutTrackedProperties // []) - ($before.logicAppsWithoutTrackedProperties // [])))[]')
+if [ "$(printf '%s' "$current" | jq '.noReportBackToDriverApp // false')" != "$(printf '%s' "$updated" | jq '.noReportBackToDriverApp // false')" ]; then
+  flows_changed="$flows_changed
+driver-reports"
+fi
 if [ -n "$flows_changed" ]; then
   # The tracked properties are in the workflow, which the deploy scripts publish (infra/stage-logic-app.sh).
   repository=$(cd .. && pwd)
@@ -63,6 +68,18 @@ if [ -n "$flows_changed" ]; then
     echo "Deploying the $flow Logic App again ($script)..."
     (cd "$repository" && eval "$(azd env get-values | sed 's/^/export /')" && "infra/$script")
   done
+fi
+# The business safety nets are settings of the TMS's Container App. Aspire sets them at the next deploy from the same toggles; this applies
+# them to the running app now, as a new revision.
+settings=$(jq -n -r --argjson before "$current" --argjson after "$updated" '
+  {staleThresholdsUnset: "ShipmentStale__ThresholdsSet", proofMissingThresholdUnset: "ProofsOfDelivery__MissingThresholdSet", lateDeliveryCheckOff: "LateDelivery__CheckEnabled"}
+  | to_entries[] | select(($before[.key] // false) != ($after[.key] // false)) | "\(.value)=\(if ($after[.key] // false) then "false" else "true" end)"')
+if [ -n "$settings" ]; then
+  eval "$(azd env get-values | sed 's/^/export /')"
+  echo "Setting the TMS API's business safety nets..."
+  # shellcheck disable=SC2086
+  az containerapp update --subscription "$AZURE_SUBSCRIPTION_ID" --name tms-api --resource-group "${AZURE_RESOURCE_GROUP:-rg-$AZURE_ENV_NAME}" \
+    --set-env-vars $settings --output none
 fi
 if [ "$(printf '%s' "$current" | jq '.proofFilesStayHot // false')" != "$(printf '%s' "$updated" | jq '.proofFilesStayHot // false')" ]; then
   echo "proofFilesStayHot changed: the TMS's storage account is Aspire's, so run azd provision to apply it."

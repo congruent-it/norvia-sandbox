@@ -292,5 +292,5 @@ These were left out on purpose while designing P6, each with its reason.
   - Presenter-panel fault: a Carrier sends a `.heic` photo. The TMS refuses it with `FileNotAccepted` and the message is dead-lettered, while the Carrier believes it succeeded.
   - Toggle: no lifecycle rule on the inbound container, so storage grows silently. This ties to the headline incident's unexplained Azure bill. Built: `noInboundLifecycleRule` ([as-found](../../operations/as-found.md#storage-secrets-and-retention)). The Logic App still deletes the blobs it processed.
   - Toggle: Proof of delivery files in the TMS stay in the hot tier. Built: `proofFilesStayHot`.
-  - Toggle: the missing threshold unset, so a Proof of delivery that never arrived goes unnoticed.
+  - Toggle: the missing threshold unset, so a Proof of delivery that never arrived goes unnoticed. Built: `proofMissingThresholdUnset` ([as-found](../../operations/as-found.md#business-safety-nets-and-api-management)).
   - Toggle: no malware scanning, so files from outside reach the TMS unscanned. Built: `noMalwareScanning`.

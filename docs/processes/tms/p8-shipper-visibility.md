@@ -208,7 +208,7 @@ Designed in this document and not built yet:
 | Gap | Where it stands |
 |---|---|
 | Consignee tracking, pushing progress to the Shipper, a tracking read model or caching, the Freight Charge, Fulfilment Transport Orders | Left out on purpose ([Deferred](#deferred)) |
-| As-found toggles and presenter-panel faults for P8 | None added. No Bicep parameter switches API Management response caching or the rate limit, and nothing in the Partner portal makes the TMS Shipper tracking API fail for a few minutes ([Deferred](#deferred)). [Failure behaviour](../../architecture/failure-behaviour.md#p8-shipper-visibility) lists the toggles as planned |
+| As-found toggles and presenter-panel faults for P8 | Two added, `shipperTrackingCached` and `noShipperRateLimit`; nothing in the Partner portal makes the TMS Shipper tracking API fail for a few minutes ([Deferred](#deferred)). [Failure behaviour](../../architecture/failure-behaviour.md#p8-shipper-visibility) names the rows they change |
 | Alerts on P8 | None built: failed requests on the Shipper tracking operations are planned only ([monitoring.bicep](../../../infra/estate/monitoring.bicep) declares no alert rule) |
 | The Integration console's panels for P8 | None. API Management's failures can be found by search only, with no panel |
 
@@ -224,6 +224,6 @@ These were left out on purpose while designing P8, each with its reason.
 - **The Freight Charge.** As in P2.
 - **Fulfilment Transport Orders.** They appear once the WMS handoff exists (P1), with no change to P8.
 - **As-found toggles and presenter-panel faults.** They are added after the fixed state is built, as for P1 to P7. P8 needs no fault of its own to re-enact the headline incident: P5's mapping fault already leaves the Shipper's screen on In transit. The candidates:
-  - Toggle: API Management response caching with a long lifetime. The TMS is right but the Shipper still sees an old Tracking status, which is a look-alike of the headline incident with a different root cause.
+  - Toggle: API Management response caching with a long lifetime. The TMS is right but the Shipper still sees an old Tracking status, which is a look-alike of the headline incident with a different root cause. Built: `shipperTrackingCached` ([as-found](../../operations/as-found.md#business-safety-nets-and-api-management)).
   - Presenter-panel fault: the TMS Shipper tracking API fails for a few minutes. The Shipper sees the error straight away, which contrasts with P5's silent failure.
-  - Toggle: no rate limit on the Shipper product, so polling Personas can load the TMS.
+  - Toggle: no rate limit on the Shipper product, so polling Personas can load the TMS. Built: `noShipperRateLimit`.

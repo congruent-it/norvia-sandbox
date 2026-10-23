@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Aspire.Hosting.Azure;
 using Azure.Provisioning;
 using Azure.Provisioning.Storage;
@@ -18,10 +17,7 @@ internal static class ProofOfDeliveryStorage
     /// Whether the as-found toggle <c>proofFilesStayHot</c> is set (docs/operations/as-found.md). <paramref name="asFound"/> is the
     /// <c>ESTATE_ASFOUND</c> object infra/as-found.sh stores in the azd environment; unset, empty or without the toggle is the fixed state.
     /// </summary>
-    public static bool StayHot(string? asFound) =>
-        !string.IsNullOrWhiteSpace(asFound)
-        && JsonDocument.Parse(asFound).RootElement.TryGetProperty("proofFilesStayHot", out var toggle)
-        && toggle.ValueKind == JsonValueKind.True;
+    public static bool StayHot(string? asFound) => AsFound.IsSet(asFound, "proofFilesStayHot");
 
     /// <summary>Adds the lifecycle rule that moves the container's blobs to cool after <see cref="HotDays"/> days, and does nothing more.</summary>
     public static void AddLifecycleRule(AzureResourceInfrastructure infrastructure)

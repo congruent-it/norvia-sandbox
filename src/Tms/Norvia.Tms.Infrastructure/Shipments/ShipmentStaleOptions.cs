@@ -7,6 +7,12 @@ public sealed class ShipmentStaleOptions
 {
     public const string SectionName = "ShipmentStale";
 
+    /// <summary>
+    /// Whether the thresholds below are set. False leaves them unset: no Shipment is flagged Stale. Only the as-found estate does this
+    /// (the toggle <c>staleThresholdsUnset</c>, docs/operations/as-found.md).
+    /// </summary>
+    public bool ThresholdsSet { get; init; } = true;
+
     /// <summary>How long after its collection window's latest time a Booked Shipment may go uncollected before it is Stale.</summary>
     [Range(typeof(TimeSpan), "00:00:00", "7.00:00:00")]
     public TimeSpan CollectionGrace { get; init; } = TimeSpan.FromHours(2);

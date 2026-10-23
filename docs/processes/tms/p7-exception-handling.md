@@ -398,5 +398,5 @@ These were left out on purpose while designing P7, each with its reason.
 - **As-found toggles and presenter-panel faults.** They are added after the fixed state is built, as for P1 to P6. The candidates:
   - Presenter-panel fault: the Shipper notification endpoint is down, so notifications end Not delivered.
   - Toggle: no alert on failed Shipper notification or Carrier cancellation Logic App runs.
-  - Toggle: the Late delivery check switched off. Together with the unset Stale thresholds from P5, only a Consignee's phone call reveals the problem, as in the headline incident.
+  - Toggle: the Late delivery check switched off. Built: `lateDeliveryCheckOff` ([as-found](../../operations/as-found.md#business-safety-nets-and-api-management)). Together with the unset Stale thresholds from P5, only a Consignee's phone call reveals the problem, as in the headline incident.
   - Presenter-panel fault: a Carrier's cancellation endpoint is down, so the Carrier booking is flagged Carrier not told.
