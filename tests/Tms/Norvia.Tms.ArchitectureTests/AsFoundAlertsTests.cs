@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text.Json.Nodes;
 
 namespace Norvia.Tms.ArchitectureTests;
@@ -56,7 +55,10 @@ public sealed class AsFoundAlertsTests
         {
             var toggles = JsonNode.Parse(File.ReadAllText(Path.Combine(Root, "infra", "presets", $"{preset}.json")))!.AsObject();
 
-            toggles.Select(toggle => toggle.Key).Should().BeEquivalentTo("flowsWithoutFailedRunAlert", "entitiesWithoutDeadLetterAlert", "noAlertReceiver");
+            toggles.Select(toggle => toggle.Key).Should().BeEquivalentTo(
+                "flowsWithoutFailedRunAlert", "entitiesWithoutDeadLetterAlert", "noAlertReceiver",
+                "noInboundLifecycleRule", "noTransitLifecycleRule", "proofFilesStayHot", "noMalwareScanning", "carrierSecretInlined",
+                "appInsightsRetentionShort", "logicAppsWithoutTrackedProperties");
         }
     }
 
@@ -75,8 +77,8 @@ public sealed class AsFoundAlertsTests
         var directory = Directory.CreateTempSubdirectory("as-found-alerts-");
         try
         {
-            var alerts = RelativeTo(directory.FullName, Path.Combine(Root, "infra", "estate", "alerts.bicep"));
-            var presetFile = RelativeTo(directory.FullName, Path.Combine(Root, "infra", "presets", $"{preset}.json"));
+            var alerts = BicepSnapshot.RelativeTo(directory.FullName, Path.Combine(Root, "infra", "estate", "alerts.bicep"));
+            var presetFile = BicepSnapshot.RelativeTo(directory.FullName, Path.Combine(Root, "infra", "presets", $"{preset}.json"));
             var flows = string.Join(", ", Entities.Select(entity => $"{{ name: '{entity}', logicAppName: 'logic-{entity}', workflowName: '{entity}' }}"));
             var queues = string.Join(", ", Entities.Select(entity => $"'{entity}'"));
             var parameters = Path.Combine(directory.FullName, "alerts.bicepparam");
@@ -90,7 +92,7 @@ public sealed class AsFoundAlertsTests
                 param entities = [{{queues}}]
                 """);
 
-            Run(directory.FullName, "snapshot", "alerts.bicepparam", "--mode", "overwrite",
+            BicepSnapshot.Run(directory.FullName, "snapshot", "alerts.bicepparam", "--mode", "overwrite",
                 "--subscription-id", "00000000-0000-0000-0000-000000000000", "--resource-group", "rg", "--location", "westeurope");
 
             var snapshot = JsonNode.Parse(File.ReadAllText(Path.Combine(directory.FullName, "alerts.snapshot.json")))!;
@@ -106,31 +108,5 @@ public sealed class AsFoundAlertsTests
         {
             directory.Delete(recursive: true);
         }
-    }
-
-    // Bicep refuses an absolute path in a parameters file.
-    private static string RelativeTo(string directory, string path) => Path.GetRelativePath(directory, path).Replace('\\', '/');
-
-    private static void Run(string workingDirectory, params string[] arguments)
-    {
-        var start = new ProcessStartInfo(BicepPath(), arguments)
-        {
-            WorkingDirectory = workingDirectory,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-        };
-        using var process = Process.Start(start)!;
-        var output = process.StandardOutput.ReadToEndAsync();
-        var error = process.StandardError.ReadToEndAsync();
-        process.WaitForExit();
-
-        process.ExitCode.Should().Be(0, $"bicep {string.Join(' ', arguments)} printed: {output.Result}{error.Result}");
-    }
-
-    // `az bicep install` puts the Bicep CLI in ~/.azure/bin, which CI does too.
-    private static string BicepPath()
-    {
-        var installed = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".azure", "bin", OperatingSystem.IsWindows() ? "bicep.exe" : "bicep");
-        return File.Exists(installed) ? installed : "bicep";
     }
 }

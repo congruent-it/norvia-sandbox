@@ -201,6 +201,6 @@ These were left out on purpose while designing the console, each with its reason
 - **Editing a message before resubmitting.** A fault is fixed in the map, not in the message.
 - **Resubmitting a Logic App run.** See [Resubmit and discard](#resubmit-and-discard).
 - **As-found toggles.** They are added after the fixed state is built, as for P1 to P12. The candidates:
-  - Toggle: Logic Apps without tracked properties, so a trail can be found by correlation ID but not by Shipment number.
-  - Toggle: Application Insights retention shorter than run history, so run bodies outlive the index that finds them.
+  - Toggle: Logic Apps without tracked properties, so a trail can be found by correlation ID but not by Shipment number. Built: `logicAppsWithoutTrackedProperties` ([as-found](as-found.md#storage-secrets-and-retention)).
+  - Toggle: Application Insights retention shorter than run history, so run bodies outlive the index that finds them. Built: `appInsightsRetentionShort`.
   - Together with P5's presenter-panel fault (an unmappable Carrier code) and missing alerts, the console re-enacts the headline incident's discovery: the message was visible on the dead-letter queue the whole time, and no one was looking.

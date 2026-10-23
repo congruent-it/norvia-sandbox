@@ -21,6 +21,9 @@ param driverReportsPrincipalId string
 @description('The P11 Trip dispatch Logic App\'s identity, which reads the same credential and nothing else in the vault.')
 param tripDispatchPrincipalId string
 
+@description('The as-found toggle noTransitLifecycleRule: build no lifecycle rule, so the files are never deleted (P12).')
+param noLifecycleRule bool = false
+
 resource driverAppSecrets 'Microsoft.KeyVault/vaults@2024-11-01' = {
   name: 'kv-driver-${uniqueString(resourceGroup().id)}'
   location: location
@@ -99,7 +102,7 @@ resource transit 'Microsoft.Storage/storageAccounts/blobServices/containers@2024
 }
 
 // Deletes a file after the estate's retention: a Proof of delivery whose files were never fetched, or whose message failed, stays for investigation until then.
-resource transitRetention 'Microsoft.Storage/storageAccounts/managementPolicies@2024-01-01' = {
+resource transitRetention 'Microsoft.Storage/storageAccounts/managementPolicies@2024-01-01' = if (!noLifecycleRule) {
   parent: transitStorage
   name: 'default'
   properties: {

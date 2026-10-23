@@ -35,12 +35,25 @@ param planName string
 param contentKeyVaultName string
 param carrierKeyVaultName string
 
+@description('The as-found toggle carrierSecretInlined: one Carrier endpoint credential is also kept in the app\'s settings in clear text (P4).')
+param carrierSecretInlined bool = false
+
+@secure()
+@description('The seed the Carrier endpoints\' credentials are derived from (partner-api.bicep). Used only to inline one of them.')
+param carrierEndpointKeySeed string = ''
+
 @description('The Integration console\'s managed identity, which reads the app\'s run history.')
 param integrationConsolePrincipalId string
 
 var resourceToken = uniqueString(resourceGroup().id)
 var logicAppName = 'logic-booking-${resourceToken}'
 var contentShareName = logicAppName
+
+// The Carrier Personas are the seed file's, as in partner-api.bicep.
+var inlinedCarrierId = map(
+  filter(loadJsonContent('../../seed/norvia.seed.json').personas, persona => persona.party.type == 'Carrier'),
+  persona => persona.party.id
+)[0]
 
 resource bookingIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
   name: bookingIdentityName
@@ -167,7 +180,7 @@ resource logicApp 'Microsoft.Web/sites@2024-11-01' = {
       minTlsVersion: '1.2'
       // Needed when the app reaches its storage with a managed identity, and for a trigger that polls Service Bus.
       functionsRuntimeScaleMonitoringEnabled: true
-      appSettings: [
+      appSettings: concat([
         { name: 'APP_KIND', value: 'workflowApp' }
         { name: 'FUNCTIONS_EXTENSION_VERSION', value: '~4' }
         { name: 'FUNCTIONS_WORKER_RUNTIME', value: 'dotnet' }
@@ -194,7 +207,11 @@ resource logicApp 'Microsoft.Web/sites@2024-11-01' = {
         { name: 'BOOKING_IDENTITY_ID', value: bookingIdentity.id }
         { name: 'SERVICE_BUS_NAMESPACE', value: '${serviceBus.name}.servicebus.windows.net' }
         { name: 'KEY_VAULT_URI', value: carrierKeyVault.properties.vaultUri }
-      ]
+      ], carrierSecretInlined ? [
+        // The first Carrier's credential, derived as in partner-api.bicep. The workflow still reads each from Key Vault: this copy is
+        // what a health check finds in the app's settings.
+        { name: 'CARRIER_ENDPOINT_KEY', value: replace('${guid(carrierEndpointKeySeed, inlinedCarrierId, 'carrier-endpoint-key')}${guid(inlinedCarrierId, carrierEndpointKeySeed, 'carrier-endpoint-key')}', '-', '') }
+      ] : [])
     }
   }
   dependsOn: [

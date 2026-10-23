@@ -19,7 +19,7 @@ az logicapp config appsettings set --subscription "$AZURE_SUBSCRIPTION_ID" --nam
 dotnet build src/Integration/Norvia.Integration.CarrierTracking.Functions --configuration Release
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
-(cd src/Integration/TrackingLogicApp && zip -qr "$work/tracking-logic-app.zip" host.json parameters.json connections.json carrier-tracking lib)
+infra/stage-logic-app.sh src/Integration/TrackingLogicApp "$work/tracking-logic-app.zip" host.json parameters.json connections.json carrier-tracking lib
 
 # A changed app setting restarts the app, and a zip deployment during the restart fails. Deploying again is safe.
 for attempt in 1 2 3; do

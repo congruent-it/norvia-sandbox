@@ -30,6 +30,13 @@ param asFound object = {
   flowsWithoutFailedRunAlert: []
   entitiesWithoutDeadLetterAlert: []
   noAlertReceiver: false
+  noInboundLifecycleRule: false
+  noTransitLifecycleRule: false
+  proofFilesStayHot: false
+  noMalwareScanning: false
+  carrierSecretInlined: false
+  appInsightsRetentionShort: false
+  logicAppsWithoutTrackedProperties: []
 }
 
 @description('''Easy Auth's sign-in callbacks on the demo UIs (the TMS UI and the Partner portal), comma separated, empty before
@@ -109,6 +116,7 @@ module monitoring 'estate/monitoring.bicep' = {
     integrationConsolePrincipalId: identities.outputs.integrationConsolePrincipalId
     alertEmail: alertEmail
     noAlertReceiver: asFound.noAlertReceiver
+    appInsightsRetentionShort: asFound.?appInsightsRetentionShort ?? false
   }
 }
 
@@ -264,6 +272,8 @@ module bookingLogicApp 'estate/booking-logic-app.bicep' = {
     planName: intakeLogicApp.outputs.planName
     contentKeyVaultName: intakeLogicApp.outputs.keyVaultName
     carrierKeyVaultName: partnerApi.outputs.partnerPortalKeyVaultName
+    carrierSecretInlined: asFound.?carrierSecretInlined ?? false
+    carrierEndpointKeySeed: carrierEndpointKeySeed
     integrationConsolePrincipalId: identities.outputs.integrationConsolePrincipalId
   }
 }
@@ -316,6 +326,7 @@ module driverApp 'estate/driver-app.bicep' = {
     driverAppPrincipalId: identities.outputs.driverAppPrincipalId
     driverReportsPrincipalId: identities.outputs.driverReportsPrincipalId
     tripDispatchPrincipalId: identities.outputs.tripDispatchPrincipalId
+    noLifecycleRule: asFound.?noTransitLifecycleRule ?? false
   }
 }
 
@@ -457,6 +468,8 @@ module inboundStorage 'estate/inbound-storage.bicep' = {
     apiManagementPrincipalId: identities.outputs.apiManagementPrincipalId
     proofOfDeliveryPrincipalId: identities.outputs.proofOfDeliveryPrincipalId
     presenterPrincipalId: presenterPrincipalId
+    noLifecycleRule: asFound.?noInboundLifecycleRule ?? false
+    noMalwareScanning: asFound.?noMalwareScanning ?? false
   }
 }
 

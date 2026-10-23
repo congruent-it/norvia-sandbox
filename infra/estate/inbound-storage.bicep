@@ -17,6 +17,12 @@ param proofOfDeliveryPrincipalId string
 @description('The presenter\'s Entra object ID, empty for none. The presenter may see whether a Proof of delivery\'s blob is still here, as the presenter smoke run does.')
 param presenterPrincipalId string = ''
 
+@description('The as-found toggle noInboundLifecycleRule: build no lifecycle rule, so processed blobs and the ones left behind are never deleted (P6).')
+param noLifecycleRule bool = false
+
+@description('The as-found toggle noMalwareScanning: build no Defender for Storage malware scanning, so files from outside reach the TMS unscanned (P6).')
+param noMalwareScanning bool = false
+
 var containerName = 'inbound-proofs-of-delivery'
 
 resource storage 'Microsoft.Storage/storageAccounts@2024-01-01' = {
@@ -46,8 +52,9 @@ resource inbound 'Microsoft.Storage/storageAccounts/blobServices/containers@2024
   name: containerName
 }
 
-// Deletes a blob after the estate's retention, the same as the run history and the trail of its message.
-resource retention 'Microsoft.Storage/storageAccounts/managementPolicies@2024-01-01' = {
+// Deletes a blob after the estate's retention, the same as the run history and the trail of its message. Absent with the
+// as-found toggle, never disabled.
+resource retention 'Microsoft.Storage/storageAccounts/managementPolicies@2024-01-01' = if (!noLifecycleRule) {
   parent: storage
   name: 'default'
   properties: {
@@ -81,6 +88,26 @@ resource retention 'Microsoft.Storage/storageAccounts/managementPolicies@2024-01
   dependsOn: [
     inbound
   ]
+}
+
+// Defender for Storage scans each blob on upload and tags the result on the blob. It is billed per storage account per month and per
+// GB scanned (docs/operations/as-found.md), so the monthly cap is low: the sandbox's Proofs of delivery are a few small files.
+resource malwareScanning 'Microsoft.Security/defenderForStorageSettings@2022-12-01-preview' = if (!noMalwareScanning) {
+  name: 'current'
+  scope: storage
+  properties: {
+    isEnabled: true
+    malwareScanning: {
+      onUpload: {
+        isEnabled: true
+        capGBPerMonth: 10
+      }
+    }
+    sensitiveDataDiscovery: {
+      isEnabled: false
+    }
+    overrideSubscriptionLevelSettings: true
+  }
 }
 
 var storageBlobDataContributor = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')

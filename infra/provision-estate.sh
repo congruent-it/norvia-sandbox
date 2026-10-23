@@ -83,6 +83,28 @@ if [ -n "${ESTATE_ASFOUND:-}" ]; then
       az monitor metrics alert delete --subscription "$AZURE_SUBSCRIPTION_ID" --resource-group "rg-$AZURE_ENV_NAME" --name "$rule"
     fi
   done
+
+  # The same for the storage settings the toggles leave out. The estate's accounts are named stinbound<token> and stdriver<token>; the
+  # TMS's is Aspire's (tagged aspire-resource-name=storage), and may not exist yet on the first deployment.
+  toggle() { printf '%s' "$ESTATE_ASFOUND" | jq -r --arg name "$1" '.[$name] // false'; }
+  account() { az storage account list --subscription "$AZURE_SUBSCRIPTION_ID" --resource-group "rg-$AZURE_ENV_NAME" --query "$1" --output tsv; }
+  delete_lifecycle_rule() {
+    [ -n "$1" ] || return 0
+    if az storage account management-policy show --subscription "$AZURE_SUBSCRIPTION_ID" --resource-group "rg-$AZURE_ENV_NAME" --account-name "$1" --output none 2>/dev/null; then
+      echo "Deleting the lifecycle rule of $1 (as-found)..."
+      az storage account management-policy delete --subscription "$AZURE_SUBSCRIPTION_ID" --resource-group "rg-$AZURE_ENV_NAME" --account-name "$1"
+    fi
+  }
+  [ "$(toggle noInboundLifecycleRule)" != true ] || delete_lifecycle_rule "$(account "[?starts_with(name, 'stinbound')].name | [0]")"
+  [ "$(toggle noTransitLifecycleRule)" != true ] || delete_lifecycle_rule "$(account "[?starts_with(name, 'stdriver')].name | [0]")"
+  [ "$(toggle proofFilesStayHot)" != true ] || delete_lifecycle_rule "$(account "[?tags.\"aspire-resource-name\" == 'storage'].name | [0]")"
+  if [ "$(toggle noMalwareScanning)" = true ]; then
+    inbound_id=$(account "[?starts_with(name, 'stinbound')].id | [0]")
+    if [ -n "$inbound_id" ]; then
+      echo "Deleting Defender for Storage malware scanning on the inbound account (as-found)..."
+      az rest --method delete --url "https://management.azure.com$inbound_id/providers/Microsoft.Security/defenderForStorageSettings/current?api-version=2022-12-01-preview" --output none || true
+    fi
+  fi
 fi
 
 # Each output as its name, its value as a JSON string, and its value as it is, tab-separated.
