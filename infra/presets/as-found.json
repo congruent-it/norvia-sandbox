@@ -1,0 +1,5 @@
+{
+  "flowsWithoutFailedRunAlert": ["carrier-tracking"],
+  "entitiesWithoutDeadLetterAlert": ["carrier-tracking"],
+  "noAlertReceiver": false
+}

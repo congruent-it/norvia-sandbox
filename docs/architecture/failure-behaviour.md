@@ -34,7 +34,7 @@ The editable source is [failure-patterns.excalidraw](diagrams/failure-patterns.e
 | **A Logic App records into an owner** | Billing, Carrier cost and Driver reports | A refusal or a used-up retry dead-letters the message with the owner's code | The operator, in the console. A Driver also sees the report's state |
 | **An application publishes an event** | Every outbox | Retried every second, forever, and a failed cycle holds back every message behind it | Nobody: the trail shows a hop that never happened |
 
-No alert is built for any of them, which is the as-found backlog below.
+No alert is built for any of them yet except the two hops of `carrier-tracking` ([as-found](../operations/as-found.md)); the rest is the as-found backlog below.
 
 ## P1: Transport Order intake
 
@@ -81,8 +81,8 @@ Flow `carrier-tracking`. The Carrier gets `202 Accepted` and never learns what h
 | Hop | Retry | Dead letter and `failureCode` | Alert | Console | Toggle |
 |---|---|---|---|---|---|
 | **APIM** `submit-carrier-tracking` | None. The Carrier retries a `503` | `TrackingNotQueued` (`Failed`, 503). `NoCarrierForClient`, `NotAllowedToSubmitTracking` (`Refused`, 403) | None built | View on the trail | *Planned*: none |
-| **Queue** `carrier-tracking` | Lock 1 minute, maximum delivery count 10 | After 10 deliveries Service Bus dead-letters with `MaxDeliveryCountExceeded`. An expired message is dead-lettered too | None built. Planned: the dead-letter queue of `carrier-tracking` | Resubmit to the queue, or discard with a reason | *Planned*: no alert on the dead-letter queue of the tracking queue |
-| **Logic App** `carrier-tracking`, map | None | Dead-lettered by the Logic App as `UnmappableTrackingMessage`: the Carrier's status code is not in the code list. The run fails | None built. Planned: failed runs of the tracking Logic App | View the run; resubmit the message once the map is fixed | *Planned* presenter-panel fault: an unmappable Carrier code. *Planned*: no alert on failed runs |
+| **Queue** `carrier-tracking` | Lock 1 minute, maximum delivery count 10 | After 10 deliveries Service Bus dead-letters with `MaxDeliveryCountExceeded`. An expired message is dead-lettered too | `alert-dead-letter-carrier-tracking`, a metric alert on the namespace's dead-lettered messages, emailed to `ESTATE_ALERT_EMAIL` ([as-found](../operations/as-found.md)) | Resubmit to the queue, or discard with a reason | `entitiesWithoutDeadLetterAlert` lists `carrier-tracking`: the rule is absent ([as-found](../operations/as-found.md)) |
+| **Logic App** `carrier-tracking`, map | None | Dead-lettered by the Logic App as `UnmappableTrackingMessage`: the Carrier's status code is not in the code list. The run fails | `alert-failed-runs-carrier-tracking`, a metric alert on the workflow's failed runs, emailed to `ESTATE_ALERT_EMAIL` ([as-found](../operations/as-found.md)) | View the run; resubmit the message once the map is fixed | `flowsWithoutFailedRunAlert` lists `carrier-tracking`: the rule is absent. *Planned* presenter-panel fault: an unmappable Carrier code |
 | **Logic App** `carrier-tracking`, `Record_in_the_TMS` | None in the action. The queue redelivers | A 4xx from the TMS: dead-lettered with the TMS's own code (such as `ShipmentNotFound`) or `TmsCallRefused`. No answer, 408, 429 or 5xx: abandoned back to the queue, run fails with `TmsUnavailable`, then `MaxDeliveryCountExceeded` | As above | As above | As above |
 | **TMS outbox** (`Shipment*`, `ShipmentExceptionReported`) | As [the outbox](#the-tms-outbox) | As [the outbox](#the-tms-outbox) | None built | As P1 | *Planned*: the Stale thresholds unset, so the business side is not told either |
 

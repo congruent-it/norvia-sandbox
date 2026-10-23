@@ -71,6 +71,20 @@ for attempt in 1 2 3; do
   sleep 60
 done
 
+# Deploying again never deletes a resource, so an alert the as-found toggles now leave out is deleted here: a "no alert" is
+# an absent rule, never a disabled one. The names are those infra/estate/alerts.bicep gives its rules.
+if [ -n "${ESTATE_ASFOUND:-}" ]; then
+  {
+    printf '%s' "$ESTATE_ASFOUND" | jq -r '(.flowsWithoutFailedRunAlert // [])[] | "alert-failed-runs-" + .'
+    printf '%s' "$ESTATE_ASFOUND" | jq -r '(.entitiesWithoutDeadLetterAlert // [])[] | "alert-dead-letter-" + .'
+  } | while read -r rule; do
+    if az monitor metrics alert show --subscription "$AZURE_SUBSCRIPTION_ID" --resource-group "rg-$AZURE_ENV_NAME" --name "$rule" --output none 2>/dev/null; then
+      echo "Deleting the alert $rule (as-found)..."
+      az monitor metrics alert delete --subscription "$AZURE_SUBSCRIPTION_ID" --resource-group "rg-$AZURE_ENV_NAME" --name "$rule"
+    fi
+  done
+fi
+
 # Each output as its name, its value as a JSON string, and its value as it is, tab-separated.
 jq -r 'to_entries[] | [(.key | ascii_upcase), (.value.value | tostring | tojson), (.value.value | tostring)] | @tsv' \
   "$work/outputs.json" > "$work/outputs.env"

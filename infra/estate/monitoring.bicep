@@ -5,6 +5,12 @@ param location string
 param tags object
 param integrationRetentionDays int
 
+@description('The address alerts are emailed to. Empty builds the action group with no receiver.')
+param alertEmail string
+
+@description('The as-found toggle: build the action group with no receiver, so the alerts exist and go nowhere.')
+param noAlertReceiver bool
+
 @description('The Integration console\'s managed identity, which searches the workspace for Message trails.')
 param integrationConsolePrincipalId string
 
@@ -49,6 +55,25 @@ resource integrationConsoleReadsTheWorkspace 'Microsoft.Authorization/roleAssign
   }
 }
 
+// Where every alert goes: an email, and nothing in the console (the console does not raise or show alerts).
+resource alertActionGroup 'Microsoft.Insights/actionGroups@2023-01-01' = {
+  name: 'ag-norvia-${resourceToken}'
+  location: 'global'
+  tags: tags
+  properties: {
+    groupShortName: 'norvia'
+    enabled: true
+    emailReceivers: noAlertReceiver || empty(alertEmail) ? [] : [
+      {
+        name: 'estate-alerts'
+        emailAddress: alertEmail
+        useCommonAlertSchema: true
+      }
+    ]
+  }
+}
+
+output actionGroupId string = alertActionGroup.id
 output workspaceName string = workspace.name
 @description('The workspace\'s ID (its customer ID), which queries address it by.')
 output workspaceId string = workspace.properties.customerId

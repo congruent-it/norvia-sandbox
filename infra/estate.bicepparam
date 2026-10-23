@@ -41,3 +41,9 @@ param erpRedirectUris = readEnvironmentVariable('ESTATE_ERP_REDIRECT_URIS', '')
 param simulatorEnabled = toLower(readEnvironmentVariable('ESTATE_SIMULATOR_ENABLED_SETTING', 'true')) == 'true'
 param simulatorMaxOrdersPerRun = int(readEnvironmentVariable('ESTATE_SIMULATOR_MAX_ORDERS_PER_RUN_SETTING', '200'))
 param simulatorMaxConcurrentRequests = int(readEnvironmentVariable('ESTATE_SIMULATOR_MAX_CONCURRENT_REQUESTS_SETTING', '4'))
+
+// Where the alerts go. Empty builds the action group with no receiver.
+param alertEmail = readEnvironmentVariable('ESTATE_ALERT_EMAIL', '')
+
+// The as-found toggles as one JSON object, set by infra/as-found.sh. Unset is the fixed state.
+param asFound = json(readEnvironmentVariable('ESTATE_ASFOUND', '{"flowsWithoutFailedRunAlert":[],"entitiesWithoutDeadLetterAlert":[],"noAlertReceiver":false}'))
