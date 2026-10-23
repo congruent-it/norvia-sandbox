@@ -222,6 +222,13 @@ if (builder.ExecutionContext.IsPublishMode)
         .WithEnvironment("Authentication__Schemes__Bearer__ValidAudiences__0", estate.TmsApiClientId)
         .WithEnvironment("IntakeCallers__ClientIdsByChannel__ShipperApi__0", estate.IntakeClientId);
 
+    // The as-found toggles for the business safety nets (staleThresholdsUnset, proofMissingThresholdUnset, lateDeliveryCheckOff) are
+    // TMS settings. infra/as-found.sh also applies them to the running app, so a toggle needs no deployment of the apps.
+    foreach (var (name, value) in AsFound.TmsSettings(builder.Configuration["ESTATE_ASFOUND"]))
+    {
+        tmsApi.WithEnvironment(name, value);
+    }
+
     // The TMS UI calls the TMS API as its own identity, which the estate grants the TMS API's manage role; it is the
     // one caller that may re-rate.
     var tmsUiIdentity = builder.AddAzureUserAssignedIdentity("tms-ui-identity")

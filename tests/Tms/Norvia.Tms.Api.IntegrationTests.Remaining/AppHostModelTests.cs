@@ -233,6 +233,34 @@ public sealed class AppHostModelTests
     }
 
     [Fact]
+    public async Task InAzure_WithoutToggles_TheTmsSafetyNetsAreOn()
+    {
+        await using var builder = await CreateForAzureAsync();
+
+        var environment = await EnvironmentOfAsync(builder, "tms-api");
+        environment["ShipmentStale__ThresholdsSet"].Should().Be("true");
+        environment["ProofsOfDelivery__MissingThresholdSet"].Should().Be("true");
+        environment["LateDelivery__CheckEnabled"].Should().Be("true");
+    }
+
+    [Theory]
+    [InlineData("staleThresholdsUnset", "ShipmentStale__ThresholdsSet")]
+    [InlineData("proofMissingThresholdUnset", "ProofsOfDelivery__MissingThresholdSet")]
+    [InlineData("lateDeliveryCheckOff", "LateDelivery__CheckEnabled")]
+    public async Task InAzure_WithABusinessSafetyNetToggle_OnlyItsTmsSettingChanges(string toggle, string setting)
+    {
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(
+            ["--operation", "publish", "--publisher", "default", "--output-path", Path.GetTempPath(), "--ESTATE_ASFOUND", $"{{\"{toggle}\":true}}"],
+            TestContext.Current.CancellationToken);
+
+        var environment = await EnvironmentOfAsync(builder, "tms-api");
+        foreach (var name in new[] { "ShipmentStale__ThresholdsSet", "ProofsOfDelivery__MissingThresholdSet", "LateDelivery__CheckEnabled" })
+        {
+            environment[name].Should().Be(name == setting ? "false" : "true");
+        }
+    }
+
+    [Fact]
     public async Task InAzure_TheTmsApi_CanWriteItsBlobs_AndTheTmsUiOnlyReadThem()
     {
         await using var builder = await CreateForAzureAsync();

@@ -25,4 +25,10 @@ public sealed class ProofOfDeliveryMissingRulesTests
     {
         _rules.IsMissing(DeliveredAt, DeliveredAt.ToUniversalTime().AddHours(48)).Should().BeTrue();
     }
+
+    [Fact]
+    public void IsMissing_WithTheThresholdUnset_IsNeverTrue()
+    {
+        ProofOfDeliveryMissingRules.Unset.IsMissing(DeliveredAt, DeliveredAt.AddYears(1)).Should().BeFalse();
+    }
 }

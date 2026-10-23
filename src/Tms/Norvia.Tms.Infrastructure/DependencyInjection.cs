@@ -88,17 +88,13 @@ public static class DependencyInjection
         builder.Services.AddOptions<ProofOfDeliveryOptions>().BindConfiguration(ProofOfDeliveryOptions.SectionName)
             .ValidateDataAnnotations().ValidateOnStart();
         builder.Services.AddSingleton(services => new ProofOfDeliveryRules(services.GetRequiredService<IOptions<ProofOfDeliveryOptions>>().Value.ClockSkew));
-        builder.Services.AddSingleton(services => new ProofOfDeliveryMissingRules(services.GetRequiredService<IOptions<ProofOfDeliveryOptions>>().Value.MissingAfter));
+        builder.Services.AddSingleton(services => MissingRulesFor(services.GetRequiredService<IOptions<ProofOfDeliveryOptions>>().Value));
         builder.Services.AddOptions<ShipmentStaleOptions>().BindConfiguration(ShipmentStaleOptions.SectionName)
             .ValidateDataAnnotations().ValidateOnStart();
-        builder.Services.AddSingleton(services =>
-        {
-            var options = services.GetRequiredService<IOptions<ShipmentStaleOptions>>().Value;
-            return new ShipmentStaleRules(options.CollectionGrace, options.SilenceLimit, options.DeliveryGrace);
-        });
+        builder.Services.AddSingleton(services => StaleRulesFor(services.GetRequiredService<IOptions<ShipmentStaleOptions>>().Value));
         builder.Services.AddOptions<LateDeliveryOptions>().BindConfiguration(LateDeliveryOptions.SectionName)
             .ValidateDataAnnotations().ValidateOnStart();
-        builder.Services.AddSingleton(services => new LateDeliveryRules(services.GetRequiredService<IOptions<LateDeliveryOptions>>().Value.Grace));
+        builder.Services.AddSingleton(services => LateDeliveryRulesFor(services.GetRequiredService<IOptions<LateDeliveryOptions>>().Value));
         builder.Services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
         builder.Services.AddScoped(typeof(IReadRepository<>), typeof(EfRepository<>));
         builder.Services.AddScoped<IConflictRetrier, EfConflictRetrier>();
@@ -290,4 +286,16 @@ public static class DependencyInjection
         environment.IsDevelopment() && configuration["Clock:ControlFile"] is { Length: > 0 } path
             ? new FileControlledTimeProvider(path)
             : TimeProvider.System;
+
+    /// <summary>P5's Stale rules, with no threshold when the settings leave them unset (the as-found estate).</summary>
+    internal static ShipmentStaleRules StaleRulesFor(ShipmentStaleOptions options) =>
+        options.ThresholdsSet ? new ShipmentStaleRules(options.CollectionGrace, options.SilenceLimit, options.DeliveryGrace) : ShipmentStaleRules.Unset;
+
+    /// <summary>P6's missing rule, with no threshold when the settings leave it unset (the as-found estate).</summary>
+    internal static ProofOfDeliveryMissingRules MissingRulesFor(ProofOfDeliveryOptions options) =>
+        options.MissingThresholdSet ? new ProofOfDeliveryMissingRules(options.MissingAfter) : ProofOfDeliveryMissingRules.Unset;
+
+    /// <summary>P7's Late delivery rules, with the time-based check off when the settings switch it off (the as-found estate).</summary>
+    internal static LateDeliveryRules LateDeliveryRulesFor(LateDeliveryOptions options) =>
+        options.CheckEnabled ? new LateDeliveryRules(options.Grace) : LateDeliveryRules.SwitchedOff;
 }

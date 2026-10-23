@@ -1,0 +1,1 @@
+        <cache-store-value key="@(&quot;shipper-tracking:&quot; + (string)context.Variables[&quot;shipperId&quot;] + &quot;:&quot; + context.Request.OriginalUrl.Path + context.Request.OriginalUrl.QueryString)" value="@(context.Response.Body.As&lt;string&gt;(preserveContent: true))" duration="86400" caching-type="internal" />

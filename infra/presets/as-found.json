@@ -8,5 +8,11 @@
   "noMalwareScanning": true,
   "carrierSecretInlined": true,
   "appInsightsRetentionShort": true,
-  "logicAppsWithoutTrackedProperties": ["billing", "carrier-cancellation", "shipper-notification"]
+  "logicAppsWithoutTrackedProperties": ["billing", "carrier-cancellation", "shipper-notification"],
+  "staleThresholdsUnset": true,
+  "proofMissingThresholdUnset": true,
+  "lateDeliveryCheckOff": false,
+  "shipperTrackingCached": true,
+  "noShipperRateLimit": true,
+  "noReportBackToDriverApp": false
 }

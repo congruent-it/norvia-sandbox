@@ -113,4 +113,15 @@ public sealed class ShipmentStaleRulesTests
         _rules.IsStale(status, null, Window, Window, now).Should().BeTrue();
         _rules.IsStale(status, null, Window, Window, now, awaitingRedelivery: true).Should().BeFalse();
     }
+
+    [Fact]
+    public void Unset_NeverMakesAQuietShipmentStale()
+    {
+        var rules = ShipmentStaleRules.Unset;
+
+        rules.IsStale(ShipmentStatus.Booked, Window, null, null, Window.AddDays(30)).Should().BeFalse();
+        rules.IsStale(ShipmentStatus.InTransit, null, null, Window, Window.AddDays(30)).Should().BeFalse();
+        rules.IsStale(ShipmentStatus.InTransit, null, Window, Window, Window.AddDays(30)).Should().BeFalse();
+        _rules.IsStale(ShipmentStatus.InTransit, null, null, Window, Window.AddDays(30)).Should().BeTrue("the same Shipment is Stale when the thresholds are set");
+    }
 }

@@ -1,0 +1,2 @@
+    <!-- One counter per subscription, shared by the four tracking operations, so a polling Persona stays well inside it. Over the limit API Management answers 429 itself. -->
+    <rate-limit-by-key calls="120" renewal-period="60" counter-key="@(context.Subscription.Id + &quot;:shipper-tracking&quot;)" />

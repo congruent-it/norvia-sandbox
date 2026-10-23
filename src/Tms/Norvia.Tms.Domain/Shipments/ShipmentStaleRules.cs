@@ -1,8 +1,14 @@
 namespace Norvia.Tms.Domain.Shipments;
 
-/// <summary>P5's Stale rules, with the thresholds from the TMS settings.</summary>
-public sealed class ShipmentStaleRules(TimeSpan collectionGrace, TimeSpan silenceLimit, TimeSpan deliveryGrace)
+/// <summary>
+/// P5's Stale rules, with the thresholds from the TMS settings. A threshold that is not set (null) never makes a Shipment Stale: with
+/// none set, nothing is.
+/// </summary>
+public sealed class ShipmentStaleRules(TimeSpan? collectionGrace, TimeSpan? silenceLimit, TimeSpan? deliveryGrace)
 {
+    /// <summary>The rules with no threshold set, as the as-found estate has them.</summary>
+    public static ShipmentStaleRules Unset { get; } = new(null, null, null);
+
     /// <summary>
     /// A Shipment on its way is Stale when its next expected Tracking event is late: a Booked or Dispatched one (awaiting collection) not
     /// collected the collection grace after its collection window's latest time; a Collected or In transit one with no Tracking event
@@ -27,9 +33,9 @@ public sealed class ShipmentStaleRules(TimeSpan collectionGrace, TimeSpan silenc
         }
 
         var awaitingCollection = status is ShipmentStatus.Booked or ShipmentStatus.Dispatched;
-        var notCollected = awaitingCollection && collectionWindowLatest is { } collection && now >= collection + collectionGrace;
-        var silent = !awaitingCollection && lastEventReceivedAt is { } last && now >= last + silenceLimit;
-        var notDelivered = deliveryWindowLatest is { } delivery && now >= delivery + deliveryGrace;
+        var notCollected = awaitingCollection && collectionGrace is { } collectionLimit && collectionWindowLatest is { } collection && now >= collection + collectionLimit;
+        var silent = !awaitingCollection && silenceLimit is { } silenceLimitSet && lastEventReceivedAt is { } last && now >= last + silenceLimitSet;
+        var notDelivered = deliveryGrace is { } deliveryLimit && deliveryWindowLatest is { } delivery && now >= delivery + deliveryLimit;
         return notCollected || silent || notDelivered;
     }
 }

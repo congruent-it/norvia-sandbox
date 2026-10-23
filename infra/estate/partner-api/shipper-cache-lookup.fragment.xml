@@ -1,0 +1,23 @@
+    <!-- The as-found cache (docs/operations/as-found.md): the answer to a Shipper's query is kept for a day, whatever the TMS knows by then. The key names the Shipper, so no Shipper is given another's answer. -->
+    <cache-lookup-value key="@(&quot;shipper-tracking:&quot; + (string)context.Variables[&quot;shipperId&quot;] + &quot;:&quot; + context.Request.OriginalUrl.Path + context.Request.OriginalUrl.QueryString)" variable-name="cachedAnswer" caching-type="internal" />
+    <choose>
+      <when condition="@(context.Variables.ContainsKey(&quot;cachedAnswer&quot;))">
+        <trace source="norvia-partner-api" severity="information">
+          <message>Answered the Shipper from the cache</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="shipper-tracking" />
+          <metadata name="partyId" value="@((string)context.Variables[&quot;shipperId&quot;])" />
+          <metadata name="outcome" value="Succeeded" />
+        </trace>
+        <return-response>
+          <set-status code="200" reason="OK" />
+          <set-header name="X-Correlation-ID" exists-action="override">
+            <value>@((string)context.Variables["correlationId"])</value>
+          </set-header>
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+          </set-header>
+          <set-body>@((string)context.Variables["cachedAnswer"])</set-body>
+        </return-response>
+      </when>
+    </choose>
