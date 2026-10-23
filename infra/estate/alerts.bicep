@@ -1,7 +1,8 @@
-// The estate's alert rules. Every flow gets a failed-run alert and every queue a dead-letter alert, except those the as-found
-// toggles list: a "no alert" is a rule that is absent, never one that is disabled (docs/operations/as-found.md). Both are metric
-// alerts, which need no query and no workspace: the Logic App's failed runs are a platform metric, and so are the
-// dead-lettered messages of a Service Bus entity.
+// The estate's alert rules. Every Logic App workflow gets a failed-run alert and every queue and subscription a Logic App reads a
+// dead-letter alert, except those the as-found toggles list: a "no alert" is a rule that is absent, never one that is disabled
+// (docs/operations/as-found.md). Both are metric alerts, which need no query and no workspace: the Logic App's failed runs are a
+// platform metric, and so are the dead-lettered messages of a Service Bus entity. A new Logic App or entity without an alert, or an
+// exemption in alert-exemptions.json, fails the drift guard (AlertDriftGuardTests).
 
 param tags object
 
@@ -13,11 +14,11 @@ param asFound object
 
 param serviceBusName string
 
-@description('The estate\'s flows that run in a Logic App: the Flow name, the Logic App and the workflow in it.')
+@description('The estate\'s Logic Apps: the name the toggles and the alert use (the workflow\'s), the Logic App and the workflow in it.')
 param flows array
 
-@description('The estate\'s Service Bus queues that a flow reads.')
-param queues array
+@description('The estate\'s Service Bus queues and subscriptions that a Logic App reads, by the name Service Bus reports them under.')
+param entities array
 
 resource serviceBus 'Microsoft.ServiceBus/namespaces@2024-01-01' existing = {
   name: serviceBusName
@@ -61,13 +62,13 @@ resource failedRunAlerts 'Microsoft.Insights/metricAlerts@2018-03-01' = [for (fl
   }
 }]
 
-// Any message in the dead-letter queue, checked every minute. The metric is a gauge, so the alert stays until the queue is emptied.
-resource deadLetterAlerts 'Microsoft.Insights/metricAlerts@2018-03-01' = [for queue in queues: if (!contains(asFound.entitiesWithoutDeadLetterAlert, queue)) {
-  name: 'alert-dead-letter-${queue}'
+// Any message in the dead-letter queue of a queue or subscription, checked every minute. The metric is a gauge, so the alert stays until the queue is emptied.
+resource deadLetterAlerts 'Microsoft.Insights/metricAlerts@2018-03-01' = [for entity in entities: if (!contains(asFound.entitiesWithoutDeadLetterAlert, entity)) {
+  name: 'alert-dead-letter-${entity}'
   location: 'global'
-  tags: union(tags, { 'norvia-alert': 'dead-letter', 'norvia-alert-for': queue })
+  tags: union(tags, { 'norvia-alert': 'dead-letter', 'norvia-alert-for': entity })
   properties: {
-    description: 'The dead-letter queue of ${queue} holds a message.'
+    description: 'The dead-letter queue of ${entity} holds a message.'
     severity: 2
     enabled: true
     scopes: [serviceBus.id]
@@ -82,7 +83,7 @@ resource deadLetterAlerts 'Microsoft.Insights/metricAlerts@2018-03-01' = [for qu
           metricName: 'DeadletteredMessages'
           metricNamespace: 'Microsoft.ServiceBus/namespaces'
           dimensions: [
-            { name: 'EntityName', operator: 'Include', values: [queue] }
+            { name: 'EntityName', operator: 'Include', values: [entity] }
           ]
           operator: 'GreaterThan'
           threshold: 0
