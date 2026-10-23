@@ -1,5 +1,5 @@
 {
-  "flowsWithoutFailedRunAlert": ["carrier-tracking"],
-  "entitiesWithoutDeadLetterAlert": ["carrier-tracking"],
+  "flowsWithoutFailedRunAlert": ["billing", "carrier-booking", "carrier-cancellation", "carrier-proof-of-delivery", "carrier-tracking", "shipper-notification"],
+  "entitiesWithoutDeadLetterAlert": ["billing", "carrier-booking", "carrier-cancellation", "carrier-cost", "carrier-proof-of-delivery", "carrier-tracking", "shipper-notification"],
   "noAlertReceiver": false
 }

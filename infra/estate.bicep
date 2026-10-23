@@ -120,10 +120,35 @@ module alerts 'estate/alerts.bicep' = {
     asFound: asFound
     serviceBusName: messaging.outputs.namespaceName
     flows: [
+      { name: 'transport-order-intake', logicAppName: intakeLogicApp.outputs.logicAppName, workflowName: 'transport-order-intake' }
+      { name: 'carrier-answer', logicAppName: answerLogicApp.outputs.logicAppName, workflowName: 'carrier-answer' }
+      { name: 'carrier-invoice', logicAppName: carrierInvoiceLogicApp.outputs.logicAppName, workflowName: 'carrier-invoice' }
+      { name: 'carrier-booking', logicAppName: bookingLogicApp.outputs.logicAppName, workflowName: 'carrier-booking' }
+      { name: 'shipper-notification', logicAppName: shipperNotificationLogicApp.outputs.logicAppName, workflowName: 'shipper-notification' }
+      { name: 'carrier-cancellation', logicAppName: carrierCancellationLogicApp.outputs.logicAppName, workflowName: 'carrier-cancellation' }
+      { name: 'trip-dispatch', logicAppName: tripDispatchLogicApp.outputs.logicAppName, workflowName: 'trip-dispatch' }
+      { name: 'driver-reports', logicAppName: driverReportsLogicApp.outputs.logicAppName, workflowName: 'driver-reports' }
+      { name: 'billing', logicAppName: billingLogicApp.outputs.logicAppName, workflowName: 'billing' }
+      { name: 'carrier-cost', logicAppName: carrierCostLogicApp.outputs.logicAppName, workflowName: 'carrier-cost' }
+      { name: 'shipper-invoice', logicAppName: shipperInvoiceLogicApp.outputs.logicAppName, workflowName: 'shipper-invoice' }
+      { name: 'carrier-invoice-outcome', logicAppName: carrierInvoiceOutcomeLogicApp.outputs.logicAppName, workflowName: 'carrier-invoice-outcome' }
       { name: 'carrier-tracking', logicAppName: trackingLogicApp.outputs.logicAppName, workflowName: 'carrier-tracking' }
+      { name: 'carrier-proof-of-delivery', logicAppName: proofOfDeliveryLogicApp.outputs.logicAppName, workflowName: 'carrier-proof-of-delivery' }
     ]
-    queues: [
-      messaging.outputs.queueName
+    // Every queue and every subscription a Logic App reads, by the name Service Bus reports it under. The monitoring
+    // subscriptions are left out on purpose (infra/estate/alert-exemptions.json).
+    entities: [
+      'carrier-tracking'
+      'carrier-proof-of-delivery'
+      'carrier-booking'
+      'shipper-notification'
+      'carrier-cancellation'
+      'carrier-cost'
+      'trip-dispatch'
+      'driver-reports'
+      'billing'
+      'shipper-invoice'
+      'carrier-invoice-outcome'
     ]
   }
 }

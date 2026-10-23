@@ -87,7 +87,7 @@ public sealed class AsFoundAlertsTests
                 param asFound = json(loadTextContent('{{presetFile}}'))
                 param serviceBusName = 'sb'
                 param flows = [{{flows}}]
-                param queues = [{{queues}}]
+                param entities = [{{queues}}]
                 """);
 
             Run(directory.FullName, "snapshot", "alerts.bicepparam", "--mode", "overwrite",

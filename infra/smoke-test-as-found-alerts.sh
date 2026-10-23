@@ -5,9 +5,9 @@
 #   infra/smoke-test-as-found-alerts.sh
 #
 # It checks that:
-#   1. with the as-found preset, the Carrier-tracking Logic App has no failed-run alert and the tracking queue has no
-#      dead-letter alert (the rules are absent, not disabled), and the action group still has its receiver;
-#   2. with the fixed preset, both rules exist, are enabled and send to the action group, which has an email receiver;
+#   1. with the as-found preset, a sample of the Logic Apps and entities the preset lists has no alert (the rules are absent,
+#      not disabled), a sample it leaves out still has one, and the action group still has its receiver;
+#   2. with the fixed preset, every sampled rule exists, is enabled and sends to the action group, which has an email receiver;
 #   3. with noAlertReceiver=true, the rules exist and the action group has no receiver.
 # It ends in the fixed state. Each step deploys the estate alone, as infra/as-found.sh does.
 set -euo pipefail
@@ -15,8 +15,17 @@ set -euo pipefail
 cd "$(dirname "$0")"
 eval "$(azd env get-values)"
 resource_group=${AZURE_RESOURCE_GROUP:-rg-$AZURE_ENV_NAME}
-failed_runs=alert-failed-runs-carrier-tracking
-dead_letter=alert-dead-letter-carrier-tracking
+# Listed by infra/presets/as-found.json: the tracking, booking and billing runs; the tracking and Proof of delivery queues and
+# the billing subscription.
+unalerted=(
+  alert-failed-runs-carrier-tracking alert-failed-runs-carrier-booking alert-failed-runs-billing
+  alert-dead-letter-carrier-tracking alert-dead-letter-carrier-proof-of-delivery alert-dead-letter-billing
+)
+# Not listed: the intake and Trip dispatch runs, the Trip dispatch and Driver reports subscriptions.
+alerted=(
+  alert-failed-runs-transport-order-intake alert-failed-runs-trip-dispatch
+  alert-dead-letter-trip-dispatch alert-dead-letter-driver-reports
+)
 
 pass() { echo "PASS  $*"; }
 fail() { echo "FAIL  $*" >&2; exit 1; }
@@ -38,20 +47,18 @@ expect_present() {
 }
 
 ./as-found.sh as-found
-expect_absent "$failed_runs"
-expect_absent "$dead_letter"
+for name in "${unalerted[@]}"; do expect_absent "$name"; done
+for name in "${alerted[@]}"; do expect_present "$name"; done
 [[ $(receivers) -ge 1 ]] || fail "the action group has no receiver under the as-found preset"
 pass "the action group still has its receiver"
 
 ./as-found.sh fixed
-expect_present "$failed_runs"
-expect_present "$dead_letter"
+for name in "${unalerted[@]}" "${alerted[@]}"; do expect_present "$name"; done
 [[ $(receivers) -ge 1 ]] || fail "the action group has no receiver under the fixed preset"
 pass "the action group has an email receiver"
 
 ./as-found.sh noAlertReceiver=true
-expect_present "$failed_runs"
-expect_present "$dead_letter"
+for name in "${unalerted[@]}" "${alerted[@]}"; do expect_present "$name"; done
 [[ $(receivers) -eq 0 ]] || fail "the action group still has a receiver under noAlertReceiver"
 pass "the action group has no receiver, and the alerts exist"
 
