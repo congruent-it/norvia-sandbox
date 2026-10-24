@@ -57,7 +57,7 @@
                 </p>
                 <div class="flex items-end gap-4">
                     <FluentSelect TOption="string" Label="Duration" Items="DurationSeconds" Value="@DurationOf(fault)"
-                                  ValueChanged="@(seconds => _durations[fault.Name] = seconds)" OptionText="@(seconds => DurationText(int.Parse(seconds)))" />
+                                  ValueChanged="@(seconds => _durations[fault.Name] = seconds)" OptionText="@(seconds => DurationText(int.Parse(seconds)))" OptionValue="@(seconds => seconds)" />
                     <FluentButton Appearance="Appearance.Accent" Disabled="_saving" aria-label="@($"Switch on {fault.Name}")"
                                   OnClick="@(() => SwitchAsync(fault, int.Parse(DurationOf(fault))))">
                         @(remaining is null ? "Switch on" : "Switch on again")
