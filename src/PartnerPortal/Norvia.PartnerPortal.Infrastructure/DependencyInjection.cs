@@ -140,8 +140,8 @@ public static class DependencyInjection
     }
 
     /// <summary>
-    /// The faults the applications own, which the presenter panel switches through their APIs as the presenter. Locally the portal signs the presenter's
-    /// token itself; in Azure it is the portal's managed identity's (ADR 0024).
+    /// The faults the applications own, which the presenter panel switches through their APIs as the presenter, and the portal's own, which it switches in process.
+    /// Locally the portal signs the presenter's token itself; in Azure it is the portal's managed identity's (ADR 0024).
     /// </summary>
     private static void AddFaultSwitches(this IHostApplicationBuilder builder)
     {
@@ -157,6 +157,11 @@ public static class DependencyInjection
             services.GetRequiredService<IOptions<FaultsOptions>>().Value.LocalTokens is null
                 ? ActivatorUtilities.CreateInstance<EntraFaultTokens>(services)
                 : ActivatorUtilities.CreateInstance<LocalFaultTokens>(services));
-        builder.Services.AddHttpClient<IFaultSwitches, FaultSwitchClient>();
+        builder.Services.AddHttpClient<FaultSwitchClient>();
+
+        // The portal's own faults: the Personas misbehaving as a Carrier or Shipper can. Off by default, and each expires by itself.
+        builder.AddFaults(PartnerPortalFaultDefinitions.All);
+        builder.Services.AddSingleton<IPartnerPortalFaults, PartnerPortalFaults>();
+        builder.Services.AddTransient<IFaultSwitches, PartnerPortalFaultSwitches>();
     }
 }

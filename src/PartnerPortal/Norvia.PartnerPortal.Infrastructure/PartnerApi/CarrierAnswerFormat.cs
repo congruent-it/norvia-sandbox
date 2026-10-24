@@ -10,7 +10,11 @@ namespace Norvia.PartnerPortal.Infrastructure.PartnerApi;
 /// </summary>
 internal static class CarrierAnswerFormat
 {
-    public static JsonObject ToJson(string carrierBookingNumber, CarrierAnswer answer)
+    /// <summary>The reason code the unmapped-reason fault sends: a Carrier's own wording, outside the list the map reads.</summary>
+    public const string UnmappedReasonCode = "CAPACITY_EXCEEDED";
+
+    /// <param name="unmappedReason">Whether the unmapped-reason fault applies: a rejection then carries <see cref="UnmappedReasonCode"/>.</param>
+    public static JsonObject ToJson(string carrierBookingNumber, CarrierAnswer answer, bool unmappedReason = false)
     {
         ArgumentNullException.ThrowIfNull(answer);
         var json = new JsonObject { ["carrierBookingNumber"] = carrierBookingNumber };
@@ -27,7 +31,7 @@ internal static class CarrierAnswerFormat
                 break;
             case CarrierAnswer.Rejection rejection:
                 json["decision"] = "DECLINED";
-                json["declineReason"] = ReasonCode(rejection.Reason);
+                json["declineReason"] = unmappedReason ? UnmappedReasonCode : ReasonCode(rejection.Reason);
                 if (rejection.Text is { } text)
                 {
                     json["declineText"] = text;

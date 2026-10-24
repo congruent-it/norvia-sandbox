@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Norvia.PartnerPortal.Application;
+using Norvia.PartnerPortal.Application.Faults;
 using Norvia.PartnerPortal.Application.ShipperNotifications.Receive;
 using Norvia.PartnerPortal.Domain.ShipperNotifications;
 
@@ -38,16 +39,26 @@ public static partial class ShipperNotificationEndpoint
         ShipperNotificationBody body,
         IConflictRetrier retrier,
         IOptions<ShipperEndpointOptions> options,
+        IPartnerPortalFaults faults,
         ILoggerFactory loggers,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(body);
         ArgumentNullException.ThrowIfNull(retrier);
         ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(faults);
         ArgumentNullException.ThrowIfNull(loggers);
 
         var logger = loggers.CreateLogger(typeof(ShipperNotificationEndpoint));
         using var trail = logger.BeginScope(EndpointTracking.Keys(Flow, shipperId, correlationId, ("transportOrderNumber", body.TransportOrderNumber)));
+
+        // The endpoint is down: it answers nothing but 503, and keeps nothing, so the Logic App reports the notification Not delivered.
+        if (faults.ShipperEndpointDown)
+        {
+            using var down = logger.BeginScope(EndpointTracking.Down("ShipperEndpointUnavailable", PartnerPortalFaultNames.ShipperEndpointDown));
+            LogDown(logger, shipperId);
+            return TypedResults.Problem(statusCode: StatusCodes.Status503ServiceUnavailable, title: "The Shipper's notification endpoint is unavailable.");
+        }
 
         // Who the caller is comes first, so an unknown Shipper and a wrong credential look the same from outside.
         if (!EndpointCredential.IsOf(shipperId, apiKey, options.Value.ApiKeys))
@@ -152,6 +163,9 @@ public static partial class ShipperNotificationEndpoint
 
     [GeneratedRegex("^TO-[0-9]{7}$")]
     private static partial Regex TransportOrderNumber();
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "The notification endpoint of Shipper {ShipperId} is down: answered 503 (fault)")]
+    private static partial void LogDown(ILogger logger, string shipperId);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Refused a notification for Shipper {ShipperId}: the credential is missing or wrong")]
     private static partial void LogRefused(ILogger logger, string shipperId);

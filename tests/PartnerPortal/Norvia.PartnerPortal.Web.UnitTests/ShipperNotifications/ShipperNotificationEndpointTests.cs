@@ -3,8 +3,11 @@ using Ardalis.Result;
 using Mediator;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Options;
+using Norvia.PartnerPortal.Application.Faults;
 using Norvia.PartnerPortal.Application.ShipperNotifications.Receive;
 using Norvia.PartnerPortal.Domain.ShipperNotifications;
 using Norvia.PartnerPortal.Web.ShipperNotifications;
@@ -18,6 +21,7 @@ public sealed class ShipperNotificationEndpointTests
     private const string Id = "0f1c0d9e-3b0a-4f43-a6f6-7f1f0d6a9b01";
 
     private readonly IMediator _mediator = Substitute.For<IMediator>();
+    private readonly IPartnerPortalFaults _faults = Substitute.For<IPartnerPortalFaults>();
     private readonly IOptions<ShipperEndpointOptions> _options =
         Options.Create(new ShipperEndpointOptions { ApiKeys = { ["SHP-0001"] = "shipper-secret" } });
 
@@ -27,7 +31,7 @@ public sealed class ShipperNotificationEndpointTests
     private Task<Results<Ok<ReceiveShipperNotificationResult>, ProblemHttpResult, UnauthorizedHttpResult>> Receive(
         string shipperId = "SHP-0001", string? apiKey = "shipper-secret", string? correlationId = "corr-1", ShipperNotificationBody? body = null) =>
         ShipperNotificationEndpoint.ReceiveAsync(
-            shipperId, apiKey, correlationId, body ?? Body(), new PassThroughRetrier(_mediator), _options, NullLoggerFactory.Instance, CancellationToken.None);
+            shipperId, apiKey, correlationId, body ?? Body(), new PassThroughRetrier(_mediator), _options, _faults, NullLoggerFactory.Instance, CancellationToken.None);
 
     private void Answers(bool repeated) =>
         _mediator.Send(Arg.Any<ReceiveShipperNotificationCommand>(), Arg.Any<CancellationToken>())
@@ -184,5 +188,36 @@ public sealed class ShipperNotificationEndpointTests
         var result = await Receive(body: body);
 
         result.Result.Should().BeOfType<Ok<ReceiveShipperNotificationResult>>();
+    }
+
+    [Fact]
+    public async Task Receive_TheEndpointDownFaultOn_Answers503_AndKeepsNothing()
+    {
+        _faults.ShipperEndpointDown.Returns(true);
+
+        var result = await Receive();
+
+        result.Result.Should().BeOfType<ProblemHttpResult>().Which.StatusCode.Should().Be(StatusCodes.Status503ServiceUnavailable);
+        _mediator.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Receive_TheEndpointDownFaultOn_RecordsTheHopFailed_WithTheFaultThatCausedIt()
+    {
+        var loggers = new FakeLoggerProvider();
+        using var factory = new LoggerFactory([loggers]);
+        _faults.ShipperEndpointDown.Returns(true);
+
+        await ShipperNotificationEndpoint.ReceiveAsync(
+            "SHP-0001", "shipper-secret", "corr-1", Body(), new PassThroughRetrier(_mediator), _options, _faults, factory, CancellationToken.None);
+
+        var scope = loggers.Collector.LatestRecord.Scopes.OfType<IEnumerable<KeyValuePair<string, object?>>>().SelectMany(keys => keys).ToDictionary();
+        scope.Should().Contain(new Dictionary<string, object?>
+        {
+            ["flow"] = "shipper-notification",
+            ["outcome"] = "Failed",
+            ["failureCode"] = "ShipperEndpointUnavailable",
+            ["fault"] = "shipper-notification-endpoint-down",
+        });
     }
 }

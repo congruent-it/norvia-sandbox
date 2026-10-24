@@ -307,7 +307,7 @@ These were left out on purpose while designing P5, each with its reason.
 - **Showing the Shipper its progress.** That is [P8](p8-shipper-visibility.md), which also defers pushing progress and Consignee tracking.
 - **Driver and vehicle details from the Carrier.** Tracking doesn't need them either.
 - **As-found toggles and presenter-panel faults.** They are added after the fixed state is built, as for P1 to P4. The candidates:
-  - Presenter-panel fault: a Carrier sends a status code outside the mapping table (for example `DLV` instead of `POD`), so the Carrier-tracking Logic App run fails.
+  - Presenter-panel fault: a Carrier sends a status code outside the mapping table (for example `DLV` instead of `POD`), so the Carrier-tracking Logic App run fails. Built: `carrier-tracking-unmapped-code` ([as-found](../../operations/as-found.md#faults-of-the-partner-portal)).
   - Toggle: no alert on failed Carrier-tracking Logic App runs. Together with the fault above, this re-enacts the headline incident: the Carrier posts "delivered", gets `202 Accepted`, and the Shipment stays In transit with no one told.
   - Toggle: no alert on the dead-letter queue of the tracking queue.
   - Presenter-panel fault: the TMS Tracking event API fails for a few minutes. Messages wait on the queue and are retried, so nothing is lost. This contrasts with the fault above.

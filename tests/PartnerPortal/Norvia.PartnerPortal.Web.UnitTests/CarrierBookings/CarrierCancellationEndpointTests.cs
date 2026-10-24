@@ -2,9 +2,12 @@ using Ardalis.Result;
 using Mediator;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Options;
 using Norvia.PartnerPortal.Application.CarrierBookings.Cancel;
+using Norvia.PartnerPortal.Application.Faults;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
 using Norvia.PartnerPortal.Web.CarrierBookings;
 
@@ -13,6 +16,7 @@ namespace Norvia.PartnerPortal.Web.UnitTests.CarrierBookings;
 public sealed class CarrierCancellationEndpointTests
 {
     private readonly IMediator _mediator = Substitute.For<IMediator>();
+    private readonly IPartnerPortalFaults _faults = Substitute.For<IPartnerPortalFaults>();
     private readonly IOptions<CarrierEndpointOptions> _options =
         Options.Create(new CarrierEndpointOptions { ApiKeys = { ["CAR-0001"] = "carrier-secret" } });
 
@@ -24,7 +28,7 @@ public sealed class CarrierCancellationEndpointTests
     private Task<Results<Ok<ReceiveCarrierCancellationResult>, ProblemHttpResult, UnauthorizedHttpResult>> Receive(
         CarrierCancellationBody? body = null, string carrierId = "CAR-0001", string? apiKey = "carrier-secret", string? correlationId = "cancel-1") =>
         CarrierCancellationEndpoint.ReceiveAsync(
-            carrierId, apiKey, correlationId, body ?? Cancelled(), _mediator, _options, NullLoggerFactory.Instance, CancellationToken.None);
+            carrierId, apiKey, correlationId, body ?? Cancelled(), _mediator, _options, _faults, NullLoggerFactory.Instance, CancellationToken.None);
 
     private void MediatorAnswers(CarrierCancellationOutcome outcome) =>
         _mediator.Send(Arg.Any<ReceiveCarrierCancellationCommand>(), Arg.Any<CancellationToken>())
@@ -136,5 +140,36 @@ public sealed class CarrierCancellationEndpointTests
         var result = await Receive();
 
         result.Result.Should().BeOfType<ProblemHttpResult>().Which.StatusCode.Should().Be(StatusCodes.Status404NotFound);
+    }
+
+    [Fact]
+    public async Task Receive_TheEndpointDownFaultOn_Answers503_AndKeepsNothing()
+    {
+        _faults.CancellationEndpointDown.Returns(true);
+
+        var result = await Receive();
+
+        result.Result.Should().BeOfType<ProblemHttpResult>().Which.StatusCode.Should().Be(StatusCodes.Status503ServiceUnavailable);
+        _mediator.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Receive_TheEndpointDownFaultOn_RecordsTheHopFailed_WithTheFaultThatCausedIt()
+    {
+        var loggers = new FakeLoggerProvider();
+        using var factory = new LoggerFactory([loggers]);
+        _faults.CancellationEndpointDown.Returns(true);
+
+        await CarrierCancellationEndpoint.ReceiveAsync(
+            "CAR-0001", "carrier-secret", "cancel-1", Cancelled(), _mediator, _options, _faults, factory, CancellationToken.None);
+
+        var scope = loggers.Collector.LatestRecord.Scopes.OfType<IEnumerable<KeyValuePair<string, object?>>>().SelectMany(keys => keys).ToDictionary();
+        scope.Should().Contain(new Dictionary<string, object?>
+        {
+            ["flow"] = "carrier-cancellation",
+            ["outcome"] = "Failed",
+            ["failureCode"] = "CarrierEndpointUnavailable",
+            ["fault"] = "carrier-cancellation-endpoint-down",
+        });
     }
 }

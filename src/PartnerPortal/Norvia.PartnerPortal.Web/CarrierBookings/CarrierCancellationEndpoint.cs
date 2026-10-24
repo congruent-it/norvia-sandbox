@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Norvia.PartnerPortal.Application.CarrierBookings.Cancel;
+using Norvia.PartnerPortal.Application.Faults;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
 
 namespace Norvia.PartnerPortal.Web.CarrierBookings;
@@ -41,17 +42,27 @@ public static partial class CarrierCancellationEndpoint
         CarrierCancellationBody body,
         IMediator mediator,
         IOptions<CarrierEndpointOptions> options,
+        IPartnerPortalFaults faults,
         ILoggerFactory loggers,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(body);
         ArgumentNullException.ThrowIfNull(mediator);
         ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(faults);
         ArgumentNullException.ThrowIfNull(loggers);
 
         var logger = loggers.CreateLogger(typeof(CarrierCancellationEndpoint));
         using var trail = logger.BeginScope(EndpointTracking.Keys(
             Flow, carrierId, correlationId, ("shipmentNumber", body.ShipmentNumber), ("carrierBookingNumber", body.CarrierBookingNumber)));
+
+        // The endpoint is down: it answers nothing but 503, and keeps nothing, so the Logic App flags the Carrier booking Carrier not told.
+        if (faults.CancellationEndpointDown)
+        {
+            using var down = logger.BeginScope(EndpointTracking.Down("CarrierEndpointUnavailable", PartnerPortalFaultNames.CancellationEndpointDown));
+            LogDown(logger, carrierId);
+            return TypedResults.Problem(statusCode: StatusCodes.Status503ServiceUnavailable, title: "The Carrier's cancellation endpoint is unavailable.");
+        }
 
         // Who the caller is comes first, so an unknown Carrier and a wrong credential look the same from outside.
         if (!EndpointCredential.IsOf(carrierId, apiKey, options.Value.ApiKeys))
@@ -150,6 +161,9 @@ public static partial class CarrierCancellationEndpoint
 
     [GeneratedRegex("^SH-[0-9]{7}$")]
     private static partial Regex ShipmentNumber();
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "The cancellation endpoint of Carrier {CarrierId} is down: answered 503 (fault)")]
+    private static partial void LogDown(ILogger logger, string carrierId);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Refused a cancellation for Carrier {CarrierId}: the credential is missing or wrong")]
     private static partial void LogRefused(ILogger logger, string carrierId);

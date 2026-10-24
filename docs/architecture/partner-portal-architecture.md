@@ -35,7 +35,8 @@ The editable source is [partner-portal-hexagon.excalidraw](diagrams/partner-port
 | `IRepository<T>`, `IReadRepository<T>`, `ITransactionalData`, `IConflictRetrier` | `EfRepository<T>`, `SqlTransactionalData`, `EfConflictRetrier` on `PartnerPortalDbContext` | The portal's own database: what each Persona sent Norvia and what Norvia answered |
 | `INorviaPartnerApi` | `NorviaPartnerApiClient`, with `EntraPersonaTokens` in Azure and `LocalPersonaTokens` under Aspire | API Management |
 | `IPersonaDirectory`, `IDriverSignInDirectory` | `SeedFilePersonaDirectory`, `SeedFileDriverSignInDirectory` | The seed file |
-| `IFaultSwitches` | `FaultSwitchClient`, with `EntraFaultTokens` in Azure and `LocalFaultTokens` under Aspire | The fault endpoints of every application that owns a Fault (today the Driver app's), as the portal's identity holding `Demo.Fault` |
+| `IFaultSwitches` | `PartnerPortalFaultSwitches`: the portal's own Faults in process, the others through `FaultSwitchClient`, with `EntraFaultTokens` in Azure and `LocalFaultTokens` under Aspire | The fault endpoints of every other application that owns a Fault (today the Driver app's), as the portal's identity holding `Demo.Fault`, and the portal's own [Faults](../operations/as-found.md#faults-of-the-partner-portal) |
+| `IPartnerPortalFaults` | `PartnerPortalFaults` over `IFaults` | Whether each of the portal's own Faults is on, asked where a Persona would misbehave |
 | `IAutoAnswerSignal`, `IAutoProgressSignal`, `ISampleCmr` | In-process signals that make a worker look at the clock again, and the sample CMR an auto-progress Persona sends with its Proof of delivery | |
 | `IResetSwitch`, `IQuietCheck` | `ConfiguredResetSwitch`, `ServiceBusQuietCheck` | Service Bus management |
 

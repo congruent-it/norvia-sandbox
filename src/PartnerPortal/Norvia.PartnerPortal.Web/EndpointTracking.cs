@@ -25,4 +25,8 @@ internal static class EndpointTracking
 
     public static Dictionary<string, object?> Outcome(string outcome, string? failureCode) =>
         failureCode is null ? new() { ["outcome"] = outcome } : new() { ["outcome"] = outcome, ["failureCode"] = failureCode };
+
+    /// <summary>The keys of a hop a fault made fail: <c>Failed</c> with the fault's failure code, and the fault's name as <c>fault</c>.</summary>
+    public static Dictionary<string, object?> Down(string failureCode, string fault) =>
+        new() { ["outcome"] = "Failed", ["failureCode"] = failureCode, ["fault"] = fault };
 }

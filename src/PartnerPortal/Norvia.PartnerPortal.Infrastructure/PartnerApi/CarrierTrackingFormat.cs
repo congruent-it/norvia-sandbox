@@ -11,7 +11,11 @@ namespace Norvia.PartnerPortal.Infrastructure.PartnerApi;
 /// </summary>
 internal static class CarrierTrackingFormat
 {
-    public static JsonObject ToJson(CarrierTrackingEvent trackingEvent)
+    /// <summary>The status code the unmapped-code fault sends for a Delivered event: a Carrier's own spelling, outside the mapping table.</summary>
+    public const string UnmappedDeliveredCode = "DLV";
+
+    /// <param name="unmappedCode">Whether the unmapped-code fault applies: a Delivered event then carries <see cref="UnmappedDeliveredCode"/> instead of <c>POD</c>.</param>
+    public static JsonObject ToJson(CarrierTrackingEvent trackingEvent, bool unmappedCode = false)
     {
         ArgumentNullException.ThrowIfNull(trackingEvent);
         return new JsonObject
@@ -19,13 +23,16 @@ internal static class CarrierTrackingFormat
             ["bookingRef"] = trackingEvent.BookingReference,
             ["carrierBookingNumber"] = trackingEvent.CarrierBookingNumber,
             ["eventId"] = trackingEvent.EventId,
-            ["statusCode"] = StatusCode(trackingEvent.Type),
+            ["statusCode"] = unmappedCode && IsUnmappable(trackingEvent.Type) ? UnmappedDeliveredCode : StatusCode(trackingEvent.Type),
             ["eventTime"] = CarrierLocalTime.At(trackingEvent.EventTime, trackingEvent.Country).ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture),
             ["place"] = trackingEvent.Place,
             ["postcode"] = trackingEvent.Postcode,
             ["country"] = trackingEvent.Country,
         };
     }
+
+    /// <summary>Whether the unmapped-code fault changes this event: only the headline incident's Delivered one.</summary>
+    public static bool IsUnmappable(TrackingEventType type) => type == TrackingEventType.Delivered;
 
     public static string StatusCode(TrackingEventType type) => type switch
     {

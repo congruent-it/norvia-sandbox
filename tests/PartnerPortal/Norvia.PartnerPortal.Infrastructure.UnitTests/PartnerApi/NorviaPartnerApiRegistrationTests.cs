@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Norvia.PartnerPortal.Application.Bookings;
+using Norvia.PartnerPortal.Application.Faults;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Infrastructure.PartnerApi;
 
@@ -77,8 +78,11 @@ public sealed class NorviaPartnerApiRegistrationTests
     {
         using var partnerApi = new StubHandler();
         partnerApi.Answer(HttpStatusCode.Created, Contracts.Read("PartnerApi/samples/responses/accepted.json"));
-        using var services = Build(Local, builder => builder.Services.AddHttpClient<INorviaPartnerApi, NorviaPartnerApiClient>()
-            .ConfigurePrimaryHttpMessageHandler(() => partnerApi));
+        using var services = Build(Local, builder =>
+        {
+            builder.Services.AddSingleton(Substitute.For<IPartnerPortalFaults>());
+            builder.Services.AddHttpClient<INorviaPartnerApi, NorviaPartnerApiClient>().ConfigurePrimaryHttpMessageHandler(() => partnerApi);
+        });
 
         await services.GetRequiredService<INorviaPartnerApi>().SubmitAsync(Samples.BrouwerDranken, new BookingRequest(), TestContext.Current.CancellationToken);
 
