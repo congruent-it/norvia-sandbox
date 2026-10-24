@@ -29,6 +29,6 @@ public sealed class PartnerPortalFaultsTests
         PartnerPortalFaultDefinitions.All.Select(definition => definition.Name).Should().OnlyHaveUniqueItems()
             .And.BeEquivalentTo(
                 PartnerPortalFaultNames.TrackingUnmappedCode, PartnerPortalFaultNames.AnswerUnmappedReason, PartnerPortalFaultNames.BookingEndpointDown,
-                PartnerPortalFaultNames.ProofHeicPhoto, PartnerPortalFaultNames.ShipperEndpointDown, PartnerPortalFaultNames.CancellationEndpointDown);
+                PartnerPortalFaultNames.ProofHeicPhoto, PartnerPortalFaultNames.ShipperEndpointDown, PartnerPortalFaultNames.CancellationEndpointDown, PartnerPortalFaultNames.DriverReportsLogicAppDisabled);
     }
 }

@@ -107,6 +107,10 @@ var driverAppApi = builder.AddProject<Projects.Norvia_DriverApp_Api>("driver-app
 partnerPortal.WithEnvironment("Faults__Owners__driver-app__Address", driverAppApi.GetEndpoint("http"))
     .WithEnvironment("Faults__Owners__tms__Address", tmsApi.GetEndpoint("http"));
 
+// The Partner portal's one fault that is Azure state, the Driver reports Logic App disabled (P12). Locally the portal creates this file and the worker that plays the
+// Logic App reads nothing while it exists. Each run has a file of its own, so a run never starts disabled.
+var driverReportsDisabledFlag = Path.Combine(Path.GetTempPath(), $"norvia-driver-reports-disabled-{Guid.NewGuid():N}");
+
 // The Driver's screens: sign in as a seeded Driver, then a read-only list of that Driver's Trips. Locally a stand-in plays
 // Entra ID's sign-in (ADR 0037); in Azure Easy Auth signs Drivers in.
 var driverAppWeb = builder.AddProject<Projects.Norvia_DriverApp_Web>("driver-app-web")
@@ -286,6 +290,9 @@ if (builder.ExecutionContext.IsPublishMode)
         // The panel switches the Driver app's and the TMS's faults as the portal's identity, which holds the Demo.Fault role on both.
         .WithEnvironment("Faults__Owners__driver-app__Audience", estate.DriverAppApiClientId)
         .WithEnvironment("Faults__Owners__tms__Audience", estate.TmsApiClientId)
+        // The panel disables the Driver reports Logic App as the portal's identity, which holds the narrow Logic App switch role on that one Logic App.
+        .WithEnvironment("Faults__LogicApp__ResourceGroupId", estate.ResourceGroupId)
+        .WithEnvironment("Faults__LogicApp__Name", estate.DriverReportsLogicApp)
         .WithEnvironment("Faults__Entra__ManagedIdentityClientId", estate.PartnerPortalClientId);
     foreach (var persona in personas)
     {
@@ -660,6 +667,7 @@ else
         .WaitFor(driverAppApi)
         .WithReference(blobs, "driver-app-blobs").WaitFor(blobs)
         .WithEnvironment("DriverReports__TmsBaseAddress", tmsApi.GetEndpoint("http"))
+        .WithEnvironment("DriverReports__DisabledFlagPath", driverReportsDisabledFlag)
         .WithEnvironment("DriverReports__TmsTokens__Issuer", LocalTokens.Issuer)
         .WithEnvironment("DriverReports__TmsTokens__Audience", LocalTokens.TmsAudience)
         .WithEnvironment("DriverReports__TmsTokens__ClientId", LocalTokens.DriverReportsLogicAppClientId)
@@ -785,7 +793,8 @@ else
         .WithEnvironment("Faults__Owners__driver-app__Audience", LocalTokens.DriverAppAudience)
         .WithEnvironment("Faults__Owners__tms__Audience", LocalTokens.TmsAudience)
         .WithEnvironment("Faults__LocalTokens__Issuer", LocalTokens.Issuer)
-        .WithEnvironment("Faults__LocalTokens__ClientId", LocalTokens.PartnerPortalClientId);
+        .WithEnvironment("Faults__LocalTokens__ClientId", LocalTokens.PartnerPortalClientId)
+        .WithEnvironment("Faults__LogicApp__FlagPath", driverReportsDisabledFlag);
     foreach (var persona in personas)
     {
         var subscriptionKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();

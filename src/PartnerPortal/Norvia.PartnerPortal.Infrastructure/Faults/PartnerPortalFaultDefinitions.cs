@@ -37,8 +37,13 @@ internal static class PartnerPortalFaultDefinitions
         Owner,
         "Every Carrier's cancellation endpoint answers 503: the Carrier booking is flagged Carrier not told.");
 
+    public static readonly FaultDefinition DriverReportsLogicAppDisabled = new(
+        PartnerPortalFaultNames.DriverReportsLogicAppDisabled,
+        Owner,
+        "The Driver reports Logic App is disabled: the Drivers' reports stay Sending, the Trip never goes In progress and Stale flags its Shipments. Expiry enables it again.");
+
     public static readonly FaultDefinition[] All =
     [
-        TrackingUnmappedCode, AnswerUnmappedReason, BookingEndpointDown, ProofHeicPhoto, ShipperEndpointDown, CancellationEndpointDown,
+        TrackingUnmappedCode, AnswerUnmappedReason, BookingEndpointDown, ProofHeicPhoto, ShipperEndpointDown, CancellationEndpointDown, DriverReportsLogicAppDisabled,
     ];
 }

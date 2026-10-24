@@ -73,3 +73,26 @@ public class DriverReportsConsumerTests
         DriverReportsConsumer.ProcessorOptions.MaxConcurrentSessions.Should().BeGreaterThan(1, "different Trips are processed side by side");
     }
 }
+
+public class DriverReportsConsumerDisabledTests
+{
+    [Fact]
+    public void IsDisabled_OnlyWhileTheFlagFileExists()
+    {
+        var flag = Path.Combine(Path.GetTempPath(), $"norvia-flag-{Guid.NewGuid():N}");
+        var options = new DriverReportsWorkerOptions { DisabledFlagPath = flag };
+        try
+        {
+            DriverReportsConsumer.IsDisabled(options).Should().BeFalse();
+            File.WriteAllText(flag, string.Empty);
+            DriverReportsConsumer.IsDisabled(options).Should().BeTrue();
+        }
+        finally
+        {
+            File.Delete(flag);
+        }
+
+        DriverReportsConsumer.IsDisabled(options).Should().BeFalse();
+        DriverReportsConsumer.IsDisabled(new DriverReportsWorkerOptions()).Should().BeFalse("no flag is configured");
+    }
+}

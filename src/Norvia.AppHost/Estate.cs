@@ -26,6 +26,9 @@ public sealed class Estate(IDistributedApplicationBuilder builder)
     /// </summary>
     public IResourceBuilder<ParameterResource> ResourceGroupId { get; } = builder.AddParameter("estate-resource-group-id");
 
+    /// <summary>The P12 Driver reports Logic App's name, which the Partner portal's identity may start and stop for the presenter panel's fault.</summary>
+    public IResourceBuilder<ParameterResource> DriverReportsLogicApp { get; } = builder.AddParameter("estate-driver-reports-logic-app");
+
     public IResourceBuilder<ParameterResource> ApplicationInsights { get; } = builder.AddParameter("estate-application-insights");
 
     /// <summary>The issuer of Entra's v2.0 tokens for the estate's tenant, which is also the authority to trust.</summary>

@@ -355,6 +355,13 @@ module tripDispatchLogicApp 'estate/trip-dispatch-logic-app.bicep' = {
   }
 }
 
+module logicAppSwitchRole 'estate/logic-app-switch-role.bicep' = {
+  scope: resourceGroup
+  params: {
+    assignableScope: resourceGroup.id
+  }
+}
+
 module driverReportsLogicApp 'estate/driver-reports-logic-app.bicep' = {
   scope: resourceGroup
   params: {
@@ -373,6 +380,8 @@ module driverReportsLogicApp 'estate/driver-reports-logic-app.bicep' = {
     planName: intakeLogicApp.outputs.planName
     contentKeyVaultName: intakeLogicApp.outputs.keyVaultName
     integrationConsolePrincipalId: identities.outputs.integrationConsolePrincipalId
+    partnerPortalPrincipalId: identities.outputs.partnerPortalPrincipalId
+    logicAppSwitchRoleId: logicAppSwitchRole.outputs.roleDefinitionId
   }
 }
 

@@ -35,6 +35,15 @@ public sealed class DriverReportsWorkerOptions
     [Required]
     public string ProofsContainer { get; set; } = "driver-proofs-of-delivery";
 
+    /// <summary>
+    /// While a file exists here the worker reads nothing, as the Logic App does while it is disabled: the presenter panel's
+    /// <c>driver-reports-logic-app-disabled</c> fault creates it and removes it when the fault ends. Empty for none.
+    /// </summary>
+    public string? DisabledFlagPath { get; set; }
+
+    /// <summary>How often the worker looks for the flag.</summary>
+    public TimeSpan DisabledFlagPoll { get; set; } = TimeSpan.FromSeconds(1);
+
     /// <summary>The bounded exponential retry policy, with the numbers of the workflow's <c>retryPolicy</c>.</summary>
     public RetryOptions Retry { get; set; } = new();
 }

@@ -20,4 +20,7 @@ public static class PartnerPortalFaultNames
 
     /// <summary>P7: while on, a Carrier's cancellation endpoint answers 503 and keeps nothing.</summary>
     public const string CancellationEndpointDown = "carrier-cancellation-endpoint-down";
+
+    /// <summary>P12: while on, the Driver reports Logic App is disabled in Azure (locally its worker is stopped), so the Drivers' reports stay Sending. The only fault that is Azure state rather than application code.</summary>
+    public const string DriverReportsLogicAppDisabled = "driver-reports-logic-app-disabled";
 }

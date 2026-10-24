@@ -19,6 +19,9 @@ public sealed class FaultsOptions
     public LocalFaultTokenOptions? LocalTokens { get; set; }
 
     public EntraFaultTokenOptions? Entra { get; set; }
+
+    [Required]
+    public FaultLogicAppOptions LogicApp { get; set; } = new();
 }
 
 public sealed class FaultOwnerOptions
@@ -51,4 +54,25 @@ public sealed class EntraFaultTokenOptions
     /// <summary>The client ID of the portal's managed identity, which the estate grants the Demo.Fault role on each application that owns a fault.</summary>
     [Required]
     public string ManagedIdentityClientId { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// The Driver reports Logic App the <c>driver-reports-logic-app-disabled</c> fault disables. In Azure it is the site named <see cref="Name"/> in
+/// the resource group <see cref="ResourceGroupId"/>, which the portal's managed identity may only start and stop; locally it is the worker that
+/// plays the Logic App, which stops while the file at <see cref="FlagPath"/> exists. Exactly one of the two is configured.
+/// </summary>
+public sealed class FaultLogicAppOptions
+{
+    /// <summary>The estate's resource group, <c>/subscriptions/{id}/resourceGroups/{name}</c>.</summary>
+    public string? ResourceGroupId { get; set; }
+
+    /// <summary>The Logic App's name.</summary>
+    public string? Name { get; set; }
+
+    /// <summary>The flag file the local worker watches.</summary>
+    public string? FlagPath { get; set; }
+
+    public bool IsAzure => FlagPath is null;
+
+    public bool IsValid => IsAzure ? !string.IsNullOrWhiteSpace(ResourceGroupId) && !string.IsNullOrWhiteSpace(Name) : !string.IsNullOrWhiteSpace(FlagPath) && ResourceGroupId is null && Name is null;
 }
