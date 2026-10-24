@@ -5,6 +5,7 @@ using System.Text.Json.Nodes;
 using Azure.Core;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Testing;
+using Norvia.Agents;
 using Norvia.Agents.Runner;
 using Norvia.IntegrationConsole.Application.Agents;
 using Norvia.IntegrationConsole.Infrastructure.Agents;
@@ -19,7 +20,7 @@ public sealed class FoundryAgentClientTests : IDisposable
     private static readonly AgentRequest Request = new("integration-operations", "Explain Message trail c-1.", CorrelationId);
 
     private static readonly string Answer = """
-        {"cause":"The Carrier sent DLV, which the map does not know.","evidence":[{"claim":"The tracking hop was dead-lettered as UnmappableTrackingMessage.","citation":"r1"}],"suggestedAction":"Ask the Carrier to send POD.","confidence":"high"}
+        {"cause":"The Carrier sent DLV, which the map does not know.","evidence":[{"claim":"The tracking hop was dead-lettered as UnmappableTrackingMessage.","citation":"r1"}],"action":"needs-a-person","suggestedAction":"Ask the Carrier to send POD.","confidence":"high"}
         """;
 
     private readonly FakeResponses _foundry = new();
@@ -76,6 +77,7 @@ public sealed class FoundryAgentClientTests : IDisposable
         result.IsSuccess.Should().BeTrue();
         result.Value.Cause.Should().Contain("DLV");
         result.Value.Evidence.Should().ContainSingle().Which.ToolName.Should().Be("get_message_trail");
+        result.Value.Run.Should().Be(new AgentRun("integration-operations", "run-42"), because: "the audit names the run if the operator acts on the Suggestion");
         var create = _foundry.Requests.Single(request => request.Method == HttpMethod.Post);
         create.Uri.Should().Be("https://ais-norvia.services.ai.azure.com/api/projects/norvia/openai/v1/responses");
         create.Authorization.Should().Be("Bearer foundry-token");
@@ -128,7 +130,7 @@ public sealed class FoundryAgentClientTests : IDisposable
     public async Task AskAsync_NumbersTheResultsInTheOrderOfTheCalls()
     {
         const string answer = """
-            {"cause":"c","evidence":[{"claim":"a","citation":"r1"},{"claim":"b","citation":"r2"}],"suggestedAction":"s","confidence":"medium"}
+            {"cause":"c","evidence":[{"claim":"a","citation":"r1"},{"claim":"b","citation":"r2"}],"action":"needs-a-person","suggestedAction":"s","confidence":"medium"}
             """;
         _foundry.Answer(Response(McpCall("get_message_trail"), McpCall("get_run"), Message(answer)));
 
@@ -239,8 +241,8 @@ public sealed class FoundryAgentClientTests : IDisposable
 
     [Theory]
     [InlineData("this is not JSON")]
-    [InlineData("""{"cause":"c","evidence":[{"claim":"a","citation":"r9"}],"suggestedAction":"s","confidence":"high"}""")]
-    [InlineData("""{"cause":"c","evidence":[],"suggestedAction":"s","confidence":"high"}""")]
+    [InlineData("""{"cause":"c","evidence":[{"claim":"a","citation":"r9"}],"action":"needs-a-person","suggestedAction":"s","confidence":"high"}""")]
+    [InlineData("""{"cause":"c","evidence":[],"action":"needs-a-person","suggestedAction":"s","confidence":"high"}""")]
     public async Task AskAsync_WhenTheReplyIsNotASuggestionTheRunCanStandBehind_IsUnavailable(string reply)
     {
         _foundry.Answer(Response(McpCall("get_message_trail"), Message(reply)));

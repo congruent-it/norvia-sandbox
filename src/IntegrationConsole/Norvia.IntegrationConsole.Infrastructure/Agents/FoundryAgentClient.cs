@@ -71,7 +71,7 @@ internal sealed partial class FoundryAgentClient(
             var suggestion = Read(definition, response);
             using var succeeded = logger.BeginScope(new Dictionary<string, object?> { ["outcome"] = "Succeeded" });
             LogAnswered(logger, request.AgentName, runId);
-            return suggestion;
+            return suggestion with { Run = new AgentRun(request.AgentName, runId) };
         }
         catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {

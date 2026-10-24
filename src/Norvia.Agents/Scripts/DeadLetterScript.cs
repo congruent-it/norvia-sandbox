@@ -28,7 +28,8 @@ internal static class DeadLetterScript
                 $"Message {sequenceNumber} isn't among the oldest dead-lettered messages of {entity} any more, so there is nothing to read about it.",
                 [("The peek of the queue shows no message with that sequence number.", peekedId)],
                 "Someone may have resubmitted or discarded it meanwhile: open its Message trail to see.",
-                "low");
+                "low",
+                "needs-a-person");
         }
 
         var reason = message.Reason ?? "no reason given";
@@ -41,12 +42,14 @@ internal static class DeadLetterScript
                 "The Carrier-tracking flow could not map the status code in the Carrier's tracking message, so it dead-lettered the message. The Carrier was still answered 202, so the Shipment stays In transit and nobody was told.",
                 evidence,
                 "Ask the Carrier to send the Delivered event again with a status code the map knows (POD, not DLV). Then resubmit this message, or discard it once the Carrier's resend has arrived.",
-                "high")
+                "high",
+                "fix-the-cause-first")
             : IntegrationOperationsScript.Json(
                 $"The message was dead-lettered with the reason '{reason}'.",
                 evidence,
                 "Fix what the reason names before you resubmit the message, or discard it when it is no longer wanted.",
-                message.Reason is null ? "low" : "medium");
+                message.Reason is null ? "low" : "medium",
+                "fix-the-cause-first");
     }
 
     private static Message? Find(string content, long sequenceNumber)

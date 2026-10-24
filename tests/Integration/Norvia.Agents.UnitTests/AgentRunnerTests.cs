@@ -24,7 +24,7 @@ public sealed class AgentRunnerTests
 
     private static Func<ScriptContext, IReadOnlyList<AIContent>> Answers(string reply) => _ => [new TextContent(reply)];
 
-    private const string GoodReply = """{"cause":"c","evidence":[{"claim":"x","citation":"r1"}],"suggestedAction":"a","confidence":"high"}""";
+    private const string GoodReply = """{"cause":"c","evidence":[{"claim":"x","citation":"r1"}],"action":"needs-a-person","suggestedAction":"a","confidence":"high"}""";
 
     [Fact]
     public async Task RunAsync_TheUnmappableCodeTrail_AnswersWithTheCauseCitingTheTrail()
@@ -166,16 +166,33 @@ public sealed class AgentRunnerTests
     [Theory]
     [InlineData("not json")]
     [InlineData("[]")]
-    [InlineData("""{"evidence":[{"claim":"x","citation":"r1"}],"suggestedAction":"a","confidence":"high"}""")]
-    [InlineData("""{"cause":"c","evidence":[{"claim":"x","citation":"r1"}],"suggestedAction":"a","confidence":"certain"}""")]
-    [InlineData("""{"cause":"c","evidence":[],"suggestedAction":"a","confidence":"high"}""")]
-    [InlineData("""{"cause":"c","evidence":[{"claim":"x","citation":"r9"}],"suggestedAction":"a","confidence":"high"}""")]
-    [InlineData("""{"cause":"c","evidence":["r1"],"suggestedAction":"a","confidence":"high"}""")]
+    [InlineData("""{"evidence":[{"claim":"x","citation":"r1"}],"action":"needs-a-person","suggestedAction":"a","confidence":"high"}""")]
+    [InlineData("""{"cause":"c","evidence":[{"claim":"x","citation":"r1"}],"action":"needs-a-person","suggestedAction":"a","confidence":"certain"}""")]
+    [InlineData("""{"cause":"c","evidence":[],"action":"needs-a-person","suggestedAction":"a","confidence":"high"}""")]
+    [InlineData("""{"cause":"c","evidence":[{"claim":"x","citation":"r9"}],"action":"needs-a-person","suggestedAction":"a","confidence":"high"}""")]
+    [InlineData("""{"cause":"c","evidence":["r1"],"action":"needs-a-person","suggestedAction":"a","confidence":"high"}""")]
+    [InlineData("""{"cause":"c","evidence":[{"claim":"x","citation":"r1"}],"suggestedAction":"a","confidence":"high"}""")]
+    [InlineData("""{"cause":"c","evidence":[{"claim":"x","citation":"r1"}],"action":"delete-everything","suggestedAction":"a","confidence":"high"}""")]
+    [InlineData("""{"cause":"c","evidence":[{"claim":"x","citation":"r1"}],"action":"Resubmit","suggestedAction":"a","confidence":"high"}""")]
     public async Task RunAsync_AReplyThatIsNotASuggestionCitingItsResults_IsAgentUnavailable(string reply)
     {
         var act = () => Runner(Says(Calls("get_message_trail"), Answers(reply)), Tools(TrailSamples.AllWell)).RunAsync(Definition, Question, CancellationToken.None);
 
         (await act.Should().ThrowAsync<AgentRunException>()).Which.FailureCode.Should().Be(AgentFailureCodes.AgentUnavailable);
+    }
+
+    [Theory]
+    [InlineData("resubmit", SuggestedActionKind.Resubmit)]
+    [InlineData("discard", SuggestedActionKind.Discard)]
+    [InlineData("fix-the-cause-first", SuggestedActionKind.FixTheCauseFirst)]
+    [InlineData("needs-a-person", SuggestedActionKind.NeedsAPerson)]
+    public async Task RunAsync_TheActionOfTheReply_IsTheSuggestionsKind(string wire, SuggestedActionKind expected)
+    {
+        var reply = GoodReply.Replace("needs-a-person", wire, StringComparison.Ordinal);
+
+        var result = await Runner(Says(Calls("get_message_trail"), Answers(reply)), Tools(TrailSamples.AllWell)).RunAsync(Definition, Question, CancellationToken.None);
+
+        result.Suggestion.Action.Should().Be(expected);
     }
 
     [Fact]

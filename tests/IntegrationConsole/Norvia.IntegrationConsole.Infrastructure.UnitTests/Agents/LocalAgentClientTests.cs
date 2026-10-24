@@ -63,6 +63,8 @@ public sealed class LocalAgentClientTests : IDisposable
         result.IsSuccess.Should().BeTrue();
         result.Value.Cause.Should().Contain("could not map the status code");
         result.Value.Evidence.Should().OnlyContain(evidence => evidence.ToolName == "get_message_trail");
+        result.Value.Action.Should().Be(SuggestedActionKind.FixTheCauseFirst);
+        result.Value.Run.Should().Be(new AgentRun("integration-operations", "run-42"), because: "the audit names the run if the operator acts on the Suggestion");
         _mcp.CorrelationIds.Should().NotBeEmpty().And.OnlyContain(id => id == CorrelationId, because: "the run passes its correlation ID down to every tool call");
     }
 

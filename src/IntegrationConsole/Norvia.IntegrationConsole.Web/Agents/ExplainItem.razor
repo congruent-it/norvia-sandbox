@@ -44,7 +44,16 @@
                         }
                     </ul>
                     <h2 class="text-lg">Suggested action</h2>
-                    <p>@suggestion.SuggestedAction</p>
+                    <p><span data-testid="action-kind" class="font-bold">@SuggestionText.Action(suggestion.Action)</span>: @suggestion.SuggestedAction</p>
+                    @* Pre-selects the message in the resubmit and discard flow and nothing more: the operator confirms there, under their own role. *@
+                    @if (OnAct.HasDelegate && suggestion.Run is not null && suggestion.Action is SuggestedActionKind.Resubmit or SuggestedActionKind.Discard)
+                    {
+                        <AuthorizeView Policy="@OperatorSignIn.ResubmitPolicy" Context="resubmitter">
+                            <FluentButton Appearance="Appearance.Accent" data-act-on-suggestion="@suggestion.Action.ToString().ToLowerInvariant()" OnClick="() => OnAct.InvokeAsync(suggestion)">
+                                @(suggestion.Action == SuggestedActionKind.Resubmit ? "Review resubmit" : "Review discard")
+                            </FluentButton>
+                        </AuthorizeView>
+                    }
                     <p class="text-muted">Confidence: @suggestion.Confidence.ToString().ToLowerInvariant(). The assistant can be wrong; you decide.</p>
                 </div>
             }
@@ -65,6 +74,10 @@
     /// <summary>What the question is about, in a few words, for the button's accessible name and the log.</summary>
     [Parameter, EditorRequired]
     public string Subject { get; set; } = string.Empty;
+
+    /// <summary>Set where the item is a dead-lettered message: acting on a Resubmit or Discard Suggestion pre-selects the message. Nothing executes.</summary>
+    [Parameter]
+    public EventCallback<Suggestion> OnAct { get; set; }
 
     [Parameter]
     public string ButtonText { get; set; } = "Explain";

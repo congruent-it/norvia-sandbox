@@ -35,7 +35,8 @@ internal static class AttentionScript
             "No dead-letter queue holds a message, so nothing needs attention.",
             [("Every queue and subscription listed has a dead-letter count of zero.", listedId)],
             "Nothing to do. Check again if a flow reports a failure.",
-            "high");
+            "high",
+            "needs-a-person");
 
     private static string Grouped(List<string> held, List<ScriptedToolResult> peeks)
     {
@@ -72,7 +73,8 @@ internal static class AttentionScript
             cause,
             evidence,
             "Start with the group that has the most messages: fix its cause, then resubmit its messages from the queue's page, or discard them once they are no longer wanted.",
-            groups.Count == 0 ? "low" : unread.Length > 0 ? "medium" : "high");
+            groups.Count == 0 ? "low" : unread.Length > 0 ? "medium" : "high",
+            "fix-the-cause-first");
     }
 
     // The queues and subscriptions that hold a message, the oldest first as the tool lists them.

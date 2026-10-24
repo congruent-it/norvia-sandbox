@@ -45,7 +45,7 @@
                         }
                     </ul>
                     <h2 class="text-lg">Suggested action</h2>
-                    <p>@suggestion.SuggestedAction</p>
+                    <p><span data-testid="action-kind" class="font-bold">@SuggestionText.Action(suggestion.Action)</span>: @suggestion.SuggestedAction</p>
                     <p class="text-muted">Confidence: @suggestion.Confidence.ToString().ToLowerInvariant(). The assistant can be wrong; you decide.</p>
                 </div>
             }

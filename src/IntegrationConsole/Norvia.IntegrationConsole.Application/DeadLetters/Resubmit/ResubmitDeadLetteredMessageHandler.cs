@@ -31,7 +31,7 @@ public sealed class ResubmitDeadLetteredMessageHandler(IDeadLetterQueues queues,
         }
 
         await audit.WriteAsync(
-            new AuditEvent(actor, AuditActions.Resubmit, resubmitted.Entity, resubmitted.OriginalMessageId, resubmitted.CorrelationId, resubmitted.BusinessKeys, time.GetUtcNow()),
+            new AuditEvent(actor, AuditActions.Resubmit, resubmitted.Entity, resubmitted.OriginalMessageId, resubmitted.CorrelationId, resubmitted.BusinessKeys, time.GetUtcNow(), Agent: command.ActingOn),
             cancellationToken);
         return resubmitted;
     }

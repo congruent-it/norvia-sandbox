@@ -31,11 +31,18 @@ internal sealed partial class OpenTelemetryAuditLog(ILogger<OpenTelemetryAuditLo
             }
         }
 
+        // Only when the operator acted on a Suggestion: the Agent's name and the run, which is on the Message trail too.
+        if (auditEvent.Agent is { } agent)
+        {
+            keys["agent.name"] = agent.AgentName;
+            keys["agent.run.id"] = agent.RunId;
+        }
+
         var businessKeys = string.Join(", ", auditEvent.BusinessKeys.Select(key => $"{key.Kind} {key.Value}"));
         var at = auditEvent.At.ToString("O", CultureInfo.InvariantCulture);
         using (logger.BeginScope(keys))
         {
-            Audited(logger, auditEvent.Actor, auditEvent.Action, auditEvent.Entity, auditEvent.MessageId, businessKeys, at, auditEvent.Reason ?? string.Empty);
+            Audited(logger, auditEvent.Actor, auditEvent.Action, auditEvent.Entity, auditEvent.MessageId, businessKeys, at, auditEvent.Reason ?? string.Empty, auditEvent.Agent?.AgentName ?? string.Empty, auditEvent.Agent?.RunId ?? string.Empty);
         }
 
         return Task.CompletedTask;
@@ -44,6 +51,6 @@ internal sealed partial class OpenTelemetryAuditLog(ILogger<OpenTelemetryAuditLo
     [LoggerMessage(
         EventId = 1,
         Level = LogLevel.Information,
-        Message = "Audit: {Actor} did {Action} on message {MessageId} of {Entity}, business keys [{BusinessKeys}], at {At}, reason: {Reason}")]
-    private static partial void Audited(ILogger logger, string actor, string action, string entity, string messageId, string businessKeys, string at, string reason);
+        Message = "Audit: {Actor} did {Action} on message {MessageId} of {Entity}, business keys [{BusinessKeys}], at {At}, reason: {Reason}, agent: {AgentName}, run: {AgentRunId}")]
+    private static partial void Audited(ILogger logger, string actor, string action, string entity, string messageId, string businessKeys, string at, string reason, string agentName, string agentRunId);
 }

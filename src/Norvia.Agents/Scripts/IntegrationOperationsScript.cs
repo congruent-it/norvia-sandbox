@@ -69,7 +69,8 @@ public static class IntegrationOperationsScript
                 "No hop on this Message trail has failed, so there is nothing to explain.",
                 [("None of the hops recorded an outcome of DeadLettered or Failed.", trailId)],
                 "Check the trail again in a few minutes: telemetry can be minutes behind, and the failing hop may not be recorded yet.",
-                "low");
+                "low",
+                "needs-a-person");
         }
 
         var evidence = new List<(string Claim, string Citation)>
@@ -86,19 +87,22 @@ public static class IntegrationOperationsScript
                 "The Carrier-tracking flow could not map the status code in the Carrier's tracking message, so it dead-lettered the message. The Carrier was still answered 202, so the Shipment stays In transit and nobody was told.",
                 evidence,
                 "Ask the Carrier to send the Delivered event again with a status code the map knows (POD, not DLV). Then resubmit the dead-lettered message from the Dead-letter queues page, or discard it once the Carrier's resend has arrived.",
-                "high")
+                "high",
+                "fix-the-cause-first")
             : Json(
                 $"The hop '{failed.Name}' ended {failed.Outcome}{(failed.FailureCode is null ? string.Empty : $" with failure code {failed.FailureCode}")}.",
                 evidence,
                 "Open the hop's run or its dead-letter queue from this page to see what failed, and fix its cause before you resubmit anything.",
-                "medium");
+                "medium",
+                "fix-the-cause-first");
     }
 
-    internal static string Json(string cause, IEnumerable<(string Claim, string Citation)> evidence, string action, string confidence) =>
+    internal static string Json(string cause, IEnumerable<(string Claim, string Citation)> evidence, string action, string confidence, string kind) =>
         JsonSerializer.Serialize(new
         {
             cause,
             evidence = evidence.Select(item => new { claim = item.Claim, citation = item.Citation }),
+            action = kind,
             suggestedAction = action,
             confidence,
         });

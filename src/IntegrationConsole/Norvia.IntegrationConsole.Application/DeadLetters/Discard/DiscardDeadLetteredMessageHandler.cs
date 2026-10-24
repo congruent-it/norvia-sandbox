@@ -44,7 +44,7 @@ public sealed class DiscardDeadLetteredMessageHandler(IDeadLetterQueues queues, 
         }
 
         await audit.WriteAsync(
-            new AuditEvent(actor, AuditActions.Discard, discarded.Entity, discarded.MessageId, discarded.CorrelationId, discarded.BusinessKeys, time.GetUtcNow(), reason),
+            new AuditEvent(actor, AuditActions.Discard, discarded.Entity, discarded.MessageId, discarded.CorrelationId, discarded.BusinessKeys, time.GetUtcNow(), reason, command.ActingOn),
             cancellationToken);
         return discarded;
     }

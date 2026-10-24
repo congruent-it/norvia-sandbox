@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Ardalis.Result;
 using Mediator;
+using Norvia.Agents;
 
 namespace Norvia.IntegrationConsole.Application.DeadLetters.Discard;
 
@@ -13,5 +14,6 @@ namespace Norvia.IntegrationConsole.Application.DeadLetters.Discard;
 /// <param name="Entity">The queue's name, or a subscription's as <c>topic/subscription</c>.</param>
 /// <param name="SequenceNumber">The broker's number for the message within its dead-letter queue.</param>
 /// <param name="Reason">Why the message is discarded. Required.</param>
-public sealed record DiscardDeadLetteredMessageCommand(ClaimsPrincipal Caller, string Entity, long SequenceNumber, string Reason)
+/// <param name="ActingOn">The Agent run whose Suggestion the operator is acting on, which the audit then carries. Null when they act on their own.</param>
+public sealed record DiscardDeadLetteredMessageCommand(ClaimsPrincipal Caller, string Entity, long SequenceNumber, string Reason, AgentRun? ActingOn = null)
     : ICommand<Result<DiscardedDeadLetter>>;

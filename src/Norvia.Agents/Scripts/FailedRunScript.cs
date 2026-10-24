@@ -34,7 +34,8 @@ internal static class FailedRunScript
                 $"The failed {flow} run isn't among the failed runs of the last 24 hours any more, so there is nothing to read about it.",
                 [("The list of failed runs has no run of that flow that started then.", listedId)],
                 "Open the Message trail of the run, if it tracked one, or look for the run in the Logic App's run history.",
-                "low");
+                "low",
+                "needs-a-person");
         }
 
         var failure = found.Step is null ? "a step the source doesn't name" : $"the step '{found.Step}'";
@@ -51,7 +52,8 @@ internal static class FailedRunScript
             found.CorrelationId is null
                 ? "Fix what that step reports, then run the flow again from its source. The run tracked no Message trail, so there is none to open."
                 : $"Open the Message trail {found.CorrelationId} to see what came before the failure, and fix what the step reports before anything is resubmitted.",
-            found.ErrorCode is null ? "low" : "medium");
+            found.ErrorCode is null ? "low" : "medium",
+            "fix-the-cause-first");
     }
 
     private static FailedRun? Find(string content, string flow, DateTimeOffset start)
