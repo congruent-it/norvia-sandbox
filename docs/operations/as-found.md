@@ -73,6 +73,16 @@ The business-side safety nets (P5, P6, P7) already exist as TMS settings; these 
 - **The cache and the rate limit are fragments of the policies.** The four Shipper tracking policies in [partner-api](../../infra/estate/partner-api) hold a place for each, and [partner-api.bicep](../../infra/estate/partner-api.bicep) fills it from [shipper-rate-limit.fragment.xml](../../infra/estate/partner-api/shipper-rate-limit.fragment.xml), [shipper-cache-lookup.fragment.xml](../../infra/estate/partner-api/shipper-cache-lookup.fragment.xml) and [shipper-cache-store.fragment.xml](../../infra/estate/partner-api/shipper-cache-store.fragment.xml), or with nothing. The cache key names the Shipper, so no Shipper is given another's answer. The answer is kept after it was mapped for the Shipper, and a hit is traced `Answered the Shipper from the cache` with outcome `Succeeded`. A file is never cached. Switching the toggle off leaves entries in the cache that nothing reads; they expire after a day.
 - **`noReportBackToDriverApp` is a deployment.** [stage-logic-app.sh](../../infra/stage-logic-app.sh) turns each call to the Driver app's `/v1/report-outcomes` into a step that answers 200 and does nothing, so the rest of the workflow, which reads the answer, runs as it does when the Driver app is well. The hops for those steps therefore say `Succeeded`: the finding is the Driver app's list, not the trail. `as-found.sh` deploys the Driver reports Logic App again when the toggle changes. The sources are never changed.
 
+## Conversation sweeper
+
+The Agent Service keeps conversations until they are deleted, and the Intake agent's hold a Shipper's email. The host deletes each run's conversation, and the nightly `conversation-sweeper` Logic App deletes anything older than a day ([operations/foundry.md](../operations/foundry.md#conversation-cleanup)). One toggle in the same `asFound` object takes the sweeper away:
+
+| Toggle | Type | Healthy | Effect | From |
+|---|---|---|---|---|
+| `noConversationSweeper` | true or false | The sweeper runs every night | The sweeper Logic App is built but stopped (`enabled: false`), so it never runs. A conversation the host could not delete stays in the Foundry project, and the failed-run alert never fires because there is no run. A finding for the health check (#377) | Agents |
+
+It is a deployment of the estate alone: `infra/as-found.sh noConversationSweeper=true` runs the estate's Bicep, and the workflow stays deployed.
+
 ## Faults
 
 A **fault** is a runtime failure the presenter makes happen in one application, so a demo can show how the estate finds it ([GLOSSARY.md](../../GLOSSARY.md)). A toggle removes something that exists and stays until it is switched back; a fault breaks something for a few minutes and then stops. The Driver app's `driver-app-unavailable` refuses every Trip version with a 503 ([P11](../processes/tms/p11-trip-dispatch.md)), the Partner portal owns six that make a Carrier or Shipper misbehave ([below](#faults-of-the-partner-portal)) and one that disables a Logic App ([below](#the-fault-that-is-azure-state)), and the TMS and the Driver app own four that break Norvia's own side ([below](#faults-of-the-tms-and-the-driver-app)).

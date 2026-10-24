@@ -59,7 +59,7 @@ public sealed class AsFoundAlertsTests
                 "flowsWithoutFailedRunAlert", "entitiesWithoutDeadLetterAlert", "noAlertReceiver",
                 "noInboundLifecycleRule", "noTransitLifecycleRule", "proofFilesStayHot", "noMalwareScanning", "carrierSecretInlined",
                 "appInsightsRetentionShort", "logicAppsWithoutTrackedProperties",
-                "staleThresholdsUnset", "proofMissingThresholdUnset", "lateDeliveryCheckOff", "shipperTrackingCached", "noShipperRateLimit", "noReportBackToDriverApp");
+                "staleThresholdsUnset", "proofMissingThresholdUnset", "lateDeliveryCheckOff", "shipperTrackingCached", "noShipperRateLimit", "noReportBackToDriverApp", "noConversationSweeper");
         }
     }
 

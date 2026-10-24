@@ -13,6 +13,7 @@
   "noInboundLifecycleRule": false,
   "noMalwareScanning": false,
   "noReportBackToDriverApp": false,
+  "noConversationSweeper": false,
   "noShipperRateLimit": false,
   "noTransitLifecycleRule": false,
   "proofFilesStayHot": false,
