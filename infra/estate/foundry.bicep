@@ -32,6 +32,10 @@ param agentsEnabled bool
 @description('Entra object IDs that may use the project: the presenter, and the pipeline that deploys the Agents. Each gets the Foundry User role.')
 param foundryUserPrincipalIds array
 
+@description('''Identities of the applications that ask an Agent, such as the Integration console\'s: Foundry User on the `norvia` project only. The Intake agent\'s project
+is theirs only when its own slice says so, because its prompts are a Shipper\'s booking text.''')
+param applicationPrincipalIds array = []
+
 var intakeProjectName = 'norvia-intake'
 
 var resourceToken = uniqueString(resourceGroup().id)
@@ -145,6 +149,16 @@ resource usersUseTheProject 'Microsoft.Authorization/roleAssignments@2022-04-01'
   scope: project
   properties: {
     principalId: principalId
+    roleDefinitionId: foundryUser
+  }
+}]
+
+resource applicationsUseTheProject 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for principalId in applicationPrincipalIds: {
+  name: guid(project.id, principalId, foundryUser)
+  scope: project
+  properties: {
+    principalId: principalId
+    principalType: 'ServicePrincipal'
     roleDefinitionId: foundryUser
   }
 }]

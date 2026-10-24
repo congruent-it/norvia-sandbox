@@ -271,8 +271,16 @@ if (builder.ExecutionContext.IsPublishMode)
         .WithEnvironment("Estate__IntegrationRetentionDays", estate.IntegrationRetentionDays)
         .WithEnvironment("Estate__ResourceGroupId", estate.ResourceGroupId)
         .WithEnvironment("Estate__ServiceBusNamespace", estate.ServiceBusNamespace)
+        // The Agents (ADR 0040) are on only where the estate says so. The console asks the Agent published in the Foundry project, as its own
+        // identity, and its agent API takes the Entra token API Management sends it for the Agent. The agent API is outside Easy Auth's gate
+        // for that: it is no browser's, and it checks the token and the one role itself.
+        .WithEnvironment("Agents__Enabled", estate.AgentsEnabled)
+        .WithEnvironment("Agents__Foundry__ProjectEndpoint", estate.FoundryProjectEndpoint)
+        .WithEnvironment("Agents__Api__Issuer", estate.EntraIssuer)
+        .WithEnvironment("Agents__Api__Audience", estate.IntegrationConsoleAgentApiClientId)
+        .WithEnvironment("Agents__Api__GatewayClientId", estate.ApiManagementClientId)
         .PublishAsAzureContainerApp((infrastructure, app) =>
-            infrastructure.Add(EntraSignIn.For(infrastructure, app, estate.IntegrationConsoleClientId, estate.EntraIssuer)));
+            infrastructure.Add(EntraSignIn.For(infrastructure, app, estate.IntegrationConsoleClientId, estate.EntraIssuer, ["/agent/v1/*"])));
 
     // In Azure the Partner portal books through API Management as each Persona: it runs as the identity every Persona's
     // client app trusts, so it gets their tokens without a secret (ADR 0005), and reads their subscription keys from

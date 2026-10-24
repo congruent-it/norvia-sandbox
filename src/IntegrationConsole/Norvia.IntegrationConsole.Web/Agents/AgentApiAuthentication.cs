@@ -32,13 +32,21 @@ public static class AgentApiAuthentication
             .AddJwtBearer(Scheme, options => options.MapInboundClaims = false);
         builder.Services.AddOptions<JwtBearerOptions>(Scheme)
             .Configure<Microsoft.Extensions.Options.IOptions<AgentApiOptions>>((options, api) =>
-                options.TokenValidationParameters = new TokenValidationParameters
                 {
-                    ValidIssuer = api.Value.Issuer,
-                    ValidAudience = api.Value.Audience,
-                    IssuerSigningKey = new SymmetricSecurityKey(Convert.FromBase64String(api.Value.SigningKey)),
-                    RoleClaimType = "roles",
-                    NameClaimType = "azp",
+                    // Locally the AppHost's key signs the tokens. In Azure there is none, and Entra's issuer gives the keys.
+                    if (string.IsNullOrWhiteSpace(api.Value.SigningKey))
+                    {
+                        options.Authority = api.Value.Issuer;
+                    }
+
+                    options.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        ValidIssuer = api.Value.Issuer,
+                        ValidAudience = api.Value.Audience,
+                        IssuerSigningKey = string.IsNullOrWhiteSpace(api.Value.SigningKey) ? null : new SymmetricSecurityKey(Convert.FromBase64String(api.Value.SigningKey)),
+                        RoleClaimType = "roles",
+                        NameClaimType = "azp",
+                    };
                 });
         builder.Services.AddAuthorizationBuilder()
             .AddPolicy(Policy, policy => policy.AddAuthenticationSchemes(Scheme).RequireAuthenticatedUser().RequireRole(AgentRoles.Read));

@@ -2,7 +2,7 @@
 
 The Foundry account and projects the Agents run on ([ADR 0040](../adr/0040-agents-read-the-estate-through-api-management-have-no-write-tools-and-their-own-identity.md)), what the estate deploys of it, and the answers to the two spikes of #497. For engineers and coding agents working on the estate. Terms are defined in [GLOSSARY.md](../../GLOSSARY.md).
 
-No Agent is defined or published yet: the deploy scripts that publish them are #499, and the model and tracing here are what they will use.
+One Agent is published: the Integration operations agent, into `norvia` ([Publishing the Agents](#publishing-the-agents)).
 
 ## What the estate deploys
 
@@ -15,7 +15,7 @@ No Agent is defined or published yet: the deploy scripts that publish them are #
 | Project `norvia-intake` | The **Intake agent's** project, with **no Application Insights connection** (spike 2). Endpoint `https://<account>.services.ai.azure.com/api/projects/norvia-intake` |
 | Model deployment | One, shared by both projects (a deployment belongs to the account), type **`DataZoneStandard`**: prompts and responses are processed inside the EU Data Boundary. `GlobalStandard` is not used. Capped at `foundryModelCapacity` (30 thousand tokens a minute by default, at most 100) |
 | Connection `application-insights` | On the `norvia` project, not the account: an account connection is shared with every project, so it would trace the Intake project too. Connects the estate's Application Insights, which turns on Foundry's server-side tracing for every agent in that project. The traces land in the same workspace as the Message trails, so the console can find an agent run |
-| Role assignments | The presenter, and any object ID in `ESTATE_FOUNDRY_USER_PRINCIPAL_IDS` (the pipeline that deploys the Agents), hold **Foundry User** on both projects: run agents and call models, no management |
+| Role assignments | The presenter, and any object ID in `ESTATE_FOUNDRY_USER_PRINCIPAL_IDS` (the pipeline that deploys the Agents), hold **Foundry User** on both projects: run agents and call models, no management. The Integration console's identity holds it on `norvia` only, to ask its Agent |
 
 Every Foundry resource carries the cost tags `workload=foundry-agents` and `cost-category=ai-model`, and the project carries `agents-enabled`.
 
@@ -137,17 +137,31 @@ A Logic Apps Standard app with one workflow, `conversation-sweeper` ([src/Integr
 
 What it does not do: it does not turn the stateful Agent Service into a stateless one. A conversation made with `POST /openai/v1/conversations` is stored whatever the response says, so the clients **do not create a conversation** unless an Agent needs history (none does: Agents keep no memory between runs, ADR 0040), and they pass `store: false` on every call. The FAQ still says the Agent Service "retains data" and the documents give no setting for a project that stores nothing, so the delete after each run and the sweeper stay: the sweeper is the safety net for a client that forgot, a failed delete and a run that died. **Not verified in a tenant**: whether `store: false` is honoured when the agent calls an MCP tool; the smoke run of the first Agent (#379) lists the project's responses afterwards and settles it.
 
+## Publishing the Agents
+
+[infra/deploy-agents.sh](../../infra/deploy-agents.sh) is the last azd postdeploy hook, so it runs after Aspire has deployed the apps whose addresses an Agent's MCP server needs. For each `agents/*.agent.yaml` ([agents/README.md](../../agents/README.md)) it:
+
+1. points the API Management backend of the Agent's server at the application (`integration-console-agent-api` at the console's `/agent/v1`) and stores `ESTATE_INTEGRATION_CONSOLE_BASE_URL`, so deploying the estate again keeps it;
+2. makes the project's `<server>-mcp` connection with the agent-identity authentication type ([create-agent-connection.sh](../../infra/create-agent-connection.sh));
+3. creates the Agent's next version with `POST /agents/<name>/versions?api-version=v1` as a **prompt agent**: the model deployment (the definition's, or the estate's own when that one is not in the project), the instructions, the temperature, and one MCP tool with `require_approval: never`, the server's address, the connection, `allowed_tools` from the definition, and the header `X-Correlation-ID: {{correlationId}}`, with `correlationId` declared as a structured input. The caller supplies it on each response, so the Agent's tool calls join the trail it was asked about. Foundry can send a per-call header to an MCP tool, so there is no fallback to the conversation ID;
+4. reads the Agent's identity from `GET /agents/<name>` (`instance_identity`) and writes `.azure/<env>/published-agents.json`;
+5. runs [assign-agent-roles.sh](../../infra/assign-agent-roles.sh) with that file, which gives each identity its one read role.
+
+Publishing the same file again is a new version of the same Agent. The response limits (`max_output_tokens`, `max_tool_calls`) are the definition's and travel with each response, not in the version. The smoke run is [infra/smoke-test-integration-operations-agent.sh](../../infra/smoke-test-integration-operations-agent.sh) ([integration-console.md](integration-console.md#explain-and-the-agent-api)).
+
+**Not yet verified in a tenant**, like the answers above: that `POST /agents/<name>/versions` takes this body and that the identity is on `instance_identity` as the Microsoft Learn page for publishing to Teams shows (the script also reads `identity`); that the MCP tool's header takes the structured input together with a project connection (the structured-inputs page says it does); and that `max_tool_calls` is accepted on a prompt-agent response. The first `azd up` with the Agents on settles them. If the first response is refused, the failure is in the smoke run's step 2, with Foundry's error code.
+
 ## Open points of #500
 
-The estate half of #500 is built (the sweeper, its toggle, the smoke run, the spike). The host-side code is not, because it lives in `Norvia.Agents`, which #379 creates. Whoever builds #379 or #458 picks these up; #500 stays open until they are done.
+The estate half of #500 is built (the sweeper, its toggle, the smoke run, the spike). The Integration console's Foundry client (#380) does points 2 and 4 for itself: every call sets `store: false` and creates no conversation, the response is deleted afterwards, best effort, and a failed delete is `ConversationNotDeleted` on the run's span (the client is `FoundryAgentClient`, in the console's Infrastructure project; there is no Foundry SDK reference). A shared `IConversationCleanup` in `Norvia.Agents` is not extracted, because a second host does not exist yet: whoever builds #458 picks it up, and #500 stays open until then.
 
 | # | Open point | Where | Needs |
 |---|---|---|---|
 | 1 | `IConversationCleanup` in `Norvia.Agents`: deletes the run's conversation and its responses as soon as the host has the answer. Best effort: a failure is logged as `ConversationNotDeleted` on the run's span and never thrown. Unit tests with the Foundry client faked (the call, the code on failure, no exception to the caller); at least 80% line coverage | `Norvia.Agents`, shared by every host | #379 |
-| 2 | Every Foundry call sets `store: false` and creates no conversation unless an Agent needs history (none does). This is the answer of spike 3 | The Foundry client of `Norvia.Agents`; an architecture test can check no `CreateResponse` omits it | #379 |
+| 2 | Every Foundry call sets `store: false` and creates no conversation unless an Agent needs history (none does). This is the answer of spike 3. **Done for the Integration console** (`FoundryAgentClient`, unit tested) | Each host's Foundry client | #458 for the Intake agent |
 | 3 | The Intake operation (`booking-drafts`) deletes first and only then returns the draft. A failed delete is `ConversationNotDeleted`, the draft is still returned (the Shipper is not punished), and the sweeper retries it. Unit test: delete fails, draft returned, code on the span | The Intake operation of #458 | #379, #458 |
 | 4 | Only Infrastructure projects reference the Foundry SDK, so the cleanup port is in the host's Application layer or in `Norvia.Agents` and the call is in Infrastructure (the architecture test of #379 covers it) | `Norvia.Agents` and each host | #379 |
-| 5 | Verify in a tenant: run `infra/smoke-test-conversation-sweeper.sh` (Foundry User may list and delete, the list response shape), and after the first Agent run list the project's responses to see whether `store: false` is honoured when an Agent calls an MCP tool. Record both here, in "The sweeper" and spike 3 | A deployed estate | #379 deployed |
+| 5 | Verify in a tenant: run `infra/smoke-test-conversation-sweeper.sh` (Foundry User may list and delete, the list response shape). The Integration operations agent's smoke run reads the response back after a run and says `NOTE` when the service kept it although `store` was false; record both here, in "The sweeper" and spike 3 | A deployed estate | The first `azd up` with the Agents on |
 | 6 | Docs that say "planned" for the host side: [failure-behaviour.md](../architecture/failure-behaviour.md) (the row for `IConversationCleanup`), [local-vs-azure.md](../architecture/local-vs-azure.md) (locally there is no Foundry conversation), the Intake agent's P1 doc. Drop "planned" when 1 to 3 are built | Docs | 1 to 3 |
 
 Acceptance criteria of #500 still open: *a normal Agent run leaves no conversation behind* (1, 2) and *the Intake operation deletes before it returns, and a failed delete is a coded span, not an error to the Shipper* (3). *A conversation the host could not delete is removed by the sweeper* is built and waits for point 5.
@@ -158,4 +172,4 @@ The conversation sweeper (#500) lists and deletes conversations in the `norvia` 
 
 ## Not here
 
-Publishing the Agents from their definition files (`infra/deploy-agents.sh`, the agent registry and the smoke run wait for the definition format of #379), `IConversationCleanup` itself ([open points](#open-points-of-500)), and the evaluation harness, which is [agent-evaluation.md](agent-evaluation.md) (#501).
+`IConversationCleanup` as a shared type ([open points](#open-points-of-500)), and the evaluation harness, which is [agent-evaluation.md](agent-evaluation.md) (#501).

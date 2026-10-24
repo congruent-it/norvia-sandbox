@@ -145,6 +145,18 @@ azd env config set infra.parameters.estate_foundry_project_endpoint "\"$foundry_
 azd env set FOUNDRY_PROJECT_ENDPOINT "$foundry_project_endpoint"
 azd env set FOUNDRY_INTAKE_PROJECT_ENDPOINT "$foundry_intake_project_endpoint"
 
+# The Integration console's agent API: the app registration API Management's identity calls it as, and that identity. The estate is at its 64
+# outputs, so they are found by name (infra/estate/integration-operations-mcp.bicep).
+console_agent_api_client_id=$(az ad app list --filter "displayName eq 'Norvia Integration console agent API ($AZURE_ENV_NAME)'" --query '[0].appId' --output tsv)
+: "${console_agent_api_client_id:?The estate has no Integration console agent API app registration}"
+apim_client_id=$(az identity list --subscription "$AZURE_SUBSCRIPTION_ID" --resource-group "rg-$AZURE_ENV_NAME" \
+  --query "[?starts_with(name, 'id-apim-')].clientId | [0]" --output tsv)
+: "${apim_client_id:?The estate has no API Management identity}"
+azd env set AZURE_ESTATE_INTEGRATION_CONSOLE_AGENT_API_CLIENT_ID "$console_agent_api_client_id"
+azd env config set infra.parameters.estate_integration_console_agent_api_client_id "\"$console_agent_api_client_id\""
+azd env set AZURE_ESTATE_API_MANAGEMENT_CLIENT_ID "$apim_client_id"
+azd env config set infra.parameters.estate_api_management_client_id "\"$apim_client_id\""
+
 # The seeded Drivers' Entra test users, whose domain and password the apps take as the Estate parameters azd asks for.
 # ARM returns an output's name with its first letter lowercased (estatE_...), so it is looked up in upper case.
 driver_app_registration_client_id=$(jq -r 'to_entries[] | select(.key | ascii_upcase == "ESTATE_DRIVER_APP_REGISTRATION_CLIENT_ID") | .value.value' "$work/outputs.json")

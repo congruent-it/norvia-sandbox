@@ -1,6 +1,6 @@
 # Locally, an in-process runner and an MCP stand-in play Foundry and API Management's MCP server
 
-**Status: Proposed.** It becomes Accepted with [ADR 0040](0040-agents-read-the-estate-through-api-management-have-no-write-tools-and-their-own-identity.md), when the first two slices of the Integration operations agent work end to end.
+**Status: Accepted** with [ADR 0040](0040-agents-read-the-estate-through-api-management-have-no-write-tools-and-their-own-identity.md), now that the first two slices of the Integration operations agent work end to end.
 
 Under Aspire there is no API Management and no Foundry, and Foundry is a cloud service: it can't call an MCP server on a developer's machine. The stand-ins of [ADR 0023](0023-locally-a-stand-in-plays-the-norvia-partner-api.md) replace Azure pieces that the code calls. Here the piece that calls the tools, the Foundry agent loop, is itself in the cloud. So the agent loop has to run in the application locally.
 

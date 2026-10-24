@@ -4,8 +4,8 @@ namespace Norvia.IntegrationConsole.Web.Agents;
 
 /// <summary>
 /// The tokens the agent API accepts (ADR 0040). Locally they are signed with the AppHost's key (<c>local-token-signing-key</c>),
-/// as the other local tokens are. Entra's own tokens are validated by the Azure slice (#380), so until then the API
-/// is mapped only where this key is set.
+/// as the other local tokens are. In Azure there is no key: the tokens are Entra's, issued to API Management's identity for the
+/// console's agent API, and the issuer's metadata gives the keys.
 /// </summary>
 public sealed class AgentApiOptions
 {
@@ -17,7 +17,13 @@ public sealed class AgentApiOptions
     [Required]
     public string Audience { get; set; } = string.Empty;
 
-    /// <summary>The AppHost's local signing key, base64-encoded.</summary>
-    [Required]
+    /// <summary>The AppHost's local signing key, base64-encoded. Empty in Azure, where Entra's keys are used.</summary>
     public string SigningKey { get; set; } = string.Empty;
+
+    /// <summary>
+    /// In Azure, API Management's identity, the one caller of the agent API. Its token's <c>azp</c> is then the gateway, not the Agent,
+    /// so the Agent's identity is read from the <c>X-Agent-ID</c> header the gateway's policy sets (it overrides the caller's own). Only
+    /// a token from this client may name the Agent that way; locally it is empty and the token's own <c>azp</c> is the Agent.
+    /// </summary>
+    public string GatewayClientId { get; set; } = string.Empty;
 }

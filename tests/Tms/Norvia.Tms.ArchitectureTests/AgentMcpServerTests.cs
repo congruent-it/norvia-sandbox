@@ -19,9 +19,6 @@ public sealed class AgentMcpServerTests
 
     private static readonly string[] Tools = ["list_things", "get_thing"];
 
-    // Servers whose tool list exists for the local MCP stand-in and whose Bicep comes with the Azure slice (#380).
-    private static readonly string[] NotYetInBicep = ["integration-operations.tools.json"];
-
     private static XElement Policy(params string[] parameters) => XElement.Parse(Single(Resources(parameters), "Microsoft.ApiManagement/service/apis/policies")["properties"]!["value"]!.GetValue<string>());
 
     private static XElement Inbound(params string[] parameters) => Policy(parameters).Element("inbound")!;
@@ -269,8 +266,6 @@ public sealed class AgentMcpServerTests
     [MemberData(nameof(ContractFiles))]
     public void ToolListContract_IsTheFileTheBicepReads_SoTheBicepCannotDriftFromIt(string fileName)
     {
-        Assert.SkipWhen(NotYetInBicep.Contains(fileName), "The Bicep for this server comes with the Azure slice (#380).");
-
         var bicep = string.Concat(Directory.EnumerateFiles(Path.Combine(RepositoryRoot.Path, "infra/estate"), "*.bicep").Select(File.ReadAllText));
 
         bicep.Should().Contain($"loadJsonContent('../../{ContractFolder}/{fileName}')");

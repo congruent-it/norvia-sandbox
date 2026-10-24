@@ -216,6 +216,48 @@ public sealed class AgentApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Get_ThroughTheGateway_IsAHopTaggedWithTheAgentTheGatewayNames()
+    {
+        await using var behindApim = await AgentApiHost.StartAsync(gatewayClientId: "apim-identity");
+        behindApim.Mediator.Send(Arg.Any<OpenTrailQuery>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(Result.Success(Trail)));
+        behindApim.Mediator.Send(Arg.Any<OpenRunQuery>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(Result.Success(Run)));
+
+        using var _ = await behindApim.Client.SendAsync(
+            AgentApiHost.Get("/agent/v1/trails/c-1", behindApim.Token(azp: "apim-identity"), ("X-Correlation-ID", "run-trail-9"), ("X-Agent-ID", "foundry-agent-identity"), ("X-Tool-Name", "get_run")),
+            TestContext.Current.CancellationToken);
+
+        behindApim.Logs.GetSnapshot()
+            .Select(log => log.Scopes.OfType<IEnumerable<KeyValuePair<string, object?>>>().SelectMany(scope => scope).ToDictionary())
+            .Last(scope => scope.ContainsKey("outcome"))["agentId"].Should().Be("foundry-agent-identity", because: "the gateway's policy sets the header from the Agent's own validated token");
+    }
+
+    [Fact]
+    public async Task Get_ByAnyoneButTheGateway_IsTaggedWithTheTokensAgent_NotTheHeader()
+    {
+        await using var behindApim = await AgentApiHost.StartAsync(gatewayClientId: "apim-identity");
+        behindApim.Mediator.Send(Arg.Any<OpenTrailQuery>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(Result.Success(Trail)));
+        behindApim.Mediator.Send(Arg.Any<OpenRunQuery>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(Result.Success(Run)));
+
+        using var _ = await behindApim.Client.SendAsync(
+            AgentApiHost.Get("/agent/v1/trails/c-1", behindApim.Token(azp: "some-other-caller"), ("X-Correlation-ID", "run-trail-9"), ("X-Agent-ID", "foundry-agent-identity")),
+            TestContext.Current.CancellationToken);
+
+        behindApim.Logs.GetSnapshot()
+            .Select(log => log.Scopes.OfType<IEnumerable<KeyValuePair<string, object?>>>().SelectMany(scope => scope).ToDictionary())
+            .Last(scope => scope.ContainsKey("outcome"))["agentId"].Should().Be("some-other-caller");
+    }
+
+    [Fact]
+    public async Task InAzure_TheTokensAreEntrasNotTheLocalKeys_SoALocallySignedTokenIsRefused()
+    {
+        await using var azure = await AgentApiHost.StartAsync(entra: true);
+
+        using var response = await azure.Client.SendAsync(AgentApiHost.Get("/agent/v1/trails/c-1", azure.Token()), TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
     public async Task Get_ThatTheUseCaseRefused_IsARefusedHop()
     {
         _host.Mediator.Send(Arg.Any<OpenTrailQuery>(), Arg.Any<CancellationToken>())

@@ -55,6 +55,10 @@ param demoUiRedirectUris string = ''
 postdeploy hook stores it, so the console's app registration keeps it when the estate is deployed again.''')
 param integrationConsoleRedirectUris string = ''
 
+@description('''The Integration console's address, empty before the console is first deployed. infra/deploy-agents.sh stores it, so the
+Integration operations agent's API Management backend keeps it when the estate is deployed again.''')
+param integrationConsoleBaseUrl string = ''
+
 @description('''Easy Auth's sign-in callback on the Driver app, empty before the Driver app is first deployed. azd's postdeploy
 hook stores it, so the Driver app's app registration keeps it when the estate is deployed again.''')
 param driverAppRedirectUris string = ''
@@ -169,6 +173,8 @@ module foundry 'estate/foundry.bicep' = {
     modelCapacity: foundryModelCapacity
     agentsEnabled: agentsEnabled
     foundryUserPrincipalIds: concat(empty(presenterPrincipalId) ? [] : [presenterPrincipalId], foundryUserPrincipalIds)
+    // The Integration console asks its Agent as its own identity (Explain).
+    applicationPrincipalIds: [identities.outputs.integrationConsolePrincipalId]
   }
 }
 
@@ -615,6 +621,20 @@ module agentMcpExample 'estate/agent-mcp-example.bicep' = {
   params: {
     environmentName: environmentName
     apiManagementName: partnerApi.outputs.apiManagementName
+  }
+}
+
+// The Integration operations agent's MCP server over the console's agent API, with the two app registrations that keep it narrow
+// (infra/smoke-test-integration-operations-agent.sh). Like the example, it has no outputs: the estate is at the 64 a template may have,
+// so the scripts and the AppHost find its app registrations by their names.
+module integrationOperationsMcp 'estate/integration-operations-mcp.bicep' = {
+  scope: resourceGroup
+  params: {
+    environmentName: environmentName
+    apiManagementName: partnerApi.outputs.apiManagementName
+    apiManagementPrincipalId: identities.outputs.apiManagementPrincipalId
+    apiManagementClientId: identities.outputs.apiManagementClientId
+    consoleBaseUrl: integrationConsoleBaseUrl
   }
 }
 

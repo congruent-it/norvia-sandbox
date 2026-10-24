@@ -145,4 +145,10 @@ public sealed class Estate(IDistributedApplicationBuilder builder)
 
     /// <summary>The Foundry project's endpoint, which the Agents' host and the deploy scripts call.</summary>
     public IResourceBuilder<ParameterResource> FoundryProjectEndpoint { get; } = builder.AddParameter("estate-foundry-project-endpoint");
+
+    /// <summary>The Integration console's agent API app registration, which is the audience of the tokens its agent API accepts. It is the only API that holds <c>IntegrationConsole.Agent.Read</c> for API Management's identity.</summary>
+    public IResourceBuilder<ParameterResource> IntegrationConsoleAgentApiClientId { get; } = builder.AddParameter("estate-integration-console-agent-api-client-id");
+
+    /// <summary>API Management's identity (its client ID), the one caller of the console's agent API. Its token names the gateway, so the console reads the Agent's identity from the header the gateway sets.</summary>
+    public IResourceBuilder<ParameterResource> ApiManagementClientId { get; } = builder.AddParameter("estate-api-management-client-id");
 }
