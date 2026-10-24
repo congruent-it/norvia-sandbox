@@ -21,9 +21,17 @@ public sealed class AgentServiceBusFixture : IAsyncLifetime
     public const string UnchangedQueue = "agent-unchanged-queue";
     public const string BodiesQueue = "agent-bodies-queue";
     public const string ExplainQueue = "agent-explain-queue";
+    public const string ActedOnQueue = "agent-acted-on-queue";
+    public const string OwnClickQueue = "agent-own-click-queue";
+    public const string IgnoredQueue = "agent-ignored-queue";
+    public const string ForbiddenQueue = "agent-forbidden-queue";
 
     public const string CountsTopic = "agent-counts-topic";
     public const string CountsSubscription = "agent-counts-sub";
+
+    public const string ResubmitTopic = "agent-resubmit-topic";
+    public const string SubscriptionA = "agent-sub-a";
+    public const string SubscriptionB = "agent-sub-b";
 
     private const string Messaging = "messaging";
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
@@ -46,12 +54,15 @@ public sealed class AgentServiceBusFixture : IAsyncLifetime
         }
 
         var messaging = builder.CreateResourceBuilder(builder.Resources.OfType<AzureServiceBusResource>().Single(resource => resource.Name == Messaging));
-        foreach (var queue in new[] { CountsQueue, EmptyQueue, PeekQueue, UnchangedQueue, BodiesQueue, ExplainQueue })
+        foreach (var queue in new[] { CountsQueue, EmptyQueue, PeekQueue, UnchangedQueue, BodiesQueue, ExplainQueue, ActedOnQueue, OwnClickQueue, IgnoredQueue, ForbiddenQueue })
         {
             messaging.AddServiceBusQueue(queue);
         }
 
         messaging.AddServiceBusTopic(CountsTopic).AddServiceBusSubscription($"{CountsTopic}-{CountsSubscription}", CountsSubscription);
+        var resubmit = messaging.AddServiceBusTopic(ResubmitTopic);
+        resubmit.AddServiceBusSubscription($"{ResubmitTopic}-{SubscriptionA}", SubscriptionA);
+        resubmit.AddServiceBusSubscription($"{ResubmitTopic}-{SubscriptionB}", SubscriptionB);
 
         _app = await builder.BuildAsync(startup.Token);
         await _app.StartAsync(startup.Token);
