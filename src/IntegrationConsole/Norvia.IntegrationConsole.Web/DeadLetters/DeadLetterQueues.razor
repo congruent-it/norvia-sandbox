@@ -1,8 +1,14 @@
 @page "/dead-letter-queues"
 @* Interactive, not prerendered: the page reads the Service Bus itself and keeps refreshing for as long as the circuit is open. *@
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using Microsoft.Extensions.Options
+@using Norvia.IntegrationConsole.Application.Agents
+@using Norvia.IntegrationConsole.Application.Agents.Explain
 @using Norvia.IntegrationConsole.Application.DeadLetters.List
+@using Norvia.IntegrationConsole.Web.Agents
 @inject IDeadLetterRequests DeadLetters
+@inject IExplainRequests Explain
+@inject IOptions<AgentsOptions> Agents
 @inject TimeProvider Time
 @inject ILogger<DeadLetterQueues> Logger
 @implements IDisposable
@@ -14,6 +20,15 @@
     Every queue and subscription of the estate's Service Bus, with the messages dead-lettered in it and how long the oldest
     has waited. Those holding messages come first. This page refreshes itself every few seconds.
 </p>
+
+@* What needs attention: a fixed question, with no free text. The assistant peeks the queues that hold messages and groups them by cause. *@
+@if (Agents.Value.Enabled)
+{
+    <section aria-label="What needs attention" class="mb-6">
+        <ExplainItem Subject="the dead-letter queues" ButtonText="What needs attention" ButtonAppearance="Appearance.Accent"
+                     Ask="@(cancellation => Explain.SummariseAsync(new SummariseDeadLettersQuery(), cancellation))" />
+    </section>
+}
 
 @if (_loading)
 {

@@ -54,7 +54,7 @@ public sealed class ExplainTrailTests : ConsoleWebContext
         var component = Render();
 
         component.Find("fluent-button").TextContent.Trim().Should().Be("Explain");
-        Explain.DidNotReceiveWithAnyArgs().ExplainAsync(default!, Xunit.TestContext.Current.CancellationToken);
+        Explain.DidNotReceiveWithAnyArgs().ExplainAsync(default(ExplainTrailQuery)!, Xunit.TestContext.Current.CancellationToken);
     }
 
     [Fact]

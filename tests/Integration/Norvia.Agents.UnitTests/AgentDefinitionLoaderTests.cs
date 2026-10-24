@@ -28,7 +28,7 @@ public sealed class AgentDefinitionLoaderTests
 
         definition.Name.Should().Be("integration-operations");
         definition.Tools.Server.Should().Be("integration-operations");
-        definition.Tools.Names.Should().Equal("get_message_trail", "get_run");
+        definition.Tools.Names.Should().Equal("get_message_trail", "get_run", "list_failed_runs", "list_dead_letter_queues", "peek_dead_letters");
         definition.Inputs.CorrelationIdHeader.Should().Be("X-Correlation-ID");
         definition.Model.MaxToolCalls.Should().BePositive();
         definition.Instructions.Should().Contain("data", because: "tool results are delimited data (ADR 0040)")

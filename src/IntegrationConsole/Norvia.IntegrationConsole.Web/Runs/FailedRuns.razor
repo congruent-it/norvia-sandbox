@@ -1,8 +1,14 @@
 @page "/failed-runs"
 @* Interactive, not prerendered: the page reads the Logic Apps itself and keeps refreshing for as long as the circuit is open. *@
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using Microsoft.Extensions.Options
+@using Norvia.IntegrationConsole.Application.Agents
+@using Norvia.IntegrationConsole.Application.Agents.Explain
 @using Norvia.IntegrationConsole.Application.Runs.Failed
+@using Norvia.IntegrationConsole.Web.Agents
 @inject IRunRequests Runs
+@inject IExplainRequests Explain
+@inject IOptions<AgentsOptions> Agents
 @inject NavigationManager Navigation
 @inject TimeProvider Time
 @inject ILogger<FailedRuns> Logger
@@ -60,7 +66,7 @@ else if (_result is { } found)
 {
     @* Keys and errors only: a body holds personal data, and shows only when an operator opens a step of the run. *@
     <FluentDataGrid Items="found.Runs.AsQueryable()" TGridItem="FailedRun" aria-label="Failed runs found" MultiLine="true"
-                    GridTemplateColumns="max-content max-content minmax(16rem, 1fr) max-content">
+                    GridTemplateColumns="@("max-content max-content minmax(16rem, 1fr) max-content" + (Agents.Value.Enabled ? " minmax(10rem, 1fr)" : ""))">
         <PropertyColumn Title="Flow" Property="@(run => run.Flow)" />
         <PropertyColumn Title="Time" Property="@(run => ConsoleTime.Format(run.Start))" />
         <TemplateColumn Title="Failing step">
@@ -91,6 +97,14 @@ else if (_result is { } found)
                 <span class="text-muted">–</span>
             }
         </TemplateColumn>
+        @* A fixed question about this run, put to the assistant: it reads the failed runs and, when there is one, the run itself. *@
+        @if (Agents.Value.Enabled)
+        {
+            <TemplateColumn Title="Assistant">
+                <ExplainItem Subject="@($"the failed {context.Flow} run of {ConsoleTime.Format(context.Start)}")"
+                             Ask="@(cancellation => Explain.ExplainAsync(new ExplainFailedRunQuery(context.Flow, context.Start, context.CorrelationId), cancellation))" />
+            </TemplateColumn>
+        }
     </FluentDataGrid>
 }
 

@@ -5,7 +5,11 @@ using System.Text.Json.Nodes;
 using Ardalis.Result;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
+using Norvia.IntegrationConsole.Application.DeadLetters;
+using Norvia.IntegrationConsole.Application.DeadLetters.List;
+using Norvia.IntegrationConsole.Application.DeadLetters.Messages;
 using Norvia.IntegrationConsole.Application.Runs;
+using Norvia.IntegrationConsole.Application.Runs.Failed;
 using Norvia.IntegrationConsole.Application.Runs.Open;
 using Norvia.IntegrationConsole.Application.Trails;
 using Norvia.IntegrationConsole.Application.Trails.Open;
@@ -123,6 +127,137 @@ public sealed class AgentApiTests : IAsyncLifetime
         view["steps"]!.AsArray().Should().BeEmpty();
     }
 
+    private static readonly DeadLetteredMessageList Peeked = new(
+        "shipment-events/billing",
+        [
+            new RecordedDeadLetter(7, Now.AddHours(-2), "UnmappableTrackingMessage", "Unknown status code DLV", 1, "c-1",
+                [new BusinessKey(BusinessKeyKind.ShipmentNumber, "SH-0000007")], new Dictionary<string, string> { ["correlationId"] = "c-1", ["statusCode"] = "DLV" }),
+            new RecordedDeadLetter(8, Now.AddHours(-1), null, null, 10, null, []),
+        ],
+        HasMore: false);
+
+    [Fact]
+    public async Task ListFailedRuns_AnswersEachRunWithItsFlowStepAndError_AndNoBody()
+    {
+        _host.Mediator.Send(Arg.Any<ListFailedRunsQuery>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(new FailedRunList(
+            Now.AddHours(-24),
+            Now,
+            ["carrier-booking"],
+            [new FailedRun("carrier-booking", new WorkflowRun("logic-booking", "carrier-booking", "08584"), Now.AddMinutes(-5), "c-9", "Call_Carrier", new StepError("BadRequest", "refused"))])));
+
+        using var response = await _host.Client.SendAsync(AgentApiHost.Get("/agent/v1/failed-runs", _host.Token()), TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var text = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        var run = JsonNode.Parse(text)!["runs"]![0]!;
+        run["flow"]!.GetValue<string>().Should().Be("carrier-booking");
+        run["failedStep"]!.GetValue<string>().Should().Be("Call_Carrier");
+        run["error"]!["code"]!.GetValue<string>().Should().Be("BadRequest");
+        run["correlationId"]!.GetValue<string>().Should().Be("c-9");
+        run["run"]!["runId"]!.GetValue<string>().Should().Be("08584");
+        text.Should().NotContainEquivalentOf("body").And.NotContainEquivalentOf("input").And.NotContainEquivalentOf("output");
+        await _host.Mediator.Received(1).Send(new ListFailedRunsQuery(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ListDeadLetterQueues_AnswersTheCountAndTheAgeOfTheOldestMessage_OfEachQueue()
+    {
+        _host.Mediator.Send(Arg.Any<ListDeadLetterQueuesQuery>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(new DeadLetterQueueList(
+            Now,
+            [new DeadLetterEntity("carrier-tracking", 3, TimeSpan.FromHours(2)), new DeadLetterEntity("transport-orders", 0, null)])));
+
+        using var response = await _host.Client.SendAsync(AgentApiHost.Get("/agent/v1/dead-letter-queues", _host.Token()), TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var queues = JsonNode.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken))!["queues"]!.AsArray();
+        queues[0]!["name"]!.GetValue<string>().Should().Be("carrier-tracking");
+        queues[0]!["count"]!.GetValue<long>().Should().Be(3);
+        queues[0]!["oldestAgeSeconds"]!.GetValue<double>().Should().Be(7200);
+        queues[1]!["oldestAgeSeconds"].Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("/agent/v1/dead-letter-queues/shipment-events%2Fbilling/messages")]
+    [InlineData("/agent/v1/dead-letter-queues/shipment-events/billing/messages")]
+    public async Task PeekDeadLetters_ForASubscription_PeeksItsMessages_AnswersWhatTheToolDescribes_AndNoBody(string path)
+    {
+        _host.Mediator.Send(Arg.Any<ListDeadLetteredMessagesQuery>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(Result.Success(Peeked)));
+
+        using var response = await _host.Client.SendAsync(AgentApiHost.Get(path, _host.Token()), TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var text = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        var message = JsonNode.Parse(text)!["messages"]![0]!;
+        message["sequenceNumber"]!.GetValue<long>().Should().Be(7);
+        message["reason"]!.GetValue<string>().Should().Be("UnmappableTrackingMessage");
+        message["description"]!.GetValue<string>().Should().Be("Unknown status code DLV");
+        message["deliveryCount"]!.GetValue<int>().Should().Be(1);
+        message["correlationId"]!.GetValue<string>().Should().Be("c-1");
+        message["businessKeys"]![0]!["value"]!.GetValue<string>().Should().Be("SH-0000007");
+        message["applicationProperties"]!["statusCode"]!.GetValue<string>().Should().Be("DLV");
+        text.Should().NotContainEquivalentOf("body");
+        await _host.Mediator.Received(1).Send(new ListDeadLetteredMessagesQuery("shipment-events/billing"), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task PeekDeadLetters_OnlyEverPeeks_SoTheQueueIsUnchanged()
+    {
+        _host.Mediator.Send(Arg.Any<ListDeadLetteredMessagesQuery>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(Result.Success(Peeked)));
+
+        using var _ = await _host.Client.SendAsync(AgentApiHost.Get("/agent/v1/dead-letter-queues/carrier-tracking/messages", _host.Token()), TestContext.Current.CancellationToken);
+
+        // The one request the view makes is the peek's query: it sends no command, which is all that could receive, resubmit or discard.
+        _host.Mediator.ReceivedCalls().Should().ContainSingle().Which.GetArguments()[0].Should().BeOfType<ListDeadLetteredMessagesQuery>();
+    }
+
+    [Fact]
+    public async Task PeekDeadLetters_ForAQueueHoldingMoreThanTheLimit_ShowsTheOldest_AndSaysThereIsMore()
+    {
+        var many = new DeadLetteredMessageList(
+            "carrier-tracking",
+            [.. Enumerable.Range(1, AgentTrailEndpoints.PeekLimit + 5).Select(number => new RecordedDeadLetter(number, Now, "r", null, 1, null, []))],
+            HasMore: false);
+        _host.Mediator.Send(Arg.Any<ListDeadLetteredMessagesQuery>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(Result.Success(many)));
+
+        using var response = await _host.Client.SendAsync(AgentApiHost.Get("/agent/v1/dead-letter-queues/carrier-tracking/messages", _host.Token()), TestContext.Current.CancellationToken);
+
+        var view = JsonNode.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken))!;
+        view["messages"]!.AsArray().Should().HaveCount(AgentTrailEndpoints.PeekLimit);
+        view["hasMore"]!.GetValue<bool>().Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task PeekDeadLetters_ForAQueueTheEstateDoesNotHave_Is404()
+    {
+        _host.Mediator.Send(Arg.Any<ListDeadLetteredMessagesQuery>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(Result<DeadLetteredMessageList>.NotFound()));
+
+        using var response = await _host.Client.SendAsync(AgentApiHost.Get("/agent/v1/dead-letter-queues/nothing/messages", _host.Token()), TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task PeekDeadLetters_WhenTheUseCaseRefusesTheInput_IsAProblem400()
+    {
+        _host.Mediator.Send(Arg.Any<ListDeadLetteredMessagesQuery>(), Arg.Any<CancellationToken>())
+            .Returns(ValueTask.FromResult(Result<DeadLetteredMessageList>.Invalid(new ValidationError("Entity", "Open a dead-letter queue by its queue or subscription name."))));
+
+        using var response = await _host.Client.SendAsync(AgentApiHost.Get("/agent/v1/dead-letter-queues/%20/messages", _host.Token()), TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Theory]
+    [InlineData("/agent/v1/failed-runs")]
+    [InlineData("/agent/v1/dead-letter-queues")]
+    [InlineData("/agent/v1/dead-letter-queues/carrier-tracking/messages")]
+    public async Task TheNewTools_WithoutTheAgentsToken_AreRefused401(string path)
+    {
+        using var response = await _host.Client.SendAsync(AgentApiHost.Get(path), TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
     [Fact]
     public async Task Get_WhenTheUseCaseRefusesTheInput_IsAProblem400()
     {
@@ -178,7 +313,7 @@ public sealed class AgentApiTests : IAsyncLifetime
     {
         var routes = _host.AgentRoutes.ToList();
 
-        routes.Should().HaveCount(2);
+        routes.Should().HaveCount(6);
         routes.SelectMany(route => route.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods ?? []).Should().OnlyContain(method => method == "GET");
         routes.Should().OnlyContain(route => route.Metadata.GetOrderedMetadata<Microsoft.AspNetCore.Authorization.IAuthorizeData>().Any(data => data.Policy == "IntegrationConsole.Agent.Read"));
     }
@@ -287,7 +422,7 @@ public sealed class AgentApiTests : IAsyncLifetime
         await using var off = await AgentApiHost.StartAsync(enabled: false, withKey: false);
 
         AgentApiAuthentication.IsEnabled(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Agents:Enabled"] = "false" }).Build()).Should().BeFalse();
-        off.AgentRoutes.Should().HaveCount(2, because: "the host maps it as Program.cs does only when enabled; this host maps it regardless to show the token scheme is absent");
+        off.AgentRoutes.Should().HaveCount(6, because: "the host maps it as Program.cs does only when enabled; this host maps it regardless to show the token scheme is absent");
         using var response = await off.Client.SendAsync(AgentApiHost.Get("/agent/v1/trails/c-1", off.Token()), TestContext.Current.CancellationToken);
         response.StatusCode.Should().NotBe(HttpStatusCode.OK);
     }

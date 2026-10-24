@@ -34,7 +34,7 @@ internal static class McpTools
         var path = tool.Path;
         foreach (var parameter in tool.Parameters)
         {
-            if (arguments?[parameter] is not JsonValue value || !value.TryGetValue<string>(out var text) || !Plain(text))
+            if (arguments?[parameter] is not JsonValue value || !value.TryGetValue<string>(out var text) || !Plain(parameter, text))
             {
                 return null;
             }
@@ -45,7 +45,10 @@ internal static class McpTools
         return path;
     }
 
-    // Business keys, correlation IDs and run IDs are identifiers; nothing else reaches a URL.
-    private static bool Plain(string text) =>
-        text.Length is > 0 and <= 200 && text.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_' or '.' or ':');
+    // Business keys, correlation IDs and run IDs are identifiers; nothing else reaches a URL. A queue or subscription's name
+    // (entity) may also hold the '/' of topic/subscription, and then only between two names.
+    private static bool Plain(string parameter, string text) =>
+        text.Length is > 0 and <= 200
+        && text.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_' or '.' or ':' || (character == '/' && parameter == "entity"))
+        && !text.Split('/').Any(name => name.Length == 0 || name.All(character => character == '.'));
 }

@@ -110,7 +110,7 @@ public sealed class AgentModelsAndDefinitionsTests
         var definition = AgentDefinitions.Load("integration-operations");
 
         definition.Name.Should().Be("integration-operations");
-        definition.Tools.Names.Should().Equal("get_message_trail", "get_run");
+        definition.Tools.Names.Should().Equal("get_message_trail", "get_run", "list_failed_runs", "list_dead_letter_queues", "peek_dead_letters");
     }
 
     [Fact]

@@ -481,7 +481,7 @@ An application's narrower, read-only endpoint group for the Agents: statuses, co
 _Avoid_: agent endpoint, agent database
 
 **Explain**:
-The button on a Message trail that has a failure. It puts one fixed question about the trail to the Integration operations agent and shows the Suggestion it answers with: cause, evidence, suggested action and confidence. The Integration operator decides what to do.
+The button on a Message trail that has a failure, on a failed run in the Failed runs panel, and on a dead-lettered message in the Dead-letter queues panel. It puts one fixed question about that item to the Integration operations agent and shows the Suggestion it answers with: cause, evidence, suggested action and confidence. The Dead-letter queues panel's "what needs attention" button is a fixed question too, about all the queues at once. The Integration operator decides what to do.
 
 **Suggestion**:
 What an Agent proposes a person do, shown in the host application's UI: a cause or reasoning, the evidence it cites, a suggested action and a confidence. It is not stored, and acting on it is the person's own command, whose trace names the Agent and the run ID.

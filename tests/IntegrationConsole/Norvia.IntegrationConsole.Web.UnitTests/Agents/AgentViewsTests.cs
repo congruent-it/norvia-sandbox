@@ -16,6 +16,12 @@ public sealed class AgentViewsTests
     [InlineData(typeof(AgentRunView), new[] { "LogicApp", "Workflow", "RunId", "IsKept", "Status", "Steps" })]
     [InlineData(typeof(AgentStepView), new[] { "Name", "Status", "DurationMs", "Error" })]
     [InlineData(typeof(AgentStepError), new[] { "Code", "Message" })]
+    [InlineData(typeof(AgentFailedRunsView), new[] { "From", "To", "Runs" })]
+    [InlineData(typeof(AgentFailedRunView), new[] { "Flow", "Run", "Start", "CorrelationId", "FailedStep", "Error" })]
+    [InlineData(typeof(AgentDeadLetterQueuesView), new[] { "At", "Queues" })]
+    [InlineData(typeof(AgentDeadLetterQueueView), new[] { "Name", "Count", "OldestAgeSeconds" })]
+    [InlineData(typeof(AgentDeadLettersView), new[] { "Entity", "Messages", "HasMore" })]
+    [InlineData(typeof(AgentDeadLetterView), new[] { "SequenceNumber", "EnqueuedAt", "Reason", "Description", "DeliveryCount", "CorrelationId", "BusinessKeys", "ApplicationProperties" })]
     public void TheView_HasExactlyTheAllowedFields(Type view, string[] allowed)
     {
         view.GetProperties().Select(property => property.Name).Should().BeEquivalentTo(allowed);
@@ -24,7 +30,7 @@ public sealed class AgentViewsTests
     [Fact]
     public void TheView_HasNoFieldThatCouldHoldABody()
     {
-        var names = new[] { typeof(AgentTrailView), typeof(AgentHopView), typeof(AgentRunView), typeof(AgentStepView), typeof(AgentStepError) }
+        var names = new[] { typeof(AgentTrailView), typeof(AgentHopView), typeof(AgentRunView), typeof(AgentStepView), typeof(AgentStepError), typeof(AgentFailedRunView), typeof(AgentDeadLetterQueueView), typeof(AgentDeadLetterView) }
             .SelectMany(view => view.GetProperties()).Select(property => property.Name);
 
         names.Should().NotContain(name => name.Contains("Body", StringComparison.OrdinalIgnoreCase) || name.Contains("Input", StringComparison.OrdinalIgnoreCase)

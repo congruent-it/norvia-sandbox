@@ -159,6 +159,26 @@ public sealed class ServiceBusDeadLetterQueuesTests
     }
 
     [Fact]
+    public async Task PeekAsync_Always_ListsTheApplicationPropertiesAsText_EachCutShort_AndStillNothingOfTheBody()
+    {
+        Found(new ServiceBusEntity("sb", "carrier-tracking", null, 1));
+        PeeksMany(Message(Enqueued, sequenceNumber: 3, body: "Café De Kroon", properties: new Dictionary<string, object>
+        {
+            ["statusCode"] = "DLV",
+            ["attempts"] = 3,
+            ["note"] = new string('x', RecordedDeadLetter.MaxPropertyLength + 50),
+        }));
+
+        var peeked = await Queues().PeekAsync("carrier-tracking", 10, TestContext.Current.CancellationToken);
+
+        var properties = peeked!.Single().ApplicationProperties!;
+        properties["statusCode"].Should().Be("DLV");
+        properties["attempts"].Should().Be("3");
+        properties["note"].Should().HaveLength(RecordedDeadLetter.MaxPropertyLength);
+        properties.Values.Should().NotContain(value => value.Contains("Café", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task PeekAsync_WithoutATrackedCorrelationId_FallsBackToTheMessagesOwn()
     {
         Found(new ServiceBusEntity("sb", "carrier-tracking", null, 1));

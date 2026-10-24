@@ -13,6 +13,24 @@
       "description": "Returns a Logic App run: its status and its steps with status, duration and error. Never a step's input or output.",
       "method": "GET",
       "path": "/runs/{logicApp}/{workflow}/{runId}"
+    },
+    {
+      "name": "list_failed_runs",
+      "description": "Lists the Logic App runs that failed in the last 24 hours, newest first: each with its flow, start time, failing step and error, the Logic App run it was (when there is one) and the correlation ID of its Message trail. Never a step's input or output.",
+      "method": "GET",
+      "path": "/failed-runs"
+    },
+    {
+      "name": "list_dead_letter_queues",
+      "description": "Lists every Service Bus queue and subscription with the count of its dead-lettered messages and the age in seconds of the oldest. Subscriptions are named topic/subscription.",
+      "method": "GET",
+      "path": "/dead-letter-queues"
+    },
+    {
+      "name": "peek_dead_letters",
+      "description": "Peeks the oldest dead-lettered messages of one queue or subscription (named as list_dead_letter_queues names it) without receiving them, so the queue is unchanged: each with its sequence number, enqueued time, dead-letter reason and description, delivery count, application properties, correlation ID and business keys. Never a message body.",
+      "method": "GET",
+      "path": "/dead-letter-queues/{entity}/messages"
     }
   ]
 }

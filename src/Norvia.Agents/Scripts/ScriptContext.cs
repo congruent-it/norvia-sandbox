@@ -11,16 +11,21 @@ public sealed partial class ScriptContext
     internal ScriptContext(IEnumerable<ChatMessage> messages, ChatOptions? options)
     {
         _options = options;
-        Turn = messages.Count(message => message.Role == ChatRole.Assistant);
+        var all = messages.ToList();
+        Question = all.FirstOrDefault(message => message.Role == ChatRole.User)?.Text ?? string.Empty;
+        Turn = all.Count(message => message.Role == ChatRole.Assistant);
         Results =
         [
-            .. messages.SelectMany(message => message.Contents)
+            .. all.SelectMany(message => message.Contents)
                 .OfType<FunctionResultContent>()
                 .Select(result => Delimited().Match(result.Result?.ToString() ?? string.Empty))
                 .Where(match => match.Success)
                 .Select(match => new ScriptedToolResult(match.Groups["id"].Value, match.Groups["tool"].Value, match.Groups["content"].Value)),
         ];
     }
+
+    /// <summary>The question the run was started with.</summary>
+    public string Question { get; }
 
     /// <summary>How many times the model has answered so far; a call's ID is made of it.</summary>
     public int Turn { get; }

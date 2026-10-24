@@ -115,7 +115,7 @@ module server 'agent-mcp-server.bicep' = {
   params: {
     apiManagementName: apiManagementName
     serverName: contract.server
-    purpose: 'The Integration operations agent\'s read-only view of the Integration console: Message trails and Logic App runs, never a message body.'
+    purpose: 'The Integration operations agent\'s read-only view of the Integration console: Message trails, Logic App runs, failed runs and dead-letter queues (counts, and a peek that changes nothing), never a message body.'
     tools: contract.tools
     audience: view.appId
     requiredRole: role
