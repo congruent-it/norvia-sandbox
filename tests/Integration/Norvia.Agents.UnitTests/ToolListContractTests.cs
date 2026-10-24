@@ -6,13 +6,15 @@ namespace Norvia.Agents.UnitTests;
 public sealed class ToolListContractTests
 {
     [Fact]
-    public void Parse_TheIntegrationOperationsToolList_HasTheTwoReadTools()
+    public void Parse_TheIntegrationOperationsToolList_HasTheReadTools()
     {
         var contract = ToolListContract.Parse(Embedded.IntegrationOperationsTools);
 
         contract.Server.Should().Be("integration-operations");
         contract.Role.Should().Be("IntegrationConsole.Agent.Read");
-        contract.Tools.Select(tool => tool.Name).Should().Equal("get_message_trail", "get_run");
+        contract.Tools.Select(tool => tool.Name).Should().Equal("get_message_trail", "get_run", "list_failed_runs", "list_dead_letter_queues", "peek_dead_letters");
+        contract.Find("peek_dead_letters")!.Parameters.Should().Equal("entity");
+        contract.Find("list_failed_runs")!.Parameters.Should().BeEmpty();
         contract.Find("get_run")!.Parameters.Should().Equal("logicApp", "workflow", "runId");
     }
 

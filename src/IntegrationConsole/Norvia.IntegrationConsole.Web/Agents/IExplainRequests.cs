@@ -8,4 +8,10 @@ namespace Norvia.IntegrationConsole.Web.Agents;
 public interface IExplainRequests
 {
     Task<Result<Suggestion>> ExplainAsync(ExplainTrailQuery query, CancellationToken cancellationToken);
+
+    Task<Result<Suggestion>> ExplainAsync(ExplainFailedRunQuery query, CancellationToken cancellationToken);
+
+    Task<Result<Suggestion>> ExplainAsync(ExplainDeadLetterQuery query, CancellationToken cancellationToken);
+
+    Task<Result<Suggestion>> SummariseAsync(SummariseDeadLettersQuery query, CancellationToken cancellationToken);
 }

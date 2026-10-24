@@ -279,8 +279,15 @@ internal sealed class ServiceBusDeadLetterQueues(IServiceBusEntities entities, I
             message.DeadLetterErrorDescription,
             message.DeliveryCount,
             string.IsNullOrEmpty(tracking) ? message.CorrelationId : tracking,
-            keys);
+            keys,
+            properties.ToDictionary(
+                property => property.Key,
+                property => Truncated(Convert.ToString(property.Value, CultureInfo.InvariantCulture) ?? string.Empty),
+                StringComparer.Ordinal));
     }
+
+    private static string Truncated(string value) =>
+        value.Length <= RecordedDeadLetter.MaxPropertyLength ? value : value[..RecordedDeadLetter.MaxPropertyLength];
 
     private static ServiceBusReceiver DeadLetterReceiver(ServiceBusClient client, ServiceBusEntity entity)
     {

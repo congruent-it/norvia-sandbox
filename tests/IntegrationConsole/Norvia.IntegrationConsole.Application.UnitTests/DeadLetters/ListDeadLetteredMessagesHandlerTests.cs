@@ -32,7 +32,7 @@ public sealed class ListDeadLetteredMessagesHandlerTests
         var result = await HandleAsync("carrier-tracking");
 
         result.Value.Messages.Should().ContainSingle().Which.Should().Be(new RecordedDeadLetter(3, Enqueued, "MaxDeliveryCountExceeded", "Failed 10 times", 10, "corr-1", keys));
-        typeof(RecordedDeadLetter).GetProperties().Select(property => property.Name).Should().NotContain(["Body", "Properties", "ApplicationProperties"]);
+        typeof(RecordedDeadLetter).GetProperties().Select(property => property.Name).Should().NotContain("Body", because: "a peek never holds a body; the application properties are for the agent view, which the page does not render");
     }
 
     [Fact]

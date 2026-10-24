@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.Extensions.AI;
+using Norvia.Agents.Runner;
 
 namespace Norvia.Agents.Scripts;
 
@@ -13,6 +14,9 @@ public static class IntegrationOperationsScript
 {
     public const string GetMessageTrail = "get_message_trail";
     public const string GetRun = "get_run";
+    public const string ListFailedRuns = "list_failed_runs";
+    public const string ListDeadLetterQueues = "list_dead_letter_queues";
+    public const string PeekDeadLetters = "peek_dead_letters";
 
     /// <summary>The failure code the Carrier-tracking flow gives a tracking message whose status code it can't map (P5).</summary>
     public const string UnmappableTrackingMessage = "UnmappableTrackingMessage";
@@ -21,6 +25,21 @@ public static class IntegrationOperationsScript
 
     private static IReadOnlyList<AIContent> Next(ScriptContext context)
     {
+        if (AgentQuestions.ParseFailedRun(context.Question) is { } failedRun)
+        {
+            return FailedRunScript.Next(context, failedRun.Flow, failedRun.Start);
+        }
+
+        if (AgentQuestions.ParseDeadLetter(context.Question) is { } deadLetter)
+        {
+            return DeadLetterScript.Next(context, deadLetter.Entity, deadLetter.SequenceNumber);
+        }
+
+        if (AgentQuestions.IsWhatNeedsAttention(context.Question))
+        {
+            return AttentionScript.Next(context);
+        }
+
         if (context.Results.Count == 0)
         {
             return [new FunctionCallContent($"call-{context.Turn}", GetMessageTrail, new Dictionary<string, object?> { ["correlationId"] = context.Input("correlationId") })];
@@ -75,7 +94,7 @@ public static class IntegrationOperationsScript
                 "medium");
     }
 
-    private static string Json(string cause, IEnumerable<(string Claim, string Citation)> evidence, string action, string confidence) =>
+    internal static string Json(string cause, IEnumerable<(string Claim, string Citation)> evidence, string action, string confidence) =>
         JsonSerializer.Serialize(new
         {
             cause,
@@ -118,7 +137,7 @@ public static class IntegrationOperationsScript
                 ? new RunRef(logicApp, workflow, runId)
                 : null;
 
-    private static string? Text(JsonElement element, string property) =>
+    internal static string? Text(JsonElement element, string property) =>
         element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
 
     private sealed record FailedHop(string Name, string Outcome, string? FailureCode, RunRef? Run);

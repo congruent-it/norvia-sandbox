@@ -4,16 +4,22 @@
 @using System.Security.Claims
 @using Ardalis.Result
 @using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.Extensions.Options
+@using Norvia.IntegrationConsole.Application.Agents
+@using Norvia.IntegrationConsole.Application.Agents.Explain
 @using Norvia.IntegrationConsole.Application.DeadLetters
 @using Norvia.IntegrationConsole.Application.DeadLetters.Bulk
 @using Norvia.IntegrationConsole.Application.DeadLetters.Discard
 @using Norvia.IntegrationConsole.Application.DeadLetters.Messages
 @using Norvia.IntegrationConsole.Application.DeadLetters.Resubmit
 @using Norvia.IntegrationConsole.Application.Operators
+@using Norvia.IntegrationConsole.Web.Agents
 @using Norvia.IntegrationConsole.Web.Operators
 @using Norvia.IntegrationConsole.Web.Runs
 @using Norvia.IntegrationConsole.Web.Trails
 @inject IDeadLetterRequests DeadLetters
+@inject IExplainRequests Explain
+@inject IOptions<AgentsOptions> Agents
 @inject ILogger<DeadLetterMessages> Logger
 @inject AuthenticationStateProvider Authentication
 @implements IDisposable
@@ -135,7 +141,7 @@ else if (_list is { } found)
     }
 
     <FluentDataGrid Items="found.Messages.AsQueryable()" TGridItem="RecordedDeadLetter" aria-label="Dead-lettered messages" MultiLine="true"
-                    GridTemplateColumns="@((_canBulk ? "max-content " : "") + "max-content max-content minmax(10rem, 1fr) max-content minmax(12rem, max-content) minmax(10rem, 1fr)")">
+                    GridTemplateColumns="@((_canBulk ? "max-content " : "") + "max-content max-content minmax(10rem, 1fr) max-content minmax(12rem, max-content) minmax(10rem, 1fr)" + (Agents.Value.Enabled ? " minmax(10rem, 1fr)" : ""))">
         @if (_canBulk)
         {
             <TemplateColumn Title="Select">
@@ -166,6 +172,14 @@ else if (_list is { } found)
                 <div><a href="@TrailLinks.Search(key)">@TrailText.Of(key)</a></div>
             }
         </TemplateColumn>
+        @* A fixed question about this message, put to the assistant: it peeks the queue, which changes nothing. *@
+        @if (Agents.Value.Enabled)
+        {
+            <TemplateColumn Title="Assistant">
+                <ExplainItem Subject="@($"dead-lettered message {context.SequenceNumber}")"
+                             Ask="@(cancellation => Explain.ExplainAsync(new ExplainDeadLetterQuery(Entity, context.SequenceNumber, context.CorrelationId), cancellation))" />
+            </TemplateColumn>
+        }
     </FluentDataGrid>
 
     @if (found.HasMore)

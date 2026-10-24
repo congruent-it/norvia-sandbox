@@ -203,6 +203,46 @@ public sealed class McpEndpointTests : IAsyncLifetime
     }
 
     [Theory]
+    [InlineData("carrier-tracking", "carrier-tracking")]
+    [InlineData("shipment-events/billing", "shipment-events%2Fbilling")]
+    public async Task ToolCall_ForADeadLetterQueue_PutsTheQueueOrTopicAndSubscriptionInOneSegment(string entity, string segment)
+    {
+        using var client = _factory.AgentClient();
+
+        using var _ = await Post(client, Rpc("tools/call", Call("peek_dead_letters", new JsonObject { ["entity"] = entity })));
+
+        _factory.Console.Calls.Single().RequestUri!.AbsolutePath.Should().Be($"/agent/v1/dead-letter-queues/{segment}/messages");
+    }
+
+    [Theory]
+    [InlineData("/")]
+    [InlineData("a//b")]
+    [InlineData("../b")]
+    [InlineData("a/..")]
+    [InlineData("a/b?c")]
+    public async Task ToolCall_ForADeadLetterQueue_WithANameThatIsNotATopicAndSubscription_IsAnInvalidParams(string entity)
+    {
+        using var client = _factory.AgentClient();
+
+        using var response = await Post(client, Rpc("tools/call", Call("peek_dead_letters", new JsonObject { ["entity"] = entity })));
+
+        (await BodyAsync(response))["error"]!["code"]!.GetValue<int>().Should().Be(-32602);
+        _factory.Console.Calls.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("list_failed_runs", "/agent/v1/failed-runs")]
+    [InlineData("list_dead_letter_queues", "/agent/v1/dead-letter-queues")]
+    public async Task ToolCall_ForAToolWithNoInputs_CallsItsRoute(string tool, string path)
+    {
+        using var client = _factory.AgentClient();
+
+        using var _ = await Post(client, Rpc("tools/call", Call(tool)));
+
+        _factory.Console.Calls.Single().RequestUri!.AbsolutePath.Should().Be(path);
+    }
+
+    [Theory]
     [InlineData("../admin")]
     [InlineData("a/b")]
     [InlineData("a?b=c")]
@@ -381,7 +421,7 @@ public sealed class McpEndpointTests : IAsyncLifetime
         var raw = await session.Tools.Single(tool => tool.Name == "get_message_trail")
             .InvokeAsync(new Microsoft.Extensions.AI.AIFunctionArguments { ["correlationId"] = "c-1" }, TestContext.Current.CancellationToken);
 
-        session.Tools.Select(tool => tool.Name).Should().Equal("get_message_trail", "get_run");
+        session.Tools.Select(tool => tool.Name).Should().Equal("get_message_trail", "get_run", "list_failed_runs", "list_dead_letter_queues", "peek_dead_letters");
         raw.Should().NotBeNull();
         _factory.Console.Calls.Single().Headers.GetValues("X-Correlation-ID").Should().Equal("c-1");
     }

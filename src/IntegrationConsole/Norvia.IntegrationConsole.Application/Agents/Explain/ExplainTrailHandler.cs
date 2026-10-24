@@ -1,6 +1,7 @@
 using Ardalis.Result;
 using Mediator;
 using Norvia.Agents;
+using Norvia.Agents.Runner;
 
 namespace Norvia.IntegrationConsole.Application.Agents.Explain;
 
@@ -21,7 +22,7 @@ public sealed class ExplainTrailHandler(IAgentClient agent) : IQueryHandler<Expl
 
         // The same question every time: the operator asks nothing free-form of the Agent in this slice.
         return await agent.AskAsync(
-            new AgentRequest(AgentName, $"Explain why the Message trail {correlationId} failed, and what the Integration operator could do about it.", correlationId),
+            new AgentRequest(AgentName, AgentQuestions.ExplainTrail(correlationId), correlationId),
             cancellationToken);
     }
 }
