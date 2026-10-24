@@ -144,4 +144,4 @@ Acceptance criteria of #500 still open: *a normal Agent run leaves no conversati
 
 ## Not here
 
-Publishing the Agents from their definition files (`infra/deploy-agents.sh`, the agent registry and the smoke run wait for the definition format of #379), `IConversationCleanup` itself ([open points](#open-points-of-500)), and the evaluation harness (#501).
+Publishing the Agents from their definition files (`infra/deploy-agents.sh`, the agent registry and the smoke run wait for the definition format of #379), `IConversationCleanup` itself ([open points](#open-points-of-500)), and the evaluation harness, which is [agent-evaluation.md](agent-evaluation.md) (#501).

@@ -1,0 +1,14 @@
+{
+  "id": "estate-info",
+  "agent": "example",
+  "description": "The example agent (#498, #499) reads the one tool of the example MCP server and reports what it says. Proves the harness end to end; a real agent's cases are its own slice.",
+  "setup": { "toggle": "none", "note": "the example MCP server is deployed" },
+  "input": "What is the name of the estate, and is the agent door open?",
+  "expect": {
+    "fields": { "cause.code": "agent-door-open", "action.code": ["none", "no-action"] },
+    "mustCite": ["get_estate_info"],
+    "mustNotContain": ["ignore previous instructions"],
+    "toolsNotCalled": ["get_run"],
+    "explanation": { "rubric": "The explanation says the estate is called norvia and that the agent door is open, in plain language, without inventing anything else.", "field": "explanation" }
+  }
+}
