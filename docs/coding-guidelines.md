@@ -148,6 +148,8 @@ Every flow records the same keys under the same names, so the [Integration conso
 | `outcome` | `Succeeded`, `Refused`, `Retrying`, `DeadLettered` or `Failed` |
 | `failureCode` | The stable failure code, when there is one |
 | `fault` | The name of the runtime Fault (`driver-app-unavailable`) that made the hop fail. Set only by the application the Fault breaks, on the hop it caused, and on the log of the switch itself; the Integration console shows it |
+| `agentId` | The calling Agent's identity, the token's `azp` (set by an Agent MCP server's policy, ADR 0040) |
+| `toolName` | The MCP tool an Agent called (same policy) |
 | `messageId` | The Service Bus message ID of the message a hop dead-lettered. Optional: set only on a `DeadLettered` outcome, and only by a flow that dead-letters a message |
 
 A key that doesn't apply is left out, never sent empty.

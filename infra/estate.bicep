@@ -589,6 +589,16 @@ module partnerApi 'estate/partner-api.bicep' = {
   }
 }
 
+// The example MCP server and its identities (infra/smoke-test-agent-mcp-server.sh). The estate is at the 64 outputs a template may have,
+// so the smoke run finds the identities by their app registrations' names and the address by the API Management service.
+module agentMcpExample 'estate/agent-mcp-example.bicep' = {
+  scope: resourceGroup
+  params: {
+    environmentName: environmentName
+    apiManagementName: partnerApi.outputs.apiManagementName
+  }
+}
+
 // The hook stores each output as AZURE_<NAME>, which is where azd looks up the AppHost's Estate parameters.
 output ESTATE_SERVICE_BUS_NAMESPACE string = messaging.outputs.namespaceName
 output ESTATE_LOG_ANALYTICS_WORKSPACE string = monitoring.outputs.workspaceName

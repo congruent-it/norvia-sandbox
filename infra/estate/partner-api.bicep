@@ -179,7 +179,9 @@ resource logger 'Microsoft.ApiManagement/service/loggers@2024-05-01' = {
 }
 
 // Every call, the policy's traces included (verbosity information), with the correlation ID on the call to the Logic App
-// and on the answer. No bodies: a booking holds the Consignee's personal data.
+// and on the answer. No bodies: a booking holds the Consignee's personal data, and an MCP server in API Management needs payload
+// logging off at this scope (ADR 0040; the template test in AgentMcpServerTests fails if a body setting is added). The Agents'
+// MCP servers add the Agent's identity and the tool name as headers.
 resource diagnostics 'Microsoft.ApiManagement/service/diagnostics@2024-05-01' = {
   parent: apiManagement
   name: 'applicationinsights'
@@ -206,6 +208,8 @@ resource diagnostics 'Microsoft.ApiManagement/service/diagnostics@2024-05-01' = 
           'X-Correlation-ID'
           'X-Shipper-ID'
           'X-Carrier-ID'
+          'X-Agent-ID'
+          'X-Tool-Name'
         ]
       }
     }
