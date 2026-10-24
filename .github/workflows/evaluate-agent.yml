@@ -1,0 +1,41 @@
+# Runs an Agent's evaluation cases against the deployed Foundry agent. Manual only: it is never part of CI and never gates a merge
+# (ADR 0040, docs/operations/agent-evaluation.md). A failed case is a finding, so the job succeeds unless the harness cannot run.
+name: Evaluate agent
+
+on:
+  workflow_dispatch:
+    inputs:
+      agent:
+        description: The agent whose cases to run (a directory of evaluation/cases)
+        required: true
+      runs:
+        description: Runs per case; more than one shows a flaky case as a pass rate
+        default: "1"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    environment: estate
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Run the cases
+        env:
+          FOUNDRY_PROJECT_ENDPOINT: ${{ vars.FOUNDRY_PROJECT_ENDPOINT }}
+          EVALUATION_JUDGE_MODEL: ${{ vars.EVALUATION_JUDGE_MODEL }}
+          AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
+        run: infra/run-agent-evaluation.sh "${{ inputs.agent }}" --runs "${{ inputs.runs }}" --out "$RUNNER_TEMP/result.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: evaluation-${{ inputs.agent }}
+          path: ${{ runner.temp }}/result.json
+          if-no-files-found: ignore
