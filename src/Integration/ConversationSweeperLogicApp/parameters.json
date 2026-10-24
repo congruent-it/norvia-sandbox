@@ -1,0 +1,14 @@
+{
+  "foundryProjectEndpoint": {
+    "type": "String",
+    "value": "@appsetting('FOUNDRY_PROJECT_ENDPOINT')"
+  },
+  "sweeperIdentityId": {
+    "type": "String",
+    "value": "@appsetting('CONVERSATION_SWEEPER_IDENTITY_ID')"
+  },
+  "maxAgeMinutes": {
+    "type": "String",
+    "value": "@appsetting('CONVERSATION_MAX_AGE_MINUTES')"
+  }
+}

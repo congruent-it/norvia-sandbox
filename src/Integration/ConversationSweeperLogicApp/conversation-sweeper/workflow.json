@@ -1,0 +1,469 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "triggers": {
+      "Every_night": {
+        "type": "Recurrence",
+        "recurrence": {
+          "frequency": "Day",
+          "interval": 1,
+          "schedule": {
+            "hours": [
+              "2"
+            ],
+            "minutes": [
+              0
+            ]
+          },
+          "timeZone": "UTC"
+        }
+      }
+    },
+    "actions": {
+      "Set_the_cutoff": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "cutoff",
+              "type": "integer",
+              "value": "@sub(div(sub(ticks(utcNow()), 621355968000000000), 10000000), mul(int(parameters('maxAgeMinutes')), 60))"
+            }
+          ]
+        },
+        "runAfter": {}
+      },
+      "Count_the_deleted": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "deleted",
+              "type": "integer",
+              "value": 0
+            }
+          ]
+        },
+        "runAfter": {
+          "Set_the_cutoff": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Count_the_not_deleted": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "notDeleted",
+              "type": "integer",
+              "value": 0
+            }
+          ]
+        },
+        "runAfter": {
+          "Count_the_deleted": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Count_the_page": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "pageDeleted",
+              "type": "integer",
+              "value": 0
+            }
+          ]
+        },
+        "runAfter": {
+          "Count_the_not_deleted": [
+            "Succeeded"
+          ]
+        }
+      },
+      "More_conversations": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "moreConversations",
+              "type": "boolean",
+              "value": true
+            }
+          ]
+        },
+        "runAfter": {
+          "Count_the_page": [
+            "Succeeded"
+          ]
+        }
+      },
+      "More_responses": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "moreResponses",
+              "type": "boolean",
+              "value": true
+            }
+          ]
+        },
+        "runAfter": {
+          "More_conversations": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Sweep_the_conversations": {
+        "type": "Until",
+        "expression": "@not(variables('moreConversations'))",
+        "limit": {
+          "count": 50,
+          "timeout": "PT1H"
+        },
+        "actions": {
+          "Start_a_page_of_conversations": {
+            "type": "SetVariable",
+            "inputs": {
+              "name": "pageDeleted",
+              "value": 0
+            },
+            "runAfter": {}
+          },
+          "List_the_oldest_conversations": {
+            "type": "Http",
+            "inputs": {
+              "method": "GET",
+              "uri": "@{parameters('foundryProjectEndpoint')}/openai/v1/conversations?limit=100&order=asc",
+              "authentication": {
+                "type": "ManagedServiceIdentity",
+                "identity": "@parameters('sweeperIdentityId')",
+                "audience": "https://ai.azure.com"
+              },
+              "retryPolicy": {
+                "type": "exponential",
+                "count": 3,
+                "interval": "PT10S",
+                "minimumInterval": "PT5S",
+                "maximumInterval": "PT1M"
+              }
+            },
+            "runAfter": {
+              "Start_a_page_of_conversations": [
+                "Succeeded"
+              ]
+            }
+          },
+          "Delete_the_conversation_loop": {
+            "type": "Foreach",
+            "foreach": "@body('List_the_oldest_conversations')?['data']",
+            "actions": {
+              "Is_the_conversation_old": {
+                "type": "If",
+                "expression": {
+                  "lessOrEquals": [
+                    "@item()?['created_at']",
+                    "@variables('cutoff')"
+                  ]
+                },
+                "actions": {
+                  "Delete_the_conversation": {
+                    "type": "Http",
+                    "inputs": {
+                      "method": "DELETE",
+                      "uri": "@{parameters('foundryProjectEndpoint')}/openai/v1/conversations/@{item()?['id']}",
+                      "authentication": {
+                        "type": "ManagedServiceIdentity",
+                        "identity": "@parameters('sweeperIdentityId')",
+                        "audience": "https://ai.azure.com"
+                      },
+                      "retryPolicy": {
+                        "type": "exponential",
+                        "count": 3,
+                        "interval": "PT10S",
+                        "minimumInterval": "PT5S",
+                        "maximumInterval": "PT1M"
+                      }
+                    },
+                    "runAfter": {}
+                  },
+                  "Count_a_deleted_conversation": {
+                    "type": "IncrementVariable",
+                    "inputs": {
+                      "name": "pageDeleted",
+                      "value": 1
+                    },
+                    "runAfter": {
+                      "Delete_the_conversation": [
+                        "Succeeded"
+                      ]
+                    }
+                  },
+                  "Count_a_conversation_not_deleted": {
+                    "type": "IncrementVariable",
+                    "inputs": {
+                      "name": "notDeleted",
+                      "value": 1
+                    },
+                    "runAfter": {
+                      "Delete_the_conversation": [
+                        "Failed",
+                        "TimedOut"
+                      ]
+                    }
+                  }
+                },
+                "else": {
+                  "actions": {}
+                },
+                "runAfter": {}
+              }
+            },
+            "runtimeConfiguration": {
+              "concurrency": {
+                "repetitions": 1
+              }
+            },
+            "runAfter": {
+              "List_the_oldest_conversations": [
+                "Succeeded"
+              ]
+            }
+          },
+          "Add_the_page_to_the_total_of_conversations": {
+            "type": "IncrementVariable",
+            "inputs": {
+              "name": "deleted",
+              "value": "@variables('pageDeleted')"
+            },
+            "runAfter": {
+              "Delete_the_conversation_loop": [
+                "Succeeded",
+                "Failed"
+              ]
+            }
+          },
+          "Decide_if_there_are_more_conversations": {
+            "type": "SetVariable",
+            "inputs": {
+              "name": "moreConversations",
+              "value": "@and(equals(body('List_the_oldest_conversations')?['has_more'], true), greater(variables('pageDeleted'), 0))"
+            },
+            "runAfter": {
+              "Add_the_page_to_the_total_of_conversations": [
+                "Succeeded"
+              ]
+            }
+          }
+        },
+        "runAfter": {
+          "More_responses": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Sweep_the_responses": {
+        "type": "Until",
+        "expression": "@not(variables('moreResponses'))",
+        "limit": {
+          "count": 50,
+          "timeout": "PT1H"
+        },
+        "actions": {
+          "Start_a_page_of_responses": {
+            "type": "SetVariable",
+            "inputs": {
+              "name": "pageDeleted",
+              "value": 0
+            },
+            "runAfter": {}
+          },
+          "List_the_oldest_responses": {
+            "type": "Http",
+            "inputs": {
+              "method": "GET",
+              "uri": "@{parameters('foundryProjectEndpoint')}/openai/v1/responses?limit=100&order=asc",
+              "authentication": {
+                "type": "ManagedServiceIdentity",
+                "identity": "@parameters('sweeperIdentityId')",
+                "audience": "https://ai.azure.com"
+              },
+              "retryPolicy": {
+                "type": "exponential",
+                "count": 3,
+                "interval": "PT10S",
+                "minimumInterval": "PT5S",
+                "maximumInterval": "PT1M"
+              }
+            },
+            "runAfter": {
+              "Start_a_page_of_responses": [
+                "Succeeded"
+              ]
+            }
+          },
+          "Delete_the_response_loop": {
+            "type": "Foreach",
+            "foreach": "@body('List_the_oldest_responses')?['data']",
+            "actions": {
+              "Is_the_response_old": {
+                "type": "If",
+                "expression": {
+                  "lessOrEquals": [
+                    "@item()?['created_at']",
+                    "@variables('cutoff')"
+                  ]
+                },
+                "actions": {
+                  "Delete_the_response": {
+                    "type": "Http",
+                    "inputs": {
+                      "method": "DELETE",
+                      "uri": "@{parameters('foundryProjectEndpoint')}/openai/v1/responses/@{item()?['id']}",
+                      "authentication": {
+                        "type": "ManagedServiceIdentity",
+                        "identity": "@parameters('sweeperIdentityId')",
+                        "audience": "https://ai.azure.com"
+                      },
+                      "retryPolicy": {
+                        "type": "exponential",
+                        "count": 3,
+                        "interval": "PT10S",
+                        "minimumInterval": "PT5S",
+                        "maximumInterval": "PT1M"
+                      }
+                    },
+                    "runAfter": {}
+                  },
+                  "Count_a_deleted_response": {
+                    "type": "IncrementVariable",
+                    "inputs": {
+                      "name": "pageDeleted",
+                      "value": 1
+                    },
+                    "runAfter": {
+                      "Delete_the_response": [
+                        "Succeeded"
+                      ]
+                    }
+                  },
+                  "Count_a_response_not_deleted": {
+                    "type": "IncrementVariable",
+                    "inputs": {
+                      "name": "notDeleted",
+                      "value": 1
+                    },
+                    "runAfter": {
+                      "Delete_the_response": [
+                        "Failed",
+                        "TimedOut"
+                      ]
+                    }
+                  }
+                },
+                "else": {
+                  "actions": {}
+                },
+                "runAfter": {}
+              }
+            },
+            "runtimeConfiguration": {
+              "concurrency": {
+                "repetitions": 1
+              }
+            },
+            "runAfter": {
+              "List_the_oldest_responses": [
+                "Succeeded"
+              ]
+            }
+          },
+          "Add_the_page_to_the_total_of_responses": {
+            "type": "IncrementVariable",
+            "inputs": {
+              "name": "deleted",
+              "value": "@variables('pageDeleted')"
+            },
+            "runAfter": {
+              "Delete_the_response_loop": [
+                "Succeeded",
+                "Failed"
+              ]
+            }
+          },
+          "Decide_if_there_are_more_responses": {
+            "type": "SetVariable",
+            "inputs": {
+              "name": "moreResponses",
+              "value": "@and(equals(body('List_the_oldest_responses')?['has_more'], true), greater(variables('pageDeleted'), 0))"
+            },
+            "runAfter": {
+              "Add_the_page_to_the_total_of_responses": [
+                "Succeeded"
+              ]
+            }
+          }
+        },
+        "runAfter": {
+          "Sweep_the_conversations": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Track_the_sweep": {
+        "type": "Compose",
+        "inputs": {
+          "deleted": "@variables('deleted')",
+          "notDeleted": "@variables('notDeleted')"
+        },
+        "runAfter": {
+          "Sweep_the_responses": [
+            "Succeeded"
+          ]
+        },
+        "trackedProperties": {
+          "flow": "conversation-sweeper",
+          "deleted": "@action()?['inputs']?['deleted']",
+          "notDeleted": "@action()?['inputs']?['notDeleted']"
+        }
+      },
+      "Fail_when_something_stayed": {
+        "type": "If",
+        "expression": {
+          "greater": [
+            "@variables('notDeleted')",
+            0
+          ]
+        },
+        "actions": {
+          "Fail_the_run": {
+            "type": "Terminate",
+            "inputs": {
+              "runStatus": "Failed",
+              "runError": {
+                "code": "ConversationNotDeleted",
+                "message": "@{variables('notDeleted')} conversations or responses older than the cutoff could not be deleted."
+              }
+            },
+            "runAfter": {}
+          }
+        },
+        "else": {
+          "actions": {}
+        },
+        "runAfter": {
+          "Track_the_sweep": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

@@ -14,5 +14,6 @@
   "lateDeliveryCheckOff": false,
   "shipperTrackingCached": false,
   "noShipperRateLimit": false,
-  "noReportBackToDriverApp": false
+  "noReportBackToDriverApp": false,
+  "noConversationSweeper": false
 }
