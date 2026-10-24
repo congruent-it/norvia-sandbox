@@ -119,3 +119,14 @@ internal sealed class StubRuns : IWorkflowRuns
         return Task.FromResult<RecordedBodies?>(null);
     }
 }
+
+/// <summary>Where the console lists failed runs from, holding the runs a test gives it.</summary>
+internal sealed class StubFailedRuns : IFailedRuns
+{
+    private readonly ConcurrentQueue<RecordedFailedRun> _runs = new();
+
+    public void Add(RecordedFailedRun run) => _runs.Enqueue(run);
+
+    public Task<IReadOnlyList<RecordedFailedRun>> FailedRunsAsync(DateTimeOffset since, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<RecordedFailedRun>>([.. _runs]);
+}
