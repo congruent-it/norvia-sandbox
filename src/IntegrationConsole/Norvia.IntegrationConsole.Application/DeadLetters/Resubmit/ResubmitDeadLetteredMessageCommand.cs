@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Ardalis.Result;
 using Mediator;
+using Norvia.Agents;
 
 namespace Norvia.IntegrationConsole.Application.DeadLetters.Resubmit;
 
@@ -12,5 +13,6 @@ namespace Norvia.IntegrationConsole.Application.DeadLetters.Resubmit;
 /// <param name="Caller">The operator, from their token.</param>
 /// <param name="Entity">The queue's name, or a subscription's as <c>topic/subscription</c>.</param>
 /// <param name="SequenceNumber">The broker's number for the message within its dead-letter queue.</param>
-public sealed record ResubmitDeadLetteredMessageCommand(ClaimsPrincipal Caller, string Entity, long SequenceNumber)
+/// <param name="ActingOn">The Agent run whose Suggestion the operator is acting on, which the audit then carries. Null when they act on their own.</param>
+public sealed record ResubmitDeadLetteredMessageCommand(ClaimsPrincipal Caller, string Entity, long SequenceNumber, AgentRun? ActingOn = null)
     : ICommand<Result<ResubmittedDeadLetter>>;

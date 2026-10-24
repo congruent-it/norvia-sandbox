@@ -17,7 +17,7 @@ namespace Norvia.IntegrationConsole.Agents.IntegrationTests;
 public sealed class FoundryAgentTests
 {
     private const string Answer = """
-        {"cause":"The Carrier sent DLV, which the map does not know.","evidence":[{"claim":"The tracking hop was dead-lettered.","citation":"r1"}],"suggestedAction":"Ask the Carrier to send POD.","confidence":"high"}
+        {"cause":"The Carrier sent DLV, which the map does not know.","evidence":[{"claim":"The tracking hop was dead-lettered.","citation":"r1"}],"action":"needs-a-person","suggestedAction":"Ask the Carrier to send POD.","confidence":"high"}
         """;
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;

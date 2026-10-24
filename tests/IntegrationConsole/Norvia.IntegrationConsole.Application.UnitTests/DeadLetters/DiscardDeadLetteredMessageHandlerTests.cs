@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Ardalis.Result;
 using Microsoft.Extensions.Time.Testing;
+using Norvia.Agents;
 using Norvia.IntegrationConsole.Application.Audit;
 using Norvia.IntegrationConsole.Application.DeadLetters;
 using Norvia.IntegrationConsole.Application.DeadLetters.Discard;
@@ -135,6 +136,48 @@ public sealed class DiscardDeadLetteredMessageHandlerTests
         await _audit.DidNotReceive().WriteAsync(Arg.Any<AuditEvent>(), Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task Handle_WhenTheOperatorActsOnASuggestion_TheAuditCarriesTheAgentNameAndRunId()
+    {
+        _queues.DiscardAsync("carrier-tracking", 3, Arg.Any<CancellationToken>()).Returns(Discarded);
+        var run = new AgentRun("integration-operations", "run-7");
+
+        await HandleAsync(Operator("Iris Operator", OperatorRoles.Resubmit), "carrier-tracking", 3, "Duplicate", run);
+
+        await _audit.Received(1).WriteAsync(
+            new AuditEvent("Iris Operator", AuditActions.Discard, "carrier-tracking", "original-1", "corr-1", Discarded.BusinessKeys, Now, "Duplicate", run),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_WhenTheOperatorDiscardsOnTheirOwn_TheAuditCarriesNoAgent()
+    {
+        _queues.DiscardAsync("carrier-tracking", 3, Arg.Any<CancellationToken>()).Returns(Discarded);
+
+        await HandleAsync(Operator("Iris Operator", OperatorRoles.Resubmit), "carrier-tracking", 3, "Duplicate");
+
+        await _audit.Received(1).WriteAsync(Arg.Is<AuditEvent>(auditEvent => auditEvent.Agent == null), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_WhenTheOperatorLacksTheResubmitRole_ASuggestionDoesNotChangeThat()
+    {
+        var result = await HandleAsync(Operator("Iris Operator", OperatorRoles.Read), "carrier-tracking", 3, "Duplicate", new AgentRun("integration-operations", "run-7"));
+
+        result.Status.Should().Be(ResultStatus.Forbidden);
+        await _queues.DidNotReceive().DiscardAsync(Arg.Any<string>(), Arg.Any<long>(), Arg.Any<CancellationToken>());
+        await _audit.DidNotReceive().WriteAsync(Arg.Any<AuditEvent>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_ForASuggestionWithoutAReason_StillNeedsOne()
+    {
+        var result = await HandleAsync(Operator("Iris Operator", OperatorRoles.Resubmit), "carrier-tracking", 3, " ", new AgentRun("integration-operations", "run-7"));
+
+        result.Status.Should().Be(ResultStatus.Invalid);
+        await _queues.DidNotReceive().DiscardAsync(Arg.Any<string>(), Arg.Any<long>(), Arg.Any<CancellationToken>());
+    }
+
     private static ClaimsPrincipal Operator(string name, string? role)
     {
         var claims = new List<Claim> { new(ClaimTypes.Name, name) };
@@ -146,7 +189,7 @@ public sealed class DiscardDeadLetteredMessageHandlerTests
         return new ClaimsPrincipal(new ClaimsIdentity(claims, "test", ClaimTypes.Name, ClaimTypes.Role));
     }
 
-    private async Task<Result<DiscardedDeadLetter>> HandleAsync(ClaimsPrincipal caller, string entity, long sequenceNumber, string reason) =>
+    private async Task<Result<DiscardedDeadLetter>> HandleAsync(ClaimsPrincipal caller, string entity, long sequenceNumber, string reason, AgentRun? actingOn = null) =>
         await new DiscardDeadLetteredMessageHandler(_queues, _audit, _time)
-            .Handle(new DiscardDeadLetteredMessageCommand(caller, entity, sequenceNumber, reason), TestContext.Current.CancellationToken);
+            .Handle(new DiscardDeadLetteredMessageCommand(caller, entity, sequenceNumber, reason, actingOn), TestContext.Current.CancellationToken);
 }

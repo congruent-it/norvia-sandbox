@@ -25,6 +25,14 @@ public static class SuggestionParser
 
         var cause = Text(root, "cause");
         var action = Text(root, "suggestedAction");
+        var kind = Text(root, "action") switch
+        {
+            "resubmit" => SuggestedActionKind.Resubmit,
+            "discard" => SuggestedActionKind.Discard,
+            "fix-the-cause-first" => SuggestedActionKind.FixTheCauseFirst,
+            "needs-a-person" => SuggestedActionKind.NeedsAPerson,
+            _ => throw new AgentRunException("The reply's action is not resubmit, discard, fix-the-cause-first or needs-a-person."),
+        };
         if (!Enum.TryParse<Confidence>(Text(root, "confidence"), ignoreCase: true, out var confidence))
         {
             throw new AgentRunException("The reply's confidence is not low, medium or high.");
@@ -47,7 +55,7 @@ public static class SuggestionParser
             evidence.Add(new Evidence(Text(item, "claim"), resultId, toolName));
         }
 
-        return new Suggestion(cause, evidence, action, confidence);
+        return new Suggestion(cause, evidence, action, confidence, kind);
     }
 
     private static string Text(JsonElement element, string property) =>

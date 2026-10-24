@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Testing;
+using Norvia.Agents;
 using Norvia.IntegrationConsole.Application.Audit;
 using Norvia.IntegrationConsole.Application.Trails;
 using Norvia.IntegrationConsole.Infrastructure.Audit;
@@ -52,6 +53,29 @@ public sealed class OpenTelemetryAuditLogTests
         var record = _logger.Collector.GetSnapshot().Should().ContainSingle().Subject;
         record.Message.Should().Contain("discard").And.Contain("reason: Duplicate of SH-0041");
         record.StructuredState.Should().Contain(state => state.Key == "Reason" && state.Value == "Duplicate of SH-0041");
+    }
+
+    [Fact]
+    public async Task WriteAsync_ForAnActedOnSuggestion_CarriesTheAgentNameAndRunId_InTheScopeAndTheRecord()
+    {
+        await new OpenTelemetryAuditLog(_logger).WriteAsync(Event() with { Agent = new AgentRun("integration-operations", "run-7") }, TestContext.Current.CancellationToken);
+
+        var record = _logger.Collector.GetSnapshot().Should().ContainSingle().Subject;
+        record.Message.Should().Contain("agent: integration-operations").And.Contain("run: run-7");
+        record.StructuredState.Should().Contain(state => state.Key == "AgentRunId" && state.Value == "run-7");
+        var scope = record.Scopes.Should().ContainSingle().Subject
+            .Should().BeAssignableTo<IEnumerable<KeyValuePair<string, object>>>().Subject.ToDictionary(pair => pair.Key, pair => pair.Value);
+        scope.Should().Contain("agent.name", "integration-operations").And.Contain("agent.run.id", "run-7");
+    }
+
+    [Fact]
+    public async Task WriteAsync_ForAnEventNobodyActedOnASuggestionFor_NamesNoAgent()
+    {
+        await new OpenTelemetryAuditLog(_logger).WriteAsync(Event(), TestContext.Current.CancellationToken);
+
+        var record = _logger.Collector.GetSnapshot().Should().ContainSingle().Subject;
+        record.StructuredState.Should().Contain(state => state.Key == "AgentName" && state.Value == string.Empty);
+        record.Scopes.Single().Should().BeAssignableTo<IEnumerable<KeyValuePair<string, object>>>().Which.Select(pair => pair.Key).Should().NotContain("agent.name");
     }
 
     private static AuditEvent Event() => new(

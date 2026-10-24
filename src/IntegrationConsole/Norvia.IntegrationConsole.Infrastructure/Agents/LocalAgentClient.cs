@@ -49,7 +49,7 @@ internal sealed partial class LocalAgentClient(
 
             using var succeeded = logger.BeginScope(new Dictionary<string, object?> { ["outcome"] = "Succeeded" });
             LogAnswered(logger, request.AgentName, runId, result.ToolCalls.Count);
-            return result.Suggestion;
+            return result.Suggestion with { Run = new AgentRun(request.AgentName, runId) };
         }
         catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {

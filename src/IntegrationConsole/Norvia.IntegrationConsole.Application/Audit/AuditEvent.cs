@@ -1,3 +1,4 @@
+using Norvia.Agents;
 using Norvia.IntegrationConsole.Application.Trails;
 
 namespace Norvia.IntegrationConsole.Application.Audit;
@@ -11,6 +12,7 @@ namespace Norvia.IntegrationConsole.Application.Audit;
 /// <param name="BusinessKeys">The tracking contract's keys the message carried.</param>
 /// <param name="At">When.</param>
 /// <param name="Reason">Why, for a discard, which needs one. Null for a resubmit.</param>
+/// <param name="Agent">The Agent run whose Suggestion the operator acted on, or null when they acted on their own (ADR 0040).</param>
 public sealed record AuditEvent(
     string Actor,
     string Action,
@@ -19,4 +21,5 @@ public sealed record AuditEvent(
     string? CorrelationId,
     IReadOnlyList<BusinessKey> BusinessKeys,
     DateTimeOffset At,
-    string? Reason = null);
+    string? Reason = null,
+    AgentRun? Agent = null);
