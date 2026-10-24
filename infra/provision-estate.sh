@@ -130,18 +130,20 @@ azd env config set infra.parameters.estate_reset_enabled "\"$reset_enabled\""
 
 # Whether the Agents do anything (Agents:Enabled), and the Foundry project endpoint the apps and scripts call. Off unless the environment says so
 # with ESTATE_AGENTS_ENABLED_SETTING=true. Like the reset setting, both are handed to the apps here, because the Estate is at its 64 outputs.
-# The account is the estate's only AIServices account; the project is named norvia (infra/estate/foundry.bicep).
+# The account is the estate's only AIServices account; the projects are norvia and norvia-intake, the Intake agent's (infra/estate/foundry.bicep).
 agents_enabled=$(printf '%s' "${ESTATE_AGENTS_ENABLED_SETTING:-false}" | tr '[:upper:]' '[:lower:]')
 [ "$agents_enabled" = "true" ] || agents_enabled=false
 foundry_account=$(az cognitiveservices account list --subscription "$AZURE_SUBSCRIPTION_ID" --resource-group "rg-$AZURE_ENV_NAME" \
   --query "[?kind=='AIServices'].name | [0]" --output tsv)
 : "${foundry_account:?The estate has no Foundry account}"
 foundry_project_endpoint="https://$foundry_account.services.ai.azure.com/api/projects/norvia"
+foundry_intake_project_endpoint="https://$foundry_account.services.ai.azure.com/api/projects/norvia-intake"
 azd env set AZURE_ESTATE_AGENTS_ENABLED "$agents_enabled"
 azd env config set infra.parameters.estate_agents_enabled "\"$agents_enabled\""
 azd env set AZURE_ESTATE_FOUNDRY_PROJECT_ENDPOINT "$foundry_project_endpoint"
 azd env config set infra.parameters.estate_foundry_project_endpoint "\"$foundry_project_endpoint\""
 azd env set FOUNDRY_PROJECT_ENDPOINT "$foundry_project_endpoint"
+azd env set FOUNDRY_INTAKE_PROJECT_ENDPOINT "$foundry_intake_project_endpoint"
 
 # The seeded Drivers' Entra test users, whose domain and password the apps take as the Estate parameters azd asks for.
 # ARM returns an output's name with its first letter lowercased (estatE_...), so it is looked up in upper case.
