@@ -34,10 +34,22 @@ internal sealed partial class DriverReportsConsumer(
             return Task.CompletedTask;
         };
 
-        await processor.StartProcessingAsync(stoppingToken);
+        var reading = false;
         try
         {
-            await Task.Delay(Timeout.Infinite, stoppingToken);
+            while (true)
+            {
+                var disabled = IsDisabled(settings);
+                if (disabled == reading)
+                {
+                    // Disabled: the subscription is left alone, so the Drivers' reports wait in their sessions, in order.
+                    await (disabled ? processor.StopProcessingAsync(stoppingToken) : processor.StartProcessingAsync(stoppingToken));
+                    reading = !disabled;
+                    LogReading(reading);
+                }
+
+                await Task.Delay(settings.DisabledFlagPoll, stoppingToken);
+            }
         }
         catch (OperationCanceledException)
         {
@@ -46,6 +58,9 @@ internal sealed partial class DriverReportsConsumer(
 
         await processor.StopProcessingAsync(CancellationToken.None);
     }
+
+    internal static bool IsDisabled(DriverReportsWorkerOptions settings) =>
+        !string.IsNullOrEmpty(settings.DisabledFlagPath) && File.Exists(settings.DisabledFlagPath);
 
     internal async Task HandleAsync(ProcessSessionMessageEventArgs args)
     {
@@ -69,6 +84,9 @@ internal sealed partial class DriverReportsConsumer(
             LogRunFailed(args.Message.SessionId);
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "The Driver reports subscription is being read: {Reading}")]
+    private partial void LogReading(bool reading);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "The Driver reports run for Trip {TripNumber} couldn't tell the Driver app the outcome; the report stays Sending")]
     private partial void LogRunFailed(string tripNumber);

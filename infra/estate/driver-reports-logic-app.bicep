@@ -43,6 +43,12 @@ param contentKeyVaultName string
 @description('The Integration console\'s managed identity, which reads the app\'s run history.')
 param integrationConsolePrincipalId string
 
+@description('The Partner portal managed identity, which the presenter panel fault uses to disable this Logic App and enable it again.')
+param partnerPortalPrincipalId string
+
+@description('The custom role that can only read, start and stop a site (logic-app-switch-role.bicep).')
+param logicAppSwitchRoleId string
+
 var resourceToken = uniqueString(resourceGroup().id)
 var logicAppName = 'logic-driver-reports-${resourceToken}'
 var contentShareName = logicAppName
@@ -214,6 +220,17 @@ resource integrationConsoleReadsRunHistory 'Microsoft.Authorization/roleAssignme
   properties: {
     principalId: integrationConsolePrincipalId
     roleDefinitionId: logicAppsStandardReader
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// The Partner portal's identity may switch this one Logic App off and on (the fault driver-reports-logic-app-disabled) and do nothing else to it.
+resource partnerPortalSwitchesLogicApp 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(logicApp.id, partnerPortalPrincipalId, logicAppSwitchRoleId)
+  scope: logicApp
+  properties: {
+    principalId: partnerPortalPrincipalId
+    roleDefinitionId: logicAppSwitchRoleId
     principalType: 'ServicePrincipal'
   }
 }

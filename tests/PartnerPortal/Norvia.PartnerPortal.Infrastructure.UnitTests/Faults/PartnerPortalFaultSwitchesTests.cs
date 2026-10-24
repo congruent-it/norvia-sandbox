@@ -21,6 +21,7 @@ public sealed class PartnerPortalFaultSwitchesTests : IDisposable
     private readonly FakeLogger<PartnerPortalFaultSwitches> _logger = new();
     private readonly HttpClient _http;
     private readonly IFaults _own;
+    private readonly ILogicAppSwitch _logicApp = Substitute.For<ILogicAppSwitch>();
     private readonly PartnerPortalFaultSwitches _switches;
 
     public PartnerPortalFaultSwitchesTests()
@@ -38,7 +39,7 @@ public sealed class PartnerPortalFaultSwitchesTests : IDisposable
         builder.AddFaults(PartnerPortalFaultDefinitions.All);
         builder.Services.AddSingleton<TimeProvider>(_time);
         _own = builder.Services.BuildServiceProvider().GetRequiredService<IFaults>();
-        _switches = new PartnerPortalFaultSwitches(others, _own, _logger);
+        _switches = new PartnerPortalFaultSwitches(others, _own, new DriverReportsLogicAppFault(_own, _logicApp, new FakeLogger<DriverReportsLogicAppFault>()), _logger);
     }
 
     public void Dispose()
@@ -62,6 +63,7 @@ public sealed class PartnerPortalFaultSwitchesTests : IDisposable
             ("partner-portal", "carrier-cancellation-endpoint-down"),
             ("partner-portal", "carrier-proof-heic-photo"),
             ("partner-portal", "carrier-tracking-unmapped-code"),
+            ("partner-portal", "driver-reports-logic-app-disabled"),
             ("partner-portal", "shipper-notification-endpoint-down"));
         faults.Should().OnlyContain(fault => fault.Description.Length > 0);
     }
@@ -73,7 +75,7 @@ public sealed class PartnerPortalFaultSwitchesTests : IDisposable
 
         var faults = await _switches.ListAsync(TestContext.Current.CancellationToken);
 
-        faults.Should().HaveCount(6).And.OnlyContain(fault => !fault.On && fault.Until == null);
+        faults.Should().HaveCount(7).And.OnlyContain(fault => !fault.On && fault.Until == null);
     }
 
     [Fact]
@@ -131,6 +133,43 @@ public sealed class PartnerPortalFaultSwitchesTests : IDisposable
             ["outcome"] = "Succeeded",
         });
         scope.Should().ContainKey("correlationId");
+    }
+
+    [Fact]
+    public async Task SwitchAsync_TheLogicAppFault_DisablesTheLogicAppAtOnce_AndSwitchingOffEnablesIt()
+    {
+        _logicApp.IsEnabledAsync(Arg.Any<CancellationToken>()).Returns(true);
+
+        var on = await _switches.SwitchAsync("partner-portal", PartnerPortalFaultNames.DriverReportsLogicAppDisabled, TimeSpan.FromMinutes(2), TestContext.Current.CancellationToken);
+
+        on.On.Should().BeTrue();
+        await _logicApp.Received(1).SetEnabledAsync(false, Arg.Any<CancellationToken>());
+
+        _logicApp.IsEnabledAsync(Arg.Any<CancellationToken>()).Returns(false);
+        var off = await _switches.SwitchAsync("partner-portal", PartnerPortalFaultNames.DriverReportsLogicAppDisabled, null, TestContext.Current.CancellationToken);
+
+        off.On.Should().BeFalse();
+        await _logicApp.Received(1).SetEnabledAsync(true, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SwitchAsync_TheLogicAppFault_WhenAzureRefuses_PutsTheFaultBack()
+    {
+        _logicApp.IsEnabledAsync(Arg.Any<CancellationToken>()).Returns(true);
+        _logicApp.SetEnabledAsync(false, Arg.Any<CancellationToken>()).Returns(Task.FromException(new HttpRequestException("403")));
+
+        var switchOn = () => _switches.SwitchAsync("partner-portal", PartnerPortalFaultNames.DriverReportsLogicAppDisabled, TimeSpan.FromMinutes(2), TestContext.Current.CancellationToken);
+
+        await switchOn.Should().ThrowAsync<InvalidOperationException>();
+        _own.IsOn(PartnerPortalFaultNames.DriverReportsLogicAppDisabled).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task SwitchAsync_AnotherPortalFault_LeavesTheLogicAppAlone()
+    {
+        await _switches.SwitchAsync("partner-portal", PartnerPortalFaultNames.ProofHeicPhoto, TimeSpan.FromMinutes(1), TestContext.Current.CancellationToken);
+
+        await _logicApp.DidNotReceive().SetEnabledAsync(Arg.Any<bool>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

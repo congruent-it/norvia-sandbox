@@ -152,12 +152,23 @@ public static class DependencyInjection
             .Validate(options => options.Owners.Values.All(IsValid), "Faults:Owners needs an Address and an Audience for each application.")
             .Validate(options => options.Entra is null || IsValid(options.Entra), "Faults:Entra needs a ManagedIdentityClientId.")
             .Validate(options => options.LocalTokens is null || IsValid(options.LocalTokens), "Faults:LocalTokens needs an Issuer, a ClientId and a SigningKey.")
+            .Validate(options => options.LogicApp.IsValid, "Faults:LogicApp needs a ResourceGroupId and a Name in Azure, or a FlagPath locally.")
+            .Validate(options => options.LogicApp.IsAzure == (options.Entra is not null), "Faults:LogicApp is the Azure site where Faults:Entra is configured, and the local flag file where Faults:LocalTokens is.")
             .ValidateOnStart();
         builder.Services.AddSingleton<IFaultTokens>(services =>
             services.GetRequiredService<IOptions<FaultsOptions>>().Value.LocalTokens is null
                 ? ActivatorUtilities.CreateInstance<EntraFaultTokens>(services)
                 : ActivatorUtilities.CreateInstance<LocalFaultTokens>(services));
         builder.Services.AddHttpClient<FaultSwitchClient>();
+
+        // The one fault that is Azure state: the Driver reports Logic App. In Azure the portal's identity starts and stops it through ARM; locally the
+        // worker that plays it stops while a flag file exists. The expiry task enables it again, which the fault's clock alone cannot.
+        builder.Services.AddSingleton<ILogicAppSwitch>(services =>
+            services.GetRequiredService<IOptions<FaultsOptions>>().Value.LogicApp.IsAzure
+                ? ActivatorUtilities.CreateInstance<AzureLogicAppSwitch>(services, services.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(AzureLogicAppSwitch)))
+                : ActivatorUtilities.CreateInstance<FlagFileLogicAppSwitch>(services));
+        builder.Services.AddSingleton<DriverReportsLogicAppFault>();
+        builder.Services.AddHostedService<DriverReportsLogicAppExpiry>();
 
         // The portal's own faults: the Personas misbehaving as a Carrier or Shipper can. Off by default, and each expires by itself.
         builder.AddFaults(PartnerPortalFaultDefinitions.All);

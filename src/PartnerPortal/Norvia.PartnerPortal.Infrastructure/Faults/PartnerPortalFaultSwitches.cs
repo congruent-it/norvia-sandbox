@@ -9,7 +9,7 @@ namespace Norvia.PartnerPortal.Infrastructure.Faults;
 /// presenter's gate already and a fault endpoint on the portal would need a token gate of its own; the others it switches
 /// through <see cref="FaultSwitchClient"/>.
 /// </summary>
-internal sealed partial class PartnerPortalFaultSwitches(FaultSwitchClient others, IFaults own, ILogger<PartnerPortalFaultSwitches> logger) : IFaultSwitches
+internal sealed partial class PartnerPortalFaultSwitches(FaultSwitchClient others, IFaults own, DriverReportsLogicAppFault logicApp, ILogger<PartnerPortalFaultSwitches> logger) : IFaultSwitches
 {
     private const string Flow = "fault-switch";
 
@@ -41,6 +41,12 @@ internal sealed partial class PartnerPortalFaultSwitches(FaultSwitchClient other
             throw new ArgumentException($"The Partner portal owns no fault '{name}'.", nameof(name));
         }
 
+        if (name == PartnerPortalFaultNames.DriverReportsLogicAppDisabled)
+        {
+            await ApplyToLogicAppAsync(cancellationToken);
+            status = own.List().Single(fault => fault.Name == name);
+        }
+
         var view = ViewOf(status!);
         // The presenter panel changes the portal's own state, so it does it on a trail of its own (coding guidelines §7).
         var keys = new Dictionary<string, object?>
@@ -56,6 +62,21 @@ internal sealed partial class PartnerPortalFaultSwitches(FaultSwitchClient other
         }
 
         return view;
+    }
+
+    // The fault is Azure state, so the panel disables (or enables) the Logic App at once rather than at the expiry task's next tick. When Azure
+    // refuses, the fault is put back: a fault that shows on but changed nothing would mislead the demo.
+    private async Task ApplyToLogicAppAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await logicApp.ReconcileAsync(cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            own.SwitchOff(PartnerPortalFaultNames.DriverReportsLogicAppDisabled, out _);
+            throw new InvalidOperationException("The Driver reports Logic App couldn't be switched, so its fault was put back.", exception);
+        }
     }
 
     private static FaultView ViewOf(FaultStatus status) => new(status.Name, status.Owner, status.Description, status.On, status.Until);

@@ -28,7 +28,7 @@ public sealed class AppHostModelTests
     public async Task Locally_EverySubscription_TakesAResubmitOnlyWhenItNamesItself()
     {
         await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(TestContext.Current.CancellationToken);
-        var subscriptions = builder.Resources.OfType<AzureServiceBusSubscriptionResource>().Select(s => s.SubscriptionName).ToList();
+        var subscriptions = builder.Resources.OfType<AzureServiceBusSubscriptionResource>().Select(s => s.SubscriptionName).Distinct().ToList();
         var configuration = new JsonObject
         {
             ["UserConfig"] = new JsonObject
