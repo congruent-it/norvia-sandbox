@@ -147,30 +147,8 @@ public sealed partial class BookingJourneyTests
     /// </summary>
     private async Task<DeliveredBooking> DeliveredBookingAsync(string? spotPrice = null, bool waitForCarrierCost = true)
     {
-        var shipperReference = NewReference();
-        await OpenBookingFormAsync("Brouwer Dranken");
-        await FillAsync("Booking", "Shipper reference", shipperReference);
-        if (spotPrice is not null)
-        {
-            await FillAsync("Delivery", "Postcode", "40212");
-            await FillAsync("Delivery", "City", "Düsseldorf");
-            await FillAsync("Delivery", "Country", "DE");
-        }
-
-        await BookAsync();
-        var transportOrder = await AcceptedNumberAsync();
-
-        var shipmentNumber = await PlanAndReleaseAsync(transportOrder, shipperReference, spotPrice);
-
-        // The booking request reaches Van Dijk's inbox, and the Carrier confirms it with a reference of its own.
-        await Portal.GotoAsync(new Uri(_norvia.PartnerPortal, $"/personas/{VanDijk}/booking-requests").ToString());
-        var request = Portal.GetByRole(AriaRole.Row).Filter(new() { HasText = shipmentNumber });
-        await Expect(request).ToContainTextAsync("CB-", new() { Timeout = PatienceMilliseconds });
-        var bookingNumber = BookingNumberPattern().Match(await request.InnerTextAsync()).Value;
-        var reference = $"VDT-{Guid.NewGuid():N}"[..12];
-        await request.GetByRole(AriaRole.Button, new() { Name = $"Confirm {bookingNumber}", Exact = true }).ClickAsync();
-        await Portal.GetByRole(AriaRole.Textbox, new() { Name = "Carrier booking reference", Exact = true }).FillAsync(reference);
-        await Portal.GetByRole(AriaRole.Button, new() { Name = "Confirm booking" }).ClickAsync();
+        var released = await ReleasedBookingAsync(spotPrice);
+        var (bookingNumber, reference) = await ConfirmedBookingAsync(released.ShipmentNumber);
 
         // It reports the Shipment on its way and delivered.
         await Portal.GotoAsync(new Uri(_norvia.PartnerPortal, $"/personas/{VanDijk}/shipments").ToString());
@@ -189,7 +167,42 @@ public sealed partial class BookingJourneyTests
                 .ToBeVisibleAsync(new() { Timeout = PatienceMilliseconds });
         }
 
-        return new(transportOrder, bookingNumber, reference);
+        return new(released.TransportOrderNumber, bookingNumber, reference);
+    }
+
+    /// <summary>A Shipment of Brouwer Dranken, assigned to Van Dijk Transport and released by the Planner.</summary>
+    private sealed record ReleasedBooking(string TransportOrderNumber, string ShipperReference, string ShipmentNumber);
+
+    /// <summary>Books a transport as the Shipper, and has the Planner assign it to Van Dijk Transport and release it.</summary>
+    private async Task<ReleasedBooking> ReleasedBookingAsync(string? spotPrice = null)
+    {
+        var shipperReference = NewReference();
+        await OpenBookingFormAsync("Brouwer Dranken");
+        await FillAsync("Booking", "Shipper reference", shipperReference);
+        if (spotPrice is not null)
+        {
+            await FillAsync("Delivery", "Postcode", "40212");
+            await FillAsync("Delivery", "City", "Düsseldorf");
+            await FillAsync("Delivery", "Country", "DE");
+        }
+
+        await BookAsync();
+        var transportOrder = await AcceptedNumberAsync();
+        return new(transportOrder, shipperReference, await PlanAndReleaseAsync(transportOrder, shipperReference, spotPrice));
+    }
+
+    /// <summary>The booking request reaches Van Dijk's inbox, and the Carrier confirms it with a reference of its own.</summary>
+    private async Task<(string BookingNumber, string Reference)> ConfirmedBookingAsync(string shipmentNumber)
+    {
+        await Portal.GotoAsync(new Uri(_norvia.PartnerPortal, $"/personas/{VanDijk}/booking-requests").ToString());
+        var request = Portal.GetByRole(AriaRole.Row).Filter(new() { HasText = shipmentNumber });
+        await Expect(request).ToContainTextAsync("CB-", new() { Timeout = PatienceMilliseconds });
+        var bookingNumber = BookingNumberPattern().Match(await request.InnerTextAsync()).Value;
+        var reference = $"VDT-{Guid.NewGuid():N}"[..12];
+        await request.GetByRole(AriaRole.Button, new() { Name = $"Confirm {bookingNumber}", Exact = true }).ClickAsync();
+        await Portal.GetByRole(AriaRole.Textbox, new() { Name = "Carrier booking reference", Exact = true }).FillAsync(reference);
+        await Portal.GetByRole(AriaRole.Button, new() { Name = "Confirm booking" }).ClickAsync();
+        return (bookingNumber, reference);
     }
 
     /// <summary>The Planner assigns the Transport Order to Van Dijk Transport and releases the Shipment, with a Spot price when the Carrier Rate Card can't price it.</summary>
