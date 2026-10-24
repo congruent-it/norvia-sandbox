@@ -1,6 +1,6 @@
 # Foundry
 
-The Foundry account and project the Agents run on ([ADR 0040](../adr/0040-agents-read-the-estate-through-api-management-have-no-write-tools-and-their-own-identity.md)), what the estate deploys of it, and the answers to the two spikes of #497. For engineers and coding agents working on the estate. Terms are defined in [GLOSSARY.md](../../GLOSSARY.md).
+The Foundry account and projects the Agents run on ([ADR 0040](../adr/0040-agents-read-the-estate-through-api-management-have-no-write-tools-and-their-own-identity.md)), what the estate deploys of it, and the answers to the two spikes of #497. For engineers and coding agents working on the estate. Terms are defined in [GLOSSARY.md](../../GLOSSARY.md).
 
 No Agent is defined or published yet: the deploy scripts that publish them are #499, and the model and tracing here are what they will use.
 
@@ -11,12 +11,22 @@ No Agent is defined or published yet: the deploy scripts that publish them are #
 | Resource | Notes |
 |---|---|
 | Account `ais-norvia-<token>` | Kind `AIServices`, project management on, a public endpoint with Entra only (local keys off), no VNet. In `AZURE_LOCATION` when the model has a `DataZoneStandard` deployment there, else Sweden Central |
-| Project `norvia` | The one project. Its endpoint is `https://<account>.services.ai.azure.com/api/projects/norvia` |
-| Model deployment | One, shared, type **`DataZoneStandard`**: prompts and responses are processed inside the EU Data Boundary. `GlobalStandard` is not used. Capped at `foundryModelCapacity` (30 thousand tokens a minute by default, at most 100) |
-| Connection `application-insights` | Connects the estate's Application Insights, which turns on Foundry's server-side tracing for every agent in the project. The traces land in the same workspace as the Message trails, so the console can find an agent run |
-| Role assignments | The presenter, and any object ID in `ESTATE_FOUNDRY_USER_PRINCIPAL_IDS` (the pipeline that deploys the Agents), hold **Foundry User** on the project: run agents and call models, no management |
+| Project `norvia` | The project of every Agent except Intake, with the Application Insights connection. Its endpoint is `https://<account>.services.ai.azure.com/api/projects/norvia` |
+| Project `norvia-intake` | The **Intake agent's** project, with **no Application Insights connection** (spike 2). Endpoint `https://<account>.services.ai.azure.com/api/projects/norvia-intake` |
+| Model deployment | One, shared by both projects (a deployment belongs to the account), type **`DataZoneStandard`**: prompts and responses are processed inside the EU Data Boundary. `GlobalStandard` is not used. Capped at `foundryModelCapacity` (30 thousand tokens a minute by default, at most 100) |
+| Connection `application-insights` | On the `norvia` project, not the account: an account connection is shared with every project, so it would trace the Intake project too. Connects the estate's Application Insights, which turns on Foundry's server-side tracing for every agent in that project. The traces land in the same workspace as the Message trails, so the console can find an agent run |
+| Role assignments | The presenter, and any object ID in `ESTATE_FOUNDRY_USER_PRINCIPAL_IDS` (the pipeline that deploys the Agents), hold **Foundry User** on both projects: run agents and call models, no management |
 
 Every Foundry resource carries the cost tags `workload=foundry-agents` and `cost-category=ai-model`, and the project carries `agents-enabled`.
+
+## Which project each Agent lives in
+
+| Agent | Project | Traced to Application Insights |
+|---|---|---|
+| Intake | `norvia-intake` | No |
+| Every other Agent | `norvia` | Yes |
+
+An Agent that reads a Shipper's text goes in `norvia-intake`; one that reads only the estate's own data through narrow views goes in `norvia`. The Intake agent's slice publishes into `norvia-intake` (`FOUNDRY_INTAKE_PROJECT_ENDPOINT`).
 
 ## Settings
 
@@ -30,7 +40,7 @@ Set in the azd environment, then `azd provision`:
 | `ESTATE_FOUNDRY_LOCATION` | empty | Overrides the region |
 | `ESTATE_FOUNDRY_USER_PRINCIPAL_IDS` | empty | Comma-separated object IDs that also get Foundry User |
 
-The project endpoint is stored by the same script as `AZURE_ESTATE_FOUNDRY_PROJECT_ENDPOINT` (the AppHost's `estate-foundry-project-endpoint`) and `FOUNDRY_PROJECT_ENDPOINT` (what scripts and the Foundry SDKs read).
+The `norvia` project endpoint is stored by the same script as `AZURE_ESTATE_FOUNDRY_PROJECT_ENDPOINT` (the AppHost's `estate-foundry-project-endpoint`) and `FOUNDRY_PROJECT_ENDPOINT` (what scripts and the Foundry SDKs read). The Intake project's is `FOUNDRY_INTAKE_PROJECT_ENDPOINT`, set the same way (the estate is at its 64 outputs, so it is not a template output).
 
 ## Spike 1: model and region
 
@@ -56,7 +66,7 @@ The table moves; when a deploy fails with a quota or region error, check it agai
 
 So the content is **recorded, but kept apart**. The estate's Application Insights is shared with the Message trails, whose rule is that no body is ever in a trail ([coding guidelines §7](../coding-guidelines.md#7-observability)). The `AppGenAIContent` table is not one the trails read, but a person who can read the workspace can read it unless the table is protected, and a shared workspace is the wrong place to rely on that.
 
-**Consequence, as decided in #378:** the Intake agent, whose prompts are a Shipper's booking text, moves to **its own Foundry project with no Application Insights connection**. A follow-up issue opens that project (#721). The other Agents read the estate's own data through narrow views and stay in the `norvia` project, where the connection stays on for the agent-run-in-the-console story ([#369](https://github.com/congruent-it/norvia-sandbox/issues/369) decision 8). Until the follow-up lands, no Intake agent exists, so nothing sensitive is traced.
+**Consequence, as decided in #378:** the Intake agent, whose prompts are a Shipper's booking text, moves to **its own Foundry project with no Application Insights connection**. That project is built (#721, `norvia-intake`). The other Agents read the estate's own data through narrow views and stay in the `norvia` project, where the connection stays on for the agent-run-in-the-console story ([#369](https://github.com/congruent-it/norvia-sandbox/issues/369) decision 8). The connection is on the `norvia` project and not the account, because an account connection is shared with every project.
 
 Two steps lower the risk of what does stay in the project, and are not yet done: register `protectGenAISensitiveData` on the subscription and set `AppGenAIContent` to *Protected* (both are per subscription or workspace, outside this Bicep). The smoke run checks the part that matters here: the prompt text is in none of the tables the Message trails use.
 
@@ -141,6 +151,10 @@ The estate half of #500 is built (the sweeper, its toggle, the smoke run, the sp
 | 6 | Docs that say "planned" for the host side: [failure-behaviour.md](../architecture/failure-behaviour.md) (the row for `IConversationCleanup`), [local-vs-azure.md](../architecture/local-vs-azure.md) (locally there is no Foundry conversation), the Intake agent's P1 doc. Drop "planned" when 1 to 3 are built | Docs | 1 to 3 |
 
 Acceptance criteria of #500 still open: *a normal Agent run leaves no conversation behind* (1, 2) and *the Intake operation deletes before it returns, and a failed delete is a coded span, not an error to the Shipper* (3). *A conversation the host could not delete is removed by the sweeper* is built and waits for point 5.
+
+## Open point of #721
+
+The conversation sweeper (#500) lists and deletes conversations in the `norvia` project only, and the Intake agent's conversations are in `norvia-intake`. Before the Intake agent publishes, the sweeper needs the Intake endpoint as well and its identity needs Foundry User on the Intake project.
 
 ## Not here
 

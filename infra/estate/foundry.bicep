@@ -1,5 +1,6 @@
-// The Foundry the Agents run on (ADR 0040): one account and one project with a public endpoint behind Entra, one small shared
-// model deployment that keeps processing in the EU Data Boundary, and Foundry's traces in the estate's Application Insights.
+// The Foundry the Agents run on (ADR 0040): one account with a public endpoint behind Entra and two projects, one small shared
+// model deployment that keeps processing in the EU Data Boundary, and Foundry's traces in the estate's Application Insights for the
+// norvia project only. The Intake agent's project (#721) has no Application Insights connection, because its prompts are a Shipper's booking text.
 // No agent is defined here: a deploy script publishes them (#499).
 
 param location string
@@ -30,6 +31,8 @@ param agentsEnabled bool
 
 @description('Entra object IDs that may use the project: the presenter, and the pipeline that deploys the Agents. Each gets the Foundry User role.')
 param foundryUserPrincipalIds array
+
+var intakeProjectName = 'norvia-intake'
 
 var resourceToken = uniqueString(resourceGroup().id)
 
@@ -81,6 +84,22 @@ resource project 'Microsoft.CognitiveServices/accounts/projects@2025-06-01' = {
   }
 }
 
+// The Intake agent's own project, with no Application Insights connection (spike 2 of #497: disconnecting Application Insights is the
+// only documented way to stop server-side tracing recording prompt content). It uses the account's model deployment, as the other project does.
+resource intakeProject 'Microsoft.CognitiveServices/accounts/projects@2025-06-01' = {
+  parent: account
+  name: intakeProjectName
+  location: location
+  tags: foundryTags
+  identity: {
+    type: 'SystemAssigned'
+  }
+  properties: {
+    displayName: 'Norvia Intake agent'
+    description: 'The Intake agent (ADR 0040), apart from the other Agents because its prompts are a Shipper\'s booking text: no Application Insights connection, so nothing is traced server-side.'
+  }
+}
+
 // DataZoneStandard: prompts and responses are processed in the EU data zone and nowhere else. GlobalStandard may process anywhere,
 // so it is not used. The capacity is the cap on spend.
 resource model 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = if (modelDeployed) {
@@ -101,16 +120,16 @@ resource model 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = i
   }
 }
 
-// Connecting Application Insights turns on server-side tracing for every agent in the project. Whether that can leave out the
-// prompt content is spike 2 (docs/operations/foundry.md): the documents give no such switch, so the content is kept apart in the protected AppGenAIContent table.
-resource tracing 'Microsoft.CognitiveServices/accounts/connections@2025-04-01-preview' = {
-  parent: account
+// Connecting Application Insights turns on server-side tracing for every agent in the project. The connection is on the norvia project
+// and not on the account, because an account connection is shared with every project of the account and the Intake project must have none
+// (docs/operations/foundry.md, spike 2). Whatever the project traces, the content is kept apart in the protected AppGenAIContent table.
+resource tracing 'Microsoft.CognitiveServices/accounts/projects/connections@2025-04-01-preview' = {
+  parent: project
   name: 'application-insights'
   properties: {
     category: 'AppInsights'
     target: applicationInsights.id
     authType: 'ApiKey'
-    isSharedToAll: true
     credentials: {
       key: applicationInsights.properties.ConnectionString
     }
@@ -130,8 +149,21 @@ resource usersUseTheProject 'Microsoft.Authorization/roleAssignments@2022-04-01'
   }
 }]
 
+resource usersUseTheIntakeProject 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for principalId in foundryUserPrincipalIds: {
+  name: guid(intakeProject.id, principalId, foundryUser)
+  scope: intakeProject
+  properties: {
+    principalId: principalId
+    roleDefinitionId: foundryUser
+  }
+}]
+
+@description('The Intake agent\'s project: no Application Insights connection.')
+output intakeProjectName string = intakeProject.name
 output accountName string = account.name
 output projectName string = project.name
 @description('The project endpoint the apps and scripts call (FOUNDRY_PROJECT_ENDPOINT).')
 output projectEndpoint string = 'https://${account.properties.customSubDomainName}.services.ai.azure.com/api/projects/${project.name}'
+@description('The Intake agent\'s project endpoint (FOUNDRY_INTAKE_PROJECT_ENDPOINT).')
+output intakeProjectEndpoint string = 'https://${account.properties.customSubDomainName}.services.ai.azure.com/api/projects/${intakeProject.name}'
 output modelDeploymentName string = modelName
