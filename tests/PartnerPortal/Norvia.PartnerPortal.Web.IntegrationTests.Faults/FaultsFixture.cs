@@ -9,14 +9,18 @@ using System.Text.Json.Nodes;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Testing;
+using Azure.Identity;
 using Azure.Messaging.ServiceBus;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Norvia.AppHost;
+using Norvia.IntegrationConsole.Application.DeadLetters;
+using Norvia.IntegrationConsole.Infrastructure.DeadLetters;
 using PortalWeb::Norvia.PartnerPortal.Web.Bookings;
 
 [assembly: AssemblyFixture(typeof(Norvia.PartnerPortal.Web.IntegrationTests.Faults.FaultsFixture))]
@@ -76,6 +80,9 @@ public sealed class FaultsFixture : IAsyncLifetime
     /// <summary>The second Service Bus emulator, which holds the tracking and Proof of delivery queues.</summary>
     public ServiceBusClient EdgeBus => _edgeBus!;
 
+    /// <summary>The Integration console's dead-letter adapter over the second emulator, as the console is configured locally: what an operator sees on the Dead-letter queues page.</summary>
+    public IDeadLetterQueues ConsoleDeadLetters { get; private set; } = null!;
+
     public async ValueTask InitializeAsync()
     {
         using var startup = new CancellationTokenSource(StartupTimeout);
@@ -122,7 +129,22 @@ public sealed class FaultsFixture : IAsyncLifetime
         Portal = _portal.Services.GetRequiredService<IPartnerPortal>();
 
         Tms = new TmsApiClient(_app.CreateHttpClient("tms-api"), _tokenSigningKey);
-        _edgeBus = new ServiceBusClient(await _app.GetConnectionStringAsync("messaging-2", startup.Token));
+        var edgeConnectionString = await _app.GetConnectionStringAsync("messaging-2", startup.Token)
+            ?? throw new InvalidOperationException("The second Service Bus emulator has no connection string.");
+        _edgeBus = new ServiceBusClient(edgeConnectionString);
+        var management = _app.GetEndpoint("messaging-2", "emulatorhealth");
+        var console = Options.Create(new LocalServiceBusOptions
+        {
+            Namespaces =
+            {
+                ["messaging-edge"] = new LocalServiceBusNamespace
+                {
+                    ConnectionString = edgeConnectionString,
+                    ManagementConnectionString = $"Endpoint=sb://{management.Host}:{management.Port};SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;",
+                },
+            },
+        });
+        ConsoleDeadLetters = new ServiceBusDeadLetterQueues(new EmulatorServiceBusEntities(console), new ServiceBusClients(new DefaultAzureCredential(), console));
     }
 
     public async ValueTask DisposeAsync()

@@ -14,6 +14,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Norvia.IntegrationConsole.Infrastructure.UnitTests" />
     <InternalsVisibleTo Include="Norvia.IntegrationConsole.Infrastructure.IntegrationTests" />
+    <InternalsVisibleTo Include="Norvia.PartnerPortal.Web.IntegrationTests.Faults" />
     <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
   </ItemGroup>
 </Project>

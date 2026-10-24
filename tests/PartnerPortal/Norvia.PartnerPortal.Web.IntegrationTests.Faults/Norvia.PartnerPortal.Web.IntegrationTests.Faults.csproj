@@ -16,6 +16,7 @@
     <Using Include="Xunit" />
     <Using Include="AwesomeAssertions" />
     <ProjectReference Include="..\..\..\src\Norvia.AppHost\Norvia.AppHost.csproj" />
+    <ProjectReference Include="..\..\..\src\IntegrationConsole\Norvia.IntegrationConsole.Infrastructure\Norvia.IntegrationConsole.Infrastructure.csproj" />
     <ProjectReference Include="..\..\..\src\PartnerPortal\Norvia.PartnerPortal.Web\Norvia.PartnerPortal.Web.csproj" Aliases="PortalWeb" />
   </ItemGroup>
   <ItemGroup>
