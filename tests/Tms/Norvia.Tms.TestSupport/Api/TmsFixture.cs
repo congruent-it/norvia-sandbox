@@ -133,7 +133,7 @@ public class TmsFixture : IAsyncLifetime
             ? [.. state.Snapshot.Urls.Select(url => new Uri(url.Url))]
             : [];
 
-    public async ValueTask InitializeAsync()
+    public virtual async ValueTask InitializeAsync()
     {
         using var startup = new CancellationTokenSource(StartAttempts * StartAttemptTimeout);
 
@@ -196,12 +196,18 @@ public class TmsFixture : IAsyncLifetime
         }
     }
 
+    /// <summary>The running AppHost, for a fixture that does more to it than the TMS API's tests.</summary>
+    protected DistributedApplication App => _app!;
+
+    /// <summary>Cuts the AppHost down to what the tests use, and sets what they need on the rest. The default is the TMS API, its database and the Service Bus emulator.</summary>
+    protected virtual void ConfigureAppHost(IDistributedApplicationTestingBuilder builder) => builder.RemoveWhatTheTmsApiTestsDontUse();
+
     private async Task StartAppAsync(CancellationToken cancellationToken)
     {
         var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(
             [$"Parameters:{LocalTokens.SigningKeyParameter}={_tokenSigningKey}"],
             cancellationToken);
-        builder.RemoveWhatTheTmsApiTestsDontUse();
+        ConfigureAppHost(builder);
         foreach (var topicName in new[] { TransportOrderEventsTopic, ShipmentEventsTopic, TripEventsTopic })
         {
             var topic = builder.Resources.OfType<AzureServiceBusTopicResource>().Single(t => t.TopicName == topicName);

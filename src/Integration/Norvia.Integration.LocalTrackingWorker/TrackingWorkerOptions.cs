@@ -16,6 +16,12 @@ public sealed class TrackingWorkerOptions
     [Required]
     public Uri? TmsBaseAddress { get; set; }
 
+    /// <summary>
+    /// How long a message is held before it is abandoned for the queue to deliver again. None by default, as the stand-in has no trigger polling interval: the queue delivers it again at once, so
+    /// a TMS that is down for a moment uses up the queue's deliveries in a fraction of a second. A test that wants a message to outlive a fault of seconds sets it.
+    /// </summary>
+    public TimeSpan RedeliveryDelay { get; set; } = TimeSpan.Zero;
+
     /// <summary>The Carrier-tracking Logic App's token for the TMS, with the role <c>TrackingEvents.Record</c>.</summary>
     [Required]
     public LocalTokenOptions TmsTokens { get; set; } = new();

@@ -29,6 +29,13 @@ public static class TestAppHost
     /// <summary>Takes the resources the TMS UI's tests don't use out of the AppHost, so it starts the TMS, its UI, the Partner portal, the workers that play the Logic Apps the journeys go through, and the Driver app API.</summary>
     public static void RemoveWhatTheTmsUiTestsDontUse(this IDistributedApplicationTestingBuilder builder) => builder.Remove(UnneededByTheTmsUi);
 
+    /// <summary>
+    /// Takes the resources the fault tests don't use out of the AppHost. They keep the workers that play the Carrier-tracking and Driver reports Logic Apps (and the Trip dispatch
+    /// Logic App that gives the Driver app its Trips), as each fault plays through the real path, from the Driver or the queue to the TMS.
+    /// </summary>
+    public static void RemoveWhatTheTmsFaultTestsDontUse(this IDistributedApplicationTestingBuilder builder) =>
+        builder.Remove([.. Unneeded.Where(name => name is not ("trip-dispatch-worker" or "driver-reports-worker" or "tracking-worker"))]);
+
     /// <summary>Takes the resources the TMS API's tests don't use out of the AppHost, so it starts the TMS (with its UI, which the demo seed test needs), its database and the Service Bus emulator.</summary>
     public static void RemoveWhatTheTmsApiTestsDontUse(this IDistributedApplicationTestingBuilder builder) => builder.Remove(Unneeded);
 

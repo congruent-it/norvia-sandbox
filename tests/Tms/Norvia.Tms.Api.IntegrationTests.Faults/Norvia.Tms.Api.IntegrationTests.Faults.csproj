@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Aspire.Azure.Storage.Blobs" />
+    <PackageReference Include="Aspire.Hosting.Testing" />
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="Azure.Messaging.ServiceBus" />
+    <PackageReference Include="JsonSchema.Net" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+    <PackageReference Include="xunit.v3.mtp-off" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="AwesomeAssertions" />
+    <ProjectReference Include="..\..\..\src\Norvia.AppHost\Norvia.AppHost.csproj" />
+    <ProjectReference Include="..\..\..\src\Tms\Norvia.Tms.Api\Norvia.Tms.Api.csproj" />
+    <ProjectReference Include="..\Norvia.Tms.TestSupport\Norvia.Tms.TestSupport.csproj" />
+    <Using Include="Norvia.Tms.TestSupport" />
+    <Using Include="Norvia.Tms.TestSupport.Capacity" />
+    <Using Include="Norvia.Tms.TestSupport.Planning" />
+    <Using Include="Norvia.Tms.TestSupport.ShipperTracking" />
+    <Using Include="Norvia.Tms.TestSupport.TrackingEvents" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- One AppHost for the whole run, and the tests run one at a time: a fault is on for the whole TMS (or the whole Driver app), so a test that has one on would break the next. -->
+    <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
