@@ -1,0 +1,18 @@
+{
+  "appInsightsRetentionShort": false,
+  "carrierSecretInlined": false,
+  "entitiesWithoutDeadLetterAlert": [],
+  "flowsWithoutFailedRunAlert": [],
+  "lateDeliveryCheckOff": false,
+  "logicAppsWithoutTrackedProperties": [],
+  "noAlertReceiver": false,
+  "noInboundLifecycleRule": false,
+  "noMalwareScanning": false,
+  "noReportBackToDriverApp": false,
+  "noShipperRateLimit": false,
+  "noTransitLifecycleRule": false,
+  "proofFilesStayHot": false,
+  "proofMissingThresholdUnset": false,
+  "shipperTrackingCached": true,
+  "staleThresholdsUnset": false
+}

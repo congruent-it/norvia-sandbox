@@ -58,7 +58,7 @@ Two events in the same quarter made Norvia's integration estate a management pro
 1. A Carrier integration silently dropped shipment status updates for four days. Nobody noticed until a Consignee called to ask why their tracking hadn't changed.
 2. Finance flagged a 30% quarter-over-quarter increase in the Azure bill with no matching change in shipment volume, and nobody in IT could explain which resource was driving it.
 
-The first slice of the sandbox can re-enact the first incident end to end: the Carrier posts "delivered" in the Partner portal, the update fails inside the integration layer without raising an alert, and the Shipper's tracking screen stays on "in transit".
+The first slice of the sandbox can re-enact the first incident end to end: the Carrier posts "delivered" in the Partner portal, the update fails inside the integration layer without raising an alert, and the Shipper's tracking screen stays on "in transit". The way to re-enact it is the [silent Carrier scenario](docs/operations/as-found.md#incident-1-the-silent-carrier).
 
 ## Differences from the health-check copy
 
