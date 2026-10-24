@@ -143,6 +143,9 @@ jobs:
           - application: Partner portal
             directory: PartnerPortal
             kinds: UnitTests ArchitectureTests IntegrationTests UiTests
+          - application: Partner portal (Carrier and Shipper faults)
+            directory: PartnerPortal
+            kinds: IntegrationTests.Faults
           - application: ERP
             directory: Erp
             kinds: UnitTests ArchitectureTests IntegrationTests UiTests
