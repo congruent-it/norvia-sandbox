@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!-- Locally, plays API Management's MCP server for the Agents (ADR 0041). azd never deploys it. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Norvia.ServiceDefaults\Norvia.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\Norvia.Agents\Norvia.Agents.csproj" />
+    <ProjectReference Include="..\Norvia.Integration.LocalSupport\Norvia.Integration.LocalSupport.csproj" />
+  </ItemGroup>
+  <!-- The tool lists API Management's MCP servers are built from (ADR 0040), so the stand-in serves what they serve. -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\..\contracts\agent-mcp\*.tools.json" LogicalName="%(Filename)%(Extension)" Exclude="..\..\..\contracts\agent-mcp\example.tools.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Norvia.Integration.LocalAgentMcp.UnitTests" />
+  </ItemGroup>
+</Project>

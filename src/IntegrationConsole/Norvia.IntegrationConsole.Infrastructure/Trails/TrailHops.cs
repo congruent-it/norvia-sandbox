@@ -144,7 +144,9 @@ internal static class TrailHops
                 [.. Rows.SelectMany(row => row.BusinessKeys).Distinct()],
                 Run,
                 Rows.Select(row => row.MessageId).FirstOrDefault(id => id is not null),
-                Rows.Select(row => row.Fault).FirstOrDefault(fault => fault is not null));
+                Rows.Select(row => row.Fault).FirstOrDefault(fault => fault is not null),
+                Rows.Select(row => row.AgentId).FirstOrDefault(agent => agent is not null),
+                Rows.Select(row => row.ToolName).FirstOrDefault(tool => tool is not null));
         }
     }
 }

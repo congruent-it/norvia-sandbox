@@ -864,6 +864,51 @@ else
             context.EnvironmentVariables[name] = Convert.ToBase64String(Encoding.UTF8.GetBytes(key!));
         });
     }
+
+    // The Agents are off locally unless the developer turns them on (Agents:Enabled, in user secrets or the launch profile), as they are off in
+    // Azure unless the estate does (ADR 0040). Then the console runs the Integration operations agent in process against a stand-in that plays
+    // API Management's MCP server (ADR 0041), and both take tokens signed with the same local key.
+    if (bool.TryParse(builder.Configuration["Agents:Enabled"], out var agentsEnabled) && agentsEnabled)
+    {
+        var agentMcp = builder.AddProject<Projects.Norvia_Integration_LocalAgentMcp>("agent-mcp")
+            .WaitFor(integrationConsole)
+            .WithHttpHealthCheck("/health")
+            .WithEnvironment("AgentMcp__Tokens__Issuer", LocalTokens.Issuer)
+            .WithEnvironment("AgentMcp__Tokens__Audience", LocalTokens.AgentAudience)
+            .WithEnvironment("AgentMcp__ConsoleAgentApi", ReferenceExpression.Create($"{integrationConsole.GetEndpoint("http")}/agent/v1"))
+            .WithEnvironment("AgentMcp__ConsoleTokens__Issuer", LocalTokens.Issuer)
+            .WithEnvironment("AgentMcp__ConsoleTokens__Audience", LocalTokens.ConsoleAgentApiAudience);
+        integrationConsole
+            .WithEnvironment("Agents__Enabled", "true")
+            .WithEnvironment("Agents__McpAddress", ReferenceExpression.Create($"{agentMcp.GetEndpoint("http")}/mcp"))
+            .WithEnvironment("Agents__Tokens__Issuer", LocalTokens.Issuer)
+            .WithEnvironment("Agents__Tokens__Audience", LocalTokens.AgentAudience)
+            .WithEnvironment("Agents__Tokens__ClientId", LocalTokens.IntegrationOperationsAgentClientId)
+            .WithEnvironment("Agents__Tokens__Role", LocalTokens.AgentReadRole)
+            .WithEnvironment("Agents__Api__Issuer", LocalTokens.Issuer)
+            .WithEnvironment("Agents__Api__Audience", LocalTokens.ConsoleAgentApiAudience);
+        // A developer's own model deployment in Foundry replaces the scripted fake (Agents:Model:Endpoint, optionally Agents:Model:Deployment).
+        if (!string.IsNullOrEmpty(builder.Configuration["Agents:Model:Endpoint"]))
+        {
+            integrationConsole.WithEnvironment("Agents__Model__Endpoint", builder.Configuration["Agents:Model:Endpoint"]!)
+                .WithEnvironment("Agents__Model__Deployment", builder.Configuration["Agents:Model:Deployment"] ?? string.Empty);
+        }
+
+        foreach (var (holder, name) in new[]
+        {
+            (agentMcp.Resource, "AgentMcp__Tokens__SigningKey"),
+            (agentMcp.Resource, "AgentMcp__ConsoleTokens__SigningKey"),
+            (integrationConsole.Resource, "Agents__Tokens__SigningKey"),
+            (integrationConsole.Resource, "Agents__Api__SigningKey"),
+        })
+        {
+            builder.CreateResourceBuilder(holder).WithEnvironment(async context =>
+            {
+                var key = await localTokenSigningKey.Resource.GetValueAsync(context.CancellationToken);
+                context.EnvironmentVariables[name] = Convert.ToBase64String(Encoding.UTF8.GetBytes(key!));
+            });
+        }
+    }
 }
 
 builder.Build().Run();

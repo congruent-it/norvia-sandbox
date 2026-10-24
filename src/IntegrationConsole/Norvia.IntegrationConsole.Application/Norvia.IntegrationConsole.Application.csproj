@@ -4,6 +4,9 @@
     deviation from coding guidelines §1 (docs/operations/integration-console.md, ADR 0017).
   -->
   <ItemGroup>
+    <ProjectReference Include="..\..\Norvia.Agents\Norvia.Agents.csproj" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Ardalis.Result" />
     <PackageReference Include="Mediator.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Options" />

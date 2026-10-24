@@ -196,16 +196,16 @@ The hops of P9 to P12, E1 and E2 are in the tables above. The as-found candidate
 
 The Integration console's own candidates, Logic Apps without tracked properties and Application Insights retention shorter than run history, are built (`logicAppsWithoutTrackedProperties`, `appInsightsRetentionShort`; [as-found](../operations/as-found.md#storage-secrets-and-retention)).
 
-## Agents (planned)
+## Agents
 
-Agents ([ADR 0040](../adr/0040-agents-read-the-estate-through-api-management-have-no-write-tools-and-their-own-identity.md)) are designed and not built, so this table is planned. An Agent is never on a critical path: when a hop below fails, the host UI says "Assistant unavailable" and everything else works. There is a short timeout and no automatic retry.
+Agents ([ADR 0040](../adr/0040-agents-read-the-estate-through-api-management-have-no-write-tools-and-their-own-identity.md)) are built locally for the Integration operations agent's Explain button (the console's in-process runner and MCP stand-in, [ADR 0041](../adr/0041-locally-an-in-process-runner-and-an-mcp-stand-in-play-foundry-and-api-managements-mcp-server.md)); Foundry and API Management's MCP servers come with its Azure slice, so the Azure columns of this table are still planned. An Agent is never on a critical path: when a hop below fails, the host UI says "Assistant unavailable" and everything else works. There is a short timeout (20 seconds for a run) and no automatic retry.
 
 | Hop | Retry | `failureCode` | Alert | Console | Toggle |
 |---|---|---|---|---|---|
-| **Foundry** (the model and the Agent loop) | None | `AgentUnavailable`, outcome `Failed`. The host application's Agent run span is marked `Failed`. A reply that does not match the expected schema is `AgentUnavailable` too | *Planned*: none | The failed run on the host's trail | *Planned*: no content filter or prompt shield, an unlimited model quota |
-| **APIM** MCP server (a tool call) | None | `AgentToolRefused` (`Refused`): no token, the wrong role, a rate limit (429) or a tool the Agent's definition does not list | *Planned*: none | The tool-call hop, tagged with the Agent's identity and the tool name | *Planned*: an Agent identity with a role wider than read, no per-Agent cap or rate limit |
+| **Foundry** (the model and the Agent loop; locally the in-process runner and its model) | None | `AgentUnavailable`, outcome `Failed`. The host application's Agent run span is marked `Failed`. A reply that does not match the expected schema, or that cites a result the run never had, is `AgentUnavailable` too | *Planned*: none | The failed run on the host's trail | *Planned*: no content filter or prompt shield, an unlimited model quota |
+| **APIM** MCP server (a tool call; locally `Norvia.Integration.LocalAgentMcp`) | None | `AgentToolRefused` (`Refused`): no token, the wrong role, a rate limit (429) or a tool the Agent's definition does not list. The runner ends the run on a refused call, and on a call over the definition's cap | *Planned*: none | The tool-call hop, tagged with the Agent's identity and the tool name | *Planned*: an Agent identity with a role wider than read, no per-Agent cap or rate limit |
 | **Agent view** (the application's narrow read API) | As the application's own read API | The application's own failure codes. A 5xx is `AgentToolRefused` to the Agent, which says it could not read | None | The application's hop on the trail | *Planned*: none |
-| **Host application**, the Agent run | None | `AgentUnavailable` when the port times out. No dead letter, no queue | None | The Agent run span | *Planned*: `Agents:Enabled` on in a public Demo UI, no cost tag |
+| **Host application**, the Agent run (the Integration console's Explain) | None | `AgentUnavailable` when the port times out or fails for any other reason. No dead letter, no queue | None | The Agent run span | *Planned*: `Agents:Enabled` on in a public Demo UI, no cost tag |
 
 ## Keeping it true
 

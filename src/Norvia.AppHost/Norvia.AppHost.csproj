@@ -33,6 +33,7 @@
     <ProjectReference Include="..\Integration\Norvia.Integration.LocalDriverReportsWorker\Norvia.Integration.LocalDriverReportsWorker.csproj" />
     <ProjectReference Include="..\Integration\Norvia.Integration.LocalTrackingWorker\Norvia.Integration.LocalTrackingWorker.csproj" />
     <ProjectReference Include="..\Integration\Norvia.Integration.LocalProofOfDeliveryWorker\Norvia.Integration.LocalProofOfDeliveryWorker.csproj" />
+    <ProjectReference Include="..\Integration\Norvia.Integration.LocalAgentMcp\Norvia.Integration.LocalAgentMcp.csproj" />
     <ProjectReference Include="..\Integration\Norvia.Integration.LocalPartnerApi\Norvia.Integration.LocalPartnerApi.csproj" />
     <ProjectReference Include="..\IntegrationConsole\Norvia.IntegrationConsole.Web\Norvia.IntegrationConsole.Web.csproj" />
     <ProjectReference Include="..\PartnerPortal\Norvia.PartnerPortal.Migrations\Norvia.PartnerPortal.Migrations.csproj" />

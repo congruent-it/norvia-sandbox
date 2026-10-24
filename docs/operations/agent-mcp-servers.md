@@ -52,7 +52,7 @@ API Management MCP servers need response payload logging off at the service scop
 ## Tests
 
 - [AgentMcpServerTests](../../tests/Tms/Norvia.Tms.ArchitectureTests/AgentMcpServerTests.cs) evaluates the module with `bicep snapshot` and tests the policy a deployment would apply: valid token and audience, wrong role, rate limit, a tool not on the list, the headers and traces recorded, no response body use. It also checks the contract files' shape, that the Bicep reads them, and the logging precondition.
-- The drift test, from the stand-in's list in `Norvia.Agents` to the contract file, comes with the stand-in.
+- The drift test, from the stand-in's list to the contract file, is in `Norvia.Integration.LocalAgentMcp.UnitTests` (`ToolsList_IsExactlyTheToolsOfTheContractFile`): the stand-in embeds the contract file and serves it. A server whose Bicep isn't built yet, `integration-operations`, is listed in `AgentMcpServerTests`' `NotYetInBicep` until its Azure slice (#380) calls the module, and the Bicep-reads-the-file test skips it until then.
 - API Management runs only in Azure, so the policy is tested by reading it; the smoke run calls it.
 
 ## Smoke run

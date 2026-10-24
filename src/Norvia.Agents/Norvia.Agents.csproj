@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The shared library of the Agents (ADR 0040, ADR 0041): the definition loader, the in-process runner, the scripted fake
+    model, the tool-list contract and the Suggestion result. It references no Azure SDK; the Foundry client lives in each
+    host application's Infrastructure project.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.AI" />
+    <PackageReference Include="ModelContextProtocol.Core" />
+    <PackageReference Include="YamlDotNet" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Norvia.Agents.UnitTests" />
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+  </ItemGroup>
+</Project>

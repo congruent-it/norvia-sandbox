@@ -64,6 +64,8 @@ internal static class HopQuery
                 outcome = coalesce(tostring(Properties.outcome), tostring(tracked.outcome)),
                 failureCode = coalesce(tostring(Properties.failureCode), tostring(tracked.failureCode)),
                 fault = tostring(Properties.fault),
+                agentId = coalesce(tostring(Properties.agentId), tostring(tracked.agentId)),
+                toolName = coalesce(tostring(Properties.toolName), tostring(tracked.toolName)),
                 eventType = tostring(Properties.eventType),
                 transportOrderNumber = coalesce(tostring(Properties.transportOrderNumber), tostring(tracked.transportOrderNumber)),
                 shipmentNumber = coalesce(tostring(Properties.shipmentNumber), tostring(tracked.shipmentNumber)),
