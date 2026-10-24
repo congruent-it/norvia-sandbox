@@ -33,11 +33,14 @@ internal sealed class AgentHost : IAsyncDisposable
     private readonly byte[] _key = RandomNumberGenerator.GetBytes(64);
     private readonly ConsoleFactory _console;
     private readonly StandInFactory _standIn;
+    private readonly IReadOnlyDictionary<string, string> _consoleSettings;
 
     /// <param name="rateLimitCalls">Calls per Agent identity the stand-in allows in a minute.</param>
     /// <param name="consoleDistrustsStandIn">Whether the console's agent API takes another key than the one the stand-in signs with, so every tool call is refused.</param>
-    public AgentHost(int rateLimitCalls = 60, bool consoleDistrustsStandIn = false)
+    /// <param name="consoleSettings">More configuration for the console, such as the Service Bus emulators it lists locally (<c>LocalServiceBus</c>).</param>
+    public AgentHost(int rateLimitCalls = 60, bool consoleDistrustsStandIn = false, IReadOnlyDictionary<string, string>? consoleSettings = null)
     {
+        _consoleSettings = consoleSettings ?? new Dictionary<string, string>();
         var apiKey = consoleDistrustsStandIn ? RandomNumberGenerator.GetBytes(64) : _key;
         _console = new ConsoleFactory(this, apiKey);
         _standIn = new StandInFactory(this, rateLimitCalls);
@@ -46,6 +49,9 @@ internal sealed class AgentHost : IAsyncDisposable
     public TrackedStore Telemetry { get; } = new();
 
     public StubRuns Runs { get; } = new();
+
+    /// <summary>The failed runs the console lists, which a test gives it.</summary>
+    public StubFailedRuns FailedRuns { get; } = new();
 
     /// <summary>The console, which starts its server on first use.</summary>
     public IServiceProvider ConsoleServices => _console.Services;
@@ -101,7 +107,7 @@ internal sealed class AgentHost : IAsyncDisposable
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             var agentKey = Convert.ToBase64String(host._key);
-            Apply(builder, new Dictionary<string, string>
+            Apply(builder, new Dictionary<string, string>(host._consoleSettings)
             {
                 ["LocalOperator:Name"] = "Iris Operator",
                 ["LocalOperator:Roles:0"] = "IntegrationConsole.Read",
@@ -122,6 +128,7 @@ internal sealed class AgentHost : IAsyncDisposable
                 services.AddSingleton(host.Telemetry.ProviderFor("integration-console"));
                 services.AddSingleton<ITrailSource>(host.Telemetry);
                 services.AddSingleton<IWorkflowRuns>(host.Runs);
+                services.AddSingleton<IFailedRuns>(host.FailedRuns);
                 // The typed client of the console's Agent, named after its port.
                 services.AddHttpClient("IAgentClient").ConfigurePrimaryHttpMessageHandler(() => host._standIn.Server.CreateHandler());
             });
