@@ -48,7 +48,7 @@ internal sealed class AgentApiHost : IAsyncDisposable
         _app.Services.GetRequiredService<EndpointDataSource>().Endpoints.OfType<RouteEndpoint>()
             .Where(endpoint => endpoint.RoutePattern.RawText?.StartsWith(AgentTrailEndpoints.Prefix, StringComparison.Ordinal) == true);
 
-    public static async Task<AgentApiHost> StartAsync(bool enabled = true, bool withKey = true)
+    public static async Task<AgentApiHost> StartAsync(bool enabled = true, bool withKey = true, string? gatewayClientId = null, bool entra = false)
     {
         var signingKey = new byte[64];
         Random.Shared.NextBytes(signingKey);
@@ -71,6 +71,18 @@ internal sealed class AgentApiHost : IAsyncDisposable
             settings["Agents:Api:Issuer"] = Issuer;
             settings["Agents:Api:Audience"] = Audience;
             settings["Agents:Api:SigningKey"] = Convert.ToBase64String(signingKey);
+        }
+
+        if (gatewayClientId is not null)
+        {
+            settings["Agents:Api:GatewayClientId"] = gatewayClientId;
+        }
+
+        if (entra)
+        {
+            // In Azure there is no key: Entra's metadata gives the keys. Nothing answers at this issuer here.
+            settings.Remove("Agents:Api:SigningKey");
+            settings["Agents:Api:Issuer"] = "https://localhost:1/tenant/v2.0";
         }
 
         builder.Configuration.AddInMemoryCollection(settings);

@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace Norvia.Agents.Runner;
 
 /// <summary>Reads the model's final reply as a <see cref="Suggestion"/>, and refuses one that isn't the expected result or cites a result the run never had.</summary>
-internal static class SuggestionParser
+public static class SuggestionParser
 {
     public static Suggestion Parse(string reply, IReadOnlyDictionary<string, string> toolNamesByResultId)
     {

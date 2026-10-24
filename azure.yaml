@@ -43,4 +43,5 @@ hooks:
       ./infra/deploy-carrier-invoice-outcome-logic-app.sh &&
       ./infra/deploy-tracking-logic-app.sh &&
       ./infra/deploy-proof-of-delivery-logic-app.sh &&
-      ./infra/register-sign-in-callbacks.sh
+      ./infra/register-sign-in-callbacks.sh &&
+      ./infra/deploy-agents.sh

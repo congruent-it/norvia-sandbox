@@ -1,6 +1,6 @@
 # Agents read the estate through API Management, have no write tools and have their own identity
 
-**Status: Proposed.** It becomes Accepted when the first two slices of the Integration operations agent work end to end (#379 locally, #380 in Azure), as #369 says.
+**Status: Accepted.** The first two slices of the Integration operations agent work end to end (#379 locally, #380 in Azure), as #369 says.
 
 Norvia's staff get **Agents**, built on Microsoft Foundry (Foundry Agent Service): an Agent reads the estate and answers a person, and the person decides. This ADR says what an Agent is, what it may touch and who stays in charge. How it runs on a developer's machine is [ADR 0041](0041-locally-an-in-process-runner-and-an-mcp-stand-in-play-foundry-and-api-managements-mcp-server.md).
 

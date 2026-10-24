@@ -653,6 +653,22 @@ public sealed class AppHostModelTests
     }
 
     [Fact]
+    public async Task InAzure_TheIntegrationConsole_AsksThePublishedAgentInFoundry_AndTakesApiManagementsEntraTokenOnItsAgentApi()
+    {
+        await using var builder = await CreateForAzureAsync();
+
+        var console = await EnvironmentOfAsync(builder, "integration-console-web");
+
+        console.Should().Contain("Agents__Enabled", "{estate-agents-enabled.value}")
+            .And.Contain("Agents__Foundry__ProjectEndpoint", "{estate-foundry-project-endpoint.value}")
+            .And.Contain("Agents__Api__Audience", "{estate-integration-console-agent-api-client-id.value}")
+            .And.Contain("Agents__Api__GatewayClientId", "{estate-api-management-client-id.value}")
+            .And.ContainKey("Agents__Api__Issuer")
+            .And.NotContainKey("Agents__Api__SigningKey", "in Azure the tokens are Entra's, with no local key")
+            .And.NotContainKey("Agents__McpAddress", "in Azure Foundry's Agent calls the MCP server, not the console");
+    }
+
+    [Fact]
     public async Task InAzure_TheIntegrationConsole_ReadsRunsFromTheEstatesLogicApps()
     {
         await using var builder = await CreateForAzureAsync();

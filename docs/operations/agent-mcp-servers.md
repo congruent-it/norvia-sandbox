@@ -41,7 +41,7 @@ API Management MCP servers need response payload logging off at the service scop
 ## Add an agent API in four steps
 
 1. **Write the tool list.** Add `contracts/agent-mcp/<server>.tools.json` (name, description, `GET`, path for each tool, and the read role). Tools are reads only; the contract test fails on any other method. The local MCP stand-in reads the same file.
-2. **Register the agent view's identity.** In the application's Bicep, an app registration for the agent view with the role from the file, a service principal that requires assignment (see `agent-mcp-example.bicep`). Agents are given the role after each publish ([identity and access](../architecture/identity-and-access.md#agents-planned)).
+2. **Register the agent view's identity.** In the application's Bicep, an app registration for the agent view with the role from the file, a service principal that requires assignment (see `agent-mcp-example.bicep`). Agents are given the role after each publish ([identity and access](../architecture/identity-and-access.md#agents)).
 3. **Call the module.** `tools: loadJsonContent('../../contracts/agent-mcp/<server>.tools.json').tools`, the `audience`, the `requiredRole`, and the `backendId`, `backendAudience` and identity of the application's agent view. Add the application's agent view as an API Management backend the way `tms-api` is in `partner-api.bicep`.
 4. **Add the smoke run.** Copy `infra/smoke-test-agent-mcp-server.sh` for the server's first tool, and add the server to the C4 and the identity matrix.
 
@@ -52,7 +52,7 @@ API Management MCP servers need response payload logging off at the service scop
 ## Tests
 
 - [AgentMcpServerTests](../../tests/Tms/Norvia.Tms.ArchitectureTests/AgentMcpServerTests.cs) evaluates the module with `bicep snapshot` and tests the policy a deployment would apply: valid token and audience, wrong role, rate limit, a tool not on the list, the headers and traces recorded, no response body use. It also checks the contract files' shape, that the Bicep reads them, and the logging precondition.
-- The drift test, from the stand-in's list to the contract file, is in `Norvia.Integration.LocalAgentMcp.UnitTests` (`ToolsList_IsExactlyTheToolsOfTheContractFile`): the stand-in embeds the contract file and serves it. A server whose Bicep isn't built yet, `integration-operations`, is listed in `AgentMcpServerTests`' `NotYetInBicep` until its Azure slice (#380) calls the module, and the Bicep-reads-the-file test skips it until then.
+- The drift test, from the stand-in's list to the contract file, is in `Norvia.Integration.LocalAgentMcp.UnitTests` (`ToolsList_IsExactlyTheToolsOfTheContractFile`): the stand-in embeds the contract file and serves it. Every contract file is called from Bicep, and `AgentMcpServerTests` checks that the Bicep reads the file: `integration-operations` does ([integration-operations-mcp.bicep](../../infra/estate/integration-operations-mcp.bicep)), so the stand-in's list is the Bicep's.
 - API Management runs only in Azure, so the policy is tested by reading it; the smoke run calls it.
 
 ## Smoke run
