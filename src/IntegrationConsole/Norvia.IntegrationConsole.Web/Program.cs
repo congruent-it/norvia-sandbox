@@ -60,3 +60,6 @@ app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 app.MapDefaultEndpoints();
 
 await app.RunAsync();
+
+/// <summary>Lets the integration tests start the console.</summary>
+public partial class Program;
