@@ -13,7 +13,11 @@ internal sealed class TrackedStore : ITrailSource
 {
     private readonly ConcurrentQueue<RecordedHop> _recorded = new();
     private readonly ConcurrentDictionary<string, List<RecordedHop>> _seeded = new(StringComparer.Ordinal);
+    private readonly ConcurrentQueue<LoggedAudit> _audits = new();
     private int _next;
+
+    /// <summary>The audit events the console wrote, with the keys of the scope each was written in, as the pipeline would export them.</summary>
+    public IReadOnlyList<LoggedAudit> Audits => [.. _audits];
 
     /// <summary>Puts hops on a trail as if earlier applications had recorded them.</summary>
     public void Seed(string correlationId, params RecordedHop[] hops) => _seeded.AddOrUpdate(correlationId, _ => [.. hops], (_, existing) => [.. existing, .. hops]);
@@ -97,10 +101,18 @@ internal sealed class TrackedStore : ITrailSource
                     }
                 },
                 keys);
+            if (category.EndsWith(".OpenTelemetryAuditLog", StringComparison.Ordinal))
+            {
+                store._audits.Enqueue(new LoggedAudit(keys, formatter(state, exception)));
+            }
+
             store.Record(application, keys, DateTimeOffset.UtcNow);
         }
     }
 }
+
+/// <summary>An audit event as logged: the message, and the tracking contract's keys and the agent's of its scope.</summary>
+internal sealed record LoggedAudit(IReadOnlyDictionary<string, string> Keys, string Message);
 
 /// <summary>The Logic Apps management API, holding the runs a test gives it, and noting whether anything asked for a step's bodies.</summary>
 internal sealed class StubRuns : IWorkflowRuns

@@ -58,6 +58,29 @@ internal static class Emulator
         return received;
     }
 
+    /// <summary>Takes the messages that arrive on a queue or subscription within <paramref name="wait"/> and completes them.</summary>
+    public static async Task<IReadOnlyList<ServiceBusReceivedMessage>> TakeAsync(ServiceBusClient client, string queueOrTopic, string? subscription, int count, TimeSpan? wait = null)
+    {
+        await using var receiver = Receiver(client, queueOrTopic, subscription);
+        var taken = new List<ServiceBusReceivedMessage>();
+        while (taken.Count < count)
+        {
+            var batch = await receiver.ReceiveMessagesAsync(count - taken.Count, wait ?? Patience, TestContext.Current.CancellationToken);
+            if (batch.Count == 0)
+            {
+                break;
+            }
+
+            foreach (var message in batch)
+            {
+                await receiver.CompleteMessageAsync(message, TestContext.Current.CancellationToken);
+                taken.Add(message);
+            }
+        }
+
+        return taken;
+    }
+
     /// <summary>Polls until the condition holds: the emulator's runtime counts trail what it has just done.</summary>
     public static async Task<T> EventuallyAsync<T>(Func<Task<T>> read, Func<T, bool> done)
     {
