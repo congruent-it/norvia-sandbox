@@ -19,7 +19,10 @@ public abstract class BrowserPage(ConsoleUiFixture console) : IAsyncLifetime
 
     protected IPage Page { get; private set; } = null!;
 
-    protected ConsoleWebHost Console => console.Console;
+    /// <summary>Whether the console under test has <c>Agents:Enabled</c> on; off unless a test class says so.</summary>
+    protected virtual bool AgentsEnabled => false;
+
+    protected ConsoleWebHost Console => AgentsEnabled ? console.AgentsConsole : console.Console;
 
     public ValueTask InitializeAsync() => ValueTask.CompletedTask;
 
@@ -28,7 +31,7 @@ public abstract class BrowserPage(ConsoleUiFixture console) : IAsyncLifetime
     {
         _context = await console.Browser.NewContextAsync(new BrowserNewContextOptions
         {
-            BaseURL = console.Console.Address.ToString(),
+            BaseURL = Console.Address.ToString(),
             RecordVideoDir = _videoDirectory,
             ExtraHTTPHeaders = new Dictionary<string, string> { ["X-MS-CLIENT-PRINCIPAL"] = ClientPrincipal(name, roles) },
         });
