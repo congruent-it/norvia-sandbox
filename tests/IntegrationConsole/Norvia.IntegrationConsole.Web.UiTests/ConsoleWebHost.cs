@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Norvia.IntegrationConsole.Application.Agents;
 using Norvia.IntegrationConsole.Application.Operators;
 
 namespace Norvia.IntegrationConsole.Web.UiTests;
@@ -15,7 +16,8 @@ namespace Norvia.IntegrationConsole.Web.UiTests;
 /// The console on Kestrel with every port faked, so a browser drives it without Azure. Every interface in the
 /// Application project is a port, and each is replaced by an NSubstitute fake that a test configures through
 /// <see cref="Port{T}"/>. The credential the adapters would call Azure with is faked too, so nothing leaves the machine.
-/// Operators sign in as Easy Auth signs them in, by the header it adds.
+/// Operators sign in as Easy Auth signs them in, by the header it adds. <c>Agents:Enabled</c> is off unless the host is
+/// made with <c>agentsEnabled</c>; the Agent itself is always the <c>IAgentClient</c> fake.
 /// </summary>
 public sealed class ConsoleWebHost : WebApplicationFactory<Program>
 {
@@ -25,7 +27,13 @@ public sealed class ConsoleWebHost : WebApplicationFactory<Program>
         .Where(type => type.IsInterface)
         .ToDictionary(port => port, port => Substitute.For([port], []));
 
-    public ConsoleWebHost() => UseKestrel(0);
+    private readonly bool _agentsEnabled;
+
+    public ConsoleWebHost(bool agentsEnabled = false)
+    {
+        _agentsEnabled = agentsEnabled;
+        UseKestrel(0);
+    }
 
     /// <summary>The ports the console's Application layer defines, each with its fake.</summary>
     public IReadOnlyDictionary<Type, object> Ports => _ports;
@@ -56,6 +64,8 @@ public sealed class ConsoleWebHost : WebApplicationFactory<Program>
                 services.AddSingleton(port, fake);
             }
 
+            // Through the options, not the setting: the setting would also map the agent API, which needs tokens of its own.
+            services.Configure<AgentsOptions>(options => options.Enabled = _agentsEnabled);
             services.RemoveAll<TokenCredential>();
             services.AddSingleton(Substitute.For<TokenCredential>());
         });

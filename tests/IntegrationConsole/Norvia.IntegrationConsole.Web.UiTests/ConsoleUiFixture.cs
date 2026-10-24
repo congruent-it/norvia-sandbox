@@ -11,6 +11,9 @@ public sealed class ConsoleUiFixture : IAsyncLifetime
 
     public ConsoleWebHost Console { get; } = new();
 
+    /// <summary>The same console with <c>Agents:Enabled</c> on.</summary>
+    public ConsoleWebHost AgentsConsole { get; } = new(agentsEnabled: true);
+
     public IBrowser Browser { get; private set; } = null!;
 
     public async ValueTask InitializeAsync()
@@ -22,6 +25,7 @@ public sealed class ConsoleUiFixture : IAsyncLifetime
         }
 
         Console.StartServer();
+        AgentsConsole.StartServer();
 
         _playwright = await Playwright.CreateAsync();
         Browser = await _playwright.Chromium.LaunchAsync();
@@ -36,5 +40,6 @@ public sealed class ConsoleUiFixture : IAsyncLifetime
 
         _playwright?.Dispose();
         await Console.DisposeAsync();
+        await AgentsConsole.DisposeAsync();
     }
 }
