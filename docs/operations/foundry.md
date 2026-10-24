@@ -127,6 +127,21 @@ A Logic Apps Standard app with one workflow, `conversation-sweeper` ([src/Integr
 
 What it does not do: it does not turn the stateful Agent Service into a stateless one. A conversation made with `POST /openai/v1/conversations` is stored whatever the response says, so the clients **do not create a conversation** unless an Agent needs history (none does: Agents keep no memory between runs, ADR 0040), and they pass `store: false` on every call. The FAQ still says the Agent Service "retains data" and the documents give no setting for a project that stores nothing, so the delete after each run and the sweeper stay: the sweeper is the safety net for a client that forgot, a failed delete and a run that died. **Not verified in a tenant**: whether `store: false` is honoured when the agent calls an MCP tool; the smoke run of the first Agent (#379) lists the project's responses afterwards and settles it.
 
+## Open points of #500
+
+The estate half of #500 is built (the sweeper, its toggle, the smoke run, the spike). The host-side code is not, because it lives in `Norvia.Agents`, which #379 creates. Whoever builds #379 or #458 picks these up; #500 stays open until they are done.
+
+| # | Open point | Where | Needs |
+|---|---|---|---|
+| 1 | `IConversationCleanup` in `Norvia.Agents`: deletes the run's conversation and its responses as soon as the host has the answer. Best effort: a failure is logged as `ConversationNotDeleted` on the run's span and never thrown. Unit tests with the Foundry client faked (the call, the code on failure, no exception to the caller); at least 80% line coverage | `Norvia.Agents`, shared by every host | #379 |
+| 2 | Every Foundry call sets `store: false` and creates no conversation unless an Agent needs history (none does). This is the answer of spike 3 | The Foundry client of `Norvia.Agents`; an architecture test can check no `CreateResponse` omits it | #379 |
+| 3 | The Intake operation (`booking-drafts`) deletes first and only then returns the draft. A failed delete is `ConversationNotDeleted`, the draft is still returned (the Shipper is not punished), and the sweeper retries it. Unit test: delete fails, draft returned, code on the span | The Intake operation of #458 | #379, #458 |
+| 4 | Only Infrastructure projects reference the Foundry SDK, so the cleanup port is in the host's Application layer or in `Norvia.Agents` and the call is in Infrastructure (the architecture test of #379 covers it) | `Norvia.Agents` and each host | #379 |
+| 5 | Verify in a tenant: run `infra/smoke-test-conversation-sweeper.sh` (Foundry User may list and delete, the list response shape), and after the first Agent run list the project's responses to see whether `store: false` is honoured when an Agent calls an MCP tool. Record both here, in "The sweeper" and spike 3 | A deployed estate | #379 deployed |
+| 6 | Docs that say "planned" for the host side: [failure-behaviour.md](../architecture/failure-behaviour.md) (the row for `IConversationCleanup`), [local-vs-azure.md](../architecture/local-vs-azure.md) (locally there is no Foundry conversation), the Intake agent's P1 doc. Drop "planned" when 1 to 3 are built | Docs | 1 to 3 |
+
+Acceptance criteria of #500 still open: *a normal Agent run leaves no conversation behind* (1, 2) and *the Intake operation deletes before it returns, and a failed delete is a coded span, not an error to the Shipper* (3). *A conversation the host could not delete is removed by the sweeper* is built and waits for point 5.
+
 ## Not here
 
-Publishing the Agents from their definition files (`infra/deploy-agents.sh`, the agent registry and the smoke run wait for the definition format of #379), `IConversationCleanup` itself, which lives in `Norvia.Agents` and so waits for #379 to create that library, and the evaluation harness (#501).
+Publishing the Agents from their definition files (`infra/deploy-agents.sh`, the agent registry and the smoke run wait for the definition format of #379), `IConversationCleanup` itself ([open points](#open-points-of-500)), and the evaluation harness (#501).
