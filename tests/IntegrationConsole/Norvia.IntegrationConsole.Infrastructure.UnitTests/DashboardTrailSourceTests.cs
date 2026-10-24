@@ -438,6 +438,20 @@ public sealed class DashboardTrailSourceTests : IDisposable
     }
 
     [Fact]
+    public async Task HopsAsync_AToolCallAnAgentMade_NamesTheAgentAndTheTool_AndAHopNoAgentMadeNamesNone()
+    {
+        _dashboard
+            .AddSpan("agent-mcp", Trace, "a1a1a1a1a1a1a1a1", null, "POST /mcp", Server, Now.AddSeconds(-10), Now.AddSeconds(-9))
+            .Add("agent-mcp", Now.AddMilliseconds(-9500), new() { ["correlationId"] = Booked, ["outcome"] = "Succeeded", ["agentId"] = "integration-operations-agent", ["toolName"] = "get_message_trail" }, traceId: Trace, spanId: "a1a1a1a1a1a1a1a1")
+            .AddSpan("tms-api", Trace, "b2b2b2b2b2b2b2b2", null, "POST /v1/trips", Server, Now.AddSeconds(-8), Now.AddSeconds(-7))
+            .Add("tms-api", Now.AddMilliseconds(-7500), new() { ["correlationId"] = Booked, ["outcome"] = "Succeeded" }, traceId: Trace, spanId: "b2b2b2b2b2b2b2b2");
+
+        var hops = await HopsAsync(Booked);
+
+        hops.Select(hop => (hop.AgentId, hop.ToolName)).Should().Equal(("integration-operations-agent", "get_message_trail"), (null, null));
+    }
+
+    [Fact]
     public async Task HopsAsync_TheDashboardRefuses_Throws_SoTheTrailPageSaysItCouldntBeOpened()
     {
         _dashboard.Status = HttpStatusCode.Unauthorized;

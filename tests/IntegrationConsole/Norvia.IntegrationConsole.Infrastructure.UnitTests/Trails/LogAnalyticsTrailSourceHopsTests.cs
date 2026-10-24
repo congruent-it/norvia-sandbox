@@ -43,6 +43,8 @@ public sealed class LogAnalyticsTrailSourceHopsTests
         LogsQueryModelFactory.LogsTableColumn("inProcess", LogsColumnType.Bool),
         LogsQueryModelFactory.LogsTableColumn("messageId", LogsColumnType.String),
         LogsQueryModelFactory.LogsTableColumn("fault", LogsColumnType.String),
+        LogsQueryModelFactory.LogsTableColumn("agentId", LogsColumnType.String),
+        LogsQueryModelFactory.LogsTableColumn("toolName", LogsColumnType.String),
     ];
 
     private static readonly string[] FrameworkCategories = ["Azure.", "Microsoft.", "System."];
@@ -418,6 +420,18 @@ public sealed class LogAnalyticsTrailSourceHopsTests
     }
 
     [Fact]
+    public async Task HopsAsync_AToolCallAnAgentMade_NamesTheAgentAndTheTool_AndAHopNoAgentMadeNamesNone()
+    {
+        Answer(
+            Row("request", "mcp", null, Now.AddSeconds(-5), 40, "POST /mcp", "agent-mcp", flow: "agent-mcp-integration-operations", outcome: "Succeeded", agentId: "integration-operations-agent", toolName: "get_message_trail"),
+            Row("request", "tms", "mcp", Now.AddSeconds(-4), 40, "POST /v1/bookings", "tms-api", outcome: "Succeeded"));
+
+        var hops = await HopsAsync(CorrelationId);
+
+        hops.Select(hop => (hop.AgentId, hop.ToolName)).Should().Equal(("integration-operations-agent", "get_message_trail"), (null, null));
+    }
+
+    [Fact]
     public async Task HopsAsync_AHopNoFaultCaused_NamesNone()
     {
         Answer(Row("request", "tms", null, Now.AddSeconds(-5), 40, "POST /v1/bookings", "tms-api", outcome: "Succeeded"));
@@ -484,11 +498,13 @@ public sealed class LogAnalyticsTrailSourceHopsTests
         string? path = null,
         string? eventType = null,
         string? messageId = null,
-        string? fault = null) =>
+        string? fault = null,
+        string? agentId = null,
+        string? toolName = null) =>
         LogsQueryModelFactory.LogsTableRow(Columns,
         [
             kind, id, parentId, start, durationMs, name, path, role, runId, workflow, category,
-            flow, outcome, failureCode, eventType, transportOrderNumber, null, null, null, null, null, messageId, fault,
+            flow, outcome, failureCode, eventType, transportOrderNumber, null, null, null, null, null, messageId, fault, agentId, toolName,
         ]);
 
     // A dependency the query returns with what places a hop in it: an in-process one is a span an application or a
@@ -497,6 +513,6 @@ public sealed class LogAnalyticsTrailSourceHopsTests
         LogsQueryModelFactory.LogsTableRow(Columns,
         [
             "link", id, parentId, start, durationMs, name, null, role, null, null, null,
-            null, null, null, null, null, null, null, null, null, inProcess, null, null,
+            null, null, null, null, null, null, null, null, null, inProcess, null, null, null, null,
         ]);
 }

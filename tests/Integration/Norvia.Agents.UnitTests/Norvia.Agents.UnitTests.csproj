@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <Include>[Norvia.Agents]*</Include>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="coverlet.msbuild" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+    <PackageReference Include="xunit.v3.mtp-off" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="AwesomeAssertions" />
+    <ProjectReference Include="..\..\..\src\Norvia.Agents\Norvia.Agents.csproj" />
+  </ItemGroup>
+  <!-- Embedded, so the tests read the definition and the tool list without touching the file system (coding guidelines §10). -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\..\agents\*.agent.yaml" LogicalName="agents/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\contracts\agent-mcp\*.tools.json" LogicalName="agent-mcp/%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

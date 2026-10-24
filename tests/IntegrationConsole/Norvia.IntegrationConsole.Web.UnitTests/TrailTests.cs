@@ -1,6 +1,7 @@
 using Ardalis.Result;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection;
+using Norvia.IntegrationConsole.Application.Operators;
 using Norvia.IntegrationConsole.Application.Trails;
 using Norvia.IntegrationConsole.Application.Trails.Open;
 using Norvia.IntegrationConsole.Web.Operators;
@@ -82,6 +83,54 @@ public sealed class TrailTests : ConsoleWebContext
         var rows = page.FindAll("tbody tr");
         rows[0].TextContent.Should().Contain("driver-app-unavailable");
         rows[1].TextContent.Should().NotContain("driver-app-unavailable");
+    }
+
+    [Fact]
+    public void Render_WithAToolCallAnAgentMade_TagsTheHopWithTheAgentAndTheTool()
+    {
+        Answer(
+            Hop("agent-mcp: POST /mcp", seconds: 0, null, Outcome.Succeeded) with { AgentId = "integration-operations-agent", ToolName = "get_message_trail" },
+            Hop("tms-api", seconds: 1, null, Outcome.Succeeded));
+
+        var page = RenderTrail();
+
+        var rows = page.FindAll("tbody tr");
+        rows[0].QuerySelector("[data-agent]")!.TextContent.Trim().Should().Be("Agent integration-operations-agent · get_message_trail");
+        rows[1].QuerySelector("[data-agent]").Should().BeNull();
+    }
+
+    [Fact]
+    public void Render_WithAFailedHop_ShowsExplain_WhenTheAgentsAreOn()
+    {
+        TurnAgentsOn();
+        Operator.SetAuthorized("Iris Operator").SetRoles(OperatorRoles.Read).SetPolicies(OperatorSignIn.ReadPolicy);
+        Answer(Hop("tracking-worker", seconds: 0, null, Outcome.DeadLettered, "UnmappableTrackingMessage"));
+
+        var page = RenderTrail();
+
+        page.Find("section[aria-label=Explanation] fluent-button").TextContent.Trim().Should().Be("Explain");
+    }
+
+    [Fact]
+    public void Render_WithNoFailedHop_ShowsNoExplain_EvenWhenTheAgentsAreOn()
+    {
+        TurnAgentsOn();
+        Operator.SetAuthorized("Iris Operator").SetRoles(OperatorRoles.Read).SetPolicies(OperatorSignIn.ReadPolicy);
+        Answer(Hop("tms-api", seconds: 0, null, Outcome.Succeeded));
+
+        var page = RenderTrail();
+
+        page.FindAll("section[aria-label=Explanation]").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Render_WithAFailedHop_ShowsNoExplain_WhileTheAgentsAreOff()
+    {
+        Answer(Hop("tracking-worker", seconds: 0, null, Outcome.DeadLettered, "UnmappableTrackingMessage"));
+
+        var page = RenderTrail();
+
+        page.FindAll("section[aria-label=Explanation]").Should().BeEmpty();
     }
 
     [Fact]

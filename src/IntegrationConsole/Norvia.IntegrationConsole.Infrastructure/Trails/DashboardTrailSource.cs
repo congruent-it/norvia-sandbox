@@ -159,7 +159,9 @@ internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTr
             failureCode,
             BusinessKeysOf(records),
             MessageId: Distinct(records, "messageId").FirstOrDefault(),
-            Fault: Distinct(records, "fault").FirstOrDefault());
+            Fault: Distinct(records, "fault").FirstOrDefault(),
+            AgentId: Distinct(records, "agentId").FirstOrDefault(),
+            ToolName: Distinct(records, "toolName").FirstOrDefault());
     }
 
     /// <summary>
@@ -323,7 +325,7 @@ internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTr
         private static readonly string[] AuditKeys = ["Actor", "Action", "Entity", "MessageId", "Reason"];
 
         private static readonly string[] TrackedKeys =
-            ["correlationId", "flow", "outcome", "failureCode", "fault", "eventType", "messageId", .. AuditKeys, .. TrackedBusinessKeys.All.Select(key => key.Key)];
+            ["correlationId", "flow", "outcome", "failureCode", "fault", "agentId", "toolName", "eventType", "messageId", .. AuditKeys, .. TrackedBusinessKeys.All.Select(key => key.Key)];
 
         public bool IsAudit => Keys.ContainsKey("Actor") && Keys.ContainsKey("Action");
 

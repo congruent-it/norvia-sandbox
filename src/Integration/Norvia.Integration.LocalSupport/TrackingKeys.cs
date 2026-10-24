@@ -18,6 +18,8 @@ public static class TrackingKeys
     public const string MessageId = "messageId";
     public const string Outcome = "outcome";
     public const string FailureCode = "failureCode";
+    public const string AgentId = "agentId";
+    public const string ToolName = "toolName";
 
     /// <summary>The <see cref="Flow"/> of a booking, from the edge to the TMS's answer.</summary>
     public const string TransportOrderIntake = "transport-order-intake";

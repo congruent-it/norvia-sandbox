@@ -55,6 +55,18 @@ Search and the trail's outline come from Application Insights, so they can be a 
 - The business keys the trail carried, each a link that searches for it.
 - A Logic App run opens its [run detail](#run-detail). A dead-lettered hop links to the message in its [dead-letter queue](#dead-letter-queues) while it's still there, or says whether it was resubmitted or discarded, and by whom (from the [audit](#audit)).
 - A resubmitted message continues the same trail, because it keeps its correlation ID. The trail shows the failed attempt and the later one.
+- A tool call an [Agent](#explain-and-the-agent-api) made is a hop like any other, tagged under its name with the Agent's identity and the tool, such as `Agent integration-operations-agent · get_message_trail`.
+
+### Explain and the agent API
+
+The first slice of the Integration operations agent ([ADR 0040](../adr/0040-agents-read-the-estate-through-api-management-have-no-write-tools-and-their-own-identity.md), [ADR 0041](../adr/0041-locally-an-in-process-runner-and-an-mcp-stand-in-play-foundry-and-api-managements-mcp-server.md)). Both ADRs become Accepted when its Azure slice (#380) works too.
+
+- **The Explain button** sits above the hops of a Message trail that has a failed hop. It asks the Agent one fixed question about that trail, and shows the answer as text: the **cause**, the **evidence**, each claim with the result it was read from (`[r1, get_message_trail]`), a **suggested action**, and a **confidence**. The suggested action is advice. The operator decides, and acts on the Dead-letter queues page or elsewhere under their own role; nothing here changes anything.
+- **It is hidden** while `Agents:Enabled` is off (the default) and for an operator without `IntegrationConsole.Read`. On any failure the operator sees "Assistant unavailable" and nothing else changes: the run has a short timeout (20 seconds) and is never retried. The failure is logged and the run's span is marked failed, with `AgentUnavailable` or `AgentToolRefused` ([failure behaviour](../architecture/failure-behaviour.md#agents)).
+- **The Agent run** is a span of the console named `Agent run`, with the run ID and the trail's correlation ID, which the Agent passes down to each tool call, so the tool calls join the trail they are about.
+- **The agent API** is a minimal-API group, `/agent/v1`, mapped only while `Agents:Enabled` is on. It wraps the existing use cases as a narrower read view and has the Agent's tools, `get_message_trail` (hops, outcomes, failure codes, Logic App runs and business keys) and `get_run` (status and the steps' status, duration and error), as GETs. It holds no message bodies, no step inputs or outputs and no audit detail, and it has no write route. It takes only an Agent's token holding `IntegrationConsole.Agent.Read`, never an operator's sign-in. A call that carries a correlation ID is a hop of the console on that trail, tagged with the Agent's identity from its token and the tool name the MCP server sets.
+- **The tool list** is [integration-operations.tools.json](../../contracts/agent-mcp/integration-operations.tools.json), read by the local MCP stand-in and, with the Azure slice, by the Bicep that builds the API Management MCP server. The Agent's instructions, tool list and model settings are [agents/integration-operations.agent.yaml](../../agents/integration-operations.agent.yaml).
+- **Locally** (`Agents:Enabled` true in the AppHost's user secrets), the console runs the Agent in process (`Norvia.Agents`) against `Norvia.Integration.LocalAgentMcp`, which plays API Management's MCP server and calls the agent API as the Agent's identity. The model is a scripted fake that explains the P5 trail (a Carrier's `DLV` instead of `POD`); set `Agents:Model:Endpoint` (and `Agents:Model:Deployment`) to use your own Foundry deployment instead. Easy Auth in front of the console in Azure comes with the Azure slice.
 
 ### Run detail
 
@@ -129,6 +141,7 @@ Ninety days is the retention Application Insights tables get at no extra cost, a
 - Integration operators sign in with Entra ID, through Container Apps' built-in authentication in front of the console ([ADR 0026](../adr/0026-the-integration-console-signs-operators-in-with-easy-auth-and-checks-their-app-role.md)). Entra signs in only users holding one of the console's roles, and every page requires `IntegrationConsole.Read`. The console's app registration has two app roles:
   - `IntegrationConsole.Read`: search, trails, run details, panels and bodies;
   - `IntegrationConsole.Resubmit`: also resubmit and discard.
+- The Integration operations agent's identity holds a third role of the same app registration's agent view, `IntegrationConsole.Agent.Read`, which opens only the [agent API](#explain-and-the-agent-api). No person holds it.
 - The console checks the user's role, then calls Azure with its own managed identity, never with the user's token. The estate Bicep grants that identity:
   - Log Analytics Reader on the workspace behind Application Insights;
   - read access to run history on each Logic App Standard app;
@@ -142,9 +155,9 @@ The console follows the coding guidelines with one deviation, stated here as §1
 
 | Project | Contains |
 |---|---|
-| `IntegrationConsole.Application` | Use cases (search, open trail, open run, list dead-letter queues, resubmit, discard), DTOs, and the ports `ITrailSource`, `IWorkflowRuns`, `IDeadLetterQueues` and `IAuditLog` |
-| `IntegrationConsole.Infrastructure` | Adapters over the Azure SDKs: Application Insights queries, the Logic Apps management API, Service Bus; locally, the Aspire dashboard's telemetry API |
-| `IntegrationConsole.Web` | Blazor web app, Interactive Server for the self-refreshing panels |
+| `IntegrationConsole.Application` | Use cases (search, open trail, open run, list dead-letter queues, resubmit, discard, explain a trail), DTOs, and the ports `ITrailSource`, `IWorkflowRuns`, `IDeadLetterQueues`, `IAuditLog` and `IAgentClient` |
+| `IntegrationConsole.Infrastructure` | Adapters over the Azure SDKs: Application Insights queries, the Logic Apps management API, Service Bus; locally, the Aspire dashboard's telemetry API and the in-process runner of the Agent |
+| `IntegrationConsole.Web` | Blazor web app, Interactive Server for the self-refreshing panels; the agent API |
 
 The dependency rule, the architecture tests, the mediator, the 80% line coverage, bUnit and Playwright all still apply. It runs under Aspire and deploys to Container Apps like the other applications (ADR 0004). Locally it searches the telemetry the Aspire dashboard holds, since no local app sends telemetry to Application Insights ([ADR 0027](../adr/0027-locally-the-integration-console-searches-the-aspire-dashboards-telemetry.md)); given a deployed estate's workspace, it reads that estate with the developer's credentials instead. Logic Apps exist only in Azure. It can also list the Service Bus emulator's dead-letter queues.
 
@@ -158,6 +171,7 @@ The dependency rule, the architecture tests, the mediator, the 80% line coverage
   - a discarded message is gone from the dead-letter queue;
   - counts and the oldest message's age are right.
 - **The Application Insights and Logic Apps adapters** are thin wrappers over their SDKs and are covered by the smoke run.
+- **Explain and the agent API** are unit tested: the runner with the scripted fake model, the definition loader, the agent API's narrowing (an allowlist of fields, no body, GET only, the Agent's role and token), the stand-in's checks in the policy's order, and architecture tests that every tool list is read-only and only Infrastructure projects reference the Foundry SDK. The integration tests are #384 and the UI tests #385.
 - **The Aspire dashboard adapter** is unit tested against the dashboard's OTLP JSON, faked at the HTTP boundary: it finds a trail by a business key or its correlation ID, within the range, from the tracking keys only.
 - **bUnit and Playwright** against the Web project with faked ports. For example, a user with only `IntegrationConsole.Read` sees no resubmit or discard, and "body no longer kept" shows for an expired run.
 - **Post-deploy smoke run, slice 1:** book as Brouwer Dranken. Find the trail by the Transport Order number and by the correlation ID. It shows the APIM call, the intake run and the TMS call, and the run's steps open with their bodies. See [Presenter smoke run](#presenter-smoke-run).

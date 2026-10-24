@@ -476,6 +476,13 @@ _Avoid_: bot, copilot, AI, assistant
 One question put to an Agent, with its tool calls and its answer, identified by a run ID. It is a span in the host application, and its tool calls are hops on a Message trail tagged with the Agent's identity and the tool name.
 _Avoid_: chat, session, conversation (that is Foundry's own record of a run)
 
+**Agent view**:
+An application's narrower, read-only endpoint group for the Agents: statuses, codes, times, numbers and business names, from an allowlist of fields, with no message body. The Integration console's is its agent API (`/agent/v1`); an MCP server exposes each operation as a tool (ADR 0040).
+_Avoid_: agent endpoint, agent database
+
+**Explain**:
+The button on a Message trail that has a failure. It puts one fixed question about the trail to the Integration operations agent and shows the Suggestion it answers with: cause, evidence, suggested action and confidence. The Integration operator decides what to do.
+
 **Suggestion**:
 What an Agent proposes a person do, shown in the host application's UI: a cause or reasoning, the evidence it cites, a suggested action and a confidence. It is not stored, and acting on it is the person's own command, whose trace names the Agent and the run ID.
 _Avoid_: recommendation, proposal, agent action

@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <Include>[Norvia.Integration.LocalAgentMcp]*</Include>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="coverlet.msbuild" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.Testing" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+    <PackageReference Include="xunit.v3.mtp-off" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="AwesomeAssertions" />
+    <ProjectReference Include="..\..\..\src\Integration\Norvia.Integration.LocalAgentMcp\Norvia.Integration.LocalAgentMcp.csproj" />
+  </ItemGroup>
+  <!-- Embedded, so the tests read the tool list and the definition without touching the file system (coding guidelines §10). -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\..\contracts\agent-mcp\integration-operations.tools.json" LogicalName="integration-operations.tools.json" />
+    <EmbeddedResource Include="..\..\..\agents\integration-operations.agent.yaml" LogicalName="integration-operations.agent.yaml" />
+  </ItemGroup>
+</Project>

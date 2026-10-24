@@ -5,6 +5,8 @@ namespace Norvia.IntegrationConsole.Application.Trails.Open;
 /// <param name="Run">The Logic App run the hop was, which opens its run detail, or null when it wasn't one.</param>
 /// <param name="DeadLetter">What became of the message a dead-lettered hop left behind, or null when it isn't one or its message isn't known.</param>
 /// <param name="Fault">The runtime fault that made the hop fail, such as <c>driver-app-unavailable</c>, so a demo shows cause and effect, or null when none did.</param>
+/// <param name="AgentId">The Agent that made the hop, or null when none did.</param>
+/// <param name="ToolName">The MCP tool the Agent called, or null when the hop wasn't a tool call.</param>
 public sealed record TrailHop(
     string Name,
     string? Flow,
@@ -15,7 +17,9 @@ public sealed record TrailHop(
     int Depth,
     WorkflowRun? Run,
     DeadLetterHandling? DeadLetter = null,
-    string? Fault = null)
+    string? Fault = null,
+    string? AgentId = null,
+    string? ToolName = null)
 {
     /// <summary>Whether the integration layer failed the message here, as a trail's failure is counted in search.</summary>
     public bool HasFailure => Outcome is Trails.Outcome.DeadLettered or Trails.Outcome.Failed;

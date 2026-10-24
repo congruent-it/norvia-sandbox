@@ -21,6 +21,7 @@ namespace Norvia.AppHost;
 /// The TMS UI signs its own token for the TMS API with the key too, as its managed identity holding the manage role.
 /// The Simulator signs its own token for the ERP API with the key too, as its managed identity holding the ERP API's manage role (Invoice now and a Credit note).
 /// The local Partner API trusts the same key for the Personas' tokens, which the Partner portal signs itself (ADR 0023).
+/// The Integration console signs the Integration operations agent's token itself, as its agent identity holding the agent read role, for the local MCP stand-in; the stand-in then signs its own token for the console's agent API as that identity (ADR 0041).
 /// </summary>
 public static class LocalTokens
 {
@@ -49,6 +50,18 @@ public static class LocalTokens
     public const string SimulatorClientId = "norvia-local-simulator";
     public const string PartnerPortalClientId = "norvia-local-partner-portal";
     public const string PartnerApiAudience = "api://norvia-partner-api";
+
+    /// <summary>The agent view's audience, which an Agent's token is for (the MCP stand-in checks it, as API Management does).</summary>
+    public const string AgentAudience = "api://norvia-integration-console-agent";
+
+    /// <summary>The console's agent API's audience, which the MCP server's token for the backend is for.</summary>
+    public const string ConsoleAgentApiAudience = "api://norvia-integration-console-agent-api";
+
+    /// <summary>The Integration operations agent's local identity, which stands in for its Entra agent identity.</summary>
+    public const string IntegrationOperationsAgentClientId = "norvia-local-agent-integration-operations";
+
+    /// <summary>The app role an Agent holds on the Integration console's agent API.</summary>
+    public const string AgentReadRole = "IntegrationConsole.Agent.Read";
 
     /// <summary>The app role a Shipper Persona holds on the Norvia Partner API, as the estate grants it in Entra.</summary>
     public const string SubmitRole = "TransportOrders.Submit";

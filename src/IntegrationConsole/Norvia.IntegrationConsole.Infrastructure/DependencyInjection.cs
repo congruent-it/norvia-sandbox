@@ -11,6 +11,7 @@ using Norvia.IntegrationConsole.Application.Audit;
 using Norvia.IntegrationConsole.Application.DeadLetters;
 using Norvia.IntegrationConsole.Application.Runs;
 using Norvia.IntegrationConsole.Application.Trails;
+using Norvia.IntegrationConsole.Infrastructure.Agents;
 using Norvia.IntegrationConsole.Infrastructure.Audit;
 using Norvia.IntegrationConsole.Infrastructure.DeadLetters;
 using Norvia.IntegrationConsole.Infrastructure.Runs;
@@ -33,6 +34,7 @@ public static partial class DependencyInjection
         builder.Services.AddSingleton(ConsoleCredential(builder.Configuration));
         builder.AddWorkflowRuns();
         builder.AddDeadLetterQueues();
+        builder.AddAgentClient();
         // Through ServiceDefaults' OpenTelemetry logging, so it reaches the same Application Insights as everything else.
         builder.Services.AddSingleton<IAuditLog, OpenTelemetryAuditLog>();
 

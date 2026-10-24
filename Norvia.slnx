@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Norvia.Agents/Norvia.Agents.csproj" />
     <Project Path="src/Norvia.AppHost/Norvia.AppHost.csproj" />
     <Project Path="src/Norvia.ServiceDefaults/Norvia.ServiceDefaults.csproj" />
     <Project Path="src/Norvia.Branding/Norvia.Branding.csproj" />
@@ -29,6 +30,7 @@
     <Project Path="src/Integration/Norvia.Integration.LocalTrackingWorker/Norvia.Integration.LocalTrackingWorker.csproj" />
     <Project Path="src/Integration/Norvia.Integration.LocalProofOfDeliveryWorker/Norvia.Integration.LocalProofOfDeliveryWorker.csproj" />
     <Project Path="src/Integration/Norvia.Integration.LocalSupport/Norvia.Integration.LocalSupport.csproj" />
+    <Project Path="src/Integration/Norvia.Integration.LocalAgentMcp/Norvia.Integration.LocalAgentMcp.csproj" />
     <Project Path="src/Integration/Norvia.Integration.LocalPartnerApi/Norvia.Integration.LocalPartnerApi.csproj" />
     <Project Path="src/Integration/Norvia.Integration.TransportOrderIntake.Functions/Norvia.Integration.TransportOrderIntake.Functions.csproj" />
   </Folder>
@@ -94,6 +96,8 @@
     <Project Path="tests/Integration/Norvia.Integration.LocalDriverReportsWorker.UnitTests/Norvia.Integration.LocalDriverReportsWorker.UnitTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.LocalTrackingWorker.UnitTests/Norvia.Integration.LocalTrackingWorker.UnitTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.LocalProofOfDeliveryWorker.UnitTests/Norvia.Integration.LocalProofOfDeliveryWorker.UnitTests.csproj" />
+    <Project Path="tests/Integration/Norvia.Agents.UnitTests/Norvia.Agents.UnitTests.csproj" />
+    <Project Path="tests/Integration/Norvia.Integration.LocalAgentMcp.UnitTests/Norvia.Integration.LocalAgentMcp.UnitTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.LocalPartnerApi.UnitTests/Norvia.Integration.LocalPartnerApi.UnitTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.TransportOrderIntake.UnitTests/Norvia.Integration.TransportOrderIntake.UnitTests.csproj" />
   </Folder>

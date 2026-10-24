@@ -1,0 +1,18 @@
+{
+  "server": "integration-operations",
+  "role": "IntegrationConsole.Agent.Read",
+  "tools": [
+    {
+      "name": "get_message_trail",
+      "description": "Returns a Message trail by its correlation ID: each hop with its flow, time, duration, outcome, failure code and the Logic App run it was, and the business keys the trail carried. Never a message body.",
+      "method": "GET",
+      "path": "/trails/{correlationId}"
+    },
+    {
+      "name": "get_run",
+      "description": "Returns a Logic App run: its status and its steps with status, duration and error. Never a step's input or output.",
+      "method": "GET",
+      "path": "/runs/{logicApp}/{workflow}/{runId}"
+    }
+  ]
+}

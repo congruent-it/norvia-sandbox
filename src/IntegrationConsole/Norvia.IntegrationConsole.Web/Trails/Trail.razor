@@ -4,6 +4,7 @@
 @using Ardalis.Result
 @using Norvia.IntegrationConsole.Application.Trails
 @using Norvia.IntegrationConsole.Application.Trails.Open
+@using Norvia.IntegrationConsole.Web.Agents
 @using Norvia.IntegrationConsole.Web.DeadLetters
 @inject ITrailRequests Trails
 @inject ILogger<Trail> Logger
@@ -64,6 +65,11 @@ else if (_trail is { } trail)
             </section>
         }
 
+        @if (trail.Hops.Any(hop => hop.HasFailure))
+        {
+            <ExplainTrail CorrelationId="@trail.CorrelationId" />
+        }
+
         @* Keys only: a body holds personal data, and shows only when an operator opens a step of a run. *@
         <FluentDataGrid Items="trail.Hops.AsQueryable()" TGridItem="TrailHop" aria-label="Hops" MultiLine="true"
                         GridTemplateColumns="minmax(16rem, 1fr) max-content max-content max-content max-content max-content">
@@ -71,6 +77,11 @@ else if (_trail is { } trail)
                 @* Each fan-out indents its branches one level under the hop that caused them. *@
                 <div style="padding-left: @(context.Depth * 1.5)rem">
                     <span data-depth="@context.Depth">@context.Name</span>
+                    @if (context.AgentId is { } agent)
+                    {
+                        @* A tool call an Agent made, tagged with who made it and which tool (ADR 0040). *@
+                        <span data-agent="@agent" class="ml-2 text-sm text-muted">Agent @agent@(context.ToolName is { } tool ? $" · {tool}" : "")</span>
+                    }
                     @if (context.Run is { } run)
                     {
                         <a href="@TrailLinks.Run(run)" class="ml-2">Open run</a>
