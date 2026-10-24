@@ -139,4 +139,10 @@ public sealed class Estate(IDistributedApplicationBuilder builder)
 
     /// <summary>The cap on requests in flight to the estate (<c>Simulator:MaxConcurrentRequests</c>).</summary>
     public IResourceBuilder<ParameterResource> SimulatorMaxConcurrentRequests { get; } = builder.AddParameter("estate-simulator-max-concurrent-requests");
+
+    /// <summary>Whether the Agents do anything (<c>Agents:Enabled</c>): the estate decides, and off by default.</summary>
+    public IResourceBuilder<ParameterResource> AgentsEnabled { get; } = builder.AddParameter("estate-agents-enabled");
+
+    /// <summary>The Foundry project's endpoint, which the Agents' host and the deploy scripts call.</summary>
+    public IResourceBuilder<ParameterResource> FoundryProjectEndpoint { get; } = builder.AddParameter("estate-foundry-project-endpoint");
 }

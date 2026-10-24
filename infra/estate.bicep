@@ -102,9 +102,39 @@ param driverAppBaseUrl string = ''
 Carrier cost and Carrier invoice Logic Apps keep it when the estate is deployed again.''')
 param erpBaseUrl string = ''
 
+@description('''Whether the Agents do anything (Agents:Enabled), off by default. The estate decides, as it does for the Simulator. The Foundry
+account, project and model exist either way.''')
+param agentsEnabled bool = false
+
+@description('''The Azure region of the Foundry account. Empty is AZURE_LOCATION when the model has a DataZoneStandard deployment there, and
+the nearest EU region that has it (Sweden Central) when not (docs/operations/foundry.md).''')
+param foundryLocation string = ''
+
+@description('The model every Agent shares. The default is the small model of docs/operations/foundry.md, spike 1.')
+param foundryModelName string = 'gpt-5.4-mini'
+
+@description('The shared model\'s version.')
+param foundryModelVersion string = '2026-03-17'
+
+@description('''Whether the shared model deployment exists. Without it every Agent run fails, which is how an agent toggle (#377) breaks
+the Agents.''')
+param foundryModelDeployed bool = true
+
+@description('The cap on the shared model deployment, in thousands of tokens per minute (DataZoneStandard).')
+@minValue(1)
+@maxValue(100)
+param foundryModelCapacity int = 30
+
+@description('''Entra object IDs besides the presenter that may use the Foundry project, such as the pipeline that deploys the Agents. Each gets the
+Foundry User role.''')
+param foundryUserPrincipalIds array = []
+
 var tags = {
   'azd-env-name': environmentName
 }
+
+// EU regions that have a DataZoneStandard deployment of gpt-5.4-mini (Microsoft Learn, October 2026).
+var foundryRegions = ['francecentral', 'germanywestcentral', 'italynorth', 'norwayeast', 'polandcentral', 'spaincentral', 'swedencentral', 'switzerlandnorth', 'westeurope']
 
 // Aspire provisions the apps into rg-<environmentName> with the same tags.
 resource resourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' = {
@@ -123,6 +153,21 @@ module monitoring 'estate/monitoring.bicep' = {
     alertEmail: alertEmail
     noAlertReceiver: asFound.noAlertReceiver
     appInsightsRetentionShort: asFound.?appInsightsRetentionShort ?? false
+  }
+}
+
+module foundry 'estate/foundry.bicep' = {
+  scope: resourceGroup
+  params: {
+    location: !empty(foundryLocation) ? foundryLocation : contains(foundryRegions, location) ? location : 'swedencentral'
+    tags: tags
+    applicationInsightsName: monitoring.outputs.applicationInsightsName
+    modelName: foundryModelName
+    modelVersion: foundryModelVersion
+    modelDeployed: foundryModelDeployed
+    modelCapacity: foundryModelCapacity
+    agentsEnabled: agentsEnabled
+    foundryUserPrincipalIds: concat(empty(presenterPrincipalId) ? [] : [presenterPrincipalId], foundryUserPrincipalIds)
   }
 }
 

@@ -24,6 +24,7 @@ The estate can also run *as found*, reproducing the problems a health check woul
 | [docs/processes/erp/](docs/processes/erp/README.md) | The ERP process catalogue: E1 Invoicing, E2 Carrier invoice matching, each with a design doc and a BPMN diagram |
 | [docs/operations/integration-console.md](docs/operations/integration-console.md) | How the Integration operator finds Message trails and resolves failed messages |
 | [docs/operations/simulator.md](docs/operations/simulator.md) | How the Simulator feeds the estate with representative orders at a chosen volume, through the estate's real doors |
+| [docs/operations/foundry.md](docs/operations/foundry.md) | The Foundry account, project and `DataZoneStandard` model the Agents run on, its settings, the spike results (model and region, trace content) and the smoke run |
 | [docs/operations/as-found.md](docs/operations/as-found.md) | The as-found toggles and presets: how to break the estate's alerts, storage, secrets and retention and fix them again with `infra/as-found.sh`, and the [scenarios](docs/operations/as-found.md#scenarios) that re-enact the headline incident |
 | [docs/branding.md](docs/branding.md) | The Norvia icon every web UI shows in its tab, where its source is and how to export the other formats |
 | [docs/coding-guidelines.md](docs/coding-guidelines.md) | How code is written here, including the tracking contract every flow must follow |

@@ -42,6 +42,14 @@ param simulatorEnabled = toLower(readEnvironmentVariable('ESTATE_SIMULATOR_ENABL
 param simulatorMaxOrdersPerRun = int(readEnvironmentVariable('ESTATE_SIMULATOR_MAX_ORDERS_PER_RUN_SETTING', '200'))
 param simulatorMaxConcurrentRequests = int(readEnvironmentVariable('ESTATE_SIMULATOR_MAX_CONCURRENT_REQUESTS_SETTING', '4'))
 
+// The Agents are off unless the environment says so. The Foundry account and model exist either way (docs/operations/foundry.md).
+param agentsEnabled = toLower(readEnvironmentVariable('ESTATE_AGENTS_ENABLED_SETTING', 'false')) == 'true'
+param foundryLocation = readEnvironmentVariable('ESTATE_FOUNDRY_LOCATION', '')
+param foundryModelDeployed = toLower(readEnvironmentVariable('ESTATE_FOUNDRY_MODEL_DEPLOYED', 'true')) == 'true'
+param foundryModelCapacity = int(readEnvironmentVariable('ESTATE_FOUNDRY_MODEL_CAPACITY', '30'))
+// Object IDs, comma separated, such as the pipeline that deploys the Agents.
+param foundryUserPrincipalIds = filter(split(readEnvironmentVariable('ESTATE_FOUNDRY_USER_PRINCIPAL_IDS', ''), ','), id => !empty(id))
+
 // Where the alerts go. Empty builds the action group with no receiver.
 param alertEmail = readEnvironmentVariable('ESTATE_ALERT_EMAIL', '')
 
