@@ -24,7 +24,6 @@ public sealed class FaultsFixture : TmsFixture
     public const string TestDriver = "DRV-0001";
     public const string SecondTestDriver = "DRV-0002";
 
-    private static readonly string[] Weekend = ["Saturday", "Sunday"];
     private static readonly TimeSpan RetryInterval = TimeSpan.FromSeconds(1);
     private readonly string _seedPath = Path.Combine(Path.GetTempPath(), $"tms.faults-seed.{Guid.NewGuid():N}.json");
     private ServiceBusClient? _edgeBus;
@@ -132,17 +131,7 @@ public sealed class FaultsFixture : TmsFixture
     /// <summary>The test seed, with a shift at the weekend for the two Drivers the tests use, so a Trip can be planned for any day the tests run on.</summary>
     protected override Dictionary<string, string> TmsApiSettings()
     {
-        var seed = JsonNode.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Seed", "tms.test-seed.json")))!.AsObject();
-        foreach (var driver in seed["drivers"]!.AsArray().Where(candidate => candidate!["id"]!.GetValue<string>() is TestDriver or SecondTestDriver))
-        {
-            var roster = driver!["roster"]!.AsObject();
-            foreach (var weekend in Weekend.Where(day => !roster.ContainsKey(day)))
-            {
-                roster[weekend] = new JsonObject { ["start"] = "08:00", ["end"] = "12:00" };
-            }
-        }
-
-        File.WriteAllText(_seedPath, seed.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+        TestSeed.WriteWithWeekendShifts(_seedPath, TestDriver, SecondTestDriver);
 
         var settings = base.TmsApiSettings();
         settings["Seed__Path"] = _seedPath;
