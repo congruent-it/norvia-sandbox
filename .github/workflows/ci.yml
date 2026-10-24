@@ -134,6 +134,9 @@ jobs:
           - application: TMS (other components)
             directory: Tms
             kinds: IntegrationTests.Remaining
+          - application: TMS (UI, Faults)
+            directory: Tms
+            kinds: UiTests.Faults
           - application: TMS (UI, Shipments)
             directory: Tms
             kinds: UiTests.Shipments

@@ -2,18 +2,15 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Nodes;
 using Azure.Messaging.ServiceBus;
+using Norvia.Tms.TestSupport.Trips;
 
 namespace Norvia.Tms.Api.IntegrationTests.Faults;
-
-/// <summary>A Trip dispatched to a Driver for today: the Driver app has it, and the TMS expects the Driver's reports.</summary>
-internal sealed record DispatchedTrip(string TripNumber, string ShipmentNumber, string DriverId);
 
 /// <summary>What the fault tests set up and do: a Carrier's tracking message on its queue, and a Driver at work on a Trip dispatched for today.</summary>
 internal sealed class Journeys(FaultsFixture fixture)
 {
     // A valid 1x1 PNG.
     private const string Png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
-    private static readonly TimeSpan TooCloseToMidnight = new(23, 30, 0);
     private static readonly TimeZoneInfo Amsterdam = TimeZoneInfo.FindSystemTimeZoneById("Europe/Amsterdam");
 
     /// <summary>Puts a Carrier's Collected message on the tracking queue as API Management does: the Carrier from the token as <c>partyId</c>, and a correlation ID.</summary>
@@ -43,23 +40,12 @@ internal sealed class Journeys(FaultsFixture fixture)
     /// </summary>
     public async Task<DispatchedTrip> DispatchedTripAsync(string driverId, string vehicleId, CancellationToken cancellationToken)
     {
-        var now = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, Amsterdam);
-        Assert.SkipWhen(now.TimeOfDay > TooCloseToMidnight, "A Trip is planned for today, and today is about to end.");
-        var today = DateOnly.FromDateTime(now.DateTime);
-        await fixture.HorizonStartingAtAsync(today, cancellationToken);
-        var shipment = await ReleasedAsync(cancellationToken);
-
-        using var created = await PostAsync(
-            fixture.TmsUi, "/v1/trips",
-            JsonContent.Create(new { day = $"{today:yyyy-MM-dd}", vehicleId, driverId, plannedStart = "08:30", plannedDrivingDuration = "02:00:00", shipmentNumbers = new[] { shipment } }),
-            cancellationToken, idempotencyKey: Guid.NewGuid().ToString());
-        var trip = (await ReadAsync(created, HttpStatusCode.Created, cancellationToken))["number"]!.GetValue<string>();
-        using var dispatched = await PostAsync(fixture.TmsUi, $"/v1/trips/{trip}/dispatch", content: null, cancellationToken);
-        await ReadAsync(dispatched, HttpStatusCode.OK, cancellationToken);
+        Assert.SkipWhen(TripCalls.TodayIsAboutToEnd(), "A Trip is planned for today, and today is about to end.");
+        var dispatched = await fixture.DispatchTripForTodayAsync(driverId, vehicleId, cancellationToken);
 
         using var driver = fixture.Driver(driverId);
-        await Eventually.Async(async () => (await TripsOfAsync(driver, cancellationToken)).FirstOrDefault(item => item!["tripNumber"]!.GetValue<string>() == trip), cancellationToken);
-        return new DispatchedTrip(trip, shipment, driverId);
+        await Eventually.Async(async () => (await TripsOfAsync(driver, cancellationToken)).FirstOrDefault(item => item!["tripNumber"]!.GetValue<string>() == dispatched.TripNumber), cancellationToken);
+        return dispatched;
     }
 
     /// <summary>The Driver presses Start Trip, and waits for the TMS to record it. Returns once the Driver app says so.</summary>
@@ -108,20 +94,6 @@ internal sealed class Journeys(FaultsFixture fixture)
     public async Task<string> ShipmentStatusAsync(string shipmentNumber, CancellationToken cancellationToken) =>
         (await fixture.GetShipmentAsync(shipmentNumber, cancellationToken))["status"]!.GetValue<string>();
 
-    // A Released Own fleet Shipment that collects from a few minutes from now, 2 pallets of 500 kg: the TMS rejects a collection window that starts in the past, and the Driver app lets a Driver
-    // start a Trip on its day only, so the Trip is for today and its Shipment collects later today.
-    private async Task<string> ReleasedAsync(CancellationToken cancellationToken)
-    {
-        var from = DateTimeOffset.UtcNow.AddMinutes(5);
-        var booking = Bookings.Valid(TmsCalls.NewReference()).CollectedFrom(from);
-        booking["goodsLines"] = new JsonArray { new JsonObject { ["packageType"] = "pallet", ["quantity"] = 2, ["weightKg"] = 500m, ["dimensionsCm"] = null } };
-        var number = await fixture.SubmitAcceptedAsync(booking, TmsCalls.NewCorrelationId(), cancellationToken);
-        await fixture.WaitForRatingResultAsync(number, "Rated", cancellationToken);
-        var shipment = (await fixture.AssignPlannedAsync(number, PlanningCalls.ToOwnFleet(), cancellationToken))["shipmentNumber"]!.GetValue<string>();
-        await fixture.ReleasedAsync(shipment, cancellationToken);
-        return shipment;
-    }
-
     private async Task<string> ActAsync(DispatchedTrip trip, string action, HttpContent? content, CancellationToken cancellationToken)
     {
         using var driver = fixture.Driver(trip.DriverId);
@@ -131,17 +103,6 @@ internal sealed class Journeys(FaultsFixture fixture)
 
     private static async Task<JsonArray> TripsOfAsync(HttpClient driver, CancellationToken cancellationToken) =>
         (await driver.GetFromJsonAsync<JsonArray>("/v1/driver/trips", cancellationToken))!;
-
-    private static async Task<HttpResponseMessage> PostAsync(HttpClient caller, string path, HttpContent? content, CancellationToken cancellationToken, string? idempotencyKey = null)
-    {
-        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(path, UriKind.Relative)) { Content = content };
-        if (idempotencyKey is not null)
-        {
-            request.Headers.Add("Idempotency-Key", idempotencyKey);
-        }
-
-        return await caller.SendAsync(request, cancellationToken);
-    }
 
     private static async Task<JsonNode> ReadAsync(HttpResponseMessage response, HttpStatusCode expected, CancellationToken cancellationToken)
     {
