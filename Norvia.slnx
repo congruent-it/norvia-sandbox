@@ -103,6 +103,7 @@
   </Folder>
   <Folder Name="/tests/IntegrationConsole/">
     <Project Path="tests/IntegrationConsole/Norvia.IntegrationConsole.Application.UnitTests/Norvia.IntegrationConsole.Application.UnitTests.csproj" />
+    <Project Path="tests/IntegrationConsole/Norvia.IntegrationConsole.Agents.IntegrationTests/Norvia.IntegrationConsole.Agents.IntegrationTests.csproj" />
     <Project Path="tests/IntegrationConsole/Norvia.IntegrationConsole.ArchitectureTests/Norvia.IntegrationConsole.ArchitectureTests.csproj" />
     <Project Path="tests/IntegrationConsole/Norvia.IntegrationConsole.Infrastructure.IntegrationTests/Norvia.IntegrationConsole.Infrastructure.IntegrationTests.csproj" />
     <Project Path="tests/IntegrationConsole/Norvia.IntegrationConsole.Infrastructure.UnitTests/Norvia.IntegrationConsole.Infrastructure.UnitTests.csproj" />
