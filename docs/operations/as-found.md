@@ -75,7 +75,7 @@ The business-side safety nets (P5, P6, P7) already exist as TMS settings; these 
 
 ## Faults
 
-A **fault** is a runtime failure the presenter makes happen in one application, so a demo can show how the estate finds it ([GLOSSARY.md](../../GLOSSARY.md)). A toggle removes something that exists and stays until it is switched back; a fault breaks something for a few minutes and then stops. The first fault is the Driver app's `driver-app-unavailable`, which refuses every Trip version with a 503 ([P11](../processes/tms/p11-trip-dispatch.md)).
+A **fault** is a runtime failure the presenter makes happen in one application, so a demo can show how the estate finds it ([GLOSSARY.md](../../GLOSSARY.md)). A toggle removes something that exists and stays until it is switched back; a fault breaks something for a few minutes and then stops. The Driver app's `driver-app-unavailable` refuses every Trip version with a 503 ([P11](../processes/tms/p11-trip-dispatch.md)), and the Partner portal owns six that make a Carrier or Shipper misbehave ([below](#faults-of-the-partner-portal)).
 
 ### The contract
 
@@ -96,15 +96,33 @@ An app role on each application that owns a fault (today the Driver app API's re
 
 ### The presenter panel
 
-`/presenter` in the Partner portal lists every fault of every application that owns one (`Faults:Owners` in the portal's configuration, set by the AppHost; today one), with its owner, whether it is on and how long it has left, counting down. **Switch on** takes a duration (1, 2 or 5 minutes) and **Switch off** puts the fault back at once. The panel reads the faults again every ten seconds, so a fault that ran out, or was changed elsewhere, shows its true state.
+`/presenter` in the Partner portal lists every fault of every application that owns one (`Faults:Owners` in the portal's configuration, set by the AppHost, plus the portal's own), with its owner, whether it is on and how long it has left, counting down. **Switch on** takes a duration (1, 2 or 5 minutes) and **Switch off** puts the fault back at once. The panel reads the faults again every ten seconds, so a fault that ran out, or was changed elsewhere, shows its true state.
 
 ### Cause and effect in the Integration console
 
 A hop a fault made fail carries the fault's name: the Driver app's refusal of a Trip version is `Failed` with `DriverAppUnavailable` and `fault=driver-app-unavailable`, and the console's trail page shows it in the hop's **Fault** column, so the demo shows the cause beside the effect. It is a **tracked property**, a `fault` key of the [tracking contract](../coding-guidelines.md#tracking-contract), not a log line of its own: a log line would be a hop of its own and could not say which hop it belonged to, and a tracked key is found the way every other key is. Only the application the fault breaks sets it, on the hop it caused. The portal's switch logs itself with the same key (flow `fault-switch`), on a trail of its own.
 
+### Faults of the Partner portal
+
+The portal plays the outside parties, so their faults need no other system: each makes a Persona do what a real Carrier or Shipper can. All six are owned by `partner-portal`, declared with `AddFaults` (off by default, 2 minutes unless told otherwise, 5 at most) and listed in the presenter panel beside the Driver app's. The portal switches its own in process: the panel is the presenter's gate already, and a fault endpoint on the portal would need a token gate of its own. A restart switches them off.
+
+| Fault | Process | What the Persona does | What the estate does | Where it shows |
+|---|---|---|---|---|
+| `carrier-tracking-unmapped-code` | P5 | A Carrier sends a Delivered event with the status code `DLV` instead of `POD` | APIM answers `202 Accepted` and queues it; the Carrier-tracking Logic App's map fails the run and dead-letters the message as `UnmappableTrackingMessage`; the Shipment stays In transit | The portal's `Send Tracking event` hop is `Succeeded` with `fault`; the Logic App's run fails |
+| `carrier-answer-unmapped-reason` | P4 | A Carrier declines with the reason code `CAPACITY_EXCEEDED`, outside the list | The Carrier-answer Logic App's map fails the run (`CarrierAnswerUnreadable`, 400); the Carrier hears the answer is unreadable and the booking stays Requested | The portal's answer hop is `Refused` with `CarrierAnswerUnreadable` and `fault` |
+| `carrier-booking-endpoint-down` | P4 | Every Carrier's booking endpoint answers 503 and keeps nothing | The booking Logic App's `Send_to_the_Carrier` fails (`CarrierUnavailable`) and reports the booking **Not delivered** | The endpoint's hop is `Failed` with `CarrierEndpointUnavailable` and `fault` |
+| `carrier-proof-heic-photo` | P6 | A Carrier attaches `photo-of-delivery.heic` to its Proof of delivery (in the place of the fifth file when it has five) | APIM answers `202`; the TMS refuses the file by its content with `FileNotAccepted`; the message is dead-lettered and the blob kept | The portal's `Send Proof of delivery` hop is `Succeeded` with `fault` |
+| `shipper-notification-endpoint-down` | P7 | Every Shipper's notification endpoint answers 503 and keeps nothing | `Send_to_the_Shipper` fails (`ShipperUnavailable`); the notification is **Not delivered** and `ShipperNotificationNotDelivered` is published | The endpoint's hop is `Failed` with `ShipperEndpointUnavailable` and `fault` |
+| `carrier-cancellation-endpoint-down` | P7 | Every Carrier's cancellation endpoint answers 503 and keeps nothing | `Send_to_the_Carrier` fails (`CarrierUnavailable`); the Carrier booking is flagged **Carrier not told** and `CarrierCancellationNotDelivered` is published | The endpoint's hop is `Failed` with `CarrierEndpointUnavailable` and `fault` |
+
+- **The message is what is faulty, not the Logic App.** The first four change what the Persona sends, at the wire (`CarrierTrackingFormat`, `CarrierAnswerFormat`, `CarrierProofOfDeliveryFormat`), so the portal still believes it succeeded and records what it sent. Only a Delivered event and a rejection are changed; a confirmation and any other event go as they are.
+- **The portal's hop carries the fault, the Logic App's does not.** Only the application a fault breaks sets `fault`, on the hop it caused: for the first four that is the Persona's send, which `Succeeded` or was `Refused`. The failed run beside it is the effect, found by the same correlation ID on the Message trail.
+- **Locally the same fault plays the same way.** The Persona is the same code, so the local stand-in and the workers (the tracking, Proof of delivery, booking, Shipper notification and Carrier cancellation workers) meet the same `DLV`, `.heic` file, reason code or 503 and settle it the same way: the tracking worker dead-letters `UnmappableTrackingMessage`, and the TMS refuses the file.
+- **The two alert toggles complete the story.** With `flowsWithoutFailedRunAlert` and `entitiesWithoutDeadLetterAlert` listing `carrier-tracking`, `carrier-tracking-unmapped-code` re-enacts the headline incident: the Carrier posts "delivered", is told `202`, and nobody is told.
+
 ### Adding a fault
 
-Declare it (`AddFaults` with a `FaultDefinition`), check `IFaults.IsOn` where the application should fail, put the name on the hop it breaks as `fault`, and expose the owner to the panel (`Faults__Owners__<owner>__Address` and `__Audience` on the portal, `Demo.Fault` on the owner's registration and for the portal's identity). `FaultEndpointGuardTests` fails when an endpoint is mapped by hand on a route that mentions a fault.
+Declare it (`AddFaults` with a `FaultDefinition`), check `IFaults.IsOn` where the application should fail, put the name on the hop it breaks as `fault`, and expose the owner to the panel (`Faults__Owners__<owner>__Address` and `__Audience` on the portal, `Demo.Fault` on the owner's registration and for the portal's identity). A fault of the portal itself needs none of that: add it to `PartnerPortalFaultDefinitions` and `IPartnerPortalFaults`. `FaultEndpointGuardTests` fails when an endpoint is mapped by hand on a route that mentions a fault.
 
 ## Presets
 
@@ -147,7 +165,7 @@ It stores the toggles in the azd environment (`ESTATE_ASFOUND`), deploys the est
 
 ## Testing
 
-The fault contract has unit tests of its own ([Norvia.ServiceDefaults.UnitTests](../../tests/ServiceDefaults/Norvia.ServiceDefaults.UnitTests)): the expiry (a fault is off after its time, switching on again starts over), the default off, the duration limits, the role guard (401 without a token, 403 without `Demo.Fault`, on every route `MapFaults` maps) and the guard test that reads the applications' source and fails when a fault endpoint is mapped without `MapFaults`. The Driver app's fault, the portal's client and the panel are covered by the Driver app's and the Partner portal's unit tests. The API's cases are in #414 and the panel's journeys in #415.
+The fault contract has unit tests of its own ([Norvia.ServiceDefaults.UnitTests](../../tests/ServiceDefaults/Norvia.ServiceDefaults.UnitTests)): the expiry (a fault is off after its time, switching on again starts over), the default off, the duration limits, the role guard (401 without a token, 403 without `Demo.Fault`, on every route `MapFaults` maps) and the guard test that reads the applications' source and fails when a fault endpoint is mapped without `MapFaults`. The Driver app's fault, the portal's client and the panel are covered by the Driver app's and the Partner portal's unit tests, which include each Persona's behaviour under its fault (the formats the client sends, the endpoints' 503 and their `fault` key, and the portal's own switches). The API's cases are in #414 and the panel's journeys in #415.
 
 The business safety-net toggles have template and policy tests of their own ([AsFoundBusinessSafetyNetTests](../../tests/Tms/Norvia.Tms.ArchitectureTests/AsFoundBusinessSafetyNetTests.cs)): per policy toggle, `bicep snapshot` gives the four Shipper tracking policies and the toggle changes only its fragment (the rate limit removed, or the cache added to the three reads and never the file), the staged Driver reports workflow loses only its calls to the Driver app, and the presets set them as described. The TMS settings flow is covered by a unit test of the settings binding ([BusinessSafetyNetSettingsTests](../../tests/Tms/Norvia.Tms.Infrastructure.UnitTests/Settings/BusinessSafetyNetSettingsTests.cs)) and by the AppHost model tests, which check that each toggle sets exactly its own environment variable.
 

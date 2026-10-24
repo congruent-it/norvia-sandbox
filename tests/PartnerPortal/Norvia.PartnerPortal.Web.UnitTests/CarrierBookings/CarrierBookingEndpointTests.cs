@@ -2,9 +2,12 @@ using Ardalis.Result;
 using Mediator;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Options;
 using Norvia.PartnerPortal.Application.CarrierBookings.Receive;
+using Norvia.PartnerPortal.Application.Faults;
 using Norvia.PartnerPortal.Web.CarrierBookings;
 
 namespace Norvia.PartnerPortal.Web.UnitTests.CarrierBookings;
@@ -14,6 +17,7 @@ public sealed class CarrierBookingEndpointTests
     private static readonly System.Text.Json.JsonSerializerOptions WebJson = new(System.Text.Json.JsonSerializerDefaults.Web);
 
     private readonly IMediator _mediator = Substitute.For<IMediator>();
+    private readonly IPartnerPortalFaults _faults = Substitute.For<IPartnerPortalFaults>();
     private readonly IOptions<CarrierEndpointOptions> _options =
         Options.Create(new CarrierEndpointOptions { ApiKeys = { ["CAR-0001"] = "carrier-secret" } });
 
@@ -27,7 +31,7 @@ public sealed class CarrierBookingEndpointTests
     private Task<Results<Ok<ReceiveCarrierBookingResult>, ProblemHttpResult, UnauthorizedHttpResult>> Receive(
         string carrierId = "CAR-0001", string? apiKey = "carrier-secret", string? correlationId = "release-1", CarrierBookingRequestBody? body = null) =>
         CarrierBookingEndpoint.ReceiveAsync(
-            carrierId, apiKey, correlationId, body ?? Body(), new PassThroughRetrier(_mediator), _options, NullLoggerFactory.Instance, CancellationToken.None);
+            carrierId, apiKey, correlationId, body ?? Body(), new PassThroughRetrier(_mediator), _options, _faults, NullLoggerFactory.Instance, CancellationToken.None);
 
     [Fact]
     public async Task Receive_ARequestWithTheCredential_IsPutInTheInboxAndAnswered()
@@ -193,5 +197,46 @@ public sealed class CarrierBookingEndpointTests
         var result = await Receive();
 
         result.Result.Should().BeOfType<ProblemHttpResult>().Which.StatusCode.Should().Be(StatusCodes.Status404NotFound);
+    }
+
+    [Fact]
+    public async Task Receive_TheEndpointDownFaultOn_Answers503_AndKeepsNothing()
+    {
+        _faults.BookingEndpointDown.Returns(true);
+
+        var result = await Receive();
+
+        result.Result.Should().BeOfType<ProblemHttpResult>().Which.StatusCode.Should().Be(StatusCodes.Status503ServiceUnavailable);
+        _mediator.ReceivedCalls().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Receive_TheEndpointDownFaultOn_Answers503_EvenToAWrongCredential()
+    {
+        _faults.BookingEndpointDown.Returns(true);
+
+        var result = await Receive(apiKey: "wrong");
+
+        result.Result.Should().BeOfType<ProblemHttpResult>().Which.StatusCode.Should().Be(StatusCodes.Status503ServiceUnavailable);
+    }
+
+    [Fact]
+    public async Task Receive_TheEndpointDownFaultOn_RecordsTheHopFailed_WithTheFaultThatCausedIt()
+    {
+        var loggers = new FakeLoggerProvider();
+        using var factory = new LoggerFactory([loggers]);
+        _faults.BookingEndpointDown.Returns(true);
+
+        await CarrierBookingEndpoint.ReceiveAsync(
+            "CAR-0001", "carrier-secret", "release-1", Body(), new PassThroughRetrier(_mediator), _options, _faults, factory, CancellationToken.None);
+
+        var scope = loggers.Collector.LatestRecord.Scopes.OfType<IEnumerable<KeyValuePair<string, object?>>>().SelectMany(keys => keys).ToDictionary();
+        scope.Should().Contain(new Dictionary<string, object?>
+        {
+            ["flow"] = "carrier-booking",
+            ["outcome"] = "Failed",
+            ["failureCode"] = "CarrierEndpointUnavailable",
+            ["fault"] = "carrier-booking-endpoint-down",
+        });
     }
 }

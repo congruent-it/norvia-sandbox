@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Options;
 using Norvia.PartnerPortal.Application.CarrierInvoices.Submit;
+using Norvia.PartnerPortal.Application.Faults;
 using Norvia.PartnerPortal.Domain.CarrierInvoices;
 using Norvia.PartnerPortal.Infrastructure.PartnerApi;
 
@@ -21,6 +22,7 @@ public sealed class NorviaPartnerApiCarrierInvoiceTests : IDisposable
     private readonly StubHandler _partnerApi = new();
     private readonly IPersonaTokens _tokens = Substitute.For<IPersonaTokens>();
     private readonly FakeLogger<NorviaPartnerApiClient> _logger = new();
+    private readonly IPartnerPortalFaults _faults = Substitute.For<IPartnerPortalFaults>();
     private readonly PortalActivities _activities = new("Norvia.PartnerPortal.Web.CarrierInvoiceTests");
     private readonly List<Activity> _spans = [];
     private readonly ActivityListener _listener;
@@ -37,7 +39,7 @@ public sealed class NorviaPartnerApiCarrierInvoiceTests : IDisposable
             PersonaClientIds = "van-dijk-transport=client-2",
             SubscriptionKeys = new() { ["van-dijk-transport"] = "van-dijk-key" },
         });
-        _client = new NorviaPartnerApiClient(_http, _tokens, options, _activities, _logger);
+        _client = new NorviaPartnerApiClient(_http, _tokens, options, _activities, _faults, _logger);
         _listener = new ActivityListener
         {
             ShouldListenTo = source => source == _activities.Source,

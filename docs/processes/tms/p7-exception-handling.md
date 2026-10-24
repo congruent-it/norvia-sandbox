@@ -396,7 +396,7 @@ These were left out on purpose while designing P7, each with its reason.
 - **Claims.** Damage and shortages are settled outside the TMS and resolved as `ClaimHandledOutsideTms`. They don't affect invoicing: an open Exception holds billing back until it is resolved, and Finance issues a Credit note by hand if a claim is settled against the invoice ([P9](p9-freight-settlement.md#billable-is-final)).
 - **Stale opening an Exception.** Stale means the Shipment has gone quiet, which is about the integration's health, not news for the Shipper.
 - **As-found toggles and presenter-panel faults.** They are added after the fixed state is built, as for P1 to P6. The candidates:
-  - Presenter-panel fault: the Shipper notification endpoint is down, so notifications end Not delivered.
+  - Presenter-panel fault: the Shipper notification endpoint is down, so notifications end Not delivered. Built: `shipper-notification-endpoint-down` ([as-found](../../operations/as-found.md#faults-of-the-partner-portal)).
   - Toggle: no alert on failed Shipper notification or Carrier cancellation Logic App runs.
   - Toggle: the Late delivery check switched off. Built: `lateDeliveryCheckOff` ([as-found](../../operations/as-found.md#business-safety-nets-and-api-management)). Together with the unset Stale thresholds from P5, only a Consignee's phone call reveals the problem, as in the headline incident.
-  - Presenter-panel fault: a Carrier's cancellation endpoint is down, so the Carrier booking is flagged Carrier not told.
+  - Presenter-panel fault: a Carrier's cancellation endpoint is down, so the Carrier booking is flagged Carrier not told. Built: `carrier-cancellation-endpoint-down` ([as-found](../../operations/as-found.md#faults-of-the-partner-portal)).

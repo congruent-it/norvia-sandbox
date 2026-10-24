@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Options;
 using Norvia.PartnerPortal.Application.Bookings;
+using Norvia.PartnerPortal.Application.Faults;
 using Norvia.PartnerPortal.Domain.Bookings;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
 using Norvia.PartnerPortal.Domain.Personas;
@@ -16,6 +17,7 @@ public sealed class NorviaPartnerApiClientTests : IDisposable
     private readonly StubHandler _partnerApi = new();
     private readonly IPersonaTokens _tokens = Substitute.For<IPersonaTokens>();
     private readonly FakeLogger<NorviaPartnerApiClient> _logger = new();
+    private readonly IPartnerPortalFaults _faults = Substitute.For<IPartnerPortalFaults>();
     private readonly PortalActivities _activities = new("Norvia.PartnerPortal.Web.Tests");
     private readonly List<Activity> _spans = [];
     private readonly ActivityListener _listener;
@@ -32,7 +34,7 @@ public sealed class NorviaPartnerApiClientTests : IDisposable
             PersonaClientIds = "brouwer-dranken=client-1;van-dijk-transport=client-2",
             SubscriptionKeys = new() { ["brouwer-dranken"] = "brouwer-key", ["van-dijk-transport"] = "van-dijk-key" },
         });
-        _client = new NorviaPartnerApiClient(_http, _tokens, options, _activities, _logger);
+        _client = new NorviaPartnerApiClient(_http, _tokens, options, _activities, _faults, _logger);
         _listener = new ActivityListener
         {
             ShouldListenTo = source => source == _activities.Source,
@@ -750,4 +752,126 @@ public sealed class NorviaPartnerApiClientTests : IDisposable
 
     private Task<NorviaAnswer> SubmitAsync(BookingRequest booking) =>
         _client.SubmitAsync(Samples.BrouwerDranken, booking, TestContext.Current.CancellationToken);
+
+    [Fact]
+    public async Task SubmitTrackingAsync_TheUnmappedCodeFaultOn_SendsDeliveredAsDLV_AndTheCarrierIsStillAccepted()
+    {
+        _faults.TrackingUnmappedCode.Returns(true);
+        _partnerApi.Answer(HttpStatusCode.Accepted, """{ "messageId": "corr-7" }""");
+
+        var reply = await SubmitTrackingAsync();
+
+        JsonNode.Parse(_partnerApi.RequestBody!)!["statusCode"]!.GetValue<string>().Should().Be("DLV");
+        reply.Should().Be(TrackingReply.Accepted("corr-7"));
+    }
+
+    [Fact]
+    public async Task SubmitTrackingAsync_TheUnmappedCodeFaultOn_RecordsTheFaultOnTheHopItCaused_ThatSucceeded()
+    {
+        _faults.TrackingUnmappedCode.Returns(true);
+        _partnerApi.Answer(HttpStatusCode.Accepted, """{ "messageId": "corr-7" }""");
+
+        await SubmitTrackingAsync();
+
+        ScopeOf(_logger.LatestRecord).Should().Contain(new Dictionary<string, object?>
+        {
+            ["outcome"] = "Succeeded",
+            ["fault"] = "carrier-tracking-unmapped-code",
+        });
+    }
+
+    [Fact]
+    public async Task SubmitTrackingAsync_TheUnmappedCodeFaultOn_LeavesAnyOtherEventAlone()
+    {
+        _faults.TrackingUnmappedCode.Returns(true);
+        _partnerApi.Answer(HttpStatusCode.Accepted, """{ "messageId": "corr-7" }""");
+
+        await _client.SubmitTrackingAsync(Samples.VanDijkTransport, "SH-0000007", Delivered with { Type = TrackingEventType.Departed }, CancellationToken.None);
+
+        JsonNode.Parse(_partnerApi.RequestBody!)!["statusCode"]!.GetValue<string>().Should().Be("DEP");
+        ScopeOf(_logger.LatestRecord).Should().NotContainKey("fault");
+    }
+
+    [Fact]
+    public async Task SubmitTrackingAsync_NoFault_RecordsNoFault()
+    {
+        _partnerApi.Answer(HttpStatusCode.Accepted, """{ "messageId": "corr-7" }""");
+
+        await SubmitTrackingAsync();
+
+        ScopeOf(_logger.LatestRecord).Should().NotContainKey("fault");
+    }
+
+    [Fact]
+    public async Task AnswerAsync_TheUnmappedReasonFaultOn_DeclinesWithAReasonCodeTheMapCantRead()
+    {
+        _faults.AnswerUnmappedReason.Returns(true);
+        _partnerApi.Answer(HttpStatusCode.BadRequest, """{ "messageId": "corr-5", "result": "INVALID", "text": "The declineReason must be one of the codes." }""");
+
+        var reply = await AnswerAsync(new CarrierAnswer.Rejection(CarrierRejectionReason.NoCapacity, null));
+
+        JsonNode.Parse(_partnerApi.RequestBody!)!["declineReason"]!.GetValue<string>().Should().Be("CAPACITY_EXCEEDED");
+        reply.Result.Should().Be(CarrierAnswerResult.Invalid);
+        ScopeOf(_logger.LatestRecord).Should().Contain(new Dictionary<string, object?>
+        {
+            ["outcome"] = "Refused",
+            ["failureCode"] = "CarrierAnswerUnreadable",
+            ["fault"] = "carrier-answer-unmapped-reason",
+        });
+    }
+
+    [Fact]
+    public async Task AnswerAsync_TheUnmappedReasonFaultOn_LeavesAConfirmationAlone()
+    {
+        _faults.AnswerUnmappedReason.Returns(true);
+        _partnerApi.Answer(HttpStatusCode.OK, Contracts.Read("PartnerApi/samples/carrier-answer-responses/recorded.json"));
+
+        await AnswerAsync(Confirmation);
+
+        Contracts.CarrierAnswerSchemaErrors(JsonNode.Parse(_partnerApi.RequestBody!)).Should().BeEmpty();
+        ScopeOf(_logger.LatestRecord).Should().NotContainKey("fault");
+    }
+
+    [Fact]
+    public async Task SubmitProofOfDeliveryAsync_TheHeicFaultOn_AddsAHeicPhoto_TheTmsRefuses()
+    {
+        _faults.ProofHeicPhoto.Returns(true);
+        _partnerApi.Answer(HttpStatusCode.Accepted, """{ "messageId": "corr-7" }""");
+
+        var reply = await SubmitProofOfDeliveryAsync();
+
+        var files = JsonNode.Parse(_partnerApi.RequestBody!)!["files"]!.AsArray();
+        files.Select(file => file!["name"]!.GetValue<string>()).Should().Equal("cmr.pdf", "photo-of-delivery.heic");
+        files[1]!["contentType"]!.GetValue<string>().Should().Be("image/heic");
+        reply.Should().Be(TrackingReply.Accepted("corr-7"));
+        ScopeOf(_logger.LatestRecord).Should().Contain(new Dictionary<string, object?>
+        {
+            ["outcome"] = "Succeeded",
+            ["fault"] = "carrier-proof-heic-photo",
+        });
+    }
+
+    [Fact]
+    public async Task SubmitProofOfDeliveryAsync_TheHeicFaultOnAndTheMostFiles_ReplacesTheLastSoTheTmsStillTakesTheCount()
+    {
+        _faults.ProofHeicPhoto.Returns(true);
+        _partnerApi.Answer(HttpStatusCode.Accepted, """{ "messageId": "corr-7" }""");
+        var full = Proof with { Files = [.. Enumerable.Range(1, 5).Select(i => new CarrierProofOfDeliveryFile($"page-{i}.pdf", "application/pdf", "%PDF-1.4"u8.ToArray()))] };
+
+        await _client.SubmitProofOfDeliveryAsync(Samples.VanDijkTransport, "SH-0000007", full, CancellationToken.None);
+
+        var names = JsonNode.Parse(_partnerApi.RequestBody!)!["files"]!.AsArray().Select(file => file!["name"]!.GetValue<string>());
+        names.Should().Equal("page-1.pdf", "page-2.pdf", "page-3.pdf", "page-4.pdf", "photo-of-delivery.heic");
+    }
+
+    [Fact]
+    public async Task SubmitProofOfDeliveryAsync_NoFault_SendsOnlyItsFiles()
+    {
+        _partnerApi.Answer(HttpStatusCode.Accepted, """{ "messageId": "corr-7" }""");
+
+        await SubmitProofOfDeliveryAsync();
+
+        JsonNode.Parse(_partnerApi.RequestBody!)!["files"]!.AsArray().Should().ContainSingle();
+        ScopeOf(_logger.LatestRecord).Should().NotContainKey("fault");
+    }
 }

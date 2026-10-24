@@ -9,6 +9,7 @@ using Norvia.PartnerPortal.Application.CarrierInvoices;
 using Norvia.PartnerPortal.Application.CarrierInvoices.Submit;
 using Norvia.PartnerPortal.Application.CarrierShipments;
 using Norvia.PartnerPortal.Application.CarrierShipments.SendProofOfDelivery;
+using Norvia.PartnerPortal.Application.Faults;
 using Norvia.PartnerPortal.Application.ShipperTracking;
 using Norvia.PartnerPortal.Domain.Bookings;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
@@ -27,6 +28,7 @@ internal sealed partial class NorviaPartnerApiClient(
     IPersonaTokens tokens,
     IOptions<PartnerApiOptions> options,
     PortalActivities activities,
+    IPartnerPortalFaults faults,
     ILogger<NorviaPartnerApiClient> logger)
     : INorviaPartnerApi
 {
@@ -72,12 +74,14 @@ internal sealed partial class NorviaPartnerApiClient(
         ArgumentNullException.ThrowIfNull(persona);
 
         using var span = activities.Source.StartActivity("Send Carrier answer", ActivityKind.Internal);
+        // The fault only changes a rejection: a confirmation has no reason code.
+        var unmappedReason = faults.AnswerUnmappedReason && answer is CarrierAnswer.Rejection;
         NorviaReply reply;
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("carrier-answers", UriKind.Relative))
             {
-                Content = JsonContent.Create(CarrierAnswerFormat.ToJson(carrierBookingNumber, answer)),
+                Content = JsonContent.Create(CarrierAnswerFormat.ToJson(carrierBookingNumber, answer, unmappedReason)),
             };
             // Buffered, so it goes out with its length: the Carrier-answer Logic App's trigger gets no body from a chunked one.
             await request.Content.LoadIntoBufferAsync(cancellationToken);
@@ -95,7 +99,13 @@ internal sealed partial class NorviaPartnerApiClient(
             reply = NorviaReply.NotReceived(messageId: null);
         }
 
-        using (logger.BeginScope(TrackingKeysOf(persona, carrierBookingNumber, shipmentNumber, reply)))
+        var answerKeys = TrackingKeysOf(persona, carrierBookingNumber, shipmentNumber, reply);
+        if (unmappedReason)
+        {
+            answerKeys["fault"] = PartnerPortalFaultNames.AnswerUnmappedReason;
+        }
+
+        using (logger.BeginScope(answerKeys))
         {
             LogAnswerReplied(persona.Id.Value, carrierBookingNumber, reply.Result);
         }
@@ -110,12 +120,13 @@ internal sealed partial class NorviaPartnerApiClient(
         ArgumentNullException.ThrowIfNull(trackingEvent);
 
         using var span = activities.Source.StartActivity("Send Tracking event", ActivityKind.Internal);
+        var unmappedCode = faults.TrackingUnmappedCode && CarrierTrackingFormat.IsUnmappable(trackingEvent.Type);
         TrackingReply reply;
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("carrier-tracking", UriKind.Relative))
             {
-                Content = JsonContent.Create(CarrierTrackingFormat.ToJson(trackingEvent)),
+                Content = JsonContent.Create(CarrierTrackingFormat.ToJson(trackingEvent, unmappedCode)),
             };
             request.Headers.Add("Ocp-Apim-Subscription-Key", options.Value.SubscriptionKeyOf(persona.Id));
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await tokens.GetTokenAsync(persona.Id, cancellationToken));
@@ -132,6 +143,11 @@ internal sealed partial class NorviaPartnerApiClient(
         }
 
         var keys = TrackingEventTracking.KeysOf(persona, shipmentNumber, trackingEvent, reply.MessageId);
+        if (unmappedCode)
+        {
+            keys["fault"] = PartnerPortalFaultNames.TrackingUnmappedCode;
+        }
+
         foreach (var (key, value) in TrackingEventTracking.OutcomeOf(reply.Result))
         {
             keys[key] = value;
@@ -152,12 +168,13 @@ internal sealed partial class NorviaPartnerApiClient(
         ArgumentNullException.ThrowIfNull(proof);
 
         using var span = activities.Source.StartActivity("Send Proof of delivery", ActivityKind.Internal);
+        var heicPhoto = faults.ProofHeicPhoto;
         TrackingReply reply;
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("carrier-proofs-of-delivery", UriKind.Relative))
             {
-                Content = JsonContent.Create(CarrierProofOfDeliveryFormat.ToJson(proof)),
+                Content = JsonContent.Create(CarrierProofOfDeliveryFormat.ToJson(proof, heicPhoto)),
             };
             // Buffered, so it goes out with its length: the edge reads the body whole, and refuses one over its limit by that length.
             await request.Content.LoadIntoBufferAsync(cancellationToken);
@@ -176,6 +193,11 @@ internal sealed partial class NorviaPartnerApiClient(
         }
 
         var keys = ProofOfDeliveryTracking.KeysOf(persona, shipmentNumber, proof, reply.MessageId);
+        if (heicPhoto)
+        {
+            keys["fault"] = PartnerPortalFaultNames.ProofHeicPhoto;
+        }
+
         foreach (var (key, value) in ProofOfDeliveryTracking.OutcomeOf(reply.Result))
         {
             keys[key] = value;

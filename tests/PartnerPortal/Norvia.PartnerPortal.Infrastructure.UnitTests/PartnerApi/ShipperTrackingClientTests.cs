@@ -1,6 +1,7 @@
 using System.Net;
 using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Options;
+using Norvia.PartnerPortal.Application.Faults;
 using Norvia.PartnerPortal.Application.ShipperTracking;
 using Norvia.PartnerPortal.Infrastructure.PartnerApi;
 
@@ -11,6 +12,7 @@ public sealed class ShipperTrackingClientTests : IDisposable
     private readonly StubHandler _partnerApi = new();
     private readonly IPersonaTokens _tokens = Substitute.For<IPersonaTokens>();
     private readonly FakeLogger<NorviaPartnerApiClient> _logger = new();
+    private readonly IPartnerPortalFaults _faults = Substitute.For<IPartnerPortalFaults>();
     private readonly PortalActivities _activities = new("Norvia.PartnerPortal.Web.Tests");
     private readonly HttpClient _http;
     private readonly NorviaPartnerApiClient _client;
@@ -25,7 +27,7 @@ public sealed class ShipperTrackingClientTests : IDisposable
             PersonaClientIds = "brouwer-dranken=client-1",
             SubscriptionKeys = new() { ["brouwer-dranken"] = "brouwer-key" },
         });
-        _client = new NorviaPartnerApiClient(_http, _tokens, options, _activities, _logger);
+        _client = new NorviaPartnerApiClient(_http, _tokens, options, _activities, _faults, _logger);
     }
 
     public void Dispose()

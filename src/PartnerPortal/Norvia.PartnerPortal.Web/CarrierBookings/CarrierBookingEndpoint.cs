@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Norvia.PartnerPortal.Application;
 using Norvia.PartnerPortal.Application.CarrierBookings.Receive;
+using Norvia.PartnerPortal.Application.Faults;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
 
 namespace Norvia.PartnerPortal.Web.CarrierBookings;
@@ -31,17 +32,27 @@ public static partial class CarrierBookingEndpoint
         CarrierBookingRequestBody body,
         IConflictRetrier retrier,
         IOptions<CarrierEndpointOptions> options,
+        IPartnerPortalFaults faults,
         ILoggerFactory loggers,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(body);
         ArgumentNullException.ThrowIfNull(retrier);
         ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(faults);
         ArgumentNullException.ThrowIfNull(loggers);
 
         var logger = loggers.CreateLogger(typeof(CarrierBookingEndpoint));
         using var trail = logger.BeginScope(EndpointTracking.Keys(
             Flow, carrierId, correlationId, ("shipmentNumber", body.ShipmentNumber), ("carrierBookingNumber", body.CarrierBookingNumber)));
+
+        // The endpoint is down: it answers nothing but 503, and keeps nothing, so the Logic App reports the booking Not delivered.
+        if (faults.BookingEndpointDown)
+        {
+            using var down = logger.BeginScope(EndpointTracking.Down("CarrierEndpointUnavailable", PartnerPortalFaultNames.BookingEndpointDown));
+            LogDown(logger, carrierId);
+            return TypedResults.Problem(statusCode: StatusCodes.Status503ServiceUnavailable, title: "The Carrier's booking endpoint is unavailable.");
+        }
 
         // Who the caller is comes first, so an unknown Carrier and a wrong credential look the same from outside.
         if (!EndpointCredential.IsOf(carrierId, apiKey, options.Value.ApiKeys))
@@ -152,6 +163,9 @@ public static partial class CarrierBookingEndpoint
             cost.Currency!, cost.Total!.Value,
             [.. cost.ChargeLines!.Select(line => new CarrierChargeLine(line.Type!, line.Amount!.Value))],
             cost.IsSpot!.Value);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "The booking endpoint of Carrier {CarrierId} is down: answered 503 (fault)")]
+    private static partial void LogDown(ILogger logger, string carrierId);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Refused a booking request for Carrier {CarrierId}: the credential is missing or wrong")]
     private static partial void LogRefused(ILogger logger, string carrierId);
