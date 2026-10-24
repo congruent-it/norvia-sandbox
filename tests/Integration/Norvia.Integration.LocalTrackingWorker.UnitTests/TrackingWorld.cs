@@ -17,6 +17,7 @@ internal sealed class TrackingWorld
     public TrackingWorld()
     {
         var time = new FakeTimeProvider(new DateTimeOffset(2030, 10, 1, 8, 0, 0, TimeSpan.Zero));
+        Time = time;
         Tms = new StubHttp(time);
         Options = Microsoft.Extensions.Options.Options.Create(new TrackingWorkerOptions
         {
@@ -30,6 +31,8 @@ internal sealed class TrackingWorld
             new TmsTrackingEvents(new HttpClient(Tms) { BaseAddress = Options.Value.TmsBaseAddress }, Options, time, loggers.CreateLogger<TmsTrackingEvents>()),
             loggers.CreateLogger<CarrierTrackingFlow>());
     }
+
+    public FakeTimeProvider Time { get; }
 
     public StubHttp Tms { get; }
 

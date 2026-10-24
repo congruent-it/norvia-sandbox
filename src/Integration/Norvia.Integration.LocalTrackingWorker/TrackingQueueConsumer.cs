@@ -14,6 +14,7 @@ internal sealed partial class TrackingQueueConsumer(
     ServiceBusClient serviceBus,
     IServiceScopeFactory scopes,
     IOptions<TrackingWorkerOptions> options,
+    TimeProvider time,
     ILogger<TrackingQueueConsumer> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -62,6 +63,11 @@ internal sealed partial class TrackingQueueConsumer(
                 await args.DeadLetterMessageAsync(args.Message, run.DeadLetterReason, run.DeadLetterDescription, args.CancellationToken);
                 break;
             default:
+                if (options.Value.RedeliveryDelay > TimeSpan.Zero)
+                {
+                    await Task.Delay(options.Value.RedeliveryDelay, time, args.CancellationToken);
+                }
+
                 await args.AbandonMessageAsync(args.Message, cancellationToken: args.CancellationToken);
                 break;
         }
