@@ -88,6 +88,60 @@ Every publish gives the Agent a new `agentIdentityId`, and the new identity hold
 
 The project's connection to an API Management MCP server uses the agent-identity authentication type (`agentic-identity`: Foundry calls the server with the token of the Agent that makes the call). The Bicep connection resource, up to API version `2026-07-01`, lists no such `authType`, so [infra/create-agent-connection.sh](../../infra/create-agent-connection.sh) makes it with `azd ai connection create`. When the schema gains the type, make the connection in Bicep and delete the script.
 
+## Conversation cleanup
+
+The Agent Service is stateful: conversations and responses persist until they are deleted ([Foundry Agent Service FAQ](https://learn.microsoft.com/azure/foundry/agents/faq#do-you-store-any-data-used-in-the-foundry-agent-service-api)), and the Intake agent's conversation holds a Shipper's email. Three things keep what Foundry keeps short ([#500](https://github.com/congruent-it/norvia-sandbox/issues/500), ADR 0040's personal-data decision):
+
+| Layer | What | Where |
+|---|---|---|
+| **Store nothing** | Every response is created with `store: false`, so a stateless call leaves no response behind (spike 3 below) | The Foundry client of `Norvia.Agents` (#379) |
+| **Delete after each run** | `IConversationCleanup` deletes the run's conversation and its responses as soon as the host application has the answer, best effort. A failure is logged as `ConversationNotDeleted` on the run's span and never reaches the user | `Norvia.Agents`, shared by every host (#379) |
+| **Delete before returning** | The Intake agent's operation (`booking-drafts`, #458) deletes first and only then returns the draft. A failed delete is `ConversationNotDeleted`, the draft is still returned (the Shipper is not punished for the cleanup) and the sweeper retries it | The Intake operation |
+| **The nightly sweeper** | Deletes every conversation, and every response, older than a day. A safety net, not the plan | [conversation-sweeper-logic-app.bicep](../../infra/estate/conversation-sweeper-logic-app.bicep) |
+
+Locally there is no Foundry conversation (the in-process runner keeps its history in memory for the run), so there is nothing to clean up and no sweeper.
+
+### The sweeper
+
+A Logic Apps Standard app with one workflow, `conversation-sweeper` ([src/Integration/ConversationSweeperLogicApp](../../src/Integration/ConversationSweeperLogicApp)), on the intake Logic App's plan, as the other flows are. A Container Apps job would have worked as well, but the estate has no job yet and every Logic App already has its failed-run alert and its place in the Integration console.
+
+- **Runs** every night at 02:00 UTC. `CONVERSATION_MAX_AGE_MINUTES` (1440, a day) is the age; a day is far shorter than `integrationRetentionDays`.
+- **Does** `GET /openai/v1/conversations?order=asc&limit=100` on the project endpoint, deletes each conversation whose `created_at` is older than the cutoff (`DELETE /openai/v1/conversations/{id}`), and asks for the first page again until a page deletes nothing or `has_more` is false. It then does the same for `/openai/v1/responses`, which catches a response that no conversation owned. It always asks for the *first* page, because deleting the item a cursor points at would break the cursor.
+- **Fails** the run with the code `ConversationNotDeleted` when any delete failed after its retries, so the failed-run alert (`alert-failed-runs-conversation-sweeper`) fires. Tracked properties on the run: `flow` (`conversation-sweeper`), `deleted` and `notDeleted`. It reads and deletes ids and timestamps; it never opens a conversation's items.
+- **Runs as** its own managed identity, `id-conversation-sweeper-<token>`, which holds **Foundry User on the project** and nothing else (no Azure role, no estate data). A second identity, the Logic App's host identity, holds its own storage and the Key Vault reference, as for the other Logic Apps.
+- **Is deployed** like the other Logic Apps: Bicep makes the app, `infra/deploy-conversation-sweeper-logic-app.sh` (an azd postdeploy hook) publishes the workflow. It needs no address from the apps Aspire deploys.
+
+**The as-found toggle `noConversationSweeper`** builds the app but stopped (`enabled: false`), so nothing is ever swept. Conversation data of the Intake agent piles up silently, which is a finding for the health check (#377): the conversations are in the project, the Logic App exists and has no runs. The failed-run alert never fires, because there are no runs.
+
+**Not yet verified in a tenant:** that Foundry User may list and delete conversations and responses, and the shape of the list response (`data`, `has_more`, `created_at` in seconds), which come from the REST reference. The first run is `infra/smoke-test-conversation-sweeper.sh`; if the Foundry role is too narrow, the run fails with a 403 on the list call and the role is the thing to change here and in the identity matrix.
+
+### Smoke run
+
+[infra/smoke-test-conversation-sweeper.sh](../../infra/smoke-test-conversation-sweeper.sh), after `azd up`, as the presenter. It leaves a conversation in the project, sets the sweeper's age to a minute, runs the trigger once through the Logic Apps management API, checks the run succeeded and the conversation is gone (404), and puts the age back to a day. It prints ids and counts only.
+
+### Spike 3: a store-nothing option
+
+**Question:** does the Responses API have a store-nothing option for prompt agents?
+
+**Answer: yes, `store: false`, for the responses.** Read in October 2026: [Build with agents, conversations, and responses](https://learn.microsoft.com/azure/foundry/agents/concepts/runtime-components#generate-responses) ("Generate a response without storing") shows a prompt agent's response created with `store=False`: "the service doesn't persist the response", and the caller carries the context itself. It is the answer for the Intake agent and for every Agent run that has one turn.
+
+What it does not do: it does not turn the stateful Agent Service into a stateless one. A conversation made with `POST /openai/v1/conversations` is stored whatever the response says, so the clients **do not create a conversation** unless an Agent needs history (none does: Agents keep no memory between runs, ADR 0040), and they pass `store: false` on every call. The FAQ still says the Agent Service "retains data" and the documents give no setting for a project that stores nothing, so the delete after each run and the sweeper stay: the sweeper is the safety net for a client that forgot, a failed delete and a run that died. **Not verified in a tenant**: whether `store: false` is honoured when the agent calls an MCP tool; the smoke run of the first Agent (#379) lists the project's responses afterwards and settles it.
+
+## Open points of #500
+
+The estate half of #500 is built (the sweeper, its toggle, the smoke run, the spike). The host-side code is not, because it lives in `Norvia.Agents`, which #379 creates. Whoever builds #379 or #458 picks these up; #500 stays open until they are done.
+
+| # | Open point | Where | Needs |
+|---|---|---|---|
+| 1 | `IConversationCleanup` in `Norvia.Agents`: deletes the run's conversation and its responses as soon as the host has the answer. Best effort: a failure is logged as `ConversationNotDeleted` on the run's span and never thrown. Unit tests with the Foundry client faked (the call, the code on failure, no exception to the caller); at least 80% line coverage | `Norvia.Agents`, shared by every host | #379 |
+| 2 | Every Foundry call sets `store: false` and creates no conversation unless an Agent needs history (none does). This is the answer of spike 3 | The Foundry client of `Norvia.Agents`; an architecture test can check no `CreateResponse` omits it | #379 |
+| 3 | The Intake operation (`booking-drafts`) deletes first and only then returns the draft. A failed delete is `ConversationNotDeleted`, the draft is still returned (the Shipper is not punished), and the sweeper retries it. Unit test: delete fails, draft returned, code on the span | The Intake operation of #458 | #379, #458 |
+| 4 | Only Infrastructure projects reference the Foundry SDK, so the cleanup port is in the host's Application layer or in `Norvia.Agents` and the call is in Infrastructure (the architecture test of #379 covers it) | `Norvia.Agents` and each host | #379 |
+| 5 | Verify in a tenant: run `infra/smoke-test-conversation-sweeper.sh` (Foundry User may list and delete, the list response shape), and after the first Agent run list the project's responses to see whether `store: false` is honoured when an Agent calls an MCP tool. Record both here, in "The sweeper" and spike 3 | A deployed estate | #379 deployed |
+| 6 | Docs that say "planned" for the host side: [failure-behaviour.md](../architecture/failure-behaviour.md) (the row for `IConversationCleanup`), [local-vs-azure.md](../architecture/local-vs-azure.md) (locally there is no Foundry conversation), the Intake agent's P1 doc. Drop "planned" when 1 to 3 are built | Docs | 1 to 3 |
+
+Acceptance criteria of #500 still open: *a normal Agent run leaves no conversation behind* (1, 2) and *the Intake operation deletes before it returns, and a failed delete is a coded span, not an error to the Shipper* (3). *A conversation the host could not delete is removed by the sweeper* is built and waits for point 5.
+
 ## Not here
 
-Publishing the Agents from their definition files (`infra/deploy-agents.sh`, the agent registry and the smoke run wait for the definition format of #379), conversation cleanup (#500) and the evaluation harness (#501).
+Publishing the Agents from their definition files (`infra/deploy-agents.sh`, the agent registry and the smoke run wait for the definition format of #379), `IConversationCleanup` itself ([open points](#open-points-of-500)), and the evaluation harness (#501).

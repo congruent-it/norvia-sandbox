@@ -43,6 +43,7 @@ param asFound object = {
   shipperTrackingCached: false
   noShipperRateLimit: false
   noReportBackToDriverApp: false
+  noConversationSweeper: false
 }
 
 @description('''Easy Auth's sign-in callbacks on the demo UIs (the TMS UI and the Partner portal), comma separated, empty before
@@ -187,6 +188,7 @@ module alerts 'estate/alerts.bicep' = {
       { name: 'carrier-cancellation', logicAppName: carrierCancellationLogicApp.outputs.logicAppName, workflowName: 'carrier-cancellation' }
       { name: 'trip-dispatch', logicAppName: tripDispatchLogicApp.outputs.logicAppName, workflowName: 'trip-dispatch' }
       { name: 'driver-reports', logicAppName: driverReportsLogicApp.outputs.logicAppName, workflowName: 'driver-reports' }
+      { name: 'conversation-sweeper', logicAppName: conversationSweeperLogicApp.outputs.logicAppName, workflowName: 'conversation-sweeper' }
       { name: 'billing', logicAppName: billingLogicApp.outputs.logicAppName, workflowName: 'billing' }
       { name: 'carrier-cost', logicAppName: carrierCostLogicApp.outputs.logicAppName, workflowName: 'carrier-cost' }
       { name: 'shipper-invoice', logicAppName: shipperInvoiceLogicApp.outputs.logicAppName, workflowName: 'shipper-invoice' }
@@ -427,6 +429,23 @@ module driverReportsLogicApp 'estate/driver-reports-logic-app.bicep' = {
     integrationConsolePrincipalId: identities.outputs.integrationConsolePrincipalId
     partnerPortalPrincipalId: identities.outputs.partnerPortalPrincipalId
     logicAppSwitchRoleId: logicAppSwitchRole.outputs.roleDefinitionId
+  }
+}
+
+module conversationSweeperLogicApp 'estate/conversation-sweeper-logic-app.bicep' = {
+  scope: resourceGroup
+  params: {
+    location: location
+    tags: tags
+    integrationRetentionDays: integrationRetentionDays
+    applicationInsightsName: monitoring.outputs.applicationInsightsName
+    planName: intakeLogicApp.outputs.planName
+    contentKeyVaultName: intakeLogicApp.outputs.keyVaultName
+    integrationConsolePrincipalId: identities.outputs.integrationConsolePrincipalId
+    foundryAccountName: foundry.outputs.accountName
+    foundryProjectName: foundry.outputs.projectName
+    foundryProjectEndpoint: foundry.outputs.projectEndpoint
+    enabled: !(asFound.?noConversationSweeper ?? false)
   }
 }
 
