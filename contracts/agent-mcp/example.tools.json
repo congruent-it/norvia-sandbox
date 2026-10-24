@@ -1,0 +1,16 @@
+{
+  "server": "example",
+  "role": "AgentExample.Read",
+  "tools": [
+    {
+      "name": "get_estate_info",
+      "description": "Returns the name of the estate and a fixed greeting. A trivial read-only tool that proves the agent door works end to end.",
+      "method": "GET",
+      "path": "/estate-info",
+      "mockResponse": {
+        "estate": "norvia",
+        "greeting": "The agent door is open."
+      }
+    }
+  ]
+}

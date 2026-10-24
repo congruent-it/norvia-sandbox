@@ -1,0 +1,32 @@
+<policies>
+  <inbound>
+    <base />
+    <!-- Only the example server answers from API Management itself, so it needs no application behind it. -->
+    <validate-azure-ad-token tenant-id="__TENANT_ID__">
+      <audiences>
+        <audience>__AUDIENCE__</audience>
+      </audiences>
+      <required-claims>
+        <claim name="roles" match="any">
+          <value>__ROLE__</value>
+        </claim>
+      </required-claims>
+    </validate-azure-ad-token>
+    <return-response>
+      <set-status code="200" reason="OK" />
+      <set-header name="Content-Type" exists-action="override">
+        <value>application/json</value>
+      </set-header>
+      <set-body>__MOCK_RESPONSE__</set-body>
+    </return-response>
+  </inbound>
+  <backend>
+    <base />
+  </backend>
+  <outbound>
+    <base />
+  </outbound>
+  <on-error>
+    <base />
+  </on-error>
+</policies>

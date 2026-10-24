@@ -1,0 +1,30 @@
+<policies>
+  <inbound>
+    <base />
+    <!-- The agent view is also an API on the gateway, so it checks the token itself: nothing reaches the application but through a token for this audience that holds the role. -->
+    <validate-azure-ad-token tenant-id="__TENANT_ID__">
+      <audiences>
+        <audience>__AUDIENCE__</audience>
+      </audiences>
+      <required-claims>
+        <claim name="roles" match="any">
+          <value>__ROLE__</value>
+        </claim>
+      </required-claims>
+    </validate-azure-ad-token>
+    <set-backend-service backend-id="__BACKEND_ID__" />
+    <rewrite-uri template="__PATH__" />
+    <authentication-managed-identity resource="__BACKEND_AUDIENCE__" client-id="__IDENTITY_CLIENT_ID__" />
+    <set-header name="Ocp-Apim-Subscription-Key" exists-action="delete" />
+  </inbound>
+  <backend>
+    <!-- A short wait and no retry: an Agent is never on a critical path (ADR 0040). -->
+    <forward-request timeout="10" follow-redirects="false" />
+  </backend>
+  <outbound>
+    <base />
+  </outbound>
+  <on-error>
+    <base />
+  </on-error>
+</policies>
