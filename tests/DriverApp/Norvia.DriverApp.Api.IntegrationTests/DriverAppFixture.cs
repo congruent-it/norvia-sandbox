@@ -51,6 +51,9 @@ public class DriverAppFixture : IAsyncLifetime
     private readonly string _tokenSigningKey = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
     private readonly ConcurrentQueue<ServiceBusReceivedMessage> _published = new();
     private DistributedApplication? _app;
+
+    /// <summary>The running AppHost, for a fixture that does more to it than the tests of the Driver app's API.</summary>
+    protected DistributedApplication App => _app!;
     private ServiceBusClient? _serviceBus;
     private BlobServiceClient? _blobs;
     private ServiceBusProcessor? _processor;

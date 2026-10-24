@@ -80,6 +80,9 @@ public sealed partial class ReportingPathTests(DriverAppFixture driverApp)
     {
         const string trip = "TR-3000003";
         await ReceiveTripAsync(trip, Anouk);
+
+        // Joost's own Trip gives his Trips page the form whose antiforgery token he posts back.
+        await ReceiveTripAsync("TR-3000103", Joost);
         using var joost = await SignedInAsync(Joost);
 
         using var started = await StartAsync(joost, trip);
@@ -480,12 +483,10 @@ public sealed partial class ReportingPathTests(DriverAppFixture driverApp)
         }
     }
 
-    /// <summary>Reports on the Stop of the Trip's only Shipment as the browser would, with an antiforgery token (the demo settings page always carries one).</summary>
+    /// <summary>Reports on the Stop of the Trip's only Shipment as the browser would, with an antiforgery token.</summary>
     private static async Task<HttpResponseMessage> PostStopAsync(HttpClient browser, string trip, string kind, string action, string? remark = null)
     {
-        var token = AntiforgeryToken().Match(await PageAsync(browser, "/settings")) is { Success: true } match
-            ? WebUtility.HtmlDecode(match.Groups[1].Value)
-            : throw new InvalidOperationException("The settings page has no form with an antiforgery token.");
+        var token = await TokenOfAsync(browser);
         List<KeyValuePair<string, string>> form = [new("__RequestVerificationToken", token)];
         if (remark is not null)
         {
@@ -520,21 +521,23 @@ public sealed partial class ReportingPathTests(DriverAppFixture driverApp)
         return await response.Content.ReadAsStringAsync(Ct);
     }
 
-    /// <summary>Presses Start Trip as the browser would: with an antiforgery token, which the demo settings page always carries.</summary>
+    /// <summary>The antiforgery token a form on the Trips page carries. It belongs to the browser, not to the form, so it serves any report the browser makes.</summary>
+    private static async Task<string> TokenOfAsync(HttpClient browser) =>
+        AntiforgeryToken().Match(await PageAsync(browser)) is { Success: true } match
+            ? WebUtility.HtmlDecode(match.Groups[1].Value)
+            : throw new InvalidOperationException("The Trips page has no form with an antiforgery token.");
+
+    /// <summary>Presses Start Trip as the browser would: with an antiforgery token.</summary>
     private static async Task<HttpResponseMessage> StartAsync(HttpClient browser, string trip)
     {
-        var token = AntiforgeryToken().Match(await PageAsync(browser, "/settings")) is { Success: true } match
-            ? WebUtility.HtmlDecode(match.Groups[1].Value)
-            : throw new InvalidOperationException("The settings page has no form with an antiforgery token.");
+        var token = await TokenOfAsync(browser);
         return await browser.PostAsync($"/trips/{trip}/start", new FormUrlEncodedContent([new("__RequestVerificationToken", token)]), Ct);
     }
 
-    /// <summary>Presses End Trip as the browser would: with an antiforgery token, which the demo settings page always carries.</summary>
+    /// <summary>Presses End Trip as the browser would: with an antiforgery token.</summary>
     private static async Task<HttpResponseMessage> EndAsync(HttpClient browser, string trip)
     {
-        var token = AntiforgeryToken().Match(await PageAsync(browser, "/settings")) is { Success: true } match
-            ? WebUtility.HtmlDecode(match.Groups[1].Value)
-            : throw new InvalidOperationException("The settings page has no form with an antiforgery token.");
+        var token = await TokenOfAsync(browser);
         return await browser.PostAsync($"/trips/{trip}/end", new FormUrlEncodedContent([new("__RequestVerificationToken", token)]), Ct);
     }
 
@@ -577,9 +580,7 @@ public sealed partial class ReportingPathTests(DriverAppFixture driverApp)
     /// <summary>Delivers the Trip's only Shipment as the browser would: the Proof of delivery form with a drawn signature and a photo, and an antiforgery token.</summary>
     private static async Task<HttpResponseMessage> DeliverAsync(HttpClient browser, string trip)
     {
-        var token = AntiforgeryToken().Match(await PageAsync(browser, "/settings")) is { Success: true } match
-            ? DecodeToken(match.Groups[1].Value)
-            : throw new InvalidOperationException("The settings page has no form with an antiforgery token.");
+        var token = await TokenOfAsync(browser);
         using var form = new MultipartFormDataContent
         {
             { new StringContent(token), "__RequestVerificationToken" },
@@ -592,8 +593,6 @@ public sealed partial class ReportingPathTests(DriverAppFixture driverApp)
         form.Add(photo, "photos", "camera.jpg");
         return await browser.PostAsync($"/trips/{trip}/stops/{Collection}/delivery/deliver", form, Ct);
     }
-
-    private static string DecodeToken(string value) => WebUtility.HtmlDecode(value);
 
     // Loading a schema registers it by its id in a registry shared by the whole process, which refuses a second registration. Tests run in
     // parallel, so each schema is loaded once.
