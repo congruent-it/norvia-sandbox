@@ -66,6 +66,28 @@ This answer comes from the documents. If a setting turns up, the Intake agent ca
 
 [infra/smoke-test-foundry.sh](../../infra/smoke-test-foundry.sh), after `azd up`, as the presenter. It checks that the deployment is `DataZoneStandard` in an EU region, that it is capped and tagged, that the model answers one request through the project endpoint, and that Foundry's span reaches Application Insights without the prompt text (a sentinel the script made up) in `AppDependencies`, `AppTraces`, `AppEvents` or `AppRequests`. It prints names and counts only.
 
+## Agent roles: which credential
+
+The spike of #499. Foundry makes an Agent's identity when it is published, so a script gives that identity its read role ([infra/assign-agent-roles.sh](../../infra/assign-agent-roles.sh)). The question is whose token makes the call.
+
+What the documents say:
+
+- The call is `POST /servicePrincipals/{agent view's service principal}/appRoleAssignedTo` with the agent identity as `principalId`. It needs `AppRoleAssignment.ReadWrite.All` and `Application.Read.All`, delegated (with a directory role such as Application Administrator) or application. It is the ordinary service principal API, not an Agent ID API.
+- The Entra Agent ID APIs (agent identity blueprints, creating agent identities) reject Azure CLI tokens with a 403, because those carry `Directory.AccessAsUser.All`. Nothing here calls them: Foundry creates the blueprint and the identity.
+- Agent identities are not in the way as the *principal* of an app role assignment: the Entra documentation does this for agent identities with the same call. Foundry does not assign the role itself, and does not give the identity any permission.
+
+So the presenter's `az` token is expected to work, and **the script uses it by default**. If Graph answers 403 (`Directory.AccessAsUser.All` rejected), the fallback is a deployment app registration: set `AGENT_ROLES_CLIENT_ID` and a secret (`AGENT_ROLES_CLIENT_SECRET`) or, in CI, a federated credential's assertion (`AGENT_ROLES_CLIENT_ASSERTION`), and the script signs in with client credentials. That registration needs only the application permissions `AppRoleAssignment.ReadWrite.All` and `Application.Read.All` (neither is on the list of permissions blocked for agents, which concerns permissions *granted to* agents), admin-consented, and it would go in [identities.bicep](../../infra/estate/identities.bicep) with just those.
+
+**Not yet verified in a tenant.** The answer above comes from the documents, as spikes 1 and 2 above did. It is settled by one run: after the first publish, `infra/assign-agent-roles.sh` as the presenter. If it passes, nothing more is needed and the registration is never added. If Graph answers 403, add the registration and record that here.
+
+## When a publish gives a new identity
+
+Every publish gives the Agent a new `agentIdentityId`, and the new identity holds nothing: its tool calls are refused (403) until the role is assigned. So `infra/assign-agent-roles.sh` runs after every publish, with the publish's result (one entry per Agent: name, server, `agentIdentityId`). If a tool call fails after a publish, run it again; it skips an identity that already holds its role. The project's shared identity, which an unpublished Agent uses, holds no role on any agent view, and the script fails if it finds one. The superseded identity keeps its role until Foundry deletes it with the version it belonged to.
+
+## Agent connection: Bicep or script
+
+The project's connection to an API Management MCP server uses the agent-identity authentication type (`agentic-identity`: Foundry calls the server with the token of the Agent that makes the call). The Bicep connection resource, up to API version `2026-07-01`, lists no such `authType`, so [infra/create-agent-connection.sh](../../infra/create-agent-connection.sh) makes it with `azd ai connection create`. When the schema gains the type, make the connection in Bicep and delete the script.
+
 ## Not here
 
-Publishing the Agents and giving each identity its read role (#499), the API Management MCP servers (#498), conversation cleanup (#500) and the evaluation harness (#501).
+Publishing the Agents from their definition files (`infra/deploy-agents.sh`, the agent registry and the smoke run wait for the definition format of #379), conversation cleanup (#500) and the evaluation harness (#501).
