@@ -37,7 +37,7 @@ public static class DependencyInjection
         builder.Services.AddScoped<IConflictRetrier, EfConflictRetrier>();
 
         // The faults the presenter can switch on: off by default, and each expires by itself. Only the API exposes the switches.
-        builder.AddFaults(DriverAppFaultDefinitions.Unavailable);
+        builder.AddFaults(DriverAppFaultDefinitions.All);
         builder.Services.AddSingleton<IDriverAppFaults, DriverAppFaults>();
 
         return builder;

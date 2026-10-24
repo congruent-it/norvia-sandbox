@@ -47,6 +47,8 @@ var driverReportOutcomeRole = 'DriverReports.ReportOutcome'
 var driverReportOutcomeRoleId = guid('norvia-driver-app-api', environmentName, driverReportOutcomeRole)
 var driverAppFaultRole = 'Demo.Fault'
 var driverAppFaultRoleId = guid('norvia-driver-app-api', environmentName, driverAppFaultRole)
+var tmsFaultRole = 'Demo.Fault'
+var tmsFaultRoleId = guid('norvia-tms-api', environmentName, tmsFaultRole)
 var recordRole = 'TrackingEvents.Record'
 var recordRoleId = guid('norvia-tms-api', environmentName, recordRole)
 var recordProofRole = 'ProofsOfDelivery.Record'
@@ -142,6 +144,16 @@ resource tmsApi 'Microsoft.Graph/applications@v1.0' = {
       value: manageRole
       displayName: 'Manage Transport Orders'
       description: 'Change Transport Orders as Norvia\'s staff do in the TMS UI, such as re-rating one. Only the TMS UI holds it.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
+    {
+      id: tmsFaultRoleId
+      value: tmsFaultRole
+      displayName: 'Switch the demo faults'
+      description: 'Switch the TMS\'s runtime faults on, for a few minutes, or off, from the presenter panel. Only the Partner portal, the presenter\'s gate (ADR 0024), holds it.'
       allowedMemberTypes: [
         'Application'
       ]
@@ -436,6 +448,13 @@ resource driverReportsOutcomeRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' 
   resourceId: driverAppApiPrincipal.id
   appRoleId: driverReportOutcomeRoleId
   principalId: driverReportsIdentity.properties.principalId
+}
+
+// The Partner portal's panel switches the TMS's faults as the portal's identity, so nothing else may.
+resource tmsFaultRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: tmsApiPrincipal.id
+  appRoleId: tmsFaultRoleId
+  principalId: partnerPortalIdentity.properties.principalId
 }
 
 // The Partner portal's panel switches the Driver app's faults as the portal's identity, so nothing else may.

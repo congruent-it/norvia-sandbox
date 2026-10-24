@@ -201,7 +201,7 @@ The Driver app signs Drivers in with Entra ID, replacing P11's Driver picker. Ea
 
 The presenter panel holds the seeded users' sign-in details for demos. Locally the Driver app's sign-in page stands in for Entra and lists the seeded Drivers.
 
-The panel also lists every Fault with its owner and the time it has left, and switches one on (for a duration) or off; the Driver app's *Driver app unavailable* Fault is the one that affects P12's Driver too, because it refuses Trips before a Driver sees them ([P11](p11-trip-dispatch.md#use-cases)). Every Fault switch needs the app role `Demo.Fault` ([as-found.md](../../operations/as-found.md#faults)).
+The panel also lists every Fault with its owner and the time it has left, and switches one on (for a duration) or off; the Driver app's *Driver app unavailable* Fault is the one that affects P12's Driver too, because it refuses Trips before a Driver sees them ([P11](p11-trip-dispatch.md#use-cases)). P12 has two of its own: *TMS unavailable* (`tms-unavailable`, the TMS API answers 503 and the reports wait) and *Driver app HEIC photo* (`driver-app-heic-photo`, the Proof of delivery is refused). Every Fault switch needs the app role `Demo.Fault` ([as-found.md](../../operations/as-found.md#faults)).
 
 ## Driver app
 
@@ -433,7 +433,7 @@ Designed in this document and not built yet:
 | Gap | Where it stands |
 |---|---|
 | Alerts on failed runs of the Driver reports Logic App, and on the dead-letter queue of its subscription | None built ([Failure behaviour](../../architecture/failure-behaviour.md)). The Driver's reports then stay in the dead-letter queue until someone looks |
-| As-found toggles and presenter-panel faults for P12 | None added. No Bicep parameter or presenter-panel fault switches anything in Driver reporting; the candidates are listed under [Deferred](#deferred), and [Failure behaviour](../../architecture/failure-behaviour.md#planned-processes) names them |
+| As-found toggles and presenter-panel faults for P12 | Two faults: `tms-unavailable` and `driver-app-heic-photo` ([as-found](../../operations/as-found.md#faults-of-the-tms-and-the-driver-app)). `noReportBackToDriverApp` is a toggle. The other candidates are listed under [Deferred](#deferred), and [Failure behaviour](../../architecture/failure-behaviour.md#planned-processes) names them |
 | Replaying a dead-lettered Driver report | Resubmitting to the `driver-reports` subscription is planned in [Failure behaviour](../../architecture/failure-behaviour.md). Until then a Start Trip dead-lettered by a TMS outage leaves the Trip's later reports refused with `TripNotUnderWay` |
 | The Planner's button for taking a Shipment off a Trip | The call is built (P11). The Trip detail does not have the button yet, so the Planner can't yet take an uncollected Shipment off an In progress Trip from the UI |
 | Everything under [Deferred](#deferred) | Left out on purpose |
@@ -452,8 +452,8 @@ These were left out on purpose while designing P12, each with its reason.
 - **Handing a Trip over to another Driver mid-run.** Deferred in P11 (ADR 0015).
 - **As-found toggles and presenter-panel faults.** They are added after the fixed state is built, as for P1 to P11. The candidates:
   - Presenter-panel fault: the Driver reports Logic App is disabled. The Driver's reports stay Sending, the Planner's Trip never goes In progress, and Stale flags its Shipments.
-  - Presenter-panel fault: the TMS is unavailable for a few minutes. The reports wait in their sessions and are processed in order afterwards, so nothing is lost.
+  - Presenter-panel fault: the TMS is unavailable for a few minutes. The reports wait in their sessions and are processed in order afterwards, so nothing is lost. Built: `tms-unavailable` ([as-found](../../operations/as-found.md#faults-of-the-tms-and-the-driver-app)); a fault that outlasts the Logic App's retries dead-letters the report as `TmsUnavailable`.
   - Toggle: no report back to the Driver app. The Driver is as blind as a Carrier. Built: `noReportBackToDriverApp` ([as-found](../../operations/as-found.md#business-safety-nets-and-api-management)).
   - Toggle: no alert on failed Driver reports Logic App runs, or on the dead-letter queue of its subscription.
   - Toggle: no lifecycle rule on the Driver app's transit container, and processed files aren't deleted.
-  - Presenter-panel fault: the Driver app sends a photo as HEIC. The TMS refuses the Proof of delivery with `FileNotAccepted`, and the Driver sees it Refused.
+  - Presenter-panel fault: the Driver app sends a photo as HEIC. The TMS refuses the Proof of delivery with `FileNotAccepted`, and the Driver sees it Refused. Built: `driver-app-heic-photo` ([as-found](../../operations/as-found.md#faults-of-the-tms-and-the-driver-app)).

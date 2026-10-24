@@ -21,6 +21,9 @@ public static class TrackingKeys
     /// <summary>The stable failure code, when there is one, such as a rating failure's <c>NoMatchingLane</c>.</summary>
     public const string FailureCode = "failureCode";
 
+    /// <summary>The name of the presenter's fault a hop was under, when one made it fail, such as <c>tms-unavailable</c>.</summary>
+    public const string Fault = "fault";
+
     /// <summary>
     /// The <see cref="Outcome"/> of a step that gave its answer, whatever the answer: Rating failed is Rating's answer, with
     /// its <see cref="FailureCode"/>, not a failed flow, as the Transport Order stays Accepted.

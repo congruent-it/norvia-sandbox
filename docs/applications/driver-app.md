@@ -53,7 +53,7 @@ The Simulator's per-Driver token is the credential for all of these. A Trip that
 
 ### Faults
 
-The Driver app owns one fault, `driver-app-unavailable`. Every fault switch is the one contract of `Norvia.ServiceDefaults` ([as-found.md](../operations/as-found.md#faults)): off by default, switched on for a duration and expiring by itself, and guarded by the app role `Demo.Fault`. A caller without a token gets 401, one without the role 403.
+The Driver app owns two faults, `driver-app-unavailable` (the Trip endpoint answers 503) and `driver-app-heic-photo` (a Proof of delivery the API records stores a photo as HEIC; the Driver's screens run in the Web process, which exposes no fault switch, and are not affected). Every fault switch is the one contract of `Norvia.ServiceDefaults` ([as-found.md](../operations/as-found.md#faults)): off by default, switched on for a duration and expiring by itself, and guarded by the app role `Demo.Fault`. A caller without a token gets 401, one without the role 403.
 
 | Method and route | Purpose | Credential | Request and response | Consumers |
 |---|---|---|---|---|

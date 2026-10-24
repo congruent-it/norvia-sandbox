@@ -1,5 +1,6 @@
 using Ardalis.Result;
 using Norvia.DriverApp.Application.Events;
+using Norvia.DriverApp.Application.Faults;
 using Norvia.DriverApp.Application.Reports.Deliver;
 using Norvia.DriverApp.Domain.Reports;
 using NSubstitute;
@@ -17,6 +18,7 @@ public sealed class DeliverHandlerTests
 
     private readonly ReportsWorld _world = new();
     private readonly IProofOfDeliveryTransit _transit = Substitute.For<IProofOfDeliveryTransit>();
+    private readonly IDriverAppFaults _faults = Substitute.For<IDriverAppFaults>();
     private readonly List<(string Name, string ContentType, byte[] Content)> _stored = [];
 
     public DeliverHandlerTests()
@@ -49,7 +51,7 @@ public sealed class DeliverHandlerTests
         new(trip, driver, shipment, receivedBy, condition, remark, signature ? new ProofFile("image/png", Png) : null, [.. Enumerable.Repeat(new ProofFile("image/jpeg", Jpeg), photos)]);
 
     private Task<Result<DeliverResult>> Deliver(DeliverCommand command) =>
-        new DeliverHandler(_world.TripRepository, _world.ReportRepository, _transit, _world.Outbox, _world.Time).Handle(command, CancellationToken.None).AsTask();
+        new DeliverHandler(_world.TripRepository, _world.ReportRepository, _transit, _world.Outbox, _faults, _world.Time).Handle(command, CancellationToken.None).AsTask();
 
     [Fact]
     public async Task Delivering_RecordsADeliveredAndAProofOfDelivery_BothSending_AndPublishesTwoEventsWithOneCorrelationId()
@@ -99,6 +101,37 @@ public sealed class DeliverHandlerTests
             new ProofOfDeliveryFileV1("signature.png", "image/png", $"{captured.DocumentId}/signature.png"),
             new ProofOfDeliveryFileV1("photo-1.jpg", "image/jpeg", $"{captured.DocumentId}/photo-1.jpg"),
             new ProofOfDeliveryFileV1("photo-2.jpg", "image/jpeg", $"{captured.DocumentId}/photo-2.jpg"));
+    }
+
+    [Fact]
+    public async Task WithTheHeicFaultOn_TheLastPhotoIsStoredAsAnHeicFile_AfterTheFormWasChecked()
+    {
+        _faults.HeicPhoto.Returns(true);
+
+        var result = await Deliver(Command(photos: 2));
+
+        result.IsSuccess.Should().BeTrue();
+        var captured = _world.Saved.OfType<ProofOfDeliveryCapturedV1>().Single();
+        captured.Files.Select(file => (file.Name, file.ContentType)).Should().Equal(("signature.png", "image/png"), ("photo-1.jpg", "image/jpeg"), ("photo-2.heic", "image/heic"));
+        _stored[^1].Content.Skip(4).Take(4).Should().Equal("ftyp"u8.ToArray(), "the TMS recognises an HEIC file by its content");
+    }
+
+    [Fact]
+    public async Task WithTheHeicFaultOn_ADeliveryWithoutPhotosGetsOne()
+    {
+        _faults.HeicPhoto.Returns(true);
+
+        await Deliver(Command(photos: 0));
+
+        _world.Saved.OfType<ProofOfDeliveryCapturedV1>().Single().Files.Select(file => file.Name).Should().Equal("signature.png", "photo-1.heic");
+    }
+
+    [Fact]
+    public async Task WithTheHeicFaultOff_NoPhotoIsChanged()
+    {
+        await Deliver(Command(photos: 1));
+
+        _world.Saved.OfType<ProofOfDeliveryCapturedV1>().Single().Files.Select(file => file.Name).Should().Equal("signature.png", "photo-1.jpg");
     }
 
     [Fact]

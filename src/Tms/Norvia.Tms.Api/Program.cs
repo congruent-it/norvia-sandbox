@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Norvia.Tms.Api.Capacity;
 using Norvia.Tms.Api.CarrierBookings;
 using Norvia.Tms.Api.Exceptions;
+using Norvia.Tms.Api.Faults;
 using Norvia.Tms.Api.ProofsOfDelivery;
 using Norvia.Tms.Api.Reset;
 using Norvia.Tms.Api.Shipments;
@@ -38,12 +39,15 @@ using Norvia.Tms.Application.Trips.Complete;
 using Norvia.Tms.Application.Trips.ReportDelivery;
 using Norvia.Tms.Application.Trips.Start;
 using Norvia.Tms.Domain.TransportOrders;
+using Norvia.ServiceDefaults.Faults;
 using Norvia.Tms.Infrastructure;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+// The faults the presenter can switch on: off by default, and each expires by itself. The gate is TmsFaultMiddleware, below.
+builder.AddFaults(TmsFaultDefinitions.All);
 builder.Services.AddScoped<IPipelineBehavior<SubmitTransportOrderCommand, Result<SubmitTransportOrderResult>>, TrackIntakeInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<SubmitTransportOrderCommand, Result<SubmitTransportOrderResult>>, TriggerRatingAfterAcceptance>();
 builder.Services.AddScoped<IPipelineBehavior<RateTransportOrderCommand, Result<RateTransportOrderResult>>, TrackReRateInLoggingScope>();
@@ -155,6 +159,8 @@ const int DuplicateKeyInUniqueIndex = 2601;
 
 // Outermost, so even a refused or failed call is traced under its correlation ID.
 app.UseMiddleware<TrackingScopeMiddleware>();
+// Behind the tracking scope, so a call a fault refuses is still traced under its correlation ID; before authentication, as a TMS that is down answers nobody.
+app.UseMiddleware<TmsFaultMiddleware>();
 app.UseExceptionHandler(new ExceptionHandlerOptions
 {
     // A request the API can't bind (malformed JSON, a field outside the Canonical Model) is the caller's error. A change
@@ -191,6 +197,11 @@ app.MapTrips();
 app.MapShipperNotifications();
 app.MapShipperTracking();
 app.MapReset();
+// The presenter panel's fault switches, guarded by the Demo.Fault role: MapFaults has no unguarded way to map them.
+app.NewVersionedApi("Faults")
+    .MapGroup("/v{version:apiVersion}/faults")
+    .HasApiVersion(1)
+    .MapFaults();
 
 await app.RunAsync();
 
