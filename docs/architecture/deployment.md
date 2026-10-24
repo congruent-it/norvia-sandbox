@@ -30,6 +30,7 @@ The AppHost references what the Bicep owns (Service Bus, Application Insights, L
 | Service Bus | Standard, one namespace | Five topics with filtered subscriptions, and the `carrier-tracking` and `carrier-proof-of-delivery` queues |
 | Inbound storage | Storage account | The claim-check container API Management stores a Carrier's Proof of delivery in, until a Logic App has handed it to the TMS |
 | Key Vaults | Key Vault | The Logic Apps' content-share secret, the Partner portal's Persona and endpoint keys, and the Driver app's endpoint key. No application holds a secret otherwise |
+| Foundry account and project | Cognitive Services `AIServices` | One account, one project and one shared `DataZoneStandard` model deployment (processing stays in the EU Data Boundary), capped and cost-tagged, connected to Application Insights. No Agent runs on it yet ([operations/foundry.md](../operations/foundry.md)) |
 | Log Analytics and Application Insights | Monitoring | Every trace, unsampled, kept for `integrationRetentionDays` (30 to 730 days, 90 by default). The one place retention is set |
 | Managed identities | User-assigned | One per caller, each holding only the app roles it needs ([identity-and-access.md](identity-and-access.md)) |
 | Microsoft Entra ID | Tenant | App registrations and app roles, a client app per Persona, and Easy Auth in front of the UIs. It is not in the resource group |
@@ -48,7 +49,7 @@ Who may open what: the Demo UIs are public behind an Entra gate that admits only
 
 ## Settings the estate decides
 
-The Simulator sends orders into the estate, so it is a demo tool and the estate controls it: `simulatorEnabled` switches it off, making the deployed Simulator answer everything but its health checks with 404. `simulatorMaxOrdersPerRun` (200 by default) and `simulatorMaxConcurrentRequests` (4) cap a run, because API Management runs on the Developer tier and Logic Apps bill by action.
+The Simulator sends orders into the estate, so it is a demo tool and the estate controls it: `simulatorEnabled` switches it off, making the deployed Simulator answer everything but its health checks with 404. `simulatorMaxOrdersPerRun` (200 by default) and `simulatorMaxConcurrentRequests` (4) cap a run, because API Management runs on the Developer tier and Logic Apps bill by action. `agentsEnabled` (off by default) is `Agents:Enabled`, and `foundryModelDeployed` and `foundryModelCapacity` switch and cap the shared model ([operations/foundry.md](../operations/foundry.md)).
 
 ## Keeping it true
 
