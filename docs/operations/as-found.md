@@ -4,7 +4,7 @@ The sandbox exists to reproduce what an integration health check finds, and to f
 
 Besides the toggles there are [faults](#faults): runtime failures the presenter switches on for a few minutes from the Partner portal's presenter panel. They break something while it runs and put it back by themselves.
 
-So far the toggles cover the estate's alerts (a failed-run alert for every Logic App and a dead-letter alert for every queue and subscription a Logic App reads), its [storage, secrets and retention](#storage-secrets-and-retention) and its [business safety nets and API Management](#business-safety-nets-and-api-management). The headline incident is Carrier tracking (P5): the tracking Logic App fails and the tracking queue dead-letters, and nobody is told. [failure-behaviour.md](../architecture/failure-behaviour.md) names each hop's alert and toggle.
+The [scenarios](#scenarios) combine presets and faults into named re-enactments, each with a smoke run. So far the toggles cover the estate's alerts (a failed-run alert for every Logic App and a dead-letter alert for every queue and subscription a Logic App reads), its [storage, secrets and retention](#storage-secrets-and-retention) and its [business safety nets and API Management](#business-safety-nets-and-api-management). The headline incident is Carrier tracking (P5): the tracking Logic App fails and the tracking queue dead-letters, and nobody is told. [failure-behaviour.md](../architecture/failure-behaviour.md) names each hop's alert and toggle.
 
 ## The alerts
 
@@ -152,6 +152,56 @@ This is the one fault that is not application code ([#377](https://github.com/co
 
 Declare it (`AddFaults` with a `FaultDefinition`), check `IFaults.IsOn` where the application should fail, put the name on the hop it breaks as `fault`, and expose the owner to the panel (`Faults__Owners__<owner>__Address` and `__Audience` on the portal, `Demo.Fault` on the owner's registration and for the portal's identity). A fault of the portal itself needs none of that: add it to `PartnerPortalFaultDefinitions` and `IPartnerPortalFaults`. `FaultEndpointGuardTests` fails when an endpoint is mapped by hand on a route that mentions a fault.
 
+## Scenarios
+
+A **scenario** is a named re-enactment: a [preset](#presets) plus the faults to switch on, a demo script and a post-deploy smoke run. Each preset is `fixed` plus only what the story needs, so the audience sees one cause. The smoke run applies the preset, stops and says what to do in the Partner portal and the presenter panel, asks what the presenter saw as yes or no, reads the estate, prints `PASS` or `FAIL` per check, and ends in the `fixed` state. The scenario of revenue that never invoices waits for E1 and E2 ([#10](https://github.com/congruent-it/norvia-sandbox/issues/10), [#11](https://github.com/congruent-it/norvia-sandbox/issues/11)) and is added then.
+
+### Incident 1: the silent Carrier
+
+| | |
+|---|---|
+| **Preset** | `silent-carrier`: no failed-run alert for `carrier-tracking`, no dead-letter alert for the tracking queue, and the Stale thresholds unset |
+| **Fault** | `carrier-tracking-unmapped-code` (P5), switched on from `/presenter` |
+| **Smoke run** | [smoke-test-as-found-silent-carrier.sh](../../infra/smoke-test-as-found-silent-carrier.sh) `<Transport Order number>` |
+
+*Story.* A Carrier posts "delivered", is told `202 Accepted`, and believes it is done. Inside the integration layer the map fails the run and the tracking queue dead-letters the message as `UnmappableTrackingMessage`, and nobody is told: no alert, and Stale, which would flag a Shipment whose next Tracking event is late, has no thresholds. The Shipper's screen stays on In transit. Only a Consignee's phone call reveals it.
+
+*What to switch on.* `infra/as-found.sh silent-carrier`, then the fault for 5 minutes, then the Carrier's Delivered event for a Shipment that is In transit.
+
+*What the audience sees.* The Carrier is told `202`. The Shipper's tracking screen stays on In transit. No email arrives. In the Integration console the message trail of the Transport Order shows the Carrier's send as `Succeeded` with `fault`, the Carrier-tracking run `Failed`, and the dead-lettered message with its reason, which the presenter can resubmit once the cause is fixed.
+
+*How to fix it.* `infra/as-found.sh fixed` is the fix and the **fixed run**: the failed-run and dead-letter alerts exist and go to the action group, whose email receiver is who is told, and the Stale thresholds are set. Run the fault again to show the email arrive within minutes; the dead-letter alert stays until the queue is emptied. The mapping itself is Norvia's to correct with the Carrier ([failure-behaviour.md](../architecture/failure-behaviour.md)).
+
+### The look-alike
+
+| | |
+|---|---|
+| **Preset** | `look-alike`: `shipperTrackingCached` |
+| **Fault** | none |
+| **Smoke run** | [smoke-test-as-found-look-alike.sh](../../infra/smoke-test-as-found-look-alike.sh) `<Transport Order number>` |
+
+*Story.* The Shipper sees an old status, and it looks like incident 1. It is not: the TMS is right, and API Management answers the read from its cache.
+
+*What to switch on.* `infra/as-found.sh look-alike`. As the Shipper read a Transport Order, as the Carrier send the next Tracking event, then read it again.
+
+*What the audience sees.* The TMS and the Shipment's timeline show the new status, every run succeeded and the dead-letter queue is empty, but the Shipper still sees the old status for up to a day. Nothing is in the Integration console to find: the answer never reached the TMS, which API Management's own hop shows.
+
+*How to fix it.* `infra/as-found.sh fixed` removes the cache from the Shipper tracking reads.
+
+### The contrast
+
+| | |
+|---|---|
+| **Preset** | `contrast`: the same as `fixed`. The estate is healthy and that is the point |
+| **Faults** | `tms-shipper-tracking-api-failing` (P8) and `tms-tracking-event-api-failing` (P5), for 2 minutes |
+| **Smoke run** | [smoke-test-as-found-contrast.sh](../../infra/smoke-test-as-found-contrast.sh) `<Transport Order number>` |
+
+*Story.* The TMS fails for a few minutes, and the failure is loud and nothing is lost: the Shipper's read fails at once with the error, the Carrier's event is accepted and the Logic App retries it from the queue, and once the TMS is back the event is recorded, in order.
+
+*What the audience sees.* The Shipper gets an error and not a stale answer. The console's TMS hops are `Failed` with the fault beside the failed runs, and after expiry the event is on the Shipment's timeline and the dead-letter queue holds nothing new. Show it after incident 1: the same cause (a failing hop) is loud when it is retried and silent when it is dead-lettered with no alert.
+
+*How to fix it.* Nothing to fix: the faults expire (or are switched off in the panel).
+
 ## Presets
 
 A preset is a file in [infra/presets](../../infra/presets) holding a value of `asFound`.
@@ -160,6 +210,7 @@ A preset is a file in [infra/presets](../../infra/presets) holding a value of `a
 |---|---|
 | `fixed` | Every alert, a receiver, every storage, secret and retention protection, every business safety net, no cache, the rate limit, and the report back to the Driver app. Nothing broken. What the estate is without a toggle |
 | `as-found` | A realistic partial set. Alerts: six Logic Apps (the earlier-built Carrier flows, notifications and `billing`) and seven queues and subscriptions unalerted, the rest alerted. The incident flows are among the unalerted: `carrier-tracking`, `carrier-proof-of-delivery`, `billing`. Storage: no inbound lifecycle rule, files stay hot, no malware scanning; the transit rule is kept. A Carrier credential inlined, a short Application Insights retention, and no tracked properties on `billing`, `carrier-cancellation` and `shipper-notification`. Business: the Stale and Proof of delivery missing thresholds unset, the Late delivery check kept, the Shipper tracking cached and without a rate limit, the report back to the Driver app kept |
+| `silent-carrier`, `look-alike`, `contrast` | The [scenarios'](#scenarios) presets: `fixed` plus only what the story needs (incident 1's missing alerts and Stale thresholds, the Shipper tracking cache, nothing) |
 
 [estate.bicepparam](../../infra/estate.bicepparam) takes the object from the `ESTATE_ASFOUND` environment variable, as JSON, and the `fixed` preset when it is unset.
 
