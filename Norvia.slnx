@@ -159,6 +159,7 @@
     <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.Planning/Norvia.Tms.Api.IntegrationTests.Planning.csproj" />
     <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.Remaining/Norvia.Tms.Api.IntegrationTests.Remaining.csproj" />
     <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.Trips/Norvia.Tms.Api.IntegrationTests.Trips.csproj" />
+    <Project Path="tests/Tms/Norvia.Tms.Api.UnitTests/Norvia.Tms.Api.UnitTests.csproj" />
     <Project Path="tests/Tms/Norvia.Tms.Application.UnitTests/Norvia.Tms.Application.UnitTests.csproj" />
     <Project Path="tests/Tms/Norvia.Tms.ArchitectureTests/Norvia.Tms.ArchitectureTests.csproj" />
     <Project Path="tests/Tms/Norvia.Tms.Domain.UnitTests/Norvia.Tms.Domain.UnitTests.csproj" />

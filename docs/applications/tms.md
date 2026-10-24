@@ -141,6 +141,15 @@ The Shipper ID comes in the `X-Shipper-ID` header, which the TMS trusts from API
 | `GET /v1/shipper-tracking/transport-orders/{transportOrderNumber}` | Get one of a Shipper's Transport Orders by Norvia's number, with its tracking. | `ShipperTracking.Read` | → `ShipperTransportOrderDetail` | API Management (P8), as above |
 | `GET /v1/shipper-tracking/transport-orders/{transportOrderNumber}/proof-of-delivery/files/{fileId}` | Read one file of the order's current Proof of delivery, streamed with the content type it was sent with. | `ShipperTracking.Read` | → file stream | API Management (P8), as above |
 
+### Faults
+
+The TMS owns three faults (`tms-unavailable`, `tms-tracking-event-api-failing`, `tms-shipper-tracking-api-failing`). Every fault switch is the one contract of `Norvia.ServiceDefaults` ([as-found.md](../operations/as-found.md#faults)): off by default, switched on for a duration and expiring by itself, and guarded by the app role `Demo.Fault`. A caller without a token gets 401, one without the role 403. While a fault is on, a middleware answers the calls it breaks with a 503 ([as-found.md](../operations/as-found.md#faults-of-the-tms-and-the-driver-app)); the fault endpoints themselves are never gated.
+
+| Method and route | Purpose | App role | Request and response | Consumers |
+|---|---|---|---|---|
+| `GET /v1/faults` | List the faults the TMS owns, with whether each is on, when it expires and how many seconds it has left. | `Demo.Fault` | → fault list | Partner portal's presenter panel (P5, P8, P12) |
+| `PUT /v1/faults/{name}` | Switch a fault on, for `durationSeconds` (the default when left out, at most a few minutes), or off. A duration over the limit is refused with 400, an unknown fault with 404. | `Demo.Fault` | `SwitchFaultRequest` → the fault | Partner portal's presenter panel (P5, P8, P12) |
+
 ### Reset
 
 | Method and route | Purpose | App role | Request and response | Consumers |

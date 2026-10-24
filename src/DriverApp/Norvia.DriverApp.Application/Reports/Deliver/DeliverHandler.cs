@@ -2,6 +2,7 @@ using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Mediator;
 using Norvia.DriverApp.Application.Events;
+using Norvia.DriverApp.Application.Faults;
 using Norvia.DriverApp.Application.Trips;
 using Norvia.DriverApp.Domain.Reports;
 using Norvia.DriverApp.Domain.Trips;
@@ -12,13 +13,15 @@ namespace Norvia.DriverApp.Application.Reports.Deliver;
 /// Records the Driver's Deliver: the Delivered that completes the Stop and the Proof of delivery, as two reports that share one correlation ID. Their files go to
 /// the transit container first, then the reports and the outbox's <c>StopCompletedReported</c> and <c>ProofOfDeliveryCaptured</c> are saved in one transaction,
 /// so both events are published exactly once and only for a Deliver that was recorded. A file stored for a Deliver that wasn't saved is left to the container's
-/// lifecycle rule. What the Driver can do and what the form asks are the Domain's to say; the TMS decides all the same.
+/// lifecycle rule. What the Driver can do and what the form asks are the Domain's to say; the TMS decides all the same. While the HEIC fault is on, the last
+/// photo is stored as an HEIC file (or one is added when the Driver gave none), after the form was checked: the Driver app accepted what the device said, and the TMS judges the content.
 /// </summary>
 public sealed class DeliverHandler(
     IReadRepository<DriverTrip> trips,
     IRepository<DriverReport> reports,
     IProofOfDeliveryTransit transit,
     IDriverEventOutbox outbox,
+    IDriverAppFaults faults,
     TimeProvider time) : ICommandHandler<DeliverCommand, Result<DeliverResult>>
 {
     public async ValueTask<Result<DeliverResult>> Handle(DeliverCommand command, CancellationToken cancellationToken)
@@ -87,11 +90,24 @@ public sealed class DeliverHandler(
         return new DeliverResult(delivered.Delivered.Id.Value, AlreadyReported: false, origin.CorrelationId);
     }
 
+    /// <summary>The photo the HEIC fault stores: it starts as an HEIC file does (an <c>ftyp</c> box), which the TMS recognises by its content and refuses.</summary>
+    private static readonly ProofFile HeicPhoto = new("image/heic", new byte[] { 0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63, 0x00, 0x00, 0x00, 0x00 });
+
     private async Task<IReadOnlyList<ProofOfDeliveryFileV1>> StoreFilesAsync(string documentId, DeliverCommand command, CancellationToken cancellationToken)
     {
         var files = new List<ProofOfDeliveryFileV1>();
         var given = new List<(string Name, ProofFile File)> { (ProofOfDeliveryRules.SignatureName, command.Signature!) };
         given.AddRange(command.Photos.Select((photo, index) => (ProofOfDeliveryRules.PhotoName(index + 1, photo.ContentType), photo)));
+        if (faults.HeicPhoto)
+        {
+            var number = Math.Max(command.Photos.Count, 1);
+            if (command.Photos.Count > 0)
+            {
+                given.RemoveAt(given.Count - 1);
+            }
+
+            given.Add(($"photo-{number}.heic", HeicPhoto));
+        }
 
         foreach (var (name, file) in given)
         {

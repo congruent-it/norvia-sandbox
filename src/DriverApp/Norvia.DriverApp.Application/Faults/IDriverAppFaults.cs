@@ -5,4 +5,7 @@ public interface IDriverAppFaults
 {
     /// <summary>Whether the "Driver app unavailable" fault is on now.</summary>
     bool IsUnavailable { get; }
+
+    /// <summary>Whether the "HEIC photo" fault is on now.</summary>
+    bool HeicPhoto { get; }
 }

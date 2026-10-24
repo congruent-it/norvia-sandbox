@@ -1,6 +1,7 @@
 using Ardalis.Result;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Testing;
+using Norvia.DriverApp.Application.Faults;
 using Norvia.DriverApp.Application.Reports;
 using Norvia.DriverApp.Application.Reports.Deliver;
 using Norvia.DriverApp.Application.Reports.EndTrip;
@@ -8,6 +9,7 @@ using Norvia.DriverApp.Application.Reports.ReportOutcome;
 using Norvia.DriverApp.Application.Reports.ReportStop;
 using Norvia.DriverApp.Application.Reports.StartTrip;
 using Norvia.DriverApp.Application.Trips;
+using NSubstitute;
 
 namespace Norvia.DriverApp.Application.UnitTests.Reports;
 
@@ -103,7 +105,7 @@ public sealed class TrackingInLoggingScopeTests : IDisposable
     [Fact]
     public async Task ADeliver_IsLoggedWithTheFlowTheTripTheShipmentTheDriverAndTheEventId_AsSucceeded()
     {
-        var behaviour = new TrackDeliverInLoggingScope(_loggerFactory.CreateLogger<TrackDeliverInLoggingScope>());
+        var behaviour = new TrackDeliverInLoggingScope(_loggerFactory.CreateLogger<TrackDeliverInLoggingScope>(), Substitute.For<IDriverAppFaults>());
 
         await behaviour.Handle(Delivery(), (_, _) => ValueTask.FromResult<Result<DeliverResult>>(new DeliverResult(EventId, false)), CancellationToken.None);
 
@@ -119,12 +121,35 @@ public sealed class TrackingInLoggingScopeTests : IDisposable
     }
 
     [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(false, false)]
+    public async Task ADeliver_CarriesTheHeicFault_OnlyWhenItWasRecordedUnderIt(bool alreadyReported, bool faultOn)
+    {
+        var faults = Substitute.For<IDriverAppFaults>();
+        faults.HeicPhoto.Returns(faultOn);
+        var behaviour = new TrackDeliverInLoggingScope(_loggerFactory.CreateLogger<TrackDeliverInLoggingScope>(), faults);
+
+        await behaviour.Handle(Delivery(), (_, _) => ValueTask.FromResult<Result<DeliverResult>>(new DeliverResult(EventId, alreadyReported)), CancellationToken.None);
+
+        var keys = ScopeKeys.Of(_logs.Collector.GetSnapshot().Should().ContainSingle().Subject);
+        if (faultOn && !alreadyReported)
+        {
+            keys.Should().Contain("fault", "driver-app-heic-photo");
+        }
+        else
+        {
+            keys.Should().NotContainKey("fault");
+        }
+    }
+
+    [Theory]
     [InlineData(ResultStatus.NotFound, "StopNotFound")]
     [InlineData(ResultStatus.Invalid, "ProofOfDeliveryInvalid")]
     [InlineData(ResultStatus.Conflict, "StopNotAvailable")]
     public async Task ADeliverTheDriverAppDoesNotTake_IsLoggedAsRefused_WithTheReasonAsFailureCode(ResultStatus status, string code)
     {
-        var behaviour = new TrackDeliverInLoggingScope(_loggerFactory.CreateLogger<TrackDeliverInLoggingScope>());
+        var behaviour = new TrackDeliverInLoggingScope(_loggerFactory.CreateLogger<TrackDeliverInLoggingScope>(), Substitute.For<IDriverAppFaults>());
         Result<DeliverResult> refused = status switch
         {
             ResultStatus.NotFound => Result.NotFound(),
