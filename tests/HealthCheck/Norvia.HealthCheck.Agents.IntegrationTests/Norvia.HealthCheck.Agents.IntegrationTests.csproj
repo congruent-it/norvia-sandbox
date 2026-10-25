@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+    <PackageReference Include="xunit.v3.mtp-off" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="AwesomeAssertions" />
+    <!-- Aliased: the app and the MCP stand-in each have a Program. -->
+    <ProjectReference Include="..\..\..\src\HealthCheck\Norvia.HealthCheck.Web\Norvia.HealthCheck.Web.csproj" Aliases="HealthCheckWeb" />
+    <ProjectReference Include="..\..\..\src\Integration\Norvia.Integration.LocalAgentMcp\Norvia.Integration.LocalAgentMcp.csproj" Aliases="AgentMcp" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Every test starts an app and a stand-in of its own in memory (no containers), so they may run side by side. -->
+    <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

@@ -108,6 +108,7 @@
   </Folder>
   <Folder Name="/tests/HealthCheck/">
     <Project Path="tests/HealthCheck/Norvia.HealthCheck.Application.UnitTests/Norvia.HealthCheck.Application.UnitTests.csproj" />
+    <Project Path="tests/HealthCheck/Norvia.HealthCheck.Agents.IntegrationTests/Norvia.HealthCheck.Agents.IntegrationTests.csproj" />
     <Project Path="tests/HealthCheck/Norvia.HealthCheck.ArchitectureTests/Norvia.HealthCheck.ArchitectureTests.csproj" />
     <Project Path="tests/HealthCheck/Norvia.HealthCheck.Infrastructure.UnitTests/Norvia.HealthCheck.Infrastructure.UnitTests.csproj" />
     <Project Path="tests/HealthCheck/Norvia.HealthCheck.Web.UnitTests/Norvia.HealthCheck.Web.UnitTests.csproj" />
