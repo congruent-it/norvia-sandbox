@@ -1,0 +1,18 @@
+{
+  "id": "p6-heic-proof-of-delivery",
+  "agent": "integration-operations",
+  "description": "A Carrier attaches photo-of-delivery.heic to its Proof of delivery. APIM answers 202, the TMS refuses the file by its content with FileNotAccepted and the message is dead-lettered. Known answer: the file type is refused, the cause is in the Carrier's file, so resubmitting the same message would fail again.",
+  "setup": {
+    "fault": "carrier-proof-heic-photo (partner-portal), switched on from /presenter",
+    "seed": "Send a Carrier Proof of delivery while it is on. Set EVALUATION_CORRELATION_ID to the correlation ID of that Message trail."
+  },
+  "input": "Explain why the Message trail ${EVALUATION_CORRELATION_ID} failed, and what the Integration operator could do about it.",
+  "expect": {
+    "fields": { "action": "fix-the-cause-first" },
+    "toolsCalled": ["get_message_trail"],
+    "explanation": {
+      "field": "cause",
+      "rubric": "Says the TMS refused a file of the Proof of delivery because of its type or content (a HEIC photo, not accepted). Does not say the TMS was down or that a retry or a resubmit of the same message would help."
+    }
+  }
+}
