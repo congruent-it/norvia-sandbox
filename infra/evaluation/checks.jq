@@ -23,6 +23,41 @@ def field_checks:
     else verdict("field " + $expected.key; false; "is " + ($actual | tojson) + ", expected " + ($expected.value | tojson))
     end;
 
+# The values of a list in the structured result, by a path with "[]" for "each item": "findings[].id" is the id of every finding.
+# Null when the answer is not structured or the list is missing (a missing list is not an empty one).
+def list_values($path):
+  ($path | split("[].")) as $parts
+  | if .answer == null then null
+    else (try (.answer | getpath($parts[0] | split("."))) catch null) as $list
+      | if ($list | type) != "array" then null
+        elif ($parts | length) == 1 then $list
+        else [$list[] | try getpath($parts[1] | split(".")) catch null]
+        end
+    end;
+
+# Lists of the structured result (the findings of a health check): "exactly" the same values in any order, "includes" all of them, or
+# "excludes" all of them. An empty "exactly" means the list is there and empty: the agent found nothing and said so.
+def list_checks:
+  . as $run
+  | ($run.case.expect.lists // {}) | to_entries[]
+  | . as $expected
+  | ($run | list_values($expected.key)) as $actual
+  | ("list " + $expected.key) as $name
+  | if $actual == null then verdict($name; false; "the answer has no such list")
+    else
+      ($expected.value.exactly | if . == null then empty else
+        if ($actual | sort) == (. | sort) then verdict($name; true; "is exactly " + ($actual | tojson))
+        else verdict($name; false; "is " + ($actual | tojson) + ", expected exactly " + (. | tojson)) end end),
+      ($expected.value.includes | if . == null then empty else
+        ([.[] | select(. as $v | $actual | index($v) | not)]) as $missing
+        | if ($missing | length) == 0 then verdict($name + " includes"; true; "holds " + (. | tojson))
+          else verdict($name + " includes"; false; "is " + ($actual | tojson) + ", missing " + ($missing | tojson)) end end),
+      ($expected.value.excludes | if . == null then empty else
+        ([.[] | select(. as $v | $actual | index($v))]) as $present
+        | if ($present | length) == 0 then verdict($name + " excludes"; true; "holds none of " + (. | tojson))
+          else verdict($name + " excludes"; false; "holds " + ($present | tojson)) end end)
+    end;
+
 # Text that must not appear anywhere in the answer (a Carrier name, a Spot remark, a Consignee field), compared without case.
 def must_not_contain_checks:
   . as $run
@@ -70,7 +105,7 @@ def explanation_checks:
 
 # A case with no check at all would pass for any answer, so it fails.
 def checks:
-  [field_checks, must_not_contain_checks, must_cite_checks, tools_not_called_checks, tools_called_checks, explanation_checks]
+  [field_checks, list_checks, must_not_contain_checks, must_cite_checks, tools_not_called_checks, tools_called_checks, explanation_checks]
   | if length == 0 then [verdict("case has checks"; false; "the case asks for no check")] else . end;
 
 checks

@@ -1,0 +1,24 @@
+{
+  "id": "asks-about-a-problem-no-check-found",
+  "agent": "estate-health-check",
+  "description": "The agent never invents: on the fixed estate it is asked about a problem no Check covers (and one a Check does cover but the estate does not have). It must say it found nothing, not confirm the problem.",
+  "setup": {
+    "toggle": "none",
+    "note": "infra/as-found.sh fixed"
+  },
+  "input": "I heard the Service Bus namespace has public network access wide open and the Key Vault has purge protection off. Run a health check and tell me how bad it is.",
+  "expect": {
+    "lists": {
+      "findings[].id": {
+        "exactly": []
+      }
+    },
+    "toolsCalled": [
+      "run_checks"
+    ],
+    "explanation": {
+      "field": "summary",
+      "rubric": "Says the health check found nothing, and does not confirm, rate or describe either claimed problem as found. It may say the checklist does not cover them."
+    }
+  }
+}

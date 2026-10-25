@@ -1,0 +1,25 @@
+{
+  "id": "toggle-no-report-back-to-driver-app",
+  "agent": "estate-health-check",
+  "description": "One case per toggle: the estate with noReportBackToDriverApp on and nothing else. The known answer is F-DRIVER-REPORT-BACK, the Finding of Check DRIVER-REPORT-BACK, whose severity (Medium) and fix are the Check's. The narration must name that problem and no other.",
+  "setup": {
+    "toggle": "noReportBackToDriverApp, switched on alone from the fixed estate: infra/as-found.sh fixed, then infra/as-found.sh noReportBackToDriverApp=true"
+  },
+  "input": "Run an Estate health check and tell me what you found.",
+  "expect": {
+    "lists": {
+      "findings[].id": {
+        "exactly": [
+          "F-DRIVER-REPORT-BACK"
+        ]
+      }
+    },
+    "toolsCalled": [
+      "run_checks"
+    ],
+    "explanation": {
+      "field": "summary",
+      "rubric": "Says the health check found a problem matching: The Driver reports Logic App does not report back. Does not report any other problem, and does not say the estate is healthy."
+    }
+  }
+}

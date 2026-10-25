@@ -1,0 +1,28 @@
+{
+  "id": "fixed-estate-no-findings",
+  "agent": "estate-health-check",
+  "description": "No false positives: the fixed estate gives no Finding, and the agent says so plainly, without inventing one to be helpful.",
+  "setup": {
+    "toggle": "none",
+    "note": "infra/as-found.sh fixed"
+  },
+  "input": "Run an Estate health check and tell me what you found.",
+  "expect": {
+    "lists": {
+      "findings[].id": {
+        "exactly": []
+      }
+    },
+    "toolsCalled": [
+      "run_checks"
+    ],
+    "toolsNotCalled": [
+      "list_failed_runs",
+      "list_dead_letter_queues"
+    ],
+    "explanation": {
+      "field": "summary",
+      "rubric": "Says plainly that the health check found nothing wrong. Names no problem, no risk and no recommendation."
+    }
+  }
+}
