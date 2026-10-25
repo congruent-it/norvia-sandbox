@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Norvia.HealthCheck.Application.Checks;
+using Norvia.HealthCheck.Application.Estate;
 using AppProgram = HealthCheckWeb::Program;
 using McpProgram = AgentMcp::Program;
 
@@ -32,13 +33,16 @@ internal sealed class HealthCheckAgentHost : IAsyncDisposable
     private readonly AppFactory _app;
     private readonly StandInFactory _standIn;
     private readonly Check[] _extraChecks;
+    private readonly Func<EstateConfiguration, EstateConfiguration>? _adjustEstate;
 
     /// <param name="snapshot">The estate the app reads: <c>as-found</c> or <c>fixed</c>.</param>
     /// <param name="rateLimitCalls">Calls per Agent identity the stand-in allows in a minute.</param>
     /// <param name="appDistrustsStandIn">Whether the app's agent API takes another key than the one the stand-in signs with, so every tool call is refused.</param>
+    /// <param name="adjustEstate">Changes the facts the snapshot gives, such as putting an alert on a flow that failed, which no snapshot holds.</param>
     /// <param name="extraChecks">Checks the checklist has besides its own, which a test gives evidence to mask.</param>
-    public HealthCheckAgentHost(string snapshot = "as-found", int rateLimitCalls = 60, bool appDistrustsStandIn = false, params Check[] extraChecks)
+    public HealthCheckAgentHost(string snapshot = "as-found", int rateLimitCalls = 60, bool appDistrustsStandIn = false, Func<EstateConfiguration, EstateConfiguration>? adjustEstate = null, params Check[] extraChecks)
     {
+        _adjustEstate = adjustEstate;
         _extraChecks = extraChecks;
         var apiKey = appDistrustsStandIn ? RandomNumberGenerator.GetBytes(64) : _key;
         _app = new AppFactory(this, snapshot, apiKey);
@@ -124,6 +128,13 @@ internal sealed class HealthCheckAgentHost : IAsyncDisposable
             builder.ConfigureTestServices(services =>
             {
                 services.AddSingleton(host.Telemetry.ProviderFor("health-check"));
+                if (host._adjustEstate is not null)
+                {
+                    var snapshotAdapter = services.Single(service => service.ServiceType == typeof(IEstateConfiguration)).ImplementationType!;
+                    services.AddSingleton<IEstateConfiguration>(provider =>
+                        new AdjustedEstate((IEstateConfiguration)ActivatorUtilities.CreateInstance(provider, snapshotAdapter), host._adjustEstate));
+                }
+
                 if (host._extraChecks.Length > 0)
                 {
                     services.AddSingleton(new Checklist([.. Checklist.Default.Checks, .. host._extraChecks]));
@@ -165,5 +176,10 @@ internal sealed class HealthCheckAgentHost : IAsyncDisposable
                 services.AddHttpClient("console-agent-api").ConfigurePrimaryHttpMessageHandler(() => host._app.Server.CreateHandler());
             });
         }
+    }
+
+    private sealed class AdjustedEstate(IEstateConfiguration inner, Func<EstateConfiguration, EstateConfiguration> adjust) : IEstateConfiguration
+    {
+        public async Task<EstateConfiguration> ReadAsync(CancellationToken cancellationToken) => adjust(await inner.ReadAsync(cancellationToken));
     }
 }

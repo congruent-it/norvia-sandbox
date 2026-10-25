@@ -139,7 +139,7 @@ public sealed class ChecklistAgainstSnapshotsTests
     ];
 
     // The Findings that pair a failure with a missing alert (#395) come from the failures a snapshot holds and name only the resources that failed,
-    // so a toggle's list does not describe them. Their own cases are in #404.
+    // so a toggle's list does not describe them. Their own cases are in UntoldFailuresAgainstSnapshotsTests (#404).
     private static List<FindingRow> ToggleFindings(JsonNode view) =>
         [.. Findings(view).Where(finding => finding.CheckId is not (UntoldFailedRunsCheck.CheckId or UntoldDeadLettersCheck.CheckId))];
 
