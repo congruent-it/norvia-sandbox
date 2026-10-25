@@ -1,0 +1,78 @@
+using System.Net;
+using Ardalis.Result;
+using Microsoft.Playwright;
+using Norvia.Agents;
+using Norvia.HealthCheck.Application.Agents;
+using Norvia.HealthCheck.Application.Operators;
+using static Microsoft.Playwright.Assertions;
+
+namespace Norvia.HealthCheck.Web.UiTests.Checks;
+
+/// <summary>The run-a-health-check journeys on the snapshots, with the Agents on and the Agent scripted.</summary>
+public sealed class RunHealthCheckJourneyTests(HealthCheckUiFixture fixture) : BrowserPage(fixture)
+{
+    [Fact]
+    public async Task AnOperatorRunningTheHealthCheckOnTheAsFoundSnapshot_SeesTheFinding_AndTheAssistantsNarration()
+    {
+        await StartAsync("as-found", OperatorRoles.Run);
+        App.Agent.NarrateAsync(Arg.Any<AgentRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Success(new Narration(
+                "One problem: the estate's alerting has a gap.",
+                [new NarratedItem("F-DLQ-ALERT", "Nobody is told when a dead-letter queue fills.", "r1", "run_checks")])));
+        await Page.GotoAsync("/");
+
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Run health check" }).ClickAsync();
+
+        var finding = Page.GetByTestId("finding");
+        await Expect(finding).ToHaveCountAsync(1);
+        await Expect(finding.GetByTestId("finding-id")).ToHaveTextAsync("F-DLQ-ALERT");
+        await Expect(finding.GetByTestId("finding-severity")).ToHaveTextAsync("High");
+        await Expect(finding.GetByTestId("finding-fix")).ToContainTextAsync("entitiesWithoutDeadLetterAlert");
+        var narration = Page.GetByTestId("narration");
+        await Expect(narration.GetByTestId("narration-summary")).ToHaveTextAsync("One problem: the estate's alerting has a gap.");
+        await Expect(narration.GetByTestId("narration-item")).ToContainTextAsync("Nobody is told when a dead-letter queue fills.");
+        await Expect(narration.Locator("cite")).ToHaveTextAsync("[r1, run_checks]");
+    }
+
+    [Fact]
+    public async Task AnOperatorRunningTheHealthCheckOnTheFixedSnapshot_SeesNoFinding()
+    {
+        await StartAsync("fixed", OperatorRoles.Run);
+        App.Agent.NarrateAsync(Arg.Any<AgentRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Success(new Narration("Nothing to report.", [])));
+        await Page.GotoAsync("/");
+
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Run health check" }).ClickAsync();
+
+        await Expect(Page.GetByTestId("no-findings")).ToContainTextAsync("No Findings");
+        await Expect(Page.GetByTestId("finding")).ToHaveCountAsync(0);
+    }
+
+    [Fact]
+    public async Task AnOperatorWithoutTheRunRole_IsRefused_AndSeesNoHealthCheck()
+    {
+        await StartAsync("as-found", OperatorRoles.Read);
+
+        var response = await Page.GotoAsync("/");
+
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "You can't run an Estate health check" })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Run health check" })).ToHaveCountAsync(0);
+        response!.Status.Should().Be((int)HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task AnOperatorRunningTheHealthCheckWhenTheAgentFails_IsToldTheAssistantIsUnavailable_AndTheFindingsStillShow()
+    {
+        await StartAsync("as-found", OperatorRoles.Run);
+        App.Agent.NarrateAsync(Arg.Any<AgentRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Result<Narration>.Unavailable("AgentUnavailable"));
+        await Page.GotoAsync("/");
+
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Run health check" }).ClickAsync();
+
+        await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync("Assistant unavailable");
+        await Expect(Page.GetByTestId("narration")).ToHaveCountAsync(0);
+        await Expect(Page.GetByTestId("finding-id")).ToHaveTextAsync("F-DLQ-ALERT");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Run health check" })).ToBeEnabledAsync();
+    }
+}
