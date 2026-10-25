@@ -111,7 +111,7 @@ public sealed class AgentModelsAndDefinitionsTests
 
         definition.Name.Should().Be("estate-health-check");
         definition.Tools.Server.Should().Be("health-check");
-        definition.Tools.Names.Should().Equal("run_checks");
+        definition.Tools.Names.Should().Equal("run_checks", "list_failed_runs", "list_dead_letter_queues");
     }
 
     [Fact]

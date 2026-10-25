@@ -6,6 +6,7 @@ using Ardalis.Result;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Norvia.HealthCheck.Application.Checks;
+using Norvia.HealthCheck.Application.Failures;
 using Norvia.HealthCheck.Application.Run;
 using Norvia.HealthCheck.Web.Agents;
 using TestContext = Xunit.TestContext;
@@ -57,6 +58,50 @@ public sealed class AgentApiTests : IAsyncLifetime
         finding["fix"]!.GetValue<string>().Should().Be("Remove it from the toggle.");
         finding["evidence"]!.AsArray().Select(item => item!["subject"]!.GetValue<string>()).Should().Equal("carrier-tracking", "billing");
         await _host.Mediator.Received(1).Send(new RunHealthCheckQuery(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GetFailedRuns_AnswersTheFlowsThatFailed_WithWhetherAnAlertWatchesEach()
+    {
+        _host.Mediator.Send(Arg.Any<ListFailedRunsQuery>(), Arg.Any<CancellationToken>())
+            .Returns(ValueTask.FromResult(Result.Success(new FailedRunsReport("as-found", 4, [new FailedFlow("carrier-tracking", 14, false)]))));
+
+        using var response = await _host.Client.SendAsync(AgentApiHost.Get("/agent/v1/failed-runs", _host.Token()), TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var view = JsonNode.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken))!;
+        view["windowDays"]!.GetValue<int>().Should().Be(4);
+        var flow = view["flows"]!.AsArray().Should().ContainSingle().Subject!.AsObject();
+        flow.Select(property => property.Key).Should().BeEquivalentTo("flow", "failedRuns", "hasFailedRunAlert");
+        flow["flow"]!.GetValue<string>().Should().Be("carrier-tracking");
+        flow["failedRuns"]!.GetValue<int>().Should().Be(14);
+        flow["hasFailedRunAlert"]!.GetValue<bool>().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GetDeadLetterQueues_AnswersTheEntitiesThatHoldMessages_WithWhetherAnAlertWatchesEach()
+    {
+        _host.Mediator.Send(Arg.Any<ListDeadLetterQueuesQuery>(), Arg.Any<CancellationToken>())
+            .Returns(ValueTask.FromResult(Result.Success(new DeadLetterQueuesReport("as-found", [new DeadLetteredEntity("carrier-tracking", 3, false)]))));
+
+        using var response = await _host.Client.SendAsync(AgentApiHost.Get("/agent/v1/dead-letter-queues", _host.Token()), TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var queue = JsonNode.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken))!["queues"]!.AsArray().Should().ContainSingle().Subject!.AsObject();
+        queue.Select(property => property.Key).Should().BeEquivalentTo("name", "deadLetteredMessages", "hasDeadLetterAlert");
+        queue["deadLetteredMessages"]!.GetValue<int>().Should().Be(3);
+    }
+
+    [Theory]
+    [InlineData("/agent/v1/failed-runs")]
+    [InlineData("/agent/v1/dead-letter-queues")]
+    public async Task TheListRoutes_WithoutTheAgentRole_AreRefused(string path)
+    {
+        using var none = await _host.Client.SendAsync(AgentApiHost.Get(path), TestContext.Current.CancellationToken);
+        using var operatorRole = await _host.Client.SendAsync(AgentApiHost.Get(path, _host.Token(roles: ["HealthCheck.Read"])), TestContext.Current.CancellationToken);
+
+        none.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        operatorRole.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     [Fact]
@@ -114,11 +159,11 @@ public sealed class AgentApiTests : IAsyncLifetime
     }
 
     [Fact]
-    public void TheAgentApi_HasOneRoute_ThatOnlyReads_AndRequiresTheAgentRole()
+    public void TheAgentApi_HasOnlyReadRoutes_ThatRequireTheAgentRole()
     {
         var routes = _host.AgentRoutes.ToList();
 
-        routes.Should().ContainSingle();
+        routes.Select(route => route.RoutePattern.RawText).Should().BeEquivalentTo("/agent/v1/checks", "/agent/v1/failed-runs", "/agent/v1/dead-letter-queues");
         routes.SelectMany(route => route.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods ?? []).Should().OnlyContain(method => method == "GET");
         routes.Should().OnlyContain(route => route.Metadata.GetOrderedMetadata<Microsoft.AspNetCore.Authorization.IAuthorizeData>().Any(data => data.Policy == "HealthCheck.Agent.Read"));
     }

@@ -1,3 +1,4 @@
+using Norvia.HealthCheck.Application.Failures;
 using Norvia.HealthCheck.Application.Run;
 
 namespace Norvia.HealthCheck.Web.Agents;
@@ -23,5 +24,24 @@ internal static class AgentViewMapping
                     finding.AsFoundToggle,
                     finding.Fix)),
             ]);
+    }
+
+    public static AgentFailedRunsView Of(FailedRunsReport report)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+
+        return new AgentFailedRunsView(
+            report.Estate,
+            report.WindowDays,
+            [.. report.Flows.Select(flow => new AgentFailedFlowView(flow.Flow, flow.FailedRuns, flow.HasFailedRunAlert))]);
+    }
+
+    public static AgentDeadLetterQueuesView Of(DeadLetterQueuesReport report)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+
+        return new AgentDeadLetterQueuesView(
+            report.Estate,
+            [.. report.Queues.Select(queue => new AgentDeadLetterQueueView(queue.Name, queue.DeadLetteredMessages, queue.HasDeadLetterAlert))]);
     }
 }

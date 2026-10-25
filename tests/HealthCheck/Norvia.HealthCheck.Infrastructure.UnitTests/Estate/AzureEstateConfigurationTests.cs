@@ -279,6 +279,55 @@ public sealed class AzureEstateConfigurationTests : IDisposable
     }
 
     [Fact]
+    public async Task ReadAsync_CountsTheFailedRunsOfEachLogicApp_FromTheWorkflowRunsMetric()
+    {
+        const string tracking = $"{AppsBase}/Microsoft.Web/sites/logic-tracking-abc";
+        const string billing = $"{AppsBase}/Microsoft.Web/sites/logic-billing-abc";
+        _azure.Resources(
+                "microsoft.web/sites",
+                Row(("id", tracking), ("name", "logic-tracking-abc"), ("enabled", true), ("workload", "")),
+                Row(("id", billing), ("name", "logic-billing-abc"), ("enabled", true), ("workload", "")))
+            .Entities(queues: [], subscriptions: [])
+            .Raw($"{tracking}/providers/microsoft.insights/metrics", Metric(6, 8))
+            .Raw($"{billing}/providers/microsoft.insights/metrics", Metric());
+
+        var estate = await Adapter().ReadAsync(TestContext.Current.CancellationToken);
+
+        estate.Flows.Select(flow => (flow.Name, flow.FailedRuns)).Should().Equal(("logic-tracking-abc", 14), ("logic-billing-abc", 0));
+        var request = _azure.Requests.Single(recorded => recorded.Uri.Contains($"{tracking}/providers/microsoft.insights/metrics", StringComparison.Ordinal)).Uri;
+        request.Should().Contain("metricnames=WorkflowRunsCompleted").And.Contain("status%20eq%20%27Failed%27");
+        Checklist.Default.Run(estate).Select(item => item.CheckId).Should().Contain(UntoldFailedRunsCheck.CheckId);
+    }
+
+    [Fact]
+    public async Task ReadAsync_ForALogicAppWithNoMetric_LeavesItsFailedRunsUnknown_AndGivesNoUntoldFinding()
+    {
+        _azure.Resources("microsoft.web/sites", Row(("id", $"{AppsBase}/Microsoft.Web/sites/logic-tracking-abc"), ("name", "logic-tracking-abc"), ("enabled", true), ("workload", "")))
+            .Entities(queues: [], subscriptions: []);
+
+        var estate = await Adapter().ReadAsync(TestContext.Current.CancellationToken);
+
+        estate.Flows.Should().ContainSingle().Which.FailedRuns.Should().BeNull();
+        Checklist.Default.Run(estate).Select(item => item.CheckId).Should().NotContain(UntoldFailedRunsCheck.CheckId);
+    }
+
+    [Fact]
+    public async Task ReadAsync_ReadsTheDeadLetteredMessagesOfEachQueueAndSubscription()
+    {
+        _azure.Entities(
+                queues: ["carrier-tracking", "billing"],
+                subscriptions: [("shipment-events", "carrier-booking")],
+                deadLettered: new() { ["carrier-tracking"] = 3, ["carrier-booking"] = 1 })
+            .Alerts(Alert("a", entities: ["carrier-booking"]));
+
+        var estate = await Adapter().ReadAsync(TestContext.Current.CancellationToken);
+
+        estate.ServiceBusEntities.Select(entity => (entity.Name, entity.DeadLetteredMessages)).Should().Equal(("carrier-tracking", 3), ("billing", 0), ("carrier-booking", 1));
+        var untold = Checklist.Default.Run(estate).Single(finding => finding.CheckId == UntoldDeadLettersCheck.CheckId);
+        untold.Evidence.Select(evidence => evidence.Subject).Should().Equal("carrier-tracking");
+    }
+
+    [Fact]
     public async Task ReadAsync_ComparesWhatApplicationInsightsKeepsWithTheWorkspace()
     {
         _azure.Resources("microsoft.insights/components", Row(("days", 30))).Resources("microsoft.operationalinsights/workspaces", Row(("days", 90)));
@@ -394,7 +443,17 @@ public sealed class AzureEstateConfigurationTests : IDisposable
     }
 
     private AzureEstateConfiguration Adapter() =>
-        new(_clients, _credential, Microsoft.Extensions.Options.Options.Create(new AzureEstateOptions { ResourceGroupId = ResourceGroupId, ServiceBusNamespace = Namespace }));
+        new(_clients, _credential, Microsoft.Extensions.Options.Options.Create(new AzureEstateOptions { ResourceGroupId = ResourceGroupId, ServiceBusNamespace = Namespace }), TimeProvider.System);
+
+    // Azure Monitor's answer for a metric: one time series with a point for each day's total, or none at all.
+    private static string Metric(params int[] totals) =>
+        new JsonObject
+        {
+            ["value"] = new JsonArray(new JsonObject
+            {
+                ["timeseries"] = new JsonArray(new JsonObject { ["data"] = new JsonArray(totals.Select(total => (JsonNode?)new JsonObject { ["total"] = total }).ToArray()) }),
+            }),
+        }.ToJsonString();
 
     private static JsonObject Alert(string name, string[]? entities, bool enabled = true, string scope = NamespaceId, string metric = "DeadletteredMessages", string dimensionOperator = "Include") => new()
     {
@@ -432,11 +491,18 @@ public sealed class AzureEstateConfigurationTests : IDisposable
 
         public List<Recorded> Requests { get; } = [];
 
-        public Azure Entities(string[] queues, (string Topic, string Name)[] subscriptions, string? queuesNextLink = null, string[]? moreQueues = null)
+        public Azure Entities(string[] queues, (string Topic, string Name)[] subscriptions, string? queuesNextLink = null, string[]? moreQueues = null, Dictionary<string, int>? deadLettered = null)
         {
-            static string Items(IEnumerable<string> names, string? nextLink = null)
+            string Items(IEnumerable<string> names, string? nextLink = null)
             {
-                var page = new JsonObject { ["value"] = new JsonArray(names.Select(name => (JsonNode?)new JsonObject { ["name"] = name }).ToArray()) };
+                var page = new JsonObject
+                {
+                    ["value"] = new JsonArray(names.Select(name => (JsonNode?)new JsonObject
+                    {
+                        ["name"] = name,
+                        ["properties"] = new JsonObject { ["countDetails"] = new JsonObject { ["deadLetterMessageCount"] = deadLettered?.GetValueOrDefault(name) ?? 0 } },
+                    }).ToArray()),
+                };
                 if (nextLink is not null)
                 {
                     page["nextLink"] = nextLink;

@@ -1,7 +1,10 @@
 namespace Norvia.HealthCheck.Application.Estate;
 
-/// <summary>A Logic App, by the name of its workflow (<c>carrier-tracking</c>), and what it should have. A null fact could not be read.</summary>
-public sealed record LogicAppFlow(string Name, bool HasFailedRunAlert, bool? RecordsTrackedProperties = true);
+/// <summary>
+/// A Logic App, by the name of its workflow (<c>carrier-tracking</c>), and what it should have. A null fact could not be read.
+/// <paramref name="FailedRuns"/> is how many of its runs failed in the last <see cref="EstateConfiguration.FailureWindowDays"/> days.
+/// </summary>
+public sealed record LogicAppFlow(string Name, bool HasFailedRunAlert, bool? RecordsTrackedProperties = true, int? FailedRuns = 0);
 
 /// <summary>Whether the storage protections exist. The healthy value is that every one does; null is a protection the adapter could not read.</summary>
 /// <param name="InboundHasLifecycleRule">The inbound Proof of delivery container deletes a processed blob after a while.</param>

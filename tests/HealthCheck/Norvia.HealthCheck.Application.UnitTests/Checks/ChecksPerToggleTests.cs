@@ -66,11 +66,13 @@ public sealed class ChecksPerToggleTests
     public void EveryCheck_HasItsOwnIdAndItsOwnToggle_AndTheTableCoversThemAll()
     {
         var checks = Checklist.Default.Checks;
+        var toggleChecks = checks.Where(check => check is not UntoldFailureCheck).ToList();
 
         checks.Select(check => check.Id).Should().OnlyHaveUniqueItems();
-        checks.Select(check => check.AsFoundToggle).Should().OnlyHaveUniqueItems("a Check maps to exactly one toggle");
+        toggleChecks.Select(check => check.AsFoundToggle).Should().OnlyHaveUniqueItems("a Check maps to exactly one toggle; the Checks that pair a failure with it share the toggle of the alert Check");
+        checks.OfType<UntoldFailureCheck>().Select(check => check.AsFoundToggle).Should().OnlyContain(toggle => toggleChecks.Any(check => check.AsFoundToggle == toggle));
         checks.Should().OnlyContain(check => !string.IsNullOrWhiteSpace(check.Rule) && !string.IsNullOrWhiteSpace(check.Title) && !string.IsNullOrWhiteSpace(check.Fix));
-        Toggles.Select(row => row.Data.Item1).Should().BeEquivalentTo(checks.Select(check => check.AsFoundToggle));
+        Toggles.Select(row => row.Data.Item1).Should().BeEquivalentTo(toggleChecks.Select(check => check.AsFoundToggle));
     }
 
     [Fact]

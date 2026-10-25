@@ -23,3 +23,14 @@ public sealed record AgentFindingView(
     string Fix);
 
 public sealed record AgentEvidenceView(string Subject, string Detail);
+
+/// <summary>The Logic Apps that failed lately (<c>list_failed_runs</c>), each with whether an alert would have told anyone.</summary>
+/// <param name="WindowDays">How many days back the failed runs are counted.</param>
+public sealed record AgentFailedRunsView(string Estate, int WindowDays, IReadOnlyList<AgentFailedFlowView> Flows);
+
+public sealed record AgentFailedFlowView(string Flow, int FailedRuns, bool HasFailedRunAlert);
+
+/// <summary>The queues and subscriptions that hold dead-lettered messages (<c>list_dead_letter_queues</c>), each with whether an alert watches it.</summary>
+public sealed record AgentDeadLetterQueuesView(string Estate, IReadOnlyList<AgentDeadLetterQueueView> Queues);
+
+public sealed record AgentDeadLetterQueueView(string Name, int DeadLetteredMessages, bool HasDeadLetterAlert);

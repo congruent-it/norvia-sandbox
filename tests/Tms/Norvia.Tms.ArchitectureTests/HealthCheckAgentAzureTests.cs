@@ -53,7 +53,7 @@ public sealed class HealthCheckAgentAzureTests
             .Should().OnlyContain(method => method == "GET");
         Of(resources, "Microsoft.ApiManagement/service/apis/operations").Select(operation => operation["properties"]!["urlTemplate"]!.GetValue<string>())
             .Should().Equal(ContractFile["tools"]!.AsArray().Select(tool => tool!["path"]!.GetValue<string>()));
-        tools.Should().ContainSingle("the health-check agent has one tool, run_checks");
+        tools.Should().HaveCount(3, "the health-check agent has run_checks, list_failed_runs and list_dead_letter_queues");
     }
 
     [Fact]

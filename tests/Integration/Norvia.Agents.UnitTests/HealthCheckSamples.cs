@@ -17,5 +17,9 @@ internal static class HealthCheckSamples
           {"id":"F-CRIT-ONE","checkId":"CRIT-ONE","title":"Something big","rule":"A big rule.","severity":"Critical","evidence":[{"subject":"x","detail":"y"}],"asFoundToggle":"t","fix":"f"}]}
         """;
 
+    public const string UntoldFailures = """
+        {"estate":"as-found","checksRun":2,"findings":[{"id":"F-FAILED-RUNS-UNTOLD","checkId":"FAILED-RUNS-UNTOLD","title":"A Logic App failed and nobody was told","rule":"A Logic App that failed has an alert.","severity":"Critical","evidence":[{"subject":"carrier-tracking","detail":"The carrier-tracking Logic App failed 14 times in the last 4 days and has no failed-run alert."}],"asFoundToggle":"flowsWithoutFailedRunAlert","fix":"Remove it."}]}
+        """;
+
     public const string NoFinding = """{"estate":"fixed","checksRun":1,"findings":[]}""";
 }

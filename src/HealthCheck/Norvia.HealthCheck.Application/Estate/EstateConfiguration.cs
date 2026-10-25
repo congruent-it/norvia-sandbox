@@ -11,6 +11,9 @@ namespace Norvia.HealthCheck.Application.Estate;
 /// <param name="ServiceBusEntities">Every queue and subscription with a dead-letter queue that a Logic App reads.</param>
 public sealed record EstateConfiguration(string Name, IReadOnlyList<ServiceBusEntity> ServiceBusEntities)
 {
+    /// <summary>How many days back the failed runs of <see cref="LogicAppFlow.FailedRuns"/> are counted. The adapters and the snapshots count the same window.</summary>
+    public const int FailureWindowDays = 4;
+
     /// <summary>Every Logic App of the estate, by the name of its workflow, with the alert and the tracked properties it has.</summary>
     public IReadOnlyList<LogicAppFlow> Flows { get; init; } = [];
 
@@ -38,5 +41,8 @@ public sealed record EstateConfiguration(string Name, IReadOnlyList<ServiceBusEn
     public AgentFacts? Agents { get; init; }
 }
 
-/// <summary>A queue or subscription, by the name Service Bus reports it under, and whether an alert watches its dead-letter queue.</summary>
-public sealed record ServiceBusEntity(string Name, bool HasDeadLetterAlert);
+/// <summary>
+/// A queue or subscription, by the name Service Bus reports it under, whether an alert watches its dead-letter queue and how many messages
+/// that queue holds now. A null count could not be read.
+/// </summary>
+public sealed record ServiceBusEntity(string Name, bool HasDeadLetterAlert, int? DeadLetteredMessages = 0);
