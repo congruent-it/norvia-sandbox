@@ -4,9 +4,9 @@ using Norvia.HealthCheck.Application.Operators;
 namespace Norvia.HealthCheck.Web.Operators;
 
 /// <summary>
-/// How an Integration operator signs in. Locally there is no Easy Auth, so the AppHost names a local operator: the developer, with
-/// the roles it gives them. Easy Auth in Azure comes with the app's deployment (#392). Where no local operator is configured the app
-/// has no way to sign anyone in, so every page refuses: it fails closed.
+/// How an Integration operator signs in (ADR 0026, as for the Integration console). In Azure, Container Apps' Easy Auth signs them in to
+/// the app's own app registration in Entra ID, and the app reads who they are and their app roles from it. Locally there is no Easy
+/// Auth, so the AppHost names a local operator: the developer, with the roles it gives them.
 /// </summary>
 public static class OperatorSignIn
 {
@@ -35,8 +35,8 @@ public static class OperatorSignIn
         }
         else
         {
-            // No scheme: the pipeline still starts, and nobody is signed in.
-            builder.Services.AddAuthentication();
+            builder.Services.AddAuthentication(EasyAuthHandler.SchemeName)
+                .AddScheme<AuthenticationSchemeOptions, EasyAuthHandler>(EasyAuthHandler.SchemeName, configureOptions: null);
         }
 
         builder.Services.AddAuthorizationBuilder()

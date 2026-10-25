@@ -1,6 +1,6 @@
 # Estate health check
 
-How an Integration operator runs an **Estate health check** and reads what it found. The first slice of the Estate health-check agent (#371): it works end to end **locally**, with one **Check**, from a snapshot of the estate's configuration, and needs no Azure. Terms are defined in [GLOSSARY.md](../../GLOSSARY.md).
+How an Integration operator runs an **Estate health check** and reads what it found. The Estate health-check agent (#371) works end to end **locally**, with one **Check**, from a snapshot of the estate's configuration, and needs no Azure; **in Azure** (#392) the same app reads the real estate and its Agent is published in Foundry. Terms are defined in [GLOSSARY.md](../../GLOSSARY.md).
 
 ## What it is
 
@@ -39,7 +39,28 @@ Locally nothing reads a running estate: there are no alerts to look at under Asp
 - [fixed.snapshot.json](../../src/HealthCheck/Norvia.HealthCheck.Infrastructure/Snapshots/fixed.snapshot.json) is the fixed estate: every queue and subscription a Logic App reads, each with a dead-letter alert.
 - [as-found.snapshot.json](../../src/HealthCheck/Norvia.HealthCheck.Infrastructure/Snapshots/as-found.snapshot.json) is the same estate as the as-found preset leaves it ([infra/presets/as-found.json](../../infra/presets/as-found.json)).
 - Tests keep them true: each snapshot gives the Findings it must (none, and the one), lists as missing exactly the entities its preset lists in `entitiesWithoutDeadLetterAlert`, and holds exactly the entities [estate.bicep](../../infra/estate.bicep) alerts. A preset that changes without its snapshot fails the build.
-- In Azure an adapter over Azure Resource Graph and Azure Monitor produces the same shape, and the app's managed identity holds Reader on the estate's resource group (#392). The snapshot adapter stays for local runs.
+- In Azure an adapter over Azure Resource Graph and Azure Monitor produces the same shape ([In Azure](#in-azure)). The snapshot adapter stays for local runs.
+
+## In Azure
+
+The same app, `health-check-web`, deployed as a Container App by the AppHost (`azd up`). Its Azure parts are the estate's and the app's, as for the Integration console:
+
+| Part | Is |
+|---|---|
+| The app's identity | A user-assigned managed identity, `id-health-check-<token>`, made by [health-check.bicep](../../infra/estate/health-check.bicep). It holds **Reader on the estate's resource group** and no other Azure role, and **Foundry User** on the `norvia` project to ask its Agent. The privileged role belongs to the app, never to the Agent (#371, question 1) |
+| The operators' sign-in | The app registration `Norvia Estate health check (<env>)`, with the roles `HealthCheck.Run` and `HealthCheck.Read`, for users only. Easy Auth sits in front of everything but the health probes and `/agent/v1/*`. [register-sign-in-callbacks.sh](../../infra/register-sign-in-callbacks.sh) adds its callback after the deploy |
+| The estate adapter | `AzureEstateConfiguration`. **Azure Resource Graph** answers which Azure Monitor metric alert rules exist and what each watches (`microsoft.insights/metricalerts` of the resource group); the namespace's **queues and subscriptions** come from Service Bus's management plane, because Resource Graph does not hold them. A queue or subscription has a dead-letter alert when an enabled rule scoped to the namespace watches `DeadletteredMessages` for it by an `EntityName` dimension that includes it (or by none, which watches them all). The subscriptions [alert-exemptions.json](../../infra/estate/alert-exemptions.json) lists are left out, as [alerts.bicep](../../infra/estate/alerts.bicep) leaves them out. It only reads. Set by `Estate:ResourceGroupId` and `Estate:ServiceBusNamespace`; where they are unset the snapshot is read |
+| The agent API's token | Entra's, for the app registration `Norvia Estate health check agent API (<env>)` (audience), which holds one role, `HealthCheck.Agent.Read`, assigned to API Management's identity alone. The app takes it on `/agent/v1` and nothing else. API Management's token names the gateway, so the Agent's identity is read from the `X-Agent-ID` header the policy sets |
+| The MCP server | `agents/health-check` in API Management, made by [health-check-mcp.bicep](../../infra/estate/health-check-mcp.bicep) from [health-check.tools.json](../../contracts/agent-mcp/health-check.tools.json) with [agent-mcp-server.bicep](../../infra/estate/agent-mcp-server.bicep): the Agent's token (audience `Norvia health-check agent view (<env>)`, role `HealthCheck.Agent.Read`), the tool list, 10 calls a minute per identity, and the correlation ID, the Agent's identity and the tool name on each call. Its backend is `health-check-agent-api`; [deploy-agents.sh](../../infra/deploy-agents.sh) points it at the app and stores `ESTATE_HEALTH_CHECK_BASE_URL` |
+| The Agent | Published into the `norvia` project from [the definition](../../agents/estate-health-check.agent.yaml) by [deploy-agents.sh](../../infra/deploy-agents.sh), with its own identity, which [assign-agent-roles.sh](../../infra/assign-agent-roles.sh) gives `HealthCheck.Agent.Read` on the agent view. It holds no Azure role. The app asks it through the Responses API as its own identity (`FoundryAgentClient`), with `store: false`, no conversation, the run's response deleted afterwards (best effort) and the correlation ID as a structured input that becomes the tool call's `X-Correlation-ID` |
+
+Turn the Agents on with `ESTATE_AGENTS_ENABLED_SETTING=true` (`azd env set`) and `azd up`; they are off by default, and the page then says "Assistant unavailable" and still lists the Findings.
+
+**The narration is checked against the tool's own answer.** Foundry returns the output of each tool call, and the client refuses a narration that explains a Finding that output does not hold, so the Agent cannot invent one in Azure either. If Foundry hands back no output the narration is refused (`AgentUnavailable`) and the Findings stay.
+
+### Smoke run
+
+[infra/smoke-test-estate-health-check.sh](../../infra/smoke-test-estate-health-check.sh), after `azd up` with the Agents on, signed in to the Azure CLI as the presenter. It checks that the Agent holds only `HealthCheck.Agent.Read` and no Azure role, that the app's agent API has that one role held by API Management alone, that the app's identity holds Reader on the resource group and no other role there, and that the project's shared identity holds none; then applies the **as-found preset** (the dead-letter alerts of the seven entities are deleted) and asks the Agent until the checks return `F-DLQ-ALERT`, naming `carrier-tracking`, and the real model explains it citing `r1`; then applies the **fixed preset**, which deploys the estate again and rebuilds the alerts, and asks until the checks return no Finding and the narration invents none; and finally that the Agent's tool calls are hops of the run's Message trail (`agent-mcp-health-check`, `agent-view-health-check`) tagged with the Agent's identity and `run_checks`. Resource Graph takes a short while to see an alert come and go, so each check asks again for up to ten minutes. The estate ends in the fixed state. The script prints names, IDs and counts only.
 
 ## What the Agent can and cannot do
 
@@ -60,10 +81,13 @@ A Finding's evidence names the resources concerned. A secret is reported by wher
 | `HealthCheck.Read` | The Integration operator | Nothing yet. Reserved for the report (#394), which shows a result to someone who may not run one |
 | `HealthCheck.Agent.Read` | The Estate health-check agent's identity alone | `/agent/v1/checks`, and nothing else in the app. No operator holds it |
 
-Locally the AppHost signs in a local operator holding both operator roles, and refuses to do it outside Development; where no local operator is configured nothing signs anyone in, so every page refuses. Easy Auth in Azure comes with the app's deployment (#392). See [identity and access](../architecture/identity-and-access.md#agents).
+Locally the AppHost signs in a local operator holding both operator roles, and refuses to do it outside Development. In Azure Container Apps' Easy Auth signs the operator in to the app's own app registration, `Norvia Estate health check (<env>)`, and the app reads their app roles from it ([ADR 0026](../adr/0026-the-integration-console-signs-operators-in-with-easy-auth-and-checks-their-app-role.md), as for the Integration console); Entra signs in only the users assigned a role, and the presenter holds both. See [identity and access](../architecture/identity-and-access.md#agents).
 
 ## Tests
 
 - **Unit tests** (80% line coverage): the engine and the Check against both snapshots, the masking, the use cases, the role checks, the agent API (token, role, audience, GET only, the tracking hop), the page (bUnit), the local agent client against a fake MCP server, and the stand-in's second server.
 - **Architecture tests**: dependencies point inwards, no write tool, one role for the Agent, and only Infrastructure references the Foundry SDK.
-- **Integration tests**: #398. **UI tests**: #399.
+- **Integration tests**: #398 (locally) and #400 (in Azure). **UI tests**: #399.
+- **Policy and drift tests** ([HealthCheckAgentAzureTests](../../tests/Tms/Norvia.Tms.ArchitectureTests/HealthCheckAgentAzureTests.cs), `bicep snapshot`, nothing deployed): the MCP server has the contract's tools and no others, GET only; the policy gets the contract's role, the agent view as audience and a rate limit; both app registrations hold the one role and Entra issues no token without it; only API Management's identity is given a role in the Bicep; the app's identity holds Reader on the resource group and nothing else, and nothing on the Agent's side holds an Azure role. The stand-in's unit tests serve the same contract file, so the stand-in's tool list is the Bicep's.
+- **Unit tests of the Azure adapter** ([AzureEstateConfigurationTests](../../tests/HealthCheck/Norvia.HealthCheck.Infrastructure.UnitTests/Estate/AzureEstateConfigurationTests.cs)): faked Resource Graph and Service Bus answers mapped to the snapshots' shape, and the Foundry client against a faked Responses endpoint.
+- **Smoke run** (not in CI): [infra/smoke-test-estate-health-check.sh](../../infra/smoke-test-estate-health-check.sh), below.

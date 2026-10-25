@@ -202,6 +202,11 @@ if (!builder.ExecutionContext.IsPublishMode)
 
 simulator.WithEnvironment("PartnerPortal__BaseAddress", partnerPortal.GetEndpoint("http"));
 
+// The Estate health check, for the Integration operator. It has no database. Locally it reads a snapshot, and in Azure the estate (#392).
+var healthCheck = builder.AddProject<Projects.Norvia_HealthCheck_Web>("health-check-web")
+    .WithHttpHealthCheck("/health")
+    .WithUrlForEndpoint("http", url => url.DisplayText = "Estate health check");
+
 if (builder.ExecutionContext.IsPublishMode)
 {
     var estate = new Estate(builder);
@@ -214,7 +219,7 @@ if (builder.ExecutionContext.IsPublishMode)
     messaging.PublishAsExisting(estate.ServiceBusNamespace, null);
 
     var insights = builder.AddAzureApplicationInsights("insights").PublishAsExisting(estate.ApplicationInsights, null);
-    foreach (var project in new[] { tmsMigrations, tmsApi, tmsWeb, partnerPortalMigrations, partnerPortal, driverAppMigrations, driverAppApi, driverAppWeb, erpMigrations, erpWeb, erpApi, integrationConsole, simulatorMigrations, simulator })
+    foreach (var project in new[] { tmsMigrations, tmsApi, tmsWeb, partnerPortalMigrations, partnerPortal, driverAppMigrations, driverAppApi, driverAppWeb, erpMigrations, erpWeb, erpApi, integrationConsole, healthCheck, simulatorMigrations, simulator })
     {
         project.WithReference(insights);
     }
@@ -281,6 +286,24 @@ if (builder.ExecutionContext.IsPublishMode)
         .WithEnvironment("Agents__Api__GatewayClientId", estate.ApiManagementClientId)
         .PublishAsAzureContainerApp((infrastructure, app) =>
             infrastructure.Add(EntraSignIn.For(infrastructure, app, estate.IntegrationConsoleClientId, estate.EntraIssuer, ["/agent/v1/*"])));
+
+    // The Estate health check opens to the operators' browsers, as the Integration console does (ADR 0026): Easy Auth signs them in to the
+    // app's own app registration, whose app roles the app checks. It reads the estate as its own identity, which holds Reader on the
+    // estate's resource group (never the Agent's, #371), and asks the Agent published in the Foundry project as that identity too. Its
+    // agent API is outside Easy Auth's gate: it is no browser's, and it checks the token API Management sends and the one role itself.
+    var healthCheckIdentity = builder.AddAzureUserAssignedIdentity("health-check-identity")
+        .PublishAsExisting(estate.HealthCheckIdentity, null);
+    healthCheck.WithExternalHttpEndpoints()
+        .WithAzureUserAssignedIdentity(healthCheckIdentity)
+        .WithEnvironment("Estate__ResourceGroupId", estate.ResourceGroupId)
+        .WithEnvironment("Estate__ServiceBusNamespace", estate.ServiceBusNamespace)
+        .WithEnvironment("Agents__Enabled", estate.AgentsEnabled)
+        .WithEnvironment("Agents__Foundry__ProjectEndpoint", estate.FoundryProjectEndpoint)
+        .WithEnvironment("Agents__Api__Issuer", estate.EntraIssuer)
+        .WithEnvironment("Agents__Api__Audience", estate.HealthCheckAgentApiClientId)
+        .WithEnvironment("Agents__Api__GatewayClientId", estate.ApiManagementClientId)
+        .PublishAsAzureContainerApp((infrastructure, app) =>
+            infrastructure.Add(EntraSignIn.For(infrastructure, app, estate.HealthCheckClientId, estate.EntraIssuer, ["/agent/v1/*"])));
 
     // In Azure the Partner portal books through API Management as each Persona: it runs as the identity every Persona's
     // client app trusts, so it gets their tokens without a secret (ADR 0005), and reads their subscription keys from
@@ -521,10 +544,8 @@ else
 
     // The Estate health check, for the Integration operator. It has no database: locally it reads a snapshot of the estate's configuration, so
     // its Findings are the snapshot's and not the running estate's. The snapshot is the estate as found unless HealthCheck:Snapshot says
-    // "fixed" (user secrets or the launch profile). It is not part of the Azure deployment yet (#392).
-    var healthCheck = builder.AddProject<Projects.Norvia_HealthCheck_Web>("health-check-web")
-        .WithHttpHealthCheck("/health")
-        .WithUrlForEndpoint("http", url => url.DisplayText = "Estate health check")
+    // "fixed" (user secrets or the launch profile). In Azure it reads the real estate instead (#392).
+    healthCheck
         .WithEnvironment("LocalOperator__Name", $"{Environment.UserName} (local)")
         .WithEnvironment("LocalOperator__Roles__0", "HealthCheck.Run")
         .WithEnvironment("LocalOperator__Roles__1", "HealthCheck.Read")

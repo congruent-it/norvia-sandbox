@@ -2,7 +2,7 @@
 
 The Foundry account and projects the Agents run on ([ADR 0040](../adr/0040-agents-read-the-estate-through-api-management-have-no-write-tools-and-their-own-identity.md)), what the estate deploys of it, and the answers to the two spikes of #497. For engineers and coding agents working on the estate. Terms are defined in [GLOSSARY.md](../../GLOSSARY.md).
 
-One Agent is published: the Integration operations agent, into `norvia` ([Publishing the Agents](#publishing-the-agents)).
+Two Agents are published, both into `norvia`: the Integration operations agent and the Estate health-check agent ([Publishing the Agents](#publishing-the-agents)).
 
 ## What the estate deploys
 
@@ -15,7 +15,7 @@ One Agent is published: the Integration operations agent, into `norvia` ([Publis
 | Project `norvia-intake` | The **Intake agent's** project, with **no Application Insights connection** (spike 2). Endpoint `https://<account>.services.ai.azure.com/api/projects/norvia-intake` |
 | Model deployment | One, shared by both projects (a deployment belongs to the account), type **`DataZoneStandard`**: prompts and responses are processed inside the EU Data Boundary. `GlobalStandard` is not used. Capped at `foundryModelCapacity` (30 thousand tokens a minute by default, at most 100) |
 | Connection `application-insights` | On the `norvia` project, not the account: an account connection is shared with every project, so it would trace the Intake project too. Connects the estate's Application Insights, which turns on Foundry's server-side tracing for every agent in that project. The traces land in the same workspace as the Message trails, so the console can find an agent run |
-| Role assignments | The presenter, and any object ID in `ESTATE_FOUNDRY_USER_PRINCIPAL_IDS` (the pipeline that deploys the Agents), hold **Foundry User** on both projects: run agents and call models, no management. The Integration console's identity holds it on `norvia` only, to ask its Agent |
+| Role assignments | The presenter, and any object ID in `ESTATE_FOUNDRY_USER_PRINCIPAL_IDS` (the pipeline that deploys the Agents), hold **Foundry User** on both projects: run agents and call models, no management. The Integration console's identity and the Estate health check's hold it on `norvia` only, to ask their Agents |
 
 Every Foundry resource carries the cost tags `workload=foundry-agents` and `cost-category=ai-model`, and the project carries `agents-enabled`.
 
@@ -141,13 +141,13 @@ What it does not do: it does not turn the stateful Agent Service into a stateles
 
 [infra/deploy-agents.sh](../../infra/deploy-agents.sh) is the last azd postdeploy hook, so it runs after Aspire has deployed the apps whose addresses an Agent's MCP server needs. For each `agents/*.agent.yaml` ([agents/README.md](../../agents/README.md)) it:
 
-1. points the API Management backend of the Agent's server at the application (`integration-console-agent-api` at the console's `/agent/v1`) and stores `ESTATE_INTEGRATION_CONSOLE_BASE_URL`, so deploying the estate again keeps it;
+1. points the API Management backend of the Agent's server at the application (`integration-console-agent-api` at the console's `/agent/v1`, `health-check-agent-api` at the Estate health check's) and stores `ESTATE_INTEGRATION_CONSOLE_BASE_URL` or `ESTATE_HEALTH_CHECK_BASE_URL`, so deploying the estate again keeps it;
 2. makes the project's `<server>-mcp` connection with the agent-identity authentication type ([create-agent-connection.sh](../../infra/create-agent-connection.sh));
 3. creates the Agent's next version with `POST /agents/<name>/versions?api-version=v1` as a **prompt agent**: the model deployment (the definition's, or the estate's own when that one is not in the project), the instructions, the temperature, and one MCP tool with `require_approval: never`, the server's address, the connection, `allowed_tools` from the definition, and the header `X-Correlation-ID: {{correlationId}}`, with `correlationId` declared as a structured input. The caller supplies it on each response, so the Agent's tool calls join the trail it was asked about. Foundry can send a per-call header to an MCP tool, so there is no fallback to the conversation ID;
 4. reads the Agent's identity from `GET /agents/<name>` (`instance_identity`) and writes `.azure/<env>/published-agents.json`;
 5. runs [assign-agent-roles.sh](../../infra/assign-agent-roles.sh) with that file, which gives each identity its one read role.
 
-Publishing the same file again is a new version of the same Agent. The response limits (`max_output_tokens`, `max_tool_calls`) are the definition's and travel with each response, not in the version. The smoke run is [infra/smoke-test-integration-operations-agent.sh](../../infra/smoke-test-integration-operations-agent.sh) ([integration-console.md](integration-console.md#explain-and-the-agent-api)).
+Publishing the same file again is a new version of the same Agent. The response limits (`max_output_tokens`, `max_tool_calls`) are the definition's and travel with each response, not in the version. The smoke runs are [infra/smoke-test-integration-operations-agent.sh](../../infra/smoke-test-integration-operations-agent.sh) ([integration-console.md](integration-console.md#explain-and-the-agent-api)) and [infra/smoke-test-estate-health-check.sh](../../infra/smoke-test-estate-health-check.sh) ([estate-health-check.md](estate-health-check.md#smoke-run)).
 
 **Not yet verified in a tenant**, like the answers above: that `POST /agents/<name>/versions` takes this body and that the identity is on `instance_identity` as the Microsoft Learn page for publishing to Teams shows (the script also reads `identity`); that the MCP tool's header takes the structured input together with a project connection (the structured-inputs page says it does); and that `max_tool_calls` is accepted on a prompt-agent response. The first `azd up` with the Agents on settles them. If the first response is refused, the failure is in the smoke run's step 2, with Foundry's error code.
 

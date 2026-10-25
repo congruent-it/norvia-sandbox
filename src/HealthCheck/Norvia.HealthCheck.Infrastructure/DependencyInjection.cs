@@ -1,4 +1,8 @@
+using Azure.Core;
+using Azure.Identity;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Norvia.HealthCheck.Application.Estate;
 using Norvia.HealthCheck.Infrastructure.Agents;
@@ -8,14 +12,45 @@ namespace Norvia.HealthCheck.Infrastructure;
 
 public static class DependencyInjection
 {
+    /// <summary>
+    /// The client ID of the app's user-assigned managed identity, which the estate Bicep owns. Aspire sets it on the container app it
+    /// gives that identity.
+    /// </summary>
+    public const string ManagedIdentityClientIdKey = "AZURE_CLIENT_ID";
+
     public static IHostApplicationBuilder AddHealthCheckInfrastructure(this IHostApplicationBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        // Locally the estate's configuration is a snapshot; an adapter over Resource Graph and Azure Monitor replaces it in Azure (#392).
-        builder.Services.AddOptions<SnapshotOptions>().BindConfiguration(SnapshotOptions.SectionName).ValidateDataAnnotations().ValidateOnStart();
-        builder.Services.AddSingleton<IEstateConfiguration, SnapshotEstateConfiguration>();
+        builder.Services.TryAddSingleton(AppCredential(builder.Configuration));
+        if (builder.Configuration.GetSection(AzureEstateOptions.SectionName)[nameof(AzureEstateOptions.ResourceGroupId)] is { Length: > 0 })
+        {
+            // In Azure the estate's configuration is read from the real estate, as the app's own identity, which holds Reader on its resource group.
+            builder.Services.AddOptions<AzureEstateOptions>().BindConfiguration(AzureEstateOptions.SectionName).ValidateDataAnnotations().ValidateOnStart();
+            builder.Services.AddHttpClient(AzureEstateConfiguration.ManagementClient);
+            builder.Services.AddSingleton<IEstateConfiguration, AzureEstateConfiguration>();
+        }
+        else
+        {
+            // Locally nothing reads a running estate: the configuration is a snapshot.
+            builder.Services.AddOptions<SnapshotOptions>().BindConfiguration(SnapshotOptions.SectionName).ValidateDataAnnotations().ValidateOnStart();
+            builder.Services.AddSingleton<IEstateConfiguration, SnapshotEstateConfiguration>();
+        }
+
         builder.AddAgentClient();
         return builder;
     }
+
+    /// <summary>
+    /// What the adapters call Azure as. In Azure the app is its own managed identity: the one holding Reader on the estate's resource group, and
+    /// the one that asks the Agent. Locally, where a developer points it at a deployed estate, that is the developer's own sign-in.
+    /// </summary>
+    private static TokenCredential AppCredential(IConfiguration configuration) =>
+        configuration[ManagedIdentityClientIdKey] is { Length: > 0 } clientId
+            ? new ManagedIdentityCredential(ManagedIdentityId.FromUserAssignedClientId(clientId))
+            : new DefaultAzureCredential(new DefaultAzureCredentialOptions
+            {
+                ExcludeManagedIdentityCredential = true,
+                ExcludeWorkloadIdentityCredential = true,
+            });
 }

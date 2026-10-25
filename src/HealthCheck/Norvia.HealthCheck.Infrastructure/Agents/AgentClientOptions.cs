@@ -3,9 +3,10 @@ using System.ComponentModel.DataAnnotations;
 namespace Norvia.HealthCheck.Infrastructure.Agents;
 
 /// <summary>
-/// How the app reaches the Agent (ADR 0040, ADR 0041). Locally the Agent runs in process: the MCP server to call, the token to call it
-/// with (signed with the AppHost's local key, as the other local tokens are), and optionally a model deployment of the developer's
-/// own. A run may take only so long. The Foundry client for Azure comes with #392.
+/// How the app reaches the Agent (ADR 0040, ADR 0041). In Azure the Foundry client asks the Agent published in the project at
+/// <see cref="FoundryOptions.ProjectEndpoint"/>. Without a project endpoint the Agent runs in process: the MCP server to call, the token
+/// to call it with (signed with the AppHost's local key, as the other local tokens are), and optionally a model deployment of the
+/// developer's own. Either way a run may take only so long.
 /// </summary>
 public sealed class AgentClientOptions
 {
@@ -23,6 +24,21 @@ public sealed class AgentClientOptions
     public AgentTokenOptions Tokens { get; set; } = new();
 
     public AgentModelOptions Model { get; set; } = new();
+
+    public FoundryOptions Foundry { get; set; } = new();
+
+    /// <summary>Whether the Agent runs in Foundry, which is the case wherever the estate gave the app a project endpoint.</summary>
+    public bool UsesFoundry => Foundry.ProjectEndpoint is not null;
+}
+
+/// <summary>The Foundry project the Agent is published in (ADR 0040), which the app calls as its own managed identity.</summary>
+public sealed class FoundryOptions
+{
+    /// <summary>The project's endpoint, such as <c>https://&lt;account&gt;.services.ai.azure.com/api/projects/norvia</c>.</summary>
+    public Uri? ProjectEndpoint { get; set; }
+
+    /// <summary>The scope of the token the project takes.</summary>
+    public string Scope { get; set; } = "https://ai.azure.com/.default";
 }
 
 /// <summary>The Agent's local token: the identity it is, the role it holds and the key the MCP stand-in trusts.</summary>

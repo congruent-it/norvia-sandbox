@@ -7,8 +7,8 @@ namespace Norvia.HealthCheck.Infrastructure.Estate;
 
 /// <summary>
 /// The local adapter of <see cref="IEstateConfiguration"/>: it reads a JSON snapshot kept in the repo, so a local health check finds
-/// what the snapshot says and not what a running estate is. In Azure an adapter over Resource Graph and Azure Monitor produces the
-/// same shape (#392). The snapshots follow the as-found presets in <c>infra/presets</c>, and a test keeps them so.
+/// what the snapshot says and not what a running estate is. In Azure <see cref="AzureEstateConfiguration"/> produces the
+/// same shape. The snapshots follow the as-found presets in <c>infra/presets</c>, and a test keeps them so.
 /// </summary>
 internal sealed class SnapshotEstateConfiguration(IOptions<SnapshotOptions> options) : IEstateConfiguration
 {

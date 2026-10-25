@@ -157,6 +157,23 @@ azd env config set infra.parameters.estate_integration_console_agent_api_client_
 azd env set AZURE_ESTATE_API_MANAGEMENT_CLIENT_ID "$apim_client_id"
 azd env config set infra.parameters.estate_api_management_client_id "\"$apim_client_id\""
 
+# The Estate health check: its app registration (the one Easy Auth signs operators in to), its agent API's app registration (the audience of the
+# tokens API Management sends it) and its identity (Reader on the resource group). The estate is at its 64 outputs, so they are found by name
+# (infra/estate/health-check.bicep, infra/estate/health-check-mcp.bicep).
+health_check_client_id=$(az ad app list --filter "displayName eq 'Norvia Estate health check ($AZURE_ENV_NAME)'" --query '[0].appId' --output tsv)
+: "${health_check_client_id:?The estate has no Estate health check app registration}"
+health_check_agent_api_client_id=$(az ad app list --filter "displayName eq 'Norvia Estate health check agent API ($AZURE_ENV_NAME)'" --query '[0].appId' --output tsv)
+: "${health_check_agent_api_client_id:?The estate has no Estate health check agent API app registration}"
+health_check_identity_name=$(az identity list --subscription "$AZURE_SUBSCRIPTION_ID" --resource-group "rg-$AZURE_ENV_NAME" \
+  --query "[?starts_with(name, 'id-health-check-')].name | [0]" --output tsv)
+: "${health_check_identity_name:?The estate has no Estate health check identity}"
+azd env set AZURE_ESTATE_HEALTH_CHECK_CLIENT_ID "$health_check_client_id"
+azd env config set infra.parameters.estate_health_check_client_id "\"$health_check_client_id\""
+azd env set AZURE_ESTATE_HEALTH_CHECK_AGENT_API_CLIENT_ID "$health_check_agent_api_client_id"
+azd env config set infra.parameters.estate_health_check_agent_api_client_id "\"$health_check_agent_api_client_id\""
+azd env set AZURE_ESTATE_HEALTH_CHECK_IDENTITY_NAME "$health_check_identity_name"
+azd env config set infra.parameters.estate_health_check_identity_name "\"$health_check_identity_name\""
+
 # The seeded Drivers' Entra test users, whose domain and password the apps take as the Estate parameters azd asks for.
 # ARM returns an output's name with its first letter lowercased (estatE_...), so it is looked up in upper case.
 driver_app_registration_client_id=$(jq -r 'to_entries[] | select(.key | ascii_upcase == "ESTATE_DRIVER_APP_REGISTRATION_CLIENT_ID") | .value.value' "$work/outputs.json")

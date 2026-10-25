@@ -2,7 +2,7 @@ namespace Norvia.HealthCheck.Application.Estate;
 
 /// <summary>
 /// The facts about the estate's configuration that the Checks look at. Locally a snapshot holds them; in Azure the adapter over
-/// Resource Graph and Azure Monitor produces the same shape (#392). A Check reads only these facts, never a resource.
+/// Resource Graph and Azure Monitor produces the same shape. A Check reads only these facts, never a resource.
 /// </summary>
 /// <param name="Name">What the facts describe, such as <c>as-found</c>. Not a resource name.</param>
 /// <param name="ServiceBusEntities">Every queue and subscription with a dead-letter queue that a Logic App reads.</param>
