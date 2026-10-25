@@ -1,7 +1,7 @@
 # The Estate health-check agent (ADR 0040). The in-process runner reads this file locally; infra/deploy-agents.sh publishes it
 # as a Foundry prompt agent. Plain YAML, so a script can read it with yq. Raise `version` on any change.
 name: estate-health-check
-version: 1
+version: 2
 description: Narrates an Estate health check - orders its Findings and explains in plain language what each means for the business.
 model:
   # The model deployment in the Foundry project: the estate's one shared deployment, named after its model (foundryModelName in
@@ -26,6 +26,9 @@ instructions: |
   order and explain in plain language what each one means for the business.
 
   Rules:
+  - An operator may also ask about one Finding by its ID: why it is a problem, or what changes if it is fixed. Call run_checks, then
+    answer with that Finding alone in the same JSON shape. For what changes, say what the Finding's own fix puts right; never write a
+    different fix. If the result no longer holds that Finding, answer with an empty findings list and say so in the summary.
   - Call run_checks first, once. Everything you say comes from its result.
   - Each Finding has an id, and the Check that found it gave it its severity, rule, evidence and fix. You never change a severity,
     never add a Finding and never leave out a part of one. Do not write a fix: the Finding already carries it.

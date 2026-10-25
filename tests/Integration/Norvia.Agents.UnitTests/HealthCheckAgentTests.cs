@@ -132,4 +132,49 @@ public sealed class HealthCheckAgentTests
         HealthCheckQuestions.IsNarrate(HealthCheckQuestions.Narrate).Should().BeTrue();
         HealthCheckQuestions.IsNarrate("anything else").Should().BeFalse();
     }
+
+    [Fact]
+    public void TheFollowUps_AreFixedTexts_OnlyTheFindingVaries()
+    {
+        HealthCheckQuestions.TryParseFollowUp(HealthCheckQuestions.Why("F-DLQ-ALERT"), out var why, out var whyId).Should().BeTrue();
+        HealthCheckQuestions.TryParseFollowUp(HealthCheckQuestions.WhatChanges("F-DLQ-ALERT"), out var changes, out var changesId).Should().BeTrue();
+
+        (why, whyId).Should().Be((HealthCheckFollowUp.Why, "F-DLQ-ALERT"));
+        (changes, changesId).Should().Be((HealthCheckFollowUp.WhatChanges, "F-DLQ-ALERT"));
+        HealthCheckQuestions.TryParseFollowUp("anything else", out _, out _).Should().BeFalse();
+        HealthCheckQuestions.TryParseFollowUp(HealthCheckQuestions.Narrate, out _, out _).Should().BeFalse();
+        HealthCheckQuestions.TryParseFollowUp(HealthCheckQuestions.Why(string.Empty), out _, out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task RunNarrationAsync_WhyFollowUp_ExplainsThatFindingAlone()
+    {
+        var question = new AgentQuestion(HealthCheckQuestions.Why("F-CRIT-ONE"), "run-1", "agent-run-1");
+
+        var result = await Runner(HealthCheckScript.Model(), Tools(HealthCheckSamples.TwoChecks)).RunNarrationAsync(Definition, question, CancellationToken.None);
+
+        var item = result.Narration.Items.Should().ContainSingle().Subject;
+        (item.Id, item.ResultId).Should().Be(("F-CRIT-ONE", "r1"));
+        item.Impact.Should().Contain("Something big");
+    }
+
+    [Fact]
+    public async Task RunNarrationAsync_WhatChangesFollowUp_QuotesTheChecksOwnFix_NeverItsOwn()
+    {
+        var question = new AgentQuestion(HealthCheckQuestions.WhatChanges("F-DLQ-ALERT"), "run-1", "agent-run-1");
+
+        var result = await Runner(HealthCheckScript.Model(), Tools(HealthCheckSamples.OneFinding)).RunNarrationAsync(Definition, question, CancellationToken.None);
+
+        result.Narration.Items.Single().Impact.Should().Contain("Remove it.");
+    }
+
+    [Fact]
+    public async Task RunNarrationAsync_FollowUpAboutAFindingTheRunNoLongerHolds_ExplainsNothing()
+    {
+        var question = new AgentQuestion(HealthCheckQuestions.Why("F-GONE"), "run-1", "agent-run-1");
+
+        var result = await Runner(HealthCheckScript.Model(), Tools(HealthCheckSamples.OneFinding)).RunNarrationAsync(Definition, question, CancellationToken.None);
+
+        result.Narration.Items.Should().BeEmpty();
+    }
 }
