@@ -117,7 +117,7 @@ module server 'agent-mcp-server.bicep' = {
   params: {
     apiManagementName: apiManagementName
     serverName: contract.server
-    purpose: 'The Estate health-check agent\'s read-only view of the Estate health check: it runs the checklist and returns its Findings, with any secret masked. It changes nothing.'
+    purpose: 'The Estate health-check agent\'s read-only view of the Estate health check: it runs the checklist and returns its Findings, with any secret masked, and lists the Logic Apps that failed and the dead-letter queues that hold messages, each with whether an alert watches it. It changes nothing.'
     tools: contract.tools
     audience: view.appId
     requiredRole: role

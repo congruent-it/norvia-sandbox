@@ -18,6 +18,9 @@ public static class HealthCheckScript
     /// <summary>The Check whose Finding is a queue or subscription with no alert on its dead-letter queue.</summary>
     public const string DeadLetterAlertCheck = "DLQ-ALERT";
 
+    /// <summary>The Checks whose Finding pairs a failure with a missing alert: it failed and nobody was told.</summary>
+    public static readonly IReadOnlyList<string> UntoldFailureChecks = ["FAILED-RUNS-UNTOLD", "DLQ-UNTOLD"];
+
     private static readonly string[] SeverityOrder = ["Critical", "High", "Medium", "Low"];
 
     public static IChatClient Model() => new ScriptedChatClient(Next);
@@ -80,7 +83,12 @@ public static class HealthCheckScript
     }
 
     private static string Impact(FindingFacts finding) =>
-        finding.CheckId == DeadLetterAlertCheck
+        UntoldFailureChecks.Contains(finding.CheckId, StringComparer.Ordinal)
+            ? $"{finding.Title}. {string.Join(" ", finding.Details)} Nobody was told, so the business step behind it stopped unnoticed. " +
+              (finding.Subjects.Contains("carrier-tracking", StringComparer.Ordinal)
+                  ? "This is the Carrier-tracking incident: the Carrier's status message failed in the integration layer, the Shipment stayed In transit, and no alert told anyone."
+                  : "Until an alert exists, the failures have to be found by hand.")
+        : finding.CheckId == DeadLetterAlertCheck
             ? $"{Subjects(finding)} no alert watches the dead-letter queue. When a message is dead-lettered there, nobody is told: it waits unnoticed and the business step behind it stops. " +
               (finding.Subjects.Contains("carrier-tracking", StringComparer.Ordinal)
                   ? "This is how the Carrier-tracking incident went unseen: the Carrier's status message dead-lettered, the Shipment stayed In transit, and nobody was told."
@@ -115,7 +123,8 @@ public static class HealthCheckScript
                         Text(finding, "title") ?? "A Check failed",
                         Text(finding, "rule") ?? string.Empty,
                         Text(finding, "fix") ?? string.Empty,
-                        SubjectsOf(finding))),
+                        SubjectsOf(finding),
+                        DetailsOf(finding))),
             ];
         }
         catch (JsonException)
@@ -129,8 +138,13 @@ public static class HealthCheckScript
             ? [.. evidence.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.Object).Select(item => Text(item, "subject")).OfType<string>()]
             : [];
 
+    private static List<string> DetailsOf(JsonElement finding) =>
+        finding.TryGetProperty("evidence", out var evidence) && evidence.ValueKind == JsonValueKind.Array
+            ? [.. evidence.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.Object).Select(item => Text(item, "detail")).OfType<string>()]
+            : [];
+
     private static string? Text(JsonElement element, string property) =>
         element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
 
-    private sealed record FindingFacts(string Id, string CheckId, string Severity, string Title, string Rule, string Fix, List<string> Subjects);
+    private sealed record FindingFacts(string Id, string CheckId, string Severity, string Title, string Rule, string Fix, List<string> Subjects, List<string> Details);
 }

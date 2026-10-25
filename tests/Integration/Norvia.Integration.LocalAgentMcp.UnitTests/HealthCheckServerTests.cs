@@ -58,7 +58,7 @@ public sealed class HealthCheckServerTests : IAsyncLifetime
 
         var tools = (await BodyAsync(response))["result"]!["tools"]!.AsArray();
         var contract = ToolListContract.Parse(Embedded("health-check.tools.json"));
-        tools.Select(tool => tool!["name"]!.GetValue<string>()).Should().Equal(contract.Tools.Select(tool => tool.Name)).And.Equal("run_checks");
+        tools.Select(tool => tool!["name"]!.GetValue<string>()).Should().Equal(contract.Tools.Select(tool => tool.Name)).And.Equal("run_checks", "list_failed_runs", "list_dead_letter_queues");
         tools.Select(tool => tool!["description"]!.GetValue<string>()).Should().Equal(contract.Tools.Select(tool => tool.Description));
         tools[0]!["inputSchema"]!["required"]!.AsArray().Should().BeEmpty();
     }
@@ -215,7 +215,8 @@ public sealed class HealthCheckServerTests : IAsyncLifetime
         var source = new McpToolSource(http, new Uri(http.BaseAddress!, "/mcp/health-check"));
 
         await using var session = await source.OpenAsync(new ToolContext("run-1", "X-Correlation-ID"), TestContext.Current.CancellationToken);
-        var tool = session.Tools.Should().ContainSingle().Subject;
+        session.Tools.Select(candidate => candidate.Name).Should().Equal("run_checks", "list_failed_runs", "list_dead_letter_queues");
+        var tool = session.Tools.Single(candidate => candidate.Name == "run_checks");
         var raw = await tool.InvokeAsync(new Microsoft.Extensions.AI.AIFunctionArguments(), TestContext.Current.CancellationToken);
 
         tool.Name.Should().Be("run_checks");

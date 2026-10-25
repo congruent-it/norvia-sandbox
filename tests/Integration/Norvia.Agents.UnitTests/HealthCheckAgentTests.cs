@@ -17,15 +17,16 @@ public sealed class HealthCheckAgentTests
     private static FakeToolSource Tools(string answer) => new(new Dictionary<string, Func<string>> { ["run_checks"] = () => answer });
 
     [Fact]
-    public void TheDefinition_IsTheOneAgentWithTheOneReadTool_OfTheHealthCheckServer()
+    public void TheDefinition_IsTheOneAgentWithTheReadTools_OfTheHealthCheckServer()
     {
         var contract = ToolListContract.Parse(Embedded.HealthCheckTools);
 
         Definition.Name.Should().Be("estate-health-check");
         Definition.Tools.Server.Should().Be("health-check").And.Be(contract.Server);
-        Definition.Tools.Names.Should().Equal("run_checks");
+        Definition.Tools.Names.Should().Equal("run_checks", "list_failed_runs", "list_dead_letter_queues");
         contract.Role.Should().Be("HealthCheck.Agent.Read");
-        contract.Tools.Should().ContainSingle().Which.IsRead.Should().BeTrue();
+        contract.Tools.Select(tool => tool.Name).Should().Equal(Definition.Tools.Names);
+        contract.Tools.Should().OnlyContain(tool => tool.IsRead);
         contract.Unknown(Definition).Should().BeEmpty();
         Definition.Model.MaxToolCalls.Should().BeGreaterThanOrEqualTo(1);
     }
@@ -47,6 +48,16 @@ public sealed class HealthCheckAgentTests
         item.Impact.Should().Contain("nobody is told", because: "that is what a missing dead-letter alert means").And.Contain("Carrier-tracking incident", because: "the evidence names carrier-tracking");
         tools.Opened.Should().Be(new ToolContext("run-1", "X-Correlation-ID"));
         tools.Disposed.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task RunNarrationAsync_AFailureNobodyWasToldAbout_SaysHowOftenItFailedAndLinksItToTheIncident()
+    {
+        var result = await Runner(HealthCheckScript.Model(), Tools(HealthCheckSamples.UntoldFailures)).RunNarrationAsync(Definition, Question, CancellationToken.None);
+
+        var item = result.Narration.Items.Should().ContainSingle().Subject;
+        item.Id.Should().Be("F-FAILED-RUNS-UNTOLD");
+        item.Impact.Should().Contain("failed 14 times").And.Contain("Nobody was told").And.Contain("Carrier-tracking incident");
     }
 
     [Fact]

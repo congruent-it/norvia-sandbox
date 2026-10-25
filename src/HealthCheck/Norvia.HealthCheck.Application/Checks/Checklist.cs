@@ -13,6 +13,8 @@ public sealed class Checklist(IReadOnlyList<Check> checks)
     [
         new FailedRunAlertCheck(),
         new DeadLetterAlertCheck(),
+        new UntoldFailedRunsCheck(),
+        new UntoldDeadLettersCheck(),
         new AlertReceiverCheck(),
         new InlinedCarrierSecretCheck(),
         new AppInsightsRetentionCheck(),

@@ -28,6 +28,7 @@ public static class DependencyInjection
             // In Azure the estate's configuration is read from the real estate, as the app's own identity, which holds Reader on its resource group.
             builder.Services.AddOptions<AzureEstateOptions>().BindConfiguration(AzureEstateOptions.SectionName).ValidateDataAnnotations().ValidateOnStart();
             builder.Services.AddHttpClient(AzureEstateConfiguration.ManagementClient);
+            builder.Services.TryAddSingleton(TimeProvider.System);
             builder.Services.AddSingleton<IEstateConfiguration, AzureEstateConfiguration>();
         }
         else

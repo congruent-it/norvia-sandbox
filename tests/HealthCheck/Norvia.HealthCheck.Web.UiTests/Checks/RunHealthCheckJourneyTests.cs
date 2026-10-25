@@ -13,7 +13,7 @@ namespace Norvia.HealthCheck.Web.UiTests.Checks;
 public sealed class RunHealthCheckJourneyTests(HealthCheckUiFixture fixture) : BrowserPage(fixture)
 {
     /// <summary>One Finding for each toggle the as-found preset turns on (infra/presets/as-found.json).</summary>
-    private const int AsFoundFindings = 13;
+    private const int AsFoundFindings = 15;
 
     private ILocator FindingOf(string id) =>
         Page.GetByTestId("finding").Filter(new() { Has = Page.GetByTestId("finding-id").Filter(new() { HasTextRegex = new Regex($"^{id}$") }) });

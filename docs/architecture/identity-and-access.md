@@ -216,7 +216,7 @@ Each Agent ([ADR 0040](../adr/0040-agents-read-the-estate-through-api-management
 | Agent identity | Calls | Holds |
 |---|---|---|
 | Integration operations agent | The Integration console's agent API, through API Management MCP: Message trails, Logic App runs, failed runs, dead-letter queue counts and a peek of dead-lettered messages, never a body | `IntegrationConsole.Agent.Read` |
-| Estate health-check agent | The Estate health check's agent API (`/agent/v1/checks`, the tool `run_checks`) | `HealthCheck.Agent.Read`. The health-check app's own managed identity holds Reader on the estate's resource group, never the Agent |
+| Estate health-check agent | The Estate health check's agent API (`/agent/v1/checks`, `/agent/v1/failed-runs` and `/agent/v1/dead-letter-queues`, the tools `run_checks`, `list_failed_runs` and `list_dead_letter_queues`) | `HealthCheck.Agent.Read`. The health-check app's own managed identity holds Reader on the estate's resource group, never the Agent |
 | Customer service agent | The TMS agent view for Customer service | `TransportOrders.CustomerServiceAgent.Read` |
 | Customer service reply agent | One tool, the Shipper view | A role of its own, only for that tool |
 | Planner agent | The TMS agent view for the Planner | `TransportOrders.PlannerAgent.Read` |

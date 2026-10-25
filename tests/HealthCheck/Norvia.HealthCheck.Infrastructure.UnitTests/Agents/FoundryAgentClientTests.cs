@@ -89,7 +89,7 @@ public sealed class FoundryAgentClientTests : IDisposable
         body["agent_reference"]!["type"]!.GetValue<string>().Should().Be("agent_reference");
         body["structured_inputs"]!["correlationId"]!.GetValue<string>().Should().Be(CorrelationId);
         body["store"]!.GetValue<bool>().Should().BeFalse();
-        body["max_tool_calls"]!.GetValue<int>().Should().Be(2, because: "the definition's cap");
+        body["max_tool_calls"]!.GetValue<int>().Should().Be(4, because: "the definition's cap");
         body["max_output_tokens"]!.GetValue<int>().Should().Be(1500);
         body["conversation"].Should().BeNull("no conversation is made (docs/operations/foundry.md, spike 3)");
     }
@@ -220,7 +220,7 @@ public sealed class FoundryAgentClientTests : IDisposable
     [Fact]
     public async Task NarrateAsync_WhenTheAgentMadeMoreCallsThanTheDefinitionAllows_IsAgentToolRefused()
     {
-        _foundry.Answer(Response(McpCall("run_checks"), McpCall("run_checks"), McpCall("run_checks"), Message(Answer)));
+        _foundry.Answer(Response(McpCall("run_checks"), McpCall("run_checks"), McpCall("run_checks"), McpCall("run_checks"), McpCall("run_checks"), Message(Answer)));
 
         var result = await Client().NarrateAsync(Request, TestContext.Current.CancellationToken);
 

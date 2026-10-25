@@ -27,7 +27,8 @@ public sealed class ChecklistAgainstSnapshotsTests
 
         view["estate"]!.GetValue<string>().Should().Be(snapshot);
         view["checksRun"]!.GetValue<int>().Should().Be(Checklist.Default.Checks.Count, "a missing Finding must mean the Check passed, not that it did not run");
-        var findings = Findings(view);
+        // The Findings that pair a failure with a missing alert (#395) come from the failures a snapshot holds and share the alert Checks' toggles.
+        var findings = ToggleFindings(view);
         findings.Select(finding => finding.AsFoundToggle).Should().BeEquivalentTo(TogglesOn(snapshot), "a Check fires for its toggle and only its toggle");
         findings.Select(finding => finding.AsFoundToggle).Should().OnlyHaveUniqueItems("a toggle gives one Finding, however many resources it names");
     }
@@ -38,7 +39,7 @@ public sealed class ChecklistAgainstSnapshotsTests
     {
         await using var host = new HealthCheckAgentHost(snapshot);
 
-        var findings = Findings(await RunChecksAsync(host));
+        var findings = ToggleFindings(await RunChecksAsync(host));
 
         foreach (var finding in findings)
         {
@@ -77,7 +78,7 @@ public sealed class ChecklistAgainstSnapshotsTests
     [Fact]
     public void EveryToggleOfTheAsFoundEstate_HasACheck_AndEveryCheckNamesAToggleOfItsOwn()
     {
-        var checks = Checklist.Default.Checks;
+        var checks = Checklist.Default.Checks.Where(check => check is not UntoldFailureCheck).ToList();
 
         // The presets are the toggles of #377; the Checks with a toggle outside them are the agent toggles of #369.
         var presetToggles = Preset("as-found").Select(toggle => toggle.Key).ToList();
@@ -136,6 +137,11 @@ public sealed class ChecklistAgainstSnapshotsTests
             _ => false,
         }).Select(toggle => toggle.Key),
     ];
+
+    // The Findings that pair a failure with a missing alert (#395) come from the failures a snapshot holds and name only the resources that failed,
+    // so a toggle's list does not describe them. Their own cases are in #404.
+    private static List<FindingRow> ToggleFindings(JsonNode view) =>
+        [.. Findings(view).Where(finding => finding.CheckId is not (UntoldFailedRunsCheck.CheckId or UntoldDeadLettersCheck.CheckId))];
 
     private static List<FindingRow> Findings(JsonNode view) =>
     [

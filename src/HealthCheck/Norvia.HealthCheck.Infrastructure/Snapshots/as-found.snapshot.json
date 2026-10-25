@@ -3,7 +3,8 @@
   "serviceBusEntities": [
     {
       "name": "carrier-tracking",
-      "hasDeadLetterAlert": false
+      "hasDeadLetterAlert": false,
+      "deadLetteredMessages": 3
     },
     {
       "name": "carrier-proof-of-delivery",
@@ -115,7 +116,8 @@
     {
       "name": "carrier-tracking",
       "hasFailedRunAlert": false,
-      "recordsTrackedProperties": true
+      "recordsTrackedProperties": true,
+      "failedRuns": 14
     },
     {
       "name": "carrier-proof-of-delivery",

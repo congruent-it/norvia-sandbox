@@ -7,6 +7,18 @@
       "description": "Runs the estate's health check and returns its Findings: each with its ID, the ID, rule and severity of the Check that found it, the evidence (the resources concerned, with any secret masked), the as-found toggle it maps to and the fix. Severity and fix are the Check's own. Returns an empty list when every Check passed. Reads configuration only and changes nothing.",
       "method": "GET",
       "path": "/checks"
+    },
+    {
+      "name": "list_failed_runs",
+      "description": "Lists the Logic Apps that failed in the last four days, the most failed first: each with its flow, how many runs failed and whether an alert watches its failed runs. Only Logic Apps that failed are listed. Reads configuration and metrics only and changes nothing.",
+      "method": "GET",
+      "path": "/failed-runs"
+    },
+    {
+      "name": "list_dead_letter_queues",
+      "description": "Lists the Service Bus queues and subscriptions whose dead-letter queue holds messages, the fullest first: each with its name, how many messages it holds and whether an alert watches the queue. Only queues that hold messages are listed. Never a message body; reads only and changes nothing.",
+      "method": "GET",
+      "path": "/dead-letter-queues"
     }
   ]
 }

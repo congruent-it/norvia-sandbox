@@ -23,11 +23,13 @@ public sealed class HealthCheckAgentTests
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    // One Finding for each toggle the as-found preset turns on (infra/presets/as-found.json).
+    // One Finding for each toggle the as-found preset turns on (infra/presets/as-found.json), and the two that pair the tracking failures
+    // the as-found snapshot holds with their missing alerts (#395).
     private static readonly string[] AsFoundFindings =
     [
         "F-FAILED-RUN-ALERT", "F-DLQ-ALERT", "F-LIFECYCLE-INBOUND", "F-PROOF-HOT-TIER", "F-MALWARE-SCANNING", "F-SECRET-INLINED", "F-APPINSIGHTS-RETENTION",
         "F-TRACKED-PROPERTIES", "F-STALE-THRESHOLDS", "F-PROOF-MISSING-THRESHOLD", "F-APIM-CACHE", "F-APIM-RATE-LIMIT", "F-CONVERSATION-SWEEPER",
+        "F-FAILED-RUNS-UNTOLD", "F-DLQ-UNTOLD",
     ];
 
     [Fact]

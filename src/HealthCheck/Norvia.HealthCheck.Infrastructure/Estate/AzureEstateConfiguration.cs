@@ -29,7 +29,8 @@ namespace Norvia.HealthCheck.Infrastructure.Estate;
 internal sealed partial class AzureEstateConfiguration(
     IHttpClientFactory clients,
     TokenCredential credential,
-    IOptions<AzureEstateOptions> options) : IEstateConfiguration
+    IOptions<AzureEstateOptions> options,
+    TimeProvider time) : IEstateConfiguration
 {
     public const string ManagementClient = "estate-management";
 
@@ -41,6 +42,7 @@ internal sealed partial class AzureEstateConfiguration(
     private const string ResourceGraphAddress = $"{Management}/providers/Microsoft.ResourceGraph/resources?api-version=2022-10-01";
     private const string DeadLetterMetric = "DeadletteredMessages";
     private const string FailedRunsMetric = "WorkflowRunsCompleted";
+    private const string MetricsApiVersion = "api-version=2018-01-01";
     private const string StorageApiVersion = "api-version=2024-01-01";
     private const string DefenderApiVersion = "api-version=2022-12-01-preview";
     private const string ApiManagementApiVersion = "api-version=2024-05-01";
@@ -63,8 +65,8 @@ internal sealed partial class AzureEstateConfiguration(
         var watching = alerts.Where(alert => alert.Enabled && alert.Scopes.Contains(namespaceId, StringComparer.OrdinalIgnoreCase)).ToList();
 
         var entities = (await ReadEntitiesAsync(namespaceId, cancellationToken))
-            .Distinct(StringComparer.Ordinal)
-            .Select(name => new ServiceBusEntity(name, watching.Exists(alert => alert.Watches(name))))
+            .DistinctBy(entity => entity.Name, StringComparer.Ordinal)
+            .Select(entity => new ServiceBusEntity(entity.Name, watching.Exists(alert => alert.Watches(entity.Name)), entity.DeadLetteredMessages))
             .ToList();
 
         var logicApps = await QueryAsync(group, "microsoft.web/sites", "| where kind contains 'workflowapp' | project id, name, enabled = tobool(properties.enabled), workload = tostring(tags.workload)", cancellationToken);
@@ -73,12 +75,20 @@ internal sealed partial class AzureEstateConfiguration(
         var retention = await ReadRetentionAsync(group, cancellationToken);
         var (inbound, transit, proofs) = await ReadStorageAsync(group, cancellationToken);
 
+        var flows = new List<LogicAppFlow>();
+        foreach (var app in logicApps)
+        {
+            var id = app["id"]?.GetValue<string>() ?? string.Empty;
+            flows.Add(new LogicAppFlow(
+                app["name"]?.GetValue<string>() ?? string.Empty,
+                alerts.Exists(alert => alert.Enabled && alert.WatchesFailedRuns && alert.Scopes.Contains(id, StringComparer.OrdinalIgnoreCase)),
+                RecordsTrackedProperties: null,
+                FailedRuns: await ReadFailedRunsAsync(id, cancellationToken)));
+        }
+
         return new EstateConfiguration(EstateName, entities)
         {
-            Flows = [.. logicApps.Select(app => new LogicAppFlow(
-                app["name"]?.GetValue<string>() ?? string.Empty,
-                alerts.Exists(alert => alert.Enabled && alert.WatchesFailedRuns && alert.Scopes.Contains(app["id"]?.GetValue<string>() ?? string.Empty, StringComparer.OrdinalIgnoreCase)),
-                RecordsTrackedProperties: null))],
+            Flows = flows,
             AlertReceivers = await ReadAlertReceiversAsync(group, cancellationToken),
             Storage = new StorageFacts(
                 inbound.HasLifecycleRule,
@@ -247,14 +257,34 @@ internal sealed partial class AzureEstateConfiguration(
         ];
     }
 
-    // Every queue, and every subscription of every topic, that a Logic App reads: the exempt subscriptions are left out.
-    private async Task<List<string>> ReadEntitiesAsync(string namespaceId, CancellationToken cancellationToken)
+    // How many runs of a Logic App failed in the failure window, or null when Azure Monitor has no such metric for it, from Azure Monitor's WorkflowRunsCompleted metric (the one the failed-run alert watches).
+    private async Task<int?> ReadFailedRunsAsync(string logicAppId, CancellationToken cancellationToken)
+    {
+        var end = time.GetUtcNow();
+        var start = end.AddDays(-EstateConfiguration.FailureWindowDays);
+        var address = $"{Management}{logicAppId}/providers/microsoft.insights/metrics?{MetricsApiVersion}&metricnames={FailedRunsMetric}&aggregation=Total"
+            + $"&timespan={Uri.EscapeDataString($"{start:yyyy-MM-ddTHH:mm:ssZ}/{end:yyyy-MM-ddTHH:mm:ssZ}")}&interval=P1D&$filter={Uri.EscapeDataString("status eq 'Failed'")}";
+        var answer = await TrySendAsync(HttpMethod.Get, address, null, notFoundIsAnAnswer: true, cancellationToken);
+        if (answer is null)
+        {
+            return null;
+        }
+
+        var total = (answer["value"] as JsonArray ?? [])
+            .SelectMany(metric => metric?["timeseries"] as JsonArray ?? [])
+            .SelectMany(series => series?["data"] as JsonArray ?? [])
+            .Sum(point => point?["total"]?.GetValue<double>() ?? 0);
+        return (int)Math.Round(total);
+    }
+
+    // Every queue, and every subscription of every topic, that a Logic App reads, with the dead-lettered messages it holds: the exempt subscriptions are left out.
+    private async Task<List<(string Name, int? DeadLetteredMessages)>> ReadEntitiesAsync(string namespaceId, CancellationToken cancellationToken)
     {
         var address = $"{Management}{namespaceId}";
-        var entities = new List<string>();
+        var entities = new List<(string, int?)>();
         foreach (var queue in await ListAsync($"{address}/queues?{ServiceBusApiVersion}", cancellationToken))
         {
-            entities.Add(Name(queue));
+            entities.Add((Name(queue), DeadLettered(queue)));
         }
 
         foreach (var topic in await ListAsync($"{address}/topics?{ServiceBusApiVersion}", cancellationToken))
@@ -264,13 +294,15 @@ internal sealed partial class AzureEstateConfiguration(
             {
                 if (!Exemptions.Subscriptions.Contains($"{topicName}/{Name(subscription)}"))
                 {
-                    entities.Add(Name(subscription));
+                    entities.Add((Name(subscription), DeadLettered(subscription)));
                 }
             }
         }
 
         return entities;
     }
+
+    private static int? DeadLettered(JsonNode entity) => entity["properties"]?["countDetails"]?["deadLetterMessageCount"]?.GetValue<int>();
 
     private static string Name(JsonNode resource) => resource["name"]?.GetValue<string>() ?? throw new InvalidOperationException("A Service Bus entity has no name.");
 
