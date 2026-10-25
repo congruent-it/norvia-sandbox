@@ -66,7 +66,9 @@ public sealed class AzureHealthCheckTests
         var requests = host.Azure.Requests;
         requests.Should().OnlyContain(request => request.Authorization == "Bearer app-token");
         requests.Should().OnlyContain(request => request.Method == HttpMethod.Post || request.Method == HttpMethod.Get, "the adapter only reads");
-        requests.Where(request => request.Method == HttpMethod.Post).Should().ContainSingle().Which.Body.Should().Contain("00000000-0000-0000-0000-00000000000a").And.Contain("rg-norvia");
+        requests.Where(request => request.Method == HttpMethod.Post).Should().OnlyContain(
+            request => request.Uri.Contains("ResourceGraph", StringComparison.Ordinal) && request.Body.Contains("00000000-0000-0000-0000-00000000000a", StringComparison.Ordinal) && request.Body.Contains("rg-norvia", StringComparison.Ordinal),
+            "the only things posted are queries over the estate's resource group");
         requests.Where(request => request.Method == HttpMethod.Get).Should().OnlyContain(request => request.Uri.Contains(AzureHost.NamespaceId, StringComparison.Ordinal));
     }
 

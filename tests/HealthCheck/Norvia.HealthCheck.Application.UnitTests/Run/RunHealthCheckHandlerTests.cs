@@ -21,7 +21,7 @@ public sealed class RunHealthCheckHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Estate.Should().Be("as-found");
-        result.Value.ChecksRun.Should().Be(1);
+        result.Value.ChecksRun.Should().Be(Checklist.Default.Checks.Count);
         result.Value.RanAt.Should().Be(_time.GetUtcNow());
         result.Value.Findings.Should().ContainSingle().Which.CheckId.Should().Be("DLQ-ALERT");
     }
@@ -34,6 +34,6 @@ public sealed class RunHealthCheckHandlerTests
         var result = await Handler().Handle(new RunHealthCheckQuery(), TestContext.Current.CancellationToken);
 
         result.Value.Findings.Should().BeEmpty();
-        result.Value.ChecksRun.Should().Be(1, because: "no Finding must be told from nothing having run");
+        result.Value.ChecksRun.Should().Be(Checklist.Default.Checks.Count, because: "no Finding must be told from nothing having run");
     }
 }

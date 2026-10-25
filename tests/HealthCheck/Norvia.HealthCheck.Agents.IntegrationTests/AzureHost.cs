@@ -168,7 +168,9 @@ internal sealed class FakeAzure : HttpMessageHandler
 
         if (address.Contains("ResourceGraph", StringComparison.Ordinal))
         {
-            return Json(new JsonObject { ["data"] = new JsonArray(_alerts.Select(alert => (JsonNode?)alert.DeepClone()).ToArray()) });
+            // Only the metric alerts are set; every other query over the estate's resources finds nothing, so those facts are unknown.
+            var alerts = body.Contains("microsoft.insights/metricalerts", StringComparison.Ordinal) ? _alerts : [];
+            return Json(new JsonObject { ["data"] = new JsonArray(alerts.Select(alert => (JsonNode?)alert.DeepClone()).ToArray()) });
         }
 
         if (address.StartsWith(Address + "/queues?", StringComparison.Ordinal))

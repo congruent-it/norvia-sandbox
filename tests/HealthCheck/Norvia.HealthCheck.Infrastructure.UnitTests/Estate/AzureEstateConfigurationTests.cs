@@ -171,15 +171,182 @@ public sealed class AzureEstateConfigurationTests : IDisposable
 
         await Adapter().ReadAsync(TestContext.Current.CancellationToken);
 
-        var graph = _azure.Requests.Single(request => request.Uri.Contains("ResourceGraph", StringComparison.Ordinal));
+        var graph = _azure.Requests.Single(request => request.Uri.Contains("ResourceGraph", StringComparison.Ordinal) && request.Body.Contains("microsoft.insights/metricalerts", StringComparison.Ordinal));
         graph.Method.Should().Be(HttpMethod.Post);
         var body = JsonNode.Parse(graph.Body)!;
         body["subscriptions"]!.AsArray().Select(id => id!.GetValue<string>()).Should().Equal("00000000-0000-0000-0000-00000000000a");
-        body["query"]!.GetValue<string>().Should().Contain("microsoft.insights/metricalerts").And.Contain("resourceGroup =~ 'rg-norvia'");
+        body["query"]!.GetValue<string>().Should().Contain("resourceGroup =~ 'rg-norvia'");
         _azure.Requests.Should().OnlyContain(request => request.Authorization == "Bearer app-token");
-        _azure.Requests.Where(request => request.Method != HttpMethod.Get).Should().ContainSingle("the only thing posted is the query; nothing is written");
+        _azure.Requests.Where(request => request.Method != HttpMethod.Get).Should().OnlyContain(
+            request => request.Uri.Contains("ResourceGraph", StringComparison.Ordinal),
+            "the only things posted are queries; nothing is written");
         await _credential.Received().GetTokenAsync(
             Arg.Is<TokenRequestContext>(context => context.Scopes.Single() == "https://management.azure.com/.default"), Arg.Any<CancellationToken>());
+    }
+
+    private const string AppsBase = $"{ResourceGroupId}/providers";
+    private const string InboundId = $"{AppsBase}/Microsoft.Storage/storageAccounts/stinboundabc";
+    private const string TransitId = $"{AppsBase}/Microsoft.Storage/storageAccounts/stdriverabc";
+    private const string TmsStorageId = $"{AppsBase}/Microsoft.Storage/storageAccounts/storageabc";
+    private const string ApiManagementId = $"{AppsBase}/Microsoft.ApiManagement/service/apim-abc";
+
+    private static JsonObject Row(params (string Key, JsonNode? Value)[] cells)
+    {
+        var row = new JsonObject();
+        foreach (var (key, value) in cells)
+        {
+            row[key] = value;
+        }
+
+        return row;
+    }
+
+    private static string LifecyclePolicy(string prefix, string action) =>
+        new JsonObject
+        {
+            ["properties"] = new JsonObject
+            {
+                ["policy"] = new JsonObject
+                {
+                    ["rules"] = new JsonArray(new JsonObject
+                    {
+                        ["enabled"] = true,
+                        ["definition"] = new JsonObject
+                        {
+                            ["filters"] = new JsonObject { ["prefixMatch"] = new JsonArray(prefix) },
+                            ["actions"] = new JsonObject { ["baseBlob"] = new JsonObject { [action] = new JsonObject { ["daysAfterModificationGreaterThan"] = 30 } } },
+                        },
+                    }),
+                },
+            },
+        }.ToJsonString();
+
+    private async Task<Norvia.HealthCheck.Application.Estate.EstateConfiguration> ReadEmptyEstateAsync()
+    {
+        _azure.Entities(queues: [], subscriptions: []).Alerts();
+        return await Adapter().ReadAsync(TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task ReadAsync_WhatReaderCannotSee_IsLeftUnknown_NotHealthy()
+    {
+        var estate = await ReadEmptyEstateAsync();
+
+        estate.InlinedCarrierSecrets.Should().BeNull("a Logic App's settings need more than Reader");
+        estate.DriverReportsReportBack.Should().BeNull();
+        estate.Agents.Should().BeNull();
+        estate.AlertReceivers.Should().BeNull();
+        estate.Retention.Should().BeNull();
+        estate.ConversationSweeperRuns.Should().BeNull();
+        estate.Storage.Should().Be(new Norvia.HealthCheck.Application.Estate.StorageFacts(null, null, null, null));
+        estate.BusinessSafetyNets.Should().Be(new Norvia.HealthCheck.Application.Estate.BusinessSafetyNetFacts(null, null, null));
+        estate.ApiManagement.Should().Be(new Norvia.HealthCheck.Application.Estate.ApiManagementFacts(null, null));
+        Checklist.Default.Run(estate).Should().BeEmpty("a Check gives no Finding for what it could not see");
+    }
+
+    [Theory]
+    [InlineData(0, "ALERT-RECEIVER")]
+    [InlineData(1, null)]
+    public async Task ReadAsync_CountsTheReceiversOfTheActionGroup(int receivers, string? finding)
+    {
+        _azure.Resources("microsoft.insights/actiongroups", Row(("enabled", true), ("receivers", receivers)));
+
+        var estate = await ReadEmptyEstateAsync();
+
+        estate.AlertReceivers.Should().Be(receivers);
+        Checklist.Default.Run(estate).Select(item => item.CheckId).Should().Equal(finding is null ? [] : [finding]);
+    }
+
+    [Fact]
+    public async Task ReadAsync_SaysWhichLogicAppsHaveAFailedRunAlert_AndWhichStandInForTheSweeper()
+    {
+        const string tracking = $"{AppsBase}/Microsoft.Web/sites/logic-tracking-abc";
+        const string billing = $"{AppsBase}/Microsoft.Web/sites/logic-billing-abc";
+        _azure.Resources(
+                "microsoft.web/sites",
+                Row(("id", tracking), ("name", "logic-tracking-abc"), ("enabled", true), ("workload", "")),
+                Row(("id", billing), ("name", "logic-billing-abc"), ("enabled", true), ("workload", "")),
+                Row(("id", $"{AppsBase}/Microsoft.Web/sites/logic-sweeper-abc"), ("name", "logic-sweeper-abc"), ("enabled", false), ("workload", "conversation-sweeper")))
+            .Entities(queues: [], subscriptions: [])
+            .Alerts(Alert("alert-failed-runs-carrier-tracking", entities: null, scope: tracking, metric: "WorkflowRunsCompleted"));
+
+        var estate = await Adapter().ReadAsync(TestContext.Current.CancellationToken);
+
+        estate.Flows.Select(flow => (flow.Name, flow.HasFailedRunAlert, flow.RecordsTrackedProperties)).Should().Equal(
+            ("logic-tracking-abc", true, null), ("logic-billing-abc", false, null), ("logic-sweeper-abc", false, null));
+        estate.ConversationSweeperRuns.Should().BeFalse();
+        Checklist.Default.Run(estate).Select(item => item.CheckId).Should().BeEquivalentTo("FAILED-RUN-ALERT", "CONVERSATION-SWEEPER");
+    }
+
+    [Fact]
+    public async Task ReadAsync_ComparesWhatApplicationInsightsKeepsWithTheWorkspace()
+    {
+        _azure.Resources("microsoft.insights/components", Row(("days", 30))).Resources("microsoft.operationalinsights/workspaces", Row(("days", 90)));
+
+        var estate = await ReadEmptyEstateAsync();
+
+        estate.Retention.Should().Be(new Norvia.HealthCheck.Application.Estate.RetentionFacts(30, 90));
+        Checklist.Default.Run(estate).Should().ContainSingle().Which.CheckId.Should().Be("APPINSIGHTS-RETENTION");
+    }
+
+    [Fact]
+    public async Task ReadAsync_ReadsTheTmsSettings_FromTheContainerAppsEnvironment()
+    {
+        _azure.Resources(
+            "microsoft.app/containerapps",
+            Row(("env", new JsonArray(
+                new JsonObject { ["name"] = "ShipmentStale__ThresholdsSet", ["value"] = "false" },
+                new JsonObject { ["name"] = "ProofsOfDelivery__MissingThresholdSet", ["value"] = "true" },
+                new JsonObject { ["name"] = "LateDelivery__CheckEnabled", ["value"] = "false" },
+                new JsonObject { ["name"] = "A_SECRET", ["secretRef"] = "x" }))));
+
+        var estate = await ReadEmptyEstateAsync();
+
+        estate.BusinessSafetyNets.Should().Be(new Norvia.HealthCheck.Application.Estate.BusinessSafetyNetFacts(false, true, false));
+        Checklist.Default.Run(estate).Select(item => item.CheckId).Should().BeEquivalentTo("STALE-THRESHOLDS", "LATE-DELIVERY-CHECK");
+    }
+
+    [Fact]
+    public async Task ReadAsync_ReadsTheStorageProtections_FromTheLifecycleRulesAndTheDefenderSetting()
+    {
+        _azure.Resources("microsoft.storage/storageaccounts", Row(("id", InboundId), ("name", "stinboundabc")), Row(("id", TransitId), ("name", "stdriverabc")), Row(("id", TmsStorageId), ("name", "storageabc")))
+            .Raw($"{InboundId}/managementPolicies/default", LifecyclePolicy("inbound-proofs-of-delivery/", "delete"))
+            .Raw($"{TmsStorageId}/managementPolicies/default", LifecyclePolicy("proofs-of-delivery/", "tierToCool"))
+            .Raw($"{InboundId}/providers/Microsoft.Security/defenderForStorageSettings/current", """{"properties":{"isEnabled":true,"malwareScanning":{"onUpload":{"isEnabled":true}}}}""");
+
+        var estate = await ReadEmptyEstateAsync();
+
+        estate.Storage.Should().Be(new Norvia.HealthCheck.Application.Estate.StorageFacts(true, false, true, true));
+        Checklist.Default.Run(estate).Should().ContainSingle().Which.CheckId.Should().Be("LIFECYCLE-TRANSIT");
+    }
+
+    [Fact]
+    public async Task ReadAsync_WhenTheStorageHasNoPolicyAndNoDefenderSetting_FindsTheProtectionsAbsent()
+    {
+        _azure.Resources("microsoft.storage/storageaccounts", Row(("id", InboundId), ("name", "stinboundabc")), Row(("id", TmsStorageId), ("name", "storageabc")));
+
+        var estate = await ReadEmptyEstateAsync();
+
+        estate.Storage.Should().Be(new Norvia.HealthCheck.Application.Estate.StorageFacts(false, null, false, false));
+        Checklist.Default.Run(estate).Select(item => item.CheckId).Should().BeEquivalentTo("LIFECYCLE-INBOUND", "PROOF-HOT-TIER", "MALWARE-SCANNING");
+    }
+
+    [Theory]
+    [InlineData(86400, true, new[] { "APIM-CACHE" })]
+    [InlineData(0, false, new[] { "APIM-RATE-LIMIT" })]
+    public async Task ReadAsync_ReadsTheCacheAndTheRateLimit_FromTheShipperTrackingPolicies(int cacheSeconds, bool limited, string[] findings)
+    {
+        _azure.Resources("microsoft.apimanagement/service", Row(("id", ApiManagementId)));
+        foreach (var operation in new[] { "list-shipper-transport-orders", "find-shipper-transport-order", "get-shipper-transport-order" })
+        {
+            var policy = (limited ? "<rate-limit-by-key calls=\"120\" /> " : string.Empty) + (cacheSeconds > 0 ? $"<cache-store-value key=\"k\" value=\"v\" duration=\"{cacheSeconds}\" />" : string.Empty);
+            _azure.Raw($"{ApiManagementId}/apis/norvia-partner-api/operations/{operation}/policies/policy", new JsonObject { ["properties"] = new JsonObject { ["value"] = policy } }.ToJsonString());
+        }
+
+        var estate = await ReadEmptyEstateAsync();
+
+        estate.ApiManagement.Should().Be(new Norvia.HealthCheck.Application.Estate.ApiManagementFacts(cacheSeconds, limited));
+        Checklist.Default.Run(estate).Select(item => item.CheckId).Should().BeEquivalentTo(findings);
     }
 
     [Fact]
@@ -258,6 +425,7 @@ public sealed class AzureEstateConfigurationTests : IDisposable
     {
         private readonly List<(string Contains, string Content)> _answers = [];
         private readonly List<JsonObject> _alerts = [];
+        private readonly List<(string Type, JsonObject Row)> _resources = [];
         private string? _skipToken;
         private List<JsonObject> _moreAlerts = [];
         private bool _refuse;
@@ -305,6 +473,13 @@ public sealed class AzureEstateConfigurationTests : IDisposable
             return this;
         }
 
+        /// <summary>The rows Resource Graph answers a query over resources of this type with.</summary>
+        public Azure Resources(string type, params JsonObject[] rows)
+        {
+            _resources.AddRange(rows.Select(row => (type, row)));
+            return this;
+        }
+
         public Azure Raw(string contains, string content)
         {
             _answers.Add((contains, content));
@@ -324,6 +499,13 @@ public sealed class AzureEstateConfigurationTests : IDisposable
 
             if (request.RequestUri.AbsoluteUri.Contains("ResourceGraph", StringComparison.Ordinal))
             {
+                var query = JsonNode.Parse(body)!["query"]!.GetValue<string>();
+                if (!query.Contains("microsoft.insights/metricalerts", StringComparison.Ordinal))
+                {
+                    var rows = _resources.Where(resource => query.Contains($"'{resource.Type}'", StringComparison.Ordinal)).Select(resource => (JsonNode?)resource.Row.DeepClone());
+                    return Json(new JsonObject { ["data"] = new JsonArray(rows.ToArray()) }.ToJsonString());
+                }
+
                 var next = JsonNode.Parse(body)!["options"]?["$skipToken"] is not null;
                 var data = next ? _moreAlerts : _alerts;
                 var page = new JsonObject { ["data"] = new JsonArray(data.Select(alert => (JsonNode?)alert.DeepClone()).ToArray()) };

@@ -45,5 +45,130 @@
       "name": "carrier-invoice-outcome",
       "hasDeadLetterAlert": true
     }
-  ]
+  ],
+  "flows": [
+    {
+      "name": "transport-order-intake",
+      "hasFailedRunAlert": true,
+      "recordsTrackedProperties": true
+    },
+    {
+      "name": "carrier-answer",
+      "hasFailedRunAlert": true,
+      "recordsTrackedProperties": true
+    },
+    {
+      "name": "carrier-invoice",
+      "hasFailedRunAlert": true,
+      "recordsTrackedProperties": true
+    },
+    {
+      "name": "carrier-booking",
+      "hasFailedRunAlert": false,
+      "recordsTrackedProperties": true
+    },
+    {
+      "name": "shipper-notification",
+      "hasFailedRunAlert": false,
+      "recordsTrackedProperties": false
+    },
+    {
+      "name": "carrier-cancellation",
+      "hasFailedRunAlert": false,
+      "recordsTrackedProperties": false
+    },
+    {
+      "name": "trip-dispatch",
+      "hasFailedRunAlert": true,
+      "recordsTrackedProperties": true
+    },
+    {
+      "name": "driver-reports",
+      "hasFailedRunAlert": true,
+      "recordsTrackedProperties": true
+    },
+    {
+      "name": "conversation-sweeper",
+      "hasFailedRunAlert": true,
+      "recordsTrackedProperties": true
+    },
+    {
+      "name": "billing",
+      "hasFailedRunAlert": false,
+      "recordsTrackedProperties": false
+    },
+    {
+      "name": "carrier-cost",
+      "hasFailedRunAlert": true,
+      "recordsTrackedProperties": true
+    },
+    {
+      "name": "shipper-invoice",
+      "hasFailedRunAlert": true,
+      "recordsTrackedProperties": true
+    },
+    {
+      "name": "carrier-invoice-outcome",
+      "hasFailedRunAlert": true,
+      "recordsTrackedProperties": true
+    },
+    {
+      "name": "carrier-tracking",
+      "hasFailedRunAlert": false,
+      "recordsTrackedProperties": true
+    },
+    {
+      "name": "carrier-proof-of-delivery",
+      "hasFailedRunAlert": false,
+      "recordsTrackedProperties": true
+    }
+  ],
+  "alertReceivers": 1,
+  "storage": {
+    "inboundHasLifecycleRule": false,
+    "transitHasLifecycleRule": true,
+    "proofFilesMoveToCool": false,
+    "inboundMalwareScanning": false
+  },
+  "inlinedCarrierSecrets": [
+    "booking Logic App setting CARRIER_ENDPOINT_KEY"
+  ],
+  "retention": {
+    "appInsightsDays": 30,
+    "runHistoryDays": 90
+  },
+  "businessSafetyNets": {
+    "staleThresholdsSet": false,
+    "proofMissingThresholdSet": false,
+    "lateDeliveryCheckOn": true
+  },
+  "apiManagement": {
+    "shipperTrackingCacheSeconds": 86400,
+    "shipperRateLimit": false
+  },
+  "driverReportsReportBack": true,
+  "conversationSweeperRuns": false,
+  "agents": {
+    "contentFilterAndPromptShield": true,
+    "identities": [
+      {
+        "name": "estate-health-check",
+        "role": "HealthCheck.Agent.Read",
+        "roleIsRead": true,
+        "hasCallCap": true,
+        "hasRateLimit": true,
+        "hasCostTag": true
+      },
+      {
+        "name": "integration-operations",
+        "role": "IntegrationConsole.Agent.Read",
+        "roleIsRead": true,
+        "hasCallCap": true,
+        "hasRateLimit": true,
+        "hasCostTag": true
+      }
+    ],
+    "enabledInPublicDemoUi": false,
+    "modelQuotaUnlimited": false
+  }
 }

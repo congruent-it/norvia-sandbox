@@ -10,9 +10,12 @@
 #   1. the identities: the Agent has its own identity and holds only HealthCheck.Agent.Read, on the agent view and nothing else, and no Azure
 #      role; the app's agent API has that one role, held by API Management's identity alone; the app's identity holds Reader on the estate's
 #      resource group and no other role on it; the project's shared identity holds no role (#371, question 1);
-#   2. with the as-found preset (entitiesWithoutDeadLetterAlert lists the queues and subscriptions without a dead-letter alert) the checks return
-#      the Finding F-DLQ-ALERT, naming carrier-tracking, and the real model explains it, citing the tool's result;
-#   3. with the fixed preset, after the estate is deployed again, the alerts are back and the checks return no Finding: the Finding is gone;
+#   2. with the as-found preset (entitiesWithoutDeadLetterAlert lists the queues and subscriptions without a dead-letter alert, and the other
+#      toggles of the preset are on too) the checks return the Finding F-DLQ-ALERT among others, naming carrier-tracking, and the real model
+#      explains it, citing the tool's result;
+#   3. with the fixed preset, after the estate is deployed again, the alerts are back and the checks return no Finding: every Finding is gone.
+#      The fixed estate has an alert receiver only when ESTATE_ALERT_EMAIL is set (azd env set), so set it first: without one the check
+#      ALERT-RECEIVER rightly finds the alerts go to nobody;
 #   4. the Agent's tool calls are hops of the run's Message trail, in API Management's MCP server and in the app, tagged with the Agent's identity
 #      and the tool name, under the correlation ID of the run.
 # The estate ends in the fixed state. Resource Graph takes a short while to see an alert come and go, so a check asks again, up to ten minutes. It
@@ -90,7 +93,7 @@ ask() {
   body=$(jq -n --arg agent "$agent" --arg run "$correlation" '{
     agent_reference: {type: "agent_reference", name: $agent},
     input: [{type: "message", role: "user", content: "Run the estate health check and narrate its Findings."}],
-    store: false, max_tool_calls: 2, max_output_tokens: 1500,
+    store: false, max_tool_calls: 2, max_output_tokens: 4000,
     structured_inputs: {correlationId: $run}}')
   curl -s --max-time 180 -X POST "$endpoint/openai/v1/responses" -H "Authorization: Bearer $(foundry_token)" -H 'Content-Type: application/json' -d "$body"
 }
@@ -103,7 +106,7 @@ wait_for_findings() {
     response=$(ask)
     if [ "$(jq -r '.status // empty' <<<"$response")" = completed ]; then
       ids=$(jq -r '[.output[] | select(.type == "mcp_call") | select(.name == "run_checks") | .output | fromjson | .findings[].id] | sort | join(",")' <<<"$response" 2>/dev/null || true)
-      if [ "$expected" = found ] && [ "$ids" = F-DLQ-ALERT ]; then return 0; fi
+      if [ "$expected" = found ] && [[ ",$ids," == *,F-DLQ-ALERT,* ]]; then return 0; fi
       if [ "$expected" = none ] && [ -z "$ids" ] && jq -e '[.output[] | select(.type == "mcp_call")] | length > 0' <<<"$response" >/dev/null; then return 0; fi
     fi
     sleep 30
@@ -126,7 +129,7 @@ jq -e '(.summary | length > 0) and ([.findings[] | select(.id == "F-DLQ-ALERT" a
   || fail "the narration does not explain F-DLQ-ALERT citing r1"
 jq -e '[.output[] | select(.type == "mcp_call") | .output | fromjson | .findings[].evidence[].subject] | index("carrier-tracking")' <<<"$response" >/dev/null \
   || fail "the Finding's evidence does not name carrier-tracking"
-pass "with the alert toggle on, the checks return F-DLQ-ALERT naming carrier-tracking, and the real model explains it"
+pass "with the as-found preset on, the checks return F-DLQ-ALERT among others, naming carrier-tracking, and the real model explains it"
 as_found_response=$(jq -r .id <<<"$response")
 
 # 4 (first part). The hops: API Management's MCP server and the app, with the Agent's identity and the tool name.

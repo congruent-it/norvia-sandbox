@@ -8,8 +8,33 @@ namespace Norvia.HealthCheck.Application.Checks;
 /// </summary>
 public sealed class Checklist(IReadOnlyList<Check> checks)
 {
-    /// <summary>The checks of the estate's health check. Slice 1 has one; #393 adds the rest, one per as-found toggle.</summary>
-    public static Checklist Default { get; } = new([new DeadLetterAlertCheck()]);
+    /// <summary>The checks of the estate's health check: one per as-found toggle (docs/operations/estate-health-check.md).</summary>
+    public static Checklist Default { get; } = new(
+    [
+        new FailedRunAlertCheck(),
+        new DeadLetterAlertCheck(),
+        new AlertReceiverCheck(),
+        new InlinedCarrierSecretCheck(),
+        new AppInsightsRetentionCheck(),
+        new TrackedPropertiesCheck(),
+        new InboundLifecycleRuleCheck(),
+        new TransitLifecycleRuleCheck(),
+        new ProofFilesHotTierCheck(),
+        new MalwareScanningCheck(),
+        new StaleThresholdsCheck(),
+        new ProofMissingThresholdCheck(),
+        new LateDeliveryCheckCheck(),
+        new ShipperCacheCheck(),
+        new ShipperRateLimitCheck(),
+        new DriverReportBackCheck(),
+        new ConversationSweeperCheck(),
+        new ContentFilterCheck(),
+        new AgentRoleCheck(),
+        new AgentCapCheck(),
+        new AgentCostTagCheck(),
+        new AgentsEnabledInPublicDemoUiCheck(),
+        new UnlimitedModelQuotaCheck(),
+    ]);
 
     public IReadOnlyList<Check> Checks => checks;
 
