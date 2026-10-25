@@ -14,7 +14,7 @@ The Estate health check is a small app, `src/HealthCheck` (Application, Infrastr
 | The snapshot adapter | The local adapter: reads a JSON snapshot embedded from the repo |
 | The agent API | `GET /agent/v1/checks`, the Agent's one tool, `run_checks`. Behind a token and the role `HealthCheck.Agent.Read` |
 | The Agent | [agents/estate-health-check.agent.yaml](../../agents/estate-health-check.agent.yaml), with the tool list [health-check.tools.json](../../contracts/agent-mcp/health-check.tools.json) |
-| The page | `/`: **Run health check**, the Findings list and the Agent's narration |
+| The page | `/`: **Run health check**, the report (Findings grouped by severity, the Agent's narration, the comparison with the previous run, **Export as Markdown**) |
 
 ## The checklist
 
@@ -60,6 +60,16 @@ Run the AppHost. The app is `health-check-web` on the Aspire dashboard (**Estate
 - **The snapshot.** The estate as found by default. Set `HealthCheck:Snapshot` to `fixed`, `contrast`, `look-alike` or `silent-carrier` in the AppHost's user secrets (or its launch profile) to read another: the fixed estate or the preset of that name. With the as-found snapshot, **Run health check** shows a Finding for each toggle the preset turns on (thirteen), `F-DLQ-ALERT` among them, naming the seven queues and subscriptions that have no dead-letter alert, `carrier-tracking` among them. With the fixed snapshot it shows no Finding and says all the Checks passed.
 - **The narration.** The Agents are off unless `Agents:Enabled` is true in the AppHost's user secrets, as for the Integration console ([Explain and the agent API](integration-console.md#explain-and-the-agent-api)). Then the app runs the Agent in process (`Norvia.Agents`) against the MCP stand-in, `Norvia.Integration.LocalAgentMcp`, which serves this Agent's server at `/mcp/health-check` and calls the app's agent API as the Agent's identity. The model is a scripted fake: it calls `run_checks`, orders the Findings by severity, and explains each from the Finding's own fields (its title and the rule it breaks), linking `F-DLQ-ALERT` to the Carrier-tracking incident when its evidence names `carrier-tracking`. Set `Agents:Model:Endpoint` (and `Agents:Model:Deployment`) to use your own Foundry deployment instead.
 - **On any failure of the Agent** the page says "Assistant unavailable", logs the failure, and the Findings stay. The run has a short timeout (20 seconds) and is never retried ([failure behaviour](../architecture/failure-behaviour.md#agents)).
+
+## The report
+
+What the page shows after **Run health check**, for an operator to read, act on and compare. It is built from the Findings and stores nothing.
+
+- **Grouped by severity**, the most severe first (`SeverityGroup`). Each Finding shows its Check ID, evidence, the as-found toggle and the **fix** (the Bicep parameter or setting, the Check's own), and, with the Agents on, **why it matters**: the Agent's narration of that Finding, linked to the Carrier-tracking incident where its evidence names `carrier-tracking`.
+- **The Agent's ordering** is explained in one paragraph (its summary). It orders the Findings *within* a severity and never moves one to another group: the severity is the Check's, and the Agent can neither change one nor add a Finding.
+- **Re-run and compare.** A second **Run health check** compares with the run before it (by Finding ID) and shows how many Findings are **new**, **fixed** and **unchanged**, lists the fixed ones and marks each Finding New or Unchanged. The previous result is held in the page session (the circuit) and nowhere else; closing the page forgets it. A run that fails keeps the last good one to compare with.
+- **Export as Markdown** downloads the current report (`estate-health-check-<date>-<time>.md`): every Finding with its Check ID, severity, evidence and fix, the assistant's words marked as its, and the comparison where there is one. The browser builds no file of its own; the page hands it the text.
+- **Follow-up questions.** With the Agents on, each Finding has two buttons, **Why is this a problem?** and **What changes if I fix it?**: fixed questions, no free text, the Finding's ID the only thing that varies ([HealthCheckQuestions](../../src/Norvia.Agents/Runner/HealthCheckQuestions.cs)). The Agent answers about that Finding alone (anything else it says is refused), and the fix it describes is the Check's. If the assistant fails the Finding says "Assistant unavailable" and nothing else changes.
 
 ## Local Findings come from a snapshot
 
@@ -120,14 +130,14 @@ A Finding's evidence names the resources concerned. A secret is reported by wher
 | Role | Holder | Opens |
 |---|---|---|
 | `HealthCheck.Run` | The Integration operator | The page: running a health check and seeing what it found |
-| `HealthCheck.Read` | The Integration operator | Nothing yet. Reserved for the report (#394), which shows a result to someone who may not run one |
+| `HealthCheck.Read` | The Integration operator | Nothing yet. Reserved for showing a report to someone who may not run a check |
 | `HealthCheck.Agent.Read` | The Estate health-check agent's identity alone | `/agent/v1/checks`, and nothing else in the app. No operator holds it |
 
 Locally the AppHost signs in a local operator holding both operator roles, and refuses to do it outside Development. In Azure Container Apps' Easy Auth signs the operator in to the app's own app registration, `Norvia Estate health check (<env>)`, and the app reads their app roles from it ([ADR 0026](../adr/0026-the-integration-console-signs-operators-in-with-easy-auth-and-checks-their-app-role.md), as for the Integration console); Entra signs in only the users assigned a role, and the presenter holds both. See [identity and access](../architecture/identity-and-access.md#agents).
 
 ## Tests
 
-- **Unit tests** (80% line coverage): the engine, every Check against the facts of its toggle (it fires for its toggle and only its toggle, and the healthy estate gives no Finding), every snapshot (exactly the Findings of the toggles its preset turns on, the fixed one none), the masking, the use cases, the role checks, the agent API (token, role, audience, GET only, the tracking hop), the page (bUnit), the local agent client against a fake MCP server, and the stand-in's second server.
+- **Unit tests** (80% line coverage): the report (grouping, the comparison, the Markdown export, a severity the Agent's answer cannot change, the follow-up question), the engine, every Check against the facts of its toggle (it fires for its toggle and only its toggle, and the healthy estate gives no Finding), every snapshot (exactly the Findings of the toggles its preset turns on, the fixed one none), the masking, the use cases, the role checks, the agent API (token, role, audience, GET only, the tracking hop), the page (bUnit), the local agent client against a fake MCP server, and the stand-in's second server.
 - **Architecture tests**: dependencies point inwards, no write tool, one role for the Agent, and only Infrastructure references the Foundry SDK.
 - **Integration tests**: #398 (locally) and #400 (in Azure: [AzureHealthCheckTests](../../tests/HealthCheck/Norvia.HealthCheck.Agents.IntegrationTests/AzureHealthCheckTests.cs), the app built as in Azure over faked Resource Graph, Service Bus and Foundry endpoints, the Finding coming and going as the alert does) and #401 (the whole checklist: [ChecklistAgainstSnapshotsTests](../../tests/HealthCheck/Norvia.HealthCheck.Agents.IntegrationTests/ChecklistAgainstSnapshotsTests.cs), every snapshot giving exactly the Findings for the toggles its preset turns on, the fixed one none, every toggle with a Check, and no secret value in evidence). **UI tests**: #399.
 - **Policy and drift tests** ([HealthCheckAgentAzureTests](../../tests/Tms/Norvia.Tms.ArchitectureTests/HealthCheckAgentAzureTests.cs), `bicep snapshot`, nothing deployed): the MCP server has the contract's tools and no others, GET only; the policy gets the contract's role, the agent view as audience and a rate limit; both app registrations hold the one role and Entra issues no token without it; only API Management's identity is given a role in the Bicep; the app's identity holds Reader on the resource group and nothing else, and nothing on the Agent's side holds an Azure role. The stand-in's unit tests serve the same contract file, so the stand-in's tool list is the Bicep's.

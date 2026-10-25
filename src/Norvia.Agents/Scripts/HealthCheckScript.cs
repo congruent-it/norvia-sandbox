@@ -24,14 +24,37 @@ public static class HealthCheckScript
 
     private static IReadOnlyList<AIContent> Next(ScriptContext context)
     {
-        if (!HealthCheckQuestions.IsNarrate(context.Question))
+        var followUp = HealthCheckQuestions.TryParseFollowUp(context.Question, out var kind, out var findingId);
+        if (!followUp && !HealthCheckQuestions.IsNarrate(context.Question))
         {
             return [new TextContent("{}")];
         }
 
-        return context.Results.Count == 0
-            ? [new FunctionCallContent($"call-{context.Turn}", RunChecks, new Dictionary<string, object?>())]
-            : [new TextContent(Answer(context.Results[0]))];
+        if (context.Results.Count == 0)
+        {
+            return [new FunctionCallContent($"call-{context.Turn}", RunChecks, new Dictionary<string, object?>())];
+        }
+
+        return [new TextContent(followUp ? FollowUpAnswer(context.Results[0], kind, findingId) : Answer(context.Results[0]))];
+    }
+
+    // The answer to one Finding's follow-up: that Finding alone, or nothing when the run no longer holds it (it was fixed meanwhile).
+    private static string FollowUpAnswer(ScriptedToolResult result, HealthCheckFollowUp kind, string findingId)
+    {
+        var finding = FindingsOf(result.Content).Find(candidate => candidate.Id == findingId);
+        if (finding is null)
+        {
+            return JsonSerializer.Serialize(new { summary = $"The health check no longer finds {findingId}.", findings = Array.Empty<object>() });
+        }
+
+        var impact = kind == HealthCheckFollowUp.Why
+            ? Impact(finding)
+            : $"Fixing it puts right what the Check found: {finding.Fix} Then the Check passes and {finding.Id} no longer appears.";
+        return JsonSerializer.Serialize(new
+        {
+            summary = kind == HealthCheckFollowUp.Why ? $"Why {finding.Id} is a problem." : $"What changes when {finding.Id} is fixed.",
+            findings = new[] { new { id = finding.Id, impact, citation = result.Id } },
+        });
     }
 
     private static string Answer(ScriptedToolResult result)
@@ -91,6 +114,7 @@ public static class HealthCheckScript
                         Text(finding, "severity") ?? string.Empty,
                         Text(finding, "title") ?? "A Check failed",
                         Text(finding, "rule") ?? string.Empty,
+                        Text(finding, "fix") ?? string.Empty,
                         SubjectsOf(finding))),
             ];
         }
@@ -108,5 +132,5 @@ public static class HealthCheckScript
     private static string? Text(JsonElement element, string property) =>
         element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
 
-    private sealed record FindingFacts(string Id, string CheckId, string Severity, string Title, string Rule, List<string> Subjects);
+    private sealed record FindingFacts(string Id, string CheckId, string Severity, string Title, string Rule, string Fix, List<string> Subjects);
 }

@@ -11,4 +11,6 @@ public interface IHealthCheckRequests
     Task<Result<HealthCheckReport>> RunAsync(RunHealthCheckQuery query, CancellationToken cancellationToken);
 
     Task<Result<Narration>> NarrateAsync(NarrateHealthCheckQuery query, CancellationToken cancellationToken);
+
+    Task<Result<NarratedItem>> ExplainAsync(ExplainFindingQuery query, CancellationToken cancellationToken);
 }

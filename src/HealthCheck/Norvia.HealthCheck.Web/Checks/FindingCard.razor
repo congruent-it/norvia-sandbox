@@ -1,0 +1,106 @@
+@using Ardalis.Result
+@using Norvia.Agents
+@using Norvia.HealthCheck.Application.Checks
+@using Norvia.HealthCheck.Application.Narrate
+
+@* Text only: names in the evidence and the assistant's words are data, so they are encoded, never rendered as markup. *@
+<article class="finding" data-testid="finding" aria-label="@Finding.Id">
+    <h4>
+        <span data-testid="finding-id">@Finding.Id</span>
+        <span class="severity severity-@Finding.Severity.ToString().ToLowerInvariant()" data-testid="finding-severity">@Finding.Severity</span>
+        <span>@Finding.Title</span>
+        @if (Status is { Length: > 0 })
+        {
+            <span class="status" data-testid="finding-status">@Status</span>
+        }
+    </h4>
+    <p>@Finding.Rule</p>
+    <ul data-testid="finding-evidence">
+        @foreach (var evidence in Finding.Evidence)
+        {
+            <li><strong>@evidence.Subject</strong>: @evidence.Detail</li>
+        }
+    </ul>
+    <dl>
+        <dt>Check</dt>
+        <dd data-testid="finding-check">@Finding.CheckId</dd>
+        <dt>As-found toggle</dt>
+        <dd><code>@Finding.AsFoundToggle</code></dd>
+        <dt>Fix</dt>
+        <dd data-testid="finding-fix">@Finding.Fix</dd>
+        @if (Explained is { } item)
+        {
+            <dt>Why it matters</dt>
+            <dd data-testid="finding-impact">@item.Impact <cite class="text-muted">[@item.ResultId, @item.ToolName]</cite></dd>
+        }
+    </dl>
+    @if (AskAsync is not null)
+    {
+        <div class="follow-up">
+            <FluentButton Appearance="Appearance.Outline" Disabled="_asking" OnClick="() => AskAsyncFor(FindingQuestion.WhyIsThisAProblem)" data-testid="ask-why">Why is this a problem?</FluentButton>
+            <FluentButton Appearance="Appearance.Outline" Disabled="_asking" OnClick="() => AskAsyncFor(FindingQuestion.WhatChangesIfIFixIt)" data-testid="ask-what-changes">What changes if I fix it?</FluentButton>
+        </div>
+        @if (_asking)
+        {
+            <div role="status"><FluentProgressRing /> <span>The assistant is answering…</span></div>
+        }
+        else if (_failed)
+        {
+            <div role="alert"><FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">Assistant unavailable</FluentMessageBar></div>
+        }
+
+        @foreach (var answer in _answers)
+        {
+            <p data-testid="follow-up-answer"><strong>@answer.Question</strong> @answer.Item.Impact <cite class="text-muted">[@answer.Item.ResultId, @answer.Item.ToolName]</cite></p>
+        }
+    }
+</article>
+
+@code {
+    private readonly List<(string Question, NarratedItem Item)> _answers = [];
+    private bool _asking;
+    private bool _failed;
+
+    [Parameter, EditorRequired]
+    public Finding Finding { get; set; } = default!;
+
+    /// <summary>What the assistant said about this Finding in the narration, if it did.</summary>
+    [Parameter]
+    public NarratedItem? Explained { get; set; }
+
+    /// <summary>"New" or "Unchanged" against the previous run; none on a first run.</summary>
+    [Parameter]
+    public string? Status { get; set; }
+
+    /// <summary>Asks the assistant one of the fixed questions about this Finding. Unset while the Agents are off, which hides the buttons.</summary>
+    [Parameter]
+    public Func<Finding, FindingQuestion, Task<Result<NarratedItem>>>? AskAsync { get; set; }
+
+    private async Task AskAsyncFor(FindingQuestion question)
+    {
+        _asking = true;
+        _failed = false;
+        try
+        {
+            var result = await AskAsync!(Finding, question);
+            if (result.IsSuccess)
+            {
+                var text = question == FindingQuestion.WhyIsThisAProblem ? "Why is this a problem?" : "What changes if I fix it?";
+                _answers.RemoveAll(answer => answer.Question == text);
+                _answers.Add((text, result.Value));
+            }
+            else
+            {
+                _failed = true;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The page was closed.
+        }
+        finally
+        {
+            _asking = false;
+        }
+    }
+}

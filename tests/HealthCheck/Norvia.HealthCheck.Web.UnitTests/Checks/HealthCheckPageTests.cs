@@ -3,6 +3,8 @@
 using Ardalis.Result;
 using Norvia.Agents;
 using Norvia.Agents.Runner;
+using Norvia.HealthCheck.Application.Agents;
+using Norvia.HealthCheck.Application.Checks;
 using Norvia.HealthCheck.Application.Narrate;
 using Norvia.HealthCheck.Application.Operators;
 using Norvia.HealthCheck.Application.Run;
@@ -194,5 +196,169 @@ public sealed class HealthCheckPageTests : HealthCheckWebContext
         var dispose = () => page.Instance.Dispose();
 
         dispose.Should().NotThrow();
+    }
+
+    [Fact]
+    public void RunHealthCheck_GroupsTheFindingsBySeverity()
+    {
+        Requests.RunAsync(Arg.Any<RunHealthCheckQuery>(), Arg.Any<CancellationToken>()).Returns(AsFound with
+        {
+            Findings = [AsFound.Findings[0] with { Id = "F-LOW", Severity = Severity.Low }, AsFound.Findings[0], AsFound.Findings[0] with { Id = "F-CRIT", Severity = Severity.Critical }],
+        });
+        var page = Render();
+
+        page.Find("fluent-button").Click();
+
+        page.FindAll("[data-testid=severity-heading]").Select(heading => heading.TextContent).Should().Equal("Critical (1)", "High (1)", "Low (1)");
+        page.FindAll("[data-testid=finding-id]").Select(id => id.TextContent).Should().Equal("F-CRIT", "F-DLQ-ALERT", "F-LOW");
+    }
+
+    [Fact]
+    public void RunHealthCheck_WithTheAgentsOn_ShowsWhyItMattersOnTheFinding_AndExplainsTheOrderingWithoutChangingSeverity()
+    {
+        TurnAgentsOn();
+        var page = Render();
+
+        page.Find("fluent-button").Click();
+
+        page.Find("[data-testid=finding-impact]").TextContent.Should().Contain("Nobody is told").And.Contain("[r1, run_checks]");
+        page.Find("[data-testid=ordering-note]").TextContent.Should().Contain("never changes a severity");
+        page.Find("[data-testid=finding-severity]").TextContent.Should().Be("High");
+    }
+
+    [Fact]
+    public void RunHealthCheck_ForTheFirstTime_ShowsNoComparison()
+    {
+        var page = Render();
+
+        page.Find("fluent-button").Click();
+
+        page.FindAll("[data-testid=comparison]").Should().BeEmpty();
+        page.FindAll("[data-testid=finding-status]").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void RunHealthCheck_AfterFixingTheToggle_ShowsTheFindingAsFixed()
+    {
+        var page = Render();
+        page.Find("fluent-button").Click();
+        Requests.RunAsync(Arg.Any<RunHealthCheckQuery>(), Arg.Any<CancellationToken>()).Returns(Fixed);
+
+        page.Find("fluent-button").Click();
+
+        page.Find("[data-testid=comparison-summary]").TextContent.Should().Contain("0 new, 1 fixed, 0 unchanged");
+        page.Find("[data-testid=fixed-findings]").TextContent.Should().Contain("F-DLQ-ALERT");
+    }
+
+    [Fact]
+    public void RunHealthCheck_Again_MarksTheFindingsNewOrUnchanged()
+    {
+        var other = AsFound.Findings[0] with { Id = "F-NEW", CheckId = "NEW" };
+        var page = Render();
+        page.Find("fluent-button").Click();
+        Requests.RunAsync(Arg.Any<RunHealthCheckQuery>(), Arg.Any<CancellationToken>()).Returns(AsFound with { Findings = [AsFound.Findings[0], other] });
+
+        page.Find("fluent-button").Click();
+
+        page.FindAll("[data-testid=finding]").Select(card => card.QuerySelector("[data-testid=finding-status]")!.TextContent).Should().Equal("Unchanged", "New");
+        page.Find("[data-testid=comparison-summary]").TextContent.Should().Contain("1 new, 0 fixed, 1 unchanged");
+    }
+
+    [Fact]
+    public void RunHealthCheck_ThatCannotRunTheSecondTime_KeepsThePreviousResultToCompareWith()
+    {
+        var page = Render();
+        page.Find("fluent-button").Click();
+        Requests.RunAsync(Arg.Any<RunHealthCheckQuery>(), Arg.Any<CancellationToken>()).Returns(Result<HealthCheckReport>.Error("gone"));
+        page.Find("fluent-button").Click();
+        Requests.RunAsync(Arg.Any<RunHealthCheckQuery>(), Arg.Any<CancellationToken>()).Returns(Fixed);
+
+        page.Find("fluent-button").Click();
+
+        page.Find("[data-testid=comparison-summary]").TextContent.Should().Contain("0 new, 1 fixed");
+    }
+
+    [Fact]
+    public void ExportAsMarkdown_HandsTheBrowserTheCurrentReport()
+    {
+        var page = Render();
+        page.Find("fluent-button").Click();
+
+        page.Find("[data-testid=export]").Click();
+
+        var call = JSInterop.Invocations["norviaDownloadText"].Should().ContainSingle().Subject;
+        call.Arguments[0].Should().Be("estate-health-check-20261025-0900.md");
+        call.Arguments[1].Should().BeOfType<string>().Which.Should().Contain("F-DLQ-ALERT").And.Contain("- Check: `DLQ-ALERT`").And.Contain("carrier-tracking").And.Contain("asFound.entitiesWithoutDeadLetterAlert");
+    }
+
+    [Fact]
+    public void ExportAsMarkdown_IsOfferedOnlyOnceThereIsAReport() =>
+        Render().FindAll("[data-testid=export]").Should().BeEmpty();
+
+    [Fact]
+    public void FollowUp_WithTheAgentsOff_OffersNoQuestion()
+    {
+        var page = Render();
+
+        page.Find("fluent-button").Click();
+
+        page.FindAll("[data-testid=ask-why]").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void FollowUp_AsksTheFixedQuestionAboutThatFinding_AndShowsTheAnswerBesideIt()
+    {
+        TurnAgentsOn();
+        Requests.ExplainAsync(Arg.Any<ExplainFindingQuery>(), Arg.Any<CancellationToken>()).Returns(new NarratedItem("F-DLQ-ALERT", "Fixing it restores the alert.", "r1", "run_checks"));
+        var page = Render();
+        page.Find("fluent-button").Click();
+
+        page.Find("[data-testid=ask-what-changes]").Click();
+
+        page.Find("[data-testid=follow-up-answer]").TextContent.Should().Contain("What changes if I fix it?").And.Contain("Fixing it restores the alert.");
+        Requests.Received(1).ExplainAsync(
+            Arg.Is<ExplainFindingQuery>(query => query.FindingId == "F-DLQ-ALERT" && query.Question == FindingQuestion.WhatChangesIfIFixIt && query.CorrelationId.Length == 32),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void FollowUp_AskedAgain_ReplacesTheEarlierAnswer()
+    {
+        TurnAgentsOn();
+        Requests.ExplainAsync(Arg.Any<ExplainFindingQuery>(), Arg.Any<CancellationToken>()).Returns(new NarratedItem("F-DLQ-ALERT", "First.", "r1", "run_checks"), new NarratedItem("F-DLQ-ALERT", "Second.", "r1", "run_checks"));
+        var page = Render();
+        page.Find("fluent-button").Click();
+
+        page.Find("[data-testid=ask-why]").Click();
+        page.Find("[data-testid=ask-why]").Click();
+
+        page.Find("[data-testid=follow-up-answer]").TextContent.Should().Contain("Second.").And.NotContain("First.");
+    }
+
+    [Fact]
+    public void FollowUp_WhenTheAssistantIsUnavailable_SaysSo_AndTheFindingStays()
+    {
+        TurnAgentsOn();
+        Requests.ExplainAsync(Arg.Any<ExplainFindingQuery>(), Arg.Any<CancellationToken>()).Returns(Result<NarratedItem>.Unavailable(AgentFailureCodes.AgentUnavailable));
+        var page = Render();
+        page.Find("fluent-button").Click();
+
+        page.Find("[data-testid=ask-why]").Click();
+
+        page.Find("[data-testid=finding] [role=alert]").TextContent.Should().Contain("Assistant unavailable");
+        page.FindAll("[data-testid=finding]").Should().ContainSingle();
+    }
+
+    [Fact]
+    public void FollowUp_ShowsTheAnswerAsTextOnly_NeverAsMarkup()
+    {
+        TurnAgentsOn();
+        Requests.ExplainAsync(Arg.Any<ExplainFindingQuery>(), Arg.Any<CancellationToken>()).Returns(new NarratedItem("F-DLQ-ALERT", "See <b>this</b>.", "r1", "run_checks"));
+        var page = Render();
+        page.Find("fluent-button").Click();
+
+        page.Find("[data-testid=ask-why]").Click();
+
+        page.FindAll("[data-testid=follow-up-answer] b").Should().BeEmpty();
     }
 }
