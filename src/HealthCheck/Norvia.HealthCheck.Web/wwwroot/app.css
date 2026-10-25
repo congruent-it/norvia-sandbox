@@ -1,0 +1,52 @@
+/*
+ * The Estate health check's stylesheet. Fluent UI draws the components; this is the page around them, in the dark charcoal and blue the
+ * Integration console has, so the two read as Norvia's tools for the people behind the scenes.
+ */
+:root {
+    --color-primary: #375a7f;
+    --color-body: #222;
+    --color-surface: #303030;
+    --color-border: #444;
+    --color-muted: #aaa;
+    --color-warning: #f39c12;
+    --color-danger: #e74c3c;
+    --color-success: #00bc8c;
+}
+
+body {
+    --body-font: "Lato", -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    margin: 0;
+    background-color: var(--color-body);
+    color: #fff;
+    font-family: var(--body-font);
+    font-size: 0.9375rem;
+    line-height: 1.5;
+}
+
+h1, h2, h3 { margin-top: 0; color: #fff; line-height: 1.2; }
+h1 { margin-bottom: 1.5rem; font-size: 1.875rem; }
+h2 { margin-bottom: 0.75rem; font-size: 1.25rem; }
+p { margin: 0 0 1rem; }
+a { color: var(--color-success); }
+code { color: #e83e8c; font-size: 0.875em; }
+
+.app-bar { background-color: var(--color-primary); }
+.app-bar nav { display: flex; align-items: center; gap: 2rem; max-width: 96rem; margin: 0 auto; padding: 1rem; }
+.app-bar .brand { color: #fff; font-size: 1.25rem; font-weight: 700; text-decoration: none; }
+.app-bar .operator { margin-left: auto; color: rgba(255, 255, 255, 0.75); }
+
+main { max-width: 96rem; margin: 0 auto; padding: 2rem 1rem; }
+
+.text-muted { color: var(--color-muted); }
+
+.finding, .narration { margin-top: 1.5rem; padding: 1rem; border: 1px solid var(--color-border); border-radius: 0.375rem; background-color: var(--color-surface); }
+.finding h3 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.75rem; margin-bottom: 0.5rem; font-size: 1.1rem; }
+.finding dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; margin: 0.5rem 0 0; }
+.finding dt { color: var(--color-muted); }
+.finding dd { margin: 0; }
+.severity { padding: 0 0.5rem; border-radius: 0.25rem; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; }
+.severity-critical, .severity-high { background-color: var(--color-danger); }
+.severity-medium { background-color: var(--color-warning); }
+.severity-low { background-color: var(--color-primary); }
+
+#blazor-error-ui { display: none; position: fixed; inset: auto 0 0 0; z-index: 1000; }

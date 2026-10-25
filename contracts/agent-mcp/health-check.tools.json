@@ -1,0 +1,12 @@
+{
+  "server": "health-check",
+  "role": "HealthCheck.Agent.Read",
+  "tools": [
+    {
+      "name": "run_checks",
+      "description": "Runs the estate's health check and returns its Findings: each with its ID, the ID, rule and severity of the Check that found it, the evidence (the resources concerned, with any secret masked), the as-found toggle it maps to and the fix. Severity and fix are the Check's own. Returns an empty list when every Check passed. Reads configuration only and changes nothing.",
+      "method": "GET",
+      "path": "/checks"
+    }
+  ]
+}

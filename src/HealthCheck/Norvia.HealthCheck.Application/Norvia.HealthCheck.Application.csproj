@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    No Domain project, repositories or specifications: the Estate health check has no aggregates and no database. It reads the
+    estate's configuration and keeps nothing (#371), the same stated deviation from coding guidelines §1 as the Integration
+    console's (docs/operations/integration-console.md, ADR 0017).
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\Norvia.Agents\Norvia.Agents.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Ardalis.Result" />
+    <PackageReference Include="Mediator.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+  </ItemGroup>
+</Project>

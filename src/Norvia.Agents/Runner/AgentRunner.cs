@@ -9,7 +9,26 @@ namespace Norvia.Agents.Runner;
 /// </summary>
 public sealed class AgentRunner(IChatClient model, IToolSource toolSource, AgentRunnerOptions options)
 {
-    public async Task<AgentRunResult> RunAsync(Definitions.AgentDefinition definition, AgentQuestion question, CancellationToken cancellationToken)
+    /// <summary>Runs the loop to a <see cref="Suggestion"/>.</summary>
+    public Task<AgentRunResult> RunAsync(Definitions.AgentDefinition definition, AgentQuestion question, CancellationToken cancellationToken) =>
+        GuardedAsync(
+            definition,
+            question,
+            transcript => new AgentRunResult(
+                question.RunId,
+                SuggestionParser.Parse(transcript.Reply, transcript.Results.ToDictionary(result => result.Key, result => result.Value.ToolName, StringComparer.Ordinal)),
+                transcript.Calls),
+            cancellationToken);
+
+    /// <summary>Runs the loop to a <see cref="Narration"/> of the Findings a tool returned.</summary>
+    public Task<NarrationRunResult> RunNarrationAsync(Definitions.AgentDefinition definition, AgentQuestion question, CancellationToken cancellationToken) =>
+        GuardedAsync(
+            definition,
+            question,
+            transcript => new NarrationRunResult(question.RunId, NarrationParser.Parse(transcript.Reply, transcript.Results), transcript.Calls),
+            cancellationToken);
+
+    private async Task<T> GuardedAsync<T>(Definitions.AgentDefinition definition, AgentQuestion question, Func<Transcript, T> finish, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentNullException.ThrowIfNull(question);
@@ -18,7 +37,7 @@ public sealed class AgentRunner(IChatClient model, IToolSource toolSource, Agent
         deadline.CancelAfter(options.Timeout);
         try
         {
-            return await LoopAsync(definition, question, deadline.Token);
+            return finish(await LoopAsync(definition, question, deadline.Token));
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -30,7 +49,7 @@ public sealed class AgentRunner(IChatClient model, IToolSource toolSource, Agent
         }
     }
 
-    private async Task<AgentRunResult> LoopAsync(Definitions.AgentDefinition definition, AgentQuestion question, CancellationToken cancellationToken)
+    private async Task<Transcript> LoopAsync(Definitions.AgentDefinition definition, AgentQuestion question, CancellationToken cancellationToken)
     {
         await using var session = await toolSource.OpenAsync(new ToolContext(question.CorrelationId, definition.Inputs.CorrelationIdHeader), cancellationToken);
         var listed = session.Tools.Where(tool => definition.Tools.Names.Contains(tool.Name, StringComparer.Ordinal)).ToDictionary(tool => tool.Name, StringComparer.Ordinal);
@@ -48,6 +67,7 @@ public sealed class AgentRunner(IChatClient model, IToolSource toolSource, Agent
         };
         List<ChatMessage> messages = [new(ChatRole.System, definition.Instructions), new(ChatRole.User, question.Text)];
         var calls = new List<ToolCallRecord>();
+        var results = new Dictionary<string, ToolResultText>(StringComparer.Ordinal);
 
         while (true)
         {
@@ -57,13 +77,10 @@ public sealed class AgentRunner(IChatClient model, IToolSource toolSource, Agent
             var requested = response.Messages.SelectMany(message => message.Contents).OfType<FunctionCallContent>().ToList();
             if (requested.Count == 0)
             {
-                return new AgentRunResult(
-                    question.RunId,
-                    SuggestionParser.Parse(response.Text, calls.ToDictionary(call => call.ResultId, call => call.ToolName, StringComparer.Ordinal)),
-                    calls);
+                return new Transcript(response.Text, calls, results);
             }
 
-            var results = new List<AIContent>();
+            var answers = new List<AIContent>();
             foreach (var call in requested)
             {
                 if (!listed.TryGetValue(call.Name, out var tool))
@@ -78,12 +95,17 @@ public sealed class AgentRunner(IChatClient model, IToolSource toolSource, Agent
 
                 var resultId = $"r{calls.Count + 1}";
                 calls.Add(new ToolCallRecord(resultId, tool.Name));
-                results.Add(new FunctionResultContent(call.CallId, ToolResults.Delimit(resultId, tool.Name, await InvokeAsync(tool, call, cancellationToken))));
+                var content = await InvokeAsync(tool, call, cancellationToken);
+                results[resultId] = new ToolResultText(tool.Name, content);
+                answers.Add(new FunctionResultContent(call.CallId, ToolResults.Delimit(resultId, tool.Name, content)));
             }
 
-            messages.Add(new ChatMessage(ChatRole.Tool, results));
+            messages.Add(new ChatMessage(ChatRole.Tool, answers));
         }
     }
+
+    // What a loop ended with: the model's last reply, the calls it made and what each returned.
+    private sealed record Transcript(string Reply, IReadOnlyList<ToolCallRecord> Calls, IReadOnlyDictionary<string, ToolResultText> Results);
 
     private static async Task<string> InvokeAsync(AIFunction tool, FunctionCallContent call, CancellationToken cancellationToken)
     {

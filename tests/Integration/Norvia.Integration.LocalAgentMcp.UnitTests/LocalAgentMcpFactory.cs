@@ -22,6 +22,10 @@ public sealed class LocalAgentMcpFactory : WebApplicationFactory<Program>
     public const string Issuer = "https://norvia.local/tokens";
     public const string AgentAudience = "api://norvia-integration-console-agent";
     public const string ConsoleAudience = "api://norvia-integration-console-agent-api";
+    public const string HealthCheckAgentId = "norvia-local-agent-estate-health-check";
+    public const string HealthCheckRole = "HealthCheck.Agent.Read";
+    public const string HealthCheckAudience = "api://norvia-health-check-agent";
+    public const string HealthCheckApiAudience = "api://norvia-health-check-agent-api";
 
     public byte[] SigningKey { get; } = RandomNumberGenerator.GetBytes(64);
 
@@ -30,6 +34,9 @@ public sealed class LocalAgentMcpFactory : WebApplicationFactory<Program>
     internal ManualTimeProvider Time { get; } = new(DateTimeOffset.UtcNow);
 
     public int RateLimitCalls { get; set; } = 60;
+
+    /// <summary>Whether the stand-in is configured to serve the Estate health check's server, as the AppHost configures it.</summary>
+    public bool ServesHealthCheck { get; set; } = true;
 
     public FakeLogCollector Logs => Services.GetRequiredService<FakeLogCollector>();
 
@@ -49,6 +56,23 @@ public sealed class LocalAgentMcpFactory : WebApplicationFactory<Program>
         })
         {
             builder.UseSetting(name, value);
+        }
+
+        if (ServesHealthCheck)
+        {
+            foreach (var (name, value) in new Dictionary<string, string>
+            {
+                ["AgentMcp:HealthCheck:Tokens:Issuer"] = Issuer,
+                ["AgentMcp:HealthCheck:Tokens:Audience"] = HealthCheckAudience,
+                ["AgentMcp:HealthCheck:Tokens:SigningKey"] = signingKey,
+                ["AgentMcp:HealthCheck:Api"] = "http://health-check/agent/v1",
+                ["AgentMcp:HealthCheck:ApiTokens:Issuer"] = Issuer,
+                ["AgentMcp:HealthCheck:ApiTokens:Audience"] = HealthCheckApiAudience,
+                ["AgentMcp:HealthCheck:ApiTokens:SigningKey"] = signingKey,
+            })
+            {
+                builder.UseSetting(name, value);
+            }
         }
 
         builder.ConfigureTestServices(services =>
@@ -81,6 +105,10 @@ public sealed class LocalAgentMcpFactory : WebApplicationFactory<Program>
             SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(signingKey ?? SigningKey), SecurityAlgorithms.HmacSha256),
         });
     }
+
+    /// <summary>The Estate health-check agent's token as Entra issues it to its agent identity.</summary>
+    public string HealthCheckToken(string? azp = HealthCheckAgentId, string[]? roles = null) =>
+        AgentToken(azp, roles ?? [HealthCheckRole], HealthCheckAudience);
 
     public HttpClient AgentClient(string? token = null)
     {

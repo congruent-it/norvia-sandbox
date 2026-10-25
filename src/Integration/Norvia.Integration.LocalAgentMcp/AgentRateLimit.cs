@@ -11,13 +11,14 @@ internal sealed class AgentRateLimit(TimeProvider time, IOptions<AgentMcpOptions
 {
     private readonly ConcurrentDictionary<string, Counter> _counters = new();
 
-    /// <summary>Counts a call for the Agent. Null when it is allowed; otherwise how long until the limit renews.</summary>
-    public TimeSpan? Count(string agentId)
+    /// <summary>Counts a call for the Agent on a server. Null when it is allowed; otherwise how long until the limit renews. Each server has its own budget, as each has its own policy.</summary>
+    public TimeSpan? Count(string server, string agentId)
     {
+        ArgumentException.ThrowIfNullOrEmpty(server);
         ArgumentException.ThrowIfNullOrEmpty(agentId);
         var window = TimeSpan.FromSeconds(options.Value.RateLimitPeriodSeconds);
         var now = time.GetUtcNow();
-        var counter = _counters.GetOrAdd(agentId, _ => new Counter(now));
+        var counter = _counters.GetOrAdd($"{server}/{agentId}", _ => new Counter(now));
         lock (counter)
         {
             if (now - counter.WindowStart >= window)

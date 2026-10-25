@@ -519,6 +519,17 @@ else
             .WithEnvironment("LocalTelemetry__ApiKey", builder.Configuration["AppHost:DashboardApiKey"] ?? string.Empty);
     }
 
+    // The Estate health check, for the Integration operator. It has no database: locally it reads a snapshot of the estate's configuration, so
+    // its Findings are the snapshot's and not the running estate's. The snapshot is the estate as found unless HealthCheck:Snapshot says
+    // "fixed" (user secrets or the launch profile). It is not part of the Azure deployment yet (#392).
+    var healthCheck = builder.AddProject<Projects.Norvia_HealthCheck_Web>("health-check-web")
+        .WithHttpHealthCheck("/health")
+        .WithUrlForEndpoint("http", url => url.DisplayText = "Estate health check")
+        .WithEnvironment("LocalOperator__Name", $"{Environment.UserName} (local)")
+        .WithEnvironment("LocalOperator__Roles__0", "HealthCheck.Run")
+        .WithEnvironment("LocalOperator__Roles__1", "HealthCheck.Read")
+        .WithEnvironment("Estate__Snapshot", builder.Configuration["HealthCheck:Snapshot"] ?? "as-found");
+
     // Locally the TMS trusts tokens signed with this key (see LocalTokens).
     var localTokenSigningKey = builder.AddParameter(
         LocalTokens.SigningKeyParameter,
@@ -874,18 +885,34 @@ else
     }
 
     // The Agents are off locally unless the developer turns them on (Agents:Enabled, in user secrets or the launch profile), as they are off in
-    // Azure unless the estate does (ADR 0040). Then the console runs the Integration operations agent in process against a stand-in that plays
-    // API Management's MCP server (ADR 0041), and both take tokens signed with the same local key.
+    // Azure unless the estate does (ADR 0040). Then the console runs the Integration operations agent, and the Estate health check the Estate
+    // health-check agent, in process against a stand-in that plays API Management's MCP server (ADR 0041), and all take tokens signed with the same local key.
     if (bool.TryParse(builder.Configuration["Agents:Enabled"], out var agentsEnabled) && agentsEnabled)
     {
         var agentMcp = builder.AddProject<Projects.Norvia_Integration_LocalAgentMcp>("agent-mcp")
             .WaitFor(integrationConsole)
+            .WaitFor(healthCheck)
             .WithHttpHealthCheck("/health")
             .WithEnvironment("AgentMcp__Tokens__Issuer", LocalTokens.Issuer)
             .WithEnvironment("AgentMcp__Tokens__Audience", LocalTokens.AgentAudience)
             .WithEnvironment("AgentMcp__ConsoleAgentApi", ReferenceExpression.Create($"{integrationConsole.GetEndpoint("http")}/agent/v1"))
             .WithEnvironment("AgentMcp__ConsoleTokens__Issuer", LocalTokens.Issuer)
-            .WithEnvironment("AgentMcp__ConsoleTokens__Audience", LocalTokens.ConsoleAgentApiAudience);
+            .WithEnvironment("AgentMcp__ConsoleTokens__Audience", LocalTokens.ConsoleAgentApiAudience)
+            // The second server: the Estate health check's, at /mcp/health-check.
+            .WithEnvironment("AgentMcp__HealthCheck__Tokens__Issuer", LocalTokens.Issuer)
+            .WithEnvironment("AgentMcp__HealthCheck__Tokens__Audience", LocalTokens.HealthCheckAgentAudience)
+            .WithEnvironment("AgentMcp__HealthCheck__Api", ReferenceExpression.Create($"{healthCheck.GetEndpoint("http")}/agent/v1"))
+            .WithEnvironment("AgentMcp__HealthCheck__ApiTokens__Issuer", LocalTokens.Issuer)
+            .WithEnvironment("AgentMcp__HealthCheck__ApiTokens__Audience", LocalTokens.HealthCheckAgentApiAudience);
+        healthCheck
+            .WithEnvironment("Agents__Enabled", "true")
+            .WithEnvironment("Agents__McpAddress", ReferenceExpression.Create($"{agentMcp.GetEndpoint("http")}/mcp/health-check"))
+            .WithEnvironment("Agents__Tokens__Issuer", LocalTokens.Issuer)
+            .WithEnvironment("Agents__Tokens__Audience", LocalTokens.HealthCheckAgentAudience)
+            .WithEnvironment("Agents__Tokens__ClientId", LocalTokens.EstateHealthCheckAgentClientId)
+            .WithEnvironment("Agents__Tokens__Role", LocalTokens.HealthCheckAgentReadRole)
+            .WithEnvironment("Agents__Api__Issuer", LocalTokens.Issuer)
+            .WithEnvironment("Agents__Api__Audience", LocalTokens.HealthCheckAgentApiAudience);
         integrationConsole
             .WithEnvironment("Agents__Enabled", "true")
             .WithEnvironment("Agents__McpAddress", ReferenceExpression.Create($"{agentMcp.GetEndpoint("http")}/mcp"))
@@ -898,16 +925,23 @@ else
         // A developer's own model deployment in Foundry replaces the scripted fake (Agents:Model:Endpoint, optionally Agents:Model:Deployment).
         if (!string.IsNullOrEmpty(builder.Configuration["Agents:Model:Endpoint"]))
         {
-            integrationConsole.WithEnvironment("Agents__Model__Endpoint", builder.Configuration["Agents:Model:Endpoint"]!)
-                .WithEnvironment("Agents__Model__Deployment", builder.Configuration["Agents:Model:Deployment"] ?? string.Empty);
+            foreach (var host in new[] { integrationConsole, healthCheck })
+            {
+                host.WithEnvironment("Agents__Model__Endpoint", builder.Configuration["Agents:Model:Endpoint"]!)
+                    .WithEnvironment("Agents__Model__Deployment", builder.Configuration["Agents:Model:Deployment"] ?? string.Empty);
+            }
         }
 
         foreach (var (holder, name) in new[]
         {
             (agentMcp.Resource, "AgentMcp__Tokens__SigningKey"),
             (agentMcp.Resource, "AgentMcp__ConsoleTokens__SigningKey"),
+            (agentMcp.Resource, "AgentMcp__HealthCheck__Tokens__SigningKey"),
+            (agentMcp.Resource, "AgentMcp__HealthCheck__ApiTokens__SigningKey"),
             (integrationConsole.Resource, "Agents__Tokens__SigningKey"),
             (integrationConsole.Resource, "Agents__Api__SigningKey"),
+            (healthCheck.Resource, "Agents__Tokens__SigningKey"),
+            (healthCheck.Resource, "Agents__Api__SigningKey"),
         })
         {
             builder.CreateResourceBuilder(holder).WithEnvironment(async context =>

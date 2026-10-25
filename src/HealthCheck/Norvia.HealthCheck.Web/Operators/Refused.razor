@@ -1,0 +1,30 @@
+@page "/refused"
+@attribute [Authorize]
+
+<PageTitle>@PageTitles.Refused</PageTitle>
+
+<h1>You can't run an Estate health check</h1>
+<p>
+    You're signed in as <strong>@_operatorName</strong>, but you don't hold the <code>@OperatorRoles.Run</code> role.
+</p>
+<p>Ask whoever manages Norvia's Entra ID to assign you the role on the Estate health check's app registration.</p>
+
+@code {
+    private string? _operatorName;
+
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationState { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpContext is not null)
+        {
+            HttpContext.Response.StatusCode = StatusCodes.Status403Forbidden;
+        }
+
+        _operatorName = AuthenticationState is null ? null : (await AuthenticationState).User.Identity?.Name;
+    }
+}

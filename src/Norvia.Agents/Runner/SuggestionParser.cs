@@ -10,7 +10,7 @@ public static class SuggestionParser
         JsonElement root;
         try
         {
-            using var document = JsonDocument.Parse(WithoutFence(reply));
+            using var document = JsonDocument.Parse(JsonReplies.WithoutFence(reply));
             root = document.RootElement.Clone();
         }
         catch (JsonException exception)
@@ -62,18 +62,4 @@ public static class SuggestionParser
         element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(value.GetString())
             ? value.GetString()!.Trim()
             : throw new AgentRunException($"The reply has no {property}.");
-
-    // Models often wrap JSON in a code fence.
-    private static string WithoutFence(string reply)
-    {
-        var text = reply.Trim();
-        if (!text.StartsWith("```", StringComparison.Ordinal))
-        {
-            return text;
-        }
-
-        var start = text.IndexOf('\n', StringComparison.Ordinal);
-        var end = text.LastIndexOf("```", StringComparison.Ordinal);
-        return start >= 0 && end > start ? text[(start + 1)..end].Trim() : text;
-    }
 }

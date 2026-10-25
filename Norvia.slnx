@@ -39,6 +39,11 @@
     <Project Path="src/IntegrationConsole/Norvia.IntegrationConsole.Infrastructure/Norvia.IntegrationConsole.Infrastructure.csproj" />
     <Project Path="src/IntegrationConsole/Norvia.IntegrationConsole.Web/Norvia.IntegrationConsole.Web.csproj" />
   </Folder>
+  <Folder Name="/src/HealthCheck/">
+    <Project Path="src/HealthCheck/Norvia.HealthCheck.Application/Norvia.HealthCheck.Application.csproj" />
+    <Project Path="src/HealthCheck/Norvia.HealthCheck.Infrastructure/Norvia.HealthCheck.Infrastructure.csproj" />
+    <Project Path="src/HealthCheck/Norvia.HealthCheck.Web/Norvia.HealthCheck.Web.csproj" />
+  </Folder>
   <Folder Name="/src/Erp/">
     <Project Path="src/Erp/Norvia.Erp.Api/Norvia.Erp.Api.csproj" />
     <Project Path="src/Erp/Norvia.Erp.Application/Norvia.Erp.Application.csproj" />
@@ -100,6 +105,12 @@
     <Project Path="tests/Integration/Norvia.Integration.LocalAgentMcp.UnitTests/Norvia.Integration.LocalAgentMcp.UnitTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.LocalPartnerApi.UnitTests/Norvia.Integration.LocalPartnerApi.UnitTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.TransportOrderIntake.UnitTests/Norvia.Integration.TransportOrderIntake.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/tests/HealthCheck/">
+    <Project Path="tests/HealthCheck/Norvia.HealthCheck.Application.UnitTests/Norvia.HealthCheck.Application.UnitTests.csproj" />
+    <Project Path="tests/HealthCheck/Norvia.HealthCheck.ArchitectureTests/Norvia.HealthCheck.ArchitectureTests.csproj" />
+    <Project Path="tests/HealthCheck/Norvia.HealthCheck.Infrastructure.UnitTests/Norvia.HealthCheck.Infrastructure.UnitTests.csproj" />
+    <Project Path="tests/HealthCheck/Norvia.HealthCheck.Web.UnitTests/Norvia.HealthCheck.Web.UnitTests.csproj" />
   </Folder>
   <Folder Name="/tests/IntegrationConsole/">
     <Project Path="tests/IntegrationConsole/Norvia.IntegrationConsole.Application.UnitTests/Norvia.IntegrationConsole.Application.UnitTests.csproj" />

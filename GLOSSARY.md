@@ -477,11 +477,23 @@ One question put to an Agent, with its tool calls and its answer, identified by 
 _Avoid_: chat, session, conversation (that is Foundry's own record of a run)
 
 **Agent view**:
-An application's narrower, read-only endpoint group for the Agents: statuses, codes, times, numbers and business names, from an allowlist of fields, with no message body. The Integration console's is its agent API (`/agent/v1`); an MCP server exposes each operation as a tool (ADR 0040).
+An application's narrower, read-only endpoint group for the Agents: statuses, codes, times, numbers and business names, from an allowlist of fields, with no message body. The Integration console's is its agent API (`/agent/v1`), and so is the Estate health check's; an MCP server exposes each operation as a tool (ADR 0040).
 _Avoid_: agent endpoint, agent database
 
 **Explain**:
 The button on a Message trail that has a failure, on a failed run in the Failed runs panel, and on a dead-lettered message in the Dead-letter queues panel. It puts one fixed question about that item to the Integration operations agent and shows the Suggestion it answers with: cause, evidence, suggested action and confidence. The Dead-letter queues panel's "what needs attention" button is a fixed question too, about all the queues at once. The Integration operator decides what to do.
+
+**Estate health check**:
+A run of the checklist over the estate's configuration, by the Integration operator on the Estate health check page (the app `src/HealthCheck`). It gives the Findings of the Checks that failed, and the Estate health-check agent narrates them: it puts them in order and explains their business impact in plain language. It changes nothing and stores nothing; the result lives in the page session. Locally the configuration is a snapshot kept in the repo, so the Findings are the snapshot's and not the running estate's.
+_Avoid_: audit, scan, assessment, review
+
+**Check**:
+One item of the Estate health check's checklist: an ID, the rule the estate's configuration must satisfy, a severity, the as-found toggle that breaks the rule and the fix (the Bicep parameter or setting). Deterministic code evaluates it, so a Finding's severity and fix are the Check's and never a model's. The first is `DLQ-ALERT`: every queue and subscription with a dead-letter queue has an alert on it.
+_Avoid_: test, rule (that is one part of a Check), audit point, scan
+
+**Finding**:
+What a Check found wrong in the estate: the Check's ID, severity, rule, as-found toggle and fix, and the evidence, which names the resources concerned and never a secret's value (a secret is reported by where it is). A Check that passes gives no Finding. The Agent cites a Finding by its ID and never adds one.
+_Avoid_: issue, problem, alert (that is an Azure Monitor rule, and what a Check looks for), defect
 
 **Suggestion**:
 What an Agent proposes a person do, shown in the host application's UI: a cause or reasoning, the evidence it cites, a suggested action and a confidence. It is not stored, and acting on it is the person's own command, whose trace names the Agent and the run ID. The suggested action is one of Resubmit, Discard, Fix the cause first or Needs a person. In the Integration console a Suggestion of Resubmit or Discard on a dead-lettered message pre-selects that message in the resubmit and discard flow and executes nothing: the operator confirms, a discard still asks for its reason, and the audit of what they then do names the Agent and the run ID. A Suggestion that is ignored is not recorded.

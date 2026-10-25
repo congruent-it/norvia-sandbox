@@ -13,11 +13,16 @@ builder.Services.AddOptions<AgentMcpOptions>().BindConfiguration(AgentMcpOptions
     .ValidateDataAnnotations()
     .Validate(options => options.Tokens.IsComplete, "AgentMcp:Tokens needs an Issuer, an Audience and a SigningKey.")
     .Validate(options => options.ConsoleTokens.IsComplete, "AgentMcp:ConsoleTokens needs an Issuer, an Audience and a SigningKey.")
+    .Validate(
+        options => options.HealthCheck is null || (options.HealthCheck.Api is { IsAbsoluteUri: true } && options.HealthCheck.Tokens.IsComplete && options.HealthCheck.ApiTokens.IsComplete),
+        "AgentMcp:HealthCheck needs an absolute Api, Tokens and ApiTokens, each with an Issuer, an Audience and a SigningKey.")
     .ValidateOnStart();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<AgentRateLimit>();
-// The tool list is the contract file the Bicep reads too (ADR 0040), so the two cannot differ.
+// The tool lists are the contract files the Bicep reads too (ADR 0040), so the two cannot differ.
 builder.Services.AddSingleton(_ => ToolListContract.Parse(ReadEmbedded("integration-operations.tools.json")));
+builder.Services.AddSingleton(_ => ToolListContract.Parse(ReadEmbedded("health-check.tools.json")));
+builder.Services.AddSingleton<AgentServers>();
 
 // A short wait and no retry: an Agent is never on a critical path, and the standard resilience handler would retry (ADR 0040).
 #pragma warning disable EXTEXP0001 // RemoveAllResilienceHandlers is the only way to opt a client out of the defaults.

@@ -15,7 +15,6 @@ namespace Norvia.Integration.LocalAgentMcp;
 /// </summary>
 internal static partial class McpEndpoint
 {
-    public const string Flow = "agent-mcp-integration-operations";
     public const string CorrelationHeader = "X-Correlation-ID";
     public const string AgentHeader = "X-Agent-ID";
     public const string ToolHeader = "X-Tool-Name";
@@ -24,16 +23,21 @@ internal static partial class McpEndpoint
     public static IEndpointRouteBuilder MapAgentMcp(this IEndpointRouteBuilder endpoints)
     {
         // Authorization is the policy's own checks, in its order, not the ASP.NET Core pipeline's.
-        endpoints.MapPost("/mcp", HandleAsync).AllowAnonymous();
-        // Streamable HTTP lets a server refuse the optional stream; a stateless server has nothing to push.
-        endpoints.MapGet("/mcp", () => Results.StatusCode(StatusCodes.Status405MethodNotAllowed)).AllowAnonymous();
-        endpoints.MapDelete("/mcp", () => Results.Ok()).AllowAnonymous();
+        // /mcp is the Integration operations agent's server; every other server is at /mcp/<server>.
+        foreach (var route in new[] { "/mcp", "/mcp/{server}" })
+        {
+            endpoints.MapPost(route, HandleAsync).AllowAnonymous();
+            // Streamable HTTP lets a server refuse the optional stream; a stateless server has nothing to push.
+            endpoints.MapGet(route, () => Results.StatusCode(StatusCodes.Status405MethodNotAllowed)).AllowAnonymous();
+            endpoints.MapDelete(route, () => Results.Ok()).AllowAnonymous();
+        }
+
         return endpoints;
     }
 
     public static async Task<IResult> HandleAsync(
         HttpContext context,
-        ToolListContract contract,
+        AgentServers servers,
         AgentRateLimit rateLimit,
         IOptions<AgentMcpOptions> options,
         TimeProvider time,
@@ -41,7 +45,7 @@ internal static partial class McpEndpoint
         ILoggerFactory loggers)
     {
         ArgumentNullException.ThrowIfNull(context);
-        ArgumentNullException.ThrowIfNull(contract);
+        ArgumentNullException.ThrowIfNull(servers);
         ArgumentNullException.ThrowIfNull(rateLimit);
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(time);
@@ -52,9 +56,15 @@ internal static partial class McpEndpoint
         var correlationId = CorrelationIdOf(context.Request);
         context.Response.Headers[CorrelationHeader] = correlationId;
         var logger = loggers.CreateLogger(typeof(McpEndpoint));
-        using var trail = logger.BeginScope(new Dictionary<string, object?> { [TrackingKeys.CorrelationId] = correlationId, [TrackingKeys.Flow] = Flow });
+        if (servers.Find(context.Request.RouteValues["server"]?.ToString()) is not { } mcpServer)
+        {
+            return Results.Json(new JsonObject { ["messageId"] = correlationId, ["text"] = "There is no such server." }, statusCode: StatusCodes.Status404NotFound);
+        }
 
-        var token = await AgentToken.ValidateAsync(context.Request.Headers.Authorization.ToString(), options.Value);
+        var contract = mcpServer.Contract;
+        using var trail = logger.BeginScope(new Dictionary<string, object?> { [TrackingKeys.CorrelationId] = correlationId, [TrackingKeys.Flow] = mcpServer.Flow });
+
+        var token = await AgentToken.ValidateAsync(context.Request.Headers.Authorization.ToString(), mcpServer.AgentTokens);
         if (token is null)
         {
             return Refuse(logger, StatusCodes.Status401Unauthorized, "AgentTokenInvalid", correlationId, "Unauthorized. Access token is missing or invalid.");
@@ -70,7 +80,7 @@ internal static partial class McpEndpoint
             return Refuse(logger, StatusCodes.Status403Forbidden, "NoAgentIdentity", correlationId, "The token names no calling application.");
         }
 
-        if (rateLimit.Count(agentId) is { } retryAfter)
+        if (rateLimit.Count(mcpServer.Contract.Server, agentId) is { } retryAfter)
         {
             context.Response.Headers.RetryAfter = Math.Ceiling(retryAfter.TotalSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture);
             return Refuse(logger, StatusCodes.Status429TooManyRequests, "AgentRateLimited", correlationId, "Too many requests. Try again later.", agentId);
@@ -108,15 +118,14 @@ internal static partial class McpEndpoint
             })),
             "ping" => Results.Json(Success(id, new JsonObject())),
             "tools/list" => Results.Json(Success(id, new JsonObject { ["tools"] = new JsonArray([.. contract.Tools.Select(tool => (JsonNode)McpTools.Describe(tool))]) })),
-            "tools/call" => await CallAsync(context, contract, options.Value, time, clients, logger, correlationId, agentId, id, message["params"] as JsonObject),
+            "tools/call" => await CallAsync(context, mcpServer, time, clients, logger, correlationId, agentId, id, message["params"] as JsonObject),
             _ => Results.Json(Failure(id, -32601, "Method not found")),
         };
     }
 
     private static async Task<IResult> CallAsync(
         HttpContext context,
-        ToolListContract contract,
-        AgentMcpOptions options,
+        AgentServer server,
         TimeProvider time,
         IHttpClientFactory clients,
         ILogger logger,
@@ -125,6 +134,8 @@ internal static partial class McpEndpoint
         JsonNode id,
         JsonObject? parameters)
     {
+        var contract = server.Contract;
+
         // The name is read from the MCP message, never from a header.
         var name = parameters?["name"]?.GetValue<string>();
         if (name is null || contract.Find(name) is not { } tool)
@@ -138,8 +149,8 @@ internal static partial class McpEndpoint
             return Results.Json(Failure(id, -32602, $"{tool.Name} needs {string.Join(", ", tool.Parameters)}, each a plain identifier."));
         }
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(options.ConsoleAgentApi!.AbsoluteUri.TrimEnd('/') + path));
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", TmsTokens.Create(options.ConsoleTokens, time, agentId, contract.Role));
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(server.Api.AbsoluteUri.TrimEnd('/') + path));
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", TmsTokens.Create(server.ApiTokens, time, agentId, contract.Role));
         request.Headers.Add(CorrelationHeader, correlationId);
         request.Headers.Add(AgentHeader, agentId);
         request.Headers.Add(ToolHeader, tool.Name);

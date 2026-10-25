@@ -21,6 +21,7 @@ namespace Norvia.AppHost;
 /// The TMS UI signs its own token for the TMS API with the key too, as its managed identity holding the manage role.
 /// The Simulator signs its own token for the ERP API with the key too, as its managed identity holding the ERP API's manage role (Invoice now and a Credit note).
 /// The local Partner API trusts the same key for the Personas' tokens, which the Partner portal signs itself (ADR 0023).
+/// The Estate health check signs the Estate health-check agent's token itself, as its agent identity holding the call role, for the same stand-in, which then signs its own token for the app's agent API as that identity.
 /// The Integration console signs the Integration operations agent's token itself, as its agent identity holding the agent read role, for the local MCP stand-in; the stand-in then signs its own token for the console's agent API as that identity (ADR 0041).
 /// </summary>
 public static class LocalTokens
@@ -62,6 +63,18 @@ public static class LocalTokens
 
     /// <summary>The app role an Agent holds on the Integration console's agent API.</summary>
     public const string AgentReadRole = "IntegrationConsole.Agent.Read";
+
+    /// <summary>The Estate health check's agent view audience, which the Estate health-check agent's token is for (the MCP stand-in checks it, as API Management does).</summary>
+    public const string HealthCheckAgentAudience = "api://norvia-health-check-agent";
+
+    /// <summary>The Estate health check's agent API audience, which the MCP server's token for the backend is for.</summary>
+    public const string HealthCheckAgentApiAudience = "api://norvia-health-check-agent-api";
+
+    /// <summary>The Estate health-check agent's local identity, which stands in for its Entra agent identity. It holds only the call role: no Azure role.</summary>
+    public const string EstateHealthCheckAgentClientId = "norvia-local-agent-estate-health-check";
+
+    /// <summary>The app role the Estate health-check agent holds on the health-check API.</summary>
+    public const string HealthCheckAgentReadRole = "HealthCheck.Agent.Read";
 
     /// <summary>The app role a Shipper Persona holds on the Norvia Partner API, as the estate grants it in Entra.</summary>
     public const string SubmitRole = "TransportOrders.Submit";

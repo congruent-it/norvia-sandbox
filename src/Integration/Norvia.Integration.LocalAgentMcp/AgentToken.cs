@@ -1,5 +1,6 @@
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
+using Norvia.Integration.LocalSupport;
 
 namespace Norvia.Integration.LocalAgentMcp;
 
@@ -7,14 +8,14 @@ namespace Norvia.Integration.LocalAgentMcp;
 internal sealed record AgentToken(string? AgentId, IReadOnlySet<string> Roles)
 {
     /// <summary>Null when the token is missing, expired, signed with another key or meant for another audience.</summary>
-    public static async Task<AgentToken?> ValidateAsync(string authorization, AgentMcpOptions options)
+    public static async Task<AgentToken?> ValidateAsync(string authorization, LocalTokenOptions tokens)
     {
         var token = authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) ? authorization["Bearer ".Length..].Trim() : string.Empty;
         var result = await new JsonWebTokenHandler().ValidateTokenAsync(token, new TokenValidationParameters
         {
-            ValidIssuer = options.Tokens.Issuer,
-            ValidAudience = options.Tokens.Audience,
-            IssuerSigningKey = options.Tokens.Key,
+            ValidIssuer = tokens.Issuer,
+            ValidAudience = tokens.Audience,
+            IssuerSigningKey = tokens.Key,
         });
 
         return result is { IsValid: true, SecurityToken: JsonWebToken jwt }

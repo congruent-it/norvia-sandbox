@@ -262,13 +262,33 @@ public sealed class AgentMcpServerTests
         tools.SelectMany(tool => tool.AsObject().Select(property => property.Key)).Distinct().Should().BeSubsetOf(["name", "description", "method", "path", "mockResponse"]);
     }
 
+    // Servers the local MCP stand-in serves before their API Management MCP server is built. Each leaves this list in the issue that adds the Bicep.
+    private static readonly Dictionary<string, string> NotYetInBicep = new()
+    {
+        ["health-check.tools.json"] = "#392: the Estate health check is deployed to Azure with its MCP server in that slice",
+    };
+
     [Theory]
     [MemberData(nameof(ContractFiles))]
     public void ToolListContract_IsTheFileTheBicepReads_SoTheBicepCannotDriftFromIt(string fileName)
     {
+        if (NotYetInBicep.ContainsKey(fileName))
+        {
+            return;
+        }
+
         var bicep = string.Concat(Directory.EnumerateFiles(Path.Combine(RepositoryRoot.Path, "infra/estate"), "*.bicep").Select(File.ReadAllText));
 
         bicep.Should().Contain($"loadJsonContent('../../{ContractFolder}/{fileName}')");
+    }
+
+    [Fact]
+    public void NotYetInBicep_ListsOnlyServersTheBicepDoesNotReadYet_SoTheListShrinksAsTheBicepIsBuilt()
+    {
+        var bicep = string.Concat(Directory.EnumerateFiles(Path.Combine(RepositoryRoot.Path, "infra/estate"), "*.bicep").Select(File.ReadAllText));
+
+        NotYetInBicep.Keys.Should().OnlyContain(fileName => File.Exists(Path.Combine(RepositoryRoot.Path, ContractFolder, fileName)));
+        NotYetInBicep.Keys.Should().NotContain(fileName => bicep.Contains($"loadJsonContent('../../{ContractFolder}/{fileName}')", StringComparison.Ordinal));
     }
 
     [Fact]

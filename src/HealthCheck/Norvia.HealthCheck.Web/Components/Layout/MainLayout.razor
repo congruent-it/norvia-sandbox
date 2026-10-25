@@ -1,0 +1,36 @@
+@inherits LayoutComponentBase
+
+<FluentDesignTheme Mode="DesignThemeModes.Dark" CustomColor="#375a7f" />
+
+<header class="app-bar">
+    <nav aria-label="Main">
+        <a href="/" class="brand">Estate health check</a>
+        @if (_operatorName is not null)
+        {
+            <span class="operator">@_operatorName</span>
+        }
+    </nav>
+</header>
+
+<main>
+    @Body
+</main>
+
+<div id="blazor-error-ui" data-nosnippet>
+    <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+        Something went wrong. <a href="">Reload</a>
+    </FluentMessageBar>
+</div>
+
+@code {
+    private string? _operatorName;
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationState { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var identity = AuthenticationState is null ? null : (await AuthenticationState).User.Identity;
+        _operatorName = identity is { IsAuthenticated: true } ? identity.Name : null;
+    }
+}

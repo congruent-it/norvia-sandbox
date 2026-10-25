@@ -23,6 +23,7 @@ The estate can also run *as found*, reproducing the problems a health check woul
 | [docs/processes/tms/](docs/processes/tms/README.md) | The TMS process catalogue, P1 Transport Order intake to P12 Trip execution, each with a design doc and a BPMN diagram |
 | [docs/processes/erp/](docs/processes/erp/README.md) | The ERP process catalogue: E1 Invoicing, E2 Carrier invoice matching, each with a design doc and a BPMN diagram |
 | [docs/operations/integration-console.md](docs/operations/integration-console.md) | How the Integration operator finds Message trails and resolves failed messages |
+| [docs/operations/estate-health-check.md](docs/operations/estate-health-check.md) | How the Integration operator runs an Estate health check and reads its Findings, the Check, the snapshots the local run reads and what the Estate health-check agent may do |
 | [docs/operations/simulator.md](docs/operations/simulator.md) | How the Simulator feeds the estate with representative orders at a chosen volume, through the estate's real doors |
 | [docs/operations/agent-mcp-servers.md](docs/operations/agent-mcp-servers.md) | The reusable API Management MCP server module for the Agents: the policy, the tool-list contract, the example server, how to add an agent API in four steps, and the smoke run |
 | [docs/operations/agent-evaluation.md](docs/operations/agent-evaluation.md) | The shared evaluation harness for the Agents: the case format, the checks, how to run it on demand, and the rule for reading a result (a failure is a finding, not a failed build) |
