@@ -164,6 +164,9 @@ jobs:
           - application: Integration console
             directory: IntegrationConsole
             kinds: UnitTests ArchitectureTests IntegrationTests UiTests
+          - application: Estate health check
+            directory: HealthCheck
+            kinds: UnitTests ArchitectureTests IntegrationTests
     steps:
       - uses: actions/checkout@v5
 
