@@ -112,6 +112,7 @@
     <Project Path="tests/HealthCheck/Norvia.HealthCheck.ArchitectureTests/Norvia.HealthCheck.ArchitectureTests.csproj" />
     <Project Path="tests/HealthCheck/Norvia.HealthCheck.Infrastructure.UnitTests/Norvia.HealthCheck.Infrastructure.UnitTests.csproj" />
     <Project Path="tests/HealthCheck/Norvia.HealthCheck.Web.UnitTests/Norvia.HealthCheck.Web.UnitTests.csproj" />
+    <Project Path="tests/HealthCheck/Norvia.HealthCheck.Web.UiTests/Norvia.HealthCheck.Web.UiTests.csproj" />
   </Folder>
   <Folder Name="/tests/IntegrationConsole/">
     <Project Path="tests/IntegrationConsole/Norvia.IntegrationConsole.Application.UnitTests/Norvia.IntegrationConsole.Application.UnitTests.csproj" />
