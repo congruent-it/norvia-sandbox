@@ -1,0 +1,19 @@
+{
+  "id": "healthy-trail-no-failure",
+  "agent": "integration-operations",
+  "description": "A trail with no failure: the agent must say so rather than find a cause. Explain is only offered on a failed trail, but an operator can still ask about one that looks fine.",
+  "setup": {
+    "fault": "none",
+    "seed": "With every fault off, let one flow complete (a Carrier tracking event for a Shipment). Set EVALUATION_CORRELATION_ID to the correlation ID of that Message trail."
+  },
+  "input": "Explain why the Message trail ${EVALUATION_CORRELATION_ID} failed, and what the Integration operator could do about it.",
+  "expect": {
+    "fields": { "action": "needs-a-person" },
+    "toolsCalled": ["get_message_trail"],
+    "toolsNotCalled": ["get_run", "peek_dead_letters"],
+    "explanation": {
+      "field": "cause",
+      "rubric": "Says the trail shows no failure (every hop succeeded) and does not invent a cause, an error or a failed step."
+    }
+  }
+}

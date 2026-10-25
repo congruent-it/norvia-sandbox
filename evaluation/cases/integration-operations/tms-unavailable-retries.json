@@ -1,0 +1,18 @@
+{
+  "id": "tms-unavailable-retries",
+  "agent": "integration-operations",
+  "description": "The TMS refuses every call for a few minutes (tms-unavailable). The Driver reports Logic App retries and the report is recorded once the fault is off, so the trail shows TmsUnavailable hops and then success. Known answer: a temporary outage that retries already covered, nothing lost, nothing to resubmit. The Suggestion has no 'nothing to do' kind, so needs-a-person is the nearest allowed answer; the rubric is what carries the diagnosis.",
+  "setup": {
+    "fault": "tms-unavailable (tms), switched on from /presenter for 2 minutes",
+    "seed": "Make a Driver report an outcome while it is on (the Simulator's Drivers do), switch it off, wait until the report is Recorded. Set EVALUATION_CORRELATION_ID to the correlation ID of the report's Message trail."
+  },
+  "input": "Explain why the Message trail ${EVALUATION_CORRELATION_ID} failed, and what the Integration operator could do about it.",
+  "expect": {
+    "fields": { "action": "needs-a-person" },
+    "toolsCalled": ["get_message_trail"],
+    "explanation": {
+      "field": "cause",
+      "rubric": "Says the TMS was temporarily unavailable (503) and the calls were retried or later succeeded, so nothing was lost. Does not say the message failed for good, or that it must be resubmitted or discarded."
+    }
+  }
+}

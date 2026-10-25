@@ -52,6 +52,15 @@ def tools_not_called_checks:
     else verdict("tool " + $tool + " not called"; true; "not called")
     end;
 
+# Tools the agent must have called (the trail must be read before it is explained).
+def tools_called_checks:
+  . as $run
+  | ($run.case.expect.toolsCalled // [])[]
+  | . as $tool
+  | if ($run.toolCalls | index($tool)) != null then verdict("tool " + $tool + " called"; true; "called")
+    else verdict("tool " + $tool + " called"; false; "the agent did not call it")
+    end;
+
 # The one model-graded check, for the explanation's quality. The grade comes from the runner; without one the check fails.
 def explanation_checks:
   if .case.expect.explanation == null then empty
@@ -61,7 +70,7 @@ def explanation_checks:
 
 # A case with no check at all would pass for any answer, so it fails.
 def checks:
-  [field_checks, must_not_contain_checks, must_cite_checks, tools_not_called_checks, explanation_checks]
+  [field_checks, must_not_contain_checks, must_cite_checks, tools_not_called_checks, tools_called_checks, explanation_checks]
   | if length == 0 then [verdict("case has checks"; false; "the case asks for no check")] else . end;
 
 checks

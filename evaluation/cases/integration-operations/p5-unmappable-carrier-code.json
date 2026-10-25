@@ -1,0 +1,19 @@
+{
+  "id": "p5-unmappable-carrier-code",
+  "agent": "integration-operations",
+  "description": "The headline incident. The Carrier's Delivered event carries the status code DLV instead of POD, the Carrier-tracking Logic App's map fails the run and the message is dead-lettered as UnmappableTrackingMessage. Known answer: the code is unknown to the map, the cause is still there, so resubmitting would fail again (docs/operations/as-found.md, faults of the Partner portal).",
+  "setup": {
+    "fault": "carrier-tracking-unmapped-code (partner-portal), switched on from /presenter",
+    "seed": "Let the Simulator or the Partner portal send a Delivered event for a Shipment while it is on. Set EVALUATION_CORRELATION_ID to the correlation ID of that Message trail (the Integration console's trail page)."
+  },
+  "input": "Explain why the Message trail ${EVALUATION_CORRELATION_ID} failed, and what the Integration operator could do about it.",
+  "expect": {
+    "fields": { "action": "fix-the-cause-first" },
+    "toolsCalled": ["get_message_trail"],
+    "toolsNotCalled": ["peek_dead_letters"],
+    "explanation": {
+      "field": "cause",
+      "rubric": "Says the Carrier's tracking message failed because its status code (DLV) is not one the map knows, or that the message could not be mapped. Does not blame the TMS, the network or the Carrier's endpoint, and does not state anything about the message's contents beyond what a tool result shows."
+    }
+  }
+}

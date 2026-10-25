@@ -1,0 +1,18 @@
+{
+  "id": "p4-carrier-endpoint-down",
+  "agent": "integration-operations",
+  "description": "Every Carrier's booking endpoint answers 503. The booking Logic App's Send_to_the_Carrier fails with CarrierUnavailable and the booking is reported Not delivered. Known answer: the Carrier's endpoint is down; it is not a Norvia fault and not a mapping fault.",
+  "setup": {
+    "fault": "carrier-booking-endpoint-down (partner-portal), switched on from /presenter",
+    "seed": "Release a Shipment to a Carrier booking while it is on. Set EVALUATION_CORRELATION_ID to the correlation ID of that Message trail."
+  },
+  "input": "Explain why the Message trail ${EVALUATION_CORRELATION_ID} failed, and what the Integration operator could do about it.",
+  "expect": {
+    "fields": { "action": ["fix-the-cause-first", "needs-a-person"] },
+    "toolsCalled": ["get_message_trail"],
+    "explanation": {
+      "field": "cause",
+      "rubric": "Says the Carrier's booking endpoint was unavailable (503 / CarrierUnavailable) when the booking was sent. Does not blame a mapping, a Norvia application or the TMS."
+    }
+  }
+}

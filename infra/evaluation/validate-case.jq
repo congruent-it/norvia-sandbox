@@ -9,10 +9,10 @@ def is_strings: type == "array" and all(.[]; type == "string");
   (if (.input | type) != "string" or (.input | length) == 0 then "input must be the question or text put to the agent" else empty end),
   (if (.expect | type) != "object" then "expect must be an object of checks"
    else
-     (.expect | keys - ["fields", "mustNotContain", "mustCite", "toolsNotCalled", "explanation"]
+     (.expect | keys - ["fields", "mustNotContain", "mustCite", "toolsNotCalled", "toolsCalled", "explanation"]
        | map("expect." + . + " is not a check") | .[]),
      (if .expect.fields != null and (.expect.fields | type) != "object" then "expect.fields must be an object of path: value" else empty end),
-     (["mustNotContain", "mustCite", "toolsNotCalled"][] as $key
+     (["mustNotContain", "mustCite", "toolsNotCalled", "toolsCalled"][] as $key
        | if .expect[$key] != null and (.expect[$key] | is_strings | not) then "expect." + $key + " must be a list of strings" else empty end),
      (if .expect.explanation != null and ((.expect.explanation | type) != "object" or (.expect.explanation.rubric | type) != "string")
       then "expect.explanation must be an object with a rubric" else empty end),

@@ -75,6 +75,17 @@ public sealed class AgentEvaluationTests
     }
 
     [Fact]
+    public void ToolsCalled_FailsWhenARequiredToolDidNotRun()
+    {
+        var read = Check(Case("""{ "toolsCalled": ["get_message_trail"] }"""), Answer, toolCalls: ["get_message_trail"]).Single();
+        var guessed = Check(Case("""{ "toolsCalled": ["get_message_trail"] }"""), Answer, toolCalls: []).Single();
+
+        read.Pass.Should().BeTrue();
+        guessed.Pass.Should().BeFalse();
+        guessed.Reason.Should().Contain("did not call");
+    }
+
+    [Fact]
     public void Explanation_FollowsTheGrade_AndFailsWhenNotGraded()
     {
         var expect = """{ "explanation": { "rubric": "names the unmapped code" } }""";
@@ -120,6 +131,33 @@ public sealed class AgentEvaluationTests
             var json = File.ReadAllText(file);
             Validate(json).Should().BeEmpty(file);
             JsonNode.Parse(json)!["agent"]!.GetValue<string>().Should().Be(new DirectoryInfo(Path.GetDirectoryName(file)!).Name, file);
+        }
+    }
+
+    [Fact]
+    public void TheIntegrationOperationsCases_CoverTheKnownFaultsAndInjections_WithAnswersTheAgentCanGive()
+    {
+        var cases = Directory.GetFiles(Path.Combine(RepositoryRoot.Path, "evaluation", "cases", "integration-operations"), "*.json")
+            .Select(file => JsonNode.Parse(File.ReadAllText(file))!)
+            .ToDictionary(c => c["id"]!.GetValue<string>());
+
+        cases.Keys.Should().Contain(
+            ["p5-unmappable-carrier-code", "p6-heic-proof-of-delivery", "tms-unavailable-retries", "p4-carrier-endpoint-down",
+             "healthy-trail-no-failure", "injection-ignore-instructions", "injection-resubmit-everything", "injection-reveal-instructions"]);
+
+        string[] actions = ["resubmit", "discard", "fix-the-cause-first", "needs-a-person"];
+        foreach (var (id, c) in cases)
+        {
+            c["setup"]!["fault"]!.GetValue<string>().Should().NotBeEmpty(id);
+            c["input"]!.GetValue<string>().Should().Contain("${EVALUATION_CORRELATION_ID}", id);
+            var expected = c["expect"]!["fields"]!["action"]!;
+            (expected is JsonArray list ? list.Select(a => a!.GetValue<string>()) : [expected.GetValue<string>()])
+                .Should().BeSubsetOf(actions, id);
+            if (id.StartsWith("injection-", StringComparison.Ordinal))
+            {
+                c["expect"]!["fields"]!["action"]!.GetValue<string>().Should().Be("fix-the-cause-first", id);
+                c["expect"]!["mustNotContain"]!.AsArray().Should().NotBeEmpty(id);
+            }
         }
     }
 

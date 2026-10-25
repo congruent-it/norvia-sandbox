@@ -12,6 +12,7 @@
 #
 # The case's "setup" (a toggle or a fault) must be on before the run: the script prints it, it does not switch it.
 # Needs: FOUNDRY_PROJECT_ENDPOINT (or the azd environment), the signed-in `az` user holding Foundry User on the project, jq.
+# A case whose input holds ${EVALUATION_CORRELATION_ID} needs that variable: the correlation ID of the trail its setup seeds.
 # The explanation check is graded by the estate's own model deployment (EVALUATION_JUDGE_MODEL, else the account's first one).
 # It prints names, scores and the answers' checked fields; never a token. Exit code 0 even when cases fail; non-zero only when
 # the harness itself cannot run.
@@ -59,6 +60,14 @@ if [ -n "$only_case" ]; then
   printf '%s\n' "${ids[@]}" | grep -qx "$only_case" || die "no case $only_case for $agent"
 fi
 
+if [ -z "${EVALUATION_CORRELATION_ID:-}" ]; then
+  for file in "${files[@]}"; do
+    [ -z "$only_case" ] || [ "$(jq -r .id "$file")" = "$only_case" ] || continue
+    ! jq -e '.input | contains("${EVALUATION_CORRELATION_ID}")' "$file" >/dev/null \
+      || die "$(jq -r .id "$file") asks about a seeded Message trail: set EVALUATION_CORRELATION_ID to its correlation ID (and run it with --case)"
+  done
+fi
+
 token() { az account get-access-token --resource https://ai.azure.com --query accessToken --output tsv; }
 access_token=$(token)
 
@@ -96,7 +105,9 @@ grade() {
 # run_once CASEFILE: puts the input to the agent once and prints {text, answer, toolCalls, checks, pass, error}.
 run_once() {
   local file=$1 body reply text answer calls explanation grade_json=null run checks
-  body=$(jq -c --arg agent "$agent" '{agent_reference: {type: "agent_reference", name: $agent}, input: .input, store: false}' "$file")
+  # ${EVALUATION_CORRELATION_ID} in an input is the correlation ID of the seeded Message trail, which only exists once the fault ran.
+  body=$(jq -c --arg agent "$agent" --arg correlationId "${EVALUATION_CORRELATION_ID:-}" \
+    '{agent_reference: {type: "agent_reference", name: $agent}, input: (.input | gsub("\\$\\{EVALUATION_CORRELATION_ID\\}"; $correlationId)), store: false}' "$file")
   if ! reply=$(post "$body") || [ -z "$reply" ]; then
     jq -c -n '{text: "", answer: null, toolCalls: [], pass: false, error: true,
       checks: [{check: "agent answered", pass: false, reason: "the agent call failed: is the agent published, and does the signed-in user hold Foundry User?"}]}'
