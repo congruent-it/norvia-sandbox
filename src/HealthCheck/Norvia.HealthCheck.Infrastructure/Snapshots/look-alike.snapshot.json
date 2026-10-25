@@ -1,0 +1,172 @@
+{
+  "name": "look-alike",
+  "serviceBusEntities": [
+    {
+      "name": "carrier-tracking",
+      "hasDeadLetterAlert": true
+    },
+    {
+      "name": "carrier-proof-of-delivery",
+      "hasDeadLetterAlert": true
+    },
+    {
+      "name": "carrier-booking",
+      "hasDeadLetterAlert": true
+    },
+    {
+      "name": "shipper-notification",
+      "hasDeadLetterAlert": true
+    },
+    {
+      "name": "carrier-cancellation",
+      "hasDeadLetterAlert": true
+    },
+    {
+      "name": "carrier-cost",
+      "hasDeadLetterAlert": true
+    },
+    {
+      "name": "trip-dispatch",
+      "hasDeadLetterAlert": true
+    },
+    {
+      "name": "driver-reports",
+      "hasDeadLetterAlert": true
+    },
+    {
+      "name": "billing",
+      "hasDeadLetterAlert": true
+    },
+    {
+      "name": "shipper-invoice",
+      "hasDeadLetterAlert": true
+    },
+    {
+      "name": "carrier-invoice-outcome",
+      "hasDeadLetterAlert": true
+    }
+  ],
+  "flows": [
+    {
+      "name": "transport-order-intake",
+      "hasFailedRunAlert": true,
+      "recordsTrackedProperties": true
+    },
+    {
+      "name": "carrier-answer",
+      "hasFailedRunAlert": true,
+      "recordsTrackedProperties": true
+    },
+    {
+      "name": "carrier-invoice",
+      "hasFailedRunAlert": true,
+      "recordsTrackedProperties": true
+    },
+    {
+      "name": "carrier-booking",
+      "hasFailedRunAlert": true,
+      "recordsTrackedProperties": true
+    },
+    {
+      "name": "shipper-notification",
+      "hasFailedRunAlert": true,
+      "recordsTrackedProperties": true
+    },
+    {
+      "name": "carrier-cancellation",
+      "hasFailedRunAlert": true,
+      "recordsTrackedProperties": true
+    },
+    {
+      "name": "trip-dispatch",
+      "hasFailedRunAlert": true,
+      "recordsTrackedProperties": true
+    },
+    {
+      "name": "driver-reports",
+      "hasFailedRunAlert": true,
+      "recordsTrackedProperties": true
+    },
+    {
+      "name": "conversation-sweeper",
+      "hasFailedRunAlert": true,
+      "recordsTrackedProperties": true
+    },
+    {
+      "name": "billing",
+      "hasFailedRunAlert": true,
+      "recordsTrackedProperties": true
+    },
+    {
+      "name": "carrier-cost",
+      "hasFailedRunAlert": true,
+      "recordsTrackedProperties": true
+    },
+    {
+      "name": "shipper-invoice",
+      "hasFailedRunAlert": true,
+      "recordsTrackedProperties": true
+    },
+    {
+      "name": "carrier-invoice-outcome",
+      "hasFailedRunAlert": true,
+      "recordsTrackedProperties": true
+    },
+    {
+      "name": "carrier-tracking",
+      "hasFailedRunAlert": true,
+      "recordsTrackedProperties": true
+    },
+    {
+      "name": "carrier-proof-of-delivery",
+      "hasFailedRunAlert": true,
+      "recordsTrackedProperties": true
+    }
+  ],
+  "alertReceivers": 1,
+  "storage": {
+    "inboundHasLifecycleRule": true,
+    "transitHasLifecycleRule": true,
+    "proofFilesMoveToCool": true,
+    "inboundMalwareScanning": true
+  },
+  "inlinedCarrierSecrets": [],
+  "retention": {
+    "appInsightsDays": 90,
+    "runHistoryDays": 90
+  },
+  "businessSafetyNets": {
+    "staleThresholdsSet": true,
+    "proofMissingThresholdSet": true,
+    "lateDeliveryCheckOn": true
+  },
+  "apiManagement": {
+    "shipperTrackingCacheSeconds": 86400,
+    "shipperRateLimit": true
+  },
+  "driverReportsReportBack": true,
+  "conversationSweeperRuns": true,
+  "agents": {
+    "contentFilterAndPromptShield": true,
+    "identities": [
+      {
+        "name": "estate-health-check",
+        "role": "HealthCheck.Agent.Read",
+        "roleIsRead": true,
+        "hasCallCap": true,
+        "hasRateLimit": true,
+        "hasCostTag": true
+      },
+      {
+        "name": "integration-operations",
+        "role": "IntegrationConsole.Agent.Read",
+        "roleIsRead": true,
+        "hasCallCap": true,
+        "hasRateLimit": true,
+        "hasCostTag": true
+      }
+    ],
+    "enabledInPublicDemoUi": false,
+    "modelQuotaUnlimited": false
+  }
+}

@@ -23,6 +23,13 @@ public sealed class HealthCheckAgentTests
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
+    // One Finding for each toggle the as-found preset turns on (infra/presets/as-found.json).
+    private static readonly string[] AsFoundFindings =
+    [
+        "F-FAILED-RUN-ALERT", "F-DLQ-ALERT", "F-LIFECYCLE-INBOUND", "F-PROOF-HOT-TIER", "F-MALWARE-SCANNING", "F-SECRET-INLINED", "F-APPINSIGHTS-RETENTION",
+        "F-TRACKED-PROPERTIES", "F-STALE-THRESHOLDS", "F-PROOF-MISSING-THRESHOLD", "F-APIM-CACHE", "F-APIM-RATE-LIMIT", "F-CONVERSATION-SWEEPER",
+    ];
+
     [Fact]
     public async Task ACallWithNoToken_IsRefused401()
     {
@@ -104,7 +111,7 @@ public sealed class HealthCheckAgentTests
     }
 
     [Fact]
-    public async Task RunChecks_OnTheAsFoundSnapshot_ReturnsTheFindingForTheMissingDeadLetterAlerts()
+    public async Task RunChecks_OnTheAsFoundSnapshot_ReturnsTheFindingsForTheTogglesItTurnsOn_TheMissingDeadLetterAlertsAmongThem()
     {
         await using var host = new HealthCheckAgentHost(snapshot: "as-found");
         using var client = host.StandInClient();
@@ -112,8 +119,9 @@ public sealed class HealthCheckAgentTests
         var view = JsonNode.Parse(await ToolTextAsync(client, "run_checks"))!;
 
         view["estate"]!.GetValue<string>().Should().Be("as-found");
-        var finding = view["findings"]!.AsArray().Should().ContainSingle().Subject!;
-        finding["id"]!.GetValue<string>().Should().Be("F-DLQ-ALERT");
+        var findings = view["findings"]!.AsArray();
+        findings.Select(item => item!["id"]!.GetValue<string>()).Should().BeEquivalentTo(AsFoundFindings);
+        var finding = findings.Single(item => item!["id"]!.GetValue<string>() == "F-DLQ-ALERT")!;
         finding["checkId"]!.GetValue<string>().Should().Be("DLQ-ALERT");
         finding["evidence"]!.AsArray().Select(item => item!["subject"]!.GetValue<string>()).Should().Contain("carrier-tracking");
     }
@@ -154,7 +162,7 @@ public sealed class HealthCheckAgentTests
         var result = await NarrateAsync(host, correlationId);
 
         result.IsSuccess.Should().BeTrue(string.Join("; ", result.Errors));
-        result.Value.Items.Select(item => (item.Id, item.ToolName)).Should().Equal([("F-DLQ-ALERT", "run_checks")]);
+        result.Value.Items.Select(item => (item.Id, item.ToolName)).Should().BeEquivalentTo(AsFoundFindings.Select(id => (id, "run_checks")));
         var trail = host.Telemetry.Trail(correlationId);
         var calls = trail.Where(hop => hop.Flow is StandInFlow or AgentViewFlow).ToList();
         calls.Select(hop => hop.Flow).Should().BeEquivalentTo([StandInFlow, AgentViewFlow], "the tool call is a hop of the stand-in and of the app's agent view");

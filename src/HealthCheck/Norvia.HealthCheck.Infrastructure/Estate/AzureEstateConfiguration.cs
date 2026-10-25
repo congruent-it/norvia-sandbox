@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using System.Text.RegularExpressions;
 using System.Net.Http.Json;
 using System.Reflection;
 using System.Text.Json;
@@ -18,8 +19,14 @@ namespace Norvia.HealthCheck.Infrastructure.Estate;
 /// An entity has a dead-letter alert when an enabled metric alert on the namespace watches <c>DeadletteredMessages</c> for it, by an
 /// <c>EntityName</c> dimension that includes it, or with none, which watches them all. The subscriptions that infra/estate/alert-exemptions.json
 /// exempts are left out, as <c>alerts.bicep</c> leaves them out: nobody reads them.
+///
+/// The other facts of the checklist (#393) come the same way, as Reader: the Logic Apps, the action group, the retention, the TMS app's
+/// settings and the storage accounts from Resource Graph, and a storage account's lifecycle rules, the Defender setting and API Management's
+/// policies from their resource. What Reader cannot see is left null, and a Check gives no Finding for it: the app settings of a Logic App
+/// (a Carrier endpoint secret kept inline), the workflows' definitions (tracked properties, the report back to the Driver app) and the
+/// agents' guards. The docs name them.
 /// </summary>
-internal sealed class AzureEstateConfiguration(
+internal sealed partial class AzureEstateConfiguration(
     IHttpClientFactory clients,
     TokenCredential credential,
     IOptions<AzureEstateOptions> options) : IEstateConfiguration
@@ -33,6 +40,16 @@ internal sealed class AzureEstateConfiguration(
     private const string ServiceBusApiVersion = "api-version=2024-01-01";
     private const string ResourceGraphAddress = $"{Management}/providers/Microsoft.ResourceGraph/resources?api-version=2022-10-01";
     private const string DeadLetterMetric = "DeadletteredMessages";
+    private const string FailedRunsMetric = "WorkflowRunsCompleted";
+    private const string StorageApiVersion = "api-version=2024-01-01";
+    private const string DefenderApiVersion = "api-version=2022-12-01-preview";
+    private const string ApiManagementApiVersion = "api-version=2024-05-01";
+    private const string InboundStoragePrefix = "stinbound";
+    private const string TransitStoragePrefix = "stdriver";
+    private const string ProofsContainer = "proofs-of-delivery";
+    private const string TmsApp = "tms-api";
+    private const string PartnerApi = "norvia-partner-api";
+    private static readonly string[] ShipperTrackingOperations = ["list-shipper-transport-orders", "find-shipper-transport-order", "get-shipper-transport-order"];
     private const string EntityDimension = "EntityName";
     private static readonly string[] ManagementScopes = [$"{Management}/.default"];
 
@@ -40,27 +57,59 @@ internal sealed class AzureEstateConfiguration(
     {
         var settings = options.Value;
         var namespaceId = $"{settings.ResourceGroupId.TrimEnd('/')}/providers/Microsoft.ServiceBus/namespaces/{settings.ServiceBusNamespace}";
+        var group = new Group(settings.ResourceGroupId.Split('/', StringSplitOptions.RemoveEmptyEntries));
 
-        var watching = (await ReadAlertsAsync(settings, cancellationToken))
-            .Where(alert => alert.Enabled && alert.Scopes.Contains(namespaceId, StringComparer.OrdinalIgnoreCase))
-            .ToList();
+        var alerts = await ReadAlertsAsync(group, cancellationToken);
+        var watching = alerts.Where(alert => alert.Enabled && alert.Scopes.Contains(namespaceId, StringComparer.OrdinalIgnoreCase)).ToList();
 
         var entities = (await ReadEntitiesAsync(namespaceId, cancellationToken))
             .Distinct(StringComparer.Ordinal)
             .Select(name => new ServiceBusEntity(name, watching.Exists(alert => alert.Watches(name))))
             .ToList();
-        return new EstateConfiguration(EstateName, entities);
+
+        var logicApps = await QueryAsync(group, "microsoft.web/sites", "| where kind contains 'workflowapp' | project id, name, enabled = tobool(properties.enabled), workload = tostring(tags.workload)", cancellationToken);
+        var tms = await ReadTmsSettingsAsync(group, cancellationToken);
+        var apiManagement = await ReadApiManagementAsync(group, cancellationToken);
+        var retention = await ReadRetentionAsync(group, cancellationToken);
+        var (inbound, transit, proofs) = await ReadStorageAsync(group, cancellationToken);
+
+        return new EstateConfiguration(EstateName, entities)
+        {
+            Flows = [.. logicApps.Select(app => new LogicAppFlow(
+                app["name"]?.GetValue<string>() ?? string.Empty,
+                alerts.Exists(alert => alert.Enabled && alert.WatchesFailedRuns && alert.Scopes.Contains(app["id"]?.GetValue<string>() ?? string.Empty, StringComparer.OrdinalIgnoreCase)),
+                RecordsTrackedProperties: null))],
+            AlertReceivers = await ReadAlertReceiversAsync(group, cancellationToken),
+            Storage = new StorageFacts(
+                inbound.HasLifecycleRule,
+                transit.HasLifecycleRule,
+                proofs,
+                inbound.MalwareScanning),
+            InlinedCarrierSecrets = null,
+            Retention = retention,
+            BusinessSafetyNets = new BusinessSafetyNetFacts(
+                tms.Setting("ShipmentStale__ThresholdsSet"),
+                tms.Setting("ProofsOfDelivery__MissingThresholdSet"),
+                tms.Setting("LateDelivery__CheckEnabled")),
+            ApiManagement = apiManagement,
+            DriverReportsReportBack = null,
+            ConversationSweeperRuns = logicApps
+                .Where(app => string.Equals(app["workload"]?.GetValue<string>(), "conversation-sweeper", StringComparison.Ordinal))
+                .Select(app => app["enabled"]?.GetValue<bool>())
+                .FirstOrDefault(),
+            Agents = null,
+        };
     }
 
     // The metric alert rules of the estate's resource group, as Resource Graph holds them.
-    private async Task<List<MetricAlert>> ReadAlertsAsync(AzureEstateOptions settings, CancellationToken cancellationToken)
+    private async Task<List<MetricAlert>> ReadAlertsAsync(Group group, CancellationToken cancellationToken) =>
+        [.. (await QueryAsync(group, "microsoft.insights/metricalerts", "| project name, enabled = tobool(properties.enabled), scopes = properties.scopes, criteria = properties.criteria", cancellationToken)).Select(MetricAlert.From)];
+
+    // Every row of a Resource Graph query over the resources of one type in the estate's resource group, across pages.
+    private async Task<List<JsonObject>> QueryAsync(Group group, string type, string projection, CancellationToken cancellationToken)
     {
-        var parts = settings.ResourceGroupId.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        var query =
-            "resources | where type =~ 'microsoft.insights/metricalerts' " +
-            $"| where resourceGroup =~ '{parts[3].Replace("'", "\\'", StringComparison.Ordinal)}' " +
-            "| project name, enabled = tobool(properties.enabled), scopes = properties.scopes, criteria = properties.criteria";
-        var alerts = new List<MetricAlert>();
+        var query = $"resources | where type =~ '{type}' | where resourceGroup =~ '{group.Name.Replace("'", "\\'", StringComparison.Ordinal)}' {projection}";
+        var rows = new List<JsonObject>();
         string? skipToken = null;
         do
         {
@@ -73,14 +122,129 @@ internal sealed class AzureEstateConfiguration(
             var answer = await SendAsync(
                 HttpMethod.Post,
                 ResourceGraphAddress,
-                new JsonObject { ["subscriptions"] = new JsonArray(parts[1]), ["query"] = query, ["options"] = options },
-                cancellationToken);
-            alerts.AddRange((answer["data"] as JsonArray ?? []).OfType<JsonObject>().Select(MetricAlert.From));
+                new JsonObject { ["subscriptions"] = new JsonArray(group.Subscription), ["query"] = query, ["options"] = options },
+                cancellationToken) ?? throw new InvalidOperationException("Resource Graph answered with nothing.");
+            rows.AddRange((answer["data"] as JsonArray ?? []).OfType<JsonObject>());
             skipToken = answer["$skipToken"]?.GetValue<string>();
         }
         while (skipToken is not null);
 
-        return alerts;
+        return rows;
+    }
+
+    // The receivers of the estate's action groups that are on. Null when the estate has no action group, so there is nothing to say.
+    private async Task<int?> ReadAlertReceiversAsync(Group group, CancellationToken cancellationToken)
+    {
+        var groups = await QueryAsync(
+            group,
+            "microsoft.insights/actiongroups",
+            "| project enabled = tobool(properties.enabled), receivers = coalesce(array_length(properties.emailReceivers), 0) + coalesce(array_length(properties.smsReceivers), 0) + coalesce(array_length(properties.webhookReceivers), 0) + coalesce(array_length(properties.armRoleReceivers), 0)",
+            cancellationToken);
+        return groups.Count == 0
+            ? null
+            : groups.Where(row => row["enabled"]?.GetValue<bool>() ?? true).Sum(row => row["receivers"]?.GetValue<int>() ?? 0);
+    }
+
+    // What Application Insights keeps against what the workspace, and so the run history, keeps. Null when either is not there.
+    private async Task<RetentionFacts?> ReadRetentionAsync(Group group, CancellationToken cancellationToken)
+    {
+        var components = await QueryAsync(group, "microsoft.insights/components", "| project days = toint(properties.RetentionInDays)", cancellationToken);
+        var workspaces = await QueryAsync(group, "microsoft.operationalinsights/workspaces", "| project days = toint(properties.retentionInDays)", cancellationToken);
+        return components.Count == 0 || workspaces.Count == 0
+            ? null
+            : new RetentionFacts(
+                components.Min(row => row["days"]?.GetValue<int>() ?? 0),
+                workspaces.Max(row => row["days"]?.GetValue<int>() ?? 0));
+    }
+
+    // The TMS API's Container App and the settings it runs with. Where the app is not there, nothing is known of them.
+    private async Task<AppSettings> ReadTmsSettingsAsync(Group group, CancellationToken cancellationToken)
+    {
+        var apps = await QueryAsync(group, "microsoft.app/containerapps", $"| where name =~ '{TmsApp}' | project env = properties.template.containers[0].env", cancellationToken);
+        var env = (apps.FirstOrDefault()?["env"] as JsonArray ?? []).OfType<JsonObject>()
+            .Where(item => item["name"] is not null && item["value"] is not null)
+            .ToDictionary(item => item["name"]!.GetValue<string>(), item => item["value"]!.GetValue<string>(), StringComparer.Ordinal);
+        return new AppSettings(env);
+    }
+
+    // API Management's policies on the Shipper tracking operations: the longest an answer is cached, and whether all of them limit the rate.
+    private async Task<ApiManagementFacts> ReadApiManagementAsync(Group group, CancellationToken cancellationToken)
+    {
+        var services = await QueryAsync(group, "microsoft.apimanagement/service", "| project id", cancellationToken);
+        if (services.Count == 0)
+        {
+            return new ApiManagementFacts(null, null);
+        }
+
+        var serviceId = services[0]["id"]?.GetValue<string>() ?? throw new InvalidOperationException("The API Management service has no ID.");
+        var policies = new List<string>();
+        foreach (var operation in ShipperTrackingOperations)
+        {
+            var policy = await TrySendAsync(HttpMethod.Get, $"{Management}{serviceId}/apis/{PartnerApi}/operations/{operation}/policies/policy?{ApiManagementApiVersion}&format=rawxml", null, notFoundIsAnAnswer: true, cancellationToken);
+            policies.Add(policy?["properties"]?["value"]?.GetValue<string>() ?? string.Empty);
+        }
+
+        return new ApiManagementFacts(
+            policies.Max(CacheSeconds),
+            policies.TrueForAll(policy => policy.Contains("<rate-limit", StringComparison.Ordinal)));
+    }
+
+    private static int CacheSeconds(string policy) =>
+        CacheDuration().Matches(policy).Select(match => int.Parse(match.Groups["seconds"].Value, System.Globalization.CultureInfo.InvariantCulture)).DefaultIfEmpty(0).Max();
+
+    [GeneratedRegex(@"<cache-store(?:-value)?\b[^>]*\bduration=""(?<seconds>\d+)""")]
+    private static partial Regex CacheDuration();
+
+    // The inbound and the transit storage accounts' lifecycle rules, the inbound account's malware scanning, and whether the TMS storage's
+    // Proof of delivery files move to cool. A protection is null where the account that should hold it is not there.
+    private async Task<(Protections Inbound, Protections Transit, bool? ProofsMoveToCool)> ReadStorageAsync(Group group, CancellationToken cancellationToken)
+    {
+        var accounts = (await QueryAsync(group, "microsoft.storage/storageaccounts", "| project id, name", cancellationToken))
+            .Select(row => (Id: row["id"]?.GetValue<string>() ?? string.Empty, Name: row["name"]?.GetValue<string>() ?? string.Empty))
+            .ToList();
+
+        var inbound = accounts.Find(account => account.Name.StartsWith(InboundStoragePrefix, StringComparison.Ordinal));
+        var transit = accounts.Find(account => account.Name.StartsWith(TransitStoragePrefix, StringComparison.Ordinal));
+        var tms = accounts.Where(account => account != inbound && account != transit).ToList();
+
+        var proofs = tms.Count == 0 ? (bool?)null : false;
+        foreach (var account in tms)
+        {
+            proofs = proofs == true || (await ReadRulesAsync(account.Id, cancellationToken)).Exists(rule => rule.Prefixes.Exists(prefix => prefix.StartsWith(ProofsContainer, StringComparison.Ordinal)) && rule.MovesToCool);
+        }
+
+        return (
+            inbound.Id is null ? default : new Protections(
+                (await ReadRulesAsync(inbound.Id, cancellationToken)).Exists(rule => rule.Deletes),
+                await MalwareScanningAsync(inbound.Id, cancellationToken)),
+            transit.Id is null ? default : new Protections((await ReadRulesAsync(transit.Id, cancellationToken)).Exists(rule => rule.Deletes), null),
+            proofs);
+    }
+
+    private async Task<bool> MalwareScanningAsync(string storageId, CancellationToken cancellationToken)
+    {
+        var setting = await TrySendAsync(HttpMethod.Get, $"{Management}{storageId}/providers/Microsoft.Security/defenderForStorageSettings/current?{DefenderApiVersion}", null, notFoundIsAnAnswer: true, cancellationToken);
+        var properties = setting?["properties"];
+        return (properties?["isEnabled"]?.GetValue<bool>() ?? false) && (properties?["malwareScanning"]?["onUpload"]?["isEnabled"]?.GetValue<bool>() ?? false);
+    }
+
+    // The enabled lifecycle rules of a storage account. An account with no policy has none.
+    private async Task<List<LifecycleRule>> ReadRulesAsync(string storageId, CancellationToken cancellationToken)
+    {
+        var policy = await TrySendAsync(HttpMethod.Get, $"{Management}{storageId}/managementPolicies/default?{StorageApiVersion}", null, notFoundIsAnAnswer: true, cancellationToken);
+        return
+        [
+            .. (policy?["properties"]?["policy"]?["rules"] as JsonArray ?? []).OfType<JsonObject>()
+                .Where(rule => rule["enabled"]?.GetValue<bool>() ?? true)
+                .Select(rule =>
+                {
+                    var baseBlob = rule["definition"]?["actions"]?["baseBlob"];
+                    return new LifecycleRule(
+                        [.. (rule["definition"]?["filters"]?["prefixMatch"] as JsonArray ?? []).Select(prefix => prefix?.GetValue<string>()).OfType<string>()],
+                        baseBlob?["delete"] is not null,
+                        baseBlob?["tierToCool"] is not null);
+                }),
+        ];
     }
 
     // Every queue, and every subscription of every topic, that a Logic App reads: the exempt subscriptions are left out.
@@ -124,7 +288,11 @@ internal sealed class AzureEstateConfiguration(
         return items;
     }
 
-    private async Task<JsonNode> SendAsync(HttpMethod method, string address, JsonNode? body, CancellationToken cancellationToken)
+    private async Task<JsonNode> SendAsync(HttpMethod method, string address, JsonNode? body, CancellationToken cancellationToken) =>
+        await TrySendAsync(method, address, body, notFoundIsAnAnswer: false, cancellationToken) ?? throw new InvalidOperationException("Azure answered with nothing.");
+
+    // A resource that is not there answers 404; where that is an answer (no lifecycle policy, no Defender setting), it is null.
+    private async Task<JsonNode?> TrySendAsync(HttpMethod method, string address, JsonNode? body, bool notFoundIsAnAnswer, CancellationToken cancellationToken)
     {
         var token = await credential.GetTokenAsync(new TokenRequestContext(ManagementScopes), cancellationToken);
         using var request = new HttpRequestMessage(method, address);
@@ -135,6 +303,11 @@ internal sealed class AzureEstateConfiguration(
         }
 
         using var response = await clients.CreateClient(ManagementClient).SendAsync(request, cancellationToken);
+        if (notFoundIsAnAnswer && response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
         response.EnsureSuccessStatusCode();
         return JsonNode.Parse(await response.Content.ReadAsStringAsync(cancellationToken)) ?? throw new InvalidOperationException("Azure answered with nothing.");
     }
@@ -143,7 +316,7 @@ internal sealed class AzureEstateConfiguration(
     /// One metric alert rule: where it is scoped, whether it is on, and what its dead-letter criteria watch. A criterion with an
     /// <c>EntityName</c> dimension watches the entities it includes (or every entity but the ones it excludes); one without watches them all.
     /// </summary>
-    private sealed record MetricAlert(bool Enabled, IReadOnlyList<string> Scopes, IReadOnlyList<Func<string, bool>> DeadLetterCriteria)
+    private sealed record MetricAlert(bool Enabled, IReadOnlyList<string> Scopes, IReadOnlyList<Func<string, bool>> DeadLetterCriteria, bool WatchesFailedRuns)
     {
         public bool Watches(string entity) => DeadLetterCriteria.Any(criterion => criterion(entity));
 
@@ -151,8 +324,10 @@ internal sealed class AzureEstateConfiguration(
         {
             var scopes = (row["scopes"] as JsonArray ?? []).Select(scope => scope?.GetValue<string>()).OfType<string>().ToList();
             var criteria = new List<Func<string, bool>>();
+            var watchesFailedRuns = false;
             foreach (var criterion in (row["criteria"]?["allOf"] as JsonArray ?? []).OfType<JsonObject>())
             {
+                watchesFailedRuns |= string.Equals(criterion["metricName"]?.GetValue<string>(), FailedRunsMetric, StringComparison.OrdinalIgnoreCase);
                 if (!string.Equals(criterion["metricName"]?.GetValue<string>(), DeadLetterMetric, StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
@@ -171,9 +346,26 @@ internal sealed class AzureEstateConfiguration(
                 criteria.Add(entity => includes ? values.Contains(entity) || values.Contains("*") : !values.Contains(entity));
             }
 
-            return new MetricAlert(row["enabled"]?.GetValue<bool>() ?? false, scopes, criteria);
+            return new MetricAlert(row["enabled"]?.GetValue<bool>() ?? false, scopes, criteria, watchesFailedRuns);
         }
     }
+
+    private sealed record Group(string[] Parts)
+    {
+        public string Subscription => Parts[1];
+
+        public string Name => Parts[3];
+    }
+
+    private sealed record AppSettings(Dictionary<string, string> Env)
+    {
+        // A setting the app runs with, or null where the app does not carry it.
+        public bool? Setting(string name) => Env.TryGetValue(name, out var value) && bool.TryParse(value, out var parsed) ? parsed : null;
+    }
+
+    private readonly record struct Protections(bool? HasLifecycleRule, bool? MalwareScanning);
+
+    private sealed record LifecycleRule(List<string> Prefixes, bool Deletes, bool MovesToCool);
 
     // The subscriptions the estate leaves without an alert on purpose, from the file alerts.bicep's drift guard reads, as "topic/subscription".
     private static class Exemptions

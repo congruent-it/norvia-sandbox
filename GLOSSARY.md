@@ -488,7 +488,7 @@ A run of the checklist over the estate's configuration, by the Integration opera
 _Avoid_: audit, scan, assessment, review
 
 **Check**:
-One item of the Estate health check's checklist: an ID, the rule the estate's configuration must satisfy, a severity, the as-found toggle that breaks the rule and the fix (the Bicep parameter or setting). Deterministic code evaluates it, so a Finding's severity and fix are the Check's and never a model's. The first is `DLQ-ALERT`: every queue and subscription with a dead-letter queue has an alert on it.
+One item of the Estate health check's checklist: an ID, the rule the estate's configuration must satisfy, a severity, the as-found toggle that breaks the rule and the fix (the Bicep parameter or setting). Deterministic code evaluates it, so a Finding's severity and fix are the Check's and never a model's. There is one Check for each as-found toggle, so every toggle has a Check that finds it; the first is `DLQ-ALERT`: every queue and subscription with a dead-letter queue has an alert on it.
 _Avoid_: test, rule (that is one part of a Check), audit point, scan
 
 **Finding**:

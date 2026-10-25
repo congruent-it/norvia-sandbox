@@ -49,7 +49,7 @@ public sealed class ChecklistTests
 
     [Fact]
     public void Checks_AreTheOnesTheChecklistWasGiven() =>
-        Checklist.Default.Checks.Should().ContainSingle().Which.Should().BeOfType<DeadLetterAlertCheck>();
+        new Checklist([new DeadLetterAlertCheck()]).Checks.Should().ContainSingle().Which.Should().BeOfType<DeadLetterAlertCheck>();
 
     private sealed class FakeCheck(string id, Severity severity, Evidence? evidence = null, bool passes = false) : Check
     {
