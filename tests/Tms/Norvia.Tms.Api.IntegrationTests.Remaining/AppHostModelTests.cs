@@ -669,6 +669,57 @@ public sealed class AppHostModelTests
     }
 
     [Fact]
+    public async Task InAzure_TheEstateHealthCheck_ReadsTheRealEstate_AsItsOwnIdentity_AndAsksThePublishedAgentInFoundry()
+    {
+        await using var builder = await CreateForAzureAsync();
+
+        var app = await EnvironmentOfAsync(builder, "health-check-web");
+
+        app.Should().Contain("Estate__ResourceGroupId", "{estate-resource-group-id.value}")
+            .And.Contain("Estate__ServiceBusNamespace", "{estate-service-bus-namespace.value}")
+            .And.Contain("Agents__Enabled", "{estate-agents-enabled.value}")
+            .And.Contain("Agents__Foundry__ProjectEndpoint", "{estate-foundry-project-endpoint.value}")
+            .And.Contain("Agents__Api__Audience", "{estate-health-check-agent-api-client-id.value}")
+            .And.Contain("Agents__Api__GatewayClientId", "{estate-api-management-client-id.value}")
+            .And.ContainKey("Agents__Api__Issuer")
+            .And.NotContainKey("Agents__Api__SigningKey", "in Azure the tokens are Entra's, with no local key")
+            .And.NotContainKey("Agents__McpAddress", "in Azure Foundry's Agent calls the MCP server, not the app")
+            .And.NotContainKey("Estate__Snapshot", "the snapshot is for local runs")
+            .And.NotContainKey("LocalOperator__Name", "Easy Auth signs operators in in Azure");
+        Resource(builder, "health-check-web").Annotations.OfType<AppIdentityAnnotation>()
+            .Should().ContainSingle().Which.IdentityResource.Should().BeOfType<AzureUserAssignedIdentityResource>().Which.Name.Should().Be("health-check-identity");
+    }
+
+    [Fact]
+    public async Task InAzure_TheEstateHealthCheck_IsBehindAnEntraSignIn_ForItsOwnAppRegistration_WithOnlyTheAgentApiOutsideTheGate()
+    {
+        await using var builder = await CreateForAzureAsync();
+
+        IsReachableFromOutsideTheContainerAppsEnvironment(builder, "health-check-web").Should().BeTrue("the operators' browsers are outside the Container Apps environment");
+        var bicep = ContainerAppBicepOf(builder, "health-check-web");
+        bicep.Should().Contain("Microsoft.App/containerApps/authConfigs@")
+            .And.Contain("unauthenticatedClientAction: 'RedirectToLoginPage'")
+            .And.Contain("clientId: estate_health_check_client_id")
+            .And.Contain("openIdIssuer: estate_entra_issuer")
+            .And.MatchRegex(@"excludedPaths: \[\s*'/health'\s*'/alive'\s*'/_content/Norvia\.Branding/\*'\s*'/agent/v1/\*'\s*\]");
+        bicep.Should().NotContain("clientSecret", "Entra gives Easy Auth an ID token without a secret");
+    }
+
+    [Fact]
+    public async Task Locally_TheEstateHealthCheck_ReadsASnapshot_AsALocalOperator_AndNothingOfAzure()
+    {
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(TestContext.Current.CancellationToken);
+
+        var app = await EnvironmentOfAsync(builder, "health-check-web");
+
+        app.Should().ContainKey("LocalOperator__Name").And.Contain("Estate__Snapshot", "as-found")
+            .And.NotContainKey("Estate__ResourceGroupId", "locally nothing reads a running estate")
+            .And.NotContainKey("Agents__Foundry__ProjectEndpoint");
+        Resource(builder, "health-check-web").Annotations.Should().NotContain(annotation => annotation is AzureContainerAppCustomizationAnnotation);
+        builder.Resources.OfType<ParameterResource>().Should().NotContain(parameter => parameter.Name.StartsWith("estate-health-check-", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task InAzure_TheIntegrationConsole_ReadsRunsFromTheEstatesLogicApps()
     {
         await using var builder = await CreateForAzureAsync();

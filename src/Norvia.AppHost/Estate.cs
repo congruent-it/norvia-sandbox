@@ -151,4 +151,13 @@ public sealed class Estate(IDistributedApplicationBuilder builder)
 
     /// <summary>API Management's identity (its client ID), the one caller of the console's agent API. Its token names the gateway, so the console reads the Agent's identity from the header the gateway sets.</summary>
     public IResourceBuilder<ParameterResource> ApiManagementClientId { get; } = builder.AddParameter("estate-api-management-client-id");
+
+    /// <summary>The Estate health check's managed identity, which reads the estate as (Reader on the estate's resource group) and asks its Agent as. The Agent's identity is another.</summary>
+    public IResourceBuilder<ParameterResource> HealthCheckIdentity { get; } = builder.AddParameter("estate-health-check-identity-name");
+
+    /// <summary>The Estate health check's app registration, which Easy Auth signs Integration operators in to. Its app roles say what an operator may do.</summary>
+    public IResourceBuilder<ParameterResource> HealthCheckClientId { get; } = builder.AddParameter("estate-health-check-client-id");
+
+    /// <summary>The Estate health check's agent API app registration, which is the audience of the tokens its agent API accepts. API Management's identity holds <c>HealthCheck.Agent.Read</c> on it.</summary>
+    public IResourceBuilder<ParameterResource> HealthCheckAgentApiClientId { get; } = builder.AddParameter("estate-health-check-agent-api-client-id");
 }

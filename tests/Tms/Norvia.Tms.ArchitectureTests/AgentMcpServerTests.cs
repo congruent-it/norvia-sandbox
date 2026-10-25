@@ -263,10 +263,7 @@ public sealed class AgentMcpServerTests
     }
 
     // Servers the local MCP stand-in serves before their API Management MCP server is built. Each leaves this list in the issue that adds the Bicep.
-    private static readonly Dictionary<string, string> NotYetInBicep = new()
-    {
-        ["health-check.tools.json"] = "#392: the Estate health check is deployed to Azure with its MCP server in that slice",
-    };
+    private static readonly Dictionary<string, string> NotYetInBicep = [];
 
     [Theory]
     [MemberData(nameof(ContractFiles))]

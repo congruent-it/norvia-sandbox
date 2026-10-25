@@ -59,6 +59,13 @@ param integrationConsoleRedirectUris string = ''
 Integration operations agent's API Management backend keeps it when the estate is deployed again.''')
 param integrationConsoleBaseUrl string = ''
 
+@description('''Easy Auth's sign-in callback on the Estate health check, empty before the app is first deployed. infra/register-sign-in-callbacks.sh stores it.''')
+param healthCheckRedirectUris string = ''
+
+@description('''The Estate health check's address, empty before the app is first deployed. infra/deploy-agents.sh stores it (ESTATE_HEALTH_CHECK_BASE_URL), so
+the Estate health-check agent's API Management backend keeps it when the estate is deployed again.''')
+param healthCheckBaseUrl string = ''
+
 @description('''Easy Auth's sign-in callback on the Driver app, empty before the Driver app is first deployed. azd's postdeploy
 hook stores it, so the Driver app's app registration keeps it when the estate is deployed again.''')
 param driverAppRedirectUris string = ''
@@ -161,6 +168,20 @@ module monitoring 'estate/monitoring.bicep' = {
   }
 }
 
+// The Estate health check's identity, with Reader on this resource group, and the app registration its operators sign in to (#392). It has
+// no outputs of the template, bar the identity's principal: the estate is at the 64 a template may have, so the scripts and the AppHost
+// find the rest by name.
+module healthCheck 'estate/health-check.bicep' = {
+  scope: resourceGroup
+  params: {
+    environmentName: environmentName
+    location: location
+    tags: tags
+    presenterPrincipalId: presenterPrincipalId
+    healthCheckRedirectUris: healthCheckRedirectUris
+  }
+}
+
 module foundry 'estate/foundry.bicep' = {
   scope: resourceGroup
   params: {
@@ -173,8 +194,8 @@ module foundry 'estate/foundry.bicep' = {
     modelCapacity: foundryModelCapacity
     agentsEnabled: agentsEnabled
     foundryUserPrincipalIds: concat(empty(presenterPrincipalId) ? [] : [presenterPrincipalId], foundryUserPrincipalIds)
-    // The Integration console asks its Agent as its own identity (Explain).
-    applicationPrincipalIds: [identities.outputs.integrationConsolePrincipalId]
+    // The Integration console asks its Agent as its own identity (Explain), and so does the Estate health check.
+    applicationPrincipalIds: [identities.outputs.integrationConsolePrincipalId, healthCheck.outputs.principalId]
   }
 }
 
@@ -635,6 +656,19 @@ module integrationOperationsMcp 'estate/integration-operations-mcp.bicep' = {
     apiManagementPrincipalId: identities.outputs.apiManagementPrincipalId
     apiManagementClientId: identities.outputs.apiManagementClientId
     consoleBaseUrl: integrationConsoleBaseUrl
+  }
+}
+
+// The Estate health-check agent's MCP server over the app's agent API, with the two app registrations that keep it narrow
+// (infra/smoke-test-estate-health-check.sh). Like the others, it has no outputs.
+module healthCheckMcp 'estate/health-check-mcp.bicep' = {
+  scope: resourceGroup
+  params: {
+    environmentName: environmentName
+    apiManagementName: partnerApi.outputs.apiManagementName
+    apiManagementPrincipalId: identities.outputs.apiManagementPrincipalId
+    apiManagementClientId: identities.outputs.apiManagementClientId
+    healthCheckBaseUrl: healthCheckBaseUrl
   }
 }
 

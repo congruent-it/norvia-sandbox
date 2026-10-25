@@ -125,14 +125,14 @@ public sealed class IntegrationOperationsAgentAzureTests
     }
 
     [Fact]
-    public void TheConsolesIdentity_HoldsFoundryUserOnTheNorviaProjectOnly()
+    public void TheApplicationsIdentities_HoldFoundryUserOnTheNorviaProjectOnly()
     {
         var foundry = File.ReadAllText(Path.Combine(RepositoryRoot.Path, "infra/estate/foundry.bicep"));
         var estate = File.ReadAllText(Path.Combine(RepositoryRoot.Path, "infra/estate.bicep"));
 
         Regex.Match(foundry, @"(?ms)^resource applicationsUseTheProject .*?^\}\]").Value.Should().Contain("scope: project").And.NotContain("intakeProject");
         foundry.Should().NotContain("for principalId in applicationPrincipalIds: {\n  name: guid(intakeProject.id");
-        estate.Should().Contain("applicationPrincipalIds: [identities.outputs.integrationConsolePrincipalId]");
+        estate.Should().Contain("applicationPrincipalIds: [identities.outputs.integrationConsolePrincipalId, healthCheck.outputs.principalId]");
     }
 
     [Fact]

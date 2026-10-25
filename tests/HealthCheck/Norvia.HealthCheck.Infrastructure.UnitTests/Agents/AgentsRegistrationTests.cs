@@ -50,6 +50,31 @@ public sealed class AgentsRegistrationTests
         services.GetRequiredService<IAgentClient>().Should().BeOfType<LocalAgentClient>();
     }
 
+    [Fact]
+    public void AddAgentClient_WhenEnabledWithAFoundryProject_AsksThePublishedAgent_AndNeedsNoMcpServerOrToken()
+    {
+        using var services = ServicesWith(new Dictionary<string, string?>
+        {
+            ["Agents:Enabled"] = "true",
+            ["Agents:Foundry:ProjectEndpoint"] = "https://ais-norvia.services.ai.azure.com/api/projects/norvia",
+        });
+
+        var start = () => Start(services);
+
+        start.Should().NotThrow();
+        services.GetRequiredService<IAgentClient>().Should().BeOfType<FoundryAgentClient>();
+    }
+
+    [Fact]
+    public void AddAgentClient_WhenEnabledWithAFoundryProjectThatIsNotAnAddress_DoesNotStart()
+    {
+        using var services = ServicesWith(new Dictionary<string, string?> { ["Agents:Enabled"] = "true", ["Agents:Foundry:ProjectEndpoint"] = "/api/projects/norvia" });
+
+        var start = () => Start(services);
+
+        start.Should().Throw<OptionsValidationException>().WithMessage("*Agents:Foundry:ProjectEndpoint*");
+    }
+
     [Theory]
     [InlineData("Agents:McpAddress", "/mcp", "Agents:McpAddress")]
     [InlineData("Agents:McpAddress", "", "Agents:McpAddress")]

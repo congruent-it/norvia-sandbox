@@ -4,7 +4,7 @@ namespace Norvia.HealthCheck.Web.Agents;
 
 /// <summary>
 /// The tokens the agent API accepts (ADR 0040). Locally they are signed with the AppHost's key (<c>local-token-signing-key</c>), as the
-/// other local tokens are. In Azure there is no key: the tokens are Entra's, and the issuer's metadata gives the keys (#392).
+/// other local tokens are. In Azure there is no key: the tokens are Entra's, and the issuer's metadata gives the keys, for the tokens API Management sends for the app's agent API.
 /// </summary>
 public sealed class AgentApiOptions
 {

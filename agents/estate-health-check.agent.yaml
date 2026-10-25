@@ -1,4 +1,4 @@
-# The Estate health-check agent (ADR 0040). The in-process runner reads this file locally; infra/deploy-agents.sh will publish it
+# The Estate health-check agent (ADR 0040). The in-process runner reads this file locally; infra/deploy-agents.sh publishes it
 # as a Foundry prompt agent. Plain YAML, so a script can read it with yq. Raise `version` on any change.
 name: estate-health-check
 version: 1

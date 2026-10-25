@@ -5,8 +5,8 @@
 #
 # No names publishes every agents/*.agent.yaml. For each Agent it
 #   1. points the Agent's MCP server at the application's address in Azure (the Integration operations agent's is the Integration console's,
-#      which the estate could not know when it was deployed): the API Management backend, and ESTATE_INTEGRATION_CONSOLE_BASE_URL so
-#      deploying the estate again keeps it;
+#      the Estate health-check agent's is the Estate health check's; the estate could not know either when it was deployed): the API Management
+#      backend, and ESTATE_INTEGRATION_CONSOLE_BASE_URL or ESTATE_HEALTH_CHECK_BASE_URL so deploying the estate again keeps it;
 #   2. makes the project's connection to the MCP server, with the agent-identity authentication type (infra/create-agent-connection.sh);
 #   3. creates the Agent's next version as a prompt agent in the Foundry project, from the file: the model, the instructions, the temperature,
 #      the MCP server as its one tool (read-only, no approval to ask for) and the correlation ID as a structured input that the tool's
@@ -56,20 +56,28 @@ foundry() {
   rm -f "$out"
 }
 
-# 1. Point each server's backend at its application. Only the Integration operations agent's server has one today.
+# 1. Point each server's backend at its application. The example server has none.
 servers=$(for file in "${files[@]}"; do yq -r '.tools.server' "$file"; done | sort -u)
 apim=$(az resource list --subscription "$AZURE_SUBSCRIPTION_ID" --resource-group "$resource_group" --resource-type Microsoft.ApiManagement/service \
   --query '[0].name' --output tsv)
 [ -n "$apim" ] || fail "there is no API Management service in $resource_group"
-for server in $servers; do
-  [ "$server" = integration-operations ] || continue
-  console="https://$(az containerapp show --subscription "$AZURE_SUBSCRIPTION_ID" --name integration-console-web --resource-group "$resource_group" \
+# point_backend SERVER CONTAINER-APP BACKEND AZD-VARIABLE
+point_backend() {
+  local server=$1 app=$2 backend=$3 variable=$4 base
+  base="https://$(az containerapp show --subscription "$AZURE_SUBSCRIPTION_ID" --name "$app" --resource-group "$resource_group" \
     --query properties.configuration.ingress.fqdn --output tsv)"
-  azd env set ESTATE_INTEGRATION_CONSOLE_BASE_URL "$console"
+  azd env set "$variable" "$base"
   az rest --method patch --output none \
-    --url "https://management.azure.com/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/$resource_group/providers/Microsoft.ApiManagement/service/$apim/backends/integration-console-agent-api?api-version=2024-05-01" \
-    --body "$(jq -n --arg url "$console/agent/v1" '{properties: {url: $url}}')"
-  pass "the $server server calls the Integration console at $console/agent/v1"
+    --url "https://management.azure.com/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/$resource_group/providers/Microsoft.ApiManagement/service/$apim/backends/$backend?api-version=2024-05-01" \
+    --body "$(jq -n --arg url "$base/agent/v1" '{properties: {url: $url}}')"
+  pass "the $server server calls $app at $base/agent/v1"
+}
+for server in $servers; do
+  case "$server" in
+    integration-operations) point_backend "$server" integration-console-web integration-console-agent-api ESTATE_INTEGRATION_CONSOLE_BASE_URL ;;
+    health-check) point_backend "$server" health-check-web health-check-agent-api ESTATE_HEALTH_CHECK_BASE_URL ;;
+    *) ;;
+  esac
 done
 
 # 2. The connections.
