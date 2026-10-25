@@ -45,6 +45,46 @@ public sealed class AgentEvaluationTests
         result.Reason.Should().Contain("not a structured result");
     }
 
+    private const string Report = """{ "summary": "Two problems.", "findings": [ { "id": "F-A" }, { "id": "F-B" } ] }""";
+
+    [Fact]
+    public void Lists_PassOnTheSameValuesInAnyOrder_AndFailOnAnExtraOrMissingOne()
+    {
+        Check(Case("""{ "lists": { "findings[].id": { "exactly": ["F-B", "F-A"] } } }"""), Report).Single().Pass.Should().BeTrue();
+
+        var extra = Check(Case("""{ "lists": { "findings[].id": { "exactly": ["F-A"] } } }"""), Report).Single();
+
+        extra.Pass.Should().BeFalse();
+        extra.Reason.Should().Contain("F-B");
+    }
+
+    [Fact]
+    public void Lists_IncludesAndExcludes_NameWhatIsMissingOrPresent()
+    {
+        Check(Case("""{ "lists": { "findings[].id": { "includes": ["F-A"], "excludes": ["F-C"] } } }"""), Report).Should().OnlyContain(r => r.Pass);
+
+        var results = Check(Case("""{ "lists": { "findings[].id": { "includes": ["F-C"], "excludes": ["F-A"] } } }"""), Report);
+
+        results.Should().OnlyContain(r => !r.Pass);
+        results.Select(r => r.Reason).Should().Contain(["is [\"F-A\",\"F-B\"], missing [\"F-C\"]", "holds [\"F-A\"]"]);
+    }
+
+    [Fact]
+    public void Lists_AnEmptyExactlyMeansTheListIsThereAndEmpty_AMissingListFails()
+    {
+        var expect = """{ "lists": { "findings[].id": { "exactly": [] } } }""";
+
+        Check(Case(expect), """{ "summary": "Nothing.", "findings": [] }""").Single().Pass.Should().BeTrue();
+        Check(Case(expect), Report).Single().Pass.Should().BeFalse();
+        Check(Case(expect), """{ "summary": "Nothing." }""").Single().Reason.Should().Contain("no such list");
+        Check(Case(expect), "prose", structured: false).Single().Pass.Should().BeFalse();
+    }
+
+    [Fact]
+    public void ACaseWithAMalformedLists_IsNamed() =>
+        Validate("""{ "id": "a", "agent": "a", "input": "q", "expect": { "lists": { "findings[].id": { "exactly": "F-A" } } } }""")
+            .Should().ContainMatch("*expect.lists must be*");
+
     [Fact]
     public void MustNotContain_FailsOnAForbiddenString_WhateverItsCase()
     {

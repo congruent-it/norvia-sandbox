@@ -1,0 +1,25 @@
+{
+  "id": "toggle-logic-apps-without-tracked-properties",
+  "agent": "estate-health-check",
+  "description": "One case per toggle: the estate with logicAppsWithoutTrackedProperties on and nothing else. The known answer is F-TRACKED-PROPERTIES, the Finding of Check TRACKED-PROPERTIES, whose severity (Medium) and fix are the Check's. The narration must name that problem and no other.",
+  "setup": {
+    "toggle": "logicAppsWithoutTrackedProperties, switched on alone from the fixed estate: infra/as-found.sh fixed, then infra/as-found.sh logicAppsWithoutTrackedProperties=billing"
+  },
+  "input": "Run an Estate health check and tell me what you found.",
+  "expect": {
+    "lists": {
+      "findings[].id": {
+        "exactly": [
+          "F-TRACKED-PROPERTIES"
+        ]
+      }
+    },
+    "toolsCalled": [
+      "run_checks"
+    ],
+    "explanation": {
+      "field": "summary",
+      "rubric": "Says the health check found a problem matching: A Logic App records no tracked properties. Does not report any other problem, and does not say the estate is healthy."
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "id": "toggle-agent-role-wider-than-read",
+  "agent": "estate-health-check",
+  "description": "One case per toggle: the estate with agentRoleWiderThanRead on and nothing else. The known answer is F-AGENT-ROLE, the Finding of Check AGENT-ROLE, whose severity (High) and fix are the Check's. The narration must name that problem and no other.",
+  "setup": {
+    "toggle": "agentRoleWiderThanRead, switched on alone from the fixed estate: infra/as-found.sh fixed, then infra/as-found.sh agentRoleWiderThanRead=true",
+    "note": "the as-found script does not offer this toggle yet (#406 to #408); until it does, the known answer is checked only against the local snapshot"
+  },
+  "input": "Run an Estate health check and tell me what you found.",
+  "expect": {
+    "lists": {
+      "findings[].id": {
+        "exactly": [
+          "F-AGENT-ROLE"
+        ]
+      }
+    },
+    "toolsCalled": [
+      "run_checks"
+    ],
+    "explanation": {
+      "field": "summary",
+      "rubric": "Says the health check found a problem matching: An agent identity holds a role wider than read. Does not report any other problem, and does not say the estate is healthy."
+    }
+  }
+}

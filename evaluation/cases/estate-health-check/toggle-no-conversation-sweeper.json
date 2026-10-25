@@ -1,0 +1,25 @@
+{
+  "id": "toggle-no-conversation-sweeper",
+  "agent": "estate-health-check",
+  "description": "One case per toggle: the estate with noConversationSweeper on and nothing else. The known answer is F-CONVERSATION-SWEEPER, the Finding of Check CONVERSATION-SWEEPER, whose severity (Medium) and fix are the Check's. The narration must name that problem and no other.",
+  "setup": {
+    "toggle": "noConversationSweeper, switched on alone from the fixed estate: infra/as-found.sh fixed, then infra/as-found.sh noConversationSweeper=true"
+  },
+  "input": "Run an Estate health check and tell me what you found.",
+  "expect": {
+    "lists": {
+      "findings[].id": {
+        "exactly": [
+          "F-CONVERSATION-SWEEPER"
+        ]
+      }
+    },
+    "toolsCalled": [
+      "run_checks"
+    ],
+    "explanation": {
+      "field": "summary",
+      "rubric": "Says the health check found a problem matching: The conversation sweeper does not run. Does not report any other problem, and does not say the estate is healthy."
+    }
+  }
+}

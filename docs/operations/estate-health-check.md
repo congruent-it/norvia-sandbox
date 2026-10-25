@@ -139,6 +139,10 @@ A Finding's evidence names the resources concerned. A secret is reported by wher
 
 Locally the AppHost signs in a local operator holding both operator roles, and refuses to do it outside Development. In Azure Container Apps' Easy Auth signs the operator in to the app's own app registration, `Norvia Estate health check (<env>)`, and the app reads their app roles from it ([ADR 0026](../adr/0026-the-integration-console-signs-operators-in-with-easy-auth-and-checks-their-app-role.md), as for the Integration console); Entra signs in only the users assigned a role, and the presenter holds both. See [identity and access](../architecture/identity-and-access.md#agents).
 
+## Evaluation
+
+The Agent's narration is checked against known answers, on demand and before a release; it never runs in CI and never gates a merge. There is a case for every toggle (the estate with that toggle on, the known answer being its Check's Finding), for the fixed estate (no Finding, said plainly), for a question about a problem no Check found (the Agent says it found nothing) and for injection through a tag, a resource name and a description. How to run it and how to read a result: [agent-evaluation.md](agent-evaluation.md#reading-the-estate-health-check-agents-results). The cases: [evaluation/cases/estate-health-check/](../../evaluation/cases/estate-health-check/).
+
 ## Tests
 
 - **Unit tests** (80% line coverage): the report (grouping, the comparison, the Markdown export, a severity the Agent's answer cannot change, the follow-up question), the engine, every Check against the facts of its toggle (it fires for its toggle and only its toggle, and the healthy estate gives no Finding), every snapshot (exactly the Findings of the toggles its preset turns on, the fixed one none), the masking, the use cases, the role checks, the agent API (token, role, audience, GET only, the tracking hop), the page (bUnit), the local agent client against a fake MCP server, and the stand-in's second server.

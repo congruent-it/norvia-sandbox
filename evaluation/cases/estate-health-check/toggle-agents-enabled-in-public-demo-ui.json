@@ -1,0 +1,26 @@
+{
+  "id": "toggle-agents-enabled-in-public-demo-ui",
+  "agent": "estate-health-check",
+  "description": "One case per toggle: the estate with agentsEnabledInPublicDemoUi on and nothing else. The known answer is F-AGENTS-PUBLIC, the Finding of Check AGENTS-PUBLIC, whose severity (High) and fix are the Check's. The narration must name that problem and no other.",
+  "setup": {
+    "toggle": "agentsEnabledInPublicDemoUi, switched on alone from the fixed estate: infra/as-found.sh fixed, then infra/as-found.sh agentsEnabledInPublicDemoUi=true",
+    "note": "the as-found script does not offer this toggle yet (#406 to #408); until it does, the known answer is checked only against the local snapshot"
+  },
+  "input": "Run an Estate health check and tell me what you found.",
+  "expect": {
+    "lists": {
+      "findings[].id": {
+        "exactly": [
+          "F-AGENTS-PUBLIC"
+        ]
+      }
+    },
+    "toolsCalled": [
+      "run_checks"
+    ],
+    "explanation": {
+      "field": "summary",
+      "rubric": "Says the health check found a problem matching: Agents are on in a public Demo UI. Does not report any other problem, and does not say the estate is healthy."
+    }
+  }
+}
