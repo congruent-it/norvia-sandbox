@@ -6,3 +6,6 @@ public sealed record AgentRunResult(string RunId, Suggestion Suggestion, IReadOn
 
 /// <summary>One tool call of a run.</summary>
 public sealed record ToolCallRecord(string ResultId, string ToolName);
+
+/// <summary>A finished Agent run that ended in a <see cref="Narration"/>.</summary>
+public sealed record NarrationRunResult(string RunId, Narration Narration, IReadOnlyList<ToolCallRecord> ToolCalls);

@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Azure.AI.OpenAI" />
+    <PackageReference Include="Azure.Identity" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
+    <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Norvia.HealthCheck.Application\Norvia.HealthCheck.Application.csproj" />
+  </ItemGroup>
+  <!-- The estate's configuration as JSON snapshots, which the snapshot adapter reads locally: one for the fixed estate and one as found. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Snapshots\*.snapshot.json" LogicalName="snapshots/%(Filename)%(Extension)" />
+  </ItemGroup>
+  <!-- The Agents' definitions, which the in-process runner reads as the Foundry deployment script reads them (ADR 0040). -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\..\agents\estate-health-check.agent.yaml" LogicalName="agents/%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Norvia.HealthCheck.Infrastructure.UnitTests" />
+    <InternalsVisibleTo Include="Norvia.HealthCheck.Infrastructure.IntegrationTests" />
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+  </ItemGroup>
+</Project>

@@ -15,4 +15,8 @@ internal static class Embedded
     public static string IntegrationOperationsDefinition => Read("agents/integration-operations.agent.yaml");
 
     public static string IntegrationOperationsTools => Read("agent-mcp/integration-operations.tools.json");
+
+    public static string EstateHealthCheckDefinition => Read("agents/estate-health-check.agent.yaml");
+
+    public static string HealthCheckTools => Read("agent-mcp/health-check.tools.json");
 }

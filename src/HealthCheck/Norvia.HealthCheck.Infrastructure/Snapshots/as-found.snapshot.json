@@ -1,0 +1,49 @@
+{
+  "name": "as-found",
+  "serviceBusEntities": [
+    {
+      "name": "carrier-tracking",
+      "hasDeadLetterAlert": false
+    },
+    {
+      "name": "carrier-proof-of-delivery",
+      "hasDeadLetterAlert": false
+    },
+    {
+      "name": "carrier-booking",
+      "hasDeadLetterAlert": false
+    },
+    {
+      "name": "shipper-notification",
+      "hasDeadLetterAlert": false
+    },
+    {
+      "name": "carrier-cancellation",
+      "hasDeadLetterAlert": false
+    },
+    {
+      "name": "carrier-cost",
+      "hasDeadLetterAlert": false
+    },
+    {
+      "name": "trip-dispatch",
+      "hasDeadLetterAlert": true
+    },
+    {
+      "name": "driver-reports",
+      "hasDeadLetterAlert": true
+    },
+    {
+      "name": "billing",
+      "hasDeadLetterAlert": false
+    },
+    {
+      "name": "shipper-invoice",
+      "hasDeadLetterAlert": true
+    },
+    {
+      "name": "carrier-invoice-outcome",
+      "hasDeadLetterAlert": true
+    }
+  ]
+}

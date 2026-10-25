@@ -10,6 +10,7 @@ What each application offers and keeps, for engineers and coding agents working 
 | [driver-app.md](driver-app.md) | `driver-app` | [v1](openapi/driver-app.v1.json) |
 | [simulator.md](simulator.md) | `simulator` | none published |
 | [integration-console.md](integration-console.md) | none: it stores nothing | none published |
+| [estate-health-check.md](estate-health-check.md) | none: it stores nothing | none published |
 
 ## What a page holds
 

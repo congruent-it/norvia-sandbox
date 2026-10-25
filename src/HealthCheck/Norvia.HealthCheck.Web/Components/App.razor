@@ -1,0 +1,23 @@
+@using System.Diagnostics.CodeAnalysis
+@attribute [ExcludeFromCodeCoverage(Justification = "The HTML document shell; it has no behaviour of its own.")]
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <link rel="stylesheet" href="@Assets["app.css"]" />
+    <Norvia.Branding.NorviaFavicon />
+    <ImportMap />
+    <HeadOutlet />
+</head>
+
+<body>
+    <PageTitle>Estate health check</PageTitle>
+    <Routes />
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+</body>
+
+</html>
