@@ -32,7 +32,7 @@ public sealed partial class InvoicingTests(SimulatorFixture fixture)
         var (_, run, log) = await simulator.RunToEndAsync(settings, Ct, InvoicingPatience);
 
         run.Status.Should().Be(SimulationRunStatus.Completed);
-        var invoicing = log.Where(Runs.IsInvoicing).OrderBy(line => line.Sequence).ToList();
+        var invoicing = log.Where(IsShipperInvoicing).OrderBy(line => line.Sequence).ToList();
 
         var invoice = invoicing.Should().ContainSingle(line => line.Outcome == LogOutcome.InvoiceIssued, "one Shipper booked, so one invoice").Subject;
         invoice.Actor.Should().Be(InvoicingActions.FinanceActor);
@@ -92,7 +92,7 @@ public sealed partial class InvoicingTests(SimulatorFixture fixture)
         var (_, run, log) = await simulator.RunToEndAsync(settings, Ct, InvoicingPatience);
 
         run.Status.Should().Be(SimulationRunStatus.Completed);
-        log.Should().NotContain(line => Runs.IsInvoicing(line), "a Credit note is only ever on an invoice");
+        log.Should().NotContain(line => IsShipperInvoicing(line), "a Credit note is only ever on an invoice");
     }
 
     [Fact]
@@ -106,6 +106,12 @@ public sealed partial class InvoicingTests(SimulatorFixture fixture)
         second.Should().Equal(first, "the funnel follows the seed; only the documents' numbers differ");
     }
 
+    // The Carriers' invoices ride on the same run and log their own lines (CarrierInvoicingTests); this class is about the Shippers' invoices.
+    private static bool IsCarrierInvoicing(LogLine line) =>
+        line.Action is InvoicingActions.SendCarrierInvoice or InvoicingActions.AcceptCarrierInvoiceLine or InvoicingActions.RejectCarrierInvoiceLine or InvoicingActions.ReceiveInvoiceOutcome;
+
+    private static bool IsShipperInvoicing(LogLine line) => Runs.IsInvoicing(line) && !IsCarrierInvoicing(line);
+
     [Fact]
     public async Task WhenTheErpCannotBeReached_FinanceLogsIt_AndTheRunStillCompletes()
     {
@@ -115,7 +121,7 @@ public sealed partial class InvoicingTests(SimulatorFixture fixture)
         var (_, run, log) = await simulator.RunToEndAsync(settings, Ct, InvoicingPatience);
 
         run.Status.Should().Be(SimulationRunStatus.Completed);
-        var lines = log.Where(Runs.IsInvoicing).ToList();
+        var lines = log.Where(IsShipperInvoicing).ToList();
         lines.Should().ContainSingle().Which.Outcome.Should().Be(LogOutcome.InvoicingNotReceived);
         lines[0].Actor.Should().Be(InvoicingActions.FinanceActor);
     }
@@ -140,7 +146,7 @@ public sealed partial class InvoicingTests(SimulatorFixture fixture)
         await using var simulator = await fixture.StartSimulatorWithSeedAsync(Ct, SeedEdits.OnlyShippers(PricedShipper));
         var settings = Runs.Invoiced(orders: 4, seed, new InvoicingShares(InvoicePercent: 100, CreditNotePercent: 100));
         var (_, _, log) = await simulator.RunToEndAsync(settings, Ct, InvoicingPatience);
-        return [.. log.Where(Runs.IsInvoicing).OrderBy(line => line.Sequence).Select(line => $"{line.Actor}|{line.Action}|{line.Outcome}")];
+        return [.. log.Where(IsShipperInvoicing).OrderBy(line => line.Sequence).Select(line => $"{line.Actor}|{line.Action}|{line.Outcome}")];
     }
 
     // Logs and traces carry the tracking keys of §7 for the ERP calls.

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -29,6 +30,8 @@ internal sealed partial class NorviaTmsApiClient(
     private const string FlowName = "transport-planning";
     private const string ExceptionFlowName = "exception-handling";
     private const string TripFlowName = "trip-dispatch";
+    private const int MaxAttempts = 3;
+    private static readonly TimeSpan RetryPause = TimeSpan.FromMilliseconds(250);
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
     {
@@ -158,21 +161,33 @@ internal sealed partial class NorviaTmsApiClient(
         PlannerAnswer answer;
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(path, UriKind.Relative));
-            if (body is not null)
+            // A 409 without a refusal's code is a write that lost a race inside the TMS, such as an order it is still taking in. A call under an idempotency key may be repeated.
+            var attempts = idempotencyKey is null ? 1 : MaxAttempts;
+            for (var attempt = 1; ; attempt++)
             {
-                request.Content = JsonContent.Create(body, body.GetType(), options: Json);
-            }
+                using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(path, UriKind.Relative));
+                if (body is not null)
+                {
+                    request.Content = JsonContent.Create(body, body.GetType(), options: Json);
+                }
 
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await tokens.GetTokenAsync(cancellationToken));
-            if (idempotencyKey is not null)
-            {
-                request.Headers.Add("Idempotency-Key", idempotencyKey);
-            }
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await tokens.GetTokenAsync(cancellationToken));
+                if (idempotencyKey is not null)
+                {
+                    request.Headers.Add("Idempotency-Key", idempotencyKey);
+                }
 
-            using var response = await http.SendAsync(request, cancellationToken);
-            var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
-            answer = read((int)response.StatusCode, responseBody, response.Headers.TryGetValues("X-Correlation-ID", out var values) ? values.FirstOrDefault() : null);
+                using var response = await http.SendAsync(request, cancellationToken);
+                var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+                answer = read((int)response.StatusCode, responseBody, response.Headers.TryGetValues("X-Correlation-ID", out var values) ? values.FirstOrDefault() : null);
+                if (response.StatusCode != HttpStatusCode.Conflict || answer.Outcome != LogOutcome.PlanningNotReceived || attempt >= attempts)
+                {
+                    break;
+                }
+
+                LogConflictRetried(spanName, attempt);
+                await Task.Delay(RetryPause * attempt, cancellationToken);
+            }
         }
         catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {
@@ -244,6 +259,9 @@ internal sealed partial class NorviaTmsApiClient(
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "{Action} didn't reach the TMS API")]
     private partial void LogNotSent(Exception exception, string action);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "The TMS answered {Action} with a conflict (try {Attempt}): the call is repeated under its idempotency key")]
+    private partial void LogConflictRetried(string action, int attempt);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "The TMS answered {Action}: {Outcome}")]
     private partial void LogAnswered(string action, LogOutcome outcome);

@@ -118,6 +118,7 @@ public sealed class ExecuteRunHandler(
         var began = time.GetUtcNow();
         using var slots = new SemaphoreSlim(concurrency);
         var inFlight = new List<Task>(bookings.Count);
+        var originals = new Dictionary<string, Task>();
 
         try
         {
@@ -129,8 +130,19 @@ public sealed class ExecuteRunHandler(
                     await Task.Delay(wait, time, stopSending);
                 }
 
+                // A repeat or a conflict of a booking is only one when Norvia has the booking: sent first, it would be the booking, and the original the repeat.
+                if (bookings[index].Bad is BadBookingKind.RepeatedReference or BadBookingKind.ConflictingReference && originals.TryGetValue(bookings[index].Reference, out var original))
+                {
+                    await Task.WhenAny(original);
+                }
+
                 await slots.WaitAsync(stopSending);
-                inFlight.Add(SendAsync(bookings[index], writer, accepted, slots, cancellationToken));
+                var sending = SendAsync(bookings[index], writer, accepted, slots, cancellationToken);
+                inFlight.Add(sending);
+                if (bookings[index].Bad is null)
+                {
+                    originals[bookings[index].Reference] = sending;
+                }
             }
         }
         catch (OperationCanceledException) when (stopSending.IsCancellationRequested)

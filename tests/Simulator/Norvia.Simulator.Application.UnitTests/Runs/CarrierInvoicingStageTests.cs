@@ -237,6 +237,23 @@ public sealed class CarrierInvoicingStageTests
     }
 
     [Fact]
+    public async Task Handle_PricesThatReachTheInboxOnTheSecondAsk_AreInvoiced_BecauseTheInboxIsAskedAgain()
+    {
+        var asks = new Dictionary<string, int>();
+        _inbox.AgreedPricesAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(call =>
+        {
+            var ask = asks[call.Arg<string>()] = asks.GetValueOrDefault(call.Arg<string>()) + 1;
+            return Task.FromResult<IReadOnlyDictionary<string, decimal>?>(
+                ask == 1 ? new Dictionary<string, decimal>() : Enumerable.Range(1, 30).ToDictionary(step => $"CB-{step:0000000}", _ => Price));
+        });
+
+        await RunAsync(edited: 0);
+
+        _invoices.Sum(sent => sent.Invoice.Lines.Count).Should().Be(6);
+        _lines.Should().NotContain(line => line.Action.Contains("has no price for Carrier booking"));
+    }
+
+    [Fact]
     public async Task Handle_NorviaRefusingTheInvoice_IsLogged_AndNothingMoreHappensForIt()
     {
         _api.SendCarrierInvoiceAsync(Arg.Any<SimulatedCarrier>(), Arg.Any<CarrierInvoiceRequest>(), Arg.Any<CancellationToken>())

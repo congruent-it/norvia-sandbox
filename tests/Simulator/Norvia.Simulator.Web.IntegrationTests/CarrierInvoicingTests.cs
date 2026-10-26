@@ -80,7 +80,8 @@ public sealed class CarrierInvoicingTests(SimulatorFixture fixture)
 
         var sent = lines.Where(line => line.Action == InvoicingActions.SendCarrierInvoice).ToList();
         sent.Should().NotBeEmpty();
-        sent.Should().OnlyContain(line => line.Detail!.Contains("PRICE_MISMATCH", StringComparison.Ordinal), "every invoice carries one edited amount");
+        sent.Should().OnlyContain(line => line.Detail!.Contains("PRICE_MISMATCH", StringComparison.Ordinal) || IsUnknown(line), "every invoice carries one edited amount, unless the ERP doesn't know its booking yet");
+        sent.Should().Contain(line => line.Detail!.Contains("PRICE_MISMATCH", StringComparison.Ordinal));
 
         var accepted = lines.Where(line => line.Action == InvoicingActions.AcceptCarrierInvoiceLine).ToList();
         accepted.Should().NotBeEmpty("every invoice carries a Price mismatch for Finance to accept");
