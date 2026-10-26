@@ -657,6 +657,11 @@ module integrationOperationsMcp 'estate/integration-operations-mcp.bicep' = {
     apiManagementClientId: identities.outputs.apiManagementClientId
     consoleBaseUrl: integrationConsoleBaseUrl
   }
+  // API Management refuses a write to a service that another write has just changed (PreconditionFailed: "Resource was modified
+  // since last retrieval"), so the MCP servers, which all write to the one service, are deployed one after another.
+  dependsOn: [
+    agentMcpExample
+  ]
 }
 
 // The Estate health-check agent's MCP server over the app's agent API, with the two app registrations that keep it narrow
@@ -670,6 +675,9 @@ module healthCheckMcp 'estate/health-check-mcp.bicep' = {
     apiManagementClientId: identities.outputs.apiManagementClientId
     healthCheckBaseUrl: healthCheckBaseUrl
   }
+  dependsOn: [
+    integrationOperationsMcp
+  ]
 }
 
 // The hook stores each output as AZURE_<NAME>, which is where azd looks up the AppHost's Estate parameters.
