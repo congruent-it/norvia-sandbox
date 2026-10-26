@@ -55,6 +55,34 @@ az keyvault list-deleted --subscription "$AZURE_SUBSCRIPTION_ID" --resource-type
       echo "Could not purge $vault." >&2
   done
 
+# The same goes for API Management services and Foundry (Cognitive Services) accounts: their names (also derived from the
+# resource group) stay taken while they are soft-deleted, which fails the deployment with ServiceAlreadyExistsInSoftDeletedState.
+# Those of this environment's resource group are purged first.
+az apim deletedservice list --subscription "$AZURE_SUBSCRIPTION_ID" \
+  --query "[].[name, location, serviceId]" --output tsv 2>/dev/null |
+  while IFS="$(printf '\t')" read -r apim apim_location apim_id; do
+    case "$apim_id" in
+      "$rg_id"*|"${rg_id%/}"/*) ;;
+      *) continue ;;
+    esac
+    echo "Purging the deleted API Management service $apim..."
+    az apim deletedservice purge --subscription "$AZURE_SUBSCRIPTION_ID" --service-name "$apim" --location "$apim_location" --output none ||
+      echo "Could not purge $apim." >&2
+  done
+
+az cognitiveservices account list-deleted --subscription "$AZURE_SUBSCRIPTION_ID" \
+  --query "[].[name, location, id]" --output tsv 2>/dev/null |
+  while IFS="$(printf '\t')" read -r account account_location account_id; do
+    case "$account_id" in
+      *"/resourceGroups/rg-$AZURE_ENV_NAME/"*|*"/resourcegroups/rg-$AZURE_ENV_NAME/"*) ;;
+      *) continue ;;
+    esac
+    echo "Purging the deleted Foundry account $account..."
+    az cognitiveservices account purge --subscription "$AZURE_SUBSCRIPTION_ID" --resource-group "rg-$AZURE_ENV_NAME" \
+      --name "$account" --location "$account_location" --output none ||
+      echo "Could not purge $account." >&2
+  done
+
 # A new managed identity can take a minute to reach Microsoft Graph, which then refuses to grant it an app role.
 # Deploying again is safe, so a first attempt that fails is retried.
 for attempt in 1 2 3; do

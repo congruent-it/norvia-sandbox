@@ -77,6 +77,13 @@ resource viewOperations 'Microsoft.ApiManagement/service/apis/operations@2024-05
       description: tool.description
       method: tool.method
       urlTemplate: tool.path
+      // API Management wants every {placeholder} of the URL template declared: "/runs/{a}/{b}" splits on '{' into
+      // "/runs/", "a}/" and "b}", and each part after the first starts with a name that ends at '}'.
+      templateParameters: map(skip(split(tool.path, '{'), 1), part => {
+        name: split(part, '}')[0]
+        required: true
+        type: 'string'
+      })
     }
   }
 ]
