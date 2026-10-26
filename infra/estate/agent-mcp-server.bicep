@@ -53,6 +53,9 @@ resource apiManagement 'Microsoft.ApiManagement/service@2024-05-01' existing = {
   name: apiManagementName
 }
 
+// API Management refuses a write to a service another write has just changed (PreconditionFailed), so the loops below run one
+// iteration at a time.
+
 // The agent view. It is an API on the gateway too, so each operation checks the token itself, and it is in no product.
 resource agentView 'Microsoft.ApiManagement/service/apis@2024-05-01' = {
   parent: apiManagement
@@ -68,6 +71,7 @@ resource agentView 'Microsoft.ApiManagement/service/apis@2024-05-01' = {
   }
 }
 
+@batchSize(1)
 resource viewOperations 'Microsoft.ApiManagement/service/apis/operations@2024-05-01' = [
   for tool in tools: {
     parent: agentView
@@ -91,6 +95,7 @@ resource viewOperations 'Microsoft.ApiManagement/service/apis/operations@2024-05
 var viewPolicy = loadTextContent('agent-mcp-server/view-operation.policy.xml')
 var mockPolicy = loadTextContent('agent-mcp-server/view-operation-mock.policy.xml')
 
+@batchSize(1)
 resource viewOperationPolicies 'Microsoft.ApiManagement/service/apis/operations/policies@2024-05-01' = [
   for (tool, i) in tools: {
     parent: viewOperations[i]
@@ -131,6 +136,7 @@ resource mcpServer 'Microsoft.ApiManagement/service/apis@2025-09-01-preview' = {
   ]
 }
 
+@batchSize(1)
 resource mcpTools 'Microsoft.ApiManagement/service/apis/tools@2025-09-01-preview' = [
   for (tool, i) in tools: {
     parent: mcpServer
