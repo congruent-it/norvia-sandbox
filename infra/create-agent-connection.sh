@@ -29,6 +29,6 @@ for server in "$@"; do
   audience=$(az ad app list --display-name "Norvia $server agent view ($AZURE_ENV_NAME)" --query '[0].appId' --output tsv)
   [ -n "$audience" ] || { echo "The agent view of $server is not in Entra: has the estate been deployed?" >&2; exit 1; }
   azd ai connection create "$server-mcp" --kind remote-tool --target "$gateway/agents/$server/mcp" \
-    --auth-type agentic-identity --audience "$audience"
+    --auth-type agentic-identity --audience "$audience" --force
   echo "Connection $server-mcp: $gateway/agents/$server/mcp (audience $audience)"
 done
