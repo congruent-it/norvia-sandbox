@@ -140,7 +140,9 @@ resource mcpServer 'Microsoft.ApiManagement/service/apis@2025-09-01-preview' = {
 resource mcpTools 'Microsoft.ApiManagement/service/apis/tools@2025-09-01-preview' = [
   for (tool, i) in tools: {
     parent: mcpServer
-    name: tool.name
+    // A tool's resource name is unique across the API Management service, while two servers may each have a tool of the same
+    // name (list_failed_runs). The name the Agent sees is the display name.
+    name: '${serverName}-${tool.name}'
     properties: {
       displayName: tool.name
       description: tool.description
