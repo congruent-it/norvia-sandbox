@@ -46,7 +46,8 @@ token=$(graph_token)
 graph() {
   local method=$1 path=$2 body=${3:-} out status
   out=$(mktemp)
-  status=$(curl -s -o "$out" -w '%{http_code}' -X "$method" "$graph$path" -H "Authorization: Bearer $token" \
+  # curl refuses a URL with a space in it (an app registration's display name has some), so they are encoded.
+  status=$(curl -s -o "$out" -w '%{http_code}' -X "$method" "$graph${path// /%20}" -H "Authorization: Bearer $token" \
     -H 'Content-Type: application/json' ${body:+-d "$body"})
   if [ "${status:0:1}" != 2 ]; then
     echo "Graph $method $path answered $status: $(jq -r '.error.code + ": " + .error.message' "$out" 2>/dev/null || echo no-detail)" >&2
