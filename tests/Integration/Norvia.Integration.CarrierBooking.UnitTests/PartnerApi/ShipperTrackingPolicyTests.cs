@@ -19,7 +19,11 @@ public sealed class ShipperTrackingPolicyTests
         "get-shipper-proof-of-delivery-file",
     };
 
-    private static XElement Read(string name) => XElement.Parse(Contracts.Read($"PartnerApiPolicies/{name}.policy.xml"));
+    // partner-api.bicep fills the place each policy holds for the rate limit; the cache is off here, as it is not under test.
+    private static XElement Read(string name) => XElement.Parse(Contracts.Read($"PartnerApiPolicies/{name}.policy.xml")
+        .Replace("[[rate-limit]]", Contracts.Read("PartnerApiPolicies/shipper-rate-limit.fragment.xml"), StringComparison.Ordinal)
+        .Replace("[[cache-lookup]]", "", StringComparison.Ordinal)
+        .Replace("[[cache-store]]", "", StringComparison.Ordinal));
 
     private static XElement Inbound(string name) => Read(name).Element("inbound")!;
 

@@ -53,7 +53,7 @@ public sealed class TrackingWorkflowTests
         var tracked = TrackingWorkflow.Action(TrackingWorkflow.TmsCall)["trackedProperties"]!.AsObject();
 
         tracked.Select(property => property.Key).Should().BeEquivalentTo(
-            "correlationId", "flow", "partyId", "sourceMessageId", "shipmentNumber", "carrierBookingNumber", "outcome", "failureCode");
+            "correlationId", "flow", "partyId", "sourceMessageId", "shipmentNumber", "carrierBookingNumber", "outcome", "messageId", "failureCode");
         tracked["flow"]!.GetValue<string>().Should().Be(TrackingWorkflow.Flow);
     }
 

@@ -100,6 +100,14 @@ public sealed class PartnerPortalFixture : IAsyncLifetime
             ["PartnerApi:LocalTokens:Audience"] = LocalTokens.PartnerApiAudience,
             ["PartnerApi:LocalTokens:SigningKey"] = "0123456789abcdef0123456789abcdef0123456789abcdef",
             ["DriverApp:Address"] = "http://127.0.0.1:1",
+            ["Faults:Owners:driver-app:Address"] = "http://127.0.0.1:1",
+            ["Faults:Owners:driver-app:Audience"] = LocalTokens.DriverAppAudience,
+            ["Faults:Owners:tms:Address"] = "http://127.0.0.1:1",
+            ["Faults:Owners:tms:Audience"] = LocalTokens.TmsAudience,
+            ["Faults:LocalTokens:Issuer"] = LocalTokens.Issuer,
+            ["Faults:LocalTokens:ClientId"] = LocalTokens.PartnerPortalClientId,
+            ["Faults:LocalTokens:SigningKey"] = Convert.ToBase64String("0123456789abcdef0123456789abcdef0123456789abcdef"u8),
+            ["Faults:LogicApp:FlagPath"] = Path.Combine(Path.GetTempPath(), $"norvia-driver-reports-disabled-{Guid.NewGuid():N}.flag"),
         };
         foreach (var persona in personas)
         {

@@ -96,6 +96,52 @@ public sealed class NorviaTmsApiClientTests : IDisposable
     }
 
     [Fact]
+    public async Task Assign_AConflictWithoutACode_IsRepeatedUnderTheSameKey_UntilTheTmsAnswers()
+    {
+        _tms.AnswerFirst(HttpStatusCode.Conflict, "", HttpStatusCode.Created, """{"shipmentNumber":"SH-0000009","correlationId":"plan-9"}""");
+
+        var answer = await _client.AssignAsync("TO-3", VanDijk, "SIM-3-1-assign", CancellationToken.None);
+
+        answer.Outcome.Should().Be(LogOutcome.Planned);
+        answer.ShipmentNumber.Should().Be("SH-0000009");
+        _tms.Calls.Should().Be(2);
+        _tms.Request!.Headers.GetValues("Idempotency-Key").Should().Equal("SIM-3-1-assign");
+    }
+
+    [Fact]
+    public async Task Assign_AConflictThatStays_IsNotReceivedAfterTheLastTry()
+    {
+        _tms.Answer(HttpStatusCode.Conflict, "");
+
+        var answer = await _client.AssignAsync("TO-3", VanDijk, "key", CancellationToken.None);
+
+        answer.Outcome.Should().Be(LogOutcome.PlanningNotReceived);
+        _tms.Calls.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task Assign_ARefusalWithACode_IsNotRepeated()
+    {
+        _tms.Answer(HttpStatusCode.Conflict, """{"code":"TransportOrderAlreadyAssigned","correlationId":"plan-2"}""");
+
+        var answer = await _client.AssignAsync("TO-3", VanDijk, "key", CancellationToken.None);
+
+        answer.Outcome.Should().Be(LogOutcome.PlanningRefused);
+        _tms.Calls.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Resolve_AConflictWithoutACode_IsNotRepeated_BecauseItHasNoIdempotencyKey()
+    {
+        _tms.Answer(HttpStatusCode.Conflict, "");
+
+        var answer = await _client.ResolveReplannedAsync("EX-1", "Replanned", CancellationToken.None);
+
+        answer.Outcome.Should().Be(LogOutcome.PlanningNotReceived);
+        _tms.Calls.Should().Be(1);
+    }
+
+    [Fact]
     public async Task Assign_TheTmsUnreachable_IsNotReceived()
     {
         _tms.Fail(new HttpRequestException("down"));

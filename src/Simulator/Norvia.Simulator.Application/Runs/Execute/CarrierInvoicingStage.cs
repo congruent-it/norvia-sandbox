@@ -31,7 +31,7 @@ internal sealed class CarrierInvoicingStage(IPartnerApi partner, IErpApi erp, IC
                 return new CarrierInvoicingResult(true, 0, 0, 0);
             }
 
-            if (await PricedAsync(group.First().Carrier, [.. group], writer, cancellationToken) is { } priced)
+            if (await PricedAsync(group.First().Carrier, [.. group], writer, stopSending, cancellationToken) is { } priced)
             {
                 invoices.Add(priced);
             }
@@ -67,10 +67,25 @@ internal sealed class CarrierInvoicingStage(IPartnerApi partner, IErpApi erp, IC
         return new CarrierInvoicingResult(received.Stopped, sent.Count, decided.Count, received.Count);
     }
 
-    // What the Carrier invoices for its deliveries: the price Norvia offered in each booking request, read from its inbox.
-    private async Task<Invoice?> PricedAsync(SimulatedCarrier carrier, List<CarrierDelivery> delivered, RunLogWriter writer, CancellationToken cancellationToken)
+    // What the Carrier invoices for its deliveries: the price Norvia offered in each booking request, read from its inbox. A request reaches the inbox through the Carrier
+    // booking Logic App, a little after the release, so the inbox is asked every interval, up to the attempts, until it holds the price of every delivered booking.
+    private async Task<Invoice?> PricedAsync(SimulatedCarrier carrier, List<CarrierDelivery> delivered, RunLogWriter writer, CancellationToken stopSending, CancellationToken cancellationToken)
     {
-        var prices = await inbox.AgreedPricesAsync(carrier.Id, cancellationToken);
+        IReadOnlyDictionary<string, decimal>? prices = null;
+        for (var attempt = 1; attempt <= pacing.PollAttempts; attempt++)
+        {
+            if (attempt > 1 && !await PauseAsync(stopSending))
+            {
+                break;
+            }
+
+            prices = await inbox.AgreedPricesAsync(carrier.Id, cancellationToken);
+            if (prices is null || delivered.All(delivery => prices.ContainsKey(delivery.CarrierBookingNumber)))
+            {
+                break;
+            }
+        }
+
         if (prices is null)
         {
             await writer.NoteAsync(time.GetUtcNow(), $"The booking inbox of {NameOf(carrier)} couldn't be read: it sends no Carrier invoice", cancellationToken);

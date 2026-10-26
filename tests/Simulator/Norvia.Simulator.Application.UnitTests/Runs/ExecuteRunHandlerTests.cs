@@ -100,6 +100,36 @@ public sealed class ExecuteRunHandlerTests
     }
 
     [Fact]
+    public async Task Handle_ARepeatOrAConflictOfABooking_IsSentOnlyAfterTheOriginalWasAnswered()
+    {
+        var run = Active(TestData.Settings(orders: 20, bad: 50, seed: 4));
+        var events = new System.Collections.Concurrent.ConcurrentQueue<string>();
+        _api.SendBookingAsync(Arg.Any<PlannedBooking>(), Arg.Any<CancellationToken>()).Returns(async call =>
+        {
+            var booking = call.Arg<PlannedBooking>();
+            events.Enqueue($"start {booking.Step}");
+            if (booking.Bad is null)
+            {
+                await Task.Delay(20, TestContext.Current.CancellationToken);
+            }
+
+            events.Enqueue($"end {booking.Step}");
+            return new BookingAnswer(LogOutcome.Accepted, $"corr-{booking.Step}", $"TO-{booking.Step:0000000}", null);
+        });
+
+        await Handler(concurrency: 10).Handle(new ExecuteRunCommand(run.Id, CancellationToken.None), CancellationToken.None);
+
+        var sequence = events.ToList();
+        var copies = run.Plan.Bookings.Where(booking => booking.Bad is BadBookingKind.RepeatedReference or BadBookingKind.ConflictingReference).ToList();
+        copies.Should().NotBeEmpty();
+        foreach (var copy in copies)
+        {
+            var original = run.Plan.Bookings.Single(booking => booking.Bad is null && booking.Reference == copy.Reference);
+            sequence.IndexOf($"end {original.Step}").Should().BeLessThan(sequence.IndexOf($"start {copy.Step}"), $"{copy.Reference} is a repeat only once Norvia has the booking");
+        }
+    }
+
+    [Fact]
     public async Task Handle_NorviaNotReached_IsLoggedAsNotReceivedAndTheRunGoesOn()
     {
         var run = Active(TestData.Settings(orders: 3));
