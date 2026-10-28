@@ -23,6 +23,14 @@ fi
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
+# Defender for Storage's malware scanning subscribes to the storage account's blob events through Event Grid. In a subscription that never
+# registered Microsoft.EventGrid that subscription fails ("Microsoft.EventGrid is not registered"), and the account is left with
+# on-upload scanning off although its deployment succeeded. Registering is idempotent, and --wait holds until it is done.
+if [ "$(az provider show --subscription "$AZURE_SUBSCRIPTION_ID" --namespace Microsoft.EventGrid --query registrationState --output tsv 2>/dev/null || true)" != Registered ]; then
+  echo "Registering Microsoft.EventGrid, which malware scanning needs..."
+  az provider register --subscription "$AZURE_SUBSCRIPTION_ID" --namespace Microsoft.EventGrid --wait
+fi
+
 ESTATE_PRESENTER_PRINCIPAL_ID=$(az ad signed-in-user show --query id --output tsv 2>/dev/null || true)
 export ESTATE_PRESENTER_PRINCIPAL_ID
 
