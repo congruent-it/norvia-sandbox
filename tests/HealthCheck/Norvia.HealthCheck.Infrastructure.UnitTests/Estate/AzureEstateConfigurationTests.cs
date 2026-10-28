@@ -71,6 +71,20 @@ public sealed class AzureEstateConfigurationTests : IDisposable
         Checklist.Default.Run(estate).Should().BeEmpty();
     }
 
+    [Theory]
+    [InlineData(1, true)]
+    [InlineData(0, false)]
+    public async Task ReadAsync_ForAnAlertWhoseEnabledFlagResourceGraphAnswersAsANumber_ReadsIt(int enabled, bool watching)
+    {
+        var alert = Alert("a", entities: ["carrier-tracking"]);
+        alert["enabled"] = enabled;
+        _azure.Entities(queues: ["carrier-tracking"], subscriptions: []).Alerts(alert);
+
+        var estate = await Adapter().ReadAsync(TestContext.Current.CancellationToken);
+
+        estate.ServiceBusEntities.Should().ContainSingle().Which.HasDeadLetterAlert.Should().Be(watching);
+    }
+
     [Fact]
     public async Task ReadAsync_ForAnAlertThatIsOff_DoesNotCountItAsWatching()
     {

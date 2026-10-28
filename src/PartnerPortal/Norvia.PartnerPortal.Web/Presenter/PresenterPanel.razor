@@ -55,14 +55,16 @@
                         <span>Off</span>
                     }
                 </p>
-                <div class="flex items-end gap-4">
-                    <FluentSelect TOption="string" Label="Duration" Items="DurationSeconds" Value="@DurationOf(fault)"
-                                  ValueChanged="@(seconds => _durations[fault.Name] = seconds)" OptionText="@(seconds => DurationText(int.Parse(seconds)))" OptionValue="@(seconds => seconds)" />
-                    <FluentButton Appearance="Appearance.Accent" Disabled="_saving" aria-label="@($"Switch on {fault.Name}")"
+                <div class="flex flex-wrap items-end gap-4">
+                    <div class="w-48 max-w-full">
+                        <FluentSelect TOption="string" Label="Duration" Items="DurationSeconds" Value="@DurationOf(fault)"
+                                      ValueChanged="@(seconds => _durations[fault.Name] = seconds)" OptionText="@(seconds => DurationText(int.Parse(seconds)))" OptionValue="@(seconds => seconds)" />
+                    </div>
+                    <FluentButton Class="shrink-0" Appearance="Appearance.Accent" Disabled="_saving" aria-label="@($"Switch on {fault.Name}")"
                                   OnClick="@(() => SwitchAsync(fault, int.Parse(DurationOf(fault))))">
                         @(remaining is null ? "Switch on" : "Switch on again")
                     </FluentButton>
-                    <FluentButton Disabled="@(_saving || remaining is null)" aria-label="@($"Switch off {fault.Name}")"
+                    <FluentButton Class="shrink-0" Disabled="@(_saving || remaining is null)" aria-label="@($"Switch off {fault.Name}")"
                                   OnClick="@(() => SwitchAsync(fault, null))">
                         Switch off
                     </FluentButton>
