@@ -28,6 +28,22 @@ public sealed class SnapshotEstateConfigurationTests
         [.. Preset(preset).Where(toggle => toggle.Value is JsonArray { Count: > 0 } || (toggle.Value is JsonValue value && value.TryGetValue<bool>(out var on) && on)).Select(toggle => toggle.Key)];
 
     [Fact]
+    public async Task ReadAsync_SaysWhichSnapshotItReads()
+    {
+        var steps = new List<string>();
+        var adapter = new SnapshotEstateConfiguration(Options.Create(new SnapshotOptions { Snapshot = SnapshotOptions.Fixed }));
+
+        await adapter.ReadAsync(TestContext.Current.CancellationToken, new Progress(steps));
+
+        steps.Should().Equal("Reading the fixed snapshot");
+    }
+
+    private sealed class Progress(List<string> steps) : IProgress<string>
+    {
+        public void Report(string value) => steps.Add(value);
+    }
+
+    [Fact]
     public void TheFixedSnapshot_GivesNoFinding() =>
         FindingsOf(SnapshotOptions.Fixed).Should().BeEmpty();
 

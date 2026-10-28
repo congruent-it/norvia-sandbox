@@ -55,26 +55,34 @@ internal sealed partial class AzureEstateConfiguration(
     private const string EntityDimension = "EntityName";
     private static readonly string[] ManagementScopes = [$"{Management}/.default"];
 
-    public async Task<EstateConfiguration> ReadAsync(CancellationToken cancellationToken)
+    public async Task<EstateConfiguration> ReadAsync(CancellationToken cancellationToken, IProgress<string>? progress = null)
     {
         var settings = options.Value;
         var namespaceId = $"{settings.ResourceGroupId.TrimEnd('/')}/providers/Microsoft.ServiceBus/namespaces/{settings.ServiceBusNamespace}";
         var group = new Group(settings.ResourceGroupId.Split('/', StringSplitOptions.RemoveEmptyEntries));
 
+        progress?.Report("Reading the alert rules");
         var alerts = await ReadAlertsAsync(group, cancellationToken);
         var watching = alerts.Where(alert => alert.Enabled && alert.Scopes.Contains(namespaceId, StringComparer.OrdinalIgnoreCase)).ToList();
 
+        progress?.Report("Reading the Service Bus queues and subscriptions");
         var entities = (await ReadEntitiesAsync(namespaceId, cancellationToken))
             .DistinctBy(entity => entity.Name, StringComparer.Ordinal)
             .Select(entity => new ServiceBusEntity(entity.Name, watching.Exists(alert => alert.Watches(entity.Name)), entity.DeadLetteredMessages))
             .ToList();
 
+        progress?.Report("Reading the Logic Apps");
         var logicApps = await QueryAsync(group, "microsoft.web/sites", "| where kind contains 'workflowapp' | project id, name, enabled = tobool(properties.enabled), workload = tostring(tags.workload)", cancellationToken);
+        progress?.Report("Reading the TMS API's settings");
         var tms = await ReadTmsSettingsAsync(group, cancellationToken);
+        progress?.Report("Reading API Management's policies");
         var apiManagement = await ReadApiManagementAsync(group, cancellationToken);
+        progress?.Report("Reading how long Application Insights and its workspace keep what they trace");
         var retention = await ReadRetentionAsync(group, cancellationToken);
+        progress?.Report("Reading the storage accounts' lifecycle rules and malware scanning");
         var (inbound, transit, proofs) = await ReadStorageAsync(group, cancellationToken);
 
+        progress?.Report("Counting the failed runs of each Logic App");
         var flows = new List<LogicAppFlow>();
         foreach (var app in logicApps)
         {
@@ -86,6 +94,7 @@ internal sealed partial class AzureEstateConfiguration(
                 FailedRuns: await ReadFailedRunsAsync(id, cancellationToken)));
         }
 
+        progress?.Report("Reading the alert receivers");
         return new EstateConfiguration(EstateName, entities)
         {
             Flows = flows,

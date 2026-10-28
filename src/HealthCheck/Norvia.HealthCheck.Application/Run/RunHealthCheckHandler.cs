@@ -11,7 +11,8 @@ public sealed class RunHealthCheckHandler(IEstateConfiguration estate, Checklist
     {
         ArgumentNullException.ThrowIfNull(query);
 
-        var facts = await estate.ReadAsync(cancellationToken);
+        var facts = await estate.ReadAsync(cancellationToken, query.Progress);
+        query.Progress?.Report($"Running the {checklist.Checks.Count} Checks over what was read");
         return new HealthCheckReport(facts.Name, time.GetUtcNow(), checklist.Checks.Count, checklist.Run(facts));
     }
 }

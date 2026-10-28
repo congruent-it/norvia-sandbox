@@ -6,5 +6,6 @@ namespace Norvia.HealthCheck.Application.Estate;
 /// </summary>
 public interface IEstateConfiguration
 {
-    Task<EstateConfiguration> ReadAsync(CancellationToken cancellationToken);
+    /// <param name="progress">Told, in a sentence, each step of the read as it starts, so a page can show what the wait is for. Optional.</param>
+    Task<EstateConfiguration> ReadAsync(CancellationToken cancellationToken, IProgress<string>? progress = null);
 }

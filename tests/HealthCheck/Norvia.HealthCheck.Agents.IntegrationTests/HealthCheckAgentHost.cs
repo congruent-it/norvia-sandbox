@@ -180,6 +180,6 @@ internal sealed class HealthCheckAgentHost : IAsyncDisposable
 
     private sealed class AdjustedEstate(IEstateConfiguration inner, Func<EstateConfiguration, EstateConfiguration> adjust) : IEstateConfiguration
     {
-        public async Task<EstateConfiguration> ReadAsync(CancellationToken cancellationToken) => adjust(await inner.ReadAsync(cancellationToken));
+        public async Task<EstateConfiguration> ReadAsync(CancellationToken cancellationToken, IProgress<string>? progress = null) => adjust(await inner.ReadAsync(cancellationToken, progress));
     }
 }

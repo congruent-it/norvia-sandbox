@@ -242,6 +242,32 @@ public sealed class AzureEstateConfigurationTests : IDisposable
     }
 
     [Fact]
+    public async Task ReadAsync_ReportsEachStepAsItStarts_InTheOrderItReadsThem()
+    {
+        var steps = new List<string>();
+        _azure.Entities(queues: [], subscriptions: []).Alerts();
+
+        await Adapter().ReadAsync(TestContext.Current.CancellationToken, new Steps(steps));
+
+        steps.Should().Equal(
+            "Reading the alert rules",
+            "Reading the Service Bus queues and subscriptions",
+            "Reading the Logic Apps",
+            "Reading the TMS API's settings",
+            "Reading API Management's policies",
+            "Reading how long Application Insights and its workspace keep what they trace",
+            "Reading the storage accounts' lifecycle rules and malware scanning",
+            "Counting the failed runs of each Logic App",
+            "Reading the alert receivers");
+    }
+
+    // Progress<T> posts to a context of its own; a test wants the steps as they are reported.
+    private sealed class Steps(List<string> steps) : IProgress<string>
+    {
+        public void Report(string value) => steps.Add(value);
+    }
+
+    [Fact]
     public async Task ReadAsync_WhatReaderCannotSee_IsLeftUnknown_NotHealthy()
     {
         var estate = await ReadEmptyEstateAsync();

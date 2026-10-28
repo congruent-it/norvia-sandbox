@@ -27,6 +27,24 @@ public sealed class RunHealthCheckHandlerTests
     }
 
     [Fact]
+    public async Task Handle_PassesTheProgressToTheRead_AndSaysWhenItRunsTheChecks()
+    {
+        var steps = new List<string>();
+        _estate.ReadAsync(Arg.Any<CancellationToken>(), Arg.Any<IProgress<string>?>()).Returns(Estates.Fixed);
+
+        await Handler().Handle(new RunHealthCheckQuery(new Steps(steps)), TestContext.Current.CancellationToken);
+
+        await _estate.Received().ReadAsync(Arg.Any<CancellationToken>(), Arg.Is<IProgress<string>?>(progress => progress is Steps));
+        steps.Should().Equal($"Running the {Checklist.Default.Checks.Count} Checks over what was read");
+    }
+
+    // Progress<T> posts to a context of its own; a test wants the steps as they are reported.
+    private sealed class Steps(List<string> steps) : IProgress<string>
+    {
+        public void Report(string value) => steps.Add(value);
+    }
+
+    [Fact]
     public async Task Handle_OverTheFixedEstate_ReportsNoFinding_ButSaysHowManyChecksRan()
     {
         _estate.ReadAsync(Arg.Any<CancellationToken>()).Returns(Estates.Fixed);

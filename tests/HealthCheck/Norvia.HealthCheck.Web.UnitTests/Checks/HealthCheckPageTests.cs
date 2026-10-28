@@ -60,6 +60,31 @@ public sealed class HealthCheckPageTests : HealthCheckWebContext
     }
 
     [Fact]
+    public void RunHealthCheck_WhileItRuns_ListsTheStepsSoFar_TheLastOneStillWorking()
+    {
+        var running = new TaskCompletionSource<Ardalis.Result.Result<HealthCheckReport>>();
+        Requests.RunAsync(Arg.Any<RunHealthCheckQuery>(), Arg.Any<CancellationToken>()).Returns(call =>
+        {
+            var progress = call.Arg<RunHealthCheckQuery>().Progress!;
+            progress.Report("Reading the alert rules");
+            progress.Report("Reading the Logic Apps");
+            return running.Task;
+        });
+        var page = Render();
+
+        page.Find("fluent-button").Click();
+
+        page.WaitForAssertion(() =>
+        {
+            var steps = page.FindAll("[data-testid=run-step]");
+            steps.Select(step => step.TextContent.Trim()).Should().Equal("✓Reading the alert rules", "Reading the Logic Apps");
+            steps.Select(step => step.GetAttribute("data-done")).Should().Equal("true", "false");
+        });
+        running.SetResult(AsFound);
+        page.WaitForAssertion(() => page.FindAll("[data-testid=run-step]").Should().BeEmpty());
+    }
+
+    [Fact]
     public void RunHealthCheck_ShowsEvidenceAsTextOnly_NeverAsMarkup()
     {
         var page = Render();
