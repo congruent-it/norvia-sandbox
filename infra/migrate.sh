@@ -7,21 +7,27 @@ set -eu
 job=$1
 database=$2
 resource_group=${AZURE_RESOURCE_GROUP:-rg-$AZURE_ENV_NAME}
-execution=$(az containerapp job start --subscription "$AZURE_SUBSCRIPTION_ID" --name "$job" \
-  --resource-group "$resource_group" --query name --output tsv)
-echo "Migrating $database ($execution)..."
 
-# The job itself gives up after its replica timeout (30 minutes).
-while
-  status=$(az containerapp job execution show --subscription "$AZURE_SUBSCRIPTION_ID" --name "$job" \
-    --resource-group "$resource_group" --job-execution-name "$execution" --query properties.status --output tsv)
-  [ "$status" = Running ] || [ "$status" = Processing ]
-do
-  sleep 10
-done
+# A job can fail to start for reasons that pass, such as its managed identity not yet getting a token ("Failed to authenticate the
+# user in Active Directory") or a serverless database still resuming. Migrations apply only what is pending, so a failed
+# execution is started again.
+for attempt in 1 2 3; do
+  execution=$(az containerapp job start --subscription "$AZURE_SUBSCRIPTION_ID" --name "$job" \
+    --resource-group "$resource_group" --query name --output tsv)
+  echo "Migrating $database ($execution, attempt $attempt)..."
 
-if [ "$status" != Succeeded ]; then
+  # The job itself gives up after its replica timeout (30 minutes).
+  while
+    status=$(az containerapp job execution show --subscription "$AZURE_SUBSCRIPTION_ID" --name "$job" \
+      --resource-group "$resource_group" --job-execution-name "$execution" --query properties.status --output tsv)
+    [ "$status" = Running ] || [ "$status" = Processing ]
+  do
+    sleep 10
+  done
+
+  [ "$status" != Succeeded ] || break
   echo "The migrations of $database ended $status. See the $job job's execution $execution in the portal." >&2
-  exit 1
-fi
+  [ "$attempt" -lt 3 ] || exit 1
+  sleep 30
+done
 echo "$database is up to date."

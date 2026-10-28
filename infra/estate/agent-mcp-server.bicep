@@ -53,6 +53,9 @@ resource apiManagement 'Microsoft.ApiManagement/service@2024-05-01' existing = {
   name: apiManagementName
 }
 
+// API Management refuses a write to a service another write has just changed (PreconditionFailed), so the loops below run one
+// iteration at a time.
+
 // The agent view. It is an API on the gateway too, so each operation checks the token itself, and it is in no product.
 resource agentView 'Microsoft.ApiManagement/service/apis@2024-05-01' = {
   parent: apiManagement
@@ -68,6 +71,7 @@ resource agentView 'Microsoft.ApiManagement/service/apis@2024-05-01' = {
   }
 }
 
+@batchSize(1)
 resource viewOperations 'Microsoft.ApiManagement/service/apis/operations@2024-05-01' = [
   for tool in tools: {
     parent: agentView
@@ -77,6 +81,13 @@ resource viewOperations 'Microsoft.ApiManagement/service/apis/operations@2024-05
       description: tool.description
       method: tool.method
       urlTemplate: tool.path
+      // API Management wants every {placeholder} of the URL template declared: "/runs/{a}/{b}" splits on '{' into
+      // "/runs/", "a}/" and "b}", and each part after the first starts with a name that ends at '}'.
+      templateParameters: map(skip(split(tool.path, '{'), 1), part => {
+        name: split(part, '}')[0]
+        required: true
+        type: 'string'
+      })
     }
   }
 ]
@@ -84,6 +95,7 @@ resource viewOperations 'Microsoft.ApiManagement/service/apis/operations@2024-05
 var viewPolicy = loadTextContent('agent-mcp-server/view-operation.policy.xml')
 var mockPolicy = loadTextContent('agent-mcp-server/view-operation-mock.policy.xml')
 
+@batchSize(1)
 resource viewOperationPolicies 'Microsoft.ApiManagement/service/apis/operations/policies@2024-05-01' = [
   for (tool, i) in tools: {
     parent: viewOperations[i]
@@ -124,10 +136,13 @@ resource mcpServer 'Microsoft.ApiManagement/service/apis@2025-09-01-preview' = {
   ]
 }
 
+@batchSize(1)
 resource mcpTools 'Microsoft.ApiManagement/service/apis/tools@2025-09-01-preview' = [
   for (tool, i) in tools: {
     parent: mcpServer
-    name: tool.name
+    // A tool's resource name is unique across the API Management service, while two servers may each have a tool of the same
+    // name (list_failed_runs). The name the Agent sees is the display name.
+    name: '${serverName}-${tool.name}'
     properties: {
       displayName: tool.name
       description: tool.description

@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.."
 
 resource_group=${AZURE_RESOURCE_GROUP:-rg-$AZURE_ENV_NAME}
 logic_app=$(az resource list --subscription "$AZURE_SUBSCRIPTION_ID" --resource-group "$resource_group" --resource-type Microsoft.Web/sites \
-  --tag workload=conversation-sweeper --query '[0].name' --output tsv)
+  --query "[?tags.workload=='conversation-sweeper'].name | [0]" --output tsv)
 [ -n "$logic_app" ] || { echo "No conversation sweeper in $resource_group. Deploy the estate first: azd hooks run preprovision" >&2; exit 1; }
 
 work=$(mktemp -d)

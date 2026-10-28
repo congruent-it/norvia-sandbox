@@ -55,6 +55,52 @@ az keyvault list-deleted --subscription "$AZURE_SUBSCRIPTION_ID" --resource-type
       echo "Could not purge $vault." >&2
   done
 
+# The same goes for API Management services and Foundry (Cognitive Services) accounts: their names (also derived from the
+# resource group) stay taken while they are soft-deleted, which fails the deployment with ServiceAlreadyExistsInSoftDeletedState.
+# Those of this environment's resource group are purged first.
+az apim deletedservice list --subscription "$AZURE_SUBSCRIPTION_ID" \
+  --query "[].[name, location, serviceId]" --output tsv 2>/dev/null |
+  while IFS="$(printf '\t')" read -r apim apim_location apim_id; do
+    case "$apim_id" in
+      "$rg_id"*|"${rg_id%/}"/*) ;;
+      *) continue ;;
+    esac
+    echo "Purging the deleted API Management service $apim..."
+    az apim deletedservice purge --subscription "$AZURE_SUBSCRIPTION_ID" --service-name "$apim" --location "$apim_location" --output none ||
+      echo "Could not purge $apim." >&2
+  done
+
+az cognitiveservices account list-deleted --subscription "$AZURE_SUBSCRIPTION_ID" \
+  --query "[].[name, location, id]" --output tsv 2>/dev/null |
+  while IFS="$(printf '\t')" read -r account account_location account_id; do
+    case "$account_id" in
+      *"/resourceGroups/rg-$AZURE_ENV_NAME/"*|*"/resourcegroups/rg-$AZURE_ENV_NAME/"*) ;;
+      *) continue ;;
+    esac
+    echo "Purging the deleted Foundry account $account..."
+    az cognitiveservices account purge --subscription "$AZURE_SUBSCRIPTION_ID" --resource-group "rg-$AZURE_ENV_NAME" \
+      --name "$account" --location "$account_location" --output none ||
+      echo "Could not purge $account." >&2
+  done
+
+# Aspire's Azure SQL roles are granted by deployment scripts, each of which starts a container group. A script that failed (the region's
+# container group quota, say) stays behind, and the next `azd provision` fails on it with "resource already exists ... pending delete".
+# Its work is only SQL role grants, which run again, so the failed scripts of this resource group are deleted first.
+az rest --method get --output tsv 2>/dev/null \
+  --url "https://management.azure.com${rg_id}providers/Microsoft.Resources/deploymentScripts?api-version=2023-08-01" \
+  --query "value[?properties.provisioningState=='Failed'].id" |
+  while read -r script; do
+    [ -n "$script" ] || continue
+    echo "Deleting the failed deployment script ${script##*/}..."
+    az rest --method delete --url "https://management.azure.com${script}?api-version=2023-08-01" --output none ||
+      echo "Could not delete ${script##*/}." >&2
+    # The delete is asynchronous, and a script still being deleted fails the next deployment the same way, so wait until it is gone.
+    for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+      az rest --method get --url "https://management.azure.com${script}?api-version=2023-08-01" --output none 2>/dev/null || break
+      sleep 10
+    done
+  done
+
 # A new managed identity can take a minute to reach Microsoft Graph, which then refuses to grant it an app role.
 # Deploying again is safe, so a first attempt that fails is retried.
 for attempt in 1 2 3; do

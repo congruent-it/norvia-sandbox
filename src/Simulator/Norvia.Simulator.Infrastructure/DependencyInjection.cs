@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Ardalis.SharedKernel;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -97,10 +98,28 @@ public static class DependencyInjection
     private static bool IsValid(object options) =>
         Validator.TryValidateObject(options, new ValidationContext(options), validationResults: null, validateAllProperties: true);
 
+    /// <summary>
+    /// In Azure the database is serverless and pauses after an hour unused, and the first connection then waits while it
+    /// resumes, which can take a minute. SqlClient gives up after 15 seconds by default, which would show the Simulator's
+    /// page as failed to load.
+    /// </summary>
+    private static string? WaitingForAResume(string? connectionString)
+    {
+        const int resumeSeconds = 90;
+        if (connectionString is null)
+        {
+            return null;
+        }
+
+        var connection = new SqlConnectionStringBuilder(connectionString);
+        connection.ConnectTimeout = Math.Max(connection.ConnectTimeout, resumeSeconds);
+        return connection.ConnectionString;
+    }
+
     private static void AddSimulatorDbContext(this IHostApplicationBuilder builder)
     {
         builder.Services.AddDbContext<SimulatorDbContext>(options =>
-            options.UseSqlServer(builder.Configuration.GetConnectionString(DatabaseConnectionName)));
+            options.UseSqlServer(WaitingForAResume(builder.Configuration.GetConnectionString(DatabaseConnectionName))));
         builder.EnrichSqlServerDbContext<SimulatorDbContext>();
         builder.Services.AddSingleton(TimeProvider.System);
     }

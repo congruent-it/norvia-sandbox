@@ -90,6 +90,8 @@ resource project 'Microsoft.CognitiveServices/accounts/projects@2025-06-01' = {
 
 // The Intake agent's own project, with no Application Insights connection (spike 2 of #497: disconnecting Application Insights is the
 // only documented way to stop server-side tracing recording prompt content). It uses the account's model deployment, as the other project does.
+// A Foundry account takes one write at a time (RequestConflict: "Another operation is in progress"), so the projects and the model
+// deployment, which all write to it, are deployed one after another.
 resource intakeProject 'Microsoft.CognitiveServices/accounts/projects@2025-06-01' = {
   parent: account
   name: intakeProjectName
@@ -102,6 +104,9 @@ resource intakeProject 'Microsoft.CognitiveServices/accounts/projects@2025-06-01
     displayName: 'Norvia Intake agent'
     description: 'The Intake agent (ADR 0040), apart from the other Agents because its prompts are a Shipper\'s booking text: no Application Insights connection, so nothing is traced server-side.'
   }
+  dependsOn: [
+    project
+  ]
 }
 
 // DataZoneStandard: prompts and responses are processed in the EU data zone and nowhere else. GlobalStandard may process anywhere,
@@ -122,6 +127,9 @@ resource model 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = i
     }
     versionUpgradeOption: 'NoAutoUpgrade'
   }
+  dependsOn: [
+    intakeProject
+  ]
 }
 
 // Connecting Application Insights turns on server-side tracing for every agent in the project. The connection is on the norvia project

@@ -23,7 +23,7 @@ fail() { echo "FAIL  $*" >&2; exit 1; }
 
 [ -n "$endpoint" ] || fail "no Foundry project endpoint: has the estate been deployed (azd provision)?"
 logic_app=$(az resource list --subscription "$AZURE_SUBSCRIPTION_ID" --resource-group "$resource_group" --resource-type Microsoft.Web/sites \
-  --tag workload=conversation-sweeper --query '[0].name' --output tsv)
+  --query "[?tags.workload=='conversation-sweeper'].name | [0]" --output tsv)
 [ -n "$logic_app" ] || fail "there is no conversation sweeper in $resource_group"
 state=$(az webapp show --subscription "$AZURE_SUBSCRIPTION_ID" --resource-group "$resource_group" --name "$logic_app" --query state --output tsv)
 [ "$state" = Running ] || fail "the sweeper $logic_app is $state, not Running (the as-found toggle noConversationSweeper is set?)"

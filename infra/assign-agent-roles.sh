@@ -46,7 +46,8 @@ token=$(graph_token)
 graph() {
   local method=$1 path=$2 body=${3:-} out status
   out=$(mktemp)
-  status=$(curl -s -o "$out" -w '%{http_code}' -X "$method" "$graph$path" -H "Authorization: Bearer $token" \
+  # curl refuses a URL with a space in it (an app registration's display name has some), so they are encoded.
+  status=$(curl -s -o "$out" -w '%{http_code}' -X "$method" "$graph${path// /%20}" -H "Authorization: Bearer $token" \
     -H 'Content-Type: application/json' ${body:+-d "$body"})
   if [ "${status:0:1}" != 2 ]; then
     echo "Graph $method $path answered $status: $(jq -r '.error.code + ": " + .error.message' "$out" 2>/dev/null || echo no-detail)" >&2
@@ -90,8 +91,8 @@ done < <(jq -c '.[]' "$published")
 # The project's shared identity holds no role on any agent view: an unpublished Agent can call nothing.
 resource_group=${AZURE_RESOURCE_GROUP:-rg-$AZURE_ENV_NAME}
 account=$(az cognitiveservices account list --resource-group "$resource_group" --query "[?kind=='AIServices'].name | [0]" --output tsv)
-project_identity=$(az resource show --resource-group "$resource_group" --resource-type Microsoft.CognitiveServices/accounts/projects \
-  --name "$account/norvia" --query identity.principalId --output tsv)
+project_identity=$(az resource show --resource-group "$resource_group" --namespace Microsoft.CognitiveServices --resource-type projects \
+  --parent "accounts/$account" --name norvia --query identity.principalId --output tsv)
 if [ -n "$project_identity" ]; then
   held=$(graph GET "/servicePrincipals/$project_identity/appRoleAssignments" | jq '.value | length')
   [ "$held" = 0 ] || fail "the project's shared identity $project_identity holds $held app role(s): it must hold none"

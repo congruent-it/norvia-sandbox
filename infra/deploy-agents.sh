@@ -42,11 +42,17 @@ fi
 
 # foundry METHOD PATH [BODY]: prints the response body; on an error prints the status and Foundry's error code and stops.
 foundry() {
-  local method=$1 path=$2 body=${3:-} out status
+  local method=$1 path=$2 body=${3:-} out status attempt
   out=$(mktemp)
-  status=$(curl -s -o "$out" -w '%{http_code}' --max-time 120 -X "$method" "$endpoint$path" \
-    -H "Authorization: Bearer $(az account get-access-token --resource https://ai.azure.com --query accessToken --output tsv)" \
-    -H 'Content-Type: application/json' ${body:+-d "$body"})
+  # A new project's Agent service can answer 404 ResourceNotFound ("Subdomain does not map to a resource") for a while after the
+  # project is made, and then work. Nothing here asks for something that may be absent, so a 404 is tried again.
+  for attempt in 1 2 3 4 5 6; do
+    status=$(curl -s -o "$out" -w '%{http_code}' --max-time 120 -X "$method" "$endpoint$path" \
+      -H "Authorization: Bearer $(az account get-access-token --resource https://ai.azure.com --query accessToken --output tsv)" \
+      -H 'Content-Type: application/json' ${body:+-d "$body"})
+    [ "$status" = 404 ] && [ "$attempt" -lt 6 ] || break
+    sleep 20
+  done
   if [ "${status:0:1}" != 2 ]; then
     echo "Foundry $method $path answered $status: $(jq -r '.error.code // .error // "no-detail"' "$out" 2>/dev/null)" >&2
     rm -f "$out"
