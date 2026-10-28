@@ -25,7 +25,7 @@ public sealed class InboundLifecycleRuleCheck : Check
         ArgumentNullException.ThrowIfNull(estate);
 
         return estate.Storage.InboundHasLifecycleRule == false
-            ? [new Evidence("inbound Proof of delivery container", "It has no lifecycle rule, so a blob a failed message left behind is never deleted.")]
+            ? [new Evidence(Named("inbound Proof of delivery container", estate.Storage.InboundAccount), "It has no lifecycle rule, so a blob a failed message left behind is never deleted.")]
             : [];
     }
 }

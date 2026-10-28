@@ -94,7 +94,9 @@ internal sealed partial class AzureEstateConfiguration(
                 inbound.HasLifecycleRule,
                 transit.HasLifecycleRule,
                 proofs,
-                inbound.MalwareScanning),
+                inbound.MalwareScanning,
+                inbound.Account,
+                transit.Account),
             InlinedCarrierSecrets = null,
             Retention = retention,
             BusinessSafetyNets = new BusinessSafetyNetFacts(
@@ -226,8 +228,9 @@ internal sealed partial class AzureEstateConfiguration(
         return (
             inbound.Id is null ? default : new Protections(
                 (await ReadRulesAsync(inbound.Id, cancellationToken)).Exists(rule => rule.Deletes),
-                await MalwareScanningAsync(inbound.Id, cancellationToken)),
-            transit.Id is null ? default : new Protections((await ReadRulesAsync(transit.Id, cancellationToken)).Exists(rule => rule.Deletes), null),
+                await MalwareScanningAsync(inbound.Id, cancellationToken),
+                inbound.Name),
+            transit.Id is null ? default : new Protections((await ReadRulesAsync(transit.Id, cancellationToken)).Exists(rule => rule.Deletes), null, transit.Name),
             proofs);
     }
 
@@ -404,7 +407,7 @@ internal sealed partial class AzureEstateConfiguration(
         public bool? Setting(string name) => Env.TryGetValue(name, out var value) && bool.TryParse(value, out var parsed) ? parsed : null;
     }
 
-    private readonly record struct Protections(bool? HasLifecycleRule, bool? MalwareScanning);
+    private readonly record struct Protections(bool? HasLifecycleRule, bool? MalwareScanning, string? Account = null);
 
     private sealed record LifecycleRule(List<string> Prefixes, bool Deletes, bool MovesToCool);
 

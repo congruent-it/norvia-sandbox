@@ -27,4 +27,7 @@ public abstract class Check
 
     /// <summary>The resources that break the rule. Empty when the estate satisfies it.</summary>
     public abstract IReadOnlyList<Evidence> Examine(EstateConfiguration estate);
+
+    /// <summary>A resource's kind followed by its name, where the estate read a real resource, so a Finding says which one.</summary>
+    protected static string Named(string kind, string? name) => string.IsNullOrWhiteSpace(name) ? kind : $"{kind} {name}";
 }

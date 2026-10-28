@@ -25,7 +25,7 @@ public sealed class TransitLifecycleRuleCheck : Check
         ArgumentNullException.ThrowIfNull(estate);
 
         return estate.Storage.TransitHasLifecycleRule == false
-            ? [new Evidence("Driver app transit container", "It has no lifecycle rule, so files that were refused or never fetched stay for good.")]
+            ? [new Evidence(Named("Driver app transit container", estate.Storage.TransitAccount), "It has no lifecycle rule, so files that were refused or never fetched stay for good.")]
             : [];
     }
 }
