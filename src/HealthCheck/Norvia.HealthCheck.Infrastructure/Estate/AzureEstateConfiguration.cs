@@ -105,7 +105,7 @@ internal sealed partial class AzureEstateConfiguration(
             DriverReportsReportBack = null,
             ConversationSweeperRuns = logicApps
                 .Where(app => string.Equals(app["workload"]?.GetValue<string>(), "conversation-sweeper", StringComparison.Ordinal))
-                .Select(app => app["enabled"]?.GetValue<bool>())
+                .Select(app => Flag(app["enabled"]))
                 .FirstOrDefault(),
             Agents = null,
         };
@@ -152,7 +152,7 @@ internal sealed partial class AzureEstateConfiguration(
             cancellationToken);
         return groups.Count == 0
             ? null
-            : groups.Where(row => row["enabled"]?.GetValue<bool>() ?? true).Sum(row => row["receivers"]?.GetValue<int>() ?? 0);
+            : groups.Where(row => Flag(row["enabled"]) ?? true).Sum(row => row["receivers"]?.GetValue<int>() ?? 0);
     }
 
     // What Application Insights keeps against what the workspace, and so the run history, keeps. Null when either is not there.
@@ -378,9 +378,18 @@ internal sealed partial class AzureEstateConfiguration(
                 criteria.Add(entity => includes ? values.Contains(entity) || values.Contains("*") : !values.Contains(entity));
             }
 
-            return new MetricAlert(row["enabled"]?.GetValue<bool>() ?? false, scopes, criteria, watchesFailedRuns);
+            return new MetricAlert(Flag(row["enabled"]) ?? false, scopes, criteria, watchesFailedRuns);
         }
     }
+
+    // Resource Graph answers a tobool(...) column as a number, 1 or 0, and not as a JSON boolean.
+    private static bool? Flag(JsonNode? node) => node?.GetValueKind() switch
+    {
+        JsonValueKind.True => true,
+        JsonValueKind.False => false,
+        JsonValueKind.Number => node.GetValue<double>() != 0,
+        _ => null,
+    };
 
     private sealed record Group(string[] Parts)
     {
