@@ -75,6 +75,25 @@ public sealed class ChecksPerToggleTests
         Toggles.Select(row => row.Data.Item1).Should().BeEquivalentTo(toggleChecks.Select(check => check.AsFoundToggle));
     }
 
+    [Theory]
+    [InlineData("noInboundLifecycleRule", "inbound Proof of delivery container stinboundabc")]
+    [InlineData("noTransitLifecycleRule", "Driver app transit container stdriverabc")]
+    [InlineData("noMalwareScanning", "inbound storage account stinboundabc")]
+    public void AStorageFindingOfARealEstate_NamesTheAccount(string toggle, string subject)
+    {
+        var estate = Healthy with
+        {
+            Storage = new StorageFacts(
+                InboundHasLifecycleRule: toggle != "noInboundLifecycleRule",
+                TransitHasLifecycleRule: toggle != "noTransitLifecycleRule",
+                InboundMalwareScanning: toggle != "noMalwareScanning",
+                InboundAccount: "stinboundabc",
+                TransitAccount: "stdriverabc"),
+        };
+
+        Checklist.Default.Run(estate).Should().ContainSingle().Which.Evidence.Select(evidence => evidence.Subject).Should().Equal(subject);
+    }
+
     [Fact]
     public void AFactTheAdapterCouldNotRead_GivesNoFinding()
     {

@@ -379,7 +379,7 @@ public sealed class AzureEstateConfigurationTests : IDisposable
 
         var estate = await ReadEmptyEstateAsync();
 
-        estate.Storage.Should().Be(new Norvia.HealthCheck.Application.Estate.StorageFacts(true, false, true, true));
+        estate.Storage.Should().Be(new Norvia.HealthCheck.Application.Estate.StorageFacts(true, false, true, true, "stinboundabc", "stdriverabc"));
         Checklist.Default.Run(estate).Should().ContainSingle().Which.CheckId.Should().Be("LIFECYCLE-TRANSIT");
     }
 
@@ -390,8 +390,10 @@ public sealed class AzureEstateConfigurationTests : IDisposable
 
         var estate = await ReadEmptyEstateAsync();
 
-        estate.Storage.Should().Be(new Norvia.HealthCheck.Application.Estate.StorageFacts(false, null, false, false));
+        estate.Storage.Should().Be(new Norvia.HealthCheck.Application.Estate.StorageFacts(false, null, false, false, "stinboundabc", null));
         Checklist.Default.Run(estate).Select(item => item.CheckId).Should().BeEquivalentTo("LIFECYCLE-INBOUND", "PROOF-HOT-TIER", "MALWARE-SCANNING");
+        Checklist.Default.Run(estate).Single(item => item.CheckId == "MALWARE-SCANNING").Evidence.Select(evidence => evidence.Subject)
+            .Should().Equal("inbound storage account stinboundabc");
     }
 
     [Theory]

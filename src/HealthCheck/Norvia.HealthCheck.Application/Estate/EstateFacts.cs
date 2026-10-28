@@ -11,11 +11,15 @@ public sealed record LogicAppFlow(string Name, bool HasFailedRunAlert, bool? Rec
 /// <param name="TransitHasLifecycleRule">The Driver app's transit container does too.</param>
 /// <param name="ProofFilesMoveToCool">The TMS's Proof of delivery files leave the hot tier.</param>
 /// <param name="InboundMalwareScanning">Defender for Storage scans what reaches the inbound container.</param>
+/// <param name="InboundAccount">The inbound storage account's name, where the adapter reads a real estate. A snapshot has none.</param>
+/// <param name="TransitAccount">The Driver app's transit storage account's name, likewise.</param>
 public sealed record StorageFacts(
     bool? InboundHasLifecycleRule = true,
     bool? TransitHasLifecycleRule = true,
     bool? ProofFilesMoveToCool = true,
-    bool? InboundMalwareScanning = true);
+    bool? InboundMalwareScanning = true,
+    string? InboundAccount = null,
+    string? TransitAccount = null);
 
 /// <summary>How long what the estate traces is kept, in days. The index that finds a run should keep what the run history keeps.</summary>
 public sealed record RetentionFacts(int AppInsightsDays = 90, int RunHistoryDays = 90);
