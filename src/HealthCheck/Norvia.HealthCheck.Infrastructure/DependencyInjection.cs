@@ -30,6 +30,7 @@ public static class DependencyInjection
             builder.Services.AddHttpClient(AzureEstateConfiguration.ManagementClient);
             builder.Services.TryAddSingleton(TimeProvider.System);
             builder.Services.AddSingleton<IEstateConfiguration, AzureEstateConfiguration>();
+            builder.Services.AddHostedService<ManagementTokenWarmUp>();
         }
         else
         {

@@ -359,6 +359,29 @@ public sealed class AzureEstateConfigurationTests : IDisposable
     }
 
     [Fact]
+    public async Task ReadAsync_StartsItsResourceGraphQueriesTogether_AndStillReportsTheStepsInOrder()
+    {
+        var steps = new List<string>();
+        _azure.Entities(queues: [], subscriptions: []);
+        _azure.Delay = TimeSpan.FromMilliseconds(100);
+
+        await Adapter().ReadAsync(TestContext.Current.CancellationToken, new Steps(steps));
+
+        _azure.MostGraphAtOnce.Should().BeGreaterThanOrEqualTo(6, "the eight queries do not wait for one another");
+        steps.Take(3).Should().Equal("Reading the alert rules", "Reading the Service Bus queues and subscriptions", "Reading the Logic Apps");
+    }
+
+    [Fact]
+    public async Task ReadAsync_WhenAQueryFails_FailsTheReadOnceTheOthersHaveEnded()
+    {
+        _azure.Refuse();
+
+        var read = () => Adapter().ReadAsync(TestContext.Current.CancellationToken);
+
+        await read.Should().ThrowAsync<Exception>();
+    }
+
+    [Fact]
     public async Task ReadAsync_ForALogicAppWithNoMetric_LeavesItsFailedRunsUnknown_AndGivesNoUntoldFinding()
     {
         _azure.Resources("microsoft.web/sites", Row(("id", $"{AppsBase}/Microsoft.Web/sites/logic-tracking-abc"), ("name", "logic-tracking-abc"), ("enabled", true), ("workload", "")))
@@ -550,6 +573,7 @@ public sealed class AzureEstateConfigurationTests : IDisposable
         private List<JsonObject> _moreAlerts = [];
         private bool _refuse;
         private int _inFlight;
+        private int _graphInFlight;
 
         public List<Recorded> Requests { get; } = [];
 
@@ -558,6 +582,9 @@ public sealed class AzureEstateConfigurationTests : IDisposable
 
         /// <summary>The most Azure Resource Manager requests that were waiting for an answer at one time.</summary>
         public int MostAtOnce { get; private set; }
+
+        /// <summary>The most Resource Graph queries that were waiting for an answer at one time.</summary>
+        public int MostGraphAtOnce { get; private set; }
 
         public Azure Entities(string[] queues, (string Topic, string Name)[] subscriptions, string? queuesNextLink = null, string[]? moreQueues = null, Dictionary<string, int>? deadLettered = null)
         {
@@ -637,6 +664,21 @@ public sealed class AzureEstateConfigurationTests : IDisposable
 
             if (request.RequestUri.AbsoluteUri.Contains("ResourceGraph", StringComparison.Ordinal))
             {
+                var querying = Interlocked.Increment(ref _graphInFlight);
+                lock (Requests)
+                {
+                    MostGraphAtOnce = Math.Max(MostGraphAtOnce, querying);
+                }
+
+                try
+                {
+                    await Task.Delay(Delay, cancellationToken);
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref _graphInFlight);
+                }
+
                 var query = JsonNode.Parse(body)!["query"]!.GetValue<string>();
                 if (!query.Contains("microsoft.insights/metricalerts", StringComparison.Ordinal))
                 {
