@@ -88,6 +88,8 @@ Locally nothing reads a running estate: there are no alerts to look at under Asp
 
 The same app, `health-check-web`, deployed as a Container App by the AppHost (`azd up`). Its Azure parts are the estate's and the app's, as for the Integration console:
 
+To deploy only the app, skip azd's postdeploy hook (the database migrations, the Logic Apps, the sign-in callbacks and the Agents, none of which a change to this app touches): `SKIP_POSTDEPLOY=true azd deploy health-check-web`. The agent's definition is published by that hook, so after a change to `agents/estate-health-check.agent.yaml` run `./infra/deploy-agents.sh estate-health-check` as well.
+
 | Part | Is |
 |---|---|
 | The app's identity | A user-assigned managed identity, `id-health-check-<token>`, made by [health-check.bicep](../../infra/estate/health-check.bicep). It holds **Reader on the estate's resource group** and no other Azure role, and **Foundry User** on the `norvia` project to ask its Agent. The privileged role belongs to the app, never to the Agent (#371, question 1) |

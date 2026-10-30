@@ -20,9 +20,12 @@ hooks:
     interactive: true
   # Then the databases' migrations, the Logic Apps, which need the address of the TMS just deployed, and the
   # demo UIs', the Integration console's, the Simulator's and the ERP's sign-in, which need theirs.
+  # SKIP_POSTDEPLOY=true skips all of it, for a deployment of one app that changes none of that:
+  #   SKIP_POSTDEPLOY=true azd deploy health-check-web
   postdeploy:
     shell: sh
     run: >-
+      if [ "${SKIP_POSTDEPLOY:-}" = true ]; then echo "SKIP_POSTDEPLOY is true: the migrations, the Logic Apps, the sign-in callbacks and the Agents are not deployed."; exit 0; fi;
       ./infra/migrate.sh tms-migrations "the TMS database" &&
       ./infra/migrate.sh partner-portal-migrations "the Partner portal's database" &&
       ./infra/migrate.sh driver-app-migrations "the Driver app's database" &&
