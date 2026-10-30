@@ -24,6 +24,7 @@ builder.Services.AddMediator(options =>
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton(Checklist.Default);
 builder.Services.AddSingleton<RecentReport>();
+builder.Services.AddSingleton(new ConsoleLinks(builder.Configuration.GetValue<Uri>("IntegrationConsole:Address")));
 builder.Services.AddSingleton<IHealthCheckRequests, HealthCheckRequests>();
 
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();

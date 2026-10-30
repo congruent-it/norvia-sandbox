@@ -205,6 +205,7 @@ simulator.WithEnvironment("PartnerPortal__BaseAddress", partnerPortal.GetEndpoin
 // The Estate health check, for the Integration operator. It has no database. Locally it reads a snapshot, and in Azure the estate (#392).
 var healthCheck = builder.AddProject<Projects.Norvia_HealthCheck_Web>("health-check-web")
     .WithHttpHealthCheck("/health")
+    .WithEnvironment("IntegrationConsole__Address", integrationConsole.GetEndpoint("http"))
     .WithUrlForEndpoint("http", url => url.DisplayText = "Estate health check");
 
 if (builder.ExecutionContext.IsPublishMode)

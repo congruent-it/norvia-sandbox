@@ -17,6 +17,9 @@ namespace Norvia.IntegrationConsole.Infrastructure.Trails;
 /// and application, and whether it ran in process: a span an application or a framework started, such as the Partner
 /// portal's for sending a booking, which records written outside any call belong to.</item>
 /// </list>
+/// A call an Agent made through an MCP server is on the trail of the run it records as <c>runId</c>, not of the correlation ID
+/// API Management made for the call; its requests, which record only that one, are those of the same operation (the W3C trace the
+/// run started) that call an agent endpoint.
 /// Only keys are read, never a column that could hold a body, and of a request's URL only its path, never its query.
 /// The time range is the query's own, set on the request.
 /// </summary>
@@ -26,9 +29,14 @@ internal static class HopQuery
         LogsQueryClient.CreateQuery($"let searched = {correlationId};") + "\n" + Body;
 
     private static readonly string Body = $$"""
+        // The operations of the Agent calls that name the searched ID as their run.
+        let agentRunOperations = toscalar(AppTraces
+            | where Properties has searched
+            | where tostring(Properties.runId) =~ searched
+            | summarize make_set(OperationId));
         // The term index narrows each table to the rows mentioning the correlation ID before any JSON is parsed.
         let requests = AppRequests
-            | where Properties has searched
+            | where Properties has searched or (OperationId in (agentRunOperations) and Name contains "/agent")
             | project TimeGenerated, source = "request", Id, ParentId, OperationId, Name, path = tostring(parse_url(Url).Path), DurationMs, AppRoleName, Properties;
         // An application's own records, not those a framework wrote in its logging scope.
         let traces = AppTraces
@@ -39,8 +47,9 @@ internal static class HopQuery
             | project TimeGenerated, source = "record", Id = "", ParentId, OperationId, Name = "", path = "", DurationMs = real(null), AppRoleName, Properties;
         let tracked = union requests, traces
             | extend tracked = parse_json(tostring(Properties.trackedProperties))
-            | extend correlationId = coalesce(tostring(Properties.correlationId), tostring(tracked.correlationId),
-                    tostring(Properties["Response-X-Correlation-ID"]), tostring(Properties["Request-X-Correlation-ID"])),
+            | extend correlationId = iff(source == "request" and OperationId in (agentRunOperations) and Name contains "/agent", searched,
+                    coalesce(tostring(Properties.runId), tostring(Properties.correlationId), tostring(tracked.correlationId),
+                        tostring(Properties["Response-X-Correlation-ID"]), tostring(Properties["Request-X-Correlation-ID"]))),
                 runId = tostring(parse_json(tostring(Properties.resource)).runId)
             | where correlationId =~ searched;
         let runIds = toscalar(tracked | where isnotempty(runId) | summarize make_set(runId));

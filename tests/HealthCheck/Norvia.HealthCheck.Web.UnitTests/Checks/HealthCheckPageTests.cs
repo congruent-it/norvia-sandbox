@@ -147,6 +147,57 @@ public sealed class HealthCheckPageTests : HealthCheckWebContext
     }
 
     [Fact]
+    public void RunHealthCheck_WithTheAgentsOn_ShowsTheRunId_AndLinksToItsMessageTrailInTheConsole()
+    {
+        TurnAgentsOn();
+        KnowTheConsoleAt("https://console.test/");
+        var page = Render();
+
+        page.Find("fluent-button").Click();
+
+        var id = Requests.ReceivedCalls().Select(call => call.GetArguments()[0]).OfType<NarrateHealthCheckQuery>().Single().CorrelationId;
+        page.Find("[data-testid=run-id] code").TextContent.Should().Be(id);
+        page.Find("[data-testid=message-trail]").GetAttribute("href").Should().Be($"https://console.test/?key={id}&within=all");
+    }
+
+    [Fact]
+    public void RunHealthCheck_WithTheAgentsOn_AndTheConsoleUnknown_ShowsTheRunId_WithoutALink()
+    {
+        TurnAgentsOn();
+        var page = Render();
+
+        page.Find("fluent-button").Click();
+
+        page.Find("[data-testid=run-id] code").TextContent.Should().HaveLength(32);
+        page.FindAll("[data-testid=message-trail]").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void RunHealthCheck_WithAnAssistantThatFails_StillShowsTheRunId_ForItsCallsAreOnItsTrail()
+    {
+        TurnAgentsOn();
+        KnowTheConsoleAt("https://console.test");
+        Requests.NarrateAsync(Arg.Any<NarrateHealthCheckQuery>(), Arg.Any<CancellationToken>()).Returns(Result<Narration>.Unavailable(AgentFailureCodes.AgentToolRefused));
+        var page = Render();
+
+        page.Find("fluent-button").Click();
+
+        page.Find("[role=alert]").TextContent.Should().Contain("Assistant unavailable");
+        page.Find("[data-testid=message-trail]").GetAttribute("href").Should().StartWith("https://console.test/?key=");
+    }
+
+    [Fact]
+    public void RunHealthCheck_WithTheAgentsOff_ShowsNoRunId()
+    {
+        KnowTheConsoleAt("https://console.test");
+        var page = Render();
+
+        page.Find("fluent-button").Click();
+
+        page.FindAll("[data-testid=run-id]").Should().BeEmpty();
+    }
+
+    [Fact]
     public void RunHealthCheck_WithAnAssistantThatFails_SaysUnavailable_AndTheFindingsStay()
     {
         TurnAgentsOn();
