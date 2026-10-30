@@ -19,7 +19,7 @@
     <PackageVersion Include="Aspire.Hosting.Testing" Version="13.6.1" />
     <PackageVersion Include="CommunityToolkit.Aspire.Hosting.SqlServer.Extensions" Version="13.6.0" />
     <PackageVersion Include="Aspire.Azure.Messaging.ServiceBus" Version="13.6.1" />
-    <PackageVersion Include="Aspire.Azure.Storage.Blobs" Version="13.6.3" />
+    <PackageVersion Include="Aspire.Azure.Storage.Blobs" Version="13.6.4" />
     <PackageVersion Include="Aspire.Microsoft.EntityFrameworkCore.SqlServer" Version="13.6.1" />
   </ItemGroup>
   <ItemGroup Label="Service defaults">
