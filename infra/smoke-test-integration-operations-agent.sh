@@ -107,7 +107,7 @@ echo "      Cause: $cause"
 
 # 3. The hops: API Management's MCP server and the console, with the Agent's identity and the tool name. Ingestion takes minutes: ask again for up to 10.
 hops() {
-  logs "AppTraces | where TimeGenerated > ago(1h) | where tostring(Properties.correlationId) == '$trail' | where tostring(Properties.flow) == '$1' | where tostring(Properties.agentId) == '$identity_client' and tostring(Properties.toolName) == 'get_message_trail' | count"
+  logs "AppTraces | where TimeGenerated > ago(1h) | where tostring(Properties.runId) == '$trail' | where tostring(Properties.flow) == '$1' | where tostring(Properties.agentId) == '$identity_client' and tostring(Properties.toolName) == 'get_message_trail' | count"
 }
 for flow in agent-mcp-integration-operations agent-view-integration-operations; do
   count=0

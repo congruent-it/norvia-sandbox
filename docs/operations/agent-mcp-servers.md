@@ -25,14 +25,14 @@ How an application's agent view is put behind an API Management MCP server for t
 
 In this order, each refusal a trace on the Message trail (flow `agent-mcp-<server>`) and a JSON body with the correlation ID:
 
-1. **Correlation ID.** API Management makes a new one for every call and ignores any the caller sends. It is returned as `X-Correlation-ID`, also on a refusal.
+1. **Correlation ID.** API Management makes a new one for every call and ignores any the caller sends, so an Agent cannot write into another trail. It is returned as `X-Correlation-ID`, also on a refusal. What the caller sent is kept as the `runId` (step 6), which is how an Agent run's calls are found.
 2. **Token.** `validate-azure-ad-token` for the audience. A missing token, another audience or an expired token is 401.
 3. **Read role.** The `roles` claim must hold the role, else 403, failure code `AgentRoleMissing`. A token without `azp` is 403, `NoAgentIdentity`.
 4. **Rate limit.** `rate-limit-by-key` on the token's `azp`, so each Agent identity has its own budget. Over it is 429.
 5. **Tool list.** A `tools/call` whose tool is not in the list is 403, `ToolNotOnList`. The name is read from the MCP message, never from a header. The tool resources are the other half: the server serves no tool that is not in the list.
-6. **Headers.** `X-Correlation-ID`, `X-Agent-ID` (the `azp`) and `X-Tool-Name` are set on the call to the agent view, overriding the caller's. The service diagnostics log them as headers on the backend request, as they log `X-Shipper-ID` for the Partner API, and the traces carry `agentId` and `toolName` ([tracking contract](../coding-guidelines.md#tracking-contract)).
+6. **Headers.** `X-Correlation-ID`, `X-Agent-ID` (the `azp`) and, on a `tools/call`, `X-Tool-Name` are set on the call to the agent view, overriding the caller's. `X-Run-ID` is the caller's own `X-Correlation-ID` when that is a plain identifier (it is the run the Agent was started for), and is left out when it is not. The service diagnostics log them as headers on the backend request, as they log `X-Shipper-ID` for the Partner API, and the traces carry `agentId`, `runId` and, on a `tools/call`, `toolName` ([tracking contract](../coding-guidelines.md#tracking-contract)).
 
-The policy never reads a response body: MCP responses stream, and payload logging is off.
+The policy never reads a response body: MCP responses stream, and payload logging is off. A client closing its event stream (`ClientConnectionFailure`) is not a failed hop and is not recorded.
 
 ## Payload logging stays off
 

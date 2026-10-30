@@ -68,6 +68,12 @@
       if ((string)context.Variables[&quot;mcpMethod&quot;] != &quot;tools/call&quot;) { return &quot;none&quot;; }
       return (string)context.Request.Body.As&lt;JObject&gt;(preserveContent: true)[&quot;params&quot;]?[&quot;name&quot;] ?? &quot;none&quot;;
     }" />
+    <!-- The run the caller says it is on (the Agent's structured input, which Foundry sends as X-Correlation-ID). It is not the trail's correlation ID, which this
+         policy makes itself, so an Agent cannot write into another trail; it is recorded as the runId, when it is a plain identifier, and "none" when it is not. -->
+    <set-variable name="runId" value="@{
+      var sent = context.Request.Headers.GetValueOrDefault(&quot;X-Correlation-ID&quot;, &quot;&quot;);
+      return System.Text.RegularExpressions.Regex.IsMatch(sent, &quot;^[A-Za-z0-9._-]{1,100}$&quot;) ? sent : &quot;none&quot;;
+    }" />
     <choose>
       <when condition="@((string)context.Variables[&quot;mcpMethod&quot;] == &quot;tools/call&quot; &amp;&amp; !&quot;__TOOLS__&quot;.Split('|').Contains((string)context.Variables[&quot;toolName&quot;]))">
         <trace source="norvia-agent-mcp" severity="information">
@@ -110,14 +116,57 @@
       </when>
     </choose>
     <set-header name="Ocp-Apim-Subscription-Key" exists-action="delete" />
-    <trace source="norvia-agent-mcp" severity="information">
-      <message>Accepted the agent's call.</message>
-      <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
-      <metadata name="flow" value="agent-mcp-__SERVER__" />
-      <metadata name="agentId" value="@((string)context.Variables[&quot;agentId&quot;])" />
-      <metadata name="toolName" value="@((string)context.Variables[&quot;toolName&quot;])" />
-      <metadata name="outcome" value="Succeeded" />
-    </trace>
+    <set-header name="X-Run-ID" exists-action="delete" />
+    <choose>
+      <when condition="@((string)context.Variables[&quot;runId&quot;] != &quot;none&quot;)">
+        <set-header name="X-Run-ID" exists-action="override">
+          <value>@((string)context.Variables["runId"])</value>
+        </set-header>
+      </when>
+    </choose>
+    <!-- A key that does not apply is left out, never sent with a stand-in value (tracking contract): the tool name is there only on a tools/call, the runId only when the caller sent one. -->
+    <choose>
+      <when condition="@((string)context.Variables[&quot;toolName&quot;] != &quot;none&quot; &amp;&amp; (string)context.Variables[&quot;runId&quot;] != &quot;none&quot;)">
+        <trace source="norvia-agent-mcp" severity="information">
+          <message>Accepted the agent's call.</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="agent-mcp-__SERVER__" />
+          <metadata name="agentId" value="@((string)context.Variables[&quot;agentId&quot;])" />
+          <metadata name="toolName" value="@((string)context.Variables[&quot;toolName&quot;])" />
+          <metadata name="runId" value="@((string)context.Variables[&quot;runId&quot;])" />
+          <metadata name="outcome" value="Succeeded" />
+        </trace>
+      </when>
+      <when condition="@((string)context.Variables[&quot;toolName&quot;] != &quot;none&quot;)">
+        <trace source="norvia-agent-mcp" severity="information">
+          <message>Accepted the agent's call.</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="agent-mcp-__SERVER__" />
+          <metadata name="agentId" value="@((string)context.Variables[&quot;agentId&quot;])" />
+          <metadata name="toolName" value="@((string)context.Variables[&quot;toolName&quot;])" />
+          <metadata name="outcome" value="Succeeded" />
+        </trace>
+      </when>
+      <when condition="@((string)context.Variables[&quot;runId&quot;] != &quot;none&quot;)">
+        <trace source="norvia-agent-mcp" severity="information">
+          <message>Accepted the agent's call.</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="agent-mcp-__SERVER__" />
+          <metadata name="agentId" value="@((string)context.Variables[&quot;agentId&quot;])" />
+          <metadata name="runId" value="@((string)context.Variables[&quot;runId&quot;])" />
+          <metadata name="outcome" value="Succeeded" />
+        </trace>
+      </when>
+      <otherwise>
+        <trace source="norvia-agent-mcp" severity="information">
+          <message>Accepted the agent's call.</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="agent-mcp-__SERVER__" />
+          <metadata name="agentId" value="@((string)context.Variables[&quot;agentId&quot;])" />
+          <metadata name="outcome" value="Succeeded" />
+        </trace>
+      </otherwise>
+    </choose>
   </inbound>
   <backend>
     <base />
@@ -132,13 +181,18 @@
     <base />
     <!-- The token is validated in the inbound section, so a bad one ends here. -->
     <set-variable name="correlationId" value="@(context.Variables.ContainsKey(&quot;correlationId&quot;) ? (string)context.Variables[&quot;correlationId&quot;] : Guid.NewGuid().ToString())" />
-    <trace source="norvia-agent-mcp" severity="information">
-      <message>@(context.LastError.Message)</message>
-      <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
-      <metadata name="flow" value="agent-mcp-__SERVER__" />
-      <metadata name="outcome" value="@(context.Response.StatusCode == 401 || context.Response.StatusCode == 403 || context.Response.StatusCode == 429 ? &quot;Refused&quot; : &quot;Failed&quot;)" />
-      <metadata name="failureCode" value="@(string.IsNullOrEmpty(context.LastError.Reason) ? context.LastError.Source : context.LastError.Reason)" />
-    </trace>
+    <!-- An MCP client closes its event stream when it is done with it (ClientConnectionFailure): nothing failed, so there is no hop to record. -->
+    <choose>
+      <when condition="@(context.LastError.Reason != &quot;ClientConnectionFailure&quot;)">
+        <trace source="norvia-agent-mcp" severity="information">
+          <message>@(context.LastError.Message)</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="agent-mcp-__SERVER__" />
+          <metadata name="outcome" value="@(context.Response.StatusCode == 401 || context.Response.StatusCode == 403 || context.Response.StatusCode == 429 ? &quot;Refused&quot; : &quot;Failed&quot;)" />
+          <metadata name="failureCode" value="@(string.IsNullOrEmpty(context.LastError.Reason) ? context.LastError.Source : context.LastError.Reason)" />
+        </trace>
+      </when>
+    </choose>
     <set-header name="X-Correlation-ID" exists-action="override">
       <value>@((string)context.Variables["correlationId"])</value>
     </set-header>

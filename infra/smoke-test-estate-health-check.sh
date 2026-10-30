@@ -134,7 +134,7 @@ as_found_response=$(jq -r .id <<<"$response")
 
 # 4 (first part). The hops: API Management's MCP server and the app, with the Agent's identity and the tool name.
 hops() {
-  logs "AppTraces | where TimeGenerated > ago(1h) | where tostring(Properties.correlationId) == '$correlation' | where tostring(Properties.flow) == '$1' | where tostring(Properties.agentId) == '$identity_client' and tostring(Properties.toolName) == 'run_checks' | count"
+  logs "AppTraces | where TimeGenerated > ago(1h) | where tostring(Properties.runId) == '$correlation' | where tostring(Properties.flow) == '$1' | where tostring(Properties.agentId) == '$identity_client' and tostring(Properties.toolName) == 'run_checks' | count"
 }
 hops_pending=(agent-mcp-health-check agent-view-health-check)
 

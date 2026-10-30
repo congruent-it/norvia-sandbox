@@ -367,6 +367,27 @@ public sealed class AgentApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Get_ThroughTheGateway_IsAHopTaggedWithTheRunTheGatewayNames_ButNotFromADirectCaller()
+    {
+        await using var behindApim = await AgentApiHost.StartAsync(gatewayClientId: "apim-identity");
+        behindApim.Mediator.Send(Arg.Any<OpenTrailQuery>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(Result.Success(Trail)));
+
+        using var viaGateway = await behindApim.Client.SendAsync(
+            AgentApiHost.Get("/agent/v1/trails/c-1", behindApim.Token(azp: "apim-identity"), ("X-Correlation-ID", "call-1"), ("X-Agent-ID", "foundry-agent-identity"), ("X-Run-ID", "run-77")),
+            TestContext.Current.CancellationToken);
+        using var direct = await behindApim.Client.SendAsync(
+            AgentApiHost.Get("/agent/v1/trails/c-1", behindApim.Token(azp: "some-agent"), ("X-Correlation-ID", "call-2"), ("X-Run-ID", "forged")),
+            TestContext.Current.CancellationToken);
+
+        var scopes = behindApim.Logs.GetSnapshot()
+            .Select(log => log.Scopes.OfType<IEnumerable<KeyValuePair<string, object?>>>().SelectMany(scope => scope).ToDictionary())
+            .Where(scope => scope.ContainsKey("outcome"))
+            .ToList();
+        scopes.Single(scope => (string?)scope["correlationId"] == "call-1")["runId"].Should().Be("run-77");
+        scopes.Single(scope => (string?)scope["correlationId"] == "call-2").Should().NotContainKey("runId");
+    }
+
+    [Fact]
     public async Task Get_ByAnyoneButTheGateway_IsTaggedWithTheTokensAgent_NotTheHeader()
     {
         await using var behindApim = await AgentApiHost.StartAsync(gatewayClientId: "apim-identity");
