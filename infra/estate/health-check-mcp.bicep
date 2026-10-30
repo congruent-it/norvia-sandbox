@@ -121,7 +121,8 @@ module server 'agent-mcp-server.bicep' = {
     tools: contract.tools
     audience: view.appId
     requiredRole: role
-    rateLimitCalls: 10
+    // Every MCP message counts, not only tool calls: one Foundry run sends initialize, initialized, a GET and tools/list before its first tool call.
+    rateLimitCalls: 60
     backendId: healthCheckBackend.name
     backendAudience: healthCheckAgentApi.appId
     apiManagementIdentityClientId: apiManagementClientId

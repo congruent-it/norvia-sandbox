@@ -17,9 +17,9 @@ public sealed class AgentClientOptions
     /// <summary>The MCP stand-in's endpoint for the health-check server, <c>/mcp/health-check</c>.</summary>
     public Uri? McpAddress { get; set; }
 
-    /// <summary>A short timeout and no retry: an Agent is never on a critical path (ADR 0040).</summary>
+    /// <summary>A short timeout and no retry: an Agent is never on a critical path (ADR 0040). It covers the Agent's own run of the Checks, which reads the estate from Azure in about 10 s.</summary>
     [Range(1, 300)]
-    public int TimeoutSeconds { get; set; } = 20;
+    public int TimeoutSeconds { get; set; } = 60;
 
     public AgentTokenOptions Tokens { get; set; } = new();
 

@@ -117,6 +117,27 @@ public sealed class AgentMcpServerTests
     }
 
     [Fact]
+    public void TheVariablesAndHeaders_NeverHoldAnEmptyValue_BecauseTheGatewayAnswers500ToOne()
+    {
+        var variables = Inbound().Elements("set-variable").Where(variable => variable.Attribute("name")!.Value is "mcpMethod" or "toolName");
+
+        variables.Should().HaveCount(2).And.OnlyContain(variable => !variable.Attribute("value")!.Value.Contains("&quot;&quot;") && !variable.Attribute("value")!.Value.Contains("\"\""));
+    }
+
+    [Fact]
+    public void TheToolNameHeader_IsDroppedFromTheCaller_AndSetOnlyWhenAToolIsNamed_BecauseAnEmptyValueMakesTheGatewayAnswer500()
+    {
+        var inbound = Inbound();
+
+        inbound.Elements("set-header").Single(header => header.Attribute("name")!.Value == "X-Tool-Name").Attribute("exists-action")!.Value.Should().Be("delete");
+        var named = inbound.Elements("choose").Single(choose => choose.Descendants("set-header").Any(header => header.Attribute("name")!.Value == "X-Tool-Name")).Element("when")!;
+        named.Attribute("condition")!.Value.Should().Contain("toolName").And.Contain("\"none\"");
+        var header = named.Element("set-header")!;
+        header.Attribute("exists-action")!.Value.Should().Be("override");
+        header.Element("value")!.Value.Should().Contain("toolName");
+    }
+
+    [Fact]
     public void TheToolName_ComesFromTheMcpMessage_NotFromAHeaderTheCallerSets()
     {
         var toolName = Inbound().Elements("set-variable").Single(variable => variable.Attribute("name")!.Value == "toolName").Attribute("value")!.Value;
@@ -131,8 +152,7 @@ public sealed class AgentMcpServerTests
 
         Header(inbound, "X-Correlation-ID").Should().Contain("correlationId");
         Header(inbound, "X-Agent-ID").Should().Contain("agentId");
-        Header(inbound, "X-Tool-Name").Should().Contain("toolName");
-        inbound.Elements("set-header").Where(header => header.Attribute("name")!.Value is "X-Correlation-ID" or "X-Agent-ID" or "X-Tool-Name")
+        inbound.Elements("set-header").Where(header => header.Attribute("name")!.Value is "X-Correlation-ID" or "X-Agent-ID")
             .Should().OnlyContain(header => header.Attribute("exists-action")!.Value == "override");
         inbound.Elements("set-header").Single(header => header.Attribute("name")!.Value == "Ocp-Apim-Subscription-Key").Attribute("exists-action")!.Value.Should().Be("delete");
         Policy().Element("outbound")!.Elements("set-header").Single(header => header.Attribute("name")!.Value == "X-Correlation-ID").Element("value")!.Value.Should().Contain("correlationId");
@@ -198,7 +218,7 @@ public sealed class AgentMcpServerTests
         policy.Element("inbound")!.Element("authentication-managed-identity")!.Attribute("resource")!.Value.Should().Be("api-audience");
         policy.Element("inbound")!.Element("authentication-managed-identity")!.Attribute("client-id")!.Value.Should().Be("identity-client");
         policy.Element("inbound")!.Element("validate-azure-ad-token")!.Element("required-claims")!.Element("claim")!.Element("value")!.Value.Should().Be(Role);
-        int.Parse(policy.Element("backend")!.Element("forward-request")!.Attribute("timeout")!.Value, System.Globalization.CultureInfo.InvariantCulture).Should().BeInRange(1, 10);
+        int.Parse(policy.Element("backend")!.Element("forward-request")!.Attribute("timeout")!.Value, System.Globalization.CultureInfo.InvariantCulture).Should().BeInRange(1, 30);
         policy.Descendants("retry").Should().BeEmpty();
     }
 
