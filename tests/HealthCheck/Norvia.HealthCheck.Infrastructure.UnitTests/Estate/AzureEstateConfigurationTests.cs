@@ -340,6 +340,25 @@ public sealed class AzureEstateConfigurationTests : IDisposable
     }
 
     [Fact]
+    public async Task ReadAsync_ReadsTheFailedRunsOfManyLogicAppsTogether_ButNotMoreThanEightAtOnce_AndKeepsTheirOrder()
+    {
+        var apps = Enumerable.Range(1, 20).Select(number => (Id: $"{AppsBase}/Microsoft.Web/sites/logic-{number:00}-abc", Name: $"logic-{number:00}-abc")).ToList();
+        _azure.Resources("microsoft.web/sites", [.. apps.Select(app => Row(("id", app.Id), ("name", app.Name), ("enabled", true), ("workload", "")))])
+            .Entities(queues: [], subscriptions: []);
+        foreach (var (app, number) in apps.Select((app, index) => (app, index + 1)))
+        {
+            _azure.Raw($"{app.Id}/providers/microsoft.insights/metrics", Metric(number));
+        }
+
+        _azure.Delay = TimeSpan.FromMilliseconds(40);
+
+        var estate = await Adapter().ReadAsync(TestContext.Current.CancellationToken);
+
+        estate.Flows.Select(flow => (flow.Name, flow.FailedRuns)).Should().Equal(apps.Select((app, index) => (app.Name, (int?)(index + 1))));
+        _azure.MostAtOnce.Should().BeInRange(2, 8);
+    }
+
+    [Fact]
     public async Task ReadAsync_ForALogicAppWithNoMetric_LeavesItsFailedRunsUnknown_AndGivesNoUntoldFinding()
     {
         _azure.Resources("microsoft.web/sites", Row(("id", $"{AppsBase}/Microsoft.Web/sites/logic-tracking-abc"), ("name", "logic-tracking-abc"), ("enabled", true), ("workload", "")))
@@ -530,8 +549,15 @@ public sealed class AzureEstateConfigurationTests : IDisposable
         private string? _skipToken;
         private List<JsonObject> _moreAlerts = [];
         private bool _refuse;
+        private int _inFlight;
 
         public List<Recorded> Requests { get; } = [];
+
+        /// <summary>How long each Azure Resource Manager answer takes, so reads that run together can be told from reads that run in turn.</summary>
+        public TimeSpan Delay { get; set; }
+
+        /// <summary>The most Azure Resource Manager requests that were waiting for an answer at one time.</summary>
+        public int MostAtOnce { get; private set; }
 
         public Azure Entities(string[] queues, (string Topic, string Name)[] subscriptions, string? queuesNextLink = null, string[]? moreQueues = null, Dictionary<string, int>? deadLettered = null)
         {
@@ -599,7 +625,11 @@ public sealed class AzureEstateConfigurationTests : IDisposable
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var body = request.Content is null ? string.Empty : await request.Content.ReadAsStringAsync(cancellationToken);
-            Requests.Add(new Recorded(request.Method, request.RequestUri!.AbsoluteUri, request.Headers.Authorization?.ToString(), body));
+            lock (Requests)
+            {
+                Requests.Add(new Recorded(request.Method, request.RequestUri!.AbsoluteUri, request.Headers.Authorization?.ToString(), body));
+            }
+
             if (_refuse)
             {
                 return new HttpResponseMessage(HttpStatusCode.Forbidden);
@@ -626,6 +656,21 @@ public sealed class AzureEstateConfigurationTests : IDisposable
             }
 
             var address = request.RequestUri.AbsoluteUri;
+            var waiting = Interlocked.Increment(ref _inFlight);
+            lock (Requests)
+            {
+                MostAtOnce = Math.Max(MostAtOnce, waiting);
+            }
+
+            try
+            {
+                await Task.Delay(Delay, cancellationToken);
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _inFlight);
+            }
+
             var answer = _answers.LastOrDefault(candidate => address.Contains(candidate.Contains, StringComparison.Ordinal));
             return answer.Content is null ? new HttpResponseMessage(HttpStatusCode.NotFound) : Json(answer.Content);
         }

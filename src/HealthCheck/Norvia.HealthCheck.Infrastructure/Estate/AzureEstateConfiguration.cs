@@ -53,6 +53,9 @@ internal sealed partial class AzureEstateConfiguration(
     private const string PartnerApi = "norvia-partner-api";
     private static readonly string[] ShipperTrackingOperations = ["list-shipper-transport-orders", "find-shipper-transport-order", "get-shipper-transport-order"];
     private const string EntityDimension = "EntityName";
+
+    // The reads inside one step do not depend on each other, so they run together, this many at a time (Azure Resource Manager throttles per subscription).
+    private const int Concurrency = 8;
     private static readonly string[] ManagementScopes = [$"{Management}/.default"];
 
     public async Task<EstateConfiguration> ReadAsync(CancellationToken cancellationToken, IProgress<string>? progress = null)
@@ -83,16 +86,15 @@ internal sealed partial class AzureEstateConfiguration(
         var (inbound, transit, proofs) = await ReadStorageAsync(group, cancellationToken);
 
         progress?.Report("Counting the failed runs of each Logic App");
-        var flows = new List<LogicAppFlow>();
-        foreach (var app in logicApps)
+        var flows = await ReadAllAsync(logicApps, async app =>
         {
             var id = app["id"]?.GetValue<string>() ?? string.Empty;
-            flows.Add(new LogicAppFlow(
+            return new LogicAppFlow(
                 app["name"]?.GetValue<string>() ?? string.Empty,
                 alerts.Exists(alert => alert.Enabled && alert.WatchesFailedRuns && alert.Scopes.Contains(id, StringComparer.OrdinalIgnoreCase)),
                 RecordsTrackedProperties: null,
-                FailedRuns: await ReadFailedRunsAsync(id, cancellationToken)));
-        }
+                FailedRuns: await ReadFailedRunsAsync(id, cancellationToken));
+        }, cancellationToken);
 
         progress?.Report("Reading the alert receivers");
         return new EstateConfiguration(EstateName, entities)
@@ -198,16 +200,15 @@ internal sealed partial class AzureEstateConfiguration(
         }
 
         var serviceId = services[0]["id"]?.GetValue<string>() ?? throw new InvalidOperationException("The API Management service has no ID.");
-        var policies = new List<string>();
-        foreach (var operation in ShipperTrackingOperations)
+        var policies = await ReadAllAsync(ShipperTrackingOperations, async operation =>
         {
             var policy = await TrySendAsync(HttpMethod.Get, $"{Management}{serviceId}/apis/{PartnerApi}/operations/{operation}/policies/policy?{ApiManagementApiVersion}&format=rawxml", null, notFoundIsAnAnswer: true, cancellationToken);
-            policies.Add(policy?["properties"]?["value"]?.GetValue<string>() ?? string.Empty);
-        }
+            return policy?["properties"]?["value"]?.GetValue<string>() ?? string.Empty;
+        }, cancellationToken);
 
         return new ApiManagementFacts(
             policies.Max(CacheSeconds),
-            policies.TrueForAll(policy => policy.Contains("<rate-limit", StringComparison.Ordinal)));
+            policies.All(policy => policy.Contains("<rate-limit", StringComparison.Ordinal)));
     }
 
     private static int CacheSeconds(string policy) =>
@@ -228,20 +229,30 @@ internal sealed partial class AzureEstateConfiguration(
         var transit = accounts.Find(account => account.Name.StartsWith(TransitStoragePrefix, StringComparison.Ordinal));
         var tms = accounts.Where(account => account != inbound && account != transit).ToList();
 
-        var proofs = tms.Count == 0 ? (bool?)null : false;
-        foreach (var account in tms)
-        {
-            proofs = proofs == true || (await ReadRulesAsync(account.Id, cancellationToken)).Exists(rule => rule.Prefixes.Exists(prefix => prefix.StartsWith(ProofsContainer, StringComparison.Ordinal)) && rule.MovesToCool);
-        }
+        var proofs = ProofsMoveToCoolAsync(tms, cancellationToken);
+        var inboundProtections = inbound.Id is null ? Task.FromResult(default(Protections)) : InboundProtectionsAsync(inbound, cancellationToken);
+        var transitProtections = transit.Id is null ? Task.FromResult(default(Protections)) : TransitProtectionsAsync(transit, cancellationToken);
+        await Task.WhenAll(proofs, inboundProtections, transitProtections);
 
-        return (
-            inbound.Id is null ? default : new Protections(
-                (await ReadRulesAsync(inbound.Id, cancellationToken)).Exists(rule => rule.Deletes),
-                await MalwareScanningAsync(inbound.Id, cancellationToken),
-                inbound.Name),
-            transit.Id is null ? default : new Protections((await ReadRulesAsync(transit.Id, cancellationToken)).Exists(rule => rule.Deletes), null, transit.Name),
-            proofs);
+        return (await inboundProtections, await transitProtections, await proofs);
     }
+
+    private async Task<bool?> ProofsMoveToCoolAsync(List<(string Id, string Name)> accounts, CancellationToken cancellationToken) =>
+        accounts.Count == 0
+            ? null
+            : (await ReadAllAsync(accounts, account => ReadRulesAsync(account.Id, cancellationToken), cancellationToken))
+                .Any(rules => rules.Exists(rule => rule.Prefixes.Exists(prefix => prefix.StartsWith(ProofsContainer, StringComparison.Ordinal)) && rule.MovesToCool));
+
+    private async Task<Protections> InboundProtectionsAsync((string Id, string Name) account, CancellationToken cancellationToken)
+    {
+        var rules = ReadRulesAsync(account.Id, cancellationToken);
+        var scanning = MalwareScanningAsync(account.Id, cancellationToken);
+        await Task.WhenAll(rules, scanning);
+        return new Protections((await rules).Exists(rule => rule.Deletes), await scanning, account.Name);
+    }
+
+    private async Task<Protections> TransitProtectionsAsync((string Id, string Name) account, CancellationToken cancellationToken) =>
+        new((await ReadRulesAsync(account.Id, cancellationToken)).Exists(rule => rule.Deletes), null, account.Name);
 
     private async Task<bool> MalwareScanningAsync(string storageId, CancellationToken cancellationToken)
     {
@@ -299,17 +310,16 @@ internal sealed partial class AzureEstateConfiguration(
             entities.Add((Name(queue), DeadLettered(queue)));
         }
 
-        foreach (var topic in await ListAsync($"{address}/topics?{ServiceBusApiVersion}", cancellationToken))
+        var topics = await ListAsync($"{address}/topics?{ServiceBusApiVersion}", cancellationToken);
+        var subscriptions = await ReadAllAsync(topics, async topic =>
         {
             var topicName = Name(topic);
-            foreach (var subscription in await ListAsync($"{address}/topics/{Uri.EscapeDataString(topicName)}/subscriptions?{ServiceBusApiVersion}", cancellationToken))
-            {
-                if (!Exemptions.Subscriptions.Contains($"{topicName}/{Name(subscription)}"))
-                {
-                    entities.Add((Name(subscription), DeadLettered(subscription)));
-                }
-            }
-        }
+            return (await ListAsync($"{address}/topics/{Uri.EscapeDataString(topicName)}/subscriptions?{ServiceBusApiVersion}", cancellationToken))
+                .Where(subscription => !Exemptions.Subscriptions.Contains($"{topicName}/{Name(subscription)}"))
+                .Select(subscription => (Name(subscription), DeadLettered(subscription)))
+                .ToList();
+        }, cancellationToken);
+        entities.AddRange(subscriptions.SelectMany(found => found));
 
         return entities;
     }
@@ -317,6 +327,24 @@ internal sealed partial class AzureEstateConfiguration(
     private static int? DeadLettered(JsonNode entity) => entity["properties"]?["countDetails"]?["deadLetterMessageCount"]?.GetValue<int>();
 
     private static string Name(JsonNode resource) => resource["name"]?.GetValue<string>() ?? throw new InvalidOperationException("A Service Bus entity has no name.");
+
+    // The answers of one read per item, in the items' order, with at most Concurrency reads under way.
+    private static async Task<TResult[]> ReadAllAsync<TItem, TResult>(IEnumerable<TItem> items, Func<TItem, Task<TResult>> read, CancellationToken cancellationToken)
+    {
+        using var limit = new SemaphoreSlim(Concurrency);
+        return await Task.WhenAll(items.Select(async item =>
+        {
+            await limit.WaitAsync(cancellationToken);
+            try
+            {
+                return await read(item);
+            }
+            finally
+            {
+                limit.Release();
+            }
+        }));
+    }
 
     private async Task<List<JsonNode>> ListAsync(string address, CancellationToken cancellationToken)
     {
