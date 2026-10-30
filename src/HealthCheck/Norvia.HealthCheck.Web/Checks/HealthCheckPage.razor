@@ -32,11 +32,32 @@
 
 @if (_running)
 {
-    <div role="status" class="mt-3">
-        <FluentStack VerticalAlignment="VerticalAlignment.Center">
-            <FluentProgressRing />
-            <span>Running the checks…</span>
-        </FluentStack>
+    @* What the run is doing, one line a step as it starts: the ones before the last are done. *@
+    <div role="status" class="mt-3" data-testid="run-steps">
+        <ul class="steps">
+            @for (var index = 0; index < _steps.Count; index++)
+            {
+                var done = index < _steps.Count - 1;
+                <li data-testid="run-step" data-done="@(done ? "true" : "false")">
+                    @if (done)
+                    {
+                        <span class="step-done" aria-hidden="true">✓</span>
+                    }
+                    else
+                    {
+                        <FluentProgressRing Class="step-working" />
+                    }
+                    <span>@_steps[index]</span>
+                </li>
+            }
+        </ul>
+        @if (_steps.Count == 0)
+        {
+            <FluentStack VerticalAlignment="VerticalAlignment.Center">
+                <FluentProgressRing />
+                <span>Starting the run…</span>
+            </FluentStack>
+        }
     </div>
 }
 else if (_runFailed)
@@ -147,6 +168,21 @@ else if (_runFailed)
     private string _correlationId = string.Empty;
     private readonly CancellationTokenSource _lifetime = new();
 
+    // The steps of the run so far, in the order they started.
+    private readonly List<string> _steps = [];
+
+    // The run reports from its own thread, so the step is added and drawn on the page's.
+    private void ShowStep(string step) => _ = InvokeAsync(() =>
+    {
+        if (_lifetime.IsCancellationRequested)
+        {
+            return;
+        }
+
+        _steps.Add(step);
+        StateHasChanged();
+    });
+
     private async Task RunAsync()
     {
         // The ID of this run: the assistant's tool calls carry it, so they join one Message trail.
@@ -154,6 +190,7 @@ else if (_runFailed)
         _correlationId = correlationId;
         // The previous result is held in the page session only, to show what a re-run changed. A run that fails keeps it.
         _running = true;
+        _steps.Clear();
         _runFailed = false;
         _unavailable = false;
         _report = null;
@@ -161,7 +198,7 @@ else if (_runFailed)
         _narration = null;
         try
         {
-            var run = await Requests.RunAsync(new RunHealthCheckQuery(), _lifetime.Token);
+            var run = await Requests.RunAsync(new RunHealthCheckQuery(new Progress<string>(ShowStep)), _lifetime.Token);
             if (!run.IsSuccess)
             {
                 _runFailed = true;

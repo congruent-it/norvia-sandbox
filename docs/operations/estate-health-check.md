@@ -14,7 +14,7 @@ The Estate health check is a small app, `src/HealthCheck` (Application, Infrastr
 | The snapshot adapter | The local adapter: reads a JSON snapshot embedded from the repo |
 | The agent API | `GET /agent/v1/checks` (`run_checks`), `/agent/v1/failed-runs` (`list_failed_runs`) and `/agent/v1/dead-letter-queues` (`list_dead_letter_queues`), the Agent's tools. The two lists show what failed and whether an alert watches it, and carry no message body. Behind a token and the role `HealthCheck.Agent.Read` |
 | The Agent | [agents/estate-health-check.agent.yaml](../../agents/estate-health-check.agent.yaml), with the tool list [health-check.tools.json](../../contracts/agent-mcp/health-check.tools.json) |
-| The page | `/`: **Run health check**, the report (Findings grouped by severity, the Agent's narration, the comparison with the previous run, **Export as Markdown**) |
+| The page | `/`: **Run health check**, the steps of the run as they start (in Azure, one for each thing it reads from the estate, then the Checks; a tick for each step that is done), the report (Findings grouped by severity, the Agent's narration, the comparison with the previous run, **Export as Markdown**) |
 
 ## The checklist
 

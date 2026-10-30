@@ -14,7 +14,11 @@ internal sealed class SnapshotEstateConfiguration(IOptions<SnapshotOptions> opti
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
-    public Task<EstateConfiguration> ReadAsync(CancellationToken cancellationToken) => Task.FromResult(Load(options.Value.Snapshot));
+    public Task<EstateConfiguration> ReadAsync(CancellationToken cancellationToken, IProgress<string>? progress = null)
+    {
+        progress?.Report($"Reading the {options.Value.Snapshot} snapshot");
+        return Task.FromResult(Load(options.Value.Snapshot));
+    }
 
     public static EstateConfiguration Load(string name)
     {
