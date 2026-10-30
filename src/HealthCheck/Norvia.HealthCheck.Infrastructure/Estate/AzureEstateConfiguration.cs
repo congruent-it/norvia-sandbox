@@ -56,7 +56,7 @@ internal sealed partial class AzureEstateConfiguration(
 
     // The reads inside one step do not depend on each other, so they run together, this many at a time (Azure Resource Manager throttles per subscription).
     private const int Concurrency = 8;
-    private static readonly string[] ManagementScopes = [$"{Management}/.default"];
+    internal static readonly string[] ManagementScopes = [$"{Management}/.default"];
 
     public async Task<EstateConfiguration> ReadAsync(CancellationToken cancellationToken, IProgress<string>? progress = null)
     {
@@ -64,8 +64,21 @@ internal sealed partial class AzureEstateConfiguration(
         var namespaceId = $"{settings.ResourceGroupId.TrimEnd('/')}/providers/Microsoft.ServiceBus/namespaces/{settings.ServiceBusNamespace}";
         var group = new Group(settings.ResourceGroupId.Split('/', StringSplitOptions.RemoveEmptyEntries));
 
+        var graph = StartGraphReads(group, cancellationToken);
+        try
+        {
+            return await ReadStepsAsync(graph, group, namespaceId, progress, cancellationToken);
+        }
+        finally
+        {
+            await graph.SettledAsync();
+        }
+    }
+
+    private async Task<EstateConfiguration> ReadStepsAsync(GraphReads graph, Group group, string namespaceId, IProgress<string>? progress, CancellationToken cancellationToken)
+    {
         progress?.Report("Reading the alert rules");
-        var alerts = await ReadAlertsAsync(group, cancellationToken);
+        var alerts = (await graph.Alerts).Select(MetricAlert.From).ToList();
         var watching = alerts.Where(alert => alert.Enabled && alert.Scopes.Contains(namespaceId, StringComparer.OrdinalIgnoreCase)).ToList();
 
         progress?.Report("Reading the Service Bus queues and subscriptions");
@@ -75,15 +88,15 @@ internal sealed partial class AzureEstateConfiguration(
             .ToList();
 
         progress?.Report("Reading the Logic Apps");
-        var logicApps = await QueryAsync(group, "microsoft.web/sites", "| where kind contains 'workflowapp' | project id, name, enabled = tobool(properties.enabled), workload = tostring(tags.workload)", cancellationToken);
+        var logicApps = await graph.LogicApps;
         progress?.Report("Reading the TMS API's settings");
-        var tms = await ReadTmsSettingsAsync(group, cancellationToken);
+        var tms = ReadTmsSettings(await graph.TmsApp);
         progress?.Report("Reading API Management's policies");
-        var apiManagement = await ReadApiManagementAsync(group, cancellationToken);
+        var apiManagement = await ReadApiManagementAsync(await graph.ApiManagement, cancellationToken);
         progress?.Report("Reading how long Application Insights and its workspace keep what they trace");
-        var retention = await ReadRetentionAsync(group, cancellationToken);
+        var retention = ReadRetention(await graph.Components, await graph.Workspaces);
         progress?.Report("Reading the storage accounts' lifecycle rules and malware scanning");
-        var (inbound, transit, proofs) = await ReadStorageAsync(group, cancellationToken);
+        var (inbound, transit, proofs) = await ReadStorageAsync(await graph.StorageAccounts, cancellationToken);
 
         progress?.Report("Counting the failed runs of each Logic App");
         var flows = await ReadAllAsync(logicApps, async app =>
@@ -100,7 +113,7 @@ internal sealed partial class AzureEstateConfiguration(
         return new EstateConfiguration(EstateName, entities)
         {
             Flows = flows,
-            AlertReceivers = await ReadAlertReceiversAsync(group, cancellationToken),
+            AlertReceivers = ReadAlertReceivers(await graph.ActionGroups),
             Storage = new StorageFacts(
                 inbound.HasLifecycleRule,
                 transit.HasLifecycleRule,
@@ -124,9 +137,37 @@ internal sealed partial class AzureEstateConfiguration(
         };
     }
 
-    // The metric alert rules of the estate's resource group, as Resource Graph holds them.
-    private async Task<List<MetricAlert>> ReadAlertsAsync(Group group, CancellationToken cancellationToken) =>
-        [.. (await QueryAsync(group, "microsoft.insights/metricalerts", "| project name, enabled = tobool(properties.enabled), scopes = properties.scopes, criteria = properties.criteria", cancellationToken)).Select(MetricAlert.From)];
+    // What the steps read from Resource Graph. The queries do not depend on each other or on the other reads, so they all start at once, and a step
+    // waits for its own: the steps still report in their order, and a query is done by the time its step asks.
+    private sealed record GraphReads(
+        Task<List<JsonObject>> Alerts,
+        Task<List<JsonObject>> LogicApps,
+        Task<List<JsonObject>> TmsApp,
+        Task<List<JsonObject>> ApiManagement,
+        Task<List<JsonObject>> Components,
+        Task<List<JsonObject>> Workspaces,
+        Task<List<JsonObject>> StorageAccounts,
+        Task<List<JsonObject>> ActionGroups)
+    {
+        /// <summary>Waits for every query to end, so one that fails after an earlier step did is not left unobserved. What it answers is only the failure, which a step has already met.</summary>
+        public Task<AggregateException?> SettledAsync() =>
+            Task.WhenAll(Alerts, LogicApps, TmsApp, ApiManagement, Components, Workspaces, StorageAccounts, ActionGroups)
+                .ContinueWith(static all => all.Exception, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
+    }
+
+    private GraphReads StartGraphReads(Group group, CancellationToken cancellationToken) => new(
+        QueryAsync(group, "microsoft.insights/metricalerts", "| project name, enabled = tobool(properties.enabled), scopes = properties.scopes, criteria = properties.criteria", cancellationToken),
+        QueryAsync(group, "microsoft.web/sites", "| where kind contains 'workflowapp' | project id, name, enabled = tobool(properties.enabled), workload = tostring(tags.workload)", cancellationToken),
+        QueryAsync(group, "microsoft.app/containerapps", $"| where name =~ '{TmsApp}' | project env = properties.template.containers[0].env", cancellationToken),
+        QueryAsync(group, "microsoft.apimanagement/service", "| project id", cancellationToken),
+        QueryAsync(group, "microsoft.insights/components", "| project days = toint(properties.RetentionInDays)", cancellationToken),
+        QueryAsync(group, "microsoft.operationalinsights/workspaces", "| project days = toint(properties.retentionInDays)", cancellationToken),
+        QueryAsync(group, "microsoft.storage/storageaccounts", "| project id, name", cancellationToken),
+        QueryAsync(
+            group,
+            "microsoft.insights/actiongroups",
+            "| project enabled = tobool(properties.enabled), receivers = coalesce(array_length(properties.emailReceivers), 0) + coalesce(array_length(properties.smsReceivers), 0) + coalesce(array_length(properties.webhookReceivers), 0) + coalesce(array_length(properties.armRoleReceivers), 0)",
+            cancellationToken));
 
     // Every row of a Resource Graph query over the resources of one type in the estate's resource group, across pages.
     private async Task<List<JsonObject>> QueryAsync(Group group, string type, string projection, CancellationToken cancellationToken)
@@ -156,34 +197,22 @@ internal sealed partial class AzureEstateConfiguration(
     }
 
     // The receivers of the estate's action groups that are on. Null when the estate has no action group, so there is nothing to say.
-    private async Task<int?> ReadAlertReceiversAsync(Group group, CancellationToken cancellationToken)
-    {
-        var groups = await QueryAsync(
-            group,
-            "microsoft.insights/actiongroups",
-            "| project enabled = tobool(properties.enabled), receivers = coalesce(array_length(properties.emailReceivers), 0) + coalesce(array_length(properties.smsReceivers), 0) + coalesce(array_length(properties.webhookReceivers), 0) + coalesce(array_length(properties.armRoleReceivers), 0)",
-            cancellationToken);
-        return groups.Count == 0
+    private static int? ReadAlertReceivers(List<JsonObject> groups) =>
+        groups.Count == 0
             ? null
             : groups.Where(row => Flag(row["enabled"]) ?? true).Sum(row => row["receivers"]?.GetValue<int>() ?? 0);
-    }
 
     // What Application Insights keeps against what the workspace, and so the run history, keeps. Null when either is not there.
-    private async Task<RetentionFacts?> ReadRetentionAsync(Group group, CancellationToken cancellationToken)
-    {
-        var components = await QueryAsync(group, "microsoft.insights/components", "| project days = toint(properties.RetentionInDays)", cancellationToken);
-        var workspaces = await QueryAsync(group, "microsoft.operationalinsights/workspaces", "| project days = toint(properties.retentionInDays)", cancellationToken);
-        return components.Count == 0 || workspaces.Count == 0
+    private static RetentionFacts? ReadRetention(List<JsonObject> components, List<JsonObject> workspaces) =>
+        components.Count == 0 || workspaces.Count == 0
             ? null
             : new RetentionFacts(
                 components.Min(row => row["days"]?.GetValue<int>() ?? 0),
                 workspaces.Max(row => row["days"]?.GetValue<int>() ?? 0));
-    }
 
     // The TMS API's Container App and the settings it runs with. Where the app is not there, nothing is known of them.
-    private async Task<AppSettings> ReadTmsSettingsAsync(Group group, CancellationToken cancellationToken)
+    private static AppSettings ReadTmsSettings(List<JsonObject> apps)
     {
-        var apps = await QueryAsync(group, "microsoft.app/containerapps", $"| where name =~ '{TmsApp}' | project env = properties.template.containers[0].env", cancellationToken);
         var env = (apps.FirstOrDefault()?["env"] as JsonArray ?? []).OfType<JsonObject>()
             .Where(item => item["name"] is not null && item["value"] is not null)
             .ToDictionary(item => item["name"]!.GetValue<string>(), item => item["value"]!.GetValue<string>(), StringComparer.Ordinal);
@@ -191,9 +220,8 @@ internal sealed partial class AzureEstateConfiguration(
     }
 
     // API Management's policies on the Shipper tracking operations: the longest an answer is cached, and whether all of them limit the rate.
-    private async Task<ApiManagementFacts> ReadApiManagementAsync(Group group, CancellationToken cancellationToken)
+    private async Task<ApiManagementFacts> ReadApiManagementAsync(List<JsonObject> services, CancellationToken cancellationToken)
     {
-        var services = await QueryAsync(group, "microsoft.apimanagement/service", "| project id", cancellationToken);
         if (services.Count == 0)
         {
             return new ApiManagementFacts(null, null);
@@ -219,9 +247,9 @@ internal sealed partial class AzureEstateConfiguration(
 
     // The inbound and the transit storage accounts' lifecycle rules, the inbound account's malware scanning, and whether the TMS storage's
     // Proof of delivery files move to cool. A protection is null where the account that should hold it is not there.
-    private async Task<(Protections Inbound, Protections Transit, bool? ProofsMoveToCool)> ReadStorageAsync(Group group, CancellationToken cancellationToken)
+    private async Task<(Protections Inbound, Protections Transit, bool? ProofsMoveToCool)> ReadStorageAsync(List<JsonObject> storageAccounts, CancellationToken cancellationToken)
     {
-        var accounts = (await QueryAsync(group, "microsoft.storage/storageaccounts", "| project id, name", cancellationToken))
+        var accounts = storageAccounts
             .Select(row => (Id: row["id"]?.GetValue<string>() ?? string.Empty, Name: row["name"]?.GetValue<string>() ?? string.Empty))
             .ToList();
 
