@@ -25,7 +25,9 @@ internal sealed record HopRow(
     string? MessageId = null,
     string? Fault = null,
     string? AgentId = null,
-    string? ToolName = null)
+    string? ToolName = null,
+    string? McpMethod = null,
+    string? McpTool = null)
 {
     public const string Request = "request";
     public const string Run = "run";
@@ -58,7 +60,9 @@ internal sealed record HopRow(
         Text(row, "messageId"),
         Text(row, "fault"),
         Text(row, "agentId"),
-        Text(row, "toolName"));
+        Text(row, "toolName"),
+        Text(row, "mcpMethod"),
+        Text(row, "mcpTool"));
 
     // A key that doesn't apply comes back empty from the query, and is left out as the tracking contract leaves it out.
     private static string? Text(LogsTableRow row, string column) => row.GetString(column) is { Length: > 0 } text ? text : null;

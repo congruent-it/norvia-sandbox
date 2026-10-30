@@ -17,6 +17,7 @@ namespace Norvia.IntegrationConsole.Infrastructure.Trails;
 /// and application, and whether it ran in process: a span an application or a framework started, such as the Partner
 /// portal's for sending a booking, which records written outside any call belong to.</item>
 /// </list>
+/// An MCP message API Management served is named by its MCP method, which it logs (see <see cref="HopNames.OfMcp"/>).
 /// A call an Agent made through an MCP server is on the trail of the run it records as <c>runId</c>, not of the correlation ID
 /// API Management made for the call; its requests, which record only that one, are those of the same operation (the W3C trace the
 /// run started) that call an agent endpoint.
@@ -75,6 +76,8 @@ internal static class HopQuery
                 fault = tostring(Properties.fault),
                 agentId = coalesce(tostring(Properties.agentId), tostring(tracked.agentId)),
                 toolName = coalesce(tostring(Properties.toolName), tostring(tracked.toolName)),
+                // What API Management logs of an MCP message: its method (initialize, tools/list, tools/call, ...) and, of a tools/call, the tool.
+                mcpMethod = tostring(Properties["gen_ai.operation.name"]), mcpTool = tostring(Properties["gen_ai.tool.name"]),
                 eventType = tostring(Properties.eventType),
                 transportOrderNumber = coalesce(tostring(Properties.transportOrderNumber), tostring(tracked.transportOrderNumber)),
                 shipmentNumber = coalesce(tostring(Properties.shipmentNumber), tostring(tracked.shipmentNumber)),
