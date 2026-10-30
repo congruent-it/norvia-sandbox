@@ -11,6 +11,8 @@ namespace Norvia.IntegrationConsole.Infrastructure.Trails;
 /// ID as the logged <c>X-Correlation-ID</c> header of its requests;</item>
 /// <item>Logic Apps Standard, as tracked properties: a JSON string in <c>Properties.trackedProperties</c>.</item>
 /// </list>
+/// A call an Agent made through an MCP server has a correlation ID of its own, which API Management makes, and records the
+/// Agent run it belongs to as <c>runId</c> (the run's correlation ID): that is the trail it is on.
 /// The time range is the query's own, set on the request. Only keys are read, never a column that could hold a body.
 /// </summary>
 internal static class TrailQuery
@@ -23,7 +25,7 @@ internal static class TrailQuery
             rows
             | extend tracked = parse_json(tostring(Properties.trackedProperties))
             | project TimeGenerated,
-                correlationId = coalesce(tostring(Properties.correlationId), tostring(tracked.correlationId),
+                correlationId = coalesce(tostring(Properties.runId), tostring(Properties.correlationId), tostring(tracked.correlationId),
                     tostring(Properties["Response-X-Correlation-ID"]), tostring(Properties["Request-X-Correlation-ID"])),
                 flow = coalesce(tostring(Properties.flow), tostring(tracked.flow)),
                 outcome = coalesce(tostring(Properties.outcome), tostring(tracked.outcome)),

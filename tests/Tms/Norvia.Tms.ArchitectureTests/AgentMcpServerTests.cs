@@ -223,7 +223,9 @@ public sealed class AgentMcpServerTests
         var tools = resources.Where(resource => Type(resource) == "Microsoft.ApiManagement/service/apis/tools").ToList();
 
         operations.Select(operation => operation["properties"]!["method"]!.GetValue<string>()).Should().OnlyContain(method => method == "GET");
-        tools.Select(tool => tool["name"]!.GetValue<string>().Split('/').Last()).Should().BeEquivalentTo(Tools);
+        // The name the Agent sees is the display name; the resource's name carries the server's, as a tool's name is unique across the service.
+        tools.Select(tool => tool["properties"]!["displayName"]!.GetValue<string>()).Should().BeEquivalentTo(Tools);
+        tools.Select(tool => tool["name"]!.GetValue<string>().Split('/').Last()).Should().BeEquivalentTo(Tools.Select(tool => $"things-{tool}"));
         operations.Select(operation => operation["name"]!.GetValue<string>().Split('/').Last()).Should().BeEquivalentTo(Tools);
         resources.Single(resource => Type(resource) == "Microsoft.ApiManagement/service/apis" && resource["properties"]!["type"]?.GetValue<string>() == "mcp")["properties"]!["subscriptionRequired"]!.GetValue<bool>()
             .Should().BeFalse("the Agent's Entra token is its credential");

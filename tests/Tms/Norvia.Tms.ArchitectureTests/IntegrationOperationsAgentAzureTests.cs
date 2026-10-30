@@ -39,7 +39,8 @@ public sealed class IntegrationOperationsAgentAzureTests
         var resources = Resources();
         var tools = Of(resources, "Microsoft.ApiManagement/service/apis/tools").ToList();
 
-        tools.Select(tool => tool["name"]!.GetValue<string>().Split('/').Last())
+        // The name the Agent sees is the display name; the resource's name carries the server's, as a tool's name is unique across the service.
+        tools.Select(tool => tool["properties"]!["displayName"]!.GetValue<string>())
             .Should().Equal(ContractFile["tools"]!.AsArray().Select(tool => tool!["name"]!.GetValue<string>()));
         tools.Select(tool => tool["properties"]!["description"]!.GetValue<string>())
             .Should().Equal(ContractFile["tools"]!.AsArray().Select(tool => tool!["description"]!.GetValue<string>()));

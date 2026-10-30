@@ -12,6 +12,7 @@
 @using Norvia.HealthCheck.Application.Report
 @using Norvia.HealthCheck.Application.Run
 @inject IHealthCheckRequests Requests
+@inject ConsoleLinks Links
 @inject IJSRuntime Js
 @inject IOptions<AgentsOptions> Agents
 @inject ILogger<HealthCheckPage> Logger
@@ -151,6 +152,18 @@ else if (_runFailed)
                     </ol>
                     <p class="text-muted">The assistant can be wrong; the Findings above are the Checks' own.</p>
                 </div>
+            }
+
+            @if (!_narrating && (_narration is not null || _unavailable))
+            {
+                @* What to search the Integration console's Message trails for: the assistant's run and its calls to the Checks' tools are on it. *@
+                <p class="text-muted" data-testid="run-id">
+                    Run ID <code>@_correlationId</code>
+                    @if (Links.Trail(_correlationId) is { } trail)
+                    {
+                        <a href="@trail" target="_blank" rel="noopener" data-testid="message-trail" aria-label="@($"Open the Message trail of {_correlationId} in the Integration console")">Message trail</a>
+                    }
+                </p>
             }
         </section>
     }

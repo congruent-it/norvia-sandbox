@@ -18,12 +18,16 @@ public abstract class HealthCheckWebContext : BunitContext
         // The Agents are off unless a test turns them on.
         Services.AddOptions<AgentsOptions>();
         Services.AddSingleton(Requests);
+        // The Integration console's address is not known unless a test gives one.
+        Services.AddSingleton(new ConsoleLinks(null));
         Operator = AddAuthorization();
     }
 
     protected BunitAuthorizationContext Operator { get; }
 
     protected IHealthCheckRequests Requests { get; } = Substitute.For<IHealthCheckRequests>();
+
+    protected void KnowTheConsoleAt(string address) => Services.AddSingleton(new ConsoleLinks(new Uri(address)));
 
     protected void TurnAgentsOn() => Services.Configure<AgentsOptions>(options => options.Enabled = true);
 
