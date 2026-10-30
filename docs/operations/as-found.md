@@ -81,7 +81,7 @@ The Agent Service keeps conversations until they are deleted, and the Intake age
 |---|---|---|---|---|
 | `noConversationSweeper` | true or false | The sweeper runs every night | The sweeper Logic App is built but stopped (`enabled: false`), so it never runs. A conversation the host could not delete stays in the Foundry project, and the failed-run alert never fires because there is no run. A finding for the health check (#377) | Agents |
 
-It is a deployment of the estate alone: `infra/as-found.sh noConversationSweeper=true` runs the estate's Bicep, and the workflow stays deployed.
+It is a deployment of the estate alone: `infra/as-found.sh noConversationSweeper=true` runs the estate's Bicep, and the workflow that was deployed stays. A disabled app cannot take a deployment, so the postdeploy hook skips the sweeper while the toggle is set; set it to false and run `azd deploy` (or `infra/deploy-conversation-sweeper-logic-app.sh`) to deploy the workflow.
 
 ## Faults
 
