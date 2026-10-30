@@ -13,6 +13,10 @@ internal static class AgentEndpoints
 {
     public const string Prefix = "/agent/v1";
 
+    // The Agent narrates a run the page has just made, so it reads what that run read instead of reading the estate again (about 20 s).
+    // The page's own run never reuses anything.
+    private static readonly TimeSpan ReportMaxAge = TimeSpan.FromSeconds(60);
+
     public static IEndpointRouteBuilder MapAgentApi(this IEndpointRouteBuilder endpoints)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
@@ -28,7 +32,7 @@ internal static class AgentEndpoints
 
     private static async Task<Ok<AgentFindingsView>> RunChecksAsync(IMediator mediator, CancellationToken cancellationToken)
     {
-        var result = await mediator.Send(new RunHealthCheckQuery(), cancellationToken);
+        var result = await mediator.Send(new RunHealthCheckQuery(ReuseWithin: ReportMaxAge), cancellationToken);
         return TypedResults.Ok(AgentViewMapping.Of(result.Value));
     }
 

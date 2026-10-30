@@ -57,7 +57,8 @@ public sealed class AgentApiTests : IAsyncLifetime
         finding["asFoundToggle"]!.GetValue<string>().Should().Be("entitiesWithoutDeadLetterAlert");
         finding["fix"]!.GetValue<string>().Should().Be("Remove it from the toggle.");
         finding["evidence"]!.AsArray().Select(item => item!["subject"]!.GetValue<string>()).Should().Equal("carrier-tracking", "billing");
-        await _host.Mediator.Received(1).Send(new RunHealthCheckQuery(), Arg.Any<CancellationToken>());
+        // The Agent follows a run the page has just made, so it asks for that run's report if it is under a minute old.
+        await _host.Mediator.Received(1).Send(new RunHealthCheckQuery(ReuseWithin: TimeSpan.FromSeconds(60)), Arg.Any<CancellationToken>());
     }
 
     [Fact]

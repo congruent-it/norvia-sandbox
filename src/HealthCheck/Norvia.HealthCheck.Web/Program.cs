@@ -23,6 +23,7 @@ builder.Services.AddMediator(options =>
 });
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton(Checklist.Default);
+builder.Services.AddSingleton<RecentReport>();
 builder.Services.AddSingleton<IHealthCheckRequests, HealthCheckRequests>();
 
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
