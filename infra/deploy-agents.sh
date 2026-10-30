@@ -10,7 +10,8 @@
 #   2. makes the project's connection to the MCP server, with the agent-identity authentication type (infra/create-agent-connection.sh);
 #   3. creates the Agent's next version as a prompt agent in the Foundry project, from the file: the model, the instructions, the temperature,
 #      the MCP server as its one tool (read-only, no approval to ask for) and the correlation ID as a structured input that the tool's
-#      X-Correlation-ID header carries, so the Agent's tool calls join the Message trail it was asked about;
+#      X-Correlation-ID header carries; the MCP server makes its own correlation ID for each call and records this one as the runId, so the Agent's
+#      tool calls are found from the run it was asked about;
 #   4. reads the Agent's identity (Foundry gives each Agent its own) and writes .azure/<env>/published-agents.json;
 #   5. gives each identity its one read role (infra/assign-agent-roles.sh), which a new identity needs after every publish.
 # It prints names, versions and counts only: never a token. Publishing the same file again is a new version of the same Agent.

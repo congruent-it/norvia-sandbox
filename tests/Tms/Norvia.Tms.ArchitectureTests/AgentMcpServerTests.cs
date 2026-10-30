@@ -25,6 +25,8 @@ public sealed class AgentMcpServerTests
 
     private static string Status(XElement refusal) => refusal.Element("return-response")!.Element("set-status")!.Attribute("code")!.Value;
 
+    private static bool HasMetadata(XElement trace, string name) => trace.Elements("metadata").Any(metadata => metadata.Attribute("name")!.Value == name);
+
     private static string Metadata(XElement trace, string name) =>
         trace.Elements("metadata").Single(metadata => metadata.Attribute("name")!.Value == name).Attribute("value")!.Value;
 
@@ -159,16 +161,43 @@ public sealed class AgentMcpServerTests
     }
 
     [Fact]
-    public void Traces_AreOnTheAgentFlow_AndRecordTheAgentAndTheTool()
+    public void Traces_AreOnTheAgentFlow_AndRecordTheAgentTheToolAndTheRun_OnlyWhereTheyApply()
     {
         var policy = Policy("param serverName = 'things'");
-        var accepted = policy.Element("inbound")!.Elements("trace").Single();
+        var accepted = policy.Element("inbound")!.Descendants("trace").Where(trace => Metadata(trace, "outcome") == "Succeeded").ToList();
 
         policy.Descendants("trace").Should().OnlyContain(trace => Metadata(trace, "flow") == "agent-mcp-things");
-        Metadata(accepted, "outcome").Should().Be("Succeeded");
-        Metadata(accepted, "agentId").Should().Contain("agentId");
-        Metadata(accepted, "toolName").Should().Contain("toolName");
-        Metadata(accepted, "correlationId").Should().Contain("correlationId");
+        accepted.Should().HaveCount(4, "one for each of: a tool and a run, a tool, a run, neither; a key that does not apply is left out, not sent with a stand-in value");
+        accepted.Should().OnlyContain(trace => Metadata(trace, "agentId").Contains("agentId") && Metadata(trace, "correlationId").Contains("correlationId"));
+        accepted.Where(trace => HasMetadata(trace, "toolName")).Should().HaveCount(2).And.OnlyContain(trace => Metadata(trace, "toolName").Contains("toolName"));
+        accepted.Where(trace => HasMetadata(trace, "runId")).Should().HaveCount(2).And.OnlyContain(trace => Metadata(trace, "runId").Contains("runId"));
+        accepted.Where(trace => HasMetadata(trace, "toolName") && HasMetadata(trace, "runId")).Should().ContainSingle();
+        accepted.Where(trace => !HasMetadata(trace, "toolName") && !HasMetadata(trace, "runId")).Should().ContainSingle();
+    }
+
+    [Fact]
+    public void TheRunId_IsWhatTheCallerSentAsAPlainIdentifier_ReadBeforeTheCorrelationHeaderIsOverridden_AndPassedToTheAppInItsOwnHeader()
+    {
+        var inbound = Inbound();
+        var steps = inbound.Elements().ToList();
+        var runId = inbound.Elements("set-variable").Single(variable => variable.Attribute("name")!.Value == "runId").Attribute("value")!.Value;
+
+        runId.Should().Contain("X-Correlation-ID").And.Contain("Regex.IsMatch").And.Contain("\"none\"");
+        steps.IndexOf(inbound.Elements("set-variable").Single(variable => variable.Attribute("name")!.Value == "runId"))
+            .Should().BeLessThan(steps.IndexOf(inbound.Elements("set-header").Single(header => header.Attribute("name")!.Value == "X-Correlation-ID")), "the caller's own header is overridden after it is read");
+        inbound.Elements("set-header").Single(header => header.Attribute("name")!.Value == "X-Run-ID").Attribute("exists-action")!.Value.Should().Be("delete");
+        var passed = inbound.Elements("choose").Single(choose => choose.Descendants("set-header").Any(header => header.Attribute("name")!.Value == "X-Run-ID")).Element("when")!;
+        passed.Attribute("condition")!.Value.Should().Contain("runId").And.Contain("\"none\"");
+        passed.Element("set-header")!.Element("value")!.Value.Should().Contain("runId");
+    }
+
+    [Fact]
+    public void OnError_DoesNotRecordAClientClosingItsStream_AsAFailedHop()
+    {
+        var recorded = Policy().Element("on-error")!.Elements("choose").Single(choose => choose.Descendants("trace").Any()).Element("when")!;
+
+        recorded.Attribute("condition")!.Value.Should().Contain("LastError.Reason").And.Contain("!=").And.Contain("ClientConnectionFailure");
+        recorded.Element("trace")!.Should().NotBeNull();
     }
 
     [Fact]

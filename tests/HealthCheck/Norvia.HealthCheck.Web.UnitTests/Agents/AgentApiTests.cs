@@ -200,6 +200,44 @@ public sealed class AgentApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task GetChecks_ThroughTheGateway_IsAHopTaggedWithTheRunTheGatewayNames()
+    {
+        await using var behindApim = await AgentApiHost.StartAsync(gatewayClientId: "apim-identity");
+        behindApim.Mediator.Send(Arg.Any<RunHealthCheckQuery>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(Result.Success(AsFound)));
+
+        using var _ = await behindApim.Client.SendAsync(
+            AgentApiHost.Get("/agent/v1/checks", behindApim.Token(azp: "apim-identity"), ("X-Correlation-ID", "call-1"), ("X-Agent-ID", "foundry-agent-identity"), ("X-Run-ID", "072913664508469ca2c78c32444991ef")),
+            TestContext.Current.CancellationToken);
+
+        var keys = LastOutcomeKeys(behindApim);
+        keys["runId"].Should().Be("072913664508469ca2c78c32444991ef");
+        keys["correlationId"].Should().Be("call-1", because: "the trail's ID is the gateway's, and the run is another key");
+    }
+
+    [Fact]
+    public async Task GetChecks_FromACallerThatIsNotTheGateway_LeavesOutTheRunIdItSends()
+    {
+        using var _ = await _host.Client.SendAsync(
+            AgentApiHost.Get("/agent/v1/checks", _host.Token(), ("X-Correlation-ID", "run-9"), ("X-Run-ID", "forged")),
+            TestContext.Current.CancellationToken);
+
+        LastOutcomeKeys(_host).Should().NotContainKey("runId");
+    }
+
+    [Fact]
+    public async Task GetChecks_ThroughTheGateway_WithNoRunId_LeavesTheKeyOut()
+    {
+        await using var behindApim = await AgentApiHost.StartAsync(gatewayClientId: "apim-identity");
+        behindApim.Mediator.Send(Arg.Any<RunHealthCheckQuery>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(Result.Success(AsFound)));
+
+        using var _ = await behindApim.Client.SendAsync(
+            AgentApiHost.Get("/agent/v1/checks", behindApim.Token(azp: "apim-identity"), ("X-Correlation-ID", "call-1"), ("X-Agent-ID", "foundry-agent-identity")),
+            TestContext.Current.CancellationToken);
+
+        LastOutcomeKeys(behindApim).Should().NotContainKey("runId");
+    }
+
+    [Fact]
     public async Task GetChecks_ThroughTheGateway_IsAHopTaggedWithTheAgentTheGatewayNames()
     {
         await using var behindApim = await AgentApiHost.StartAsync(gatewayClientId: "apim-identity");

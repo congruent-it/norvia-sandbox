@@ -14,6 +14,7 @@ internal sealed partial class AgentCallTracking(IOptions<AgentApiOptions> option
     public const string CorrelationHeader = "X-Correlation-ID";
     public const string ToolHeader = "X-Tool-Name";
     public const string AgentHeader = "X-Agent-ID";
+    public const string RunHeader = "X-Run-ID";
 
     /// <summary>The <c>flow</c> of a call on an application's agent view.</summary>
     public const string Flow = "agent-view-health-check";
@@ -41,6 +42,11 @@ internal sealed partial class AgentCallTracking(IOptions<AgentApiOptions> option
             keys["toolName"] = toolName;
         }
 
+        if (RunIdOf(http) is { Length: > 0 } runId)
+        {
+            keys["runId"] = runId;
+        }
+
         using var trail = logger.BeginScope(keys);
         var result = await next(context);
         using var outcome = logger.BeginScope(new Dictionary<string, object?> { ["outcome"] = OutcomeOf(result) });
@@ -48,13 +54,16 @@ internal sealed partial class AgentCallTracking(IOptions<AgentApiOptions> option
         return result;
     }
 
-    private string? AgentIdOf(HttpContext http)
+    private string? AgentIdOf(HttpContext http) => IsGateway(http) ? http.Request.Headers[AgentHeader].ToString() : http.User.FindFirstValue("azp");
+
+    // The run the Agent says it is on, which the gateway's policy passes on after checking that it is a plain identifier. It is not the trail's
+    // correlation ID, so no one else's header is believed on it either: a direct caller's runId is left out.
+    private string? RunIdOf(HttpContext http) => IsGateway(http) ? http.Request.Headers[RunHeader].ToString() : null;
+
+    private bool IsGateway(HttpContext http)
     {
-        var caller = http.User.FindFirstValue("azp");
         var gateway = options.Value.GatewayClientId;
-        return gateway.Length > 0 && string.Equals(caller, gateway, StringComparison.OrdinalIgnoreCase)
-            ? http.Request.Headers[AgentHeader].ToString()
-            : caller;
+        return gateway.Length > 0 && string.Equals(http.User.FindFirstValue("azp"), gateway, StringComparison.OrdinalIgnoreCase);
     }
 
     // A validation problem is the agent view refusing the call; anything else that got this far was read.
