@@ -29,7 +29,7 @@ internal static class TrailHops
 
         var hops = new List<Hop>();
         hops.AddRange(rows.Where(row => row.Kind == HopRow.Request && row.Id is not null)
-            .Select(row => new Hop(row.Id!, row.ParentId, HopNames.OfCall(row.Role ?? "unknown", row.Name ?? string.Empty, null, row.Path), row.Start, row.End, null, [row])));
+            .Select(row => new Hop(row.Id!, row.ParentId, NameOfCall(row), row.Start, row.End, null, [row])));
         hops.AddRange(rows.Where(row => row.Kind == HopRow.Run && row.RunId is not null && row.Id is not null)
             .GroupBy(row => row.RunId!, StringComparer.Ordinal)
             .Select(Run));
@@ -99,6 +99,15 @@ internal static class TrailHops
     }
 
     /// <summary>The nearest in-process span at or above the record's parent in the record's own application, if any.</summary>
+    // A call, by its method and path, except an MCP message, which is by what it asked of the server.
+    private static string NameOfCall(HopRow row)
+    {
+        var application = row.Role ?? "unknown";
+        return row.McpMethod is { } method ? HopNames.OfMcp(application, method, row.McpTool)
+            : HopNames.IsMcpStream(row.Name, row.Path) ? HopNames.OfMcpStream(application)
+            : HopNames.OfCall(application, row.Name ?? string.Empty, null, row.Path);
+    }
+
     private static HopRow? SpanOf(HopRow record, Dictionary<string, HopRow> spans, Func<string, string?> parentOf)
     {
         var seen = new HashSet<string>(StringComparer.Ordinal);

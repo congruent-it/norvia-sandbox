@@ -27,6 +27,23 @@ internal static partial class HopNames
             : $"{ApplicationOf(application)}: {name}";
     }
 
+    /// <summary>
+    /// An MCP message API Management served, by its MCP method and, for a <c>tools/call</c>, the tool, such as <c>apim-norvia: MCP initialize</c>
+    /// or <c>apim-norvia: MCP tools/call run_checks</c>. Every message is a POST to the server's one path, so the path says nothing of what it did.
+    /// </summary>
+    public static string OfMcp(string application, string mcpMethod, string? tool) =>
+        tool is { Length: > 0 } ? $"{ApplicationOf(application)}: MCP {mcpMethod} {tool}" : $"{ApplicationOf(application)}: MCP {mcpMethod}";
+
+    /// <summary>The GET that opens an MCP server's event stream, which carries no message of its own and so logs no method.</summary>
+    public static string OfMcpStream(string application) => $"{ApplicationOf(application)}: MCP event stream";
+
+    /// <summary>Whether a call is the GET on an MCP server's path (<c>/agents/&lt;server&gt;/mcp</c>) that opens its event stream.</summary>
+    public static bool IsMcpStream(string? name, string? path) =>
+        name is not null && name.StartsWith("GET ", StringComparison.Ordinal) && path is not null && McpPath().IsMatch(path);
+
+    [GeneratedRegex("^/agents/[^/]+/mcp$")]
+    private static partial Regex McpPath();
+
     /// <summary>What an application did outside any call, by the span it started for it, such as <c>tms-api: Rate Transport Order</c>.</summary>
     public static string OfSpan(string application, string name) => $"{ApplicationOf(application)}: {name}";
 

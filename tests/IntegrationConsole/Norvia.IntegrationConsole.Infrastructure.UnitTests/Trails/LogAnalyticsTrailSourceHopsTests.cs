@@ -45,6 +45,8 @@ public sealed class LogAnalyticsTrailSourceHopsTests
         LogsQueryModelFactory.LogsTableColumn("fault", LogsColumnType.String),
         LogsQueryModelFactory.LogsTableColumn("agentId", LogsColumnType.String),
         LogsQueryModelFactory.LogsTableColumn("toolName", LogsColumnType.String),
+        LogsQueryModelFactory.LogsTableColumn("mcpMethod", LogsColumnType.String),
+        LogsQueryModelFactory.LogsTableColumn("mcpTool", LogsColumnType.String),
     ];
 
     private static readonly string[] FrameworkCategories = ["Azure.", "Microsoft.", "System."];
@@ -476,6 +478,34 @@ public sealed class LogAnalyticsTrailSourceHopsTests
             .Returns(Response.FromValue(result, Substitute.For<Response>()));
     }
 
+    [Fact]
+    public async Task HopsAsync_NamesAnMcpMessageByItsMethod_AndAToolCallByItsTool_AndTheEventStreamByWhatItIs()
+    {
+        const string path = "/agents/health-check/mcp";
+        Answer(
+            Row("request", "initialize", null, Now.AddSeconds(-10), 1, "POST /agents/health-check/mcp", "apim-norvia-eowsgwet24y3e West Europe", path: path, mcpMethod: "initialize"),
+            Row("request", "stream", null, Now.AddSeconds(-9.9), 39, "GET /agents/health-check/mcp", "apim-norvia-eowsgwet24y3e West Europe", path: path),
+            Row("request", "list", null, Now.AddSeconds(-9.8), 1, "POST /agents/health-check/mcp", "apim-norvia-eowsgwet24y3e West Europe", path: path, mcpMethod: "tools/list"),
+            Row("request", "call", null, Now.AddSeconds(-9.7), 448, "POST /agents/health-check/mcp", "apim-norvia-eowsgwet24y3e West Europe", path: path, mcpMethod: "tools/call", mcpTool: "run_checks"));
+
+        var hops = await HopsAsync(CorrelationId);
+
+        hops.Select(hop => hop.Name).Should().Equal(
+            "apim-norvia: MCP initialize", "apim-norvia: MCP event stream", "apim-norvia: MCP tools/list", "apim-norvia: MCP tools/call run_checks");
+    }
+
+    [Fact]
+    public async Task HopsAsync_LeavesOtherCallsToTheMcpServersPathsNamedAsTheyWere()
+    {
+        Answer(
+            Row("request", "view", null, Now.AddSeconds(-9), 445, "GET /agent-views/health-check/checks", "apim-norvia-eowsgwet24y3e West Europe", path: "/agent-views/health-check/checks"),
+            Row("request", "post", null, Now.AddSeconds(-8), 5, "POST /agents/health-check/mcp", "apim-norvia-eowsgwet24y3e West Europe", path: "/agents/health-check/mcp"));
+
+        var hops = await HopsAsync(CorrelationId);
+
+        hops.Select(hop => hop.Name).Should().Equal("apim-norvia: GET /agent-views/health-check/checks", "apim-norvia: POST /agents/health-check/mcp");
+    }
+
     // A link carries only its ID and parent; the query leaves the rest empty, as a union does.
     private static LogsTableRow Row(string kind, string? id, string? parentId) =>
         Row(kind, id, parentId, null, null, null, null);
@@ -500,11 +530,13 @@ public sealed class LogAnalyticsTrailSourceHopsTests
         string? messageId = null,
         string? fault = null,
         string? agentId = null,
-        string? toolName = null) =>
+        string? toolName = null,
+        string? mcpMethod = null,
+        string? mcpTool = null) =>
         LogsQueryModelFactory.LogsTableRow(Columns,
         [
             kind, id, parentId, start, durationMs, name, path, role, runId, workflow, category,
-            flow, outcome, failureCode, eventType, transportOrderNumber, null, null, null, null, null, messageId, fault, agentId, toolName,
+            flow, outcome, failureCode, eventType, transportOrderNumber, null, null, null, null, null, messageId, fault, agentId, toolName, mcpMethod, mcpTool,
         ]);
 
     // A dependency the query returns with what places a hop in it: an in-process one is a span an application or a
@@ -513,6 +545,6 @@ public sealed class LogAnalyticsTrailSourceHopsTests
         LogsQueryModelFactory.LogsTableRow(Columns,
         [
             "link", id, parentId, start, durationMs, name, null, role, null, null, null,
-            null, null, null, null, null, null, null, null, null, inProcess, null, null, null, null,
+            null, null, null, null, null, null, null, null, null, inProcess, null, null, null, null, null, null,
         ]);
 }
