@@ -178,7 +178,7 @@ The seed file gets Carrier Rate Cards, in the same shape as the Rate Cards from 
 |---|---|---|
 | Van Dijk Transport | Benelux Lanes, and a deliberate gap: no Lane into Germany | Releasing Rotterdam → Düsseldorf to Van Dijk fails with `NoMatchingLane`, and the Planner enters a Spot price. Van Dijk answers by hand, so the presenter can confirm the Spot price or reject it with `PriceNotAccepted` |
 | Kessler Spedition | Benelux and German Lanes | The Carrier Rate Card prices Rotterdam → Düsseldorf |
-| PakketPunt Express | Every Lane in the seed's Zones | Always priced |
+| PakketPunt Express | Every Lane of every Shipper's Rate Card, out of Rotterdam and Utrecht | Always priced |
 
 Each Carrier cost sits about 15–25% below the Freight Charge for the same Lane and weight, so the margin in the ERP looks believable.
 
