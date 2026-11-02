@@ -351,11 +351,16 @@ if (builder.ExecutionContext.IsPublishMode)
     // in it (ADR 0037). The presenter panel shows the Driver test users the estate made.
     // The Driver's screens store the files of a Proof of delivery in the estate's transit container (ADR 0009), as the identity the estate lets
     // write there. The connection is the container's storage account, reached with that identity.
+    // With ESTATE_DRIVER_PICKER on, the Driver app is behind the presenter's gate like the TMS UI instead, and the presenter picks which
+    // seeded Driver to act as, so no Driver test user needs multi-factor authentication for a demo (ADR 0047).
+    var driverPicker = bool.TryParse(builder.Configuration["ESTATE_DRIVER_PICKER"], out var pickDriver) && pickDriver;
+    var driverAppGate = driverPicker ? estate.DemoUisClientId : estate.DriverAppRegistrationClientId;
     driverAppWeb.WithExternalHttpEndpoints()
         .WithAzureUserAssignedIdentity(driverAppIdentity)
         .WithEnvironment("ConnectionStrings__driver-app-blobs", estate.DriverAppBlobEndpoint)
+        .WithEnvironment("DriverPicker__Enabled", driverPicker.ToString())
         .PublishAsAzureContainerApp((infrastructure, app) =>
-            infrastructure.Add(EntraSignIn.For(infrastructure, app, estate.DriverAppRegistrationClientId, estate.EntraIssuer)));
+            infrastructure.Add(EntraSignIn.For(infrastructure, app, driverAppGate, estate.EntraIssuer)));
     partnerPortal.WithEnvironment("DriverSignIns__Domain", estate.DriverSignInDomain)
         .WithEnvironment("DriverSignIns__Password", estate.DriverSignInPassword);
 

@@ -52,6 +52,7 @@ app.MapStaticAssets();
 // Every screen is a Driver's own: it needs a token that carries a Driver ID (ADR 0005, ADR 0037).
 app.MapRazorComponents<App>().RequireAuthorization(DriverClaims.DriverPolicy);
 app.MapDriverSignInStandIn();
+app.MapDriverPicker();
 app.MapReports();
 app.MapDefaultEndpoints();
 

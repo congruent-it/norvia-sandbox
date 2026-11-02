@@ -18,7 +18,12 @@
 
 <div class="trips-heading">
     <h1>@_name</h1>
-    @if (_signedInWithEntra)
+    @if (_pickedByPresenter)
+    {
+        @* The presenter is signed in with their own account and acts as this Driver (ADR 0047). *@
+        <FluentAnchor Href="@DriverPicker.PickerPath" Appearance="Appearance.Hypertext">Switch driver</FluentAnchor>
+    }
+    else if (_signedInWithEntra)
     {
         @* Easy Auth's endpoint, which signs the browser out of the Driver app and Entra ID. *@
         <FluentAnchor Href="@EasyAuthHandler.SignOutPath" Appearance="Appearance.Hypertext">Not you? Sign out</FluentAnchor>
@@ -61,6 +66,7 @@ else if (_trips.Count == 0)
 
     private string _name = "My Trips";
     private bool _signedInWithEntra;
+    private bool _pickedByPresenter;
     private IReadOnlyList<DriverTripView> _trips = [];
     private bool _loadFailed;
     private bool _sending;
@@ -70,7 +76,8 @@ else if (_trips.Count == 0)
         // The Driver ID comes from the token, never from the request (ADR 0005). The route's policy admits only a user with one.
         var user = HttpContext?.User ?? throw new InvalidOperationException("My Trips renders only for a request.");
         var driverId = user.FindFirstValue(DriverClaims.DriverId) ?? throw new InvalidOperationException("The policy admits only a Driver ID.");
-        _name = user.Identity?.Name ?? driverId;
+        _pickedByPresenter = user.HasClaim(claim => claim.Type == DriverClaims.DriverName);
+        _name = user.FindFirstValue(DriverClaims.DriverName) ?? user.Identity?.Name ?? driverId;
         _signedInWithEntra = EasyAuthHandler.SignedInWithEntra(user);
 
         try
