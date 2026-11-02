@@ -28,7 +28,7 @@ public sealed class TripDispatchWorkflowTests
 
     [Fact]
     public void Trigger_LocksTheMessage_SoTheWorkflowSettlesIt() =>
-        TripDispatchWorkflow.Trigger["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("peekLockTopicMessages");
+        TripDispatchWorkflow.Trigger["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("peekLockTopicMessagesV2");
 
     [Fact]
     public void Trigger_ClientTrackingId_IsTheDispatchsCorrelationId() =>
@@ -101,7 +101,7 @@ public sealed class TripDispatchWorkflowTests
 
         TripDispatchWorkflow.Action(TripDispatchWorkflow.Check)["else"]!["actions"]!.AsObject().Select(action => action.Key)
             .Should().Equal(TripDispatchWorkflow.DeadLetter, TripDispatchWorkflow.FailTheRun);
-        deadLetter["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("deadLetterTopicMessage");
+        deadLetter["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("deadLetterTopicMessageV2");
         parameters["topicName"]!.GetValue<string>().Should().Be("trip-events");
         parameters["subscriptionName"]!.GetValue<string>().Should().Be("trip-dispatch");
         parameters["lockToken"]!.GetValue<string>().Should().Be("@triggerBody()?['lockToken']");
@@ -118,7 +118,7 @@ public sealed class TripDispatchWorkflowTests
         var complete = TripDispatchWorkflow.Action(TripDispatchWorkflow.Complete);
 
         complete["runAfter"]!.AsObject().Should().BeEmpty();
-        complete["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("completeTopicMessage");
+        complete["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("completeTopicMessageV2");
         TripDispatchWorkflow.Action(TripDispatchWorkflow.Check)["actions"]!.AsObject().Select(action => action.Key).Should().StartWith(TripDispatchWorkflow.Complete);
         Statuses(TripDispatchWorkflow.Action(TripDispatchWorkflow.Credential), TripDispatchWorkflow.Complete).Should().BeEquivalentTo("Succeeded");
     }
@@ -206,7 +206,9 @@ public sealed class TripDispatchWorkflowTests
     {
         var report = TripDispatchWorkflow.Action(TripDispatchWorkflow.Report);
 
-        Statuses(report, TripDispatchWorkflow.Send).Should().BeEquivalentTo("Succeeded", "Failed", "TimedOut");
+        Statuses(TripDispatchWorkflow.Action("Read_the_answer"), TripDispatchWorkflow.Send).Should().BeEquivalentTo("Succeeded", "Failed", "TimedOut");
+        Statuses(TripDispatchWorkflow.Action("Track_the_answer"), "Read_the_answer").Should().BeEquivalentTo("Succeeded");
+        Statuses(report, "Track_the_answer").Should().BeEquivalentTo("Succeeded");
         report["actions"]!.AsObject().Select(action => action.Key).Should().Equal(TripDispatchWorkflow.ReportDelivered);
         report["else"]!["actions"]!.AsObject().Select(action => action.Key).Should().Contain(TripDispatchWorkflow.ReportNotDelivered);
         var expression = report["expression"]!.ToJsonString();
@@ -220,7 +222,7 @@ public sealed class TripDispatchWorkflowTests
 
         body.Select(property => property.Key).Should().Equal("cause");
         var cause = body["cause"]!.GetValue<string>();
-        cause.Should().Contain("coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0)");
+        cause.Should().Contain("outputs('Read_the_answer')?['statusCode']");
         cause.Should().Contain("min(500,");
         cause.Should().Contain("retryHistory");
     }
@@ -232,7 +234,7 @@ public sealed class TripDispatchWorkflowTests
         {
             var tracked = TripDispatchWorkflow.Action(name)["trackedProperties"]!.AsObject();
 
-            tracked.Select(property => property.Key).Should().Contain(["outcome", "failureCode", "tripNumber", "correlationId", "partyId"]);
+            tracked.Select(property => property.Key).Should().Contain(["outcome", "failureCode", "correlationId"]);
             tracked["failureCode"]!.GetValue<string>().Should().Contain("TmsUnavailable").And.Contain("TmsCallRefused");
         }
     }
@@ -240,7 +242,7 @@ public sealed class TripDispatchWorkflowTests
     [Fact]
     public void Send_TracksTheDriverAppsFailureAsUnavailableOrRefused()
     {
-        var failureCode = TripDispatchWorkflow.Action(TripDispatchWorkflow.Send)["trackedProperties"]!["failureCode"]!.GetValue<string>();
+        var failureCode = TripDispatchWorkflow.Action("Read_the_answer")["inputs"]!["failureCode"]!.GetValue<string>();
 
         failureCode.Should().Contain("DriverAppUnavailable").And.Contain("DriverAppRefused");
     }

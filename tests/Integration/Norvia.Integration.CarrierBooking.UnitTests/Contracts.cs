@@ -16,6 +16,10 @@ internal static class Contracts
             .Where(name => name.StartsWith(folder + "/", StringComparison.Ordinal) && !name[(folder.Length + 1)..].Contains('/', StringComparison.Ordinal))
             .Select(name => name[(folder.Length + 1)..]);
 
+    /// <summary>The paths of the Logic App workflows embedded in this project, as <c>Read</c> takes them.</summary>
+    public static IEnumerable<string> Workflows() =>
+        Assembly.GetManifestResourceNames().Where(name => name.EndsWith("LogicApp/" + name.Split('/')[^2] + "/workflow.json", StringComparison.Ordinal)).Order(StringComparer.Ordinal);
+
     public static string Read(string path)
     {
         using var stream = Assembly.GetManifestResourceStream(path) ?? throw new InvalidOperationException($"{path} is not an embedded contract.");

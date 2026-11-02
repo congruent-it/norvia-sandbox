@@ -106,9 +106,9 @@ public sealed class DemoSeedTests(TmsFixture tms)
     }
 
     [Fact]
-    public void CarrierRateCards_PakketPuntPricesEveryLaneOfBrouwerDrankensRateCard()
+    public void CarrierRateCards_PakketPuntPricesEveryLaneOfEveryShippersRateCard()
     {
-        var shipperLanes = LanesOf(BrouwerDrankensRateCard()).Select(lane => (lane.Origin, lane.Destination));
+        var shipperLanes = DemoSeed()["rateCards"]!.AsArray().SelectMany(card => LanesOf(card!)).Select(lane => (lane.Origin, lane.Destination)).Distinct().ToList();
 
         LanesOf("PakketPunt Express").Select(lane => (lane.Origin, lane.Destination)).Should().Contain(shipperLanes);
     }

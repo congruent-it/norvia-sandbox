@@ -12,7 +12,7 @@
           },
           "serviceProviderConfiguration": {
             "connectionName": "serviceBus",
-            "operationId": "peekLockQueueMessages",
+            "operationId": "peekLockQueueMessagesV2",
             "serviceProviderId": "/serviceProviders/serviceBus"
           }
         },
@@ -57,10 +57,10 @@
           ]
         },
         "trackedProperties": {
-          "correlationId": "@outputs('Track_the_message')?['correlationId']",
+          "correlationId": "@triggerBody()?['userProperties']?['correlationId']",
           "flow": "carrier-proof-of-delivery",
-          "partyId": "@outputs('Track_the_message')?['partyId']",
-          "sourceMessageId": "@outputs('Track_the_message')?['sourceMessageId']",
+          "partyId": "@triggerBody()?['userProperties']?['partyId']",
+          "sourceMessageId": "@triggerBody()?['userProperties']?['sourceMessageId']",
           "outcome": "@if(equals(action()?['status'], 'Failed'), 'DeadLettered', null)",
           "messageId": "@if(equals(action()?['status'], 'Failed'), triggerBody()?['messageId'], null)",
           "failureCode": "@if(equals(action()?['status'], 'Failed'), 'ProofOfDeliveryBlobMissing', null)"
@@ -76,7 +76,7 @@
           },
           "serviceProviderConfiguration": {
             "connectionName": "serviceBus",
-            "operationId": "deadLetterQueueMessage",
+            "operationId": "deadLetterQueueMessageV2",
             "serviceProviderId": "/serviceProviders/serviceBus"
           }
         },
@@ -86,10 +86,10 @@
           ]
         },
         "trackedProperties": {
-          "correlationId": "@outputs('Track_the_message')?['correlationId']",
+          "correlationId": "@triggerBody()?['userProperties']?['correlationId']",
           "flow": "carrier-proof-of-delivery",
-          "partyId": "@outputs('Track_the_message')?['partyId']",
-          "sourceMessageId": "@outputs('Track_the_message')?['sourceMessageId']",
+          "partyId": "@triggerBody()?['userProperties']?['partyId']",
+          "sourceMessageId": "@triggerBody()?['userProperties']?['sourceMessageId']",
           "outcome": "DeadLettered",
           "messageId": "@triggerBody()?['messageId']",
           "failureCode": "ProofOfDeliveryBlobMissing"
@@ -126,10 +126,10 @@
           ]
         },
         "trackedProperties": {
-          "correlationId": "@outputs('Track_the_message')?['correlationId']",
+          "correlationId": "@triggerBody()?['userProperties']?['correlationId']",
           "flow": "carrier-proof-of-delivery",
-          "partyId": "@outputs('Track_the_message')?['partyId']",
-          "sourceMessageId": "@outputs('Track_the_message')?['sourceMessageId']",
+          "partyId": "@triggerBody()?['userProperties']?['partyId']",
+          "sourceMessageId": "@triggerBody()?['userProperties']?['sourceMessageId']",
           "outcome": "@if(equals(action()?['status'], 'Failed'), 'DeadLettered', null)",
           "messageId": "@if(equals(action()?['status'], 'Failed'), triggerBody()?['messageId'], null)",
           "failureCode": "@if(equals(action()?['status'], 'Failed'), 'UnmappableProofOfDelivery', null)"
@@ -145,7 +145,7 @@
           },
           "serviceProviderConfiguration": {
             "connectionName": "serviceBus",
-            "operationId": "deadLetterQueueMessage",
+            "operationId": "deadLetterQueueMessageV2",
             "serviceProviderId": "/serviceProviders/serviceBus"
           }
         },
@@ -155,10 +155,10 @@
           ]
         },
         "trackedProperties": {
-          "correlationId": "@outputs('Track_the_message')?['correlationId']",
+          "correlationId": "@triggerBody()?['userProperties']?['correlationId']",
           "flow": "carrier-proof-of-delivery",
-          "partyId": "@outputs('Track_the_message')?['partyId']",
-          "sourceMessageId": "@outputs('Track_the_message')?['sourceMessageId']",
+          "partyId": "@triggerBody()?['userProperties']?['partyId']",
+          "sourceMessageId": "@triggerBody()?['userProperties']?['sourceMessageId']",
           "outcome": "DeadLettered",
           "messageId": "@triggerBody()?['messageId']",
           "failureCode": "UnmappableProofOfDelivery"
@@ -204,12 +204,12 @@
           ]
         },
         "trackedProperties": {
-          "correlationId": "@outputs('Track_the_message')?['correlationId']",
+          "correlationId": "@triggerBody()?['userProperties']?['correlationId']",
           "flow": "carrier-proof-of-delivery",
-          "partyId": "@outputs('Track_the_message')?['partyId']",
-          "sourceMessageId": "@outputs('Track_the_message')?['sourceMessageId']",
+          "partyId": "@triggerBody()?['userProperties']?['partyId']",
+          "sourceMessageId": "@triggerBody()?['userProperties']?['sourceMessageId']",
           "shipmentNumber": "@actions('Record_in_the_TMS')?['outputs']?['body']?['shipmentNumber']",
-          "carrierBookingNumber": "@json(body('Map_the_proof_of_delivery'))?['$multipart']?[0]?['body']?['carrierBookingNumber']",
+          "carrierBookingNumber": "@action()?['inputs']?['body']?['$multipart']?[0]?['body']?['carrierBookingNumber']",
           "outcome": "@if(and(greaterOrEquals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', if(or(equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 500)), 'Retrying', 'DeadLettered'))",
           "messageId": "@if(and(greaterOrEquals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 500)), null, triggerBody()?['messageId']))",
           "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Record_in_the_TMS')?['outputs']?['statusCode'], 0), 500)), 'TmsUnavailable', coalesce(actions('Record_in_the_TMS')?['outputs']?['body']?['code'], 'TmsCallRefused')))"
@@ -249,10 +249,10 @@
             },
             "runAfter": {},
             "trackedProperties": {
-              "correlationId": "@outputs('Track_the_message')?['correlationId']",
+              "correlationId": "@triggerBody()?['userProperties']?['correlationId']",
               "flow": "carrier-proof-of-delivery",
-              "partyId": "@outputs('Track_the_message')?['partyId']",
-              "sourceMessageId": "@outputs('Track_the_message')?['sourceMessageId']",
+              "partyId": "@triggerBody()?['userProperties']?['partyId']",
+              "sourceMessageId": "@triggerBody()?['userProperties']?['sourceMessageId']",
               "outcome": "Succeeded"
             }
           },
@@ -264,7 +264,7 @@
               },
               "serviceProviderConfiguration": {
                 "connectionName": "serviceBus",
-                "operationId": "completeQueueMessage",
+                "operationId": "completeQueueMessageV2",
                 "serviceProviderId": "/serviceProviders/serviceBus"
               }
             },
@@ -302,19 +302,19 @@
                     },
                     "serviceProviderConfiguration": {
                       "connectionName": "serviceBus",
-                      "operationId": "deadLetterQueueMessage",
+                      "operationId": "deadLetterQueueMessageV2",
                       "serviceProviderId": "/serviceProviders/serviceBus"
                     }
                   },
                   "runAfter": {},
                   "trackedProperties": {
-                    "correlationId": "@outputs('Track_the_message')?['correlationId']",
+                    "correlationId": "@triggerBody()?['userProperties']?['correlationId']",
                     "flow": "carrier-proof-of-delivery",
-                    "partyId": "@outputs('Track_the_message')?['partyId']",
-                    "sourceMessageId": "@outputs('Track_the_message')?['sourceMessageId']",
+                    "partyId": "@triggerBody()?['userProperties']?['partyId']",
+                    "sourceMessageId": "@triggerBody()?['userProperties']?['sourceMessageId']",
                     "outcome": "DeadLettered",
                     "messageId": "@triggerBody()?['messageId']",
-                    "failureCode": "@coalesce(actions('Record_in_the_TMS')?['outputs']?['body']?['code'], 'TmsCallRefused')"
+                    "failureCode": "@action()?['inputs']?['parameters']?['deadLetterReason']"
                   }
                 },
                 "Fail_the_run_on_the_refused_message": {
@@ -344,16 +344,16 @@
                       },
                       "serviceProviderConfiguration": {
                         "connectionName": "serviceBus",
-                        "operationId": "abandonQueueMessage",
+                        "operationId": "abandonQueueMessageV2",
                         "serviceProviderId": "/serviceProviders/serviceBus"
                       }
                     },
                     "runAfter": {},
                     "trackedProperties": {
-                      "correlationId": "@outputs('Track_the_message')?['correlationId']",
+                      "correlationId": "@triggerBody()?['userProperties']?['correlationId']",
                       "flow": "carrier-proof-of-delivery",
-                      "partyId": "@outputs('Track_the_message')?['partyId']",
-                      "sourceMessageId": "@outputs('Track_the_message')?['sourceMessageId']",
+                      "partyId": "@triggerBody()?['userProperties']?['partyId']",
+                      "sourceMessageId": "@triggerBody()?['userProperties']?['sourceMessageId']",
                       "outcome": "Retrying",
                       "failureCode": "TmsUnavailable"
                     }

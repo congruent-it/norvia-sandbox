@@ -17,7 +17,7 @@ public sealed class TrackingWorkflowTests
     public void Trigger_IsTheTrackingQueue_AndItsClientTrackingIdIsTheCorrelationId()
     {
         TrackingWorkflow.Trigger["inputs"]!["parameters"]!["queueName"]!.GetValue<string>().Should().Be("carrier-tracking");
-        TrackingWorkflow.Trigger["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("peekLockQueueMessages");
+        TrackingWorkflow.Trigger["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("peekLockQueueMessagesV2");
         TrackingWorkflow.Trigger["correlation"]!["clientTrackingId"]!.GetValue<string>().Should().Be("@{triggerOutputs()?['body']?['userProperties']?['correlationId']}");
     }
 
@@ -65,7 +65,7 @@ public sealed class TrackingWorkflowTests
         var end = TrackingWorkflow.Action("Fail_the_run_on_the_unmappable_message");
 
         deadLetter["runAfter"]![TrackingWorkflow.Map]!.AsArray().Select(status => status!.GetValue<string>()).Should().BeEquivalentTo("Failed");
-        OperationId("Dead_letter_the_unmappable_message").Should().Be("deadLetterQueueMessage");
+        OperationId("Dead_letter_the_unmappable_message").Should().Be("deadLetterQueueMessageV2");
         deadLetter["inputs"]!["parameters"]!["deadLetterReason"]!.GetValue<string>().Should().Be("UnmappableTrackingMessage");
         deadLetter["inputs"]!["parameters"]!["deadLetterErrorDescription"]!.GetValue<string>().Should().NotBeNullOrWhiteSpace();
         end["inputs"]!["runStatus"]!.GetValue<string>().Should().Be("Failed");
@@ -85,7 +85,7 @@ public sealed class TrackingWorkflowTests
 
         settle["runAfter"]![TrackingWorkflow.TmsCall]!.AsArray().Select(status => status!.GetValue<string>()).Should().BeEquivalentTo("Succeeded", "Failed", "TimedOut");
         settle["expression"]!.ToJsonString().Should().Contain("200").And.Contain("300");
-        OperationId("Complete_the_message").Should().Be("completeQueueMessage");
+        OperationId("Complete_the_message").Should().Be("completeQueueMessageV2");
         settle["actions"]!.AsObject().Select(action => action.Key).Should().BeEquivalentTo("Complete_the_message");
     }
 
@@ -95,7 +95,7 @@ public sealed class TrackingWorkflowTests
         var deadLetter = TrackingWorkflow.Action("Dead_letter_the_refused_message");
         var parameters = deadLetter["inputs"]!["parameters"]!;
 
-        OperationId("Dead_letter_the_refused_message").Should().Be("deadLetterQueueMessage");
+        OperationId("Dead_letter_the_refused_message").Should().Be("deadLetterQueueMessageV2");
         parameters["deadLetterReason"]!.GetValue<string>().Should().Contain("['code']").And.Contain("TmsCallRefused");
         parameters["deadLetterErrorDescription"]!.GetValue<string>().Should().Contain("['detail']");
         TrackingWorkflow.Action("Settle_the_refused_or_unreached_message")["expression"]!.ToJsonString()
@@ -106,7 +106,7 @@ public sealed class TrackingWorkflowTests
     [Fact]
     public void Settle_AbandonsAServerErrorOrTimeout_SoTheQueueRetriesItUpToItsMaximumDeliveryCount()
     {
-        OperationId("Abandon_the_message_to_retry").Should().Be("abandonQueueMessage");
+        OperationId("Abandon_the_message_to_retry").Should().Be("abandonQueueMessageV2");
         TrackingWorkflow.Action("Abandon_the_message_to_retry")["trackedProperties"]!["outcome"]!.GetValue<string>().Should().Be("Retrying");
         TrackingWorkflow.Action("Fail_the_run_on_the_unreached_TMS")["inputs"]!["runError"]!["code"]!.GetValue<string>().Should().Be("TmsUnavailable");
     }

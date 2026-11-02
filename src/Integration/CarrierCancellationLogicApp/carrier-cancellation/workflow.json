@@ -13,7 +13,7 @@
           },
           "serviceProviderConfiguration": {
             "connectionName": "serviceBus",
-            "operationId": "peekLockTopicMessages",
+            "operationId": "peekLockTopicMessagesV2",
             "serviceProviderId": "/serviceProviders/serviceBus"
           }
         },
@@ -56,7 +56,6 @@
           ]
         },
         "trackedProperties": {
-          "correlationId": "@outputs('Track_the_cancellation')?['correlationId']",
           "flow": "carrier-cancellation",
           "outcome": "@if(equals(action()?['status'], 'Failed'), 'Failed', null)",
           "failureCode": "@if(equals(action()?['status'], 'Failed'), 'CarrierCancellationUnreadable', null)"
@@ -74,7 +73,7 @@
           },
           "serviceProviderConfiguration": {
             "connectionName": "serviceBus",
-            "operationId": "deadLetterTopicMessage",
+            "operationId": "deadLetterTopicMessageV2",
             "serviceProviderId": "/serviceProviders/serviceBus"
           }
         },
@@ -84,14 +83,8 @@
           ]
         },
         "trackedProperties": {
-          "correlationId": "@outputs('Track_the_cancellation')?['correlationId']",
           "flow": "carrier-cancellation",
-          "partyId": "@outputs('Track_the_cancellation')?['partyId']",
-          "carrierBookingNumber": "@outputs('Track_the_cancellation')?['carrierBookingNumber']",
-          "shipmentNumber": "@outputs('Track_the_cancellation')?['shipmentNumber']",
-          "sourceMessageId": "@outputs('Track_the_cancellation')?['sourceMessageId']",
           "outcome": "DeadLettered",
-          "messageId": "@triggerBody()?['messageId']",
           "failureCode": "CarrierCancellationUnreadable"
         }
       },
@@ -121,7 +114,7 @@
           },
           "serviceProviderConfiguration": {
             "connectionName": "serviceBus",
-            "operationId": "completeTopicMessage",
+            "operationId": "completeTopicMessageV2",
             "serviceProviderId": "/serviceProviders/serviceBus"
           }
         },
@@ -188,13 +181,47 @@
           }
         },
         "trackedProperties": {
-          "correlationId": "@outputs('Track_the_cancellation')?['correlationId']",
+          "flow": "carrier-cancellation"
+        }
+      },
+      "Read_the_answer": {
+        "type": "Compose",
+        "inputs": {
+          "outcome": "@if(and(greaterOrEquals(coalesce(actions('Send_to_the_Carrier')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Send_to_the_Carrier')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
+          "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Send_to_the_Carrier')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Send_to_the_Carrier')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Send_to_the_Carrier')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Send_to_the_Carrier')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Send_to_the_Carrier')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Send_to_the_Carrier')?['outputs']?['statusCode'], 0), 500)), 'CarrierUnavailable', 'CarrierRefused'))",
+          "statusCode": "@coalesce(actions('Send_to_the_Carrier')?['outputs']?['statusCode'], 0)"
+        },
+        "runAfter": {
+          "Send_to_the_Carrier": [
+            "Succeeded",
+            "Failed",
+            "TimedOut"
+          ]
+        }
+      },
+      "Track_the_answer": {
+        "type": "Compose",
+        "inputs": {
+          "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
+          "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['carrierId']",
+          "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
+          "carrierBookingNumber": "@json(base64ToString(triggerBody()?['contentData']))?['carrierBookingNumber']",
+          "outcome": "@outputs('Read_the_answer')?['outcome']",
+          "failureCode": "@outputs('Read_the_answer')?['failureCode']"
+        },
+        "runAfter": {
+          "Read_the_answer": [
+            "Succeeded"
+          ]
+        },
+        "trackedProperties": {
+          "correlationId": "@action()?['inputs']?['correlationId']",
           "flow": "carrier-cancellation",
-          "partyId": "@outputs('Track_the_cancellation')?['partyId']",
-          "shipmentNumber": "@outputs('Track_the_cancellation')?['shipmentNumber']",
-          "outcome": "@if(and(greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 200), less(coalesce(action()?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
-          "failureCode": "@if(and(greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 200), less(coalesce(action()?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(action()?['outputs']?['statusCode'], 0), 0), equals(coalesce(action()?['outputs']?['statusCode'], 0), 408), equals(coalesce(action()?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 500)), 'CarrierUnavailable', 'CarrierRefused'))",
-          "carrierBookingNumber": "@outputs('Track_the_cancellation')?['carrierBookingNumber']"
+          "partyId": "@action()?['inputs']?['partyId']",
+          "shipmentNumber": "@action()?['inputs']?['shipmentNumber']",
+          "carrierBookingNumber": "@action()?['inputs']?['carrierBookingNumber']",
+          "outcome": "@action()?['inputs']?['outcome']",
+          "failureCode": "@action()?['inputs']?['failureCode']"
         }
       },
       "Report_the_outcome_to_the_TMS": {
@@ -240,13 +267,10 @@
             },
             "runAfter": {},
             "trackedProperties": {
-              "correlationId": "@outputs('Track_the_cancellation')?['correlationId']",
+              "correlationId": "@action()?['inputs']?['headers']?['X-Correlation-ID']",
               "flow": "carrier-cancellation",
-              "partyId": "@outputs('Track_the_cancellation')?['partyId']",
-              "shipmentNumber": "@outputs('Track_the_cancellation')?['shipmentNumber']",
-              "outcome": "@if(and(greaterOrEquals(coalesce(actions('Report_the_cancellation_told')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_cancellation_told')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
-              "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Report_the_cancellation_told')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_cancellation_told')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Report_the_cancellation_told')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Report_the_cancellation_told')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Report_the_cancellation_told')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Report_the_cancellation_told')?['outputs']?['statusCode'], 0), 500)), 'TmsUnavailable', 'TmsCallRefused'))",
-              "carrierBookingNumber": "@outputs('Track_the_cancellation')?['carrierBookingNumber']"
+              "outcome": "@if(and(greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 200), less(coalesce(action()?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
+              "failureCode": "@if(and(greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 200), less(coalesce(action()?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(action()?['outputs']?['statusCode'], 0), 0), equals(coalesce(action()?['outputs']?['statusCode'], 0), 408), equals(coalesce(action()?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 500)), 'TmsUnavailable', 'TmsCallRefused'))"
             }
           }
         },
@@ -279,7 +303,7 @@
                   "maximumInterval": "PT20S"
                 },
                 "body": {
-                  "statusCode": "@coalesce(actions('Send_to_the_Carrier')?['outputs']?['statusCode'], 0)",
+                  "statusCode": "@outputs('Read_the_answer')?['statusCode']",
                   "message": "@substring(outputs('Take_the_Carriers_answer'), 0, min(500, length(outputs('Take_the_Carriers_answer'))))"
                 }
               },
@@ -289,22 +313,17 @@
                 ]
               },
               "trackedProperties": {
-                "correlationId": "@outputs('Track_the_cancellation')?['correlationId']",
+                "correlationId": "@action()?['inputs']?['headers']?['X-Correlation-ID']",
                 "flow": "carrier-cancellation",
-                "partyId": "@outputs('Track_the_cancellation')?['partyId']",
-                "shipmentNumber": "@outputs('Track_the_cancellation')?['shipmentNumber']",
-                "outcome": "@if(and(greaterOrEquals(coalesce(actions('Report_the_cancellation_not_delivered')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_cancellation_not_delivered')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
-                "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Report_the_cancellation_not_delivered')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_cancellation_not_delivered')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Report_the_cancellation_not_delivered')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Report_the_cancellation_not_delivered')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Report_the_cancellation_not_delivered')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Report_the_cancellation_not_delivered')?['outputs']?['statusCode'], 0), 500)), 'TmsUnavailable', 'TmsCallRefused'))",
-                "carrierBookingNumber": "@outputs('Track_the_cancellation')?['carrierBookingNumber']"
+                "outcome": "@if(and(greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 200), less(coalesce(action()?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
+                "failureCode": "@if(and(greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 200), less(coalesce(action()?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(action()?['outputs']?['statusCode'], 0), 0), equals(coalesce(action()?['outputs']?['statusCode'], 0), 408), equals(coalesce(action()?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 500)), 'TmsUnavailable', 'TmsCallRefused'))"
               }
             }
           }
         },
         "runAfter": {
-          "Send_to_the_Carrier": [
-            "Succeeded",
-            "Failed",
-            "TimedOut"
+          "Track_the_answer": [
+            "Succeeded"
           ]
         }
       }

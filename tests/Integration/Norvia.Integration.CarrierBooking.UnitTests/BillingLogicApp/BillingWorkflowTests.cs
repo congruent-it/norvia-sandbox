@@ -25,7 +25,7 @@ public sealed class BillingWorkflowTests
         inputs["parameters"]!["topicName"]!.GetValue<string>().Should().Be("transport-order-events");
         inputs["parameters"]!["subscriptionName"]!.GetValue<string>().Should().Be("billing");
         inputs["serviceProviderConfiguration"]!["serviceProviderId"]!.GetValue<string>().Should().Be("/serviceProviders/serviceBus");
-        inputs["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("peekLockTopicMessages", "the workflow settles the message itself");
+        inputs["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("peekLockTopicMessagesV2", "the workflow settles the message itself");
     }
 
     [Fact]
@@ -102,7 +102,7 @@ public sealed class BillingWorkflowTests
 
         BillingWorkflow.Action(BillingWorkflow.Check)["else"]!["actions"]!.AsObject().Select(action => action.Key)
             .Should().Equal(BillingWorkflow.DeadLetterUnreadable, BillingWorkflow.FailTheUnreadableRun);
-        deadLetter["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("deadLetterTopicMessage");
+        deadLetter["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("deadLetterTopicMessageV2");
         parameters["topicName"]!.GetValue<string>().Should().Be("transport-order-events");
         parameters["subscriptionName"]!.GetValue<string>().Should().Be("billing");
         parameters["lockToken"]!.GetValue<string>().Should().Be("@triggerBody()?['lockToken']");
@@ -172,7 +172,7 @@ public sealed class BillingWorkflowTests
         settle["expression"]!.ToJsonString().Should().Contain("greaterOrEquals").And.Contain("200").And.Contain("less").And.Contain("300");
         settle["actions"]!.AsObject().Select(action => action.Key).Should().Equal(BillingWorkflow.Complete);
         var complete = BillingWorkflow.Action(BillingWorkflow.Complete);
-        complete["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("completeTopicMessage");
+        complete["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("completeTopicMessageV2");
         Parameters(BillingWorkflow.Complete)["lockToken"]!.GetValue<string>().Should().Be("@triggerBody()?['lockToken']");
     }
 
@@ -184,14 +184,14 @@ public sealed class BillingWorkflowTests
         var parameters = Parameters(BillingWorkflow.DeadLetterRefused);
 
         settle["else"]!["actions"]!.AsObject().Select(action => action.Key).Should().Equal(BillingWorkflow.DeadLetterRefused, BillingWorkflow.FailTheRefusedRun);
-        deadLetter["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("deadLetterTopicMessage");
+        deadLetter["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("deadLetterTopicMessageV2");
         parameters["topicName"]!.GetValue<string>().Should().Be("transport-order-events");
         parameters["subscriptionName"]!.GetValue<string>().Should().Be("billing");
         parameters["lockToken"]!.GetValue<string>().Should().Be("@triggerBody()?['lockToken']");
         parameters["deadLetterReason"]!.GetValue<string>().Should().Contain("['body']?['code']").And.Contain("'ErpUnavailable'").And.Contain("'ErpCallRefused'");
         parameters["deadLetterErrorDescription"]!.GetValue<string>().Should().Contain("['body']?['detail']").And.Contain("['body']?['title']");
         deadLetter["trackedProperties"]!["outcome"]!.GetValue<string>().Should().Be("DeadLettered");
-        deadLetter["trackedProperties"]!["failureCode"]!.GetValue<string>().Should().Be(parameters["deadLetterReason"]!.GetValue<string>());
+        deadLetter["trackedProperties"]!["failureCode"]!.GetValue<string>().Should().Be("@action()?['inputs']?['parameters']?['deadLetterReason']");
         BillingWorkflow.Action(BillingWorkflow.FailTheRefusedRun)["inputs"]!["runStatus"]!.GetValue<string>().Should().Be("Failed");
     }
 

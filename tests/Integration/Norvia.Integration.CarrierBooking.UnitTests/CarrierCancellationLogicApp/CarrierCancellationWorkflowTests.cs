@@ -94,7 +94,7 @@ public sealed class CarrierCancellationWorkflowTests
 
     [Fact]
     public void Trigger_LocksTheMessage_SoTheWorkflowSettlesIt() =>
-        CarrierCancellationWorkflow.Trigger["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("peekLockTopicMessages");
+        CarrierCancellationWorkflow.Trigger["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("peekLockTopicMessagesV2");
 
     [Fact]
     public void UnreadableCancellation_IsDeadLetteredWithTheFailureCodeAndAReadableMessage_AndFailsTheRun()
@@ -103,7 +103,7 @@ public sealed class CarrierCancellationWorkflowTests
         var parameters = deadLetter["inputs"]!["parameters"]!;
 
         Statuses(deadLetter, CarrierCancellationWorkflow.MapAction).Should().BeEquivalentTo("Failed");
-        deadLetter["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("deadLetterTopicMessage");
+        deadLetter["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("deadLetterTopicMessageV2");
         parameters["subscriptionName"]!.GetValue<string>().Should().Be("carrier-cancellation");
         parameters["lockToken"]!.GetValue<string>().Should().Be("@triggerBody()?['lockToken']");
         parameters["deadLetterReason"]!.GetValue<string>().Should().Be("CarrierCancellationUnreadable");
@@ -205,7 +205,9 @@ public sealed class CarrierCancellationWorkflowTests
     {
         var report = CarrierCancellationWorkflow.Action(CarrierCancellationWorkflow.Report);
 
-        Statuses(report, CarrierCancellationWorkflow.Send).Should().BeEquivalentTo("Succeeded", "Failed", "TimedOut");
+        Statuses(CarrierCancellationWorkflow.Action("Read_the_answer"), CarrierCancellationWorkflow.Send).Should().BeEquivalentTo("Succeeded", "Failed", "TimedOut");
+        Statuses(CarrierCancellationWorkflow.Action("Track_the_answer"), "Read_the_answer").Should().BeEquivalentTo("Succeeded");
+        Statuses(report, "Track_the_answer").Should().BeEquivalentTo("Succeeded");
         report["actions"]!.AsObject().Select(action => action.Key).Should().Equal(CarrierCancellationWorkflow.ReportTold);
         report["else"]!["actions"]!.AsObject().Select(action => action.Key).Should().Contain(CarrierCancellationWorkflow.ReportNotDelivered);
         var expression = report["expression"]!.ToJsonString();
@@ -218,7 +220,7 @@ public sealed class CarrierCancellationWorkflowTests
         var body = CarrierCancellationWorkflow.Action(CarrierCancellationWorkflow.ReportNotDelivered)["inputs"]!["body"]!.AsObject();
 
         body.Select(property => property.Key).Should().BeEquivalentTo("statusCode", "message");
-        body["statusCode"]!.GetValue<string>().Should().Contain("coalesce(actions('Send_to_the_Carrier')?['outputs']?['statusCode'], 0)");
+        body["statusCode"]!.GetValue<string>().Should().Contain("outputs('Read_the_answer')?['statusCode']");
         body["message"]!.GetValue<string>().Should().Contain("min(500,");
     }
 
@@ -229,7 +231,7 @@ public sealed class CarrierCancellationWorkflowTests
         {
             var tracked = CarrierCancellationWorkflow.Action(name)["trackedProperties"]!.AsObject();
 
-            tracked.Select(property => property.Key).Should().Contain(["outcome", "failureCode", "carrierBookingNumber", "correlationId"]);
+            tracked.Select(property => property.Key).Should().Contain(["outcome", "failureCode", "correlationId"]);
             tracked["failureCode"]!.GetValue<string>().Should().Contain("TmsUnavailable").And.Contain("TmsCallRefused");
         }
     }
@@ -237,7 +239,7 @@ public sealed class CarrierCancellationWorkflowTests
     [Fact]
     public void Send_TracksTheCarriersFailureAsUnavailableOrRefused()
     {
-        var failureCode = CarrierCancellationWorkflow.Action(CarrierCancellationWorkflow.Send)["trackedProperties"]!["failureCode"]!.GetValue<string>();
+        var failureCode = CarrierCancellationWorkflow.Action("Read_the_answer")["inputs"]!["failureCode"]!.GetValue<string>();
 
         failureCode.Should().Contain("CarrierUnavailable").And.Contain("CarrierRefused");
     }

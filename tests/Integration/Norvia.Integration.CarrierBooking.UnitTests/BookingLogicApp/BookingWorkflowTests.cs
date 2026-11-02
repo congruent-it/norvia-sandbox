@@ -176,7 +176,9 @@ public sealed class BookingWorkflowTests
     {
         var report = BookingWorkflow.Action(BookingWorkflow.Report);
 
-        Statuses(report, BookingWorkflow.Send).Should().BeEquivalentTo("Succeeded", "Failed", "TimedOut");
+        Statuses(BookingWorkflow.Action("Read_the_answer"), BookingWorkflow.Send).Should().BeEquivalentTo("Succeeded", "Failed", "TimedOut");
+        Statuses(BookingWorkflow.Action("Track_the_answer"), "Read_the_answer").Should().BeEquivalentTo("Succeeded");
+        Statuses(report, "Track_the_answer").Should().BeEquivalentTo("Succeeded");
         report["actions"]!.AsObject().Select(action => action.Key).Should().Equal(BookingWorkflow.ReportSent);
         report["else"]!["actions"]!.AsObject().Select(action => action.Key).Should().Contain(BookingWorkflow.ReportNotDelivered);
         var expression = report["expression"]!.ToJsonString();
@@ -189,7 +191,7 @@ public sealed class BookingWorkflowTests
         var body = BookingWorkflow.Action(BookingWorkflow.ReportNotDelivered)["inputs"]!["body"]!.AsObject();
 
         body.Select(property => property.Key).Should().BeEquivalentTo("statusCode", "message");
-        body["statusCode"]!.GetValue<string>().Should().Contain("coalesce(actions('Send_to_the_Carrier')?['outputs']?['statusCode'], 0)");
+        body["statusCode"]!.GetValue<string>().Should().Contain("outputs('Read_the_answer')?['statusCode']");
         body["message"]!.GetValue<string>().Should().Contain("min(500,");
     }
 
@@ -200,7 +202,7 @@ public sealed class BookingWorkflowTests
         {
             var tracked = BookingWorkflow.Action(name)["trackedProperties"]!.AsObject();
 
-            tracked.Select(property => property.Key).Should().Contain(["outcome", "failureCode", "carrierBookingNumber", "correlationId"]);
+            tracked.Select(property => property.Key).Should().Contain(["outcome", "failureCode", "correlationId"]);
             tracked["failureCode"]!.GetValue<string>().Should().Contain("TmsUnavailable").And.Contain("TmsCallRefused");
         }
     }
@@ -208,7 +210,7 @@ public sealed class BookingWorkflowTests
     [Fact]
     public void Send_TracksTheCarriersFailureAsUnavailableOrRefused()
     {
-        var failureCode = BookingWorkflow.Action(BookingWorkflow.Send)["trackedProperties"]!["failureCode"]!.GetValue<string>();
+        var failureCode = BookingWorkflow.Action("Read_the_answer")["inputs"]!["failureCode"]!.GetValue<string>();
 
         failureCode.Should().Contain("CarrierUnavailable").And.Contain("CarrierRefused");
     }

@@ -398,7 +398,7 @@
       ]
     },
     {
-      "$comment": "PakketPunt Express's Carrier Rate Card: every Lane in the seed's Zones, about 23% below Brouwer Dranken's Rate Card where it has the same Lane, so it always prices (P9).",
+      "$comment": "PakketPunt Express's Carrier Rate Card: every Lane out of Rotterdam and Utrecht, the origins of the Shippers' Rate Cards, about 23% below the Shipper's Rate Card where it has the same Lane, so it always prices (P9).",
       "id": "CRC-0003",
       "carrierId": "CAR-0003",
       "versions": [
@@ -491,6 +491,50 @@
                 { "upToKg": 1000, "pricePer100Kg": 12.40 },
                 { "upToKg": 2500, "pricePer100Kg": 10.32 },
                 { "upToKg": 24000, "pricePer100Kg": 7.08 }
+              ]
+            },
+            {
+              "origin": "Utrecht",
+              "destination": "Utrecht",
+              "minimumCharge": 42.35,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 7.32 },
+                { "upToKg": 1000, "pricePer100Kg": 6.31 },
+                { "upToKg": 2500, "pricePer100Kg": 5.31 },
+                { "upToKg": 24000, "pricePer100Kg": 3.70 }
+              ]
+            },
+            {
+              "origin": "Utrecht",
+              "destination": "Amsterdam",
+              "minimumCharge": 53.90,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 9.55 },
+                { "upToKg": 1000, "pricePer100Kg": 8.16 },
+                { "upToKg": 2500, "pricePer100Kg": 6.85 },
+                { "upToKg": 24000, "pricePer100Kg": 4.77 }
+              ]
+            },
+            {
+              "origin": "Utrecht",
+              "destination": "Rotterdam",
+              "minimumCharge": 50.05,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 9.09 },
+                { "upToKg": 1000, "pricePer100Kg": 7.85 },
+                { "upToKg": 2500, "pricePer100Kg": 6.62 },
+                { "upToKg": 24000, "pricePer100Kg": 4.54 }
+              ]
+            },
+            {
+              "origin": "Utrecht",
+              "destination": "Antwerpen",
+              "minimumCharge": 69.30,
+              "weightBreaks": [
+                { "upToKg": 500, "pricePer100Kg": 11.70 },
+                { "upToKg": 1000, "pricePer100Kg": 9.93 },
+                { "upToKg": 2500, "pricePer100Kg": 8.32 },
+                { "upToKg": 24000, "pricePer100Kg": 5.70 }
               ]
             }
           ]
