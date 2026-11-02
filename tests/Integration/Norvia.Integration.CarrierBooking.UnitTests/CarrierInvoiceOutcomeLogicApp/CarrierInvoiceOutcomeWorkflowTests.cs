@@ -96,7 +96,7 @@ public sealed class CarrierInvoiceOutcomeWorkflowTests
         var parameters = deadLetter["inputs"]!["parameters"]!;
 
         Statuses(deadLetter, CarrierInvoiceOutcomeWorkflow.MapAction).Should().BeEquivalentTo("Failed");
-        deadLetter["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("deadLetterTopicMessage");
+        deadLetter["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("deadLetterTopicMessageV2");
         parameters["subscriptionName"]!.GetValue<string>().Should().Be("carrier-invoice-outcome");
         parameters["lockToken"]!.GetValue<string>().Should().Be("@triggerBody()?['lockToken']");
         parameters["deadLetterReason"]!.GetValue<string>().Should().Be("CarrierInvoiceApprovedUnreadable");

@@ -124,10 +124,10 @@
               }
             },
             "trackedProperties": {
-              "correlationId": "@outputs('Track_the_trip')?['correlationId']",
+              "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
               "flow": "trip-dispatch",
-              "partyId": "@outputs('Track_the_trip')?['partyId']",
-              "tripNumber": "@outputs('Track_the_trip')?['tripNumber']",
+              "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['driver']?['driverId']",
+              "tripNumber": "@json(base64ToString(triggerBody()?['contentData']))?['tripNumber']",
               "outcome": "@if(and(greaterOrEquals(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
               "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 500)), 'DriverAppUnavailable', 'DriverAppRefused'))"
             }
@@ -175,10 +175,10 @@
                 },
                 "runAfter": {},
                 "trackedProperties": {
-                  "correlationId": "@outputs('Track_the_trip')?['correlationId']",
+                  "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
                   "flow": "trip-dispatch",
-                  "partyId": "@outputs('Track_the_trip')?['partyId']",
-                  "tripNumber": "@outputs('Track_the_trip')?['tripNumber']",
+                  "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['driver']?['driverId']",
+                  "tripNumber": "@json(base64ToString(triggerBody()?['contentData']))?['tripNumber']",
                   "outcome": "@if(and(greaterOrEquals(coalesce(actions('Report_the_version_delivered')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_version_delivered')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
                   "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Report_the_version_delivered')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_version_delivered')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Report_the_version_delivered')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Report_the_version_delivered')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Report_the_version_delivered')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Report_the_version_delivered')?['outputs']?['statusCode'], 0), 500)), 'TmsUnavailable', 'TmsCallRefused'))"
                 }
@@ -222,10 +222,10 @@
                     ]
                   },
                   "trackedProperties": {
-                    "correlationId": "@outputs('Track_the_trip')?['correlationId']",
+                    "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
                     "flow": "trip-dispatch",
-                    "partyId": "@outputs('Track_the_trip')?['partyId']",
-                    "tripNumber": "@outputs('Track_the_trip')?['tripNumber']",
+                    "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['driver']?['driverId']",
+                    "tripNumber": "@json(base64ToString(triggerBody()?['contentData']))?['tripNumber']",
                     "outcome": "@if(and(greaterOrEquals(coalesce(actions('Report_the_version_not_delivered')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_version_not_delivered')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
                     "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Report_the_version_not_delivered')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_version_not_delivered')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Report_the_version_not_delivered')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Report_the_version_not_delivered')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Report_the_version_not_delivered')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Report_the_version_not_delivered')?['outputs']?['statusCode'], 0), 500)), 'TmsUnavailable', 'TmsCallRefused'))"
                   }
@@ -255,17 +255,17 @@
                 },
                 "serviceProviderConfiguration": {
                   "connectionName": "serviceBus",
-                  "operationId": "deadLetterTopicMessage",
+                  "operationId": "deadLetterTopicMessageV2",
                   "serviceProviderId": "/serviceProviders/serviceBus"
                 }
               },
               "runAfter": {},
               "trackedProperties": {
-                "correlationId": "@outputs('Track_the_trip')?['correlationId']",
+                "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
                 "flow": "trip-dispatch",
-                "partyId": "@outputs('Track_the_trip')?['partyId']",
-                "tripNumber": "@outputs('Track_the_trip')?['tripNumber']",
-                "sourceMessageId": "@outputs('Track_the_trip')?['sourceMessageId']",
+                "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['driver']?['driverId']",
+                "tripNumber": "@json(base64ToString(triggerBody()?['contentData']))?['tripNumber']",
+                "sourceMessageId": "@json(base64ToString(triggerBody()?['contentData']))?['eventId']",
                 "outcome": "DeadLettered",
                 "messageId": "@triggerBody()?['messageId']",
                 "failureCode": "TripDispatchUnreadable"

@@ -54,7 +54,7 @@
           ]
         },
         "trackedProperties": {
-          "correlationId": "@outputs('Track_the_invoice')?['correlationId']",
+          "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
           "flow": "invoicing",
           "outcome": "@if(equals(action()?['status'], 'Failed'), 'Failed', null)",
           "failureCode": "@if(equals(action()?['status'], 'Failed'), 'ShipperInvoiceIssuedUnreadable', null)"
@@ -72,7 +72,7 @@
           },
           "serviceProviderConfiguration": {
             "connectionName": "serviceBus",
-            "operationId": "deadLetterTopicMessage",
+            "operationId": "deadLetterTopicMessageV2",
             "serviceProviderId": "/serviceProviders/serviceBus"
           }
         },
@@ -82,11 +82,11 @@
           ]
         },
         "trackedProperties": {
-          "correlationId": "@outputs('Track_the_invoice')?['correlationId']",
+          "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
           "flow": "invoicing",
-          "partyId": "@outputs('Track_the_invoice')?['partyId']",
-          "documentNumber": "@outputs('Track_the_invoice')?['documentNumber']",
-          "sourceMessageId": "@outputs('Track_the_invoice')?['sourceMessageId']",
+          "partyId": "@coalesce(json(base64ToString(triggerBody()?['contentData']))?['invoice']?['shipper']?['shipperId'], json(base64ToString(triggerBody()?['contentData']))?['creditNote']?['shipper']?['shipperId'])",
+          "documentNumber": "@coalesce(json(base64ToString(triggerBody()?['contentData']))?['invoice']?['invoiceNumber'], json(base64ToString(triggerBody()?['contentData']))?['creditNote']?['creditNoteNumber'])",
+          "sourceMessageId": "@json(base64ToString(triggerBody()?['contentData']))?['eventId']",
           "outcome": "DeadLettered",
           "messageId": "@triggerBody()?['messageId']",
           "failureCode": "ShipperInvoiceIssuedUnreadable"
@@ -185,10 +185,10 @@
           }
         },
         "trackedProperties": {
-          "correlationId": "@outputs('Track_the_invoice')?['correlationId']",
+          "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
           "flow": "invoicing",
-          "partyId": "@outputs('Track_the_invoice')?['partyId']",
-          "documentNumber": "@outputs('Track_the_invoice')?['documentNumber']",
+          "partyId": "@coalesce(json(base64ToString(triggerBody()?['contentData']))?['invoice']?['shipper']?['shipperId'], json(base64ToString(triggerBody()?['contentData']))?['creditNote']?['shipper']?['shipperId'])",
+          "documentNumber": "@coalesce(json(base64ToString(triggerBody()?['contentData']))?['invoice']?['invoiceNumber'], json(base64ToString(triggerBody()?['contentData']))?['creditNote']?['creditNoteNumber'])",
           "outcome": "@if(and(greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 200), less(coalesce(action()?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
           "failureCode": "@if(and(greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 200), less(coalesce(action()?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(action()?['outputs']?['statusCode'], 0), 0), equals(coalesce(action()?['outputs']?['statusCode'], 0), 408), equals(coalesce(action()?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 500)), 'ShipperUnavailable', 'ShipperRefused'))"
         }
@@ -236,10 +236,10 @@
             },
             "runAfter": {},
             "trackedProperties": {
-              "correlationId": "@outputs('Track_the_invoice')?['correlationId']",
+              "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
               "flow": "invoicing",
-              "partyId": "@outputs('Track_the_invoice')?['partyId']",
-              "documentNumber": "@outputs('Track_the_invoice')?['documentNumber']",
+              "partyId": "@coalesce(json(base64ToString(triggerBody()?['contentData']))?['invoice']?['shipper']?['shipperId'], json(base64ToString(triggerBody()?['contentData']))?['creditNote']?['shipper']?['shipperId'])",
+              "documentNumber": "@coalesce(json(base64ToString(triggerBody()?['contentData']))?['invoice']?['invoiceNumber'], json(base64ToString(triggerBody()?['contentData']))?['creditNote']?['creditNoteNumber'])",
               "outcome": "@if(and(greaterOrEquals(coalesce(actions('Report_the_invoice_sent')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_invoice_sent')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
               "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Report_the_invoice_sent')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_invoice_sent')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Report_the_invoice_sent')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Report_the_invoice_sent')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Report_the_invoice_sent')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Report_the_invoice_sent')?['outputs']?['statusCode'], 0), 500)), 'ErpUnavailable', 'ErpCallRefused'))"
             }
@@ -284,10 +284,10 @@
                 ]
               },
               "trackedProperties": {
-                "correlationId": "@outputs('Track_the_invoice')?['correlationId']",
+                "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
                 "flow": "invoicing",
-                "partyId": "@outputs('Track_the_invoice')?['partyId']",
-                "documentNumber": "@outputs('Track_the_invoice')?['documentNumber']",
+                "partyId": "@coalesce(json(base64ToString(triggerBody()?['contentData']))?['invoice']?['shipper']?['shipperId'], json(base64ToString(triggerBody()?['contentData']))?['creditNote']?['shipper']?['shipperId'])",
+                "documentNumber": "@coalesce(json(base64ToString(triggerBody()?['contentData']))?['invoice']?['invoiceNumber'], json(base64ToString(triggerBody()?['contentData']))?['creditNote']?['creditNoteNumber'])",
                 "outcome": "@if(and(greaterOrEquals(coalesce(actions('Report_the_invoice_not_delivered')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_invoice_not_delivered')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
                 "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Report_the_invoice_not_delivered')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_invoice_not_delivered')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Report_the_invoice_not_delivered')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Report_the_invoice_not_delivered')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Report_the_invoice_not_delivered')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Report_the_invoice_not_delivered')?['outputs']?['statusCode'], 0), 500)), 'ErpUnavailable', 'ErpCallRefused'))"
               }

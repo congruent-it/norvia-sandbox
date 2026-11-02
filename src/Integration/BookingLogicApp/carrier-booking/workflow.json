@@ -56,7 +56,7 @@
           ]
         },
         "trackedProperties": {
-          "correlationId": "@outputs('Track_the_booking')?['correlationId']",
+          "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
           "flow": "carrier-booking",
           "outcome": "@if(equals(action()?['status'], 'Failed'), 'Failed', null)",
           "failureCode": "@if(equals(action()?['status'], 'Failed'), 'ShipmentReleasedUnreadable', null)"
@@ -119,11 +119,11 @@
           }
         },
         "trackedProperties": {
-          "correlationId": "@outputs('Track_the_booking')?['correlationId']",
+          "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
           "flow": "carrier-booking",
-          "partyId": "@outputs('Track_the_booking')?['partyId']",
-          "shipmentNumber": "@outputs('Track_the_booking')?['shipmentNumber']",
-          "carrierBookingNumber": "@outputs('Track_the_booking')?['carrierBookingNumber']",
+          "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['carrierId']",
+          "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
+          "carrierBookingNumber": "@json(base64ToString(triggerBody()?['contentData']))?['carrierBookingNumber']",
           "outcome": "@if(and(greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 200), less(coalesce(action()?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
           "failureCode": "@if(and(greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 200), less(coalesce(action()?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(action()?['outputs']?['statusCode'], 0), 0), equals(coalesce(action()?['outputs']?['statusCode'], 0), 408), equals(coalesce(action()?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 500)), 'CarrierUnavailable', 'CarrierRefused'))"
         }
@@ -171,11 +171,11 @@
             },
             "runAfter": {},
             "trackedProperties": {
-              "correlationId": "@outputs('Track_the_booking')?['correlationId']",
+              "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
               "flow": "carrier-booking",
-              "partyId": "@outputs('Track_the_booking')?['partyId']",
-              "shipmentNumber": "@outputs('Track_the_booking')?['shipmentNumber']",
-              "carrierBookingNumber": "@outputs('Track_the_booking')?['carrierBookingNumber']",
+              "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['carrierId']",
+              "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
+              "carrierBookingNumber": "@json(base64ToString(triggerBody()?['contentData']))?['carrierBookingNumber']",
               "outcome": "@if(and(greaterOrEquals(coalesce(actions('Report_the_booking_sent')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_booking_sent')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
               "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Report_the_booking_sent')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_booking_sent')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Report_the_booking_sent')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Report_the_booking_sent')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Report_the_booking_sent')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Report_the_booking_sent')?['outputs']?['statusCode'], 0), 500)), 'TmsUnavailable', 'TmsCallRefused'))"
             }
@@ -220,11 +220,11 @@
                 ]
               },
               "trackedProperties": {
-                "correlationId": "@outputs('Track_the_booking')?['correlationId']",
+                "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
                 "flow": "carrier-booking",
-                "partyId": "@outputs('Track_the_booking')?['partyId']",
-                "shipmentNumber": "@outputs('Track_the_booking')?['shipmentNumber']",
-                "carrierBookingNumber": "@outputs('Track_the_booking')?['carrierBookingNumber']",
+                "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['carrierId']",
+                "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
+                "carrierBookingNumber": "@json(base64ToString(triggerBody()?['contentData']))?['carrierBookingNumber']",
                 "outcome": "@if(and(greaterOrEquals(coalesce(actions('Report_the_booking_not_delivered')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_booking_not_delivered')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
                 "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Report_the_booking_not_delivered')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_booking_not_delivered')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Report_the_booking_not_delivered')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Report_the_booking_not_delivered')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Report_the_booking_not_delivered')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Report_the_booking_not_delivered')?['outputs']?['statusCode'], 0), 500)), 'TmsUnavailable', 'TmsCallRefused'))"
               }

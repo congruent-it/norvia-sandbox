@@ -103,7 +103,7 @@ public sealed class ShipperNotificationWorkflowTests
         var parameters = deadLetter["inputs"]!["parameters"]!;
 
         Statuses(deadLetter, ShipperNotificationWorkflow.MapAction).Should().BeEquivalentTo("Failed");
-        deadLetter["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("deadLetterTopicMessage");
+        deadLetter["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("deadLetterTopicMessageV2");
         parameters["subscriptionName"]!.GetValue<string>().Should().Be("shipper-notification");
         parameters["lockToken"]!.GetValue<string>().Should().Be("@triggerBody()?['lockToken']");
         parameters["deadLetterReason"]!.GetValue<string>().Should().Be("ShipperNotificationRequestedUnreadable");

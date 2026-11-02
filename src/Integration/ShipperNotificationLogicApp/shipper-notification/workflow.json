@@ -57,7 +57,7 @@
           ]
         },
         "trackedProperties": {
-          "correlationId": "@outputs('Track_the_notification')?['correlationId']",
+          "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
           "flow": "shipper-notification",
           "outcome": "@if(equals(action()?['status'], 'Failed'), 'Failed', null)",
           "failureCode": "@if(equals(action()?['status'], 'Failed'), 'ShipperNotificationRequestedUnreadable', null)"
@@ -75,7 +75,7 @@
           },
           "serviceProviderConfiguration": {
             "connectionName": "serviceBus",
-            "operationId": "deadLetterTopicMessage",
+            "operationId": "deadLetterTopicMessageV2",
             "serviceProviderId": "/serviceProviders/serviceBus"
           }
         },
@@ -85,12 +85,12 @@
           ]
         },
         "trackedProperties": {
-          "correlationId": "@outputs('Track_the_notification')?['correlationId']",
+          "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
           "flow": "shipper-notification",
-          "partyId": "@outputs('Track_the_notification')?['partyId']",
-          "transportOrderNumber": "@outputs('Track_the_notification')?['transportOrderNumber']",
-          "shipmentNumber": "@outputs('Track_the_notification')?['shipmentNumber']",
-          "sourceMessageId": "@outputs('Track_the_notification')?['sourceMessageId']",
+          "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['shipperId']",
+          "transportOrderNumber": "@json(base64ToString(triggerBody()?['contentData']))?['transportOrderNumber']",
+          "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
+          "sourceMessageId": "@json(base64ToString(triggerBody()?['contentData']))?['eventId']",
           "outcome": "DeadLettered",
           "messageId": "@triggerBody()?['messageId']",
           "failureCode": "ShipperNotificationRequestedUnreadable"
@@ -189,13 +189,13 @@
           }
         },
         "trackedProperties": {
-          "correlationId": "@outputs('Track_the_notification')?['correlationId']",
+          "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
           "flow": "shipper-notification",
-          "partyId": "@outputs('Track_the_notification')?['partyId']",
-          "shipmentNumber": "@outputs('Track_the_notification')?['shipmentNumber']",
+          "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['shipperId']",
+          "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
           "outcome": "@if(and(greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 200), less(coalesce(action()?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
           "failureCode": "@if(and(greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 200), less(coalesce(action()?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(action()?['outputs']?['statusCode'], 0), 0), equals(coalesce(action()?['outputs']?['statusCode'], 0), 408), equals(coalesce(action()?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 500)), 'ShipperUnavailable', 'ShipperRefused'))",
-          "transportOrderNumber": "@outputs('Track_the_notification')?['transportOrderNumber']"
+          "transportOrderNumber": "@json(base64ToString(triggerBody()?['contentData']))?['transportOrderNumber']"
         }
       },
       "Report_the_outcome_to_the_TMS": {
@@ -241,13 +241,13 @@
             },
             "runAfter": {},
             "trackedProperties": {
-              "correlationId": "@outputs('Track_the_notification')?['correlationId']",
+              "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
               "flow": "shipper-notification",
-              "partyId": "@outputs('Track_the_notification')?['partyId']",
-              "shipmentNumber": "@outputs('Track_the_notification')?['shipmentNumber']",
+              "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['shipperId']",
+              "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
               "outcome": "@if(and(greaterOrEquals(coalesce(actions('Report_the_notification_sent')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_notification_sent')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
               "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Report_the_notification_sent')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_notification_sent')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Report_the_notification_sent')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Report_the_notification_sent')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Report_the_notification_sent')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Report_the_notification_sent')?['outputs']?['statusCode'], 0), 500)), 'TmsUnavailable', 'TmsCallRefused'))",
-              "transportOrderNumber": "@outputs('Track_the_notification')?['transportOrderNumber']"
+              "transportOrderNumber": "@json(base64ToString(triggerBody()?['contentData']))?['transportOrderNumber']"
             }
           }
         },
@@ -290,13 +290,13 @@
                 ]
               },
               "trackedProperties": {
-                "correlationId": "@outputs('Track_the_notification')?['correlationId']",
+                "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
                 "flow": "shipper-notification",
-                "partyId": "@outputs('Track_the_notification')?['partyId']",
-                "shipmentNumber": "@outputs('Track_the_notification')?['shipmentNumber']",
+                "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['shipperId']",
+                "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
                 "outcome": "@if(and(greaterOrEquals(coalesce(actions('Report_the_notification_not_delivered')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_notification_not_delivered')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
                 "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Report_the_notification_not_delivered')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_notification_not_delivered')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Report_the_notification_not_delivered')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Report_the_notification_not_delivered')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Report_the_notification_not_delivered')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Report_the_notification_not_delivered')?['outputs']?['statusCode'], 0), 500)), 'TmsUnavailable', 'TmsCallRefused'))",
-                "transportOrderNumber": "@outputs('Track_the_notification')?['transportOrderNumber']"
+                "transportOrderNumber": "@json(base64ToString(triggerBody()?['contentData']))?['transportOrderNumber']"
               }
             }
           }

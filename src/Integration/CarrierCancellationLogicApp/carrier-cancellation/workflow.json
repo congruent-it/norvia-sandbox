@@ -56,7 +56,7 @@
           ]
         },
         "trackedProperties": {
-          "correlationId": "@outputs('Track_the_cancellation')?['correlationId']",
+          "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
           "flow": "carrier-cancellation",
           "outcome": "@if(equals(action()?['status'], 'Failed'), 'Failed', null)",
           "failureCode": "@if(equals(action()?['status'], 'Failed'), 'CarrierCancellationUnreadable', null)"
@@ -74,7 +74,7 @@
           },
           "serviceProviderConfiguration": {
             "connectionName": "serviceBus",
-            "operationId": "deadLetterTopicMessage",
+            "operationId": "deadLetterTopicMessageV2",
             "serviceProviderId": "/serviceProviders/serviceBus"
           }
         },
@@ -84,12 +84,12 @@
           ]
         },
         "trackedProperties": {
-          "correlationId": "@outputs('Track_the_cancellation')?['correlationId']",
+          "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
           "flow": "carrier-cancellation",
-          "partyId": "@outputs('Track_the_cancellation')?['partyId']",
-          "carrierBookingNumber": "@outputs('Track_the_cancellation')?['carrierBookingNumber']",
-          "shipmentNumber": "@outputs('Track_the_cancellation')?['shipmentNumber']",
-          "sourceMessageId": "@outputs('Track_the_cancellation')?['sourceMessageId']",
+          "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['carrierId']",
+          "carrierBookingNumber": "@json(base64ToString(triggerBody()?['contentData']))?['carrierBookingNumber']",
+          "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
+          "sourceMessageId": "@json(base64ToString(triggerBody()?['contentData']))?['eventId']",
           "outcome": "DeadLettered",
           "messageId": "@triggerBody()?['messageId']",
           "failureCode": "CarrierCancellationUnreadable"
@@ -188,13 +188,13 @@
           }
         },
         "trackedProperties": {
-          "correlationId": "@outputs('Track_the_cancellation')?['correlationId']",
+          "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
           "flow": "carrier-cancellation",
-          "partyId": "@outputs('Track_the_cancellation')?['partyId']",
-          "shipmentNumber": "@outputs('Track_the_cancellation')?['shipmentNumber']",
+          "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['carrierId']",
+          "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
           "outcome": "@if(and(greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 200), less(coalesce(action()?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
           "failureCode": "@if(and(greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 200), less(coalesce(action()?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(action()?['outputs']?['statusCode'], 0), 0), equals(coalesce(action()?['outputs']?['statusCode'], 0), 408), equals(coalesce(action()?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 500)), 'CarrierUnavailable', 'CarrierRefused'))",
-          "carrierBookingNumber": "@outputs('Track_the_cancellation')?['carrierBookingNumber']"
+          "carrierBookingNumber": "@json(base64ToString(triggerBody()?['contentData']))?['carrierBookingNumber']"
         }
       },
       "Report_the_outcome_to_the_TMS": {
@@ -240,13 +240,13 @@
             },
             "runAfter": {},
             "trackedProperties": {
-              "correlationId": "@outputs('Track_the_cancellation')?['correlationId']",
+              "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
               "flow": "carrier-cancellation",
-              "partyId": "@outputs('Track_the_cancellation')?['partyId']",
-              "shipmentNumber": "@outputs('Track_the_cancellation')?['shipmentNumber']",
+              "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['carrierId']",
+              "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
               "outcome": "@if(and(greaterOrEquals(coalesce(actions('Report_the_cancellation_told')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_cancellation_told')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
               "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Report_the_cancellation_told')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_cancellation_told')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Report_the_cancellation_told')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Report_the_cancellation_told')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Report_the_cancellation_told')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Report_the_cancellation_told')?['outputs']?['statusCode'], 0), 500)), 'TmsUnavailable', 'TmsCallRefused'))",
-              "carrierBookingNumber": "@outputs('Track_the_cancellation')?['carrierBookingNumber']"
+              "carrierBookingNumber": "@json(base64ToString(triggerBody()?['contentData']))?['carrierBookingNumber']"
             }
           }
         },
@@ -289,13 +289,13 @@
                 ]
               },
               "trackedProperties": {
-                "correlationId": "@outputs('Track_the_cancellation')?['correlationId']",
+                "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
                 "flow": "carrier-cancellation",
-                "partyId": "@outputs('Track_the_cancellation')?['partyId']",
-                "shipmentNumber": "@outputs('Track_the_cancellation')?['shipmentNumber']",
+                "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['carrierId']",
+                "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
                 "outcome": "@if(and(greaterOrEquals(coalesce(actions('Report_the_cancellation_not_delivered')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_cancellation_not_delivered')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
                 "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Report_the_cancellation_not_delivered')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_cancellation_not_delivered')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Report_the_cancellation_not_delivered')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Report_the_cancellation_not_delivered')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Report_the_cancellation_not_delivered')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Report_the_cancellation_not_delivered')?['outputs']?['statusCode'], 0), 500)), 'TmsUnavailable', 'TmsCallRefused'))",
-                "carrierBookingNumber": "@outputs('Track_the_cancellation')?['carrierBookingNumber']"
+                "carrierBookingNumber": "@json(base64ToString(triggerBody()?['contentData']))?['carrierBookingNumber']"
               }
             }
           }

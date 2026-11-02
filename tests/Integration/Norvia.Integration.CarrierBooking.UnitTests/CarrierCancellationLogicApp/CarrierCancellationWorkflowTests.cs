@@ -103,7 +103,7 @@ public sealed class CarrierCancellationWorkflowTests
         var parameters = deadLetter["inputs"]!["parameters"]!;
 
         Statuses(deadLetter, CarrierCancellationWorkflow.MapAction).Should().BeEquivalentTo("Failed");
-        deadLetter["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("deadLetterTopicMessage");
+        deadLetter["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("deadLetterTopicMessageV2");
         parameters["subscriptionName"]!.GetValue<string>().Should().Be("carrier-cancellation");
         parameters["lockToken"]!.GetValue<string>().Should().Be("@triggerBody()?['lockToken']");
         parameters["deadLetterReason"]!.GetValue<string>().Should().Be("CarrierCancellationUnreadable");

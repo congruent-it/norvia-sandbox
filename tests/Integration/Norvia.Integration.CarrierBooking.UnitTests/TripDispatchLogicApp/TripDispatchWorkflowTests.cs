@@ -101,7 +101,7 @@ public sealed class TripDispatchWorkflowTests
 
         TripDispatchWorkflow.Action(TripDispatchWorkflow.Check)["else"]!["actions"]!.AsObject().Select(action => action.Key)
             .Should().Equal(TripDispatchWorkflow.DeadLetter, TripDispatchWorkflow.FailTheRun);
-        deadLetter["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("deadLetterTopicMessage");
+        deadLetter["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("deadLetterTopicMessageV2");
         parameters["topicName"]!.GetValue<string>().Should().Be("trip-events");
         parameters["subscriptionName"]!.GetValue<string>().Should().Be("trip-dispatch");
         parameters["lockToken"]!.GetValue<string>().Should().Be("@triggerBody()?['lockToken']");
