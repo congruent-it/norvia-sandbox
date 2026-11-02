@@ -13,7 +13,7 @@
           },
           "serviceProviderConfiguration": {
             "connectionName": "serviceBus",
-            "operationId": "peekLockTopicMessages",
+            "operationId": "peekLockTopicMessagesV2",
             "serviceProviderId": "/serviceProviders/serviceBus"
           }
         },
@@ -61,7 +61,7 @@
               },
               "serviceProviderConfiguration": {
                 "connectionName": "serviceBus",
-                "operationId": "completeTopicMessage",
+                "operationId": "completeTopicMessageV2",
                 "serviceProviderId": "/serviceProviders/serviceBus"
               }
             },
@@ -124,12 +124,46 @@
               }
             },
             "trackedProperties": {
+              "flow": "trip-dispatch"
+            }
+          },
+          "Read_the_answer": {
+            "type": "Compose",
+            "inputs": {
+              "outcome": "@if(and(greaterOrEquals(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
+              "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 500)), 'DriverAppUnavailable', 'DriverAppRefused'))",
+              "statusCode": "@coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0)",
+              "retryHistory": "@coalesce(actions('Send_to_the_Driver_app')?['retryHistory'], json('[]'))"
+            },
+            "runAfter": {
+              "Send_to_the_Driver_app": [
+                "Succeeded",
+                "Failed",
+                "TimedOut"
+              ]
+            }
+          },
+          "Track_the_answer": {
+            "type": "Compose",
+            "inputs": {
               "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
-              "flow": "trip-dispatch",
               "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['driver']?['driverId']",
               "tripNumber": "@json(base64ToString(triggerBody()?['contentData']))?['tripNumber']",
-              "outcome": "@if(and(greaterOrEquals(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
-              "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 500)), 'DriverAppUnavailable', 'DriverAppRefused'))"
+              "outcome": "@outputs('Read_the_answer')?['outcome']",
+              "failureCode": "@outputs('Read_the_answer')?['failureCode']"
+            },
+            "runAfter": {
+              "Read_the_answer": [
+                "Succeeded"
+              ]
+            },
+            "trackedProperties": {
+              "correlationId": "@action()?['inputs']?['correlationId']",
+              "flow": "trip-dispatch",
+              "partyId": "@action()?['inputs']?['partyId']",
+              "tripNumber": "@action()?['inputs']?['tripNumber']",
+              "outcome": "@action()?['inputs']?['outcome']",
+              "failureCode": "@action()?['inputs']?['failureCode']"
             }
           },
           "Report_the_outcome_to_the_TMS": {
@@ -175,12 +209,10 @@
                 },
                 "runAfter": {},
                 "trackedProperties": {
-                  "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
+                  "correlationId": "@action()?['inputs']?['headers']?['X-Correlation-ID']",
                   "flow": "trip-dispatch",
-                  "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['driver']?['driverId']",
-                  "tripNumber": "@json(base64ToString(triggerBody()?['contentData']))?['tripNumber']",
-                  "outcome": "@if(and(greaterOrEquals(coalesce(actions('Report_the_version_delivered')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_version_delivered')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
-                  "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Report_the_version_delivered')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_version_delivered')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Report_the_version_delivered')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Report_the_version_delivered')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Report_the_version_delivered')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Report_the_version_delivered')?['outputs']?['statusCode'], 0), 500)), 'TmsUnavailable', 'TmsCallRefused'))"
+                  "outcome": "@if(and(greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 200), less(coalesce(action()?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
+                  "failureCode": "@if(and(greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 200), less(coalesce(action()?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(action()?['outputs']?['statusCode'], 0), 0), equals(coalesce(action()?['outputs']?['statusCode'], 0), 408), equals(coalesce(action()?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 500)), 'TmsUnavailable', 'TmsCallRefused'))"
                 }
               }
             },
@@ -213,7 +245,7 @@
                       "maximumInterval": "PT20S"
                     },
                     "body": {
-                      "cause": "@concat('The Driver app ', if(equals(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0), 0), 'didn''t answer', concat('answered ', string(coalesce(actions('Send_to_the_Driver_app')?['outputs']?['statusCode'], 0)))), ': ', substring(outputs('Take_the_Driver_apps_answer'), 0, min(500, length(outputs('Take_the_Driver_apps_answer')))), ' (', string(add(length(coalesce(actions('Send_to_the_Driver_app')?['retryHistory'], json('[]'))), 1)), if(equals(add(length(coalesce(actions('Send_to_the_Driver_app')?['retryHistory'], json('[]'))), 1), 1), ' attempt', ' attempts'), ').')"
+                      "cause": "@concat('The Driver app ', if(equals(outputs('Read_the_answer')?['statusCode'], 0), 'didn''t answer', concat('answered ', string(outputs('Read_the_answer')?['statusCode']))), ': ', substring(outputs('Take_the_Driver_apps_answer'), 0, min(500, length(outputs('Take_the_Driver_apps_answer')))), ' (', string(add(length(outputs('Read_the_answer')?['retryHistory']), 1)), if(equals(add(length(outputs('Read_the_answer')?['retryHistory']), 1), 1), ' attempt', ' attempts'), ').')"
                     }
                   },
                   "runAfter": {
@@ -222,21 +254,17 @@
                     ]
                   },
                   "trackedProperties": {
-                    "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
+                    "correlationId": "@action()?['inputs']?['headers']?['X-Correlation-ID']",
                     "flow": "trip-dispatch",
-                    "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['driver']?['driverId']",
-                    "tripNumber": "@json(base64ToString(triggerBody()?['contentData']))?['tripNumber']",
-                    "outcome": "@if(and(greaterOrEquals(coalesce(actions('Report_the_version_not_delivered')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_version_not_delivered')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
-                    "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Report_the_version_not_delivered')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_version_not_delivered')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Report_the_version_not_delivered')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Report_the_version_not_delivered')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Report_the_version_not_delivered')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Report_the_version_not_delivered')?['outputs']?['statusCode'], 0), 500)), 'TmsUnavailable', 'TmsCallRefused'))"
+                    "outcome": "@if(and(greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 200), less(coalesce(action()?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
+                    "failureCode": "@if(and(greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 200), less(coalesce(action()?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(action()?['outputs']?['statusCode'], 0), 0), equals(coalesce(action()?['outputs']?['statusCode'], 0), 408), equals(coalesce(action()?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 500)), 'TmsUnavailable', 'TmsCallRefused'))"
                   }
                 }
               }
             },
             "runAfter": {
-              "Send_to_the_Driver_app": [
-                "Succeeded",
-                "Failed",
-                "TimedOut"
+              "Track_the_answer": [
+                "Succeeded"
               ]
             }
           }
@@ -261,13 +289,8 @@
               },
               "runAfter": {},
               "trackedProperties": {
-                "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
                 "flow": "trip-dispatch",
-                "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['driver']?['driverId']",
-                "tripNumber": "@json(base64ToString(triggerBody()?['contentData']))?['tripNumber']",
-                "sourceMessageId": "@json(base64ToString(triggerBody()?['contentData']))?['eventId']",
                 "outcome": "DeadLettered",
-                "messageId": "@triggerBody()?['messageId']",
                 "failureCode": "TripDispatchUnreadable"
               }
             },

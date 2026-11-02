@@ -13,7 +13,7 @@
           },
           "serviceProviderConfiguration": {
             "connectionName": "serviceBus",
-            "operationId": "peekLockTopicMessages",
+            "operationId": "peekLockTopicMessagesV2",
             "serviceProviderId": "/serviceProviders/serviceBus"
           }
         },
@@ -116,7 +116,7 @@
                   },
                   "serviceProviderConfiguration": {
                     "connectionName": "serviceBus",
-                    "operationId": "completeTopicMessage",
+                    "operationId": "completeTopicMessageV2",
                     "serviceProviderId": "/serviceProviders/serviceBus"
                   }
                 },

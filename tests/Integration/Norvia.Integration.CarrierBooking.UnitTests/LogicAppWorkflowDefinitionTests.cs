@@ -5,14 +5,14 @@ namespace Norvia.Integration.CarrierBooking.UnitTests;
 
 /// <summary>
 /// The Logic Apps runtime validates a workflow definition when it loads it, and a workflow it refuses is Unhealthy and never runs. The runtime only exists in
-/// Azure, so these tests check the two mistakes it has refused so far in every workflow definition.
+/// Azure, so these tests check the mistakes it has refused so far in every workflow definition.
 /// </summary>
 public sealed partial class LogicAppWorkflowDefinitionTests
 {
     public static TheoryData<string> WorkflowPaths { get; } = [.. Contracts.Workflows()];
 
     // The Service Bus built-in connector's operations that have no unsuffixed ID any more (docs: Service Bus built-in connector operations).
-    private static readonly string[] RetiredOperationIds = ["deadLetterTopicMessage"];
+    private static readonly string[] RetiredOperationIds = ["deadLetterTopicMessage", "deadLetterQueueMessage", "completeTopicMessage"];
 
     [Fact]
     public void Workflows_Embedded_IsNotEmpty() => Contracts.Workflows().Should().NotBeEmpty();
@@ -28,6 +28,29 @@ public sealed partial class LogicAppWorkflowDefinitionTests
             .ToList();
 
         others.Should().BeEmpty("a tracked property may only read its own action's inputs and outputs, the trigger and parameters, or the run is refused at load");
+    }
+
+    [Theory]
+    [MemberData(nameof(WorkflowPaths))]
+    public void TrackedProperties_InAWorkflowWithSecureData_ReadOnlyTheirOwnInputsAndOutputs(string path)
+    {
+        var operations = Operations(path).ToList();
+        var secure = operations.Where(operation => operation.Node["runtimeConfiguration"]?["secureData"] is not null).Select(operation => operation.Name).ToList();
+        if (secure.Count == 0)
+        {
+            return;
+        }
+
+        // The runtime refuses the workflow when a step with tracked properties reads the trigger, or reads a step that has secureData in its own definition.
+        var offenders = operations
+            .Where(operation => operation.Node["trackedProperties"] is JsonObject { Count: > 0 })
+            .SelectMany(operation => operation.Node["trackedProperties"]!.AsObject()
+                .Select(property => (operation.Name, Key: property.Key, Reason: TriggerReadRegex().IsMatch(property.Value!.ToString()) ? "reads the trigger" : null))
+                .Append((operation.Name, Key: "(inputs)", Reason: secure.Any(name => operation.Name != name && operation.Node["inputs"]?.ToJsonString().Contains($"('{name}')", StringComparison.Ordinal) == true) ? "reads a secureData step" : null)))
+            .Where(offence => offence.Reason is not null)
+            .ToList();
+
+        offenders.Should().BeEmpty("with secureData in the workflow, a step with tracked properties may read only its own inputs and outputs, and not a secureData step, or the run is refused at load");
     }
 
     [Theory]
@@ -75,4 +98,7 @@ public sealed partial class LogicAppWorkflowDefinitionTests
 
     [GeneratedRegex(@"(?:actions|outputs|body|result)\('([^']+)'\)")]
     private static partial Regex ReadActionRegex();
+
+    [GeneratedRegex(@"trigger(?:Body|Outputs)?\(")]
+    private static partial Regex TriggerReadRegex();
 }

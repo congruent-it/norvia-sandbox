@@ -23,7 +23,7 @@ public sealed class CarrierInvoiceOutcomeWorkflowTests
         var parameters = CarrierInvoiceOutcomeWorkflow.Trigger["inputs"]!["parameters"]!;
 
         CarrierInvoiceOutcomeWorkflow.Trigger["type"]!.GetValue<string>().Should().Be("ServiceProvider");
-        CarrierInvoiceOutcomeWorkflow.Trigger["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("peekLockTopicMessages");
+        CarrierInvoiceOutcomeWorkflow.Trigger["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("peekLockTopicMessagesV2");
         parameters["topicName"]!.GetValue<string>().Should().Be("invoicing-events");
         parameters["subscriptionName"]!.GetValue<string>().Should().Be("carrier-invoice-outcome");
     }
@@ -195,7 +195,9 @@ public sealed class CarrierInvoiceOutcomeWorkflowTests
     {
         var report = CarrierInvoiceOutcomeWorkflow.Action(CarrierInvoiceOutcomeWorkflow.Report);
 
-        Statuses(report, CarrierInvoiceOutcomeWorkflow.Send).Should().BeEquivalentTo("Succeeded", "Failed", "TimedOut");
+        Statuses(CarrierInvoiceOutcomeWorkflow.Action("Read_the_answer"), CarrierInvoiceOutcomeWorkflow.Send).Should().BeEquivalentTo("Succeeded", "Failed", "TimedOut");
+        Statuses(CarrierInvoiceOutcomeWorkflow.Action("Track_the_answer"), "Read_the_answer").Should().BeEquivalentTo("Succeeded");
+        Statuses(report, "Track_the_answer").Should().BeEquivalentTo("Succeeded");
         report["actions"]!.AsObject().Select(action => action.Key).Should().Equal(CarrierInvoiceOutcomeWorkflow.ReportTold);
         report["else"]!["actions"]!.AsObject().Select(action => action.Key).Should().Contain(CarrierInvoiceOutcomeWorkflow.ReportNotDelivered);
         var expression = report["expression"]!.ToJsonString();
@@ -220,7 +222,7 @@ public sealed class CarrierInvoiceOutcomeWorkflowTests
         var body = CarrierInvoiceOutcomeWorkflow.Action(CarrierInvoiceOutcomeWorkflow.ReportNotDelivered)["inputs"]!["body"]!.AsObject();
 
         body.Select(property => property.Key).Should().BeEquivalentTo("statusCode", "message");
-        body["statusCode"]!.GetValue<string>().Should().Contain("coalesce(actions('Send_to_the_Carrier')?['outputs']?['statusCode'], 0)");
+        body["statusCode"]!.GetValue<string>().Should().Contain("outputs('Read_the_answer')?['statusCode']");
         body["message"]!.GetValue<string>().Should().Contain("min(500,");
     }
 
@@ -231,8 +233,8 @@ public sealed class CarrierInvoiceOutcomeWorkflowTests
         {
             var tracked = CarrierInvoiceOutcomeWorkflow.Action(name)["trackedProperties"]!.AsObject();
 
-            tracked.Select(property => property.Key).Should().Contain(["outcome", "failureCode", "documentNumber", "correlationId", "partyId"]);
-            tracked["failureCode"]!.GetValue<string>().Should().Contain("ErpUnavailable").And.Contain("ErpCallRefused").And.Contain($"actions('{name}')");
+            tracked.Select(property => property.Key).Should().Contain(["outcome", "failureCode", "correlationId"]);
+            tracked["failureCode"]!.GetValue<string>().Should().Contain("ErpUnavailable").And.Contain("ErpCallRefused").And.Contain("action()");
         }
     }
 
@@ -241,14 +243,14 @@ public sealed class CarrierInvoiceOutcomeWorkflowTests
     {
         var tracked = CarrierInvoiceOutcomeWorkflow.Action(CarrierInvoiceOutcomeWorkflow.ReportTold)["trackedProperties"]!.AsObject();
 
-        tracked.Select(property => property.Key).Should().Contain(["outcome", "failureCode", "documentNumber", "correlationId", "partyId"]);
+        tracked.Select(property => property.Key).Should().Contain(["outcome", "failureCode", "correlationId"]);
         tracked["failureCode"]!.GetValue<string>().Should().Contain("ErpUnavailable").And.Contain("ErpCallRefused");
     }
 
     [Fact]
     public void Send_TracksTheCarriersFailureAsUnavailableOrRefused()
     {
-        var failureCode = CarrierInvoiceOutcomeWorkflow.Action(CarrierInvoiceOutcomeWorkflow.Send)["trackedProperties"]!["failureCode"]!.GetValue<string>();
+        var failureCode = CarrierInvoiceOutcomeWorkflow.Action("Read_the_answer")["inputs"]!["failureCode"]!.GetValue<string>();
 
         failureCode.Should().Contain("CarrierUnavailable").And.Contain("CarrierRefused");
     }

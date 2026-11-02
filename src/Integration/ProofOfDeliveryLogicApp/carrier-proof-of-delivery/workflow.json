@@ -12,7 +12,7 @@
           },
           "serviceProviderConfiguration": {
             "connectionName": "serviceBus",
-            "operationId": "peekLockQueueMessages",
+            "operationId": "peekLockQueueMessagesV2",
             "serviceProviderId": "/serviceProviders/serviceBus"
           }
         },
@@ -76,7 +76,7 @@
           },
           "serviceProviderConfiguration": {
             "connectionName": "serviceBus",
-            "operationId": "deadLetterQueueMessage",
+            "operationId": "deadLetterQueueMessageV2",
             "serviceProviderId": "/serviceProviders/serviceBus"
           }
         },
@@ -145,7 +145,7 @@
           },
           "serviceProviderConfiguration": {
             "connectionName": "serviceBus",
-            "operationId": "deadLetterQueueMessage",
+            "operationId": "deadLetterQueueMessageV2",
             "serviceProviderId": "/serviceProviders/serviceBus"
           }
         },
@@ -264,7 +264,7 @@
               },
               "serviceProviderConfiguration": {
                 "connectionName": "serviceBus",
-                "operationId": "completeQueueMessage",
+                "operationId": "completeQueueMessageV2",
                 "serviceProviderId": "/serviceProviders/serviceBus"
               }
             },
@@ -302,7 +302,7 @@
                     },
                     "serviceProviderConfiguration": {
                       "connectionName": "serviceBus",
-                      "operationId": "deadLetterQueueMessage",
+                      "operationId": "deadLetterQueueMessageV2",
                       "serviceProviderId": "/serviceProviders/serviceBus"
                     }
                   },
@@ -344,7 +344,7 @@
                       },
                       "serviceProviderConfiguration": {
                         "connectionName": "serviceBus",
-                        "operationId": "abandonQueueMessage",
+                        "operationId": "abandonQueueMessageV2",
                         "serviceProviderId": "/serviceProviders/serviceBus"
                       }
                     },

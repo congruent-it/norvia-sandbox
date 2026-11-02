@@ -13,7 +13,7 @@
           },
           "serviceProviderConfiguration": {
             "connectionName": "serviceBus",
-            "operationId": "peekLockTopicMessages",
+            "operationId": "peekLockTopicMessagesV2",
             "serviceProviderId": "/serviceProviders/serviceBus"
           }
         },
@@ -54,7 +54,6 @@
           ]
         },
         "trackedProperties": {
-          "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
           "flow": "carrier-invoices",
           "outcome": "@if(equals(action()?['status'], 'Failed'), 'Failed', null)",
           "failureCode": "@if(equals(action()?['status'], 'Failed'), 'CarrierInvoiceApprovedUnreadable', null)"
@@ -82,13 +81,8 @@
           ]
         },
         "trackedProperties": {
-          "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
           "flow": "carrier-invoices",
-          "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['carrierId']",
-          "documentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['invoiceNumber']",
-          "sourceMessageId": "@json(base64ToString(triggerBody()?['contentData']))?['eventId']",
           "outcome": "DeadLettered",
-          "messageId": "@triggerBody()?['messageId']",
           "failureCode": "CarrierInvoiceApprovedUnreadable"
         }
       },
@@ -118,7 +112,7 @@
           },
           "serviceProviderConfiguration": {
             "connectionName": "serviceBus",
-            "operationId": "completeTopicMessage",
+            "operationId": "completeTopicMessageV2",
             "serviceProviderId": "/serviceProviders/serviceBus"
           }
         },
@@ -185,12 +179,45 @@
           }
         },
         "trackedProperties": {
+          "flow": "carrier-invoices"
+        }
+      },
+      "Read_the_answer": {
+        "type": "Compose",
+        "inputs": {
+          "outcome": "@if(and(greaterOrEquals(coalesce(actions('Send_to_the_Carrier')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Send_to_the_Carrier')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
+          "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Send_to_the_Carrier')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Send_to_the_Carrier')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Send_to_the_Carrier')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Send_to_the_Carrier')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Send_to_the_Carrier')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Send_to_the_Carrier')?['outputs']?['statusCode'], 0), 500)), 'CarrierUnavailable', 'CarrierRefused'))",
+          "statusCode": "@coalesce(actions('Send_to_the_Carrier')?['outputs']?['statusCode'], 0)"
+        },
+        "runAfter": {
+          "Send_to_the_Carrier": [
+            "Succeeded",
+            "Failed",
+            "TimedOut"
+          ]
+        }
+      },
+      "Track_the_answer": {
+        "type": "Compose",
+        "inputs": {
           "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
-          "flow": "carrier-invoices",
           "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['carrierId']",
           "documentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['invoiceNumber']",
-          "outcome": "@if(and(greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 200), less(coalesce(action()?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
-          "failureCode": "@if(and(greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 200), less(coalesce(action()?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(action()?['outputs']?['statusCode'], 0), 0), equals(coalesce(action()?['outputs']?['statusCode'], 0), 408), equals(coalesce(action()?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 500)), 'CarrierUnavailable', 'CarrierRefused'))"
+          "outcome": "@outputs('Read_the_answer')?['outcome']",
+          "failureCode": "@outputs('Read_the_answer')?['failureCode']"
+        },
+        "runAfter": {
+          "Read_the_answer": [
+            "Succeeded"
+          ]
+        },
+        "trackedProperties": {
+          "correlationId": "@action()?['inputs']?['correlationId']",
+          "flow": "carrier-invoices",
+          "partyId": "@action()?['inputs']?['partyId']",
+          "documentNumber": "@action()?['inputs']?['documentNumber']",
+          "outcome": "@action()?['inputs']?['outcome']",
+          "failureCode": "@action()?['inputs']?['failureCode']"
         }
       },
       "Report_the_outcome_to_the_ERP": {
@@ -236,12 +263,10 @@
             },
             "runAfter": {},
             "trackedProperties": {
-              "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
+              "correlationId": "@action()?['inputs']?['headers']?['X-Correlation-ID']",
               "flow": "carrier-invoices",
-              "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['carrierId']",
-              "documentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['invoiceNumber']",
-              "outcome": "@if(and(greaterOrEquals(coalesce(actions('Report_the_outcome_told')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_outcome_told')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
-              "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Report_the_outcome_told')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_outcome_told')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Report_the_outcome_told')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Report_the_outcome_told')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Report_the_outcome_told')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Report_the_outcome_told')?['outputs']?['statusCode'], 0), 500)), 'ErpUnavailable', 'ErpCallRefused'))"
+              "outcome": "@if(and(greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 200), less(coalesce(action()?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
+              "failureCode": "@if(and(greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 200), less(coalesce(action()?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(action()?['outputs']?['statusCode'], 0), 0), equals(coalesce(action()?['outputs']?['statusCode'], 0), 408), equals(coalesce(action()?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 500)), 'ErpUnavailable', 'ErpCallRefused'))"
             }
           }
         },
@@ -274,7 +299,7 @@
                   "maximumInterval": "PT20S"
                 },
                 "body": {
-                  "statusCode": "@if(equals(coalesce(actions('Send_to_the_Carrier')?['outputs']?['statusCode'], 0), 0), null, actions('Send_to_the_Carrier')?['outputs']?['statusCode'])",
+                  "statusCode": "@if(equals(outputs('Read_the_answer')?['statusCode'], 0), null, outputs('Read_the_answer')?['statusCode'])",
                   "message": "@substring(outputs('Take_the_Carriers_answer'), 0, min(500, length(outputs('Take_the_Carriers_answer'))))"
                 }
               },
@@ -284,21 +309,17 @@
                 ]
               },
               "trackedProperties": {
-                "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
+                "correlationId": "@action()?['inputs']?['headers']?['X-Correlation-ID']",
                 "flow": "carrier-invoices",
-                "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['carrierId']",
-                "documentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['invoiceNumber']",
-                "outcome": "@if(and(greaterOrEquals(coalesce(actions('Report_the_outcome_not_delivered')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_outcome_not_delivered')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
-                "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Report_the_outcome_not_delivered')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_outcome_not_delivered')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Report_the_outcome_not_delivered')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Report_the_outcome_not_delivered')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Report_the_outcome_not_delivered')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Report_the_outcome_not_delivered')?['outputs']?['statusCode'], 0), 500)), 'ErpUnavailable', 'ErpCallRefused'))"
+                "outcome": "@if(and(greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 200), less(coalesce(action()?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
+                "failureCode": "@if(and(greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 200), less(coalesce(action()?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(action()?['outputs']?['statusCode'], 0), 0), equals(coalesce(action()?['outputs']?['statusCode'], 0), 408), equals(coalesce(action()?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 500)), 'ErpUnavailable', 'ErpCallRefused'))"
               }
             }
           }
         },
         "runAfter": {
-          "Send_to_the_Carrier": [
-            "Succeeded",
-            "Failed",
-            "TimedOut"
+          "Track_the_answer": [
+            "Succeeded"
           ]
         }
       }

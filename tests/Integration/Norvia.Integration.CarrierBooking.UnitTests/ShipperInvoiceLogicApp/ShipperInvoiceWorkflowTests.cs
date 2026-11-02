@@ -23,7 +23,7 @@ public sealed class ShipperInvoiceWorkflowTests
         var parameters = ShipperInvoiceWorkflow.Trigger["inputs"]!["parameters"]!;
 
         ShipperInvoiceWorkflow.Trigger["type"]!.GetValue<string>().Should().Be("ServiceProvider");
-        ShipperInvoiceWorkflow.Trigger["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("peekLockTopicMessages");
+        ShipperInvoiceWorkflow.Trigger["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("peekLockTopicMessagesV2");
         parameters["topicName"]!.GetValue<string>().Should().Be("invoicing-events");
         parameters["subscriptionName"]!.GetValue<string>().Should().Be("shipper-invoice");
     }
@@ -205,7 +205,9 @@ public sealed class ShipperInvoiceWorkflowTests
     {
         var report = ShipperInvoiceWorkflow.Action(ShipperInvoiceWorkflow.Report);
 
-        Statuses(report, ShipperInvoiceWorkflow.Send).Should().BeEquivalentTo("Succeeded", "Failed", "TimedOut");
+        Statuses(ShipperInvoiceWorkflow.Action("Read_the_answer"), ShipperInvoiceWorkflow.Send).Should().BeEquivalentTo("Succeeded", "Failed", "TimedOut");
+        Statuses(ShipperInvoiceWorkflow.Action("Track_the_answer"), "Read_the_answer").Should().BeEquivalentTo("Succeeded");
+        Statuses(report, "Track_the_answer").Should().BeEquivalentTo("Succeeded");
         report["actions"]!.AsObject().Select(action => action.Key).Should().Equal(ShipperInvoiceWorkflow.ReportSent);
         report["else"]!["actions"]!.AsObject().Select(action => action.Key).Should().Contain(ShipperInvoiceWorkflow.ReportNotDelivered);
         var expression = report["expression"]!.ToJsonString();
@@ -230,7 +232,7 @@ public sealed class ShipperInvoiceWorkflowTests
         var body = ShipperInvoiceWorkflow.Action(ShipperInvoiceWorkflow.ReportNotDelivered)["inputs"]!["body"]!.AsObject();
 
         body.Select(property => property.Key).Should().BeEquivalentTo("statusCode", "message");
-        body["statusCode"]!.GetValue<string>().Should().Contain("coalesce(actions('Send_to_the_Shipper')?['outputs']?['statusCode'], 0)");
+        body["statusCode"]!.GetValue<string>().Should().Contain("outputs('Read_the_answer')?['statusCode']");
         body["message"]!.GetValue<string>().Should().Contain("min(500,");
     }
 
@@ -241,8 +243,8 @@ public sealed class ShipperInvoiceWorkflowTests
         {
             var tracked = ShipperInvoiceWorkflow.Action(name)["trackedProperties"]!.AsObject();
 
-            tracked.Select(property => property.Key).Should().Contain(["outcome", "failureCode", "documentNumber", "correlationId", "partyId"]);
-            tracked["failureCode"]!.GetValue<string>().Should().Contain("ErpUnavailable").And.Contain("ErpCallRefused").And.Contain($"actions('{name}')");
+            tracked.Select(property => property.Key).Should().Contain(["outcome", "failureCode", "correlationId"]);
+            tracked["failureCode"]!.GetValue<string>().Should().Contain("ErpUnavailable").And.Contain("ErpCallRefused").And.Contain("action()");
         }
     }
 
@@ -251,14 +253,14 @@ public sealed class ShipperInvoiceWorkflowTests
     {
         var tracked = ShipperInvoiceWorkflow.Action(ShipperInvoiceWorkflow.ReportSent)["trackedProperties"]!.AsObject();
 
-        tracked.Select(property => property.Key).Should().Contain(["outcome", "failureCode", "documentNumber", "correlationId", "partyId"]);
+        tracked.Select(property => property.Key).Should().Contain(["outcome", "failureCode", "correlationId"]);
         tracked["failureCode"]!.GetValue<string>().Should().Contain("ErpUnavailable").And.Contain("ErpCallRefused");
     }
 
     [Fact]
     public void Send_TracksTheShippersFailureAsUnavailableOrRefused()
     {
-        var failureCode = ShipperInvoiceWorkflow.Action(ShipperInvoiceWorkflow.Send)["trackedProperties"]!["failureCode"]!.GetValue<string>();
+        var failureCode = ShipperInvoiceWorkflow.Action("Read_the_answer")["inputs"]!["failureCode"]!.GetValue<string>();
 
         failureCode.Should().Contain("ShipperUnavailable").And.Contain("ShipperRefused");
     }

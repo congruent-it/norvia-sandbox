@@ -25,7 +25,7 @@ public sealed class BillingWorkflowTests
         inputs["parameters"]!["topicName"]!.GetValue<string>().Should().Be("transport-order-events");
         inputs["parameters"]!["subscriptionName"]!.GetValue<string>().Should().Be("billing");
         inputs["serviceProviderConfiguration"]!["serviceProviderId"]!.GetValue<string>().Should().Be("/serviceProviders/serviceBus");
-        inputs["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("peekLockTopicMessages", "the workflow settles the message itself");
+        inputs["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("peekLockTopicMessagesV2", "the workflow settles the message itself");
     }
 
     [Fact]
@@ -172,7 +172,7 @@ public sealed class BillingWorkflowTests
         settle["expression"]!.ToJsonString().Should().Contain("greaterOrEquals").And.Contain("200").And.Contain("less").And.Contain("300");
         settle["actions"]!.AsObject().Select(action => action.Key).Should().Equal(BillingWorkflow.Complete);
         var complete = BillingWorkflow.Action(BillingWorkflow.Complete);
-        complete["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("completeTopicMessage");
+        complete["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("completeTopicMessageV2");
         Parameters(BillingWorkflow.Complete)["lockToken"]!.GetValue<string>().Should().Be("@triggerBody()?['lockToken']");
     }
 

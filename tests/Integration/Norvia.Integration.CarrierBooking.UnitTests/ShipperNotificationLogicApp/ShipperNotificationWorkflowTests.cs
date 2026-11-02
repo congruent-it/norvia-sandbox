@@ -94,7 +94,7 @@ public sealed class ShipperNotificationWorkflowTests
 
     [Fact]
     public void Trigger_LocksTheMessage_SoTheWorkflowSettlesIt() =>
-        ShipperNotificationWorkflow.Trigger["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("peekLockTopicMessages");
+        ShipperNotificationWorkflow.Trigger["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("peekLockTopicMessagesV2");
 
     [Fact]
     public void UnreadableNotification_IsDeadLetteredWithTheFailureCodeAndAReadableMessage_AndFailsTheRun()
@@ -205,7 +205,9 @@ public sealed class ShipperNotificationWorkflowTests
     {
         var report = ShipperNotificationWorkflow.Action(ShipperNotificationWorkflow.Report);
 
-        Statuses(report, ShipperNotificationWorkflow.Send).Should().BeEquivalentTo("Succeeded", "Failed", "TimedOut");
+        Statuses(ShipperNotificationWorkflow.Action("Read_the_answer"), ShipperNotificationWorkflow.Send).Should().BeEquivalentTo("Succeeded", "Failed", "TimedOut");
+        Statuses(ShipperNotificationWorkflow.Action("Track_the_answer"), "Read_the_answer").Should().BeEquivalentTo("Succeeded");
+        Statuses(report, "Track_the_answer").Should().BeEquivalentTo("Succeeded");
         report["actions"]!.AsObject().Select(action => action.Key).Should().Equal(ShipperNotificationWorkflow.ReportSent);
         report["else"]!["actions"]!.AsObject().Select(action => action.Key).Should().Contain(ShipperNotificationWorkflow.ReportNotDelivered);
         var expression = report["expression"]!.ToJsonString();
@@ -218,7 +220,7 @@ public sealed class ShipperNotificationWorkflowTests
         var body = ShipperNotificationWorkflow.Action(ShipperNotificationWorkflow.ReportNotDelivered)["inputs"]!["body"]!.AsObject();
 
         body.Select(property => property.Key).Should().BeEquivalentTo("statusCode", "message");
-        body["statusCode"]!.GetValue<string>().Should().Contain("coalesce(actions('Send_to_the_Shipper')?['outputs']?['statusCode'], 0)");
+        body["statusCode"]!.GetValue<string>().Should().Contain("outputs('Read_the_answer')?['statusCode']");
         body["message"]!.GetValue<string>().Should().Contain("min(500,");
     }
 
@@ -229,7 +231,7 @@ public sealed class ShipperNotificationWorkflowTests
         {
             var tracked = ShipperNotificationWorkflow.Action(name)["trackedProperties"]!.AsObject();
 
-            tracked.Select(property => property.Key).Should().Contain(["outcome", "failureCode", "transportOrderNumber", "correlationId"]);
+            tracked.Select(property => property.Key).Should().Contain(["outcome", "failureCode", "correlationId"]);
             tracked["failureCode"]!.GetValue<string>().Should().Contain("TmsUnavailable").And.Contain("TmsCallRefused");
         }
     }
@@ -237,7 +239,7 @@ public sealed class ShipperNotificationWorkflowTests
     [Fact]
     public void Send_TracksTheShippersFailureAsUnavailableOrRefused()
     {
-        var failureCode = ShipperNotificationWorkflow.Action(ShipperNotificationWorkflow.Send)["trackedProperties"]!["failureCode"]!.GetValue<string>();
+        var failureCode = ShipperNotificationWorkflow.Action("Read_the_answer")["inputs"]!["failureCode"]!.GetValue<string>();
 
         failureCode.Should().Contain("ShipperUnavailable").And.Contain("ShipperRefused");
     }
