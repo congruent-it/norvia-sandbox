@@ -7,13 +7,22 @@ using Microsoft.Extensions.Options;
 
 namespace Norvia.DriverApp.Web.Drivers;
 
+internal sealed class EasyAuthOptions : AuthenticationSchemeOptions
+{
+    /// <summary>Whether the user's app roles are Driver IDs (ADR 0037). Not when the presenter picks the Driver (ADR 0047).</summary>
+    public bool RolesAreDriverIds { get; set; } = true;
+
+    /// <summary>Where a signed-in user without a Driver ID is sent.</summary>
+    public string ForbiddenPath { get; set; } = DriverSignIn.RefusalPath;
+}
+
 /// <summary>
 /// Reads the Driver Container Apps' Easy Auth signed in to Entra ID from the X-MS-CLIENT-PRINCIPAL header it adds to every
 /// request. Container Apps doesn't let a request from outside set that header, so it holds only what Easy Auth put there.
 /// The Driver ID is the user's app role on the Driver app's registration (ADR 0037), which this turns into the Driver ID claim.
 /// </summary>
-internal sealed class EasyAuthHandler(IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder)
-    : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
+internal sealed class EasyAuthHandler(IOptionsMonitor<EasyAuthOptions> options, ILoggerFactory logger, UrlEncoder encoder)
+    : AuthenticationHandler<EasyAuthOptions>(options, logger, encoder)
 {
     public const string SchemeName = "EasyAuth";
     public const string ClientPrincipalHeader = "X-MS-CLIENT-PRINCIPAL";
@@ -45,7 +54,7 @@ internal sealed class EasyAuthHandler(IOptionsMonitor<AuthenticationSchemeOption
         var principal = Decode(header.ToString());
         return Task.FromResult(principal is null
             ? AuthenticateResult.Fail($"The {ClientPrincipalHeader} header holds no client principal.")
-            : AuthenticateResult.Success(new AuthenticationTicket(ToClaimsPrincipal(principal), SchemeName)));
+            : AuthenticateResult.Success(new AuthenticationTicket(ToClaimsPrincipal(principal, Options.RolesAreDriverIds), SchemeName)));
     }
 
     /// <summary>Easy Auth normally signs the browser in before the request gets here; this covers a session that ended.</summary>
@@ -56,10 +65,10 @@ internal sealed class EasyAuthHandler(IOptionsMonitor<AuthenticationSchemeOption
         return Task.CompletedTask;
     }
 
-    /// <summary>A user without a Driver ID gets the page that says so.</summary>
+    /// <summary>A user without a Driver ID gets the page that says so, or with the picker, the page to pick one.</summary>
     protected override Task HandleForbiddenAsync(AuthenticationProperties properties)
     {
-        Response.Redirect(DriverSignIn.RefusalPath);
+        Response.Redirect(Options.ForbiddenPath);
         return Task.CompletedTask;
     }
 
@@ -75,10 +84,10 @@ internal sealed class EasyAuthHandler(IOptionsMonitor<AuthenticationSchemeOption
         }
     }
 
-    private static ClaimsPrincipal ToClaimsPrincipal(EasyAuthPrincipal principal)
+    private static ClaimsPrincipal ToClaimsPrincipal(EasyAuthPrincipal principal, bool rolesAreDriverIds)
     {
         var claims = principal.Claims
-            .Select(claim => claim.Type == EntraRoles || claim.Type == principal.RoleType
+            .Select(claim => rolesAreDriverIds && (claim.Type == EntraRoles || claim.Type == principal.RoleType)
                 ? new Claim(DriverClaims.DriverId, claim.Value)
                 : new Claim(claim.Type, claim.Value))
             .ToList();

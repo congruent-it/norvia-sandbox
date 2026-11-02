@@ -169,6 +169,177 @@ public sealed class SignInTests
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
+    [Fact]
+    public async Task GetMyTrips_WithThePicker_ForAPresenterWhoHasNotPicked_SendsThemToThePicker()
+    {
+        await using var app = new DriverAppWebFactory("Production", standIn: false, picker: true);
+        using var client = app.CreateClient(NoRedirects);
+
+        var response = await Send(client, "/", PresenterPrincipal());
+
+        response.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        response.Headers.Location!.OriginalString.Should().Be("/pick-driver");
+    }
+
+    [Fact]
+    public async Task GetMyTrips_WithThePicker_WithoutASignIn_SendsTheBrowserToEntra()
+    {
+        await using var app = new DriverAppWebFactory("Production", standIn: false, picker: true);
+        using var client = app.CreateClient(NoRedirects);
+
+        var response = await client.GetAsync(new Uri("/", UriKind.Relative), TestContext.Current.CancellationToken);
+
+        response.Headers.Location!.OriginalString.Should().StartWith("/.auth/login/aad?post_login_redirect_uri=");
+    }
+
+    [Fact]
+    public async Task GetPicker_WithoutASignIn_SendsTheBrowserToEntra()
+    {
+        await using var app = new DriverAppWebFactory("Production", standIn: false, picker: true);
+        using var client = app.CreateClient(NoRedirects);
+
+        var response = await client.GetAsync(new Uri("/pick-driver", UriKind.Relative), TestContext.Current.CancellationToken);
+
+        response.Headers.Location!.OriginalString.Should().StartWith("/.auth/login/aad");
+    }
+
+    [Fact]
+    public async Task GetPicker_ForAPresenter_ListsTheSeededDrivers()
+    {
+        await using var app = new DriverAppWebFactory("Production", standIn: false, picker: true);
+        using var client = app.CreateClient(NoRedirects);
+
+        var page = await GetAsync(client, "/pick-driver", PresenterPrincipal());
+
+        page.Should().Contain("Anouk de Vries").And.Contain(DriverAppWebFactory.AnoukId).And.Contain("Joost Bakker");
+    }
+
+    [Fact]
+    public async Task GetMyTrips_WithThePicker_AfterPickingADriver_ShowsOnlyThatDriversTrips_UnderTheirName()
+    {
+        await using var app = new DriverAppWebFactory("Production", standIn: false, picker: true);
+        using var client = app.CreateClient(NoRedirects);
+
+        var page = await GetAsync(client, "/", PresenterPrincipal(), pickedDriver: DriverAppWebFactory.JoostId);
+
+        page.Should().Contain("TR-0000003").And.NotContain("TR-0000001").And.Contain("Joost Bakker").And.Contain("Switch driver");
+    }
+
+    [Fact]
+    public async Task PostPicker_AsAPresenter_RemembersTheDriver_ForTheNextRequest()
+    {
+        await using var app = new DriverAppWebFactory("Production", standIn: false, picker: true);
+        using var client = app.CreateClient(NoRedirects);
+        var principal = PresenterPrincipal();
+        var form = await GetAsync(client, "/pick-driver", principal, antiforgery: true);
+
+        using var post = new HttpRequestMessage(HttpMethod.Post, new Uri("/pick-driver", UriKind.Relative))
+        {
+            Content = new FormUrlEncodedContent([new("driver", DriverAppWebFactory.JoostId), .. HiddenFields(form.Page)]),
+        };
+        post.Headers.Add("X-MS-CLIENT-PRINCIPAL", principal);
+        post.Headers.Add("Cookie", form.AntiforgeryCookie);
+        var response = await client.SendAsync(post, TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        response.Headers.GetValues("Set-Cookie").Should().Contain(cookie => cookie.StartsWith("norvia-driver-picked=DRV-0002", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task PostPicker_WithoutTheAntiforgeryToken_PicksNoDriver()
+    {
+        await using var app = new DriverAppWebFactory("Production", standIn: false, picker: true);
+        using var client = app.CreateClient(NoRedirects);
+
+        using var post = new HttpRequestMessage(HttpMethod.Post, new Uri("/pick-driver", UriKind.Relative))
+        {
+            Content = new FormUrlEncodedContent([new("driver", DriverAppWebFactory.JoostId)]),
+        };
+        post.Headers.Add("X-MS-CLIENT-PRINCIPAL", PresenterPrincipal());
+        var response = await client.SendAsync(post, TestContext.Current.CancellationToken);
+
+        response.Headers.Contains("Set-Cookie").Should().BeFalse("no Driver is picked without the page's own token");
+    }
+
+    [Fact]
+    public async Task GetMyTrips_WithThePicker_ForAnUnknownPickedDriver_SendsThemBackToThePicker()
+    {
+        await using var app = new DriverAppWebFactory("Production", standIn: false, picker: true);
+        using var client = app.CreateClient(NoRedirects);
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("/", UriKind.Relative));
+        request.Headers.Add("X-MS-CLIENT-PRINCIPAL", PresenterPrincipal());
+        request.Headers.Add("Cookie", "norvia-driver-picked=DRV-9999");
+
+        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        response.Headers.Location!.OriginalString.Should().Be("/pick-driver");
+    }
+
+    [Fact]
+    public async Task GetMyTrips_WithThePicker_TakesNoDriverIdFromThePresentersRoles()
+    {
+        await using var app = new DriverAppWebFactory("Production", standIn: false, picker: true);
+        using var client = app.CreateClient(NoRedirects);
+
+        // A role of the demo UIs' registration, and even a Driver ID role: the Driver comes from the pick, not from the roles.
+        var response = await Send(client, "/", ClientPrincipal("DemoUis.Use", DriverAppWebFactory.AnoukId));
+
+        response.Headers.Location!.OriginalString.Should().Be("/pick-driver");
+    }
+
+    [Fact]
+    public async Task GetPicker_WithoutThePicker_IsNotThere()
+    {
+        await using var app = new DriverAppWebFactory("Production", standIn: false);
+        using var client = app.CreateClient(NoRedirects);
+
+        var response = await Send(client, "/pick-driver", PresenterPrincipal());
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Start_WithThePickerAndTheStandIn_Refuses()
+    {
+        await using var app = new DriverAppWebFactory("Development", standIn: true, picker: true);
+
+        var starting = () => app.CreateClient();
+
+        starting.Should().Throw<InvalidOperationException>().WithMessage("*turn on one*");
+        await Task.CompletedTask;
+    }
+
+    private static async Task<string> GetAsync(HttpClient client, string path, string principal, string? pickedDriver = null)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(path, UriKind.Relative));
+        request.Headers.Add("X-MS-CLIENT-PRINCIPAL", principal);
+        if (pickedDriver is not null)
+        {
+            request.Headers.Add("Cookie", $"norvia-driver-picked={pickedDriver}");
+        }
+
+        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+        return await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+    }
+
+    private static async Task<(string Page, string AntiforgeryCookie)> GetAsync(HttpClient client, string path, string principal, bool antiforgery)
+    {
+        _ = antiforgery;
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(path, UriKind.Relative));
+        request.Headers.Add("X-MS-CLIENT-PRINCIPAL", principal);
+        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+        var cookie = string.Join("; ", response.Headers.GetValues("Set-Cookie").Select(value => value.Split(';')[0]));
+        return (await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken), cookie);
+    }
+
+    /// <summary>The hidden fields of the picker's form, the antiforgery token among them, as a browser would post them back.</summary>
+    private static IEnumerable<KeyValuePair<string, string>> HiddenFields(string page) =>
+        System.Text.RegularExpressions.Regex.Matches(page, "<input type=\"hidden\" name=\"([^\"]+)\" value=\"([^\"]*)\" />")
+            .Select(match => new KeyValuePair<string, string>(match.Groups[1].Value, System.Net.WebUtility.HtmlDecode(match.Groups[2].Value)));
+
+    /// <summary>The presenter, signed in by Easy Auth to the demo UIs' registration: a role of that registration and no Driver ID.</summary>
+    private static string PresenterPrincipal() => ClientPrincipal("DemoUis.Use");
+
     private static async Task<string> GetAsync(HttpClient client, string path, string principal)
     {
         var response = await Send(client, path, principal);

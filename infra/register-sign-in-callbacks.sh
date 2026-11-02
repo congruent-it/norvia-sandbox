@@ -25,6 +25,7 @@ register() {
   client_id=$1
   what=$2
   kept_as=$3
+  optional=${4:-}
 
   redirect_uris=""
   while read -r app gate host; do
@@ -35,6 +36,11 @@ register() {
   done <<APPS
 $signed_in_apps
 APPS
+  # The Driver app signs in to the demo UIs' registration instead when the Driver picker is on (ADR 0047), so nothing signs in to its own.
+  if [ -z "$redirect_uris" ] && [ -n "$optional" ]; then
+    echo "No container app signs in to $what's app registration $client_id; skipping it."
+    return 0
+  fi
   [ -n "$redirect_uris" ] || { echo "No container app signs in to $what's app registration $client_id." >&2; exit 1; }
 
   # Kept in the azd environment too, so deploying the estate again keeps the redirect URIs.
@@ -50,7 +56,7 @@ register "${AZURE_ESTATE_INTEGRATION_CONSOLE_CLIENT_ID:?Deploy the estate first:
 register "${AZURE_ESTATE_HEALTH_CHECK_CLIENT_ID:?Deploy the estate first: azd hooks run preprovision}" \
   "the Estate health check" ESTATE_HEALTH_CHECK_REDIRECT_URIS
 register "${AZURE_ESTATE_DRIVER_APP_REGISTRATION_CLIENT_ID:?Deploy the estate first: azd hooks run preprovision}" \
-  "the Driver app" ESTATE_DRIVER_APP_REDIRECT_URIS
+  "the Driver app" ESTATE_DRIVER_APP_REDIRECT_URIS optional
 register "${AZURE_ESTATE_SIMULATOR_REGISTRATION_CLIENT_ID:?Deploy the estate first: azd hooks run preprovision}" \
   "the Simulator" ESTATE_SIMULATOR_REDIRECT_URIS
 register "${AZURE_ESTATE_ERP_REGISTRATION_CLIENT_ID:?Deploy the estate first: azd hooks run preprovision}" \

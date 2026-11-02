@@ -17,7 +17,7 @@ namespace Norvia.DriverApp.Web.IntegrationTests;
 /// Runs the Driver app's screens in memory with the Trips of <see cref="Trips"/> in place of the database, signed in the way
 /// the environment says: Easy Auth's header in Azure, or the stand-in locally (ADR 0037).
 /// </summary>
-public sealed class DriverAppWebFactory(string environment, bool standIn) : WebApplicationFactory<Program>
+public sealed class DriverAppWebFactory(string environment, bool standIn, bool picker = false) : WebApplicationFactory<Program>
 {
     public const string AnoukId = "DRV-0001";
     public const string JoostId = "DRV-0002";
@@ -56,6 +56,11 @@ public sealed class DriverAppWebFactory(string environment, bool standIn) : WebA
         if (standIn)
         {
             builder.UseSetting("LocalSignIn:Enabled", "true");
+        }
+
+        if (picker)
+        {
+            builder.UseSetting("DriverPicker:Enabled", "true");
         }
 
         builder.ConfigureTestServices(services =>

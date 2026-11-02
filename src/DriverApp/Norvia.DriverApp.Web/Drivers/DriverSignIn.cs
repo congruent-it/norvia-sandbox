@@ -35,6 +35,12 @@ public static class DriverSignIn
     {
         ArgumentNullException.ThrowIfNull(builder);
 
+        if (builder.Configuration.IsStandIn() && builder.Configuration.IsPicker())
+        {
+            throw new InvalidOperationException(
+                $"The sign-in stand-in ({StandInSettingsSection}) and the Driver picker ({DriverPicker.SettingsSection}) are two ways to pick a Driver; turn on one.");
+        }
+
         if (builder.Configuration.IsStandIn())
         {
             // Anywhere else, the stand-in would let anyone in as any Driver.
@@ -58,8 +64,19 @@ public static class DriverSignIn
         }
         else
         {
+            var picker = builder.Configuration.IsPicker();
             builder.Services.AddAuthentication(EasyAuthHandler.SchemeName)
-                .AddScheme<AuthenticationSchemeOptions, EasyAuthHandler>(EasyAuthHandler.SchemeName, configureOptions: null);
+                .AddScheme<EasyAuthOptions, EasyAuthHandler>(EasyAuthHandler.SchemeName, options =>
+                {
+                    // With the picker, the presenter's roles are the demo UIs', not Driver IDs: the Driver comes from the pick.
+                    options.RolesAreDriverIds = !picker;
+                    options.ForbiddenPath = picker ? DriverPicker.PickerPath : RefusalPath;
+                });
+            if (picker)
+            {
+                builder.Services.AddHttpContextAccessor();
+                builder.Services.AddScoped<IClaimsTransformation, DriverPicker.PickedDriverClaims>();
+            }
         }
 
         builder.Services.AddAuthorizationBuilder()
@@ -136,7 +153,7 @@ public static class DriverSignIn
     }
 
     /// <summary>Where to go after signing in: back to where the browser was, if that is a path on this app, else home.</summary>
-    private static string LocalOrHome(string? returnUrl) =>
+    internal static string LocalOrHome(string? returnUrl) =>
         string.IsNullOrEmpty(returnUrl) || !Uri.IsWellFormedUriString(returnUrl, UriKind.Relative) || returnUrl.StartsWith("//", StringComparison.Ordinal)
             ? "/"
             : returnUrl;
