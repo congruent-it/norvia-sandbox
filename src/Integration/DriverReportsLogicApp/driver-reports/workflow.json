@@ -4,20 +4,26 @@
     "contentVersion": "1.0.0.0",
     "triggers": {
       "When_a_Driver_report_is_available": {
-        "type": "ServiceProvider",
+        "type": "ApiConnection",
         "inputs": {
-          "parameters": {
-            "topicName": "driver-app-events",
-            "subscriptionName": "driver-reports"
+          "host": {
+            "connection": {
+              "referenceName": "servicebus"
+            }
           },
-          "serviceProviderConfiguration": {
-            "connectionName": "serviceBus",
-            "operationId": "onSingleNewMessageFromTopicSession",
-            "serviceProviderId": "/serviceProviders/serviceBus"
+          "method": "get",
+          "path": "/@{encodeURIComponent(encodeURIComponent('driver-app-events'))}/subscriptions/@{encodeURIComponent('driver-reports')}/messages/head/peek",
+          "queries": {
+            "subscriptionType": "Main",
+            "sessionId": "Next Available"
           }
         },
+        "recurrence": {
+          "frequency": "Minute",
+          "interval": 1
+        },
         "correlation": {
-          "clientTrackingId": "@{triggerOutputs()?['body']?['userProperties']?['correlationId']}"
+          "clientTrackingId": "@{coalesce(if(equals(length(string(coalesce(triggerBody(), ''))), 0), json('{}'), triggerBody())?['Properties']?['correlationId'], '00000000-0000-0000-0000-000000000000')}"
         }
       }
     },
@@ -25,23 +31,23 @@
       "Track_the_report": {
         "type": "Compose",
         "inputs": {
-          "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
-          "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['driverId']",
-          "tripNumber": "@json(base64ToString(triggerBody()?['contentData']))?['tripNumber']",
-          "eventType": "@json(base64ToString(triggerBody()?['contentData']))?['eventType']",
-          "sourceMessageId": "@json(base64ToString(triggerBody()?['contentData']))?['eventId']",
-          "occurredAt": "@json(base64ToString(triggerBody()?['contentData']))?['occurredAt']",
-          "version": "@json(base64ToString(triggerBody()?['contentData']))?['version']",
-          "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
-          "stop": "@json(base64ToString(triggerBody()?['contentData']))?['stop']",
-          "trackingEventType": "@json(base64ToString(triggerBody()?['contentData']))?['trackingEventType']",
-          "location": "@json(base64ToString(triggerBody()?['contentData']))?['location']",
-          "remark": "@json(base64ToString(triggerBody()?['contentData']))?['remark']",
-          "documentId": "@json(base64ToString(triggerBody()?['contentData']))?['documentId']",
-          "receivedBy": "@json(base64ToString(triggerBody()?['contentData']))?['receivedBy']",
-          "deliveryTime": "@json(base64ToString(triggerBody()?['contentData']))?['deliveryTime']",
-          "condition": "@json(base64ToString(triggerBody()?['contentData']))?['condition']",
-          "files": "@json(base64ToString(triggerBody()?['contentData']))?['files']"
+          "correlationId": "@json(base64ToString(triggerBody()?['ContentData']))?['correlationId']",
+          "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?['driverId']",
+          "tripNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['tripNumber']",
+          "eventType": "@json(base64ToString(triggerBody()?['ContentData']))?['eventType']",
+          "sourceMessageId": "@json(base64ToString(triggerBody()?['ContentData']))?['eventId']",
+          "occurredAt": "@json(base64ToString(triggerBody()?['ContentData']))?['occurredAt']",
+          "version": "@json(base64ToString(triggerBody()?['ContentData']))?['version']",
+          "shipmentNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['shipmentNumber']",
+          "stop": "@json(base64ToString(triggerBody()?['ContentData']))?['stop']",
+          "trackingEventType": "@json(base64ToString(triggerBody()?['ContentData']))?['trackingEventType']",
+          "location": "@json(base64ToString(triggerBody()?['ContentData']))?['location']",
+          "remark": "@json(base64ToString(triggerBody()?['ContentData']))?['remark']",
+          "documentId": "@json(base64ToString(triggerBody()?['ContentData']))?['documentId']",
+          "receivedBy": "@json(base64ToString(triggerBody()?['ContentData']))?['receivedBy']",
+          "deliveryTime": "@json(base64ToString(triggerBody()?['ContentData']))?['deliveryTime']",
+          "condition": "@json(base64ToString(triggerBody()?['ContentData']))?['condition']",
+          "files": "@json(base64ToString(triggerBody()?['ContentData']))?['files']"
         },
         "runAfter": {},
         "trackedProperties": {
@@ -75,7 +81,7 @@
         "type": "If",
         "expression": {
           "equals": [
-            "@and(equals(actions('Track_the_report')?['status'], 'Succeeded'), not(empty(outputs('Track_the_report')?['correlationId'])), not(empty(outputs('Track_the_report')?['tripNumber'])), not(empty(outputs('Track_the_report')?['partyId'])), not(empty(outputs('Track_the_report')?['sourceMessageId'])), or(equals(outputs('Track_the_report')?['eventType'], 'TripStartReported'), equals(outputs('Track_the_report')?['eventType'], 'TripEndReported'), and(equals(outputs('Track_the_report')?['eventType'], 'StopCompletedReported'), not(empty(outputs('Track_the_report')?['shipmentNumber'])), not(empty(outputs('Track_the_report')?['trackingEventType'])), not(empty(outputs('Track_the_report')?['version'])), not(empty(outputs('Track_the_report')?['occurredAt'])), not(empty(outputs('Track_the_report')?['location']?['place'])), not(empty(outputs('Track_the_report')?['location']?['postcode'])), not(empty(outputs('Track_the_report')?['location']?['countryCode']))), and(equals(outputs('Track_the_report')?['eventType'], 'ProofOfDeliveryCaptured'), not(empty(outputs('Track_the_report')?['shipmentNumber'])), not(empty(outputs('Track_the_report')?['version'])), not(empty(outputs('Track_the_report')?['documentId'])), not(empty(outputs('Track_the_report')?['receivedBy'])), not(empty(outputs('Track_the_report')?['deliveryTime'])), not(empty(outputs('Track_the_report')?['condition'])), not(empty(outputs('Track_the_report')?['location']?['place'])), not(empty(outputs('Track_the_report')?['location']?['postcode'])), not(empty(outputs('Track_the_report')?['location']?['countryCode'])), greater(length(coalesce(outputs('Track_the_report')?['files'], json('[]'))), 0))))",
+            "@and(equals(actions('Track_the_report')?['status'], 'Succeeded'), not(empty(outputs('Track_the_report')?['correlationId'])), not(empty(outputs('Track_the_report')?['tripNumber'])), not(empty(outputs('Track_the_report')?['partyId'])), not(empty(outputs('Track_the_report')?['sourceMessageId'])), or(equals(outputs('Track_the_report')?['eventType'], 'TripStartReported'), equals(outputs('Track_the_report')?['eventType'], 'TripEndReported'), and(equals(outputs('Track_the_report')?['eventType'], 'StopCompletedReported'), not(empty(outputs('Track_the_report')?['shipmentNumber'])), not(empty(outputs('Track_the_report')?['trackingEventType'])), not(equals(outputs('Track_the_report')?['version'], null)), not(empty(outputs('Track_the_report')?['occurredAt'])), not(empty(outputs('Track_the_report')?['location']?['place'])), not(empty(outputs('Track_the_report')?['location']?['postcode'])), not(empty(outputs('Track_the_report')?['location']?['countryCode']))), and(equals(outputs('Track_the_report')?['eventType'], 'ProofOfDeliveryCaptured'), not(empty(outputs('Track_the_report')?['shipmentNumber'])), not(equals(outputs('Track_the_report')?['version'], null)), not(empty(outputs('Track_the_report')?['documentId'])), not(empty(outputs('Track_the_report')?['receivedBy'])), not(empty(outputs('Track_the_report')?['deliveryTime'])), not(empty(outputs('Track_the_report')?['condition'])), not(empty(outputs('Track_the_report')?['location']?['place'])), not(empty(outputs('Track_the_report')?['location']?['postcode'])), not(empty(outputs('Track_the_report')?['location']?['countryCode'])), greater(length(coalesce(outputs('Track_the_report')?['files'], json('[]'))), 0))))",
             true
           ]
         },
@@ -219,7 +225,7 @@
             "type": "Compose",
             "inputs": {
               "$content-type": "multipart/form-data",
-              "$multipart": "@union(createArray(createObject('headers', createObject('Content-Disposition', 'form-data; name=\"metadata\"'), 'body', if(empty(outputs('Track_the_report')?['remark']), outputs('Build_the_Proof_of_delivery'), addProperty(outputs('Build_the_Proof_of_delivery'), 'remark', outputs('Track_the_report')?['remark'])))), variables('fileParts'))"
+              "$multipart": "@union(createArray(addProperty(addProperty(json('{}'), 'headers', addProperty(json('{}'), 'Content-Disposition', 'form-data; name=\"metadata\"')), 'body', if(empty(outputs('Track_the_report')?['remark']), outputs('Build_the_Proof_of_delivery'), addProperty(outputs('Build_the_Proof_of_delivery'), 'remark', outputs('Track_the_report')?['remark'])))), variables('fileParts'))"
             },
             "runAfter": {
               "Build_the_Proof_of_delivery": [
@@ -228,16 +234,18 @@
             }
           },
           "Dead_letter_the_report_whose_files_are_gone": {
-            "type": "ServiceProvider",
+            "type": "ApiConnection",
             "inputs": {
-              "serviceProviderConfiguration": {
-                "connectionName": "serviceBus",
-                "operationId": "deadLetterMessageInSession",
-                "serviceProviderId": "/serviceProviders/serviceBus"
+              "host": {
+                "connection": {
+                  "referenceName": "servicebus"
+                }
               },
-              "parameters": {
-                "messageId": "@triggerBody()?['messageId']",
-                "lockToken": "@triggerBody()?['lockToken']",
+              "method": "post",
+              "path": "/@{encodeURIComponent(encodeURIComponent('driver-app-events'))}/subscriptions/@{encodeURIComponent('driver-reports')}/messages/deadletter",
+              "queries": {
+                "lockToken": "@triggerBody()?['LockToken']",
+                "sessionId": "@triggerBody()?['SessionId']",
                 "deadLetterReason": "ProofOfDeliveryFilesGone",
                 "deadLetterErrorDescription": "The Proof of delivery's files could not be read from the Driver app's transit container, so nothing was sent to the TMS."
               }
@@ -249,15 +257,33 @@
               ]
             },
             "trackedProperties": {
-              "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
+              "correlationId": "@json(base64ToString(triggerBody()?['ContentData']))?['correlationId']",
               "flow": "trip-execution",
-              "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['driverId']",
-              "tripNumber": "@json(base64ToString(triggerBody()?['contentData']))?['tripNumber']",
-              "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
-              "sourceMessageId": "@json(base64ToString(triggerBody()?['contentData']))?['eventId']",
+              "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?['driverId']",
+              "tripNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['tripNumber']",
+              "shipmentNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['shipmentNumber']",
+              "sourceMessageId": "@json(base64ToString(triggerBody()?['ContentData']))?['eventId']",
               "outcome": "DeadLettered",
-              "messageId": "@triggerBody()?['messageId']",
+              "messageId": "@triggerBody()?['MessageId']",
               "failureCode": "ProofOfDeliveryFilesGone"
+            }
+          },
+          "Close_the_session_after_the_files_are_gone": {
+            "type": "ApiConnection",
+            "description": "Releases the session as soon as its message is settled, so the next message is not held back until the session's lock expires.",
+            "inputs": {
+              "host": {
+                "connection": {
+                  "referenceName": "servicebus"
+                }
+              },
+              "method": "delete",
+              "path": "/@{encodeURIComponent(encodeURIComponent('driver-app-events'))}/subscriptions/@{encodeURIComponent('driver-reports')}/sessions/@{encodeURIComponent(encodeURIComponent(triggerBody()?['SessionId']))}/close"
+            },
+            "runAfter": {
+              "Dead_letter_the_report_whose_files_are_gone": [
+                "Succeeded"
+              ]
             }
           },
           "Report_the_files_are_gone": {
@@ -291,17 +317,18 @@
               }
             },
             "runAfter": {
-              "Dead_letter_the_report_whose_files_are_gone": [
-                "Succeeded"
+              "Close_the_session_after_the_files_are_gone": [
+                "Succeeded",
+                "Failed"
               ]
             },
             "trackedProperties": {
-              "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
+              "correlationId": "@json(base64ToString(triggerBody()?['ContentData']))?['correlationId']",
               "flow": "trip-execution",
-              "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['driverId']",
-              "tripNumber": "@json(base64ToString(triggerBody()?['contentData']))?['tripNumber']",
-              "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
-              "sourceMessageId": "@json(base64ToString(triggerBody()?['contentData']))?['eventId']",
+              "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?['driverId']",
+              "tripNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['tripNumber']",
+              "shipmentNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['shipmentNumber']",
+              "sourceMessageId": "@json(base64ToString(triggerBody()?['ContentData']))?['eventId']",
               "outcome": "@if(and(greaterOrEquals(coalesce(actions('Report_the_files_are_gone')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_files_are_gone')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
               "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Report_the_files_are_gone')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_the_files_are_gone')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Report_the_files_are_gone')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Report_the_files_are_gone')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Report_the_files_are_gone')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Report_the_files_are_gone')?['outputs']?['statusCode'], 0), 500)), 'DriverAppUnavailable', 'DriverAppRefused'))"
             }
@@ -350,12 +377,12 @@
               ]
             },
             "trackedProperties": {
-              "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
+              "correlationId": "@json(base64ToString(triggerBody()?['ContentData']))?['correlationId']",
               "flow": "trip-execution",
-              "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['driverId']",
-              "tripNumber": "@json(base64ToString(triggerBody()?['contentData']))?['tripNumber']",
-              "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
-              "sourceMessageId": "@json(base64ToString(triggerBody()?['contentData']))?['eventId']",
+              "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?['driverId']",
+              "tripNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['tripNumber']",
+              "shipmentNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['shipmentNumber']",
+              "sourceMessageId": "@json(base64ToString(triggerBody()?['ContentData']))?['eventId']",
               "outcome": "@if(and(greaterOrEquals(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
               "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 500)), 'TmsUnavailable', 'TmsCallRefused'))"
             }
@@ -370,19 +397,40 @@
             },
             "actions": {
               "Complete_the_message": {
-                "type": "ServiceProvider",
+                "type": "ApiConnection",
                 "inputs": {
-                  "serviceProviderConfiguration": {
-                    "connectionName": "serviceBus",
-                    "operationId": "completeMessageInSession",
-                    "serviceProviderId": "/serviceProviders/serviceBus"
+                  "host": {
+                    "connection": {
+                      "referenceName": "servicebus"
+                    }
                   },
-                  "parameters": {
-                    "messageId": "@triggerBody()?['messageId']",
-                    "lockToken": "@triggerBody()?['lockToken']"
+                  "method": "delete",
+                  "path": "/@{encodeURIComponent(encodeURIComponent('driver-app-events'))}/subscriptions/@{encodeURIComponent('driver-reports')}/messages/complete",
+                  "queries": {
+                    "lockToken": "@triggerBody()?['LockToken']",
+                    "subscriptionType": "Main",
+                    "sessionId": "@triggerBody()?['SessionId']"
                   }
                 },
                 "runAfter": {}
+              },
+              "Close_the_session_after_completing": {
+                "type": "ApiConnection",
+                "description": "Releases the session as soon as its message is settled, so the next message is not held back until the session's lock expires.",
+                "inputs": {
+                  "host": {
+                    "connection": {
+                      "referenceName": "servicebus"
+                    }
+                  },
+                  "method": "delete",
+                  "path": "/@{encodeURIComponent(encodeURIComponent('driver-app-events'))}/subscriptions/@{encodeURIComponent('driver-reports')}/sessions/@{encodeURIComponent(encodeURIComponent(triggerBody()?['SessionId']))}/close"
+                },
+                "runAfter": {
+                  "Complete_the_message": [
+                    "Succeeded"
+                  ]
+                }
               },
               "Report_recorded": {
                 "type": "Http",
@@ -413,17 +461,18 @@
                   }
                 },
                 "runAfter": {
-                  "Complete_the_message": [
-                    "Succeeded"
+                  "Close_the_session_after_completing": [
+                    "Succeeded",
+                    "Failed"
                   ]
                 },
                 "trackedProperties": {
-                  "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
+                  "correlationId": "@json(base64ToString(triggerBody()?['ContentData']))?['correlationId']",
                   "flow": "trip-execution",
-                  "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['driverId']",
-                  "tripNumber": "@json(base64ToString(triggerBody()?['contentData']))?['tripNumber']",
-                  "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
-                  "sourceMessageId": "@json(base64ToString(triggerBody()?['contentData']))?['eventId']",
+                  "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?['driverId']",
+                  "tripNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['tripNumber']",
+                  "shipmentNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['shipmentNumber']",
+                  "sourceMessageId": "@json(base64ToString(triggerBody()?['ContentData']))?['eventId']",
                   "outcome": "@if(and(greaterOrEquals(coalesce(actions('Report_recorded')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_recorded')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
                   "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Report_recorded')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_recorded')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Report_recorded')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Report_recorded')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Report_recorded')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Report_recorded')?['outputs']?['statusCode'], 0), 500)), 'DriverAppUnavailable', 'DriverAppRefused'))"
                 }
@@ -473,31 +522,51 @@
                   },
                   "actions": {
                     "Dead_letter_the_report_the_TMS_could_not_take": {
-                      "type": "ServiceProvider",
+                      "type": "ApiConnection",
                       "inputs": {
-                        "serviceProviderConfiguration": {
-                          "connectionName": "serviceBus",
-                          "operationId": "deadLetterMessageInSession",
-                          "serviceProviderId": "/serviceProviders/serviceBus"
+                        "host": {
+                          "connection": {
+                            "referenceName": "servicebus"
+                          }
                         },
-                        "parameters": {
-                          "messageId": "@triggerBody()?['messageId']",
-                          "lockToken": "@triggerBody()?['lockToken']",
+                        "method": "post",
+                        "path": "/@{encodeURIComponent(encodeURIComponent('driver-app-events'))}/subscriptions/@{encodeURIComponent('driver-reports')}/messages/deadletter",
+                        "queries": {
+                          "lockToken": "@triggerBody()?['LockToken']",
+                          "sessionId": "@triggerBody()?['SessionId']",
                           "deadLetterReason": "TmsUnavailable",
                           "deadLetterErrorDescription": "@concat('The TMS ', if(equals(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 0), 'didn''t answer', concat('answered ', string(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0)))), ' (', string(add(length(coalesce(actions('Send_the_report_to_the_TMS')?['retryHistory'], json('[]'))), 1)), if(equals(add(length(coalesce(actions('Send_the_report_to_the_TMS')?['retryHistory'], json('[]'))), 1), 1), ' attempt', ' attempts'), ').')"
                         }
                       },
                       "runAfter": {},
                       "trackedProperties": {
-                        "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
+                        "correlationId": "@json(base64ToString(triggerBody()?['ContentData']))?['correlationId']",
                         "flow": "trip-execution",
-                        "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['driverId']",
-                        "tripNumber": "@json(base64ToString(triggerBody()?['contentData']))?['tripNumber']",
-                        "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
-                        "sourceMessageId": "@json(base64ToString(triggerBody()?['contentData']))?['eventId']",
+                        "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?['driverId']",
+                        "tripNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['tripNumber']",
+                        "shipmentNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['shipmentNumber']",
+                        "sourceMessageId": "@json(base64ToString(triggerBody()?['ContentData']))?['eventId']",
                         "outcome": "DeadLettered",
-                        "messageId": "@triggerBody()?['messageId']",
+                        "messageId": "@triggerBody()?['MessageId']",
                         "failureCode": "TmsUnavailable"
+                      }
+                    },
+                    "Close_the_session_after_dead_lettering_the_unavailable_report": {
+                      "type": "ApiConnection",
+                      "description": "Releases the session as soon as its message is settled, so the next message is not held back until the session's lock expires.",
+                      "inputs": {
+                        "host": {
+                          "connection": {
+                            "referenceName": "servicebus"
+                          }
+                        },
+                        "method": "delete",
+                        "path": "/@{encodeURIComponent(encodeURIComponent('driver-app-events'))}/subscriptions/@{encodeURIComponent('driver-reports')}/sessions/@{encodeURIComponent(encodeURIComponent(triggerBody()?['SessionId']))}/close"
+                      },
+                      "runAfter": {
+                        "Dead_letter_the_report_the_TMS_could_not_take": [
+                          "Succeeded"
+                        ]
                       }
                     },
                     "Report_not_recorded": {
@@ -531,17 +600,18 @@
                         }
                       },
                       "runAfter": {
-                        "Dead_letter_the_report_the_TMS_could_not_take": [
-                          "Succeeded"
+                        "Close_the_session_after_dead_lettering_the_unavailable_report": [
+                          "Succeeded",
+                          "Failed"
                         ]
                       },
                       "trackedProperties": {
-                        "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
+                        "correlationId": "@json(base64ToString(triggerBody()?['ContentData']))?['correlationId']",
                         "flow": "trip-execution",
-                        "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['driverId']",
-                        "tripNumber": "@json(base64ToString(triggerBody()?['contentData']))?['tripNumber']",
-                        "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
-                        "sourceMessageId": "@json(base64ToString(triggerBody()?['contentData']))?['eventId']",
+                        "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?['driverId']",
+                        "tripNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['tripNumber']",
+                        "shipmentNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['shipmentNumber']",
+                        "sourceMessageId": "@json(base64ToString(triggerBody()?['ContentData']))?['eventId']",
                         "outcome": "@if(and(greaterOrEquals(coalesce(actions('Report_not_recorded')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_not_recorded')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
                         "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Report_not_recorded')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_not_recorded')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Report_not_recorded')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Report_not_recorded')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Report_not_recorded')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Report_not_recorded')?['outputs']?['statusCode'], 0), 500)), 'DriverAppUnavailable', 'DriverAppRefused'))"
                       }
@@ -550,31 +620,51 @@
                   "else": {
                     "actions": {
                       "Dead_letter_the_refused_report": {
-                        "type": "ServiceProvider",
+                        "type": "ApiConnection",
                         "inputs": {
-                          "serviceProviderConfiguration": {
-                            "connectionName": "serviceBus",
-                            "operationId": "deadLetterMessageInSession",
-                            "serviceProviderId": "/serviceProviders/serviceBus"
+                          "host": {
+                            "connection": {
+                              "referenceName": "servicebus"
+                            }
                           },
-                          "parameters": {
-                            "messageId": "@triggerBody()?['messageId']",
-                            "lockToken": "@triggerBody()?['lockToken']",
+                          "method": "post",
+                          "path": "/@{encodeURIComponent(encodeURIComponent('driver-app-events'))}/subscriptions/@{encodeURIComponent('driver-reports')}/messages/deadletter",
+                          "queries": {
+                            "lockToken": "@triggerBody()?['LockToken']",
+                            "sessionId": "@triggerBody()?['SessionId']",
                             "deadLetterReason": "@coalesce(outputs('Send_the_report_to_the_TMS')?['body']?['code'], 'TmsCallRefused')",
                             "deadLetterErrorDescription": "@substring(string(coalesce(outputs('Send_the_report_to_the_TMS')?['body']?['detail'], outputs('Send_the_report_to_the_TMS')?['body']?['title'], 'The TMS refused the report.')), 0, min(1000, length(string(coalesce(outputs('Send_the_report_to_the_TMS')?['body']?['detail'], outputs('Send_the_report_to_the_TMS')?['body']?['title'], 'The TMS refused the report.')))))"
                           }
                         },
                         "runAfter": {},
                         "trackedProperties": {
-                          "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
+                          "correlationId": "@json(base64ToString(triggerBody()?['ContentData']))?['correlationId']",
                           "flow": "trip-execution",
-                          "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['driverId']",
-                          "tripNumber": "@json(base64ToString(triggerBody()?['contentData']))?['tripNumber']",
-                          "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
-                          "sourceMessageId": "@json(base64ToString(triggerBody()?['contentData']))?['eventId']",
+                          "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?['driverId']",
+                          "tripNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['tripNumber']",
+                          "shipmentNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['shipmentNumber']",
+                          "sourceMessageId": "@json(base64ToString(triggerBody()?['ContentData']))?['eventId']",
                           "outcome": "DeadLettered",
-                          "messageId": "@triggerBody()?['messageId']",
+                          "messageId": "@triggerBody()?['MessageId']",
                           "failureCode": "@action()?['inputs']?['parameters']?['deadLetterReason']"
+                        }
+                      },
+                      "Close_the_session_after_dead_lettering_the_refused_report": {
+                        "type": "ApiConnection",
+                        "description": "Releases the session as soon as its message is settled, so the next message is not held back until the session's lock expires.",
+                        "inputs": {
+                          "host": {
+                            "connection": {
+                              "referenceName": "servicebus"
+                            }
+                          },
+                          "method": "delete",
+                          "path": "/@{encodeURIComponent(encodeURIComponent('driver-app-events'))}/subscriptions/@{encodeURIComponent('driver-reports')}/sessions/@{encodeURIComponent(encodeURIComponent(triggerBody()?['SessionId']))}/close"
+                        },
+                        "runAfter": {
+                          "Dead_letter_the_refused_report": [
+                            "Succeeded"
+                          ]
                         }
                       },
                       "Report_refused": {
@@ -608,17 +698,18 @@
                           }
                         },
                         "runAfter": {
-                          "Dead_letter_the_refused_report": [
-                            "Succeeded"
+                          "Close_the_session_after_dead_lettering_the_refused_report": [
+                            "Succeeded",
+                            "Failed"
                           ]
                         },
                         "trackedProperties": {
-                          "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
+                          "correlationId": "@json(base64ToString(triggerBody()?['ContentData']))?['correlationId']",
                           "flow": "trip-execution",
-                          "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['driverId']",
-                          "tripNumber": "@json(base64ToString(triggerBody()?['contentData']))?['tripNumber']",
-                          "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
-                          "sourceMessageId": "@json(base64ToString(triggerBody()?['contentData']))?['eventId']",
+                          "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?['driverId']",
+                          "tripNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['tripNumber']",
+                          "shipmentNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['shipmentNumber']",
+                          "sourceMessageId": "@json(base64ToString(triggerBody()?['ContentData']))?['eventId']",
                           "outcome": "@if(and(greaterOrEquals(coalesce(actions('Report_refused')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_refused')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
                           "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Report_refused')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Report_refused')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Report_refused')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Report_refused')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Report_refused')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Report_refused')?['outputs']?['statusCode'], 0), 500)), 'DriverAppUnavailable', 'DriverAppRefused'))"
                         }
@@ -641,31 +732,51 @@
         "else": {
           "actions": {
             "Dead_letter_the_unreadable_report": {
-              "type": "ServiceProvider",
+              "type": "ApiConnection",
               "inputs": {
-                "serviceProviderConfiguration": {
-                  "connectionName": "serviceBus",
-                  "operationId": "deadLetterMessageInSession",
-                  "serviceProviderId": "/serviceProviders/serviceBus"
+                "host": {
+                  "connection": {
+                    "referenceName": "servicebus"
+                  }
                 },
-                "parameters": {
-                  "messageId": "@triggerBody()?['messageId']",
-                  "lockToken": "@triggerBody()?['lockToken']",
+                "method": "post",
+                "path": "/@{encodeURIComponent(encodeURIComponent('driver-app-events'))}/subscriptions/@{encodeURIComponent('driver-reports')}/messages/deadletter",
+                "queries": {
+                  "lockToken": "@triggerBody()?['LockToken']",
+                  "sessionId": "@triggerBody()?['SessionId']",
                   "deadLetterReason": "DriverReportUnreadable",
                   "deadLetterErrorDescription": "The message isn't a Trip start, a Trip end, a Stop report or a Proof of delivery the Driver app made, so nothing was sent to the TMS."
                 }
               },
               "runAfter": {},
               "trackedProperties": {
-                "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
+                "correlationId": "@json(base64ToString(triggerBody()?['ContentData']))?['correlationId']",
                 "flow": "trip-execution",
-                "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['driverId']",
-                "tripNumber": "@json(base64ToString(triggerBody()?['contentData']))?['tripNumber']",
-                "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
-                "sourceMessageId": "@json(base64ToString(triggerBody()?['contentData']))?['eventId']",
+                "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?['driverId']",
+                "tripNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['tripNumber']",
+                "shipmentNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['shipmentNumber']",
+                "sourceMessageId": "@json(base64ToString(triggerBody()?['ContentData']))?['eventId']",
                 "outcome": "DeadLettered",
-                "messageId": "@triggerBody()?['messageId']",
+                "messageId": "@triggerBody()?['MessageId']",
                 "failureCode": "DriverReportUnreadable"
+              }
+            },
+            "Close_the_session_after_dead_lettering_the_unreadable_report": {
+              "type": "ApiConnection",
+              "description": "Releases the session as soon as its message is settled, so the next message is not held back until the session's lock expires.",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "referenceName": "servicebus"
+                  }
+                },
+                "method": "delete",
+                "path": "/@{encodeURIComponent(encodeURIComponent('driver-app-events'))}/subscriptions/@{encodeURIComponent('driver-reports')}/sessions/@{encodeURIComponent(encodeURIComponent(triggerBody()?['SessionId']))}/close"
+              },
+              "runAfter": {
+                "Dead_letter_the_unreadable_report": [
+                  "Succeeded"
+                ]
               }
             },
             "Fail_the_run_on_the_unreadable_report": {
@@ -678,9 +789,11 @@
                 }
               },
               "runAfter": {
-                "Dead_letter_the_unreadable_report": [
+                "Close_the_session_after_dead_lettering_the_unreadable_report": [
                   "Succeeded",
-                  "Failed"
+                  "Failed",
+                  "Skipped",
+                  "TimedOut"
                 ]
               }
             }

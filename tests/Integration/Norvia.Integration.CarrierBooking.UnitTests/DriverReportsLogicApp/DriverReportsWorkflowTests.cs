@@ -17,6 +17,12 @@ public sealed class DriverReportsWorkflowTests
         DriverReportsWorkflow.ReportFilesGone,
     ];
 
+    /// <summary>The step that closes the session once <paramref name="settle"/> has settled the message.</summary>
+    private static string CloseAfter(string settle) => DriverReportsWorkflow.Operations()
+        .Single(operation => operation.Operation["type"]?.GetValue<string>() == "ApiConnection"
+            && operation.Operation["inputs"]!["path"]!.GetValue<string>().EndsWith("/close", StringComparison.Ordinal)
+            && operation.Operation["runAfter"]?[settle] is not null).Name;
+
     private static string[] Statuses(JsonObject action, string after) =>
         [.. action["runAfter"]![after]!.AsArray().Select(status => status!.GetValue<string>())];
 
@@ -25,16 +31,15 @@ public sealed class DriverReportsWorkflowTests
     {
         var inputs = DriverReportsWorkflow.Trigger["inputs"]!;
 
-        DriverReportsWorkflow.Trigger["type"]!.GetValue<string>().Should().Be("ServiceProvider");
-        inputs["parameters"]!["topicName"]!.GetValue<string>().Should().Be("driver-app-events");
-        inputs["parameters"]!["subscriptionName"]!.GetValue<string>().Should().Be("driver-reports");
-        inputs["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("onSingleNewMessageFromTopicSession");
-        inputs["serviceProviderConfiguration"]!["serviceProviderId"]!.GetValue<string>().Should().Be("/serviceProviders/serviceBus");
+        DriverReportsWorkflow.Trigger["type"]!.GetValue<string>().Should().Be("ApiConnection");
+        inputs["host"]!["connection"]!["referenceName"]!.GetValue<string>().Should().Be("servicebus");
+        inputs["path"]!.GetValue<string>().Should().Contain("'driver-app-events'").And.Contain("'driver-reports'").And.EndWith("/messages/head/peek");
+        inputs["queries"]!["sessionId"]!.GetValue<string>().Should().Be("Next Available", "the subscription requires sessions");
     }
 
     [Fact]
     public void Trigger_ClientTrackingId_IsTheDriversActionCorrelationId() =>
-        DriverReportsWorkflow.Trigger["correlation"]!["clientTrackingId"]!.GetValue<string>().Should().Be("@{triggerOutputs()?['body']?['userProperties']?['correlationId']}");
+        DriverReportsWorkflow.Trigger["correlation"]!["clientTrackingId"]!.GetValue<string>().Should().Be("@{coalesce(if(equals(length(string(coalesce(triggerBody(), ''))), 0), json('{}'), triggerBody())?['Properties']?['correlationId'], '00000000-0000-0000-0000-000000000000')}");
 
     [Fact]
     public void Tracking_RunsFirst_AndOnlyItDoes()
@@ -53,7 +58,7 @@ public sealed class DriverReportsWorkflowTests
             "correlationId", "partyId", "tripNumber", "eventType", "sourceMessageId", "occurredAt", "version", "shipmentNumber", "stop", "trackingEventType", "location", "remark",
             "documentId", "receivedBy", "deliveryTime", "condition", "files");
         inputs.Select(input => input.Value!.GetValue<string>()).Should().OnlyContain(
-            expression => expression.StartsWith("@json(base64ToString(triggerBody()?['contentData']))?['", StringComparison.Ordinal) && !expression.Contains("@{", StringComparison.Ordinal));
+            expression => expression.StartsWith("@json(base64ToString(triggerBody()?['ContentData']))?['", StringComparison.Ordinal) && !expression.Contains("@{", StringComparison.Ordinal));
         inputs["partyId"]!.GetValue<string>().Should().EndWith("?['driverId']");
         inputs["sourceMessageId"]!.GetValue<string>().Should().EndWith("?['eventId']");
     }
@@ -195,9 +200,10 @@ public sealed class DriverReportsWorkflowTests
 
         Statuses(settle, DriverReportsWorkflow.SendToTms).Should().BeEquivalentTo("Succeeded", "Failed", "TimedOut");
         settle["expression"]!.ToJsonString().Should().Contain("greaterOrEquals").And.Contain("200").And.Contain("less").And.Contain("300");
-        settle["actions"]!.AsObject().Select(action => action.Key).Should().Equal(DriverReportsWorkflow.Complete, DriverReportsWorkflow.ReportRecorded, DriverReportsWorkflow.DeleteFiles);
-        DriverReportsWorkflow.Action(DriverReportsWorkflow.Complete)["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("completeMessageInSession");
-        Statuses(DriverReportsWorkflow.Action(DriverReportsWorkflow.ReportRecorded), DriverReportsWorkflow.Complete).Should().Equal("Succeeded");
+        settle["actions"]!.AsObject().Select(action => action.Key).Should().Equal(DriverReportsWorkflow.Complete, CloseAfter(DriverReportsWorkflow.Complete), DriverReportsWorkflow.ReportRecorded, DriverReportsWorkflow.DeleteFiles);
+        DriverReportsWorkflow.Action(DriverReportsWorkflow.Complete)["inputs"]!["path"]!.GetValue<string>().Should().EndWith("/messages/complete");
+        DriverReportsWorkflow.Action(DriverReportsWorkflow.Complete)["inputs"]!["queries"]!["sessionId"]!.GetValue<string>().Should().Be("@triggerBody()?['SessionId']");
+        Statuses(DriverReportsWorkflow.Action(DriverReportsWorkflow.ReportRecorded), CloseAfter(DriverReportsWorkflow.Complete)).Should().BeEquivalentTo("Succeeded", "Failed");
     }
 
     [Theory]
@@ -207,13 +213,13 @@ public sealed class DriverReportsWorkflowTests
     {
         var inputs = DriverReportsWorkflow.Action(deadLetter)["inputs"]!;
 
-        inputs["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("deadLetterMessageInSession");
-        inputs["parameters"]!["deadLetterReason"]!.GetValue<string>().Should().NotBeNullOrWhiteSpace();
-        inputs["parameters"]!["deadLetterErrorDescription"]!.GetValue<string>().Should().NotBeNullOrWhiteSpace();
-        inputs["parameters"]!["lockToken"]!.GetValue<string>().Should().Be("@triggerBody()?['lockToken']");
-        inputs["parameters"]!["messageId"]!.GetValue<string>().Should().Be("@triggerBody()?['messageId']");
+        inputs["path"]!.GetValue<string>().Should().EndWith("/messages/deadletter");
+        inputs["queries"]!["deadLetterReason"]!.GetValue<string>().Should().NotBeNullOrWhiteSpace();
+        inputs["queries"]!["deadLetterErrorDescription"]!.GetValue<string>().Should().NotBeNullOrWhiteSpace();
+        inputs["queries"]!["lockToken"]!.GetValue<string>().Should().Be("@triggerBody()?['LockToken']");
+        inputs["queries"]!["sessionId"]!.GetValue<string>().Should().Be("@triggerBody()?['SessionId']");
         DriverReportsWorkflow.Action(deadLetter)["trackedProperties"]!["outcome"]!.GetValue<string>().Should().Be("DeadLettered");
-        Statuses(DriverReportsWorkflow.Action(report), deadLetter).Should().Equal("Succeeded");
+        Statuses(DriverReportsWorkflow.Action(report), CloseAfter(deadLetter)).Should().BeEquivalentTo("Succeeded", "Failed");
     }
 
     [Fact]
@@ -223,18 +229,18 @@ public sealed class DriverReportsWorkflowTests
 
         var expression = check["expression"]!.ToJsonString();
         expression.Should().Contain("408").And.Contain("429").And.Contain("500");
-        check["actions"]!.AsObject().Select(action => action.Key).Should().Equal(DriverReportsWorkflow.DeadLetterUnavailable, DriverReportsWorkflow.ReportNotRecorded);
-        check["else"]!["actions"]!.AsObject().Select(action => action.Key).Should().Equal(DriverReportsWorkflow.DeadLetterRefused, DriverReportsWorkflow.ReportRefused);
+        check["actions"]!.AsObject().Select(action => action.Key).Should().Equal(DriverReportsWorkflow.DeadLetterUnavailable, CloseAfter(DriverReportsWorkflow.DeadLetterUnavailable), DriverReportsWorkflow.ReportNotRecorded);
+        check["else"]!["actions"]!.AsObject().Select(action => action.Key).Should().Equal(DriverReportsWorkflow.DeadLetterRefused, CloseAfter(DriverReportsWorkflow.DeadLetterRefused), DriverReportsWorkflow.ReportRefused);
     }
 
     [Fact]
     public void UnreadableReport_IsDeadLetteredWithTheFailureCodeAndAReadableMessage_AndFailsTheRun()
     {
         var deadLetter = DriverReportsWorkflow.Action(DriverReportsWorkflow.DeadLetterUnreadable);
-        var parameters = deadLetter["inputs"]!["parameters"]!;
+        var parameters = deadLetter["inputs"]!["queries"]!;
 
         DriverReportsWorkflow.Action(DriverReportsWorkflow.Check)["else"]!["actions"]!.AsObject().Select(action => action.Key)
-            .Should().Equal(DriverReportsWorkflow.DeadLetterUnreadable, DriverReportsWorkflow.FailTheRun);
+            .Should().Equal(DriverReportsWorkflow.DeadLetterUnreadable, CloseAfter(DriverReportsWorkflow.DeadLetterUnreadable), DriverReportsWorkflow.FailTheRun);
         parameters["deadLetterReason"]!.GetValue<string>().Should().Be("DriverReportUnreadable");
         parameters["deadLetterErrorDescription"]!.GetValue<string>().Should().Contain("Trip start, a Trip end, a Stop report or a Proof of delivery").And.Contain("nothing was sent to the TMS");
         deadLetter["trackedProperties"]!["failureCode"]!.GetValue<string>().Should().Be("DriverReportUnreadable");
@@ -345,10 +351,10 @@ public sealed class DriverReportsWorkflowTests
         var report = DriverReportsWorkflow.Action(DriverReportsWorkflow.ReportFilesGone);
 
         Statuses(deadLetter, DriverReportsWorkflow.FetchFiles).Should().BeEquivalentTo("Failed", "TimedOut");
-        deadLetter["inputs"]!["parameters"]!["deadLetterReason"]!.GetValue<string>().Should().Be("ProofOfDeliveryFilesGone");
-        deadLetter["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("deadLetterMessageInSession");
+        deadLetter["inputs"]!["queries"]!["deadLetterReason"]!.GetValue<string>().Should().Be("ProofOfDeliveryFilesGone");
+        deadLetter["inputs"]!["path"]!.GetValue<string>().Should().EndWith("/messages/deadletter");
         deadLetter["trackedProperties"]!["outcome"]!.GetValue<string>().Should().Be("DeadLettered");
-        Statuses(report, DriverReportsWorkflow.DeadLetterFilesGone).Should().Equal("Succeeded");
+        Statuses(report, CloseAfter(DriverReportsWorkflow.DeadLetterFilesGone)).Should().BeEquivalentTo("Succeeded", "Failed");
         report["inputs"]!["body"]!["outcome"]!.GetValue<string>().Should().Be("NotRecorded");
         report["inputs"]!["body"]!["failureCode"]!.GetValue<string>().Should().Be("ProofOfDeliveryFilesGone");
         report["inputs"]!["body"]!["driverAppEventId"]!.GetValue<string>().Should().Be("@outputs('Track_the_report')?['sourceMessageId']");
@@ -387,15 +393,68 @@ public sealed class DriverReportsWorkflowTests
     {
         var connections = DriverReportsWorkflow.ConnectionsFile["serviceProviderConnections"]!.AsObject();
 
-        connections.Select(connection => connection.Key).Should().Equal("serviceBus", "AzureBlob");
-        var authProvider = connections["serviceBus"]!["parameterValues"]!["authProvider"]!;
-        authProvider["Type"]!.GetValue<string>().Should().Be("ManagedServiceIdentity");
-        authProvider["Identity"]!.GetValue<string>().Should().Be("@appsetting('DRIVER_REPORTS_IDENTITY_ID')");
-        connections["serviceBus"]!["parameterValues"]!["fullyQualifiedNamespace"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_NAMESPACE')");
+        connections.Select(connection => connection.Key).Should().Equal("AzureBlob");
         var blob = connections["AzureBlob"]!["parameterValues"]!;
         blob["authProvider"]!["Type"]!.GetValue<string>().Should().Be("ManagedServiceIdentity");
         blob["authProvider"]!["Identity"]!.GetValue<string>().Should().Be("@appsetting('DRIVER_REPORTS_IDENTITY_ID')");
         blob["blobStorageEndpoint"]!.GetValue<string>().Should().Be("@appsetting('DRIVER_PROOFS_BLOB_ENDPOINT')");
+    }
+
+    [Fact]
+    public void ServiceBusConnection_IsAManagedConnectionSignedInAsTheDriverReportsIdentity_ForTheTokenStoreAndForServiceBus()
+    {
+        var connections = DriverReportsWorkflow.ConnectionsFile["managedApiConnections"]!.AsObject();
+        var serviceBus = connections["servicebus"]!;
+
+        connections.Select(connection => connection.Key).Should().BeEquivalentTo("servicebus");
+        serviceBus["api"]!["id"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_API_ID')");
+        serviceBus["connection"]!["id"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_CONNECTION_ID')");
+        serviceBus["connectionRuntimeUrl"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_CONNECTION_RUNTIME_URL')");
+        foreach (var authentication in new[] { serviceBus["authentication"]!, serviceBus["connectionProperties"]!["authentication"]! })
+        {
+            authentication["type"]!.GetValue<string>().Should().Be("ManagedServiceIdentity");
+            authentication["identity"]!.GetValue<string>().Should().Be("@appsetting('DRIVER_REPORTS_IDENTITY_ID')");
+        }
+
+        serviceBus["connectionProperties"]!["authentication"]!["audience"]!.GetValue<string>().Should().Be("https://servicebus.azure.net");
+    }
+
+    [Fact]
+    public void EveryServiceBusStep_SettlesTheMessageOfItsSession_ByTheLockToken_OrClosesThatSession()
+    {
+        var steps = DriverReportsWorkflow.Operations().Where(operation => operation.Operation["type"]!.GetValue<string>() == "ApiConnection" && operation.Name != "trigger").ToList();
+        var settling = steps.Where(step => !step.Operation["inputs"]!["path"]!.GetValue<string>().EndsWith("/close", StringComparison.Ordinal)).ToList();
+
+        settling.Should().HaveCount(5, "Complete and four dead letters");
+        settling.Should().OnlyContain(step => step.Operation["inputs"]!["queries"]!["lockToken"]!.GetValue<string>() == "@triggerBody()?['LockToken']"
+            && step.Operation["inputs"]!["queries"]!["sessionId"]!.GetValue<string>() == "@triggerBody()?['SessionId']"
+            && step.Operation["inputs"]!["path"]!.GetValue<string>().Contains("'driver-reports'", StringComparison.Ordinal));
+        steps.Should().OnlyContain(step => step.Operation["inputs"]!["host"]!["connection"]!["referenceName"]!.GetValue<string>() == "servicebus");
+    }
+
+    [Fact]
+    public void EverySettlingStep_IsFollowedByClosingItsSession_SoTheNextMessageIsNotHeldBackUntilTheSessionLockExpires()
+    {
+        string[] settling = [DriverReportsWorkflow.Complete, DriverReportsWorkflow.DeadLetterUnavailable, DriverReportsWorkflow.DeadLetterRefused, DriverReportsWorkflow.DeadLetterUnreadable, DriverReportsWorkflow.DeadLetterFilesGone];
+
+        foreach (var settle in settling)
+        {
+            var close = DriverReportsWorkflow.Action(CloseAfter(settle));
+
+            close["inputs"]!["method"]!.GetValue<string>().Should().Be("delete");
+            close["inputs"]!["path"]!.GetValue<string>().Should().Contain("'driver-app-events'").And.Contain("'driver-reports'").And.Contain("triggerBody()?['SessionId']");
+            Statuses(close, settle).Should().Equal("Succeeded");
+        }
+    }
+
+    [Fact]
+    public void Check_TestsTheNumericVersionForNull_NotForEmpty_BecauseEmptyRefusesAnInteger()
+    {
+        // empty() takes a string, an array or an object; the Driver app's version is a number, and the run fails with InvalidTemplate on it.
+        var expression = DriverReportsWorkflow.Action(DriverReportsWorkflow.Check)["expression"]!["equals"]![0]!.GetValue<string>();
+
+        expression.Should().NotContain("empty(outputs('Track_the_report')?['version'])");
+        expression.Should().Contain("equals(outputs('Track_the_report')?['version'], null)");
     }
 
     [Fact]

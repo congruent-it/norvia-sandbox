@@ -17,20 +17,39 @@ public sealed class BookingWorkflowTests
     private static string[] Statuses(JsonObject action, string after) =>
         [.. action["runAfter"]![after]!.AsArray().Select(status => status!.GetValue<string>())];
 
-    [Fact]
-    public void Trigger_IsTheBookingSubscriptionOnTheShipmentEventsTopic()
-    {
-        var parameters = BookingWorkflow.Trigger["inputs"]!["parameters"]!;
+    private const string SubscriptionPath = "/@{encodeURIComponent(encodeURIComponent('shipment-events'))}/subscriptions/@{encodeURIComponent('carrier-booking')}/messages/";
 
-        BookingWorkflow.Trigger["type"]!.GetValue<string>().Should().Be("ServiceProvider");
-        parameters["topicName"]!.GetValue<string>().Should().Be("shipment-events");
-        parameters["subscriptionName"]!.GetValue<string>().Should().Be("carrier-booking");
-        BookingWorkflow.Trigger["inputs"]!["serviceProviderConfiguration"]!["serviceProviderId"]!.GetValue<string>().Should().Be("/serviceProviders/serviceBus");
+    [Fact]
+    public void Trigger_IsTheBookingSubscriptionOnTheShipmentEventsTopic_PeekedWithALockThroughTheManagedConnector()
+    {
+        var inputs = BookingWorkflow.Trigger["inputs"]!;
+
+        BookingWorkflow.Trigger["type"]!.GetValue<string>().Should().Be("ApiConnection");
+        inputs["host"]!["connection"]!["referenceName"]!.GetValue<string>().Should().Be("servicebus");
+        inputs["method"]!.GetValue<string>().Should().Be("get");
+        inputs["path"]!.GetValue<string>().Should().Be(SubscriptionPath + "head/peek");
     }
 
     [Fact]
-    public void Trigger_ClientTrackingId_IsTheReleasesCorrelationId() =>
-        BookingWorkflow.Trigger["correlation"]!["clientTrackingId"]!.GetValue<string>().Should().Be("@{triggerOutputs()?['body']?['correlationId']}");
+    public void Trigger_ClientTrackingId_IsTheReleasesCorrelationId_AndSurvivesAPollThatFindsNoMessage()
+    {
+        // A poll with nothing to peek answers 202 with an empty body, and the runtime evaluates the expression on it all the same.
+        var clientTrackingId = BookingWorkflow.Trigger["correlation"]!["clientTrackingId"]!.GetValue<string>();
+
+        clientTrackingId.Should().Contain("?['CorrelationId']").And.Contain("equals(length(string(coalesce(triggerBody(), ''))), 0)");
+    }
+
+    [Fact]
+    public void Message_IsCompletedRightAfterTheTracking_AsTheReceiveAndDeleteTriggerDid_SoAFailedBookingIsReportedNotRedelivered()
+    {
+        var complete = BookingWorkflow.Action("Complete_the_message");
+
+        complete["inputs"]!["method"]!.GetValue<string>().Should().Be("delete");
+        complete["inputs"]!["path"]!.GetValue<string>().Should().Be(SubscriptionPath + "complete");
+        complete["inputs"]!["queries"]!["lockToken"]!.GetValue<string>().Should().Be("@triggerBody()?['LockToken']");
+        Statuses(complete, BookingWorkflow.Tracking).Should().BeEquivalentTo("Succeeded", "Failed");
+        Statuses(BookingWorkflow.Action(BookingWorkflow.MapAction), "Complete_the_message").Should().BeEquivalentTo("Succeeded");
+    }
 
     [Fact]
     public void Trigger_TracksNothing_BecauseTheFirstStepTracksTheKeysTheMessageCarries() =>
@@ -43,7 +62,6 @@ public sealed class BookingWorkflowTests
         BookingWorkflow.Action(BookingWorkflow.Tracking)["runAfter"]!.AsObject().Should().BeEmpty();
         BookingWorkflow.Actions.Where(action => action.Key != BookingWorkflow.Tracking)
             .Should().OnlyContain(action => action.Value!["runAfter"]!.AsObject().Count > 0);
-        Statuses(BookingWorkflow.Action(BookingWorkflow.MapAction), BookingWorkflow.Tracking).Should().BeEquivalentTo("Succeeded");
     }
 
     [Fact]
@@ -54,7 +72,7 @@ public sealed class BookingWorkflowTests
 
         inputs.Select(input => input.Key).Should().BeEquivalentTo("correlationId", "partyId", "shipmentNumber", "carrierBookingNumber", "sourceMessageId");
         inputs.Select(input => input.Value!.GetValue<string>()).Should().OnlyContain(
-            expression => expression.StartsWith("@json(base64ToString(triggerBody()?['contentData']))?['", StringComparison.Ordinal) && !expression.Contains("@{", StringComparison.Ordinal));
+            expression => expression.StartsWith("@json(base64ToString(triggerBody()?['ContentData']))?['", StringComparison.Ordinal) && !expression.Contains("@{", StringComparison.Ordinal));
         inputs["partyId"]!.GetValue<string>().Should().EndWith("?['carrierId']");
         inputs["sourceMessageId"]!.GetValue<string>().Should().EndWith("?['eventId']");
     }
@@ -87,7 +105,7 @@ public sealed class BookingWorkflowTests
 
         map["type"]!.GetValue<string>().Should().Be("InvokeFunction");
         map["inputs"]!["functionName"]!.GetValue<string>().Should().Be("MapShipmentReleased");
-        map["inputs"]!["parameters"]!["shipmentReleased"]!.GetValue<string>().Should().Be("@{triggerBody()?['contentData']}");
+        map["inputs"]!["parameters"]!["shipmentReleased"]!.GetValue<string>().Should().Be("@{triggerBody()?['ContentData']}");
         map["trackedProperties"]!["failureCode"]!.GetValue<string>().Should().Contain("ShipmentReleasedUnreadable");
     }
 
@@ -239,16 +257,32 @@ public sealed class BookingWorkflowTests
     {
         var connections = BookingWorkflow.ConnectionsFile["serviceProviderConnections"]!.AsObject();
 
-        connections.Select(connection => connection.Key).Should().BeEquivalentTo("serviceBus", "keyVault");
-        foreach (var (_, connection) in connections)
+        connections.Select(connection => connection.Key).Should().BeEquivalentTo("keyVault");        foreach (var (_, connection) in connections)
         {
             var authProvider = connection!["parameterValues"]!["authProvider"]!;
             authProvider["Type"]!.GetValue<string>().Should().Be("ManagedServiceIdentity");
             authProvider["Identity"]!.GetValue<string>().Should().Be("@appsetting('BOOKING_IDENTITY_ID')");
         }
-
-        connections["serviceBus"]!["parameterValues"]!["fullyQualifiedNamespace"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_NAMESPACE')");
         connections["keyVault"]!["parameterValues"]!["VaultUri"]!.GetValue<string>().Should().Be("@appsetting('KEY_VAULT_URI')");
+    }
+
+    [Fact]
+    public void ServiceBusConnection_IsAManagedConnectionSignedInAsTheBookingIdentity_ForTheTokenStoreAndForServiceBus()
+    {
+        var connections = BookingWorkflow.ConnectionsFile["managedApiConnections"]!.AsObject();
+        var serviceBus = connections["servicebus"]!;
+
+        connections.Select(connection => connection.Key).Should().BeEquivalentTo("servicebus");
+        serviceBus["api"]!["id"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_API_ID')");
+        serviceBus["connection"]!["id"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_CONNECTION_ID')");
+        serviceBus["connectionRuntimeUrl"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_CONNECTION_RUNTIME_URL')");
+        foreach (var authentication in new[] { serviceBus["authentication"]!, serviceBus["connectionProperties"]!["authentication"]! })
+        {
+            authentication["type"]!.GetValue<string>().Should().Be("ManagedServiceIdentity");
+            authentication["identity"]!.GetValue<string>().Should().Be("@appsetting('BOOKING_IDENTITY_ID')");
+        }
+
+        serviceBus["connectionProperties"]!["authentication"]!["audience"]!.GetValue<string>().Should().Be("https://servicebus.azure.net");
     }
 
     [Fact]
