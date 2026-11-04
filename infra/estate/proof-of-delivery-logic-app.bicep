@@ -41,6 +41,7 @@ param integrationConsolePrincipalId string
 var resourceToken = uniqueString(resourceGroup().id)
 var logicAppName = 'logic-pod-${resourceToken}'
 var contentShareName = logicAppName
+var serviceBusApiId = subscriptionResourceId('Microsoft.Web/locations/managedApis', location, 'servicebus')
 
 resource proofOfDeliveryIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
   name: proofOfDeliveryIdentityName
@@ -139,6 +140,47 @@ resource contentConnectionAccess 'Microsoft.Authorization/roleAssignments@2022-0
   }
 }
 
+// The Service Bus managed connector, which the workflow reads the Proof of delivery queue with. The built-in Service Bus trigger fails in this app
+// before it creates a run, with no error to read; the managed connector says why when it fails. The connection signs in as the
+// app's identity, which holds Azure Service Bus Data Receiver on what it reads, and the access policy lets that identity use it.
+resource serviceBusConnection 'Microsoft.Web/connections@2016-06-01' = {
+  name: 'servicebus-proof-of-delivery'
+  location: location
+  tags: tags
+  #disable-next-line BCP187 // the connection's type lacks the kind a Standard logic app's connection needs
+  kind: 'V2'
+  properties: {
+    displayName: 'Service Bus'
+    api: {
+      id: serviceBusApiId
+    }
+    #disable-next-line BCP089 // the type lacks the authentication set a managed identity connection uses
+    parameterValueSet: {
+      name: 'managedIdentityAuth'
+      values: {
+        namespaceEndpoint: {
+          value: 'sb://${serviceBus.name}.servicebus.windows.net/'
+        }
+      }
+    }
+  }
+}
+
+#disable-next-line BCP081 // no type definitions are published for the access policy
+resource serviceBusConnectionAccess 'Microsoft.Web/connections/accessPolicies@2016-06-01' = {
+  parent: serviceBusConnection
+  name: 'proof-of-delivery-identity'
+  properties: {
+    principal: {
+      type: 'ActiveDirectory'
+      identity: {
+        tenantId: tenant().tenantId
+        objectId: proofOfDeliveryIdentity.properties.principalId
+      }
+    }
+  }
+}
+
 resource logicApp 'Microsoft.Web/sites@2024-11-01' = {
   name: logicAppName
   location: location
@@ -188,7 +230,11 @@ resource logicApp 'Microsoft.Web/sites@2024-11-01' = {
         { name: 'PROOF_OF_DELIVERY_IDENTITY_ID', value: proofOfDeliveryIdentity.id }
         { name: 'INBOUND_CONTAINER', value: inboundContainerName }
         { name: 'INBOUND_BLOB_ENDPOINT', value: inboundBlobEndpoint }
-        { name: 'SERVICE_BUS_NAMESPACE', value: '${serviceBus.name}.servicebus.windows.net' }
+        // The Service Bus managed connection (connections.json).
+        { name: 'SERVICE_BUS_API_ID', value: serviceBusApiId }
+        { name: 'SERVICE_BUS_CONNECTION_ID', value: serviceBusConnection.id }
+        #disable-next-line use-resource-symbol-reference // the connection's type doesn't declare its runtime URL
+        { name: 'SERVICE_BUS_CONNECTION_RUNTIME_URL', value: reference(serviceBusConnection.id, '2016-06-01', 'Full').properties.connectionRuntimeUrl }
       ]
     }
   }
@@ -196,6 +242,7 @@ resource logicApp 'Microsoft.Web/sites@2024-11-01' = {
     storageAccess
     contentConnectionAccess
     contentShare
+    serviceBusConnectionAccess
   ]
 }
 

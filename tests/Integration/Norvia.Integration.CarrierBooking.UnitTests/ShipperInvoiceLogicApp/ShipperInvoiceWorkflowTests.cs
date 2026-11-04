@@ -20,17 +20,17 @@ public sealed class ShipperInvoiceWorkflowTests
     [Fact]
     public void Trigger_IsTheShipperInvoiceSubscriptionOnTheInvoicingEventsTopic()
     {
-        var parameters = ShipperInvoiceWorkflow.Trigger["inputs"]!["parameters"]!;
+        var path = ShipperInvoiceWorkflow.Trigger["inputs"]!["path"]!.GetValue<string>();
 
-        ShipperInvoiceWorkflow.Trigger["type"]!.GetValue<string>().Should().Be("ServiceProvider");
-        ShipperInvoiceWorkflow.Trigger["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("peekLockTopicMessagesV2");
-        parameters["topicName"]!.GetValue<string>().Should().Be("invoicing-events");
-        parameters["subscriptionName"]!.GetValue<string>().Should().Be("shipper-invoice");
+        ShipperInvoiceWorkflow.Trigger["type"]!.GetValue<string>().Should().Be("ApiConnection");
+        ShipperInvoiceWorkflow.Trigger["inputs"]!["path"]!.GetValue<string>().Should().EndWith("/messages/head/peek");
+        path.Should().Contain("'invoicing-events'");
+        path.Should().Contain("'shipper-invoice'");
     }
 
     [Fact]
     public void Trigger_ClientTrackingId_IsTheInvoicesCorrelationId() =>
-        ShipperInvoiceWorkflow.Trigger["correlation"]!["clientTrackingId"]!.GetValue<string>().Should().Be("@{triggerOutputs()?['body']?['userProperties']?['correlationId']}");
+        ShipperInvoiceWorkflow.Trigger["correlation"]!["clientTrackingId"]!.GetValue<string>().Should().Be("@{coalesce(if(equals(length(string(coalesce(triggerBody(), ''))), 0), json('{}'), triggerBody())?['Properties']?['correlationId'], '00000000-0000-0000-0000-000000000000')}");
 
     [Fact]
     public void Tracking_RunsFirst_AndOnlyItDoes()
@@ -49,8 +49,8 @@ public sealed class ShipperInvoiceWorkflowTests
 
         inputs.Select(input => input.Key).Should().BeEquivalentTo("correlationId", "partyId", "documentNumber", "sourceMessageId");
         inputs.Select(input => input.Value!.GetValue<string>()).Should().OnlyContain(
-            expression => (expression.StartsWith("@json(base64ToString(triggerBody()?['contentData']))?['", StringComparison.Ordinal)
-                    || expression.StartsWith("@coalesce(json(base64ToString(triggerBody()?['contentData']))?['", StringComparison.Ordinal))
+            expression => (expression.StartsWith("@json(base64ToString(triggerBody()?['ContentData']))?['", StringComparison.Ordinal)
+                    || expression.StartsWith("@coalesce(json(base64ToString(triggerBody()?['ContentData']))?['", StringComparison.Ordinal))
                 && !expression.Contains("@{", StringComparison.Ordinal));
         inputs["partyId"]!.GetValue<string>().Should().Contain("?['invoice']?['shipper']?['shipperId']").And.Contain("?['creditNote']?['shipper']?['shipperId']");
         inputs["documentNumber"]!.GetValue<string>().Should().Contain("?['invoice']?['invoiceNumber']").And.Contain("?['creditNote']?['creditNoteNumber']");
@@ -85,7 +85,7 @@ public sealed class ShipperInvoiceWorkflowTests
 
         map["type"]!.GetValue<string>().Should().Be("InvokeFunction");
         map["inputs"]!["functionName"]!.GetValue<string>().Should().Be("MapShipperDocument");
-        map["inputs"]!["parameters"]!["message"]!.GetValue<string>().Should().Be("@{triggerBody()?['contentData']}");
+        map["inputs"]!["parameters"]!["message"]!.GetValue<string>().Should().Be("@{triggerBody()?['ContentData']}");
         map["trackedProperties"]!["failureCode"]!.GetValue<string>().Should().Contain("ShipperInvoiceIssuedUnreadable");
     }
 
@@ -93,12 +93,11 @@ public sealed class ShipperInvoiceWorkflowTests
     public void UnreadableInvoice_IsDeadLetteredWithTheFailureCodeAndAReadableMessage_AndFailsTheRun()
     {
         var deadLetter = ShipperInvoiceWorkflow.Action("Dead_letter_the_unreadable_invoice");
-        var parameters = deadLetter["inputs"]!["parameters"]!;
+        var parameters = deadLetter["inputs"]!["queries"]!;
 
         Statuses(deadLetter, ShipperInvoiceWorkflow.MapAction).Should().BeEquivalentTo("Failed");
-        deadLetter["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("deadLetterTopicMessageV2");
-        parameters["subscriptionName"]!.GetValue<string>().Should().Be("shipper-invoice");
-        parameters["lockToken"]!.GetValue<string>().Should().Be("@triggerBody()?['lockToken']");
+        deadLetter["inputs"]!["path"]!.GetValue<string>().Should().EndWith("/messages/deadletter");
+        parameters["lockToken"]!.GetValue<string>().Should().Be("@triggerBody()?['LockToken']");
         parameters["deadLetterReason"]!.GetValue<string>().Should().Be("ShipperInvoiceIssuedUnreadable");
         parameters["deadLetterErrorDescription"]!.GetValue<string>().Should().Contain("nothing was sent");
         deadLetter["trackedProperties"]!["outcome"]!.GetValue<string>().Should().Be("DeadLettered");
@@ -289,16 +288,44 @@ public sealed class ShipperInvoiceWorkflowTests
     {
         var connections = ShipperInvoiceWorkflow.ConnectionsFile["serviceProviderConnections"]!.AsObject();
 
-        connections.Select(connection => connection.Key).Should().BeEquivalentTo("serviceBus", "keyVault");
+        connections.Select(connection => connection.Key).Should().BeEquivalentTo("keyVault");
         foreach (var (_, connection) in connections)
         {
             var authProvider = connection!["parameterValues"]!["authProvider"]!;
             authProvider["Type"]!.GetValue<string>().Should().Be("ManagedServiceIdentity");
             authProvider["Identity"]!.GetValue<string>().Should().Be("@appsetting('SHIPPER_INVOICE_IDENTITY_ID')");
         }
-
-        connections["serviceBus"]!["parameterValues"]!["fullyQualifiedNamespace"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_NAMESPACE')");
         connections["keyVault"]!["parameterValues"]!["VaultUri"]!.GetValue<string>().Should().Be("@appsetting('KEY_VAULT_URI')");
+    }
+
+    [Fact]
+    public void EveryServiceBusStep_ReadsTheOneSubscriptionThroughTheManagedConnection()
+    {
+        var steps = ShipperInvoiceWorkflow.Operations().Where(operation => operation.Operation["type"]!.GetValue<string>() == "ApiConnection").ToList();
+
+        steps.Should().NotBeEmpty();
+        steps.Should().OnlyContain(step => step.Operation["inputs"]!["host"]!["connection"]!["referenceName"]!.GetValue<string>() == "servicebus"
+            && step.Operation["inputs"]!["path"]!.GetValue<string>().Contains("'invoicing-events'", StringComparison.Ordinal)
+            && step.Operation["inputs"]!["path"]!.GetValue<string>().Contains("'shipper-invoice'", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ServiceBusConnection_IsAManagedConnectionSignedInAsTheIdentity_ForTheTokenStoreAndForServiceBus()
+    {
+        var connections = ShipperInvoiceWorkflow.ConnectionsFile["managedApiConnections"]!.AsObject();
+        var serviceBus = connections["servicebus"]!;
+
+        connections.Select(connection => connection.Key).Should().BeEquivalentTo("servicebus");
+        serviceBus["api"]!["id"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_API_ID')");
+        serviceBus["connection"]!["id"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_CONNECTION_ID')");
+        serviceBus["connectionRuntimeUrl"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_CONNECTION_RUNTIME_URL')");
+        foreach (var authentication in new[] { serviceBus["authentication"]!, serviceBus["connectionProperties"]!["authentication"]! })
+        {
+            authentication["type"]!.GetValue<string>().Should().Be("ManagedServiceIdentity");
+            authentication["identity"]!.GetValue<string>().Should().Be("@appsetting('SHIPPER_INVOICE_IDENTITY_ID')");
+        }
+
+        serviceBus["connectionProperties"]!["authentication"]!["audience"]!.GetValue<string>().Should().Be("https://servicebus.azure.net");
     }
 
     [Fact]

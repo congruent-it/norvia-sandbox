@@ -14,23 +14,23 @@ public sealed class CarrierCostWorkflowTests
     private static string[] Statuses(JsonObject action, string after) =>
         [.. action["runAfter"]![after]!.AsArray().Select(status => status!.GetValue<string>())];
 
-    private static JsonObject Parameters(string action) => CarrierCostWorkflow.Action(action)["inputs"]!["parameters"]!.AsObject();
+    private static JsonObject Parameters(string action) => CarrierCostWorkflow.Action(action)["inputs"]!["queries"]!.AsObject();
 
     [Fact]
     public void Trigger_IsTheCarrierCostSubscriptionOnTheShipmentEventsTopic_AndLocksTheMessage()
     {
         var inputs = CarrierCostWorkflow.Trigger["inputs"]!;
 
-        CarrierCostWorkflow.Trigger["type"]!.GetValue<string>().Should().Be("ServiceProvider");
-        inputs["parameters"]!["topicName"]!.GetValue<string>().Should().Be("shipment-events");
-        inputs["parameters"]!["subscriptionName"]!.GetValue<string>().Should().Be("carrier-cost");
-        inputs["serviceProviderConfiguration"]!["serviceProviderId"]!.GetValue<string>().Should().Be("/serviceProviders/serviceBus");
-        inputs["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("peekLockTopicMessagesV2", "the workflow settles the message itself");
+        CarrierCostWorkflow.Trigger["type"]!.GetValue<string>().Should().Be("ApiConnection");
+        inputs["path"]!.GetValue<string>().Should().Contain("'shipment-events'");
+        inputs["path"]!.GetValue<string>().Should().Contain("'carrier-cost'");
+        CarrierCostWorkflow.Trigger["inputs"]!["host"]!["connection"]!["referenceName"]!.GetValue<string>().Should().Be("servicebus");
+        inputs["path"]!.GetValue<string>().Should().EndWith("/messages/head/peek");
     }
 
     [Fact]
     public void Trigger_ClientTrackingId_IsTheCorrelationId() =>
-        CarrierCostWorkflow.Trigger["correlation"]!["clientTrackingId"]!.GetValue<string>().Should().Be("@{triggerOutputs()?['body']?['userProperties']?['correlationId']}");
+        CarrierCostWorkflow.Trigger["correlation"]!["clientTrackingId"]!.GetValue<string>().Should().Be("@{coalesce(if(equals(length(string(coalesce(triggerBody(), ''))), 0), json('{}'), triggerBody())?['Properties']?['correlationId'], '00000000-0000-0000-0000-000000000000')}");
 
     [Fact]
     public void Trigger_TracksNothing_BecauseTheFirstStepTracksTheKeysTheMessageCarries() =>
@@ -53,7 +53,7 @@ public sealed class CarrierCostWorkflowTests
 
         inputs.Select(input => input.Key).Should().BeEquivalentTo("correlationId", "partyId", "transportOrderNumber", "carrierBookingNumber", "shipmentNumber", "eventType", "sourceMessageId");
         inputs.Select(input => input.Value!.GetValue<string>()).Should().OnlyContain(
-            expression => expression.StartsWith("@json(base64ToString(triggerBody()?['contentData']))?['", StringComparison.Ordinal) && !expression.Contains("@{", StringComparison.Ordinal));
+            expression => expression.StartsWith("@json(base64ToString(triggerBody()?['ContentData']))?['", StringComparison.Ordinal) && !expression.Contains("@{", StringComparison.Ordinal));
         inputs["partyId"]!.GetValue<string>().Should().EndWith("?['carrierId']");
         inputs["sourceMessageId"]!.GetValue<string>().Should().EndWith("?['eventId']");
     }
@@ -102,10 +102,8 @@ public sealed class CarrierCostWorkflowTests
 
         CarrierCostWorkflow.Action(CarrierCostWorkflow.Check)["else"]!["actions"]!.AsObject().Select(action => action.Key)
             .Should().Equal(CarrierCostWorkflow.DeadLetterUnreadable, CarrierCostWorkflow.FailTheUnreadableRun);
-        deadLetter["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("deadLetterTopicMessageV2");
-        parameters["topicName"]!.GetValue<string>().Should().Be("shipment-events");
-        parameters["subscriptionName"]!.GetValue<string>().Should().Be("carrier-cost");
-        parameters["lockToken"]!.GetValue<string>().Should().Be("@triggerBody()?['lockToken']");
+        deadLetter["inputs"]!["path"]!.GetValue<string>().Should().EndWith("/messages/deadletter");
+        parameters["lockToken"]!.GetValue<string>().Should().Be("@triggerBody()?['LockToken']");
         parameters["deadLetterReason"]!.GetValue<string>().Should().Be("CarrierCostUnreadable");
         parameters["deadLetterErrorDescription"]!.GetValue<string>().Should().Contain("nothing was sent to the ERP");
         deadLetter["trackedProperties"]!["outcome"]!.GetValue<string>().Should().Be("DeadLettered");
@@ -122,7 +120,7 @@ public sealed class CarrierCostWorkflowTests
         inputs["method"]!.GetValue<string>().Should().Be("POST");
         inputs["uri"]!.GetValue<string>().Should().Be("@{parameters('erpBaseUrl')}/v1/carrier-costs");
         inputs["headers"]!["X-Correlation-ID"]!.GetValue<string>().Should().Be(CorrelationId);
-        inputs["body"]!.GetValue<string>().Should().Be("@json(base64ToString(triggerBody()?['contentData']))", "the ERP accepts the Canonical Model, so there is nothing to map");
+        inputs["body"]!.GetValue<string>().Should().Be("@json(base64ToString(triggerBody()?['ContentData']))", "the ERP accepts the Canonical Model, so there is nothing to map");
         record["runAfter"]!.AsObject().Should().BeEmpty("it is the first step of the check's branch for a readable event");
         CarrierCostWorkflow.Action(CarrierCostWorkflow.Check)["actions"]!.AsObject().Select(action => action.Key).Should().Equal(CarrierCostWorkflow.Record, CarrierCostWorkflow.Settle);
     }
@@ -172,8 +170,8 @@ public sealed class CarrierCostWorkflowTests
         settle["expression"]!.ToJsonString().Should().Contain("greaterOrEquals").And.Contain("200").And.Contain("less").And.Contain("300");
         settle["actions"]!.AsObject().Select(action => action.Key).Should().Equal(CarrierCostWorkflow.Complete);
         var complete = CarrierCostWorkflow.Action(CarrierCostWorkflow.Complete);
-        complete["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("completeTopicMessageV2");
-        Parameters(CarrierCostWorkflow.Complete)["lockToken"]!.GetValue<string>().Should().Be("@triggerBody()?['lockToken']");
+        complete["inputs"]!["path"]!.GetValue<string>().Should().EndWith("/messages/complete");
+        Parameters(CarrierCostWorkflow.Complete)["lockToken"]!.GetValue<string>().Should().Be("@triggerBody()?['LockToken']");
     }
 
     [Fact]
@@ -184,10 +182,8 @@ public sealed class CarrierCostWorkflowTests
         var parameters = Parameters(CarrierCostWorkflow.DeadLetterRefused);
 
         settle["else"]!["actions"]!.AsObject().Select(action => action.Key).Should().Equal(CarrierCostWorkflow.DeadLetterRefused, CarrierCostWorkflow.FailTheRefusedRun);
-        deadLetter["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("deadLetterTopicMessageV2");
-        parameters["topicName"]!.GetValue<string>().Should().Be("shipment-events");
-        parameters["subscriptionName"]!.GetValue<string>().Should().Be("carrier-cost");
-        parameters["lockToken"]!.GetValue<string>().Should().Be("@triggerBody()?['lockToken']");
+        deadLetter["inputs"]!["path"]!.GetValue<string>().Should().EndWith("/messages/deadletter");
+        parameters["lockToken"]!.GetValue<string>().Should().Be("@triggerBody()?['LockToken']");
         parameters["deadLetterReason"]!.GetValue<string>().Should().Contain("['body']?['code']").And.Contain("'ErpUnavailable'").And.Contain("'ErpCallRefused'");
         parameters["deadLetterErrorDescription"]!.GetValue<string>().Should().Contain("['body']?['detail']").And.Contain("['body']?['title']");
         deadLetter["trackedProperties"]!["outcome"]!.GetValue<string>().Should().Be("DeadLettered");
@@ -198,10 +194,10 @@ public sealed class CarrierCostWorkflowTests
     [Fact]
     public void EveryServiceBusStep_SettlesTheMessageByItsLockToken()
     {
-        var steps = CarrierCostWorkflow.Operations().Where(operation => operation.Operation["type"]!.GetValue<string>() == "ServiceProvider" && operation.Name != "trigger").ToList();
+        var steps = CarrierCostWorkflow.Operations().Where(operation => operation.Operation["type"]!.GetValue<string>() == "ApiConnection" && operation.Name != "trigger").ToList();
 
         steps.Select(step => step.Name).Should().BeEquivalentTo(CarrierCostWorkflow.Complete, CarrierCostWorkflow.DeadLetterRefused, CarrierCostWorkflow.DeadLetterUnreadable);
-        steps.Should().OnlyContain(step => step.Operation["inputs"]!["parameters"]!["lockToken"]!.GetValue<string>() == "@triggerBody()?['lockToken']");
+        steps.Should().OnlyContain(step => step.Operation["inputs"]!["queries"]!["lockToken"]!.GetValue<string>() == "@triggerBody()?['LockToken']");
     }
 
     [Fact]
@@ -227,11 +223,37 @@ public sealed class CarrierCostWorkflowTests
     {
         var connections = CarrierCostWorkflow.ConnectionsFile["serviceProviderConnections"]!.AsObject();
 
-        connections.Select(connection => connection.Key).Should().BeEquivalentTo("serviceBus");
-        var authProvider = connections["serviceBus"]!["parameterValues"]!["authProvider"]!;
-        authProvider["Type"]!.GetValue<string>().Should().Be("ManagedServiceIdentity");
-        authProvider["Identity"]!.GetValue<string>().Should().Be("@appsetting('CARRIER_COST_IDENTITY_ID')");
-        connections["serviceBus"]!["parameterValues"]!["fullyQualifiedNamespace"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_NAMESPACE')");
+        connections.Should().BeEmpty("the Service Bus connection is a managed one");
+    }
+
+    [Fact]
+    public void EveryServiceBusStep_ReadsTheOneSubscriptionThroughTheManagedConnection()
+    {
+        var steps = CarrierCostWorkflow.Operations().Where(operation => operation.Operation["type"]!.GetValue<string>() == "ApiConnection").ToList();
+
+        steps.Should().NotBeEmpty();
+        steps.Should().OnlyContain(step => step.Operation["inputs"]!["host"]!["connection"]!["referenceName"]!.GetValue<string>() == "servicebus"
+            && step.Operation["inputs"]!["path"]!.GetValue<string>().Contains("'shipment-events'", StringComparison.Ordinal)
+            && step.Operation["inputs"]!["path"]!.GetValue<string>().Contains("'carrier-cost'", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ServiceBusConnection_IsAManagedConnectionSignedInAsTheIdentity_ForTheTokenStoreAndForServiceBus()
+    {
+        var connections = CarrierCostWorkflow.ConnectionsFile["managedApiConnections"]!.AsObject();
+        var serviceBus = connections["servicebus"]!;
+
+        connections.Select(connection => connection.Key).Should().BeEquivalentTo("servicebus");
+        serviceBus["api"]!["id"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_API_ID')");
+        serviceBus["connection"]!["id"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_CONNECTION_ID')");
+        serviceBus["connectionRuntimeUrl"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_CONNECTION_RUNTIME_URL')");
+        foreach (var authentication in new[] { serviceBus["authentication"]!, serviceBus["connectionProperties"]!["authentication"]! })
+        {
+            authentication["type"]!.GetValue<string>().Should().Be("ManagedServiceIdentity");
+            authentication["identity"]!.GetValue<string>().Should().Be("@appsetting('CARRIER_COST_IDENTITY_ID')");
+        }
+
+        serviceBus["connectionProperties"]!["authentication"]!["audience"]!.GetValue<string>().Should().Be("https://servicebus.azure.net");
     }
 
     [Fact]

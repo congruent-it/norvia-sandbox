@@ -4,21 +4,26 @@
     "contentVersion": "1.0.0.0",
     "triggers": {
       "When_a_Carrier_booking_is_cancelled_or_withdrawn": {
-        "type": "ServiceProvider",
+        "type": "ApiConnection",
         "inputs": {
-          "parameters": {
-            "topicName": "shipment-events",
-            "subscriptionName": "carrier-cancellation",
-            "isSessionsEnabled": false
+          "host": {
+            "connection": {
+              "referenceName": "servicebus"
+            }
           },
-          "serviceProviderConfiguration": {
-            "connectionName": "serviceBus",
-            "operationId": "peekLockTopicMessagesV2",
-            "serviceProviderId": "/serviceProviders/serviceBus"
+          "method": "get",
+          "path": "/@{encodeURIComponent(encodeURIComponent('shipment-events'))}/subscriptions/@{encodeURIComponent('carrier-cancellation')}/messages/head/peek",
+          "queries": {
+            "subscriptionType": "Main",
+            "sessionId": "None"
           }
         },
+        "recurrence": {
+          "frequency": "Minute",
+          "interval": 1
+        },
         "correlation": {
-          "clientTrackingId": "@{triggerOutputs()?['body']?['userProperties']?['correlationId']}"
+          "clientTrackingId": "@{coalesce(if(equals(length(string(coalesce(triggerBody(), ''))), 0), json('{}'), triggerBody())?['Properties']?['correlationId'], '00000000-0000-0000-0000-000000000000')}"
         }
       }
     },
@@ -26,11 +31,11 @@
       "Track_the_cancellation": {
         "type": "Compose",
         "inputs": {
-          "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
-          "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['carrierId']",
-          "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
-          "carrierBookingNumber": "@json(base64ToString(triggerBody()?['contentData']))?['carrierBookingNumber']",
-          "sourceMessageId": "@json(base64ToString(triggerBody()?['contentData']))?['eventId']"
+          "correlationId": "@json(base64ToString(triggerBody()?['ContentData']))?['correlationId']",
+          "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?['carrierId']",
+          "shipmentNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['shipmentNumber']",
+          "carrierBookingNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['carrierBookingNumber']",
+          "sourceMessageId": "@json(base64ToString(triggerBody()?['ContentData']))?['eventId']"
         },
         "runAfter": {},
         "trackedProperties": {
@@ -47,7 +52,7 @@
         "inputs": {
           "functionName": "MapCarrierCancellation",
           "parameters": {
-            "carrierCancellationEvent": "@{triggerBody()?['contentData']}"
+            "carrierCancellationEvent": "@{triggerBody()?['ContentData']}"
           }
         },
         "runAfter": {
@@ -62,19 +67,20 @@
         }
       },
       "Dead_letter_the_unreadable_cancellation": {
-        "type": "ServiceProvider",
+        "type": "ApiConnection",
         "inputs": {
-          "parameters": {
-            "topicName": "shipment-events",
-            "subscriptionName": "carrier-cancellation",
-            "lockToken": "@triggerBody()?['lockToken']",
+          "host": {
+            "connection": {
+              "referenceName": "servicebus"
+            }
+          },
+          "method": "post",
+          "path": "/@{encodeURIComponent(encodeURIComponent('shipment-events'))}/subscriptions/@{encodeURIComponent('carrier-cancellation')}/messages/deadletter",
+          "queries": {
+            "lockToken": "@triggerBody()?['LockToken']",
+            "sessionId": "",
             "deadLetterReason": "CarrierCancellationUnreadable",
             "deadLetterErrorDescription": "The message isn't a cancellation the Carrier can be told of, so nothing was sent to the Carrier."
-          },
-          "serviceProviderConfiguration": {
-            "connectionName": "serviceBus",
-            "operationId": "deadLetterTopicMessageV2",
-            "serviceProviderId": "/serviceProviders/serviceBus"
           }
         },
         "runAfter": {
@@ -105,17 +111,19 @@
         }
       },
       "Complete_the_message": {
-        "type": "ServiceProvider",
+        "type": "ApiConnection",
         "inputs": {
-          "parameters": {
-            "topicName": "shipment-events",
-            "subscriptionName": "carrier-cancellation",
-            "lockToken": "@triggerBody()?['lockToken']"
+          "host": {
+            "connection": {
+              "referenceName": "servicebus"
+            }
           },
-          "serviceProviderConfiguration": {
-            "connectionName": "serviceBus",
-            "operationId": "completeTopicMessageV2",
-            "serviceProviderId": "/serviceProviders/serviceBus"
+          "method": "delete",
+          "path": "/@{encodeURIComponent(encodeURIComponent('shipment-events'))}/subscriptions/@{encodeURIComponent('carrier-cancellation')}/messages/complete",
+          "queries": {
+            "lockToken": "@triggerBody()?['LockToken']",
+            "subscriptionType": "Main",
+            "sessionId": ""
           }
         },
         "runAfter": {
@@ -202,10 +210,10 @@
       "Track_the_answer": {
         "type": "Compose",
         "inputs": {
-          "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
-          "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['carrierId']",
-          "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
-          "carrierBookingNumber": "@json(base64ToString(triggerBody()?['contentData']))?['carrierBookingNumber']",
+          "correlationId": "@json(base64ToString(triggerBody()?['ContentData']))?['correlationId']",
+          "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?['carrierId']",
+          "shipmentNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['shipmentNumber']",
+          "carrierBookingNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['carrierBookingNumber']",
           "outcome": "@outputs('Read_the_answer')?['outcome']",
           "failureCode": "@outputs('Read_the_answer')?['failureCode']"
         },

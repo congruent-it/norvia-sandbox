@@ -11,6 +11,8 @@ public sealed class ProofOfDeliveryWorkflowTests
 {
     private static JsonObject Inputs(string action) => ProofOfDeliveryWorkflow.Action(action)["inputs"]!.AsObject();
 
+    private static string MessagePath(string action) => Inputs(action)["path"]!.GetValue<string>();
+
     private static string OperationId(string action) => Inputs(action)["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>();
 
     private static IEnumerable<string> RunsAfter(string action, string previous) =>
@@ -19,9 +21,10 @@ public sealed class ProofOfDeliveryWorkflowTests
     [Fact]
     public void Trigger_IsTheProofOfDeliveryQueue_AndItsClientTrackingIdIsTheCorrelationId()
     {
-        ProofOfDeliveryWorkflow.Trigger["inputs"]!["parameters"]!["queueName"]!.GetValue<string>().Should().Be("carrier-proof-of-delivery");
-        ProofOfDeliveryWorkflow.Trigger["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("peekLockQueueMessagesV2");
-        ProofOfDeliveryWorkflow.Trigger["correlation"]!["clientTrackingId"]!.GetValue<string>().Should().Be("@{triggerOutputs()?['body']?['userProperties']?['correlationId']}");
+        ProofOfDeliveryWorkflow.Trigger["type"]!.GetValue<string>().Should().Be("ApiConnection");
+        ProofOfDeliveryWorkflow.Trigger["inputs"]!["path"]!.GetValue<string>().Should().Contain("'carrier-proof-of-delivery'");
+        ProofOfDeliveryWorkflow.Trigger["inputs"]!["path"]!.GetValue<string>().Should().EndWith("/messages/head/peek");
+        ProofOfDeliveryWorkflow.Trigger["correlation"]!["clientTrackingId"]!.GetValue<string>().Should().Be("@{coalesce(if(equals(length(string(coalesce(triggerBody(), ''))), 0), json('{}'), triggerBody())?['Properties']?['correlationId'], '00000000-0000-0000-0000-000000000000')}");
     }
 
     [Fact]
@@ -54,9 +57,9 @@ public sealed class ProofOfDeliveryWorkflowTests
         var deadLetter = ProofOfDeliveryWorkflow.Action("Dead_letter_the_missing_blob");
 
         RunsAfter("Dead_letter_the_missing_blob", "Read_the_blob").Should().BeEquivalentTo("Failed");
-        OperationId("Dead_letter_the_missing_blob").Should().Be("deadLetterQueueMessageV2");
-        deadLetter["inputs"]!["parameters"]!["deadLetterReason"]!.GetValue<string>().Should().Be("ProofOfDeliveryBlobMissing");
-        deadLetter["inputs"]!["parameters"]!["deadLetterErrorDescription"]!.GetValue<string>().Should().NotBeNullOrWhiteSpace();
+        MessagePath("Dead_letter_the_missing_blob").Should().EndWith("/messages/deadletter");
+        deadLetter["inputs"]!["queries"]!["deadLetterReason"]!.GetValue<string>().Should().Be("ProofOfDeliveryBlobMissing");
+        deadLetter["inputs"]!["queries"]!["deadLetterErrorDescription"]!.GetValue<string>().Should().NotBeNullOrWhiteSpace();
         ProofOfDeliveryWorkflow.Action("Fail_the_run_on_the_missing_blob")["inputs"]!["runStatus"]!.GetValue<string>().Should().Be("Failed");
     }
 
@@ -68,8 +71,8 @@ public sealed class ProofOfDeliveryWorkflowTests
         var deadLetter = ProofOfDeliveryWorkflow.Action("Dead_letter_the_unmappable_message");
 
         RunsAfter("Dead_letter_the_unmappable_message", ProofOfDeliveryWorkflow.Map).Should().BeEquivalentTo("Failed");
-        OperationId("Dead_letter_the_unmappable_message").Should().Be("deadLetterQueueMessageV2");
-        deadLetter["inputs"]!["parameters"]!["deadLetterReason"]!.GetValue<string>().Should().Be("UnmappableProofOfDelivery");
+        MessagePath("Dead_letter_the_unmappable_message").Should().EndWith("/messages/deadletter");
+        deadLetter["inputs"]!["queries"]!["deadLetterReason"]!.GetValue<string>().Should().Be("UnmappableProofOfDelivery");
         ProofOfDeliveryWorkflow.Action("Fail_the_run_on_the_unmappable_message")["inputs"]!["runStatus"]!.GetValue<string>().Should().Be("Failed");
     }
 
@@ -107,7 +110,7 @@ public sealed class ProofOfDeliveryWorkflowTests
         settle["expression"]!.ToJsonString().Should().Contain("200").And.Contain("300");
         OperationId("Delete_the_blob").Should().Be("deleteBlob");
         Inputs("Delete_the_blob")["parameters"]!["containerName"]!.GetValue<string>().Should().Be("@parameters('inboundContainer')");
-        OperationId("Complete_the_message").Should().Be("completeQueueMessageV2");
+        MessagePath("Complete_the_message").Should().EndWith("/messages/complete");
         RunsAfter("Complete_the_message", "Delete_the_blob").Should().BeEquivalentTo("Succeeded");
         settle["actions"]!.AsObject().Select(action => action.Key).Should().BeEquivalentTo("Delete_the_blob", "Complete_the_message");
     }
@@ -116,9 +119,9 @@ public sealed class ProofOfDeliveryWorkflowTests
     public void Settle_DeadLettersAClientError_WithTheFailureCodeAsReasonAndTheMessageAsDescription_NotRetried_AndKeepsTheBlob()
     {
         var deadLetter = ProofOfDeliveryWorkflow.Action("Dead_letter_the_refused_message");
-        var parameters = deadLetter["inputs"]!["parameters"]!;
+        var parameters = deadLetter["inputs"]!["queries"]!;
 
-        OperationId("Dead_letter_the_refused_message").Should().Be("deadLetterQueueMessageV2");
+        MessagePath("Dead_letter_the_refused_message").Should().EndWith("/messages/deadletter");
         parameters["deadLetterReason"]!.GetValue<string>().Should().Contain("['code']").And.Contain("TmsCallRefused");
         parameters["deadLetterErrorDescription"]!.GetValue<string>().Should().Contain("['detail']");
         ProofOfDeliveryWorkflow.Action("Settle_the_refused_or_unreached_message")["expression"]!.ToJsonString()
@@ -130,7 +133,7 @@ public sealed class ProofOfDeliveryWorkflowTests
     [Fact]
     public void Settle_AbandonsAServerErrorOrTimeout_SoTheQueueRetriesItUpToItsMaximumDeliveryCount()
     {
-        OperationId("Abandon_the_message_to_retry").Should().Be("abandonQueueMessageV2");
+        MessagePath("Abandon_the_message_to_retry").Should().EndWith("/messages/abandon");
         ProofOfDeliveryWorkflow.Action("Abandon_the_message_to_retry")["trackedProperties"]!["outcome"]!.GetValue<string>().Should().Be("Retrying");
         ProofOfDeliveryWorkflow.Action("Fail_the_run_on_the_unreached_TMS")["inputs"]!["runError"]!["code"]!.GetValue<string>().Should().Be("TmsUnavailable");
     }
@@ -139,11 +142,11 @@ public sealed class ProofOfDeliveryWorkflowTests
     public void EveryServiceBusSettlingStep_SettlesTheMessageByItsLockToken()
     {
         var steps = ProofOfDeliveryWorkflow.Operations()
-            .Where(operation => operation.Name != "trigger" && operation.Operation["inputs"]?["serviceProviderConfiguration"]?["connectionName"]?.GetValue<string>() == "serviceBus")
+            .Where(operation => operation.Name != "trigger" && operation.Operation["type"]!.GetValue<string>() == "ApiConnection")
             .ToList();
 
         steps.Should().HaveCount(5, "Dead_letter x3, Complete and Abandon");
-        steps.Should().OnlyContain(step => step.Operation["inputs"]!["parameters"]!["lockToken"]!.GetValue<string>() == "@triggerBody()?['lockToken']");
+        steps.Should().OnlyContain(step => step.Operation["inputs"]!["queries"]!["lockToken"]!.GetValue<string>() == "@triggerBody()?['LockToken']");
     }
 
     [Fact]
@@ -165,8 +168,37 @@ public sealed class ProofOfDeliveryWorkflowTests
     {
         var connections = Contracts.Read("ProofOfDeliveryLogicApp/connections.json");
 
-        connections.Should().Contain("/serviceProviders/serviceBus").And.Contain("/serviceProviders/AzureBlob");
+        connections.Should().Contain("SERVICE_BUS_CONNECTION_ID").And.Contain("/serviceProviders/AzureBlob").And.NotContain("/serviceProviders/serviceBus");
         connections.Should().Contain("@appsetting('PROOF_OF_DELIVERY_IDENTITY_ID')").And.NotContain("ConnectionString");
+    }
+
+    [Fact]
+    public void EveryServiceBusStep_ReadsTheOneQueueThroughTheManagedConnection()
+    {
+        var steps = ProofOfDeliveryWorkflow.Operations().Where(operation => operation.Operation["type"]!.GetValue<string>() == "ApiConnection").ToList();
+
+        steps.Should().NotBeEmpty();
+        steps.Should().OnlyContain(step => step.Operation["inputs"]!["host"]!["connection"]!["referenceName"]!.GetValue<string>() == "servicebus"
+            && step.Operation["inputs"]!["path"]!.GetValue<string>().Contains("'carrier-proof-of-delivery'", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ServiceBusConnection_IsAManagedConnectionSignedInAsTheIdentity_ForTheTokenStoreAndForServiceBus()
+    {
+        var connections = JsonNode.Parse(Contracts.Read("ProofOfDeliveryLogicApp/connections.json"))!["managedApiConnections"]!.AsObject();
+        var serviceBus = connections["servicebus"]!;
+
+        connections.Select(connection => connection.Key).Should().BeEquivalentTo("servicebus");
+        serviceBus["api"]!["id"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_API_ID')");
+        serviceBus["connection"]!["id"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_CONNECTION_ID')");
+        serviceBus["connectionRuntimeUrl"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_CONNECTION_RUNTIME_URL')");
+        foreach (var authentication in new[] { serviceBus["authentication"]!, serviceBus["connectionProperties"]!["authentication"]! })
+        {
+            authentication["type"]!.GetValue<string>().Should().Be("ManagedServiceIdentity");
+            authentication["identity"]!.GetValue<string>().Should().Be("@appsetting('PROOF_OF_DELIVERY_IDENTITY_ID')");
+        }
+
+        serviceBus["connectionProperties"]!["authentication"]!["audience"]!.GetValue<string>().Should().Be("https://servicebus.azure.net");
     }
 
     [Fact]

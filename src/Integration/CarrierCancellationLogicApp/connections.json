@@ -1,18 +1,5 @@
 {
   "serviceProviderConnections": {
-    "serviceBus": {
-      "displayName": "Shipment events",
-      "parameterValues": {
-        "fullyQualifiedNamespace": "@appsetting('SERVICE_BUS_NAMESPACE')",
-        "authProvider": {
-          "Type": "ManagedServiceIdentity",
-          "Identity": "@appsetting('CARRIER_CANCELLATION_IDENTITY_ID')"
-        }
-      },
-      "serviceProvider": {
-        "id": "/serviceProviders/serviceBus"
-      }
-    },
     "keyVault": {
       "displayName": "Carrier endpoint credentials",
       "parameterValues": {
@@ -27,5 +14,26 @@
       }
     }
   },
-  "managedApiConnections": {}
+  "managedApiConnections": {
+    "servicebus": {
+      "api": {
+        "id": "@appsetting('SERVICE_BUS_API_ID')"
+      },
+      "authentication": {
+        "type": "ManagedServiceIdentity",
+        "identity": "@appsetting('CARRIER_CANCELLATION_IDENTITY_ID')"
+      },
+      "connection": {
+        "id": "@appsetting('SERVICE_BUS_CONNECTION_ID')"
+      },
+      "connectionProperties": {
+        "authentication": {
+          "audience": "https://servicebus.azure.net",
+          "type": "ManagedServiceIdentity",
+          "identity": "@appsetting('CARRIER_CANCELLATION_IDENTITY_ID')"
+        }
+      },
+      "connectionRuntimeUrl": "@appsetting('SERVICE_BUS_CONNECTION_RUNTIME_URL')"
+    }
+  }
 }

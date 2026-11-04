@@ -64,6 +64,12 @@ public sealed partial class LogicAppWorkflowDefinitionTests
         used.Should().NotContain(RetiredOperationIds);
     }
 
+    // The workflow expression language builds an object with addProperty on json('{}'); it has no createObject (docs: Reference guide to functions in expressions).
+    [Theory]
+    [MemberData(nameof(WorkflowPaths))]
+    public void Expressions_UseOnlyFunctionsTheRuntimeKnows(string path) =>
+        Contracts.Read(path).Should().NotContain("createObject(", "the runtime refuses the action at run time with InvalidTemplate");
+
     private static IEnumerable<(string Name, JsonNode Node)> Operations(string path) =>
         Walk(JsonNode.Parse(Contracts.Read(path))!["definition"]!.AsObject());
 

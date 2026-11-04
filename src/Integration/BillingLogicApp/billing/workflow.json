@@ -4,21 +4,26 @@
     "contentVersion": "1.0.0.0",
     "triggers": {
       "When_a_Transport_Order_is_billable": {
-        "type": "ServiceProvider",
+        "type": "ApiConnection",
         "inputs": {
-          "parameters": {
-            "topicName": "transport-order-events",
-            "subscriptionName": "billing",
-            "isSessionsEnabled": false
+          "host": {
+            "connection": {
+              "referenceName": "servicebus"
+            }
           },
-          "serviceProviderConfiguration": {
-            "connectionName": "serviceBus",
-            "operationId": "peekLockTopicMessagesV2",
-            "serviceProviderId": "/serviceProviders/serviceBus"
+          "method": "get",
+          "path": "/@{encodeURIComponent(encodeURIComponent('transport-order-events'))}/subscriptions/@{encodeURIComponent('billing')}/messages/head/peek",
+          "queries": {
+            "subscriptionType": "Main",
+            "sessionId": "None"
           }
         },
+        "recurrence": {
+          "frequency": "Minute",
+          "interval": 1
+        },
         "correlation": {
-          "clientTrackingId": "@{triggerOutputs()?['body']?['userProperties']?['correlationId']}"
+          "clientTrackingId": "@{coalesce(if(equals(length(string(coalesce(triggerBody(), ''))), 0), json('{}'), triggerBody())?['Properties']?['correlationId'], '00000000-0000-0000-0000-000000000000')}"
         }
       }
     },
@@ -26,12 +31,12 @@
       "Track_the_billable_line": {
         "type": "Compose",
         "inputs": {
-          "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
-          "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['shipperId']",
-          "transportOrderNumber": "@json(base64ToString(triggerBody()?['contentData']))?['transportOrderNumber']",
-          "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
-          "eventType": "@json(base64ToString(triggerBody()?['contentData']))?['eventType']",
-          "sourceMessageId": "@json(base64ToString(triggerBody()?['contentData']))?['eventId']"
+          "correlationId": "@json(base64ToString(triggerBody()?['ContentData']))?['correlationId']",
+          "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?['shipperId']",
+          "transportOrderNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['transportOrderNumber']",
+          "shipmentNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['shipmentNumber']",
+          "eventType": "@json(base64ToString(triggerBody()?['ContentData']))?['eventType']",
+          "sourceMessageId": "@json(base64ToString(triggerBody()?['ContentData']))?['eventId']"
         },
         "runAfter": {},
         "trackedProperties": {
@@ -66,7 +71,7 @@
                 "identity": "@parameters('billingIdentityId')",
                 "audience": "@parameters('erpAudience')"
               },
-              "body": "@json(base64ToString(triggerBody()?['contentData']))",
+              "body": "@json(base64ToString(triggerBody()?['ContentData']))",
               "retryPolicy": {
                 "type": "exponential",
                 "count": 3,
@@ -77,12 +82,12 @@
             },
             "runAfter": {},
             "trackedProperties": {
-              "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
+              "correlationId": "@json(base64ToString(triggerBody()?['ContentData']))?['correlationId']",
               "flow": "billing",
-              "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['shipperId']",
-              "transportOrderNumber": "@json(base64ToString(triggerBody()?['contentData']))?['transportOrderNumber']",
-              "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
-              "sourceMessageId": "@json(base64ToString(triggerBody()?['contentData']))?['eventId']",
+              "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?['shipperId']",
+              "transportOrderNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['transportOrderNumber']",
+              "shipmentNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['shipmentNumber']",
+              "sourceMessageId": "@json(base64ToString(triggerBody()?['ContentData']))?['eventId']",
               "outcome": "@if(and(greaterOrEquals(coalesce(actions('Record_the_billable_line')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Record_the_billable_line')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
               "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Record_the_billable_line')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Record_the_billable_line')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Record_the_billable_line')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Record_the_billable_line')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Record_the_billable_line')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Record_the_billable_line')?['outputs']?['statusCode'], 0), 500)), 'ErpUnavailable', coalesce(actions('Record_the_billable_line')?['outputs']?['body']?['code'], 'ErpCallRefused')))"
             }
@@ -107,17 +112,19 @@
             },
             "actions": {
               "Complete_the_message": {
-                "type": "ServiceProvider",
+                "type": "ApiConnection",
                 "inputs": {
-                  "parameters": {
-                    "topicName": "transport-order-events",
-                    "subscriptionName": "billing",
-                    "lockToken": "@triggerBody()?['lockToken']"
+                  "host": {
+                    "connection": {
+                      "referenceName": "servicebus"
+                    }
                   },
-                  "serviceProviderConfiguration": {
-                    "connectionName": "serviceBus",
-                    "operationId": "completeTopicMessageV2",
-                    "serviceProviderId": "/serviceProviders/serviceBus"
+                  "method": "delete",
+                  "path": "/@{encodeURIComponent(encodeURIComponent('transport-order-events'))}/subscriptions/@{encodeURIComponent('billing')}/messages/complete",
+                  "queries": {
+                    "lockToken": "@triggerBody()?['LockToken']",
+                    "subscriptionType": "Main",
+                    "sessionId": ""
                   }
                 },
                 "runAfter": {}
@@ -126,31 +133,32 @@
             "else": {
               "actions": {
                 "Dead_letter_the_refused_billable_line": {
-                  "type": "ServiceProvider",
+                  "type": "ApiConnection",
                   "inputs": {
-                    "parameters": {
-                      "topicName": "transport-order-events",
-                      "subscriptionName": "billing",
-                      "lockToken": "@triggerBody()?['lockToken']",
+                    "host": {
+                      "connection": {
+                        "referenceName": "servicebus"
+                      }
+                    },
+                    "method": "post",
+                    "path": "/@{encodeURIComponent(encodeURIComponent('transport-order-events'))}/subscriptions/@{encodeURIComponent('billing')}/messages/deadletter",
+                    "queries": {
+                      "lockToken": "@triggerBody()?['LockToken']",
+                      "sessionId": "",
                       "deadLetterReason": "@if(or(equals(coalesce(actions('Record_the_billable_line')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Record_the_billable_line')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Record_the_billable_line')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Record_the_billable_line')?['outputs']?['statusCode'], 0), 500)), 'ErpUnavailable', coalesce(actions('Record_the_billable_line')?['outputs']?['body']?['code'], 'ErpCallRefused'))",
                       "deadLetterErrorDescription": "@coalesce(actions('Record_the_billable_line')?['outputs']?['body']?['detail'], actions('Record_the_billable_line')?['outputs']?['body']?['title'], if(or(equals(coalesce(actions('Record_the_billable_line')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Record_the_billable_line')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Record_the_billable_line')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Record_the_billable_line')?['outputs']?['statusCode'], 0), 500)), 'The ERP billing API did not answer after the retries.', 'The ERP billing API refused the Billable line.'))"
-                    },
-                    "serviceProviderConfiguration": {
-                      "connectionName": "serviceBus",
-                      "operationId": "deadLetterTopicMessageV2",
-                      "serviceProviderId": "/serviceProviders/serviceBus"
                     }
                   },
                   "runAfter": {},
                   "trackedProperties": {
-                    "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
+                    "correlationId": "@json(base64ToString(triggerBody()?['ContentData']))?['correlationId']",
                     "flow": "billing",
-                    "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['shipperId']",
-                    "transportOrderNumber": "@json(base64ToString(triggerBody()?['contentData']))?['transportOrderNumber']",
-                    "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
-                    "sourceMessageId": "@json(base64ToString(triggerBody()?['contentData']))?['eventId']",
+                    "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?['shipperId']",
+                    "transportOrderNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['transportOrderNumber']",
+                    "shipmentNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['shipmentNumber']",
+                    "sourceMessageId": "@json(base64ToString(triggerBody()?['ContentData']))?['eventId']",
                     "outcome": "DeadLettered",
-                    "messageId": "@triggerBody()?['messageId']",
+                    "messageId": "@triggerBody()?['MessageId']",
                     "failureCode": "@action()?['inputs']?['parameters']?['deadLetterReason']"
                   }
                 },
@@ -184,31 +192,32 @@
         "else": {
           "actions": {
             "Dead_letter_the_unreadable_billable_line": {
-              "type": "ServiceProvider",
+              "type": "ApiConnection",
               "inputs": {
-                "parameters": {
-                  "topicName": "transport-order-events",
-                  "subscriptionName": "billing",
-                  "lockToken": "@triggerBody()?['lockToken']",
+                "host": {
+                  "connection": {
+                    "referenceName": "servicebus"
+                  }
+                },
+                "method": "post",
+                "path": "/@{encodeURIComponent(encodeURIComponent('transport-order-events'))}/subscriptions/@{encodeURIComponent('billing')}/messages/deadletter",
+                "queries": {
+                  "lockToken": "@triggerBody()?['LockToken']",
+                  "sessionId": "",
                   "deadLetterReason": "BillableLineUnreadable",
                   "deadLetterErrorDescription": "The message isn't a TransportOrderBillable the ERP can record, so nothing was sent to the ERP."
-                },
-                "serviceProviderConfiguration": {
-                  "connectionName": "serviceBus",
-                  "operationId": "deadLetterTopicMessageV2",
-                  "serviceProviderId": "/serviceProviders/serviceBus"
                 }
               },
               "runAfter": {},
               "trackedProperties": {
-                "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
+                "correlationId": "@json(base64ToString(triggerBody()?['ContentData']))?['correlationId']",
                 "flow": "billing",
-                "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['shipperId']",
-                "transportOrderNumber": "@json(base64ToString(triggerBody()?['contentData']))?['transportOrderNumber']",
-                "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
-                "sourceMessageId": "@json(base64ToString(triggerBody()?['contentData']))?['eventId']",
+                "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?['shipperId']",
+                "transportOrderNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['transportOrderNumber']",
+                "shipmentNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['shipmentNumber']",
+                "sourceMessageId": "@json(base64ToString(triggerBody()?['ContentData']))?['eventId']",
                 "outcome": "DeadLettered",
-                "messageId": "@triggerBody()?['messageId']",
+                "messageId": "@triggerBody()?['MessageId']",
                 "failureCode": "BillableLineUnreadable"
               }
             },

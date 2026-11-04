@@ -4,21 +4,26 @@
     "contentVersion": "1.0.0.0",
     "triggers": {
       "When_a_Shipper_notification_is_requested": {
-        "type": "ServiceProvider",
+        "type": "ApiConnection",
         "inputs": {
-          "parameters": {
-            "topicName": "shipment-events",
-            "subscriptionName": "shipper-notification",
-            "isSessionsEnabled": false
+          "host": {
+            "connection": {
+              "referenceName": "servicebus"
+            }
           },
-          "serviceProviderConfiguration": {
-            "connectionName": "serviceBus",
-            "operationId": "peekLockTopicMessagesV2",
-            "serviceProviderId": "/serviceProviders/serviceBus"
+          "method": "get",
+          "path": "/@{encodeURIComponent(encodeURIComponent('shipment-events'))}/subscriptions/@{encodeURIComponent('shipper-notification')}/messages/head/peek",
+          "queries": {
+            "subscriptionType": "Main",
+            "sessionId": "None"
           }
         },
+        "recurrence": {
+          "frequency": "Minute",
+          "interval": 1
+        },
         "correlation": {
-          "clientTrackingId": "@{triggerOutputs()?['body']?['userProperties']?['correlationId']}"
+          "clientTrackingId": "@{coalesce(if(equals(length(string(coalesce(triggerBody(), ''))), 0), json('{}'), triggerBody())?['Properties']?['correlationId'], '00000000-0000-0000-0000-000000000000')}"
         }
       }
     },
@@ -26,12 +31,12 @@
       "Track_the_notification": {
         "type": "Compose",
         "inputs": {
-          "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
-          "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['shipperId']",
-          "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
-          "transportOrderNumber": "@json(base64ToString(triggerBody()?['contentData']))?['transportOrderNumber']",
-          "notificationId": "@json(base64ToString(triggerBody()?['contentData']))?['notificationId']",
-          "sourceMessageId": "@json(base64ToString(triggerBody()?['contentData']))?['eventId']"
+          "correlationId": "@json(base64ToString(triggerBody()?['ContentData']))?['correlationId']",
+          "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?['shipperId']",
+          "shipmentNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['shipmentNumber']",
+          "transportOrderNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['transportOrderNumber']",
+          "notificationId": "@json(base64ToString(triggerBody()?['ContentData']))?['notificationId']",
+          "sourceMessageId": "@json(base64ToString(triggerBody()?['ContentData']))?['eventId']"
         },
         "runAfter": {},
         "trackedProperties": {
@@ -48,7 +53,7 @@
         "inputs": {
           "functionName": "MapShipperNotificationRequested",
           "parameters": {
-            "shipperNotificationRequested": "@{triggerBody()?['contentData']}"
+            "shipperNotificationRequested": "@{triggerBody()?['ContentData']}"
           }
         },
         "runAfter": {
@@ -63,19 +68,20 @@
         }
       },
       "Dead_letter_the_unreadable_notification": {
-        "type": "ServiceProvider",
+        "type": "ApiConnection",
         "inputs": {
-          "parameters": {
-            "topicName": "shipment-events",
-            "subscriptionName": "shipper-notification",
-            "lockToken": "@triggerBody()?['lockToken']",
+          "host": {
+            "connection": {
+              "referenceName": "servicebus"
+            }
+          },
+          "method": "post",
+          "path": "/@{encodeURIComponent(encodeURIComponent('shipment-events'))}/subscriptions/@{encodeURIComponent('shipper-notification')}/messages/deadletter",
+          "queries": {
+            "lockToken": "@triggerBody()?['LockToken']",
+            "sessionId": "",
             "deadLetterReason": "ShipperNotificationRequestedUnreadable",
             "deadLetterErrorDescription": "The message isn't a notification the Shipper can be told of, so nothing was sent to the Shipper."
-          },
-          "serviceProviderConfiguration": {
-            "connectionName": "serviceBus",
-            "operationId": "deadLetterTopicMessageV2",
-            "serviceProviderId": "/serviceProviders/serviceBus"
           }
         },
         "runAfter": {
@@ -106,17 +112,19 @@
         }
       },
       "Complete_the_message": {
-        "type": "ServiceProvider",
+        "type": "ApiConnection",
         "inputs": {
-          "parameters": {
-            "topicName": "shipment-events",
-            "subscriptionName": "shipper-notification",
-            "lockToken": "@triggerBody()?['lockToken']"
+          "host": {
+            "connection": {
+              "referenceName": "servicebus"
+            }
           },
-          "serviceProviderConfiguration": {
-            "connectionName": "serviceBus",
-            "operationId": "completeTopicMessageV2",
-            "serviceProviderId": "/serviceProviders/serviceBus"
+          "method": "delete",
+          "path": "/@{encodeURIComponent(encodeURIComponent('shipment-events'))}/subscriptions/@{encodeURIComponent('shipper-notification')}/messages/complete",
+          "queries": {
+            "lockToken": "@triggerBody()?['LockToken']",
+            "subscriptionType": "Main",
+            "sessionId": ""
           }
         },
         "runAfter": {
@@ -203,10 +211,10 @@
       "Track_the_answer": {
         "type": "Compose",
         "inputs": {
-          "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
-          "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['shipperId']",
-          "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
-          "transportOrderNumber": "@json(base64ToString(triggerBody()?['contentData']))?['transportOrderNumber']",
+          "correlationId": "@json(base64ToString(triggerBody()?['ContentData']))?['correlationId']",
+          "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?['shipperId']",
+          "shipmentNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['shipmentNumber']",
+          "transportOrderNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['transportOrderNumber']",
           "outcome": "@outputs('Read_the_answer')?['outcome']",
           "failureCode": "@outputs('Read_the_answer')?['failureCode']"
         },

@@ -94,20 +94,22 @@ az cognitiveservices account list-deleted --subscription "$AZURE_SUBSCRIPTION_ID
 # Aspire's Azure SQL roles are granted by deployment scripts, each of which starts a container group. A script that failed (the region's
 # container group quota, say) stays behind, and the next `azd provision` fails on it with "resource already exists ... pending delete".
 # Its work is only SQL role grants, which run again, so the failed scripts of this resource group are deleted first.
-az rest --method get --output tsv 2>/dev/null \
+failed_scripts=$(az rest --method get --output tsv 2>/dev/null \
   --url "https://management.azure.com${rg_id}providers/Microsoft.Resources/deploymentScripts?api-version=2023-08-01" \
-  --query "value[?properties.provisioningState=='Failed'].id" |
-  while read -r script; do
-    [ -n "$script" ] || continue
-    echo "Deleting the failed deployment script ${script##*/}..."
-    az rest --method delete --url "https://management.azure.com${script}?api-version=2023-08-01" --output none ||
-      echo "Could not delete ${script##*/}." >&2
-    # The delete is asynchronous, and a script still being deleted fails the next deployment the same way, so wait until it is gone.
-    for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
-      az rest --method get --url "https://management.azure.com${script}?api-version=2023-08-01" --output none 2>/dev/null || break
-      sleep 10
-    done
+  --query "value[?properties.provisioningState=='Failed'].id" || true)
+for script in $failed_scripts; do
+  echo "Deleting the failed deployment script ${script##*/}..."
+  az rest --method delete --url "https://management.azure.com${script}?api-version=2023-08-01" --output none ||
+    echo "Could not delete ${script##*/}." >&2
+  # The delete is asynchronous, and a script still being deleted fails the next deployment the same way, so wait until it is gone.
+  for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+    az rest --method get --url "https://management.azure.com${script}?api-version=2023-08-01" --output none 2>/dev/null || break
+    sleep 10
   done
+done
+# Even once it can no longer be read, ARM's identity service can keep the script as "pending delete" for a while longer, and a deployment
+# that creates it again then fails with "Conflict ... pending delete". So after a delete, wait a little more before deploying.
+[ -z "$failed_scripts" ] || { echo "Waiting for the deleted deployment scripts to clear..."; sleep 120; }
 
 # A new managed identity can take a minute to reach Microsoft Graph, which then refuses to grant it an app role.
 # Deploying again is safe, so a first attempt that fails is retried.
@@ -124,6 +126,30 @@ for attempt in 1 2 3; do
   [ "$attempt" -lt 3 ] || exit 1
   sleep 60
 done
+
+# A new subscription starts with a $Default rule that passes every message, and the Bicep adds each subscription's real filter as
+# the rule "resubmit-aware". (A rule named $Default with a SQL filter in the Bicep does not work: Service Bus accepts it, then the
+# rule is gone and the subscription receives nothing.) Deploying again never deletes a resource, so the $Default rules are
+# deleted here, or each subscription would keep passing everything. Deleting one that is already gone is harmless.
+# ARM changes the case of an output's name ("estatE_SERVICE_BUS_NAMESPACE"), so it is matched upper-cased, as further down.
+service_bus=$(jq -r 'to_entries[] | select(.key | ascii_upcase == "ESTATE_SERVICE_BUS_NAMESPACE") | .value.value' "$work/outputs.json")
+[ -n "$service_bus" ] || { echo "The estate has no Service Bus namespace output." >&2; exit 1; }
+az servicebus topic list --subscription "$AZURE_SUBSCRIPTION_ID" --resource-group "rg-$AZURE_ENV_NAME" --namespace-name "$service_bus" \
+  --query "[].name" --output tsv | tr -d '\r' |
+  while read -r topic; do
+    [ -n "$topic" ] || continue
+    az servicebus topic subscription list --subscription "$AZURE_SUBSCRIPTION_ID" --resource-group "rg-$AZURE_ENV_NAME" \
+      --namespace-name "$service_bus" --topic-name "$topic" --query "[].name" --output tsv | tr -d '\r' |
+      while read -r subscription; do
+        [ -n "$subscription" ] || continue
+        if az servicebus topic subscription rule show --subscription "$AZURE_SUBSCRIPTION_ID" --resource-group "rg-$AZURE_ENV_NAME" \
+          --namespace-name "$service_bus" --topic-name "$topic" --subscription-name "$subscription" --name '$Default' --output none 2>/dev/null; then
+          echo "Deleting the \$Default rule of $topic/$subscription..."
+          az servicebus topic subscription rule delete --subscription "$AZURE_SUBSCRIPTION_ID" --resource-group "rg-$AZURE_ENV_NAME" \
+            --namespace-name "$service_bus" --topic-name "$topic" --subscription-name "$subscription" --name '$Default' --output none
+        fi
+      done
+  done
 
 # Deploying again never deletes a resource, so an alert the as-found toggles now leave out is deleted here: a "no alert" is
 # an absent rule, never a disabled one. The names are those infra/estate/alerts.bicep gives its rules.
@@ -155,8 +181,17 @@ if [ -n "${ESTATE_ASFOUND:-}" ]; then
   if [ "$(toggle noMalwareScanning)" = true ]; then
     inbound_id=$(account "[?starts_with(name, 'stinbound')].id | [0]")
     if [ -n "$inbound_id" ]; then
-      echo "Deleting Defender for Storage malware scanning on the inbound account (as-found)..."
-      az rest --method delete --url "https://management.azure.com$inbound_id/providers/Microsoft.Security/defenderForStorageSettings/current?api-version=2022-12-01-preview" --output none || true
+      # The setting cannot be deleted ("DeleteNotSupported"), so "absent" is the setting turned off, for this account whatever the
+      # subscription's own Defender plan says. It is only written when scanning is on, and the estate Bicep turns it on again when the
+      # toggle is cleared.
+      defender_url="https://management.azure.com$inbound_id/providers/Microsoft.Security/defenderForStorageSettings/current?api-version=2022-12-01-preview"
+      scanning=$(az rest --method get --url "$defender_url" --query "properties.malwareScanning.onUpload.isEnabled || properties.isEnabled" --output tsv 2>/dev/null || true)
+      if [ "$scanning" = true ] || [ "$scanning" = True ]; then
+        echo "Turning off Defender for Storage malware scanning on the inbound account (as-found)..."
+        az rest --method put --url "$defender_url" --output none \
+          --body '{"properties":{"isEnabled":false,"overrideSubscriptionLevelSettings":true,"malwareScanning":{"onUpload":{"isEnabled":false}},"sensitiveDataDiscovery":{"isEnabled":false}}}' ||
+          echo "Could not turn off malware scanning." >&2
+      fi
     fi
   fi
 fi

@@ -20,17 +20,17 @@ public sealed class ShipperNotificationWorkflowTests
     [Fact]
     public void Trigger_IsTheShipperNotificationSubscriptionOnTheShipmentEventsTopic()
     {
-        var parameters = ShipperNotificationWorkflow.Trigger["inputs"]!["parameters"]!;
+        var path = ShipperNotificationWorkflow.Trigger["inputs"]!["path"]!.GetValue<string>();
 
-        ShipperNotificationWorkflow.Trigger["type"]!.GetValue<string>().Should().Be("ServiceProvider");
-        parameters["topicName"]!.GetValue<string>().Should().Be("shipment-events");
-        parameters["subscriptionName"]!.GetValue<string>().Should().Be("shipper-notification");
-        ShipperNotificationWorkflow.Trigger["inputs"]!["serviceProviderConfiguration"]!["serviceProviderId"]!.GetValue<string>().Should().Be("/serviceProviders/serviceBus");
+        ShipperNotificationWorkflow.Trigger["type"]!.GetValue<string>().Should().Be("ApiConnection");
+        path.Should().Contain("'shipment-events'");
+        path.Should().Contain("'shipper-notification'");
+        ShipperNotificationWorkflow.Trigger["inputs"]!["host"]!["connection"]!["referenceName"]!.GetValue<string>().Should().Be("servicebus");
     }
 
     [Fact]
     public void Trigger_ClientTrackingId_IsTheNotificationsCorrelationId() =>
-        ShipperNotificationWorkflow.Trigger["correlation"]!["clientTrackingId"]!.GetValue<string>().Should().Be("@{triggerOutputs()?['body']?['userProperties']?['correlationId']}");
+        ShipperNotificationWorkflow.Trigger["correlation"]!["clientTrackingId"]!.GetValue<string>().Should().Be("@{coalesce(if(equals(length(string(coalesce(triggerBody(), ''))), 0), json('{}'), triggerBody())?['Properties']?['correlationId'], '00000000-0000-0000-0000-000000000000')}");
 
     [Fact]
     public void Trigger_TracksNothing_BecauseTheFirstStepTracksTheKeysTheMessageCarries() =>
@@ -55,7 +55,7 @@ public sealed class ShipperNotificationWorkflowTests
         // The notification ID is no key of the contract: the report's address needs it, so it is taken but never tracked.
         inputs.Select(input => input.Key).Should().BeEquivalentTo("correlationId", "partyId", "shipmentNumber", "transportOrderNumber", "notificationId", "sourceMessageId");
         inputs.Select(input => input.Value!.GetValue<string>()).Should().OnlyContain(
-            expression => expression.StartsWith("@json(base64ToString(triggerBody()?['contentData']))?['", StringComparison.Ordinal) && !expression.Contains("@{", StringComparison.Ordinal));
+            expression => expression.StartsWith("@json(base64ToString(triggerBody()?['ContentData']))?['", StringComparison.Ordinal) && !expression.Contains("@{", StringComparison.Ordinal));
         inputs["partyId"]!.GetValue<string>().Should().EndWith("?['shipperId']");
         inputs["sourceMessageId"]!.GetValue<string>().Should().EndWith("?['eventId']");
     }
@@ -88,24 +88,23 @@ public sealed class ShipperNotificationWorkflowTests
 
         map["type"]!.GetValue<string>().Should().Be("InvokeFunction");
         map["inputs"]!["functionName"]!.GetValue<string>().Should().Be("MapShipperNotificationRequested");
-        map["inputs"]!["parameters"]!["shipperNotificationRequested"]!.GetValue<string>().Should().Be("@{triggerBody()?['contentData']}");
+        map["inputs"]!["parameters"]!["shipperNotificationRequested"]!.GetValue<string>().Should().Be("@{triggerBody()?['ContentData']}");
         map["trackedProperties"]!["failureCode"]!.GetValue<string>().Should().Contain("ShipperNotificationRequestedUnreadable");
     }
 
     [Fact]
     public void Trigger_LocksTheMessage_SoTheWorkflowSettlesIt() =>
-        ShipperNotificationWorkflow.Trigger["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("peekLockTopicMessagesV2");
+        ShipperNotificationWorkflow.Trigger["inputs"]!["path"]!.GetValue<string>().Should().EndWith("/messages/head/peek");
 
     [Fact]
     public void UnreadableNotification_IsDeadLetteredWithTheFailureCodeAndAReadableMessage_AndFailsTheRun()
     {
         var deadLetter = ShipperNotificationWorkflow.Action("Dead_letter_the_unreadable_notification");
-        var parameters = deadLetter["inputs"]!["parameters"]!;
+        var parameters = deadLetter["inputs"]!["queries"]!;
 
         Statuses(deadLetter, ShipperNotificationWorkflow.MapAction).Should().BeEquivalentTo("Failed");
-        deadLetter["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("deadLetterTopicMessageV2");
-        parameters["subscriptionName"]!.GetValue<string>().Should().Be("shipper-notification");
-        parameters["lockToken"]!.GetValue<string>().Should().Be("@triggerBody()?['lockToken']");
+        deadLetter["inputs"]!["path"]!.GetValue<string>().Should().EndWith("/messages/deadletter");
+        parameters["lockToken"]!.GetValue<string>().Should().Be("@triggerBody()?['LockToken']");
         parameters["deadLetterReason"]!.GetValue<string>().Should().Be("ShipperNotificationRequestedUnreadable");
         parameters["deadLetterErrorDescription"]!.GetValue<string>().Should().Contain("nothing was sent");
         deadLetter["trackedProperties"]!["outcome"]!.GetValue<string>().Should().Be("DeadLettered");
@@ -268,16 +267,44 @@ public sealed class ShipperNotificationWorkflowTests
     {
         var connections = ShipperNotificationWorkflow.ConnectionsFile["serviceProviderConnections"]!.AsObject();
 
-        connections.Select(connection => connection.Key).Should().BeEquivalentTo("serviceBus", "keyVault");
+        connections.Select(connection => connection.Key).Should().BeEquivalentTo("keyVault");
         foreach (var (_, connection) in connections)
         {
             var authProvider = connection!["parameterValues"]!["authProvider"]!;
             authProvider["Type"]!.GetValue<string>().Should().Be("ManagedServiceIdentity");
             authProvider["Identity"]!.GetValue<string>().Should().Be("@appsetting('SHIPPER_NOTIFICATION_IDENTITY_ID')");
         }
-
-        connections["serviceBus"]!["parameterValues"]!["fullyQualifiedNamespace"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_NAMESPACE')");
         connections["keyVault"]!["parameterValues"]!["VaultUri"]!.GetValue<string>().Should().Be("@appsetting('KEY_VAULT_URI')");
+    }
+
+    [Fact]
+    public void EveryServiceBusStep_ReadsTheOneSubscriptionThroughTheManagedConnection()
+    {
+        var steps = ShipperNotificationWorkflow.Operations().Where(operation => operation.Operation["type"]!.GetValue<string>() == "ApiConnection").ToList();
+
+        steps.Should().NotBeEmpty();
+        steps.Should().OnlyContain(step => step.Operation["inputs"]!["host"]!["connection"]!["referenceName"]!.GetValue<string>() == "servicebus"
+            && step.Operation["inputs"]!["path"]!.GetValue<string>().Contains("'shipment-events'", StringComparison.Ordinal)
+            && step.Operation["inputs"]!["path"]!.GetValue<string>().Contains("'shipper-notification'", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ServiceBusConnection_IsAManagedConnectionSignedInAsTheIdentity_ForTheTokenStoreAndForServiceBus()
+    {
+        var connections = ShipperNotificationWorkflow.ConnectionsFile["managedApiConnections"]!.AsObject();
+        var serviceBus = connections["servicebus"]!;
+
+        connections.Select(connection => connection.Key).Should().BeEquivalentTo("servicebus");
+        serviceBus["api"]!["id"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_API_ID')");
+        serviceBus["connection"]!["id"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_CONNECTION_ID')");
+        serviceBus["connectionRuntimeUrl"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_CONNECTION_RUNTIME_URL')");
+        foreach (var authentication in new[] { serviceBus["authentication"]!, serviceBus["connectionProperties"]!["authentication"]! })
+        {
+            authentication["type"]!.GetValue<string>().Should().Be("ManagedServiceIdentity");
+            authentication["identity"]!.GetValue<string>().Should().Be("@appsetting('SHIPPER_NOTIFICATION_IDENTITY_ID')");
+        }
+
+        serviceBus["connectionProperties"]!["authentication"]!["audience"]!.GetValue<string>().Should().Be("https://servicebus.azure.net");
     }
 
     [Fact]

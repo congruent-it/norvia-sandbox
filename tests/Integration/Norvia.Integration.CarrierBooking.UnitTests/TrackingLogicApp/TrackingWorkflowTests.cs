@@ -11,14 +11,17 @@ public sealed class TrackingWorkflowTests
 {
     private static JsonObject Inputs(string action) => TrackingWorkflow.Action(action)["inputs"]!.AsObject();
 
+    private static string MessagePath(string action) => Inputs(action)["path"]!.GetValue<string>();
+
     private static string OperationId(string action) => Inputs(action)["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>();
 
     [Fact]
     public void Trigger_IsTheTrackingQueue_AndItsClientTrackingIdIsTheCorrelationId()
     {
-        TrackingWorkflow.Trigger["inputs"]!["parameters"]!["queueName"]!.GetValue<string>().Should().Be("carrier-tracking");
-        TrackingWorkflow.Trigger["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("peekLockQueueMessagesV2");
-        TrackingWorkflow.Trigger["correlation"]!["clientTrackingId"]!.GetValue<string>().Should().Be("@{triggerOutputs()?['body']?['userProperties']?['correlationId']}");
+        TrackingWorkflow.Trigger["type"]!.GetValue<string>().Should().Be("ApiConnection");
+        TrackingWorkflow.Trigger["inputs"]!["path"]!.GetValue<string>().Should().Contain("'carrier-tracking'");
+        TrackingWorkflow.Trigger["inputs"]!["path"]!.GetValue<string>().Should().EndWith("/messages/head/peek");
+        TrackingWorkflow.Trigger["correlation"]!["clientTrackingId"]!.GetValue<string>().Should().Be("@{coalesce(if(equals(length(string(coalesce(triggerBody(), ''))), 0), json('{}'), triggerBody())?['Properties']?['correlationId'], '00000000-0000-0000-0000-000000000000')}");
     }
 
     [Fact]
@@ -65,9 +68,9 @@ public sealed class TrackingWorkflowTests
         var end = TrackingWorkflow.Action("Fail_the_run_on_the_unmappable_message");
 
         deadLetter["runAfter"]![TrackingWorkflow.Map]!.AsArray().Select(status => status!.GetValue<string>()).Should().BeEquivalentTo("Failed");
-        OperationId("Dead_letter_the_unmappable_message").Should().Be("deadLetterQueueMessageV2");
-        deadLetter["inputs"]!["parameters"]!["deadLetterReason"]!.GetValue<string>().Should().Be("UnmappableTrackingMessage");
-        deadLetter["inputs"]!["parameters"]!["deadLetterErrorDescription"]!.GetValue<string>().Should().NotBeNullOrWhiteSpace();
+        MessagePath("Dead_letter_the_unmappable_message").Should().EndWith("/messages/deadletter");
+        deadLetter["inputs"]!["queries"]!["deadLetterReason"]!.GetValue<string>().Should().Be("UnmappableTrackingMessage");
+        deadLetter["inputs"]!["queries"]!["deadLetterErrorDescription"]!.GetValue<string>().Should().NotBeNullOrWhiteSpace();
         end["inputs"]!["runStatus"]!.GetValue<string>().Should().Be("Failed");
     }
 
@@ -85,7 +88,7 @@ public sealed class TrackingWorkflowTests
 
         settle["runAfter"]![TrackingWorkflow.TmsCall]!.AsArray().Select(status => status!.GetValue<string>()).Should().BeEquivalentTo("Succeeded", "Failed", "TimedOut");
         settle["expression"]!.ToJsonString().Should().Contain("200").And.Contain("300");
-        OperationId("Complete_the_message").Should().Be("completeQueueMessageV2");
+        MessagePath("Complete_the_message").Should().EndWith("/messages/complete");
         settle["actions"]!.AsObject().Select(action => action.Key).Should().BeEquivalentTo("Complete_the_message");
     }
 
@@ -93,9 +96,9 @@ public sealed class TrackingWorkflowTests
     public void Settle_DeadLettersAClientError_WithTheFailureCodeAsReasonAndTheMessageAsDescription_NotRetried()
     {
         var deadLetter = TrackingWorkflow.Action("Dead_letter_the_refused_message");
-        var parameters = deadLetter["inputs"]!["parameters"]!;
+        var parameters = deadLetter["inputs"]!["queries"]!;
 
-        OperationId("Dead_letter_the_refused_message").Should().Be("deadLetterQueueMessageV2");
+        MessagePath("Dead_letter_the_refused_message").Should().EndWith("/messages/deadletter");
         parameters["deadLetterReason"]!.GetValue<string>().Should().Contain("['code']").And.Contain("TmsCallRefused");
         parameters["deadLetterErrorDescription"]!.GetValue<string>().Should().Contain("['detail']");
         TrackingWorkflow.Action("Settle_the_refused_or_unreached_message")["expression"]!.ToJsonString()
@@ -106,7 +109,7 @@ public sealed class TrackingWorkflowTests
     [Fact]
     public void Settle_AbandonsAServerErrorOrTimeout_SoTheQueueRetriesItUpToItsMaximumDeliveryCount()
     {
-        OperationId("Abandon_the_message_to_retry").Should().Be("abandonQueueMessageV2");
+        MessagePath("Abandon_the_message_to_retry").Should().EndWith("/messages/abandon");
         TrackingWorkflow.Action("Abandon_the_message_to_retry")["trackedProperties"]!["outcome"]!.GetValue<string>().Should().Be("Retrying");
         TrackingWorkflow.Action("Fail_the_run_on_the_unreached_TMS")["inputs"]!["runError"]!["code"]!.GetValue<string>().Should().Be("TmsUnavailable");
     }
@@ -114,16 +117,45 @@ public sealed class TrackingWorkflowTests
     [Fact]
     public void EveryServiceBusStep_SettlesTheMessageByItsLockToken()
     {
-        var steps = TrackingWorkflow.Operations().Where(operation => operation.Operation["type"]!.GetValue<string>() == "ServiceProvider" && operation.Name != "trigger").ToList();
+        var steps = TrackingWorkflow.Operations().Where(operation => operation.Operation["type"]!.GetValue<string>() == "ApiConnection" && operation.Name != "trigger").ToList();
 
         steps.Should().HaveCount(4);
-        steps.Should().OnlyContain(step => step.Operation["inputs"]!["parameters"]!["lockToken"]!.GetValue<string>() == "@triggerBody()?['lockToken']");
+        steps.Should().OnlyContain(step => step.Operation["inputs"]!["queries"]!["lockToken"]!.GetValue<string>() == "@triggerBody()?['LockToken']");
     }
 
     [Fact]
     public void Parameters_AreTheTmsAndTheTrackingIdentity()
     {
         TrackingWorkflow.ParametersFile.Select(parameter => parameter.Key).Should().BeEquivalentTo("tmsBaseUrl", "tmsAudience", "trackingIdentityId");
+    }
+
+    [Fact]
+    public void EveryServiceBusStep_ReadsTheOneQueueThroughTheManagedConnection()
+    {
+        var steps = TrackingWorkflow.Operations().Where(operation => operation.Operation["type"]!.GetValue<string>() == "ApiConnection").ToList();
+
+        steps.Should().NotBeEmpty();
+        steps.Should().OnlyContain(step => step.Operation["inputs"]!["host"]!["connection"]!["referenceName"]!.GetValue<string>() == "servicebus"
+            && step.Operation["inputs"]!["path"]!.GetValue<string>().Contains("'carrier-tracking'", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ServiceBusConnection_IsAManagedConnectionSignedInAsTheIdentity_ForTheTokenStoreAndForServiceBus()
+    {
+        var connections = JsonNode.Parse(Contracts.Read("TrackingLogicApp/connections.json"))!["managedApiConnections"]!.AsObject();
+        var serviceBus = connections["servicebus"]!;
+
+        connections.Select(connection => connection.Key).Should().BeEquivalentTo("servicebus");
+        serviceBus["api"]!["id"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_API_ID')");
+        serviceBus["connection"]!["id"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_CONNECTION_ID')");
+        serviceBus["connectionRuntimeUrl"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_CONNECTION_RUNTIME_URL')");
+        foreach (var authentication in new[] { serviceBus["authentication"]!, serviceBus["connectionProperties"]!["authentication"]! })
+        {
+            authentication["type"]!.GetValue<string>().Should().Be("ManagedServiceIdentity");
+            authentication["identity"]!.GetValue<string>().Should().Be("@appsetting('TRACKING_IDENTITY_ID')");
+        }
+
+        serviceBus["connectionProperties"]!["authentication"]!["audience"]!.GetValue<string>().Should().Be("https://servicebus.azure.net");
     }
 
     [Fact]

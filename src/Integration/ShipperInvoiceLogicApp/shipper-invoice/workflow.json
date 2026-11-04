@@ -4,21 +4,26 @@
     "contentVersion": "1.0.0.0",
     "triggers": {
       "When_a_Shipper_invoice_is_issued": {
-        "type": "ServiceProvider",
+        "type": "ApiConnection",
         "inputs": {
-          "parameters": {
-            "topicName": "invoicing-events",
-            "subscriptionName": "shipper-invoice",
-            "isSessionsEnabled": false
+          "host": {
+            "connection": {
+              "referenceName": "servicebus"
+            }
           },
-          "serviceProviderConfiguration": {
-            "connectionName": "serviceBus",
-            "operationId": "peekLockTopicMessagesV2",
-            "serviceProviderId": "/serviceProviders/serviceBus"
+          "method": "get",
+          "path": "/@{encodeURIComponent(encodeURIComponent('invoicing-events'))}/subscriptions/@{encodeURIComponent('shipper-invoice')}/messages/head/peek",
+          "queries": {
+            "subscriptionType": "Main",
+            "sessionId": "None"
           }
         },
+        "recurrence": {
+          "frequency": "Minute",
+          "interval": 1
+        },
         "correlation": {
-          "clientTrackingId": "@{triggerOutputs()?['body']?['userProperties']?['correlationId']}"
+          "clientTrackingId": "@{coalesce(if(equals(length(string(coalesce(triggerBody(), ''))), 0), json('{}'), triggerBody())?['Properties']?['correlationId'], '00000000-0000-0000-0000-000000000000')}"
         }
       }
     },
@@ -26,10 +31,10 @@
       "Track_the_invoice": {
         "type": "Compose",
         "inputs": {
-          "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
-          "partyId": "@coalesce(json(base64ToString(triggerBody()?['contentData']))?['invoice']?['shipper']?['shipperId'], json(base64ToString(triggerBody()?['contentData']))?['creditNote']?['shipper']?['shipperId'])",
-          "documentNumber": "@coalesce(json(base64ToString(triggerBody()?['contentData']))?['invoice']?['invoiceNumber'], json(base64ToString(triggerBody()?['contentData']))?['creditNote']?['creditNoteNumber'])",
-          "sourceMessageId": "@json(base64ToString(triggerBody()?['contentData']))?['eventId']"
+          "correlationId": "@json(base64ToString(triggerBody()?['ContentData']))?['correlationId']",
+          "partyId": "@coalesce(json(base64ToString(triggerBody()?['ContentData']))?['invoice']?['shipper']?['shipperId'], json(base64ToString(triggerBody()?['ContentData']))?['creditNote']?['shipper']?['shipperId'])",
+          "documentNumber": "@coalesce(json(base64ToString(triggerBody()?['ContentData']))?['invoice']?['invoiceNumber'], json(base64ToString(triggerBody()?['ContentData']))?['creditNote']?['creditNoteNumber'])",
+          "sourceMessageId": "@json(base64ToString(triggerBody()?['ContentData']))?['eventId']"
         },
         "runAfter": {},
         "trackedProperties": {
@@ -45,7 +50,7 @@
         "inputs": {
           "functionName": "MapShipperDocument",
           "parameters": {
-            "message": "@{triggerBody()?['contentData']}"
+            "message": "@{triggerBody()?['ContentData']}"
           }
         },
         "runAfter": {
@@ -60,19 +65,20 @@
         }
       },
       "Dead_letter_the_unreadable_invoice": {
-        "type": "ServiceProvider",
+        "type": "ApiConnection",
         "inputs": {
-          "parameters": {
-            "topicName": "invoicing-events",
-            "subscriptionName": "shipper-invoice",
-            "lockToken": "@triggerBody()?['lockToken']",
+          "host": {
+            "connection": {
+              "referenceName": "servicebus"
+            }
+          },
+          "method": "post",
+          "path": "/@{encodeURIComponent(encodeURIComponent('invoicing-events'))}/subscriptions/@{encodeURIComponent('shipper-invoice')}/messages/deadletter",
+          "queries": {
+            "lockToken": "@triggerBody()?['LockToken']",
+            "sessionId": "",
             "deadLetterReason": "ShipperInvoiceIssuedUnreadable",
             "deadLetterErrorDescription": "The message isn't an invoice or Credit note the Shipper can be sent, so nothing was sent to the Shipper."
-          },
-          "serviceProviderConfiguration": {
-            "connectionName": "serviceBus",
-            "operationId": "deadLetterTopicMessageV2",
-            "serviceProviderId": "/serviceProviders/serviceBus"
           }
         },
         "runAfter": {
@@ -103,17 +109,19 @@
         }
       },
       "Complete_the_message": {
-        "type": "ServiceProvider",
+        "type": "ApiConnection",
         "inputs": {
-          "parameters": {
-            "topicName": "invoicing-events",
-            "subscriptionName": "shipper-invoice",
-            "lockToken": "@triggerBody()?['lockToken']"
+          "host": {
+            "connection": {
+              "referenceName": "servicebus"
+            }
           },
-          "serviceProviderConfiguration": {
-            "connectionName": "serviceBus",
-            "operationId": "completeTopicMessageV2",
-            "serviceProviderId": "/serviceProviders/serviceBus"
+          "method": "delete",
+          "path": "/@{encodeURIComponent(encodeURIComponent('invoicing-events'))}/subscriptions/@{encodeURIComponent('shipper-invoice')}/messages/complete",
+          "queries": {
+            "lockToken": "@triggerBody()?['LockToken']",
+            "subscriptionType": "Main",
+            "sessionId": ""
           }
         },
         "runAfter": {
@@ -200,9 +208,9 @@
       "Track_the_answer": {
         "type": "Compose",
         "inputs": {
-          "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
-          "partyId": "@coalesce(json(base64ToString(triggerBody()?['contentData']))?['invoice']?['shipper']?['shipperId'], json(base64ToString(triggerBody()?['contentData']))?['creditNote']?['shipper']?['shipperId'])",
-          "documentNumber": "@coalesce(json(base64ToString(triggerBody()?['contentData']))?['invoice']?['invoiceNumber'], json(base64ToString(triggerBody()?['contentData']))?['creditNote']?['creditNoteNumber'])",
+          "correlationId": "@json(base64ToString(triggerBody()?['ContentData']))?['correlationId']",
+          "partyId": "@coalesce(json(base64ToString(triggerBody()?['ContentData']))?['invoice']?['shipper']?['shipperId'], json(base64ToString(triggerBody()?['ContentData']))?['creditNote']?['shipper']?['shipperId'])",
+          "documentNumber": "@coalesce(json(base64ToString(triggerBody()?['ContentData']))?['invoice']?['invoiceNumber'], json(base64ToString(triggerBody()?['ContentData']))?['creditNote']?['creditNoteNumber'])",
           "outcome": "@outputs('Read_the_answer')?['outcome']",
           "failureCode": "@outputs('Read_the_answer')?['failureCode']"
         },

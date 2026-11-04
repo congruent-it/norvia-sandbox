@@ -74,10 +74,11 @@ resource monitoring 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-0
 }
 
 // Every subscription's filter also routes resubmits from the Integration console, so a resubmitted message reaches only
-// the subscription it was dead-lettered from (coding guidelines §7). It replaces the $Default rule, which passes all.
+// the subscription it was dead-lettered from (coding guidelines §7). The rule is not named $Default, which Service Bus drops when
+// it carries a SQL filter; infra/provision-estate.sh deletes the $Default rule, which passes all, after the deployment.
 resource monitoringFilter 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
   parent: monitoring
-  name: '$Default'
+  name: 'resubmit-aware'
   properties: {
     filterType: 'SqlFilter'
     sqlFilter: {
@@ -99,7 +100,7 @@ resource tripMonitoring 'Microsoft.ServiceBus/namespaces/topics/subscriptions@20
 
 resource tripMonitoringFilter 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
   parent: tripMonitoring
-  name: '$Default'
+  name: 'resubmit-aware'
   properties: {
     filterType: 'SqlFilter'
     sqlFilter: {
@@ -118,7 +119,7 @@ resource tripDispatch 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024
 
 resource tripDispatchFilter 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
   parent: tripDispatch
-  name: '$Default'
+  name: 'resubmit-aware'
   properties: {
     filterType: 'SqlFilter'
     sqlFilter: {
@@ -149,7 +150,7 @@ resource driverReports 'Microsoft.ServiceBus/namespaces/topics/subscriptions@202
 
 resource driverReportsFilter 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
   parent: driverReports
-  name: '$Default'
+  name: 'resubmit-aware'
   properties: {
     filterType: 'SqlFilter'
     sqlFilter: {
@@ -172,7 +173,7 @@ resource billing 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-0
 
 resource billingFilter 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
   parent: billing
-  name: '$Default'
+  name: 'resubmit-aware'
   properties: {
     filterType: 'SqlFilter'
     sqlFilter: {
@@ -194,7 +195,7 @@ resource shipmentMonitoring 'Microsoft.ServiceBus/namespaces/topics/subscription
 
 resource shipmentMonitoringFilter 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
   parent: shipmentMonitoring
-  name: '$Default'
+  name: 'resubmit-aware'
   properties: {
     filterType: 'SqlFilter'
     sqlFilter: {
@@ -213,7 +214,7 @@ resource carrierBooking 'Microsoft.ServiceBus/namespaces/topics/subscriptions@20
 
 resource carrierBookingFilter 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
   parent: carrierBooking
-  name: '$Default'
+  name: 'resubmit-aware'
   properties: {
     filterType: 'SqlFilter'
     sqlFilter: {
@@ -232,7 +233,7 @@ resource shipperNotification 'Microsoft.ServiceBus/namespaces/topics/subscriptio
 
 resource shipperNotificationFilter 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
   parent: shipperNotification
-  name: '$Default'
+  name: 'resubmit-aware'
   properties: {
     filterType: 'SqlFilter'
     sqlFilter: {
@@ -251,7 +252,7 @@ resource carrierCancellation 'Microsoft.ServiceBus/namespaces/topics/subscriptio
 
 resource carrierCancellationFilter 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
   parent: carrierCancellation
-  name: '$Default'
+  name: 'resubmit-aware'
   properties: {
     filterType: 'SqlFilter'
     sqlFilter: {
@@ -278,7 +279,7 @@ resource carrierCost 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-
 
 resource carrierCostFilter 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
   parent: carrierCost
-  name: '$Default'
+  name: 'resubmit-aware'
   properties: {
     filterType: 'SqlFilter'
     sqlFilter: {
@@ -451,7 +452,7 @@ resource invoicingMonitoring 'Microsoft.ServiceBus/namespaces/topics/subscriptio
 
 resource invoicingMonitoringFilter 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
   parent: invoicingMonitoring
-  name: '$Default'
+  name: 'resubmit-aware'
   properties: {
     filterType: 'SqlFilter'
     sqlFilter: {
@@ -470,7 +471,7 @@ resource shipperInvoice 'Microsoft.ServiceBus/namespaces/topics/subscriptions@20
 
 resource shipperInvoiceFilter 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
   parent: shipperInvoice
-  name: '$Default'
+  name: 'resubmit-aware'
   properties: {
     filterType: 'SqlFilter'
     sqlFilter: {
@@ -499,7 +500,7 @@ resource carrierInvoiceOutcome 'Microsoft.ServiceBus/namespaces/topics/subscript
 
 resource carrierInvoiceOutcomeFilter 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
   parent: carrierInvoiceOutcome
-  name: '$Default'
+  name: 'resubmit-aware'
   properties: {
     filterType: 'SqlFilter'
     sqlFilter: {

@@ -15,24 +15,37 @@ public sealed class TripDispatchWorkflowTests
     private static string[] Statuses(JsonObject action, string after) =>
         [.. action["runAfter"]![after]!.AsArray().Select(status => status!.GetValue<string>())];
 
-    [Fact]
-    public void Trigger_IsTheTripDispatchSubscriptionOnTheTripEventsTopic()
-    {
-        var parameters = TripDispatchWorkflow.Trigger["inputs"]!["parameters"]!;
+    private const string SubscriptionPath = "/@{encodeURIComponent(encodeURIComponent('trip-events'))}/subscriptions/@{encodeURIComponent('trip-dispatch')}/messages/";
 
-        TripDispatchWorkflow.Trigger["type"]!.GetValue<string>().Should().Be("ServiceProvider");
-        parameters["topicName"]!.GetValue<string>().Should().Be("trip-events");
-        parameters["subscriptionName"]!.GetValue<string>().Should().Be("trip-dispatch");
-        TripDispatchWorkflow.Trigger["inputs"]!["serviceProviderConfiguration"]!["serviceProviderId"]!.GetValue<string>().Should().Be("/serviceProviders/serviceBus");
+    [Fact]
+    public void Trigger_IsTheTripDispatchSubscriptionOnTheTripEventsTopic_ThroughTheServiceBusManagedConnector()
+    {
+        var inputs = TripDispatchWorkflow.Trigger["inputs"]!;
+
+        TripDispatchWorkflow.Trigger["type"]!.GetValue<string>().Should().Be("ApiConnection");
+        inputs["host"]!["connection"]!["referenceName"]!.GetValue<string>().Should().Be("servicebus");
+        inputs["path"]!.GetValue<string>().Should().StartWith(SubscriptionPath);
     }
 
     [Fact]
-    public void Trigger_LocksTheMessage_SoTheWorkflowSettlesIt() =>
-        TripDispatchWorkflow.Trigger["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("peekLockTopicMessagesV2");
+    public void Trigger_PeeksTheMessageWithALock_SoTheWorkflowSettlesIt()
+    {
+        var inputs = TripDispatchWorkflow.Trigger["inputs"]!;
+
+        inputs["method"]!.GetValue<string>().Should().Be("get");
+        inputs["path"]!.GetValue<string>().Should().EndWith("messages/head/peek");
+        inputs["queries"]!["subscriptionType"]!.GetValue<string>().Should().Be("Main");
+        TripDispatchWorkflow.Trigger["recurrence"]!["frequency"]!.GetValue<string>().Should().Be("Minute");
+    }
 
     [Fact]
-    public void Trigger_ClientTrackingId_IsTheDispatchsCorrelationId() =>
-        TripDispatchWorkflow.Trigger["correlation"]!["clientTrackingId"]!.GetValue<string>().Should().Be("@{triggerOutputs()?['body']?['userProperties']?['correlationId']}");
+    public void Trigger_ClientTrackingId_IsTheDispatchsCorrelationId_AndSurvivesAPollThatFindsNoMessage()
+    {
+        // A poll with nothing to peek answers 202 with an empty body, and the runtime evaluates the expression on it all the same.
+        var clientTrackingId = TripDispatchWorkflow.Trigger["correlation"]!["clientTrackingId"]!.GetValue<string>();
+
+        clientTrackingId.Should().Contain("?['Properties']?['correlationId']").And.Contain("equals(length(string(coalesce(triggerBody(), ''))), 0)");
+    }
 
     [Fact]
     public void Trigger_TracksNothing_BecauseTheFirstStepTracksTheKeysTheMessageCarries() =>
@@ -56,7 +69,7 @@ public sealed class TripDispatchWorkflowTests
         // The version is not a key of the contract; it is the reports' address.
         inputs.Select(input => input.Key).Should().BeEquivalentTo("correlationId", "partyId", "tripNumber", "version", "eventType", "sourceMessageId");
         inputs.Select(input => input.Value!.GetValue<string>()).Should().OnlyContain(
-            expression => expression.StartsWith("@json(base64ToString(triggerBody()?['contentData']))?['", StringComparison.Ordinal) && !expression.Contains("@{", StringComparison.Ordinal));
+            expression => expression.StartsWith("@json(base64ToString(triggerBody()?['ContentData']))?['", StringComparison.Ordinal) && !expression.Contains("@{", StringComparison.Ordinal));
         inputs["partyId"]!.GetValue<string>().Should().EndWith("?['driver']?['driverId']");
         inputs["sourceMessageId"]!.GetValue<string>().Should().EndWith("?['eventId']");
     }
@@ -97,16 +110,18 @@ public sealed class TripDispatchWorkflowTests
     public void UnreadableTrip_IsDeadLetteredWithTheFailureCodeAndAReadableMessage_AndFailsTheRun()
     {
         var deadLetter = TripDispatchWorkflow.Action(TripDispatchWorkflow.DeadLetter);
-        var parameters = deadLetter["inputs"]!["parameters"]!;
+        var inputs = deadLetter["inputs"]!;
+        var queries = inputs["queries"]!;
 
         TripDispatchWorkflow.Action(TripDispatchWorkflow.Check)["else"]!["actions"]!.AsObject().Select(action => action.Key)
             .Should().Equal(TripDispatchWorkflow.DeadLetter, TripDispatchWorkflow.FailTheRun);
-        deadLetter["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("deadLetterTopicMessageV2");
-        parameters["topicName"]!.GetValue<string>().Should().Be("trip-events");
-        parameters["subscriptionName"]!.GetValue<string>().Should().Be("trip-dispatch");
-        parameters["lockToken"]!.GetValue<string>().Should().Be("@triggerBody()?['lockToken']");
-        parameters["deadLetterReason"]!.GetValue<string>().Should().Be("TripDispatchUnreadable");
-        parameters["deadLetterErrorDescription"]!.GetValue<string>().Should().Contain("nothing was sent");
+        deadLetter["type"]!.GetValue<string>().Should().Be("ApiConnection");
+        inputs["host"]!["connection"]!["referenceName"]!.GetValue<string>().Should().Be("servicebus");
+        inputs["method"]!.GetValue<string>().Should().Be("post");
+        inputs["path"]!.GetValue<string>().Should().Be(SubscriptionPath + "deadletter");
+        queries["lockToken"]!.GetValue<string>().Should().Be("@triggerBody()?['LockToken']");
+        queries["deadLetterReason"]!.GetValue<string>().Should().Be("TripDispatchUnreadable");
+        queries["deadLetterErrorDescription"]!.GetValue<string>().Should().Contain("nothing was sent");
         deadLetter["trackedProperties"]!["outcome"]!.GetValue<string>().Should().Be("DeadLettered");
         deadLetter["trackedProperties"]!["failureCode"]!.GetValue<string>().Should().Be("TripDispatchUnreadable");
         TripDispatchWorkflow.Action(TripDispatchWorkflow.FailTheRun)["inputs"]!["runStatus"]!.GetValue<string>().Should().Be("Failed");
@@ -118,7 +133,10 @@ public sealed class TripDispatchWorkflowTests
         var complete = TripDispatchWorkflow.Action(TripDispatchWorkflow.Complete);
 
         complete["runAfter"]!.AsObject().Should().BeEmpty();
-        complete["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("completeTopicMessageV2");
+        complete["type"]!.GetValue<string>().Should().Be("ApiConnection");
+        complete["inputs"]!["method"]!.GetValue<string>().Should().Be("delete");
+        complete["inputs"]!["path"]!.GetValue<string>().Should().Be(SubscriptionPath + "complete");
+        complete["inputs"]!["queries"]!["lockToken"]!.GetValue<string>().Should().Be("@triggerBody()?['LockToken']");
         TripDispatchWorkflow.Action(TripDispatchWorkflow.Check)["actions"]!.AsObject().Select(action => action.Key).Should().StartWith(TripDispatchWorkflow.Complete);
         Statuses(TripDispatchWorkflow.Action(TripDispatchWorkflow.Credential), TripDispatchWorkflow.Complete).Should().BeEquivalentTo("Succeeded");
     }
@@ -143,7 +161,7 @@ public sealed class TripDispatchWorkflowTests
         inputs["uri"]!.GetValue<string>().Should().Be("@{parameters('driverAppBaseUrl')}/v1/trips");
         inputs["headers"]!["X-Correlation-ID"]!.GetValue<string>().Should().Be(CorrelationId);
         inputs["headers"]!["X-Api-Key"]!.GetValue<string>().Should().Be("@{body('Get_the_Driver_app_endpoint_credential')?['value']}");
-        inputs["body"]!.GetValue<string>().Should().Be("@json(base64ToString(triggerBody()?['contentData']))");
+        inputs["body"]!.GetValue<string>().Should().Be("@json(base64ToString(triggerBody()?['ContentData']))");
         Statuses(send, TripDispatchWorkflow.Credential).Should().BeEquivalentTo("Succeeded");
     }
 
@@ -271,16 +289,30 @@ public sealed class TripDispatchWorkflowTests
     {
         var connections = TripDispatchWorkflow.ConnectionsFile["serviceProviderConnections"]!.AsObject();
 
-        connections.Select(connection => connection.Key).Should().BeEquivalentTo("serviceBus", "keyVault");
-        foreach (var (_, connection) in connections)
+        connections.Select(connection => connection.Key).Should().BeEquivalentTo("keyVault");
+        var authProvider = connections["keyVault"]!["parameterValues"]!["authProvider"]!;
+        authProvider["Type"]!.GetValue<string>().Should().Be("ManagedServiceIdentity");
+        authProvider["Identity"]!.GetValue<string>().Should().Be("@appsetting('TRIP_DISPATCH_IDENTITY_ID')");
+        connections["keyVault"]!["parameterValues"]!["VaultUri"]!.GetValue<string>().Should().Be("@appsetting('KEY_VAULT_URI')");
+    }
+
+    [Fact]
+    public void ServiceBusConnection_IsAManagedConnectionSignedInAsTheTripDispatchIdentity_ForTheTokenStoreAndForServiceBus()
+    {
+        var connections = TripDispatchWorkflow.ConnectionsFile["managedApiConnections"]!.AsObject();
+        var serviceBus = connections["servicebus"]!;
+
+        connections.Select(connection => connection.Key).Should().BeEquivalentTo("servicebus");
+        serviceBus["api"]!["id"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_API_ID')");
+        serviceBus["connection"]!["id"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_CONNECTION_ID')");
+        serviceBus["connectionRuntimeUrl"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_CONNECTION_RUNTIME_URL')");
+        foreach (var authentication in new[] { serviceBus["authentication"]!, serviceBus["connectionProperties"]!["authentication"]! })
         {
-            var authProvider = connection!["parameterValues"]!["authProvider"]!;
-            authProvider["Type"]!.GetValue<string>().Should().Be("ManagedServiceIdentity");
-            authProvider["Identity"]!.GetValue<string>().Should().Be("@appsetting('TRIP_DISPATCH_IDENTITY_ID')");
+            authentication["type"]!.GetValue<string>().Should().Be("ManagedServiceIdentity");
+            authentication["identity"]!.GetValue<string>().Should().Be("@appsetting('TRIP_DISPATCH_IDENTITY_ID')");
         }
 
-        connections["serviceBus"]!["parameterValues"]!["fullyQualifiedNamespace"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_NAMESPACE')");
-        connections["keyVault"]!["parameterValues"]!["VaultUri"]!.GetValue<string>().Should().Be("@appsetting('KEY_VAULT_URI')");
+        serviceBus["connectionProperties"]!["authentication"]!["audience"]!.GetValue<string>().Should().Be("https://servicebus.azure.net");
     }
 
     [Fact]
