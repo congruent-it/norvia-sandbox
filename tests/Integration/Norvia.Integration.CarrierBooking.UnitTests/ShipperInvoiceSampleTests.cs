@@ -104,7 +104,7 @@ public sealed class ShipperInvoiceSampleTests
 
     /// <summary>What a tracking expression of the workflow gives for a message: the first of its <c>json(...)</c> paths that the message has.</summary>
     internal static string? Resolve(JsonNode message, string expression) =>
-        expression.Split("json(base64ToString(triggerBody()?['contentData']))", StringSplitOptions.RemoveEmptyEntries)
+        expression.Split("json(base64ToString(triggerBody()?['ContentData']))", StringSplitOptions.RemoveEmptyEntries)
             .Select(segment => System.Text.RegularExpressions.Regex.Matches(segment, @"\?\['(\w+)'\]").Select(match => match.Groups[1].Value).ToList())
             .Where(path => path.Count > 0)
             .Select(path => path.Aggregate((JsonNode?)message, (current, field) => current?[field]))

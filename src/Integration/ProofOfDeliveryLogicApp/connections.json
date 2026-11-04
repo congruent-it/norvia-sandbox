@@ -1,18 +1,5 @@
 {
   "serviceProviderConnections": {
-    "serviceBus": {
-      "displayName": "Carrier Proof of delivery queue",
-      "parameterValues": {
-        "fullyQualifiedNamespace": "@appsetting('SERVICE_BUS_NAMESPACE')",
-        "authProvider": {
-          "Type": "ManagedServiceIdentity",
-          "Identity": "@appsetting('PROOF_OF_DELIVERY_IDENTITY_ID')"
-        }
-      },
-      "serviceProvider": {
-        "id": "/serviceProviders/serviceBus"
-      }
-    },
     "AzureBlob": {
       "displayName": "Inbound Proofs of delivery",
       "parameterValues": {
@@ -27,5 +14,26 @@
       }
     }
   },
-  "managedApiConnections": {}
+  "managedApiConnections": {
+    "servicebus": {
+      "api": {
+        "id": "@appsetting('SERVICE_BUS_API_ID')"
+      },
+      "authentication": {
+        "type": "ManagedServiceIdentity",
+        "identity": "@appsetting('PROOF_OF_DELIVERY_IDENTITY_ID')"
+      },
+      "connection": {
+        "id": "@appsetting('SERVICE_BUS_CONNECTION_ID')"
+      },
+      "connectionProperties": {
+        "authentication": {
+          "audience": "https://servicebus.azure.net",
+          "type": "ManagedServiceIdentity",
+          "identity": "@appsetting('PROOF_OF_DELIVERY_IDENTITY_ID')"
+        }
+      },
+      "connectionRuntimeUrl": "@appsetting('SERVICE_BUS_CONNECTION_RUNTIME_URL')"
+    }
+  }
 }

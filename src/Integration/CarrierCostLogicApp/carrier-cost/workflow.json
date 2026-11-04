@@ -4,21 +4,26 @@
     "contentVersion": "1.0.0.0",
     "triggers": {
       "When_a_Carrier_cost_is_incurred": {
-        "type": "ServiceProvider",
+        "type": "ApiConnection",
         "inputs": {
-          "parameters": {
-            "topicName": "shipment-events",
-            "subscriptionName": "carrier-cost",
-            "isSessionsEnabled": false
+          "host": {
+            "connection": {
+              "referenceName": "servicebus"
+            }
           },
-          "serviceProviderConfiguration": {
-            "connectionName": "serviceBus",
-            "operationId": "peekLockTopicMessagesV2",
-            "serviceProviderId": "/serviceProviders/serviceBus"
+          "method": "get",
+          "path": "/@{encodeURIComponent(encodeURIComponent('shipment-events'))}/subscriptions/@{encodeURIComponent('carrier-cost')}/messages/head/peek",
+          "queries": {
+            "subscriptionType": "Main",
+            "sessionId": "None"
           }
         },
+        "recurrence": {
+          "frequency": "Minute",
+          "interval": 1
+        },
         "correlation": {
-          "clientTrackingId": "@{triggerOutputs()?['body']?['userProperties']?['correlationId']}"
+          "clientTrackingId": "@{coalesce(if(equals(length(string(coalesce(triggerBody(), ''))), 0), json('{}'), triggerBody())?['Properties']?['correlationId'], '00000000-0000-0000-0000-000000000000')}"
         }
       }
     },
@@ -26,13 +31,13 @@
       "Track_the_carrier_cost": {
         "type": "Compose",
         "inputs": {
-          "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
-          "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['carrierId']",
-          "transportOrderNumber": "@json(base64ToString(triggerBody()?['contentData']))?['transportOrderNumber']",
-          "carrierBookingNumber": "@json(base64ToString(triggerBody()?['contentData']))?['carrierBookingNumber']",
-          "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
-          "eventType": "@json(base64ToString(triggerBody()?['contentData']))?['eventType']",
-          "sourceMessageId": "@json(base64ToString(triggerBody()?['contentData']))?['eventId']"
+          "correlationId": "@json(base64ToString(triggerBody()?['ContentData']))?['correlationId']",
+          "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?['carrierId']",
+          "transportOrderNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['transportOrderNumber']",
+          "carrierBookingNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['carrierBookingNumber']",
+          "shipmentNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['shipmentNumber']",
+          "eventType": "@json(base64ToString(triggerBody()?['ContentData']))?['eventType']",
+          "sourceMessageId": "@json(base64ToString(triggerBody()?['ContentData']))?['eventId']"
         },
         "runAfter": {},
         "trackedProperties": {
@@ -68,7 +73,7 @@
                 "identity": "@parameters('carrierCostIdentityId')",
                 "audience": "@parameters('erpAudience')"
               },
-              "body": "@json(base64ToString(triggerBody()?['contentData']))",
+              "body": "@json(base64ToString(triggerBody()?['ContentData']))",
               "retryPolicy": {
                 "type": "exponential",
                 "count": 3,
@@ -79,13 +84,13 @@
             },
             "runAfter": {},
             "trackedProperties": {
-              "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
+              "correlationId": "@json(base64ToString(triggerBody()?['ContentData']))?['correlationId']",
               "flow": "carrier-costs",
-              "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['carrierId']",
-              "transportOrderNumber": "@json(base64ToString(triggerBody()?['contentData']))?['transportOrderNumber']",
-              "carrierBookingNumber": "@json(base64ToString(triggerBody()?['contentData']))?['carrierBookingNumber']",
-              "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
-              "sourceMessageId": "@json(base64ToString(triggerBody()?['contentData']))?['eventId']",
+              "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?['carrierId']",
+              "transportOrderNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['transportOrderNumber']",
+              "carrierBookingNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['carrierBookingNumber']",
+              "shipmentNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['shipmentNumber']",
+              "sourceMessageId": "@json(base64ToString(triggerBody()?['ContentData']))?['eventId']",
               "outcome": "@if(and(greaterOrEquals(coalesce(actions('Record_the_carrier_cost')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Record_the_carrier_cost')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
               "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Record_the_carrier_cost')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Record_the_carrier_cost')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Record_the_carrier_cost')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Record_the_carrier_cost')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Record_the_carrier_cost')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Record_the_carrier_cost')?['outputs']?['statusCode'], 0), 500)), 'ErpUnavailable', coalesce(actions('Record_the_carrier_cost')?['outputs']?['body']?['code'], 'ErpCallRefused')))"
             }
@@ -110,17 +115,19 @@
             },
             "actions": {
               "Complete_the_message": {
-                "type": "ServiceProvider",
+                "type": "ApiConnection",
                 "inputs": {
-                  "parameters": {
-                    "topicName": "shipment-events",
-                    "subscriptionName": "carrier-cost",
-                    "lockToken": "@triggerBody()?['lockToken']"
+                  "host": {
+                    "connection": {
+                      "referenceName": "servicebus"
+                    }
                   },
-                  "serviceProviderConfiguration": {
-                    "connectionName": "serviceBus",
-                    "operationId": "completeTopicMessageV2",
-                    "serviceProviderId": "/serviceProviders/serviceBus"
+                  "method": "delete",
+                  "path": "/@{encodeURIComponent(encodeURIComponent('shipment-events'))}/subscriptions/@{encodeURIComponent('carrier-cost')}/messages/complete",
+                  "queries": {
+                    "lockToken": "@triggerBody()?['LockToken']",
+                    "subscriptionType": "Main",
+                    "sessionId": ""
                   }
                 },
                 "runAfter": {}
@@ -129,32 +136,33 @@
             "else": {
               "actions": {
                 "Dead_letter_the_refused_carrier_cost": {
-                  "type": "ServiceProvider",
+                  "type": "ApiConnection",
                   "inputs": {
-                    "parameters": {
-                      "topicName": "shipment-events",
-                      "subscriptionName": "carrier-cost",
-                      "lockToken": "@triggerBody()?['lockToken']",
+                    "host": {
+                      "connection": {
+                        "referenceName": "servicebus"
+                      }
+                    },
+                    "method": "post",
+                    "path": "/@{encodeURIComponent(encodeURIComponent('shipment-events'))}/subscriptions/@{encodeURIComponent('carrier-cost')}/messages/deadletter",
+                    "queries": {
+                      "lockToken": "@triggerBody()?['LockToken']",
+                      "sessionId": "",
                       "deadLetterReason": "@if(or(equals(coalesce(actions('Record_the_carrier_cost')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Record_the_carrier_cost')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Record_the_carrier_cost')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Record_the_carrier_cost')?['outputs']?['statusCode'], 0), 500)), 'ErpUnavailable', coalesce(actions('Record_the_carrier_cost')?['outputs']?['body']?['code'], 'ErpCallRefused'))",
                       "deadLetterErrorDescription": "@coalesce(actions('Record_the_carrier_cost')?['outputs']?['body']?['detail'], actions('Record_the_carrier_cost')?['outputs']?['body']?['title'], if(or(equals(coalesce(actions('Record_the_carrier_cost')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Record_the_carrier_cost')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Record_the_carrier_cost')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Record_the_carrier_cost')?['outputs']?['statusCode'], 0), 500)), 'The ERP billing API did not answer after the retries.', 'The ERP billing API refused the Carrier cost.'))"
-                    },
-                    "serviceProviderConfiguration": {
-                      "connectionName": "serviceBus",
-                      "operationId": "deadLetterTopicMessageV2",
-                      "serviceProviderId": "/serviceProviders/serviceBus"
                     }
                   },
                   "runAfter": {},
                   "trackedProperties": {
-                    "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
+                    "correlationId": "@json(base64ToString(triggerBody()?['ContentData']))?['correlationId']",
                     "flow": "carrier-costs",
-                    "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['carrierId']",
-                    "transportOrderNumber": "@json(base64ToString(triggerBody()?['contentData']))?['transportOrderNumber']",
-                    "carrierBookingNumber": "@json(base64ToString(triggerBody()?['contentData']))?['carrierBookingNumber']",
-                    "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
-                    "sourceMessageId": "@json(base64ToString(triggerBody()?['contentData']))?['eventId']",
+                    "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?['carrierId']",
+                    "transportOrderNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['transportOrderNumber']",
+                    "carrierBookingNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['carrierBookingNumber']",
+                    "shipmentNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['shipmentNumber']",
+                    "sourceMessageId": "@json(base64ToString(triggerBody()?['ContentData']))?['eventId']",
                     "outcome": "DeadLettered",
-                    "messageId": "@triggerBody()?['messageId']",
+                    "messageId": "@triggerBody()?['MessageId']",
                     "failureCode": "@action()?['inputs']?['parameters']?['deadLetterReason']"
                   }
                 },
@@ -188,32 +196,33 @@
         "else": {
           "actions": {
             "Dead_letter_the_unreadable_carrier_cost": {
-              "type": "ServiceProvider",
+              "type": "ApiConnection",
               "inputs": {
-                "parameters": {
-                  "topicName": "shipment-events",
-                  "subscriptionName": "carrier-cost",
-                  "lockToken": "@triggerBody()?['lockToken']",
+                "host": {
+                  "connection": {
+                    "referenceName": "servicebus"
+                  }
+                },
+                "method": "post",
+                "path": "/@{encodeURIComponent(encodeURIComponent('shipment-events'))}/subscriptions/@{encodeURIComponent('carrier-cost')}/messages/deadletter",
+                "queries": {
+                  "lockToken": "@triggerBody()?['LockToken']",
+                  "sessionId": "",
                   "deadLetterReason": "CarrierCostUnreadable",
                   "deadLetterErrorDescription": "The message isn't a CarrierCostIncurred the ERP can record, so nothing was sent to the ERP."
-                },
-                "serviceProviderConfiguration": {
-                  "connectionName": "serviceBus",
-                  "operationId": "deadLetterTopicMessageV2",
-                  "serviceProviderId": "/serviceProviders/serviceBus"
                 }
               },
               "runAfter": {},
               "trackedProperties": {
-                "correlationId": "@json(base64ToString(triggerBody()?['contentData']))?['correlationId']",
+                "correlationId": "@json(base64ToString(triggerBody()?['ContentData']))?['correlationId']",
                 "flow": "carrier-costs",
-                "partyId": "@json(base64ToString(triggerBody()?['contentData']))?['carrierId']",
-                "transportOrderNumber": "@json(base64ToString(triggerBody()?['contentData']))?['transportOrderNumber']",
-                "carrierBookingNumber": "@json(base64ToString(triggerBody()?['contentData']))?['carrierBookingNumber']",
-                "shipmentNumber": "@json(base64ToString(triggerBody()?['contentData']))?['shipmentNumber']",
-                "sourceMessageId": "@json(base64ToString(triggerBody()?['contentData']))?['eventId']",
+                "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?['carrierId']",
+                "transportOrderNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['transportOrderNumber']",
+                "carrierBookingNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['carrierBookingNumber']",
+                "shipmentNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['shipmentNumber']",
+                "sourceMessageId": "@json(base64ToString(triggerBody()?['ContentData']))?['eventId']",
                 "outcome": "DeadLettered",
-                "messageId": "@triggerBody()?['messageId']",
+                "messageId": "@triggerBody()?['MessageId']",
                 "failureCode": "CarrierCostUnreadable"
               }
             },

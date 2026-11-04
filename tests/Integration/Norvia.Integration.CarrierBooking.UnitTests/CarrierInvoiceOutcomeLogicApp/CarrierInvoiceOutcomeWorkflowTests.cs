@@ -20,17 +20,17 @@ public sealed class CarrierInvoiceOutcomeWorkflowTests
     [Fact]
     public void Trigger_IsTheCarrierInvoiceOutcomeSubscriptionOnTheInvoicingEventsTopic()
     {
-        var parameters = CarrierInvoiceOutcomeWorkflow.Trigger["inputs"]!["parameters"]!;
+        var path = CarrierInvoiceOutcomeWorkflow.Trigger["inputs"]!["path"]!.GetValue<string>();
 
-        CarrierInvoiceOutcomeWorkflow.Trigger["type"]!.GetValue<string>().Should().Be("ServiceProvider");
-        CarrierInvoiceOutcomeWorkflow.Trigger["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("peekLockTopicMessagesV2");
-        parameters["topicName"]!.GetValue<string>().Should().Be("invoicing-events");
-        parameters["subscriptionName"]!.GetValue<string>().Should().Be("carrier-invoice-outcome");
+        CarrierInvoiceOutcomeWorkflow.Trigger["type"]!.GetValue<string>().Should().Be("ApiConnection");
+        CarrierInvoiceOutcomeWorkflow.Trigger["inputs"]!["path"]!.GetValue<string>().Should().EndWith("/messages/head/peek");
+        path.Should().Contain("'invoicing-events'");
+        path.Should().Contain("'carrier-invoice-outcome'");
     }
 
     [Fact]
     public void Trigger_ClientTrackingId_IsTheInvoicesCorrelationId() =>
-        CarrierInvoiceOutcomeWorkflow.Trigger["correlation"]!["clientTrackingId"]!.GetValue<string>().Should().Be("@{triggerOutputs()?['body']?['userProperties']?['correlationId']}");
+        CarrierInvoiceOutcomeWorkflow.Trigger["correlation"]!["clientTrackingId"]!.GetValue<string>().Should().Be("@{coalesce(if(equals(length(string(coalesce(triggerBody(), ''))), 0), json('{}'), triggerBody())?['Properties']?['correlationId'], '00000000-0000-0000-0000-000000000000')}");
 
     [Fact]
     public void Tracking_RunsFirst_AndOnlyItDoes()
@@ -49,7 +49,7 @@ public sealed class CarrierInvoiceOutcomeWorkflowTests
 
         inputs.Select(input => input.Key).Should().BeEquivalentTo("correlationId", "partyId", "documentNumber", "sourceMessageId");
         inputs.Select(input => input.Value!.GetValue<string>()).Should().OnlyContain(
-            expression => expression.StartsWith("@json(base64ToString(triggerBody()?['contentData']))?['", StringComparison.Ordinal)
+            expression => expression.StartsWith("@json(base64ToString(triggerBody()?['ContentData']))?['", StringComparison.Ordinal)
                 && !expression.Contains("@{", StringComparison.Ordinal));
         inputs["correlationId"]!.GetValue<string>().Should().EndWith("?['correlationId']");
         inputs["partyId"]!.GetValue<string>().Should().EndWith("?['carrierId']");
@@ -85,7 +85,7 @@ public sealed class CarrierInvoiceOutcomeWorkflowTests
 
         map["type"]!.GetValue<string>().Should().Be("InvokeFunction");
         map["inputs"]!["functionName"]!.GetValue<string>().Should().Be("MapCarrierInvoiceOutcome");
-        map["inputs"]!["parameters"]!["message"]!.GetValue<string>().Should().Be("@{triggerBody()?['contentData']}");
+        map["inputs"]!["parameters"]!["message"]!.GetValue<string>().Should().Be("@{triggerBody()?['ContentData']}");
         map["trackedProperties"]!["failureCode"]!.GetValue<string>().Should().Contain("CarrierInvoiceApprovedUnreadable");
     }
 
@@ -93,12 +93,11 @@ public sealed class CarrierInvoiceOutcomeWorkflowTests
     public void UnreadableInvoice_IsDeadLetteredWithTheFailureCodeAndAReadableMessage_AndFailsTheRun()
     {
         var deadLetter = CarrierInvoiceOutcomeWorkflow.Action("Dead_letter_the_unreadable_invoice");
-        var parameters = deadLetter["inputs"]!["parameters"]!;
+        var parameters = deadLetter["inputs"]!["queries"]!;
 
         Statuses(deadLetter, CarrierInvoiceOutcomeWorkflow.MapAction).Should().BeEquivalentTo("Failed");
-        deadLetter["inputs"]!["serviceProviderConfiguration"]!["operationId"]!.GetValue<string>().Should().Be("deadLetterTopicMessageV2");
-        parameters["subscriptionName"]!.GetValue<string>().Should().Be("carrier-invoice-outcome");
-        parameters["lockToken"]!.GetValue<string>().Should().Be("@triggerBody()?['lockToken']");
+        deadLetter["inputs"]!["path"]!.GetValue<string>().Should().EndWith("/messages/deadletter");
+        parameters["lockToken"]!.GetValue<string>().Should().Be("@triggerBody()?['LockToken']");
         parameters["deadLetterReason"]!.GetValue<string>().Should().Be("CarrierInvoiceApprovedUnreadable");
         parameters["deadLetterErrorDescription"]!.GetValue<string>().Should().Contain("nothing was sent");
         deadLetter["trackedProperties"]!["outcome"]!.GetValue<string>().Should().Be("DeadLettered");
@@ -279,16 +278,44 @@ public sealed class CarrierInvoiceOutcomeWorkflowTests
     {
         var connections = CarrierInvoiceOutcomeWorkflow.ConnectionsFile["serviceProviderConnections"]!.AsObject();
 
-        connections.Select(connection => connection.Key).Should().BeEquivalentTo("serviceBus", "keyVault");
+        connections.Select(connection => connection.Key).Should().BeEquivalentTo("keyVault");
         foreach (var (_, connection) in connections)
         {
             var authProvider = connection!["parameterValues"]!["authProvider"]!;
             authProvider["Type"]!.GetValue<string>().Should().Be("ManagedServiceIdentity");
             authProvider["Identity"]!.GetValue<string>().Should().Be("@appsetting('CARRIER_INVOICE_OUTCOME_IDENTITY_ID')");
         }
-
-        connections["serviceBus"]!["parameterValues"]!["fullyQualifiedNamespace"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_NAMESPACE')");
         connections["keyVault"]!["parameterValues"]!["VaultUri"]!.GetValue<string>().Should().Be("@appsetting('KEY_VAULT_URI')");
+    }
+
+    [Fact]
+    public void EveryServiceBusStep_ReadsTheOneSubscriptionThroughTheManagedConnection()
+    {
+        var steps = CarrierInvoiceOutcomeWorkflow.Operations().Where(operation => operation.Operation["type"]!.GetValue<string>() == "ApiConnection").ToList();
+
+        steps.Should().NotBeEmpty();
+        steps.Should().OnlyContain(step => step.Operation["inputs"]!["host"]!["connection"]!["referenceName"]!.GetValue<string>() == "servicebus"
+            && step.Operation["inputs"]!["path"]!.GetValue<string>().Contains("'invoicing-events'", StringComparison.Ordinal)
+            && step.Operation["inputs"]!["path"]!.GetValue<string>().Contains("'carrier-invoice-outcome'", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ServiceBusConnection_IsAManagedConnectionSignedInAsTheIdentity_ForTheTokenStoreAndForServiceBus()
+    {
+        var connections = CarrierInvoiceOutcomeWorkflow.ConnectionsFile["managedApiConnections"]!.AsObject();
+        var serviceBus = connections["servicebus"]!;
+
+        connections.Select(connection => connection.Key).Should().BeEquivalentTo("servicebus");
+        serviceBus["api"]!["id"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_API_ID')");
+        serviceBus["connection"]!["id"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_CONNECTION_ID')");
+        serviceBus["connectionRuntimeUrl"]!.GetValue<string>().Should().Be("@appsetting('SERVICE_BUS_CONNECTION_RUNTIME_URL')");
+        foreach (var authentication in new[] { serviceBus["authentication"]!, serviceBus["connectionProperties"]!["authentication"]! })
+        {
+            authentication["type"]!.GetValue<string>().Should().Be("ManagedServiceIdentity");
+            authentication["identity"]!.GetValue<string>().Should().Be("@appsetting('CARRIER_INVOICE_OUTCOME_IDENTITY_ID')");
+        }
+
+        serviceBus["connectionProperties"]!["authentication"]!["audience"]!.GetValue<string>().Should().Be("https://servicebus.azure.net");
     }
 
     [Fact]
