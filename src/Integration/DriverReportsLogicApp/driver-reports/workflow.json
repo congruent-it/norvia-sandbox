@@ -158,7 +158,7 @@
                       "Content-Disposition": "form-data; name=\"files\"; filename=\"@{items('Fetch_the_files')?['name']}\"",
                       "Content-Type": "@{items('Fetch_the_files')?['contentType']}"
                     },
-                    "body": "@outputs('Read_the_file')?['content']"
+                    "body": "@outputs('Read_the_file')?['body']?['content']"
                   }
                 },
                 "runAfter": {
@@ -217,18 +217,6 @@
             },
             "runAfter": {
               "Select_the_file_descriptions": [
-                "Succeeded"
-              ]
-            }
-          },
-          "Build_the_Proof_of_delivery_multipart": {
-            "type": "Compose",
-            "inputs": {
-              "$content-type": "multipart/form-data",
-              "$multipart": "@union(createArray(addProperty(addProperty(json('{}'), 'headers', addProperty(json('{}'), 'Content-Disposition', 'form-data; name=\"metadata\"')), 'body', if(empty(outputs('Track_the_report')?['remark']), outputs('Build_the_Proof_of_delivery'), addProperty(outputs('Build_the_Proof_of_delivery'), 'remark', outputs('Track_the_report')?['remark'])))), variables('fileParts'))"
-            },
-            "runAfter": {
-              "Build_the_Proof_of_delivery": [
                 "Succeeded"
               ]
             }
@@ -349,49 +337,117 @@
               ]
             }
           },
-          "Send_the_report_to_the_TMS": {
-            "type": "Http",
-            "inputs": {
-              "method": "POST",
-              "uri": "@{parameters('tmsBaseUrl')}/v1/@{if(equals(outputs('Track_the_report')?['eventType'], 'ProofOfDeliveryCaptured'), 'proofs-of-delivery', if(equals(outputs('Track_the_report')?['eventType'], 'StopCompletedReported'), 'tracking-events', if(equals(outputs('Track_the_report')?['eventType'], 'TripEndReported'), concat('trips/', outputs('Track_the_report')?['tripNumber'], '/end'), concat('trips/', outputs('Track_the_report')?['tripNumber'], '/start'))))}",
-              "headers": {
-                "X-Correlation-ID": "@{outputs('Track_the_report')?['correlationId']}"
-              },
-              "authentication": {
-                "type": "ManagedServiceIdentity",
-                "identity": "@parameters('driverReportsIdentityId')",
-                "audience": "@parameters('tmsAudience')"
-              },
-              "retryPolicy": {
-                "type": "exponential",
-                "count": 3,
-                "interval": "PT5S",
-                "minimumInterval": "PT5S",
-                "maximumInterval": "PT20S"
-              },
-              "body": "@if(equals(outputs('Track_the_report')?['eventType'], 'ProofOfDeliveryCaptured'), outputs('Build_the_Proof_of_delivery_multipart'), if(equals(outputs('Track_the_report')?['eventType'], 'StopCompletedReported'), if(empty(outputs('Track_the_report')?['remark']), outputs('Build_the_Tracking_event'), addProperty(outputs('Build_the_Tracking_event'), 'remark', outputs('Track_the_report')?['remark'])), if(equals(outputs('Track_the_report')?['eventType'], 'TripEndReported'), outputs('Build_the_Trip_end'), outputs('Build_the_Trip_start'))))"
-            },
-            "runAfter": {
-              "Build_the_Proof_of_delivery_multipart": [
-                "Succeeded"
+          "Send_the_report": {
+            "type": "If",
+            "expression": {
+              "equals": [
+                "@outputs('Track_the_report')?['eventType']",
+                "ProofOfDeliveryCaptured"
               ]
             },
-            "trackedProperties": {
-              "correlationId": "@json(base64ToString(triggerBody()?['ContentData']))?['correlationId']",
-              "flow": "trip-execution",
-              "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?['driverId']",
-              "tripNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['tripNumber']",
-              "shipmentNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['shipmentNumber']",
-              "sourceMessageId": "@json(base64ToString(triggerBody()?['ContentData']))?['eventId']",
-              "outcome": "@if(and(greaterOrEquals(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
-              "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 500)), 'TmsUnavailable', 'TmsCallRefused'))"
+            "actions": {
+              "Send_the_Proof_of_delivery_to_the_TMS": {
+                "type": "Http",
+                "inputs": {
+                  "method": "POST",
+                  "uri": "@{parameters('tmsBaseUrl')}/v1/proofs-of-delivery",
+                  "headers": {
+                    "X-Correlation-ID": "@{outputs('Track_the_report')?['correlationId']}"
+                  },
+                  "authentication": {
+                    "type": "ManagedServiceIdentity",
+                    "identity": "@parameters('driverReportsIdentityId')",
+                    "audience": "@parameters('tmsAudience')"
+                  },
+                  "retryPolicy": {
+                    "type": "exponential",
+                    "count": 3,
+                    "interval": "PT5S",
+                    "minimumInterval": "PT5S",
+                    "maximumInterval": "PT20S"
+                  },
+                  "body": {
+                    "$content-type": "multipart/form-data",
+                    "$multipart": "@union(createArray(addProperty(addProperty(json('{}'), 'headers', addProperty(json('{}'), 'Content-Disposition', 'form-data; name=\"metadata\"')), 'body', if(empty(outputs('Track_the_report')?['remark']), outputs('Build_the_Proof_of_delivery'), addProperty(outputs('Build_the_Proof_of_delivery'), 'remark', outputs('Track_the_report')?['remark'])))), variables('fileParts'))"
+                  }
+                },
+                "runAfter": {},
+                "trackedProperties": {
+                  "correlationId": "@json(base64ToString(triggerBody()?['ContentData']))?['correlationId']",
+                  "flow": "trip-execution",
+                  "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?['driverId']",
+                  "tripNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['tripNumber']",
+                  "shipmentNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['shipmentNumber']",
+                  "sourceMessageId": "@json(base64ToString(triggerBody()?['ContentData']))?['eventId']",
+                  "outcome": "@if(and(greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 200), less(coalesce(action()?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
+                  "failureCode": "@if(and(greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 200), less(coalesce(action()?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(action()?['outputs']?['statusCode'], 0), 0), equals(coalesce(action()?['outputs']?['statusCode'], 0), 408), equals(coalesce(action()?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 500)), 'TmsUnavailable', 'TmsCallRefused'))"
+                }
+              }
+            },
+            "else": {
+              "actions": {
+                "Send_the_report_to_the_TMS": {
+                  "type": "Http",
+                  "inputs": {
+                    "method": "POST",
+                    "uri": "@{parameters('tmsBaseUrl')}/v1/@{if(equals(outputs('Track_the_report')?['eventType'], 'StopCompletedReported'), 'tracking-events', if(equals(outputs('Track_the_report')?['eventType'], 'TripEndReported'), concat('trips/', outputs('Track_the_report')?['tripNumber'], '/end'), concat('trips/', outputs('Track_the_report')?['tripNumber'], '/start')))}",
+                    "headers": {
+                      "X-Correlation-ID": "@{outputs('Track_the_report')?['correlationId']}"
+                    },
+                    "authentication": {
+                      "type": "ManagedServiceIdentity",
+                      "identity": "@parameters('driverReportsIdentityId')",
+                      "audience": "@parameters('tmsAudience')"
+                    },
+                    "retryPolicy": {
+                      "type": "exponential",
+                      "count": 3,
+                      "interval": "PT5S",
+                      "minimumInterval": "PT5S",
+                      "maximumInterval": "PT20S"
+                    },
+                    "body": "@if(equals(outputs('Track_the_report')?['eventType'], 'StopCompletedReported'), if(empty(outputs('Track_the_report')?['remark']), outputs('Build_the_Tracking_event'), addProperty(outputs('Build_the_Tracking_event'), 'remark', outputs('Track_the_report')?['remark'])), if(equals(outputs('Track_the_report')?['eventType'], 'TripEndReported'), outputs('Build_the_Trip_end'), outputs('Build_the_Trip_start')))"
+                  },
+                  "runAfter": {},
+                  "trackedProperties": {
+                    "correlationId": "@json(base64ToString(triggerBody()?['ContentData']))?['correlationId']",
+                    "flow": "trip-execution",
+                    "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?['driverId']",
+                    "tripNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['tripNumber']",
+                    "shipmentNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['shipmentNumber']",
+                    "sourceMessageId": "@json(base64ToString(triggerBody()?['ContentData']))?['eventId']",
+                    "outcome": "@if(and(greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 200), less(coalesce(action()?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
+                    "failureCode": "@if(and(greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 200), less(coalesce(action()?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(action()?['outputs']?['statusCode'], 0), 0), equals(coalesce(action()?['outputs']?['statusCode'], 0), 408), equals(coalesce(action()?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(action()?['outputs']?['statusCode'], 0), 500)), 'TmsUnavailable', 'TmsCallRefused'))"
+                  }
+                }
+              }
+            },
+            "runAfter": {
+              "Build_the_Proof_of_delivery": [
+                "Succeeded"
+              ]
+            }
+          },
+          "Read_the_TMS_answer": {
+            "type": "Compose",
+            "inputs": {
+              "statusCode": "@coalesce(actions('Send_the_Proof_of_delivery_to_the_TMS')?['outputs']?['statusCode'], actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0)",
+              "body": "@coalesce(actions('Send_the_Proof_of_delivery_to_the_TMS')?['outputs']?['body'], actions('Send_the_report_to_the_TMS')?['outputs']?['body'])",
+              "retryHistory": "@coalesce(actions('Send_the_Proof_of_delivery_to_the_TMS')?['retryHistory'], actions('Send_the_report_to_the_TMS')?['retryHistory'], json('[]'))"
+            },
+            "runAfter": {
+              "Send_the_report": [
+                "Succeeded",
+                "Failed",
+                "TimedOut"
+              ]
             }
           },
           "Settle_the_report_and_tell_the_Driver_app": {
             "type": "If",
             "expression": {
               "equals": [
-                "@and(greaterOrEquals(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 300))",
+                "@and(greaterOrEquals(coalesce(outputs('Read_the_TMS_answer')?['statusCode'], 0), 200), less(coalesce(outputs('Read_the_TMS_answer')?['statusCode'], 0), 300))",
                 true
               ]
             },
@@ -516,7 +572,7 @@
                   "type": "If",
                   "expression": {
                     "equals": [
-                      "@or(equals(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 500))",
+                      "@or(equals(coalesce(outputs('Read_the_TMS_answer')?['statusCode'], 0), 0), equals(coalesce(outputs('Read_the_TMS_answer')?['statusCode'], 0), 408), equals(coalesce(outputs('Read_the_TMS_answer')?['statusCode'], 0), 429), greaterOrEquals(coalesce(outputs('Read_the_TMS_answer')?['statusCode'], 0), 500))",
                       true
                     ]
                   },
@@ -535,7 +591,7 @@
                           "lockToken": "@triggerBody()?['LockToken']",
                           "sessionId": "@triggerBody()?['SessionId']",
                           "deadLetterReason": "TmsUnavailable",
-                          "deadLetterErrorDescription": "@concat('The TMS ', if(equals(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 0), 'didn''t answer', concat('answered ', string(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0)))), ' (', string(add(length(coalesce(actions('Send_the_report_to_the_TMS')?['retryHistory'], json('[]'))), 1)), if(equals(add(length(coalesce(actions('Send_the_report_to_the_TMS')?['retryHistory'], json('[]'))), 1), 1), ' attempt', ' attempts'), ').')"
+                          "deadLetterErrorDescription": "@concat('The TMS ', if(equals(coalesce(outputs('Read_the_TMS_answer')?['statusCode'], 0), 0), 'didn''t answer', concat('answered ', string(coalesce(outputs('Read_the_TMS_answer')?['statusCode'], 0)))), ' (', string(add(length(coalesce(outputs('Read_the_TMS_answer')?['retryHistory'], json('[]'))), 1)), if(equals(add(length(coalesce(outputs('Read_the_TMS_answer')?['retryHistory'], json('[]'))), 1), 1), ' attempt', ' attempts'), ').')"
                         }
                       },
                       "runAfter": {},
@@ -596,7 +652,7 @@
                           "correlationId": "@outputs('Track_the_report')?['correlationId']",
                           "outcome": "NotRecorded",
                           "failureCode": "TmsUnavailable",
-                          "message": "@concat('The TMS ', if(equals(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0), 0), 'didn''t answer', concat('answered ', string(coalesce(actions('Send_the_report_to_the_TMS')?['outputs']?['statusCode'], 0)))), ' (', string(add(length(coalesce(actions('Send_the_report_to_the_TMS')?['retryHistory'], json('[]'))), 1)), if(equals(add(length(coalesce(actions('Send_the_report_to_the_TMS')?['retryHistory'], json('[]'))), 1), 1), ' attempt', ' attempts'), ').')"
+                          "message": "@concat('The TMS ', if(equals(coalesce(outputs('Read_the_TMS_answer')?['statusCode'], 0), 0), 'didn''t answer', concat('answered ', string(coalesce(outputs('Read_the_TMS_answer')?['statusCode'], 0)))), ' (', string(add(length(coalesce(outputs('Read_the_TMS_answer')?['retryHistory'], json('[]'))), 1)), if(equals(add(length(coalesce(outputs('Read_the_TMS_answer')?['retryHistory'], json('[]'))), 1), 1), ' attempt', ' attempts'), ').')"
                         }
                       },
                       "runAfter": {
@@ -632,8 +688,8 @@
                           "queries": {
                             "lockToken": "@triggerBody()?['LockToken']",
                             "sessionId": "@triggerBody()?['SessionId']",
-                            "deadLetterReason": "@coalesce(outputs('Send_the_report_to_the_TMS')?['body']?['code'], 'TmsCallRefused')",
-                            "deadLetterErrorDescription": "@substring(string(coalesce(outputs('Send_the_report_to_the_TMS')?['body']?['detail'], outputs('Send_the_report_to_the_TMS')?['body']?['title'], 'The TMS refused the report.')), 0, min(1000, length(string(coalesce(outputs('Send_the_report_to_the_TMS')?['body']?['detail'], outputs('Send_the_report_to_the_TMS')?['body']?['title'], 'The TMS refused the report.')))))"
+                            "deadLetterReason": "@coalesce(outputs('Read_the_TMS_answer')?['body']?['code'], 'TmsCallRefused')",
+                            "deadLetterErrorDescription": "@substring(string(coalesce(outputs('Read_the_TMS_answer')?['body']?['detail'], outputs('Read_the_TMS_answer')?['body']?['title'], 'The TMS refused the report.')), 0, min(1000, length(string(coalesce(outputs('Read_the_TMS_answer')?['body']?['detail'], outputs('Read_the_TMS_answer')?['body']?['title'], 'The TMS refused the report.')))))"
                           }
                         },
                         "runAfter": {},
@@ -693,8 +749,8 @@
                             "tripNumber": "@outputs('Track_the_report')?['tripNumber']",
                             "correlationId": "@outputs('Track_the_report')?['correlationId']",
                             "outcome": "Refused",
-                            "failureCode": "@coalesce(outputs('Send_the_report_to_the_TMS')?['body']?['code'], 'TmsCallRefused')",
-                            "message": "@substring(string(coalesce(outputs('Send_the_report_to_the_TMS')?['body']?['detail'], outputs('Send_the_report_to_the_TMS')?['body']?['title'], 'The TMS refused the report.')), 0, min(1000, length(string(coalesce(outputs('Send_the_report_to_the_TMS')?['body']?['detail'], outputs('Send_the_report_to_the_TMS')?['body']?['title'], 'The TMS refused the report.')))))"
+                            "failureCode": "@coalesce(outputs('Read_the_TMS_answer')?['body']?['code'], 'TmsCallRefused')",
+                            "message": "@substring(string(coalesce(outputs('Read_the_TMS_answer')?['body']?['detail'], outputs('Read_the_TMS_answer')?['body']?['title'], 'The TMS refused the report.')), 0, min(1000, length(string(coalesce(outputs('Read_the_TMS_answer')?['body']?['detail'], outputs('Read_the_TMS_answer')?['body']?['title'], 'The TMS refused the report.')))))"
                           }
                         },
                         "runAfter": {
@@ -721,10 +777,8 @@
               }
             },
             "runAfter": {
-              "Send_the_report_to_the_TMS": [
-                "Succeeded",
-                "Failed",
-                "TimedOut"
+              "Read_the_TMS_answer": [
+                "Succeeded"
               ]
             }
           }

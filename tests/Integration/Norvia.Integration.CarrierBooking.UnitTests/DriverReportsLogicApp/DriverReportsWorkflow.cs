@@ -24,6 +24,9 @@ internal static class DriverReportsWorkflow
     public const string DeleteFiles = "Delete_the_files";
     public const string DeleteFile = "Delete_the_file";
     public const string SendToTms = "Send_the_report_to_the_TMS";
+    public const string SendTheReport = "Send_the_report";
+    public const string SendProofOfDelivery = "Send_the_Proof_of_delivery_to_the_TMS";
+    public const string ReadAnswer = "Read_the_TMS_answer";
     public const string Settle = "Settle_the_report_and_tell_the_Driver_app";
     public const string Complete = "Complete_the_message";
     public const string ReportRecorded = "Report_recorded";

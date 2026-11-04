@@ -13,7 +13,7 @@ public sealed class DriverReportsWorkflowTests
 
     private static readonly string[] CalledActions =
     [
-        DriverReportsWorkflow.SendToTms, DriverReportsWorkflow.ReportRecorded, DriverReportsWorkflow.ReportNotRecorded, DriverReportsWorkflow.ReportRefused,
+        DriverReportsWorkflow.SendToTms, DriverReportsWorkflow.SendProofOfDelivery, DriverReportsWorkflow.ReportRecorded, DriverReportsWorkflow.ReportNotRecorded, DriverReportsWorkflow.ReportRefused,
         DriverReportsWorkflow.ReportFilesGone,
     ];
 
@@ -102,8 +102,46 @@ public sealed class DriverReportsWorkflowTests
         inputs["authentication"]!["type"]!.GetValue<string>().Should().Be("ManagedServiceIdentity");
         inputs["authentication"]!["identity"]!.GetValue<string>().Should().Be("@parameters('driverReportsIdentityId')");
         inputs["authentication"]!["audience"]!.GetValue<string>().Should().Be("@parameters('tmsAudience')");
-        uri.Should().Contain("'proofs-of-delivery'");
-        Statuses(send, DriverReportsWorkflow.BuildMultipart).Should().Equal("Succeeded");
+        uri.Should().NotContain("'proofs-of-delivery'", "a Proof of delivery is sent by its own call, whose body is a multipart envelope");
+        DriverReportsWorkflow.Action(DriverReportsWorkflow.SendTheReport)["else"]!["actions"]!.AsObject().Select(action => action.Key).Should().Equal(DriverReportsWorkflow.SendToTms);
+    }
+
+    [Fact]
+    public void SendProofOfDelivery_PostsTheMultipartToTheProofsOfDeliveryOperation_AsTheDriverReportsIdentity_AndOnlyForAProofOfDelivery()
+    {
+        var wrapper = DriverReportsWorkflow.Action(DriverReportsWorkflow.SendTheReport);
+        var send = DriverReportsWorkflow.Action(DriverReportsWorkflow.SendProofOfDelivery);
+        var inputs = send["inputs"]!;
+
+        wrapper["type"]!.GetValue<string>().Should().Be("If");
+        wrapper["expression"]!["equals"]![0]!.GetValue<string>().Should().Be("@outputs('Track_the_report')?['eventType']");
+        wrapper["expression"]!["equals"]![1]!.GetValue<string>().Should().Be("ProofOfDeliveryCaptured");
+        wrapper["actions"]!.AsObject().Select(action => action.Key).Should().Equal(DriverReportsWorkflow.SendProofOfDelivery);
+        Statuses(wrapper, DriverReportsWorkflow.BuildProofOfDelivery).Should().Equal("Succeeded");
+        inputs["method"]!.GetValue<string>().Should().Be("POST");
+        inputs["uri"]!.GetValue<string>().Should().Be("@{parameters('tmsBaseUrl')}/v1/proofs-of-delivery");
+        inputs["headers"]!["X-Correlation-ID"]!.GetValue<string>().Should().Be(CorrelationId);
+        inputs["authentication"]!["type"]!.GetValue<string>().Should().Be("ManagedServiceIdentity");
+        inputs["authentication"]!["identity"]!.GetValue<string>().Should().Be("@parameters('driverReportsIdentityId')");
+        inputs["authentication"]!["audience"]!.GetValue<string>().Should().Be("@parameters('tmsAudience')");
+    }
+
+    [Fact]
+    public void ReadAnswer_TakesTheStatusBodyAndRetriesFromWhicheverSendRan_AndEverythingAfterItReadsOnlyThat()
+    {
+        var read = DriverReportsWorkflow.Action(DriverReportsWorkflow.ReadAnswer);
+
+        Statuses(read, DriverReportsWorkflow.SendTheReport).Should().BeEquivalentTo("Succeeded", "Failed", "TimedOut");
+        foreach (var field in new[] { "statusCode", "body", "retryHistory" })
+        {
+            read["inputs"]![field]!.GetValue<string>().Should().Contain($"actions('{DriverReportsWorkflow.SendProofOfDelivery}')").And.Contain($"actions('{DriverReportsWorkflow.SendToTms}')");
+        }
+
+        // A step's own definition, not the steps nested inside it.
+        static string Own(JsonObject operation) => new JsonObject(operation.Where(property => property.Key is not ("actions" or "else")).Select(property => KeyValuePair.Create(property.Key, property.Value?.DeepClone()))).ToJsonString();
+        var readers = DriverReportsWorkflow.Operations().Where(operation => operation.Name is not (DriverReportsWorkflow.ReadAnswer or DriverReportsWorkflow.SendToTms or DriverReportsWorkflow.SendProofOfDelivery or DriverReportsWorkflow.SendTheReport)
+            && Own(operation.Operation).Contains(DriverReportsWorkflow.SendToTms, StringComparison.Ordinal)).Select(operation => operation.Name).ToList();
+        readers.Should().BeEmpty("the answer is read from Read_the_TMS_answer: the send that did not run is skipped, and reading it would fail");
     }
 
     [Fact]
@@ -140,6 +178,7 @@ public sealed class DriverReportsWorkflowTests
 
     [Theory]
     [InlineData(DriverReportsWorkflow.SendToTms)]
+    [InlineData(DriverReportsWorkflow.SendProofOfDelivery)]
     [InlineData(DriverReportsWorkflow.ReportRecorded)]
     [InlineData(DriverReportsWorkflow.ReportNotRecorded)]
     [InlineData(DriverReportsWorkflow.ReportRefused)]
@@ -198,7 +237,7 @@ public sealed class DriverReportsWorkflowTests
     {
         var settle = DriverReportsWorkflow.Action(DriverReportsWorkflow.Settle);
 
-        Statuses(settle, DriverReportsWorkflow.SendToTms).Should().BeEquivalentTo("Succeeded", "Failed", "TimedOut");
+        Statuses(settle, DriverReportsWorkflow.ReadAnswer).Should().Equal("Succeeded");
         settle["expression"]!.ToJsonString().Should().Contain("greaterOrEquals").And.Contain("200").And.Contain("less").And.Contain("300");
         settle["actions"]!.AsObject().Select(action => action.Key).Should().Equal(DriverReportsWorkflow.Complete, CloseAfter(DriverReportsWorkflow.Complete), DriverReportsWorkflow.ReportRecorded, DriverReportsWorkflow.DeleteFiles);
         DriverReportsWorkflow.Action(DriverReportsWorkflow.Complete)["inputs"]!["path"]!.GetValue<string>().Should().EndWith("/messages/complete");
@@ -318,14 +357,17 @@ public sealed class DriverReportsWorkflowTests
         read["parameters"]!["blobName"]!.GetValue<string>().Should().Contain("['blobReference']");
         append["name"]!.GetValue<string>().Should().Be("fileParts");
         append["value"]!["headers"]!["Content-Disposition"]!.GetValue<string>().Should().Contain("name=\"files\"").And.Contain("['name']");
-        append["value"]!["body"]!.GetValue<string>().Should().Contain("Read_the_file");
+        // readBlob answers { statusCode, body: { content } }: a part read from ['content'] alone has a null body and the TMS call fails with
+        // "The multipart content body cannot be null" (seen in a deployed run).
+        append["value"]!["body"]!.GetValue<string>().Should().Be("@outputs('Read_the_file')?['body']?['content']");
     }
 
     [Fact]
     public void TheMultipartCall_HasTheMetadataOfOwnFleetThenTheFiles_AndLeavesOutARemarkTheDriverDidNotGive()
     {
         var metadata = DriverReportsWorkflow.Action(DriverReportsWorkflow.BuildProofOfDelivery)["inputs"]!;
-        var multipart = DriverReportsWorkflow.Action(DriverReportsWorkflow.BuildMultipart)["inputs"]!;
+        var send = DriverReportsWorkflow.Action(DriverReportsWorkflow.SendProofOfDelivery)["inputs"]!;
+        var multipart = send["body"]!;
         var body = DriverReportsWorkflow.Action(DriverReportsWorkflow.SendToTms)["inputs"]!["body"]!.GetValue<string>();
 
         metadata["source"]!["type"]!.GetValue<string>().Should().Be("OwnFleet");
@@ -339,9 +381,8 @@ public sealed class DriverReportsWorkflowTests
         metadata.AsObject().ContainsKey("remark").Should().BeFalse();
         multipart["$content-type"]!.GetValue<string>().Should().Be("multipart/form-data");
         multipart["$multipart"]!.GetValue<string>().Should().Contain("name=\"metadata\"").And.Contain("addProperty(outputs('Build_the_Proof_of_delivery')").And.Contain("variables('fileParts')");
-        body.Should().Contain("ProofOfDeliveryCaptured").And.Contain("outputs('Build_the_Proof_of_delivery_multipart')");
-        DriverReportsWorkflow.Action(DriverReportsWorkflow.SendToTms)["inputs"]!["headers"]!.AsObject().ContainsKey("Content-Type")
-            .Should().BeFalse("a multipart body brings its own content type with its boundary");
+        body.Should().NotContain("multipart", "the JSON report types are sent by the other call");
+        send["headers"]!.AsObject().ContainsKey("Content-Type").Should().BeFalse("a multipart body brings its own content type with its boundary");
     }
 
     [Fact]
@@ -359,7 +400,7 @@ public sealed class DriverReportsWorkflowTests
         report["inputs"]!["body"]!["failureCode"]!.GetValue<string>().Should().Be("ProofOfDeliveryFilesGone");
         report["inputs"]!["body"]!["driverAppEventId"]!.GetValue<string>().Should().Be("@outputs('Track_the_report')?['sourceMessageId']");
         DriverReportsWorkflow.Action(DriverReportsWorkflow.FailTheRunOnFilesGone)["inputs"]!["runStatus"]!.GetValue<string>().Should().Be("Failed");
-        Statuses(DriverReportsWorkflow.Action(DriverReportsWorkflow.SendToTms), DriverReportsWorkflow.BuildMultipart).Should().Equal("Succeeded");
+        Statuses(DriverReportsWorkflow.Action(DriverReportsWorkflow.SendTheReport), DriverReportsWorkflow.BuildProofOfDelivery).Should().Equal("Succeeded");
     }
 
     [Fact]
