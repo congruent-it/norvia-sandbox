@@ -357,7 +357,9 @@ public sealed class DriverReportsWorkflowTests
         read["parameters"]!["blobName"]!.GetValue<string>().Should().Contain("['blobReference']");
         append["name"]!.GetValue<string>().Should().Be("fileParts");
         append["value"]!["headers"]!["Content-Disposition"]!.GetValue<string>().Should().Contain("name=\"files\"").And.Contain("['name']");
-        append["value"]!["body"]!.GetValue<string>().Should().Contain("Read_the_file");
+        // readBlob answers { statusCode, body: { content } }: a part read from ['content'] alone has a null body and the TMS call fails with
+        // "The multipart content body cannot be null" (seen in a deployed run).
+        append["value"]!["body"]!.GetValue<string>().Should().Be("@outputs('Read_the_file')?['body']?['content']");
     }
 
     [Fact]

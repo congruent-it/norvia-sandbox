@@ -158,7 +158,7 @@
                       "Content-Disposition": "form-data; name=\"files\"; filename=\"@{items('Fetch_the_files')?['name']}\"",
                       "Content-Type": "@{items('Fetch_the_files')?['contentType']}"
                     },
-                    "body": "@outputs('Read_the_file')?['content']"
+                    "body": "@outputs('Read_the_file')?['body']?['content']"
                   }
                 },
                 "runAfter": {
