@@ -23,8 +23,8 @@ namespace Norvia.Simulator.Web.UiTests;
 /// its migrations, the local Partner API, the tracking and Proof of delivery workers (the Carriers' tracking only reaches the TMS through them),
 /// the Integration console (the log's Message trail links point at it), the TMS UI (the log's Transport Order, Shipment and Trip links point at it, and the Simulator waits for its address), the Partner portal (the Shipper's tracking view, which needs the Driver app API its settings point at), the Trip dispatch and Driver reports workers (a dispatched Trip only reaches the Driver app
 /// through the first, and the Drivers' reports only reach the TMS through the second) and the Simulator with its database. A headless Chromium drives the Simulator, which sends its bookings to the real Partner API.
-/// Four more Simulators share its database and settings, each changed in one thing a journey needs: an operator who may only read, two whose TMS API
-/// is a <see cref="ResetStub"/> that switches its reset off or refuses it, and one whose Own fleet is another Vehicle and Driver, so the signatures journey gets a Trip of its own on a day.
+/// Six more Simulators share its database and settings, each changed in one thing a journey needs: an operator who may only read, two whose TMS API
+/// is a <see cref="ResetStub"/> that switches its reset off or refuses it, two with the Agents on (one whose model fails for one profile), and one whose Own fleet is another Vehicle and Driver, so the signatures journey gets a Trip of its own on a day.
 /// </summary>
 public sealed class SimulatorUiFixture : IAsyncLifetime
 {
@@ -66,6 +66,12 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
     /// <summary>A Simulator whose Own fleet is not the first one's, so a Trip of its run is the Trip of another Vehicle and Driver.</summary>
     public Uri SignatureFleet { get; private set; } = null!;
 
+    /// <summary>A Simulator with the Agents on, so a plan's pools of Carrier texts are written by the personas agent (the in-process runner with the scripted fake model).</summary>
+    public Uri WithAgents { get; private set; } = null!;
+
+    /// <summary>A Simulator with the Agents on whose model cannot write the terse Dutch pools, so those fall back to the built-in ones.</summary>
+    public Uri WithFailingAgent { get; private set; } = null!;
+
     /// <summary>A Simulator whose operator holds only the Read role.</summary>
     public Uri Viewer { get; private set; } = null!;
 
@@ -105,13 +111,16 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
         _signatureSeedCopy = await CopySeedOfAsync(PricedShipper, SignatureFleetVehicle, SignatureFleetDriver, startup.Token);
         _stub = ResetStub.Start();
         AddVariant(builder, simulator, "simulator-signatures", ("Seed__Path", _signatureSeedCopy));
+        AddVariant(builder, simulator, "simulator-agents", ("Agents__Enabled", "true"));
+        // The scripted model reads the language from the question's "language:" line, so a style that carries a line of its own with a language it doesn't know makes it answer with no texts.
+        AddVariant(builder, simulator, "simulator-agents-failing", ("Agents__Enabled", "true"), ("Personas__Profiles__1__Style", "a few blunt words\nlanguage: tlh"));
         AddVariant(builder, simulator, "simulator-viewer", ("LocalOperator__Roles__0", "Simulator.Read"), ("LocalOperator__Roles__1", ""));
         AddVariant(builder, simulator, "simulator-reset-off", ("TmsApi__BaseAddress", _stub.SwitchedOff.ToString()));
         AddVariant(builder, simulator, "simulator-reset-refused", ("TmsApi__BaseAddress", _stub.Refusing.ToString()));
 
         _app = await builder.BuildAsync(startup.Token);
         await _app.StartAsync(startup.Token);
-        foreach (var resource in new[] { "tms-api", "partner-api", "partner-portal-web", "tms-web", "simulator-web", "simulator-signatures", "simulator-viewer", "simulator-reset-off", "simulator-reset-refused" })
+        foreach (var resource in new[] { "tms-api", "partner-api", "partner-portal-web", "tms-web", "simulator-web", "simulator-signatures", "simulator-agents", "simulator-agents-failing", "simulator-viewer", "simulator-reset-off", "simulator-reset-refused" })
         {
             await _app.ResourceNotifications.WaitForResourceHealthyAsync(resource, startup.Token);
         }
@@ -120,6 +129,8 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
         PartnerPortal = _app.GetEndpoint("partner-portal-web", "http");
         TmsUi = _app.GetEndpoint("tms-web", "http");
         SignatureFleet = _app.GetEndpoint("simulator-signatures", "http");
+        WithAgents = _app.GetEndpoint("simulator-agents", "http");
+        WithFailingAgent = _app.GetEndpoint("simulator-agents-failing", "http");
         Viewer = _app.GetEndpoint("simulator-viewer", "http");
         ResetSwitchedOff = _app.GetEndpoint("simulator-reset-off", "http");
         ResetRefused = _app.GetEndpoint("simulator-reset-refused", "http");
