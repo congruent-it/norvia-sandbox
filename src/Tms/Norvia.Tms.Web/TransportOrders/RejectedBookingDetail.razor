@@ -4,6 +4,7 @@
 @implements IDisposable
 @inject ITransportOrderQueries Queries
 @inject ILogger<RejectedBookingDetail> Logger
+@using Norvia.Tms.Web.Agents
 
 <PageTitle>Rejected booking · Norvia TMS</PageTitle>
 
@@ -43,6 +44,8 @@ else
     @* Named as the Shipper names it on the phone: by its Shipper reference, when it gave one. *@
     <h1>@(string.IsNullOrWhiteSpace(reference) ? $"Rejected booking from {shipper}" : $"Rejected booking {reference}")</h1>
 
+    <ExplainRejectedBooking Id="Id" ForCustomerService="RoleKey == NorviaRole.CustomerService.Key" />
+
     <div class="mb-4">
         <TransportOrderSection Heading="Reasons">
             <ul class="m-0 list-disc space-y-1 pl-5">
@@ -80,6 +83,17 @@ else
 
     [Parameter, EditorRequired]
     public Guid Id { get; set; }
+
+    // The role comes from the request's cookie. The page is interactive, so it reads the role while it prerenders and carries it into the
+    // circuit; a page that couldn't read it shows no Explain button.
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    [PersistentState]
+    public string? RoleKey { get; set; }
+
+    protected override void OnInitialized() =>
+        RoleKey ??= HttpContext is null ? null : NorviaRole.Current(HttpContext.Request).Key;
 
     protected override async Task OnParametersSetAsync()
     {

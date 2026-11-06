@@ -13,6 +13,9 @@
     <ProjectReference Include="..\Norvia.Tms.Application\Norvia.Tms.Application.csproj" />
     <ProjectReference Include="..\Norvia.Tms.Infrastructure\Norvia.Tms.Infrastructure.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Norvia.Tms.Api.UnitTests" />
+  </ItemGroup>
   <!-- The TMS reads its Shippers from the seed file, so the published image carries it (Seed:Path in Azure). -->
   <ItemGroup>
     <None Include="..\..\..\seed\norvia.seed.json" Link="seed\norvia.seed.json" CopyToPublishDirectory="PreserveNewest" />

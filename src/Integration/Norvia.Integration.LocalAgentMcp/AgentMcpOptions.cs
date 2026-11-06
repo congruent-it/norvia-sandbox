@@ -25,6 +25,12 @@ public sealed class AgentMcpOptions
     /// </summary>
     public HealthCheckServerOptions? HealthCheck { get; set; }
 
+    /// <summary>
+    /// The Customer service agent's MCP server (<c>customer-service</c>), served at <c>/mcp/customer-service</c>. Not configured, the
+    /// stand-in does not serve it.
+    /// </summary>
+    public HealthCheckServerOptions? CustomerService { get; set; }
+
     /// <summary>Calls per Agent identity in a window, as the policy's <c>rate-limit-by-key</c> allows (60 a minute).</summary>
     [Range(1, 10_000)]
     public int RateLimitCalls { get; set; } = 60;
@@ -33,14 +39,14 @@ public sealed class AgentMcpOptions
     public int RateLimitPeriodSeconds { get; set; } = 60;
 }
 
-/// <summary>A second MCP server of the stand-in: the tokens it accepts from its Agent, the agent API it calls, and the tokens it calls it with.</summary>
+/// <summary>Another MCP server of the stand-in (the Estate health check's, the Customer service agent's): the tokens it accepts from its Agent, the agent API it calls, and the tokens it calls it with.</summary>
 public sealed class HealthCheckServerOptions
 {
     /// <summary>The Agent's tokens as the AppHost's local key signs them. The audience is the agent view's.</summary>
     [Required]
     public LocalTokenOptions Tokens { get; set; } = new();
 
-    /// <summary>The Estate health check's agent API.</summary>
+    /// <summary>The application's agent API: the Estate health check's, or the TMS API's Customer service agent view.</summary>
     [Required]
     public Uri? Api { get; set; }
 

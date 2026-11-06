@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <!-- Only the faults' gate is covered here; the endpoints are tested through the running API in the integration tests and Program.cs is the composition root (coding guidelines §10). -->
-    <Include>[Norvia.Tms.Api]Norvia.Tms.Api.Faults.*</Include>
+    <!-- Only the faults' gate and the agent view are covered here; the endpoints are tested through the running API in the integration tests and Program.cs is the composition root (coding guidelines §10). -->
+    <Include>[Norvia.Tms.Api]Norvia.Tms.Api.Faults.*,[Norvia.Tms.Api]Norvia.Tms.Api.Agents.*</Include>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="AwesomeAssertions" />

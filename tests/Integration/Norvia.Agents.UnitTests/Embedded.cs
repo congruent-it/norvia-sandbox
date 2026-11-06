@@ -21,4 +21,8 @@ internal static class Embedded
     public static string SimulatorPersonasDefinition => Read("agents/simulator-personas.agent.yaml");
 
     public static string HealthCheckTools => Read("agent-mcp/health-check.tools.json");
+
+    public static string CustomerServiceDefinition => Read("agents/customer-service.agent.yaml");
+
+    public static string CustomerServiceTools => Read("agent-mcp/customer-service.tools.json");
 }

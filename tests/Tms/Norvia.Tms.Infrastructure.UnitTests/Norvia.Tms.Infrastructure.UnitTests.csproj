@@ -2,15 +2,16 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <!--
-      Only the namespaces these tests unit test are gated (the rating worker and the Fleet seed directories and horizon job). The rest of TMS Infrastructure is EF Core, SQL and Service Bus
+      Only the namespaces these tests unit test are gated (the rating worker, the Fleet seed directories and horizon job and the Agent client). The rest of TMS Infrastructure is EF Core, SQL and Service Bus
       code, which the API integration tests run against real containers (coding guidelines §10).
     -->
-    <Include>[Norvia.Tms.Infrastructure]Norvia.Tms.Infrastructure.Rating.*,[Norvia.Tms.Infrastructure]Norvia.Tms.Infrastructure.Fleet.*</Include>
+    <Include>[Norvia.Tms.Infrastructure]Norvia.Tms.Infrastructure.Rating.*,[Norvia.Tms.Infrastructure]Norvia.Tms.Infrastructure.Fleet.*,[Norvia.Tms.Infrastructure]Norvia.Tms.Infrastructure.Agents.*</Include>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="AwesomeAssertions" />
     <PackageReference Include="coverlet.msbuild" PrivateAssets="all" />
     <PackageReference Include="Microsoft.Extensions.Diagnostics.Testing" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="NSubstitute" />

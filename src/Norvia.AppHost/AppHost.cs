@@ -924,6 +924,7 @@ else
         var agentMcp = builder.AddProject<Projects.Norvia_Integration_LocalAgentMcp>("agent-mcp")
             .WaitFor(integrationConsole)
             .WaitFor(healthCheck)
+            .WaitFor(tmsApi)
             .WithHttpHealthCheck("/health")
             .WithEnvironment("AgentMcp__Tokens__Issuer", LocalTokens.Issuer)
             .WithEnvironment("AgentMcp__Tokens__Audience", LocalTokens.AgentAudience)
@@ -935,7 +936,21 @@ else
             .WithEnvironment("AgentMcp__HealthCheck__Tokens__Audience", LocalTokens.HealthCheckAgentAudience)
             .WithEnvironment("AgentMcp__HealthCheck__Api", ReferenceExpression.Create($"{healthCheck.GetEndpoint("http")}/agent/v1"))
             .WithEnvironment("AgentMcp__HealthCheck__ApiTokens__Issuer", LocalTokens.Issuer)
-            .WithEnvironment("AgentMcp__HealthCheck__ApiTokens__Audience", LocalTokens.HealthCheckAgentApiAudience);
+            .WithEnvironment("AgentMcp__HealthCheck__ApiTokens__Audience", LocalTokens.HealthCheckAgentApiAudience)
+            // The third server: the Customer service agent's, at /mcp/customer-service. It calls the TMS API's agent view as the Agent's
+            // identity, with a token for the TMS API's audience.
+            .WithEnvironment("AgentMcp__CustomerService__Tokens__Issuer", LocalTokens.Issuer)
+            .WithEnvironment("AgentMcp__CustomerService__Tokens__Audience", LocalTokens.CustomerServiceAgentAudience)
+            .WithEnvironment("AgentMcp__CustomerService__Api", ReferenceExpression.Create($"{tmsApi.GetEndpoint("http")}/v1/agent/customer-service"))
+            .WithEnvironment("AgentMcp__CustomerService__ApiTokens__Issuer", LocalTokens.Issuer)
+            .WithEnvironment("AgentMcp__CustomerService__ApiTokens__Audience", LocalTokens.TmsAudience);
+        tmsWeb
+            .WithEnvironment("Agents__Enabled", "true")
+            .WithEnvironment("Agents__McpAddress", ReferenceExpression.Create($"{agentMcp.GetEndpoint("http")}/mcp/customer-service"))
+            .WithEnvironment("Agents__Tokens__Issuer", LocalTokens.Issuer)
+            .WithEnvironment("Agents__Tokens__Audience", LocalTokens.CustomerServiceAgentAudience)
+            .WithEnvironment("Agents__Tokens__ClientId", LocalTokens.CustomerServiceAgentClientId)
+            .WithEnvironment("Agents__Tokens__Role", LocalTokens.CustomerServiceAgentReadRole);
         healthCheck
             .WithEnvironment("Agents__Enabled", "true")
             .WithEnvironment("Agents__McpAddress", ReferenceExpression.Create($"{agentMcp.GetEndpoint("http")}/mcp/health-check"))
@@ -959,7 +974,7 @@ else
         // A developer's own model deployment in Foundry replaces the scripted fake (Agents:Model:Endpoint, optionally Agents:Model:Deployment).
         if (!string.IsNullOrEmpty(builder.Configuration["Agents:Model:Endpoint"]))
         {
-            foreach (var host in new[] { integrationConsole, healthCheck })
+            foreach (var host in new[] { integrationConsole, healthCheck, tmsWeb })
             {
                 host.WithEnvironment("Agents__Model__Endpoint", builder.Configuration["Agents:Model:Endpoint"]!)
                     .WithEnvironment("Agents__Model__Deployment", builder.Configuration["Agents:Model:Deployment"] ?? string.Empty);
@@ -972,6 +987,9 @@ else
             (agentMcp.Resource, "AgentMcp__ConsoleTokens__SigningKey"),
             (agentMcp.Resource, "AgentMcp__HealthCheck__Tokens__SigningKey"),
             (agentMcp.Resource, "AgentMcp__HealthCheck__ApiTokens__SigningKey"),
+            (agentMcp.Resource, "AgentMcp__CustomerService__Tokens__SigningKey"),
+            (agentMcp.Resource, "AgentMcp__CustomerService__ApiTokens__SigningKey"),
+            (tmsWeb.Resource, "Agents__Tokens__SigningKey"),
             (integrationConsole.Resource, "Agents__Tokens__SigningKey"),
             (integrationConsole.Resource, "Agents__Api__SigningKey"),
             (healthCheck.Resource, "Agents__Tokens__SigningKey"),

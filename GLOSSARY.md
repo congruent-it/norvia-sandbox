@@ -485,7 +485,7 @@ One question put to an Agent, with its tool calls and its answer, identified by 
 _Avoid_: chat, session, conversation (that is Foundry's own record of a run)
 
 **Agent view**:
-An application's narrower, read-only endpoint group for the Agents: statuses, codes, times, numbers and business names, from an allowlist of fields, with no message body. The Integration console's is its agent API (`/agent/v1`), and so is the Estate health check's; an MCP server exposes each operation as a tool (ADR 0040).
+An application's narrower, read-only endpoint group for the Agents: statuses, codes, times, numbers and business names, from an allowlist of fields, with no message body. The Integration console's is its agent API (`/agent/v1`), and so is the Estate health check's; the TMS API's is `/v1/agent/customer-service`, the Customer service agent's view of a Rejected booking, which leaves out the Consignee's name, address and contacts and every file's contents; an MCP server exposes each operation as a tool (ADR 0040).
 _Avoid_: agent endpoint, agent database
 
 **Explain**:
